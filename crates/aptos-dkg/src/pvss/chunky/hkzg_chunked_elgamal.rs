@@ -131,9 +131,9 @@ type LiftedWeightedChunkedElgamal<'a, E> =
 // TODO: note here that we had to put a zero before z_{i,j}, because that's what DeKARTv2 is doing. So maybe
 // it would make more sense to say this is a tuple homomorphism consisting of (lifts of) the
 // DeKARTv2::commitment_homomorphism together with the chunked_elgamal::homomorphism.
-pub type Homomorphism<'a, E> = TupleHomomorphism<LiftedHkzg<'a, E>, LiftedChunkedElgamal<'a, E>>;
+pub type Homomorphism<'a, E> = TupleHomomorphism<LiftedHkzg<'a, E>, LiftedChunkedElgamal<'a, E>, true>;
 pub type WeightedHomomorphism<'a, E> =
-    TupleHomomorphism<LiftedHkzgWeighted<'a, E>, LiftedWeightedChunkedElgamal<'a, E>>;
+    TupleHomomorphism<LiftedHkzgWeighted<'a, E>, LiftedWeightedChunkedElgamal<'a, E>, true>;
 
 pub type Proof<'a, E> = sigma_protocol::Proof<E, Homomorphism<'a, E>>;
 pub type WeightedProof<'a, E> = sigma_protocol::Proof<E, WeightedHomomorphism<'a, E>>;

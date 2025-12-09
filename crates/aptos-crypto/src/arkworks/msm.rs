@@ -10,6 +10,7 @@
 use ark_ec::CurveGroup;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use anyhow::ensure;
+use crate::utils;
 
 /// Input to a (not necessarily fixed-base) multi-scalar multiplication (MSM).
 ///
@@ -36,7 +37,7 @@ pub struct MsmInput<
 /// This exists as a workaround because stable Rust does not yet support default
 /// associated types. (Now we have to do `type MsmInput: IsMsmInput` rather than `type MsmInput = IsMsmInput`)
 /// TODO: we probably don't need this trait, can just do MsmInput<E::Base, E::Scalar> in function signatures???
-pub trait IsMsmInput<B, S> {
+pub trait IsMsmInput<B, S> { // maybe make B and S associated types instead
     /// Returns a reference to the slice of base elements in this MSM input.
     fn bases(&self) -> &[B];
 
@@ -150,4 +151,18 @@ pub fn verify_msm_terms_with_start<C: CurveGroup>(
     ensure!(msm_result == C::ZERO);
 
     Ok(())
+}
+
+/// Verifies that a collection of MSMs are all equal to zero, by combining
+/// them into one big MSM using random linear combination, following the 
+/// Schwartz-Zippel philosophy
+#[allow(non_snake_case)]
+pub fn verify_msm_terms<C: CurveGroup>(
+    msm_terms: Vec<MsmInput<C::Affine, C::ScalarField>>,
+    beta: C::ScalarField,
+) -> anyhow::Result<()>
+{
+    let powers_of_beta = utils::powers(beta, msm_terms.len());
+
+    verify_msm_terms_with_start::<C>(msm_terms, Vec::new(), Vec::new(), powers_of_beta)
 }

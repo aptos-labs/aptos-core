@@ -26,15 +26,15 @@ use aptos_crypto::arkworks::msm::IsMsmInput;
 ///   for batch verification in Σ-protocols.
 pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOutput>> {
     /// The scalar type used in the MSMs.
-    type Scalar: Clone;
+    type Scalar: Clone; // scrap and make associated type of MsmInput
 
     /// The group/base type used in the MSMs. Current instantiations always use E::G1Affine but as explained
     /// in the TODO of doc comment of `fn verify_msm_hom`, we might want to be working with enums here in the future.
-    type Base: Clone;
+    type Base: Clone; // scrap and make associated type of MsmInput
 
     /// Type representing a single MSM input (a set of bases and scalars). Normally, this would default
     /// to `MsmInput<Self::Base, Self::Scalar>`, but stable Rust does not yet support associated type defaults,
-    /// hence we introduce a trait `IsMsmInput` and struct `MsmInput` below.
+    /// hence we introduce a trait `IsMsmInput` and struct `MsmInput` elsewhere.
     type MsmInput: CanonicalSerialize
         + CanonicalDeserialize
         + Clone
@@ -62,8 +62,7 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
     ///
     /// ### TODO
     /// - The use of `IntoIterator` leads to cloning, which might not be very efficient
-    type CodomainShape<T>: EntrywiseMap<T, Output<T> = Self::CodomainShape<T>>
-        + IntoIterator<Item = T>
+    type CodomainShape<T>: IntoIterator<Item = T>
         + CanonicalSerialize
         + CanonicalDeserialize
         + Clone
@@ -80,7 +79,7 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
 
     /// Evaluates a single MSM instance given slices of bases and scalars. Current instantiations always use E::G1Affine
     /// for the base, but we might want to use enums for the base and output in the future.
-    fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput;
+    fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput; // why not Self::MsmInput as input?
 
     /// Applies `msm_eval` elementwise to a collection of MSM inputs.
     fn apply_msm(
@@ -94,6 +93,102 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
         >,
     {
         msms.map(|msm_input| Self::msm_eval(&msm_input.bases(), &msm_input.scalars()))
+    }
+}
+
+// dude je moet iets algemeners maken... dat alleen msm terms bouwt ofzo... hmmmm
+pub trait TraitTwo: homomorphism::Trait<Codomain = (Self::FirstCodomainShape<Self::FirstMsmOutput>, Self::SecondCodomainShape<Self::SecondMsmOutput>)> {
+    /// The scalar type used in the MSMs.
+    type Scalar: Clone;
+
+    /// The group/base type used in the MSMs. Current instantiations always use E::G1Affine but as explained
+    /// in the TODO of doc comment of `fn verify_msm_hom`, we might want to be working with enums here in the future.
+    type FirstBase: Clone;
+    type SecondBase: Clone;
+
+    /// Type representing a single MSM input (a set of bases and scalars). Normally, this would default
+    /// to `MsmInput<Self::Base, Self::Scalar>`, but stable Rust does not yet support associated type defaults,
+    /// hence we introduce a trait `IsMsmInput` and struct `MsmInput` below.
+    type FirstMsmInput: CanonicalSerialize
+        + CanonicalDeserialize
+        + Clone
+        + IsMsmInput<Self::FirstBase, Self::Scalar>
+        + Debug
+        + Eq;
+    type SecondMsmInput: CanonicalSerialize
+        + CanonicalDeserialize
+        + Clone
+        + IsMsmInput<Self::SecondBase, Self::Scalar>
+        + Debug
+        + Eq;
+
+    /// The output type of evaluating an MSM. `Codomain` should equal `CodomainShape<MsmOutput>`, in the current version
+    /// of the code. In a future version where MsmOutput might be an enum (E::G1 or E::G2), Codomain should probably follow suit.
+    /// (TODO: Think this over)
+    type FirstMsmOutput: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
+    type SecondMsmOutput: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
+
+    /// Represents the **shape** of the homomorphism's output, parameterized by an inner type `T`.
+    ///
+    /// ### Overview
+    /// The codomain of a homomorphism is often a **nested structure** — for example, `Vec<Vec<E::G1>>`.
+    /// In the case of a `FixedBaseMsms`, the homomorphism then factorizes as:
+    ///
+    /// Domain ─▶ Vec<Vec<MsmInput>> ─▶ Vec<Vec<E::G1>> = Codomain
+    ///
+    /// For **efficient batch verification**, it’s useful to collect all MSM terms together and
+    /// combine them with the sigma proof’s *commitment* (the first prover message) and the public statement.
+    /// To do this consistently, we need a uniform way to iterate over nested structures such as `Vec<Vec<T>>`
+    /// to access all elements in a **consistent** order.
+    ///
+    /// ### TODO
+    /// - The use of `IntoIterator` leads to cloning, which might not be very efficient
+    type FirstCodomainShape<T>: IntoIterator<Item = T>
+        + CanonicalSerialize
+        + CanonicalDeserialize
+        + Clone
+        + Debug
+        + Eq
+    where
+        T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
+    type SecondCodomainShape<T>: IntoIterator<Item = T>
+        + CanonicalSerialize
+        + CanonicalDeserialize
+        + Clone
+        + Debug
+        + Eq
+    where
+        T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
+
+    /// Returns the MSM terms corresponding to a given homomorphism input.
+    ///
+    /// The result is structured such that applying MSM evaluation elementwise
+    /// yields the homomorphism’s output.
+    fn msm_terms(&self, input: &Self::Domain) -> (Self::FirstCodomainShape<Self::FirstMsmInput>, Self::SecondCodomainShape<Self::SecondMsmInput>);
+
+    /// Evaluates a single MSM instance given slices of bases and scalars. Current instantiations always use E::G1Affine
+    /// for the base, but we might want to use enums for the base and output in the future.
+    fn first_msm_eval(bases: &[Self::FirstBase], scalars: &[Self::Scalar]) -> Self::FirstMsmOutput;
+    fn second_msm_eval(bases: &[Self::SecondBase], scalars: &[Self::Scalar]) -> Self::SecondMsmOutput;
+
+    /// Applies `msm_eval` elementwise to a collection of MSM inputs.
+    fn apply_msm(
+        &self,
+        msms: (Self::FirstCodomainShape<Self::FirstMsmInput>, Self::SecondCodomainShape<Self::SecondMsmInput>),
+    ) -> (Self::FirstCodomainShape<Self::FirstMsmOutput>, Self::SecondCodomainShape<Self::SecondMsmOutput>)
+    where
+        Self::FirstCodomainShape<Self::FirstMsmInput>: EntrywiseMap<
+            Self::FirstMsmInput,
+            Output<Self::FirstMsmOutput> = Self::FirstCodomainShape<Self::FirstMsmOutput>,
+        >,
+        Self::SecondCodomainShape<Self::SecondMsmInput>: EntrywiseMap<
+            Self::SecondMsmInput,
+            Output<Self::SecondMsmOutput> = Self::SecondCodomainShape<Self::SecondMsmOutput>,
+        >,
+    {
+        (msms.0.map(|msm_input| Self::first_msm_eval(&msm_input.bases(), &msm_input.scalars())), msms.1.map(|msm_input| Self::second_msm_eval(&msm_input.bases(), &msm_input.scalars())))
+
+        //msms.map(|first_msm_input, second_msm_input| (Self::first_msm_eval(&first_msm_input.bases(), &first_msm_input.scalars()), Self::second_msm_eval(&second_msm_input.bases(), &second_msm_input.scalars())))
     }
 }
 

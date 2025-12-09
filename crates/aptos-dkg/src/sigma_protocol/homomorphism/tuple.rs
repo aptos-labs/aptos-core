@@ -28,7 +28,7 @@ use std::fmt::Debug;
 /// In category-theoretic terms, this is the composition of the diagonal map
 /// `Δ: Domain -> Domain × Domain` with the product map `h1 × h2`.
 #[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
-pub struct TupleHomomorphism<H1, H2>
+pub struct TupleHomomorphism<H1, H2, const HOMOG: bool>
 where
     H1: homomorphism::Trait,
     H2: homomorphism::Trait<Domain = H1::Domain>,
@@ -43,7 +43,7 @@ where
 ///
 /// In other words, for input `x: Domain`, this produces
 /// `(hom1(x), hom2(x))`. For technical reasons, we then put the output inside a wrapper.
-impl<H1, H2> homomorphism::Trait for TupleHomomorphism<H1, H2>
+impl<H1, H2, const HOMOG: bool> homomorphism::Trait for TupleHomomorphism<H1, H2, HOMOG>
 where
     H1: homomorphism::Trait,
     H2: homomorphism::Trait<Domain = H1::Domain>,
@@ -153,7 +153,7 @@ where
 /// not necessary through enums.
 ///
 /// The codomain shapes of the two homomorphisms are combined using `TupleCodomainShape`.
-impl<H1, H2> fixed_base_msms::Trait for TupleHomomorphism<H1, H2>
+impl<H1, H2> fixed_base_msms::Trait for TupleHomomorphism<H1, H2, true>
 where
     H1: fixed_base_msms::Trait,
     H2: fixed_base_msms::Trait<
@@ -185,12 +185,14 @@ where
     }
 }
 
-impl<E: Pairing, H1, H2> sigma_protocol::Trait<E> for TupleHomomorphism<H1, H2>
+impl<E: Pairing, H1, H2> sigma_protocol::Trait<E> for TupleHomomorphism<H1, H2, true>
 where
     H1: sigma_protocol::Trait<E>,
     H2: sigma_protocol::Trait<E>,
     H2: fixed_base_msms::Trait<Domain = H1::Domain, MsmInput = H1::MsmInput>,
 {
+    /// Concatenate the DSTs of the two homomorphisms, plus some
+    /// additional metadata to ensure uniqueness.
     fn dst(&self) -> Vec<u8> {
         let mut dst = Vec::new();
 
@@ -207,5 +209,37 @@ where
         dst.extend_from_slice(b")");
 
         dst
+    }
+}
+
+// mwa je moet gewoon een aparte fixed_base_msms::Trait gaan maken... dan is HOMOG misschien niet meer nodig
+impl<H1, H2> fixed_base_msms::Trait for TupleHomomorphism<H1, H2, false>
+where
+    H1: fixed_base_msms::Trait,
+    H2: fixed_base_msms::Trait<
+        Domain = H1::Domain,
+        Scalar = H1::Scalar,
+        MsmInput = H1::MsmInput,
+        MsmOutput = H1::MsmOutput,
+    >,
+{
+    type Base = H1::Base;
+    type CodomainShape<T>
+        = TupleCodomainShape<H1::CodomainShape<T>, H2::CodomainShape<T>>
+    where
+        T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
+    type MsmInput = H1::MsmInput;
+    type MsmOutput = H1::MsmOutput;
+    type Scalar = H1::Scalar;
+
+    /// Returns the MSM terms for each homomorphism, combined into a tuple.
+    fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
+        let terms1 = self.hom1.msm_terms(input);
+        let terms2 = self.hom2.msm_terms(input);
+        TupleCodomainShape(terms1, terms2)
+    }
+
+    fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
+        H1::msm_eval(bases, scalars) // !!!!!!!!!!!!!! doesn't make sense, should put `fn eval` back,,, which is already in HomTrait
     }
 }

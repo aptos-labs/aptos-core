@@ -95,7 +95,7 @@ mod schnorr {
 mod chaum_pedersen {
     use super::{schnorr::*, *};
 
-    pub type ChaumPedersen<E> = TupleHomomorphism<Schnorr<E>, Schnorr<E>>;
+    pub type ChaumPedersen<E> = TupleHomomorphism<Schnorr<E>, Schnorr<E>, true>;
 
     // Implementing e.g. Default here would require a wrapper, but then sigma_protocol::Trait would have to get re-implemented...
     #[allow(non_snake_case)]

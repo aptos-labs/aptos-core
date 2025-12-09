@@ -13,9 +13,10 @@ macro_rules! dealt_secret_key_share_impl {
         /// The size of a serialized *dealt secret key share*.
         const DEALT_SK_SHARE_NUM_BYTES: usize = DEALT_SK_NUM_BYTES;
 
-        /// A player's *share* of the secret key that was dealt via the PVSS transcript.
+        /// A player's *share* of the secret key that was dealt via the PVSS transcript. Wrapping around 
+        /// `DealtSecretKey` ensures they have the same type; it is irrelevant otherwise
         #[derive(DeserializeKey, SerializeKey, SilentDisplay, SilentDebug, PartialEq, Clone)]
-        pub struct DealtSecretKeyShare(pub(crate) DealtSecretKey);
+        pub struct DealtSecretKeyShare(DealtSecretKey);
 
         #[cfg(feature = "assert-private-keys-not-cloneable")]
         static_assertions::assert_not_impl_any!(DealtSecretKeyShare: Clone);
