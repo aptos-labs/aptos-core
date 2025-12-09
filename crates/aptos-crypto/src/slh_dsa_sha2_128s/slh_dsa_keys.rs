@@ -29,8 +29,8 @@ static_assertions::assert_not_impl_any!(PrivateKey: Clone);
 #[cfg(any(test, feature = "cloneable-private-keys"))]
 impl Clone for PrivateKey {
     fn clone(&self) -> Self {
-        let serialized: &[u8] = &(self.to_bytes());
-        PrivateKey::try_from(serialized).unwrap()
+        let sk_bytes: &[u8] = &(self.to_bytes());
+        PrivateKey::try_from(sk_bytes).unwrap()
     }
 }
 
@@ -52,22 +52,40 @@ impl PrivateKey {
     pub const LENGTH: usize = PRIVATE_KEY_LENGTH;
 
     /// Serialize a PrivateKey
+    /// Returns only the first PRIVATE_KEY_LENGTH bytes (48 bytes), which contain
+    /// the SK seed, PRF seed, and PK seed. The PK root is excluded as it's part
+    /// of the public key material.
     pub fn to_bytes(&self) -> Vec<u8> {
-        self.0.to_bytes().to_vec()
+        let full_bytes = self.0.to_bytes();
+        // Extract only the first PRIVATE_KEY_LENGTH bytes (the three 16-byte seeds)
+        // The full serialization includes the PK root, which we exclude
+        full_bytes[..PRIVATE_KEY_LENGTH.min(full_bytes.len())].to_vec()
     }
 
     /// Deserialize a PrivateKey without any validation checks apart from expected key size.
     /// For SLH-DSA, we use slh_keygen_internal with the seed as sk_seed, sk_prf, and pk_seed.
-    /// Since we only have a 32-byte seed, we use it for all three parameters.
+    /// The input bytes should be PRIVATE_KEY_LENGTH (48 bytes), which we split into three 16-byte seeds.
     pub(crate) fn from_bytes_unchecked(
         bytes: &[u8],
     ) -> std::result::Result<PrivateKey, CryptoMaterialError> {
         if bytes.len() != PRIVATE_KEY_LENGTH {
             return Err(CryptoMaterialError::WrongLengthError);
         }
-        // SLH-DSA private key generation requires sk_seed, sk_prf, and pk_seed
-        // For simplicity, we use the same seed for all three (this is a common pattern)
-        let signing_key = SlhDsaSigningKey::<Sha2_128s>::slh_keygen_internal(bytes, bytes, bytes);
+        // SLH-DSA private key generation requires sk_seed, sk_prf, and pk_seed (each 16 bytes)
+        // Split the 48-byte input into three 16-byte seeds
+        let sk_seed: [u8; 16] = bytes[0..16]
+            .try_into()
+            .map_err(|_| CryptoMaterialError::WrongLengthError)?;
+        let sk_prf: [u8; 16] = bytes[16..32]
+            .try_into()
+            .map_err(|_| CryptoMaterialError::WrongLengthError)?;
+        let pk_seed: [u8; 16] = bytes[32..48]
+            .try_into()
+            .map_err(|_| CryptoMaterialError::WrongLengthError)?;
+
+        let signing_key = SlhDsaSigningKey::<Sha2_128s>::slh_keygen_internal(
+            &sk_seed, &sk_prf, &pk_seed,
+        );
         Ok(PrivateKey(signing_key))
     }
 
@@ -297,5 +315,113 @@ impl proptest::arbitrary::Arbitrary for PublicKey {
         crate::test_utils::uniform_keypair_strategy::<PrivateKey, PublicKey>()
             .prop_map(|v| v.public_key)
             .boxed()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::traits::{Signature as SignatureTrait, Uniform};
+    use rand::{rngs::StdRng, SeedableRng};
+
+    #[test]
+    fn test_private_key_serialization_wrong_length() {
+        // Test that deserializing with wrong length fails
+        let too_short = vec![0u8; PRIVATE_KEY_LENGTH - 1];
+        assert!(
+            PrivateKey::try_from(&too_short[..]).is_err(),
+            "Should reject keys that are too short"
+        );
+
+        let too_long = vec![0u8; PRIVATE_KEY_LENGTH + 1];
+        assert!(
+            PrivateKey::try_from(&too_long[..]).is_err(),
+            "Should reject keys that are too long"
+        );
+    }
+
+    #[test]
+    fn test_private_key_serialization_different_keys() {
+        // Test that different bytes produce different keys
+        let sk_bytes_1 = vec![0x01u8; PRIVATE_KEY_LENGTH];
+        let sk_bytes_2 = vec![0x02u8; PRIVATE_KEY_LENGTH];
+
+        let key1 = PrivateKey::try_from(&sk_bytes_1[..])
+            .expect("Should create key from sk_bytes_1");
+        let key2 = PrivateKey::try_from(&sk_bytes_2[..])
+            .expect("Should create key from sk_bytes_2");
+
+        // Get public keys
+        let pubkey1: PublicKey = (&key1).into();
+        let pubkey2: PublicKey = (&key2).into();
+
+        // Different bytes should produce different public keys
+        assert_ne!(
+            pubkey1.to_bytes(),
+            pubkey2.to_bytes(),
+            "Different seed bytes should produce different public keys"
+        );
+    }
+
+    #[test]
+    fn test_private_key_generate_and_use() {
+        // Test that generated keys can be used for signing and verification
+        let mut rng = StdRng::from_seed([0u8; 32]);
+        let key = PrivateKey::generate(&mut rng);
+
+        let pubkey: PublicKey = (&key).into();
+        let test_message = b"test message";
+
+        // Sign the message
+        let signature = key.sign_arbitrary_message(test_message);
+
+        // Verify the signature
+        assert!(
+            signature.verify_arbitrary_msg(test_message, &pubkey).is_ok(),
+            "Generated key should produce valid signatures"
+        );
+
+        // Verify wrong message fails
+        assert!(
+            signature.verify_arbitrary_msg(b"wrong message", &pubkey).is_err(),
+            "Signature should not verify for wrong message"
+        );
+    }
+
+    #[test]
+    fn test_private_key_serialization_round_trip() {
+        // Create a random key
+        // Test that generated keys can be used for signing and verification
+        let mut rng = StdRng::from_seed([0u8; 32]);
+        let original_sk = PrivateKey::generate(&mut rng);
+
+        // Serialize the key
+        let sk_bytes = original_sk.to_bytes();
+
+        // Verify the sk_bytes length is PRIVATE_KEY_LENGTH
+        assert_eq!(
+            sk_bytes.len(),
+            PRIVATE_KEY_LENGTH,
+            "Serialized key should be exactly PRIVATE_KEY_LENGTH bytes"
+        );
+
+        // Deserialize the key
+        let deserialized_sk = PrivateKey::try_from(&sk_bytes[..])
+            .expect("Should be able to deserialize key from sk_bytes bytes");
+
+        // Verify keys are the same and produce the same public key
+        assert_eq!(
+            original_sk.to_bytes(),
+            deserialized_sk.to_bytes(),
+            "Keys should be the same"
+        );
+
+        let original_pubkey: PublicKey = (&original_sk).into();
+        let deserialized_pubkey: PublicKey = (&deserialized_sk).into();
+        assert_eq!(
+            original_pubkey.to_bytes(),
+            deserialized_pubkey.to_bytes(),
+            "Deserialized key should produce the same public key"
+        );
     }
 }
