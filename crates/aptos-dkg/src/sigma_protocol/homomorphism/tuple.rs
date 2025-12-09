@@ -8,12 +8,12 @@ use crate::{
         homomorphism::{fixed_base_msms, EntrywiseMap},
     },
 };
-use ark_ec::pairing::Pairing;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid,
 };
 pub use ark_std::io::Write;
 use std::fmt::Debug;
+use ark_ec::CurveGroup;
 
 /// `TupleHomomorphism` combines two homomorphisms with the same domain
 /// into a single homomorphism that outputs a tuple of codomains.
@@ -181,10 +181,10 @@ where
     }
 }
 
-impl<E: Pairing, H1, H2> sigma_protocol::Trait<E> for TupleHomomorphism<H1, H2, true>
+impl<C: CurveGroup, H1, H2> sigma_protocol::Trait<C> for TupleHomomorphism<H1, H2, true>
 where
-    H1: sigma_protocol::Trait<E>,
-    H2: sigma_protocol::Trait<E>,
+    H1: sigma_protocol::Trait<C>,
+    H2: sigma_protocol::Trait<C>,
     H2: fixed_base_msms::Trait<Domain = H1::Domain, MsmInput = H1::MsmInput>,
 {
     /// Concatenate the DSTs of the two homomorphisms, plus some

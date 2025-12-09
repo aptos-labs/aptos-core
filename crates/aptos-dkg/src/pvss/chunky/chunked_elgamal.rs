@@ -392,13 +392,13 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for WeightedHomomorphism<'a, E> {
     }
 }
 
-impl<'a, E: Pairing> sigma_protocol::Trait<E> for Homomorphism<'a, E> {
+impl<'a, E: Pairing> sigma_protocol::Trait<E::G1> for Homomorphism<'a, E> {
     fn dst(&self) -> Vec<u8> {
         DST.to_vec()
     }
 }
 
-impl<'a, E: Pairing> sigma_protocol::Trait<E> for WeightedHomomorphism<'a, E> {
+impl<'a, E: Pairing> sigma_protocol::Trait<E::G1> for WeightedHomomorphism<'a, E> {
     fn dst(&self) -> Vec<u8> {
         let mut result = b"WEIGHTED_".to_vec();
         result.extend(DST);

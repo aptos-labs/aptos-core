@@ -135,8 +135,8 @@ pub type Homomorphism<'a, E> = TupleHomomorphism<LiftedHkzg<'a, E>, LiftedChunke
 pub type WeightedHomomorphism<'a, E> =
     TupleHomomorphism<LiftedHkzgWeighted<'a, E>, LiftedWeightedChunkedElgamal<'a, E>, true>;
 
-pub type Proof<'a, E> = sigma_protocol::Proof<E, Homomorphism<'a, E>>;
-pub type WeightedProof<'a, E> = sigma_protocol::Proof<E, WeightedHomomorphism<'a, E>>;
+pub type Proof<'a, E> = sigma_protocol::Proof<<E as Pairing>::G1, Homomorphism<'a, E>>;
+pub type WeightedProof<'a, E> = sigma_protocol::Proof<<E as Pairing>::G1, WeightedHomomorphism<'a, E>>;
 
 impl<'a, E: Pairing> Proof<'a, E> {
     /// Generates a random looking proof (but not a valid one).

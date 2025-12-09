@@ -33,7 +33,7 @@ use ark_ff::PrimeField;
 #[derive(CanonicalSerialize, Debug, PartialEq, Eq, Clone, CanonicalDeserialize)]
 pub struct Proof<E: Pairing> {
     hatC: E::G1,
-    pi_PoK: sigma_protocol::Proof<E, two_term_msm::Homomorphism<E>>,
+    pi_PoK: sigma_protocol::Proof<E::G1, two_term_msm::Homomorphism<E::G1>>,
     Cs: Vec<E::G1>, // has length ell
     D: E::G1,
     a: E::ScalarField,
@@ -390,7 +390,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         );
 
         // Step 3b
-        fiat_shamir::append_sigma_proof(&mut fs_t, &pi_PoK);
+        fiat_shamir::append_sigma_proof::<E>(&mut fs_t, &pi_PoK);
 
         // Step 4a
         let rs: Vec<E::ScalarField> = (0..ell).map(|_| sample_field_element(rng)).collect();
@@ -683,7 +683,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         )?;
 
         // Step 4a
-        fiat_shamir::append_sigma_proof(&mut fs_t, &pi_PoK);
+        fiat_shamir::append_sigma_proof::<E>(&mut fs_t, &pi_PoK);
 
         // Step 4b
         fiat_shamir::append_f_j_commitments::<E>(&mut fs_t, &Cs);
@@ -807,7 +807,7 @@ mod fiat_shamir {
     #[allow(non_snake_case)]
     pub(crate) fn append_sigma_proof<E: Pairing>(
         fs_transcript: &mut Transcript,
-        pi_PoK: &sigma_protocol::Proof<E, two_term_msm::Homomorphism<E>>,
+        pi_PoK: &sigma_protocol::Proof<E::G1, two_term_msm::Homomorphism<E::G1>>,
     ) {
         <Transcript as RangeProof<E, Proof<E>>>::append_sigma_proof(fs_transcript, pi_PoK);
     }
@@ -883,9 +883,9 @@ pub mod two_term_msm {
     use aptos_crypto_derive::SigmaProtocolWitness;
     use aptos_crypto::arkworks::msm::IsMsmInput;
     pub use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
-    pub type Proof<E> = sigma_protocol::Proof<E, Homomorphism<E>>;
+    pub type Proof<C> = sigma_protocol::Proof<C, Homomorphism<C>>;
 
-    impl<E: Pairing> Proof<E> {
+    impl<C: CurveGroup> Proof<C> {
         /// Generates a random looking proof (but not a valid one).
         /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
         pub fn generate<R: rand::Rng + rand::CryptoRng>(rng: &mut R) -> Self {
@@ -906,9 +906,9 @@ pub mod two_term_msm {
     /// This structure defines a map from two scalars to one group element:
     /// `f(x1, x2) = base_1 * x1 + base_2 * x2`.
     #[derive(CanonicalSerialize, Clone, Debug, PartialEq, Eq)]
-    pub struct Homomorphism<E: Pairing> {
-        pub base_1: E::G1Affine,
-        pub base_2: E::G1Affine,
+    pub struct Homomorphism<C: CurveGroup> {
+        pub base_1: C::Affine,
+        pub base_2: C::Affine,
     }
 
     #[derive(
@@ -919,9 +919,9 @@ pub mod two_term_msm {
         pub hiding_kzg_randomness: Scalar<F>,
     }
 
-    impl<E: Pairing> homomorphism::Trait for Homomorphism<E> {
-        type Codomain = CodomainShape<E::G1>;
-        type Domain = Witness<E::ScalarField>;
+    impl<C: CurveGroup> homomorphism::Trait for Homomorphism<C> {
+        type Codomain = CodomainShape<C>;
+        type Domain = Witness<C::ScalarField>;
 
         fn apply(&self, input: &Self::Domain) -> Self::Codomain {
             // Not doing `self.apply_msm(self.msm_terms(input))` because E::G1::msm is slower!
@@ -933,13 +933,13 @@ pub mod two_term_msm {
         }
     }
 
-    impl<E: Pairing> fixed_base_msms::Trait for Homomorphism<E> {
+    impl<C: CurveGroup> fixed_base_msms::Trait for Homomorphism<C> {
         type CodomainShape<T>
             = CodomainShape<T>
         where
             T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq + Debug;
-        type MsmInput = MsmInput<E::G1Affine, E::ScalarField>;
-        type MsmOutput = E::G1;
+        type MsmInput = MsmInput<C::Affine, C::ScalarField>;
+        type MsmOutput = C;
 
         fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
             let mut scalars = Vec::with_capacity(2);
@@ -954,11 +954,11 @@ pub mod two_term_msm {
         }
 
         fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
-            E::G1::msm(input.bases(), input.scalars()).expect("MSM failed in TwoTermMSM")
+            C::msm(input.bases(), input.scalars()).expect("MSM failed in TwoTermMSM")
         }
     }
 
-    impl<E: Pairing> sigma_protocol::Trait<E> for Homomorphism<E> {
+    impl<C: CurveGroup> sigma_protocol::Trait<C> for Homomorphism<C> {
         fn dst(&self) -> Vec<u8> {
             b"DEKART_V2_SIGMA_PROTOCOL".to_vec()
         }

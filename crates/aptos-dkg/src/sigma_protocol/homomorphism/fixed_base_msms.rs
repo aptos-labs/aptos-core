@@ -5,10 +5,10 @@ use crate::{
     sigma_protocol,
     sigma_protocol::{homomorphism, homomorphism::EntrywiseMap, Witness},
 };
-use ark_ec::pairing::Pairing;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use std::fmt::Debug;
 use aptos_crypto::arkworks::msm::IsMsmInput;
+use ark_ec::CurveGroup;
 
 /// A `FixedBaseMsms` instance represents a homomorphism whose outputs can be expressed as
 /// one or more **fixed-base multi-scalar multiplications (MSMs)**, sharing consistent base and scalar types.
@@ -202,11 +202,11 @@ where
     }
 }
 
-impl<E: Pairing, H, LargerDomain> sigma_protocol::Trait<E>
+impl<C: CurveGroup, H, LargerDomain> sigma_protocol::Trait<C>
     for homomorphism::LiftHomomorphism<H, LargerDomain>
 where
-    H: sigma_protocol::Trait<E>,
-    LargerDomain: Witness<E::ScalarField>,
+    H: sigma_protocol::Trait<C>,
+    LargerDomain: Witness<C::ScalarField>,
 {
     fn dst(&self) -> Vec<u8> {
         let mut dst = Vec::new();
