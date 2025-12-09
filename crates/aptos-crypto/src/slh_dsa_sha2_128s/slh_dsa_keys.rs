@@ -424,4 +424,33 @@ mod tests {
             "Deserialized key should produce the same public key"
         );
     }
+
+    #[test]
+    fn test_public_key_serialization_round_trip() {
+        // Pick a random SK
+        let mut rng = StdRng::from_seed([0u8; 32]);
+        let sk = PrivateKey::generate(&mut rng);
+
+        // Get its PK
+        let original_pk: PublicKey = (&sk).into();
+
+        // Serialize the PK
+        let pk_bytes = original_pk.to_bytes();
+
+        // Verify the pk_bytes length is PUBLIC_KEY_LENGTH
+        assert_eq!(
+            pk_bytes.len(),
+            PUBLIC_KEY_LENGTH,
+            "Serialized public key should be exactly PUBLIC_KEY_LENGTH bytes"
+        );
+
+        // Deserialize it back
+        let deserialized_pk = PublicKey::try_from(&pk_bytes[..])
+            .expect("Should be able to deserialize public key from bytes");
+
+        assert_eq!(
+            original_pk, deserialized_pk,
+            "Deserialized public key should be equal to the original"
+        );
+    }
 }
