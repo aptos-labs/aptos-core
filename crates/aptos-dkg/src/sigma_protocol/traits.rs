@@ -24,9 +24,8 @@ use std::{fmt::Debug, io::Write};
 pub trait Trait<E: Pairing>:
     fixed_base_msms::Trait<
         Domain: Witness<E>,
-        Scalar = E::ScalarField,
-        Base = E::G1Affine,
         MsmOutput = E::G1,
+        MsmInput: IsMsmInput<Base = E::G1Affine, Scalar= E::ScalarField>,
     > + Sized
     + CanonicalSerialize
 {
@@ -67,14 +66,14 @@ pub trait Trait<E: Pairing>:
         Ok(())
     }
 
-    // Returns the MSM terms that verify needs
+    // Returns the MSM terms that `verify()` needs
     #[allow(non_snake_case)]
     fn msm_terms_for_verify<C: Serialize, H>(
         &self,
         public_statement: &Self::Codomain,
         proof: &Proof<E, H>,
         cntxt: &C,
-    ) -> (Vec<Self::Base>, Vec<Self::Scalar>)
+    ) -> (Vec<<Self::MsmInput as IsMsmInput>::Base>, Vec<<Self::MsmInput as IsMsmInput>::Scalar>)
     where
         H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>,
         {
@@ -98,12 +97,12 @@ pub trait Trait<E: Pairing>:
             // Instead, we follow the simple approach:
             let mut rng = ark_std::rand::thread_rng(); // TODO: make this part of the function input?
             let beta = E::ScalarField::rand(&mut rng);
-            let len = public_statement.clone().into_iter().count();
+            let len = public_statement.clone().into_iter().count(); // hmm maybe pass the into_iter version in combine_msm_terms?
             let powers_of_betas = utils::powers(beta, len);
 
             let msm_terms_of_response = self.msm_terms(&proof.z);
 
-            let (bases, scalars) = combine_msm_terms::<E, Self, <Self as fixed_base_msms::Trait>::MsmInput>(
+            let (bases, scalars) = combine_msm_terms::<E, Self>(
                 msm_terms_of_response.into_iter().collect(),
                 prover_first_message,
                 public_statement,
@@ -689,8 +688,8 @@ where
 /// is useful for combining with the MSM terms of other protocols, but note that beta powers are already being
 /// added here because it's convenient (and slightly faster) to do that when the c factor is being added
 #[allow(non_snake_case)]
-fn combine_msm_terms<E, H, M: IsMsmInput<E::G1Affine, E::ScalarField>>( // can't we associate M to H?
-    msm_terms: Vec<M>,
+fn combine_msm_terms<E, H>( // can't we associate M to H?
+    msm_terms: Vec<H::MsmInput>,
     prover_first_message: &H::Codomain,
     statement: &H::Codomain,
     powers_of_beta: Vec<E::ScalarField>,
@@ -699,11 +698,10 @@ fn combine_msm_terms<E, H, M: IsMsmInput<E::G1Affine, E::ScalarField>>( // can't
 where
     E: Pairing,
     H: fixed_base_msms::Trait<
-        // Scalar = E::ScalarField,
-        Base = E::G1Affine,
         MsmOutput = E::G1,
     >,
     H::Codomain: Clone + IntoIterator,
+    H::MsmInput: IsMsmInput<Base = E::G1Affine, Scalar= E::ScalarField>,
 {
     // let len = statement.clone().into_iter().count() + excess_betas;
     // let powers_of_betas = utils::powers(beta, len);

@@ -158,20 +158,16 @@ where
     H1: fixed_base_msms::Trait,
     H2: fixed_base_msms::Trait<
         Domain = H1::Domain,
-        Scalar = H1::Scalar,
-        Base = H1::Base,
         MsmInput = H1::MsmInput,
         MsmOutput = H1::MsmOutput,
     >,
 {
-    type Base = H1::Base;
     type CodomainShape<T>
         = TupleCodomainShape<H1::CodomainShape<T>, H2::CodomainShape<T>>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
     type MsmInput = H1::MsmInput;
     type MsmOutput = H1::MsmOutput;
-    type Scalar = H1::Scalar;
 
     /// Returns the MSM terms for each homomorphism, combined into a tuple.
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
@@ -180,8 +176,8 @@ where
         TupleCodomainShape(terms1, terms2)
     }
 
-    fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
-        H1::msm_eval(bases, scalars)
+    fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
+        H1::msm_eval(input)
     }
 }
 
@@ -218,19 +214,16 @@ where
     H1: fixed_base_msms::Trait,
     H2: fixed_base_msms::Trait<
         Domain = H1::Domain,
-        Scalar = H1::Scalar,
         MsmInput = H1::MsmInput,
         MsmOutput = H1::MsmOutput,
     >,
 {
-    type Base = H1::Base;
     type CodomainShape<T>
         = TupleCodomainShape<H1::CodomainShape<T>, H2::CodomainShape<T>>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
     type MsmInput = H1::MsmInput;
     type MsmOutput = H1::MsmOutput;
-    type Scalar = H1::Scalar;
 
     /// Returns the MSM terms for each homomorphism, combined into a tuple.
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
@@ -239,7 +232,7 @@ where
         TupleCodomainShape(terms1, terms2)
     }
 
-    fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
-        H1::msm_eval(bases, scalars) // !!!!!!!!!!!!!! doesn't make sense, should put `fn eval` back,,, which is already in HomTrait
+    fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
+        H1::msm_eval(input) // !!!!!!!!!!!!!! doesn't make sense, should put `fn eval` back,,, which is already in HomTrait
     }
 }

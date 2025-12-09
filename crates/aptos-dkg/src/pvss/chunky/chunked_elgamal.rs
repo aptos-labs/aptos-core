@@ -15,6 +15,7 @@ use ark_serialize::{
 };
 use ark_std::fmt::Debug;
 use aptos_crypto::arkworks::msm::MsmInput;
+use aptos_crypto::arkworks::msm::IsMsmInput;
 
 pub const DST: &[u8; 35] = b"APTOS_CHUNKED_ELGAMAL_GENERATOR_DST"; // This is used to create public parameters, see `default()` below
 
@@ -269,14 +270,12 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator
 
 #[allow(non_snake_case)]
 impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
-    type Base = E::G1Affine;
     type CodomainShape<T>
         = CodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-    type MsmInput = MsmInput<Self::Base, Self::Scalar>;
+    type MsmInput = MsmInput<E::G1Affine, E::ScalarField>;
     type MsmOutput = E::G1;
-    type Scalar = E::ScalarField;
 
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
         // C_{i,j} = z_{i,j} * G_1 + r_j * ek[i]
@@ -306,8 +305,8 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
         }
     }
 
-    fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
-        E::G1::msm(bases, scalars).expect("MSM failed in ChunkedElgamal")
+    fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
+        E::G1::msm(input.bases(), input.scalars()).expect("MSM failed in ChunkedElgamal")
     }
 }
 
@@ -348,14 +347,12 @@ pub fn chunks_vec_msm_terms<E: Pairing>(
 
 #[allow(non_snake_case)]
 impl<'a, E: Pairing> fixed_base_msms::Trait for WeightedHomomorphism<'a, E> {
-    type Base = E::G1Affine;
     type CodomainShape<T>
         = WeightedCodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-    type MsmInput = MsmInput<Self::Base, Self::Scalar>;
+    type MsmInput = MsmInput<E::G1Affine, E::ScalarField>;
     type MsmOutput = E::G1;
-    type Scalar = E::ScalarField;
 
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
         // C_{i,j} = z_{i,j} * G_1 + r_j * ek[i]
@@ -390,8 +387,8 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for WeightedHomomorphism<'a, E> {
         }
     }
 
-    fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
-        E::G1::msm(bases, scalars).expect("MSM failed in ChunkedElgamal")
+    fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
+        E::G1::msm(input.bases(), input.scalars()).expect("MSM failed in ChunkedElgamal")
     }
 }
 

@@ -16,6 +16,7 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::thread_rng;
 use std::fmt::Debug;
 use aptos_crypto::arkworks::msm::MsmInput;
+use aptos_crypto::arkworks::msm::IsMsmInput;
 
 #[cfg(test)]
 pub fn test_sigma_protocol<E, H>(hom: H, witness: H::Domain)
@@ -45,7 +46,7 @@ mod schnorr {
         pub G: E::G1Affine,
     }
 
-    // E::G1Affine doesn't seem to implement Default, otherwise it would've been derived for Schnorr
+    // `E::G1Affine` doesn't seem to implement `Default`, otherwise it would've been derived for `Schnorr` here
     impl<E: Pairing> Default for Schnorr<E> {
         fn default() -> Self {
             Self {
@@ -64,14 +65,12 @@ mod schnorr {
     }
 
     impl<E: Pairing> fixed_base_msms::Trait for Schnorr<E> {
-        type Base = E::G1Affine;
         type CodomainShape<T>
             = CodomainShape<T>
         where
             T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-        type MsmInput = MsmInput<Self::Base, Self::Scalar>;
+        type MsmInput = MsmInput<E::G1Affine, E::ScalarField>;
         type MsmOutput = E::G1;
-        type Scalar = E::ScalarField;
 
         fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
             CodomainShape(MsmInput {
@@ -80,8 +79,8 @@ mod schnorr {
             })
         }
 
-        fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
-            E::G1::msm(bases, scalars).expect("MSM failed in Schnorr")
+        fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
+            E::G1::msm(input.bases(), input.scalars()).expect("MSM failed in Schnorr")
         }
     }
 
@@ -97,7 +96,7 @@ mod chaum_pedersen {
 
     pub type ChaumPedersen<E> = TupleHomomorphism<Schnorr<E>, Schnorr<E>, true>;
 
-    // Implementing e.g. Default here would require a wrapper, but then sigma_protocol::Trait would have to get re-implemented...
+    // Implementing e.g. `Default` here would require a wrapper, but then `sigma_protocol::Trait` would have to get re-implemented...
     #[allow(non_snake_case)]
     pub fn make_chaum_pedersen_instance<E: Pairing>() -> ChaumPedersen<E> {
         let G_1 = E::G1::generator().into_affine();

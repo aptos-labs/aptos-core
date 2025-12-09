@@ -37,18 +37,25 @@ pub struct MsmInput<
 /// This exists as a workaround because stable Rust does not yet support default
 /// associated types. (Now we have to do `type MsmInput: IsMsmInput` rather than `type MsmInput = IsMsmInput`)
 /// TODO: we probably don't need this trait, can just do MsmInput<E::Base, E::Scalar> in function signatures???
-pub trait IsMsmInput<B, S> { // maybe make B and S associated types instead
+pub trait IsMsmInput { // maybe make B and S associated types instead
+    /// The scalar type used in the MSMs.
+    type Scalar: Clone + CanonicalSerialize + CanonicalDeserialize; // scrap and make associated type of MsmInput
+
+    /// The group/base type used in the MSMs. Current instantiations always use E::G1Affine but as explained
+    /// in the TODO of doc comment of `fn verify_msm_hom`, we might want to be working with enums here in the future.
+    type Base: Clone + CanonicalSerialize + CanonicalDeserialize; // scrap and make associated type of MsmInput
+
     /// Returns a reference to the slice of base elements in this MSM input.
-    fn bases(&self) -> &[B];
+    fn bases(&self) -> &[Self::Base];
 
     /// Returns a reference to the slice of scalar elements in this MSM input.
-    fn scalars(&self) -> &[S];
+    fn scalars(&self) -> &[Self::Scalar];
 }
 
 impl<B, S> MsmInput<B, S>
 where
-    B: CanonicalSerialize + CanonicalDeserialize,
-    S: CanonicalSerialize + CanonicalDeserialize,
+    B: CanonicalSerialize + CanonicalDeserialize + Clone,
+    S: CanonicalSerialize + CanonicalDeserialize + Clone,
 {
     /// Creates a new `MsmInput`, ensuring base and scalar lengths match.
     pub fn new(bases: Vec<B>, scalars: Vec<S>) -> anyhow::Result<Self> {
@@ -63,16 +70,19 @@ where
     }
 }
 
-impl<
-        B: CanonicalSerialize + CanonicalDeserialize,
-        S: CanonicalSerialize + CanonicalDeserialize,
-    > IsMsmInput<B, S> for MsmInput<B, S>
+impl<B, S> IsMsmInput for MsmInput<B, S>
+where
+    B: CanonicalSerialize + CanonicalDeserialize + Clone,
+    S: CanonicalSerialize + CanonicalDeserialize + Clone,
 {
-    fn bases(&self) -> &[B] {
+    type Base = B;
+    type Scalar = S;
+
+    fn bases(&self) -> &[Self::Base] {
         &self.bases
     }
 
-    fn scalars(&self) -> &[S] {
+    fn scalars(&self) -> &[Self::Scalar] {
         &self.scalars
     }
 }

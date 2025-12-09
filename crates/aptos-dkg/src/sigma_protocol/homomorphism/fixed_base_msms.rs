@@ -25,20 +25,13 @@ use aptos_crypto::arkworks::msm::IsMsmInput;
 /// - A uniform “shape” abstraction for collecting and flattening MSM outputs
 ///   for batch verification in Σ-protocols.
 pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOutput>> {
-    /// The scalar type used in the MSMs.
-    type Scalar: Clone; // scrap and make associated type of MsmInput
-
-    /// The group/base type used in the MSMs. Current instantiations always use E::G1Affine but as explained
-    /// in the TODO of doc comment of `fn verify_msm_hom`, we might want to be working with enums here in the future.
-    type Base: Clone; // scrap and make associated type of MsmInput
-
     /// Type representing a single MSM input (a set of bases and scalars). Normally, this would default
     /// to `MsmInput<Self::Base, Self::Scalar>`, but stable Rust does not yet support associated type defaults,
     /// hence we introduce a trait `IsMsmInput` and struct `MsmInput` elsewhere.
     type MsmInput: CanonicalSerialize
         + CanonicalDeserialize
         + Clone
-        + IsMsmInput<Self::Base, Self::Scalar>
+        + IsMsmInput
         + Debug
         + Eq;
 
@@ -79,7 +72,7 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
 
     /// Evaluates a single MSM instance given slices of bases and scalars. Current instantiations always use E::G1Affine
     /// for the base, but we might want to use enums for the base and output in the future.
-    fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput; // why not Self::MsmInput as input?
+    fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput; // why not Self::MsmInput as input?
 
     /// Applies `msm_eval` elementwise to a collection of MSM inputs.
     fn apply_msm(
@@ -92,7 +85,7 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
             Output<Self::MsmOutput> = Self::CodomainShape<Self::MsmOutput>,
         >,
     {
-        msms.map(|msm_input| Self::msm_eval(&msm_input.bases(), &msm_input.scalars()))
+        msms.map(|msm_input| Self::msm_eval(msm_input))
     }
 }
 
@@ -112,13 +105,13 @@ pub trait TraitTwo: homomorphism::Trait<Codomain = (Self::FirstCodomainShape<Sel
     type FirstMsmInput: CanonicalSerialize
         + CanonicalDeserialize
         + Clone
-        + IsMsmInput<Self::FirstBase, Self::Scalar>
+        + IsMsmInput
         + Debug
         + Eq;
     type SecondMsmInput: CanonicalSerialize
         + CanonicalDeserialize
         + Clone
-        + IsMsmInput<Self::SecondBase, Self::Scalar>
+        + IsMsmInput
         + Debug
         + Eq;
 
@@ -168,8 +161,8 @@ pub trait TraitTwo: homomorphism::Trait<Codomain = (Self::FirstCodomainShape<Sel
 
     /// Evaluates a single MSM instance given slices of bases and scalars. Current instantiations always use E::G1Affine
     /// for the base, but we might want to use enums for the base and output in the future.
-    fn first_msm_eval(bases: &[Self::FirstBase], scalars: &[Self::Scalar]) -> Self::FirstMsmOutput;
-    fn second_msm_eval(bases: &[Self::SecondBase], scalars: &[Self::Scalar]) -> Self::SecondMsmOutput;
+    fn first_msm_eval(input: Self::FirstMsmInput) -> Self::FirstMsmOutput;
+    fn second_msm_eval(input: Self::SecondMsmInput) -> Self::SecondMsmOutput;
 
     /// Applies `msm_eval` elementwise to a collection of MSM inputs.
     fn apply_msm(
@@ -186,7 +179,7 @@ pub trait TraitTwo: homomorphism::Trait<Codomain = (Self::FirstCodomainShape<Sel
             Output<Self::SecondMsmOutput> = Self::SecondCodomainShape<Self::SecondMsmOutput>,
         >,
     {
-        (msms.0.map(|msm_input| Self::first_msm_eval(&msm_input.bases(), &msm_input.scalars())), msms.1.map(|msm_input| Self::second_msm_eval(&msm_input.bases(), &msm_input.scalars())))
+        (msms.0.map(|msm_input| Self::first_msm_eval(msm_input)), msms.1.map(|msm_input| Self::second_msm_eval(msm_input)))
 
         //msms.map(|first_msm_input, second_msm_input| (Self::first_msm_eval(&first_msm_input.bases(), &first_msm_input.scalars()), Self::second_msm_eval(&second_msm_input.bases(), &second_msm_input.scalars())))
     }
@@ -199,14 +192,12 @@ impl<H, LargerDomain> Trait for homomorphism::LiftHomomorphism<H, LargerDomain>
 where
     H: Trait,
 {
-    type Base = H::Base;
     type CodomainShape<T>
         = H::CodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
     type MsmInput = H::MsmInput;
     type MsmOutput = H::MsmOutput;
-    type Scalar = H::Scalar;
 
     /// Returns the MSM terms corresponding to a given homomorphism input. The output is shaped so that applying the MSM elementwise yields the homomorphism output.
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
@@ -214,8 +205,8 @@ where
         self.hom.msm_terms(&projected)
     }
 
-    fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
-        H::msm_eval(bases, scalars)
+    fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
+        H::msm_eval(input)
     }
 }
 

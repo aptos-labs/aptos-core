@@ -880,6 +880,7 @@ pub mod two_term_msm {
     use crate::sigma_protocol::{homomorphism::fixed_base_msms, traits::FirstProofItem};
     use aptos_crypto::arkworks::random::UniformRand;
     use aptos_crypto_derive::SigmaProtocolWitness;
+    use aptos_crypto::arkworks::msm::IsMsmInput;
     pub use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
     pub type Proof<E> = sigma_protocol::Proof<E, Homomorphism<E>>;
 
@@ -932,14 +933,12 @@ pub mod two_term_msm {
     }
 
     impl<E: Pairing> fixed_base_msms::Trait for Homomorphism<E> {
-        type Base = E::G1Affine;
         type CodomainShape<T>
             = CodomainShape<T>
         where
             T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq + Debug;
-        type MsmInput = MsmInput<Self::Base, Self::Scalar>;
+        type MsmInput = MsmInput<E::G1Affine, E::ScalarField>;
         type MsmOutput = E::G1;
-        type Scalar = E::ScalarField;
 
         fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
             let mut scalars = Vec::with_capacity(2);
@@ -953,8 +952,8 @@ pub mod two_term_msm {
             CodomainShape(MsmInput { bases, scalars })
         }
 
-        fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
-            E::G1::msm(bases, scalars).expect("MSM failed in TwoTermMSM")
+        fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
+            E::G1::msm(input.bases(), input.scalars()).expect("MSM failed in TwoTermMSM")
         }
     }
 
