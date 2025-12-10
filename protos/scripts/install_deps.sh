@@ -14,5 +14,5 @@ cargo install --locked --version 0.3.1 protoc-gen-prost-crate
 cargo install --locked --version 0.4.1 protoc-gen-tonic
 
 # For generating Python code
-cd ../python
+cd python
 poetry install
