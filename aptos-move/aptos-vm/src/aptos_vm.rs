@@ -3193,7 +3193,10 @@ impl VMValidator for AptosVM {
             }
         }
 
-        if !self.features().is_enabled(FeatureFlag::SLH_DSA_SHA2_128S_SIGNATURE) {
+        if !self
+            .features()
+            .is_enabled(FeatureFlag::SLH_DSA_SHA2_128S_SIGNATURE)
+        {
             if let Ok(sk_authenticators) = transaction
                 .authenticator_ref()
                 .to_single_key_authenticators()
