@@ -8,7 +8,7 @@ use aptos_crypto::{SecretSharingConfig, Uniform};
 use aptos_dkg::{
     algebra::evaluation_domain::BatchEvaluationDomain,
     pvss::{
-        chunky::Transcript as ChunkyTranscript,
+        chunky::UnsignedUnweightedTranscript as ChunkyTranscript,
         das,
         test_utils::{
             self, get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,

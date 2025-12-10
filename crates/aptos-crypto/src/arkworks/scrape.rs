@@ -7,14 +7,16 @@
 
 use crate::{
     arkworks,
-    arkworks::{msm::MsmInput, random},
+    arkworks::{
+        msm::{IsMsmInput, MsmInput},
+        random,
+    },
 };
 use anyhow::{bail, ensure, Context};
 use ark_ec::CurveGroup;
 use ark_ff::{FftField, PrimeField};
 use ark_poly::domain::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_std::vec::Vec;
-use crate::arkworks::msm::IsMsmInput;
 
 /// A dual code word polynomial $f$ of degree $n-t-1$ for checking that the $n$ evaluations of another
 /// polynomial (typically at the roots-of-unity $p(\omega^i)$, \forall i \in [0, n)$) encode a degree

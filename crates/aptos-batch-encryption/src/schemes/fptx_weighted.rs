@@ -222,7 +222,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
     type MasterSecretKeyShare = WeightedBIBEMasterSecretKeyShare;
     type PreparedCiphertext = PreparedCiphertext;
     type Round = u64;
-    type SubTranscript = aptos_dkg::pvss::chunky::WeightedSubTranscript<Pairing>;
+    type SubTranscript = aptos_dkg::pvss::chunky::WeightedSubtranscript<Pairing>;
     type ThresholdConfig = aptos_crypto::weighted_config::WeightedConfigArkworks<Fr>;
     type VerificationKey = WeightedBIBEVerificationKey;
 

@@ -879,10 +879,13 @@ pub mod two_term_msm {
     use super::*;
     use crate::sigma_protocol::{homomorphism::fixed_base_msms, traits::FirstProofItem};
     use aptos_crypto::arkworks::{msm::IsMsmInput, random::UniformRand};
-    use ark_ec::AffineRepr;
     use aptos_crypto_derive::SigmaProtocolWitness;
+    use ark_ec::AffineRepr;
     pub use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
-    pub type Proof<C> = sigma_protocol::Proof<<<C as CurveGroup>::Affine as AffineRepr>::ScalarField, Homomorphism<C>>;
+    pub type Proof<C> = sigma_protocol::Proof<
+        <<C as CurveGroup>::Affine as AffineRepr>::ScalarField,
+        Homomorphism<C>,
+    >;
 
     impl<C: CurveGroup> Proof<C> {
         /// Generates a random looking proof (but not a valid one).
@@ -939,6 +942,7 @@ pub mod two_term_msm {
             T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq + Debug;
         type MsmInput = MsmInput<C::Affine, C::ScalarField>;
         type MsmOutput = C;
+        type Scalar = C::ScalarField;
 
         fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
             let mut scalars = Vec::with_capacity(2);

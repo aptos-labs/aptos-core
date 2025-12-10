@@ -143,7 +143,6 @@ where
     }
 }
 
-// TODO: Maak een DifferingTupleHomomorphism ???
 /// Implementation of `FixedBaseMsms` for a tuple of two homomorphisms.
 ///
 /// This allows combining two homomorphisms that share the same `Domain`.
@@ -168,6 +167,7 @@ where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
     type MsmInput = H1::MsmInput;
     type MsmOutput = H1::MsmOutput;
+    type Scalar = H1::Scalar;
 
     /// Returns the MSM terms for each homomorphism, combined into a tuple.
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
@@ -185,7 +185,7 @@ impl<C: CurveGroup, H1, H2> sigma_protocol::Trait<C> for TupleHomomorphism<H1, H
 where
     H1: sigma_protocol::Trait<C>,
     H2: sigma_protocol::Trait<C>,
-    H2: fixed_base_msms::Trait<Domain = H1::Domain, MsmInput = H1::MsmInput>,
+    H2: fixed_base_msms::Trait<Domain = H1::Domain, MsmInput = H1::MsmInput>, // Huh MsmOutput = H1::MsmOutput yields compiler error??
 {
     /// Concatenate the DSTs of the two homomorphisms, plus some
     /// additional metadata to ensure uniqueness.
@@ -205,34 +205,5 @@ where
         dst.extend_from_slice(b")");
 
         dst
-    }
-}
-
-// mwa je moet gewoon een aparte fixed_base_msms::Trait gaan maken... dan is HOMOG misschien niet meer nodig
-impl<H1, H2> fixed_base_msms::Trait for TupleHomomorphism<H1, H2, false>
-where
-    H1: fixed_base_msms::Trait,
-    H2: fixed_base_msms::Trait<
-        Domain = H1::Domain,
-        MsmInput = H1::MsmInput,
-        MsmOutput = H1::MsmOutput,
-    >,
-{
-    type CodomainShape<T>
-        = TupleCodomainShape<H1::CodomainShape<T>, H2::CodomainShape<T>>
-    where
-        T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-    type MsmInput = H1::MsmInput;
-    type MsmOutput = H1::MsmOutput;
-
-    /// Returns the MSM terms for each homomorphism, combined into a tuple.
-    fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
-        let terms1 = self.hom1.msm_terms(input);
-        let terms2 = self.hom2.msm_terms(input);
-        TupleCodomainShape(terms1, terms2)
-    }
-
-    fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
-        H1::msm_eval(input) // !!!!!!!!!!!!!! doesn't make sense, should put `fn eval` back,,, which is already in HomTrait
     }
 }

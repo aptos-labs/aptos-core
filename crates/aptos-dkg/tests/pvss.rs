@@ -27,9 +27,9 @@ use aptos_dkg::pvss::{
     },
     GenericWeighting, ThresholdConfigBlstrs,
 };
+use ark_bn254::Bn254;
 use rand::{rngs::StdRng, thread_rng};
 use rand_core::SeedableRng;
-use ark_bn254::Bn254;
 
 // TODO: Add a test for public parameters serialization roundtrip?
 // TODO: and add a test for aggregate!!!!
@@ -64,7 +64,7 @@ fn test_pvss_all_unweighted() {
 
         let seed = random_scalar(&mut rng);
 
-        type ChunkyTranscriptBn254 = chunky::Transcript<ark_bn254::Bn254>;
+        type ChunkyTranscriptBn254 = chunky::UnsignedUnweightedTranscript<ark_bn254::Bn254>;
 
         // Chunky
         nonaggregatable_pvss_deal_verify_and_reconstruct::<ChunkyTranscriptBn254>(
@@ -121,21 +121,24 @@ fn test_pvss_all_weighted() {
         // Signed weighted Chunky
         nonaggregatable_weighted_pvss_deal_verify_and_reconstruct::<
             Bn254,
-            signed::GenericSigning<chunky::WeightedTranscript<Bn254>>,
+            chunky::SignedWeightedTranscript<Bn254>,
         >(&wc, seed.to_bytes_le());
 
         // Unsigned weighted Chunky
         nonaggregatable_weighted_pvss_deal_verify_and_reconstruct::<
             Bn254,
-            chunky::WeightedTranscript<Bn254>,
+            chunky::UnsignedWeightedTranscript<Bn254>,
         >(&wc, seed.to_bytes_le());
 
         //type SignedChunkyTranscriptBn254 = signed::GenericSigning<chunky::WeightedTranscript<Bn254>>; TODO!!
-        type UnsignedChunkyTranscriptBn254 = chunky::WeightedTranscript<Bn254>;
+        type UnsignedChunkyTranscriptBn254 = chunky::UnsignedWeightedTranscript<Bn254>;
 
         // OLD: <ChunkyTranscriptBn254 as Transcript>::SecretSharingConfig
         if wc.get_total_num_players() > 8 {
-            test_pvss_aggregate_subtranscript_and_decrypt::<Bn254, UnsignedChunkyTranscriptBn254>(&wc, seed.to_bytes_le());
+            test_pvss_aggregate_subtranscript_and_decrypt::<Bn254, UnsignedChunkyTranscriptBn254>(
+                &wc,
+                seed.to_bytes_le(),
+            );
         }
     }
 }
@@ -157,8 +160,9 @@ fn test_pvss_transcript_size() {
     for sc in get_threshold_configs_for_benchmarking().iter().take(1) {
         // Only trying 1 for now to keep tests fast (also the second one has the same n, which means it would yield the same size...)
         println!();
-        let actual_size = actual_transcript_size::<chunky::Transcript<ark_bn254::Bn254>>(&sc);
-        print_transcript_size::<chunky::Transcript<ark_bn254::Bn254>>(
+        let actual_size =
+            actual_transcript_size::<chunky::UnsignedUnweightedTranscript<ark_bn254::Bn254>>(&sc);
+        print_transcript_size::<chunky::UnsignedUnweightedTranscript<ark_bn254::Bn254>>(
             "Actual for BN254",
             &sc,
             actual_size,
@@ -170,9 +174,10 @@ fn test_pvss_transcript_size() {
         // Only trying 1 for now to keep tests fast (also the second one has the same n, which means it would yield the same size...)
 
         println!();
-        let actual_size =
-            actual_transcript_size::<chunky::Transcript<ark_bls12_381::Bls12_381>>(&sc);
-        print_transcript_size::<chunky::Transcript<ark_bls12_381::Bls12_381>>(
+        let actual_size = actual_transcript_size::<
+            chunky::UnsignedUnweightedTranscript<ark_bls12_381::Bls12_381>,
+        >(&sc);
+        print_transcript_size::<chunky::UnsignedUnweightedTranscript<ark_bls12_381::Bls12_381>>(
             "Actual for BLS12_381",
             &sc,
             actual_size,
@@ -242,7 +247,11 @@ fn pvss_deal_verify_and_reconstruct<T: AggregatableTranscript>(
 use aptos_dkg::pvss::traits::transcript::Aggregatable;
 
 #[cfg(test)]
-fn test_pvss_aggregate_subtranscript_and_decrypt<E: Pairing, T: HasAggregatableSubtranscript<WeightedConfigArkworks<E::ScalarField>> + NonAggregatableTranscript<SecretSharingConfig = WeightedConfigArkworks<E::ScalarField>>>(
+fn test_pvss_aggregate_subtranscript_and_decrypt<
+    E: Pairing,
+    T: HasAggregatableSubtranscript<WeightedConfigArkworks<E::ScalarField>>
+        + NonAggregatableTranscript<SecretSharingConfig = WeightedConfigArkworks<E::ScalarField>>,
+>(
     sc: &WeightedConfigArkworks<E::ScalarField>,
     seed_bytes: [u8; 32],
 ) {
@@ -279,7 +288,7 @@ fn test_pvss_aggregate_subtranscript_and_decrypt<E: Pairing, T: HasAggregatableS
     }
 
     let final_share = agg.decrypt_own_share(sc, &sc.get_player(0), &d.dks[0], &d.pp);
-    
+
     // let trs = T::deal(
     //     &sc,
     //     &d.pp,
@@ -319,7 +328,6 @@ fn test_pvss_aggregate_subtranscript_and_decrypt<E: Pairing, T: HasAggregatableS
     // trs.get_subtranscript().aggregate_with(sc, &another_trs.get_subtranscript()).unwrap();
     // trs.get_subtranscript().aggregate_with(sc, &yet_another_trs.get_subtranscript()).unwrap();
 
-
     // let first_share = trs.decrypt_own_share(sc, &sc.get_player(0), &d.dks[0], &d.pp);
     // let second_share = another_trs.decrypt_own_share(sc, &sc.get_player(1), &d.dks[1], &d.pp);
 
@@ -329,7 +337,6 @@ fn test_pvss_aggregate_subtranscript_and_decrypt<E: Pairing, T: HasAggregatableS
     //eprintln!("!!!! {:?}", final_share.0);
     // assert_eq!(first_share.0 + second_share.0, final_share.0);
 }
-
 
 #[cfg(test)]
 fn nonaggregatable_pvss_deal_verify_and_reconstruct<T: NonAggregatableTranscript>(

@@ -80,7 +80,7 @@ where
                 scalars.len(),
             );
         }
-        Ok(Self { bases, scalars })        
+        Ok(Self { bases, scalars })
     }
 }
 

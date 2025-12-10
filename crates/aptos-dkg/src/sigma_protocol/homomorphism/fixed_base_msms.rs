@@ -7,6 +7,7 @@ use crate::{
 };
 use aptos_crypto::arkworks::msm::IsMsmInput;
 use ark_ec::CurveGroup;
+use ark_ff::Zero;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use std::fmt::Debug;
 
@@ -25,15 +26,22 @@ use std::fmt::Debug;
 /// - A uniform “shape” abstraction for collecting and flattening MSM outputs
 ///   for batch verification in Σ-protocols.
 pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOutput>> {
+    type Scalar: ark_ff::PrimeField;
+
     /// Type representing a single MSM input (a set of bases and scalars). Normally, this would default
     /// to `MsmInput<..., ...>`, but stable Rust does not yet support associated type defaults,
     /// hence we introduce a trait `IsMsmInput` and struct `MsmInput` elsewhere.
-    type MsmInput: CanonicalSerialize + CanonicalDeserialize + Clone + IsMsmInput + Debug + Eq;
+    type MsmInput: CanonicalSerialize
+        + CanonicalDeserialize
+        + Clone
+        + IsMsmInput<Scalar = Self::Scalar>
+        + Debug
+        + Eq;
 
     /// The output type of evaluating an MSM. `Codomain` should equal `CodomainShape<MsmOutput>`, in the current version
     /// of the code. In a future version where MsmOutput might be an enum (E::G1 or E::G2), Codomain should probably follow suit.
     /// (TODO: Think this over)
-    type MsmOutput: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
+    type MsmOutput: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq + Zero;
 
     /// Represents the **shape** of the homomorphism's output, parameterized by an inner type `T`.
     ///
@@ -93,13 +101,23 @@ pub trait Inhomogeneous:
     ),
 >
 {
-    /// Types representing a single MSM input (a set of bases and scalars). Normally, this would default
-    /// to `MsmInput<Self::Base, Self::Scalar>`, but stable Rust does not yet support associated type defaults,
-    /// hence we introduce a trait `IsMsmInput` and struct `MsmInput` below.
-    type FirstMsmInput: CanonicalSerialize + CanonicalDeserialize + Clone + IsMsmInput + Debug + Eq;
-    type SecondMsmInput: CanonicalSerialize + CanonicalDeserialize + Clone + IsMsmInput + Debug + Eq;
+    type Scalar;
 
-    /// The output type of evaluating an MSM. `Codomain` should equal `CodomainShape<MsmOutput>`, in the current version
+    /// Types representing a single MSM input (a set of bases and scalars).
+    type FirstMsmInput: CanonicalSerialize
+        + CanonicalDeserialize
+        + Clone
+        + IsMsmInput<Scalar = Self::Scalar>
+        + Debug
+        + Eq;
+    type SecondMsmInput: CanonicalSerialize
+        + CanonicalDeserialize
+        + Clone
+        + IsMsmInput<Scalar = Self::Scalar>
+        + Debug
+        + Eq;
+
+    /// The output types of evaluating an MSM. `Codomain` should equal `CodomainShape<MsmOutput>`, in the current version
     /// of the code. In a future version where MsmOutput might be an enum (E::G1 or E::G2), Codomain should probably follow suit.
     /// (TODO: Think this over)
     type FirstMsmOutput: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
@@ -197,6 +215,7 @@ where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
     type MsmInput = H::MsmInput;
     type MsmOutput = H::MsmOutput;
+    type Scalar = H::Scalar;
 
     /// Returns the MSM terms corresponding to a given homomorphism input. The output is shaped so that applying the MSM elementwise yields the homomorphism output.
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {

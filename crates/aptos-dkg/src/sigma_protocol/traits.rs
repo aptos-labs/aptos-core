@@ -15,20 +15,19 @@ use aptos_crypto::{
     utils,
 };
 use ark_ec::CurveGroup;
-use ark_ff::PrimeField;
+use ark_ff::{Field, PrimeField};
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Valid, Validate,
 };
 use ark_std::{io::Read, UniformRand};
 use serde::Serialize;
 use std::{fmt::Debug, io::Write};
-use ark_ff::Field;
 
 pub trait Trait<C: CurveGroup>:
     fixed_base_msms::Trait<
         Domain: Witness<C::ScalarField>,
         MsmOutput = C,
-        MsmInput: IsMsmInput<Base = C::Affine, Scalar= C::ScalarField>, // need to be a bit specific because this code multiplies scalars and does into_affine(), etc
+        MsmInput: IsMsmInput<Base = C::Affine, Scalar = C::ScalarField>, // need to be a bit specific because this code multiplies scalars and does into_affine(), etc
     > + Sized
     + CanonicalSerialize
 {
@@ -54,7 +53,7 @@ pub trait Trait<C: CurveGroup>:
         cntxt: &Ct,
     ) -> anyhow::Result<()>
     where
-        H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>,
+        H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>, // need this?
     {
         let msm_terms = self.msm_terms_for_verify::<_, H>(
             public_statement,
@@ -62,11 +61,48 @@ pub trait Trait<C: CurveGroup>:
             cntxt,
         );
 
-        let msm_result =
-            C::msm(msm_terms.bases(), msm_terms.scalars()).expect("Could not compute MSM for verifier");
-        ensure!(msm_result == C::ZERO);
+        // let msm_result =
+        //     C::msm(msm_terms.bases(), msm_terms.scalars()).expect("Could not compute MSM for verifier");
+
+        let msm_result = Self::msm_eval(msm_terms);
+        ensure!(msm_result == C::ZERO); // or MsmOutput::zero() ?
 
         Ok(())
+    }
+
+    #[allow(non_snake_case)]
+    fn compute_verifier_challenges<Ct, H>(
+        &self,
+        public_statement: &H::Codomain,
+        proof: &Proof<C::ScalarField, H>,
+        cntxt: &Ct,
+        number_of_beta_powers: usize,
+    ) -> (C::ScalarField, Vec<C::ScalarField>)
+    where
+        Ct: Serialize,
+        H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>,
+    {
+        let prover_first_message = match &proof.first_proof_item {
+            FirstProofItem::Commitment(A) => A,
+            FirstProofItem::Challenge(_) => {
+                panic!("Missing implementation - expected commitment, not challenge")
+            },
+        };
+        // --- Fiat–Shamir challenge c ---
+        let c = fiat_shamir_challenge_for_sigma_protocol::<_, C::ScalarField, _>(
+            cntxt,
+            self,
+            public_statement,
+            prover_first_message,
+            &self.dst(),
+        );
+
+        // --- Random verifier challenge β ---
+        let mut rng = ark_std::rand::thread_rng();
+        let beta = C::ScalarField::rand(&mut rng);
+        let powers_of_beta = utils::powers(beta, number_of_beta_powers);
+
+        (c, powers_of_beta)
     }
 
     // Returns the MSM terms that `verify()` needs
@@ -78,7 +114,7 @@ pub trait Trait<C: CurveGroup>:
         cntxt: &Ct,
     ) -> Self::MsmInput
     where
-        H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>,
+        H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>, // huh?? need this?
     {
         let prover_first_message = match &proof.first_proof_item {
             FirstProofItem::Commitment(A) => A,
@@ -86,23 +122,10 @@ pub trait Trait<C: CurveGroup>:
                 panic!("Missing implementation - expected commitment, not challenge")
             },
         };
-        let c = fiat_shamir_challenge_for_sigma_protocol::<_, C::ScalarField, _>(
-            cntxt,
-            self,
-            public_statement,
-            &prover_first_message,
-            &self.dst(),
-        );
 
-        // **Compute verifier-specific challenge (used for weighted MSM)**
-        // While this could be derived deterministically via Fiat–Shamir, doing so would require
-        // integrating it into the prover as well for composability; we no longer follow this approach.
-        // Instead, we follow the simple approach:
-        let mut rng = ark_std::rand::thread_rng(); // TODO: make this part of the function input?
-        let beta = C::ScalarField::rand(&mut rng);
+        let number_of_beta_powers = public_statement.clone().into_iter().count(); // hmm maybe pass the into_iter version in combine_msm_terms?
 
-        let len = public_statement.clone().into_iter().count(); // hmm maybe pass the into_iter version in combine_msm_terms?
-        let powers_of_betas = utils::powers(beta, len);
+        let (c, powers_of_beta) = self.compute_verifier_challenges(public_statement, proof, cntxt, number_of_beta_powers);
 
         let msm_terms_of_response = self.msm_terms(&proof.z);
 
@@ -110,7 +133,7 @@ pub trait Trait<C: CurveGroup>:
             msm_terms_of_response.into_iter().collect(),
             prover_first_message,
             public_statement,
-            powers_of_betas,
+            powers_of_beta,
             c,
         );
 
@@ -118,15 +141,106 @@ pub trait Trait<C: CurveGroup>:
     }
 }
 
-use ark_ec::pairing::Pairing;
-use ark_ec::VariableBaseMSM;
+use ark_ec::{pairing::Pairing, VariableBaseMSM};
 use ark_ff::AdditiveGroup;
+
+// pub trait Inhomogeneous<E: Pairing, H1: Trait<E::G1>, H2: Trait<E::G2> >
+// {
+//     /// Domain-separation tag (DST) used to ensure that all cryptographic hashes and
+//     /// transcript operations within the protocol are uniquely namespaced
+//     fn dst(&self) -> Vec<u8>;
+
+//     fn prove<C: Serialize, R: rand_core::RngCore + rand_core::CryptoRng>(
+//         &self,
+//         witness: &Self::Domain,
+//         statement: &Self::Codomain,
+//         cntxt: &C, // for SoK purposes
+//         rng: &mut R,
+//     ) -> Proof<E::ScalarField, Self> {
+//         prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
+//     }
+
+//     #[allow(non_snake_case)]
+//     fn verify<C: Serialize, H>(
+//         &self,
+//         public_statement: &Self::Codomain,
+//         proof: &Proof<E::ScalarField, H>, // Would like to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
+//         cntxt: &C,
+//     ) -> anyhow::Result<()>
+//     where
+//         H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>,
+//     {
+//         let (first_msm_terms, second_msm_terms) = self.msm_terms_for_verify::<_, H>(
+//             public_statement,
+//             proof,
+//             cntxt,
+//         );
+
+//         let first_msm_result =
+//             E::G1::msm(first_msm_terms.bases(), first_msm_terms.scalars()).expect("Could not compute MSM for verifier");
+//         ensure!(first_msm_result == E::G1::ZERO);
+
+//         let second_msm_result =
+//             E::G2::msm(second_msm_terms.bases(), second_msm_terms.scalars()).expect("Could not compute MSM for verifier");
+//         ensure!(second_msm_result == E::G2::ZERO);
+
+//         Ok(())
+//     }
+
+//     fn msm_terms_for_verify<Ct: Serialize, H>(
+//         &self,
+//         public_statement: &Self::Codomain,
+//         proof: &Proof<E::ScalarField, H>,
+//         cntxt: &Ct,
+//     ) -> (Self::FirstMsmInput, Self::SecondMsmInput)
+//     where
+//         H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>,
+//     {
+//         let prover_first_message = match &proof.first_proof_item {
+//             FirstProofItem::Commitment(A) => A,
+//             FirstProofItem::Challenge(_) => {
+//                 panic!("Missing implementation - expected commitment, not challenge")
+//             },
+//         };
+//         let c = fiat_shamir_challenge_for_sigma_protocol::<_, E::ScalarField, _>(
+//             cntxt,
+//             self,
+//             public_statement,
+//             &prover_first_message,
+//             &self.dst(),
+//         );
+
+//         // **Compute verifier-specific challenge (used for weighted MSM)**
+//         // While this could be derived deterministically via Fiat–Shamir, doing so would require
+//         // integrating it into the prover as well for composability; we no longer follow this approach.
+//         // Instead, we follow the simple approach:
+//         let mut rng = ark_std::rand::thread_rng(); // TODO: make this part of the function input?
+//         let beta = E::ScalarField::rand(&mut rng);
+
+//         let len = public_statement.clone().into_iter().count(); // hmm maybe pass the into_iter version in combine_msm_terms?
+//         let powers_of_betas = utils::powers(beta, len);
+
+//         let msm_terms_of_response = self.msm_terms(&proof.z);
+
+//         let (bases, scalars) = combine_msm_terms::<C, Self>(
+//             msm_terms_of_response.into_iter().collect(),
+//             prover_first_message,
+//             public_statement,
+//             powers_of_betas,
+//             c,
+//         );
+
+//         (bases, scalars)
+//     }
+// }
 
 // pub trait Inhomogeneous<E: Pairing>:
 //     fixed_base_msms::Inhomogeneous<
 //         Domain: Witness<E::ScalarField>,
 //         FirstMsmOutput = E::G1,
 //         SecondMsmOutput = E::G2,
+//         FirstMsmInput: IsMsmInput<Base = E::G1Affine, Scalar = E::ScalarField>,
+//         SecondMsmInput: IsMsmInput<Base = E::G2Affine, Scalar = E::ScalarField>
 //     > + Sized
 //     + CanonicalSerialize
 // {
@@ -154,18 +268,18 @@ use ark_ff::AdditiveGroup;
 //     where
 //         H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>,
 //     {
-//         let ((first_bases, first_scalars), (second_bases, second_scalars)) = self.msm_terms_for_verify::<_, H>(
+//         let (first_msm_terms, second_msm_terms) = self.msm_terms_for_verify::<_, H>(
 //             public_statement,
 //             proof,
 //             cntxt,
 //         );
 
 //         let first_msm_result =
-//             E::G1::msm(&first_bases, &first_scalars).expect("Could not compute MSM for verifier");
+//             E::G1::msm(first_msm_terms.bases(), first_msm_terms.scalars()).expect("Could not compute MSM for verifier");
 //         ensure!(first_msm_result == E::G1::ZERO);
 
 //         let second_msm_result =
-//             E::G2::msm(&second_bases, &second_scalars).expect("Could not compute MSM for verifier");
+//             E::G2::msm(second_msm_terms.bases(), second_msm_terms.scalars()).expect("Could not compute MSM for verifier");
 //         ensure!(second_msm_result == E::G2::ZERO);
 
 //         Ok(())
@@ -174,9 +288,9 @@ use ark_ff::AdditiveGroup;
 //     fn msm_terms_for_verify<Ct: Serialize, H>(
 //         &self,
 //         public_statement: &Self::Codomain,
-//         proof: &Proof<C::ScalarField, H>,
+//         proof: &Proof<E::ScalarField, H>,
 //         cntxt: &Ct,
-//     ) -> (Vec<<Self::MsmInput as IsMsmInput>::Base>, Vec<<Self::MsmInput as IsMsmInput>::Scalar>)
+//     ) -> (Self::FirstMsmInput, Self::SecondMsmInput)
 //     where
 //         H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>,
 //     {
@@ -186,7 +300,7 @@ use ark_ff::AdditiveGroup;
 //                 panic!("Missing implementation - expected commitment, not challenge")
 //             },
 //         };
-//         let c = fiat_shamir_challenge_for_sigma_protocol::<_, C::ScalarField, _>(
+//         let c = fiat_shamir_challenge_for_sigma_protocol::<_, E::ScalarField, _>(
 //             cntxt,
 //             self,
 //             public_statement,
@@ -199,7 +313,7 @@ use ark_ff::AdditiveGroup;
 //         // integrating it into the prover as well for composability; we no longer follow this approach.
 //         // Instead, we follow the simple approach:
 //         let mut rng = ark_std::rand::thread_rng(); // TODO: make this part of the function input?
-//         let beta = C::ScalarField::rand(&mut rng);
+//         let beta = E::ScalarField::rand(&mut rng);
 
 //         let len = public_statement.clone().into_iter().count(); // hmm maybe pass the into_iter version in combine_msm_terms?
 //         let powers_of_betas = utils::powers(beta, len);
@@ -545,154 +659,6 @@ where
         z,
     }
 }
-
-// This function is currently not used, see comments in `fn verify()`
-// pub fn fiat_shamir_challenge_for_msm_verifier<E: Pairing, H: homomorphism::Trait>(
-//     fs_transcript: &mut merlin::Transcript,
-//     public_statement: &H::Codomain,
-//     prover_last_message: &H::Domain,
-//     dst: &[u8],
-// ) -> E::ScalarField
-// where
-//     H::Domain: Witness<E>,
-//     H::Codomain: Statement,
-// {
-//     // Append the Σ-protocol separator to the transcript
-//     <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_sep(
-//         fs_transcript,
-//         dst,
-//     );
-
-//     // Add the last prover message (the prover's response) to the transcript
-//     <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_last_message(
-//         fs_transcript,
-//         prover_last_message,
-//     );
-
-//     // Add the public statment (the image of the prover's witness) to the transcript
-//     <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_public_statement(
-//         fs_transcript,
-//         public_statement,
-//     );
-
-//     // Generate the Fiat-Shamir challenge from the updated transcript
-//     <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::challenge_for_sigma_protocol(
-//         fs_transcript,
-//     )
-// }
-
-/// Performs a **batch verification** of multiple Sigma protocol MSM (Multi-Scalar Multiplication) relations.
-///
-/// ### Overview
-/// Suppose we need to verify a family of equations of the form:
-///
-/// ```text
-/// ∑_i g_{i,j} * x_{i,j} = A_j + P_j * c      for each index j.
-/// ```
-///
-/// Instead of checking each equation individually, we batch them using a random challenge \(\beta\).
-/// The verifier checks that:
-///
-/// ```text
-/// ∑_j β^j * ( ∑_i g_{i,j} * x_{i,j} - A_j - P_j * c ) = 0
-/// ```
-///
-/// This reduces the verification of multiple MSM-based equations to a single MSM check,
-/// significantly improving efficiency.
-///
-/// ### Generalization
-/// This batching technique can be extended to simultaneously verify multiple protocols
-/// that involve MSM relations.
-///
-/// ### Notes
-/// - The random challenge \(\beta\) is currently sampled locally by the verifier, for composability with larger protocols. But this could be derived via Fiat–Shamir as well. (TODO: Pending discussion)
-///
-/// ### TODO
-/// - The code is currently set up on the case where the MSM input representation is
-///   `Vec<(Scalars, Bases)> = Vec<(E::ScalarField, E::G1Affine)>`. If we want to add a
-///   homomorphism whose codomain has components in both G_1 and G_2, we should probably put
-///   the `Bases` component and MsmOutput inside of enums.
-// #[allow(non_snake_case)]
-// pub fn verify_msm_hom<C: Serialize, E: Pairing, H>(
-//     homomorphism: &H,
-//     statement: &H::Codomain,
-//     prover_first_message: &H::Codomain,
-//     prover_last_message: &H::Domain,
-//     cntxt: &C,
-//     dst: &[u8],
-// ) -> anyhow::Result<()>
-// where
-// //     H: fixed_base_msms::Trait<Scalar = E::ScalarField, Base = E::G1Affine, MsmOutput = E::G1, MsmInput = MsmInput<E::G1Affine, E::ScalarField>>
-//     H: fixed_base_msms::Trait<Scalar = E::ScalarField, Base = E::G1Affine, MsmOutput = E::G1>
-//         + CanonicalSerialize,
-//     H::Domain: Witness<E>,
-// {
-//     // Step 1: Reproduce the prover's Fiat-Shamir challenge
-//     let c = fiat_shamir_challenge_for_sigma_protocol::<_, E, H>(
-//         cntxt,
-//         homomorphism,
-//         statement,
-//         &prover_first_message,
-//         dst,
-//     );
-
-//     // Step 2: Compute verifier-specific challenge (used for weighted MSM)
-//     // While this could be derived deterministically via Fiat–Shamir, doing so would require
-//     // integrating it into the prover as well for composability; we no longer follow this approach.
-//     // Instead, we follow the simple approach:
-//     let mut rng = ark_std::rand::thread_rng(); // TODO: make this part of the function input?
-//     let beta = E::ScalarField::rand(&mut rng);
-
-//     let msm_terms = homomorphism.msm_terms(prover_last_message);
-//     // let powers_of_beta = utils::powers(beta, statement.clone().into_iter().count()); // TODO: Maybe get rid of clone? Is .count() an efficient way to get the length?
-
-//     // let terms_iter = msm_terms.clone().into_iter(); // TODO: get rid of these clones?
-//     // let prover_iter = prover_first_message.clone().into_iter();
-//     // let statement_iter = statement.clone().into_iter();
-
-//     // let mut final_bases = Vec::new();
-//     // let mut final_scalars = Vec::new();
-
-//     // for (((term, A), P), beta_power) in terms_iter
-//     //     .zip(prover_iter)
-//     //     .zip(statement_iter)
-//     //     .zip(powers_of_beta)
-//     // {
-//     //     // Destructure term and create a new MsmInput
-//     //     let mut bases = term.bases().to_vec();
-//     //     let mut scalars = term.scalars().to_vec();
-
-//     //     for scalar in scalars.iter_mut() {
-//     //         *scalar *= beta_power;
-//     //     }
-
-//     //     // Append bases/scalars from prover and statement
-//     //     bases.push(A.clone().into_affine()); // TODO: do a batch into affine
-//     //     bases.push(P.clone().into_affine()); // TODO: do a batch into affine
-
-//     //     scalars.push(-beta_power);
-//     //     scalars.push(-c * beta_power);
-
-//     //     final_bases.extend(bases);
-//     //     final_scalars.extend(scalars);
-//     // }
-
-//     let (final_bases, final_scalars, _) = combine_msm_terms::<E, H, <H as fixed_base_msms::Trait>::MsmInput>(
-//         msm_terms.into_iter().collect(),
-//         prover_first_message,
-//         statement,
-//         beta,
-//         c,
-//         0
-//     );
-
-//     // Step 7: Perform the final MSM check. TODO: Could use msm_eval here?
-//     let msm_result =
-//         E::G1::msm(&final_bases, &final_scalars).expect("Could not compute MSM for verifier");
-//     ensure!(msm_result == E::G1::ZERO);
-
-//     Ok(())
-// }
 
 /// The MSM terms of the sigma protocol. Instead of computing the answer, returning the terms in thsi form
 /// is useful for combining with the MSM terms of other protocols, but note that beta powers are already being

@@ -14,11 +14,10 @@ use aptos_dkg::{
 };
 use ark_bls12_381::Bls12_381;
 use ark_bn254::Bn254;
-use ark_ec::{pairing::Pairing, CurveGroup};
+use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::thread_rng;
 use std::fmt::Debug;
-use ark_ec::PrimeGroup;
 
 #[cfg(test)]
 pub fn test_sigma_protocol<C, H>(hom: H, witness: H::Domain)
@@ -72,6 +71,7 @@ mod schnorr {
             T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
         type MsmInput = MsmInput<C::Affine, C::ScalarField>;
         type MsmOutput = C;
+        type Scalar = C::ScalarField;
 
         fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
             CodomainShape(MsmInput {
@@ -112,7 +112,8 @@ mod chaum_pedersen {
         }
     }
 
-    pub type InhomogChaumPedersen<E> = TupleHomomorphism<Schnorr<<E as Pairing>::G1>, Schnorr<<E as Pairing>::G2>, false>;
+    pub type InhomogChaumPedersen<E> =
+        TupleHomomorphism<Schnorr<<E as Pairing>::G1>, Schnorr<<E as Pairing>::G2>, false>;
 
     #[allow(non_snake_case)]
     pub fn make_inhomogeneous_chaum_pedersen_instance<E: Pairing>() -> InhomogChaumPedersen<E> {
@@ -153,7 +154,7 @@ fn test_chaum_pedersen() {
     // ---- Bn254 ----
     let witness_bn = Scalar(sample_field_element(&mut rng));
     test_sigma_protocol::<<Bn254 as Pairing>::G1, _>(make_chaum_pedersen_instance(), witness_bn);
-//    test_sigma_protocol::<<Bn254 as Pairing>::G1, _>(make_inhomogeneous_chaum_pedersen_instance(), witness_bn);
+    //    test_sigma_protocol::<<Bn254 as Pairing>::G1, _>(make_inhomogeneous_chaum_pedersen_instance(), witness_bn);
 
     // ---- Bls12_381 ----
     let witness_bls = Scalar(sample_field_element(&mut rng));
