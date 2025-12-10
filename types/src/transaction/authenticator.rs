@@ -18,6 +18,7 @@ use aptos_crypto::{
     hash::CryptoHash,
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
     secp256k1_ecdsa, secp256r1_ecdsa, signing_message,
+    slh_dsa_sha2_128s,
     traits::Signature,
     CryptoMaterialError, HashValue, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
@@ -1240,6 +1241,9 @@ pub enum AnySignature {
     Secp256k1Ecdsa {
         signature: secp256k1_ecdsa::Signature,
     },
+    SlhDsaSha2_128s {
+        signature: slh_dsa_sha2_128s::Signature,
+    },
     WebAuthn {
         signature: PartialAuthenticatorAssertionResponse,
     },
@@ -1257,6 +1261,10 @@ impl AnySignature {
         Self::Secp256k1Ecdsa { signature }
     }
 
+    pub fn slh_dsa_sha2_128s(signature: slh_dsa_sha2_128s::Signature) -> Self {
+        Self::SlhDsaSha2_128s { signature }
+    }
+
     pub fn webauthn(signature: PartialAuthenticatorAssertionResponse) -> Self {
         Self::WebAuthn { signature }
     }
@@ -1269,6 +1277,7 @@ impl AnySignature {
         match self {
             Self::Ed25519 { .. } => "Ed25519",
             Self::Secp256k1Ecdsa { .. } => "Secp256k1Ecdsa",
+            Self::SlhDsaSha2_128s { .. } => "SlhDsaSha2_128s",
             Self::WebAuthn { .. } => "WebAuthn",
             Self::Keyless { .. } => "Keyless",
         }
@@ -1284,6 +1293,9 @@ impl AnySignature {
                 signature.verify(message, public_key)
             },
             (Self::Secp256k1Ecdsa { signature }, AnyPublicKey::Secp256k1Ecdsa { public_key }) => {
+                signature.verify(message, public_key)
+            },
+            (Self::SlhDsaSha2_128s { signature }, AnyPublicKey::SlhDsaSha2_128s { public_key }) => {
                 signature.verify(message, public_key)
             },
             (Self::WebAuthn { signature }, _) => signature.verify(message, public_key),
@@ -1352,6 +1364,9 @@ pub enum AnyPublicKey {
     Secp256r1Ecdsa {
         public_key: secp256r1_ecdsa::PublicKey,
     },
+    SlhDsaSha2_128s {
+        public_key: slh_dsa_sha2_128s::PublicKey,
+    },
     Keyless {
         public_key: KeylessPublicKey,
     },
@@ -1371,6 +1386,10 @@ impl AnyPublicKey {
 
     pub fn secp256r1_ecdsa(public_key: secp256r1_ecdsa::PublicKey) -> Self {
         Self::Secp256r1Ecdsa { public_key }
+    }
+
+    pub fn slh_dsa_sha2_128s(public_key: slh_dsa_sha2_128s::PublicKey) -> Self {
+        Self::SlhDsaSha2_128s { public_key }
     }
 
     pub fn keyless(public_key: KeylessPublicKey) -> Self {
