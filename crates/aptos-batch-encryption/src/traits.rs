@@ -8,7 +8,12 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;
 
 pub trait BatchThresholdEncryption {
+
+    /// Config stuct which specifies the number of parties and threshold required to decrypt.
     type ThresholdConfig: aptos_crypto::SecretSharingConfig;
+
+    /// The PVSS subtranscript which is used to derive the master public key and the keypairs
+    /// for each party.
     type SubTranscript: SubTranscript;
 
     /// An encryption key for the scheme. Allows for generating ciphertexts. If we want to actually

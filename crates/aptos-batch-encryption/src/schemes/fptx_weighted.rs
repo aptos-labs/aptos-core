@@ -5,7 +5,7 @@ use crate::{
     group::*,
     schemes::fptx::{self, EncryptionKey},
     shared::{
-        ark_serialize::*,
+        serialize::arkworks::*,
         ciphertext::{CTDecrypt, CTEncrypt, Ciphertext, PreparedCiphertext},
         digest::{Digest, DigestKey, EvalProofs, EvalProofsPromise},
         ids::{

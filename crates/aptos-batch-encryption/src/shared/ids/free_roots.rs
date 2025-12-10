@@ -5,7 +5,7 @@ use crate::{
     group::{Fr, G1Affine, G1Projective},
     shared::{
         algebra::mult_tree::{compute_mult_tree, quotient},
-        ark_serialize::*,
+        serialize::arkworks::*,
     },
 };
 use ark_ec::VariableBaseMSM;

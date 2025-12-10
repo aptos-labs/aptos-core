@@ -4,7 +4,7 @@ use super::symmetric;
 use crate::{
     errors::BatchEncryptionError,
     group::{Fr, G1Affine, G2Affine, PairingSetting},
-    shared::{ark_serialize::*, digest::Digest},
+    shared::{serialize::arkworks::*, digest::Digest},
     traits::{DecryptionKeyShare, VerificationKey},
 };
 use anyhow::Result;

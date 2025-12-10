@@ -8,7 +8,7 @@ use super::{
 use crate::{
     errors::{BatchEncryptionError, CTVerifyError},
     group::{Fr, G1Affine, G2Affine, G2Prepared, PairingOutput, PairingSetting},
-    shared::{ark_serialize::*, ids::Id},
+    shared::{serialize::arkworks::*, ids::Id},
     traits::{AssociatedData, Plaintext},
 };
 use anyhow::Result;

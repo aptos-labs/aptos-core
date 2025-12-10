@@ -1,3 +1,5 @@
+use crate::shared::algebra::batch_msm::batch_msm;
+
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use super::mult_tree::compute_mult_tree;
@@ -142,10 +144,7 @@ pub fn multi_point_eval_naive<
         })
         .collect::<Vec<Vec<F>>>();
 
-    powers
-        .into_par_iter()
-        .map(|p| T::msm(f, &p).unwrap())
-        .collect()
+    batch_msm(&f, &powers)
 }
 
 pub fn multi_point_eval_with_mult_tree<F: FftField, T: DomainCoeff<F> + Mul<F, Output = T>>(

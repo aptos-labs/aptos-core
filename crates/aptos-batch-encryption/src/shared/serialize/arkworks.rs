@@ -27,7 +27,7 @@ where
 pub mod tests {
     use crate::{
         group::{G1Affine, G1Projective, G2Affine, G2Projective},
-        shared::ark_serialize::*,
+        shared::serialize::arkworks::*,
     };
     use ark_ec::AffineRepr as _;
     use ark_ff::{BigInteger, PrimeField};

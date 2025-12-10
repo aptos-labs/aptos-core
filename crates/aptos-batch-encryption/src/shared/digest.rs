@@ -6,7 +6,7 @@ use super::ids::{Id, IdSet, OssifiedIdSet};
 use crate::{
     errors::BatchEncryptionError,
     group::{Fr, G1Affine, G1Projective, G2Affine, G2Projective, PairingSetting},
-    shared::{algebra::fk_algorithm::FKDomain, ark_serialize::*},
+    shared::{algebra::fk_algorithm::FKDomain, serialize::arkworks::*},
 };
 use anyhow::{anyhow, Result};
 use ark_ec::{pairing::Pairing, AffineRepr, ScalarMul, VariableBaseMSM};

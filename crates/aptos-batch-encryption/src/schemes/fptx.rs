@@ -4,7 +4,7 @@ use crate::{
     errors::BatchEncryptionError,
     group::{self, *},
     shared::{
-        ark_serialize::*,
+        serialize::arkworks::*,
         ciphertext::{BIBEEncryptionKey, CTDecrypt, CTEncrypt, Ciphertext, PreparedCiphertext},
         digest::{Digest, DigestKey, EvalProofs, EvalProofsPromise},
         ids::{
