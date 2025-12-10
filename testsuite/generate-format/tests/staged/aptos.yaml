@@ -92,11 +92,16 @@ AnyPublicKey:
           - public_key:
               TYPENAME: Secp256r1EcdsaPublicKey
     3:
+      SlhDsa_Sha2_128s:
+        STRUCT:
+          - public_key:
+              TYPENAME: SlhDsa_Sha2_128s_PublicKey
+    4:
       Keyless:
         STRUCT:
           - public_key:
               TYPENAME: KeylessPublicKey
-    4:
+    5:
       FederatedKeyless:
         STRUCT:
           - public_key:
@@ -114,11 +119,16 @@ AnySignature:
           - signature:
               TYPENAME: Secp256k1EcdsaSignature
     2:
+      SlhDsa_Sha2_128s:
+        STRUCT:
+          - signature:
+              TYPENAME: SlhDsa_Sha2_128s_Signature
+    3:
       WebAuthn:
         STRUCT:
           - signature:
               TYPENAME: PartialAuthenticatorAssertionResponse
-    3:
+    4:
       Keyless:
         STRUCT:
           - signature:
@@ -580,6 +590,12 @@ SingleKeyAuthenticator:
         TYPENAME: AnyPublicKey
     - signature:
         TYPENAME: AnySignature
+SlhDsa_Sha2_128s_PrivateKey:
+  NEWTYPESTRUCT: BYTES
+SlhDsa_Sha2_128s_PublicKey:
+  NEWTYPESTRUCT: BYTES
+SlhDsa_Sha2_128s_Signature:
+  NEWTYPESTRUCT: BYTES
 StateKey:
   ENUM:
     0:

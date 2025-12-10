@@ -13277,6 +13277,7 @@ components:
       - $ref: '#/components/schemas/PublicKey_Ed25519'
       - $ref: '#/components/schemas/PublicKey_Secp256k1Ecdsa'
       - $ref: '#/components/schemas/PublicKey_Secp256r1Ecdsa'
+      - $ref: '#/components/schemas/PublicKey_SlhDsa_Sha2_128s'
       - $ref: '#/components/schemas/PublicKey_Keyless'
       - $ref: '#/components/schemas/PublicKey_FederatedKeyless'
       discriminator:
@@ -13285,6 +13286,7 @@ components:
           ed25519: '#/components/schemas/PublicKey_Ed25519'
           secp256k1_ecdsa: '#/components/schemas/PublicKey_Secp256k1Ecdsa'
           secp256r1_ecdsa: '#/components/schemas/PublicKey_Secp256r1Ecdsa'
+          slh_dsa__sha2_128s: '#/components/schemas/PublicKey_SlhDsa_Sha2_128s'
           keyless: '#/components/schemas/PublicKey_Keyless'
           federated_keyless: '#/components/schemas/PublicKey_FederatedKeyless'
     PublicKey_Ed25519:
@@ -13347,6 +13349,18 @@ components:
             - secp256r1_ecdsa
             example: secp256r1_ecdsa
       - $ref: '#/components/schemas/Secp256r1Ecdsa'
+    PublicKey_SlhDsa_Sha2_128s:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - slh_dsa__sha2_128s
+            example: slh_dsa__sha2_128s
+      - $ref: '#/components/schemas/SlhDsa_Sha2_128s'
     RSA_JWK:
       type: object
       description: |-
@@ -13452,6 +13466,7 @@ components:
       oneOf:
       - $ref: '#/components/schemas/Signature_Ed25519'
       - $ref: '#/components/schemas/Signature_Secp256k1Ecdsa'
+      - $ref: '#/components/schemas/Signature_SlhDsa_Sha2_128s'
       - $ref: '#/components/schemas/Signature_WebAuthn'
       - $ref: '#/components/schemas/Signature_Keyless'
       discriminator:
@@ -13459,6 +13474,7 @@ components:
         mapping:
           ed25519: '#/components/schemas/Signature_Ed25519'
           secp256k1_ecdsa: '#/components/schemas/Signature_Secp256k1Ecdsa'
+          slh_dsa__sha2_128s: '#/components/schemas/Signature_SlhDsa_Sha2_128s'
           web_authn: '#/components/schemas/Signature_WebAuthn'
           keyless: '#/components/schemas/Signature_Keyless'
     Signature_Ed25519:
@@ -13497,6 +13513,18 @@ components:
             - secp256k1_ecdsa
             example: secp256k1_ecdsa
       - $ref: '#/components/schemas/Secp256k1Ecdsa'
+    Signature_SlhDsa_Sha2_128s:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - slh_dsa__sha2_128s
+            example: slh_dsa__sha2_128s
+      - $ref: '#/components/schemas/SlhDsa_Sha2_128s'
     Signature_WebAuthn:
       allOf:
       - type: object
@@ -13520,6 +13548,13 @@ components:
           $ref: '#/components/schemas/PublicKey'
         signature:
           $ref: '#/components/schemas/Signature'
+    SlhDsa_Sha2_128s:
+      type: object
+      required:
+      - value
+      properties:
+        value:
+          $ref: '#/components/schemas/HexEncodedBytes'
     StateCheckpointTransaction:
       type: object
       description: A state checkpoint transaction
