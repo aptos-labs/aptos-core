@@ -56,14 +56,14 @@ pub trait Trait<C: CurveGroup>:
     where
         H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>,
     {
-        let (bases, scalars) = self.msm_terms_for_verify::<_, H>(
+        let msm_terms = self.msm_terms_for_verify::<_, H>(
             public_statement,
             proof,
             cntxt,
         );
 
         let msm_result =
-            C::msm(&bases, &scalars).expect("Could not compute MSM for verifier");
+            C::msm(msm_terms.bases(), msm_terms.scalars()).expect("Could not compute MSM for verifier");
         ensure!(msm_result == C::ZERO);
 
         Ok(())
@@ -76,7 +76,7 @@ pub trait Trait<C: CurveGroup>:
         public_statement: &Self::Codomain,
         proof: &Proof<C::ScalarField, H>,
         cntxt: &Ct,
-    ) -> (Vec<<Self::MsmInput as IsMsmInput>::Base>, Vec<<Self::MsmInput as IsMsmInput>::Scalar>)
+    ) -> Self::MsmInput
     where
         H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>,
     {
@@ -114,11 +114,13 @@ pub trait Trait<C: CurveGroup>:
             c,
         );
 
-        (bases, scalars)
+        Self::MsmInput::new(bases, scalars).expect("Something went wrong constructing MSM input")
     }
 }
 
 use ark_ec::pairing::Pairing;
+use ark_ec::VariableBaseMSM;
+use ark_ff::AdditiveGroup;
 
 // pub trait Inhomogeneous<E: Pairing>:
 //     fixed_base_msms::Inhomogeneous<
@@ -138,7 +140,7 @@ use ark_ec::pairing::Pairing;
 //         statement: &Self::Codomain,
 //         cntxt: &C, // for SoK purposes
 //         rng: &mut R,
-//     ) -> Proof<E, Self> {
+//     ) -> Proof<E::ScalarField, Self> {
 //         prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
 //     }
 
@@ -146,7 +148,7 @@ use ark_ec::pairing::Pairing;
 //     fn verify<C: Serialize, H>(
 //         &self,
 //         public_statement: &Self::Codomain,
-//         proof: &Proof<E, H>, // Would like to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
+//         proof: &Proof<E::ScalarField, H>, // Would like to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
 //         cntxt: &C,
 //     ) -> anyhow::Result<()>
 //     where
@@ -169,51 +171,51 @@ use ark_ec::pairing::Pairing;
 //         Ok(())
 //     }
 
-//     // Returns the MSM terms that verify needs
-//     #[allow(non_snake_case)]
-//     fn msm_terms_for_verify<C: Serialize, H>(
+//     fn msm_terms_for_verify<Ct: Serialize, H>(
 //         &self,
 //         public_statement: &Self::Codomain,
-//         proof: &Proof<E, H>,
-//         cntxt: &C,
-//     ) -> ((Vec<Self::FirstBase>, Vec<Self::Scalar>), (Vec<Self::SecondBase>, Vec<Self::Scalar>))
+//         proof: &Proof<C::ScalarField, H>,
+//         cntxt: &Ct,
+//     ) -> (Vec<<Self::MsmInput as IsMsmInput>::Base>, Vec<<Self::MsmInput as IsMsmInput>::Scalar>)
 //     where
 //         H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>,
-//         {
-//             let prover_first_message = match &proof.first_proof_item {
-//                 FirstProofItem::Commitment(A) => A,
-//                 FirstProofItem::Challenge(_) => {
-//                     panic!("Missing implementation - expected commitment, not challenge")
-//                 },
-//             };
-//             let c = fiat_shamir_challenge_for_sigma_protocol::<_, E, _>(
-//                 cntxt,
-//                 self,
-//                 public_statement,
-//                 &prover_first_message,
-//                 &self.dst(),
-//             );
+//     {
+//         let prover_first_message = match &proof.first_proof_item {
+//             FirstProofItem::Commitment(A) => A,
+//             FirstProofItem::Challenge(_) => {
+//                 panic!("Missing implementation - expected commitment, not challenge")
+//             },
+//         };
+//         let c = fiat_shamir_challenge_for_sigma_protocol::<_, C::ScalarField, _>(
+//             cntxt,
+//             self,
+//             public_statement,
+//             &prover_first_message,
+//             &self.dst(),
+//         );
 
-//             // Step 2: Compute verifier-specific challenge (used for weighted MSM)
-//             // While this could be derived deterministically via Fiat–Shamir, doing so would require
-//             // integrating it into the prover as well for composability; we no longer follow this approach.
-//             // Instead, we follow the simple approach:
-//             let mut rng = ark_std::rand::thread_rng(); // TODO: make this part of the function input?
-//             let beta = E::ScalarField::rand(&mut rng);
+//         // **Compute verifier-specific challenge (used for weighted MSM)**
+//         // While this could be derived deterministically via Fiat–Shamir, doing so would require
+//         // integrating it into the prover as well for composability; we no longer follow this approach.
+//         // Instead, we follow the simple approach:
+//         let mut rng = ark_std::rand::thread_rng(); // TODO: make this part of the function input?
+//         let beta = C::ScalarField::rand(&mut rng);
 
-//             let msm_terms_of_response = self.msm_terms(&proof.z);
+//         let len = public_statement.clone().into_iter().count(); // hmm maybe pass the into_iter version in combine_msm_terms?
+//         let powers_of_betas = utils::powers(beta, len);
 
-//             let (first_bases, first_scalars, _) = combine_msm_terms::<E, Self, <Self as fixed_base_msms::TraitTwo>::FirstMsmInput>(
-//                 msm_terms_of_response.0.into_iter().collect(),
-//                 &prover_first_message.0,
-//                 &public_statement.0,
-//                 beta, // TODO: aanpassen dit...
-//                 c,
-//                 0
-//             );
+//         let msm_terms_of_response = self.msm_terms(&proof.z);
 
-//             ((first_bases, first_scalars), (second_bases, second_scalars))
-//         }
+//         let (bases, scalars) = combine_msm_terms::<C, Self>(
+//             msm_terms_of_response.into_iter().collect(),
+//             prover_first_message,
+//             public_statement,
+//             powers_of_betas,
+//             c,
+//         );
+
+//         (bases, scalars)
+//     }
 // }
 
 pub trait Witness<F: Field>: CanonicalSerialize + CanonicalDeserialize + Clone + Eq {

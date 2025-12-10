@@ -37,7 +37,7 @@ pub struct MsmInput<
 /// This exists as a workaround because stable Rust does not yet support default
 /// associated types. (Now we have to do `type MsmInput: IsMsmInput` rather than `type MsmInput = IsMsmInput`)
 /// TODO: we probably don't need this trait, can just do MsmInput<E::Base, E::Scalar> in function signatures???
-pub trait IsMsmInput {
+pub trait IsMsmInput: Sized {
     // maybe make B and S associated types instead
     /// The scalar type used in the MSMs.
     type Scalar: Clone + CanonicalSerialize + CanonicalDeserialize; // scrap and make associated type of MsmInput
@@ -51,24 +51,9 @@ pub trait IsMsmInput {
 
     /// Returns a reference to the slice of scalar elements in this MSM input.
     fn scalars(&self) -> &[Self::Scalar];
-}
 
-impl<B, S> MsmInput<B, S>
-where
-    B: CanonicalSerialize + CanonicalDeserialize + Clone,
-    S: CanonicalSerialize + CanonicalDeserialize + Clone,
-{
-    /// Creates a new `MsmInput`, ensuring base and scalar lengths match.
-    pub fn new(bases: Vec<B>, scalars: Vec<S>) -> anyhow::Result<Self> {
-        if bases.len() != scalars.len() {
-            anyhow::bail!(
-                "MsmInput length mismatch: {} bases, {} scalars",
-                bases.len(),
-                scalars.len(),
-            );
-        }
-        Ok(Self { bases, scalars })
-    }
+    /// Returns a new instance
+    fn new(bases: Vec<Self::Base>, scalars: Vec<Self::Scalar>) -> anyhow::Result<Self>;
 }
 
 impl<B, S> IsMsmInput for MsmInput<B, S>
@@ -85,6 +70,17 @@ where
 
     fn scalars(&self) -> &[Self::Scalar] {
         &self.scalars
+    }
+
+    fn new(bases: Vec<Self::Base>, scalars: Vec<Self::Scalar>) -> anyhow::Result<Self> {
+        if bases.len() != scalars.len() {
+            anyhow::bail!(
+                "MsmInput length mismatch: {} bases, {} scalars",
+                bases.len(),
+                scalars.len(),
+            );
+        }
+        Ok(Self { bases, scalars })        
     }
 }
 
