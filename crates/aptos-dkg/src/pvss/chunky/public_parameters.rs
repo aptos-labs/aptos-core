@@ -91,7 +91,7 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
             pk_range_proof: serialized.pk_range_proof,
             G_2: serialized.G_2,
             ell: serialized.ell,
-            table: dlog::table::build::<E::G1>(G, 1u32 << (serialized.ell / 2)),
+            table: Self::build_dlog_table(G, serialized.ell, serialized.max_aggregation),
             powers_of_radix: compute_powers_of_radix::<E>(serialized.ell),
             max_aggregation: serialized.max_aggregation,
         })
@@ -101,6 +101,19 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
 impl<E: Pairing> PublicParameters<E> {
     pub fn get_commitment_base(&self) -> E::G2Affine {
         self.G_2
+    }
+
+    #[allow(non_snake_case)]
+    pub(crate) fn build_dlog_table(
+        G: E::G1,
+        ell: u8,
+        max_aggregation: usize,
+    ) -> HashMap<Vec<u8>, u32> {
+        dlog::table::build::<E::G1>(G, 1u32 << ((ell as u32 + log2(max_aggregation)) / 2))
+    }
+
+    pub(crate) fn get_dlog_range_bound(&self) -> u32 {
+        1u32 << (self.ell as u32 + log2(self.max_aggregation))
     }
 }
 
@@ -145,7 +158,12 @@ impl<E: Pairing> TryFrom<&[u8]> for PublicParameters<E> {
 #[allow(non_snake_case)]
 impl<E: Pairing> PublicParameters<E> {
     /// Verifiably creates Aptos-specific public parameters.
-    pub fn new<R: RngCore + CryptoRng>(max_num_shares: usize, ell: u8, max_aggregation: usize, rng: &mut R) -> Self {
+    pub fn new<R: RngCore + CryptoRng>(
+        max_num_shares: usize,
+        ell: u8,
+        max_aggregation: usize,
+        rng: &mut R,
+    ) -> Self {
         let max_num_chunks_padded =
             ((max_num_shares * num_chunks_per_scalar::<E::ScalarField>(ell) as usize) + 1)
                 .next_power_of_two()
@@ -166,7 +184,7 @@ impl<E: Pairing> PublicParameters<E> {
             G_2: hashing::unsafe_hash_to_affine(b"G_2", DST),
             ell,
             max_aggregation,
-            table: dlog::table::build::<E::G1>(G.into(), 1u32 << ((ell as u32 + log2(max_aggregation)) / 2)),
+            table: Self::build_dlog_table(G.into(), ell, max_aggregation),
             powers_of_radix: compute_powers_of_radix::<E>(ell),
         };
 
