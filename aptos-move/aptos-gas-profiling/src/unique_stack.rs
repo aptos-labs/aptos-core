@@ -163,6 +163,7 @@ impl UniqueStackFoldedCallFrame {
                     fn_name,
                     ty_args,
                     cost,
+                    ..
                 } => (
                     InstructionKey::CallNative {
                         module_id,
@@ -204,6 +205,7 @@ impl UniqueStackFoldedCallFrame {
                     module_id,
                     fn_name,
                     ty_args,
+                    args: vec![],
                     cost,
                 },
                 InstructionKey::LoadResource { addr, ty } => {
@@ -226,6 +228,7 @@ impl UniqueStackFoldedCallFrame {
         events.reverse();
         CallFrame {
             name,
+            args: vec![],
             events,
             native_gas: self.self_gas,
         }
