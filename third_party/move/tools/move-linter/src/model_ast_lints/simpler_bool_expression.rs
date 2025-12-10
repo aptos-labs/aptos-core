@@ -20,7 +20,8 @@
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
     ast::{Exp, ExpData, Operation},
-    model::FunctionEnv,
+    model::{FunctionEnv, GlobalEnv, NodeId},
+    ty::Type,
 };
 use ExpData::Call;
 use Operation::{And, Not, Or};
@@ -58,13 +59,33 @@ fn is_constant(expr: &ExpData) -> bool {
     matches!(expr, ExpData::Value(_, _))
 }
 
+/// If `op` is `Exists` operation, compute if the node instantiations corresponding to `id1`
+/// `id2` are of the same type.
+/// For non `Exists` operations, always returns true.
+fn exists_instantiation_equal(op: &Operation, id1: NodeId, id2: NodeId, env: &GlobalEnv) -> bool {
+    if !matches!(op, Operation::Exists(_)) {
+        return true;
+    }
+    // Get the 0th type instantiation (exists should only have one type instantiation)
+    // for both the node ids.
+    let Type::Struct(mid1, sid1, ref params1) = env.get_node_instantiation(id1)[0] else {
+        // note that `exists` instantiations must be a struct to be valid code
+        // but the check for this validity may happen after this lint is called
+        return false;
+    };
+    let Type::Struct(mid2, sid2, ref params2) = env.get_node_instantiation(id2)[0] else {
+        return false;
+    };
+    mid1 == mid2 && sid1 == sid2 && params1 == params2
+}
+
 /// Check if two expressions are structurally equal
-fn is_expression_equal(expr1: &ExpData, expr2: &ExpData) -> bool {
+fn is_expression_equal(env: &GlobalEnv, expr1: &ExpData, expr2: &ExpData) -> bool {
     match (expr1, expr2) {
         (ExpData::LocalVar(_, s1), ExpData::LocalVar(_, s2)) => s1 == s2,
         (ExpData::Value(_, v1), ExpData::Value(_, v2)) => v1 == v2,
         (ExpData::Temporary(_, t1), ExpData::Temporary(_, t2)) => t1 == t2,
-        (ExpData::Call(_, op1, args1), ExpData::Call(_, op2, args2)) => {
+        (ExpData::Call(id1, op1, args1), ExpData::Call(id2, op2, args2)) => {
             if is_move_function(expr1)
                 || is_move_function(expr2)
                 || args1.iter().any(|a| is_move_function(a))
@@ -78,7 +99,8 @@ fn is_expression_equal(expr1: &ExpData, expr2: &ExpData) -> bool {
                 && args1
                     .iter()
                     .zip(args2.iter())
-                    .all(|(a1, a2)| is_expression_equal(a1, a2))
+                    .all(|(a1, a2)| is_expression_equal(env, a1, a2))
+                && exists_instantiation_equal(op1, *id1, *id2, env)
         },
         _ => false,
     }
@@ -88,14 +110,15 @@ impl SimplerBoolExpression {
     /// Check for absorption law patterns: `a && b || a` or `a || a && b`
     fn check_absorption_law(
         &self,
+        env: &GlobalEnv,
         left: &ExpData,
         right: &ExpData,
     ) -> Option<SimplerBoolPatternType> {
         let check_pattern = |left: &ExpData, right: &ExpData| {
             if let ExpData::Call(_, And, and_args) = left {
                 if and_args.len() == 2 {
-                    return is_expression_equal(and_args[0].as_ref(), right)
-                        || is_expression_equal(and_args[1].as_ref(), right);
+                    return is_expression_equal(env, and_args[0].as_ref(), right)
+                        || is_expression_equal(env, and_args[1].as_ref(), right);
                 }
             }
             false
@@ -113,13 +136,18 @@ impl SimplerBoolExpression {
     }
 
     /// Check for idempotence patterns: `a && a` or `a || a`
-    fn check_idempotence(&self, left: &ExpData, right: &ExpData) -> Option<SimplerBoolPatternType> {
+    fn check_idempotence(
+        &self,
+        env: &GlobalEnv,
+        left: &ExpData,
+        right: &ExpData,
+    ) -> Option<SimplerBoolPatternType> {
         // If left or right is a constant or known value, we ignore this since it's already implemented in `nonminimal_bool`
         if is_constant(left) || is_constant(right) {
             return None;
         }
 
-        if is_expression_equal(left, right) {
+        if is_expression_equal(env, left, right) {
             return Some(SimplerBoolPatternType::Idempotence);
         }
         None
@@ -128,13 +156,14 @@ impl SimplerBoolExpression {
     /// Check for contradiction and tautology patterns: `a && !a` or `a || !a`
     fn check_contradiction_tautology(
         &self,
+        env: &GlobalEnv,
         op: &Operation,
         left: &ExpData,
         right: &ExpData,
     ) -> Option<SimplerBoolPatternType> {
         let is_negation_pair = |expr1: &ExpData, expr2: &ExpData| -> bool {
             matches!(expr2, ExpData::Call(_, Not, not_args)
-                if not_args.len() == 1 && is_expression_equal(expr1, not_args[0].as_ref()))
+                if not_args.len() == 1 && is_expression_equal(env, expr1, not_args[0].as_ref()))
         };
 
         // If left or right is a constant or known value, we ignore this since it's already implemented in `nonminimal_bool`
@@ -159,6 +188,7 @@ impl SimplerBoolExpression {
     /// Check for distributive law patterns: `(a && b) || (a && c)` or `(a || b) && (a || c)`
     fn check_distributive_law(
         &self,
+        env: &GlobalEnv,
         op: &Operation,
         left: &ExpData,
         right: &ExpData,
@@ -171,7 +201,7 @@ impl SimplerBoolExpression {
 
                 for left_elem in left_args.iter() {
                     for right_elem in right_args.iter() {
-                        if is_expression_equal(left_elem.as_ref(), right_elem.as_ref()) {
+                        if is_expression_equal(env, left_elem.as_ref(), right_elem.as_ref()) {
                             return Some(SimplerBoolPatternType::DistributiveLaw);
                         }
                     }
@@ -223,15 +253,15 @@ impl ExpChecker for SimplerBoolExpression {
 
                 // For Or operations, try absorption law first
                 let absorption = if matches!(op, Or) {
-                    self.check_absorption_law(left, right)
+                    self.check_absorption_law(env, left, right)
                 } else {
                     None
                 };
 
                 absorption
-                    .or_else(|| self.check_idempotence(left, right))
-                    .or_else(|| self.check_contradiction_tautology(op, left, right))
-                    .or_else(|| self.check_distributive_law(op, left, right))
+                    .or_else(|| self.check_idempotence(env, left, right))
+                    .or_else(|| self.check_contradiction_tautology(env, op, left, right))
+                    .or_else(|| self.check_distributive_law(env, op, left, right))
             },
             Not => self.check_double_negation(op, args),
             _ => None,

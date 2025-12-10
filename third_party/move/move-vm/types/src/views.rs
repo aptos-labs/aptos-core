@@ -21,7 +21,7 @@ pub trait TypeView {
 ///
 /// This is used to expose certain info to clients (e.g. the gas meter),
 /// usually in a lazily evaluated fashion.
-pub trait ValueView {
+pub trait ValueView: std::fmt::Debug {
     fn visit(&self, visitor: &mut impl ValueVisitor) -> PartialVMResult<()>;
 
     /// Returns the abstract memory size of the value.

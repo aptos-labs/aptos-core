@@ -12,6 +12,9 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+bigquery_integration_tests = []
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-config = { workspace = true }
@@ -47,9 +50,9 @@ url = { workspace = true }
 uuid = { workspace = true }
 warp = { workspace = true }
 
-[features]
-bigquery_integration_tests = []
-
 [dev-dependencies]
 claims = { workspace = true }
+ed25519-dalek = { workspace = true }
+hex = { workspace = true }
 httpmock = { workspace = true }
+urlencoding = "2.1"

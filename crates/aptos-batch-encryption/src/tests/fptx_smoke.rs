@@ -132,6 +132,7 @@ fn smoke_with_pvss() {
     let pp = <T as Transcript>::PublicParameters::new_with_commitment_base(
         tc_happy.get_total_num_players(),
         aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_TESTING,
+        1,
         G2Affine::generator(),
         &mut rng_aptos,
     );

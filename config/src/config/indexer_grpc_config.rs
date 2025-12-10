@@ -18,6 +18,7 @@ const DEFAULT_PROCESSOR_BATCH_SIZE: u16 = 1000;
 const DEFAULT_OUTPUT_BATCH_SIZE: u16 = 100;
 const DEFAULT_TRANSACTION_CHANNEL_SIZE: usize = 35;
 pub const DEFAULT_GRPC_STREAM_PORT: u16 = 50051;
+const DEFAULT_MAX_TRANSACTION_FILTER_SIZE_BYTES: usize = 10_000;
 
 pub fn get_default_processor_task_count(use_data_service_interface: bool) -> u16 {
     if use_data_service_interface {
@@ -52,6 +53,9 @@ pub struct IndexerGrpcConfig {
 
     /// Size of the transaction channel buffer for streaming.
     pub transaction_channel_size: usize,
+
+    /// Maximum size in bytes for transaction filters.
+    pub max_transaction_filter_size_bytes: usize,
 }
 
 impl Debug for IndexerGrpcConfig {
@@ -67,6 +71,10 @@ impl Debug for IndexerGrpcConfig {
             .field("processor_batch_size", &self.processor_batch_size)
             .field("output_batch_size", &self.output_batch_size)
             .field("transaction_channel_size", &self.transaction_channel_size)
+            .field(
+                "max_transaction_filter_size_bytes",
+                &self.max_transaction_filter_size_bytes,
+            )
             .finish()
     }
 }
@@ -87,6 +95,7 @@ impl Default for IndexerGrpcConfig {
             processor_batch_size: DEFAULT_PROCESSOR_BATCH_SIZE,
             output_batch_size: DEFAULT_OUTPUT_BATCH_SIZE,
             transaction_channel_size: DEFAULT_TRANSACTION_CHANNEL_SIZE,
+            max_transaction_filter_size_bytes: DEFAULT_MAX_TRANSACTION_FILTER_SIZE_BYTES,
         }
     }
 }

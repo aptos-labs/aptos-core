@@ -101,6 +101,7 @@ members = [
     "crates/aptos-system-utils",
     "crates/aptos-telemetry",
     "crates/aptos-telemetry-service",
+    "crates/aptos-telemetry-service/e2e-test/test-client",
     "crates/aptos-temppath",
     "crates/aptos-time-service",
     "crates/aptos-transaction-filters",
@@ -706,6 +707,7 @@ p256 = { version = "0.13.2" }
 prettydiff = "0.6.2"
 primitive-types = { version = "0.12.2" }
 signature = "2.1.0"
+slh-dsa = "0.2.0-rc.1"
 pairing = "0.23"
 parking_lot = "0.12.0"
 paste = "1.0.7"

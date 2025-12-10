@@ -194,7 +194,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
                 pp.pp_elgamal.G.into_group(),
                 &dealt_encrypted_secret_key_share_chunks,
                 &pp.table,
-                1 << pp.ell as u32,
+                pp.get_dlog_range_bound(),
             )
             .expect("BSGS dlog failed");
 
@@ -443,7 +443,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
                 pp.pp_elgamal.G.into_group(),
                 &dealt_encrypted_secret_key_share_chunks,
                 &pp.table,
-                1 << pp.ell as u32,
+                pp.get_dlog_range_bound(),
             )
             .expect("BSGS dlog failed");
 

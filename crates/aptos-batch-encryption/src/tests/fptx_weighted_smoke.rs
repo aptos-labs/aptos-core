@@ -111,12 +111,14 @@ fn weighted_smoke_with_setup_for_testing() {
 }
 
 type T = aptos_dkg::pvss::chunky::UnsignedWeightedTranscript<crate::group::Pairing>;
-use crate::group::G2Affine;
+type C = WeightedConfigArkworks<Fr>;
+use crate::group::{Fr, G2Affine};
 use aptos_crypto::{SigningKey, Uniform};
 use aptos_dkg::pvss::{
     test_utils::NoAux,
     traits::{
-        transcript::HasAggregatableSubtranscript, Convert, HasEncryptionPublicParams, Transcript,
+        transcript::{Aggregatable, HasAggregatableSubtranscript},
+        Convert, HasEncryptionPublicParams, Transcript,
     },
 };
 
@@ -130,6 +132,7 @@ fn weighted_smoke_with_pvss() {
     let pp = <T as Transcript>::PublicParameters::new_with_commitment_base(
         tc_happy.get_total_weight(),
         aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_TESTING,
+        tc_happy.get_total_num_players(),
         G2Affine::generator(),
         &mut rng_aptos,
     );
@@ -150,34 +153,58 @@ fn weighted_smoke_with_pvss() {
         .map(|dk| dk.to(pp.get_encryption_public_params()))
         .collect();
 
-    let s = <T as Transcript>::InputSecret::generate(&mut rng_aptos);
+    let secrets: Vec<<T as Transcript>::InputSecret> = (0..tc_happy.get_total_num_players())
+        .map(|_| <T as Transcript>::InputSecret::generate(&mut rng_aptos))
+        .collect();
 
     // Test dealing
-    let subtrx_happypath = T::deal(
-        &tc_happy,
-        &pp,
-        &ssks[0],
-        &spks[0],
-        &eks,
-        &s,
-        &NoAux,
-        &tc_happy.get_player(0),
-        &mut rng_aptos,
-    )
-    .get_subtranscript();
+    let subtrx_happypaths: Vec<<T as HasAggregatableSubtranscript<C>>::SubTranscript> = secrets
+        .iter()
+        .enumerate()
+        .map(|(i, s)| {
+            T::deal(
+                &tc_happy,
+                &pp,
+                &ssks[i],
+                &spks[i],
+                &eks,
+                s,
+                &NoAux,
+                &tc_happy.get_player(i),
+                &mut rng_aptos,
+            )
+            .get_subtranscript()
+        })
+        .collect();
 
-    let subtrx_slowpath = T::deal(
-        &tc_slow,
-        &pp,
-        &ssks[0],
-        &spks[0],
-        &eks,
-        &s,
-        &NoAux,
-        &tc_slow.get_player(0),
-        &mut rng_aptos,
-    )
-    .get_subtranscript();
+    let subtrx_slowpaths: Vec<<T as HasAggregatableSubtranscript<C>>::SubTranscript> = secrets
+        .iter()
+        .enumerate()
+        .map(|(i, s)| {
+            T::deal(
+                &tc_slow,
+                &pp,
+                &ssks[i],
+                &spks[i],
+                &eks,
+                s,
+                &NoAux,
+                &tc_slow.get_player(i),
+                &mut rng_aptos,
+            )
+            .get_subtranscript()
+        })
+        .collect();
+
+    let mut subtrx_happypath = subtrx_happypaths[0].clone();
+    for acc in &subtrx_happypaths[1..] {
+        subtrx_happypath.aggregate_with(&tc_happy, acc).unwrap();
+    }
+
+    let mut subtrx_slowpath = subtrx_slowpaths[0].clone();
+    for acc in &subtrx_slowpaths[1..] {
+        subtrx_slowpath.aggregate_with(&tc_slow, acc).unwrap();
+    }
 
     let dk = DigestKey::new(&mut rng, 8, 1).unwrap();
 

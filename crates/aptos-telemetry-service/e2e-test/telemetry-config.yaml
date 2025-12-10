@@ -1,0 +1,94 @@
+# Aptos Telemetry Service E2E Test Configuration
+# This config is used for local end-to-end testing with aptos-node --test
+
+address: "0.0.0.0:8082"
+
+# Short allowlist cache TTL for testing (default is 300 seconds)
+allowlist_cache_ttl_secs: 10
+
+# Required Aptos node config (not used for custom contracts, but must be present)
+trusted_full_node_addresses:
+  mainnet: "https://api.mainnet.aptoslabs.com"
+  testnet: "https://api.testnet.aptoslabs.com"
+  devnet: "https://api.devnet.aptoslabs.com"
+update_interval: 300
+pfn_allowlist: {}
+log_env_map: {}
+peer_identities: {}
+
+# Required BigQuery config (placeholder - not used in local testing)
+custom_event_config:
+  project_id: "local-test"
+  dataset_id: "telemetry_events"
+  table_id: "custom_events"
+
+# ========================================================================
+# CUSTOM CONTRACT CONFIGURATION FOR E2E TESTING
+# ========================================================================
+custom_contract_configs:
+  # Test contract configuration
+  - name: "e2e_test_contract"
+    
+    on_chain_auth:
+      # Chain ID where the contract is deployed (4 = local testnet)
+      chain_id: 4
+      
+      # Use view function method (recommended)
+      method: viewfunction
+      
+      # Contract function to call - will be substituted with deployed address
+      # Format: ${CONTRACT_ADDRESS}::telemetry_registry::get_all_members
+      resource_path: "${TEST_CONTRACT_ADDRESS}::telemetry_registry::get_all_members"
+      
+      # Arguments to pass to the view function
+      # get_all_members(registry_address: address) - pass the registry address
+      view_function_args:
+        - "${TEST_CONTRACT_ADDRESS}"
+      
+      # Extract address field from returned Member structs
+      # The Move contract returns vector<Member> where Member has an 'address' field
+      address_list_field: "[0].address"
+      
+      # REST API URL - points to local test node
+      rest_api_url: "http://127.0.0.1:8080"
+      
+      # Custom node type for JWT claims
+      node_type_name: "TelemetryTestNode"
+    
+    # Metrics sink - local VictoriaMetrics
+    metrics_sinks:
+      endpoint_urls:
+        local: "http://127.0.0.1:8428/api/v1/import/prometheus"
+      # No auth required for local testing
+      keys_env_var: "TEST_METRICS_KEYS"
+    
+    # Logs sink - local Loki
+    logs_sink:
+      endpoint_url: "http://127.0.0.1:3100/loki/api/v1/push"
+      # No auth required for local testing
+      key_env_var: "TEST_LOKI_TOKEN"
+      backend_type: loki
+
+# Standard telemetry endpoints (required but not used in custom contract testing)
+metrics_endpoints_config:
+  telemetry_service_metrics:
+    endpoint_urls:
+      local: "http://127.0.0.1:8428/api/v1/import/prometheus"
+    keys_env_var: "TEST_METRICS_KEYS"
+  ingest_metrics:
+    endpoint_urls: {}
+    keys_env_var: "TEST_METRICS_KEYS"
+  untrusted_ingest_metrics:
+    endpoint_urls: {}
+    keys_env_var: "TEST_METRICS_KEYS"
+
+humio_ingest_config:
+  known_logs_endpoint:
+    endpoint_url: "http://127.0.0.1:3100/loki/api/v1/push"
+    key_env_var: "TEST_LOKI_TOKEN"
+    backend_type: loki
+  unknown_logs_endpoint:
+    endpoint_url: "http://127.0.0.1:3100/loki/api/v1/push"
+    key_env_var: "TEST_LOKI_TOKEN"
+    backend_type: loki
+

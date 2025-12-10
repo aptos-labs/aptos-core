@@ -5,7 +5,7 @@ use crate::{
     auth,
     constants::GCP_CLOUD_TRACE_CONTEXT_HEADER,
     context::Context,
-    custom_event, debug,
+    custom_contract_auth, custom_contract_ingest, custom_event, debug,
     errors::ServiceError,
     log_ingest,
     metrics::SERVICE_ERROR_COUNTS,
@@ -35,7 +35,13 @@ pub fn routes(
             .or(custom_event::custom_event_ingest(context.clone()))
             .or(prometheus_push_metrics::metrics_ingest(context.clone()))
             .or(log_ingest::log_ingest(context.clone()))
-            .or(remote_config::telemetry_log_env(context)),
+            .or(remote_config::telemetry_log_env(context.clone()))
+            // custom contract auth endpoints
+            .or(custom_contract_auth::auth_challenge(context.clone()))
+            .or(custom_contract_auth::auth(context.clone()))
+            .or(custom_contract_ingest::metrics_ingest(context.clone()))
+            .or(custom_contract_ingest::log_ingest(context.clone()))
+            .or(custom_contract_ingest::custom_event_ingest(context)),
     );
 
     v1_api
