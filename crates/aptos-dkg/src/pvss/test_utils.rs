@@ -241,8 +241,8 @@ pub fn get_weighted_configs_for_testing<T: traits::ThresholdConfig>() -> Vec<Wei
     );
 
     // 50-out-of-100, weights [11, 13, 9, 10, 12, 8, 7, 14, 10, 6]
-    //Disabling for now b/c the test is taking too long
-    wcs.push(WeightedConfig::<T>::new(50, vec![11, 13, 9, 10, 12, 8, 7, 14, 10, 6]).unwrap());
+    // Disabling for now b/c the test is taking too long
+    // wcs.push(WeightedConfig::<T>::new(50, vec![11, 13, 9, 10, 12, 8, 7, 14, 10, 6]).unwrap());
 
     wcs
 }

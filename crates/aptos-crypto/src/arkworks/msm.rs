@@ -17,7 +17,7 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 /// An MSM input consists of:
 /// * a list of base elements, and
 /// * a list of scalar elements,
-/// which are interpreted pairwise.  
+/// which are interpreted pairwise.
 ///
 /// Implementations that construct an `MsmInput` should ensure that
 /// `bases.len() == scalars.len()`
@@ -52,7 +52,9 @@ pub trait IsMsmInput: Sized {
     /// Returns a reference to the slice of scalar elements in this MSM input.
     fn scalars(&self) -> &[Self::Scalar];
 
-    /// Returns a new instance
+    /// Constructs a new MSM input from the provided bases and scalars.
+    ///
+    /// Should return an error if the lengths of `bases` and `scalars` do not match.
     fn new(bases: Vec<Self::Base>, scalars: Vec<Self::Scalar>) -> anyhow::Result<Self>;
 }
 

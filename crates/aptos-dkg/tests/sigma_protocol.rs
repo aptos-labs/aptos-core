@@ -14,7 +14,7 @@ use aptos_dkg::{
 };
 use ark_bls12_381::Bls12_381;
 use ark_bn254::Bn254;
-use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup};
+use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::thread_rng;
 use std::fmt::Debug;
@@ -112,22 +112,22 @@ mod chaum_pedersen {
         }
     }
 
-    pub type InhomogChaumPedersen<E> =
-        TupleHomomorphism<Schnorr<<E as Pairing>::G1>, Schnorr<<E as Pairing>::G2>, false>;
+    // pub type InhomogChaumPedersen<E> =
+    //     TupleHomomorphism<Schnorr<<E as Pairing>::G1>, Schnorr<<E as Pairing>::G2>, false>;
 
-    #[allow(non_snake_case)]
-    pub fn make_inhomogeneous_chaum_pedersen_instance<E: Pairing>() -> InhomogChaumPedersen<E> {
-        let G_1 = E::G1::generator().into_affine();
-        let G_2 = E::G2::generator().into_affine();
+    // #[allow(non_snake_case)]
+    // pub fn make_inhomogeneous_chaum_pedersen_instance<E: Pairing>() -> InhomogChaumPedersen<E> {
+    //     let G_1 = E::G1::generator().into_affine();
+    //     let G_2 = E::G2::generator().into_affine();
 
-        let schnorr1 = Schnorr { G: G_1 };
-        let schnorr2 = Schnorr { G: G_2 };
+    //     let schnorr1 = Schnorr { G: G_1 };
+    //     let schnorr2 = Schnorr { G: G_2 };
 
-        TupleHomomorphism {
-            hom1: schnorr1,
-            hom2: schnorr2,
-        }
-    }
+    //     TupleHomomorphism {
+    //         hom1: schnorr1,
+    //         hom2: schnorr2,
+    //     }
+    // }
 }
 
 #[test]
