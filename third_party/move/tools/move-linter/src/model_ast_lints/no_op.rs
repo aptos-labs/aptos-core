@@ -32,9 +32,9 @@ use move_model::{
 use std::collections::HashSet;
 
 static NO_EFFECT_STMT: &str = "This statement has no effect and can be removed";
-static NO_EFFECT_OR_ABORT_STMT: &str = "This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed";
+static NO_EFFECT_OR_ABORT_STMT: &str = "This statement has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed";
 static NO_EFFECT_ASSIGN: &str = "This assignment has no effect and can be removed";
-static NO_EFFECT_OR_ABORT_ASSIGN: &str = "This assignment has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed";
+static NO_EFFECT_OR_ABORT_ASSIGN: &str = "This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed";
 
 #[derive(Default)]
 pub struct NoOp {
