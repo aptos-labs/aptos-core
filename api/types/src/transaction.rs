@@ -12,7 +12,7 @@ use aptos_crypto::{
     multi_ed25519::{self, MultiEd25519PublicKey, BITMAP_NUM_OF_BYTES, MAX_NUM_OF_KEYS},
     secp256k1_ecdsa, secp256r1_ecdsa,
     secp256r1_ecdsa::PUBLIC_KEY_LENGTH,
-    ValidCryptoMaterial,
+    slh_dsa_sha2_128s, ValidCryptoMaterial,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -1448,6 +1448,35 @@ impl VerifyInput for Secp256k1EcdsaSignature {
     }
 }
 
+/// A single SlhDsa_Sha2_128s signature
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+#[allow(non_camel_case_types)]
+pub struct SlhDsa_Sha2_128sSignature {
+    pub public_key: HexEncodedBytes,
+    pub signature: HexEncodedBytes,
+}
+
+impl VerifyInput for SlhDsa_Sha2_128sSignature {
+    fn verify(&self) -> anyhow::Result<()> {
+        let public_key_len = self.public_key.inner().len();
+        let signature_len = self.signature.inner().len();
+        if public_key_len != slh_dsa_sha2_128s::PUBLIC_KEY_LENGTH {
+            bail!(
+                "SlhDsa_Sha2_128s signature's public key is an invalid number of bytes, should be {} bytes but found {}",
+                slh_dsa_sha2_128s::PUBLIC_KEY_LENGTH, public_key_len
+            )
+        } else if signature_len != slh_dsa_sha2_128s::SIGNATURE_LENGTH {
+            bail!(
+                "SlhDsa_Sha2_128s signature length is an invalid number of bytes, should be {} bytes but found {}",
+                slh_dsa_sha2_128s::SIGNATURE_LENGTH, signature_len
+            )
+        } else {
+            // TODO: Check if they match / parse correctly?
+            Ok(())
+        }
+    }
+}
+
 /// A single WebAuthn signature
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct WebAuthnSignature {
@@ -1512,9 +1541,11 @@ impl VerifyInput for KeylessSignature {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
+#[allow(non_camel_case_types)]
 pub enum Signature {
     Ed25519(Ed25519),
     Secp256k1Ecdsa(Secp256k1Ecdsa),
+    SlhDsa_Sha2_128s(SlhDsa_Sha2_128s),
     WebAuthn(WebAuthn),
     Keyless(Keyless),
 }
@@ -1547,6 +1578,18 @@ pub struct Secp256r1Ecdsa {
 }
 
 impl Secp256r1Ecdsa {
+    pub fn new(value: HexEncodedBytes) -> Self {
+        Self { value }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+#[allow(non_camel_case_types)]
+pub struct SlhDsa_Sha2_128s {
+    pub value: HexEncodedBytes,
+}
+
+impl SlhDsa_Sha2_128s {
     pub fn new(value: HexEncodedBytes) -> Self {
         Self { value }
     }
@@ -1593,6 +1636,9 @@ impl TryFrom<&Signature> for AnySignature {
             Signature::Secp256k1Ecdsa(s) => {
                 AnySignature::secp256k1_ecdsa(s.value.inner().try_into()?)
             },
+            Signature::SlhDsa_Sha2_128s(s) => {
+                AnySignature::slh_dsa_sha2_128s(s.value.inner().try_into()?)
+            },
             Signature::WebAuthn(s) => AnySignature::webauthn(s.value.inner().try_into()?),
             Signature::Keyless(s) => AnySignature::keyless(s.value.inner().try_into()?),
         })
@@ -1608,6 +1654,9 @@ impl From<&AnySignature> for Signature {
             AnySignature::Secp256k1Ecdsa { signature } => {
                 Signature::Secp256k1Ecdsa(Secp256k1Ecdsa::new(signature.to_bytes().to_vec().into()))
             },
+            AnySignature::SlhDsa_Sha2_128s { signature } => Signature::SlhDsa_Sha2_128s(
+                SlhDsa_Sha2_128s::new(signature.to_bytes().to_vec().into()),
+            ),
             AnySignature::WebAuthn { signature } => {
                 Signature::WebAuthn(WebAuthn::new(signature.to_bytes().to_vec().into()))
             },
@@ -1621,10 +1670,12 @@ impl From<&AnySignature> for Signature {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
+#[allow(non_camel_case_types)]
 pub enum PublicKey {
     Ed25519(Ed25519),
     Secp256k1Ecdsa(Secp256k1Ecdsa),
     Secp256r1Ecdsa(Secp256r1Ecdsa),
+    SlhDsa_Sha2_128s(SlhDsa_Sha2_128s),
     Keyless(Keyless),
     FederatedKeyless(FederatedKeyless),
 }
@@ -1640,6 +1691,9 @@ impl TryFrom<&PublicKey> for AnyPublicKey {
             },
             PublicKey::Secp256r1Ecdsa(p) => {
                 AnyPublicKey::secp256r1_ecdsa(p.value.inner().try_into()?)
+            },
+            PublicKey::SlhDsa_Sha2_128s(p) => {
+                AnyPublicKey::slh_dsa_sha2_128s(p.value.inner().try_into()?)
             },
             PublicKey::Keyless(p) => AnyPublicKey::keyless(p.value.inner().try_into()?),
             PublicKey::FederatedKeyless(p) => {
@@ -1660,6 +1714,9 @@ impl From<&AnyPublicKey> for PublicKey {
             ),
             AnyPublicKey::Secp256r1Ecdsa { public_key } => PublicKey::Secp256r1Ecdsa(
                 Secp256r1Ecdsa::new(public_key.to_bytes().to_vec().into()),
+            ),
+            AnyPublicKey::SlhDsa_Sha2_128s { public_key } => PublicKey::SlhDsa_Sha2_128s(
+                SlhDsa_Sha2_128s::new(public_key.to_bytes().to_vec().into()),
             ),
             AnyPublicKey::Keyless { public_key } => {
                 PublicKey::Keyless(Keyless::new(public_key.to_bytes().into()))
@@ -1688,6 +1745,13 @@ impl VerifyInput for SingleKeySignature {
             .verify(),
             (PublicKey::Secp256k1Ecdsa(p), Signature::Secp256k1Ecdsa(s)) => {
                 Secp256k1EcdsaSignature {
+                    public_key: p.value.clone(),
+                    signature: s.value.clone(),
+                }
+                .verify()
+            },
+            (PublicKey::SlhDsa_Sha2_128s(p), Signature::SlhDsa_Sha2_128s(s)) => {
+                SlhDsa_Sha2_128sSignature {
                     public_key: p.value.clone(),
                     signature: s.value.clone(),
                 }
@@ -1747,6 +1811,12 @@ impl TryFrom<&SingleKeySignature> for AccountAuthenticator {
                     )?;
                     AnyPublicKey::secp256r1_ecdsa(key)
                 },
+                PublicKey::SlhDsa_Sha2_128s(ref p) => {
+                    let key = p.value.inner().try_into().context(
+                        "Failed to parse given public_key bytes as SlhDsa_Sha2_128sPublicKey",
+                    )?;
+                    AnyPublicKey::slh_dsa_sha2_128s(key)
+                },
                 PublicKey::Keyless(ref p) => {
                     let key = p.value.inner().try_into().context(
                         "Failed to parse given public_key bytes as AnyPublicKey::Keyless",
@@ -1776,6 +1846,12 @@ impl TryFrom<&SingleKeySignature> for AccountAuthenticator {
                         "Failed to parse given signature bytes as Secp256k1EcdsaSignature",
                     )?;
                 AnySignature::secp256k1_ecdsa(signature)
+            },
+            Signature::SlhDsa_Sha2_128s(ref s) => {
+                let signature = s.value.inner().try_into().context(
+                    "Failed to parse given signature bytes as SlhDsa_Sha2_128sSignature",
+                )?;
+                AnySignature::slh_dsa_sha2_128s(signature)
             },
             Signature::WebAuthn(ref s) => {
                 let signature = s
@@ -1876,6 +1952,12 @@ impl TryFrom<&MultiKeySignature> for AccountAuthenticator {
                     )?;
                     AnyPublicKey::secp256r1_ecdsa(key)
                 },
+                PublicKey::SlhDsa_Sha2_128s(p) => {
+                    let key = p.value.inner().try_into().context(
+                        "Failed to parse given public_key bytes as SlhDsa_Sha2_128sPublicKey",
+                    )?;
+                    AnyPublicKey::slh_dsa_sha2_128s(key)
+                },
                 PublicKey::Keyless(p) => {
                     let key = p.value.inner().try_into().context(
                         "Failed to parse given public_key bytes as AnyPublicKey::Keyless",
@@ -1907,6 +1989,12 @@ impl TryFrom<&MultiKeySignature> for AccountAuthenticator {
                             "Failed to parse given signature as Secp256k1EcdsaSignature",
                         )?;
                         AnySignature::secp256k1_ecdsa(signature)
+                    },
+                    Signature::SlhDsa_Sha2_128s(s) => {
+                        let signature = s.value.inner().try_into().context(
+                            "Failed to parse given signature as SlhDsa_Sha2_128sSignature",
+                        )?;
+                        AnySignature::slh_dsa_sha2_128s(signature)
                     },
                     Signature::WebAuthn(s) => {
                         let paar = s.value.inner().try_into().context(
@@ -2121,6 +2209,17 @@ impl
 
 impl From<(&secp256k1_ecdsa::PublicKey, &secp256k1_ecdsa::Signature)> for Secp256k1EcdsaSignature {
     fn from((pk, sig): (&secp256k1_ecdsa::PublicKey, &secp256k1_ecdsa::Signature)) -> Self {
+        Self {
+            public_key: pk.to_bytes().to_vec().into(),
+            signature: sig.to_bytes().to_vec().into(),
+        }
+    }
+}
+
+impl From<(&slh_dsa_sha2_128s::PublicKey, &slh_dsa_sha2_128s::Signature)>
+    for SlhDsa_Sha2_128sSignature
+{
+    fn from((pk, sig): (&slh_dsa_sha2_128s::PublicKey, &slh_dsa_sha2_128s::Signature)) -> Self {
         Self {
             public_key: pk.to_bytes().to_vec().into(),
             signature: sig.to_bytes().to_vec().into(),

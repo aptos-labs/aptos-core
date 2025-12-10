@@ -537,6 +537,7 @@ message AnyPublicKey {
     TYPE_SECP256R1_ECDSA = 3;
     TYPE_KEYLESS = 4;
     TYPE_FEDERATED_KEYLESS = 5;
+    TYPE_SLH_DSA_SHA2_128S = 6;
   }
 
   Type type = 1;
@@ -550,6 +551,7 @@ message AnySignature {
     TYPE_SECP256K1_ECDSA = 2;
     TYPE_WEBAUTHN = 3;
     TYPE_KEYLESS = 4;
+    TYPE_SLH_DSA_SHA2_128S = 5;
   }
 
   Type type = 1;
@@ -564,6 +566,7 @@ message AnySignature {
     Secp256k1Ecdsa secp256k1_ecdsa = 4;
     WebAuthn webauthn = 5;
     Keyless keyless = 6;
+    SlhDsa_Sha2_128s slh_dsa_sha2_128s = 7;
   }
 }
 
@@ -580,6 +583,10 @@ message WebAuthn {
 }
 
 message Keyless {
+  bytes signature = 1;
+}
+
+message SlhDsa_Sha2_128s {
   bytes signature = 1;
 }
 
