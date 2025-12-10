@@ -24,8 +24,8 @@ use aptos_crypto::{
 };
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{pairing::Pairing, AdditiveGroup};
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_ff::PrimeField;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 /// Witness data for the `chunked_elgamal_field` PVSS protocol.
 ///
@@ -70,16 +70,23 @@ pub struct HkzgWeightedElgamalWitness<F: PrimeField> {
 /// two components: in each case, the witness omits (or “ignores”) one of its three fields, then applies
 /// a homomorphism. Thus, the overall homomorphism of the Σ-protocol can be viewed as a tuple of two
 /// *lifted* homomorphisms.
-type LiftedHkzg<'a, E> =
-    LiftHomomorphism<univariate_hiding_kzg::CommitmentHomomorphism<'a, E>, HkzgElgamalWitness<<E as Pairing>::ScalarField>>;
-type LiftedChunkedElgamal<'a, E> =
-    LiftHomomorphism<chunked_elgamal::Homomorphism<'a, E>, HkzgElgamalWitness<<E as Pairing>::ScalarField>>;
+type LiftedHkzg<'a, E> = LiftHomomorphism<
+    univariate_hiding_kzg::CommitmentHomomorphism<'a, E>,
+    HkzgElgamalWitness<<E as Pairing>::ScalarField>,
+>;
+type LiftedChunkedElgamal<'a, E> = LiftHomomorphism<
+    chunked_elgamal::Homomorphism<'a, E>,
+    HkzgElgamalWitness<<E as Pairing>::ScalarField>,
+>;
 
 type LiftedHkzgWeighted<'a, E> = LiftHomomorphism<
     univariate_hiding_kzg::CommitmentHomomorphism<'a, E>,
-    HkzgWeightedElgamalWitness<<E as Pairing>::ScalarField>>;
-type LiftedWeightedChunkedElgamal<'a, E> =
-    LiftHomomorphism<chunked_elgamal::WeightedHomomorphism<'a, E>, HkzgWeightedElgamalWitness<<E as Pairing>::ScalarField>>;
+    HkzgWeightedElgamalWitness<<E as Pairing>::ScalarField>,
+>;
+type LiftedWeightedChunkedElgamal<'a, E> = LiftHomomorphism<
+    chunked_elgamal::WeightedHomomorphism<'a, E>,
+    HkzgWeightedElgamalWitness<<E as Pairing>::ScalarField>,
+>;
 
 //                                 ┌───────────────────────────────┐
 //                                 │     HkzgElgamalWitness<E>     │
@@ -131,12 +138,14 @@ type LiftedWeightedChunkedElgamal<'a, E> =
 // TODO: note here that we had to put a zero before z_{i,j}, because that's what DeKARTv2 is doing. So maybe
 // it would make more sense to say this is a tuple homomorphism consisting of (lifts of) the
 // DeKARTv2::commitment_homomorphism together with the chunked_elgamal::homomorphism.
-pub type Homomorphism<'a, E> = TupleHomomorphism<LiftedHkzg<'a, E>, LiftedChunkedElgamal<'a, E>, true>;
+pub type Homomorphism<'a, E> =
+    TupleHomomorphism<LiftedHkzg<'a, E>, LiftedChunkedElgamal<'a, E>, true>;
 pub type WeightedHomomorphism<'a, E> =
     TupleHomomorphism<LiftedHkzgWeighted<'a, E>, LiftedWeightedChunkedElgamal<'a, E>, true>;
 
-pub type Proof<'a, E> = sigma_protocol::Proof<<E as Pairing>::G1, Homomorphism<'a, E>>;
-pub type WeightedProof<'a, E> = sigma_protocol::Proof<<E as Pairing>::G1, WeightedHomomorphism<'a, E>>;
+pub type Proof<'a, E> = sigma_protocol::Proof<<E as Pairing>::ScalarField, Homomorphism<'a, E>>;
+pub type WeightedProof<'a, E> =
+    sigma_protocol::Proof<<E as Pairing>::ScalarField, WeightedHomomorphism<'a, E>>;
 
 impl<'a, E: Pairing> Proof<'a, E> {
     /// Generates a random looking proof (but not a valid one).
@@ -156,7 +165,8 @@ impl<'a, E: Pairing> Proof<'a, E> {
                 },
             )),
             z: HkzgElgamalWitness {
-                hkzg_randomness: univariate_hiding_kzg::CommitmentRandomness::<E::ScalarField>::rand(rng),
+                hkzg_randomness:
+                    univariate_hiding_kzg::CommitmentRandomness::<E::ScalarField>::rand(rng),
                 chunked_plaintexts: vec![
                     vec![Scalar(sample_field_element(rng)); number_of_chunks];
                     n
@@ -195,7 +205,8 @@ impl<'a, E: Pairing> WeightedProof<'a, E> {
                 },
             )),
             z: HkzgWeightedElgamalWitness {
-                hkzg_randomness: univariate_hiding_kzg::CommitmentRandomness::<E::ScalarField>::rand(rng),
+                hkzg_randomness:
+                    univariate_hiding_kzg::CommitmentRandomness::<E::ScalarField>::rand(rng),
                 chunked_plaintexts: (0..sc.get_total_num_players())
                     .map(|i| {
                         let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...

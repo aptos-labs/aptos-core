@@ -5,10 +5,10 @@ use crate::{
     sigma_protocol,
     sigma_protocol::{homomorphism, homomorphism::EntrywiseMap, Witness},
 };
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use std::fmt::Debug;
 use aptos_crypto::arkworks::msm::IsMsmInput;
 use ark_ec::CurveGroup;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use std::fmt::Debug;
 
 /// A `FixedBaseMsms` instance represents a homomorphism whose outputs can be expressed as
 /// one or more **fixed-base multi-scalar multiplications (MSMs)**, sharing consistent base and scalar types.
@@ -26,14 +26,9 @@ use ark_ec::CurveGroup;
 ///   for batch verification in Σ-protocols.
 pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOutput>> {
     /// Type representing a single MSM input (a set of bases and scalars). Normally, this would default
-    /// to `MsmInput<Self::Base, Self::Scalar>`, but stable Rust does not yet support associated type defaults,
+    /// to `MsmInput<..., ...>`, but stable Rust does not yet support associated type defaults,
     /// hence we introduce a trait `IsMsmInput` and struct `MsmInput` elsewhere.
-    type MsmInput: CanonicalSerialize
-        + CanonicalDeserialize
-        + Clone
-        + IsMsmInput
-        + Debug
-        + Eq;
+    type MsmInput: CanonicalSerialize + CanonicalDeserialize + Clone + IsMsmInput + Debug + Eq;
 
     /// The output type of evaluating an MSM. `Codomain` should equal `CodomainShape<MsmOutput>`, in the current version
     /// of the code. In a future version where MsmOutput might be an enum (E::G1 or E::G2), Codomain should probably follow suit.
@@ -90,22 +85,19 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
 }
 
 // Alternate version for tuple MSMs with incompatible types, namely whose output is G1 and G2
-pub trait InhomogeneousTrait: homomorphism::Trait<Codomain = (Self::FirstCodomainShape<Self::FirstMsmOutput>, Self::SecondCodomainShape<Self::SecondMsmOutput>)> {
-    /// Type representing a single MSM input (a set of bases and scalars). Normally, this would default
+pub trait Inhomogeneous:
+    homomorphism::Trait<
+    Codomain = (
+        Self::FirstCodomainShape<Self::FirstMsmOutput>,
+        Self::SecondCodomainShape<Self::SecondMsmOutput>,
+    ),
+>
+{
+    /// Types representing a single MSM input (a set of bases and scalars). Normally, this would default
     /// to `MsmInput<Self::Base, Self::Scalar>`, but stable Rust does not yet support associated type defaults,
     /// hence we introduce a trait `IsMsmInput` and struct `MsmInput` below.
-    type FirstMsmInput: CanonicalSerialize
-        + CanonicalDeserialize
-        + Clone
-        + IsMsmInput
-        + Debug
-        + Eq;
-    type SecondMsmInput: CanonicalSerialize
-        + CanonicalDeserialize
-        + Clone
-        + IsMsmInput
-        + Debug
-        + Eq;
+    type FirstMsmInput: CanonicalSerialize + CanonicalDeserialize + Clone + IsMsmInput + Debug + Eq;
+    type SecondMsmInput: CanonicalSerialize + CanonicalDeserialize + Clone + IsMsmInput + Debug + Eq;
 
     /// The output type of evaluating an MSM. `Codomain` should equal `CodomainShape<MsmOutput>`, in the current version
     /// of the code. In a future version where MsmOutput might be an enum (E::G1 or E::G2), Codomain should probably follow suit.
@@ -149,7 +141,13 @@ pub trait InhomogeneousTrait: homomorphism::Trait<Codomain = (Self::FirstCodomai
     ///
     /// The result is structured such that applying MSM evaluation elementwise
     /// yields the homomorphism’s output.
-    fn msm_terms(&self, input: &Self::Domain) -> (Self::FirstCodomainShape<Self::FirstMsmInput>, Self::SecondCodomainShape<Self::SecondMsmInput>);
+    fn msm_terms(
+        &self,
+        input: &Self::Domain,
+    ) -> (
+        Self::FirstCodomainShape<Self::FirstMsmInput>,
+        Self::SecondCodomainShape<Self::SecondMsmInput>,
+    );
 
     /// Evaluates a single MSM instance given slices of bases and scalars. Current instantiations always use E::G1Affine
     /// for the base, but we might want to use enums for the base and output in the future.
@@ -159,8 +157,14 @@ pub trait InhomogeneousTrait: homomorphism::Trait<Codomain = (Self::FirstCodomai
     /// Applies `msm_eval` elementwise to a collection of MSM inputs.
     fn apply_msm(
         &self,
-        msms: (Self::FirstCodomainShape<Self::FirstMsmInput>, Self::SecondCodomainShape<Self::SecondMsmInput>),
-    ) -> (Self::FirstCodomainShape<Self::FirstMsmOutput>, Self::SecondCodomainShape<Self::SecondMsmOutput>)
+        msms: (
+            Self::FirstCodomainShape<Self::FirstMsmInput>,
+            Self::SecondCodomainShape<Self::SecondMsmInput>,
+        ),
+    ) -> (
+        Self::FirstCodomainShape<Self::FirstMsmOutput>,
+        Self::SecondCodomainShape<Self::SecondMsmOutput>,
+    )
     where
         Self::FirstCodomainShape<Self::FirstMsmInput>: EntrywiseMap<
             Self::FirstMsmInput,
@@ -171,7 +175,10 @@ pub trait InhomogeneousTrait: homomorphism::Trait<Codomain = (Self::FirstCodomai
             Output<Self::SecondMsmOutput> = Self::SecondCodomainShape<Self::SecondMsmOutput>,
         >,
     {
-        (msms.0.map(|msm_input| Self::first_msm_eval(msm_input)), msms.1.map(|msm_input| Self::second_msm_eval(msm_input)))
+        (
+            msms.0.map(|msm_input| Self::first_msm_eval(msm_input)),
+            msms.1.map(|msm_input| Self::second_msm_eval(msm_input)),
+        )
 
         //msms.map(|first_msm_input, second_msm_input| (Self::first_msm_eval(&first_msm_input.bases(), &first_msm_input.scalars()), Self::second_msm_eval(&second_msm_input.bases(), &second_msm_input.scalars())))
     }

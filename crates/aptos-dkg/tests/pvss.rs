@@ -29,6 +29,7 @@ use aptos_dkg::pvss::{
 };
 use rand::{rngs::StdRng, thread_rng};
 use rand_core::SeedableRng;
+use ark_bn254::Bn254;
 
 // TODO: Add a test for public parameters serialization roundtrip?
 // TODO: and add a test for aggregate!!!!
@@ -50,7 +51,8 @@ fn test_pvss_all_unweighted() {
         // Das
         pvss_deal_verify_and_reconstruct::<das::Transcript>(&tc, seed.to_bytes_le());
 
-        // Insecure testing-only field-element PVSS
+        // Insecure testing-only field-element PVSS.
+        // TODO: Remove?
         pvss_deal_verify_and_reconstruct::<insecure_field::Transcript>(&tc, seed.to_bytes_le());
     }
 
@@ -62,17 +64,17 @@ fn test_pvss_all_unweighted() {
 
         let seed = random_scalar(&mut rng);
 
-        type ChunkyTranscript = chunky::Transcript<ark_bn254::Bn254>;
+        type ChunkyTranscriptBn254 = chunky::Transcript<ark_bn254::Bn254>;
 
         // Chunky
-        pvss_nonaggregate_deal_verify_and_reconstruct::<chunky::Transcript<ark_bn254::Bn254>>(
+        nonaggregatable_pvss_deal_verify_and_reconstruct::<ChunkyTranscriptBn254>(
             &tc,
             seed.to_bytes_le(),
         );
 
         pvss_deal_verify_and_reconstruct_from_subtranscript::<
-            <ChunkyTranscript as Transcript>::SecretSharingConfig,
-            ChunkyTranscript,
+            <ChunkyTranscriptBn254 as Transcript>::SecretSharingConfig,
+            ChunkyTranscriptBn254,
         >(&tc, seed.to_bytes_le());
     }
 }
@@ -92,6 +94,7 @@ fn test_pvss_all_weighted() {
 
         // Generically-weighted Das
         // WARNING: Insecure, due to encrypting different shares with the same randomness, do not use!
+        // TODO: Remove?
         pvss_deal_verify_and_reconstruct::<GenericWeighting<das::Transcript>>(
             &wc,
             seed.to_bytes_le(),
@@ -99,6 +102,7 @@ fn test_pvss_all_weighted() {
 
         // Generically-weighted field-element PVSS
         // WARNING: Insecure, reveals the dealt secret and its shares.
+        // TODO: Remove?
         pvss_deal_verify_and_reconstruct::<GenericWeighting<insecure_field::Transcript>>(
             &wc,
             seed.to_bytes_le(),
@@ -114,15 +118,25 @@ fn test_pvss_all_weighted() {
         println!("\nTesting {wc} PVSS");
         let seed = random_scalar(&mut rng);
 
-        pvss_nonaggregate_weighted_deal_verify_and_reconstruct::<
-            ark_bn254::Bn254,
-            signed::GenericSigning<chunky::WeightedTranscript<ark_bn254::Bn254>>,
+        // Signed weighted Chunky
+        nonaggregatable_weighted_pvss_deal_verify_and_reconstruct::<
+            Bn254,
+            signed::GenericSigning<chunky::WeightedTranscript<Bn254>>,
         >(&wc, seed.to_bytes_le());
 
-        pvss_nonaggregate_weighted_deal_verify_and_reconstruct::<
-            ark_bn254::Bn254,
-            chunky::WeightedTranscript<ark_bn254::Bn254>,
+        // Unsigned weighted Chunky
+        nonaggregatable_weighted_pvss_deal_verify_and_reconstruct::<
+            Bn254,
+            chunky::WeightedTranscript<Bn254>,
         >(&wc, seed.to_bytes_le());
+
+        //type SignedChunkyTranscriptBn254 = signed::GenericSigning<chunky::WeightedTranscript<Bn254>>; TODO!!
+        type UnsignedChunkyTranscriptBn254 = chunky::WeightedTranscript<Bn254>;
+
+        // OLD: <ChunkyTranscriptBn254 as Transcript>::SecretSharingConfig
+        if wc.get_total_num_players() > 8 {
+            test_pvss_aggregate_subtranscript_and_decrypt::<Bn254, UnsignedChunkyTranscriptBn254>(&wc, seed.to_bytes_le());
+        }
     }
 }
 
@@ -225,8 +239,100 @@ fn pvss_deal_verify_and_reconstruct<T: AggregatableTranscript>(
     }
 }
 
+use aptos_dkg::pvss::traits::transcript::Aggregatable;
+
 #[cfg(test)]
-fn pvss_nonaggregate_deal_verify_and_reconstruct<T: NonAggregatableTranscript>(
+fn test_pvss_aggregate_subtranscript_and_decrypt<E: Pairing, T: HasAggregatableSubtranscript<WeightedConfigArkworks<E::ScalarField>> + NonAggregatableTranscript<SecretSharingConfig = WeightedConfigArkworks<E::ScalarField>>>(
+    sc: &WeightedConfigArkworks<E::ScalarField>,
+    seed_bytes: [u8; 32],
+) {
+    // let mut rng = StdRng::from_seed(seed_bytes); deterministic rng
+
+    let mut rng = rand::thread_rng();
+
+    let d = test_utils::setup_dealing_weighted::<E::ScalarField, T, _>(sc, &mut rng);
+
+    let mut all_trs: Vec<_> = (0..9)
+        .map(|i| {
+            T::deal(
+                &sc,
+                &d.pp,
+                &d.ssks[i],
+                &d.spks[i],
+                &d.eks,
+                &d.s,
+                &NoAux,
+                &sc.get_player(i),
+                &mut rng,
+            )
+        })
+        .collect();
+
+    // Use the first player's transcript as the accumulator
+    let mut agg = all_trs[0].clone();
+
+    // Aggregate all other transcripts into it
+    for trs in all_trs.iter().skip(1) {
+        agg.get_subtranscript()
+            .aggregate_with(&sc, &trs.get_subtranscript())
+            .unwrap();
+    }
+
+    let final_share = agg.decrypt_own_share(sc, &sc.get_player(0), &d.dks[0], &d.pp);
+    
+    // let trs = T::deal(
+    //     &sc,
+    //     &d.pp,
+    //     &d.ssks[0],
+    //     &d.spks[0],
+    //     &d.eks,
+    //     &d.s,
+    //     &NoAux,
+    //     &sc.get_player(0),
+    //     &mut rng,
+    // );
+
+    // let another_trs = T::deal(
+    //     &sc,
+    //     &d.pp,
+    //     &d.ssks[1],
+    //     &d.spks[1],
+    //     &d.eks,
+    //     &d.s,
+    //     &NoAux,
+    //     &sc.get_player(1),
+    //     &mut rng,
+    // );
+
+    // let yet_another_trs = T::deal(
+    //     &sc,
+    //     &d.pp,
+    //     &d.ssks[2],
+    //     &d.spks[2],
+    //     &d.eks,
+    //     &d.s,
+    //     &NoAux,
+    //     &sc.get_player(2),
+    //     &mut rng,
+    // );
+
+    // trs.get_subtranscript().aggregate_with(sc, &another_trs.get_subtranscript()).unwrap();
+    // trs.get_subtranscript().aggregate_with(sc, &yet_another_trs.get_subtranscript()).unwrap();
+
+
+    // let first_share = trs.decrypt_own_share(sc, &sc.get_player(0), &d.dks[0], &d.pp);
+    // let second_share = another_trs.decrypt_own_share(sc, &sc.get_player(1), &d.dks[1], &d.pp);
+
+    // let final_share = trs.decrypt_own_share(sc, &sc.get_player(0), &d.dks[0], &d.pp);
+
+    eprintln!("IM DOING STUFF!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    //eprintln!("!!!! {:?}", final_share.0);
+    // assert_eq!(first_share.0 + second_share.0, final_share.0);
+}
+
+
+#[cfg(test)]
+fn nonaggregatable_pvss_deal_verify_and_reconstruct<T: NonAggregatableTranscript>(
     sc: &T::SecretSharingConfig,
     seed_bytes: [u8; 32],
 ) {
@@ -265,7 +371,7 @@ fn pvss_nonaggregate_deal_verify_and_reconstruct<T: NonAggregatableTranscript>(
 use ark_ec::pairing::Pairing;
 // TODO: merge this stuff
 #[cfg(test)]
-fn pvss_nonaggregate_weighted_deal_verify_and_reconstruct<
+fn nonaggregatable_weighted_pvss_deal_verify_and_reconstruct<
     E: Pairing,
     T: NonAggregatableTranscript<SecretSharingConfig = WeightedConfigArkworks<E::ScalarField>>,
 >(

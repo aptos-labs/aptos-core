@@ -10,10 +10,10 @@
 use crate::{
     range_proofs::traits::BatchedRangeProof, sigma_protocol, sigma_protocol::homomorphism, Scalar,
 };
+use ark_ec::pairing::Pairing;
 use ark_ff::PrimeField;
 use ark_serialize::CanonicalSerialize;
 use serde::Serialize;
-use ark_ec::pairing::Pairing;
 
 /// Helper trait for deriving random scalars from a transcript.
 ///
@@ -52,15 +52,10 @@ impl<F: PrimeField> ScalarProtocol<F> for merlin::Transcript {
         self.challenge_bytes(label, &mut buf);
 
         buf.chunks(16)
-            .map(|chunk| {
-                Scalar(F::from_le_bytes_mod_order(
-                    chunk.try_into().unwrap(),
-                ))
-            })
+            .map(|chunk| Scalar(F::from_le_bytes_mod_order(chunk.try_into().unwrap())))
             .collect()
     }
 }
-
 
 pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
     fn append_sep(&mut self, dst: &[u8]);
@@ -156,21 +151,23 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcrip
     }
 
     fn challenges_for_quotient_polynomials(&mut self, ell: usize) -> Vec<E::ScalarField> {
-        let challenges = <merlin::Transcript as ScalarProtocol<E::ScalarField>>::challenge_128bit_scalars(
-            self,
-            b"challenge_for_quotient_polynomials",
-            ell + 1,
-        );
+        let challenges =
+            <merlin::Transcript as ScalarProtocol<E::ScalarField>>::challenge_128bit_scalars(
+                self,
+                b"challenge_for_quotient_polynomials",
+                ell + 1,
+            );
 
         Scalar::<E::ScalarField>::vec_into_inner(challenges)
     }
 
     fn challenges_for_linear_combination(&mut self, num: usize) -> Vec<E::ScalarField> {
-        let challenges = <merlin::Transcript as ScalarProtocol<E::ScalarField>>::challenge_128bit_scalars(
-            self,
-            b"challenge_for_linear_combination",
-            num,
-        );
+        let challenges =
+            <merlin::Transcript as ScalarProtocol<E::ScalarField>>::challenge_128bit_scalars(
+                self,
+                b"challenge_for_linear_combination",
+                num,
+            );
 
         Scalar::<E::ScalarField>::vec_into_inner(challenges)
     }

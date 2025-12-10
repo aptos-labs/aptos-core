@@ -15,6 +15,7 @@ use anyhow::ensure;
 use aptos_crypto::arkworks::random::UniformRand;
 use aptos_crypto::{
     arkworks::{
+        msm::{IsMsmInput, MsmInput},
         random::{sample_field_element, unsafe_random_point},
         GroupGenerators,
     },
@@ -25,15 +26,12 @@ use ark_ec::{
     pairing::{Pairing, PairingOutput},
     AdditiveGroup, CurveGroup, VariableBaseMSM,
 };
-use ark_ff::Field;
+use ark_ff::{Field, PrimeField};
 use ark_poly::EvaluationDomain;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::{CryptoRng, RngCore};
 use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
 use std::fmt::Debug;
-use aptos_crypto::arkworks::msm::MsmInput;
-use aptos_crypto::arkworks::msm::IsMsmInput;
-use ark_ff::PrimeField;
 
 pub type Commitment<E> = CodomainShape<<E as Pairing>::G1>;
 
@@ -320,7 +318,8 @@ impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
     }
 
     fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
-        E::G1::msm(input.bases(), &input.scalars()).expect("MSM computation failed in univariate KZG")
+        E::G1::msm(input.bases(), &input.scalars())
+            .expect("MSM computation failed in univariate KZG")
     }
 }
 

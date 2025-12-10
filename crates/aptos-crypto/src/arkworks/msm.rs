@@ -7,10 +7,10 @@
 //! their linear combination. This module defines a simple container for such
 //! inputs, along with a small trait to abstract over concrete container types.
 
+use crate::utils;
+use anyhow::ensure;
 use ark_ec::CurveGroup;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use anyhow::ensure;
-use crate::utils;
 
 /// Input to a (not necessarily fixed-base) multi-scalar multiplication (MSM).
 ///
@@ -19,7 +19,7 @@ use crate::utils;
 /// * a list of scalar elements,
 /// which are interpreted pairwise.  
 ///
-/// Implementations that construct an `MsmInput` should ensure that 
+/// Implementations that construct an `MsmInput` should ensure that
 /// `bases.len() == scalars.len()`
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, PartialEq, Eq, Debug)]
 pub struct MsmInput<
@@ -37,7 +37,8 @@ pub struct MsmInput<
 /// This exists as a workaround because stable Rust does not yet support default
 /// associated types. (Now we have to do `type MsmInput: IsMsmInput` rather than `type MsmInput = IsMsmInput`)
 /// TODO: we probably don't need this trait, can just do MsmInput<E::Base, E::Scalar> in function signatures???
-pub trait IsMsmInput { // maybe make B and S associated types instead
+pub trait IsMsmInput {
+    // maybe make B and S associated types instead
     /// The scalar type used in the MSMs.
     type Scalar: Clone + CanonicalSerialize + CanonicalDeserialize; // scrap and make associated type of MsmInput
 
@@ -88,64 +89,23 @@ where
 }
 
 /// Verifies that a collection of MSMs are all equal to zero, by combining
-/// them into one big MSM using random linear combination, following the 
-/// Schwartz-Zippel philosophy
-// #[allow(non_snake_case)]
-// pub fn verify_msm_terms<C: CurveGroup, R: rand::RngCore + rand::CryptoRng>(
-//     msm_terms: Vec<MsmInput<C::Affine, C::ScalarField>>,
-//     rng: &mut R,
-// ) -> anyhow::Result<()>
-// {
-//     let beta: C::ScalarField = sample_field_element(rng);
-
-//     let powers_of_beta = utils::powers(beta, msm_terms.len());
-
-//     let mut final_bases = Vec::new();
-//     let mut final_scalars = Vec::new();
-
-//     verify_msm_terms_with_start()
-
-//     for (term, beta_power) in msm_terms.into_iter()
-//         .zip(powers_of_beta)
-//     {
-//         let mut scalars = term.scalars().to_vec();
-
-//         for scalar in scalars.iter_mut() {
-//             *scalar *= beta_power;
-//         }
-
-//         final_bases.extend(term.bases());
-//         final_scalars.extend(scalars);
-//     }
-
-//     let msm_result =
-//         C::msm(&final_bases, &final_scalars).expect("Could not compute batch MSM");
-//     ensure!(msm_result == C::ZERO);
-
-//     Ok(())
-// }
-
-/// Verifies that a collection of MSMs are all equal to zero, by combining
-/// them into one big MSM using random linear combination, following the 
-/// Schwartz-Zippel philosophy
-/// 
+/// them into one big MSM using random linear combination, following the
+/// Schwartz-Zippel philosophy.
+///
 /// In this particular function we assume that this process has already been
-/// "started", which is useful since the sigma protocol's msm terms already
-/// manipulated with betas, and changing that would make things a tiiiny
-/// bit slower
+/// "started", which is *useful* since the sigma protocol's MSM scalars are
+/// already manipulated with betas, and changing that would make things a
+/// tiny bit slower
 #[allow(non_snake_case)]
 pub fn verify_msm_terms_with_start<C: CurveGroup>(
     msm_terms: Vec<MsmInput<C::Affine, C::ScalarField>>,
     mut final_bases: Vec<C::Affine>,
     mut final_scalars: Vec<C::ScalarField>,
     powers_of_beta: Vec<C::ScalarField>,
-) -> anyhow::Result<()>
-{
+) -> anyhow::Result<()> {
     assert_eq!(msm_terms.len(), powers_of_beta.len());
 
-    for (term, beta_power) in msm_terms.into_iter()
-        .zip(powers_of_beta)
-    {
+    for (term, beta_power) in msm_terms.into_iter().zip(powers_of_beta) {
         let mut scalars = term.scalars().to_vec();
 
         for scalar in scalars.iter_mut() {
@@ -156,22 +116,21 @@ pub fn verify_msm_terms_with_start<C: CurveGroup>(
         final_scalars.extend(scalars);
     }
 
-    let msm_result =
-        C::msm(&final_bases, &final_scalars).expect("Could not compute batch MSM");
+    let msm_result = C::msm(&final_bases, &final_scalars).expect("Could not compute batch MSM");
     ensure!(msm_result == C::ZERO);
 
     Ok(())
 }
 
 /// Verifies that a collection of MSMs are all equal to zero, by combining
-/// them into one big MSM using random linear combination, following the 
-/// Schwartz-Zippel philosophy
+/// them into one big MSM using random linear combination, following the
+/// Schwartz-Zippel philosophy; delegates the actual work to
+/// `verify_msm_terms_with_start()`
 #[allow(non_snake_case)]
 pub fn verify_msm_terms<C: CurveGroup>(
     msm_terms: Vec<MsmInput<C::Affine, C::ScalarField>>,
     beta: C::ScalarField,
-) -> anyhow::Result<()>
-{
+) -> anyhow::Result<()> {
     let powers_of_beta = utils::powers(beta, msm_terms.len());
 
     verify_msm_terms_with_start::<C>(msm_terms, Vec::new(), Vec::new(), powers_of_beta)

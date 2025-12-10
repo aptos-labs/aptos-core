@@ -6,7 +6,11 @@ use crate::{
     sigma_protocol::homomorphism::{self, fixed_base_msms, fixed_base_msms::Trait, EntrywiseMap},
     Scalar,
 };
-use aptos_crypto::arkworks::{hashing, random::sample_field_element};
+use aptos_crypto::arkworks::{
+    hashing,
+    msm::{IsMsmInput, MsmInput},
+    random::sample_field_element,
+};
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{pairing::Pairing, VariableBaseMSM};
 use ark_ff::PrimeField;
@@ -14,8 +18,6 @@ use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
 };
 use ark_std::fmt::Debug;
-use aptos_crypto::arkworks::msm::MsmInput;
-use aptos_crypto::arkworks::msm::IsMsmInput;
 
 pub const DST: &[u8; 35] = b"APTOS_CHUNKED_ELGAMAL_GENERATOR_DST"; // This is used to create public parameters, see `default()` below
 
@@ -483,7 +485,7 @@ mod tests {
         let (zs, witness, radix_exponent, _num_chunks) = prepare_chunked_witness::<E>(2, 16);
 
         // 6. Initialize the homomorphism
-        let pp: PublicParameters::<E> = PublicParameters::default();
+        let pp: PublicParameters<E> = PublicParameters::default();
 
         let hom = Homomorphism {
             pp: &pp,

@@ -5,11 +5,10 @@ use crate::sigma_protocol::{
     homomorphism,
     homomorphism::{fixed_base_msms, fixed_base_msms::Trait, TrivialShape as CodomainShape},
 };
+use aptos_crypto::arkworks::msm::{IsMsmInput, MsmInput};
 use ark_ec::{pairing::Pairing, VariableBaseMSM};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use std::fmt::Debug;
-use aptos_crypto::arkworks::msm::MsmInput;
-use aptos_crypto::arkworks::msm::IsMsmInput;
 
 /// Homomorphism for univariate KZG commitments using a Lagrange basis.
 ///

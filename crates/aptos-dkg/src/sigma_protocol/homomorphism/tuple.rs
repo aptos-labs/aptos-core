@@ -8,12 +8,12 @@ use crate::{
         homomorphism::{fixed_base_msms, EntrywiseMap},
     },
 };
+use ark_ec::CurveGroup;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid,
 };
 pub use ark_std::io::Write;
 use std::fmt::Debug;
-use ark_ec::CurveGroup;
 
 /// `TupleHomomorphism` combines two homomorphisms with the same domain
 /// into a single homomorphism that outputs a tuple of codomains.

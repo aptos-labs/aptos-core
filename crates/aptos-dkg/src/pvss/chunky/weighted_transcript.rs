@@ -42,7 +42,7 @@ use aptos_crypto::{
     },
     bls12381::{self},
     utils,
-    weighted_config::{WeightedConfigArkworks},
+    weighted_config::WeightedConfigArkworks,
     CryptoMaterialError, SecretSharingConfig as _, ValidCryptoMaterial,
 };
 use ark_ec::{
@@ -217,27 +217,32 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 }
 
 impl<E: Pairing> Aggregatable<SecretSharingConfig<E>> for SubTranscript<E> {
+    #[allow(non_snake_case)]
     fn aggregate_with(&mut self, sc: &SecretSharingConfig<E>, other: &Self) -> anyhow::Result<()> {
         debug_assert_eq!(self.Cs.len(), sc.get_total_num_players());
-        debug_assert_eq!(self.Vs.len(), sc.get_total_num_players() + 1);
+        debug_assert_eq!(self.Vs.len(), sc.get_total_num_players());
         debug_assert_eq!(self.Cs.len(), other.Cs.len());
         debug_assert_eq!(self.Rs.len(), other.Rs.len());
         debug_assert_eq!(self.Vs.len(), other.Vs.len());
 
+        // Aggregate the V0s
+        self.V0 += other.V0;
+
         for i in 0..sc.get_total_num_players() {
             for j in 0..self.Vs[i].len() {
+                // Aggregate the V_{i,j}s
                 self.Vs[i][j] += other.Vs[i][j];
                 for k in 0..self.Cs[i][j].len() {
+                    // Aggregate the C_{i,j,k}s
                     self.Cs[i][j][k] += other.Cs[i][j][k];
                 }
             }
         }
 
-        self.V0 += other.V0;
-
-        for i in 0..self.Rs.len() {
-            for (r_self, r_other) in self.Rs[i].iter_mut().zip(&other.Rs[i]) {
-                *r_self += r_other;
+        for j in 0..self.Rs.len() {
+            for (R_jk, other_R_jk) in self.Rs[j].iter_mut().zip(&other.Rs[j]) {
+                // Aggregate the R_{j,k}s
+                *R_jk += other_R_jk;
             }
         }
 
@@ -249,7 +254,7 @@ impl<E: Pairing> Aggregatable<SecretSharingConfig<E>> for SubTranscript<E> {
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct SharingProof<E: Pairing> {
     /// SoK: the SK is knowledge of `witnesses` s_{i,j} yielding the commitment and the C and the R, their image is the PK, and the signed message is a certain context `cntxt`
-    pub SoK: sigma_protocol::Proof<E::G1, hkzg_chunked_elgamal::WeightedHomomorphism<'static, E>>, // static because we don't want the lifetime of the Proof to depend on the Homomorphism TODO: try removing it?
+    pub SoK: sigma_protocol::Proof<E::ScalarField, hkzg_chunked_elgamal::WeightedHomomorphism<'static, E>>, // static because we don't want the lifetime of the Proof to depend on the Homomorphism TODO: try removing it?
     /// A batched range proof showing that all committed values s_{i,j} lie in some range
     pub range_proof: dekart_univariate_v2::Proof<E>,
     /// A KZG-style commitment to the values s_{i,j} going into the range proof
@@ -356,7 +361,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let flattened_Vs = arkworks::commit_to_scalars(&G_2, &f_evals);
         debug_assert_eq!(flattened_Vs.len(), sc.get_total_weight() + 1);
 
-        let Vs = sc.group_by_player(&flattened_Vs);  // This won't use the last item in `flattened_Vs` because of `sc`
+        let Vs = sc.group_by_player(&flattened_Vs); // This won't use the last item in `flattened_Vs` because of `sc`
         let V0 = *flattened_Vs.last().unwrap();
 
         Transcript {
@@ -579,7 +584,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> NonAggr
             sc.get_total_weight() + 1,
             true,
             &sc.get_threshold_config().domain,
-        ); // includes_zero is true here means it includes a commitment to f(0), which is in V[n]  
+        ); // includes_zero is true here means it includes a commitment to f(0), which is in V[n]
         let mut Vs_flat: Vec<_> = self.subtrs.Vs.iter().flatten().cloned().collect();
         Vs_flat.push(self.subtrs.V0);
         // could add an assert_eq here with sc.get_total_weight()

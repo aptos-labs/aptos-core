@@ -38,13 +38,3 @@ impl<P: SWCurveConfig> WeightedSum for Affine<P> {
             .into()
     }
 }
-
-// impl<F: ark_ff::PrimeField> WeightedSum for F {
-//     type Scalar = F;
-
-//     fn weighted_sum(bases: &[Self], scalars: &[Self::Scalar]) -> Self {
-//         assert_eq!(bases.len(), scalars.len());
-
-//         bases.iter().zip(scalars).map(|(b, s)| b * s).sum()
-//     }
-// }

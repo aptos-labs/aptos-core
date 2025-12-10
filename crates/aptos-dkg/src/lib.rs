@@ -63,8 +63,7 @@ impl<F: PrimeField> Scalar<F> {
     /// Converts a `&[Scalar<E>]` into a `&[E::ScalarField]`; could do this without copying
     /// (and similarly for the other functions below) by using `#[repr(transparent)]` and
     /// unsafe Rust, but we want to avoid that
-    pub fn slice_as_inner(slice: &[Self]) -> Vec<F>
-    {
+    pub fn slice_as_inner(slice: &[Self]) -> Vec<F> {
         slice.iter().map(|s| s.0).collect()
     }
 
@@ -104,35 +103,8 @@ impl<F: PrimeField> UniformRand for Scalar<F> {
     }
 }
 
-// TODO: maybe move the Reconstructable trait to the SecretSharingConfig in the PVSS trait, with associated Scalar equal to InputSecret
-// then make the existing implementation of `fn reconstruct()` part of a trait... and then we can remove the trivial implementation below!
-//impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
-// impl<F: PrimeField>
-//     Reconstructable<ShamirThresholdConfig<F>> for Scalar<F>
-// {
-//     type ShareValue = Scalar<F>;
-
-//     fn reconstruct(
-//         sc: &ShamirThresholdConfig<F>,
-//         shares: &[ShamirShare<Self::ShareValue>],
-//     ) -> anyhow::Result<Self> {
-//         assert_ge!(shares.len(), sc.get_threshold());
-//         assert_le!(shares.len(), sc.get_total_num_players());
-
-//         let shares_destructured: Vec<(Player, F)> = shares
-//             .iter()
-//             .map(|(player, scalar)| (*player, scalar.0))
-//             .collect();
-
-//         Ok(Scalar(F::reconstruct(
-//             sc,
-//             &shares_destructured,
-//         )?))
-//     }
-// }
-
-impl<const N: usize, P: FpConfig<N>>
-    Reconstructable<ShamirThresholdConfig<Fp<P, N>>> for Scalar<Fp<P, N>>
+impl<const N: usize, P: FpConfig<N>> Reconstructable<ShamirThresholdConfig<Fp<P, N>>>
+    for Scalar<Fp<P, N>>
 {
     type ShareValue = Scalar<Fp<P, N>>;
 
@@ -148,48 +120,6 @@ impl<const N: usize, P: FpConfig<N>>
             .map(|(player, scalar)| (*player, scalar.0))
             .collect();
 
-        Ok(Scalar(Fp::<P, N>::reconstruct(
-            sc,
-            &shares_destructured,
-        )?))
+        Ok(Scalar(Fp::<P, N>::reconstruct(sc, &shares_destructured)?))
     }
 }
-
-// TODO: make this stuff more generic, like blstrs....
-// TODO: can make stuff more generic... what if we make a thresholdconfig a weightedconfig with weights 1?
-//impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
-//    Reconstructable<WeightedConfigArkworks<E::ScalarField>> for Scalar<E>
-//{
-//    type ShareValue = Vec<Scalar<E>>;
-//
-//    fn reconstruct(
-//        sc: &WeightedConfigArkworks<E::ScalarField>,
-//        shares: &[ShamirShare<Self::ShareValue>],
-//    ) -> anyhow::Result<Self> {
-//        let mut flattened_shares = Vec::with_capacity(sc.get_total_weight());
-//
-//        // println!();
-//        for (player, sub_shares) in shares {
-//            // println!(
-//            //     "Flattening {} share(s) for player {player}",
-//            //     sub_shares.len()
-//            // );
-//            for (pos, share) in sub_shares.iter().enumerate() {
-//                let virtual_player = sc.get_virtual_player(player, pos);
-//
-//                // println!(
-//                //     " + Adding share {pos} as virtual player {virtual_player}: {:?}",
-//                //     share
-//                // );
-//                // TODO(Performance): Avoiding the cloning here might be nice
-//                let tuple = (virtual_player, share.clone());
-//                flattened_shares.push(tuple);
-//            }
-//        }
-//
-//        assert_ge!(flattened_shares.len(), sc.get_threshold_weight());
-//        assert_le!(flattened_shares.len(), sc.get_total_weight());
-//
-//        Scalar::<E>::reconstruct(sc.get_threshold_config(), &flattened_shares)
-//    }
-//}

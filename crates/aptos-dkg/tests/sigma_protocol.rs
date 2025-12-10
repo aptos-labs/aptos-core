@@ -1,7 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_crypto::arkworks::random::sample_field_element;
+use aptos_crypto::arkworks::{
+    msm::{IsMsmInput, MsmInput},
+    random::sample_field_element,
+};
 use aptos_dkg::{
     sigma_protocol::{
         self, homomorphism,
@@ -15,8 +18,7 @@ use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::thread_rng;
 use std::fmt::Debug;
-use aptos_crypto::arkworks::msm::MsmInput;
-use aptos_crypto::arkworks::msm::IsMsmInput;
+use ark_ec::PrimeGroup;
 
 #[cfg(test)]
 pub fn test_sigma_protocol<C, H>(hom: H, witness: H::Domain)
@@ -45,7 +47,7 @@ mod schnorr {
         pub G: C::Affine,
     }
 
-    // `E::G1Affine` doesn't seem to implement `Default`, otherwise it would've been derived for `Schnorr` here
+    // `C::Affine` doesn't seem to implement `Default`, otherwise it would've been derived for `Schnorr` here
     impl<C: CurveGroup> Default for Schnorr<C> {
         fn default() -> Self {
             Self {
@@ -93,13 +95,29 @@ mod schnorr {
 mod chaum_pedersen {
     use super::{schnorr::*, *};
 
-    pub type ChaumPedersen<E> = TupleHomomorphism<Schnorr<E>, Schnorr<E>, true>;
+    pub type ChaumPedersen<C> = TupleHomomorphism<Schnorr<C>, Schnorr<C>, true>;
 
     // Implementing e.g. `Default` here would require a wrapper, but then `sigma_protocol::Trait` would have to get re-implemented...
     #[allow(non_snake_case)]
     pub fn make_chaum_pedersen_instance<C: CurveGroup>() -> ChaumPedersen<C> {
         let G_1 = C::generator().into_affine();
         let G_2 = (G_1 * C::ScalarField::from(123456789u64)).into_affine();
+
+        let schnorr1 = Schnorr { G: G_1 };
+        let schnorr2 = Schnorr { G: G_2 };
+
+        TupleHomomorphism {
+            hom1: schnorr1,
+            hom2: schnorr2,
+        }
+    }
+
+    pub type InhomogChaumPedersen<E> = TupleHomomorphism<Schnorr<<E as Pairing>::G1>, Schnorr<<E as Pairing>::G2>, false>;
+
+    #[allow(non_snake_case)]
+    pub fn make_inhomogeneous_chaum_pedersen_instance<E: Pairing>() -> InhomogChaumPedersen<E> {
+        let G_1 = E::G1::generator().into_affine();
+        let G_2 = E::G2::generator().into_affine();
 
         let schnorr1 = Schnorr { G: G_1 };
         let schnorr2 = Schnorr { G: G_2 };
@@ -135,8 +153,16 @@ fn test_chaum_pedersen() {
     // ---- Bn254 ----
     let witness_bn = Scalar(sample_field_element(&mut rng));
     test_sigma_protocol::<<Bn254 as Pairing>::G1, _>(make_chaum_pedersen_instance(), witness_bn);
+//    test_sigma_protocol::<<Bn254 as Pairing>::G1, _>(make_inhomogeneous_chaum_pedersen_instance(), witness_bn);
 
     // ---- Bls12_381 ----
     let witness_bls = Scalar(sample_field_element(&mut rng));
-    test_sigma_protocol::<<Bls12_381 as Pairing>::G1, _>(make_chaum_pedersen_instance(), witness_bls);
+    test_sigma_protocol::<<Bls12_381 as Pairing>::G1, _>(
+        make_chaum_pedersen_instance(),
+        witness_bls,
+    );
+    // test_sigma_protocol::<<Bls12_381 as Pairing>::G1, _>(
+    //     make_inhomogeneous_chaum_pedersen_instance(),
+    //     witness_bls,
+    // );
 }

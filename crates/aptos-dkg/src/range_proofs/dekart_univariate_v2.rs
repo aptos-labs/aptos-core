@@ -12,13 +12,14 @@ use crate::{
 };
 use aptos_crypto::arkworks::{
     self,
+    msm::MsmInput,
     random::{
         sample_field_element, sample_field_elements, unsafe_random_point, unsafe_random_points,
     },
     GroupGenerators,
 };
 use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup, VariableBaseMSM};
-use ark_ff::{AdditiveGroup, Field};
+use ark_ff::{AdditiveGroup, Field, PrimeField};
 use ark_poly::{self, EvaluationDomain, Polynomial};
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid, Validate,
@@ -26,14 +27,12 @@ use ark_serialize::{
 use num_integer::Roots;
 use rand::{CryptoRng, RngCore};
 use std::{fmt::Debug, io::Write};
-use aptos_crypto::arkworks::msm::MsmInput;
-use ark_ff::PrimeField;
 
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, Debug, PartialEq, Eq, Clone, CanonicalDeserialize)]
 pub struct Proof<E: Pairing> {
     hatC: E::G1,
-    pi_PoK: sigma_protocol::Proof<E::G1, two_term_msm::Homomorphism<E::G1>>,
+    pi_PoK: sigma_protocol::Proof<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
     Cs: Vec<E::G1>, // has length ell
     D: E::G1,
     a: E::ScalarField,
@@ -807,7 +806,7 @@ mod fiat_shamir {
     #[allow(non_snake_case)]
     pub(crate) fn append_sigma_proof<E: Pairing>(
         fs_transcript: &mut Transcript,
-        pi_PoK: &sigma_protocol::Proof<E::G1, two_term_msm::Homomorphism<E::G1>>,
+        pi_PoK: &sigma_protocol::Proof<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
     ) {
         <Transcript as RangeProof<E, Proof<E>>>::append_sigma_proof(fs_transcript, pi_PoK);
     }
@@ -879,11 +878,11 @@ pub mod two_term_msm {
     // TODO: maybe fixed_base_msms should become a folder and put its code inside mod.rs? Then put this mod inside of that folder?
     use super::*;
     use crate::sigma_protocol::{homomorphism::fixed_base_msms, traits::FirstProofItem};
-    use aptos_crypto::arkworks::random::UniformRand;
+    use aptos_crypto::arkworks::{msm::IsMsmInput, random::UniformRand};
+    use ark_ec::AffineRepr;
     use aptos_crypto_derive::SigmaProtocolWitness;
-    use aptos_crypto::arkworks::msm::IsMsmInput;
     pub use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
-    pub type Proof<C> = sigma_protocol::Proof<C, Homomorphism<C>>;
+    pub type Proof<C> = sigma_protocol::Proof<<<C as CurveGroup>::Affine as AffineRepr>::ScalarField, Homomorphism<C>>;
 
     impl<C: CurveGroup> Proof<C> {
         /// Generates a random looking proof (but not a valid one).

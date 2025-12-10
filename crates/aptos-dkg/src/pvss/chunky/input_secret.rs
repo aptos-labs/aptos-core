@@ -51,7 +51,9 @@ impl<F: ark_ff::Field> InputSecret<F> {
     }
 }
 
-impl<E: Pairing> Convert<Scalar<E::ScalarField>, PublicParameters<E>> for InputSecret<E::ScalarField> {
+impl<E: Pairing> Convert<Scalar<E::ScalarField>, PublicParameters<E>>
+    for InputSecret<E::ScalarField>
+{
     fn to(&self, _with: &PublicParameters<E>) -> Scalar<E::ScalarField> {
         Scalar(*self.get_secret_a())
     }

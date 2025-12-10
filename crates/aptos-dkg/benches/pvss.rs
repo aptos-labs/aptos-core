@@ -232,12 +232,12 @@ fn pvss_subaggregate<
     g.bench_function(format!("aggregate/{}", sc), move |b| {
         b.iter_with_setup(
             || {
-                let trx = T::generate(
+                let trs = T::generate(
                     &sc,
                     &T::PublicParameters::with_max_num_shares(sc.get_total_num_shares()),
                     &mut rng,
                 );
-                (trx.clone(), trx)
+                (trs.clone(), trs)
             },
             |(first, second)| {
                 first
