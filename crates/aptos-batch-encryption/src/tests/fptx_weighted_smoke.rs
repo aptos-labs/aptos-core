@@ -131,6 +131,7 @@ fn weighted_smoke_with_pvss() {
     let pp = <T as Transcript>::PublicParameters::new_with_commitment_base(
         tc_happy.get_total_weight(),
         aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_TESTING,
+        tc_happy.get_total_num_players(),
         G2Affine::generator(),
         &mut rng_aptos,
     );
@@ -151,7 +152,7 @@ fn weighted_smoke_with_pvss() {
         .map(|dk| dk.to(pp.get_encryption_public_params()))
         .collect();
 
-    let secrets : Vec<<T as Transcript>::InputSecret> = (0..2).into_iter().map(|_| <T as Transcript>::InputSecret::generate(&mut rng_aptos)).collect();
+    let secrets : Vec<<T as Transcript>::InputSecret> = (0..tc_happy.get_total_num_players()).into_iter().map(|_| <T as Transcript>::InputSecret::generate(&mut rng_aptos)).collect();
 
     // Test dealing
     let subtrx_happypaths : Vec<<T as HasAggregatableSubtranscript<C>>::SubTranscript> = secrets.iter().enumerate().map(|(i,s)| T::deal(
