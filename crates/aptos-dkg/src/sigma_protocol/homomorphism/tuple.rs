@@ -5,10 +5,10 @@ use crate::{
     sigma_protocol,
     sigma_protocol::{
         homomorphism,
-        homomorphism::{fixed_base_msms::Trait, EntrywiseMap},
+        homomorphism::{fixed_base_msms, EntrywiseMap},
     },
 };
-use ark_ec::pairing::Pairing;
+use ark_ec::CurveGroup;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid,
 };
@@ -28,7 +28,7 @@ use std::fmt::Debug;
 /// In category-theoretic terms, this is the composition of the diagonal map
 /// `Δ: Domain -> Domain × Domain` with the product map `h1 × h2`.
 #[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
-pub struct TupleHomomorphism<H1, H2>
+pub struct TupleHomomorphism<H1, H2, const HOMOG: bool>
 where
     H1: homomorphism::Trait,
     H2: homomorphism::Trait<Domain = H1::Domain>,
@@ -43,7 +43,7 @@ where
 ///
 /// In other words, for input `x: Domain`, this produces
 /// `(hom1(x), hom2(x))`. For technical reasons, we then put the output inside a wrapper.
-impl<H1, H2> homomorphism::Trait for TupleHomomorphism<H1, H2>
+impl<H1, H2, const HOMOG: bool> homomorphism::Trait for TupleHomomorphism<H1, H2, HOMOG>
 where
     H1: homomorphism::Trait,
     H2: homomorphism::Trait<Domain = H1::Domain>,
@@ -152,18 +152,15 @@ where
 /// not necessary through enums.
 ///
 /// The codomain shapes of the two homomorphisms are combined using `TupleCodomainShape`.
-impl<H1, H2> Trait for TupleHomomorphism<H1, H2>
+impl<H1, H2> fixed_base_msms::Trait for TupleHomomorphism<H1, H2, true>
 where
-    H1: Trait,
-    H2: Trait<
+    H1: fixed_base_msms::Trait,
+    H2: fixed_base_msms::Trait<
         Domain = H1::Domain,
-        Scalar = H1::Scalar,
-        Base = H1::Base,
         MsmInput = H1::MsmInput,
         MsmOutput = H1::MsmOutput,
     >,
 {
-    type Base = H1::Base;
     type CodomainShape<T>
         = TupleCodomainShape<H1::CodomainShape<T>, H2::CodomainShape<T>>
     where
@@ -179,17 +176,19 @@ where
         TupleCodomainShape(terms1, terms2)
     }
 
-    fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
-        H1::msm_eval(bases, scalars)
+    fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
+        H1::msm_eval(input)
     }
 }
 
-impl<E: Pairing, H1, H2> sigma_protocol::Trait<E> for TupleHomomorphism<H1, H2>
+impl<C: CurveGroup, H1, H2> sigma_protocol::Trait<C> for TupleHomomorphism<H1, H2, true>
 where
-    H1: sigma_protocol::Trait<E>,
-    H2: sigma_protocol::Trait<E>,
-    H2: Trait<Domain = H1::Domain, MsmInput = H1::MsmInput>,
+    H1: sigma_protocol::Trait<C>,
+    H2: sigma_protocol::Trait<C>,
+    H2: fixed_base_msms::Trait<Domain = H1::Domain, MsmInput = H1::MsmInput>, // Huh MsmOutput = H1::MsmOutput yields compiler error??
 {
+    /// Concatenate the DSTs of the two homomorphisms, plus some
+    /// additional metadata to ensure uniqueness.
     fn dst(&self) -> Vec<u8> {
         let mut dst = Vec::new();
 

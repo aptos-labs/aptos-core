@@ -110,7 +110,7 @@ fn weighted_smoke_with_setup_for_testing() {
     );
 }
 
-type T = aptos_dkg::pvss::chunky::WeightedTranscript<crate::group::Pairing>;
+type T = aptos_dkg::pvss::chunky::UnsignedWeightedTranscript<crate::group::Pairing>;
 type C = WeightedConfigArkworks<Fr>;
 use crate::group::{Fr, G2Affine};
 use aptos_crypto::{SigningKey, Uniform};

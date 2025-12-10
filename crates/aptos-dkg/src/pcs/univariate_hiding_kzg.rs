@@ -15,6 +15,7 @@ use anyhow::ensure;
 use aptos_crypto::arkworks::random::UniformRand;
 use aptos_crypto::{
     arkworks::{
+        msm::{IsMsmInput, MsmInput},
         random::{sample_field_element, unsafe_random_point},
         GroupGenerators,
     },
@@ -25,7 +26,7 @@ use ark_ec::{
     pairing::{Pairing, PairingOutput},
     AdditiveGroup, CurveGroup, VariableBaseMSM,
 };
-use ark_ff::Field;
+use ark_ff::{Field, PrimeField};
 use ark_poly::EvaluationDomain;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::{CryptoRng, RngCore};
@@ -34,7 +35,7 @@ use std::fmt::Debug;
 
 pub type Commitment<E> = CodomainShape<<E as Pairing>::G1>;
 
-pub type CommitmentRandomness<E> = Scalar<E>;
+pub type CommitmentRandomness<F> = Scalar<F>;
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, PartialEq, Eq, Clone)]
 pub struct OpeningProof<E: Pairing> {
@@ -153,7 +154,7 @@ pub fn setup<E: Pairing, R: RngCore + CryptoRng>(
 pub fn commit_with_randomness<E: Pairing>(
     ck: &CommitmentKey<E>,
     values: &[E::ScalarField],
-    r: &CommitmentRandomness<E>,
+    r: &CommitmentRandomness<E::ScalarField>,
 ) -> Commitment<E> {
     let commitment_hom: CommitmentHomomorphism<'_, E> = CommitmentHomomorphism {
         lagr_g1: &ck.lagr_g1,
@@ -175,7 +176,7 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
         rho: E::ScalarField,
         x: E::ScalarField,
         y: E::ScalarField,
-        s: &CommitmentRandomness<E>,
+        s: &CommitmentRandomness<E::ScalarField>,
     ) -> OpeningProof<E> {
         if ck.roots_of_unity_in_eval_dom.contains(&x) {
             panic!("x is not allowed to be a root of unity");
@@ -275,14 +276,14 @@ pub struct CommitmentHomomorphism<'a, E: Pairing> {
 #[derive(
     SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq,
 )]
-pub struct Witness<E: Pairing> {
-    pub hiding_randomness: CommitmentRandomness<E>,
-    pub values: Vec<Scalar<E>>,
+pub struct Witness<F: PrimeField> {
+    pub hiding_randomness: CommitmentRandomness<F>,
+    pub values: Vec<Scalar<F>>,
 }
 
 impl<E: Pairing> homomorphism::Trait for CommitmentHomomorphism<'_, E> {
     type Codomain = CodomainShape<E::G1>;
-    type Domain = Witness<E>;
+    type Domain = Witness<E::ScalarField>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
         self.apply_msm(self.msm_terms(input))
@@ -290,12 +291,11 @@ impl<E: Pairing> homomorphism::Trait for CommitmentHomomorphism<'_, E> {
 }
 
 impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
-    type Base = E::G1Affine;
     type CodomainShape<T>
         = CodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-    type MsmInput = fixed_base_msms::MsmInput<Self::Base, Self::Scalar>;
+    type MsmInput = MsmInput<E::G1Affine, E::ScalarField>;
     type MsmOutput = E::G1;
     type Scalar = E::ScalarField;
 
@@ -315,15 +315,16 @@ impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
         bases.push(self.xi_1);
         bases.extend(&self.lagr_g1[..input.values.len()]);
 
-        CodomainShape(fixed_base_msms::MsmInput { bases, scalars })
+        CodomainShape(MsmInput { bases, scalars })
     }
 
-    fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
-        E::G1::msm(bases, &scalars).expect("MSM computation failed in univariate KZG")
+    fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
+        E::G1::msm(input.bases(), &input.scalars())
+            .expect("MSM computation failed in univariate KZG")
     }
 }
 
-impl<'a, E: Pairing> sigma_protocol::Trait<E> for CommitmentHomomorphism<'a, E> {
+impl<'a, E: Pairing> sigma_protocol::Trait<E::G1> for CommitmentHomomorphism<'a, E> {
     fn dst(&self) -> Vec<u8> {
         b"APTOS_HIDING_KZG_SIGMA_PROTOCOL_DST".to_vec()
     }

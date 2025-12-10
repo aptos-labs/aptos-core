@@ -78,7 +78,7 @@ impl BatchThresholdEncryption for FPTX {
     type MasterSecretKeyShare = BIBEMasterSecretKeyShare;
     type PreparedCiphertext = PreparedCiphertext;
     type Round = u64;
-    type SubTranscript = aptos_dkg::pvss::chunky::SubTranscript<group::Pairing>;
+    type SubTranscript = aptos_dkg::pvss::chunky::UnweightedSubtranscript<group::Pairing>;
     type ThresholdConfig = aptos_crypto::arkworks::shamir::ShamirThresholdConfig<Fr>;
     type VerificationKey = BIBEVerificationKey;
 

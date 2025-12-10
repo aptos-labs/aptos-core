@@ -12,13 +12,14 @@ use crate::{
 };
 use aptos_crypto::arkworks::{
     self,
+    msm::MsmInput,
     random::{
         sample_field_element, sample_field_elements, unsafe_random_point, unsafe_random_points,
     },
     GroupGenerators,
 };
 use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup, VariableBaseMSM};
-use ark_ff::{AdditiveGroup, Field};
+use ark_ff::{AdditiveGroup, Field, PrimeField};
 use ark_poly::{self, EvaluationDomain, Polynomial};
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid, Validate,
@@ -31,7 +32,7 @@ use std::{fmt::Debug, io::Write};
 #[derive(CanonicalSerialize, Debug, PartialEq, Eq, Clone, CanonicalDeserialize)]
 pub struct Proof<E: Pairing> {
     hatC: E::G1,
-    pi_PoK: sigma_protocol::Proof<E, two_term_msm::Homomorphism<E>>,
+    pi_PoK: sigma_protocol::Proof<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
     Cs: Vec<E::G1>, // has length ell
     D: E::G1,
     a: E::ScalarField,
@@ -230,7 +231,7 @@ fn compute_h_denom_eval<E: Pairing>(
 impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     type Commitment = univariate_hiding_kzg::Commitment<E>;
     type CommitmentKey = univariate_hiding_kzg::CommitmentKey<E>;
-    type CommitmentRandomness = univariate_hiding_kzg::CommitmentRandomness<E>;
+    type CommitmentRandomness = univariate_hiding_kzg::CommitmentRandomness<E::ScalarField>;
     type Input = E::ScalarField;
     type ProverKey = ProverKey<E>;
     type PublicStatement = PublicStatement<E>;
@@ -388,7 +389,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         );
 
         // Step 3b
-        fiat_shamir::append_sigma_proof(&mut fs_t, &pi_PoK);
+        fiat_shamir::append_sigma_proof::<E>(&mut fs_t, &pi_PoK);
 
         // Step 4a
         let rs: Vec<E::ScalarField> = (0..ell).map(|_| sample_field_element(rng)).collect();
@@ -681,7 +682,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         )?;
 
         // Step 4a
-        fiat_shamir::append_sigma_proof(&mut fs_t, &pi_PoK);
+        fiat_shamir::append_sigma_proof::<E>(&mut fs_t, &pi_PoK);
 
         // Step 4b
         fiat_shamir::append_f_j_commitments::<E>(&mut fs_t, &Cs);
@@ -805,7 +806,7 @@ mod fiat_shamir {
     #[allow(non_snake_case)]
     pub(crate) fn append_sigma_proof<E: Pairing>(
         fs_transcript: &mut Transcript,
-        pi_PoK: &sigma_protocol::Proof<E, two_term_msm::Homomorphism<E>>,
+        pi_PoK: &sigma_protocol::Proof<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
     ) {
         <Transcript as RangeProof<E, Proof<E>>>::append_sigma_proof(fs_transcript, pi_PoK);
     }
@@ -877,12 +878,16 @@ pub mod two_term_msm {
     // TODO: maybe fixed_base_msms should become a folder and put its code inside mod.rs? Then put this mod inside of that folder?
     use super::*;
     use crate::sigma_protocol::{homomorphism::fixed_base_msms, traits::FirstProofItem};
-    use aptos_crypto::arkworks::random::UniformRand;
+    use aptos_crypto::arkworks::{msm::IsMsmInput, random::UniformRand};
     use aptos_crypto_derive::SigmaProtocolWitness;
+    use ark_ec::AffineRepr;
     pub use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
-    pub type Proof<E> = sigma_protocol::Proof<E, Homomorphism<E>>;
+    pub type Proof<C> = sigma_protocol::Proof<
+        <<C as CurveGroup>::Affine as AffineRepr>::ScalarField,
+        Homomorphism<C>,
+    >;
 
-    impl<E: Pairing> Proof<E> {
+    impl<C: CurveGroup> Proof<C> {
         /// Generates a random looking proof (but not a valid one).
         /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
         pub fn generate<R: rand::Rng + rand::CryptoRng>(rng: &mut R) -> Self {
@@ -903,22 +908,22 @@ pub mod two_term_msm {
     /// This structure defines a map from two scalars to one group element:
     /// `f(x1, x2) = base_1 * x1 + base_2 * x2`.
     #[derive(CanonicalSerialize, Clone, Debug, PartialEq, Eq)]
-    pub struct Homomorphism<E: Pairing> {
-        pub base_1: E::G1Affine,
-        pub base_2: E::G1Affine,
+    pub struct Homomorphism<C: CurveGroup> {
+        pub base_1: C::Affine,
+        pub base_2: C::Affine,
     }
 
     #[derive(
         SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq,
     )]
-    pub struct Witness<E: Pairing> {
-        pub poly_randomness: Scalar<E>,
-        pub hiding_kzg_randomness: Scalar<E>,
+    pub struct Witness<F: PrimeField> {
+        pub poly_randomness: Scalar<F>,
+        pub hiding_kzg_randomness: Scalar<F>,
     }
 
-    impl<E: Pairing> homomorphism::Trait for Homomorphism<E> {
-        type Codomain = CodomainShape<E::G1>;
-        type Domain = Witness<E>;
+    impl<C: CurveGroup> homomorphism::Trait for Homomorphism<C> {
+        type Codomain = CodomainShape<C>;
+        type Domain = Witness<C::ScalarField>;
 
         fn apply(&self, input: &Self::Domain) -> Self::Codomain {
             // Not doing `self.apply_msm(self.msm_terms(input))` because E::G1::msm is slower!
@@ -930,15 +935,14 @@ pub mod two_term_msm {
         }
     }
 
-    impl<E: Pairing> fixed_base_msms::Trait for Homomorphism<E> {
-        type Base = E::G1Affine;
+    impl<C: CurveGroup> fixed_base_msms::Trait for Homomorphism<C> {
         type CodomainShape<T>
             = CodomainShape<T>
         where
             T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq + Debug;
-        type MsmInput = fixed_base_msms::MsmInput<Self::Base, Self::Scalar>;
-        type MsmOutput = E::G1;
-        type Scalar = E::ScalarField;
+        type MsmInput = MsmInput<C::Affine, C::ScalarField>;
+        type MsmOutput = C;
+        type Scalar = C::ScalarField;
 
         fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
             let mut scalars = Vec::with_capacity(2);
@@ -949,15 +953,15 @@ pub mod two_term_msm {
             bases.push(self.base_1);
             bases.push(self.base_2);
 
-            CodomainShape(fixed_base_msms::MsmInput { bases, scalars })
+            CodomainShape(MsmInput { bases, scalars })
         }
 
-        fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
-            E::G1::msm(bases, scalars).expect("MSM failed in TwoTermMSM")
+        fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
+            C::msm(input.bases(), input.scalars()).expect("MSM failed in TwoTermMSM")
         }
     }
 
-    impl<E: Pairing> sigma_protocol::Trait<E> for Homomorphism<E> {
+    impl<C: CurveGroup> sigma_protocol::Trait<C> for Homomorphism<C> {
         fn dst(&self) -> Vec<u8> {
             b"DEKART_V2_SIGMA_PROTOCOL".to_vec()
         }

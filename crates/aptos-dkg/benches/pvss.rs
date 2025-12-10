@@ -8,7 +8,7 @@ use aptos_crypto::{SecretSharingConfig, Uniform};
 use aptos_dkg::{
     algebra::evaluation_domain::BatchEvaluationDomain,
     pvss::{
-        chunky::Transcript as ChunkyTranscript,
+        chunky::UnsignedUnweightedTranscript as ChunkyTranscript,
         das,
         test_utils::{
             self, get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
@@ -232,12 +232,12 @@ fn pvss_subaggregate<
     g.bench_function(format!("aggregate/{}", sc), move |b| {
         b.iter_with_setup(
             || {
-                let trx = T::generate(
+                let trs = T::generate(
                     &sc,
                     &T::PublicParameters::with_max_num_shares(sc.get_total_num_shares()),
                     &mut rng,
                 );
-                (trx.clone(), trx)
+                (trs.clone(), trs)
             },
             |(first, second)| {
                 first

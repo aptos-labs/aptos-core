@@ -113,7 +113,7 @@ fn smoke_with_setup_for_testing() {
     );
 }
 
-type T = aptos_dkg::pvss::chunky::Transcript<crate::group::Pairing>;
+type T = aptos_dkg::pvss::chunky::UnsignedUnweightedTranscript<crate::group::Pairing>;
 use aptos_crypto::{SigningKey, Uniform};
 use aptos_dkg::pvss::{
     test_utils::NoAux,
