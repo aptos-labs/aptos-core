@@ -39,7 +39,7 @@ pub mod common {
         }
     }
 
-    #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+    #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
     pub enum NodeType {
         Validator,
         ValidatorFullNode,
@@ -47,17 +47,22 @@ pub mod common {
         Unknown,
         UnknownValidator,
         UnknownFullNode,
+        /// Custom node type with a user-defined name (e.g., "ShelbyStorageProvider")
+        Custom(String),
     }
 
     impl NodeType {
-        pub fn as_str(self) -> &'static str {
+        /// Get the string representation of the node type
+        /// For Custom types, returns "custom({name})" to prevent ambiguity with built-in types
+        pub fn as_str(&self) -> String {
             match self {
-                NodeType::Validator => "validator",
-                NodeType::ValidatorFullNode => "validator_fullnode",
-                NodeType::PublicFullNode => "public_fullnode",
-                NodeType::Unknown => "unknown_peer",
-                NodeType::UnknownValidator => "unknown_validator",
-                NodeType::UnknownFullNode => "unknown_fullnode",
+                NodeType::Validator => "validator".to_string(),
+                NodeType::ValidatorFullNode => "validator_fullnode".to_string(),
+                NodeType::PublicFullNode => "public_fullnode".to_string(),
+                NodeType::Unknown => "unknown_peer".to_string(),
+                NodeType::UnknownValidator => "unknown_validator".to_string(),
+                NodeType::UnknownFullNode => "unknown_fullnode".to_string(),
+                NodeType::Custom(name) => format!("custom({})", name),
             }
         }
     }
