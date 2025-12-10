@@ -138,6 +138,7 @@ impl ExecutionAndIOCosts {
                             fn_name,
                             ty_args,
                             cost,
+                            ..
                         } => self.lines.push(
                             format!(
                                 "{};{}",
