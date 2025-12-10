@@ -19,7 +19,7 @@ use std::fmt;
 /// A SLH-DSA SHA2-128s signature.
 /// NOTE: The max size on this struct is enforced in its `TryFrom<u8>` trait implementation.
 #[derive(DeserializeKey, Clone, SerializeKey, PartialEq, Eq)]
-#[key_name("SlhDsaSha2_128sSignature")]
+#[key_name("SlhDsa_Sha2_128s_Signature")]
 pub struct Signature(pub(crate) SlhDsaSignature<Sha2_128s>);
 
 impl Signature {

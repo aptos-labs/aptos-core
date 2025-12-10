@@ -17,8 +17,7 @@ use aptos_crypto::{
     ed25519::{Ed25519PublicKey, Ed25519Signature},
     hash::CryptoHash,
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
-    secp256k1_ecdsa, secp256r1_ecdsa, signing_message,
-    slh_dsa_sha2_128s,
+    secp256k1_ecdsa, secp256r1_ecdsa, signing_message, slh_dsa_sha2_128s,
     traits::Signature,
     CryptoMaterialError, HashValue, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
@@ -1234,6 +1233,7 @@ impl SingleKeyAuthenticator {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[allow(non_camel_case_types)]
 pub enum AnySignature {
     Ed25519 {
         signature: Ed25519Signature,
@@ -1241,7 +1241,7 @@ pub enum AnySignature {
     Secp256k1Ecdsa {
         signature: secp256k1_ecdsa::Signature,
     },
-    SlhDsaSha2_128s {
+    SlhDsa_Sha2_128s {
         signature: slh_dsa_sha2_128s::Signature,
     },
     WebAuthn {
@@ -1262,7 +1262,7 @@ impl AnySignature {
     }
 
     pub fn slh_dsa_sha2_128s(signature: slh_dsa_sha2_128s::Signature) -> Self {
-        Self::SlhDsaSha2_128s { signature }
+        Self::SlhDsa_Sha2_128s { signature }
     }
 
     pub fn webauthn(signature: PartialAuthenticatorAssertionResponse) -> Self {
@@ -1277,7 +1277,7 @@ impl AnySignature {
         match self {
             Self::Ed25519 { .. } => "Ed25519",
             Self::Secp256k1Ecdsa { .. } => "Secp256k1Ecdsa",
-            Self::SlhDsaSha2_128s { .. } => "SlhDsaSha2_128s",
+            Self::SlhDsa_Sha2_128s { .. } => "SlhDsaSha2_128s",
             Self::WebAuthn { .. } => "WebAuthn",
             Self::Keyless { .. } => "Keyless",
         }
@@ -1295,9 +1295,10 @@ impl AnySignature {
             (Self::Secp256k1Ecdsa { signature }, AnyPublicKey::Secp256k1Ecdsa { public_key }) => {
                 signature.verify(message, public_key)
             },
-            (Self::SlhDsaSha2_128s { signature }, AnyPublicKey::SlhDsaSha2_128s { public_key }) => {
-                signature.verify(message, public_key)
-            },
+            (
+                Self::SlhDsa_Sha2_128s { signature },
+                AnyPublicKey::SlhDsa_Sha2_128s { public_key },
+            ) => signature.verify(message, public_key),
             (Self::WebAuthn { signature }, _) => signature.verify(message, public_key),
             (Self::Keyless { signature }, AnyPublicKey::Keyless { public_key: _ }) => {
                 Self::verify_keyless_ephemeral_signature(message, signature)
@@ -1354,6 +1355,7 @@ impl TryFrom<&[u8]> for AnySignature {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[allow(non_camel_case_types)]
 pub enum AnyPublicKey {
     Ed25519 {
         public_key: Ed25519PublicKey,
@@ -1364,7 +1366,7 @@ pub enum AnyPublicKey {
     Secp256r1Ecdsa {
         public_key: secp256r1_ecdsa::PublicKey,
     },
-    SlhDsaSha2_128s {
+    SlhDsa_Sha2_128s {
         public_key: slh_dsa_sha2_128s::PublicKey,
     },
     Keyless {
@@ -1389,7 +1391,7 @@ impl AnyPublicKey {
     }
 
     pub fn slh_dsa_sha2_128s(public_key: slh_dsa_sha2_128s::PublicKey) -> Self {
-        Self::SlhDsaSha2_128s { public_key }
+        Self::SlhDsa_Sha2_128s { public_key }
     }
 
     pub fn keyless(public_key: KeylessPublicKey) -> Self {
