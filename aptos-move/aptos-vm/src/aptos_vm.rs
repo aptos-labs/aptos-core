@@ -3187,6 +3187,21 @@ impl VMValidator for AptosVM {
             }
         }
 
+        if !self.features().is_enabled(FeatureFlag::SLH_DSA_SHA2_128S_SIGNATURE) {
+            if let Ok(sk_authenticators) = transaction
+                .authenticator_ref()
+                .to_single_key_authenticators()
+            {
+                for authenticator in sk_authenticators {
+                    if let AnySignature::SlhDsa_Sha2_128s { .. } = authenticator.signature() {
+                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+                    }
+                }
+            } else {
+                return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
+            }
+        }
+
         if !self
             .features()
             .is_enabled(FeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS)
