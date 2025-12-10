@@ -49,6 +49,7 @@ use ark_ec::{
     pairing::{Pairing, PairingOutput},
     AffineRepr, CurveGroup, VariableBaseMSM,
 };
+use ark_std::log2;
 use ark_ff::{AdditiveGroup, Fp, FpConfig};
 use ark_poly::EvaluationDomain;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -194,7 +195,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
                 pp.pp_elgamal.G.into_group(),
                 &dealt_encrypted_secret_key_share_chunks,
                 &pp.table,
-                1 << pp.ell as u32,
+                1 << ((pp.ell as u32) + log2(pp.max_aggregation)) as u32,
             )
             .expect("BSGS dlog failed");
 
@@ -435,7 +436,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
                 pp.pp_elgamal.G.into_group(),
                 &dealt_encrypted_secret_key_share_chunks,
                 &pp.table,
-                1 << pp.ell as u32,
+                1 << ((pp.ell as u32) + log2(pp.max_aggregation)) as u32,
             )
             .expect("BSGS dlog failed");
 
