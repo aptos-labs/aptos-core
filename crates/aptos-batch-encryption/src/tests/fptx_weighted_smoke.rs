@@ -111,12 +111,13 @@ fn weighted_smoke_with_setup_for_testing() {
 }
 
 type T = aptos_dkg::pvss::chunky::WeightedTranscript<crate::group::Pairing>;
-use crate::group::G2Affine;
+type C = WeightedConfigArkworks<Fr>;
+use crate::group::{G2Affine, Fr};
 use aptos_crypto::{SigningKey, Uniform};
 use aptos_dkg::pvss::{
     test_utils::NoAux,
     traits::{
-        transcript::HasAggregatableSubtranscript, Convert, HasEncryptionPublicParams, Transcript,
+        transcript::{Aggregatable, HasAggregatableSubtranscript}, Convert, HasEncryptionPublicParams, Transcript,
     },
 };
 
@@ -150,34 +151,47 @@ fn weighted_smoke_with_pvss() {
         .map(|dk| dk.to(pp.get_encryption_public_params()))
         .collect();
 
-    let s = <T as Transcript>::InputSecret::generate(&mut rng_aptos);
+    let secrets : Vec<<T as Transcript>::InputSecret> = (0..2).into_iter().map(|_| <T as Transcript>::InputSecret::generate(&mut rng_aptos)).collect();
 
     // Test dealing
-    let subtrx_happypath = T::deal(
+    let subtrx_happypaths : Vec<<T as HasAggregatableSubtranscript<C>>::SubTranscript> = secrets.iter().enumerate().map(|(i,s)| T::deal(
         &tc_happy,
         &pp,
-        &ssks[0],
-        &spks[0],
+        &ssks[i],
+        &spks[i],
         &eks,
         &s,
         &NoAux,
-        &tc_happy.get_player(0),
+        &tc_happy.get_player(i),
         &mut rng_aptos,
     )
-    .get_subtranscript();
+    .get_subtranscript())
+        .collect();
 
-    let subtrx_slowpath = T::deal(
+    let subtrx_slowpaths : Vec<<T as HasAggregatableSubtranscript<C>>::SubTranscript> = secrets.iter().enumerate().map(|(i,s)| T::deal(
         &tc_slow,
         &pp,
-        &ssks[0],
-        &spks[0],
+        &ssks[i],
+        &spks[i],
         &eks,
         &s,
         &NoAux,
-        &tc_slow.get_player(0),
+        &tc_slow.get_player(i),
         &mut rng_aptos,
     )
-    .get_subtranscript();
+    .get_subtranscript())
+        .collect();
+
+
+    let mut subtrx_happypath = subtrx_happypaths[0].clone();
+    for acc in &subtrx_happypaths[1..] {
+        subtrx_happypath.aggregate_with(&tc_happy, acc).unwrap();
+    }
+
+    let mut subtrx_slowpath = subtrx_slowpaths[0].clone();
+    for acc in &subtrx_slowpaths[1..] {
+        subtrx_slowpath.aggregate_with(&tc_slow, acc).unwrap();
+    }
 
     let dk = DigestKey::new(&mut rng, 8, 1).unwrap();
 
