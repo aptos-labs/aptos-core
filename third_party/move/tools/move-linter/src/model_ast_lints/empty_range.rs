@@ -89,7 +89,7 @@ impl EmptyRange {
             return None;
         }
 
-        if !matches!(loop_expr.as_ref(), ExpData::Loop(..)) {
+        if !Self::contains_loop(loop_expr.as_ref()) {
             return None;
         }
 
@@ -99,6 +99,14 @@ impl EmptyRange {
         };
 
         Some((bottom.clone(), top.clone()))
+    }
+
+    fn contains_loop(expr: &ExpData) -> bool {
+        match expr {
+            ExpData::Loop(..) => true,
+            ExpData::Sequence(_, items) => items.iter().any(|e| Self::contains_loop(e.as_ref())),
+            _ => false,
+        }
     }
 
     fn range_check(&self, to: BigInt, from: BigInt, nid: NodeId, env: &GlobalEnv) {
