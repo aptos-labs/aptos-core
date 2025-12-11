@@ -106,6 +106,10 @@ pub trait EntrywiseMap<T> {
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
 }
 
+// ===============================================================================
+// ============================= BEGIN: TRIVIAL SHAPE ============================
+// ===============================================================================
+
 /// A trivial wrapper type for a single value. Should be used to wrap when the codomain of a homomorphism is something like E::G1
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct TrivialShape<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq>(pub T);
@@ -138,6 +142,15 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> IntoIter
     }
 }
 
+// ===============================================================================
+// ============================= END: TRIVIAL SHAPE ==============================
+// ===============================================================================
+
+// ==============================================================================
+// ============================= BEGIN: VECTOR SHAPE ============================
+// ==============================================================================
+// Not in use at the moment, can be removed
+
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct VectorShape<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq>(
     pub Vec<T>,
@@ -169,3 +182,7 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> IntoIter
         self.0.into_iter()
     }
 }
+
+// ==============================================================================
+// ============================= END: VECTOR SHAPE ==============================
+// ==============================================================================
