@@ -15,7 +15,7 @@ use crate::{
         },
         traits::{
             self,
-            transcript::{Aggregatable, MalleableTranscript, NonAggregatableTranscript},
+            transcript::{Aggregatable, HasAggregatableSubtranscript, MalleableTranscript},
             HasEncryptionPublicParams,
         },
         Player,
@@ -26,7 +26,6 @@ use crate::{
         homomorphism::{tuple::TupleCodomainShape, Trait as _},
         traits::Trait as _,
     },
-    traits::transcript::HasAggregatableSubtranscript,
     Scalar,
 };
 use anyhow::bail;
@@ -76,6 +75,10 @@ pub struct Transcript<E: Pairing> {
     CanonicalSerialize, CanonicalDeserialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq,
 )]
 pub struct SubTranscript<E: Pairing> {
+    // The dealt public key
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
+    pub V0: E::G2,
+    // The dealt public key shares
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub Vs: Vec<Vec<E::G2>>,
     /// First chunked ElGamal component: C[i][j] = s_{i,j} * G + r_j * ek_i. Here s_i = \sum_j s_{i,j} * B^j // TODO: change notation because B is not a group element?
@@ -109,22 +112,180 @@ impl<E: Pairing> TryFrom<&[u8]> for SubTranscript<E> {
 type SecretSharingConfig<E: Pairing> = WeightedConfigArkworks<E::ScalarField>;
 
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
-    HasAggregatableSubtranscript<SecretSharingConfig<E>> for Transcript<E>
+    HasAggregatableSubtranscript for Transcript<E>
 {
-    type SubTranscript = SubTranscript<E>;
+    type Subtranscript = SubTranscript<E>;
 
-    fn get_subtranscript(&self) -> Self::SubTranscript {
+    fn get_subtranscript(&self) -> Self::Subtranscript {
         self.subtrs.clone()
+    }
+
+    #[allow(non_snake_case)]
+    fn verify<A: Serialize + Clone>(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        pp: &Self::PublicParameters,
+        spks: &[Self::SigningPubKey],
+        eks: &[Self::EncryptPubKey],
+        sid: &A,
+    ) -> anyhow::Result<()> {
+        if eks.len() != sc.get_total_num_players() {
+            bail!(
+                "Expected {} encryption keys, but got {}",
+                sc.get_total_num_players(),
+                eks.len()
+            );
+        }
+        if self.subtrs.Cs.len() != sc.get_total_num_players() {
+            bail!(
+                "Expected {} arrays of chunked ciphertexts, but got {}",
+                sc.get_total_num_players(),
+                self.subtrs.Cs.len()
+            );
+        }
+        if self.subtrs.Vs.len() != sc.get_total_num_players() {
+            bail!(
+                "Expected {} arrays of commitment elements, but got {}",
+                sc.get_total_num_players(),
+                self.subtrs.Vs.len()
+            );
+        }
+
+        // Initialize the **identical** PVSS SoK context
+        let sok_cntxt = (
+            &spks[self.dealer.id],
+            sid.clone(),
+            self.dealer.id,
+            DST.to_vec(),
+        ); // As above, this is a bit hacky... though we have access to `self` now
+
+        {
+            // Verify the PoK
+            let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
+            let hom = hkzg_chunked_elgamal::WeightedHomomorphism::new(
+                &pp.pk_range_proof.ck_S.lagr_g1,
+                pp.pk_range_proof.ck_S.xi_1,
+                &pp.pp_elgamal,
+                &eks_inner,
+            );
+            if let Err(err) = hom.verify(
+                &TupleCodomainShape(
+                    self.sharing_proof.range_proof_commitment.clone(),
+                    chunked_elgamal::WeightedCodomainShape {
+                        chunks: self.subtrs.Cs.clone(),
+                        randomness: self.subtrs.Rs.clone(),
+                    },
+                ),
+                &self.sharing_proof.SoK,
+                &sok_cntxt,
+            ) {
+                bail!("PoK verification failed: {:?}", err);
+            }
+
+            // Verify the range proof
+            if let Err(err) = self.sharing_proof.range_proof.verify(
+                &pp.pk_range_proof.vk,
+                sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize,
+                pp.ell as usize,
+                &self.sharing_proof.range_proof_commitment,
+            ) {
+                bail!("Range proof batch verification failed: {:?}", err);
+            }
+        }
+
+        let mut rng = rand::thread_rng(); // TODO: make `rng` a parameter of fn verify()?
+
+        // Do the SCRAPE LDT
+        let ldt = LowDegreeTest::random(
+            &mut rng,
+            sc.get_threshold_weight(),
+            sc.get_total_weight() + 1,
+            true,
+            &sc.get_threshold_config().domain,
+        ); // includes_zero is true here means it includes a commitment to f(0), which is in V[n]
+        let mut Vs_flat: Vec<_> = self.subtrs.Vs.iter().flatten().cloned().collect();
+        Vs_flat.push(self.subtrs.V0);
+        // could add an assert_eq here with sc.get_total_weight()
+        ldt.low_degree_test_group(&Vs_flat)?;
+
+        // let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
+        // let hom = hkzg_chunked_elgamal::WeightedHomomorphism::new(
+        //     &pp.pk_range_proof.ck_S.lagr_g1,
+        //     pp.pk_range_proof.ck_S.xi_1,
+        //     &pp.pp_elgamal,
+        //     &eks_inner,
+        // );
+        // let (sigma_bases, sigma_scalars, beta_powers) = hom.verify_msm_terms(
+        //         &TupleCodomainShape(
+        //             self.sharing_proof.range_proof_commitment.clone(),
+        //             chunked_elgamal::WeightedCodomainShape {
+        //                 chunks: self.subtrs.Cs.clone(),
+        //                 randomness: self.subtrs.Rs.clone(),
+        //             },
+        //         ),
+        //         &self.sharing_proof.SoK,
+        //         &sok_cntxt,
+        //     );
+        // let ldt_msm_terms = ldt.ldt_msm_input(&Vs_flat)?;
+        // use aptos_crypto::arkworks::msm::verify_msm_terms_with_start;
+        // verify_msm_terms_with_start(ldt_msm_terms, sigma_bases, sigma_scalars, beta_powers);
+
+        // Now compute the final MSM // TODO: merge this multi_exp with the PoK verification, as in YOLO YOSO? // TODO2: and use the iterate stuff you developed? it's being forgotten here
+        let mut base_vec = Vec::new();
+        let mut exp_vec = Vec::new();
+
+        let beta = sample_field_element(&mut rng);
+        let powers_of_beta = utils::powers(beta, sc.get_total_weight() + 1);
+
+        let Cs_flat: Vec<_> = self.subtrs.Cs.iter().flatten().cloned().collect();
+        assert_eq!(
+            Cs_flat.len(),
+            sc.get_total_weight(),
+            "Number of ciphertexts does not equal number of weights"
+        ); // TODO what if zero weight?
+           // could add an assert_eq here with sc.get_total_weight()
+
+        for i in 0..Cs_flat.len() {
+            for j in 0..Cs_flat[i].len() {
+                let base = Cs_flat[i][j];
+                let exp = pp.powers_of_radix[j] * powers_of_beta[i];
+                base_vec.push(base);
+                exp_vec.push(exp);
+            }
+        }
+
+        let weighted_Cs = E::G1::msm(&E::G1::normalize_batch(&base_vec), &exp_vec)
+            .expect("Failed to compute MSM of Cs in chunky");
+
+        let weighted_Vs = E::G2::msm(
+            &E::G2::normalize_batch(&Vs_flat[..sc.get_total_weight()]), // Don't use the last entry of `Vs_flat`
+            &powers_of_beta[..sc.get_total_weight()],
+        )
+        .expect("Failed to compute MSM of Vs in chunky");
+
+        let res = E::multi_pairing(
+            [
+                weighted_Cs.into_affine(),
+                *pp.get_encryption_public_params().message_base(),
+            ],
+            [pp.get_commitment_base(), (-weighted_Vs).into_affine()],
+        ); // Making things affine here rather than converting the two bases to group elements, since that's probably what they would be converted to anyway: https://github.com/arkworks-rs/algebra/blob/c1f4f5665504154a9de2345f464b0b3da72c28ec/ec/src/models/bls12/g1.rs#L14
+
+        if PairingOutput::<E>::ZERO != res {
+            return Err(anyhow::anyhow!("Expected zero during multi-pairing check"));
+        }
+
+        Ok(())
     }
 }
 
-impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::SubTranscript
+impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Subtranscript
     for SubTranscript<E>
 {
     type DealtPubKey = keys::DealtPubKey<E>;
     type DealtPubKeyShare = Vec<keys::DealtPubKeyShare<E>>;
-    type DealtSecretKey = keys::DealtSecretKey<E>;
-    type DealtSecretKeyShare = Vec<keys::DealtSecretKeyShare<E>>;
+    type DealtSecretKey = keys::DealtSecretKey<E::ScalarField>;
+    type DealtSecretKeyShare = Vec<keys::DealtSecretKeyShare<E::ScalarField>>;
     type DecryptPrivKey = keys::DecryptPrivKey<E>;
     type EncryptPubKey = keys::EncryptPubKey<E>;
     type PublicParameters = PublicParameters<E>;
@@ -138,16 +299,12 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     ) -> Self::DealtPubKeyShare {
         self.Vs[player.id]
             .iter()
-            .map(|V_i| {
-                let affine = V_i.into_affine();
-
-                keys::DealtPubKeyShare::<E>::new(keys::DealtPubKey::new(affine))
-            })
+            .map(|&V_i| keys::DealtPubKeyShare::<E>::new(keys::DealtPubKey::new(V_i.into_affine())))
             .collect()
     }
 
     fn get_dealt_public_key(&self) -> Self::DealtPubKey {
-        Self::DealtPubKey::new(self.Vs.last().expect("V is empty somehow")[0].into_affine())
+        Self::DealtPubKey::new(self.V0.into_affine())
     }
 
     #[allow(non_snake_case)]
@@ -179,7 +336,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             );
         }
 
-        let mut sk_shares: Vec<Scalar<E>> = Vec::with_capacity(weight);
+        let mut sk_shares: Vec<Scalar<E::ScalarField>> = Vec::with_capacity(weight);
         let pk_shares = self.get_public_key_share(sc, player);
 
         for i in 0..weight {
@@ -194,7 +351,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
                 pp.pp_elgamal.G.into_group(),
                 &dealt_encrypted_secret_key_share_chunks,
                 &pp.table,
-                1 << pp.ell as u32,
+                pp.get_dlog_range_bound(),
             )
             .expect("BSGS dlog failed");
 
@@ -211,33 +368,40 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         }
 
         (
-            sk_shares, pk_shares, // TODO: review this formalism... wh ydo we need this here?
+            sk_shares, pk_shares, // TODO: review this formalism... why do we need this here?
         )
     }
 }
 
-impl<E: Pairing> Aggregatable<SecretSharingConfig<E>> for SubTranscript<E> {
+impl<E: Pairing> Aggregatable for SubTranscript<E> {
+    type SecretSharingConfig = SecretSharingConfig<E>;
+
+    #[allow(non_snake_case)]
     fn aggregate_with(&mut self, sc: &SecretSharingConfig<E>, other: &Self) -> anyhow::Result<()> {
         debug_assert_eq!(self.Cs.len(), sc.get_total_num_players());
-        debug_assert_eq!(self.Vs.len(), sc.get_total_num_players() + 1);
+        debug_assert_eq!(self.Vs.len(), sc.get_total_num_players());
         debug_assert_eq!(self.Cs.len(), other.Cs.len());
         debug_assert_eq!(self.Rs.len(), other.Rs.len());
         debug_assert_eq!(self.Vs.len(), other.Vs.len());
 
+        // Aggregate the V0s
+        self.V0 += other.V0;
+
         for i in 0..sc.get_total_num_players() {
             for j in 0..self.Vs[i].len() {
+                // Aggregate the V_{i,j}s
                 self.Vs[i][j] += other.Vs[i][j];
                 for k in 0..self.Cs[i][j].len() {
+                    // Aggregate the C_{i,j,k}s
                     self.Cs[i][j][k] += other.Cs[i][j][k];
                 }
             }
         }
 
-        self.Vs[sc.get_total_num_players()][0] += other.Vs[sc.get_total_num_players()][0];
-
-        for i in 0..self.Rs.len() {
-            for (r_self, r_other) in self.Rs[i].iter_mut().zip(&other.Rs[i]) {
-                *r_self += r_other;
+        for j in 0..self.Rs.len() {
+            for (R_jk, other_R_jk) in self.Rs[j].iter_mut().zip(&other.Rs[j]) {
+                // Aggregate the R_{j,k}s
+                *R_jk += other_R_jk;
             }
         }
 
@@ -249,7 +413,10 @@ impl<E: Pairing> Aggregatable<SecretSharingConfig<E>> for SubTranscript<E> {
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct SharingProof<E: Pairing> {
     /// SoK: the SK is knowledge of `witnesses` s_{i,j} yielding the commitment and the C and the R, their image is the PK, and the signed message is a certain context `cntxt`
-    pub SoK: sigma_protocol::Proof<E, hkzg_chunked_elgamal::WeightedHomomorphism<'static, E>>, // static because we don't want the lifetime of the Proof to depend on the Homomorphism TODO: try removing it?
+    pub SoK: sigma_protocol::Proof<
+        E::ScalarField,
+        hkzg_chunked_elgamal::WeightedHomomorphism<'static, E>,
+    >, // static because we don't want the lifetime of the Proof to depend on the Homomorphism TODO: try removing it?
     /// A batched range proof showing that all committed values s_{i,j} lie in some range
     pub range_proof: dekart_univariate_v2::Proof<E>,
     /// A KZG-style commitment to the values s_{i,j} going into the range proof
@@ -289,8 +456,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 {
     type DealtPubKey = keys::DealtPubKey<E>;
     type DealtPubKeyShare = Vec<keys::DealtPubKeyShare<E>>;
-    type DealtSecretKey = keys::DealtSecretKey<E>;
-    type DealtSecretKeyShare = Vec<keys::DealtSecretKeyShare<E>>;
+    type DealtSecretKey = keys::DealtSecretKey<E::ScalarField>;
+    type DealtSecretKeyShare = Vec<keys::DealtSecretKeyShare<E::ScalarField>>;
     type DecryptPrivKey = keys::DecryptPrivKey<E>;
     type EncryptPubKey = keys::EncryptPubKey<E>;
     type InputSecret = InputSecret<E::ScalarField>;
@@ -356,12 +523,12 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let flattened_Vs = arkworks::commit_to_scalars(&G_2, &f_evals);
         debug_assert_eq!(flattened_Vs.len(), sc.get_total_weight() + 1);
 
-        let mut Vs = sc.group_by_player(&flattened_Vs);
-        Vs.push(vec![*flattened_Vs.last().unwrap()]);
+        let Vs = sc.group_by_player(&flattened_Vs); // This won't use the last item in `flattened_Vs` because of `sc`
+        let V0 = *flattened_Vs.last().unwrap();
 
         Transcript {
             dealer: *dealer,
-            subtrs: SubTranscript { Vs, Cs, Rs },
+            subtrs: SubTranscript { V0, Vs, Cs, Rs },
             sharing_proof,
         }
     }
@@ -387,7 +554,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     }
 
     fn get_dealt_public_key(&self) -> Self::DealtPubKey {
-        Self::DealtPubKey::new(self.subtrs.Vs.last().expect("V is empty somehow")[0].into_affine())
+        Self::DealtPubKey::new(self.subtrs.V0.into_affine())
     }
 
     #[allow(non_snake_case)]
@@ -420,7 +587,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             );
         }
 
-        let mut sk_shares: Vec<Scalar<E>> = Vec::with_capacity(weight);
+        let mut sk_shares: Vec<Scalar<E::ScalarField>> = Vec::with_capacity(weight);
         let pk_shares = self.get_public_key_share(sc, player);
 
         for i in 0..weight {
@@ -435,7 +602,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
                 pp.pp_elgamal.G.into_group(),
                 &dealt_encrypted_secret_key_share_chunks,
                 &pp.table,
-                1 << pp.ell as u32,
+                pp.get_dlog_range_bound(),
             )
             .expect("BSGS dlog failed");
 
@@ -466,8 +633,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         Transcript {
             dealer: sc.get_player(0),
             subtrs: SubTranscript {
+                V0: unsafe_random_point::<E::G2, _>(rng),
                 Vs: sc.group_by_player(&unsafe_random_points::<E::G2, _>(
-                    sc.get_total_weight() + 1,
+                    sc.get_total_weight(),
                     rng,
                 )),
                 Cs: (0..sc.get_total_num_players())
@@ -490,145 +658,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
                 range_proof: dekart_univariate_v2::Proof::generate(pp.ell, rng),
             },
         }
-    }
-}
-
-impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> NonAggregatableTranscript
-    for Transcript<E>
-{
-    #[allow(non_snake_case)]
-    fn verify<A: Serialize + Clone>(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        pp: &Self::PublicParameters,
-        spks: &[Self::SigningPubKey],
-        eks: &[Self::EncryptPubKey],
-        sid: &A,
-    ) -> anyhow::Result<()> {
-        if eks.len() != sc.get_total_num_players() {
-            bail!(
-                "Expected {} encryption keys, but got {}",
-                sc.get_total_num_players(),
-                eks.len()
-            );
-        }
-        if self.subtrs.Cs.len() != sc.get_total_num_players() {
-            bail!(
-                "Expected {} arrays of chunked ciphertexts, but got {}",
-                sc.get_total_num_players(),
-                self.subtrs.Cs.len()
-            );
-        }
-        if self.subtrs.Vs.len() != sc.get_total_num_players() + 1 {
-            bail!(
-                "Expected {} commitment elements, but got {}",
-                sc.get_total_num_players() + 1,
-                self.subtrs.Vs.len()
-            );
-        }
-
-        // Initialize the **identical** PVSS SoK context
-        let sok_cntxt = (
-            &spks[self.dealer.id],
-            sid.clone(),
-            self.dealer.id,
-            DST.to_vec(),
-        ); // As above, this is a bit hacky... though we have access to `self` now
-
-        {
-            // Verify the PoK
-            let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
-            let hom = hkzg_chunked_elgamal::WeightedHomomorphism::new(
-                &pp.pk_range_proof.ck_S.lagr_g1,
-                pp.pk_range_proof.ck_S.xi_1,
-                &pp.pp_elgamal,
-                &eks_inner,
-            );
-            if let Err(err) = hom.verify(
-                &TupleCodomainShape(
-                    self.sharing_proof.range_proof_commitment.clone(),
-                    chunked_elgamal::WeightedCodomainShape {
-                        chunks: self.subtrs.Cs.clone(),
-                        randomness: self.subtrs.Rs.clone(),
-                    },
-                ),
-                &self.sharing_proof.SoK,
-                &sok_cntxt,
-            ) {
-                bail!("PoK verification failed: {:?}", err);
-            }
-
-            // Verify the range proof
-            if let Err(err) = self.sharing_proof.range_proof.verify(
-                &pp.pk_range_proof.vk,
-                sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize,
-                pp.ell as usize,
-                &self.sharing_proof.range_proof_commitment,
-            ) {
-                bail!("Range proof batch verification failed: {:?}", err);
-            }
-        }
-
-        let mut rng = rand::thread_rng(); // TODO: make `rng` a parameter of fn verify()?
-
-        // Do the SCRAPE LDT
-        let ldt = LowDegreeTest::random(
-            &mut rng,
-            sc.get_threshold_weight(),
-            sc.get_total_weight() + 1,
-            true,
-            &sc.get_threshold_config().domain,
-        ); // includes_zero is true here means it includes a commitment to f(0), which is in V[n]
-        let Vs_flat: Vec<_> = self.subtrs.Vs.iter().flatten().cloned().collect();
-        // could add an assert_eq here with sc.get_total_weight()
-        ldt.low_degree_test_group(&Vs_flat)?;
-
-        // Now compute the final MSM // TODO: merge this multi_exp with the PoK verification, as in YOLO YOSO? // TODO2: and use the iterate stuff you developed? it's being forgotten here
-        let mut base_vec = Vec::new();
-        let mut exp_vec = Vec::new();
-
-        let beta = sample_field_element(&mut rng);
-        let powers_of_beta = utils::powers(beta, sc.get_total_weight() + 1);
-
-        let Cs_flat: Vec<_> = self.subtrs.Cs.iter().flatten().cloned().collect();
-        assert_eq!(
-            Cs_flat.len(),
-            sc.get_total_weight(),
-            "Number of ciphertexts does not equal number of weights"
-        ); // TODO what if zero weight?
-           // could add an assert_eq here with sc.get_total_weight()
-
-        for i in 0..Cs_flat.len() {
-            for j in 0..Cs_flat[i].len() {
-                let base = Cs_flat[i][j];
-                let exp = pp.powers_of_radix[j] * powers_of_beta[i];
-                base_vec.push(base);
-                exp_vec.push(exp);
-            }
-        }
-
-        let weighted_Cs = E::G1::msm(&E::G1::normalize_batch(&base_vec), &exp_vec)
-            .expect("Failed to compute MSM of Cs in chunky");
-
-        let weighted_Vs = E::G2::msm(
-            &E::G2::normalize_batch(&Vs_flat[..sc.get_total_weight()]),
-            &powers_of_beta[..sc.get_total_weight()],
-        )
-        .expect("Failed to compute MSM of Vs in chunky");
-
-        let res = E::multi_pairing(
-            [
-                weighted_Cs.into_affine(),
-                *pp.get_encryption_public_params().message_base(),
-            ],
-            [pp.get_commitment_base(), (-weighted_Vs).into_affine()],
-        ); // Making things affine here rather than converting the two bases to group elements, since that's probably what they would be converted to anyway: https://github.com/arkworks-rs/algebra/blob/c1f4f5665504154a9de2345f464b0b3da72c28ec/ec/src/models/bls12/g1.rs#L14
-
-        if PairingOutput::<E>::ZERO != res {
-            return Err(anyhow::anyhow!("Expected zero during multi-pairing check"));
-        }
-
-        Ok(())
     }
 }
 

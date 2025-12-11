@@ -20,7 +20,6 @@
 ///     read, read_snapshot, read_derived_string
 module aptos_framework::aggregator_v2 {
     use std::error;
-    use std::features;
     use std::string::String;
 
     /// The value of aggregator overflows. Raised by uncoditional add() call
@@ -135,7 +134,6 @@ module aptos_framework::aggregator_v2 {
     ///
     /// Parallelism info: This operation enables speculative parallelism.
     public fun is_at_least<IntElement>(self: &Aggregator<IntElement>, min_amount: IntElement): bool {
-        assert!(features::aggregator_v2_is_at_least_api_enabled(), EAGGREGATOR_API_V2_NOT_ENABLED);
         self.is_at_least_impl(min_amount)
     }
 

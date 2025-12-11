@@ -337,7 +337,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS
             },
             FeatureFlag::ObjectNativeDerivedAddress => {
-                AptosFeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS
+                AptosFeatureFlag::_OBJECT_NATIVE_DERIVED_ADDRESS
             },
             FeatureFlag::DispatchableFungibleAsset => AptosFeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET,
             FeatureFlag::NewAccountsDefaultToFaAptStore => {
@@ -347,7 +347,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE
             },
             FeatureFlag::AggregatorV2IsAtLeastApi => {
-                AptosFeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API
+                AptosFeatureFlag::_AGGREGATOR_V2_IS_AT_LEAST_API
             },
             FeatureFlag::ConcurrentFungibleBalance => AptosFeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
             FeatureFlag::DefaultToConcurrentFungibleBalance => {
@@ -376,7 +376,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT
             },
             FeatureFlag::CollectionOwner => AptosFeatureFlag::COLLECTION_OWNER,
-            FeatureFlag::NativeMemoryOperations => AptosFeatureFlag::NATIVE_MEMORY_OPERATIONS,
+            FeatureFlag::NativeMemoryOperations => AptosFeatureFlag::_NATIVE_MEMORY_OPERATIONS,
             FeatureFlag::EnableLoaderV2 => AptosFeatureFlag::_ENABLE_LOADER_V2,
             FeatureFlag::DisallowInitModuleToPublishModules => {
                 AptosFeatureFlag::_DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES
@@ -519,7 +519,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS => {
                 FeatureFlag::PrimaryAPTFungibleStoreAtUserAddress
             },
-            AptosFeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS => {
+            AptosFeatureFlag::_OBJECT_NATIVE_DERIVED_ADDRESS => {
                 FeatureFlag::ObjectNativeDerivedAddress
             },
             AptosFeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET => FeatureFlag::DispatchableFungibleAsset,
@@ -529,7 +529,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE => {
                 FeatureFlag::OperationsDefaultToFaAptStore
             },
-            AptosFeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API => {
+            AptosFeatureFlag::_AGGREGATOR_V2_IS_AT_LEAST_API => {
                 FeatureFlag::AggregatorV2IsAtLeastApi
             },
             AptosFeatureFlag::CONCURRENT_FUNGIBLE_BALANCE => FeatureFlag::ConcurrentFungibleBalance,
@@ -559,7 +559,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::TransactionSimulationEnhancement
             },
             AptosFeatureFlag::COLLECTION_OWNER => FeatureFlag::CollectionOwner,
-            AptosFeatureFlag::NATIVE_MEMORY_OPERATIONS => FeatureFlag::NativeMemoryOperations,
+            AptosFeatureFlag::_NATIVE_MEMORY_OPERATIONS => FeatureFlag::NativeMemoryOperations,
             AptosFeatureFlag::_ENABLE_LOADER_V2 => FeatureFlag::EnableLoaderV2,
             AptosFeatureFlag::_DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES => {
                 FeatureFlag::DisallowInitModuleToPublishModules

@@ -1009,7 +1009,6 @@ Only called during genesis to initialize system resources for this module.
     txn_expiration_time: u64,
     <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8,
 ) {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_fee_payer_enabled">features::fee_payer_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EFEE_PAYER_NOT_ENABLED">PROLOGUE_EFEE_PAYER_NOT_ENABLED</a>));
     // prologue_common and multi_agent_common_prologue <b>with</b> is_simulation set <b>to</b> <b>false</b> behaves identically <b>to</b> the
     // original fee_payer_script_prologue function.
     <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(
@@ -1068,7 +1067,6 @@ Only called during genesis to initialize system resources for this module.
     <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8,
     is_simulation: bool,
 ) {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_fee_payer_enabled">features::fee_payer_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EFEE_PAYER_NOT_ENABLED">PROLOGUE_EFEE_PAYER_NOT_ENABLED</a>));
     <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(
         &sender,
         &<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(fee_payer_address),

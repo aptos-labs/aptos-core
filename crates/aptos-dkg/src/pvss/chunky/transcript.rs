@@ -26,7 +26,7 @@ use crate::{
         homomorphism::{tuple::TupleCodomainShape, Trait as _},
         traits::Trait as _,
     },
-    traits::transcript::{HasAggregatableSubtranscript, NonAggregatableTranscript},
+    traits::transcript::HasAggregatableSubtranscript,
     Scalar,
 };
 use anyhow::bail;
@@ -114,13 +114,13 @@ impl<E: Pairing> TryFrom<&[u8]> for SubTranscript<E> {
 }
 
 // TODO: Copy-paste ewww
-impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::SubTranscript
+impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Subtranscript
     for SubTranscript<E>
 {
     type DealtPubKey = keys::DealtPubKey<E>;
     type DealtPubKeyShare = keys::DealtPubKeyShare<E>;
-    type DealtSecretKey = keys::DealtSecretKey<E>;
-    type DealtSecretKeyShare = keys::DealtSecretKeyShare<E>;
+    type DealtSecretKey = keys::DealtSecretKey<E::ScalarField>;
+    type DealtSecretKeyShare = keys::DealtSecretKeyShare<E::ScalarField>;
     type DecryptPrivKey = keys::DecryptPrivKey<E>;
     type EncryptPubKey = keys::EncryptPubKey<E>;
     type PublicParameters = PublicParameters<E>;
@@ -164,7 +164,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             pp.pp_elgamal.G.into_group(),
             &dealt_encrypted_secret_key_share_chunks,
             &pp.table,
-            1 << pp.ell as u32,
+            pp.get_dlog_range_bound(),
         )
         .expect("BSGS dlog failed");
 
@@ -186,336 +186,14 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 }
 
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
-    HasAggregatableSubtranscript<SecretSharingConfig<E::ScalarField>> for Transcript<E>
+    HasAggregatableSubtranscript for Transcript<E>
 {
-    type SubTranscript = SubTranscript<E>;
+    type Subtranscript = SubTranscript<E>;
 
-    fn get_subtranscript(&self) -> Self::SubTranscript {
+    fn get_subtranscript(&self) -> Self::Subtranscript {
         self.utrs.subtranscript.clone()
     }
-}
 
-impl<E: Pairing> Aggregatable<SecretSharingConfig<E::ScalarField>> for SubTranscript<E> {
-    fn aggregate_with(
-        &mut self,
-        sc: &SecretSharingConfig<E::ScalarField>,
-        other: &Self,
-    ) -> anyhow::Result<()> {
-        debug_assert_eq!(self.Cs.len(), sc.n);
-        debug_assert_eq!(self.Vs.len(), sc.n + 1);
-        debug_assert_eq!(self.Cs.len(), other.Cs.len());
-        debug_assert_eq!(self.Rs.len(), other.Rs.len());
-        debug_assert_eq!(self.Vs.len(), other.Vs.len());
-
-        for i in 0..sc.n {
-            self.Vs[i] += other.Vs[i];
-            for j in 0..self.Cs[i].len() {
-                self.Cs[i][j] += other.Cs[i][j];
-            }
-        }
-        self.Vs[sc.n] += other.Vs[sc.n];
-
-        for (r_self, r_other) in self.Rs.iter_mut().zip(&other.Rs) {
-            *r_self += r_other;
-        }
-
-        Ok(())
-    }
-}
-
-// ================================================================
-//            IMPLEMENTATION OF UNSIGNED TRANSCRIPT HASHER
-// ================================================================
-
-/// Cryptographic hasher for an BCS-serializable UnsignedTranscript
-#[derive(Clone)]
-pub struct UnsignedTranscriptHasher(aptos_crypto::hash::DefaultHasher);
-
-impl UnsignedTranscriptHasher {
-    fn new() -> Self {
-        const DOMAIN: &[u8] = b"UnsignedTranscript";
-
-        UnsignedTranscriptHasher(aptos_crypto::hash::DefaultHasher::new(DOMAIN))
-    }
-}
-
-static UNSIGNED_TRANSCRIPT_HASHER: aptos_crypto::_once_cell::sync::Lazy<UnsignedTranscriptHasher> =
-    aptos_crypto::_once_cell::sync::Lazy::new(|| UnsignedTranscriptHasher::new());
-
-impl Default for UnsignedTranscriptHasher {
-    fn default() -> Self {
-        UNSIGNED_TRANSCRIPT_HASHER.clone()
-    }
-}
-
-impl aptos_crypto::hash::CryptoHasher for UnsignedTranscriptHasher {
-    fn seed() -> &'static [u8; 32] {
-        // Directly compute a fixed seed from the domain string.
-        const DOMAIN: &[u8] = b"UnsignedTranscript";
-
-        // Compute once and leak to get 'static
-        Box::leak(Box::new(aptos_crypto::hash::DefaultHasher::prefixed_hash(
-            DOMAIN,
-        )))
-    }
-
-    fn update(&mut self, bytes: &[u8]) {
-        self.0.update(bytes);
-    }
-
-    fn finish(self) -> aptos_crypto::hash::HashValue {
-        self.0.finish()
-    }
-}
-
-impl std::io::Write for UnsignedTranscriptHasher {
-    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
-        self.0.update(bytes);
-        Ok(bytes.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
-// ================================================================
-//         END IMPLEMENTATION OF UNSIGNED TRANSCRIPT HASHER
-// ================================================================
-
-// ================================================================
-//          IMPLEMENTATION OF UNSIGNED TRANSCRIPT BCS HASH
-// ================================================================
-
-use aptos_crypto::hash::{CryptoHash, HashValue};
-
-/// Manual implementation of `BCSCryptoHash` for `UnsignedTranscript<E>`
-impl<E: Pairing> CryptoHash for UnsignedTranscript<E>
-where
-    UnsignedTranscript<E>: Serialize,
-{
-    type Hasher = UnsignedTranscriptHasher;
-
-    fn hash(&self) -> HashValue {
-        use aptos_crypto::hash::CryptoHasher;
-
-        let mut state = Self::Hasher::default();
-        // If BCS serialization fails, this is a programmer error
-        bcs::serialize_into(&mut state, &self)
-            .expect("BCS serialization of UnsignedTranscript should not fail");
-        state.finish()
-    }
-}
-
-// ================================================================
-//        END IMPLEMENTATION OF UNSIGNED TRANSCRIPT BCS HASH
-// ================================================================
-
-#[allow(non_snake_case)]
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
-pub struct SharingProof<E: Pairing> {
-    /// Proof showing knowledge of `witnesses` s_{i,j} yielding the commitment and the C and the R
-    pub PoK: sigma_protocol::Proof<E, hkzg_chunked_elgamal::Homomorphism<'static, E>>, // static because we don't want the lifetime of the Proof to depend on the Homomorphism TODO: try removing it?
-    /// A batched range proof showing that all committed values s_{i,j} lie in some range
-    pub range_proof: dekart_univariate_v2::Proof<E>,
-    /// A KZG-style commitment to the values s_{i,j} going into the range proof
-    pub range_proof_commitment:
-        <dekart_univariate_v2::Proof<E> as BatchedRangeProof<E>>::Commitment,
-}
-
-impl<E: Pairing> ValidCryptoMaterial for Transcript<E> {
-    const AIP_80_PREFIX: &'static str = "";
-
-    fn to_bytes(&self) -> Vec<u8> {
-        // TODO: using `Result<Vec<u8>>` and `.map_err(|_| CryptoMaterialError::DeserializationError)` would be more consistent here?
-        bcs::to_bytes(&self).expect("Unexpected error during PVSS transcript serialization")
-    }
-}
-
-impl<E: Pairing> TryFrom<&[u8]> for Transcript<E> {
-    type Error = CryptoMaterialError;
-
-    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        bcs::from_bytes::<Transcript<E>>(bytes)
-            .map_err(|_| CryptoMaterialError::DeserializationError)
-    }
-}
-
-// Temporary hack, will deal with this at some point
-#[allow(type_alias_bounds)]
-type SokContext<'a, A: Serialize + Clone, E: Pairing> = (
-    ShamirThresholdConfig<E::ScalarField>,
-    bls12381::PublicKey,
-    &'a A,
-    usize,
-    Vec<u8>,
-);
-
-// Not sure this alias is very useful
-type SecretSharingConfig<F> = ShamirThresholdConfig<F>;
-
-impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Transcript
-    for Transcript<E>
-{
-    type DealtPubKey = keys::DealtPubKey<E>;
-    type DealtPubKeyShare = keys::DealtPubKeyShare<E>;
-    type DealtSecretKey = keys::DealtSecretKey<E>;
-    type DealtSecretKeyShare = keys::DealtSecretKeyShare<E>;
-    type DecryptPrivKey = keys::DecryptPrivKey<E>;
-    type EncryptPubKey = keys::EncryptPubKey<E>;
-    type InputSecret = InputSecret<E::ScalarField>;
-    type PublicParameters = PublicParameters<E>;
-    type SecretSharingConfig = SecretSharingConfig<E::ScalarField>;
-    type SigningPubKey = bls12381::PublicKey;
-    type SigningSecretKey = bls12381::PrivateKey;
-
-    fn scheme_name() -> String {
-        "chunky_pvss".to_string()
-    }
-
-    fn dst() -> Vec<u8> {
-        DST.to_vec()
-    }
-
-    #[allow(non_snake_case)]
-    fn deal<A: Serialize + Clone, R: rand_core::RngCore + rand_core::CryptoRng>(
-        sc: &Self::SecretSharingConfig,
-        pp: &Self::PublicParameters,
-        ssk: &Self::SigningSecretKey,
-        spk: &Self::SigningPubKey,
-        eks: &[Self::EncryptPubKey],
-        s: &Self::InputSecret,
-        session_id: &A,
-        dealer: &Player,
-        rng: &mut R,
-    ) -> Self {
-        debug_assert_eq!(
-            eks.len(),
-            sc.n,
-            "Number of encryption keys must equal number of players"
-        );
-
-        // Initialize the PVSS Fiat-Shamir context
-        let sok_ctxt = (*sc, spk.clone(), session_id, dealer.id, DST.to_vec()); // This is a bit hacky; also get rid of DST here and use self.dst?
-
-        // Generate the Shamir secret sharing polynomial
-        let mut f = vec![*s.get_secret_a()]; // constant term of polynomial
-        f.extend(sample_field_elements::<E::ScalarField, _>(
-            sc.get_threshold() - 1,
-            rng,
-        )); // these are the remaining coefficients; total degree is `t - 1`
-
-        // Generate its `n` evaluations (shares) by doing an FFT over the whole domain, then truncating
-        let mut f_evals = sc.domain.fft(&f);
-        f_evals.truncate(sc.n);
-        debug_assert_eq!(f_evals.len(), sc.n);
-
-        // Encrypt the chunked shares and generate the sharing proof
-        let (Cs, Rs, sharing_proof) =
-            Self::encrypt_chunked_shares(&f_evals, eks, sc, pp, sok_ctxt, rng);
-
-        // Add constant term for the `\mathbb{G}_2` commitment (we're doing this
-        // **after** the previous step because we're now mutating `f_evals` by enlarging it; this is a silly
-        // technicality however, it has no impact on computational complexity whatsoever as we could simply
-        // modify the `commit_to_scalars()` function to take another input)
-        f_evals.push(f[0]); // or *s.get_secret_a()
-
-        // Commit to polynomial evaluations + constant term
-        let G_2 = pp.get_commitment_base();
-        let Vs = arkworks::commit_to_scalars(&G_2, &f_evals);
-        debug_assert_eq!(Vs.len(), sc.n + 1);
-
-        // Construct the **unsigned** transcript struct with all computed values
-        let utrs = UnsignedTranscript {
-            dealer: *dealer,
-            subtranscript: SubTranscript { Vs, Cs, Rs },
-            sharing_proof,
-        };
-
-        // Now sign this transcript
-        let sgn = ssk
-            .sign(&utrs)
-            .expect("signing of `chunky` PVSS transcript failed");
-
-        Transcript { utrs, sgn }
-    }
-
-    fn get_dealers(&self) -> Vec<Player> {
-        vec![self.utrs.dealer]
-    }
-
-    #[allow(non_snake_case)]
-    fn generate<R>(sc: &Self::SecretSharingConfig, pp: &Self::PublicParameters, rng: &mut R) -> Self
-    where
-        R: rand_core::RngCore + rand_core::CryptoRng,
-    {
-        let num_chunks_per_share = num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize;
-        let utrs = UnsignedTranscript {
-            dealer: sc.get_player(0),
-            subtranscript: SubTranscript {
-                Vs: unsafe_random_points::<E::G2, _>(sc.n + 1, rng),
-                Cs: (0..sc.n)
-                    .map(|_| unsafe_random_points(num_chunks_per_share, rng))
-                    .collect::<Vec<_>>(), // TODO: would this become faster if generated in one batch and flattened?
-                Rs: unsafe_random_points(num_chunks_per_share, rng),
-            },
-            sharing_proof: SharingProof {
-                range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
-                    unsafe_random_point(rng),
-                ),
-                PoK: hkzg_chunked_elgamal::Proof::generate(
-                    (sc.n - 1).next_power_of_two() - 1,
-                    num_chunks_per_share,
-                    rng,
-                ),
-                range_proof: dekart_univariate_v2::Proof::generate(pp.ell, rng),
-            },
-        };
-
-        let ssk = PrivateKey::generate(rng);
-
-        let sgn = ssk
-            .sign(&utrs)
-            .expect("signing of PVSS transcript should have succeeded");
-
-        Transcript { utrs, sgn }
-    }
-
-    fn get_public_key_share(
-        &self,
-        _sc: &Self::SecretSharingConfig,
-        player: &Player,
-    ) -> Self::DealtPubKeyShare {
-        // local use here since we have a `SubTranscript` struct in this file
-        use traits::SubTranscript;
-        self.utrs.subtranscript.get_public_key_share(_sc, &player)
-    }
-
-    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
-        // local use here since we have a `SubTranscript` struct in this file
-        use traits::SubTranscript;
-        self.utrs.subtranscript.get_dealt_public_key()
-    }
-
-    #[allow(non_snake_case)]
-    fn decrypt_own_share(
-        &self,
-        _sc: &Self::SecretSharingConfig,
-        player: &Player,
-        dk: &Self::DecryptPrivKey,
-        pp: &Self::PublicParameters,
-    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        // local use here since we have a `SubTranscript` struct in this file
-        use traits::SubTranscript;
-        self.utrs
-            .subtranscript
-            .decrypt_own_share(_sc, player, dk, pp)
-    }
-}
-
-impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> NonAggregatableTranscript
-    for Transcript<E>
-{
     #[allow(non_snake_case)]
     fn verify<A: Serialize + Clone>(
         &self,
@@ -730,6 +408,326 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         };
 
         (Cs, Rs, sharing_proof)
+    }
+}
+
+impl<E: Pairing> Aggregatable for SubTranscript<E> {
+    type SecretSharingConfig = SecretSharingConfig<E::ScalarField>;
+
+    fn aggregate_with(
+        &mut self,
+        sc: &SecretSharingConfig<E::ScalarField>,
+        other: &Self,
+    ) -> anyhow::Result<()> {
+        debug_assert_eq!(self.Cs.len(), sc.n);
+        debug_assert_eq!(self.Vs.len(), sc.n + 1);
+        debug_assert_eq!(self.Cs.len(), other.Cs.len());
+        debug_assert_eq!(self.Rs.len(), other.Rs.len());
+        debug_assert_eq!(self.Vs.len(), other.Vs.len());
+
+        for i in 0..sc.n {
+            self.Vs[i] += other.Vs[i];
+            for j in 0..self.Cs[i].len() {
+                self.Cs[i][j] += other.Cs[i][j];
+            }
+        }
+        self.Vs[sc.n] += other.Vs[sc.n];
+
+        for (r_self, r_other) in self.Rs.iter_mut().zip(&other.Rs) {
+            *r_self += r_other;
+        }
+
+        Ok(())
+    }
+}
+
+// ================================================================
+//            IMPLEMENTATION OF UNSIGNED TRANSCRIPT HASHER
+// ================================================================
+
+/// Cryptographic hasher for an BCS-serializable UnsignedTranscript
+#[derive(Clone)]
+pub struct UnsignedTranscriptHasher(aptos_crypto::hash::DefaultHasher);
+
+impl UnsignedTranscriptHasher {
+    fn new() -> Self {
+        const DOMAIN: &[u8] = b"UnsignedTranscript";
+
+        UnsignedTranscriptHasher(aptos_crypto::hash::DefaultHasher::new(DOMAIN))
+    }
+}
+
+static UNSIGNED_TRANSCRIPT_HASHER: aptos_crypto::_once_cell::sync::Lazy<UnsignedTranscriptHasher> =
+    aptos_crypto::_once_cell::sync::Lazy::new(|| UnsignedTranscriptHasher::new());
+
+impl Default for UnsignedTranscriptHasher {
+    fn default() -> Self {
+        UNSIGNED_TRANSCRIPT_HASHER.clone()
+    }
+}
+
+impl aptos_crypto::hash::CryptoHasher for UnsignedTranscriptHasher {
+    fn seed() -> &'static [u8; 32] {
+        // Directly compute a fixed seed from the domain string.
+        const DOMAIN: &[u8] = b"UnsignedTranscript";
+
+        // Compute once and leak to get 'static
+        Box::leak(Box::new(aptos_crypto::hash::DefaultHasher::prefixed_hash(
+            DOMAIN,
+        )))
+    }
+
+    fn update(&mut self, bytes: &[u8]) {
+        self.0.update(bytes);
+    }
+
+    fn finish(self) -> aptos_crypto::hash::HashValue {
+        self.0.finish()
+    }
+}
+
+impl std::io::Write for UnsignedTranscriptHasher {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.0.update(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+// ================================================================
+//         END IMPLEMENTATION OF UNSIGNED TRANSCRIPT HASHER
+// ================================================================
+
+// ================================================================
+//          IMPLEMENTATION OF UNSIGNED TRANSCRIPT BCS HASH
+// ================================================================
+
+use aptos_crypto::hash::{CryptoHash, HashValue};
+
+/// Manual implementation of `BCSCryptoHash` for `UnsignedTranscript<E>`
+impl<E: Pairing> CryptoHash for UnsignedTranscript<E>
+where
+    UnsignedTranscript<E>: Serialize,
+{
+    type Hasher = UnsignedTranscriptHasher;
+
+    fn hash(&self) -> HashValue {
+        use aptos_crypto::hash::CryptoHasher;
+
+        let mut state = Self::Hasher::default();
+        // If BCS serialization fails, this is a programmer error
+        bcs::serialize_into(&mut state, &self)
+            .expect("BCS serialization of UnsignedTranscript should not fail");
+        state.finish()
+    }
+}
+
+// ================================================================
+//        END IMPLEMENTATION OF UNSIGNED TRANSCRIPT BCS HASH
+// ================================================================
+
+#[allow(non_snake_case)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
+pub struct SharingProof<E: Pairing> {
+    /// Proof showing knowledge of `witnesses` s_{i,j} yielding the commitment and the C and the R
+    pub PoK: sigma_protocol::Proof<E::ScalarField, hkzg_chunked_elgamal::Homomorphism<'static, E>>, // static because we don't want the lifetime of the Proof to depend on the Homomorphism TODO: try removing it?
+    /// A batched range proof showing that all committed values s_{i,j} lie in some range
+    pub range_proof: dekart_univariate_v2::Proof<E>,
+    /// A KZG-style commitment to the values s_{i,j} going into the range proof
+    pub range_proof_commitment:
+        <dekart_univariate_v2::Proof<E> as BatchedRangeProof<E>>::Commitment,
+}
+
+impl<E: Pairing> ValidCryptoMaterial for Transcript<E> {
+    const AIP_80_PREFIX: &'static str = "";
+
+    fn to_bytes(&self) -> Vec<u8> {
+        // TODO: using `Result<Vec<u8>>` and `.map_err(|_| CryptoMaterialError::DeserializationError)` would be more consistent here?
+        bcs::to_bytes(&self).expect("Unexpected error during PVSS transcript serialization")
+    }
+}
+
+impl<E: Pairing> TryFrom<&[u8]> for Transcript<E> {
+    type Error = CryptoMaterialError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+        bcs::from_bytes::<Transcript<E>>(bytes)
+            .map_err(|_| CryptoMaterialError::DeserializationError)
+    }
+}
+
+// Temporary hack, will deal with this at some point
+#[allow(type_alias_bounds)]
+type SokContext<'a, A: Serialize + Clone, E: Pairing> = (
+    ShamirThresholdConfig<E::ScalarField>,
+    bls12381::PublicKey,
+    &'a A,
+    usize,
+    Vec<u8>,
+);
+
+// Not sure this alias is very useful
+type SecretSharingConfig<F> = ShamirThresholdConfig<F>;
+
+impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Transcript
+    for Transcript<E>
+{
+    type DealtPubKey = keys::DealtPubKey<E>;
+    type DealtPubKeyShare = keys::DealtPubKeyShare<E>;
+    type DealtSecretKey = keys::DealtSecretKey<E::ScalarField>;
+    type DealtSecretKeyShare = keys::DealtSecretKeyShare<E::ScalarField>;
+    type DecryptPrivKey = keys::DecryptPrivKey<E>;
+    type EncryptPubKey = keys::EncryptPubKey<E>;
+    type InputSecret = InputSecret<E::ScalarField>;
+    type PublicParameters = PublicParameters<E>;
+    type SecretSharingConfig = SecretSharingConfig<E::ScalarField>;
+    type SigningPubKey = bls12381::PublicKey;
+    type SigningSecretKey = bls12381::PrivateKey;
+
+    fn scheme_name() -> String {
+        "chunky_pvss".to_string()
+    }
+
+    fn dst() -> Vec<u8> {
+        DST.to_vec()
+    }
+
+    #[allow(non_snake_case)]
+    fn deal<A: Serialize + Clone, R: rand_core::RngCore + rand_core::CryptoRng>(
+        sc: &Self::SecretSharingConfig,
+        pp: &Self::PublicParameters,
+        ssk: &Self::SigningSecretKey,
+        spk: &Self::SigningPubKey,
+        eks: &[Self::EncryptPubKey],
+        s: &Self::InputSecret,
+        session_id: &A,
+        dealer: &Player,
+        rng: &mut R,
+    ) -> Self {
+        debug_assert_eq!(
+            eks.len(),
+            sc.n,
+            "Number of encryption keys must equal number of players"
+        );
+
+        // Initialize the PVSS Fiat-Shamir context
+        let sok_ctxt = (*sc, spk.clone(), session_id, dealer.id, DST.to_vec()); // This is a bit hacky; also get rid of DST here and use self.dst?
+
+        // Generate the Shamir secret sharing polynomial
+        let mut f = vec![*s.get_secret_a()]; // constant term of polynomial
+        f.extend(sample_field_elements::<E::ScalarField, _>(
+            sc.get_threshold() - 1,
+            rng,
+        )); // these are the remaining coefficients; total degree is `t - 1`
+
+        // Generate its `n` evaluations (shares) by doing an FFT over the whole domain, then truncating
+        let mut f_evals = sc.domain.fft(&f);
+        f_evals.truncate(sc.n);
+        debug_assert_eq!(f_evals.len(), sc.n);
+
+        // Encrypt the chunked shares and generate the sharing proof
+        let (Cs, Rs, sharing_proof) =
+            Self::encrypt_chunked_shares(&f_evals, eks, sc, pp, sok_ctxt, rng);
+
+        // Add constant term for the `\mathbb{G}_2` commitment (we're doing this
+        // **after** the previous step because we're now mutating `f_evals` by enlarging it; this is a silly
+        // technicality however, it has no impact on computational complexity whatsoever as we could simply
+        // modify the `commit_to_scalars()` function to take another input)
+        f_evals.push(f[0]); // or *s.get_secret_a()
+
+        // Commit to polynomial evaluations + constant term
+        let G_2 = pp.get_commitment_base();
+        let Vs = arkworks::commit_to_scalars(&G_2, &f_evals);
+        debug_assert_eq!(Vs.len(), sc.n + 1);
+
+        // Construct the **unsigned** transcript struct with all computed values
+        let utrs = UnsignedTranscript {
+            dealer: *dealer,
+            subtranscript: SubTranscript { Vs, Cs, Rs },
+            sharing_proof,
+        };
+
+        // Now sign this transcript
+        let sgn = ssk
+            .sign(&utrs)
+            .expect("signing of `chunky` PVSS transcript failed");
+
+        Transcript { utrs, sgn }
+    }
+
+    fn get_dealers(&self) -> Vec<Player> {
+        vec![self.utrs.dealer]
+    }
+
+    #[allow(non_snake_case)]
+    fn generate<R>(sc: &Self::SecretSharingConfig, pp: &Self::PublicParameters, rng: &mut R) -> Self
+    where
+        R: rand_core::RngCore + rand_core::CryptoRng,
+    {
+        let num_chunks_per_share = num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize;
+        let utrs = UnsignedTranscript {
+            dealer: sc.get_player(0),
+            subtranscript: SubTranscript {
+                Vs: unsafe_random_points::<E::G2, _>(sc.n + 1, rng),
+                Cs: (0..sc.n)
+                    .map(|_| unsafe_random_points(num_chunks_per_share, rng))
+                    .collect::<Vec<_>>(), // TODO: would this become faster if generated in one batch and flattened?
+                Rs: unsafe_random_points(num_chunks_per_share, rng),
+            },
+            sharing_proof: SharingProof {
+                range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
+                    unsafe_random_point(rng),
+                ),
+                PoK: hkzg_chunked_elgamal::Proof::generate(
+                    (sc.n - 1).next_power_of_two() - 1,
+                    num_chunks_per_share,
+                    rng,
+                ),
+                range_proof: dekart_univariate_v2::Proof::generate(pp.ell, rng),
+            },
+        };
+
+        let ssk = PrivateKey::generate(rng);
+
+        let sgn = ssk
+            .sign(&utrs)
+            .expect("signing of PVSS transcript should have succeeded");
+
+        Transcript { utrs, sgn }
+    }
+
+    fn get_public_key_share(
+        &self,
+        _sc: &Self::SecretSharingConfig,
+        player: &Player,
+    ) -> Self::DealtPubKeyShare {
+        // local use here since we have a `SubTranscript` struct in this file
+        use traits::Subtranscript;
+        self.utrs.subtranscript.get_public_key_share(_sc, &player)
+    }
+
+    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
+        // local use here since we have a `SubTranscript` struct in this file
+        use traits::Subtranscript;
+        self.utrs.subtranscript.get_dealt_public_key()
+    }
+
+    #[allow(non_snake_case)]
+    fn decrypt_own_share(
+        &self,
+        _sc: &Self::SecretSharingConfig,
+        player: &Player,
+        dk: &Self::DecryptPrivKey,
+        pp: &Self::PublicParameters,
+    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
+        // local use here since we have a `SubTranscript` struct in this file
+        use traits::Subtranscript;
+        self.utrs
+            .subtranscript
+            .decrypt_own_share(_sc, player, dk, pp)
     }
 }
 

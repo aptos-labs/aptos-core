@@ -279,7 +279,7 @@ impl AggregatableTranscript for Transcript {
     #[allow(non_snake_case)]
     fn verify<A: Serialize + Clone>(
         &self,
-        sc: &Self::SecretSharingConfig,
+        sc: &<Self as traits::Transcript>::SecretSharingConfig,
         pp: &Self::PublicParameters,
         spks: &[Self::SigningPubKey],
         eks: &[Self::EncryptPubKey],
@@ -377,7 +377,9 @@ impl AggregatableTranscript for Transcript {
     }
 }
 
-impl Aggregatable<WeightedConfig<ThresholdConfigBlstrs>> for Transcript {
+impl Aggregatable for Transcript {
+    type SecretSharingConfig = WeightedConfig<ThresholdConfigBlstrs>;
+
     #[allow(non_snake_case)]
     fn aggregate_with(
         &mut self,

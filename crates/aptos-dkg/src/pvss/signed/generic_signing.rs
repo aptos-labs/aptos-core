@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    pvss::{test_utils::NoAux, traits::transcript::NonAggregatableTranscript},
+    pvss::{test_utils::NoAux, traits::transcript::HasAggregatableSubtranscript},
     traits::Transcript,
 };
 use aptos_crypto::{
@@ -15,6 +15,9 @@ use serde::{Deserialize, Serialize};
 
 /// A generic transformation from a non-malleable PVSS to a signed and non-malleable PVSS.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+
+/// The transcript after applying this transform, will consist of the original transcript plus a BLS12-381 signature
+/// of its dealt pub key and session id
 pub struct GenericSigning<T> {
     trs: T,
     sig: bls12381::Signature,
@@ -40,7 +43,7 @@ impl<T: Transcript> TryFrom<&[u8]> for GenericSigning<T> {
 
 #[derive(Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct SessionContribution<C, S> {
-    pub contrib: C, // the transcript's contribution, to be signed
+    pub contrib: C, // the transcript's contribution (the dealt pub key), to be signed
     pub sid: S,     // the session id
 }
 
@@ -143,12 +146,18 @@ impl<
 
 // Following the requirements of `Transcript` here
 impl<
-        T: NonAggregatableTranscript<
+        T: HasAggregatableSubtranscript<
             SigningPubKey = bls12381::PublicKey,
             SigningSecretKey = bls12381::PrivateKey,
         >,
-    > NonAggregatableTranscript for GenericSigning<T>
+    > HasAggregatableSubtranscript for GenericSigning<T>
 {
+    type Subtranscript = T::Subtranscript;
+
+    fn get_subtranscript(&self) -> Self::Subtranscript {
+        T::get_subtranscript(&self.trs)
+    }
+
     fn verify<A: Serialize + Clone>(
         &self,
         sc: &Self::SecretSharingConfig,

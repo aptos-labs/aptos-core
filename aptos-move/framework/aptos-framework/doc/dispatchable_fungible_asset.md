@@ -45,8 +45,7 @@ See AIP-73 for further discussion
     -  [Function `dispatchable_derived_supply`](#@Specification_1_dispatchable_derived_supply)
 
 
-<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
-<b>use</b> <a href="function_info.md#0x1_function_info">0x1::function_info</a>;
+<pre><code><b>use</b> <a href="function_info.md#0x1_function_info">0x1::function_info</a>;
 <b>use</b> <a href="fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;
 <b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
@@ -85,16 +84,6 @@ See AIP-73 for further discussion
 <a id="@Constants_0"></a>
 
 ## Constants
-
-
-<a id="0x1_dispatchable_fungible_asset_ENOT_ACTIVATED"></a>
-
-Feature is not activated yet on the network.
-
-
-<pre><code><b>const</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_ENOT_ACTIVATED">ENOT_ACTIVATED</a>: u64 = 3;
-</code></pre>
-
 
 
 <a id="0x1_dispatchable_fungible_asset_EAMOUNT_MISMATCH"></a>
@@ -225,10 +214,6 @@ The semantics of deposit will be governed by the function specified in DispatchF
     <a href="fungible_asset.md#0x1_fungible_asset_withdraw_permission_check">fungible_asset::withdraw_permission_check</a>(owner, store, amount);
     <b>let</b> func_opt = <a href="fungible_asset.md#0x1_fungible_asset_withdraw_dispatch_function">fungible_asset::withdraw_dispatch_function</a>(store);
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&func_opt)) {
-        <b>assert</b>!(
-            <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_dispatchable_fungible_asset_enabled">features::dispatchable_fungible_asset_enabled</a>(),
-            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_aborted">error::aborted</a>(<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_ENOT_ACTIVATED">ENOT_ACTIVATED</a>)
-        );
         <b>let</b> func = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&func_opt);
         <a href="function_info.md#0x1_function_info_load_module_from_function">function_info::load_module_from_function</a>(func);
         <b>let</b> fa = <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_withdraw">dispatchable_withdraw</a>(
@@ -270,10 +255,6 @@ The semantics of deposit will be governed by the function specified in DispatchF
     <a href="fungible_asset.md#0x1_fungible_asset_deposit_sanity_check">fungible_asset::deposit_sanity_check</a>(store, <b>false</b>);
     <b>let</b> func_opt = <a href="fungible_asset.md#0x1_fungible_asset_deposit_dispatch_function">fungible_asset::deposit_dispatch_function</a>(store);
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&func_opt)) {
-        <b>assert</b>!(
-            <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_dispatchable_fungible_asset_enabled">features::dispatchable_fungible_asset_enabled</a>(),
-            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_aborted">error::aborted</a>(<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_ENOT_ACTIVATED">ENOT_ACTIVATED</a>)
-        );
         <b>let</b> func = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&func_opt);
         <a href="function_info.md#0x1_function_info_load_module_from_function">function_info::load_module_from_function</a>(func);
         <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_deposit">dispatchable_deposit</a>(
@@ -383,10 +364,6 @@ The semantics of value will be governed by the function specified in DispatchFun
 <pre><code><b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_derived_balance">derived_balance</a>&lt;T: key&gt;(store: Object&lt;T&gt;): u64 {
     <b>let</b> func_opt = <a href="fungible_asset.md#0x1_fungible_asset_derived_balance_dispatch_function">fungible_asset::derived_balance_dispatch_function</a>(store);
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&func_opt)) {
-        <b>assert</b>!(
-            <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_dispatchable_fungible_asset_enabled">features::dispatchable_fungible_asset_enabled</a>(),
-            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_aborted">error::aborted</a>(<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_ENOT_ACTIVATED">ENOT_ACTIVATED</a>)
-        );
         <b>let</b> func = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&func_opt);
         <a href="function_info.md#0x1_function_info_load_module_from_function">function_info::load_module_from_function</a>(func);
         <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_derived_balance">dispatchable_derived_balance</a>(store, func)
@@ -422,10 +399,6 @@ The semantics of value will be governed by the function specified in DispatchFun
 <pre><code><b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_is_derived_balance_at_least">is_derived_balance_at_least</a>&lt;T: key&gt;(store: Object&lt;T&gt;, amount: u64): bool {
     <b>let</b> func_opt = <a href="fungible_asset.md#0x1_fungible_asset_derived_balance_dispatch_function">fungible_asset::derived_balance_dispatch_function</a>(store);
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&func_opt)) {
-        <b>assert</b>!(
-            <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_dispatchable_fungible_asset_enabled">features::dispatchable_fungible_asset_enabled</a>(),
-            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_aborted">error::aborted</a>(<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_ENOT_ACTIVATED">ENOT_ACTIVATED</a>)
-        );
         <b>let</b> func = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&func_opt);
         <a href="function_info.md#0x1_function_info_load_module_from_function">function_info::load_module_from_function</a>(func);
         <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_derived_balance">dispatchable_derived_balance</a>(store, func) &gt;= amount
@@ -461,10 +434,6 @@ The semantics of supply will be governed by the function specified in DeriveSupp
 <pre><code><b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_derived_supply">derived_supply</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): Option&lt;u128&gt; {
     <b>let</b> func_opt = <a href="fungible_asset.md#0x1_fungible_asset_derived_supply_dispatch_function">fungible_asset::derived_supply_dispatch_function</a>(metadata);
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&func_opt)) {
-        <b>assert</b>!(
-            <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_dispatchable_fungible_asset_enabled">features::dispatchable_fungible_asset_enabled</a>(),
-            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_aborted">error::aborted</a>(<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_ENOT_ACTIVATED">ENOT_ACTIVATED</a>)
-        );
         <b>let</b> func = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&func_opt);
         <a href="function_info.md#0x1_function_info_load_module_from_function">function_info::load_module_from_function</a>(func);
         <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_derived_supply">dispatchable_derived_supply</a>(metadata, func)

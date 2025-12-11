@@ -118,7 +118,7 @@ impl<E: Pairing> CanonicalSerialize for VerificationKey<E> {
 impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     type Commitment = Commitment<E>;
     type CommitmentKey = ProverKey<E>;
-    type CommitmentRandomness = Scalar<E>;
+    type CommitmentRandomness = Scalar<E::ScalarField>;
     type Input = E::ScalarField;
     type ProverKey = ProverKey<E>;
     type PublicStatement = PublicStatement<E>;

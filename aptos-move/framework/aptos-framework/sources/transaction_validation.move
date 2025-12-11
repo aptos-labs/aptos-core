@@ -450,7 +450,6 @@ module aptos_framework::transaction_validation {
         txn_expiration_time: u64,
         chain_id: u8,
     ) {
-        assert!(features::fee_payer_enabled(), error::invalid_state(PROLOGUE_EFEE_PAYER_NOT_ENABLED));
         // prologue_common and multi_agent_common_prologue with is_simulation set to false behaves identically to the
         // original fee_payer_script_prologue function.
         prologue_common(
@@ -492,7 +491,6 @@ module aptos_framework::transaction_validation {
         chain_id: u8,
         is_simulation: bool,
     ) {
-        assert!(features::fee_payer_enabled(), error::invalid_state(PROLOGUE_EFEE_PAYER_NOT_ENABLED));
         prologue_common(
             &sender,
             &create_signer::create_signer(fee_payer_address),

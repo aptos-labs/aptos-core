@@ -17,9 +17,10 @@ macro_rules! dealt_pub_key_share_impl {
         /// The size of a serialized *dealt public key share*.
         pub(crate) const DEALT_PK_SHARE_NUM_BYTES: usize = DEALT_PK_NUM_BYTES;
 
-        /// A player's *share* of the *dealt public key* from above.
+        /// A player's *share* of the *dealt public key* from above. Wrapping around
+        /// `DealtPubKey` ensures they have the same type; it is irrelevant otherwise
         #[derive(DeserializeKey, Clone, Debug, SerializeKey, PartialEq, Eq)]
-        pub struct DealtPubKeyShare(pub(crate) DealtPubKey);
+        pub struct DealtPubKeyShare(DealtPubKey);
 
         //
         // DealtPublicKeyShare

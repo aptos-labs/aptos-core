@@ -140,10 +140,11 @@ impl ExecutionGasEvent {
                 module_id,
                 fn_name,
                 ty_args,
+                args,
                 cost,
             } => Node::new(
                 format!(
-                    "{}",
+                    "{}({})",
                     Render(&(
                         module_id,
                         fn_name.as_ident_str(),
@@ -152,7 +153,8 @@ impl ExecutionGasEvent {
                         } else {
                             &[]
                         }
-                    ))
+                    )),
+                    args.join(", ")
                 ),
                 *cost,
             ),
@@ -176,7 +178,7 @@ impl CallFrame {
                 ty_args,
             } => {
                 format!(
-                    "{}",
+                    "{}({})",
                     Render(&(
                         module_id,
                         name.as_ident_str(),
@@ -185,7 +187,8 @@ impl CallFrame {
                         } else {
                             &[]
                         }
-                    ))
+                    )),
+                    self.args.join(", ")
                 )
             },
         };

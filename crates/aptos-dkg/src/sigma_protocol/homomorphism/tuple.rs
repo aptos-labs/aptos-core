@@ -5,14 +5,14 @@ use crate::{
     sigma_protocol,
     sigma_protocol::{
         homomorphism,
-        homomorphism::{fixed_base_msms::Trait, EntrywiseMap},
+        homomorphism::{fixed_base_msms, EntrywiseMap},
     },
 };
-use ark_ec::pairing::Pairing;
+use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid,
 };
-pub use ark_std::io::Write;
+use ark_std::io::Write;
 use std::fmt::Debug;
 
 /// `TupleHomomorphism` combines two homomorphisms with the same domain
@@ -37,6 +37,18 @@ where
     pub hom2: H2,
 }
 
+#[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
+pub struct PairingTupleHomomorphism<E, H1, H2>
+where
+    E: Pairing,
+    H1: homomorphism::Trait,
+    H2: homomorphism::Trait<Domain = H1::Domain>,
+{
+    pub hom1: H1,
+    pub hom2: H2,
+    pub _pairing: std::marker::PhantomData<E>,
+}
+
 /// Implements `Homomorphism` for `TupleHomomorphism` by applying both
 /// component homomorphisms to the same input and returning their results
 /// as a tuple.
@@ -45,6 +57,22 @@ where
 /// `(hom1(x), hom2(x))`. For technical reasons, we then put the output inside a wrapper.
 impl<H1, H2> homomorphism::Trait for TupleHomomorphism<H1, H2>
 where
+    H1: homomorphism::Trait,
+    H2: homomorphism::Trait<Domain = H1::Domain>,
+    H1::Codomain: CanonicalSerialize + CanonicalDeserialize,
+    H2::Codomain: CanonicalSerialize + CanonicalDeserialize,
+{
+    type Codomain = TupleCodomainShape<H1::Codomain, H2::Codomain>;
+    type Domain = H1::Domain;
+
+    fn apply(&self, x: &Self::Domain) -> Self::Codomain {
+        TupleCodomainShape(self.hom1.apply(x), self.hom2.apply(x))
+    }
+}
+
+impl<E, H1, H2> homomorphism::Trait for PairingTupleHomomorphism<E, H1, H2>
+where
+    E: Pairing,
     H1: homomorphism::Trait,
     H2: homomorphism::Trait<Domain = H1::Domain>,
     H1::Codomain: CanonicalSerialize + CanonicalDeserialize,
@@ -152,18 +180,15 @@ where
 /// not necessary through enums.
 ///
 /// The codomain shapes of the two homomorphisms are combined using `TupleCodomainShape`.
-impl<H1, H2> Trait for TupleHomomorphism<H1, H2>
+impl<H1, H2> fixed_base_msms::Trait for TupleHomomorphism<H1, H2>
 where
-    H1: Trait,
-    H2: Trait<
+    H1: fixed_base_msms::Trait,
+    H2: fixed_base_msms::Trait<
         Domain = H1::Domain,
-        Scalar = H1::Scalar,
-        Base = H1::Base,
         MsmInput = H1::MsmInput,
         MsmOutput = H1::MsmOutput,
     >,
 {
-    type Base = H1::Base;
     type CodomainShape<T>
         = TupleCodomainShape<H1::CodomainShape<T>, H2::CodomainShape<T>>
     where
@@ -179,17 +204,19 @@ where
         TupleCodomainShape(terms1, terms2)
     }
 
-    fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
-        H1::msm_eval(bases, scalars)
+    fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
+        H1::msm_eval(input)
     }
 }
 
-impl<E: Pairing, H1, H2> sigma_protocol::Trait<E> for TupleHomomorphism<H1, H2>
+impl<C: CurveGroup, H1, H2> sigma_protocol::Trait<C> for TupleHomomorphism<H1, H2>
 where
-    H1: sigma_protocol::Trait<E>,
-    H2: sigma_protocol::Trait<E>,
-    H2: Trait<Domain = H1::Domain, MsmInput = H1::MsmInput>,
+    H1: sigma_protocol::Trait<C>,
+    H2: sigma_protocol::Trait<C>,
+    H2: fixed_base_msms::Trait<Domain = H1::Domain, MsmInput = H1::MsmInput>, // Huh MsmOutput = H1::MsmOutput yields compiler error??
 {
+    /// Concatenate the DSTs of the two homomorphisms, plus some
+    /// additional metadata to ensure uniqueness.
     fn dst(&self) -> Vec<u8> {
         let mut dst = Vec::new();
 
@@ -206,5 +233,142 @@ where
         dst.extend_from_slice(b")");
 
         dst
+    }
+}
+
+use crate::sigma_protocol::{
+    traits::{fiat_shamir_challenge_for_sigma_protocol, prove_homomorphism, FirstProofItem},
+    Proof,
+};
+use anyhow::ensure;
+use aptos_crypto::utils;
+use ark_ff::{UniformRand, Zero};
+use serde::Serialize;
+
+// Slightly hacky implementation of a sigma protocol for `PairingTupleHomomorphism`
+impl<E: Pairing, H1, H2> PairingTupleHomomorphism<E, H1, H2>
+where
+    H1: sigma_protocol::Trait<E::G1>,
+    H2: sigma_protocol::Trait<E::G2>,
+    H2: fixed_base_msms::Trait<Domain = H1::Domain>,
+{
+    fn dst(&self) -> Vec<u8> {
+        let mut dst = Vec::new();
+
+        let dst1 = self.hom1.dst();
+        let dst2 = self.hom2.dst();
+
+        // Domain-separate them properly so concatenation is unambiguous.
+        // Prefix with their lengths so [a|b] and [ab|] don't collide.
+        dst.extend_from_slice(b"PairingTupleHomomorphism(");
+        dst.extend_from_slice(&(dst1.len() as u32).to_be_bytes());
+        dst.extend_from_slice(&dst1);
+        dst.extend_from_slice(&(dst2.len() as u32).to_be_bytes());
+        dst.extend_from_slice(&dst2);
+        dst.extend_from_slice(b")");
+
+        dst
+    }
+
+    /// Returns the MSM terms for each homomorphism, combined into a tuple.
+    fn msm_terms(
+        &self,
+        input: &H1::Domain,
+    ) -> (
+        H1::CodomainShape<H1::MsmInput>,
+        H2::CodomainShape<H2::MsmInput>,
+    ) {
+        let terms1 = self.hom1.msm_terms(input);
+        let terms2 = self.hom2.msm_terms(input);
+        (terms1, terms2)
+    }
+
+    pub fn prove<Ct: Serialize, R: rand_core::RngCore + rand_core::CryptoRng>(
+        &self,
+        witness: &<Self as homomorphism::Trait>::Domain,
+        statement: &<Self as homomorphism::Trait>::Codomain,
+        cntxt: &Ct, // for SoK purposes
+        rng: &mut R,
+    ) -> Proof<H1::Scalar, Self> {
+        prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
+    }
+
+    #[allow(non_snake_case)]
+    pub fn verify<C: Serialize, H>(
+        &self,
+        public_statement: &<Self as homomorphism::Trait>::Codomain,
+        proof: &Proof<H1::Scalar, H>, // Would like to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
+        cntxt: &C,
+    ) -> anyhow::Result<()>
+    where
+        H: homomorphism::Trait<
+            Domain = <Self as homomorphism::Trait>::Domain,
+            Codomain = <Self as homomorphism::Trait>::Codomain,
+        >,
+    {
+        let (first_msm_terms, second_msm_terms) =
+            self.msm_terms_for_verify::<_, H>(public_statement, proof, cntxt);
+
+        let first_msm_result = H1::msm_eval(first_msm_terms);
+        ensure!(first_msm_result == H1::MsmOutput::zero());
+
+        let second_msm_result = H2::msm_eval(second_msm_terms);
+        ensure!(second_msm_result == H2::MsmOutput::zero());
+
+        Ok(())
+    }
+
+    #[allow(non_snake_case)]
+    fn msm_terms_for_verify<Ct: Serialize, H>(
+        &self,
+        public_statement: &<Self as homomorphism::Trait>::Codomain,
+        proof: &Proof<H1::Scalar, H>,
+        cntxt: &Ct,
+    ) -> (H1::MsmInput, H2::MsmInput)
+    where
+        H: homomorphism::Trait<
+            Domain = <Self as homomorphism::Trait>::Domain,
+            Codomain = <Self as homomorphism::Trait>::Codomain,
+        >, // need this?
+    {
+        let prover_first_message = match &proof.first_proof_item {
+            FirstProofItem::Commitment(A) => A,
+            FirstProofItem::Challenge(_) => {
+                panic!("Missing implementation - expected commitment, not challenge")
+            },
+        };
+        let c = fiat_shamir_challenge_for_sigma_protocol::<_, H1::Scalar, _>(
+            cntxt,
+            self,
+            public_statement,
+            &prover_first_message,
+            &self.dst(),
+        );
+
+        let mut rng = ark_std::rand::thread_rng(); // TODO: make this part of the function input?
+        let beta = H1::Scalar::rand(&mut rng);
+        let len1 = public_statement.0.clone().into_iter().count(); // hmm maybe pass the into_iter version in merge_msm_terms?
+        let len2 = public_statement.1.clone().into_iter().count();
+        let powers_of_beta = utils::powers(beta, len1 + len2);
+        let (first_powers_of_beta, second_powers_of_beta) = powers_of_beta.split_at(len1);
+
+        let (first_msm_terms_of_response, second_msm_terms_of_response) = self.msm_terms(&proof.z);
+
+        let first_input = H1::merge_msm_terms(
+            first_msm_terms_of_response.into_iter().collect(),
+            &prover_first_message.0,
+            &public_statement.0,
+            first_powers_of_beta,
+            c,
+        );
+        let second_input = H2::merge_msm_terms(
+            second_msm_terms_of_response.into_iter().collect(),
+            &prover_first_message.1,
+            &public_statement.1,
+            second_powers_of_beta,
+            c,
+        );
+
+        (first_input, second_input)
     }
 }

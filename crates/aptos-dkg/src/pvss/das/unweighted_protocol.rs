@@ -225,7 +225,7 @@ impl traits::Transcript for Transcript {
 impl AggregatableTranscript for Transcript {
     fn verify<A: Serialize + Clone>(
         &self,
-        sc: &Self::SecretSharingConfig,
+        sc: &<Self as traits::Transcript>::SecretSharingConfig,
         pp: &Self::PublicParameters,
         spks: &[Self::SigningPubKey],
         eks: &[Self::EncryptPubKey],
@@ -313,7 +313,9 @@ impl AggregatableTranscript for Transcript {
     }
 }
 
-impl Aggregatable<ThresholdConfigBlstrs> for Transcript {
+impl Aggregatable for Transcript {
+    type SecretSharingConfig = ThresholdConfigBlstrs;
+
     fn aggregate_with(
         &mut self,
         sc: &ThresholdConfigBlstrs,

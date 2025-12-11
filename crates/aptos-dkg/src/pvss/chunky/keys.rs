@@ -9,6 +9,7 @@ use aptos_crypto::{
 };
 use aptos_crypto_derive::{SilentDebug, SilentDisplay};
 use ark_ec::{pairing::Pairing, CurveGroup};
+use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use serde::{Deserialize, Serialize};
 use std::ops::Mul;
@@ -105,6 +106,6 @@ impl<E: Pairing> DealtPubKeyShare<E> {
 
 // TODO: maybe make these actual structs
 #[allow(type_alias_bounds)]
-pub type DealtSecretKey<E: Pairing> = Scalar<E>;
+pub type DealtSecretKey<F: PrimeField> = Scalar<F>;
 #[allow(type_alias_bounds)]
-pub type DealtSecretKeyShare<E: Pairing> = Scalar<E>;
+pub type DealtSecretKeyShare<F: PrimeField> = Scalar<F>;

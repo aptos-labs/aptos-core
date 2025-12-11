@@ -25,6 +25,7 @@ use aptos_crypto::{
 };
 use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_serialize::{SerializationError, Valid};
+use ark_std::log2;
 use rand::{thread_rng, CryptoRng, RngCore};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::{collections::HashMap, ops::Mul};
@@ -54,6 +55,8 @@ pub struct PublicParameters<E: Pairing> {
 
     pub ell: u8,
 
+    pub max_aggregation: usize,
+
     #[serde(skip)]
     pub table: HashMap<Vec<u8>, u32>,
 
@@ -77,6 +80,7 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
             #[serde(deserialize_with = "ark_de")]
             G_2: E::G2Affine,
             ell: u8,
+            max_aggregation: usize,
         }
 
         let serialized = SerializedFields::<E>::deserialize(deserializer)?;
@@ -87,8 +91,9 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
             pk_range_proof: serialized.pk_range_proof,
             G_2: serialized.G_2,
             ell: serialized.ell,
-            table: dlog::table::build::<E::G1>(G, 1u32 << (serialized.ell / 2)),
+            table: Self::build_dlog_table(G, serialized.ell, serialized.max_aggregation),
             powers_of_radix: compute_powers_of_radix::<E>(serialized.ell),
+            max_aggregation: serialized.max_aggregation,
         })
     }
 }
@@ -96,6 +101,19 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
 impl<E: Pairing> PublicParameters<E> {
     pub fn get_commitment_base(&self) -> E::G2Affine {
         self.G_2
+    }
+
+    #[allow(non_snake_case)]
+    pub(crate) fn build_dlog_table(
+        G: E::G1,
+        ell: u8,
+        max_aggregation: usize,
+    ) -> HashMap<Vec<u8>, u32> {
+        dlog::table::build::<E::G1>(G, 1u32 << ((ell as u32 + log2(max_aggregation)) / 2))
+    }
+
+    pub(crate) fn get_dlog_range_bound(&self) -> u32 {
+        1u32 << (self.ell as u32 + log2(self.max_aggregation))
     }
 }
 
@@ -140,7 +158,12 @@ impl<E: Pairing> TryFrom<&[u8]> for PublicParameters<E> {
 #[allow(non_snake_case)]
 impl<E: Pairing> PublicParameters<E> {
     /// Verifiably creates Aptos-specific public parameters.
-    pub fn new<R: RngCore + CryptoRng>(max_num_shares: usize, ell: u8, rng: &mut R) -> Self {
+    pub fn new<R: RngCore + CryptoRng>(
+        max_num_shares: usize,
+        ell: u8,
+        max_aggregation: usize,
+        rng: &mut R,
+    ) -> Self {
         let max_num_chunks_padded =
             ((max_num_shares * num_chunks_per_scalar::<E::ScalarField>(ell) as usize) + 1)
                 .next_power_of_two()
@@ -160,7 +183,8 @@ impl<E: Pairing> PublicParameters<E> {
             .0,
             G_2: hashing::unsafe_hash_to_affine(b"G_2", DST),
             ell,
-            table: dlog::table::build::<E::G1>(G.into(), 1u32 << (ell / 2)),
+            max_aggregation,
+            table: Self::build_dlog_table(G.into(), ell, max_aggregation),
             powers_of_radix: compute_powers_of_radix::<E>(ell),
         };
 
@@ -171,10 +195,11 @@ impl<E: Pairing> PublicParameters<E> {
     pub fn new_with_commitment_base<R: RngCore + CryptoRng>(
         n: usize,
         ell: u8,
+        max_aggregation: usize,
         commitment_base: E::G2Affine,
         rng: &mut R,
     ) -> Self {
-        let mut pp = Self::new(n, ell, rng);
+        let mut pp = Self::new(n, ell, max_aggregation, rng);
         pp.G_2 = commitment_base;
         pp
     }
@@ -194,19 +219,19 @@ impl<E: Pairing> Default for PublicParameters<E> {
     // This is only used for testing and benchmarking
     fn default() -> Self {
         let mut rng = thread_rng();
-        Self::new(1, DEFAULT_ELL_FOR_TESTING, &mut rng)
+        Self::new(1, DEFAULT_ELL_FOR_TESTING, 1, &mut rng)
     }
 }
 
 impl<E: Pairing> WithMaxNumShares for PublicParameters<E> {
     fn with_max_num_shares(n: usize) -> Self {
         let mut rng = thread_rng();
-        Self::new(n, DEFAULT_ELL_FOR_TESTING, &mut rng)
+        Self::new(n, DEFAULT_ELL_FOR_TESTING, 1, &mut rng)
     }
 
     // The only thing from `pp` that `generate()` uses is `pp.ell`, so make the rest as small as possible.
     fn with_max_num_shares_for_generate(_n: usize) -> Self {
         let mut rng = thread_rng();
-        Self::new(1, DEFAULT_ELL_FOR_TESTING, &mut rng)
+        Self::new(1, DEFAULT_ELL_FOR_TESTING, 1, &mut rng)
     }
 }

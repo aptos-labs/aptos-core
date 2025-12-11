@@ -21,7 +21,7 @@ use crate::{
 use anyhow::{anyhow, Result};
 use aptos_crypto::SecretSharingConfig as _;
 use aptos_dkg::pvss::{
-    traits::{Reconstructable as _, SubTranscript},
+    traits::{Reconstructable as _, Subtranscript},
     Player,
 };
 use ark_ec::AffineRepr as _;
@@ -78,19 +78,19 @@ impl BatchThresholdEncryption for FPTX {
     type MasterSecretKeyShare = BIBEMasterSecretKeyShare;
     type PreparedCiphertext = PreparedCiphertext;
     type Round = u64;
-    type SubTranscript = aptos_dkg::pvss::chunky::SubTranscript<group::Pairing>;
+    type SubTranscript = aptos_dkg::pvss::chunky::UnweightedSubtranscript<group::Pairing>;
     type ThresholdConfig = aptos_crypto::arkworks::shamir::ShamirThresholdConfig<Fr>;
     type VerificationKey = BIBEVerificationKey;
 
     fn setup(
         digest_key: &Self::DigestKey,
-        pvss_public_params: &<Self::SubTranscript as SubTranscript>::PublicParameters,
+        pvss_public_params: &<Self::SubTranscript as Subtranscript>::PublicParameters,
         subtranscript_happypath: &Self::SubTranscript,
         subtranscript_slowpath: &Self::SubTranscript,
         tc_happypath: &Self::ThresholdConfig,
         tc_slowpath: &Self::ThresholdConfig,
         current_player: Player,
-        msk_share_decryption_key: &<Self::SubTranscript as SubTranscript>::DecryptPrivKey,
+        msk_share_decryption_key: &<Self::SubTranscript as Subtranscript>::DecryptPrivKey,
     ) -> Result<(
         Self::EncryptionKey,
         Vec<Self::VerificationKey>,
