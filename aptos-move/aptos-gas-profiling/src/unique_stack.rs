@@ -50,6 +50,7 @@ impl TransactionGasLog {
             exec_io: self.exec_io.combine(&other.exec_io),
             storage: self.storage.combine(&other.storage),
             num_txns: self.num_txns + other.num_txns,
+            peak_memory_usage: self.peak_memory_usage.max(other.peak_memory_usage),
         }
     }
 }
