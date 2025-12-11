@@ -8,6 +8,10 @@ bypasser_configs:
     file: "/tmp/auth_tokens.txt"
   - type: "IpAllowlist"
     file: "/tmp/ip_allowlist.txt"
+  - type: "FirebaseJwtDomain"
+    allowed_domains:
+      - "example.com"
+    identity_platform_gcp_project: "your-gcp-project-id"
 checker_configs:
   - type: "MagicHeader"
     magic_header_key: "what_wallet_my_guy"
