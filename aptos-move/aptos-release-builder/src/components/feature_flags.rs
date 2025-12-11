@@ -96,7 +96,6 @@ pub enum FeatureFlag {
     CommissionChangeDelegationPool,
     Bn254Structures,
     WebAuthnSignature,
-    SlhDsaSha2_128sSignature,
     ReconfigureWithDkg,
     KeylessAccounts,
     KeylessButZklessAccounts,
@@ -158,6 +157,7 @@ pub enum FeatureFlag {
     EnableFrameworkForOption,
     SessionContinuation,
     EnableFunctionReflection,
+    SlhDsaSha2_128sSignature,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
