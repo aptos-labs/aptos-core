@@ -1241,14 +1241,14 @@ pub enum AnySignature {
     Secp256k1Ecdsa {
         signature: secp256k1_ecdsa::Signature,
     },
-    SlhDsa_Sha2_128s {
-        signature: slh_dsa_sha2_128s::Signature,
-    },
     WebAuthn {
         signature: PartialAuthenticatorAssertionResponse,
     },
     Keyless {
         signature: KeylessSignature,
+    },
+    SlhDsa_Sha2_128s {
+        signature: slh_dsa_sha2_128s::Signature,
     },
 }
 
@@ -1366,14 +1366,14 @@ pub enum AnyPublicKey {
     Secp256r1Ecdsa {
         public_key: secp256r1_ecdsa::PublicKey,
     },
-    SlhDsa_Sha2_128s {
-        public_key: slh_dsa_sha2_128s::PublicKey,
-    },
     Keyless {
         public_key: KeylessPublicKey,
     },
     FederatedKeyless {
         public_key: FederatedKeylessPublicKey,
+    },
+    SlhDsa_Sha2_128s {
+        public_key: slh_dsa_sha2_128s::PublicKey,
     },
 }
 

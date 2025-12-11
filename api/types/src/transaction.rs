@@ -1545,9 +1545,9 @@ impl VerifyInput for KeylessSignature {
 pub enum Signature {
     Ed25519(Ed25519),
     Secp256k1Ecdsa(Secp256k1Ecdsa),
-    SlhDsa_Sha2_128s(SlhDsa_Sha2_128s),
     WebAuthn(WebAuthn),
     Keyless(Keyless),
+    SlhDsa_Sha2_128s(SlhDsa_Sha2_128s),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
@@ -1675,9 +1675,9 @@ pub enum PublicKey {
     Ed25519(Ed25519),
     Secp256k1Ecdsa(Secp256k1Ecdsa),
     Secp256r1Ecdsa(Secp256r1Ecdsa),
-    SlhDsa_Sha2_128s(SlhDsa_Sha2_128s),
     Keyless(Keyless),
     FederatedKeyless(FederatedKeyless),
+    SlhDsa_Sha2_128s(SlhDsa_Sha2_128s),
 }
 
 impl TryFrom<&PublicKey> for AnyPublicKey {

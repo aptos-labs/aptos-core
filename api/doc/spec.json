@@ -17693,13 +17693,13 @@
             "$ref": "#/components/schemas/PublicKey_Secp256r1Ecdsa"
           },
           {
-            "$ref": "#/components/schemas/PublicKey_SlhDsa_Sha2_128s"
-          },
-          {
             "$ref": "#/components/schemas/PublicKey_Keyless"
           },
           {
             "$ref": "#/components/schemas/PublicKey_FederatedKeyless"
+          },
+          {
+            "$ref": "#/components/schemas/PublicKey_SlhDsa_Sha2_128s"
           }
         ],
         "discriminator": {
@@ -17708,9 +17708,9 @@
             "ed25519": "#/components/schemas/PublicKey_Ed25519",
             "secp256k1_ecdsa": "#/components/schemas/PublicKey_Secp256k1Ecdsa",
             "secp256r1_ecdsa": "#/components/schemas/PublicKey_Secp256r1Ecdsa",
-            "slh_dsa__sha2_128s": "#/components/schemas/PublicKey_SlhDsa_Sha2_128s",
             "keyless": "#/components/schemas/PublicKey_Keyless",
-            "federated_keyless": "#/components/schemas/PublicKey_FederatedKeyless"
+            "federated_keyless": "#/components/schemas/PublicKey_FederatedKeyless",
+            "slh_dsa__sha2_128s": "#/components/schemas/PublicKey_SlhDsa_Sha2_128s"
           }
         }
       },
@@ -18006,13 +18006,13 @@
             "$ref": "#/components/schemas/Signature_Secp256k1Ecdsa"
           },
           {
-            "$ref": "#/components/schemas/Signature_SlhDsa_Sha2_128s"
-          },
-          {
             "$ref": "#/components/schemas/Signature_WebAuthn"
           },
           {
             "$ref": "#/components/schemas/Signature_Keyless"
+          },
+          {
+            "$ref": "#/components/schemas/Signature_SlhDsa_Sha2_128s"
           }
         ],
         "discriminator": {
@@ -18020,9 +18020,9 @@
           "mapping": {
             "ed25519": "#/components/schemas/Signature_Ed25519",
             "secp256k1_ecdsa": "#/components/schemas/Signature_Secp256k1Ecdsa",
-            "slh_dsa__sha2_128s": "#/components/schemas/Signature_SlhDsa_Sha2_128s",
             "web_authn": "#/components/schemas/Signature_WebAuthn",
-            "keyless": "#/components/schemas/Signature_Keyless"
+            "keyless": "#/components/schemas/Signature_Keyless",
+            "slh_dsa__sha2_128s": "#/components/schemas/Signature_SlhDsa_Sha2_128s"
           }
         }
       },
