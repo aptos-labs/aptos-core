@@ -248,7 +248,7 @@ use aptos_dkg::pvss::traits::transcript::Aggregatable;
 
 #[cfg(test)]
 #[allow(dead_code)]
-fn test_pvss_aggregate_subtranscript_and_decrypt<E: Pairing, T: HasAggregatableSubtranscript>(
+fn test_pvss_aggregate_subtranscript_and_decrypt<E: Pairing, T>(
     sc: &WeightedConfigArkworks<E::ScalarField>,
     seed_bytes: [u8; 32],
 ) where
@@ -332,14 +332,12 @@ fn nonaggregatable_pvss_deal_verify_and_reconstruct<C, T: HasAggregatableSubtran
 use ark_ec::pairing::Pairing;
 // TODO: merge this stuff
 #[cfg(test)]
-fn nonaggregatable_weighted_pvss_deal_verify_and_reconstruct<
-    E: Pairing,
-    T: HasAggregatableSubtranscript,
->(
+fn nonaggregatable_weighted_pvss_deal_verify_and_reconstruct<E: Pairing, T>(
     sc: &WeightedConfigArkworks<E::ScalarField>,
     seed_bytes: [u8; 32],
 ) where
-    T: Transcript<SecretSharingConfig = WeightedConfigArkworks<E::ScalarField>>,
+    T: HasAggregatableSubtranscript
+        + Transcript<SecretSharingConfig = WeightedConfigArkworks<E::ScalarField>>,
 {
     // println!();
     // println!("Seed: {}", hex::encode(seed_bytes.as_slice()));
@@ -404,7 +402,7 @@ fn pvss_deal_verify_and_reconstruct_from_subtranscript<
     let trx = trx.get_subtranscript();
 
     if d.dsk
-        != reconstruct_dealt_secret_key_randomly_subtranscript::<StdRng, T::SubTranscript>(
+        != reconstruct_dealt_secret_key_randomly_subtranscript::<StdRng, T::Subtranscript>(
             sc, &mut rng, &d.dks, trx, &d.pp,
         )
     {
