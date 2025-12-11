@@ -137,3 +137,35 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> IntoIter
         std::iter::once(self.0)
     }
 }
+
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
+pub struct VectorShape<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq>(
+    pub Vec<T>,
+);
+
+/// Implements `EntrywiseMap` for `VectorShape`, mapping each element of the vector.
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> EntrywiseMap<T>
+    for VectorShape<T>
+{
+    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> = VectorShape<U>;
+
+    fn map<U, F>(self, f: F) -> Self::Output<U>
+    where
+        F: Fn(T) -> U,
+        U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
+    {
+        VectorShape(self.0.into_iter().map(f).collect())
+    }
+}
+
+/// Implements `IntoIterator` for `VectorShape`, producing an iterator over T.
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> IntoIterator
+    for VectorShape<T>
+{
+    type IntoIter = std::vec::IntoIter<T>;
+    type Item = T;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}

@@ -238,20 +238,19 @@ where
 
 use crate::sigma_protocol::{
     traits::{fiat_shamir_challenge_for_sigma_protocol, prove_homomorphism, FirstProofItem},
-    Proof, Witness,
+    Proof,
 };
 use anyhow::ensure;
 use aptos_crypto::utils;
 use ark_ff::{UniformRand, Zero};
 use serde::Serialize;
 
-// Slightly hacky implementation of a sigma protocol
+// Slightly hacky implementation of a sigma protocol for `PairingTupleHomomorphism`
 impl<E: Pairing, H1, H2> PairingTupleHomomorphism<E, H1, H2>
 where
     H1: sigma_protocol::Trait<E::G1>,
     H2: sigma_protocol::Trait<E::G2>,
-    H1: fixed_base_msms::Trait<Domain: Witness<H1::Scalar>>,
-    H2: fixed_base_msms::Trait<Domain = H1::Domain, Scalar = H1::Scalar>,
+    H2: fixed_base_msms::Trait<Domain = H1::Domain>,
 {
     fn dst(&self) -> Vec<u8> {
         let mut dst = Vec::new();
