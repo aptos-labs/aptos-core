@@ -2,14 +2,14 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use anyhow::Result;
 use aptos_crypto::player::Player;
-use aptos_dkg::pvss::traits::SubTranscript;
+use aptos_dkg::pvss::traits::Subtranscript;
 use ark_std::rand::{CryptoRng, RngCore};
 use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;
 
 pub trait BatchThresholdEncryption {
     type ThresholdConfig: aptos_crypto::SecretSharingConfig;
-    type SubTranscript: SubTranscript;
+    type SubTranscript: Subtranscript;
 
     /// An encryption key for the scheme. Allows for generating ciphertexts. If we want to actually
     /// deploy this scheme, the functionality here will have to be implemented in the SDK.
@@ -58,13 +58,13 @@ pub trait BatchThresholdEncryption {
 
     fn setup(
         digest_key: &Self::DigestKey,
-        pvss_public_params: &<Self::SubTranscript as SubTranscript>::PublicParameters,
+        pvss_public_params: &<Self::SubTranscript as Subtranscript>::PublicParameters,
         subtranscript_happypath: &Self::SubTranscript,
         subtranscript_slowpath: &Self::SubTranscript,
         tc_happypath: &Self::ThresholdConfig,
         tc_slowpath: &Self::ThresholdConfig,
         current_player: Player,
-        sk_share_decryption_key: &<Self::SubTranscript as SubTranscript>::DecryptPrivKey,
+        sk_share_decryption_key: &<Self::SubTranscript as Subtranscript>::DecryptPrivKey,
     ) -> Result<(
         Self::EncryptionKey,
         Vec<Self::VerificationKey>,

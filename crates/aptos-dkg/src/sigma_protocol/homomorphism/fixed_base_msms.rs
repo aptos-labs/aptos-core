@@ -26,7 +26,8 @@ use std::fmt::Debug;
 /// - A uniform “shape” abstraction for collecting and flattening MSM outputs
 ///   for batch verification in Σ-protocols.
 pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOutput>> {
-    type Scalar: ark_ff::PrimeField; // Probably don't need this, let's keep it for now
+    // Type representing the scalar used in the `MsmInput`s. Convenient to repeat here
+    type Scalar: ark_ff::PrimeField; // Probably need less here but this what it'll be in practice
 
     /// Type representing a single MSM input (a set of bases and scalars). Normally, this would default
     /// to `MsmInput<..., ...>`, but stable Rust does not yet support associated type defaults,
@@ -39,8 +40,7 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
         + Eq;
 
     /// The output type of evaluating an MSM. `Codomain` should equal `CodomainShape<MsmOutput>`, in the current version
-    /// of the code. In a future version where MsmOutput might be an enum (E::G1 or E::G2), Codomain should probably follow suit.
-    /// (TODO: Think this over)
+    /// of the code.
     type MsmOutput: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq + Zero;
 
     /// Represents the **shape** of the homomorphism's output, parameterized by an inner type `T`.

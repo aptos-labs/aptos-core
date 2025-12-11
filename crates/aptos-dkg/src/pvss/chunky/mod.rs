@@ -23,5 +23,3 @@ pub use weighted_transcript::{
 
 #[allow(type_alias_bounds)]
 pub type SignedWeightedTranscript<E: Pairing> = GenericSigning<UnsignedWeightedTranscript<E>>;
-#[allow(type_alias_bounds)]
-pub type SignedUnweightedTranscript<E: Pairing> = GenericSigning<UnsignedUnweightedTranscript<E>>;

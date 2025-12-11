@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    pvss::{test_utils::NoAux, traits::transcript::NonAggregatableTranscript},
+    pvss::{test_utils::NoAux, traits::transcript::HasAggregatableSubtranscript},
     traits::Transcript,
 };
 use aptos_crypto::{
@@ -146,12 +146,18 @@ impl<
 
 // Following the requirements of `Transcript` here
 impl<
-        T: NonAggregatableTranscript<
+        T: HasAggregatableSubtranscript<
             SigningPubKey = bls12381::PublicKey,
             SigningSecretKey = bls12381::PrivateKey,
         >,
-    > NonAggregatableTranscript for GenericSigning<T>
+    > HasAggregatableSubtranscript for GenericSigning<T>
 {
+    type Subtranscript = T::Subtranscript;
+
+    fn get_subtranscript(&self) -> Self::Subtranscript {
+        T::get_subtranscript(&self.trs)
+    }
+
     fn verify<A: Serialize + Clone>(
         &self,
         sc: &Self::SecretSharingConfig,
