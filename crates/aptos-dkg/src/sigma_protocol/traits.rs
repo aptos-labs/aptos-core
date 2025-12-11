@@ -27,7 +27,8 @@ pub trait Trait<C: CurveGroup>:
     fixed_base_msms::Trait<
         Domain: Witness<C::ScalarField>,
         MsmOutput = C,
-        MsmInput: IsMsmInput<Base = C::Affine, Scalar = C::ScalarField>, // need to be a bit specific because this code multiplies scalars and does into_affine(), etc
+        Scalar = C::ScalarField,
+        MsmInput: IsMsmInput<Base = C::Affine, Scalar = C::ScalarField>, // is the last one necessary? // need to be a bit specific because this code multiplies scalars and does into_affine(), etc
     > + Sized
     + CanonicalSerialize
 {
@@ -41,7 +42,7 @@ pub trait Trait<C: CurveGroup>:
         statement: &Self::Codomain,
         cntxt: &Ct, // for SoK purposes
         rng: &mut R,
-    ) -> Proof<C::ScalarField, Self> {
+    ) -> Proof<<<Self as fixed_base_msms::Trait>::MsmInput as IsMsmInput>::Scalar, Self> { // or C::ScalarField
         prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
     }
 
@@ -53,16 +54,13 @@ pub trait Trait<C: CurveGroup>:
         cntxt: &Ct,
     ) -> anyhow::Result<()>
     where
-        H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>, // need this?
+        H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>, // need this because `H` is technically different from `Self` due to lifetime changes
     {
         let msm_terms = self.msm_terms_for_verify::<_, H>(
             public_statement,
             proof,
             cntxt,
         );
-
-        // let msm_result =
-        //     C::msm(msm_terms.bases(), msm_terms.scalars()).expect("Could not compute MSM for verifier");
 
         let msm_result = Self::msm_eval(msm_terms);
         ensure!(msm_result == C::ZERO); // or MsmOutput::zero() ?
@@ -71,23 +69,17 @@ pub trait Trait<C: CurveGroup>:
     }
 
     #[allow(non_snake_case)]
-    fn compute_verifier_challenges<Ct, H>(
+    fn compute_verifier_challenges<Ct>(
         &self,
-        public_statement: &H::Codomain,
-        proof: &Proof<C::ScalarField, H>,
+        public_statement: &Self::Codomain,
+        prover_first_message: &Self::Codomain, // TODO: this input will have to be modified for `compact` proofs; we just need something serializable, could pass `FirstProofItem<F, H>` instead
         cntxt: &Ct,
         number_of_beta_powers: usize,
     ) -> (C::ScalarField, Vec<C::ScalarField>)
     where
         Ct: Serialize,
-        H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>,
+        // H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>, // will probably need this if we use `FirstProofItem<F, H>` instead
     {
-        let prover_first_message = match &proof.first_proof_item {
-            FirstProofItem::Commitment(A) => A,
-            FirstProofItem::Challenge(_) => {
-                panic!("Missing implementation - expected commitment, not challenge")
-            },
-        };
         // --- Fiat–Shamir challenge c ---
         let c = fiat_shamir_challenge_for_sigma_protocol::<_, C::ScalarField, _>(
             cntxt,
@@ -98,7 +90,7 @@ pub trait Trait<C: CurveGroup>:
         );
 
         // --- Random verifier challenge β ---
-        let mut rng = ark_std::rand::thread_rng();
+        let mut rng = ark_std::rand::thread_rng(); // TODO: move this to trait!!
         let beta = C::ScalarField::rand(&mut rng);
         let powers_of_beta = utils::powers(beta, number_of_beta_powers);
 
@@ -114,7 +106,7 @@ pub trait Trait<C: CurveGroup>:
         cntxt: &Ct,
     ) -> Self::MsmInput
     where
-        H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>, // huh?? need this?
+        H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>, // Need this because the lifetime was changed
     {
         let prover_first_message = match &proof.first_proof_item {
             FirstProofItem::Commitment(A) => A,
@@ -123,21 +115,69 @@ pub trait Trait<C: CurveGroup>:
             },
         };
 
-        let number_of_beta_powers = public_statement.clone().into_iter().count(); // hmm maybe pass the into_iter version in combine_msm_terms?
+        let number_of_beta_powers = public_statement.clone().into_iter().count(); // TODO: maybe pass the into_iter version in combine_msm_terms?
 
-        let (c, powers_of_beta) = self.compute_verifier_challenges(public_statement, proof, cntxt, number_of_beta_powers);
+        let (c, powers_of_beta) = self.compute_verifier_challenges(public_statement, prover_first_message, cntxt, number_of_beta_powers);
 
-        let msm_terms_of_response = self.msm_terms(&proof.z);
+        let msm_terms_for_prover_response = self.msm_terms(&proof.z);
 
-        let (bases, scalars) = combine_msm_terms::<C, Self>(
-            msm_terms_of_response.into_iter().collect(),
+        Self::merge_msm_terms(
+            msm_terms_for_prover_response.into_iter().collect(),
             prover_first_message,
             public_statement,
-            powers_of_beta,
+            &powers_of_beta,
             c,
-        );
+        )
+    }
 
-        Self::MsmInput::new(bases, scalars).expect("Something went wrong constructing MSM input")
+    /// The MSM terms of the sigma protocol. Instead of computing the answer, returning the terms in this form.
+    /// This is useful for combining with the MSM terms of other protocols, but note that beta powers are already being
+    /// added here because it's convenient (and slightly faster) to do that when the c factor is being added
+    #[allow(non_snake_case)]
+    fn merge_msm_terms(
+        msm_terms: Vec<Self::MsmInput>,
+        prover_first_message: &Self::Codomain,
+        statement: &Self::Codomain,
+        powers_of_beta: &[C::ScalarField],
+        c: C::ScalarField,
+    ) -> Self::MsmInput
+    {
+        let mut final_basis = Vec::new();
+        let mut final_scalars = Vec::new();
+
+        // Collect all projective points to batch normalize
+        let mut all_points_to_normalize = Vec::new();
+        for (A, P) in prover_first_message.clone().into_iter()
+            .zip(statement.clone().into_iter())
+        {
+            all_points_to_normalize.push(A);
+            all_points_to_normalize.push(P);
+        }
+
+        let affine_points = C::normalize_batch(&all_points_to_normalize);
+        let mut affine_iter = affine_points.into_iter();
+
+        for (term, beta_power) in msm_terms.into_iter().zip(powers_of_beta) {
+            let mut bases = term.bases().to_vec();
+            let mut scalars = term.scalars().to_vec();
+
+            // Multiply scalars by βᶦ
+            for scalar in scalars.iter_mut() {
+                *scalar *= beta_power;
+            }
+
+            // Add prover + statement contributions
+            bases.push(affine_iter.next().unwrap()); // this is the element `A` from the prover's first message
+            bases.push(affine_iter.next().unwrap()); // this is the element `P` from the statement
+
+            scalars.push(- (*beta_power));
+            scalars.push(-c * beta_power);
+
+            final_basis.extend(bases);
+            final_scalars.extend(scalars);
+        }
+
+        Self::MsmInput::new(final_basis, final_scalars).expect("Something went wrong constructing MSM input")
     }
 }
 
@@ -467,54 +507,4 @@ where
         first_proof_item,
         z,
     }
-}
-
-/// The MSM terms of the sigma protocol. Instead of computing the answer, returning the terms in thsi form
-/// is useful for combining with the MSM terms of other protocols, but note that beta powers are already being
-/// added here because it's convenient (and slightly faster) to do that when the c factor is being added
-#[allow(non_snake_case)]
-fn combine_msm_terms<C, H>(
-    // can't we associate M to H?
-    msm_terms: Vec<H::MsmInput>,
-    prover_first_message: &H::Codomain,
-    statement: &H::Codomain,
-    powers_of_beta: Vec<C::ScalarField>,
-    c: C::ScalarField,
-) -> (Vec<C::Affine>, Vec<C::ScalarField>)
-// change the types here??
-where
-    C: CurveGroup,
-    H: fixed_base_msms::Trait<MsmOutput = C>,
-    H::Codomain: Clone + IntoIterator,
-    H::MsmInput: IsMsmInput<Base = C::Affine, Scalar = C::ScalarField>,
-{
-    let mut final_basis = Vec::new();
-    let mut final_scalars = Vec::new();
-
-    for (((term, A), P), beta_power) in msm_terms
-        .into_iter()
-        .zip(prover_first_message.clone().into_iter())
-        .zip(statement.clone().into_iter())
-        .zip(powers_of_beta)
-    {
-        let mut bases = term.bases().to_vec();
-        let mut scalars = term.scalars().to_vec();
-
-        // multiply scalars by βᶦ
-        for scalar in scalars.iter_mut() {
-            *scalar *= beta_power;
-        }
-
-        // add prover + statement contributions
-        bases.push(A.into_affine()); // TODO: batch affine conversion
-        bases.push(P.into_affine()); // TODO: batch affine conversion
-
-        scalars.push(-beta_power);
-        scalars.push(-c * beta_power);
-
-        final_basis.extend(bases);
-        final_scalars.extend(scalars);
-    }
-
-    (final_basis, final_scalars)
 }
