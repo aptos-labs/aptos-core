@@ -37,7 +37,7 @@ use move_vm_runtime::{
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunctionTable,
     AsFunctionValueExtension, AsUnsyncModuleStorage, InstantiatedFunctionLoader,
-    LegacyLoaderConfig, RuntimeEnvironment,
+    InterpreterFunctionCaches, LegacyLoaderConfig, RuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use rayon::prelude::*;
@@ -346,6 +346,7 @@ impl SharedTestingConfig {
                         &mut traversal_context,
                         &mut extensions,
                         &loader,
+                        &mut InterpreterFunctionCaches::new(),
                     )
                 })
         });

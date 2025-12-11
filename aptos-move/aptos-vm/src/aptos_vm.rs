@@ -141,8 +141,8 @@ use move_vm_runtime::{
     execution_tracing::{FullTraceRecorder, NoOpTraceRecorder, TraceRecorder},
     logging::expect_no_verification_errors,
     module_traversal::{TraversalContext, TraversalStorage},
-    InstantiatedFunctionLoader, LegacyLoaderConfig, ModuleStorage, RuntimeEnvironment,
-    ScriptLoader, WithRuntimeEnvironment,
+    InstantiatedFunctionLoader, InterpreterFunctionCaches, LegacyLoaderConfig, ModuleStorage,
+    RuntimeEnvironment, ScriptLoader, WithRuntimeEnvironment,
 };
 use move_vm_types::gas::{DependencyKind, GasMeter, UnmeteredGasMeter};
 use num_cpus;
@@ -193,6 +193,7 @@ macro_rules! dispatch_transaction_arg_validation {
         $loader:expr,
         $gas_meter:expr,
         $traversal_context:expr,
+        $function_caches:ident,
         $serialized_signers:ident,
         $args:expr,
         $function:expr,
@@ -204,6 +205,7 @@ macro_rules! dispatch_transaction_arg_validation {
                 $loader,
                 $gas_meter,
                 $traversal_context,
+                $function_caches,
                 $serialized_signers,
                 $args,
                 $function,
@@ -216,6 +218,7 @@ macro_rules! dispatch_transaction_arg_validation {
                 $loader,
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
+                $function_caches,
                 $serialized_signers,
                 $args,
                 $function,
@@ -569,6 +572,7 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
         traversal_context: &mut TraversalContext,
+        function_caches: &mut InterpreterFunctionCaches,
     ) -> (VMStatus, VMOutput) {
         if self.gas_feature_version() >= 12 {
             // Check if the gas meter's internal counters are consistent.
@@ -618,6 +622,7 @@ impl AptosVM {
                         log_context,
                         change_set_configs,
                         traversal_context,
+                        function_caches,
                     )
                     .unwrap_or_else(|status| discarded_output(status.status_code()));
                 (error_vm_status, output)
@@ -689,6 +694,7 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
         traversal_context: &mut TraversalContext,
+        function_caches: &mut InterpreterFunctionCaches,
     ) -> Result<VMOutput, VMStatus> {
         // Storage refund is zero since no slots are deleted in aborted transactions.
         const ZERO_STORAGE_REFUND: u64 = 0;
@@ -707,6 +713,7 @@ impl AptosVM {
                     gas_meter,
                     txn_data.sender(),
                     traversal_context,
+                    function_caches,
                 )
                 // If this fails, it is likely due to out of gas, so we try again without metering
                 // and then validate below that we charged sufficiently.
@@ -717,6 +724,7 @@ impl AptosVM {
                         &mut UnmeteredGasMeter,
                         txn_data.sender(),
                         traversal_context,
+                        function_caches,
                     )
                 })
                 .map_err(expect_no_verification_errors)
@@ -807,6 +815,7 @@ impl AptosVM {
                 log_context,
                 traversal_context,
                 self.is_simulation,
+                function_caches,
             )
         })?;
         epilogue_session.finish(fee_statement, status, change_set_configs, module_storage)
@@ -822,6 +831,7 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
         traversal_context: &mut TraversalContext,
+        function_caches: &mut InterpreterFunctionCaches,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         if self.gas_feature_version() >= 12 {
             // Check if the gas meter's internal counters are consistent.
@@ -855,6 +865,7 @@ impl AptosVM {
                 log_context,
                 traversal_context,
                 self.is_simulation,
+                function_caches,
             )
         })?;
         let output = epilogue_session.finish(
@@ -878,6 +889,7 @@ impl AptosVM {
         traversal_context: &mut TraversalContext<'a>,
         serialized_script: &'a Script,
         trace_recorder: &mut impl TraceRecorder,
+        function_caches: &mut InterpreterFunctionCaches,
     ) -> Result<(), VMStatus> {
         if !self
             .features()
@@ -915,6 +927,7 @@ impl AptosVM {
                 &loader,
                 gas_meter,
                 traversal_context,
+                function_caches,
                 serialized_signers,
                 convert_txn_args(serialized_script.args()),
                 &func,
@@ -928,6 +941,7 @@ impl AptosVM {
                 traversal_context,
                 &loader,
                 trace_recorder,
+                function_caches,
             )?;
             Ok(())
         })
@@ -942,6 +956,7 @@ impl AptosVM {
         traversal_context: &mut TraversalContext,
         entry_fn: &EntryFunction,
         trace_recorder: &mut impl TraceRecorder,
+        function_caches: &mut InterpreterFunctionCaches,
     ) -> Result<(), VMStatus> {
         dispatch_loader!(module_storage, loader, {
             let legacy_loader_config = LegacyLoaderConfig {
@@ -986,6 +1001,7 @@ impl AptosVM {
                 &loader,
                 gas_meter,
                 traversal_context,
+                function_caches,
                 serialized_signers,
                 entry_fn.args().to_vec(),
                 &function,
@@ -1001,6 +1017,7 @@ impl AptosVM {
                 traversal_context,
                 &loader,
                 trace_recorder,
+                function_caches,
             )?;
             Ok(())
         })
@@ -1019,6 +1036,7 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
         trace_recorder: &mut impl TraceRecorder,
+        function_caches: &mut InterpreterFunctionCaches,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         fail_point!("aptos_vm::execute_script_or_entry_function", |_| {
             Err(VMStatus::Error {
@@ -1044,6 +1062,7 @@ impl AptosVM {
                         traversal_context,
                         script,
                         trace_recorder,
+                        function_caches,
                     )
                 })?;
             },
@@ -1057,6 +1076,7 @@ impl AptosVM {
                         traversal_context,
                         entry_fn,
                         trace_recorder,
+                        function_caches,
                     )
                 })?;
             },
@@ -1094,6 +1114,7 @@ impl AptosVM {
             log_context,
             change_set_configs,
             traversal_context,
+            function_caches,
         )
     }
 
@@ -1175,6 +1196,7 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
         trace_recorder: &mut impl TraceRecorder,
+        function_caches: &mut InterpreterFunctionCaches,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         fail_point!("move_adapter::execute_multisig_transaction", |_| {
             Err(VMStatus::error(
@@ -1236,6 +1258,7 @@ impl AptosVM {
                     gas_meter,
                     traversal_context,
                     module_storage,
+                    function_caches,
                 )
             })?
             .return_values
@@ -1281,6 +1304,7 @@ impl AptosVM {
                     &entry_function,
                     change_set_configs,
                     trace_recorder,
+                    function_caches,
                 ),
         };
 
@@ -1303,6 +1327,7 @@ impl AptosVM {
                 txn_data,
                 cleanup_args,
                 traversal_context,
+                function_caches,
             )?,
             Ok(user_session_change_set) => {
                 // Charge gas for write set before we do cleanup. This ensures we don't charge gas for
@@ -1325,6 +1350,7 @@ impl AptosVM {
                             &mut UnmeteredGasMeter,
                             traversal_context,
                             module_storage,
+                            function_caches,
                         )
                         .map_err(|e| e.into_vm_status())
                 })?;
@@ -1342,6 +1368,7 @@ impl AptosVM {
             log_context,
             change_set_configs,
             traversal_context,
+            function_caches,
         )
     }
 
@@ -1356,6 +1383,7 @@ impl AptosVM {
         payload: &EntryFunction,
         change_set_configs: &ChangeSetConfigs,
         trace_recorder: &mut impl TraceRecorder,
+        function_caches: &mut InterpreterFunctionCaches,
     ) -> Result<UserSessionChangeSet, VMStatus> {
         // If txn args are not valid, we'd still consider the transaction as executed but
         // failed. This is primarily because it's unrecoverable at this point.
@@ -1368,6 +1396,7 @@ impl AptosVM {
                 traversal_context,
                 payload,
                 trace_recorder,
+                function_caches,
             )
         })?;
 
@@ -1392,6 +1421,7 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         mut cleanup_args: Vec<Vec<u8>>,
         traversal_context: &mut TraversalContext,
+        function_caches: &mut InterpreterFunctionCaches,
     ) -> Result<EpilogueSession<'r>, VMStatus> {
         // Start a fresh session for running cleanup that does not contain any changes from
         // the inner function call earlier (since it failed).
@@ -1419,6 +1449,7 @@ impl AptosVM {
                     &mut UnmeteredGasMeter,
                     traversal_context,
                     module_storage,
+                    function_caches,
                 )
                 .map_err(|e| e.into_vm_status())
         })?;
@@ -1771,6 +1802,7 @@ impl AptosVM {
         is_approved_gov_script: bool,
         traversal_context: &mut TraversalContext,
         gas_meter: &mut impl AptosGasMeter,
+        function_caches: &mut InterpreterFunctionCaches,
     ) -> Result<SerializedSigners, VMStatus> {
         // Check transaction format.
         if transaction.contains_duplicate_signers() {
@@ -1835,6 +1867,7 @@ impl AptosVM {
                             auth_data,
                             traversal_context,
                             module_storage,
+                            function_caches,
                         )
                         .map_err(|mut vm_error| {
                             if vm_error.major_status() == OUT_OF_GAS {
@@ -1875,6 +1908,7 @@ impl AptosVM {
                             auth_data,
                             traversal_context,
                             module_storage,
+                            function_caches,
                         )
                         .map_err(|mut vm_error| {
                             if vm_error.major_status() == OUT_OF_GAS {
@@ -1931,6 +1965,7 @@ impl AptosVM {
             log_context,
             is_approved_gov_script,
             traversal_context,
+            function_caches,
         )?;
         Ok(serialized_signers)
     }
@@ -1949,6 +1984,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         change_set_configs: &ChangeSetConfigs,
         traversal_context: &mut TraversalContext,
+        function_caches: &mut InterpreterFunctionCaches,
     ) -> (VMStatus, VMOutput) {
         self.failed_transaction_cleanup(
             prologue_session_change_set,
@@ -1961,6 +1997,7 @@ impl AptosVM {
             log_context,
             change_set_configs,
             traversal_context,
+            function_caches,
         )
     }
 
@@ -1974,6 +2011,7 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         gas_meter: &mut impl AptosGasMeter,
         mut trace_recorder: impl TraceRecorder,
+        function_caches: &mut InterpreterFunctionCaches,
     ) -> (VMStatus, VMOutput) {
         let _timer = VM_TIMER.timer_with_label("AptosVM::execute_user_transaction_impl");
 
@@ -1993,6 +2031,7 @@ impl AptosVM {
                 is_approved_gov_script,
                 &mut traversal_context,
                 gas_meter,
+                function_caches,
             )
         }));
 
@@ -2033,6 +2072,7 @@ impl AptosVM {
                     gas_meter,
                     txn.sender(),
                     &mut traversal_context,
+                    function_caches,
                 ))
             );
         }
@@ -2063,6 +2103,7 @@ impl AptosVM {
                 log_context,
                 change_set_configs,
                 &mut trace_recorder,
+                function_caches,
             )
         } else {
             self.execute_script_or_entry_function(
@@ -2077,6 +2118,7 @@ impl AptosVM {
                 log_context,
                 change_set_configs,
                 &mut trace_recorder,
+                function_caches,
             )
         };
         drop(payload_timer);
@@ -2099,6 +2141,7 @@ impl AptosVM {
                 gas_meter,
                 change_set_configs,
                 &mut traversal_context,
+                function_caches,
             )
         });
 
@@ -2148,6 +2191,7 @@ impl AptosVM {
             code_storage,
         );
 
+        let mut function_caches = InterpreterFunctionCaches::new();
         let (status, output) = if self.should_perform_async_runtime_checks_for_txn(txn) {
             self.execute_user_transaction_impl(
                 resolver,
@@ -2158,6 +2202,7 @@ impl AptosVM {
                 log_context,
                 &mut gas_meter,
                 FullTraceRecorder::new(),
+                &mut function_caches,
             )
         } else {
             self.execute_user_transaction_impl(
@@ -2169,6 +2214,7 @@ impl AptosVM {
                 log_context,
                 &mut gas_meter,
                 NoOpTraceRecorder,
+                &mut function_caches,
             )
         };
 
@@ -2291,6 +2337,7 @@ impl AptosVM {
                     &mut traversal_context,
                     script,
                     &mut NoOpTraceRecorder,
+                    &mut InterpreterFunctionCaches::new(),
                 )?;
 
                 let change_set_configs =
@@ -2430,6 +2477,7 @@ impl AptosVM {
                 &mut gas_meter,
                 &mut traversal_context,
                 module_storage,
+                &mut InterpreterFunctionCaches::new(),
             )
             .map(|_return_vals| ())
             .or_else(|e| {
@@ -2513,6 +2561,7 @@ impl AptosVM {
                 &mut gas_meter,
                 &mut traversal_context,
                 module_storage,
+                &mut InterpreterFunctionCaches::new(),
             )
             .map(|_return_vals| ())
             .or_else(|e| {
@@ -2578,6 +2627,7 @@ impl AptosVM {
                 &mut gas_meter,
                 &mut traversal_context,
                 module_storage,
+                &mut InterpreterFunctionCaches::new(),
             )
             .map(|_return_vals| ())
             .or_else(|e| expect_only_successful_execution(e, BLOCK_EPILOGUE.as_str(), log_context))
@@ -2759,6 +2809,7 @@ impl AptosVM {
                 &loader,
                 // No need to record any traces for view functions.
                 &mut NoOpTraceRecorder,
+                &mut InterpreterFunctionCaches::new(),
             )?;
 
             Ok(result
@@ -2780,6 +2831,7 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         is_approved_gov_script: bool,
         traversal_context: &mut TraversalContext,
+        function_caches: &mut InterpreterFunctionCaches,
     ) -> Result<(), VMStatus> {
         check_gas(
             self.gas_params(log_context)?,
@@ -2815,6 +2867,7 @@ impl AptosVM {
             log_context,
             traversal_context,
             self.is_simulation,
+            function_caches,
         )?;
 
         if let Some(multisig_address) = extra_config.multisig_address() {
@@ -2834,6 +2887,7 @@ impl AptosVM {
                     self.features(),
                     log_context,
                     traversal_context,
+                    function_caches,
                 )?
             }
         }
@@ -3245,6 +3299,7 @@ impl VMValidator for AptosVM {
             is_approved_gov_script,
             &mut TraversalContext::new(&storage),
             &mut gas_meter,
+            &mut InterpreterFunctionCaches::new(),
         ) {
             Err(err) if err.status_code() != StatusCode::SEQUENCE_NUMBER_TOO_NEW => (
                 "failure",
@@ -3341,6 +3396,7 @@ fn create_account_if_does_not_exist(
     gas_meter: &mut impl GasMeter,
     account: AccountAddress,
     traversal_context: &mut TraversalContext,
+    function_caches: &mut InterpreterFunctionCaches,
 ) -> VMResult<()> {
     session.execute_function_bypass_visibility(
         &ACCOUNT_MODULE,
@@ -3350,6 +3406,7 @@ fn create_account_if_does_not_exist(
         gas_meter,
         traversal_context,
         module_storage,
+        function_caches,
     )?;
     Ok(())
 }
@@ -3362,6 +3419,7 @@ fn dispatchable_authenticate(
     auth_data: &AbstractAuthenticationData,
     traversal_context: &mut TraversalContext,
     module_storage: &impl ModuleStorage,
+    function_caches: &mut InterpreterFunctionCaches,
 ) -> VMResult<Vec<u8>> {
     let auth_data = bcs::to_bytes(auth_data).expect("from rust succeeds");
     let mut params = serialize_values(&vec![
@@ -3378,6 +3436,7 @@ fn dispatchable_authenticate(
             gas_meter,
             traversal_context,
             module_storage,
+            function_caches,
         )
         .map(|mut return_vals| {
             assert!(

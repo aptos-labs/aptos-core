@@ -65,7 +65,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
-    ModuleStorage, RuntimeEnvironment, StagingModuleStorage,
+    InterpreterFunctionCaches, ModuleStorage, RuntimeEnvironment, StagingModuleStorage,
 };
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
@@ -457,6 +457,7 @@ fn exec_function_internal(
             &mut UnmeteredGasMeter,
             traversal_context,
             module_storage,
+            &mut InterpreterFunctionCaches::new(),
         )
         .unwrap_or_else(|e| {
             panic!(
