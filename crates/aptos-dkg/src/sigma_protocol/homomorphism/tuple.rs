@@ -348,7 +348,7 @@ where
 
         let mut rng = ark_std::rand::thread_rng(); // TODO: make this part of the function input?
         let beta = H1::Scalar::rand(&mut rng);
-        let len1 = public_statement.0.clone().into_iter().count(); // hmm maybe pass the into_iter version in combine_msm_terms?
+        let len1 = public_statement.0.clone().into_iter().count(); // hmm maybe pass the into_iter version in merge_msm_terms?
         let len2 = public_statement.1.clone().into_iter().count();
         let powers_of_beta = utils::powers(beta, len1 + len2);
         let (first_powers_of_beta, second_powers_of_beta) = powers_of_beta.split_at(len1);
