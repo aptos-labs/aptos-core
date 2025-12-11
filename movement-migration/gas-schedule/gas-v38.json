@@ -427,7 +427,7 @@
     ],
     [
       "txn.max_transaction_size_in_bytes",
-      65536
+      100000000
     ],
     [
       "txn.max_transaction_size_in_bytes.gov",
@@ -523,11 +523,11 @@
     ],
     [
       "txn.max_execution_gas",
-      920000000
+      5000000000
     ],
     [
       "txn.max_execution_gas.gov",
-      4000000000
+      10000000000
     ],
     [
       "txn.max_io_gas",

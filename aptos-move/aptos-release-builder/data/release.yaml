@@ -12,6 +12,4 @@ proposals:
     update_sequence:
       - Gas:
           old: movement-migration/gas-schedule/gas-old-movement.json
-          new: movement-migration/gas-schedule/gas-v36.json
-      - Framework:
-          bytecode_version: 7
+          new: movement-migration/gas-schedule/gas-v38.json
