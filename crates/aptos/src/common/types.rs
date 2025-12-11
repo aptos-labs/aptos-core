@@ -1088,10 +1088,10 @@ pub struct MovePackageDir {
     #[clap(long)]
     pub skip_attribute_checks: bool,
 
-    /// Do apply extended checks for Aptos (e.g. `#[view]` attribute) also on test code.
+    /// Do apply extended checks for Supra (e.g. `#[view]` attribute) also on test code.
     /// NOTE: this behavior will become the default in the future.
     /// See <https://github.com/aptos-labs/aptos-core/issues/10335>
-    #[clap(long, env = "APTOS_CHECK_TEST_CODE")]
+    #[clap(long, env = "SUPRA_CHECK_TEST_CODE")]
     pub check_test_code: bool,
 }
 
