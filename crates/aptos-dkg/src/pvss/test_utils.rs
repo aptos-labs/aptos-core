@@ -4,7 +4,7 @@
 use crate::pvss::{
     traits::{
         transcript::{Transcript, WithMaxNumShares},
-        Convert, HasEncryptionPublicParams, SubTranscript,
+        Convert, HasEncryptionPublicParams, Subtranscript,
     },
     Player, ThresholdConfigBlstrs, WeightedConfigBlstrs,
 };
@@ -342,13 +342,13 @@ where
     T::DealtSecretKey::reconstruct(sc, &players_and_shares).unwrap()
 }
 
-pub fn reconstruct_dealt_secret_key_randomly_subtranscript<R, T: SubTranscript>(
-    sc: &<T as SubTranscript>::SecretSharingConfig,
+pub fn reconstruct_dealt_secret_key_randomly_subtranscript<R, T: Subtranscript>(
+    sc: &<T as Subtranscript>::SecretSharingConfig,
     rng: &mut R,
-    dks: &Vec<<T as SubTranscript>::DecryptPrivKey>,
+    dks: &Vec<<T as Subtranscript>::DecryptPrivKey>,
     trx: T,
-    pp: &<T as SubTranscript>::PublicParameters,
-) -> <T as SubTranscript>::DealtSecretKey
+    pp: &<T as Subtranscript>::PublicParameters,
+) -> <T as Subtranscript>::DealtSecretKey
 where
     R: rand_core::RngCore,
 {
@@ -365,5 +365,5 @@ where
         })
         .collect::<Vec<(Player, T::DealtSecretKeyShare)>>();
 
-    <T as SubTranscript>::DealtSecretKey::reconstruct(sc, &players_and_shares).unwrap()
+    <T as Subtranscript>::DealtSecretKey::reconstruct(sc, &players_and_shares).unwrap()
 }

@@ -4,7 +4,7 @@
 pub mod transcript;
 
 pub use aptos_crypto::arkworks::shamir::Reconstructable;
-pub use transcript::{Aggregatable, AggregatableTranscript, SubTranscript, Transcript};
+pub use transcript::{Aggregatable, AggregatableTranscript, Subtranscript, Transcript};
 
 /// Converts a type `Self` to `ToType` using auxiliary data from type `AuxType`.
 pub trait Convert<ToType, AuxType> {

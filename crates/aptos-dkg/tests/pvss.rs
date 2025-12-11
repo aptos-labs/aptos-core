@@ -24,7 +24,7 @@ use aptos_dkg::pvss::{
     },
     traits::{
         transcript::{HasAggregatableSubtranscript, Transcript, WithMaxNumShares},
-        SubTranscript,
+        Subtranscript,
     },
     GenericWeighting, ThresholdConfigBlstrs,
 };
@@ -254,7 +254,7 @@ fn test_pvss_aggregate_subtranscript_and_decrypt<E: Pairing, T: HasAggregatableS
 ) where
     T: Transcript<SecretSharingConfig = WeightedConfigArkworks<E::ScalarField>>,
     T: HasAggregatableSubtranscript<
-        SubTranscript: Aggregatable<SecretSharingConfig = WeightedConfigArkworks<E::ScalarField>>,
+        Subtranscript: Aggregatable<SecretSharingConfig = WeightedConfigArkworks<E::ScalarField>>,
     >,
 {
     let mut rng = StdRng::from_seed(seed_bytes); // deterministic rng

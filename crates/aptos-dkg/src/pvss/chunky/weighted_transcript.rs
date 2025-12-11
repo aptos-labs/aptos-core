@@ -114,9 +114,9 @@ type SecretSharingConfig<E: Pairing> = WeightedConfigArkworks<E::ScalarField>;
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
     HasAggregatableSubtranscript for Transcript<E>
 {
-    type SubTranscript = SubTranscript<E>;
+    type Subtranscript = SubTranscript<E>;
 
-    fn get_subtranscript(&self) -> Self::SubTranscript {
+    fn get_subtranscript(&self) -> Self::Subtranscript {
         self.subtrs.clone()
     }
 
@@ -279,7 +279,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
     }
 }
 
-impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::SubTranscript
+impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Subtranscript
     for SubTranscript<E>
 {
     type DealtPubKey = keys::DealtPubKey<E>;

@@ -107,7 +107,7 @@ pub fn subaggregatable_pvss_group<T: HasAggregatableSubtranscript + MalleableTra
 ) -> DealingArgs<T>
 where
     T: HasAggregatableSubtranscript<
-        SubTranscript: Aggregatable<SecretSharingConfig = <T as Transcript>::SecretSharingConfig>,
+        Subtranscript: Aggregatable<SecretSharingConfig = <T as Transcript>::SecretSharingConfig>,
     >,
 {
     let name = T::scheme_name();
@@ -220,7 +220,7 @@ fn pvss_subaggregate<T: Transcript + HasAggregatableSubtranscript, M: Measuremen
     g: &mut BenchmarkGroup<M>,
 ) where
     T: HasAggregatableSubtranscript<
-        SubTranscript: Aggregatable<SecretSharingConfig = <T as Transcript>::SecretSharingConfig>,
+        Subtranscript: Aggregatable<SecretSharingConfig = <T as Transcript>::SecretSharingConfig>,
     >,
 {
     g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));

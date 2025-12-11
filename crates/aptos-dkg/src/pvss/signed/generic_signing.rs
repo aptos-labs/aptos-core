@@ -152,9 +152,9 @@ impl<
         >,
     > HasAggregatableSubtranscript for GenericSigning<T>
 {
-    type SubTranscript = T::SubTranscript;
+    type Subtranscript = T::Subtranscript;
 
-    fn get_subtranscript(&self) -> Self::SubTranscript {
+    fn get_subtranscript(&self) -> Self::Subtranscript {
         T::get_subtranscript(&self.trs)
     }
 

@@ -61,7 +61,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, ops::AddAssign};
 
 // TODO: get rid of all the copy-paste here
-pub trait SubTranscript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
+pub trait Subtranscript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     type PublicParameters: HasEncryptionPublicParams
         + WithMaxNumShares
         + Default
@@ -294,8 +294,8 @@ pub trait AggregatableTranscript:
 }
 
 pub trait HasAggregatableSubtranscript: Transcript {
-    type SubTranscript: Aggregatable
-        + SubTranscript<
+    type Subtranscript: Aggregatable
+        + Subtranscript<
             PublicParameters = Self::PublicParameters,
             SecretSharingConfig = Self::SecretSharingConfig,
             DealtPubKeyShare = Self::DealtPubKeyShare,
@@ -306,7 +306,7 @@ pub trait HasAggregatableSubtranscript: Transcript {
             DecryptPrivKey = Self::DecryptPrivKey,
         >;
 
-    fn get_subtranscript(&self) -> Self::SubTranscript;
+    fn get_subtranscript(&self) -> Self::Subtranscript;
 
     fn verify<A: Serialize + Clone>(
         &self,

@@ -114,7 +114,7 @@ impl<E: Pairing> TryFrom<&[u8]> for SubTranscript<E> {
 }
 
 // TODO: Copy-paste ewww
-impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::SubTranscript
+impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Subtranscript
     for SubTranscript<E>
 {
     type DealtPubKey = keys::DealtPubKey<E>;
@@ -188,9 +188,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
     HasAggregatableSubtranscript for Transcript<E>
 {
-    type SubTranscript = SubTranscript<E>;
+    type Subtranscript = SubTranscript<E>;
 
-    fn get_subtranscript(&self) -> Self::SubTranscript {
+    fn get_subtranscript(&self) -> Self::Subtranscript {
         self.utrs.subtranscript.clone()
     }
 
@@ -705,13 +705,13 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         player: &Player,
     ) -> Self::DealtPubKeyShare {
         // local use here since we have a `SubTranscript` struct in this file
-        use traits::SubTranscript;
+        use traits::Subtranscript;
         self.utrs.subtranscript.get_public_key_share(_sc, &player)
     }
 
     fn get_dealt_public_key(&self) -> Self::DealtPubKey {
         // local use here since we have a `SubTranscript` struct in this file
-        use traits::SubTranscript;
+        use traits::Subtranscript;
         self.utrs.subtranscript.get_dealt_public_key()
     }
 
@@ -724,7 +724,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
         // local use here since we have a `SubTranscript` struct in this file
-        use traits::SubTranscript;
+        use traits::Subtranscript;
         self.utrs
             .subtranscript
             .decrypt_own_share(_sc, player, dk, pp)
