@@ -115,12 +115,7 @@ impl<G> GasProfiler<G> {
             intrinsic_cost: None,
             keyless_cost: None,
             dependencies: vec![],
-            frames: vec![CallFrame::new_function(
-                module_id,
-                func_name,
-                ty_args,
-                vec![],
-            )],
+            frames: vec![CallFrame::new_function(module_id, func_name, ty_args)],
             transaction_transient: None,
             events_transient: vec![],
             write_set_transient: vec![],
@@ -417,7 +412,6 @@ where
             module_id,
             fn_name: name,
             ty_args,
-            args: frame.args,
             cost,
         });
 
@@ -481,12 +475,6 @@ where
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
         num_locals: NumArgs,
     ) -> PartialVMResult<()> {
-        // Capture arguments
-        let arg_strings = args
-            .clone()
-            .map(|arg| format!("{:?}", arg))
-            .collect::<Vec<_>>();
-
         let (cost, res) =
             self.delegate_charge(|base| base.charge_call(module_id, func_name, args, num_locals));
 
@@ -495,7 +483,6 @@ where
             module_id.clone(),
             Identifier::new(func_name).unwrap(),
             vec![],
-            arg_strings,
         ));
 
         res
@@ -514,12 +501,6 @@ where
             .map(|ty| ty.to_type_tag())
             .collect::<Vec<_>>();
 
-        // Capture arguments
-        let arg_strings = args
-            .clone()
-            .map(|arg| format!("{:?}", arg))
-            .collect::<Vec<_>>();
-
         let (cost, res) = self.delegate_charge(|base| {
             base.charge_call_generic(module_id, func_name, ty_args, args, num_locals)
         });
@@ -529,7 +510,6 @@ where
             module_id.clone(),
             Identifier::new(func_name).unwrap(),
             ty_tags,
-            arg_strings,
         ));
 
         res
