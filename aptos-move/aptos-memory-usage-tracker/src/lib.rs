@@ -4,7 +4,7 @@
 use aptos_gas_algebra::{
     AbstractValueSize, Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes, NumTypeNodes,
 };
-use aptos_gas_meter::{AptosGasMeter, CacheValueSizes};
+use aptos_gas_meter::{AptosGasMeter, CacheValueSizes, PeakMemoryUsage};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS, contract_event::ContractEvent,
     state_store::state_key::StateKey, write_set::WriteOpSize,
@@ -22,34 +22,31 @@ use move_vm_types::{
     views::{TypeView, ValueView},
 };
 
-/// Special gas meter implementation that tracks the VM's memory usage based on the operations
-/// executed.
-///
-/// Must be composed with a base gas meter.
-pub struct MemoryTrackedGasMeter<G> {
-    base: G,
-
-    memory_quota: AbstractValueSize,
-    should_leak_memory_for_native: bool,
+pub trait MemoryAlgebra {
+    fn new(memory_quota: AbstractValueSize, feature_version: u64) -> Self;
+    fn use_heap_memory(&mut self, amount: AbstractValueSize) -> PartialVMResult<()>;
+    fn release_heap_memory(&mut self, amount: AbstractValueSize);
+    fn current_memory_usage(&self) -> AbstractValueSize;
 }
 
-impl<G> MemoryTrackedGasMeter<G>
-where
-    G: AptosGasMeter + CacheValueSizes,
-{
-    pub fn new(base: G) -> Self {
-        let memory_quota = base.vm_gas_params().txn.memory_quota;
+pub struct StandardMemoryAlgebra {
+    initial_memory_quota: AbstractValueSize,
+    memory_quota: AbstractValueSize,
+    feature_version: u64,
+}
 
+impl MemoryAlgebra for StandardMemoryAlgebra {
+    fn new(memory_quota: AbstractValueSize, feature_version: u64) -> Self {
         Self {
-            base,
+            initial_memory_quota: memory_quota,
             memory_quota,
-            should_leak_memory_for_native: false,
+            feature_version,
         }
     }
 
     #[inline]
     fn use_heap_memory(&mut self, amount: AbstractValueSize) -> PartialVMResult<()> {
-        if self.feature_version() >= 3 {
+        if self.feature_version >= 3 {
             match self.memory_quota.checked_sub(amount) {
                 Some(remaining_quota) => {
                     self.memory_quota = remaining_quota;
@@ -67,9 +64,106 @@ where
 
     #[inline]
     fn release_heap_memory(&mut self, amount: AbstractValueSize) {
-        if self.feature_version() >= 3 {
+        if self.feature_version >= 3 {
             self.memory_quota += amount;
         }
+    }
+
+    #[inline]
+    fn current_memory_usage(&self) -> AbstractValueSize {
+        match self.initial_memory_quota.checked_sub(self.memory_quota) {
+            Some(usage) => usage,
+            None => AbstractValueSize::zero(),
+            // Note: It's possible for the available memory quota to rise above the initial quota
+            //       under rare circumstances (e.g. values not being tracked initially).
+            //       In such cases, just treat the usage as 0.
+        }
+    }
+}
+
+pub struct ExtendedMemoryAlgebra {
+    base: StandardMemoryAlgebra,
+    peak_memory_usage: AbstractValueSize,
+}
+
+impl ExtendedMemoryAlgebra {
+    #[inline]
+    fn update_peak_memory_usage(&mut self) {
+        self.peak_memory_usage = self.base.current_memory_usage().max(self.peak_memory_usage);
+    }
+}
+
+impl MemoryAlgebra for ExtendedMemoryAlgebra {
+    fn new(memory_quota: AbstractValueSize, feature_version: u64) -> Self {
+        Self {
+            base: StandardMemoryAlgebra::new(memory_quota, feature_version),
+            peak_memory_usage: AbstractValueSize::zero(),
+        }
+    }
+
+    #[inline]
+    fn use_heap_memory(&mut self, amount: AbstractValueSize) -> PartialVMResult<()> {
+        let res = self.base.use_heap_memory(amount);
+        self.update_peak_memory_usage();
+        res
+    }
+
+    #[inline]
+    fn release_heap_memory(&mut self, amount: AbstractValueSize) {
+        self.base.release_heap_memory(amount);
+        self.update_peak_memory_usage();
+    }
+
+    #[inline]
+    fn current_memory_usage(&self) -> AbstractValueSize {
+        self.base.current_memory_usage()
+    }
+}
+
+/// Special gas meter implementation that tracks the VM's memory usage based on the operations
+/// executed.
+///
+/// Must be composed with a base gas meter.
+pub struct MemoryTrackedGasMeterImpl<G, A> {
+    base: G,
+
+    algebra: A,
+    should_leak_memory_for_native: bool,
+}
+
+pub type MemoryTrackedGasMeter<G> = MemoryTrackedGasMeterImpl<G, StandardMemoryAlgebra>;
+pub type ExtendedMemoryTrackedGasMeter<G> = MemoryTrackedGasMeterImpl<G, ExtendedMemoryAlgebra>;
+
+impl<G> PeakMemoryUsage for ExtendedMemoryTrackedGasMeter<G> {
+    fn peak_memory_usage(&self) -> AbstractValueSize {
+        self.algebra.peak_memory_usage
+    }
+}
+
+impl<G, A> MemoryTrackedGasMeterImpl<G, A>
+where
+    G: AptosGasMeter + CacheValueSizes,
+    A: MemoryAlgebra,
+{
+    pub fn new(base: G) -> Self {
+        let memory_quota = base.vm_gas_params().txn.memory_quota;
+        let feature_version = base.feature_version();
+
+        Self {
+            base,
+            algebra: A::new(memory_quota, feature_version),
+            should_leak_memory_for_native: false,
+        }
+    }
+
+    #[inline]
+    fn use_heap_memory(&mut self, amount: AbstractValueSize) -> PartialVMResult<()> {
+        self.algebra.use_heap_memory(amount)
+    }
+
+    #[inline]
+    fn release_heap_memory(&mut self, amount: AbstractValueSize) {
+        self.algebra.release_heap_memory(amount);
     }
 }
 
@@ -96,18 +190,20 @@ macro_rules! delegate_mut {
     };
 }
 
-impl<G> DependencyGasMeter for MemoryTrackedGasMeter<G>
+impl<G, A> DependencyGasMeter for MemoryTrackedGasMeterImpl<G, A>
 where
     G: AptosGasMeter,
+    A: MemoryAlgebra,
 {
     delegate_mut! {
         fn charge_dependency(&mut self, kind: DependencyKind, addr: &AccountAddress, name: &IdentStr, size: NumBytes) -> PartialVMResult<()>;
     }
 }
 
-impl<G> NativeGasMeter for MemoryTrackedGasMeter<G>
+impl<G, A> NativeGasMeter for MemoryTrackedGasMeterImpl<G, A>
 where
     G: AptosGasMeter + CacheValueSizes,
+    A: MemoryAlgebra,
 {
     delegate! {
         fn legacy_gas_budget_in_native_context(&self) -> InternalGas;
@@ -123,9 +219,10 @@ where
     }
 }
 
-impl<G> GasMeter for MemoryTrackedGasMeter<G>
+impl<G, A> GasMeter for MemoryTrackedGasMeterImpl<G, A>
 where
     G: AptosGasMeter + CacheValueSizes,
+    A: MemoryAlgebra,
 {
     delegate_mut! {
         fn charge_simple_instr(&mut self, instr: SimpleInstruction) -> PartialVMResult<()>;
@@ -540,9 +637,10 @@ where
     }
 }
 
-impl<G> CacheValueSizes for MemoryTrackedGasMeter<G>
+impl<G, A> CacheValueSizes for MemoryTrackedGasMeterImpl<G, A>
 where
     G: AptosGasMeter + CacheValueSizes,
+    A: MemoryAlgebra,
 {
     #[inline]
     fn charge_read_ref_cached(
@@ -567,9 +665,10 @@ where
     }
 }
 
-impl<G> AptosGasMeter for MemoryTrackedGasMeter<G>
+impl<G, A> AptosGasMeter for MemoryTrackedGasMeterImpl<G, A>
 where
     G: AptosGasMeter + CacheValueSizes,
+    A: MemoryAlgebra,
 {
     type Algebra = G::Algebra;
 

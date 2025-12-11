@@ -10,4 +10,4 @@ mod traits;
 
 pub use algebra::StandardGasAlgebra;
 pub use meter::StandardGasMeter;
-pub use traits::{AptosGasMeter, CacheValueSizes, GasAlgebra};
+pub use traits::{AptosGasMeter, CacheValueSizes, GasAlgebra, PeakMemoryUsage};
