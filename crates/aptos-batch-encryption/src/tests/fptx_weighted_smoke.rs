@@ -110,8 +110,8 @@ fn weighted_smoke_with_setup_for_testing() {
     );
 }
 
-type T = aptos_dkg::pvss::chunky::UnsignedWeightedTranscript<crate::group::Pairing>;
-type C = WeightedConfigArkworks<Fr>;
+type T = aptos_dkg::pvss::chunky::SignedWeightedTranscript<crate::group::Pairing>;
+// type C = WeightedConfigArkworks<Fr>;
 use crate::group::{Fr, G2Affine};
 use aptos_crypto::{SigningKey, Uniform};
 use aptos_dkg::pvss::{
@@ -158,7 +158,7 @@ fn weighted_smoke_with_pvss() {
         .collect();
 
     // Test dealing
-    let subtrx_happypaths: Vec<<T as HasAggregatableSubtranscript<C>>::SubTranscript> = secrets
+    let subtrx_happypaths: Vec<<T as HasAggregatableSubtranscript>::SubTranscript> = secrets
         .iter()
         .enumerate()
         .map(|(i, s)| {
@@ -177,7 +177,7 @@ fn weighted_smoke_with_pvss() {
         })
         .collect();
 
-    let subtrx_slowpaths: Vec<<T as HasAggregatableSubtranscript<C>>::SubTranscript> = secrets
+    let subtrx_slowpaths: Vec<<T as HasAggregatableSubtranscript>::SubTranscript> = secrets
         .iter()
         .enumerate()
         .map(|(i, s)| {

@@ -192,12 +192,14 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
     }
 }
 
-impl<T: AggregatableTranscript<SecretSharingConfig = ThresholdConfigBlstrs>> AggregatableTranscript
-    for GenericWeighting<T>
+impl<T: AggregatableTranscript> AggregatableTranscript for GenericWeighting<T>
+where
+    T: Aggregatable<SecretSharingConfig = ThresholdConfigBlstrs>,
+    T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>,
 {
     fn verify<A: Serialize + Clone>(
         &self,
-        sc: &Self::SecretSharingConfig,
+        sc: &<Self as Transcript>::SecretSharingConfig,
         pp: &Self::PublicParameters,
         spk: &[Self::SigningPubKey],
         eks: &[Self::EncryptPubKey],
@@ -216,10 +218,14 @@ impl<T: AggregatableTranscript<SecretSharingConfig = ThresholdConfigBlstrs>> Agg
     }
 }
 
-impl<T> Aggregatable<WeightedConfig<ThresholdConfigBlstrs>> for GenericWeighting<T>
+impl<T> Aggregatable for GenericWeighting<T>
 where
-    T: AggregatableTranscript + Transcript<SecretSharingConfig = ThresholdConfigBlstrs>,
+    T: AggregatableTranscript
+        + Aggregatable<SecretSharingConfig = ThresholdConfigBlstrs>
+        + Transcript<SecretSharingConfig = ThresholdConfigBlstrs>,
 {
+    type SecretSharingConfig = WeightedConfig<ThresholdConfigBlstrs>;
+
     fn aggregate_with(
         &mut self,
         sc: &WeightedConfig<ThresholdConfigBlstrs>,

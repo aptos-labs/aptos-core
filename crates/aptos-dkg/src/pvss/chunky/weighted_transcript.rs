@@ -15,7 +15,7 @@ use crate::{
         },
         traits::{
             self,
-            transcript::{Aggregatable, MalleableTranscript, HasAggregatableSubtranscript},
+            transcript::{Aggregatable, HasAggregatableSubtranscript, MalleableTranscript},
             HasEncryptionPublicParams,
         },
         Player,
@@ -112,7 +112,7 @@ impl<E: Pairing> TryFrom<&[u8]> for SubTranscript<E> {
 type SecretSharingConfig<E: Pairing> = WeightedConfigArkworks<E::ScalarField>;
 
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
-    HasAggregatableSubtranscript<SecretSharingConfig<E>> for Transcript<E>
+    HasAggregatableSubtranscript for Transcript<E>
 {
     type SubTranscript = SubTranscript<E>;
 
@@ -373,7 +373,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     }
 }
 
-impl<E: Pairing> Aggregatable<SecretSharingConfig<E>> for SubTranscript<E> {
+impl<E: Pairing> Aggregatable for SubTranscript<E> {
+    type SecretSharingConfig = SecretSharingConfig<E>;
+
     #[allow(non_snake_case)]
     fn aggregate_with(&mut self, sc: &SecretSharingConfig<E>, other: &Self) -> anyhow::Result<()> {
         debug_assert_eq!(self.Cs.len(), sc.get_total_num_players());

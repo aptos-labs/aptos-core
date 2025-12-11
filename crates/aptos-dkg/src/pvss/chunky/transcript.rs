@@ -26,7 +26,7 @@ use crate::{
         homomorphism::{tuple::TupleCodomainShape, Trait as _},
         traits::Trait as _,
     },
-    traits::transcript::{HasAggregatableSubtranscript},
+    traits::transcript::HasAggregatableSubtranscript,
     Scalar,
 };
 use anyhow::bail;
@@ -186,7 +186,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 }
 
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
-    HasAggregatableSubtranscript<SecretSharingConfig<E::ScalarField>> for Transcript<E>
+    HasAggregatableSubtranscript for Transcript<E>
 {
     type SubTranscript = SubTranscript<E>;
 
@@ -411,7 +411,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
     }
 }
 
-impl<E: Pairing> Aggregatable<SecretSharingConfig<E::ScalarField>> for SubTranscript<E> {
+impl<E: Pairing> Aggregatable for SubTranscript<E> {
+    type SecretSharingConfig = SecretSharingConfig<E::ScalarField>;
+
     fn aggregate_with(
         &mut self,
         sc: &SecretSharingConfig<E::ScalarField>,

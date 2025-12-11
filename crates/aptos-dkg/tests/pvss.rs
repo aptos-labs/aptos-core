@@ -23,9 +23,7 @@ use aptos_dkg::pvss::{
         reconstruct_dealt_secret_key_randomly, NoAux,
     },
     traits::{
-        transcript::{
-            HasAggregatableSubtranscript, Transcript, WithMaxNumShares,
-        },
+        transcript::{HasAggregatableSubtranscript, Transcript, WithMaxNumShares},
         SubTranscript,
     },
     GenericWeighting, ThresholdConfigBlstrs,
@@ -69,15 +67,15 @@ fn test_pvss_all_unweighted() {
         type ChunkyTranscriptBn254 = chunky::UnsignedUnweightedTranscript<ark_bn254::Bn254>;
 
         // Chunky
-        nonaggregatable_pvss_deal_verify_and_reconstruct::<<ChunkyTranscriptBn254 as Transcript>::SecretSharingConfig, ChunkyTranscriptBn254>(
-            &tc,
-            seed.to_bytes_le(),
-        );
-
-        pvss_deal_verify_and_reconstruct_from_subtranscript::<
+        nonaggregatable_pvss_deal_verify_and_reconstruct::<
             <ChunkyTranscriptBn254 as Transcript>::SecretSharingConfig,
             ChunkyTranscriptBn254,
         >(&tc, seed.to_bytes_le());
+
+        pvss_deal_verify_and_reconstruct_from_subtranscript::<ChunkyTranscriptBn254>(
+            &tc,
+            seed.to_bytes_le(),
+        );
     }
 }
 
@@ -211,7 +209,7 @@ fn print_transcript_size<T: Transcript>(size_type: &str, sc: &T::SecretSharingCo
 ///  3. Ensures the a sufficiently-large random subset of the players can recover the dealt secret
 #[cfg(test)]
 fn pvss_deal_verify_and_reconstruct<T: AggregatableTranscript>(
-    sc: &T::SecretSharingConfig,
+    sc: &<T as Transcript>::SecretSharingConfig,
     seed_bytes: [u8; 32],
 ) {
     // println!();
@@ -250,13 +248,15 @@ use aptos_dkg::pvss::traits::transcript::Aggregatable;
 
 #[cfg(test)]
 #[allow(dead_code)]
-fn test_pvss_aggregate_subtranscript_and_decrypt<
-    E: Pairing,
-    T: HasAggregatableSubtranscript<WeightedConfigArkworks<E::ScalarField>>
->(
+fn test_pvss_aggregate_subtranscript_and_decrypt<E: Pairing, T: HasAggregatableSubtranscript>(
     sc: &WeightedConfigArkworks<E::ScalarField>,
     seed_bytes: [u8; 32],
-) {
+) where
+    T: Transcript<SecretSharingConfig = WeightedConfigArkworks<E::ScalarField>>,
+    T: HasAggregatableSubtranscript<
+        SubTranscript: Aggregatable<SecretSharingConfig = WeightedConfigArkworks<E::ScalarField>>,
+    >,
+{
     let mut rng = StdRng::from_seed(seed_bytes); // deterministic rng
                                                  //let mut rng = rand::thread_rng();
 
@@ -293,7 +293,7 @@ fn test_pvss_aggregate_subtranscript_and_decrypt<
 }
 
 #[cfg(test)]
-fn nonaggregatable_pvss_deal_verify_and_reconstruct<C, T: HasAggregatableSubtranscript<C>>(
+fn nonaggregatable_pvss_deal_verify_and_reconstruct<C, T: HasAggregatableSubtranscript>(
     sc: &T::SecretSharingConfig,
     seed_bytes: [u8; 32],
 ) {
@@ -334,11 +334,13 @@ use ark_ec::pairing::Pairing;
 #[cfg(test)]
 fn nonaggregatable_weighted_pvss_deal_verify_and_reconstruct<
     E: Pairing,
-    T: HasAggregatableSubtranscript<WeightedConfigArkworks<E::ScalarField>>,
+    T: HasAggregatableSubtranscript,
 >(
     sc: &WeightedConfigArkworks<E::ScalarField>,
     seed_bytes: [u8; 32],
-) {
+) where
+    T: Transcript<SecretSharingConfig = WeightedConfigArkworks<E::ScalarField>>,
+{
     // println!();
     // println!("Seed: {}", hex::encode(seed_bytes.as_slice()));
     let mut rng = StdRng::from_seed(seed_bytes);
@@ -373,8 +375,7 @@ fn nonaggregatable_weighted_pvss_deal_verify_and_reconstruct<
 
 #[cfg(test)]
 fn pvss_deal_verify_and_reconstruct_from_subtranscript<
-    C: SecretSharingConfig,
-    T: Transcript<SecretSharingConfig = C> + HasAggregatableSubtranscript<C>,
+    T: Transcript + HasAggregatableSubtranscript,
 >(
     sc: &T::SecretSharingConfig,
     seed_bytes: [u8; 32],

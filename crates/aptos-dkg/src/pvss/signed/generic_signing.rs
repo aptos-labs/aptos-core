@@ -145,12 +145,12 @@ impl<
 }
 
 // Following the requirements of `Transcript` here
-impl<C, 
-        T: HasAggregatableSubtranscript<C, 
+impl<
+        T: HasAggregatableSubtranscript<
             SigningPubKey = bls12381::PublicKey,
             SigningSecretKey = bls12381::PrivateKey,
         >,
-    > HasAggregatableSubtranscript<C> for GenericSigning<T>
+    > HasAggregatableSubtranscript for GenericSigning<T>
 {
     type SubTranscript = T::SubTranscript;
 

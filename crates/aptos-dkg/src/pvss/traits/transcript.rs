@@ -246,14 +246,21 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare);
 }
 
-pub trait Aggregatable<C>: Sized {
-    // Sized was somehow needed for the type alias below
+pub trait Aggregatable: Sized {
+    // Rename this?
+    type SecretSharingConfig;
+
+    // Sized was needed for `Vec<Self>`
     /// Aggregates two transcripts using a generic config type.
-    fn aggregate_with(&mut self, sc: &C, other: &Self) -> anyhow::Result<()>;
+    fn aggregate_with(
+        &mut self,
+        sc: &Self::SecretSharingConfig,
+        other: &Self,
+    ) -> anyhow::Result<()>;
 
     /// Helper function for aggregating a vector of transcripts.
     /// Used primarily for benchmarks and tests.
-    fn aggregate(sc: &C, mut trxs: Vec<Self>) -> anyhow::Result<Self> {
+    fn aggregate(sc: &Self::SecretSharingConfig, mut trxs: Vec<Self>) -> anyhow::Result<Self> {
         if trxs.is_empty() {
             bail!("Cannot aggregate empty vector of transcripts");
         }
@@ -273,12 +280,12 @@ pub trait Aggregatable<C>: Sized {
 }
 
 pub trait AggregatableTranscript:
-    Transcript + Aggregatable<<Self as Transcript>::SecretSharingConfig>
+    Transcript + Aggregatable<SecretSharingConfig = <Self as Transcript>::SecretSharingConfig>
 {
     // The signature here is slightly different from `NonAggregatableTranscript`, because our aggregatable PVSSs needs all of the session ids
     fn verify<A: Serialize + Clone>(
         &self,
-        sc: &Self::SecretSharingConfig,
+        sc: &<Self as Transcript>::SecretSharingConfig,
         pp: &Self::PublicParameters,
         spks: &[Self::SigningPubKey],
         eks: &[Self::EncryptPubKey],
@@ -286,8 +293,8 @@ pub trait AggregatableTranscript:
     ) -> anyhow::Result<()>;
 }
 
-pub trait HasAggregatableSubtranscript<C>: Transcript {
-    type SubTranscript: Aggregatable<C>
+pub trait HasAggregatableSubtranscript: Transcript {
+    type SubTranscript: Aggregatable
         + SubTranscript<
             PublicParameters = Self::PublicParameters,
             SecretSharingConfig = Self::SecretSharingConfig,
