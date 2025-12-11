@@ -24,7 +24,7 @@ use aptos_dkg::pvss::{
     },
     traits::{
         transcript::{
-            HasAggregatableSubtranscript, NonAggregatableTranscript, Transcript, WithMaxNumShares,
+            HasAggregatableSubtranscript, Transcript, WithMaxNumShares,
         },
         SubTranscript,
     },
@@ -69,7 +69,7 @@ fn test_pvss_all_unweighted() {
         type ChunkyTranscriptBn254 = chunky::UnsignedUnweightedTranscript<ark_bn254::Bn254>;
 
         // Chunky
-        nonaggregatable_pvss_deal_verify_and_reconstruct::<ChunkyTranscriptBn254>(
+        nonaggregatable_pvss_deal_verify_and_reconstruct::<<ChunkyTranscriptBn254 as Transcript>::SecretSharingConfig, ChunkyTranscriptBn254>(
             &tc,
             seed.to_bytes_le(),
         );
@@ -253,7 +253,6 @@ use aptos_dkg::pvss::traits::transcript::Aggregatable;
 fn test_pvss_aggregate_subtranscript_and_decrypt<
     E: Pairing,
     T: HasAggregatableSubtranscript<WeightedConfigArkworks<E::ScalarField>>
-        + NonAggregatableTranscript<SecretSharingConfig = WeightedConfigArkworks<E::ScalarField>>,
 >(
     sc: &WeightedConfigArkworks<E::ScalarField>,
     seed_bytes: [u8; 32],
@@ -294,7 +293,7 @@ fn test_pvss_aggregate_subtranscript_and_decrypt<
 }
 
 #[cfg(test)]
-fn nonaggregatable_pvss_deal_verify_and_reconstruct<T: NonAggregatableTranscript>(
+fn nonaggregatable_pvss_deal_verify_and_reconstruct<C, T: HasAggregatableSubtranscript<C>>(
     sc: &T::SecretSharingConfig,
     seed_bytes: [u8; 32],
 ) {
@@ -335,7 +334,7 @@ use ark_ec::pairing::Pairing;
 #[cfg(test)]
 fn nonaggregatable_weighted_pvss_deal_verify_and_reconstruct<
     E: Pairing,
-    T: NonAggregatableTranscript<SecretSharingConfig = WeightedConfigArkworks<E::ScalarField>>,
+    T: HasAggregatableSubtranscript<WeightedConfigArkworks<E::ScalarField>>,
 >(
     sc: &WeightedConfigArkworks<E::ScalarField>,
     seed_bytes: [u8; 32],

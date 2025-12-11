@@ -27,7 +27,7 @@ use std::fmt::Debug;
 ///   for batch verification in Σ-protocols.
 pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOutput>> {
     // Type representing the scalar used in the `MsmInput`s. Convenient to repeat here
-    type Scalar: ark_ff::PrimeField;
+    type Scalar: ark_ff::PrimeField; // Probably need less here but this what it'll be in practice
 
     /// Type representing a single MSM input (a set of bases and scalars). Normally, this would default
     /// to `MsmInput<..., ...>`, but stable Rust does not yet support associated type defaults,

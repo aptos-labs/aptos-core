@@ -66,6 +66,6 @@ impl<C: CurveGroup> fixed_base_msms::Trait for Homomorphism<C> {
     }
 
     fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
-        input.bases()[0] * &input.scalars()[0]
+        input.bases()[0] * input.scalars()[0]
     }
 }

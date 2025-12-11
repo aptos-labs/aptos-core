@@ -41,6 +41,7 @@ pub type Homomorphism<'a, E> = PairingTupleHomomorphism<
     LiftedHkzgElgamalHomomorphism<'a, E>,
     LiftedCommitHomomorphism<<E as Pairing>::G2>,
 >;
+#[allow(dead_code)]
 pub type Proof<'a, E> = sigma_protocol::Proof<<E as Pairing>::ScalarField, Homomorphism<'a, E>>;
 
 #[allow(non_snake_case)]

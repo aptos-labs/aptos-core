@@ -16,7 +16,7 @@ use aptos_dkg::{
         },
         traits::transcript::{
             Aggregatable, AggregatableTranscript, HasAggregatableSubtranscript,
-            MalleableTranscript, NonAggregatableTranscript, Transcript, WithMaxNumShares,
+            MalleableTranscript, Transcript, WithMaxNumShares,
         },
         LowDegreeTest, WeightedConfigBlstrs,
     },
@@ -106,8 +106,7 @@ pub fn aggregatable_pvss_group<T: AggregatableTranscript + MalleableTranscript>(
 // TODO: combine with function above, rather than copy-paste
 pub fn subaggregatable_pvss_group<
     C: SecretSharingConfig,
-    T: NonAggregatableTranscript
-        + HasAggregatableSubtranscript<C>
+    T: HasAggregatableSubtranscript<C>
         + MalleableTranscript<SecretSharingConfig = C>,
 >(
     sc: &T::SecretSharingConfig,
@@ -123,7 +122,7 @@ pub fn subaggregatable_pvss_group<
     // pvss_transcript_random::<T, WallTime>(sc, &mut group);
     pvss_deal::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
     pvss_subaggregate::<C, T, WallTime>(sc, &mut group);
-    pvss_nonaggregate_verify::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
+    pvss_nonaggregate_verify::<_, T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
     pvss_decrypt_own_share::<T, WallTime>(
         sc, &d.pp, &d.ssks, &d.spks, &d.dks, &d.eks, &d.s, &mut group,
     );
@@ -285,7 +284,7 @@ fn pvss_verify<T: AggregatableTranscript, M: Measurement>(
     });
 }
 
-fn pvss_nonaggregate_verify<T: NonAggregatableTranscript, M: Measurement>(
+fn pvss_nonaggregate_verify<C, T: HasAggregatableSubtranscript<C>, M: Measurement>(
     sc: &T::SecretSharingConfig,
     pp: &T::PublicParameters,
     ssks: &[T::SigningSecretKey],

@@ -179,19 +179,6 @@ fn test_chaum_pedersen() {
     test_sigma_protocol::<<Bn254 as Pairing>::G1, _>(make_chaum_pedersen_instance(), witness_bn);
     test_imhomog_chaum_pedersen::<Bn254>(make_inhomogeneous_chaum_pedersen_instance(), witness_bn);
 
-    // ---- Bn254 Inhomogeneous ---- // TODO!!! make this nicer
-    use aptos_dkg::sigma_protocol::homomorphism::Trait;
-    let hom = make_inhomogeneous_chaum_pedersen_instance::<Bn254>();
-    let mut rng = thread_rng();
-
-    let statement = hom.apply(&witness_bn);
-    let ctxt = b"SIGMA-PROTOCOL-CONTEXT";
-
-    let proof = hom.prove(&witness_bn, &statement, ctxt, &mut rng);
-
-    hom.verify(&statement, &proof, ctxt)
-        .expect("Sigma protocol proof failed verification");
-
     // ---- Bls12_381 ----
     let witness_bls = Scalar(sample_field_element(&mut rng));
     test_sigma_protocol::<<Bls12_381 as Pairing>::G1, _>(

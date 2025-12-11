@@ -28,7 +28,7 @@ pub trait Trait<C: CurveGroup>:
         Domain: Witness<C::ScalarField>,
         MsmOutput = C,
         Scalar = C::ScalarField,
-        MsmInput: IsMsmInput<Base = C::Affine>, // is the last one necessary? // need to be a bit specific because this code multiplies scalars and does into_affine(), etc
+        MsmInput: IsMsmInput<Base = C::Affine>, // need to be a bit specific because this code multiplies scalars and does into_affine(), etc
     > + Sized
     + CanonicalSerialize
 {
@@ -63,7 +63,7 @@ pub trait Trait<C: CurveGroup>:
         );
 
         let msm_result = Self::msm_eval(msm_terms);
-        ensure!(msm_result == C::ZERO); // or MsmOutput::zero() ?
+        ensure!(msm_result == C::ZERO); // or MsmOutput::zero()
 
         Ok(())
     }
@@ -168,7 +168,7 @@ pub trait Trait<C: CurveGroup>:
 
             // Add prover + statement contributions
             bases.push(affine_iter.next().unwrap()); // this is the element `A` from the prover's first message
-            bases.push(affine_iter.next().unwrap()); // this is the element `P` from the statement
+            bases.push(affine_iter.next().unwrap()); // this is the element `P` from the statement, but we'll need `P^c`
 
             scalars.push(- (*beta_power));
             scalars.push(-c * beta_power);

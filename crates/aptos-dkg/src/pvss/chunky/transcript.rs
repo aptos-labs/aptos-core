@@ -26,7 +26,7 @@ use crate::{
         homomorphism::{tuple::TupleCodomainShape, Trait as _},
         traits::Trait as _,
     },
-    traits::transcript::{HasAggregatableSubtranscript, NonAggregatableTranscript},
+    traits::transcript::{HasAggregatableSubtranscript},
     Scalar,
 };
 use anyhow::bail;
@@ -192,6 +192,222 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
 
     fn get_subtranscript(&self) -> Self::SubTranscript {
         self.utrs.subtranscript.clone()
+    }
+
+    #[allow(non_snake_case)]
+    fn verify<A: Serialize + Clone>(
+        &self,
+        sc: &<Self as traits::Transcript>::SecretSharingConfig,
+        pp: &<Self as traits::Transcript>::PublicParameters,
+        spks: &[<Self as traits::Transcript>::SigningPubKey],
+        eks: &[<Self as traits::Transcript>::EncryptPubKey],
+        sid: &A,
+    ) -> anyhow::Result<()> {
+        if eks.len() != sc.n {
+            bail!("Expected {} encryption keys, but got {}", sc.n, eks.len());
+        }
+        if self.utrs.subtranscript.Cs.len() != sc.n {
+            bail!(
+                "Expected {} arrays of chunked ciphertexts, but got {}",
+                sc.n,
+                self.utrs.subtranscript.Cs.len()
+            );
+        }
+        if self.utrs.subtranscript.Vs.len() != sc.n + 1 {
+            bail!(
+                "Expected {} commitment elements, but got {}",
+                sc.n + 1,
+                self.utrs.subtranscript.Vs.len()
+            );
+        }
+
+        // Initialize the PVSS Fiat-Shamir context
+        let sok_ctxt = (
+            *sc,
+            &spks[self.utrs.dealer.id],
+            sid,
+            self.utrs.dealer.id,
+            DST.to_vec(),
+        ); // This is a bit hacky; also get rid of DST here and use self.dst?
+
+        // Verify the transcript signature
+        self.sgn.verify(&self.utrs, &spks[self.utrs.dealer.id])?;
+
+        {
+            // Verify the PoK
+            let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
+            let hom = hkzg_chunked_elgamal::Homomorphism::new(
+                &pp.pk_range_proof.ck_S.lagr_g1,
+                pp.pk_range_proof.ck_S.xi_1,
+                &pp.pp_elgamal,
+                &eks_inner,
+            );
+            if let Err(err) = hom.verify(
+                &TupleCodomainShape(
+                    self.utrs.sharing_proof.range_proof_commitment.clone(),
+                    chunked_elgamal::CodomainShape {
+                        chunks: self.utrs.subtranscript.Cs.clone(),
+                        randomness: self.utrs.subtranscript.Rs.clone(),
+                    },
+                ),
+                &self.utrs.sharing_proof.PoK,
+                &sok_ctxt,
+            ) {
+                bail!("PoK verification failed: {:?}", err);
+            }
+
+            // Verify the range proof
+            if let Err(err) = self.utrs.sharing_proof.range_proof.verify(
+                &pp.pk_range_proof.vk,
+                sc.n * num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize,
+                pp.ell as usize,
+                &self.utrs.sharing_proof.range_proof_commitment,
+            ) {
+                bail!("Range proof batch verification failed: {:?}", err);
+            }
+        }
+
+        let mut rng = rand::thread_rng(); // TODO: make `rng` a parameter of fn verify()?
+
+        // Do the SCRAPE LDT
+        let ldt = LowDegreeTest::random(&mut rng, sc.t, sc.n + 1, true, &sc.domain); // includes_zero is true here means it includes a commitment to f(0), which is in V[n]
+        ldt.low_degree_test_group(&self.utrs.subtranscript.Vs)?;
+
+        // Now compute the final MSM // TODO: merge this multi_exp with the PoK verification, as in YOLO YOSO?
+        let mut base_vec = Vec::new();
+        let mut exp_vec = Vec::new();
+
+        let beta = sample_field_element(&mut rng);
+        let powers_of_beta = utils::powers(beta, self.utrs.subtranscript.Cs.len() + 1);
+
+        for i in 0..self.utrs.subtranscript.Cs.len() {
+            for j in 0..self.utrs.subtranscript.Cs[i].len() {
+                let base = self.utrs.subtranscript.Cs[i][j];
+                let exp = pp.powers_of_radix[j] * powers_of_beta[i];
+                base_vec.push(base);
+                exp_vec.push(exp);
+            }
+        }
+
+        let weighted_Cs = E::G1::msm(&E::G1::normalize_batch(&base_vec), &exp_vec)
+            .expect("Failed to compute MSM of Cs in chunky");
+
+        let weighted_Vs = E::G2::msm(
+            &E::G2::normalize_batch(
+                &self.utrs.subtranscript.Vs[..self.utrs.subtranscript.Cs.len()],
+            ),
+            &powers_of_beta[..self.utrs.subtranscript.Cs.len()],
+        )
+        .expect("Failed to compute MSM of Vs in chunky");
+
+        let res = E::multi_pairing(
+            [
+                weighted_Cs.into_affine(),
+                *pp.get_encryption_public_params().message_base(),
+            ],
+            [pp.get_commitment_base(), (-weighted_Vs).into_affine()],
+        ); // Making things affine here rather than converting the two bases to group elements, since that's probably what they would be converted to anyway: https://github.com/arkworks-rs/algebra/blob/c1f4f5665504154a9de2345f464b0b3da72c28ec/ec/src/models/bls12/g1.rs#L14
+
+        if PairingOutput::<E>::ZERO != res {
+            return Err(anyhow::anyhow!("Expected zero during multi-pairing check"));
+        }
+
+        Ok(())
+    }
+}
+
+impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcript<E> {
+    // why are N and P needed? TODO: maybe integrate into deal()
+    #[allow(non_snake_case)]
+    pub fn encrypt_chunked_shares<
+        'a,
+        A: Serialize + Clone,
+        R: rand_core::RngCore + rand_core::CryptoRng,
+    >(
+        f_evals: &[E::ScalarField],
+        eks: &[keys::EncryptPubKey<E>],
+        _sc: &ShamirThresholdConfig<E::ScalarField>,
+        pp: &PublicParameters<E>,
+        sok_ctxt: SokContext<'a, A, E>,
+        rng: &mut R,
+    ) -> (Vec<Vec<E::G1>>, Vec<E::G1>, SharingProof<E>) {
+        let sc = sok_ctxt.0;
+
+        // Generate the required randomness
+        let hkzg_randomness = univariate_hiding_kzg::CommitmentRandomness::rand(rng);
+
+        let elgamal_randomness = Scalar::vec_from_inner(chunked_elgamal::correlated_randomness(
+            rng,
+            1 << pp.ell as u64,
+            num_chunks_per_scalar::<E::ScalarField>(pp.ell),
+        ));
+
+        // Chunk and flatten the shares
+        let f_evals_chunked: Vec<Vec<E::ScalarField>> = f_evals
+            .iter()
+            .map(|f_eval| chunks::scalar_to_le_chunks(pp.ell, f_eval))
+            .collect();
+        // Flatten it now before `f_evals_chunked` is consumed in the next step
+        let f_evals_chunked_flat: Vec<E::ScalarField> =
+            f_evals_chunked.iter().flatten().copied().collect();
+
+        // Now generate the encrypted shares and range proof commitment, together with its PoK, so:
+        // (1) Set up the witness
+        let witness = HkzgElgamalWitness {
+            hkzg_randomness,
+            chunked_plaintexts: Scalar::vecvec_from_inner(f_evals_chunked),
+            elgamal_randomness,
+        };
+        // (2) Compute its image under the corresponding homomorphism, and prove knowledge of an inverse
+        //   (2a) Set up the tuple homomorphism
+        let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect(); // TODO: this is a bit ugly
+        let hom = hkzg_chunked_elgamal::Homomorphism::new(
+            &pp.pk_range_proof.ck_S.lagr_g1,
+            pp.pk_range_proof.ck_S.xi_1,
+            &pp.pp_elgamal,
+            &eks_inner,
+        );
+        //   (2b) Compute its image (the public statement), so the range proof commitment and chunked_elgamal encryptions
+        let statement = hom.apply(&witness);
+        //   (2c) Prove knowledge of its inverse
+        let PoK = hom
+            .prove(&witness, &statement, &sok_ctxt, rng)
+            .change_lifetime(); // Make sure the lifetime of the proof is not coupled to `hom` which has references
+                                // TODO: don't do &mut but just pass it
+
+        // Destructure the "public statement" of the above sigma protocol
+        let TupleCodomainShape(
+            range_proof_commitment,
+            chunked_elgamal::CodomainShape {
+                chunks: Cs,
+                randomness: Rs,
+            },
+        ) = statement;
+
+        debug_assert_eq!(
+            Cs.len(),
+            sc.n,
+            "Number of encrypted chunks must equal number of players"
+        );
+
+        // Generate the batch range proof, given the `range_proof_commitment` produced in the PoK
+        let range_proof = dekart_univariate_v2::Proof::prove(
+            &pp.pk_range_proof,
+            &f_evals_chunked_flat,
+            pp.ell as usize,
+            &range_proof_commitment,
+            &hkzg_randomness,
+            rng,
+        ); // TODO: don't do &mut fs_t but just pass it
+
+        // Assemble the sharing proof
+        let sharing_proof = SharingProof {
+            PoK,
+            range_proof,
+            range_proof_commitment,
+        };
+
+        (Cs, Rs, sharing_proof)
     }
 }
 
@@ -510,226 +726,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         self.utrs
             .subtranscript
             .decrypt_own_share(_sc, player, dk, pp)
-    }
-}
-
-impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> NonAggregatableTranscript
-    for Transcript<E>
-{
-    #[allow(non_snake_case)]
-    fn verify<A: Serialize + Clone>(
-        &self,
-        sc: &<Self as traits::Transcript>::SecretSharingConfig,
-        pp: &<Self as traits::Transcript>::PublicParameters,
-        spks: &[<Self as traits::Transcript>::SigningPubKey],
-        eks: &[<Self as traits::Transcript>::EncryptPubKey],
-        sid: &A,
-    ) -> anyhow::Result<()> {
-        if eks.len() != sc.n {
-            bail!("Expected {} encryption keys, but got {}", sc.n, eks.len());
-        }
-        if self.utrs.subtranscript.Cs.len() != sc.n {
-            bail!(
-                "Expected {} arrays of chunked ciphertexts, but got {}",
-                sc.n,
-                self.utrs.subtranscript.Cs.len()
-            );
-        }
-        if self.utrs.subtranscript.Vs.len() != sc.n + 1 {
-            bail!(
-                "Expected {} commitment elements, but got {}",
-                sc.n + 1,
-                self.utrs.subtranscript.Vs.len()
-            );
-        }
-
-        // Initialize the PVSS Fiat-Shamir context
-        let sok_ctxt = (
-            *sc,
-            &spks[self.utrs.dealer.id],
-            sid,
-            self.utrs.dealer.id,
-            DST.to_vec(),
-        ); // This is a bit hacky; also get rid of DST here and use self.dst?
-
-        // Verify the transcript signature
-        self.sgn.verify(&self.utrs, &spks[self.utrs.dealer.id])?;
-
-        {
-            // Verify the PoK
-            let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
-            let hom = hkzg_chunked_elgamal::Homomorphism::new(
-                &pp.pk_range_proof.ck_S.lagr_g1,
-                pp.pk_range_proof.ck_S.xi_1,
-                &pp.pp_elgamal,
-                &eks_inner,
-            );
-            if let Err(err) = hom.verify(
-                &TupleCodomainShape(
-                    self.utrs.sharing_proof.range_proof_commitment.clone(),
-                    chunked_elgamal::CodomainShape {
-                        chunks: self.utrs.subtranscript.Cs.clone(),
-                        randomness: self.utrs.subtranscript.Rs.clone(),
-                    },
-                ),
-                &self.utrs.sharing_proof.PoK,
-                &sok_ctxt,
-            ) {
-                bail!("PoK verification failed: {:?}", err);
-            }
-
-            // Verify the range proof
-            if let Err(err) = self.utrs.sharing_proof.range_proof.verify(
-                &pp.pk_range_proof.vk,
-                sc.n * num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize,
-                pp.ell as usize,
-                &self.utrs.sharing_proof.range_proof_commitment,
-            ) {
-                bail!("Range proof batch verification failed: {:?}", err);
-            }
-        }
-
-        let mut rng = rand::thread_rng(); // TODO: make `rng` a parameter of fn verify()?
-
-        // Do the SCRAPE LDT
-        let ldt = LowDegreeTest::random(&mut rng, sc.t, sc.n + 1, true, &sc.domain); // includes_zero is true here means it includes a commitment to f(0), which is in V[n]
-        ldt.low_degree_test_group(&self.utrs.subtranscript.Vs)?;
-
-        // Now compute the final MSM // TODO: merge this multi_exp with the PoK verification, as in YOLO YOSO?
-        let mut base_vec = Vec::new();
-        let mut exp_vec = Vec::new();
-
-        let beta = sample_field_element(&mut rng);
-        let powers_of_beta = utils::powers(beta, self.utrs.subtranscript.Cs.len() + 1);
-
-        for i in 0..self.utrs.subtranscript.Cs.len() {
-            for j in 0..self.utrs.subtranscript.Cs[i].len() {
-                let base = self.utrs.subtranscript.Cs[i][j];
-                let exp = pp.powers_of_radix[j] * powers_of_beta[i];
-                base_vec.push(base);
-                exp_vec.push(exp);
-            }
-        }
-
-        let weighted_Cs = E::G1::msm(&E::G1::normalize_batch(&base_vec), &exp_vec)
-            .expect("Failed to compute MSM of Cs in chunky");
-
-        let weighted_Vs = E::G2::msm(
-            &E::G2::normalize_batch(
-                &self.utrs.subtranscript.Vs[..self.utrs.subtranscript.Cs.len()],
-            ),
-            &powers_of_beta[..self.utrs.subtranscript.Cs.len()],
-        )
-        .expect("Failed to compute MSM of Vs in chunky");
-
-        let res = E::multi_pairing(
-            [
-                weighted_Cs.into_affine(),
-                *pp.get_encryption_public_params().message_base(),
-            ],
-            [pp.get_commitment_base(), (-weighted_Vs).into_affine()],
-        ); // Making things affine here rather than converting the two bases to group elements, since that's probably what they would be converted to anyway: https://github.com/arkworks-rs/algebra/blob/c1f4f5665504154a9de2345f464b0b3da72c28ec/ec/src/models/bls12/g1.rs#L14
-
-        if PairingOutput::<E>::ZERO != res {
-            return Err(anyhow::anyhow!("Expected zero during multi-pairing check"));
-        }
-
-        Ok(())
-    }
-}
-
-impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcript<E> {
-    // why are N and P needed? TODO: maybe integrate into deal()
-    #[allow(non_snake_case)]
-    pub fn encrypt_chunked_shares<
-        'a,
-        A: Serialize + Clone,
-        R: rand_core::RngCore + rand_core::CryptoRng,
-    >(
-        f_evals: &[E::ScalarField],
-        eks: &[keys::EncryptPubKey<E>],
-        _sc: &ShamirThresholdConfig<E::ScalarField>,
-        pp: &PublicParameters<E>,
-        sok_ctxt: SokContext<'a, A, E>,
-        rng: &mut R,
-    ) -> (Vec<Vec<E::G1>>, Vec<E::G1>, SharingProof<E>) {
-        let sc = sok_ctxt.0;
-
-        // Generate the required randomness
-        let hkzg_randomness = univariate_hiding_kzg::CommitmentRandomness::rand(rng);
-
-        let elgamal_randomness = Scalar::vec_from_inner(chunked_elgamal::correlated_randomness(
-            rng,
-            1 << pp.ell as u64,
-            num_chunks_per_scalar::<E::ScalarField>(pp.ell),
-        ));
-
-        // Chunk and flatten the shares
-        let f_evals_chunked: Vec<Vec<E::ScalarField>> = f_evals
-            .iter()
-            .map(|f_eval| chunks::scalar_to_le_chunks(pp.ell, f_eval))
-            .collect();
-        // Flatten it now before `f_evals_chunked` is consumed in the next step
-        let f_evals_chunked_flat: Vec<E::ScalarField> =
-            f_evals_chunked.iter().flatten().copied().collect();
-
-        // Now generate the encrypted shares and range proof commitment, together with its PoK, so:
-        // (1) Set up the witness
-        let witness = HkzgElgamalWitness {
-            hkzg_randomness,
-            chunked_plaintexts: Scalar::vecvec_from_inner(f_evals_chunked),
-            elgamal_randomness,
-        };
-        // (2) Compute its image under the corresponding homomorphism, and prove knowledge of an inverse
-        //   (2a) Set up the tuple homomorphism
-        let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect(); // TODO: this is a bit ugly
-        let hom = hkzg_chunked_elgamal::Homomorphism::new(
-            &pp.pk_range_proof.ck_S.lagr_g1,
-            pp.pk_range_proof.ck_S.xi_1,
-            &pp.pp_elgamal,
-            &eks_inner,
-        );
-        //   (2b) Compute its image (the public statement), so the range proof commitment and chunked_elgamal encryptions
-        let statement = hom.apply(&witness);
-        //   (2c) Prove knowledge of its inverse
-        let PoK = hom
-            .prove(&witness, &statement, &sok_ctxt, rng)
-            .change_lifetime(); // Make sure the lifetime of the proof is not coupled to `hom` which has references
-                                // TODO: don't do &mut but just pass it
-
-        // Destructure the "public statement" of the above sigma protocol
-        let TupleCodomainShape(
-            range_proof_commitment,
-            chunked_elgamal::CodomainShape {
-                chunks: Cs,
-                randomness: Rs,
-            },
-        ) = statement;
-
-        debug_assert_eq!(
-            Cs.len(),
-            sc.n,
-            "Number of encrypted chunks must equal number of players"
-        );
-
-        // Generate the batch range proof, given the `range_proof_commitment` produced in the PoK
-        let range_proof = dekart_univariate_v2::Proof::prove(
-            &pp.pk_range_proof,
-            &f_evals_chunked_flat,
-            pp.ell as usize,
-            &range_proof_commitment,
-            &hkzg_randomness,
-            rng,
-        ); // TODO: don't do &mut fs_t but just pass it
-
-        // Assemble the sharing proof
-        let sharing_proof = SharingProof {
-            PoK,
-            range_proof,
-            range_proof_commitment,
-        };
-
-        (Cs, Rs, sharing_proof)
     }
 }
 

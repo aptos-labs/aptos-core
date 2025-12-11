@@ -286,18 +286,6 @@ pub trait AggregatableTranscript:
     ) -> anyhow::Result<()>;
 }
 
-// TODO: add HasAggregatableSubtranscript ?
-pub trait NonAggregatableTranscript: Transcript {
-    fn verify<A: Serialize + Clone>(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        pp: &Self::PublicParameters,
-        spks: &[Self::SigningPubKey],
-        eks: &[Self::EncryptPubKey],
-        sid: &A, // Note the different function signature heres
-    ) -> anyhow::Result<()>;
-}
-
 pub trait HasAggregatableSubtranscript<C>: Transcript {
     type SubTranscript: Aggregatable<C>
         + SubTranscript<
@@ -312,6 +300,15 @@ pub trait HasAggregatableSubtranscript<C>: Transcript {
         >;
 
     fn get_subtranscript(&self) -> Self::SubTranscript;
+
+    fn verify<A: Serialize + Clone>(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        pp: &Self::PublicParameters,
+        spks: &[Self::SigningPubKey],
+        eks: &[Self::EncryptPubKey],
+        sid: &A, // Note the different function signature heres
+    ) -> anyhow::Result<()>;
 }
 
 /// This traits defines testing-only and benchmarking-only interfaces.
