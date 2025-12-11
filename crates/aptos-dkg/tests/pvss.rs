@@ -67,10 +67,10 @@ fn test_pvss_all_unweighted() {
         type ChunkyTranscriptBn254 = chunky::UnsignedUnweightedTranscript<ark_bn254::Bn254>;
 
         // Chunky
-        nonaggregatable_pvss_deal_verify_and_reconstruct::<
-            <ChunkyTranscriptBn254 as Transcript>::SecretSharingConfig,
-            ChunkyTranscriptBn254,
-        >(&tc, seed.to_bytes_le());
+        nonaggregatable_pvss_deal_verify_and_reconstruct::<ChunkyTranscriptBn254>(
+            &tc,
+            seed.to_bytes_le(),
+        );
 
         pvss_deal_verify_and_reconstruct_from_subtranscript::<ChunkyTranscriptBn254>(
             &tc,
@@ -293,7 +293,7 @@ fn test_pvss_aggregate_subtranscript_and_decrypt<E: Pairing, T>(
 }
 
 #[cfg(test)]
-fn nonaggregatable_pvss_deal_verify_and_reconstruct<C, T: HasAggregatableSubtranscript>(
+fn nonaggregatable_pvss_deal_verify_and_reconstruct<T: HasAggregatableSubtranscript>(
     sc: &T::SecretSharingConfig,
     seed_bytes: [u8; 32],
 ) {
