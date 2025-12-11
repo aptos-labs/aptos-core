@@ -245,6 +245,7 @@ use aptos_crypto::utils;
 use ark_ff::{UniformRand, Zero};
 use serde::Serialize;
 
+// Slightly hacky implementation of a sigma protocol
 impl<E: Pairing, H1, H2> PairingTupleHomomorphism<E, H1, H2>
 where
     H1: sigma_protocol::Trait<E::G1>,
@@ -255,10 +256,16 @@ where
     fn dst(&self) -> Vec<u8> {
         let mut dst = Vec::new();
 
+        let dst1 = self.hom1.dst();
+        let dst2 = self.hom2.dst();
+
         // Domain-separate them properly so concatenation is unambiguous.
         // Prefix with their lengths so [a|b] and [ab|] don't collide.
-        // TODO!!!!!!!!!
-        dst.extend_from_slice(b"TupleHomomorphism(");
+        dst.extend_from_slice(b"PairingTupleHomomorphism(");
+        dst.extend_from_slice(&(dst1.len() as u32).to_be_bytes());
+        dst.extend_from_slice(&dst1);
+        dst.extend_from_slice(&(dst2.len() as u32).to_be_bytes());
+        dst.extend_from_slice(&dst2);
         dst.extend_from_slice(b")");
 
         dst

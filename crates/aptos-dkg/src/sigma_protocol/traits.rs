@@ -28,7 +28,7 @@ pub trait Trait<C: CurveGroup>:
         Domain: Witness<C::ScalarField>,
         MsmOutput = C,
         Scalar = C::ScalarField,
-        MsmInput: IsMsmInput<Base = C::Affine, Scalar = C::ScalarField>, // is the last one necessary? // need to be a bit specific because this code multiplies scalars and does into_affine(), etc
+        MsmInput: IsMsmInput<Base = C::Affine>, // is the last one necessary? // need to be a bit specific because this code multiplies scalars and does into_affine(), etc
     > + Sized
     + CanonicalSerialize
 {
@@ -42,7 +42,7 @@ pub trait Trait<C: CurveGroup>:
         statement: &Self::Codomain,
         cntxt: &Ct, // for SoK purposes
         rng: &mut R,
-    ) -> Proof<<<Self as fixed_base_msms::Trait>::MsmInput as IsMsmInput>::Scalar, Self> { // or C::ScalarField
+    ) -> Proof<<Self as fixed_base_msms::Trait>::Scalar, Self> { // or C::ScalarField
         prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
     }
 
@@ -115,7 +115,7 @@ pub trait Trait<C: CurveGroup>:
             },
         };
 
-        let number_of_beta_powers = public_statement.clone().into_iter().count(); // TODO: maybe pass the into_iter version in combine_msm_terms?
+        let number_of_beta_powers = public_statement.clone().into_iter().count(); // TODO: maybe pass the into_iter version in merge_msm_terms?
 
         let (c, powers_of_beta) = self.compute_verifier_challenges(public_statement, prover_first_message, cntxt, number_of_beta_powers);
 
