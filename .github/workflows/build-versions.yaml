@@ -1,0 +1,231 @@
+name: "🔨 Build Version"
+run-name: "Building version for ${{ inputs.ref || github.ref_name }}"
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'The git ref to build (branch, tag, sha).'
+        required: true
+        default: 'main'
+      build_profile:
+        description: 'The cargo build profile to use.'
+        default: 'release'
+
+jobs:
+  setup:
+    runs-on: buildjet-16vcpu-ubuntu-2204
+    outputs:
+      short_sha: ${{ steps.chop_sha.outputs.short_sha }}
+      build_date: ${{ steps.build_date.outputs.build_date }}
+      git_branch: ${{ steps.git_branch.outputs.git_branch }}
+      git_tag: ${{ steps.git_tag.outputs.git_tag }}
+      build_profile: ${{ steps.build_profile.outputs.build_profile }}
+      git_sha: ${{ steps.get_sha.outputs.git_sha }}
+    env:
+      BUILD_REF: ${{ inputs.ref || github.sha}}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha}}
+      - id: get_sha
+        run: |
+          GIT_SHA=$(git rev-parse HEAD)
+          echo "git_sha=$GIT_SHA" >> $GITHUB_OUTPUT
+      - id: chop_sha
+        run: |
+          SHORT_SHA=$(echo "${{ steps.get_sha.outputs.git_sha }}" | cut -c1-7)
+          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+      - id: build_date
+        run: |
+          BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          echo "build_date=$BUILD_DATE" >> $GITHUB_OUTPUT
+      - id: git_branch
+        run: |
+          # Determine if the checked-out ref is a branch
+          if git show-ref --verify --quiet "refs/heads/${{ env.BUILD_REF }}"; then
+            echo "git_branch=${{ env.BUILD_REF }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ inputs.ref }}" ]; then
+            # If a custom ref was provided, try to extract branch name
+            BRANCH_NAME=$(git symbolic-ref -q --short HEAD 2>/dev/null || echo "detached")
+            echo "git_branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          elif [ "${GITHUB_REF_TYPE}" = "branch" ]; then
+            # Fall back to workflow trigger ref for push events
+            echo "git_branch=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+          else
+            echo "git_branch=detached" >> $GITHUB_OUTPUT
+          fi
+      - id: git_tag
+        run: |
+          # Check if the checked-out ref is a tag
+          TAG_NAME=$(git describe --exact-match --tags HEAD 2>/dev/null || echo "")
+          if [ -n "$TAG_NAME" ]; then
+            echo "git_tag=$TAG_NAME" >> $GITHUB_OUTPUT
+          elif [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            # Fall back to workflow trigger ref for tag push events
+            echo "git_tag=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+          else
+            echo "git_tag=none" >> $GITHUB_OUTPUT
+          fi
+      - id: build_profile
+        run: |
+          echo "build_profile=${{ inputs.build_profile || 'release' }}" >> $GITHUB_OUTPUT
+
+  binaries-aptos-node:
+    needs: 
+      - setup
+    runs-on: buildjet-16vcpu-ubuntu-2204
+    name: "Build ${{ matrix.binary.package }} with Nix"
+    strategy:
+      matrix:
+        binary:
+          - package: "aptos-node"
+          - package: "movement"
+          - package: "l1-migration"
+    env:
+      TARGET_FOLDER: target/${{ needs.setup.outputs.build_profile }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha}}
+      - name: Build binary ${{ matrix.binary.package }}
+        uses: movementlabsxyz/aptos-core/.github/actions/build-binary@ci/version-builds
+        with:
+          binary_package: ${{ matrix.binary.package }}
+          profile: ${{ needs.setup.outputs.build_profile }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          git_sha: ${{ needs.setup.outputs.git_sha }}
+  container-aptos-node:
+    needs: 
+      - setup
+      - binaries-aptos-node
+    runs-on: buildjet-16vcpu-ubuntu-2204
+    name: "build container: aptos-node"
+    permissions:
+      contents: read
+      packages: write
+    env:
+      TARGET_FOLDER: target/${{ needs.setup.outputs.build_profile }}
+      SHORT_SHA: ${{ needs.setup.outputs.short_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha}}
+      # Download artifacts
+      - name: Download aptos-node binary
+        uses: actions/download-artifact@v4
+        with:
+          name: aptos-node-${{ env.SHORT_SHA }}
+          path: ${{ env.TARGET_FOLDER }}
+      - name: Download movement binary
+        uses: actions/download-artifact@v4
+        with:
+          name: movement-${{ env.SHORT_SHA }}
+          path: ${{ env.TARGET_FOLDER }}
+      - name: Download l1-migration binary
+        uses: actions/download-artifact@v4
+        with:
+          name: l1-migration-${{ env.SHORT_SHA }}
+          path: ${{ env.TARGET_FOLDER }}
+      - name: List binaries
+        run: ls -la ${{ env.TARGET_FOLDER }}
+        
+      - name: Build Container
+        uses: movementlabsxyz/aptos-core/.github/actions/build-container@ci/version-builds
+        with:
+          image_name: ghcr.io/movementlabsxyz/aptos-node
+          dockerfile_subdir: aptos-node
+          build_args: |
+            BINARY_PATH=${{ env.TARGET_FOLDER }}
+            GIT_SHA=${{ env.SHORT_SHA }}
+            GIT_TAG=${{ needs.setup.outputs.git_tag }}
+            GIT_BRANCH=${{ needs.setup.outputs.git_branch }}
+            BUILD_DATE=${{ needs.setup.outputs.build_date }}
+          ghcr_username: ${{ vars.INFRA_GH_USER }}
+          ghcr_password: ${{ secrets.INFRA_GH_PAT }}
+          git_sha: ${{ needs.setup.outputs.git_sha }}
+
+  binaries-aptos-faucet-service:
+    needs: 
+      - setup
+    runs-on: buildjet-16vcpu-ubuntu-2204
+    name: "Build ${{ matrix.binary.package }} with Nix"
+    strategy:
+      matrix:
+        binary:
+          - package: "aptos-faucet-service"
+    env:
+      TARGET_FOLDER: target/${{ needs.setup.outputs.build_profile }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha}}
+      - name: Build binary ${{ matrix.binary.package }}
+        uses: movementlabsxyz/aptos-core/.github/actions/build-binary@ci/version-builds
+        with:
+          binary_package: ${{ matrix.binary.package }}
+          profile: ${{ needs.setup.outputs.build_profile }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          git_sha: ${{ needs.setup.outputs.git_sha }}
+  container-aptos-faucet-service:
+    needs: 
+      - setup
+      - binaries-aptos-faucet-service
+    runs-on: buildjet-16vcpu-ubuntu-2204
+    name: "build container: aptos-faucet-service"
+    permissions:
+      contents: read
+      packages: write
+    env:
+      TARGET_FOLDER: target/${{ needs.setup.outputs.build_profile }}
+      SHORT_SHA: ${{ needs.setup.outputs.short_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha}}
+      # Download artifacts
+      - name: Download aptos-faucet-service binary
+        uses: actions/download-artifact@v4
+        with:
+          name: aptos-faucet-service-${{ env.SHORT_SHA }}
+          path: ${{ env.TARGET_FOLDER }}
+      - name: List binaries
+        run: ls -la ${{ env.TARGET_FOLDER }}
+        
+      - name: Build Container
+        uses: movementlabsxyz/aptos-core/.github/actions/build-container@ci/version-builds
+        with:
+          image_name: ghcr.io/movementlabsxyz/aptos-faucet-service
+          dockerfile_subdir: aptos-faucet-service
+          build_args: |
+            BINARY_PATH=${{ env.TARGET_FOLDER }}
+            GIT_SHA=${{ env.SHORT_SHA }}
+            GIT_TAG=${{ needs.setup.outputs.git_tag }}
+            GIT_BRANCH=${{ needs.setup.outputs.git_branch }}
+            BUILD_DATE=${{ needs.setup.outputs.build_date }}
+          ghcr_username: ${{ vars.INFRA_GH_USER }}
+          ghcr_password: ${{ secrets.INFRA_GH_PAT }}
+          git_sha: ${{ needs.setup.outputs.git_sha }}
+
+  binaries-aptos-tools:
+    needs: 
+      - setup
+    runs-on: buildjet-16vcpu-ubuntu-2204
+    name: "Build ${{ matrix.binary.package }} with Nix"
+    strategy:
+      matrix:
+        binary:
+          - package: "aptos-transaction-emitter"
+    env:
+      TARGET_FOLDER: target/${{ needs.setup.outputs.build_profile }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha}}
+      - name: Build binary ${{ matrix.binary.package }}
+        uses: movementlabsxyz/aptos-core/.github/actions/build-binary@ci/version-builds
+        with:
+          binary_package: ${{ matrix.binary.package }}
+          profile: ${{ needs.setup.outputs.build_profile }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          git_sha: ${{ needs.setup.outputs.git_sha }}
