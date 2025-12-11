@@ -25,7 +25,7 @@ fn test_wvuf_basic_viability() {
 }
 
 fn weighted_wvuf_bvt<
-    T: AggregatableTranscript,
+    T,
     WVUF: WeightedVUF<
         SecretKey = T::DealtSecretKey,
         PubKey = T::DealtPubKey,
@@ -34,7 +34,7 @@ fn weighted_wvuf_bvt<
     >,
 >()
 where
-    T: Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
+    T: AggregatableTranscript + Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
     WVUF::PublicParameters: for<'a> From<&'a T::PublicParameters>,
 {
     let mut rng = thread_rng();
@@ -52,11 +52,9 @@ where
     );
 }
 
-fn weighted_pvss<T: AggregatableTranscript>(
-    rng: &mut StdRng,
-) -> (WeightedConfigBlstrs, DealingArgs<T>, T)
+fn weighted_pvss<T>(rng: &mut StdRng) -> (WeightedConfigBlstrs, DealingArgs<T>, T)
 where
-    T: Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
+    T: AggregatableTranscript + Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
 {
     let wc = WeightedConfigBlstrs::new(10, vec![3, 5, 3, 4, 2, 1, 1, 7]).unwrap();
 

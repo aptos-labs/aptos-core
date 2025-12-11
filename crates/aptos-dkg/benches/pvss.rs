@@ -101,14 +101,17 @@ pub fn aggregatable_pvss_group<T: AggregatableTranscript + MalleableTranscript>(
 }
 
 // TODO: combine with function above, rather than copy-paste
-pub fn subaggregatable_pvss_group<T: HasAggregatableSubtranscript + MalleableTranscript>(
+pub fn subaggregatable_pvss_group<T>(
     sc: &T::SecretSharingConfig,
     c: &mut Criterion,
 ) -> DealingArgs<T>
 where
-    T: HasAggregatableSubtranscript<
-        Subtranscript: Aggregatable<SecretSharingConfig = <T as Transcript>::SecretSharingConfig>,
-    >,
+    T: MalleableTranscript
+        + HasAggregatableSubtranscript<
+            Subtranscript: Aggregatable<
+                SecretSharingConfig = <T as Transcript>::SecretSharingConfig,
+            >,
+        >,
 {
     let name = T::scheme_name();
     let mut group = c.benchmark_group(format!("pvss/{}", name));
@@ -215,10 +218,8 @@ fn pvss_aggregate<T: AggregatableTranscript, M: Measurement>(
     });
 }
 
-fn pvss_subaggregate<T: Transcript + HasAggregatableSubtranscript, M: Measurement>(
-    sc: &T::SecretSharingConfig,
-    g: &mut BenchmarkGroup<M>,
-) where
+fn pvss_subaggregate<T, M: Measurement>(sc: &T::SecretSharingConfig, g: &mut BenchmarkGroup<M>)
+where
     T: HasAggregatableSubtranscript<
         Subtranscript: Aggregatable<SecretSharingConfig = <T as Transcript>::SecretSharingConfig>,
     >,
