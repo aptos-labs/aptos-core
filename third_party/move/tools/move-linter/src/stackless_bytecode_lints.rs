@@ -7,6 +7,7 @@
 
 mod avoid_copy_on_identity_comparison;
 mod needless_mutable_reference;
+mod return_signer;
 
 use move_compiler_v2::external_checks::StacklessBytecodeChecker;
 use std::collections::BTreeMap;
@@ -19,6 +20,7 @@ pub fn get_default_linter_pipeline(
     let checks: Vec<Box<dyn StacklessBytecodeChecker>> = vec![
         Box::new(avoid_copy_on_identity_comparison::AvoidCopyOnIdentityComparison {}),
         Box::new(needless_mutable_reference::NeedlessMutableReference {}),
+        Box::new(return_signer::ReturnSigner {}),
     ];
     let checks_category = config.get("checks").map_or("default", |s| s.as_str());
     if checks_category == "strict" || checks_category == "experimental" {
