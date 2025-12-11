@@ -1,0 +1,97 @@
+name: "Build Container"
+description: "Builds and pushes Docker container images with configurable inputs"
+inputs:
+  image_name:
+    description: "Full Docker image name (e.g., ghcr.io/org/repo/image)"
+    required: true
+  dockerfile_subdir:
+    description: "Subdirectory under 'docker/' containing the Dockerfile (e.g., 'aptos-node')"
+    required: true
+  build_args:
+    description: "Multi-line string of Docker build arguments (e.g., 'BINARY_PATH=target/debug ANOTHER_ARG=value')"
+    required: false
+    default: ""
+  ghcr_username:
+    description: "Username for GHCR login"
+    required: true
+  ghcr_password:
+    description: "Password for GHCR login"
+    required: true
+  git_sha:
+    description: "Git SHA to use for image tagging (defaults to github.sha)"
+    required: false
+    default: ""
+
+outputs:
+  image_name:
+    description: "The Docker image name that was built and pushed"
+    value: ${{ inputs.image_name }}
+  image_tag:
+    description: "The tag of the Docker image that was built and pushed"
+    value: ${{ env.GIT_SHA_SHORT }}
+  registry:
+    description: "The container registry where the image was pushed"
+    value: ghcr.io
+  artifact_name:
+    description: "The name of the uploaded artifact"
+    value: ${{ inputs.image_name }}:${{ env.GIT_SHA_SHORT }}
+
+runs:
+  using: "composite"
+  steps:
+  - name: Set build environment
+    run: |
+      if [ -n "${{ inputs.git_sha }}" ]; then
+        GIT_SHA_SHORT=$(echo "${{ inputs.git_sha }}" | cut -c1-7)
+      else
+        GIT_SHA_SHORT=$(echo ${{ github.sha }} | cut -c1-7)
+      fi
+      echo "GIT_SHA_SHORT=$GIT_SHA_SHORT" >> $GITHUB_ENV
+      echo "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
+    shell: bash
+
+  - name: Login to GHCR
+    run: |
+      echo "${{ inputs.ghcr_password }}" | docker login ghcr.io -u "${{ inputs.ghcr_username }}" --password-stdin
+    shell: bash
+
+  - name: Build and push Docker image
+    run: |
+      DOCKERFILE_PATH="docker/${{ inputs.dockerfile_subdir }}/Dockerfile"
+      if [ ! -f "$DOCKERFILE_PATH" ]; then
+        echo "Error: Dockerfile not found at $DOCKERFILE_PATH"
+        exit 1
+      fi
+
+      BUILD_ARGS_ARRAY=()
+      while IFS= read -r line; do
+        [[ -n "$line" ]] && BUILD_ARGS_ARRAY+=("--build-arg" "$line")
+      done <<< "${{ inputs.build_args }}"
+
+      docker build \
+        "${BUILD_ARGS_ARRAY[@]}" \
+        -f "$DOCKERFILE_PATH" \
+        -t ${{ inputs.image_name }}:${{ env.GIT_SHA_SHORT }} \
+        -t ${{ inputs.image_name }}:latest .
+      docker push ${{ inputs.image_name }}:${{ env.GIT_SHA_SHORT }}
+      docker push ${{ inputs.image_name }}:latest
+    shell: bash
+
+  - name: Output image information
+    run: |
+      echo "✅ Docker image built and pushed successfully!"
+      echo "📦 Image: ${{ inputs.image_name }}:${{ env.GIT_SHA_SHORT }}"
+      echo "🏷️ Tag: ${{ env.GIT_SHA_SHORT }}"
+      echo "🏷️ Tag: latest"
+      echo "🌐 Registry: ${{ inputs.image_name }}"
+    shell: bash
+
+  - name: Add image info to summary
+    run: |
+      echo "### Docker Image Built and Pushed" >> $GITHUB_STEP_SUMMARY
+      echo "" >> $GITHUB_STEP_SUMMARY
+      echo "- **Image:** \`${{ inputs.image_name }}:${{ env.GIT_SHA_SHORT }}\`" >> $GITHUB_STEP_SUMMARY
+      echo "- **Tag:** \`${{ env.GIT_SHA_SHORT }}\`" >> $GITHUB_STEP_SUMMARY
+      echo "- **Tag:** \`latest\`" >> $GITHUB_STEP_SUMMARY
+      echo "- **Registry:** \`${{ inputs.image_name }}\`" >> $GITHUB_STEP_SUMMARY
+    shell: bash

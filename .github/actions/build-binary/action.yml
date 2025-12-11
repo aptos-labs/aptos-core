@@ -1,0 +1,70 @@
+name: "Build Binary"
+description: "Builds a Rust binary using Nix and uploads artifact"
+inputs:
+  binary_package:
+    description: "Cargo package name to build"
+    required: true
+  profile:
+    description: "Cargo build profile"
+    required: true
+  features:
+    description: "Cargo features to enable"
+    required: false
+    default: ""
+  github_token:
+    description: "GitHub token for Nix installation"
+    required: true
+  git_sha:
+    description: "Git SHA to use for artifact naming (defaults to GITHUB_SHA)"
+    required: false
+    default: ""
+
+outputs:
+  artifact_name:
+    description: "The name of the uploaded artifact"
+    value: ${{ inputs.binary_package }}-${{ env.SHORT_SHA }}
+
+runs:
+  using: "composite"
+  steps:
+  - run: sudo apt-get update && sudo apt-get install -y xz-utils
+    shell: bash
+  - uses: cachix/install-nix-action@v27
+    with:
+      github_access_token: ${{ inputs.github_token }}
+      nix_path: nixpkgs=channel:nixos-unstable
+  - run: |
+      nix develop -c cargo build -p ${{ inputs.binary_package }} --profile ${{ inputs.profile }} --features "${{ inputs.features }}"
+    shell: bash
+  - name: determine output directory
+    run: |
+      if [ -d "target/release" ]; then
+        echo "Using release build output directory"
+        echo "TARGET_FOLDER=target/release" >> $GITHUB_ENV
+      else
+        echo "Using debug build output directory"
+        echo "TARGET_FOLDER=target/debug" >> $GITHUB_ENV
+      fi
+    shell: bash
+  - name: shorten sha
+    run: |
+      if [ -n "${{ inputs.git_sha }}" ]; then
+        SHORT_SHA=$(echo "${{ inputs.git_sha }}" | cut -c1-7)
+      else
+        SHORT_SHA=$(echo ${GITHUB_SHA} | cut -c1-7)
+      fi
+      echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
+    shell: bash
+  - run: |
+      if [ -f "${{ env.TARGET_FOLDER }}/${{ inputs.binary_package }}" ]; then
+        echo "✅ Binary ${{ inputs.binary_package }} built successfully"
+      else
+        echo "❌ Binary ${{ inputs.binary_package }} not found"
+        exit 1
+      fi
+    shell: bash
+  - uses: actions/upload-artifact@v4
+    with:
+      name: ${{ inputs.binary_package }}-${{ env.SHORT_SHA }}
+      path: ${{ env.TARGET_FOLDER }}/${{ inputs.binary_package }}
+      retention-days: 7
