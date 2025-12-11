@@ -133,6 +133,7 @@ pub struct ExecutionAndIOCosts {
 
     pub intrinsic_cost: InternalGas,
     pub keyless_cost: InternalGas,
+    pub slh_dsa_sha2_128s_cost: InternalGas,
     pub dependencies: Vec<Dependency>,
     pub call_graph: CallFrame,
     pub transaction_transient: Option<InternalGas>,
@@ -266,6 +267,7 @@ impl ExecutionAndIOCosts {
 
         total += self.intrinsic_cost;
         total += self.keyless_cost;
+        total += self.slh_dsa_sha2_128s_cost;
 
         for dep in &self.dependencies {
             total += dep.cost;
