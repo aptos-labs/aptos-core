@@ -2,14 +2,17 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    add_aptos_packages_to_state_store, check_aptos_packages_availability, compile_aptos_packages,
     data_state_view::DataStateView, dump_and_compile_from_package_metadata, is_aptos_package,
-    CompilationCache, DataManager, IndexWriter, PackageInfo, TxnIndex,
+    CompilationCache, DataManager, IndexWriter, PackageInfo, TxnIndex, APTOS_COMMONS,
 };
 use anyhow::{format_err, Result};
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_framework::natives::code::PackageMetadata;
 use aptos_rest_client::Client;
+use aptos_transaction_simulation::InMemoryStateStore;
 use aptos_types::{
+    on_chain_config::FeatureFlag,
     state_store::{state_key::StateKey, state_value::StateValue, TStateView},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
@@ -114,6 +117,7 @@ impl DataCollection {
         map: HashMap<(AccountAddress, String), PackageMetadata>,
         compilation_cache: &mut CompilationCache,
         current_dir: PathBuf,
+        base_experiments: &[String],
     ) -> Option<PackageInfo> {
         let upgrade_number = if is_aptos_package(&package_name) {
             None
@@ -127,7 +131,10 @@ impl DataCollection {
             package_name: package_name.clone(),
             upgrade_number,
         };
-        if compilation_cache.failed_packages_v1.contains(&package_info) {
+        if compilation_cache
+            .failed_packages_base
+            .contains(&package_info)
+        {
             return None;
         }
         if !is_aptos_package(&package_name)
@@ -141,6 +148,8 @@ impl DataCollection {
                 &map,
                 compilation_cache,
                 None,
+                base_experiments,
+                &[],
             );
             if res.is_err() {
                 eprintln!("{} at: {}", res.unwrap_err(), version);
@@ -170,9 +179,29 @@ impl DataCollection {
         }
     }
 
-    pub async fn dump_data(&self, begin: Version, limit: u64) -> Result<()> {
+    /// Dump txn data from txn `begin` with number no larger than `limit`
+    /// `base_experiments` is the experiments to be used for compiling the source code
+    pub async fn dump_data(
+        &self,
+        begin: Version,
+        limit: u64,
+        base_experiments: Vec<String>,
+    ) -> Result<()> {
         println!("begin dumping data");
-        let compilation_cache = Arc::new(Mutex::new(CompilationCache::default()));
+        let aptos_commons_path = self.current_dir.join(APTOS_COMMONS);
+        if self.filter_condition.check_source_code
+            && !check_aptos_packages_availability(aptos_commons_path.clone())
+        {
+            return Err(anyhow::Error::msg("aptos packages are missing"));
+        }
+        let mut compiled_cache = CompilationCache::default();
+        compile_aptos_packages(
+            &aptos_commons_path,
+            &mut compiled_cache.base_compiled_package_cache,
+            &base_experiments,
+            "base",
+        )?;
+        let compilation_cache: Arc<Mutex<CompilationCache>> = Arc::new(Mutex::new(compiled_cache));
         let data_manager = Arc::new(Mutex::new(DataManager::new_with_dir_creation(
             &self.current_dir,
         )));
@@ -204,7 +233,7 @@ impl DataCollection {
             }
             let txns = res_txns.unwrap_or_default();
             if !txns.is_empty() {
-                let mut txn_execution_ths = vec![];
+                let mut txn_execution_ths = Vec::with_capacity(txns.len());
                 for (version, txn, source_code_data) in txns {
                     println!("get txn at version:{}", version);
 
@@ -213,27 +242,27 @@ impl DataCollection {
                     let dump_write_set = self.dump_write_set;
                     let data_manager = data_manager.clone();
                     let index = index_writer.clone();
-
-                    let state_view =
-                        DataStateView::new_with_data_reads(self.debugger.clone(), version);
+                    let base_experiments = base_experiments.clone();
+                    let data_state = InMemoryStateStore::default();
+                    // Use pre-compiled module to make sure VM still works when old framework is loaded.
+                    let features_to_enable = vec![FeatureFlag::ENABLE_ENUM_OPTION];
+                    let cache_v1 = compilation_cache
+                        .lock()
+                        .unwrap()
+                        .base_compiled_package_cache
+                        .clone();
+                    add_aptos_packages_to_state_store(&data_state, &cache_v1);
+                    let state_view = DataStateView::new_with_data_reads_and_code(
+                        self.debugger.clone(),
+                        version,
+                        data_state,
+                        features_to_enable,
+                        vec![],
+                    );
 
                     let txn_execution_thread = tokio::task::spawn_blocking(move || {
-                        // Get auxiliary info for this transaction from the debugger
-                        let aux_info = tokio::runtime::Handle::current().block_on(async {
-                            match state_view
-                                .debugger()
-                                .get_committed_transactions(version, 1)
-                                .await
-                            {
-                                Ok((_, _, mut aux_infos)) => {
-                                    aux_infos.pop().unwrap_or(PersistedAuxiliaryInfo::None)
-                                },
-                                Err(_) => {
-                                    // Fallback to default auxiliary info if not found
-                                    PersistedAuxiliaryInfo::None
-                                },
-                            }
-                        });
+                        // Use default info to improve performance
+                        let aux_info = PersistedAuxiliaryInfo::None;
 
                         let epoch_result_res =
                             Self::execute_transactions_at_version_with_state_view(
@@ -264,6 +293,7 @@ impl DataCollection {
                                 map,
                                 &mut compilation_cache.lock().unwrap(),
                                 current_dir.clone(),
+                                &base_experiments,
                             );
                             if package_info_opt.is_none() {
                                 return;
