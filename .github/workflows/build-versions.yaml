@@ -122,9 +122,6 @@ jobs:
         with:
           name: movement-${{ env.SHORT_SHA }}
           path: ${{ env.TARGET_FOLDER }}
-      # TODO: Remove when ci/version-builds branch is merged into l1-migration
-      - name: rename movement binary to aptos
-        run: mv ${{ env.TARGET_FOLDER }}/movement ${{ env.TARGET_FOLDER }}/aptos
       - name: Download l1-migration binary
         uses: actions/download-artifact@v4
         with:
