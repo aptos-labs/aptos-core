@@ -530,8 +530,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> NonAggr
         }
         if self.subtrs.Vs.len() != sc.get_total_num_players() {
             bail!(
-                "Expected {} commitment elements, but got {}",
-                sc.get_total_num_players() + 1,
+                "Expected {} arrays of commitment elements, but got {}",
+                sc.get_total_num_players(),
                 self.subtrs.Vs.len()
             );
         }

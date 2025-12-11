@@ -8,13 +8,17 @@ use aptos_crypto::arkworks::{
 use aptos_dkg::{
     sigma_protocol::{
         self, homomorphism,
-        homomorphism::{fixed_base_msms, fixed_base_msms::Trait, tuple::TupleHomomorphism},
+        homomorphism::{
+            fixed_base_msms,
+            fixed_base_msms::Trait,
+            tuple::{PairingTupleHomomorphism, TupleHomomorphism},
+        },
     },
     Scalar,
 };
 use ark_bls12_381::Bls12_381;
 use ark_bn254::Bn254;
-use ark_ec::{pairing::Pairing, CurveGroup};
+use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::thread_rng;
 use std::fmt::Debug;
@@ -95,7 +99,7 @@ mod schnorr {
 mod chaum_pedersen {
     use super::{schnorr::*, *};
 
-    pub type ChaumPedersen<C> = TupleHomomorphism<Schnorr<C>, Schnorr<C>, true>;
+    pub type ChaumPedersen<C> = TupleHomomorphism<Schnorr<C>, Schnorr<C>>;
 
     // Implementing e.g. `Default` here would require a wrapper, but then `sigma_protocol::Trait` would have to get re-implemented...
     #[allow(non_snake_case)]
@@ -112,22 +116,23 @@ mod chaum_pedersen {
         }
     }
 
-    // pub type InhomogChaumPedersen<E> =
-    //     TupleHomomorphism<Schnorr<<E as Pairing>::G1>, Schnorr<<E as Pairing>::G2>, false>;
+    pub type InhomogChaumPedersen<E> =
+        PairingTupleHomomorphism<E, Schnorr<<E as Pairing>::G1>, Schnorr<<E as Pairing>::G2>>;
 
-    // #[allow(non_snake_case)]
-    // pub fn make_inhomogeneous_chaum_pedersen_instance<E: Pairing>() -> InhomogChaumPedersen<E> {
-    //     let G_1 = E::G1::generator().into_affine();
-    //     let G_2 = E::G2::generator().into_affine();
+    #[allow(non_snake_case)]
+    pub fn make_inhomogeneous_chaum_pedersen_instance<E: Pairing>() -> InhomogChaumPedersen<E> {
+        let G_1 = E::G1::generator().into_affine();
+        let G_2 = E::G2::generator().into_affine();
 
-    //     let schnorr1 = Schnorr { G: G_1 };
-    //     let schnorr2 = Schnorr { G: G_2 };
+        let schnorr1 = Schnorr { G: G_1 };
+        let schnorr2 = Schnorr { G: G_2 };
 
-    //     TupleHomomorphism {
-    //         hom1: schnorr1,
-    //         hom2: schnorr2,
-    //     }
-    // }
+        PairingTupleHomomorphism {
+            hom1: schnorr1,
+            hom2: schnorr2,
+            _pairing: std::marker::PhantomData,
+        }
+    }
 }
 
 #[test]
@@ -155,6 +160,19 @@ fn test_chaum_pedersen() {
     let witness_bn = Scalar(sample_field_element(&mut rng));
     test_sigma_protocol::<<Bn254 as Pairing>::G1, _>(make_chaum_pedersen_instance(), witness_bn);
     //    test_sigma_protocol::<<Bn254 as Pairing>::G1, _>(make_inhomogeneous_chaum_pedersen_instance(), witness_bn);
+
+    // ---- Bn254 Inhomogeneous ---- // TODO!!! make this nicer
+    use aptos_dkg::sigma_protocol::homomorphism::Trait;
+    let hom = make_inhomogeneous_chaum_pedersen_instance::<Bn254>();
+    let mut rng = thread_rng();
+
+    let statement = hom.apply(&witness_bn);
+    let ctxt = b"SIGMA-PROTOCOL-CONTEXT";
+
+    let proof = hom.prove(&witness_bn, &statement, ctxt, &mut rng);
+
+    hom.verify(&statement, &proof, ctxt)
+        .expect("Sigma protocol proof failed verification");
 
     // ---- Bls12_381 ----
     let witness_bls = Scalar(sample_field_element(&mut rng));
