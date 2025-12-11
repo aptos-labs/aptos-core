@@ -10,6 +10,7 @@ mod blocks_in_conditions;
 mod collapsible_if;
 mod cyclomatic_complexity;
 mod empty_if;
+mod empty_range;
 mod equal_operands_in_bin_op;
 mod find_unnecessary_casts;
 mod known_to_abort;
@@ -39,6 +40,7 @@ pub fn get_default_linter_pipeline(config: &BTreeMap<String, String>) -> Vec<Box
         Box::<blocks_in_conditions::BlocksInConditions>::default(),
         Box::<collapsible_if::CollapsibleIf>::default(),
         Box::<empty_if::EmptyIf>::default(),
+        Box::<empty_range::EmptyRange>::default(),
         Box::<equal_operands_in_bin_op::EqualOperandsInBinOp>::default(),
         Box::<find_unnecessary_casts::FindUnnecessaryCasts>::default(),
         Box::<known_to_abort::KnownToAbort>::default(),
