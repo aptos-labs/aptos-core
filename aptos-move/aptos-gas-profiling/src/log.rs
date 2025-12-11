@@ -30,7 +30,6 @@ pub enum ExecutionGasEvent {
         module_id: ModuleId,
         fn_name: Identifier,
         ty_args: Vec<TypeTag>,
-        args: Vec<String>,
         cost: InternalGas,
     },
     LoadResource {
@@ -61,7 +60,6 @@ pub enum FrameName {
 #[derive(Debug, Clone)]
 pub struct CallFrame {
     pub name: FrameName,
-    pub args: Vec<String>,
     pub events: Vec<ExecutionGasEvent>,
     /// Accumulates gas charged by native functions. For frames of non-native functions, kept as 0.
     pub native_gas: InternalGas,
@@ -192,19 +190,13 @@ impl<'a> Iterator for GasEventIter<'a> {
 }
 
 impl CallFrame {
-    pub fn new_function(
-        module_id: ModuleId,
-        name: Identifier,
-        ty_args: Vec<TypeTag>,
-        args: Vec<String>,
-    ) -> Self {
+    pub fn new_function(module_id: ModuleId, name: Identifier, ty_args: Vec<TypeTag>) -> Self {
         Self {
             name: FrameName::Function {
                 module_id,
                 name,
                 ty_args,
             },
-            args,
             events: vec![],
             native_gas: 0.into(),
         }
@@ -213,7 +205,6 @@ impl CallFrame {
     pub fn new_script() -> Self {
         Self {
             name: FrameName::Script,
-            args: vec![],
             events: vec![],
             native_gas: 0.into(),
         }
@@ -222,7 +213,6 @@ impl CallFrame {
     pub fn new_transaction_batch() -> Self {
         Self {
             name: FrameName::TransactionBatch,
-            args: vec![],
             events: vec![],
             native_gas: 0.into(),
         }
