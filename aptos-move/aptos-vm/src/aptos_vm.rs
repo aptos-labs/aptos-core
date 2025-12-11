@@ -1032,6 +1032,9 @@ impl AptosVM {
         if txn_data.is_keyless() {
             gas_meter.charge_keyless()?;
         }
+        if txn_data.is_slh_dsa_sha2_128s() {
+            gas_meter.charge_slh_dsa_sha2_128s()?;
+        }
 
         match executable {
             TransactionExecutableRef::Script(script) => {
@@ -1186,6 +1189,9 @@ impl AptosVM {
         gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
         if txn_data.is_keyless() {
             gas_meter.charge_keyless()?;
+        }
+        if txn_data.is_slh_dsa_sha2_128s() {
+            gas_meter.charge_slh_dsa_sha2_128s()?;
         }
 
         // Step 1: Obtain the payload. If any errors happen here, the entire transaction should fail
