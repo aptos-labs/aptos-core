@@ -284,3 +284,7 @@ pub trait CacheValueSizes: AptosGasMeter {
         heap_size: AbstractValueSize,
     ) -> PartialVMResult<()>;
 }
+
+pub trait PeakMemoryUsage {
+    fn peak_memory_usage(&self) -> AbstractValueSize;
+}

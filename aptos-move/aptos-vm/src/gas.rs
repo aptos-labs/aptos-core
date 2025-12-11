@@ -9,7 +9,9 @@ use aptos_gas_schedule::{
     VMGasParameters,
 };
 use aptos_logger::{enabled, Level};
-use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
+use aptos_memory_usage_tracker::{
+    MemoryAlgebra, MemoryTrackedGasMeter, MemoryTrackedGasMeterImpl, StandardMemoryAlgebra,
+};
 use aptos_types::on_chain_config::Features;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_log, speculative_warn};
 use aptos_vm_types::{
@@ -36,7 +38,25 @@ pub fn make_prod_gas_meter<T: BlockSynchronizationKillSwitch>(
     meter_balance: Gas,
     block_synchronization_kill_switch: &T,
 ) -> ProdGasMeter<'_, T> {
-    MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
+    make_prod_gas_meter_impl::<T, StandardMemoryAlgebra>(
+        gas_feature_version,
+        vm_gas_params,
+        storage_gas_params,
+        is_approved_gov_script,
+        meter_balance,
+        block_synchronization_kill_switch,
+    )
+}
+
+pub fn make_prod_gas_meter_impl<T: BlockSynchronizationKillSwitch, M: MemoryAlgebra>(
+    gas_feature_version: u64,
+    vm_gas_params: VMGasParameters,
+    storage_gas_params: StorageGasParameters,
+    is_approved_gov_script: bool,
+    meter_balance: Gas,
+    block_synchronization_kill_switch: &T,
+) -> MemoryTrackedGasMeterImpl<StandardGasMeter<StandardGasAlgebra<'_, T>>, M> {
+    MemoryTrackedGasMeterImpl::new(StandardGasMeter::new(StandardGasAlgebra::new(
         gas_feature_version,
         vm_gas_params,
         storage_gas_params,

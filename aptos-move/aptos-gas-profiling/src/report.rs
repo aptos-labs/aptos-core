@@ -326,6 +326,12 @@ impl TransactionGasLog {
             );
         }
 
+        // Memory usage
+        data.insert(
+            "peak-memory-usage".to_string(),
+            Value::String(format!("{}", self.peak_memory_usage)),
+        );
+
         // Execution trace
         let mut tree = self.exec_io.to_erased(true).tree;
         tree.include_child_costs();
