@@ -11,6 +11,7 @@ module aptos_experimental::market_bulk_order_tests {
     };
     use aptos_experimental::event_utils;
     use aptos_experimental::order_book_types::{good_till_cancelled};
+    use aptos_experimental::market_types;
 
     // Import common functions from market_tests
     use aptos_experimental::market_tests_common::{
@@ -301,7 +302,7 @@ module aptos_experimental::market_bulk_order_tests {
         let order_id = order_id_option.destroy_some();
 
         // Cancel the bulk order
-        cancel_bulk_order(&mut market, maker, &test_market_callbacks());
+        cancel_bulk_order(&mut market, maker, market_types::order_cancellation_reason_cancelled_by_user(), &test_market_callbacks());
 
         // Verify the cancellation event
         let cancel_event_store = new_event_store();

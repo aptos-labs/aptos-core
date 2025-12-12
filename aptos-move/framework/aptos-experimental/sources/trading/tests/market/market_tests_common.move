@@ -35,10 +35,11 @@ module aptos_experimental::market_tests_common {
         market_signer: &signer,
         allow_self_matching: bool
     ): Market<clearinghouse_test::TestOrderMetadata> {
+        timestamp::set_time_has_started_for_testing(admin);
         let market = new_market(
             admin,
             market_signer,
-            new_market_config(allow_self_matching, true, PRE_CANCEL_WINDOW_SECS)
+            new_market_config(allow_self_matching, true, PRE_CANCEL_WINDOW_SECS, false, 0)
         );
         clearinghouse_test::initialize(admin);
         market

@@ -6,6 +6,7 @@ module aptos_experimental::clearinghouse_test {
     #[test_only] friend aptos_experimental::market_test_utils;
     #[test_only] friend aptos_experimental::market_bulk_order_tests;
     #[test_only] friend aptos_experimental::market_mixed_order_tests;
+    #[test_only] friend aptos_experimental::dead_mans_switch_operations_test;
 
     use std::error;
     use std::option;

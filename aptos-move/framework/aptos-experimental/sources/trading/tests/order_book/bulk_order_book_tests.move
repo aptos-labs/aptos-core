@@ -8,6 +8,8 @@ module aptos_experimental::bulk_order_book_tests {
         destroy_bulk_order_place_response,
     };
     use aptos_experimental::price_time_index;
+    use aptos_framework::timestamp;
+    use aptos_framework::account;
 
     // Test accounts
     const TEST_ACCOUNT_1: address = @0x1;
@@ -35,6 +37,8 @@ module aptos_experimental::bulk_order_book_tests {
     }
 
     fun setup_test(): (BulkOrderBook<TestMetadata>, price_time_index::PriceTimeIndex) {
+        let aptos_framework = account::create_signer_for_test(@0x1);
+        timestamp::set_time_has_started_for_testing(&aptos_framework);
         let order_book = new_bulk_order_book<TestMetadata>();
         let price_time_idx = price_time_index::new_price_time_idx();
 
@@ -135,7 +139,7 @@ module aptos_experimental::bulk_order_book_tests {
         expected_remaining_size: u64
     ) {
         let (matched_order, matched_size) = match_result.destroy_order_match();
-        let (_order_id, account, _unique_priority_idx, price, remaining_size, is_bid, _sequence_number, _metadata) =
+        let (_order_id, account, _unique_priority_idx, price, remaining_size, is_bid, _sequence_number, _creation_time_micros, _metadata) =
             matched_order.destroy_bulk_order_match_details();
 
         assert!(account == expected_account);
@@ -155,7 +159,7 @@ module aptos_experimental::bulk_order_book_tests {
         expected_is_bid: bool
     ) {
         let (matched_order, matched_size) = match_result.destroy_order_match();
-        let (_order_id, account, _unique_priority_idx, price, _remaining_size, is_bid, _sequence_number, _metadata) =
+        let (_order_id, account, _unique_priority_idx, price, _remaining_size, is_bid, _sequence_number, _creation_time_micros, _metadata) =
             matched_order.destroy_bulk_order_match_details();
 
         assert!(account == expected_account);
@@ -185,7 +189,7 @@ module aptos_experimental::bulk_order_book_tests {
         match_result: OrderMatch<TestMetadata>
     ): (address, u64, u64, u64, u64, bool) {
         let (matched_order, matched_size) = match_result.destroy_order_match();
-        let (_order_id, account, _unique_priority_idx, price, remaining_size, is_bid, _sequence_number, _metadata) =
+        let (_order_id, account, _unique_priority_idx, price, remaining_size, is_bid, _sequence_number, _creation_time_micros, _metadata) =
             matched_order.destroy_bulk_order_match_details();
         (account, price, 0, matched_size, remaining_size, is_bid)
     }
@@ -291,7 +295,7 @@ module aptos_experimental::bulk_order_book_tests {
         expected_is_bid: bool
     ) {
         let (matched_order_result, matched_size) = match_result.destroy_order_match();
-        let (_, account, _, price, _, is_bid, _, _) = matched_order_result.destroy_bulk_order_match_details();
+        let (_, account, _, price, _, is_bid, _, _, _) = matched_order_result.destroy_bulk_order_match_details();
 
         assert!(account == expected_account);
         assert!(price == expected_price);

@@ -140,6 +140,12 @@ types of pending orders are supported.
 
 </dd>
 <dt>
+<code>creation_time_micros: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
 <code>metadata: M</code>
 </dt>
 <dd>
@@ -452,6 +458,7 @@ types of pending orders are supported.
         is_bid,
         trigger_condition,
         time_in_force,
+        creation_time_micros: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
         metadata
     }
 }
@@ -489,6 +496,7 @@ types of pending orders are supported.
         remaining_size,
         is_bid,
         time_in_force,
+        creation_time_micros,
         metadata
     ) = order_match_details.destroy_single_order_match_details();
     SingleOrderRequest::V1 {
@@ -501,6 +509,7 @@ types of pending orders are supported.
         is_bid,
         trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
         time_in_force,
+        creation_time_micros: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(creation_time_micros),
         metadata,
     }
 }
@@ -602,6 +611,7 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
             is_bid,
             _,
             _,
+            _,
             _
         ) = order.destroy_single_order();
         price_time_idx.cancel_active_order(bid_price, unique_priority_idx, is_bid);
@@ -621,6 +631,7 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
             _size,
             _is_bid,
             trigger_condition,
+            _,
             _,
             _
         ) = order.destroy_single_order();
@@ -804,6 +815,7 @@ else it is added to the active order book. The API aborts if it's not a maker or
             order_req.is_bid,
             order_req.trigger_condition,
             order_req.time_in_force,
+            order_req.creation_time_micros,
             order_req.metadata
         );
     <b>assert</b>!(
@@ -915,6 +927,7 @@ it is added to the order book, if it exists, its size is updated.
             order_req.is_bid,
             order_req.trigger_condition,
             order_req.time_in_force,
+            order_req.creation_time_micros,
             order_req.metadata
         );
 
@@ -992,13 +1005,14 @@ API to ensure that the order is a taker order before calling this API, otherwise
         is_bid,
         _,
         time_in_force,
-        metadata
+        metadata,
+        creation_time_micros
     ) = order.destroy_single_order();
 
     <b>if</b> (remaining_size == 0 && client_order_id.is_some()) {
         self.client_order_ids.remove(&new_account_client_order_id(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id.destroy_some()));
     };
-    new_order_match(new_single_order_match_details(order_id, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id, unique_priority_idx, price, orig_size, size, is_bid, time_in_force, metadata), matched_size)
+    new_order_match(new_single_order_match_details(order_id, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id, unique_priority_idx, price, orig_size, size, is_bid, time_in_force, creation_time_micros, metadata), matched_size)
 }
 </code></pre>
 
