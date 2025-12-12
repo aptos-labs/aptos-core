@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use aptos_batch_encryption::{
     schemes::fptx::FPTX, shared::key_derivation::BIBEDecryptionKeyShare,
     traits::BatchThresholdEncryption,
@@ -7,14 +7,12 @@ use aptos_batch_encryption::{
 use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
 use ark_std::rand::{distributions::Alphanumeric, thread_rng, Rng as _};
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use rayon::ThreadPoolBuilder;
 
 pub fn digest(c: &mut Criterion) {
     let mut group = c.benchmark_group("FPTX::digest");
 
     for batch_size in [32, 128, 512, 2048] {
         let mut rng = thread_rng();
-        let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ShamirThresholdConfig::new(1, 1);
         let (ek, dk, _, _, _, _) =
             FPTX::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
@@ -28,9 +26,9 @@ pub fn digest(c: &mut Criterion) {
 
         group.bench_with_input(
             BenchmarkId::from_parameter(batch_size),
-            &(dk, cts, tp),
+            &(dk, cts),
             |b, input| {
-                b.iter(|| FPTX::digest(&input.0, &input.1, 0, &input.2));
+                b.iter(|| FPTX::digest(&input.0, &input.1, 0));
             },
         );
     }
@@ -88,7 +86,6 @@ pub fn eval_proofs_compute_all(c: &mut Criterion) {
 
     for batch_size in [32, 128, 256, 512, 2048] {
         let mut rng = thread_rng();
-        let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ShamirThresholdConfig::new(1, 1);
         let (ek, dk, _, _, _, _) =
             FPTX::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
@@ -100,13 +97,13 @@ pub fn eval_proofs_compute_all(c: &mut Criterion) {
             .map(|_| FPTX::encrypt(&ek, &mut rng, &msg, &associated_data).unwrap())
             .collect();
 
-        let (_, pfs) = FPTX::digest(&dk, &cts, 0, &tp).unwrap();
+        let (_, pfs) = FPTX::digest(&dk, &cts, 0).unwrap();
 
         group.bench_with_input(
             BenchmarkId::from_parameter(batch_size),
-            &(pfs, dk, tp),
+            &(pfs, dk),
             |b, input| {
-                b.iter(|| FPTX::eval_proofs_compute_all(&input.0, &input.1, &input.2));
+                b.iter(|| FPTX::eval_proofs_compute_all(&input.0, &input.1));
             },
         );
     }
@@ -118,7 +115,6 @@ pub fn eval_proofs_compute_all_2(c: &mut Criterion) {
 
     for batch_size in [32, 128, 256, 512, 2048] {
         let mut rng = thread_rng();
-        let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ShamirThresholdConfig::new(1, 1);
         let (ek, dk, _, _, _, _) =
             FPTX::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
@@ -130,17 +126,13 @@ pub fn eval_proofs_compute_all_2(c: &mut Criterion) {
             .map(|_| FPTX::encrypt(&ek, &mut rng, &msg, &associated_data).unwrap())
             .collect();
 
-        let (_, pfs) = FPTX::digest(&dk, &cts, 0, &tp).unwrap();
+        let (_, pfs) = FPTX::digest(&dk, &cts, 0).unwrap();
 
         group.bench_with_input(
             BenchmarkId::from_parameter(batch_size),
-            &(pfs, dk, tp),
+            &(pfs, dk),
             |b, input| {
-                b.iter(|| {
-                    FPTX::eval_proofs_compute_all_vzgg_multi_point_eval(
-                        &input.0, &input.1, &input.2,
-                    )
-                });
+                b.iter(|| FPTX::eval_proofs_compute_all_vzgg_multi_point_eval(&input.0, &input.1));
             },
         );
     }
@@ -153,7 +145,6 @@ pub fn derive_decryption_key_share(c: &mut Criterion) {
     for n in [128, 256, 512, 1024] {
         let t = n * 2 / 3 + 1;
         let mut rng = thread_rng();
-        let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ShamirThresholdConfig::new(t, n);
         let (ek, dk, _, msk_shares, _, _) =
             FPTX::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
@@ -165,7 +156,7 @@ pub fn derive_decryption_key_share(c: &mut Criterion) {
             .map(|_| FPTX::encrypt(&ek, &mut rng, &msg, &associated_data).unwrap())
             .collect();
 
-        let (d, _) = FPTX::digest(&dk, &cts, 0, &tp).unwrap();
+        let (d, _) = FPTX::digest(&dk, &cts, 0).unwrap();
 
         let msk_share = &msk_shares[0];
 
@@ -184,7 +175,6 @@ pub fn verify_decryption_key_share(c: &mut Criterion) {
 
     for batch_size in [32, 128, 512, 2048] {
         let mut rng = thread_rng();
-        let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ShamirThresholdConfig::new(1, 1);
         let (ek, dk, vks, msk_shares, _, _) =
             FPTX::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
@@ -196,7 +186,7 @@ pub fn verify_decryption_key_share(c: &mut Criterion) {
             .map(|_| FPTX::encrypt(&ek, &mut rng, &msg, &associated_data).unwrap())
             .collect();
 
-        let (d, _) = FPTX::digest(&dk, &cts, 0, &tp).unwrap();
+        let (d, _) = FPTX::digest(&dk, &cts, 0).unwrap();
 
         let dk_share = FPTX::derive_decryption_key_share(&msk_shares[0], &d).unwrap();
         let vk = &vks[0];
@@ -218,7 +208,6 @@ pub fn reconstruct_decryption_key(c: &mut Criterion) {
     for n in [10, 128, 256, 512, 1024] {
         let t = n * 2 / 3 + 1;
         let mut rng = thread_rng();
-        let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ShamirThresholdConfig::new(t, n);
         let (ek, dk, _, msk_shares, _, _) =
             FPTX::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
@@ -230,7 +219,7 @@ pub fn reconstruct_decryption_key(c: &mut Criterion) {
             .map(|_| FPTX::encrypt(&ek, &mut rng, &msg, &associated_data).unwrap())
             .collect();
 
-        let (d, _) = FPTX::digest(&dk, &cts, 0, &tp).unwrap();
+        let (d, _) = FPTX::digest(&dk, &cts, 0).unwrap();
 
         let dk_shares: Vec<BIBEDecryptionKeyShare> = msk_shares
             .iter()
@@ -240,9 +229,9 @@ pub fn reconstruct_decryption_key(c: &mut Criterion) {
 
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("n={}, t={}", n, t)),
-            &(dk_shares, tc, tp),
+            &(dk_shares, tc),
             |b, input| {
-                b.iter(|| FPTX::reconstruct_decryption_key(&input.0, &input.1, &input.2).unwrap());
+                b.iter(|| FPTX::reconstruct_decryption_key(&input.0, &input.1).unwrap());
             },
         );
     }
@@ -253,7 +242,6 @@ pub fn decrypt(c: &mut Criterion) {
 
     for batch_size in [32, 128, 512, 2048] {
         let mut rng = thread_rng();
-        let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ShamirThresholdConfig::new(1, 1);
         let (ek, dk, _, msk_shares, _, _) =
             FPTX::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
@@ -265,23 +253,23 @@ pub fn decrypt(c: &mut Criterion) {
             .map(|_| FPTX::encrypt(&ek, &mut rng, &msg, &associated_data).unwrap())
             .collect();
 
-        let (d, pfs_promise) = FPTX::digest(&dk, &cts, 0, &tp).unwrap();
+        let (d, pfs_promise) = FPTX::digest(&dk, &cts, 0).unwrap();
 
-        let pfs = FPTX::eval_proofs_compute_all(&pfs_promise, &dk, &tp);
+        let pfs = FPTX::eval_proofs_compute_all(&pfs_promise, &dk);
 
         let dk_shares: Vec<BIBEDecryptionKeyShare> =
             vec![FPTX::derive_decryption_key_share(&msk_shares[0], &d).unwrap()];
 
-        let dk = FPTX::reconstruct_decryption_key(&dk_shares, &tc, &tp).unwrap();
+        let dk = FPTX::reconstruct_decryption_key(&dk_shares, &tc).unwrap();
 
         let prepared_cts: Vec<<FPTX as BatchThresholdEncryption>::PreparedCiphertext> =
             cts.iter().map(|ct| ct.prepare(&d, &pfs).unwrap()).collect();
 
         group.bench_with_input(
             BenchmarkId::from_parameter(batch_size),
-            &(dk, prepared_cts, tp),
+            &(dk, prepared_cts),
             |b, input| {
-                b.iter(|| FPTX::decrypt::<String>(&input.0, &input.1, &input.2).unwrap());
+                b.iter(|| FPTX::decrypt::<String>(&input.0, &input.1).unwrap());
             },
         );
     }

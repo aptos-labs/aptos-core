@@ -29,8 +29,8 @@ pub fn batch_verify_soks<Gr, A>(
     soks: &[SoK<Gr>],
     pk_base: &Gr,
     pk: &Gr,
-    spks: &Vec<bls12381::PublicKey>,
-    aux: &Vec<A>,
+    spks: &[bls12381::PublicKey],
+    aux: &[A],
     tau: &Scalar,
 ) -> anyhow::Result<()>
 where

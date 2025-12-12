@@ -251,7 +251,10 @@ impl AptosValidatorInterface for RestDebuggerInterface {
             .0
             .get_persisted_auxiliary_infos(start, limit)
             .await
-            .map_err(|e| anyhow!("Failed to get auxiliary info: {}", e))?;
+            .unwrap_or_else(|_e| {
+                // Instead of returning an error, return a Vec filled with PersistedAuxiliaryInfo::None
+                (0..limit).map(|_| PersistedAuxiliaryInfo::None).collect()
+            });
 
         Ok((txns, txn_infos, auxiliary_infos))
     }

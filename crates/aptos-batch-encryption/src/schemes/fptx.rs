@@ -1,7 +1,8 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
-    group::*,
+    errors::BatchEncryptionError,
+    group::{self, *},
     shared::{
         ark_serialize::*,
         ciphertext::{BIBEEncryptionKey, CTDecrypt, CTEncrypt, Ciphertext, PreparedCiphertext},
@@ -18,6 +19,12 @@ use crate::{
     traits::{AssociatedData, BatchThresholdEncryption, Plaintext},
 };
 use anyhow::{anyhow, Result};
+use aptos_crypto::SecretSharingConfig as _;
+use aptos_dkg::pvss::{
+    traits::{Reconstructable as _, Subtranscript},
+    Player,
+};
+use ark_ec::AffineRepr as _;
 use ark_ff::UniformRand as _;
 use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 use rayon::iter::{IntoParallelIterator, ParallelIterator as _};
@@ -81,8 +88,105 @@ impl BatchThresholdEncryption for FPTX {
     type MasterSecretKeyShare = BIBEMasterSecretKeyShare;
     type PreparedCiphertext = PreparedCiphertext;
     type Round = u64;
+    type SubTranscript = aptos_dkg::pvss::chunky::UnweightedSubtranscript<group::Pairing>;
     type ThresholdConfig = aptos_crypto::arkworks::shamir::ShamirThresholdConfig<Fr>;
     type VerificationKey = BIBEVerificationKey;
+
+    fn setup(
+        digest_key: &Self::DigestKey,
+        pvss_public_params: &<Self::SubTranscript as Subtranscript>::PublicParameters,
+        subtranscript_happypath: &Self::SubTranscript,
+        subtranscript_slowpath: &Self::SubTranscript,
+        tc_happypath: &Self::ThresholdConfig,
+        tc_slowpath: &Self::ThresholdConfig,
+        current_player: Player,
+        msk_share_decryption_key: &<Self::SubTranscript as Subtranscript>::DecryptPrivKey,
+    ) -> Result<(
+        Self::EncryptionKey,
+        Vec<Self::VerificationKey>,
+        Self::MasterSecretKeyShare,
+        Vec<Self::VerificationKey>,
+        Self::MasterSecretKeyShare,
+    )> {
+        (subtranscript_happypath.get_dealt_public_key()
+            == subtranscript_slowpath.get_dealt_public_key())
+        .then_some(())
+        .ok_or(BatchEncryptionError::HappySlowPathMismatchError)?;
+
+        let mpk_g2: G2Affine = subtranscript_happypath.get_dealt_public_key().as_g2();
+
+        let ek = EncryptionKey::new(mpk_g2, digest_key.tau_g2);
+
+        let vks_happypath: Vec<Self::VerificationKey> = tc_happypath
+            .get_players()
+            .into_iter()
+            .map(|p| Self::VerificationKey {
+                player: p,
+                mpk_g2,
+                vk_g2: subtranscript_happypath
+                    .get_public_key_share(tc_happypath, &p)
+                    .as_g2(),
+            })
+            .collect();
+
+        let vks_slowpath: Vec<Self::VerificationKey> = tc_slowpath
+            .get_players()
+            .into_iter()
+            .map(|p| Self::VerificationKey {
+                player: p,
+                mpk_g2,
+                vk_g2: subtranscript_slowpath
+                    .get_public_key_share(tc_slowpath, &p)
+                    .as_g2(),
+            })
+            .collect();
+
+        let msk_share_happypath = Self::MasterSecretKeyShare {
+            mpk_g2,
+            player: current_player,
+            shamir_share_eval: subtranscript_happypath
+                .decrypt_own_share(
+                    tc_happypath,
+                    &current_player,
+                    msk_share_decryption_key,
+                    pvss_public_params,
+                )
+                .0
+                .into_fr(),
+        };
+
+        let msk_share_slowpath = Self::MasterSecretKeyShare {
+            mpk_g2,
+            player: current_player,
+            shamir_share_eval: subtranscript_slowpath
+                .decrypt_own_share(
+                    tc_slowpath,
+                    &current_player,
+                    msk_share_decryption_key,
+                    pvss_public_params,
+                )
+                .0
+                .into_fr(),
+        };
+
+        for (vks, msk_share) in [
+            (&vks_happypath, &msk_share_happypath),
+            (&vks_slowpath, &msk_share_slowpath),
+        ] {
+            (vks[msk_share.player.get_id()].vk_g2
+                == G2Affine::generator() * msk_share.shamir_share_eval)
+                .then_some(())
+                .ok_or(BatchEncryptionError::VKMSKMismatchError)?;
+        }
+
+        Ok((
+            ek,
+            vks_happypath,
+            msk_share_happypath,
+            vks_slowpath,
+            msk_share_slowpath,
+        ))
+    }
 
     fn setup_for_testing(
         seed: u64,
@@ -136,13 +240,12 @@ impl BatchThresholdEncryption for FPTX {
         digest_key: &Self::DigestKey,
         cts: &[Self::Ciphertext],
         round: Self::Round,
-        pool: &rayon::ThreadPool,
     ) -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise)> {
         let mut ids: FreeRootIdSet<UncomputedCoeffs> =
             FreeRootIdSet::from_slice(&cts.iter().map(|ct| ct.id()).collect::<Vec<FreeRootId>>())
                 .ok_or(anyhow!(""))?;
 
-        pool.install(|| digest_key.digest(&mut ids, round))
+        digest_key.digest(&mut ids, round)
     }
 
     fn verify_ct(
@@ -159,17 +262,15 @@ impl BatchThresholdEncryption for FPTX {
     fn eval_proofs_compute_all(
         proofs: &Self::EvalProofsPromise,
         digest_key: &DigestKey,
-        pool: &rayon::ThreadPool,
     ) -> Self::EvalProofs {
-        pool.install(|| proofs.compute_all(digest_key))
+        proofs.compute_all(digest_key)
     }
 
     fn eval_proofs_compute_all_vzgg_multi_point_eval(
         proofs: &Self::EvalProofsPromise,
         digest_key: &DigestKey,
-        pool: &rayon::ThreadPool,
     ) -> Self::EvalProofs {
-        pool.install(|| proofs.compute_all_vgzz_multi_point_eval(digest_key))
+        proofs.compute_all_vgzz_multi_point_eval(digest_key)
     }
 
     fn eval_proof_for_ct(
@@ -189,37 +290,30 @@ impl BatchThresholdEncryption for FPTX {
     fn reconstruct_decryption_key(
         shares: &[Self::DecryptionKeyShare],
         config: &Self::ThresholdConfig,
-        pool: &rayon::ThreadPool,
     ) -> anyhow::Result<Self::DecryptionKey> {
-        pool.install(|| BIBEDecryptionKey::reconstruct(shares, config))
+        BIBEDecryptionKey::reconstruct(config, shares)
     }
 
     fn prepare_cts(
         cts: &[Self::Ciphertext],
         digest: &Self::Digest,
         eval_proofs: &Self::EvalProofs,
-        pool: &rayon::ThreadPool,
     ) -> Result<Vec<Self::PreparedCiphertext>> {
-        pool.install(|| {
-            cts.into_par_iter()
-                .map(|ct| ct.prepare(digest, eval_proofs))
-                .collect::<anyhow::Result<Vec<Self::PreparedCiphertext>>>()
-        })
+        cts.into_par_iter()
+            .map(|ct| ct.prepare(digest, eval_proofs))
+            .collect::<anyhow::Result<Vec<Self::PreparedCiphertext>>>()
     }
 
     fn decrypt<'a, P: Plaintext>(
         decryption_key: &Self::DecryptionKey,
         cts: &[Self::PreparedCiphertext],
-        pool: &rayon::ThreadPool,
     ) -> anyhow::Result<Vec<P>> {
-        pool.install(|| {
-            cts.into_par_iter()
-                .map(|ct| {
-                    let plaintext: Result<P> = decryption_key.decrypt(ct);
-                    plaintext
-                })
-                .collect::<anyhow::Result<Vec<P>>>()
-        })
+        cts.into_par_iter()
+            .map(|ct| {
+                let plaintext: Result<P> = decryption_key.decrypt(ct);
+                plaintext
+            })
+            .collect::<anyhow::Result<Vec<P>>>()
     }
 
     fn verify_decryption_key_share(

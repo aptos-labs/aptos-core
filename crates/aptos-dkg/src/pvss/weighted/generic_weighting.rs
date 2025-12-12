@@ -48,7 +48,7 @@ impl<T: Transcript> TryFrom<&[u8]> for GenericWeighting<T> {
 impl<T: Transcript> GenericWeighting<T> {
     fn to_weighted_encryption_keys(
         sc: &WeightedConfigBlstrs,
-        eks: &Vec<T::EncryptPubKey>,
+        eks: &[T::EncryptPubKey],
     ) -> Vec<T::EncryptPubKey> {
         // Re-organize the encryption key vector so that we deal multiple shares to each player,
         // proportional to their weight.
@@ -99,7 +99,7 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
         pp: &Self::PublicParameters,
         ssk: &Self::SigningSecretKey,
         spk: &Self::SigningPubKey,
-        eks: &Vec<Self::EncryptPubKey>,
+        eks: &[Self::EncryptPubKey],
         s: &Self::InputSecret,
         aux: &A,
         dealer: &Player,
@@ -121,26 +121,6 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
                 rng,
             ),
         }
-    }
-
-    fn verify<A: Serialize + Clone>(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        pp: &Self::PublicParameters,
-        spk: &Vec<Self::SigningPubKey>,
-        eks: &Vec<Self::EncryptPubKey>,
-        aux: &Vec<A>,
-    ) -> anyhow::Result<()> {
-        let duplicated_eks = GenericWeighting::<T>::to_weighted_encryption_keys(sc, eks);
-
-        T::verify(
-            &self.trx,
-            sc.get_threshold_config(),
-            pp,
-            spk,
-            &duplicated_eks,
-            aux,
-        )
     }
 
     fn get_dealers(&self) -> Vec<Player> {
@@ -212,10 +192,40 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
     }
 }
 
-impl<T> Aggregatable<WeightedConfig<ThresholdConfigBlstrs>> for GenericWeighting<T>
+impl<T: AggregatableTranscript> AggregatableTranscript for GenericWeighting<T>
 where
-    T: AggregatableTranscript + Transcript<SecretSharingConfig = ThresholdConfigBlstrs>,
+    T: Aggregatable<SecretSharingConfig = ThresholdConfigBlstrs>,
+    T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>,
 {
+    fn verify<A: Serialize + Clone>(
+        &self,
+        sc: &<Self as Transcript>::SecretSharingConfig,
+        pp: &Self::PublicParameters,
+        spk: &[Self::SigningPubKey],
+        eks: &[Self::EncryptPubKey],
+        aux: &[A],
+    ) -> anyhow::Result<()> {
+        let duplicated_eks = GenericWeighting::<T>::to_weighted_encryption_keys(sc, eks);
+
+        T::verify(
+            &self.trx,
+            sc.get_threshold_config(),
+            pp,
+            spk,
+            &duplicated_eks,
+            aux,
+        )
+    }
+}
+
+impl<T> Aggregatable for GenericWeighting<T>
+where
+    T: AggregatableTranscript
+        + Aggregatable<SecretSharingConfig = ThresholdConfigBlstrs>
+        + Transcript<SecretSharingConfig = ThresholdConfigBlstrs>,
+{
+    type SecretSharingConfig = WeightedConfig<ThresholdConfigBlstrs>;
+
     fn aggregate_with(
         &mut self,
         sc: &WeightedConfig<ThresholdConfigBlstrs>,

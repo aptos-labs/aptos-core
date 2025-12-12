@@ -1,14 +1,15 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use anyhow::Result;
 use aptos_crypto::player::Player;
+use aptos_dkg::pvss::traits::Subtranscript;
 use ark_std::rand::{CryptoRng, RngCore};
-use rayon::ThreadPool;
 use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;
 
 pub trait BatchThresholdEncryption {
-    type ThresholdConfig: aptos_crypto::ThresholdConfig;
+    type ThresholdConfig: aptos_crypto::SecretSharingConfig;
+    type SubTranscript: Subtranscript;
 
     /// An encryption key for the scheme. Allows for generating ciphertexts. If we want to actually
     /// deploy this scheme, the functionality here will have to be implemented in the SDK.
@@ -55,6 +56,23 @@ pub trait BatchThresholdEncryption {
     type DecryptionKey;
     type Id: PartialEq + Eq;
 
+    fn setup(
+        digest_key: &Self::DigestKey,
+        pvss_public_params: &<Self::SubTranscript as Subtranscript>::PublicParameters,
+        subtranscript_happypath: &Self::SubTranscript,
+        subtranscript_slowpath: &Self::SubTranscript,
+        tc_happypath: &Self::ThresholdConfig,
+        tc_slowpath: &Self::ThresholdConfig,
+        current_player: Player,
+        sk_share_decryption_key: &<Self::SubTranscript as Subtranscript>::DecryptPrivKey,
+    ) -> Result<(
+        Self::EncryptionKey,
+        Vec<Self::VerificationKey>,
+        Self::MasterSecretKeyShare,
+        Vec<Self::VerificationKey>,
+        Self::MasterSecretKeyShare,
+    )>;
+
     /// Generates an (insecure) setup for the batch threshold encryption scheme. Consists of
     /// a [`PublicKey`] which can be used to encrypt messages and to compute a digest from a list
     /// of ciphertexts, along with a vector of shares of type [`MasterSecretKeyShare`], which share
@@ -90,7 +108,6 @@ pub trait BatchThresholdEncryption {
         digest_key: &Self::DigestKey,
         cts: &[Self::Ciphertext],
         round: Self::Round,
-        pool: &ThreadPool,
     ) -> Result<(Self::Digest, Self::EvalProofsPromise)>;
 
     /// Validators *must* verify each ciphertext before approving it to be decrypted, in order to
@@ -106,7 +123,6 @@ pub trait BatchThresholdEncryption {
     fn eval_proofs_compute_all(
         proofs: &Self::EvalProofsPromise,
         digest_key: &Self::DigestKey,
-        pool: &ThreadPool,
     ) -> Self::EvalProofs;
 
     /// Compute KZG eval proofs. This will be the most expensive operation in the scheme. This
@@ -115,7 +131,6 @@ pub trait BatchThresholdEncryption {
     fn eval_proofs_compute_all_vzgg_multi_point_eval(
         proofs: &Self::EvalProofsPromise,
         digest_key: &Self::DigestKey,
-        pool: &ThreadPool,
     ) -> Self::EvalProofs;
 
     fn eval_proof_for_ct(
@@ -142,7 +157,6 @@ pub trait BatchThresholdEncryption {
     fn reconstruct_decryption_key(
         shares: &[Self::DecryptionKeyShare],
         config: &Self::ThresholdConfig,
-        pool: &ThreadPool,
     ) -> Result<Self::DecryptionKey>;
 
     // TODO: verify decryption key?
@@ -151,14 +165,12 @@ pub trait BatchThresholdEncryption {
         cts: &[Self::Ciphertext],
         digest: &Self::Digest,
         eval_proofs: &Self::EvalProofs,
-        pool: &ThreadPool,
     ) -> Result<Vec<Self::PreparedCiphertext>>;
 
     /// Decrypt a set of ciphertext using a decryption key and advice.
     fn decrypt<P: Plaintext>(
         decryption_key: &Self::DecryptionKey,
         cts: &[Self::PreparedCiphertext],
-        pool: &ThreadPool,
     ) -> Result<Vec<P>>;
 
     fn decrypt_individual<P: Plaintext>(

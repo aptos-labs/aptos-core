@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     commands::init_logger_and_metrics,
@@ -109,7 +109,7 @@ impl DiffCommand {
             .begin_version()
             .expect("Begin version must be set");
 
-        let diff_builder = TransactionDiffBuilder::new(self.allow_different_gas_usage);
+        let diff_builder = TransactionDiffBuilder::new(self.allow_different_gas_usage, false);
         let mut diffs = Vec::with_capacity(outputs.len());
 
         println!(

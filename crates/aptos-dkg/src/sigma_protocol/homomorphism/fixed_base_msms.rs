@@ -5,7 +5,9 @@ use crate::{
     sigma_protocol,
     sigma_protocol::{homomorphism, homomorphism::EntrywiseMap, Witness},
 };
-use ark_ec::pairing::Pairing;
+use aptos_crypto::arkworks::msm::IsMsmInput;
+use ark_ec::CurveGroup;
+use ark_ff::Zero;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use std::fmt::Debug;
 
@@ -24,27 +26,22 @@ use std::fmt::Debug;
 /// - A uniform “shape” abstraction for collecting and flattening MSM outputs
 ///   for batch verification in Σ-protocols.
 pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOutput>> {
-    /// The scalar type used in the MSMs.
-    type Scalar: Clone;
-
-    /// The group/base type used in the MSMs. Current instantiations always use E::G1Affine but as explained
-    /// in the TODO of doc comment of `fn verify_msm_hom`, we might want to be working with enums here in the future.
-    type Base: Clone;
+    // Type representing the scalar used in the `MsmInput`s. Convenient to repeat here
+    type Scalar: ark_ff::PrimeField; // Probably need less here but this what it'll be in practice
 
     /// Type representing a single MSM input (a set of bases and scalars). Normally, this would default
-    /// to `MsmInput<Self::Base, Self::Scalar>`, but stable Rust does not yet support associated type defaults,
-    /// hence we introduce a trait `IsMsmInput` and struct `MsmInput` below.
+    /// to `MsmInput<..., ...>`, but stable Rust does not yet support associated type defaults,
+    /// hence we introduce a trait `IsMsmInput` and struct `MsmInput` elsewhere.
     type MsmInput: CanonicalSerialize
         + CanonicalDeserialize
         + Clone
-        + IsMsmInput<Self::Base, Self::Scalar>
+        + IsMsmInput<Scalar = Self::Scalar>
         + Debug
         + Eq;
 
     /// The output type of evaluating an MSM. `Codomain` should equal `CodomainShape<MsmOutput>`, in the current version
-    /// of the code. In a future version where MsmOutput might be an enum (E::G1 or E::G2), Codomain should probably follow suit.
-    /// (TODO: Think this over)
-    type MsmOutput: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
+    /// of the code.
+    type MsmOutput: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq + Zero;
 
     /// Represents the **shape** of the homomorphism's output, parameterized by an inner type `T`.
     ///
@@ -61,8 +58,7 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
     ///
     /// ### TODO
     /// - The use of `IntoIterator` leads to cloning, which might not be very efficient
-    type CodomainShape<T>: EntrywiseMap<T, Output<T> = Self::CodomainShape<T>>
-        + IntoIterator<Item = T>
+    type CodomainShape<T>: IntoIterator<Item = T>
         + CanonicalSerialize
         + CanonicalDeserialize
         + Clone
@@ -79,7 +75,7 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
 
     /// Evaluates a single MSM instance given slices of bases and scalars. Current instantiations always use E::G1Affine
     /// for the base, but we might want to use enums for the base and output in the future.
-    fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput;
+    fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput;
 
     /// Applies `msm_eval` elementwise to a collection of MSM inputs.
     fn apply_msm(
@@ -92,42 +88,7 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
             Output<Self::MsmOutput> = Self::CodomainShape<Self::MsmOutput>,
         >,
     {
-        msms.map(|msm_input| Self::msm_eval(&msm_input.bases(), &msm_input.scalars()))
-    }
-}
-
-/// Workaround (see the main trait below) because stable Rust does not yet support associated type defaults.
-pub trait IsMsmInput<B, S> {
-    /// Returns a reference to the slice of base elements in this MSM input.
-    fn bases(&self) -> &[B];
-
-    /// Returns a reference to the slice of scalar elements in this MSM input.
-    fn scalars(&self) -> &[S];
-}
-
-/// Represents the input to a (not necessarily fixed-base) multi-scalar multiplication (MSM):
-/// a collection of bases and corresponding scalars.
-/// TODO: Might not be the right file for this struct, since not necessarily fixed-base
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, PartialEq, Eq, Debug)]
-pub struct MsmInput<
-    B: CanonicalSerialize + CanonicalDeserialize,
-    S: CanonicalSerialize + CanonicalDeserialize,
-> {
-    pub bases: Vec<B>,
-    pub scalars: Vec<S>,
-}
-
-impl<
-        B: CanonicalSerialize + CanonicalDeserialize,
-        S: CanonicalSerialize + CanonicalDeserialize,
-    > IsMsmInput<B, S> for MsmInput<B, S>
-{
-    fn bases(&self) -> &[B] {
-        &self.bases
-    }
-
-    fn scalars(&self) -> &[S] {
-        &self.scalars
+        msms.map(|msm_input| Self::msm_eval(msm_input))
     }
 }
 
@@ -138,7 +99,6 @@ impl<H, LargerDomain> Trait for homomorphism::LiftHomomorphism<H, LargerDomain>
 where
     H: Trait,
 {
-    type Base = H::Base;
     type CodomainShape<T>
         = H::CodomainShape<T>
     where
@@ -153,16 +113,16 @@ where
         self.hom.msm_terms(&projected)
     }
 
-    fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
-        H::msm_eval(bases, scalars)
+    fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
+        H::msm_eval(input)
     }
 }
 
-impl<E: Pairing, H, LargerDomain> sigma_protocol::Trait<E>
+impl<C: CurveGroup, H, LargerDomain> sigma_protocol::Trait<C>
     for homomorphism::LiftHomomorphism<H, LargerDomain>
 where
-    H: sigma_protocol::Trait<E>,
-    LargerDomain: Witness<E>,
+    H: sigma_protocol::Trait<C>,
+    LargerDomain: Witness<C::ScalarField>,
 {
     fn dst(&self) -> Vec<u8> {
         let mut dst = Vec::new();

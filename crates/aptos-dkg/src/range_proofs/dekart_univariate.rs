@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     algebra::polynomials, fiat_shamir, pcs::univariate_kzg, range_proofs::traits,
@@ -118,7 +118,7 @@ impl<E: Pairing> CanonicalSerialize for VerificationKey<E> {
 impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     type Commitment = Commitment<E>;
     type CommitmentKey = ProverKey<E>;
-    type CommitmentRandomness = Scalar<E>;
+    type CommitmentRandomness = Scalar<E::ScalarField>;
     type Input = E::ScalarField;
     type ProverKey = ProverKey<E>;
     type PublicStatement = PublicStatement<E>;

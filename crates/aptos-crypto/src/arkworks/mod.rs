@@ -5,6 +5,7 @@
 
 pub mod differentiate;
 pub mod hashing;
+pub mod msm;
 pub mod random;
 pub mod scrape;
 pub mod serialization;

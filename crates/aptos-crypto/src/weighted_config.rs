@@ -4,7 +4,10 @@
 //! Weighted threshold secret sharing configuration for BLSTRS-based PVSS.
 
 use crate::{
-    arkworks::shamir::{Reconstructable, ShamirShare, ShamirThresholdConfig},
+    arkworks::{
+        shamir::{Reconstructable, ShamirShare, ShamirThresholdConfig},
+        weighted_sum::WeightedSum,
+    },
     blstrs::{
         evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
         threshold_config::ThresholdConfigBlstrs,
@@ -13,12 +16,20 @@ use crate::{
     traits::{self, SecretSharingConfig as _, ThresholdConfig},
 };
 use anyhow::anyhow;
+use ark_ec::CurveGroup;
 use ark_ff::FftField;
 use more_asserts::assert_lt;
 use rand::Rng;
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
+
+/// A Shamir share consisting of a player and their associated share value.
+#[allow(type_alias_bounds)]
+pub type WeightedShamirShare<F: WeightedSum> = (Player, Vec<F>);
+/// A Shamir share specialized for elliptic curve groups.
+#[allow(type_alias_bounds)]
+pub type WeightedShamirGroupShare<G: CurveGroup> = WeightedShamirShare<G>;
 
 /// Encodes the *threshold configuration* for a *weighted* PVSS: i.e., the minimum weight $w$ and
 /// the total weight $W$ such that any subset of players with weight $\ge w$ can reconstruct a
@@ -260,6 +271,21 @@ impl<TC: ThresholdConfig> WeightedConfig<TC> {
 
         picked_players
     }
+
+    /// Convenience function that takes a slice of an arbitrary type
+    /// and groups the elements according to the player weights of this
+    /// config.
+    pub fn group_by_player<T: Clone>(&self, items: &[T]) -> Vec<Vec<T>> {
+        self.get_players()
+            .into_iter()
+            .map(|player| {
+                self.get_all_virtual_players(&player)
+                    .into_iter()
+                    .map(|virt_player| items[virt_player.get_id()].clone())
+                    .collect::<Vec<T>>()
+            })
+            .collect()
+    }
 }
 
 impl WeightedConfigBlstrs {
@@ -273,6 +299,13 @@ impl WeightedConfigBlstrs {
         self.tc.get_evaluation_domain()
     }
 }
+
+//impl<F: FftField> WeightedConfigArkworks<F> {
+//    pub fn share(&self, coeffs: &[F]) -> Vec<WeightedShamirShare<F>> {
+//        debug_assert_eq!(coeffs.len(), self.get_total_weight());
+//        let evals = self.get_threshold_config().domain.fft(coeffs);
+//    }
+//}
 
 impl<TC: ThresholdConfig> Display for WeightedConfig<TC> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -375,6 +408,43 @@ impl<SK: Reconstructable<ThresholdConfigBlstrs>> Reconstructable<WeightedConfigB
                 flattened_shares.push(tuple);
             }
         }
+
+        SK::reconstruct(sc.get_threshold_config(), &flattened_shares)
+    }
+}
+
+/// Implements weighted reconstruction of a secret `SK` through the existing unweighted reconstruction
+/// implementation of `SK`.
+impl<F: FftField, SK: Reconstructable<ShamirThresholdConfig<F>>>
+    Reconstructable<WeightedConfigArkworks<F>> for SK
+{
+    type ShareValue = Vec<SK::ShareValue>;
+
+    fn reconstruct(
+        sc: &WeightedConfigArkworks<F>,
+        shares: &[ShamirShare<Self::ShareValue>],
+    ) -> anyhow::Result<Self> {
+        let mut flattened_shares = Vec::with_capacity(sc.get_total_weight());
+
+        // println!();
+        for (player, sub_shares) in shares {
+            // println!(
+            //     "Flattening {} share(s) for player {player}",
+            //     sub_shares.len()
+            // );
+            for (pos, share) in sub_shares.iter().enumerate() {
+                let virtual_player = sc.get_virtual_player(player, pos);
+
+                // println!(
+                //     " + Adding share {pos} as virtual player {virtual_player}: {:?}",
+                //     share
+                // );
+                // TODO(Performance): Avoiding the cloning here might be nice
+                let tuple = (virtual_player, share.clone());
+                flattened_shares.push(tuple);
+            }
+        }
+        flattened_shares.truncate(sc.get_threshold_weight());
 
         SK::reconstruct(sc.get_threshold_config(), &flattened_shares)
     }

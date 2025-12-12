@@ -100,7 +100,7 @@ macro_rules! dealt_secret_key_impl {
                 );
                 let bases = shares
                     .iter()
-                    .map(|(_, share)| share.0.h_hat)
+                    .map(|(_, share)| *share.as_group_element())
                     .collect::<Vec<$GTProjective>>();
 
                 // println!();

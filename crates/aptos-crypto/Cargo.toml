@@ -66,6 +66,7 @@ sha2 = { workspace = true }
 sha2_0_10_6 = { workspace = true }
 sha3 = { workspace = true }
 signature = { workspace = true }
+slh-dsa = { workspace = true }
 static_assertions = { workspace = true }
 thiserror = { workspace = true }
 tiny-keccak = { workspace = true }
@@ -146,6 +147,10 @@ harness = false
 
 [[bench]]
 name = "secp256k1"
+harness = false
+
+[[bench]]
+name = "slh_dsa_sha2_128s"
 harness = false
 
 [[example]]

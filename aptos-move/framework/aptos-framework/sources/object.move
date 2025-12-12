@@ -225,14 +225,7 @@ module aptos_framework::object {
 
     /// Derives an object address from the source address and an object: sha3_256([source | object addr | 0xFC]).
     public fun create_user_derived_object_address(source: address, derive_from: address): address {
-        if (std::features::object_native_derived_address_enabled()) {
-            create_user_derived_object_address_impl(source, derive_from)
-        } else {
-            let bytes = bcs::to_bytes(&source);
-            vector::append(&mut bytes, bcs::to_bytes(&derive_from));
-            vector::push_back(&mut bytes, OBJECT_DERIVED_SCHEME);
-            from_bcs::to_address(hash::sha3_256(bytes))
-        }
+        create_user_derived_object_address_impl(source, derive_from)
     }
 
     /// Derives an object from an Account GUID.
@@ -929,20 +922,12 @@ module aptos_framework::object {
 
     #[test(fx = @std)]
     fun test_correct_derived_object_address(fx: signer) {
-        use std::features;
         use aptos_framework::object;
-        let feature = features::get_object_native_derived_address_feature();
 
         let source = @0x12345;
         let derive_from = @0x7890;
 
-        features::change_feature_flags_for_testing(&fx, vector[], vector[feature]);
-        let in_move = object::create_user_derived_object_address(source, derive_from);
-
-        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
         let in_native = object::create_user_derived_object_address(source, derive_from);
-
-        assert!(in_move == in_native, 0);
 
         let bytes = bcs::to_bytes(&source);
         vector::append(&mut bytes, bcs::to_bytes(&derive_from));

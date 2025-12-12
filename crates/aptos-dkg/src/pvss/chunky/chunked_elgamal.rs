@@ -6,7 +6,11 @@ use crate::{
     sigma_protocol::homomorphism::{self, fixed_base_msms, fixed_base_msms::Trait, EntrywiseMap},
     Scalar,
 };
-use aptos_crypto::arkworks::{hashing, random::sample_field_element};
+use aptos_crypto::arkworks::{
+    hashing,
+    msm::{IsMsmInput, MsmInput},
+    random::sample_field_element,
+};
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{pairing::Pairing, VariableBaseMSM};
 use ark_ff::PrimeField;
@@ -73,8 +77,42 @@ pub struct Homomorphism<'a, E: Pairing> {
     pub eks: &'a [E::G1Affine],
 }
 
+// Identical to the previous struct as the bases are identical, but the witness will be different
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(non_snake_case)]
+pub struct WeightedHomomorphism<'a, E: Pairing> {
+    pub pp: &'a PublicParameters<E>,
+    pub eks: &'a [E::G1Affine],
+}
+
 // Need to manually implement `CanonicalSerialize` because `Homomorphism` has references instead of owned values
 impl<'a, E: Pairing> CanonicalSerialize for Homomorphism<'a, E> {
+    fn serialize_with_mode<W: Write>(
+        &self,
+        mut writer: W,
+        compress: Compress,
+    ) -> Result<(), SerializationError> {
+        self.pp.G.serialize_with_mode(&mut writer, compress)?;
+        self.pp.H.serialize_with_mode(&mut writer, compress)?;
+        for ek in self.eks {
+            ek.serialize_with_mode(&mut writer, compress)?;
+        }
+        Ok(())
+    }
+
+    fn serialized_size(&self, compress: Compress) -> usize {
+        self.pp.G.serialized_size(compress)
+            + self.pp.H.serialized_size(compress)
+            + self
+                .eks
+                .iter()
+                .map(|ek| ek.serialized_size(compress))
+                .sum::<usize>()
+    }
+}
+
+// TODO: get rid of this copy-paste with a marker...
+impl<'a, E: Pairing> CanonicalSerialize for WeightedHomomorphism<'a, E> {
     fn serialize_with_mode<W: Write>(
         &self,
         mut writer: W,
@@ -106,20 +144,46 @@ pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone> {
     pub randomness: Vec<T>,  // Same story, depending on T
 }
 
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
+pub struct WeightedCodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone> {
+    pub chunks: Vec<Vec<Vec<T>>>, // Depending on T these can be chunked ciphertexts, or their MSM representations
+    pub randomness: Vec<Vec<T>>,  // Same story, depending on T
+}
+
 // Witness shape happens to be identical to CodomainShape, this is mostly coincidental
 // Setting `type Witness = CodomainShape<Scalar<E>>` would later require deriving SigmaProtocolWitness for CodomainShape<T>
-// (and would be overkill anyway), but this leads to issues as it expects T to be a Pairing, so we'll simply redefine it:
+// (and would be overkill anyway), but this leads to issues as it expects `T` to be a Pairing, so we'll simply redefine it:
 #[derive(
     SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq,
 )]
-pub struct Witness<E: Pairing> {
-    pub plaintext_chunks: Vec<Vec<Scalar<E>>>,
-    pub plaintext_randomness: Vec<Scalar<E>>,
+pub struct Witness<F: PrimeField> {
+    pub plaintext_chunks: Vec<Vec<Scalar<F>>>,
+    pub plaintext_randomness: Vec<Scalar<F>>, // PlaintextRandomness<E>,
 }
+
+#[derive(
+    SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq,
+)]
+pub struct WeightedWitness<F: PrimeField> {
+    pub plaintext_chunks: Vec<Vec<Vec<Scalar<F>>>>,
+    pub plaintext_randomness: Vec<Vec<Scalar<F>>>, // For at most max_weight, there needs to be a vector of randomness to encrypt a vector of chunks
+}
+
+// type PlayerPlaintextChunks<E: Pairing> = Vec<Vec<Scalar<E>>>;
+// type PlaintextRandomness<E: Pairing> = Vec<Scalar<E>>;
 
 impl<E: Pairing> homomorphism::Trait for Homomorphism<'_, E> {
     type Codomain = CodomainShape<E::G1>;
-    type Domain = Witness<E>;
+    type Domain = Witness<E::ScalarField>;
+
+    fn apply(&self, input: &Self::Domain) -> Self::Codomain {
+        self.apply_msm(self.msm_terms(input))
+    }
+}
+
+impl<E: Pairing> homomorphism::Trait for WeightedHomomorphism<'_, E> {
+    type Codomain = WeightedCodomainShape<E::G1>;
+    type Domain = WeightedWitness<E::ScalarField>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
         self.apply_msm(self.msm_terms(input))
@@ -150,6 +214,37 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> Entrywis
     }
 }
 
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> EntrywiseMap<T>
+    for WeightedCodomainShape<T>
+{
+    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> =
+        WeightedCodomainShape<U>;
+
+    fn map<U, F>(self, f: F) -> Self::Output<U>
+    where
+        F: Fn(T) -> U,
+        U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
+    {
+        let chunks = self
+            .chunks
+            .into_iter()
+            .map(|row| {
+                row.into_iter()
+                    .map(|inner_row| inner_row.into_iter().map(&f).collect::<Vec<_>>())
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+
+        let randomness = self
+            .randomness
+            .into_iter()
+            .map(|inner_vec| inner_vec.into_iter().map(&f).collect::<Vec<_>>())
+            .collect();
+
+        WeightedCodomainShape { chunks, randomness }
+    }
+}
+
 // TODO: Use a derive macro?
 impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator for CodomainShape<T> {
     type IntoIter = std::vec::IntoIter<T>;
@@ -162,14 +257,26 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator for Codo
     }
 }
 
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator
+    for WeightedCodomainShape<T>
+{
+    type IntoIter = std::vec::IntoIter<T>;
+    type Item = T;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let mut combined: Vec<T> = self.chunks.into_iter().flatten().flatten().collect();
+        combined.extend(self.randomness.into_iter().flatten());
+        combined.into_iter()
+    }
+}
+
 #[allow(non_snake_case)]
 impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
-    type Base = E::G1Affine;
     type CodomainShape<T>
         = CodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-    type MsmInput = fixed_base_msms::MsmInput<Self::Base, Self::Scalar>;
+    type MsmInput = MsmInput<E::G1Affine, E::ScalarField>;
     type MsmOutput = E::G1;
     type Scalar = E::ScalarField;
 
@@ -180,13 +287,8 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
             .iter()
             .enumerate()
             .map(|(i, z_i)| {
-                z_i.iter()
-                    .zip(input.plaintext_randomness.iter())
-                    .map(|(&z_ij, &r_j)| fixed_base_msms::MsmInput {
-                        bases: vec![self.pp.G, self.eks[i]],
-                        scalars: vec![z_ij.0, r_j.0],
-                    })
-                    .collect()
+                // here i is the player's id
+                chunks_msm_terms(self.pp, self.eks[i], z_i, &input.plaintext_randomness)
             })
             .collect();
 
@@ -194,7 +296,7 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
         let Rs = input
             .plaintext_randomness
             .iter()
-            .map(|&r_j| fixed_base_msms::MsmInput {
+            .map(|&r_j| MsmInput {
                 bases: vec![self.pp.H],
                 scalars: vec![r_j.0],
             })
@@ -206,14 +308,105 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
         }
     }
 
-    fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
-        E::G1::msm(bases, scalars).expect("MSM failed in ChunkedElgamal")
+    fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
+        E::G1::msm(input.bases(), input.scalars()).expect("MSM failed in ChunkedElgamal")
     }
 }
 
-impl<'a, E: Pairing> sigma_protocol::Trait<E> for Homomorphism<'a, E> {
+// Given a chunked scalar [z_j] and vector of randomness [r_j], returns a vector of MSM terms
+// of the vector C_j = z_j * G_1 + r_j * ek, so a vector with entries [(G_1, ek), (z_j, r_j)]_j
+fn chunks_msm_terms<E: Pairing>(
+    pp: &PublicParameters<E>,
+    ek: <E as Pairing>::G1Affine,
+    chunks: &[Scalar<E::ScalarField>],
+    correlated_randomness: &[Scalar<E::ScalarField>],
+) -> Vec<MsmInput<E::G1Affine, E::ScalarField>> {
+    chunks
+        .iter()
+        .zip(correlated_randomness.iter())
+        .map(|(&z_ij, &r_j)| MsmInput {
+            bases: vec![pp.G, ek],
+            scalars: vec![z_ij.0, r_j.0],
+        })
+        .collect()
+}
+
+// Given a vector of chunked scalar [[z_j]] and vector of randomness [[r_j]], returns a vector of
+// vector of MSM terms. This is used for the weighted PVSS, where each player gets a vector of chunks
+pub fn chunks_vec_msm_terms<E: Pairing>(
+    pp: &PublicParameters<E>,
+    ek: <E as Pairing>::G1Affine,
+    chunks_vec: &[Vec<Scalar<E::ScalarField>>],
+    correlated_randomness_vec: &[Vec<Scalar<E::ScalarField>>],
+) -> Vec<Vec<MsmInput<E::G1Affine, E::ScalarField>>> {
+    chunks_vec
+        .iter()
+        .zip(correlated_randomness_vec.iter())
+        .map(|(chunks, correlated_randomness)| {
+            chunks_msm_terms(pp, ek, chunks, correlated_randomness)
+        })
+        .collect()
+}
+
+#[allow(non_snake_case)]
+impl<'a, E: Pairing> fixed_base_msms::Trait for WeightedHomomorphism<'a, E> {
+    type CodomainShape<T>
+        = WeightedCodomainShape<T>
+    where
+        T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
+    type MsmInput = MsmInput<E::G1Affine, E::ScalarField>;
+    type MsmOutput = E::G1;
+    type Scalar = E::ScalarField;
+
+    fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
+        // C_{i,j} = z_{i,j} * G_1 + r_j * ek[i]
+        let Cs = input
+            .plaintext_chunks
+            .iter()
+            .enumerate()
+            .map(|(i, z_i)| {
+                // here `i` is the player's id
+                chunks_vec_msm_terms(self.pp, self.eks[i], z_i, &input.plaintext_randomness)
+            })
+            .collect();
+
+        // R_j = r_j * H_1
+        let Rs = input
+            .plaintext_randomness
+            .iter()
+            .map(|inner_vec| {
+                inner_vec
+                    .iter()
+                    .map(|&r_j| MsmInput {
+                        bases: vec![self.pp.H],
+                        scalars: vec![r_j.0],
+                    })
+                    .collect()
+            })
+            .collect();
+
+        WeightedCodomainShape {
+            chunks: Cs,
+            randomness: Rs,
+        }
+    }
+
+    fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
+        E::G1::msm(input.bases(), input.scalars()).expect("MSM failed in ChunkedElgamal")
+    }
+}
+
+impl<'a, E: Pairing> sigma_protocol::Trait<E::G1> for Homomorphism<'a, E> {
     fn dst(&self) -> Vec<u8> {
-        b"APTOS_CHUNKED_ELGAMAL_SIGMA_PROTOCOL_DST".to_vec()
+        DST.to_vec()
+    }
+}
+
+impl<'a, E: Pairing> sigma_protocol::Trait<E::G1> for WeightedHomomorphism<'a, E> {
+    fn dst(&self) -> Vec<u8> {
+        let mut result = b"WEIGHTED_".to_vec();
+        result.extend(DST);
+        result
     }
 }
 
@@ -243,8 +436,8 @@ where
     r_vals
 }
 
-pub(crate) fn num_chunks_per_scalar<E: Pairing>(ell: u8) -> u32 {
-    E::ScalarField::MODULUS_BIT_SIZE.div_ceil(ell as u32) // Maybe add `as usize` here?
+pub(crate) fn num_chunks_per_scalar<F: PrimeField>(ell: u8) -> u32 {
+    F::MODULUS_BIT_SIZE.div_ceil(ell as u32) // Maybe add `as usize` here?
 }
 
 #[cfg(test)]
@@ -262,14 +455,14 @@ mod tests {
     fn prepare_chunked_witness<E: Pairing>(
         num_values: usize,
         ell: u8,
-    ) -> (Vec<E::ScalarField>, Witness<E>, u8, u32) {
+    ) -> (Vec<E::ScalarField>, Witness<E::ScalarField>, u8, u32) {
         let mut rng = thread_rng();
 
         // 1. Generate random values
         let zs = sample_field_elements(num_values, &mut rng);
 
         // 2. Compute number of chunks
-        let number_of_chunks = num_chunks_per_scalar::<E>(ell);
+        let number_of_chunks = num_chunks_per_scalar::<E::ScalarField>(ell);
 
         // 3. Generate correlated randomness
         let rs: Vec<E::ScalarField> = correlated_randomness(&mut rng, 1 << ell, number_of_chunks);
@@ -282,7 +475,7 @@ mod tests {
 
         // 5. Build witness
         let witness = Witness {
-            plaintext_chunks: Scalar::<E>::vecvec_from_inner(chunked_values),
+            plaintext_chunks: Scalar::<E::ScalarField>::vecvec_from_inner(chunked_values),
             plaintext_randomness: Scalar::vec_from_inner(rs),
         };
 
@@ -294,7 +487,7 @@ mod tests {
         let (zs, witness, radix_exponent, _num_chunks) = prepare_chunked_witness::<E>(2, 16);
 
         // 6. Initialize the homomorphism
-        let pp = PublicParameters::default();
+        let pp: PublicParameters<E> = PublicParameters::default();
 
         let hom = Homomorphism {
             pp: &pp,
@@ -328,7 +521,7 @@ mod tests {
         let (zs, witness, radix_exponent, _num_chunks) = prepare_chunked_witness::<E>(2, 16);
 
         // 6. Initialize the homomorphism
-        let pp = PublicParameters::default();
+        let pp: PublicParameters<E> = PublicParameters::default();
         let dks: Vec<E::ScalarField> = sample_field_elements(2, &mut thread_rng());
 
         let hom = Homomorphism {
@@ -337,7 +530,7 @@ mod tests {
         };
 
         // 7. Apply homomorphism to obtain chunked ciphertexts
-        let CodomainShape {
+        let CodomainShape::<E::G1> {
             chunks: Cs,
             randomness: Rs,
         } = hom.apply(&witness);

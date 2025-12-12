@@ -2,6 +2,8 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    allowlist_cache::AllowlistCache,
+    challenge_cache::ChallengeCache,
     clients::{big_query::TableWriteClient, humio, victoria_metrics_api::Client as MetricsClient},
     peer_location::PeerLocation,
     types::common::EpochedPeerStore,
@@ -20,7 +22,7 @@ use std::{
 use warp::Filter;
 
 /// Container that holds various metric clients used for sending metrics from
-/// various sources to appropriate backends.
+/// various sources to appropriate backends (node telemetry only).
 #[derive(Clone, Default)]
 pub struct GroupedMetricsClients {
     /// Client(s) for exporting metrics of the running telemetry service
@@ -52,10 +54,30 @@ impl From<MetricsEndpointsConfig> for GroupedMetricsClients {
     }
 }
 
+/// Log backend type
+#[derive(Clone, Debug)]
+pub enum LogIngestClient {
+    Humio(humio::IngestClient),
+    Loki(crate::clients::loki::LokiIngestClient),
+}
+
+impl LogIngestClient {
+    /// Ingest unstructured logs (works for both Humio and Loki)
+    pub async fn ingest_unstructured_log(
+        &self,
+        log: crate::types::humio::UnstructuredLog,
+    ) -> Result<reqwest::Response, anyhow::Error> {
+        match self {
+            LogIngestClient::Humio(client) => client.ingest_unstructured_log(log).await,
+            LogIngestClient::Loki(client) => client.ingest_unstructured_log(log).await,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct LogIngestClients {
-    pub known_logs_ingest_client: humio::IngestClient,
-    pub unknown_logs_ingest_client: humio::IngestClient,
+    pub known_logs_ingest_client: LogIngestClient,
+    pub unknown_logs_ingest_client: LogIngestClient,
     pub blacklist: Option<HashSet<PeerId>>,
 }
 
@@ -102,11 +124,28 @@ impl PeerStoreTuple {
     }
 }
 
+/// Container for a single custom contract configuration and its clients
+#[derive(Clone)]
+pub struct CustomContractInstance {
+    pub config: crate::OnChainAuthConfig,
+    pub metrics_clients: HashMap<String, MetricsClient>,
+    pub logs_client: Option<LogIngestClient>,
+    pub bigquery_client: Option<TableWriteClient>,
+}
+
+/// Container for all custom contract configurations
+#[derive(Clone, Default)]
+pub struct CustomContractClients {
+    /// Map of custom contract name to its instance
+    pub instances: HashMap<String, CustomContractInstance>,
+}
+
 #[derive(Clone)]
 pub struct ClientTuple {
     bigquery_client: Option<TableWriteClient>,
     victoria_metrics_clients: Option<GroupedMetricsClients>,
     log_ingest_clients: Option<LogIngestClients>,
+    custom_contract_clients: Option<CustomContractClients>,
 }
 
 impl ClientTuple {
@@ -114,11 +153,13 @@ impl ClientTuple {
         bigquery_client: Option<TableWriteClient>,
         victoria_metrics_clients: Option<GroupedMetricsClients>,
         log_ingest_clients: Option<LogIngestClients>,
+        custom_contract_clients: Option<CustomContractClients>,
     ) -> ClientTuple {
         Self {
             bigquery_client,
             victoria_metrics_clients,
             log_ingest_clients,
+            custom_contract_clients,
         }
     }
 }
@@ -167,6 +208,8 @@ pub struct Context {
     log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
     peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
     peer_locations: Arc<RwLock<HashMap<PeerId, PeerLocation>>>,
+    allowlist_cache: AllowlistCache,
+    challenge_cache: ChallengeCache,
 }
 
 impl Context {
@@ -187,6 +230,10 @@ impl Context {
             log_env_map,
             peer_identities,
             peer_locations,
+            // Cache is kept fresh by AllowlistCacheUpdater running in background
+            allowlist_cache: AllowlistCache::new(),
+            // Challenge cache uses same TTL as CHALLENGE_TTL_SECS (300 seconds)
+            challenge_cache: ChallengeCache::new(),
         }
     }
 
@@ -242,5 +289,33 @@ impl Context {
     #[cfg(test)]
     pub fn log_env_map_mut(&mut self) -> &mut HashMap<ChainId, HashMap<PeerId, String>> {
         &mut self.log_env_map
+    }
+
+    /// Get storage provider clients
+    pub fn custom_contract_clients(&self) -> &CustomContractClients {
+        self.clients
+            .custom_contract_clients
+            .as_ref()
+            .unwrap_or_else(|| {
+                // Return empty clients if not configured
+                static EMPTY: once_cell::sync::Lazy<CustomContractClients> =
+                    once_cell::sync::Lazy::new(CustomContractClients::default);
+                &EMPTY
+            })
+    }
+
+    /// Get a specific custom contract instance by name
+    pub fn get_custom_contract(&self, name: &str) -> Option<&CustomContractInstance> {
+        self.custom_contract_clients().instances.get(name)
+    }
+
+    /// Get the allowlist cache
+    pub fn allowlist_cache(&self) -> &AllowlistCache {
+        &self.allowlist_cache
+    }
+
+    /// Get the challenge cache for custom contract authentication
+    pub fn challenge_cache(&self) -> &ChallengeCache {
+        &self.challenge_cache
     }
 }

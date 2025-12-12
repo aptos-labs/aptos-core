@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Defines different overrides for on-chain state used for benchmarking. With overrides, past
 //! transactions can be replayed on top of a modified state, and we can evaluate how it impacts
@@ -88,10 +88,7 @@ impl OverrideConfig {
         })
     }
 
-    pub(crate) fn get_state_override(
-        &self,
-        state_view: &impl StateView,
-    ) -> HashMap<StateKey, StateValue> {
+    pub fn get_state_override(&self, state_view: &impl StateView) -> HashMap<StateKey, StateValue> {
         let mut state_override = HashMap::new();
 
         // Enable/disable features.

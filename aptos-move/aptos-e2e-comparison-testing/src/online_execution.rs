@@ -26,6 +26,7 @@ pub struct OnlineExecutor {
     filter_condition: FilterCondition,
     execution_mode: ExecutionMode,
     endpoint: String,
+    disable_aa_fa: bool,
 }
 
 impl OnlineExecutor {
@@ -37,6 +38,7 @@ impl OnlineExecutor {
         skip_publish_txns: bool,
         execution_mode: ExecutionMode,
         endpoint: String,
+        disable_aa_fa: bool,
     ) -> Self {
         Self {
             debugger,
@@ -50,6 +52,7 @@ impl OnlineExecutor {
             },
             execution_mode,
             endpoint,
+            disable_aa_fa,
         }
     }
 
@@ -61,6 +64,7 @@ impl OnlineExecutor {
         skip_publish_txns: bool,
         execution_mode: ExecutionMode,
         endpoint: String,
+        disable_aa_fa: bool,
     ) -> Result<Self> {
         Ok(Self::new(
             Arc::new(RestDebuggerInterface::new(rest_client)),
@@ -70,6 +74,7 @@ impl OnlineExecutor {
             skip_publish_txns,
             execution_mode,
             endpoint,
+            disable_aa_fa,
         ))
     }
 
@@ -81,6 +86,8 @@ impl OnlineExecutor {
         compilation_cache: &mut CompilationCache,
         execution_mode: Option<ExecutionMode>,
         current_dir: PathBuf,
+        base_experiments: &[String],
+        compared_experiments: &[String],
     ) -> Option<PackageInfo> {
         let upgrade_number = if is_aptos_package(&package_name) {
             None
@@ -94,7 +101,10 @@ impl OnlineExecutor {
             package_name: package_name.clone(),
             upgrade_number,
         };
-        if compilation_cache.failed_packages_v1.contains(&package_info) {
+        if compilation_cache
+            .failed_packages_base
+            .contains(&package_info)
+        {
             return None;
         }
         if !is_aptos_package(&package_name)
@@ -108,6 +118,8 @@ impl OnlineExecutor {
                 &map,
                 compilation_cache,
                 execution_mode,
+                base_experiments,
+                compared_experiments,
             );
             if res.is_err() {
                 eprintln!("{} at:{}", res.unwrap_err(), version);
@@ -117,7 +129,13 @@ impl OnlineExecutor {
         Some(package_info)
     }
 
-    pub async fn execute(&self, begin: Version, limit: u64) -> Result<()> {
+    pub async fn execute(
+        &self,
+        begin: Version,
+        limit: u64,
+        base_experiments: Vec<String>,
+        compared_experiments: Vec<String>,
+    ) -> Result<()> {
         println!("begin executing events");
         let compilation_cache = Arc::new(Mutex::new(CompilationCache::default()));
         let index_writer = Arc::new(Mutex::new(IndexWriter::new(&self.current_dir)));
@@ -126,15 +144,23 @@ impl OnlineExecutor {
         if self.execution_mode.is_v1_or_compare() {
             compile_aptos_packages(
                 &aptos_commons_path,
-                &mut compilation_cache.lock().unwrap().compiled_package_cache_v1,
-                false,
+                &mut compilation_cache
+                    .lock()
+                    .unwrap()
+                    .base_compiled_package_cache,
+                &base_experiments,
+                "base",
             )?;
         }
         if self.execution_mode.is_v2_or_compare() {
             compile_aptos_packages(
                 &aptos_commons_path,
-                &mut compilation_cache.lock().unwrap().compiled_package_cache_v2,
-                true,
+                &mut compilation_cache
+                    .lock()
+                    .unwrap()
+                    .compared_compiled_package_cache,
+                &compared_experiments,
+                "compared",
             )?;
         }
 
@@ -175,11 +201,17 @@ impl OnlineExecutor {
                     let compilation_cache = compilation_cache.clone();
                     let current_dir = self.current_dir.clone();
                     let execution_mode = self.execution_mode;
+                    let disable_aa_fa = self.disable_aa_fa;
                     let endpoint = self.endpoint.clone();
+                    let base_experiments = base_experiments.clone();
+                    let compared_experiments = compared_experiments.clone();
 
                     let txn_execution_thread = tokio::task::spawn_blocking(move || {
-                        let executor = crate::Execution::new(current_dir.clone(), execution_mode);
-
+                        let executor = crate::Execution::new(
+                            current_dir.clone(),
+                            execution_mode,
+                            disable_aa_fa,
+                        );
                         let mut version_idx = TxnIndex {
                             version,
                             txn: txn.clone(),
@@ -197,6 +229,8 @@ impl OnlineExecutor {
                                 &mut compilation_cache.lock().unwrap(),
                                 execution_mode_opt,
                                 current_dir.clone(),
+                                &base_experiments,
+                                &compared_experiments,
                             );
                             if package_info_opt.is_none() {
                                 return;
@@ -209,12 +243,12 @@ impl OnlineExecutor {
                             let cache_v1 = compilation_cache
                                 .lock()
                                 .unwrap()
-                                .compiled_package_cache_v1
+                                .base_compiled_package_cache
                                 .clone();
                             let cache_v2 = compilation_cache
                                 .lock()
                                 .unwrap()
-                                .compiled_package_cache_v2
+                                .compared_compiled_package_cache
                                 .clone();
 
                             let client = Client::new(Url::parse(&endpoint).unwrap());
