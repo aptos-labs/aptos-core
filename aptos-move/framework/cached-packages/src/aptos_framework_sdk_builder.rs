@@ -565,6 +565,11 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
+    PboDelegationPoolAdminIncreaseLastUnlockPeriod {
+        pool_address: AccountAddress,
+        additional_periods: u64,
+    },
+
     /// Allows a delegator to delegate its voting power to a voter. If this delegator already has a delegated voter,
     /// this change won't take effects until the next lockup period.
     PboDelegationPoolDelegateVotingPower {
@@ -1609,6 +1614,13 @@ impl EntryFunctionCall {
                 pool_address,
                 amount,
             } => pbo_delegation_pool_add_stake(pool_address, amount),
+            PboDelegationPoolAdminIncreaseLastUnlockPeriod {
+                pool_address,
+                additional_periods,
+            } => pbo_delegation_pool_admin_increase_last_unlock_period(
+                pool_address,
+                additional_periods,
+            ),
             PboDelegationPoolDelegateVotingPower {
                 pool_address,
                 new_voter,
@@ -3496,6 +3508,27 @@ pub fn pbo_delegation_pool_add_stake(
         vec![
             bcs::to_bytes(&pool_address).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
+        ],
+    ))
+}
+
+pub fn pbo_delegation_pool_admin_increase_last_unlock_period(
+    pool_address: AccountAddress,
+    additional_periods: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("pbo_delegation_pool").to_owned(),
+        ),
+        ident_str!("admin_increase_last_unlock_period").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&pool_address).unwrap(),
+            bcs::to_bytes(&additional_periods).unwrap(),
         ],
     ))
 }
@@ -6413,6 +6446,21 @@ mod decoder {
         }
     }
 
+    pub fn pbo_delegation_pool_admin_increase_last_unlock_period(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::PboDelegationPoolAdminIncreaseLastUnlockPeriod {
+                    pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    additional_periods: bcs::from_bytes(script.args().get(1)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn pbo_delegation_pool_delegate_voting_power(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -7917,6 +7965,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "pbo_delegation_pool_add_stake".to_string(),
             Box::new(decoder::pbo_delegation_pool_add_stake),
+        );
+        map.insert(
+            "pbo_delegation_pool_admin_increase_last_unlock_period".to_string(),
+            Box::new(decoder::pbo_delegation_pool_admin_increase_last_unlock_period),
         );
         map.insert(
             "pbo_delegation_pool_delegate_voting_power".to_string(),

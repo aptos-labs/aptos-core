@@ -203,6 +203,7 @@ transferred to A
 -  [Function `replace_in_smart_tables`](#0x1_pbo_delegation_pool_replace_in_smart_tables)
 -  [Function `authorized_reactivate_stake`](#0x1_pbo_delegation_pool_authorized_reactivate_stake)
 -  [Function `admin_withdraw`](#0x1_pbo_delegation_pool_admin_withdraw)
+-  [Function `admin_increase_last_unlock_period`](#0x1_pbo_delegation_pool_admin_increase_last_unlock_period)
 -  [Function `lock_delegators_stakes`](#0x1_pbo_delegation_pool_lock_delegators_stakes)
 -  [Function `replace_delegator`](#0x1_pbo_delegation_pool_replace_delegator)
 -  [Function `is_principle_stakeholder`](#0x1_pbo_delegation_pool_is_principle_stakeholder)
@@ -241,6 +242,7 @@ transferred to A
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64">0x1::fixed_point64</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/math128.md#0x1_math128">0x1::math128</a>;
+<b>use</b> <a href="../../aptos-stdlib/doc/math64.md#0x1_math64">0x1::math64</a>;
 <b>use</b> <a href="multisig_account.md#0x1_multisig_account">0x1::multisig_account</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/pool_u64_unbound.md#0x1_pool_u64_unbound">0x1::pool_u64_unbound</a>;
@@ -1589,6 +1591,16 @@ amount of stake available in the specified stake pool.
 
 
 
+<a id="0x1_pbo_delegation_pool_EINVALID_STATE_FOR_OPERATION"></a>
+
+Can not increase last unlock period if not at the last element of schedule
+
+
+<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EINVALID_STATE_FOR_OPERATION">EINVALID_STATE_FOR_OPERATION</a>: u64 = 42;
+</code></pre>
+
+
+
 <a id="0x1_pbo_delegation_pool_EMINIMUM_UNLOCK_AMOUNT"></a>
 
 Minimum amount of coins to be unlocked.
@@ -1720,6 +1732,7 @@ Commission percentage change is too late in this lockup period, and should be do
 
 <a id="0x1_pbo_delegation_pool_EUNLOCKING_ALREADY_STARTED"></a>
 
+Unlocking has already started, so unlock schedule can not be updated
 
 
 <pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EUNLOCKING_ALREADY_STARTED">EUNLOCKING_ALREADY_STARTED</a>: u64 = 41;
@@ -4394,6 +4407,51 @@ validator-owners to prevent it from being abused.
 
 </details>
 
+<a id="0x1_pbo_delegation_pool_admin_increase_last_unlock_period"></a>
+
+## Function `admin_increase_last_unlock_period`
+
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_admin_increase_last_unlock_period">admin_increase_last_unlock_period</a>(multisig_admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, additional_periods: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_admin_increase_last_unlock_period">admin_increase_last_unlock_period</a>(
+    multisig_admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    pool_address: <b>address</b>,
+    additional_periods: u64
+) <b>acquires</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegationPool">DelegationPool</a> {
+    // Ensure that the caller is the admin of the delegation pool.
+    {
+        <b>assert</b>!(
+            <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_is_admin">is_admin</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(multisig_admin), pool_address),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_ENOT_AUTHORIZED">ENOT_AUTHORIZED</a>)
+        );
+    };
+
+    <b>let</b> delegation_pool = <b>borrow_global_mut</b>&lt;<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+    <b>let</b> last_unlocked_period = delegation_pool.principle_unlock_schedule.last_unlock_period;
+    <b>let</b> schedule_length = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&delegation_pool.principle_unlock_schedule.schedule);
+    // Current last_unlock_period must be greater or equal <b>to</b> schedule_length -1, this is because
+    // last_unlock_period is used <b>as</b> index into schedule <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>. If we are not already at the last index or beyond
+    // increasing this would have undesirable effect. For example <b>if</b> schedule is [20%, 30%, 10%] and
+    // last_unlock_period = 1, increasing it by two would directly go <b>to</b> 10% unlock skipping 30% unlock part
+    <b>assert</b>!(schedule_length -1 &lt;= last_unlocked_period, <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EINVALID_STATE_FOR_OPERATION">EINVALID_STATE_FOR_OPERATION</a>);
+    delegation_pool.principle_unlock_schedule.last_unlock_period = delegation_pool.principle_unlock_schedule.last_unlock_period + additional_periods;
+
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_pbo_delegation_pool_lock_delegators_stakes"></a>
 
 ## Function `lock_delegators_stakes`
@@ -4852,7 +4910,7 @@ Note: this does not synchronize with stake pool, therefore the answer may be con
         cfraction = <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_min">fixed_point64::min</a>(cfraction, one);
     };
     unlock_schedule.cumulative_unlocked_fraction = cfraction;
-    unlock_schedule.last_unlock_period = unlock_periods_passed;
+    unlock_schedule.last_unlock_period = <a href="../../aptos-stdlib/doc/math64.md#0x1_math64_max">math64::max</a>(unlock_periods_passed, last_unlocked_period);
     <b>let</b> unlockable_amount = <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_cached_unlockable_balance">cached_unlockable_balance</a>(delegator_addr, pool_address);
     amount &lt;= unlockable_amount
 }
