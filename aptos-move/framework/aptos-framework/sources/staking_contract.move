@@ -1209,7 +1209,6 @@ module aptos_framework::staking_contract {
             10000,
             1000000
         );
-
         let staker_address = signer::address_of(staker);
         if (!account::exists_at(staker_address)) {
             account::create_account_for_test(staker_address);
@@ -1283,6 +1282,15 @@ module aptos_framework::staking_contract {
         assert!(staker_address(pool_address) == std::option::some(staker_address), 0);
 
         // Operator joins the validator set.
+        let (_sk2, pk2, pop2) = stake::generate_identity();
+        stake::initialize_test_validator(
+            &pk2,
+            &pop2,
+            operator,
+            INITIAL_BALANCE,
+            true,
+            true
+        );
         let (_sk, pk, pop) = stake::generate_identity();
         stake::join_validator_set_for_test(&pk, &pop, operator, pool_address, true);
         assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
