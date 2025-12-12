@@ -28,6 +28,7 @@ use aptos_network::{
     },
 };
 use aptos_storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
+use aptos_transaction_tracing::trace_collector::TransactionTraceCollector;
 use aptos_types::{
     mempool_status::MempoolStatusCode,
     on_chain_config::{InMemoryOnChainConfig, OnChainConfigPayload},
@@ -117,7 +118,7 @@ impl MockSharedMempool {
         let mut config = NodeConfig::generate_random_config();
         config.validator_network = Some(NetworkConfig::network_with_id(NetworkId::Validator));
 
-        let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
+        let mempool = Arc::new(Mutex::new(CoreMempool::new_for_testing(&config)));
         let (network_reqs_tx, _network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (_network_notifs_tx, network_notifs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
@@ -153,6 +154,7 @@ impl MockSharedMempool {
         );
         let network_and_events = hashmap! {NetworkId::Validator => network_events};
         let network_service_events = NetworkServiceEvents::new(network_and_events);
+        let transaction_trace_collector = Arc::new(TransactionTraceCollector::new_empty());
 
         start_shared_mempool(
             handle,
@@ -168,6 +170,7 @@ impl MockSharedMempool {
             Arc::new(RwLock::new(validator)),
             vec![],
             peers_and_metadata,
+            transaction_trace_collector,
         );
 
         (ac_client, mempool, quorum_store_sender, mempool_notifier)
