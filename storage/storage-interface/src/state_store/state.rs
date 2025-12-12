@@ -19,11 +19,13 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_experimental_layered_map::{LayeredMap, MapLayer};
+use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     state_store::{
         hot_state::HotStateConfig, state_key::StateKey, state_slot::StateSlot,
-        state_storage_usage::StateStorageUsage, StateViewId, NUM_STATE_SHARDS,
+        state_storage_usage::StateStorageUsage, state_value::StateValue, StateViewId,
+        NUM_STATE_SHARDS,
     },
     transaction::Version,
 };
@@ -155,8 +157,13 @@ impl State {
         per_version_updates: &PerVersionStateUpdateRefs,
         all_checkpoint_versions: &[Version],
         state_cache: &ShardedStateCache,
-    ) -> Self {
+    ) -> (
+        Self,
+        [HashMap<StateKey, Option<StateValue>>; NUM_STATE_SHARDS],
+        [HashMap<StateKey, Option<StateValue>>; NUM_STATE_SHARDS],
+    ) {
         let _timer = TIMER.timer_with(&["state__update"]);
+        let last_version = batched_updates.last_version();
 
         // 1. The update batch must begin at self.next_version().
         assert_eq!(self.next_version(), batched_updates.first_version);
@@ -175,7 +182,10 @@ impl State {
         assert!(self.next_version() >= state_cache.next_version());
 
         let overlay = self.make_delta(persisted);
-        let ((shards, new_metadata), usage_delta_per_shard): ((Vec<_>, Vec<_>), Vec<_>) = (
+        let ((((shards, new_metadata), usage_delta_per_shard), all_inserted), all_evicted): (
+            (((Vec<_>, Vec<_>), Vec<_>), Vec<_>),
+            Vec<_>,
+        ) = (
             state_cache.shards.as_slice(),
             overlay.shards.as_slice(),
             self.hot_state_metadata.as_slice(),
@@ -183,8 +193,9 @@ impl State {
             per_version_updates.shards.as_slice(),
         )
             .into_par_iter()
+            .enumerate()
             .map(
-                |(cache, overlay, hot_metadata, batched_updates, per_version)| {
+                |(shard_id, (cache, overlay, hot_metadata, batched_updates, per_version))| {
                     let mut lru = HotStateLRU::new(
                         NonZeroUsize::new(self.hot_state_config.max_items_per_shard).unwrap(),
                         Arc::clone(&persisted_hot_state),
@@ -194,21 +205,39 @@ impl State {
                         hot_metadata.num_items,
                     );
                     let mut all_updates = per_version.iter();
+                    let mut updated = HashMap::new();
+                    let mut evicted = HashMap::new();
                     for ckpt_version in all_checkpoint_versions {
                         for (key, update) in
                             all_updates.take_while_ref(|(_k, u)| u.version <= *ckpt_version)
                         {
-                            Self::apply_one_update(&mut lru, overlay, cache, key, update);
+                            let inserted_value =
+                                Self::apply_one_update(&mut lru, overlay, cache, key, update);
+                            updated.insert((*key).clone(), inserted_value);
                         }
-                        // Only evict at the checkpoints.
-                        lru.maybe_evict();
+                        let actually_evicted = lru.maybe_evict();
+                        evicted = actually_evicted
+                            .into_iter()
+                            .map(|(k, slot)| {
+                                assert!(slot.is_hot());
+                                (k, slot.into_state_value_opt())
+                            })
+                            .collect();
                     }
                     for (key, update) in all_updates {
+                        panic!("not state-sync right now");
                         Self::apply_one_update(&mut lru, overlay, cache, key, update);
                     }
 
                     let (new_items, new_head, new_tail, new_num_items) = lru.into_updates();
                     let new_items = new_items.into_iter().collect_vec();
+                    info!(
+                        "shard {}: #new items for version {:?}: {}. # updates: {}",
+                        shard_id,
+                        last_version,
+                        new_items.len(),
+                        updated.len(),
+                    );
 
                     // TODO(aldenhu): change interface to take iter of ref
                     let new_layer = overlay.new_layer(&new_items);
@@ -218,7 +247,7 @@ impl State {
                         num_items: new_num_items,
                     };
                     let new_usage = Self::usage_delta_for_shard(cache, overlay, batched_updates);
-                    ((new_layer, new_metadata), new_usage)
+                    ((((new_layer, new_metadata), new_usage), updated), evicted)
                 },
             )
             .unzip();
@@ -226,13 +255,20 @@ impl State {
         let new_metadata = new_metadata.try_into().expect("Known to be 16 shards.");
         let usage = self.update_usage(usage_delta_per_shard);
 
+        assert_eq!(all_inserted.len(), 16);
+        assert_eq!(all_evicted.len(), 16);
+
         // TODO(HotState): extract and pass new hot state onchain config if needed.
-        State::new_with_updates(
-            batched_updates.last_version(),
-            shards,
-            new_metadata,
-            usage,
-            self.hot_state_config,
+        (
+            State::new_with_updates(
+                batched_updates.last_version(),
+                shards,
+                new_metadata,
+                usage,
+                self.hot_state_config,
+            ),
+            all_inserted.try_into().unwrap(),
+            all_evicted.try_into().unwrap(),
         )
     }
 
@@ -242,26 +278,28 @@ impl State {
         read_cache: &StateCacheShard,
         key: &StateKey,
         update: &StateUpdateRef,
-    ) {
+    ) -> Option<StateValue> {
         if update.state_op.is_value_write_op() {
             lru.insert((*key).clone(), update.to_result_slot().unwrap());
-            return;
+            return update.state_op.as_state_value_opt().unwrap().cloned();
         }
 
         if let Some(mut slot) = lru.get_slot(key) {
-            lru.insert(
-                (*key).clone(),
-                if slot.is_hot() {
-                    slot.refresh(update.version);
-                    slot
-                } else {
-                    slot.to_hot(update.version)
-                },
-            );
+            let slot_to_insert = if slot.is_hot() {
+                slot.refresh(update.version);
+                slot
+            } else {
+                slot.to_hot(update.version)
+            };
+            let ret = slot_to_insert.as_state_value_opt().cloned();
+            lru.insert((*key).clone(), slot_to_insert);
+            ret
         } else {
             let slot = Self::expect_old_slot(overlay, read_cache, key);
             assert!(slot.is_cold());
+            let ret = slot.as_state_value_opt().cloned();
             lru.insert((*key).clone(), slot.to_hot(update.version));
+            ret
         }
     }
 
@@ -368,47 +406,31 @@ impl LedgerState {
         persisted_snapshot: &State,
         updates: &StateUpdateRefs,
         reads: &ShardedStateCache,
-    ) -> LedgerState {
+    ) -> (
+        LedgerState,
+        [HashMap<StateKey, Option<StateValue>>; NUM_STATE_SHARDS],
+        [HashMap<StateKey, Option<StateValue>>; NUM_STATE_SHARDS],
+    ) {
         let _timer = TIMER.timer_with(&["ledger_state__update"]);
 
-        let last_checkpoint = if let Some(batched) = updates.for_last_checkpoint_batched() {
-            let per_version = updates
-                .for_last_checkpoint_per_version()
-                .expect("Both per-version and batched updates should exist.");
-            self.latest().update(
-                Arc::clone(&persisted_hot_view),
-                persisted_snapshot,
-                batched,
-                per_version,
-                updates.all_checkpoint_versions(),
-                reads,
-            )
-        } else {
-            self.last_checkpoint.clone()
-        };
+        let batched = updates.for_last_checkpoint_batched().unwrap();
+        let per_version = updates
+            .for_last_checkpoint_per_version()
+            .expect("Both per-version and batched updates should exist.");
+        let (new_ckpt, hot_inserted, hot_evicted) = self.latest().update(
+            Arc::clone(&persisted_hot_view),
+            persisted_snapshot,
+            batched,
+            per_version,
+            updates.all_checkpoint_versions(),
+            reads,
+        );
 
-        let base_of_latest = if updates.for_last_checkpoint_batched().is_none() {
-            self.latest()
-        } else {
-            &last_checkpoint
-        };
-        let latest = if let Some(batched) = updates.for_latest_batched() {
-            let per_version = updates
-                .for_latest_per_version()
-                .expect("Both per-version and batched updates should exist.");
-            base_of_latest.update(
-                persisted_hot_view,
-                persisted_snapshot,
-                batched,
-                per_version,
-                &[],
-                reads,
-            )
-        } else {
-            base_of_latest.clone()
-        };
-
-        LedgerState::new(latest, last_checkpoint)
+        (
+            LedgerState::new(new_ckpt.clone(), new_ckpt),
+            hot_inserted,
+            hot_evicted,
+        )
     }
 
     /// Old values of the updated keys are read from the DbReader at the version of the
@@ -429,7 +451,7 @@ impl LedgerState {
         );
         state_view.prime_cache(updates, PrimingPolicy::All)?;
 
-        let updated = self.update_with_memorized_reads(
+        let (updated, _, _) = self.update_with_memorized_reads(
             hot_state,
             persisted_snapshot,
             updates,
