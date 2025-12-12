@@ -1,0 +1,56 @@
+// Purpose: swapping outer vector entries should not invalidate nested indexed ref.
+// Flow:
+//   (1) build outer = [[Foo::A(1)], [Foo::B(2)]]
+//   (2) borrow payload_ref = &outer[0][0].A::x
+//   (3) vec_swap outer[0] <-> outer[1]
+//   (4) read payload_ref; succeeds because Foo::A instance moved intact
+// Diagram (after step 2)                       Diagram (after step 3)
+//   outer[0] ──▶ [Foo::A { x:1 }] ◀── payload_ref   outer[0] ──▶ [Foo::B { x:2 }]
+//   outer[1] ──▶ [Foo::B { x:2 }]                  outer[1] ──▶ [Foo::A { x:1 }] ◀── payload_ref
+
+//# publish
+module 0xc0ffe5::nested_swap
+
+enum Foo has drop
+  A
+    x: u64
+  B
+    x: u64
+
+public fun stale_nested_swap()
+    local outer: vector<vector<Foo>>
+    local payload_ref: &u64
+
+    // Build [[Foo::A {1}], [Foo::B {2}]]
+    ld_u64 1
+    pack_variant Foo, A
+    vec_pack<Foo> 1
+    ld_u64 2
+    pack_variant Foo, B
+    vec_pack<Foo> 1
+    vec_pack<vector<Foo>> 2
+    st_loc outer
+
+    // Borrow field from inner element [0][0]
+    borrow_loc outer
+    ld_u64 0
+    vec_borrow<vector<Foo>>
+    ld_u64 0
+    vec_borrow<Foo>
+    borrow_variant_field Foo, A::x
+    st_loc payload_ref
+
+    // Attempt to swap outer entries while stale ref exists
+    mut_borrow_loc outer
+    ld_u64 0
+    ld_u64 1
+    vec_swap<vector<Foo>>
+
+    // Attempt to read stale ref
+    move_loc payload_ref
+    read_ref
+    pop
+    ret
+
+//# run 0xc0ffe5::nested_swap::stale_nested_swap --verbose
+

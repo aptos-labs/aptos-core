@@ -210,7 +210,6 @@ members = [
     "third_party/move/move-bytecode-spec",
     "third_party/move/move-bytecode-verifier",
     "third_party/move/move-bytecode-verifier/bytecode-verifier-tests",
-    "third_party/move/move-bytecode-verifier/fuzz",
     "third_party/move/move-bytecode-verifier/invalid-mutations",
     "third_party/move/move-bytecode-verifier/transactional-tests",
     "third_party/move/move-command-line-common",
