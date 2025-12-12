@@ -102,28 +102,28 @@ struct V<T0> has drop
     ret
 
 // Function definition at index 9
-#[borrow] friend fun borrow$Data$0$0(l0: &Data): &u64
+#[borrow=0] friend fun borrow$Data$0$0(l0: &Data): &u64
     local l1: &Data
     move_loc l0
     borrow_variant_field Data, V1::x, V2::x
     ret
 
 // Function definition at index 10
-#[borrow] friend fun borrow$Data$1$1(l0: &Data): &bool
+#[borrow=1] friend fun borrow$Data$1$1(l0: &Data): &bool
     local l1: &Data
     move_loc l0
     borrow_variant_field Data, V2::y
     ret
 
 // Function definition at index 11
-#[borrow_mut] friend fun borrow_mut$Data$0$0(l0: &mut Data): &mut u64
+#[borrow_mut=0] friend fun borrow_mut$Data$0$0(l0: &mut Data): &mut u64
     local l1: &mut Data
     move_loc l0
     mut_borrow_variant_field Data, V1::x, V2::x
     ret
 
 // Function definition at index 12
-#[borrow_mut] friend fun borrow_mut$Data$1$1(l0: &mut Data): &mut bool
+#[borrow_mut=1] friend fun borrow_mut$Data$1$1(l0: &mut Data): &mut bool
     local l1: &mut Data
     move_loc l0
     mut_borrow_variant_field Data, V2::y
@@ -193,28 +193,28 @@ struct V<T0> has drop
     ret
 
 // Function definition at index 22
-#[borrow] friend fun borrow$Data2$0$0(l0: &Data2): &u64
+#[borrow=0] friend fun borrow$Data2$0$0(l0: &Data2): &u64
     local l1: &Data2
     move_loc l0
     borrow_variant_field Data2, V1::x, V2::y
     ret
 
 // Function definition at index 23
-#[borrow] friend fun borrow$Data2$1$1(l0: &Data2): &u64
+#[borrow=1] friend fun borrow$Data2$1$1(l0: &Data2): &u64
     local l1: &Data2
     move_loc l0
     borrow_variant_field Data2, V2::x
     ret
 
 // Function definition at index 24
-#[borrow_mut] friend fun borrow_mut$Data2$0$0(l0: &mut Data2): &mut u64
+#[borrow_mut=0] friend fun borrow_mut$Data2$0$0(l0: &mut Data2): &mut u64
     local l1: &mut Data2
     move_loc l0
     mut_borrow_variant_field Data2, V1::x, V2::y
     ret
 
 // Function definition at index 25
-#[borrow_mut] friend fun borrow_mut$Data2$1$1(l0: &mut Data2): &mut u64
+#[borrow_mut=1] friend fun borrow_mut$Data2$1$1(l0: &mut Data2): &mut u64
     local l1: &mut Data2
     move_loc l0
     mut_borrow_variant_field Data2, V2::x
@@ -318,56 +318,56 @@ struct V<T0> has drop
     ret
 
 // Function definition at index 38
-#[borrow] friend fun borrow$Data3$0$0(l0: &Data3): &Data
+#[borrow=0] friend fun borrow$Data3$0$0(l0: &Data3): &Data
     local l1: &Data3
     move_loc l0
     borrow_variant_field Data3, V1::d1, V2::d1, V3::d1, V4::d1
     ret
 
 // Function definition at index 39
-#[borrow] friend fun borrow$Data3$1$1(l0: &Data3): &Data2
+#[borrow=1] friend fun borrow$Data3$1$1(l0: &Data3): &Data2
     local l1: &Data3
     move_loc l0
     borrow_variant_field Data3, V2::d2, V3::d2, V4::d2
     ret
 
 // Function definition at index 40
-#[borrow] friend fun borrow$Data3$2$2(l0: &Data3): &V<u64>
+#[borrow=2] friend fun borrow$Data3$2$2(l0: &Data3): &V<u64>
     local l1: &Data3
     move_loc l0
     borrow_variant_field Data3, V3::d3, V4::d3
     ret
 
 // Function definition at index 41
-#[borrow] friend fun borrow$Data3$3$3(l0: &Data3): &vector<u64>
+#[borrow=3] friend fun borrow$Data3$3$3(l0: &Data3): &vector<u64>
     local l1: &Data3
     move_loc l0
     borrow_variant_field Data3, V4::d4
     ret
 
 // Function definition at index 42
-#[borrow_mut] friend fun borrow_mut$Data3$0$0(l0: &mut Data3): &mut Data
+#[borrow_mut=0] friend fun borrow_mut$Data3$0$0(l0: &mut Data3): &mut Data
     local l1: &mut Data3
     move_loc l0
     mut_borrow_variant_field Data3, V1::d1, V2::d1, V3::d1, V4::d1
     ret
 
 // Function definition at index 43
-#[borrow_mut] friend fun borrow_mut$Data3$1$1(l0: &mut Data3): &mut Data2
+#[borrow_mut=1] friend fun borrow_mut$Data3$1$1(l0: &mut Data3): &mut Data2
     local l1: &mut Data3
     move_loc l0
     mut_borrow_variant_field Data3, V2::d2, V3::d2, V4::d2
     ret
 
 // Function definition at index 44
-#[borrow_mut] friend fun borrow_mut$Data3$2$2(l0: &mut Data3): &mut V<u64>
+#[borrow_mut=2] friend fun borrow_mut$Data3$2$2(l0: &mut Data3): &mut V<u64>
     local l1: &mut Data3
     move_loc l0
     mut_borrow_variant_field Data3, V3::d3, V4::d3
     ret
 
 // Function definition at index 45
-#[borrow_mut] friend fun borrow_mut$Data3$3$3(l0: &mut Data3): &mut vector<u64>
+#[borrow_mut=3] friend fun borrow_mut$Data3$3$3(l0: &mut Data3): &mut vector<u64>
     local l1: &mut Data3
     move_loc l0
     mut_borrow_variant_field Data3, V4::d4
@@ -388,14 +388,14 @@ struct V<T0> has drop
     ret
 
 // Function definition at index 48
-#[borrow] friend fun borrow$V$0<T0>(l0: &V<T0>): &vector<T0>
+#[borrow=0] friend fun borrow$V$0<T0>(l0: &V<T0>): &vector<T0>
     local l1: &V<T0>
     move_loc l0
     borrow_field V<T0>, x
     ret
 
 // Function definition at index 49
-#[borrow_mut] friend fun borrow_mut$V$0<T0>(l0: &mut V<T0>): &mut vector<T0>
+#[borrow_mut=0] friend fun borrow_mut$V$0<T0>(l0: &mut V<T0>): &mut vector<T0>
     local l1: &mut V<T0>
     move_loc l0
     mut_borrow_field V<T0>, x
