@@ -137,6 +137,7 @@ impl Script {
             param_tys,
             access_specifier: AccessSpecifier::Any,
             is_persistent: false,
+            borrow_field_mut_api_offset_opt: None,
             has_module_reentrancy_lock: false,
             is_trusted: false,
         });

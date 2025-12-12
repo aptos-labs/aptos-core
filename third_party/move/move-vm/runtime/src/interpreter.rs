@@ -29,9 +29,9 @@ use crate::{
 use fail::fail_point;
 use itertools::Itertools;
 use move_binary_format::{
-    errors,
-    errors::*,
+    errors::{self, *},
     file_format::{AccessKind, FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex},
+    file_format_common::VERSION_DEFAULT_LANG_V2_4,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -948,6 +948,12 @@ where
                 }
             }
         }
+        self.ref_state.in_borrow_field_mut_api =
+            if function.function.file_format_version() >= VERSION_DEFAULT_LANG_V2_4 {
+                function.function.borrow_field_mut_api_offset_opt()
+            } else {
+                None
+            };
         RTRCheck::core_call_transition(num_param_tys, num_locals, mask, &mut self.ref_state)?;
         Frame::make_new_frame::<RTTCheck>(
             gas_meter,

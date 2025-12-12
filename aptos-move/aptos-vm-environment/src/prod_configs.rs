@@ -166,6 +166,7 @@ pub fn aptos_prod_verifier_config(gas_feature_version: u64, features: &Features)
         } else {
             None
         },
+        check_struct_api_attributes: features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V10),
     }
 }
 
