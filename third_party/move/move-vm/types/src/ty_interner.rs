@@ -7,12 +7,12 @@
 use crate::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndex};
 use move_core_types::ability::AbilitySet;
 use parking_lot::RwLock;
-use std::collections::HashMap;
+use std::{cell::UnsafeCell, collections::HashMap};
 use triomphe::Arc;
 
 /// Compactly represents a loaded type.
 #[repr(transparent)]
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct TypeId(u32);
 
 /// Compactly represents a vector of types.
@@ -77,85 +77,207 @@ impl<T, I> InternMap<T, I> {
 
 /// Interns single types.
 struct TypeInterner {
-    inner: RwLock<InternMap<TypeRepr, TypeId>>,
+    hot: UnsafeCell<InternMap<TypeRepr, TypeId>>,
+    cold: RwLock<InternMap<TypeRepr, TypeId>>,
 }
+
+// Safety: `hot` is only mutated via `publish_cold_to_hot_unchecked` at block boundaries
+// when the caller ensures quiescence. `cold` guards all concurrent mutations within a block.
+unsafe impl Sync for TypeInterner {}
 
 impl Default for TypeInterner {
     fn default() -> Self {
         Self {
-            inner: RwLock::new(InternMap::default()),
+            hot: UnsafeCell::new(InternMap::default()),
+            cold: RwLock::new(InternMap::default()),
         }
     }
 }
 
 impl TypeInterner {
+    #[inline]
+    fn hot_ref(&self) -> &InternMap<TypeRepr, TypeId> {
+        // Safe for read-only access as long as `hot` is not mutated concurrently.
+        unsafe { &*self.hot.get() }
+    }
+
     fn intern(&self, repr: TypeRepr) -> TypeId {
-        if let Some(id) = self.inner.read().interned.get(&repr) {
+        // Fast path: lock-free hit in hot tier.
+        if let Some(id) = self.hot_ref().interned.get(&repr) {
             return *id;
         }
 
-        let mut inner = self.inner.write();
-        if let Some(id) = inner.interned.get(&repr) {
+        // Try cold tier under shared read lock.
+        if let Some(id) = self.cold.read().interned.get(&repr) {
             return *id;
         }
 
-        let id = TypeId(inner.data.len() as u32);
-        inner.data.push(repr);
-        inner.interned.insert(repr, id);
+        // Insert into cold tier under write lock.
+        let mut cold = self.cold.write();
+        if let Some(id) = cold.interned.get(&repr) {
+            return *id;
+        }
+        // Assign id as hot_len + cold_len to preserve TypeId==index after publish append.
+        let id = TypeId((self.hot_ref().data.len() + cold.data.len()) as u32);
+        cold.data.push(repr);
+        cold.interned.insert(repr, id);
         id
+    }
+
+    /// Unsafely publish cold tier into hot tier without locking hot.
+    ///
+    /// # Safety
+    /// Caller must ensure global quiescence (no concurrent readers/writers) for this interner
+    /// while this function runs. Mutates the `hot` tier without synchronization.
+    pub unsafe fn publish_cold_to_hot_unchecked(&self) {
+        let mut cold = self.cold.write();
+        if cold.interned.is_empty() && cold.data.is_empty() {
+            return;
+        }
+        // Move out cold state to minimize lock hold time.
+        let moved_data = std::mem::take(&mut cold.data);
+        let moved_map = std::mem::take(&mut cold.interned);
+        drop(cold);
+
+        let hot: &mut InternMap<TypeRepr, TypeId> = unsafe { &mut *self.hot.get() };
+        hot.data.reserve(moved_data.len());
+        for k in moved_data {
+            hot.data.push(k);
+        }
+        hot.interned.reserve(moved_map.len());
+        for (k, v) in moved_map {
+            // assert!(!hot.interned.contains_key(&k));
+            hot.interned.insert(k, v);
+        }
+    }
+
+    /// Unsafely clear both tiers. Resets indices back to 0.
+    ///
+    /// # Safety
+    /// Caller must ensure global quiescence (no concurrent readers/writers) for this interner.
+    pub unsafe fn clear_all_unchecked(&self) {
+        {
+            let mut cold = self.cold.write();
+            cold.clear();
+        }
+        let hot = unsafe { &mut *self.hot.get() };
+        hot.clear();
     }
 }
 
 /// Interns vector of types (e.g., list of type arguments).
 struct TypeVecInterner {
-    inner: RwLock<InternMap<Arc<[TypeId]>, TypeVecId>>,
+    hot: UnsafeCell<InternMap<Arc<[TypeId]>, TypeVecId>>,
+    cold: RwLock<InternMap<Arc<[TypeId]>, TypeVecId>>,
 }
+
+// Safety: same reasoning as for TypeInterner.
+unsafe impl Sync for TypeVecInterner {}
 
 impl Default for TypeVecInterner {
     fn default() -> Self {
         Self {
-            inner: RwLock::new(InternMap::default()),
+            hot: UnsafeCell::new(InternMap::default()),
+            cold: RwLock::new(InternMap::default()),
         }
     }
 }
 
 impl TypeVecInterner {
+    #[inline]
+    fn hot_ref(&self) -> &InternMap<Arc<[TypeId]>, TypeVecId> {
+        // Safe for read-only access as long as `hot` is not mutated concurrently.
+        unsafe { &*self.hot.get() }
+    }
+
     fn intern(&self, tys: &[TypeId]) -> TypeVecId {
-        if let Some(id) = self.inner.read().interned.get(tys) {
+        // Fast path: lock-free hit in hot tier (borrowed lookup by slice).
+        if let Some(id) = self.hot_ref().interned.get(tys) {
+            return *id;
+        }
+
+        // Try cold tier under shared read lock.
+        if let Some(id) = self.cold.read().interned.get(tys) {
             return *id;
         }
 
         let tys_arced: Arc<[TypeId]> = Arc::from(tys);
         let tys_arced_key = tys_arced.clone();
 
-        let mut inner = self.inner.write();
-        if let Some(id) = inner.interned.get(tys) {
+        // Insert into cold tier under write lock.
+        let mut cold = self.cold.write();
+        if let Some(id) = cold.interned.get(tys) {
             return *id;
         }
-
-        let id = TypeVecId(inner.data.len() as u32);
-        inner.data.push(tys_arced);
-        inner.interned.insert(tys_arced_key, id);
+        let id = TypeVecId((self.hot_ref().data.len() + cold.data.len()) as u32);
+        cold.data.push(tys_arced);
+        cold.interned.insert(tys_arced_key, id);
         id
     }
 
     fn intern_vec(&self, tys: Vec<TypeId>) -> TypeVecId {
-        if let Some(id) = self.inner.read().interned.get(tys.as_slice()) {
+        // Fast path: lock-free hit in hot tier (borrowed lookup by slice).
+        if let Some(id) = self.hot_ref().interned.get(tys.as_slice()) {
             return *id;
         }
 
         let tys: Arc<[TypeId]> = tys.into();
         let tys_key = tys.clone();
 
-        let mut inner = self.inner.write();
-        if let Some(id) = inner.interned.get(&tys) {
+        // Try cold tier under shared read lock.
+        if let Some(id) = self.cold.read().interned.get(&tys) {
             return *id;
         }
 
-        let id = TypeVecId(inner.data.len() as u32);
-        inner.data.push(tys);
-        inner.interned.insert(tys_key, id);
+        // Insert into cold tier under write lock.
+        let mut cold = self.cold.write();
+        if let Some(id) = cold.interned.get(&tys) {
+            return *id;
+        }
+        let id = TypeVecId((self.hot_ref().data.len() + cold.data.len()) as u32);
+        cold.data.push(tys);
+        cold.interned.insert(tys_key, id);
         id
+    }
+
+    /// Unsafely publish cold tier into hot tier without locking hot.
+    ///
+    /// # Safety
+    /// Caller must ensure global quiescence (no concurrent readers/writers) for this interner
+    /// while this function runs. Mutates the `hot` tier without synchronization.
+    pub unsafe fn publish_cold_to_hot_unchecked(&self) {
+        let mut cold = self.cold.write();
+        if cold.interned.is_empty() && cold.data.is_empty() {
+            return;
+        }
+        // Move out cold state to minimize lock hold time.
+        let moved_data = std::mem::take(&mut cold.data);
+        let moved_map = std::mem::take(&mut cold.interned);
+        drop(cold);
+
+        let hot: &mut InternMap<Arc<[TypeId]>, TypeVecId> = unsafe { &mut *self.hot.get() };
+        hot.data.reserve(moved_data.len());
+        for k in moved_data {
+            hot.data.push(k);
+        }
+        hot.interned.reserve(moved_map.len());
+        for (k, v) in moved_map {
+            // assert!(!hot.interned.contains_key(&k));
+            hot.interned.insert(k, v);
+        }
+    }
+
+    /// Unsafely clear both tiers. Resets indices back to 0.
+    ///
+    /// # Safety
+    /// Caller must ensure global quiescence (no concurrent readers/writers) for this interner.
+    pub unsafe fn clear_all_unchecked(&self) {
+        {
+            let mut cold = self.cold.write();
+            cold.clear();
+        }
+        let hot = unsafe { &mut *self.hot.get() };
+        hot.clear();
     }
 }
 
@@ -184,12 +306,12 @@ impl InternedTypePool {
 
     /// Returns how many distinct types are instantiated.
     pub fn num_interned_tys(&self) -> usize {
-        self.ty_interner.inner.read().data.len()
+        self.ty_interner.hot_ref().data.len() + self.ty_interner.cold.read().data.len()
     }
 
     /// Returns how many distinct vectors of types are instantiated.
     pub fn num_interned_ty_vecs(&self) -> usize {
-        self.ty_vec_interner.inner.read().data.len()
+        self.ty_vec_interner.hot_ref().data.len() + self.ty_vec_interner.cold.read().data.len()
     }
 
     /// Clears all interned data, and then warm-ups the cache for common types. Should be called if
@@ -201,13 +323,11 @@ impl InternedTypePool {
 
     /// Flushes all cached data without warming up the cache.
     fn flush_impl(&self) {
-        let mut ty_interner = self.ty_interner.inner.write();
-        ty_interner.clear();
-        drop(ty_interner);
-
-        let mut ty_vec_interner = self.ty_vec_interner.inner.write();
-        ty_vec_interner.clear();
-        drop(ty_vec_interner);
+        // Safety: caller ensures quiescence when flushing interners in tests.
+        unsafe {
+            self.ty_interner.clear_all_unchecked();
+            self.ty_vec_interner.clear_all_unchecked();
+        }
     }
 
     /// Interns common type representations.
@@ -231,6 +351,11 @@ impl InternedTypePool {
         self.ty_vec_interner.intern(&[]);
         self.ty_vec_interner.intern(&[u8_id]);
         self.ty_vec_interner.intern(&[u64_id]);
+        // Publish warm entries into hot tier for lock-free reads.
+        unsafe {
+            self.ty_interner.publish_cold_to_hot_unchecked();
+            self.ty_vec_interner.publish_cold_to_hot_unchecked();
+        }
     }
 
     /// Given a vector if fully-instantiated type arguments, returns the corresponding [TypeVecId].
@@ -329,6 +454,35 @@ impl InternedTypePool {
     fn instantiated_struct_of(&self, idx: StructNameIndex, ty_args: Vec<TypeId>) -> TypeId {
         let ty_args = self.ty_vec_interner.intern_vec(ty_args);
         self.ty_interner.intern(TypeRepr::Struct { idx, ty_args })
+    }
+
+    /// Unsafely publish cold tiers of both interners into their hot tiers.
+    /// Safety: Caller must ensure global quiescence (e.g., at block boundary).
+    ///
+    /// # Safety
+    /// The caller must guarantee that no other threads are reading from or writing to
+    /// the underlying interners while this function executes. This should only be
+    /// invoked at a block boundary or other global quiescence point.
+    pub unsafe fn publish_unchecked(&self) {
+        unsafe {
+            self.ty_interner.publish_cold_to_hot_unchecked();
+            self.ty_vec_interner.publish_cold_to_hot_unchecked();
+        }
+    }
+
+    /// Unsafely clear both interners and re-warm caches. Resets indices back to 0.
+    /// Safety: Caller must ensure global quiescence (e.g., at block boundary).
+    ///
+    /// # Safety
+    /// The caller must guarantee global quiescence across all users of this pool.
+    /// No concurrent readers or writers may access the interners while the clear and
+    /// subsequent warmup are in progress.
+    pub unsafe fn clear_all_unchecked(&self) {
+        unsafe {
+            self.ty_interner.clear_all_unchecked();
+            self.ty_vec_interner.clear_all_unchecked();
+        }
+        self.warmup();
     }
 }
 
