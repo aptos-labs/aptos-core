@@ -260,8 +260,9 @@ impl BatchStore {
         );
 
         let mut expired_keys = Vec::new();
+        let gc_timestamp = last_certified_time.saturating_sub(expiration_buffer_usecs);
         for (digest, value) in db_content {
-            let expiration = value.expiration().saturating_sub(expiration_buffer_usecs);
+            let expiration = value.expiration();
 
             trace!(
                 "QS: Batchreader recovery content exp {:?}, digest {}",
@@ -269,7 +270,7 @@ impl BatchStore {
                 digest
             );
 
-            if last_certified_time >= expiration {
+            if expiration < gc_timestamp {
                 expired_keys.push(digest);
             } else {
                 batch_store
@@ -306,16 +307,16 @@ impl BatchStore {
         );
 
         let mut expired_keys = Vec::new();
+        let gc_timestamp = last_certified_time.saturating_sub(expiration_buffer_usecs);
         for (digest, value) in db_content {
-            let expiration = value.expiration().saturating_sub(expiration_buffer_usecs);
-
+            let expiration = value.expiration();
             trace!(
                 "QS: Batchreader recovery content exp {:?}, digest {}",
                 expiration,
                 digest
             );
 
-            if last_certified_time >= expiration {
+            if expiration < gc_timestamp {
                 expired_keys.push(digest);
             } else {
                 batch_store
