@@ -1,0 +1,13 @@
+{
+  "name": "@bgub/ts-base",
+  "version": "1.0.2",
+  "license": "MIT",
+  "exports": "./src/index.ts",
+  "publish": {
+    "include": [
+      "LICENSE",
+      "README.md",
+      "src/**/*.ts"
+    ]
+  }
+}
