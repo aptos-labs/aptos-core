@@ -199,7 +199,7 @@ module aptos_std::pool_u64 {
     }
 
     /// Directly deduct `shareholder`'s number of shares in `self` and return the number of remaining shares.
-    fun deduct_shares(self: &mut Pool, shareholder: address, num_shares: u64): u64 {
+    public fun deduct_shares(self: &mut Pool, shareholder: address, num_shares: u64): u64 {
         assert!(self.contains(shareholder), error::invalid_argument(ESHAREHOLDER_NOT_FOUND));
         assert!(self.shares(shareholder) >= num_shares, error::invalid_argument(EINSUFFICIENT_SHARES));
 

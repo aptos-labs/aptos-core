@@ -683,7 +683,7 @@ Transfer shares from <code>shareholder_1</code> to <code>shareholder_2</code>.
 Directly deduct <code>shareholder</code>'s number of shares in <code>self</code> and return the number of remaining shares.
 
 
-<pre><code><b>fun</b> <a href="pool_u64.md#0x1_pool_u64_deduct_shares">deduct_shares</a>(self: &<b>mut</b> <a href="pool_u64.md#0x1_pool_u64_Pool">pool_u64::Pool</a>, shareholder: <b>address</b>, num_shares: u64): u64
+<pre><code><b>public</b> <b>fun</b> <a href="pool_u64.md#0x1_pool_u64_deduct_shares">deduct_shares</a>(self: &<b>mut</b> <a href="pool_u64.md#0x1_pool_u64_Pool">pool_u64::Pool</a>, shareholder: <b>address</b>, num_shares: u64): u64
 </code></pre>
 
 
@@ -692,7 +692,7 @@ Directly deduct <code>shareholder</code>'s number of shares in <code>self</code>
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="pool_u64.md#0x1_pool_u64_deduct_shares">deduct_shares</a>(self: &<b>mut</b> <a href="pool_u64.md#0x1_pool_u64_Pool">Pool</a>, shareholder: <b>address</b>, num_shares: u64): u64 {
+<pre><code><b>public</b> <b>fun</b> <a href="pool_u64.md#0x1_pool_u64_deduct_shares">deduct_shares</a>(self: &<b>mut</b> <a href="pool_u64.md#0x1_pool_u64_Pool">Pool</a>, shareholder: <b>address</b>, num_shares: u64): u64 {
     <b>assert</b>!(self.<a href="pool_u64.md#0x1_pool_u64_contains">contains</a>(shareholder), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64.md#0x1_pool_u64_ESHAREHOLDER_NOT_FOUND">ESHAREHOLDER_NOT_FOUND</a>));
     <b>assert</b>!(self.<a href="pool_u64.md#0x1_pool_u64_shares">shares</a>(shareholder) &gt;= num_shares, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64.md#0x1_pool_u64_EINSUFFICIENT_SHARES">EINSUFFICIENT_SHARES</a>));
 
@@ -1157,7 +1157,7 @@ Return the number of coins <code>shares</code> are worth in <code>self</code> wi
 ### Function `deduct_shares`
 
 
-<pre><code><b>fun</b> <a href="pool_u64.md#0x1_pool_u64_deduct_shares">deduct_shares</a>(self: &<b>mut</b> <a href="pool_u64.md#0x1_pool_u64_Pool">pool_u64::Pool</a>, shareholder: <b>address</b>, num_shares: u64): u64
+<pre><code><b>public</b> <b>fun</b> <a href="pool_u64.md#0x1_pool_u64_deduct_shares">deduct_shares</a>(self: &<b>mut</b> <a href="pool_u64.md#0x1_pool_u64_Pool">pool_u64::Pool</a>, shareholder: <b>address</b>, num_shares: u64): u64
 </code></pre>
 
 
