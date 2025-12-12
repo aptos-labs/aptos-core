@@ -446,19 +446,233 @@ fun n::test_no_err() {
 }
 
 
-Diagnostics:
-bug: compiler internal error: struct not defined
-   ┌─ tests/checking-lang-v2.4/cross_module_borrow_field_err.move:16:9
-   │
-16 │     fun test_1() {
-   │         ^^^^^^
-   │
-   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0xc0ffee::m
+enum Wrapper has drop
+  V1
+    _0: u64
+    _1: u64
+  V2
+    _0: u64
 
-bug: compiler internal error: struct not defined
-   ┌─ tests/checking-lang-v2.4/cross_module_borrow_field_err.move:41:9
+// Function definition at index 0
+public fun test_variant$Wrapper$V1(l0: &Wrapper): bool
+    local l1: &Wrapper
+    move_loc l0
+    test_variant Wrapper, V1
+    ret
+
+// Function definition at index 1
+public fun test_variant$Wrapper$V2(l0: &Wrapper): bool
+    local l1: &Wrapper
+    move_loc l0
+    test_variant Wrapper, V2
+    ret
+
+// Function definition at index 2
+public fun pack$Wrapper$V1(l0: u64, l1: u64): Wrapper
+    local l2: u64
+    local l3: u64
+    move_loc l0
+    move_loc l1
+    pack_variant Wrapper, V1
+    ret
+
+// Function definition at index 3
+public fun pack$Wrapper$V2(l0: u64): Wrapper
+    local l1: u64
+    move_loc l0
+    pack_variant Wrapper, V2
+    ret
+
+// Function definition at index 4
+public fun unpack$Wrapper$V1(l0: Wrapper): (u64, u64)
+    local l1: Wrapper
+    move_loc l0
+    unpack_variant Wrapper, V1
+    ret
+
+// Function definition at index 5
+public fun unpack$Wrapper$V2(l0: Wrapper): u64
+    local l1: Wrapper
+    move_loc l0
+    unpack_variant Wrapper, V2
+    ret
+
+// Function definition at index 6
+public fun borrow$Wrapper$0$0(l0: &Wrapper): &u64
+    local l1: &Wrapper
+    move_loc l0
+    borrow_variant_field Wrapper, V1::_0, V2::_0
+    ret
+
+// Function definition at index 7
+public fun borrow$Wrapper$1$1(l0: &Wrapper): &u64
+    local l1: &Wrapper
+    move_loc l0
+    borrow_variant_field Wrapper, V1::_1
+    ret
+
+// Function definition at index 8
+public fun borrow_mut$Wrapper$0$0(l0: &mut Wrapper): &mut u64
+    local l1: &mut Wrapper
+    move_loc l0
+    mut_borrow_variant_field Wrapper, V1::_0, V2::_0
+    ret
+
+// Function definition at index 9
+public fun borrow_mut$Wrapper$1$1(l0: &mut Wrapper): &mut u64
+    local l1: &mut Wrapper
+    move_loc l0
+    mut_borrow_variant_field Wrapper, V1::_1
+    ret
+
+// Function definition at index 10
+#[persistent] public fun make(l0: u64): Wrapper
+    copy_loc l0
+    move_loc l0
+    ld_u64 1
+    add
+    pack_variant Wrapper, V1
+    // @5
+    ret
+
+// Bytecode version v9
+module 0xc0ffee::n
+use 0xc0ffee::m
+// Function definition at index 0
+fun foo(l0: &mut u64, l1: &mut u64)
+    move_loc l0
+    pop
+    move_loc l1
+    pop
+    ret
+
+// Function definition at index 1
+fun test_1()
+    local l0: m::Wrapper
+    local l1: &mut u64
+    local l2: &mut u64
+    ld_u64 22
+    call m::make
+    st_loc l0
+    mut_borrow_loc l0
+    call m::borrow_mut$Wrapper$0$0
+    // @5
+    mut_borrow_loc l0
+    call m::borrow_mut$Wrapper$1$1
+    call foo
+    ret
+
+// Function definition at index 2
+fun test_2()
+    local l0: m::Wrapper
+    local l1: u64
+    local l2: &mut u64
+    local l3: &mut u64
+    ld_u64 22
+    call m::make
+    st_loc l0
+    mut_borrow_loc l0
+    call m::borrow_mut$Wrapper$0$0
+    // @5
+    mut_borrow_loc l0
+    call m::borrow_mut$Wrapper$1$1
+    st_loc l2
+    st_loc l3
+    ld_u64 23
+    // @10
+    move_loc l3
+    write_ref
+    ld_u64 24
+    move_loc l2
+    write_ref
+    // @15
+    ret
+
+// Function definition at index 3
+fun test_match()
+    local l0: m::Wrapper
+    local l1: &mut m::Wrapper
+    local l2: &m::Wrapper
+    local l3: &mut u64
+    local l4: &mut u64
+    ld_u64 22
+    call m::make
+    st_loc l0
+    mut_borrow_loc l0
+    st_loc l1
+    // @5
+    copy_loc l1
+    freeze_ref
+    call m::test_variant$Wrapper$V2
+    br_false l0
+    move_loc l1
+    // @10
+    pop
+    ret
+l0: copy_loc l1
+    freeze_ref
+    call m::test_variant$Wrapper$V1
+    // @15
+    br_false l1
+    copy_loc l1
+    freeze_ref
+    st_loc l2
+    copy_loc l2
+    // @20
+    call m::test_variant$Wrapper$V1
+    br_true l2
+    move_loc l2
+    pop
+    move_loc l1
+    // @25
+    pop
+    ld_u64 14566554180833181697
+    abort
+l2: move_loc l2
+    pop
+    // @30
+    copy_loc l1
+    call m::borrow_mut$Wrapper$0$0
+    move_loc l1
+    call m::borrow_mut$Wrapper$1$1
+    call foo
+    // @35
+    ret
+l1: move_loc l1
+    pop
+    ld_u64 14566554180833181697
+    abort
+
+// Function definition at index 4
+fun test_no_err()
+    local l0: m::Wrapper
+    ld_u64 22
+    call m::make
+    st_loc l0
+    ld_u64 23
+    mut_borrow_loc l0
+    // @5
+    call m::borrow_mut$Wrapper$0$0
+    write_ref
+    ld_u64 24
+    mut_borrow_loc l0
+    call m::borrow_mut$Wrapper$1$1
+    // @10
+    write_ref
+    ret
+
+
+============ bytecode verification failed ========
+
+Diagnostics:
+bug: bytecode verification failed with unexpected status code `CALL_BORROWED_MUTABLE_REFERENCE_ERROR`:
+Error message: none
+   ┌─ tests/checking-lang-v2.4/cross_module_borrow_field_err.move:20:19
    │
-41 │     fun test_match() {
-   │         ^^^^^^^^^^
+20 │         let x_1 = &mut x.1;
+   │                   ^^^^^^^^
    │
    = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)

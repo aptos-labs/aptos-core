@@ -1,0 +1,673 @@
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0x42::m
+friend 0x42::m2
+enum Data has drop
+  V1
+    x: u64
+  V2
+    x: u64
+    y: bool
+  V3
+
+enum Data2 has drop
+  V1
+    x: u64
+  V2
+    y: u64
+    x: u64
+  V3
+
+enum Data3 has drop
+  V1
+    d1: Data
+  V2
+    d1: Data
+    d2: Data2
+  V3
+    d1: Data
+    d2: Data2
+    d3: V<u64>
+  V4
+    d1: Data
+    d2: Data2
+    d3: V<u64>
+    d4: vector<u64>
+
+struct V<T0> has drop
+  x: vector<T0>
+
+// Function definition at index 0
+friend fun test_variant$Data$V1(l0: &Data): bool
+    local l1: &Data
+    move_loc l0
+    test_variant Data, V1
+    ret
+
+// Function definition at index 1
+friend fun test_variant$Data$V2(l0: &Data): bool
+    local l1: &Data
+    move_loc l0
+    test_variant Data, V2
+    ret
+
+// Function definition at index 2
+friend fun test_variant$Data$V3(l0: &Data): bool
+    local l1: &Data
+    move_loc l0
+    test_variant Data, V3
+    ret
+
+// Function definition at index 3
+friend fun pack$Data$V1(l0: u64): Data
+    local l1: u64
+    move_loc l0
+    pack_variant Data, V1
+    ret
+
+// Function definition at index 4
+friend fun pack$Data$V2(l0: u64, l1: bool): Data
+    local l2: u64
+    local l3: bool
+    move_loc l0
+    move_loc l1
+    pack_variant Data, V2
+    ret
+
+// Function definition at index 5
+friend fun pack$Data$V3(): Data
+    pack_variant Data, V3
+    ret
+
+// Function definition at index 6
+friend fun unpack$Data$V1(l0: Data): u64
+    local l1: Data
+    move_loc l0
+    unpack_variant Data, V1
+    ret
+
+// Function definition at index 7
+friend fun unpack$Data$V2(l0: Data): (u64, bool)
+    local l1: Data
+    move_loc l0
+    unpack_variant Data, V2
+    ret
+
+// Function definition at index 8
+friend fun unpack$Data$V3(l0: Data)
+    local l1: Data
+    move_loc l0
+    unpack_variant Data, V3
+    ret
+
+// Function definition at index 9
+friend fun borrow$Data$0$0(l0: &Data): &u64
+    local l1: &Data
+    move_loc l0
+    borrow_variant_field Data, V1::x, V2::x
+    ret
+
+// Function definition at index 10
+friend fun borrow$Data$1$1(l0: &Data): &bool
+    local l1: &Data
+    move_loc l0
+    borrow_variant_field Data, V2::y
+    ret
+
+// Function definition at index 11
+friend fun borrow_mut$Data$0$0(l0: &mut Data): &mut u64
+    local l1: &mut Data
+    move_loc l0
+    mut_borrow_variant_field Data, V1::x, V2::x
+    ret
+
+// Function definition at index 12
+friend fun borrow_mut$Data$1$1(l0: &mut Data): &mut bool
+    local l1: &mut Data
+    move_loc l0
+    mut_borrow_variant_field Data, V2::y
+    ret
+
+// Function definition at index 13
+friend fun test_variant$Data2$V1(l0: &Data2): bool
+    local l1: &Data2
+    move_loc l0
+    test_variant Data2, V1
+    ret
+
+// Function definition at index 14
+friend fun test_variant$Data2$V2(l0: &Data2): bool
+    local l1: &Data2
+    move_loc l0
+    test_variant Data2, V2
+    ret
+
+// Function definition at index 15
+friend fun test_variant$Data2$V3(l0: &Data2): bool
+    local l1: &Data2
+    move_loc l0
+    test_variant Data2, V3
+    ret
+
+// Function definition at index 16
+friend fun pack$Data2$V1(l0: u64): Data2
+    local l1: u64
+    move_loc l0
+    pack_variant Data2, V1
+    ret
+
+// Function definition at index 17
+friend fun pack$Data2$V2(l0: u64, l1: u64): Data2
+    local l2: u64
+    local l3: u64
+    move_loc l0
+    move_loc l1
+    pack_variant Data2, V2
+    ret
+
+// Function definition at index 18
+friend fun pack$Data2$V3(): Data2
+    pack_variant Data2, V3
+    ret
+
+// Function definition at index 19
+friend fun unpack$Data2$V1(l0: Data2): u64
+    local l1: Data2
+    move_loc l0
+    unpack_variant Data2, V1
+    ret
+
+// Function definition at index 20
+friend fun unpack$Data2$V2(l0: Data2): (u64, u64)
+    local l1: Data2
+    move_loc l0
+    unpack_variant Data2, V2
+    ret
+
+// Function definition at index 21
+friend fun unpack$Data2$V3(l0: Data2)
+    local l1: Data2
+    move_loc l0
+    unpack_variant Data2, V3
+    ret
+
+// Function definition at index 22
+friend fun borrow$Data2$0$0(l0: &Data2): &u64
+    local l1: &Data2
+    move_loc l0
+    borrow_variant_field Data2, V1::x, V2::y
+    ret
+
+// Function definition at index 23
+friend fun borrow$Data2$1$1(l0: &Data2): &u64
+    local l1: &Data2
+    move_loc l0
+    borrow_variant_field Data2, V2::x
+    ret
+
+// Function definition at index 24
+friend fun borrow_mut$Data2$0$0(l0: &mut Data2): &mut u64
+    local l1: &mut Data2
+    move_loc l0
+    mut_borrow_variant_field Data2, V1::x, V2::y
+    ret
+
+// Function definition at index 25
+friend fun borrow_mut$Data2$1$1(l0: &mut Data2): &mut u64
+    local l1: &mut Data2
+    move_loc l0
+    mut_borrow_variant_field Data2, V2::x
+    ret
+
+// Function definition at index 26
+friend fun test_variant$Data3$V1(l0: &Data3): bool
+    local l1: &Data3
+    move_loc l0
+    test_variant Data3, V1
+    ret
+
+// Function definition at index 27
+friend fun test_variant$Data3$V2(l0: &Data3): bool
+    local l1: &Data3
+    move_loc l0
+    test_variant Data3, V2
+    ret
+
+// Function definition at index 28
+friend fun test_variant$Data3$V3(l0: &Data3): bool
+    local l1: &Data3
+    move_loc l0
+    test_variant Data3, V3
+    ret
+
+// Function definition at index 29
+friend fun test_variant$Data3$V4(l0: &Data3): bool
+    local l1: &Data3
+    move_loc l0
+    test_variant Data3, V4
+    ret
+
+// Function definition at index 30
+friend fun pack$Data3$V1(l0: Data): Data3
+    local l1: Data
+    move_loc l0
+    pack_variant Data3, V1
+    ret
+
+// Function definition at index 31
+friend fun pack$Data3$V2(l0: Data, l1: Data2): Data3
+    local l2: Data
+    local l3: Data2
+    move_loc l0
+    move_loc l1
+    pack_variant Data3, V2
+    ret
+
+// Function definition at index 32
+friend fun pack$Data3$V3(l0: Data, l1: Data2, l2: V<u64>): Data3
+    local l3: Data
+    local l4: Data2
+    local l5: V<u64>
+    move_loc l0
+    move_loc l1
+    move_loc l2
+    pack_variant Data3, V3
+    ret
+
+// Function definition at index 33
+friend fun pack$Data3$V4(l0: Data, l1: Data2, l2: V<u64>, l3: vector<u64>): Data3
+    local l4: Data
+    local l5: Data2
+    local l6: V<u64>
+    local l7: vector<u64>
+    move_loc l0
+    move_loc l1
+    move_loc l2
+    move_loc l3
+    pack_variant Data3, V4
+    // @5
+    ret
+
+// Function definition at index 34
+friend fun unpack$Data3$V1(l0: Data3): Data
+    local l1: Data3
+    move_loc l0
+    unpack_variant Data3, V1
+    ret
+
+// Function definition at index 35
+friend fun unpack$Data3$V2(l0: Data3): (Data, Data2)
+    local l1: Data3
+    move_loc l0
+    unpack_variant Data3, V2
+    ret
+
+// Function definition at index 36
+friend fun unpack$Data3$V3(l0: Data3): (Data, Data2, V<u64>)
+    local l1: Data3
+    move_loc l0
+    unpack_variant Data3, V3
+    ret
+
+// Function definition at index 37
+friend fun unpack$Data3$V4(l0: Data3): (Data, Data2, V<u64>, vector<u64>)
+    local l1: Data3
+    move_loc l0
+    unpack_variant Data3, V4
+    ret
+
+// Function definition at index 38
+friend fun borrow$Data3$0$0(l0: &Data3): &Data
+    local l1: &Data3
+    move_loc l0
+    borrow_variant_field Data3, V1::d1, V2::d1, V3::d1, V4::d1
+    ret
+
+// Function definition at index 39
+friend fun borrow$Data3$1$1(l0: &Data3): &Data2
+    local l1: &Data3
+    move_loc l0
+    borrow_variant_field Data3, V2::d2, V3::d2, V4::d2
+    ret
+
+// Function definition at index 40
+friend fun borrow$Data3$2$2(l0: &Data3): &V<u64>
+    local l1: &Data3
+    move_loc l0
+    borrow_variant_field Data3, V3::d3, V4::d3
+    ret
+
+// Function definition at index 41
+friend fun borrow$Data3$3$3(l0: &Data3): &vector<u64>
+    local l1: &Data3
+    move_loc l0
+    borrow_variant_field Data3, V4::d4
+    ret
+
+// Function definition at index 42
+friend fun borrow_mut$Data3$0$0(l0: &mut Data3): &mut Data
+    local l1: &mut Data3
+    move_loc l0
+    mut_borrow_variant_field Data3, V1::d1, V2::d1, V3::d1, V4::d1
+    ret
+
+// Function definition at index 43
+friend fun borrow_mut$Data3$1$1(l0: &mut Data3): &mut Data2
+    local l1: &mut Data3
+    move_loc l0
+    mut_borrow_variant_field Data3, V2::d2, V3::d2, V4::d2
+    ret
+
+// Function definition at index 44
+friend fun borrow_mut$Data3$2$2(l0: &mut Data3): &mut V<u64>
+    local l1: &mut Data3
+    move_loc l0
+    mut_borrow_variant_field Data3, V3::d3, V4::d3
+    ret
+
+// Function definition at index 45
+friend fun borrow_mut$Data3$3$3(l0: &mut Data3): &mut vector<u64>
+    local l1: &mut Data3
+    move_loc l0
+    mut_borrow_variant_field Data3, V4::d4
+    ret
+
+// Function definition at index 46
+friend fun pack$V<T0>(l0: vector<T0>): V<T0>
+    local l1: vector<T0>
+    move_loc l0
+    pack V<T0>
+    ret
+
+// Function definition at index 47
+friend fun unpack$V<T0>(l0: V<T0>): vector<T0>
+    local l1: V<T0>
+    move_loc l0
+    unpack V<T0>
+    ret
+
+// Function definition at index 48
+friend fun borrow$V$0<T0>(l0: &V<T0>): &vector<T0>
+    local l1: &V<T0>
+    move_loc l0
+    borrow_field V<T0>, x
+    ret
+
+// Function definition at index 49
+friend fun borrow_mut$V$0<T0>(l0: &mut V<T0>): &mut vector<T0>
+    local l1: &mut V<T0>
+    move_loc l0
+    mut_borrow_field V<T0>, x
+    ret
+
+// Bytecode version v9
+module 0x42::m2
+use 0x42::m
+// Function definition at index 0
+fun test_v1(): bool
+    local l0: m::Data
+    local l1: &m::Data
+    local l2: bool
+    ld_u64 43
+    call m::pack$Data$V1
+    st_loc l0
+    borrow_loc l0
+    call m::test_variant$Data$V1
+    // @5
+    br_false l0
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    call m::test_variant$Data$V1
+    // @10
+    st_loc l2
+    copy_loc l2
+    br_false l1
+    move_loc l1
+    pop
+    // @15
+l3: move_loc l2
+    ret
+l1: move_loc l1
+    call m::test_variant$Data$V3
+    st_loc l2
+    // @20
+    copy_loc l2
+    br_true l2
+    branch l3
+l2: move_loc l2
+    ret
+    // @25
+l0: ld_false
+    ret
+
+// Function definition at index 1
+#[persistent] public fun test_v1_mut_borrow()
+    local l0: m::Data
+    local l1: u64
+    local l2: &mut u64
+    ld_u64 43
+    call m::pack$Data$V1
+    st_loc l0
+    mut_borrow_loc l0
+    call m::borrow_mut$Data$0$0
+    // @5
+    st_loc l2
+    ld_u64 44
+    move_loc l2
+    write_ref
+    borrow_loc l0
+    // @10
+    call m::borrow$Data$0$0
+    read_ref
+    ld_u64 44
+    eq
+    br_false l0
+    // @15
+    ret
+l0: ld_u64 1
+    abort
+
+// Function definition at index 2
+fun test_v1v3(): bool
+    local l0: m::Data
+    local l1: &m::Data
+    local l2: bool
+    local l3: m::Data
+    local l4: &m::Data
+    local l5: bool
+    ld_u64 43
+    call m::pack$Data$V1
+    st_loc l0
+    borrow_loc l0
+    st_loc l1
+    // @5
+    copy_loc l1
+    call m::test_variant$Data$V1
+    st_loc l2
+    copy_loc l2
+    br_false l0
+    // @10
+    move_loc l1
+    pop
+l5: call m::pack$Data$V3
+    st_loc l3
+    move_loc l2
+    // @15
+    br_false l1
+    borrow_loc l3
+    st_loc l4
+    copy_loc l4
+    call m::test_variant$Data$V1
+    // @20
+    st_loc l5
+    copy_loc l5
+    br_false l2
+    move_loc l4
+    pop
+    // @25
+l4: move_loc l5
+    ret
+l2: move_loc l4
+    call m::test_variant$Data$V3
+    st_loc l5
+    // @30
+    copy_loc l5
+    br_true l3
+    branch l4
+l3: move_loc l5
+    ret
+    // @35
+l1: ld_false
+    ret
+l0: move_loc l1
+    call m::test_variant$Data$V3
+    st_loc l2
+    // @40
+    branch l5
+
+// Function definition at index 3
+fun test_v1v3_ref(): bool
+    local l0: m::Data
+    local l1: &m::Data
+    local l2: bool
+    local l3: m::Data
+    local l4: &mut m::Data
+    local l5: bool
+    ld_u64 43
+    call m::pack$Data$V1
+    st_loc l0
+    borrow_loc l0
+    st_loc l1
+    // @5
+    copy_loc l1
+    call m::test_variant$Data$V1
+    st_loc l2
+    copy_loc l2
+    br_false l0
+    // @10
+    move_loc l1
+    pop
+l5: call m::pack$Data$V3
+    st_loc l3
+    move_loc l2
+    // @15
+    br_false l1
+    mut_borrow_loc l3
+    st_loc l4
+    copy_loc l4
+    freeze_ref
+    // @20
+    call m::test_variant$Data$V1
+    st_loc l5
+    copy_loc l5
+    br_false l2
+    move_loc l4
+    // @25
+    pop
+l4: move_loc l5
+    ret
+l2: move_loc l4
+    freeze_ref
+    // @30
+    call m::test_variant$Data$V3
+    st_loc l5
+    copy_loc l5
+    br_true l3
+    branch l4
+    // @35
+l3: move_loc l5
+    ret
+l1: ld_false
+    ret
+l0: move_loc l1
+    // @40
+    call m::test_variant$Data$V3
+    st_loc l2
+    branch l5
+
+// Function definition at index 4
+#[persistent] public fun test_v2_mut_borrow_2()
+    local l0: m::Data2
+    local l1: &mut m::Data2
+    local l2: &m::Data2
+    local l3: &mut u64
+    local l4: &m::Data2
+    local l5: &u64
+    ld_u64 43
+    ld_u64 44
+    call m::pack$Data2$V2
+    st_loc l0
+    mut_borrow_loc l0
+    // @5
+    st_loc l1
+    copy_loc l1
+    freeze_ref
+    call m::test_variant$Data2$V2
+    br_true l0
+    // @10
+    copy_loc l1
+    freeze_ref
+    st_loc l2
+    copy_loc l2
+    call m::test_variant$Data2$V1
+    // @15
+    br_true l1
+    move_loc l2
+    pop
+    move_loc l1
+    pop
+    // @20
+    ld_u64 14566554180833181697
+    abort
+l1: move_loc l2
+    pop
+    move_loc l1
+    // @25
+    call m::borrow_mut$Data2$0$0
+    st_loc l3
+l6: ld_u64 45
+    move_loc l3
+    write_ref
+    // @30
+    borrow_loc l0
+    st_loc l4
+    copy_loc l4
+    call m::test_variant$Data2$V2
+    br_true l2
+    // @35
+    copy_loc l4
+    call m::test_variant$Data2$V1
+    br_true l3
+    move_loc l4
+    pop
+    // @40
+    ld_u64 14566554180833181697
+    abort
+l3: move_loc l4
+    call m::borrow$Data2$0$0
+    st_loc l5
+    // @45
+l5: move_loc l5
+    read_ref
+    ld_u64 45
+    eq
+    br_false l4
+    // @50
+    ret
+l4: ld_u64 1
+    abort
+l2: move_loc l4
+    call m::borrow$Data2$1$1
+    // @55
+    st_loc l5
+    branch l5
+l0: move_loc l1
+    call m::borrow_mut$Data2$1$1
+    st_loc l3
+    // @60
+    branch l6
+
+
+============ bytecode verification succeeded ========

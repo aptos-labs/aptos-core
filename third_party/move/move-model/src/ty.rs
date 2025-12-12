@@ -1343,6 +1343,11 @@ impl Type {
         }
     }
 
+    /// Wrap the type in a reference
+    pub fn wrap_in_reference(&self, is_mut: bool) -> Type {
+        Type::Reference(ReferenceKind::from_is_mut(is_mut), Box::new(self.clone()))
+    }
+
     /// If this is a reference, return its kind.
     pub fn try_reference_kind(&self) -> Option<ReferenceKind> {
         if let Type::Reference(k, _) = self {
