@@ -485,7 +485,7 @@ where
                     incarnation,
                     TriompheArc::new(value),
                     None,
-                );
+                )?;
             }
             for (key, delta) in output_before_guard.aggregator_v1_delta_set().into_iter() {
                 prev_modified_aggregator_v1_keys.remove(&key);
@@ -656,7 +656,7 @@ where
                 }
                 versioned_cache
                     .data()
-                    .write(k, idx_to_execute, incarnation, v, maybe_layout);
+                    .write(k, idx_to_execute, incarnation, v, maybe_layout)?;
             }
 
             // Then, apply deltas.
@@ -1739,6 +1739,18 @@ where
         // +1 for potential BlockEpilogue txn.
         let last_input_output = TxnLastInputOutput::new(num_txns + 1);
         let mut versioned_cache = MVHashMap::new();
+        if self.config.local.enable_pre_write {
+            for txn_idx in 0..num_txns {
+                let values = T::pre_write_values(signature_verified_block.get_txn(txn_idx));
+                for (k, v) in values {
+                    // pre-write doesn't need to use write_v2 because there's no dependencies.
+                    versioned_cache
+                        .data()
+                        .write(k, txn_idx, 0, triomphe::Arc::new(v), None)
+                        .map_err(|_| ())?;
+                }
+            }
+        }
         let scheduler = SchedulerV2::new(num_txns, num_workers);
 
         let shared_sync_params: SharedSyncParams<'_, T, E, S> = SharedSyncParams {
@@ -1865,6 +1877,17 @@ where
         );
 
         let mut versioned_cache = MVHashMap::new();
+        if self.config.local.enable_pre_write {
+            for txn_idx in 0..signature_verified_block.num_txns() as u32 {
+                let values = T::pre_write_values(signature_verified_block.get_txn(txn_idx));
+                for (k, v) in values {
+                    versioned_cache
+                        .data()
+                        .write(k, txn_idx, 0, triomphe::Arc::new(v), None)
+                        .map_err(|_| ())?;
+                }
+            }
+        }
         let start_shared_counter = gen_id_start_value(false);
         let shared_counter = AtomicU32::new(start_shared_counter);
 
