@@ -8,7 +8,6 @@ license = { workspace = true }
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
-aptos-runtimes = { workspace = true }
 ark-bls12-381 = { workspace = true }
 ark-bn254 = { workspace = true }
 ark-ec = { workspace = true }
@@ -19,7 +18,6 @@ ark-std = { workspace = true }
 bcs = { workspace = true }
 blst = { workspace = true }
 blstrs = { workspace = true }
-criterion = { workspace = true }
 derive_more = { workspace = true }
 ff = { workspace = true }
 group = { workspace = true }
@@ -39,6 +37,8 @@ sha3 = { workspace = true }
 static_assertions = { workspace = true }
 
 [dev-dependencies]
+aptos-runtimes = { workspace = true }
+criterion = { workspace = true }
 num_cpus = { workspace = true }
 
 [features]
