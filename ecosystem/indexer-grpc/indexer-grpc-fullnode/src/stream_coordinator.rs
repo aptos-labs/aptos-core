@@ -530,7 +530,7 @@ impl IndexerStreamCoordinator {
     }
 
     pub fn set_highest_known_version(&mut self) -> anyhow::Result<()> {
-        let info = self.context.get_latest_ledger_info_wrapped()?;
+        let info = self.context.get_latest_ledger_info_wrapped().unwrap();
         let latest_table_info_version = self
             .context
             .indexer_reader

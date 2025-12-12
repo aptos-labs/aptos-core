@@ -25,7 +25,9 @@ impl DoStateCheckpoint {
 
         let state_summary = parent_state_summary.update(
             persisted_state_summary,
-            execution_output.to_commit.state_update_refs(),
+            &execution_output.hot_inserted,
+            &execution_output.hot_evicted,
+            execution_output.next_version(),
         )?;
 
         let state_checkpoint_hashes = Self::get_state_checkpoint_hashes(

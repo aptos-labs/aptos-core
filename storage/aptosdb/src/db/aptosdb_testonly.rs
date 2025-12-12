@@ -130,67 +130,68 @@ impl AptosDB {
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         sync_commit: bool,
     ) -> Result<()> {
-        let (transactions, transaction_outputs, transaction_infos) =
-            Self::disassemble_txns_to_commit(txns_to_commit);
-        // Keep auxiliary info consistent with what was used to create TransactionInfo
-        // Use block-relative indices to match what was used during TransactionInfo creation
-        let persisted_auxiliary_infos = txns_to_commit
-            .iter()
-            .map(
-                |txn_to_commit| match txn_to_commit.transaction_info.auxiliary_info_hash() {
-                    Some(hash) => {
-                        for i in 0..100 {
-                            if hash
-                                == CryptoHash::hash(&PersistedAuxiliaryInfo::V1 {
-                                    transaction_index: i as u32,
-                                })
-                            {
-                                return PersistedAuxiliaryInfo::V1 {
-                                    transaction_index: i as u32,
-                                };
-                            }
-                        }
-                        panic!("Hash not found");
-                    },
-                    None => PersistedAuxiliaryInfo::None,
-                },
-            )
-            .collect();
-        let transactions_to_keep = TransactionsToKeep::make(
-            first_version,
-            transactions,
-            transaction_outputs,
-            persisted_auxiliary_infos,
-        );
+        unimplemented!();
+        // let (transactions, transaction_outputs, transaction_infos) =
+        //     Self::disassemble_txns_to_commit(txns_to_commit);
+        // // Keep auxiliary info consistent with what was used to create TransactionInfo
+        // // Use block-relative indices to match what was used during TransactionInfo creation
+        // let persisted_auxiliary_infos = txns_to_commit
+        //     .iter()
+        //     .map(
+        //         |txn_to_commit| match txn_to_commit.transaction_info.auxiliary_info_hash() {
+        //             Some(hash) => {
+        //                 for i in 0..100 {
+        //                     if hash
+        //                         == CryptoHash::hash(&PersistedAuxiliaryInfo::V1 {
+        //                             transaction_index: i as u32,
+        //                         })
+        //                     {
+        //                         return PersistedAuxiliaryInfo::V1 {
+        //                             transaction_index: i as u32,
+        //                         };
+        //                     }
+        //                 }
+        //                 panic!("Hash not found");
+        //             },
+        //             None => PersistedAuxiliaryInfo::None,
+        //         },
+        //     )
+        //     .collect();
+        // let transactions_to_keep = TransactionsToKeep::make(
+        //     first_version,
+        //     transactions,
+        //     transaction_outputs,
+        //     persisted_auxiliary_infos,
+        // );
 
-        let current = self.state_store.current_state_locked().clone();
-        let (hot_state, persisted_state) = self.state_store.get_persisted_state()?;
-        let (new_state, reads) = current.ledger_state().update_with_db_reader(
-            &persisted_state,
-            hot_state,
-            transactions_to_keep.state_update_refs(),
-            self.state_store.clone(),
-        )?;
-        let persisted_summary = self.state_store.get_persisted_state_summary()?;
-        let new_state_summary = current.ledger_state_summary().update(
-            &ProvableStateSummary::new(persisted_summary, self),
-            transactions_to_keep.state_update_refs(),
-        )?;
+        // let current = self.state_store.current_state_locked().clone();
+        // let (hot_state, persisted_state) = self.state_store.get_persisted_state()?;
+        // let (new_state, reads) = current.ledger_state().update_with_db_reader(
+        //     &persisted_state,
+        //     hot_state,
+        //     transactions_to_keep.state_update_refs(),
+        //     self.state_store.clone(),
+        // )?;
+        // let persisted_summary = self.state_store.get_persisted_state_summary()?;
+        // let new_state_summary = current.ledger_state_summary().update(
+        //     &ProvableStateSummary::new(persisted_summary, self),
+        //     transactions_to_keep.state_update_refs(),
+        // )?;
 
-        let chunk = ChunkToCommit {
-            first_version,
-            transactions: &transactions_to_keep.transactions,
-            persisted_auxiliary_infos: &transactions_to_keep.persisted_auxiliary_infos,
-            transaction_outputs: &transactions_to_keep.transaction_outputs,
-            transaction_infos: &transaction_infos,
-            state: &new_state,
-            state_summary: &new_state_summary,
-            state_update_refs: transactions_to_keep.state_update_refs(),
-            state_reads: &reads,
-            is_reconfig: transactions_to_keep.is_reconfig(),
-        };
+        // let chunk = ChunkToCommit {
+        //     first_version,
+        //     transactions: &transactions_to_keep.transactions,
+        //     persisted_auxiliary_infos: &transactions_to_keep.persisted_auxiliary_infos,
+        //     transaction_outputs: &transactions_to_keep.transaction_outputs,
+        //     transaction_infos: &transaction_infos,
+        //     state: &new_state,
+        //     state_summary: &new_state_summary,
+        //     state_update_refs: transactions_to_keep.state_update_refs(),
+        //     state_reads: &reads,
+        //     is_reconfig: transactions_to_keep.is_reconfig(),
+        // };
 
-        self.save_transactions(chunk, ledger_info_with_sigs, sync_commit)
+        // self.save_transactions(chunk, ledger_info_with_sigs, sync_commit)
     }
 
     fn disassemble_txns_to_commit(
