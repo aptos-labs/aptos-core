@@ -36,6 +36,8 @@ pub struct DataCollection {
     batch_size: u64,
     dump_write_set: bool,
     filter_condition: FilterCondition,
+    enable_features: Vec<FeatureFlag>,
+    disable_features: Vec<FeatureFlag>,
 }
 
 impl DataCollection {
@@ -48,6 +50,8 @@ impl DataCollection {
         dump_write_set: bool,
         skip_source_code: bool,
         target_account: Option<AccountAddress>,
+        enable_features: Vec<FeatureFlag>,
+        disable_features: Vec<FeatureFlag>,
     ) -> Self {
         Self {
             debugger,
@@ -60,6 +64,8 @@ impl DataCollection {
                 check_source_code: !skip_source_code,
                 target_account,
             },
+            enable_features,
+            disable_features,
         }
     }
 
@@ -72,6 +78,8 @@ impl DataCollection {
         dump_write_set: bool,
         skip_source_code: bool,
         target_account: Option<AccountAddress>,
+        enable_features: Vec<FeatureFlag>,
+        disable_features: Vec<FeatureFlag>,
     ) -> Result<Self> {
         Ok(Self::new(
             Arc::new(RestDebuggerInterface::new(rest_client)),
@@ -82,6 +90,8 @@ impl DataCollection {
             dump_write_set,
             skip_source_code,
             target_account,
+            enable_features,
+            disable_features,
         ))
     }
 
@@ -244,8 +254,8 @@ impl DataCollection {
                     let index = index_writer.clone();
                     let base_experiments = base_experiments.clone();
                     let data_state = InMemoryStateStore::default();
-                    // Use pre-compiled module to make sure VM still works when old framework is loaded.
-                    let features_to_enable = vec![FeatureFlag::ENABLE_ENUM_OPTION];
+                    let features_to_enable = self.enable_features.clone();
+                    let features_to_disable = self.disable_features.clone();
                     let cache_v1 = compilation_cache
                         .lock()
                         .unwrap()
@@ -257,7 +267,7 @@ impl DataCollection {
                         version,
                         data_state,
                         features_to_enable,
-                        vec![],
+                        features_to_disable,
                     );
 
                     let txn_execution_thread = tokio::task::spawn_blocking(move || {

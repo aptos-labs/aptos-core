@@ -9,7 +9,7 @@ use anyhow::Result;
 use aptos_framework::natives::code::PackageMetadata;
 use aptos_rest_client::Client;
 use aptos_transaction_simulation::InMemoryStateStore;
-use aptos_types::transaction::Version;
+use aptos_types::{on_chain_config::FeatureFlag, transaction::Version};
 use aptos_validator_interface::{AptosValidatorInterface, FilterCondition, RestDebuggerInterface};
 use move_core_types::account_address::AccountAddress;
 use std::{
@@ -26,7 +26,8 @@ pub struct OnlineExecutor {
     filter_condition: FilterCondition,
     execution_mode: ExecutionMode,
     endpoint: String,
-    disable_aa_fa: bool,
+    enable_features: Vec<FeatureFlag>,
+    disable_features: Vec<FeatureFlag>,
 }
 
 impl OnlineExecutor {
@@ -38,7 +39,8 @@ impl OnlineExecutor {
         skip_publish_txns: bool,
         execution_mode: ExecutionMode,
         endpoint: String,
-        disable_aa_fa: bool,
+        enable_features: Vec<FeatureFlag>,
+        disable_features: Vec<FeatureFlag>,
     ) -> Self {
         Self {
             debugger,
@@ -52,7 +54,8 @@ impl OnlineExecutor {
             },
             execution_mode,
             endpoint,
-            disable_aa_fa,
+            enable_features,
+            disable_features,
         }
     }
 
@@ -64,7 +67,8 @@ impl OnlineExecutor {
         skip_publish_txns: bool,
         execution_mode: ExecutionMode,
         endpoint: String,
-        disable_aa_fa: bool,
+        enable_features: Vec<FeatureFlag>,
+        disable_features: Vec<FeatureFlag>,
     ) -> Result<Self> {
         Ok(Self::new(
             Arc::new(RestDebuggerInterface::new(rest_client)),
@@ -74,7 +78,8 @@ impl OnlineExecutor {
             skip_publish_txns,
             execution_mode,
             endpoint,
-            disable_aa_fa,
+            enable_features,
+            disable_features,
         ))
     }
 
@@ -201,8 +206,9 @@ impl OnlineExecutor {
                     let compilation_cache = compilation_cache.clone();
                     let current_dir = self.current_dir.clone();
                     let execution_mode = self.execution_mode;
-                    let disable_aa_fa = self.disable_aa_fa;
                     let endpoint = self.endpoint.clone();
+                    let enable_features = self.enable_features.clone();
+                    let disable_features = self.disable_features.clone();
                     let base_experiments = base_experiments.clone();
                     let compared_experiments = compared_experiments.clone();
 
@@ -210,7 +216,8 @@ impl OnlineExecutor {
                         let executor = crate::Execution::new(
                             current_dir.clone(),
                             execution_mode,
-                            disable_aa_fa,
+                            enable_features,
+                            disable_features,
                         );
                         let mut version_idx = TxnIndex {
                             version,
