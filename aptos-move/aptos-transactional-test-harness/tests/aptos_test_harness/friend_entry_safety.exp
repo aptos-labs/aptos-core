@@ -1,0 +1,10 @@
+processed 2 tasks
+task 1 lines 4-28:  publish --private-key alice [module alice::entry_points_safety {]
+Error: compilation errors:
+ error: unbound module `0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::test_friend_caller` in friend declaration
+  ┌─ TEMPFILE:6:5
+  │
+6 │     friend alice::test_friend_caller;
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
