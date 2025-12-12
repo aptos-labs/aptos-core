@@ -465,7 +465,7 @@ pub struct TestPackage {
     )]
     pub instruction_execution_bound: u64,
 
-    /// Collect coverage information for later use with the various `aptos move coverage` subcommands
+    /// Collect coverage information for later use with the various `supra move tool coverage` subcommands
     #[clap(long = "coverage")]
     pub compute_coverage: bool,
 
@@ -533,7 +533,7 @@ impl CliCommand<&'static str> for TestPackage {
             };
             summary.coverage()?;
 
-            println!("Please use `aptos move coverage -h` for more detailed source or bytecode test coverage of this package");
+            println!("Please use `supra move tool coverage -h` for more detailed source or bytecode test coverage of this package");
         }
 
         match result {
