@@ -51,7 +51,7 @@ use aptos_types::{
 };
 use aptos_vm::VMBlockExecutor;
 use itertools::Itertools;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 pub struct DoGetExecutionOutput;
 
@@ -171,7 +171,7 @@ impl DoGetExecutionOutput {
             }
         }
 
-        Parser::parse(
+        let parsed = Parser::parse(
             state_view.next_version(),
             transactions,
             transaction_outputs,
@@ -182,7 +182,9 @@ impl DoGetExecutionOutput {
             transaction_slice_metadata
                 .append_state_checkpoint_to_block()
                 .is_some(),
-        )
+        )?;
+        info!("Finished executing transactions");
+        Ok(parsed)
     }
 
     pub fn by_transaction_execution_sharded<V: VMBlockExecutor>(
@@ -417,12 +419,18 @@ impl Parser {
             },
         )?;
 
-        let result_state = parent_state.update_with_memorized_reads(
+        let (result_state, hot_inserted, hot_evicted) = parent_state.update_with_memorized_reads(
             base_state_view.persisted_hot_state(),
             base_state_view.persisted_state(),
             to_commit.state_update_refs(),
             base_state_view.memorized_reads(),
         );
+        for (i, shard) in hot_inserted.iter().enumerate() {
+            info!("shard {}: # inserted: {}", i, shard.len());
+        }
+        for (i, shard) in hot_evicted.iter().enumerate() {
+            info!("shard {}: # evicted: {}", i, shard.len());
+        }
         let state_reads = base_state_view.into_memorized_reads();
 
         let out = ExecutionOutput::new(
@@ -437,6 +445,8 @@ impl Parser {
             block_end_info,
             next_epoch_state,
             Planned::place_holder(),
+            hot_inserted,
+            hot_evicted,
         );
         let ret = out.clone();
         ret.subscribable_events

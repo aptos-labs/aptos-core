@@ -19,7 +19,7 @@ use aptos_db_indexer_schemas::{
         column_families, indexer_metadata::IndexerMetadataSchema, table_info::TableInfoSchema,
     },
 };
-use aptos_logger::warn;
+use aptos_logger::{info, warn};
 use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{batch::SchemaBatch, DB};
@@ -98,6 +98,7 @@ impl Indexer {
         first_version: Version,
         write_sets: &[&WriteSet],
     ) -> Result<()> {
+        info!("index_with_annotator. first_version: {}", first_version);
         let next_version = self.next_version();
         db_ensure!(
             first_version <= next_version,
@@ -106,6 +107,7 @@ impl Indexer {
             first_version,
         );
         let end_version = first_version + write_sets.len() as Version;
+        info!("index_with_annotator. end_version: {}", end_version);
         if end_version <= next_version {
             warn!(
                 "Seeing old transactions. Expecting version: {}, got {} transactions starting from version {}.",
