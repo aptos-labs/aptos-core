@@ -243,21 +243,13 @@ impl Context {
     pub fn get_latest_storage_ledger_info<E: ServiceUnavailableError>(
         &self,
     ) -> Result<LedgerInfo, E> {
-        let ledger_info = self
-            .get_latest_ledger_info_with_signatures()
-            .context("Failed to retrieve latest ledger info")
-            .map_err(|e| {
-                E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
-            })?;
+        let ledger_info = self.get_latest_ledger_info_with_signatures().unwrap();
 
         let (oldest_version, oldest_block_height) = self.get_oldest_version_and_block_height()?;
         let (_, _, newest_block_event) = self
             .db
             .get_block_info_by_version(ledger_info.ledger_info().version())
-            .context("Failed to retrieve latest block information")
-            .map_err(|e| {
-                E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
-            })?;
+            .unwrap();
 
         Ok(LedgerInfo::new(
             &self.chain_id(),

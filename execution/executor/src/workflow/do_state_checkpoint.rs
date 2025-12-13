@@ -7,6 +7,7 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::{
     execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput,
 };
+use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::state_store::state_summary::{
     LedgerStateSummary, ProvableStateSummary,
@@ -22,10 +23,13 @@ impl DoStateCheckpoint {
         known_state_checkpoints: Option<Vec<Option<HashValue>>>,
     ) -> Result<StateCheckpointOutput> {
         let _timer = OTHER_TIMERS.timer_with(&["do_state_checkpoint"]);
+        info!("Start getting state checkpoint");
 
         let state_summary = parent_state_summary.update(
             persisted_state_summary,
-            execution_output.to_commit.state_update_refs(),
+            &execution_output.hot_inserted,
+            &execution_output.hot_evicted,
+            execution_output.next_version(),
         )?;
 
         let state_checkpoint_hashes = Self::get_state_checkpoint_hashes(
@@ -33,6 +37,8 @@ impl DoStateCheckpoint {
             known_state_checkpoints,
             &state_summary,
         )?;
+
+        info!("Finished getting state checkpoint");
 
         Ok(StateCheckpointOutput::new(
             state_summary,
