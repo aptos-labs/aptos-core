@@ -965,6 +965,7 @@ name = "aptos-consensus"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-batch-encryption",
  "aptos-bitvec",
  "aptos-bounded-executor",
  "aptos-cached-packages",
@@ -4782,6 +4783,7 @@ version = "0.0.3"
 dependencies = [
  "ahash 0.8.11",
  "anyhow",
+ "aptos-batch-encryption",
  "aptos-bitvec",
  "aptos-crypto",
  "aptos-crypto-derive",

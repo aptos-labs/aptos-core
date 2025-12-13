@@ -62,6 +62,10 @@ pub enum LogEvent {
     NetworkReceiveOptProposal,
     ReceiveOptProposal,
     ProcessOptProposal,
+    // secret sharing events
+    ReceiveSecretShare,
+    BroadcastSecretShare,
+    ReceiveReactiveSecretShare,
 }
 
 impl LogSchema {
