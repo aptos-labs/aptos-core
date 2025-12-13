@@ -20,7 +20,7 @@ use StateSlot::*;
 /// value_version: non-empty value changed at this version
 /// hot_since_version: the timestamp of a hot value / vacancy in the hot state, which determines
 ///                    the order of eviction
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub enum StateSlot {
     ColdVacant,
     HotVacant {
@@ -37,6 +37,21 @@ pub enum StateSlot {
         hot_since_version: Version,
         lru_info: LRUEntry<StateKey>,
     },
+}
+
+impl std::fmt::Debug for StateSlot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ColdVacant => write!(f, "ColdVacant"),
+            Self::HotVacant { .. } => write!(f, "HotVacant"),
+            Self::ColdOccupied { value_version, .. } => {
+                write!(f, "ColdOccupied {{ value_version: {} }}", value_version)
+            },
+            Self::HotOccupied { value_version, .. } => {
+                write!(f, "HotOccupied {{ value_version: {} }}", value_version)
+            },
+        }
+    }
 }
 
 impl StateSlot {
