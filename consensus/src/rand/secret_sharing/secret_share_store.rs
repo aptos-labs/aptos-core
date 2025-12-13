@@ -12,10 +12,7 @@ use aptos_types::secret_sharing::{
     SecretShare, SecretShareConfig, SecretShareMetadata, SecretSharedKey,
 };
 use itertools::Either;
-use std::{
-    collections::{HashMap, HashSet},
-    mem,
-};
+use std::collections::{HashMap, HashSet};
 
 pub struct SecretShareAggregator {
     self_author: Author,

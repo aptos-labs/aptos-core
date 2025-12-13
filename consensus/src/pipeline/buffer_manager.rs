@@ -76,6 +76,7 @@ pub struct ResetRequest {
     pub signal: ResetSignal,
 }
 
+#[derive(Clone)]
 pub struct OrderedBlocks {
     pub ordered_blocks: Vec<Arc<PipelinedBlock>>,
     pub ordered_proof: LedgerInfoWithSignatures,
