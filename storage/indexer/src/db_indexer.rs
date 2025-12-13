@@ -20,7 +20,7 @@ use aptos_db_indexer_schemas::{
         MAX_REQUEST_LIMIT,
     },
 };
-use aptos_logger::warn;
+use aptos_logger::{info, warn};
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::{batch::SchemaBatch, DB};
 use aptos_storage_interface::{
@@ -108,7 +108,9 @@ impl InternalIndexerDB {
     }
 
     pub fn get_persisted_version(&self) -> Result<Option<Version>> {
-        self.get_version(&MetadataKey::LatestVersion)
+        let ret = self.get_version(&MetadataKey::LatestVersion)?;
+        info!("InternalIndexerDB::get_persisted_version: {ret:?}");
+        Ok(ret)
     }
 
     pub fn get_event_version(&self) -> Result<Option<Version>> {

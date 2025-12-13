@@ -20,6 +20,7 @@ use crate::{
 };
 use aptos_crypto::HashValue;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
+use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::{
@@ -607,6 +608,10 @@ impl AptosDB {
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         chunk_opt: Option<ChunkToCommit>,
     ) -> Result<()> {
+        info!(
+            "post_commit. old_committed_version: {:?}. version: {}",
+            old_committed_version, version
+        );
         // If commit succeeds and there are at least one transaction written to the storage, we
         // will inform the pruner thread to work.
         if old_committed_version.is_none() || version > old_committed_version.unwrap() {
@@ -634,6 +639,7 @@ impl AptosDB {
             // Note: this must happen after txns have been saved to db because types can be newly
             // created in this same chunk of transactions.
             if let Some(indexer) = &self.indexer {
+                info!("Using indexer!!!");
                 let _timer = OTHER_TIMERS_SECONDS.timer_with(&["indexer_index"]);
                 // n.b. txns_to_commit can be partial, when the control was handed over from consensus to state sync
                 // where state sync won't send the pre-committed part to the DB again.
