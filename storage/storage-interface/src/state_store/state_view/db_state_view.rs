@@ -31,8 +31,9 @@ impl DbStateView {
                 // DB doesn't support returning proofs for buffered state, so only optionally
                 // verify proof.
                 // TODO: support returning state proof for buffered state.
-                if let Ok((value, proof)) =
-                    self.db.get_state_value_with_proof_by_version(key, version)
+                if let Ok((value, proof)) = self
+                    .db
+                    .get_state_value_with_proof_by_version(key, version, /* is_hot = */ false)
                 {
                     proof.verify(root_hash, *key.crypto_hash_ref(), value.as_ref())?;
                 }
