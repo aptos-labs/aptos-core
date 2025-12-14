@@ -315,7 +315,14 @@ where
                 output.set_state_checkpoint_output(DoStateCheckpoint::run(
                     &output.execution_output,
                     parent_block.output.ensure_result_state_summary()?,
-                    &ProvableStateSummary::new_persisted(self.db.reader.as_ref())?,
+                    &ProvableStateSummary::new_persisted(
+                        self.db.reader.as_ref(),
+                        /* is_hot = */ true,
+                    )?,
+                    &ProvableStateSummary::new_persisted(
+                        self.db.reader.as_ref(),
+                        /* is_hot = */ false,
+                    )?,
                     None,
                 )?);
                 output.set_ledger_update_output(DoLedgerUpdate::run(
