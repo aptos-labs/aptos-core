@@ -85,6 +85,7 @@ pub mod test_helper;
 use crate::metrics::{APTOS_JELLYFISH_LEAF_COUNT, APTOS_JELLYFISH_LEAF_DELETION_COUNT, COUNTER};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
+use aptos_logger::info;
 use aptos_metrics_core::{IntCounterHelper, IntCounterVecHelper};
 use aptos_storage_interface::{db_ensure as ensure, db_other_bail, AptosDbError, Result};
 use aptos_types::{
@@ -302,7 +303,7 @@ pub struct JellyfishMerkleTree<'a, R, K> {
 impl<'a, R, K> JellyfishMerkleTree<'a, R, K>
 where
     R: 'a + TreeReader<K> + Sync,
-    K: Key,
+    K: Key + std::fmt::Debug,
 {
     /// Creates a `JellyfishMerkleTree` backed by the given [`TreeReader`](trait.TreeReader.html).
     pub fn new(reader: &'a R) -> Self {
@@ -466,6 +467,7 @@ where
         if let Some(root_persisted_version) = root_persisted_version {
             let root_node_key = NodeKey::new_empty_path(root_persisted_version);
             let root_node = self.reader.get_node_with_tag(&root_node_key, "commit")?;
+            info!("root_node: {:?}", root_node);
             match root_node {
                 Node::Internal(root_node) => {
                     for shard_id in 0..16 {
@@ -475,6 +477,7 @@ where
                         }
                     }
                 },
+                Node::Null => (),
                 _ => {
                     unreachable!("Assume the db doesn't have exactly 1 state.")
                 },
