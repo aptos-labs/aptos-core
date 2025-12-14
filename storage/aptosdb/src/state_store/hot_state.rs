@@ -269,11 +269,11 @@ impl Committer {
             );
 
             debug_assert!(self.validate_lru(shard_id).is_ok());
-
-            COUNTER.inc_with_by(&["hot_state_insert"], n_insert);
-            COUNTER.inc_with_by(&["hot_state_update"], n_update);
-            COUNTER.inc_with_by(&["hot_state_evict"], n_evict);
         }
+
+        COUNTER.inc_with_by(&["hot_state_insert"], n_insert);
+        COUNTER.inc_with_by(&["hot_state_update"], n_update);
+        COUNTER.inc_with_by(&["hot_state_evict"], n_evict);
     }
 
     /// Traverses the entire map and checks if all the pointers are correctly linked.
