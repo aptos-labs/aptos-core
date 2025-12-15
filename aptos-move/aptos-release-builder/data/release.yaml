@@ -11,7 +11,7 @@ proposals:
     execution_mode: MultiStep
     update_sequence:
       - Gas:
-          new: current
+          # new: current
           # replace with below for actual release, above "current" is needed for compat tests:
           old: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/v1.38.1.json
           new: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/v1.39.0.json
