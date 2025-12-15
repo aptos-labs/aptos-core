@@ -1,0 +1,76 @@
+// -- Model dump before first bytecode pipeline
+module 0x123::a {
+    public fun bar() {
+        {
+          let (x: bool): (bool) = Tuple(false);
+          if Not(x) {
+            if Eq<u64>(1, 1) {
+              Tuple()
+            } else {
+              Abort(14566554180833181696)
+            };
+            Tuple()
+          } else {
+            Tuple()
+          }
+        };
+        Tuple()
+    }
+    private inline fun foo(x: bool) {
+        if Not(x) {
+          if Eq<u64>(1, 1) {
+            Tuple()
+          } else {
+            Abort(14566554180833181696)
+          };
+          Tuple()
+        } else {
+          Tuple()
+        }
+    }
+} // end 0x123::a
+
+// -- Sourcified model before first bytecode pipeline
+module 0x123::a {
+    public fun bar() {
+        {
+            let (x) = (false);
+            if (!x) {
+                if (1 == 1) () else abort 14566554180833181696;
+            }
+        };
+    }
+    inline fun foo(x: bool) {
+        if (!x) {
+            if (1 == 1) () else abort 14566554180833181696;
+        }
+    }
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x123::a {
+    public fun bar() {
+        if true {
+          Tuple()
+        } else {
+          Abort(14566554180833181696)
+        };
+        Tuple();
+        Tuple()
+    }
+    private inline fun foo(x: bool) {
+        if Not(x) {
+          if true {
+            Tuple()
+          } else {
+            Abort(14566554180833181696)
+          };
+          Tuple()
+        } else {
+          Tuple()
+        }
+    }
+} // end 0x123::a
+
+
+============ bytecode verification succeeded ========
