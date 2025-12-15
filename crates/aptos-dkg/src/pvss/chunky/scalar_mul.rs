@@ -16,7 +16,7 @@ use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use std::fmt::Debug;
 
-pub const DST: &[u8; 26] = b"APTOS_COMMIT_HOM_SIGMA_DST"; // This is used to create public parameters, see `default()` below
+pub const DST: &[u8; 26] = b"APTOS_COMMIT_HOM_SIGMA_DST";
 
 /// In this file we set up the following "commitment" homomorphism:
 /// Commit to scalars by multiplying a base group element (in affine representation)

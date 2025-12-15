@@ -123,11 +123,19 @@ fn test_pvss_all_weighted() {
             Bn254,
             chunky::SignedWeightedTranscript<Bn254>,
         >(&wc, seed.to_bytes_le());
+        nonaggregatable_weighted_pvss_deal_verify_and_reconstruct::<
+            Bn254,
+            chunky::SignedWeightedTranscriptv2<Bn254>,
+        >(&wc, seed.to_bytes_le());
 
         // Unsigned weighted Chunky
         nonaggregatable_weighted_pvss_deal_verify_and_reconstruct::<
             Bn254,
             chunky::UnsignedWeightedTranscript<Bn254>,
+        >(&wc, seed.to_bytes_le());
+        nonaggregatable_weighted_pvss_deal_verify_and_reconstruct::<
+            Bn254,
+            chunky::UnsignedWeightedTranscriptv2<Bn254>,
         >(&wc, seed.to_bytes_le());
 
         //type SignedChunkyTranscriptBn254 = signed::GenericSigning<chunky::WeightedTranscript<Bn254>>; TODO!!

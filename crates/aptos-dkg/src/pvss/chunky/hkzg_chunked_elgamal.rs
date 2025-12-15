@@ -26,6 +26,8 @@ use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{pairing::Pairing, AdditiveGroup};
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_ec::CurveGroup;
+use ark_ec::AffineRepr;
 
 /// Witness data for the `chunked_elgamal_field` PVSS protocol.
 ///
@@ -74,18 +76,18 @@ type LiftedHkzg<'a, E> = LiftHomomorphism<
     univariate_hiding_kzg::CommitmentHomomorphism<'a, E>,
     HkzgElgamalWitness<<E as Pairing>::ScalarField>,
 >;
-type LiftedChunkedElgamal<'a, E> = LiftHomomorphism<
-    chunked_elgamal::Homomorphism<'a, E>,
-    HkzgElgamalWitness<<E as Pairing>::ScalarField>,
+type LiftedChunkedElgamal<'a, C> = LiftHomomorphism<
+    chunked_elgamal::Homomorphism<'a, C>,
+    HkzgElgamalWitness<<<C as CurveGroup>::Affine as AffineRepr>::ScalarField>,
 >;
 
 type LiftedHkzgWeighted<'a, E> = LiftHomomorphism<
     univariate_hiding_kzg::CommitmentHomomorphism<'a, E>,
     HkzgWeightedElgamalWitness<<E as Pairing>::ScalarField>,
 >;
-type LiftedWeightedChunkedElgamal<'a, E> = LiftHomomorphism<
-    chunked_elgamal::WeightedHomomorphism<'a, E>,
-    HkzgWeightedElgamalWitness<<E as Pairing>::ScalarField>,
+type LiftedWeightedChunkedElgamal<'a, C> = LiftHomomorphism<
+    chunked_elgamal::WeightedHomomorphism<'a, C>,
+    HkzgWeightedElgamalWitness<<<C as CurveGroup>::Affine as AffineRepr>::ScalarField>,
 >;
 
 //                                 ┌───────────────────────────────┐
@@ -138,9 +140,9 @@ type LiftedWeightedChunkedElgamal<'a, E> = LiftHomomorphism<
 // TODO: note here that we had to put a zero before z_{i,j}, because that's what DeKARTv2 is doing. So maybe
 // it would make more sense to say this is a tuple homomorphism consisting of (lifts of) the
 // DeKARTv2::commitment_homomorphism together with the chunked_elgamal::homomorphism.
-pub type Homomorphism<'a, E> = TupleHomomorphism<LiftedHkzg<'a, E>, LiftedChunkedElgamal<'a, E>>;
+pub type Homomorphism<'a, E> = TupleHomomorphism<LiftedHkzg<'a, E>, LiftedChunkedElgamal<'a, <E as Pairing>::G1>>;
 pub type WeightedHomomorphism<'a, E> =
-    TupleHomomorphism<LiftedHkzgWeighted<'a, E>, LiftedWeightedChunkedElgamal<'a, E>>;
+    TupleHomomorphism<LiftedHkzgWeighted<'a, E>, LiftedWeightedChunkedElgamal<'a, <E as Pairing>::G1>>;
 
 pub type Proof<'a, E> = sigma_protocol::Proof<<E as Pairing>::ScalarField, Homomorphism<'a, E>>;
 pub type WeightedProof<'a, E> =
@@ -254,7 +256,7 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
             },
         };
         // Set up the chunked_elgamal homomorphism, and use a projection map to lift it to HkzgElgamalWitness
-        let lifted_chunked_elgamal = LiftedChunkedElgamal::<E> {
+        let lifted_chunked_elgamal = LiftedChunkedElgamal::<E::G1> {
             hom: chunked_elgamal::Homomorphism { pp, eks },
             // The projection map simply ignores the `hkzg_randomness` component
             projection: |dom: &HkzgElgamalWitness<E::ScalarField>| {
@@ -307,7 +309,7 @@ impl<'a, E: Pairing> WeightedHomomorphism<'a, E> {
             },
         };
         // Set up the chunked_elgamal homomorphism, and use a projection map to lift it to HkzgElgamalWitness
-        let lifted_chunked_elgamal = LiftedWeightedChunkedElgamal::<E> {
+        let lifted_chunked_elgamal = LiftedWeightedChunkedElgamal::<E::G1> {
             hom: chunked_elgamal::WeightedHomomorphism { pp, eks },
             // The projection map simply ignores the `hkzg_randomness` component
             projection: |dom: &HkzgWeightedElgamalWitness<E::ScalarField>| {

@@ -14,6 +14,7 @@ use crate::{
     }
 };
 use crate::sigma_protocol::homomorphism::VectorShape;
+use crate::pvss::chunky::chunked_scalar_mul;
 use anyhow::bail;
 use aptos_crypto::{
     arkworks::{
@@ -163,7 +164,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
                         randomness: self.subtrs.Rs.clone(),
                     },
                 ),
-            VectorShape(self.subtrs.Vs.clone().into_iter().flatten().collect())),
+            chunked_scalar_mul::CodomainShape(self.subtrs.Vs.clone())),
                 &self.sharing_proof.SoK,
                 &sok_cntxt,
             ) {
@@ -709,7 +710,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
             pp.ell
         );
         //   (2b) Compute its image (the public statement), so the range proof commitment and chunked_elgamal encryptions
-        let statement = hom.apply(&witness);
+        let statement = hom.apply(&witness); // hmm slightly inefficient that we're unchunking here, so might be better to set up a "small" hom just for this part
         //   (2c) Produce the SoK
         let SoK = PairingTupleHomomorphism::prove(&hom, &witness, &statement, &sok_cntxt, rng)
             .change_lifetime(); // Make sure the lifetime of the proof is not coupled to `hom` which has references
@@ -722,7 +723,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
                         chunks: Cs,
                         randomness: Rs,
                     }),
-                Vs_flat,
+                chunked_scalar_mul::CodomainShape(Vs),
         ) = statement;
 
         // debug_assert_eq!(
@@ -748,7 +749,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
             range_proof_commitment,
         };
 
-        let Vs = sc.group_by_player(&Vs_flat.0);
+        //let Vs = sc.group_by_player(&Vs_flat.0);
 
         (Cs, Rs, Vs, sharing_proof)
     }

@@ -12,7 +12,6 @@ use aptos_crypto::arkworks::{
     random::sample_field_element,
 };
 use aptos_crypto_derive::SigmaProtocolWitness;
-use ark_ec::{pairing::Pairing, VariableBaseMSM};
 use ark_ff::PrimeField;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
@@ -22,7 +21,7 @@ use ark_ec::CurveGroup;
 
 pub const DST: &[u8; 35] = b"APTOS_CHUNKED_ELGAMAL_GENERATOR_DST"; // This is used to create public parameters, see `default()` below
 
-// TODO: Change this to PublicParameters<E: CurveGroup>. Would first require changing Scalar<E: Pairing> to Scalar<F: PrimeField>, which would be a bit of work
+// TODO: Change this to PublicParameters<E: CurveGroup>. Would first require changing Scalar<C: CurveGroup> to Scalar<F: PrimeField>, which would be a bit of work
 #[derive(CanonicalSerialize, CanonicalDeserialize, PartialEq, Clone, Eq, Debug)]
 #[allow(non_snake_case)]
 pub struct PublicParameters<C: CurveGroup> {
@@ -73,21 +72,21 @@ impl<C: CurveGroup> PublicParameters<C> {
 /// and `R_j` carry the corresponding randomness contributions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(non_snake_case)]
-pub struct Homomorphism<'a, E: Pairing> {
-    pub pp: &'a PublicParameters<E::G1>, // This is small so could clone it here, then no custom `CanonicalSerialize` is needed
-    pub eks: &'a [E::G1Affine],
+pub struct Homomorphism<'a, C: CurveGroup> {
+    pub pp: &'a PublicParameters<C>, // This is small so could clone it here, then no custom `CanonicalSerialize` is needed
+    pub eks: &'a [C::Affine],
 }
 
 // Identical to the previous struct as the bases are identical, but the witness will be different
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(non_snake_case)]
-pub struct WeightedHomomorphism<'a, E: Pairing> {
-    pub pp: &'a PublicParameters<E::G1>,
-    pub eks: &'a [E::G1Affine],
+pub struct WeightedHomomorphism<'a, C: CurveGroup> {
+    pub pp: &'a PublicParameters<C>,
+    pub eks: &'a [C::Affine],
 }
 
 // Need to manually implement `CanonicalSerialize` because `Homomorphism` has references instead of owned values
-impl<'a, E: Pairing> CanonicalSerialize for Homomorphism<'a, E> {
+impl<'a, C: CurveGroup> CanonicalSerialize for Homomorphism<'a, C> {
     fn serialize_with_mode<W: Write>(
         &self,
         mut writer: W,
@@ -113,7 +112,7 @@ impl<'a, E: Pairing> CanonicalSerialize for Homomorphism<'a, E> {
 }
 
 // TODO: get rid of this copy-paste with a marker...
-impl<'a, E: Pairing> CanonicalSerialize for WeightedHomomorphism<'a, E> {
+impl<'a, C: CurveGroup> CanonicalSerialize for WeightedHomomorphism<'a, C> {
     fn serialize_with_mode<W: Write>(
         &self,
         mut writer: W,
@@ -170,21 +169,21 @@ pub struct WeightedWitness<F: PrimeField> {
     pub plaintext_randomness: Vec<Vec<Scalar<F>>>, // For at most max_weight, there needs to be a vector of randomness to encrypt a vector of chunks
 }
 
-// type PlayerPlaintextChunks<E: Pairing> = Vec<Vec<Scalar<E>>>;
-// type PlaintextRandomness<E: Pairing> = Vec<Scalar<E>>;
+// type PlayerPlaintextChunks<C: CurveGroup> = Vec<Vec<Scalar<E>>>;
+// type PlaintextRandomness<C: CurveGroup> = Vec<Scalar<E>>;
 
-impl<E: Pairing> homomorphism::Trait for Homomorphism<'_, E> {
-    type Codomain = CodomainShape<E::G1>;
-    type Domain = Witness<E::ScalarField>;
+impl<C: CurveGroup> homomorphism::Trait for Homomorphism<'_, C> {
+    type Codomain = CodomainShape<C>;
+    type Domain = Witness<C::ScalarField>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
         self.apply_msm(self.msm_terms(input))
     }
 }
 
-impl<E: Pairing> homomorphism::Trait for WeightedHomomorphism<'_, E> {
-    type Codomain = WeightedCodomainShape<E::G1>;
-    type Domain = WeightedWitness<E::ScalarField>;
+impl<C: CurveGroup> homomorphism::Trait for WeightedHomomorphism<'_, C> {
+    type Codomain = WeightedCodomainShape<C>;
+    type Domain = WeightedWitness<C::ScalarField>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
         self.apply_msm(self.msm_terms(input))
@@ -272,14 +271,14 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator
 }
 
 #[allow(non_snake_case)]
-impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
+impl<'a, C: CurveGroup> fixed_base_msms::Trait for Homomorphism<'a, C> {
     type CodomainShape<T>
         = CodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-    type MsmInput = MsmInput<E::G1Affine, E::ScalarField>;
-    type MsmOutput = E::G1;
-    type Scalar = E::ScalarField;
+    type MsmInput = MsmInput<C::Affine, C::ScalarField>;
+    type MsmOutput = C;
+    type Scalar = C::ScalarField;
 
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
         // C_{i,j} = z_{i,j} * G_1 + r_j * ek[i]
@@ -310,7 +309,7 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
     }
 
     fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
-        E::G1::msm(input.bases(), input.scalars()).expect("MSM failed in ChunkedElgamal")
+        C::msm(input.bases(), input.scalars()).expect("MSM failed in ChunkedElgamal")
     }
 }
 
@@ -350,14 +349,14 @@ pub fn chunks_vec_msm_terms<C: CurveGroup>(
 }
 
 #[allow(non_snake_case)]
-impl<'a, E: Pairing> fixed_base_msms::Trait for WeightedHomomorphism<'a, E> {
+impl<'a, C: CurveGroup> fixed_base_msms::Trait for WeightedHomomorphism<'a, C> {
     type CodomainShape<T>
         = WeightedCodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-    type MsmInput = MsmInput<E::G1Affine, E::ScalarField>;
-    type MsmOutput = E::G1;
-    type Scalar = E::ScalarField;
+    type MsmInput = MsmInput<C::Affine, C::ScalarField>;
+    type MsmOutput = C;
+    type Scalar = C::ScalarField;
 
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
         // C_{i,j} = z_{i,j} * G_1 + r_j * ek[i]
@@ -393,17 +392,17 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for WeightedHomomorphism<'a, E> {
     }
 
     fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
-        E::G1::msm(input.bases(), input.scalars()).expect("MSM failed in ChunkedElgamal")
+        C::msm(input.bases(), input.scalars()).expect("MSM failed in ChunkedElgamal")
     }
 }
 
-impl<'a, E: Pairing> sigma_protocol::Trait<E::G1> for Homomorphism<'a, E> {
+impl<'a, C: CurveGroup> sigma_protocol::Trait<C> for Homomorphism<'a, C> {
     fn dst(&self) -> Vec<u8> {
         DST.to_vec()
     }
 }
 
-impl<'a, E: Pairing> sigma_protocol::Trait<E::G1> for WeightedHomomorphism<'a, E> {
+impl<'a, C: CurveGroup> sigma_protocol::Trait<C> for WeightedHomomorphism<'a, C> {
     fn dst(&self) -> Vec<u8> {
         let mut result = b"WEIGHTED_".to_vec();
         result.extend(DST);
@@ -451,32 +450,31 @@ mod tests {
     };
     use ark_ec::{AffineRepr, CurveGroup};
     use rand::thread_rng;
-    use std::ops::Sub;
 
-    fn prepare_chunked_witness<E: Pairing>(
+    fn prepare_chunked_witness<C: CurveGroup>(
         num_values: usize,
         ell: u8,
-    ) -> (Vec<E::ScalarField>, Witness<E::ScalarField>, u8, u32) {
+    ) -> (Vec<C::ScalarField>, Witness<C::ScalarField>, u8, u32) {
         let mut rng = thread_rng();
 
         // 1. Generate random values
         let zs = sample_field_elements(num_values, &mut rng);
 
         // 2. Compute number of chunks
-        let number_of_chunks = num_chunks_per_scalar::<E::ScalarField>(ell);
+        let number_of_chunks = num_chunks_per_scalar::<C::ScalarField>(ell);
 
         // 3. Generate correlated randomness
-        let rs: Vec<E::ScalarField> = correlated_randomness(&mut rng, 1 << ell, number_of_chunks);
+        let rs: Vec<C::ScalarField> = correlated_randomness(&mut rng, 1 << ell, number_of_chunks);
 
         // 4. Convert values into little-endian chunks
-        let chunked_values: Vec<Vec<E::ScalarField>> = zs
+        let chunked_values: Vec<Vec<C::ScalarField>> = zs
             .iter()
             .map(|z| chunks::scalar_to_le_chunks(ell, z))
             .collect();
 
         // 5. Build witness
         let witness = Witness {
-            plaintext_chunks: Scalar::<E::ScalarField>::vecvec_from_inner(chunked_values),
+            plaintext_chunks: Scalar::<C::ScalarField>::vecvec_from_inner(chunked_values),
             plaintext_randomness: Scalar::vec_from_inner(rs),
         };
 
@@ -484,15 +482,15 @@ mod tests {
     }
 
     #[allow(non_snake_case)]
-    fn test_reconstruct_ciphertexts<E: Pairing>() {
-        let (zs, witness, radix_exponent, _num_chunks) = prepare_chunked_witness::<E>(2, 16);
+    fn test_reconstruct_ciphertexts<C: CurveGroup>() {
+        let (zs, witness, radix_exponent, _num_chunks) = prepare_chunked_witness::<C>(2, 16);
 
         // 6. Initialize the homomorphism
-        let pp: PublicParameters<E::G1> = PublicParameters::default();
+        let pp: PublicParameters<C> = PublicParameters::default();
 
-        let hom = Homomorphism::<E> {
+        let hom = Homomorphism::<C> {
             pp: &pp,
-            eks: &E::G1::normalize_batch(&unsafe_random_points(2, &mut thread_rng())), // Randomly generate encryption keys, we won't use them
+            eks: &C::normalize_batch(&unsafe_random_points(2, &mut thread_rng())), // Randomly generate encryption keys, we won't use them
         };
 
         // 7. Apply homomorphism to obtain chunked ciphertexts
@@ -500,11 +498,11 @@ mod tests {
 
         // 8. Reconstruct original values from the chunked ciphertexts
         for (i, &orig_val) in zs.iter().enumerate() {
-            let powers_of_radix: Vec<E::ScalarField> =
-                utils::powers(E::ScalarField::from(1u64 << radix_exponent), Cs[i].len());
+            let powers_of_radix: Vec<C::ScalarField> =
+                utils::powers(C::ScalarField::from(1u64 << radix_exponent), Cs[i].len());
 
             // perform the MSM to reconstruct the encryption of z_i
-            let reconstructed = E::G1::msm(&E::G1::normalize_batch(&Cs[i]), &powers_of_radix)
+            let reconstructed = C::msm(&C::normalize_batch(&Cs[i]), &powers_of_radix)
                 .expect("MSM reconstruction failed");
 
             let expected = *pp.message_base() * orig_val;
@@ -518,32 +516,32 @@ mod tests {
 
     // This is essentially a more advanced version of the previous test... so remove that one?
     #[allow(non_snake_case)]
-    fn test_decrypt_roundtrip<E: Pairing>() {
-        let (zs, witness, radix_exponent, _num_chunks) = prepare_chunked_witness::<E>(2, 16);
+    fn test_decrypt_roundtrip<C: CurveGroup>() {
+        let (zs, witness, radix_exponent, _num_chunks) = prepare_chunked_witness::<C>(2, 16);
 
         // 6. Initialize the homomorphism
-        let pp: PublicParameters<E::G1> = PublicParameters::default();
-        let dks: Vec<E::ScalarField> = sample_field_elements(2, &mut thread_rng());
+        let pp: PublicParameters<C> = PublicParameters::default();
+        let dks: Vec<C::ScalarField> = sample_field_elements(2, &mut thread_rng());
 
-        let hom = Homomorphism::<E> {
+        let hom = Homomorphism::<C> {
             pp: &pp,
-            eks: &E::G1::normalize_batch(&[pp.H * dks[0], pp.H * dks[1]]),
+            eks: &C::normalize_batch(&[pp.H * dks[0], pp.H * dks[1]]),
         };
 
         // 7. Apply homomorphism to obtain chunked ciphertexts
-        let CodomainShape::<E::G1> {
+        let CodomainShape::<C> {
             chunks: Cs,
             randomness: Rs,
         } = hom.apply(&witness);
 
         // 8. Build a baby-step giant-step table for computing discrete logs
-        let table = dlog::table::build::<E::G1>(pp.G.into(), 1u32 << (radix_exponent / 2));
+        let table = dlog::table::build::<C>(pp.G.into(), 1u32 << (radix_exponent / 2));
 
         // 9. Perform decryption of each ciphertext and reconstruct plaintexts
         let mut decrypted_scalars = Vec::new();
         for i in 0..2 {
             // Compute C - d_k * R for all chunks
-            let exponentiated_chunks: Vec<E::G1> = Cs[i]
+            let exponentiated_chunks: Vec<C> = Cs[i]
                 .iter()
                 .zip(Rs.iter())
                 .map(|(C_ij, &R_j)| C_ij.sub(R_j * dks[i]))
@@ -558,7 +556,7 @@ mod tests {
             )
             .expect("dlog_vec failed")
             .into_iter()
-            .map(|x| E::ScalarField::from(x))
+            .map(|x| C::ScalarField::from(x))
             .collect();
 
             // Convert chunks back to scalar
@@ -578,11 +576,11 @@ mod tests {
 
     #[test]
     fn test_reconstruct_ciphertexts_bn254() {
-        test_reconstruct_ciphertexts::<ark_bn254::Bn254>();
+        test_reconstruct_ciphertexts::<ark_bn254::G1Projective>();
     }
 
     #[test]
     fn test_decrypt_roundtrip_bn254() {
-        test_decrypt_roundtrip::<ark_bn254::Bn254>();
+        test_decrypt_roundtrip::<ark_bn254::G1Projective>();
     }
 }

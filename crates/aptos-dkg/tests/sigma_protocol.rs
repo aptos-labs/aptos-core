@@ -3,7 +3,7 @@
 
 use aptos_crypto::arkworks::{
     msm::{IsMsmInput, MsmInput},
-    random::sample_field_element,
+    random::{sample_field_element, sample_field_elements},
 };
 use aptos_dkg::{
     sigma_protocol::{
@@ -24,6 +24,8 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::thread_rng;
 use std::fmt::Debug;
 
+const CNTXT: &[u8; 32] = b"SIGMA-PROTOCOL-TESTS-SOK-CONTEXT";
+
 #[cfg(test)]
 pub fn test_sigma_protocol<C, H>(hom: H, witness: H::Domain)
 where
@@ -33,14 +35,14 @@ where
     let mut rng = thread_rng();
 
     let statement = hom.apply(&witness);
-    let ctxt = b"SIGMA-PROTOCOL-CONTEXT";
 
-    let proof = hom.prove(&witness, &statement, ctxt, &mut rng);
+    let proof = hom.prove(&witness, &statement, CNTXT, &mut rng);
 
-    hom.verify(&statement, &proof, ctxt)
+    hom.verify(&statement, &proof, CNTXT)
         .expect("Sigma protocol proof failed verification");
 }
 
+// TODO: Find a way to make this more modular
 fn test_imhomog_chaum_pedersen<E>(
     hom: chaum_pedersen::InhomogChaumPedersen<E>,
     witness: Scalar<E::ScalarField>,
@@ -50,12 +52,29 @@ fn test_imhomog_chaum_pedersen<E>(
     let mut rng = thread_rng();
 
     let statement = hom.apply(&witness);
-    let ctxt = b"SIGMA-PROTOCOL-CONTEXT";
 
-    let proof = hom.prove(&witness, &statement, ctxt, &mut rng);
+    let proof = hom.prove(&witness, &statement, CNTXT, &mut rng);
 
-    hom.verify(&statement, &proof, ctxt)
-        .expect("PairingTupleHomomorphism proof failed verification");
+    hom.verify(&statement, &proof, CNTXT)
+        .expect("Inhomogeneous Chaum Pederson sigma proof failed verification");
+}
+
+use aptos_dkg::pvss::chunky::chunked_scalar_mul::Witness;
+
+fn test_imhomog_scalar_mul<E>(
+    hom: scalar_mul::InhomogScalarMul<E>,
+    witness: Witness<E::ScalarField>,
+) where
+    E: Pairing,
+{
+    let mut rng = thread_rng();
+
+    let statement = hom.apply(&witness);
+
+    let proof = hom.prove(&witness, &statement, CNTXT, &mut rng);
+
+    hom.verify(&statement, &proof, CNTXT)
+        .expect("Inhomogeneous Chaum Pederson sigma proof failed verification");
 }
 
 mod schnorr {
@@ -103,7 +122,7 @@ mod schnorr {
         }
 
         fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
-            C::msm(input.bases(), input.scalars()).expect("MSM failed in Schnorr")
+            input.bases()[0] * input.scalars()[0] // No need to do an MSM here
         }
     }
 
@@ -153,6 +172,29 @@ mod chaum_pedersen {
     }
 }
 
+mod scalar_mul {
+    use super::*;
+    use aptos_dkg::pvss::chunky::chunked_scalar_mul;
+
+    pub type InhomogScalarMul<E> =
+        PairingTupleHomomorphism<E, chunked_scalar_mul::Homomorphism<<E as Pairing>::G1>, chunked_scalar_mul::Homomorphism<<E as Pairing>::G2>>;
+
+    #[allow(non_snake_case)]
+    pub fn make_inhomogeneous_scalar_mul<E: Pairing>() -> InhomogScalarMul<E> {
+        let G_1 = E::G1::generator().into_affine();
+        let G_2 = E::G2::generator().into_affine();
+
+        let hom1 = chunked_scalar_mul::Homomorphism { base: G_1, ell: 16 };
+        let hom2 = chunked_scalar_mul::Homomorphism { base: G_2, ell: 16 };
+
+        PairingTupleHomomorphism {
+            hom1,
+            hom2,
+            _pairing: std::marker::PhantomData,
+        }
+    }
+}
+
 #[test]
 fn test_schnorr() {
     use schnorr::*;
@@ -189,4 +231,30 @@ fn test_chaum_pedersen() {
         make_inhomogeneous_chaum_pedersen_instance(),
         witness_bls,
     );
+
+    use aptos_dkg::pvss::chunky::chunks;
+    use aptos_dkg::pvss::chunky::chunked_scalar_mul::Witness;
+    use crate::scalar_mul::make_inhomogeneous_scalar_mul;
+    
+    let ell = 16u8;
+
+    let scalars = sample_field_elements(16, &mut rng);
+
+    use ark_bn254::Fr;
+
+    let chunked_values: Vec<Vec<Vec<Scalar<Fr>>>> = scalars
+        .iter()
+        .map(|s| {
+            vec![chunks::scalar_to_le_chunks(ell, s)
+                .into_iter()
+                .map(|chunk| Scalar(chunk))
+                .collect::<Vec<_>>()]
+        })
+        .collect();
+
+    let witness = Witness {
+        chunked_values: chunked_values.clone(),
+    };
+
+    test_imhomog_scalar_mul::<Bn254>(make_inhomogeneous_scalar_mul(), witness);
 }
