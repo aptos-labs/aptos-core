@@ -29,7 +29,7 @@ full_node_networks:
     seeds:
       9967EBF40AC8C2CCB38709488952DA1826176584EA3067B63B1695362ECB3D1F:
         addresses:
-        - "/dns/testnet.movementnetwork.xyz/tcp/6182/noise-ik/9967EBF40AC8C2CCB38709488952DA1826176584EA3067B63B1695362ECB3D1F/handshake/0"
+        - "/dns/consensus.mainnet.movementnetwork.xyz/tcp/6182/noise-ik/9967EBF40AC8C2CCB38709488952DA1826176584EA3067B63B1695362ECB3D1F/handshake/0"
         role: "Upstream"
 api:
     enabled: true
@@ -40,4 +40,4 @@ state_sync:
     bootstrapping_mode: DownloadLatestStates
     continuous_syncing_mode: ApplyTransactionOutputs
     # We start sync from the waypoint ledger epoch
-    start_epoch: 2111769
+    start_epoch: 10774941
