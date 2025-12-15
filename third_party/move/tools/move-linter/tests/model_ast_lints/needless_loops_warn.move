@@ -109,4 +109,35 @@ module 0x1::needless_loops {
             // Some other logic could be here
         }
     }
+
+    fun do_something() {}
+
+    fun test_no_warn_self_continue(cond: bool) {
+        loop {
+            if (cond) continue;
+            break;
+        }
+    }
+
+    fun test_no_warn_call_first() {
+        loop {
+            do_something();
+            break;
+        }
+    }
+
+    fun test_no_warn_continue_to_outer(cond: bool) {
+        loop {
+            loop {
+                if (cond) {
+                    continue;
+                };
+                break;
+            };
+            if (cond) {
+                continue;
+            };
+            break;
+        }
+    }
 }
