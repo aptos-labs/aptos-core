@@ -240,6 +240,7 @@ impl TxnOptions {
             timestamp_us: None,
             version: Some(simulated_txn.version),
             vm_status: Some(format!("{:?}", simulated_txn.info.status())), // TODO: add proper status
+            deployed_object_address: None,
         })
     }
 
@@ -324,6 +325,7 @@ impl TxnOptions {
             timestamp_us: None,
             version: Some(version), // The transaction is not committed so there is no new version.
             vm_status: Some(vm_status.to_string()),
+            deployed_object_address: None,
         })
     }
 
