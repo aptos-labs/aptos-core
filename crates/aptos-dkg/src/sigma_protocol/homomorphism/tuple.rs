@@ -37,6 +37,7 @@ where
     pub hom2: H2,
 }
 
+// We need to add `E: Pairing` because of the sigma protocol implementation below, Rust wouldn't allow that otherwise
 #[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
 pub struct PairingTupleHomomorphism<E, H1, H2>
 where
@@ -245,7 +246,9 @@ use aptos_crypto::utils;
 use ark_ff::{UniformRand, Zero};
 use serde::Serialize;
 
-// Slightly hacky implementation of a sigma protocol for `PairingTupleHomomorphism`
+/// Slightly hacky implementation of a sigma protocol for `PairingTupleHomomorphism`
+///
+/// We need `E: Pairing` here because the sigma_protocol needs to know which curves `H1` and `H2` are working over
 impl<E: Pairing, H1, H2> PairingTupleHomomorphism<E, H1, H2>
 where
     H1: sigma_protocol::Trait<E::G1>,
@@ -294,11 +297,11 @@ where
     }
 
     #[allow(non_snake_case)]
-    pub fn verify<C: Serialize, H>(
+    pub fn verify<Ct: Serialize, H>(
         &self,
         public_statement: &<Self as homomorphism::Trait>::Codomain,
         proof: &Proof<H1::Scalar, H>, // Would like to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
-        cntxt: &C,
+        cntxt: &Ct,
     ) -> anyhow::Result<()>
     where
         H: homomorphism::Trait<

@@ -2,36 +2,21 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    dlog::bsgs,
-    pcs::univariate_hiding_kzg,
-    pvss::{
-        chunky::{
-            chunked_elgamal::{self, num_chunks_per_scalar},
-            chunks,
-            hkzg_chunked_elgamal::{self, HkzgWeightedElgamalWitness},
-            input_secret::InputSecret,
-            keys,
-            public_parameters::PublicParameters,
-        },
-        traits::{
-            self,
-            transcript::{Aggregatable, HasAggregatableSubtranscript, MalleableTranscript},
-            HasEncryptionPublicParams,
-        },
-        Player,
-    },
-    range_proofs::{dekart_univariate_v2, traits::BatchedRangeProof},
-    sigma_protocol::{
+    Scalar, dlog::bsgs, pcs::univariate_hiding_kzg, pvss::{
+        Player, chunky::{
+            chunked_elgamal::{self, num_chunks_per_scalar}, chunks, hkzg_chunked_elgamal::{HkzgWeightedElgamalWitness}, hkzg_chunked_elgamal_commit, input_secret::InputSecret, keys, public_parameters::PublicParameters
+        }, traits::{
+            self, HasEncryptionPublicParams, transcript::{Aggregatable, HasAggregatableSubtranscript, MalleableTranscript}
+        }
+    }, range_proofs::{dekart_univariate_v2, traits::BatchedRangeProof}, sigma_protocol::{
         self,
-        homomorphism::{tuple::TupleCodomainShape, Trait as _},
-        traits::Trait as _,
-    },
-    Scalar,
+        homomorphism::{Trait as _, tuple::TupleCodomainShape},
+    }
 };
+use crate::sigma_protocol::homomorphism::VectorShape;
 use anyhow::bail;
 use aptos_crypto::{
     arkworks::{
-        self,
         random::{
             sample_field_element, sample_field_elements, unsafe_random_point, unsafe_random_points,
             UniformRand,
@@ -162,20 +147,23 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         {
             // Verify the PoK
             let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
-            let hom = hkzg_chunked_elgamal::WeightedHomomorphism::<E>::new(
+            let hom = hkzg_chunked_elgamal_commit::Homomorphism::<E>::new(
                 &pp.pk_range_proof.ck_S.lagr_g1,
                 pp.pk_range_proof.ck_S.xi_1,
                 &pp.pp_elgamal,
                 &eks_inner,
+                pp.get_commitment_base(),
+                pp.ell
             );
             if let Err(err) = hom.verify(
-                &TupleCodomainShape(
+                &TupleCodomainShape(TupleCodomainShape(
                     self.sharing_proof.range_proof_commitment.clone(),
                     chunked_elgamal::WeightedCodomainShape {
                         chunks: self.subtrs.Cs.clone(),
                         randomness: self.subtrs.Rs.clone(),
                     },
                 ),
+            VectorShape(self.subtrs.Vs.clone().into_iter().flatten().collect())),
                 &self.sharing_proof.SoK,
                 &sok_cntxt,
             ) {
@@ -413,10 +401,7 @@ impl<E: Pairing> Aggregatable for Subtranscript<E> {
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct SharingProof<E: Pairing> {
     /// SoK: the SK is knowledge of `witnesses` s_{i,j} yielding the commitment and the C and the R, their image is the PK, and the signed message is a certain context `cntxt`
-    pub SoK: sigma_protocol::Proof<
-        E::ScalarField,
-        hkzg_chunked_elgamal::WeightedHomomorphism<'static, E>,
-    >, // static because we don't want the lifetime of the Proof to depend on the Homomorphism TODO: try removing it?
+    pub SoK: hkzg_chunked_elgamal_commit::Proof<'static, E>, // static because we don't want the lifetime of the Proof to depend on the Homomorphism TODO: try removing it?
     /// A batched range proof showing that all committed values s_{i,j} lie in some range
     pub range_proof: dekart_univariate_v2::Proof<E>,
     /// A KZG-style commitment to the values s_{i,j} going into the range proof
@@ -509,22 +494,24 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         debug_assert_eq!(f_evals.len(), sc.get_total_weight());
 
         // Encrypt the chunked shares and generate the sharing proof
-        let (Cs, Rs, sharing_proof) =
+        let (Cs, Rs, Vs, sharing_proof) =
             Self::encrypt_chunked_shares(&f_evals, eks, pp, sc, sok_cntxt, rng);
 
         // Add constant term for the `\mathbb{G}_2` commitment (we're doing this **after** the previous step
         // because we're now mutating `f_evals` by enlarging it; this is an unimportant technicality however,
         // it has no impact on computational complexity whatsoever as we could simply modify the `commit_to_scalars()`
         // function to take another input)
-        f_evals.push(f[0]); // or *s.get_secret_a()
+        // f_evals.push(f[0]); // or *s.get_secret_a()
 
-        // Commit to polynomial evaluations + constant term
-        let G_2 = pp.get_commitment_base();
-        let flattened_Vs = arkworks::commit_to_scalars(&G_2, &f_evals);
-        debug_assert_eq!(flattened_Vs.len(), sc.get_total_weight() + 1);
+        // // Commit to polynomial evaluations + constant term
+        // let G_2 = pp.get_commitment_base();
+        // let flattened_Vs = arkworks::commit_to_scalars(&G_2, &f_evals);
+        // debug_assert_eq!(flattened_Vs.len(), sc.get_total_weight() + 1);
 
-        let Vs = sc.group_by_player(&flattened_Vs); // This won't use the last item in `flattened_Vs` because of `sc`
-        let V0 = *flattened_Vs.last().unwrap();
+        // let Vs = sc.group_by_player(&flattened_Vs); // This won't use the last item in `flattened_Vs` because of `sc`
+        // let V0 = *flattened_Vs.last().unwrap();
+
+        let V0 = pp.get_commitment_base() * f[0];
 
         Transcript {
             dealer: *dealer,
@@ -654,12 +641,14 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
                 range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
                     unsafe_random_point(rng),
                 ),
-                SoK: hkzg_chunked_elgamal::WeightedProof::generate(sc, num_chunks_per_share, rng),
+                SoK: hkzg_chunked_elgamal_commit::Proof::generate(sc, num_chunks_per_share, rng),
                 range_proof: dekart_univariate_v2::Proof::generate(pp.ell, rng),
             },
         }
     }
 }
+
+use crate::sigma_protocol::homomorphism::tuple::PairingTupleHomomorphism;
 
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcript<E> {
     // why are N and P needed? TODO: maybe integrate into deal()
@@ -675,7 +664,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         sc: &<Self as traits::Transcript>::SecretSharingConfig, // only for debugging purposes?
         sok_cntxt: SokContext<'a, A>,
         rng: &mut R,
-    ) -> (Vec<Vec<Vec<E::G1>>>, Vec<Vec<E::G1>>, SharingProof<E>) {
+    ) -> (Vec<Vec<Vec<E::G1>>>, Vec<Vec<E::G1>>, Vec<Vec<E::G2>>, SharingProof<E>) {
         // Generate the required randomness
         let hkzg_randomness = univariate_hiding_kzg::CommitmentRandomness::rand(rng);
         let elgamal_randomness = Scalar::vecvec_from_inner(
@@ -711,26 +700,29 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         // (2) Compute its image under the corresponding homomorphism, and produce an SoK
         //   (2a) Set up the tuple homomorphism
         let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect(); // TODO: this is a bit ugly
-        let hom = hkzg_chunked_elgamal::WeightedHomomorphism::<E>::new(
+        let hom = hkzg_chunked_elgamal_commit::Homomorphism::<E>::new(
             &pp.pk_range_proof.ck_S.lagr_g1,
             pp.pk_range_proof.ck_S.xi_1,
             &pp.pp_elgamal,
             &eks_inner,
+            pp.get_commitment_base(),
+            pp.ell
         );
         //   (2b) Compute its image (the public statement), so the range proof commitment and chunked_elgamal encryptions
         let statement = hom.apply(&witness);
         //   (2c) Produce the SoK
-        let SoK = hom
-            .prove(&witness, &statement, &sok_cntxt, rng)
+        let SoK = PairingTupleHomomorphism::prove(&hom, &witness, &statement, &sok_cntxt, rng)
             .change_lifetime(); // Make sure the lifetime of the proof is not coupled to `hom` which has references
 
         // Destructure the "public statement" of the above sigma protocol
         let TupleCodomainShape(
-            range_proof_commitment,
-            chunked_elgamal::WeightedCodomainShape {
-                chunks: Cs,
-                randomness: Rs,
-            },
+                TupleCodomainShape(
+                    range_proof_commitment,
+                    chunked_elgamal::WeightedCodomainShape {
+                        chunks: Cs,
+                        randomness: Rs,
+                    }),
+                Vs_flat,
         ) = statement;
 
         // debug_assert_eq!(
@@ -756,7 +748,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
             range_proof_commitment,
         };
 
-        (Cs, Rs, sharing_proof)
+        let Vs = sc.group_by_player(&Vs_flat.0);
+
+        (Cs, Rs, Vs, sharing_proof)
     }
 }
 

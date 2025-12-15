@@ -236,7 +236,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         {
             // Verify the PoK
             let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
-            let hom = hkzg_chunked_elgamal::Homomorphism::new(
+            let hom = hkzg_chunked_elgamal::Homomorphism::<E>::new(
                 &pp.pk_range_proof.ck_S.lagr_g1,
                 pp.pk_range_proof.ck_S.xi_1,
                 &pp.pp_elgamal,
@@ -361,7 +361,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         // (2) Compute its image under the corresponding homomorphism, and prove knowledge of an inverse
         //   (2a) Set up the tuple homomorphism
         let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect(); // TODO: this is a bit ugly
-        let hom = hkzg_chunked_elgamal::Homomorphism::new(
+        let hom = hkzg_chunked_elgamal::Homomorphism::<E>::new(
             &pp.pk_range_proof.ck_S.lagr_g1,
             pp.pk_range_proof.ck_S.xi_1,
             &pp.pp_elgamal,

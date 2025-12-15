@@ -18,31 +18,32 @@ use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
 };
 use ark_std::fmt::Debug;
+use ark_ec::CurveGroup;
 
 pub const DST: &[u8; 35] = b"APTOS_CHUNKED_ELGAMAL_GENERATOR_DST"; // This is used to create public parameters, see `default()` below
 
 // TODO: Change this to PublicParameters<E: CurveGroup>. Would first require changing Scalar<E: Pairing> to Scalar<F: PrimeField>, which would be a bit of work
 #[derive(CanonicalSerialize, CanonicalDeserialize, PartialEq, Clone, Eq, Debug)]
 #[allow(non_snake_case)]
-pub struct PublicParameters<E: Pairing> {
+pub struct PublicParameters<C: CurveGroup> {
     /// A group element $G$ that is raised to the encrypted message
-    pub G: E::G1Affine,
+    pub G: C::Affine,
     /// A group element $H$ that is used to exponentiate both
     /// (1) the ciphertext randomness and (2) the DSK when computing its EK.
-    pub H: E::G1Affine,
+    pub H: C::Affine,
 }
 
 #[allow(non_snake_case)]
-impl<E: Pairing> PublicParameters<E> {
-    pub fn new(G: E::G1Affine, H: E::G1Affine) -> Self {
+impl<C: CurveGroup> PublicParameters<C> {
+    pub fn new(G: C::Affine, H: C::Affine) -> Self {
         Self { G, H }
     }
 
-    pub fn message_base(&self) -> &E::G1Affine {
+    pub fn message_base(&self) -> &C::Affine {
         &self.G
     }
 
-    pub fn pubkey_base(&self) -> &E::G1Affine {
+    pub fn pubkey_base(&self) -> &C::Affine {
         &self.H
     }
 
@@ -73,7 +74,7 @@ impl<E: Pairing> PublicParameters<E> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(non_snake_case)]
 pub struct Homomorphism<'a, E: Pairing> {
-    pub pp: &'a PublicParameters<E>, // This is small so could clone it here, then no custom `CanonicalSerialize` is needed
+    pub pp: &'a PublicParameters<E::G1>, // This is small so could clone it here, then no custom `CanonicalSerialize` is needed
     pub eks: &'a [E::G1Affine],
 }
 
@@ -81,7 +82,7 @@ pub struct Homomorphism<'a, E: Pairing> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(non_snake_case)]
 pub struct WeightedHomomorphism<'a, E: Pairing> {
-    pub pp: &'a PublicParameters<E>,
+    pub pp: &'a PublicParameters<E::G1>,
     pub eks: &'a [E::G1Affine],
 }
 
@@ -315,12 +316,12 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
 
 // Given a chunked scalar [z_j] and vector of randomness [r_j], returns a vector of MSM terms
 // of the vector C_j = z_j * G_1 + r_j * ek, so a vector with entries [(G_1, ek), (z_j, r_j)]_j
-fn chunks_msm_terms<E: Pairing>(
-    pp: &PublicParameters<E>,
-    ek: <E as Pairing>::G1Affine,
-    chunks: &[Scalar<E::ScalarField>],
-    correlated_randomness: &[Scalar<E::ScalarField>],
-) -> Vec<MsmInput<E::G1Affine, E::ScalarField>> {
+fn chunks_msm_terms<C: CurveGroup>(
+    pp: &PublicParameters<C>,
+    ek: C::Affine,
+    chunks: &[Scalar<C::ScalarField>],
+    correlated_randomness: &[Scalar<C::ScalarField>],
+) -> Vec<MsmInput<C::Affine, C::ScalarField>> {
     chunks
         .iter()
         .zip(correlated_randomness.iter())
@@ -333,12 +334,12 @@ fn chunks_msm_terms<E: Pairing>(
 
 // Given a vector of chunked scalar [[z_j]] and vector of randomness [[r_j]], returns a vector of
 // vector of MSM terms. This is used for the weighted PVSS, where each player gets a vector of chunks
-pub fn chunks_vec_msm_terms<E: Pairing>(
-    pp: &PublicParameters<E>,
-    ek: <E as Pairing>::G1Affine,
-    chunks_vec: &[Vec<Scalar<E::ScalarField>>],
-    correlated_randomness_vec: &[Vec<Scalar<E::ScalarField>>],
-) -> Vec<Vec<MsmInput<E::G1Affine, E::ScalarField>>> {
+pub fn chunks_vec_msm_terms<C: CurveGroup>(
+    pp: &PublicParameters<C>,
+    ek: C::Affine,
+    chunks_vec: &[Vec<Scalar<C::ScalarField>>],
+    correlated_randomness_vec: &[Vec<Scalar<C::ScalarField>>],
+) -> Vec<Vec<MsmInput<C::Affine, C::ScalarField>>> {
     chunks_vec
         .iter()
         .zip(correlated_randomness_vec.iter())
@@ -487,9 +488,9 @@ mod tests {
         let (zs, witness, radix_exponent, _num_chunks) = prepare_chunked_witness::<E>(2, 16);
 
         // 6. Initialize the homomorphism
-        let pp: PublicParameters<E> = PublicParameters::default();
+        let pp: PublicParameters<E::G1> = PublicParameters::default();
 
-        let hom = Homomorphism {
+        let hom = Homomorphism::<E> {
             pp: &pp,
             eks: &E::G1::normalize_batch(&unsafe_random_points(2, &mut thread_rng())), // Randomly generate encryption keys, we won't use them
         };
@@ -521,10 +522,10 @@ mod tests {
         let (zs, witness, radix_exponent, _num_chunks) = prepare_chunked_witness::<E>(2, 16);
 
         // 6. Initialize the homomorphism
-        let pp: PublicParameters<E> = PublicParameters::default();
+        let pp: PublicParameters<E::G1> = PublicParameters::default();
         let dks: Vec<E::ScalarField> = sample_field_elements(2, &mut thread_rng());
 
-        let hom = Homomorphism {
+        let hom = Homomorphism::<E> {
             pp: &pp,
             eks: &E::G1::normalize_batch(&[pp.H * dks[0], pp.H * dks[1]]),
         };

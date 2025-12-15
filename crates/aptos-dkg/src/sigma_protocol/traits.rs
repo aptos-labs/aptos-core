@@ -22,7 +22,12 @@ use ark_serialize::{
 use ark_std::{io::Read, UniformRand};
 use serde::Serialize;
 use std::{fmt::Debug, io::Write};
+use ark_ff::FpConfig;
+use ark_ff::Fp;
+use rand_core::RngCore;
+use rand_core::CryptoRng;
 
+// `CurveGroup` is needed because the code does `into_affine()`
 pub trait Trait<C: CurveGroup>:
     fixed_base_msms::Trait<
         Domain: Witness<C::ScalarField>,
@@ -36,7 +41,7 @@ pub trait Trait<C: CurveGroup>:
     /// transcript operations within the protocol are uniquely namespaced
     fn dst(&self) -> Vec<u8>;
 
-    fn prove<Ct: Serialize, R: rand_core::RngCore + rand_core::CryptoRng>(
+    fn prove<Ct: Serialize, R: RngCore + CryptoRng>(
         &self,
         witness: &Self::Domain,
         statement: &Self::Codomain,
@@ -189,30 +194,25 @@ pub trait Witness<F: Field>: CanonicalSerialize + CanonicalDeserialize + Clone +
     /// Samples a random element in the domain. The prover has a witness `w` and calls `w.rand(rng)` to get
     /// the prover's first nonce (of the same "size" as `w`, hence why this cannot be a static method),
     /// which it then uses to compute the prover's first message in the sigma protocol.
-    fn rand<R: rand_core::RngCore + rand_core::CryptoRng>(&self, rng: &mut R) -> Self;
+    fn rand<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Self;
 }
 
-// use ark_ff::FpConfig;
-// use ark_ff::Fp;
+impl<const N: usize, P: FpConfig<N>> Witness<Fp<P, N>> for Fp<P, N> {
+    fn scaled_add(self, other: &Self, c: Fp<P, N>) -> Self {
+        self + c * other
+    }
 
-// impl<const N: usize, P: FpConfig<N>> Witness for Fp<P, N> {
-//     type Scalar = Fp<P, N>;
-
-//     fn scaled_add(self, other: &Self, c: Fp<P, N>) -> Self {
-//         Scalar(self.0 + (c) * other.0)
-//     }
-
-//     fn rand<R: rand_core::RngCore + rand_core::CryptoRng>(&self, rng: &mut R) -> Self {
-//         Scalar(sample_field_element(rng))
-//     }
-// }
+    fn rand<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Self {
+        sample_field_element(rng)
+    }
+}
 
 impl<F: PrimeField> Witness<F> for Scalar<F> {
     fn scaled_add(self, other: &Self, c: F) -> Self {
         Scalar(self.0 + (c) * other.0)
     }
 
-    fn rand<R: rand_core::RngCore + rand_core::CryptoRng>(&self, rng: &mut R) -> Self {
+    fn rand<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Self {
         Scalar(sample_field_element(rng))
     }
 }
@@ -225,7 +225,7 @@ impl<F: PrimeField, W: Witness<F>> Witness<F> for Vec<W> {
             .collect()
     }
 
-    fn rand<R: rand_core::RngCore + rand_core::CryptoRng>(&self, rng: &mut R) -> Self {
+    fn rand<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Self {
         self.iter().map(|elem| elem.rand(rng)).collect()
     }
 }
@@ -463,6 +463,8 @@ where
     )
 }
 
+// We're keeping this separate because it only needs the homomorphism property rather than being a bunch of "fixed-base MSMS",
+// and moreover in this way it gets reused in the PairingTupleHomomorphism code which has a custom sigma protocol implementation
 #[allow(non_snake_case)]
 pub fn prove_homomorphism<Ct: Serialize, F: PrimeField, H: homomorphism::Trait, R>(
     homomorphism: &H,
@@ -476,7 +478,7 @@ pub fn prove_homomorphism<Ct: Serialize, F: PrimeField, H: homomorphism::Trait, 
 where
     H::Domain: Witness<F>,
     H::Codomain: Statement,
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: RngCore + CryptoRng,
 {
     // Step 1: Sample randomness. Here the `witness` is only used to make sure that `r` has the right dimensions
     let r = witness.rand(rng);

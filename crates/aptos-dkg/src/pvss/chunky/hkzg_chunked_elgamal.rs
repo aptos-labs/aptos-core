@@ -181,10 +181,10 @@ impl<'a, E: Pairing> WeightedProof<'a, E> {
     /// Useful for testing and benchmarking.
     pub fn generate<R: rand::Rng + rand::CryptoRng>(
         sc: &WeightedConfigArkworks<E::ScalarField>,
-        number_of_chunks: usize,
+        number_of_chunks_per_share: usize,
         rng: &mut R,
     ) -> Self {
-        // or should number_of_chunks be a const?
+        // or should number_of_chunks_per_share be a const?
         Self {
             first_proof_item: FirstProofItem::Commitment(TupleCodomainShape(
                 TrivialShape(unsafe_random_point(rng)), // because TrivialShape is the codomain of univariate_hiding_kzg::CommitmentHomomorphism. TODO: develop generate() methods there? Maybe make it part of sigma_protocol::Trait ?
@@ -193,12 +193,12 @@ impl<'a, E: Pairing> WeightedProof<'a, E> {
                         .map(|i| {
                             let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
                             (0..w)
-                                .map(|_| unsafe_random_points(number_of_chunks, rng))
+                                .map(|_| unsafe_random_points(number_of_chunks_per_share, rng))
                                 .collect()
                         })
                         .collect(),
                     randomness: vec![
-                        unsafe_random_points(number_of_chunks, rng);
+                        unsafe_random_points(number_of_chunks_per_share, rng);
                         sc.get_max_weight()
                     ],
                 },
@@ -211,13 +211,13 @@ impl<'a, E: Pairing> WeightedProof<'a, E> {
                         let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
                         (0..w)
                             .map(|_| {
-                                Scalar::vec_from_inner(sample_field_elements(number_of_chunks, rng))
+                                Scalar::vec_from_inner(sample_field_elements(number_of_chunks_per_share, rng))
                             })
                             .collect()
                     })
                     .collect(),
                 elgamal_randomness: vec![
-                    vec![Scalar(sample_field_element(rng)); number_of_chunks];
+                    vec![Scalar(sample_field_element(rng)); number_of_chunks_per_share];
                     sc.get_max_weight()
                 ],
             },
@@ -230,7 +230,7 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
     pub fn new(
         lagr_g1: &'a [E::G1Affine],
         xi_1: E::G1Affine,
-        pp: &'a chunked_elgamal::PublicParameters<E>,
+        pp: &'a chunked_elgamal::PublicParameters<E::G1>,
         eks: &'a [E::G1Affine],
     ) -> Self {
         // Set up the HKZG homomorphism, and use a projection map to lift it to HkzgElgamalWitness
@@ -283,7 +283,7 @@ impl<'a, E: Pairing> WeightedHomomorphism<'a, E> {
     pub fn new(
         lagr_g1: &'a [E::G1Affine],
         xi_1: E::G1Affine,
-        pp: &'a chunked_elgamal::PublicParameters<E>,
+        pp: &'a chunked_elgamal::PublicParameters<E::G1>,
         eks: &'a [E::G1Affine],
     ) -> Self {
         // Set up the HKZG homomorphism, and use a projection map to lift it to HkzgElgamalWitness
