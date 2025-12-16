@@ -242,4 +242,14 @@ module 0xc0ffee::m {
         let y = 100;
         if (x >= 5 || (x > 10 || x > y)) { bar() };
     }
+
+    // 2c: Contradiction boundary with && — Le + Gt (x <= 5 && x > 5)
+    public fun test2c_warn(x: u64) {
+        if (x <= 5 && x > 5) { bar() };
+    }
+
+    // 2d: Contradiction boundary reverse — Gt + Le (x > 5 && x <= 5)
+    public fun test2d_warn(x: u64) {
+        if (x > 5 && x <= 5) { bar() };
+    }
 }

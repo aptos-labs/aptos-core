@@ -65,7 +65,7 @@ const COMPARISON_RULES: &[ComparisonRule] = &[
     ComparisonRule {
         left_op: Le,
         right_op: Gt,
-        condition: |left_val, right_val| left_val < right_val,
+        condition: |left_val, right_val| left_val <= right_val,
         relationship: RuleType::Contradiction,
         applies_to: And,
     },
