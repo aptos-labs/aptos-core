@@ -11,10 +11,8 @@ module aptos_framework::jwks {
     use std::option;
     use std::option::Option;
     use std::signer;
-    use std::string;
     use std::string::{String, utf8};
-    use std::vector;
-    use aptos_std::comparator::{compare_u8_vector, is_greater_than, is_equal};
+    use aptos_std::comparator::compare_u8_vector;
     use aptos_std::copyable_any;
     use aptos_std::copyable_any::Any;
     use aptos_framework::chain_status;
@@ -192,13 +190,13 @@ module aptos_framework::jwks {
         };
 
         let fed_jwks = borrow_global_mut<FederatedJWKs>(jwk_addr);
-        vector::for_each_ref(&patches, |obj|{
+        patches.for_each_ref(|obj|{
             let patch: &Patch = obj;
             apply_patch(&mut fed_jwks.jwks, *patch);
         });
 
         // TODO: Can we check the size more efficiently instead of serializing it via BCS?
-        let num_bytes = vector::length(&bcs::to_bytes(fed_jwks));
+        let num_bytes = bcs::to_bytes(fed_jwks).length();
         assert!(num_bytes < MAX_FEDERATED_JWKS_SIZE_BYTES, error::invalid_argument(EFEDERATED_JWKS_TOO_LARGE));
     }
 
@@ -256,22 +254,22 @@ module aptos_framework::jwks {
     ///
     /// NOTE: Currently only RSA keys are supported.
     public entry fun update_federated_jwk_set(jwk_owner: &signer, iss: vector<u8>, kid_vec: vector<String>, alg_vec: vector<String>, e_vec: vector<String>, n_vec: vector<String>) acquires FederatedJWKs {
-        assert!(!vector::is_empty(&kid_vec), error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
-        let num_jwk = vector::length<String>(&kid_vec);
-        assert!(vector::length(&alg_vec) == num_jwk , error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
-        assert!(vector::length(&e_vec) == num_jwk, error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
-        assert!(vector::length(&n_vec) == num_jwk, error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
+        assert!(!kid_vec.is_empty(), error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
+        let num_jwk = kid_vec.length<String>();
+        assert!(alg_vec.length() == num_jwk , error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
+        assert!(e_vec.length() == num_jwk, error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
+        assert!(n_vec.length() == num_jwk, error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
 
         let remove_all_patch = new_patch_remove_all();
         let patches = vector[remove_all_patch];
-        while (!vector::is_empty(&kid_vec)) {
-            let kid = vector::pop_back(&mut kid_vec);
-            let alg = vector::pop_back(&mut alg_vec);
-            let e = vector::pop_back(&mut e_vec);
-            let n = vector::pop_back(&mut n_vec);
+        while (!kid_vec.is_empty()) {
+            let kid = kid_vec.pop_back();
+            let alg = alg_vec.pop_back();
+            let e = e_vec.pop_back();
+            let n = n_vec.pop_back();
             let jwk = new_rsa_jwk(kid, alg, e, n);
             let patch = new_patch_upsert_jwk(iss, jwk);
-            vector::push_back(&mut patches, patch)
+            patches.push_back(patch)
         };
         patch_federated_jwks(jwk_owner, patches);
     }
@@ -280,7 +278,7 @@ module aptos_framework::jwks {
     /// Abort if such a JWK does not exist.
     /// More convenient to call from Rust, since it does not wrap the JWK in an `Option`.
     public fun get_patched_jwk(issuer: vector<u8>, jwk_id: vector<u8>): JWK acquires PatchedJWKs {
-        option::extract(&mut try_get_patched_jwk(issuer, jwk_id))
+        try_get_patched_jwk(issuer, jwk_id).extract()
     }
 
     /// Get a JWK by issuer and key ID from the `PatchedJWKs`, if it exists.
@@ -300,7 +298,7 @@ module aptos_framework::jwks {
         let provider_set = borrow_global_mut<SupportedOIDCProviders>(@aptos_framework);
 
         let old_config_url= remove_oidc_provider_internal(provider_set, name);
-        vector::push_back(&mut provider_set.providers, OIDCProvider { name, config_url });
+        provider_set.providers.push_back(OIDCProvider { name, config_url });
         old_config_url
     }
 
@@ -324,7 +322,7 @@ module aptos_framework::jwks {
         };
 
         let old_config_url = remove_oidc_provider_internal(&mut provider_set, name);
-        vector::push_back(&mut provider_set.providers, OIDCProvider { name, config_url });
+        provider_set.providers.push_back(OIDCProvider { name, config_url });
         config_buffer::upsert(provider_set);
         old_config_url
     }
@@ -442,13 +440,13 @@ module aptos_framework::jwks {
     /// Helper function that removes an OIDC provider from the `SupportedOIDCProviders`.
     /// Returns the old config URL of the provider, if any, as an `Option`.
     fun remove_oidc_provider_internal(provider_set: &mut SupportedOIDCProviders, name: vector<u8>): Option<vector<u8>> {
-        let (name_exists, idx) = vector::find(&provider_set.providers, |obj| {
+        let (name_exists, idx) = provider_set.providers.find(|obj| {
             let provider: &OIDCProvider = obj;
             provider.name == name
         });
 
         if (name_exists) {
-            let old_provider = vector::swap_remove(&mut provider_set.providers, idx);
+            let old_provider = provider_set.providers.swap_remove(idx);
             option::some(old_provider.config_url)
         } else {
             option::none()
@@ -464,10 +462,10 @@ module aptos_framework::jwks {
         let observed_jwks = borrow_global_mut<ObservedJWKs>(@aptos_framework);
 
         if (features::is_jwk_consensus_per_key_mode_enabled()) {
-            vector::for_each(provider_jwks_vec, |proposed_provider_jwks|{
+            provider_jwks_vec.for_each(|proposed_provider_jwks|{
                 let maybe_cur_issuer_jwks = remove_issuer(&mut observed_jwks.jwks, proposed_provider_jwks.issuer);
-                let cur_issuer_jwks = if (option::is_some(&maybe_cur_issuer_jwks)) {
-                    option::extract(&mut maybe_cur_issuer_jwks)
+                let cur_issuer_jwks = if (maybe_cur_issuer_jwks.is_some()) {
+                    maybe_cur_issuer_jwks.extract()
                 } else {
                     ProviderJWKs {
                         issuer: proposed_provider_jwks.issuer,
@@ -476,10 +474,10 @@ module aptos_framework::jwks {
                     }
                 };
                 assert!(cur_issuer_jwks.version + 1 == proposed_provider_jwks.version, error::invalid_argument(EUNEXPECTED_VERSION));
-                vector::for_each(proposed_provider_jwks.jwks, |jwk|{
-                    let variant_type_name = *string::bytes(copyable_any::type_name(&jwk.variant));
+                proposed_provider_jwks.jwks.for_each(|jwk|{
+                    let variant_type_name = *jwk.variant.type_name().bytes();
                     let is_delete = if (variant_type_name == b"0x1::jwks::UnsupportedJWK") {
-                        let repr = copyable_any::unpack<UnsupportedJWK>(jwk.variant);
+                        let repr = jwk.variant.unpack<UnsupportedJWK>();
                         &repr.payload == &DELETE_COMMAND_INDICATOR
                     } else {
                         false
@@ -490,11 +488,11 @@ module aptos_framework::jwks {
                         upsert_jwk(&mut cur_issuer_jwks, jwk);
                     }
                 });
-                cur_issuer_jwks.version = cur_issuer_jwks.version + 1;
+                cur_issuer_jwks.version += 1;
                 upsert_provider_jwks(&mut observed_jwks.jwks, cur_issuer_jwks);
             });
         } else {
-            vector::for_each(provider_jwks_vec, |provider_jwks| {
+            provider_jwks_vec.for_each(|provider_jwks| {
                 upsert_provider_jwks(&mut observed_jwks.jwks, provider_jwks);
             });
         };
@@ -523,7 +521,7 @@ module aptos_framework::jwks {
     fun regenerate_patched_jwks() acquires PatchedJWKs, Patches, ObservedJWKs {
         let jwks = borrow_global<ObservedJWKs>(@aptos_framework).jwks;
         let patches = borrow_global<Patches>(@aptos_framework);
-        vector::for_each_ref(&patches.patches, |obj|{
+        patches.patches.for_each_ref(|obj|{
             let patch: &Patch = obj;
             apply_patch(&mut jwks, *patch);
         });
@@ -532,13 +530,13 @@ module aptos_framework::jwks {
 
     /// Get a JWK by issuer and key ID from an `AllProvidersJWKs`, if it exists.
     fun try_get_jwk_by_issuer(jwks: &AllProvidersJWKs, issuer: vector<u8>, jwk_id: vector<u8>): Option<JWK> {
-        let (issuer_found, index) = vector::find(&jwks.entries, |obj| {
+        let (issuer_found, index) = jwks.entries.find(|obj| {
             let provider_jwks: &ProviderJWKs = obj;
             issuer == provider_jwks.issuer
         });
 
         if (issuer_found) {
-            try_get_jwk_by_id(vector::borrow(&jwks.entries, index), jwk_id)
+            try_get_jwk_by_id(jwks.entries.borrow(index), jwk_id)
         } else {
             option::none()
         }
@@ -546,13 +544,13 @@ module aptos_framework::jwks {
 
     /// Get a JWK by key ID from a `ProviderJWKs`, if it exists.
     fun try_get_jwk_by_id(provider_jwks: &ProviderJWKs, jwk_id: vector<u8>): Option<JWK> {
-        let (jwk_id_found, index) = vector::find(&provider_jwks.jwks, |obj|{
+        let (jwk_id_found, index) = provider_jwks.jwks.find(|obj|{
             let jwk: &JWK = obj;
             jwk_id == get_jwk_id(jwk)
         });
 
         if (jwk_id_found) {
-            option::some(*vector::borrow(&provider_jwks.jwks, index))
+            option::some(provider_jwks.jwks[index])
         } else {
             option::none()
         }
@@ -560,12 +558,12 @@ module aptos_framework::jwks {
 
     /// Get the ID of a JWK.
     fun get_jwk_id(jwk: &JWK): vector<u8> {
-        let variant_type_name = *string::bytes(copyable_any::type_name(&jwk.variant));
+        let variant_type_name = *jwk.variant.type_name().bytes();
         if (variant_type_name == b"0x1::jwks::RSA_JWK") {
-            let rsa = copyable_any::unpack<RSA_JWK>(jwk.variant);
-            *string::bytes(&rsa.kid)
+            let rsa = jwk.variant.unpack<RSA_JWK>();
+            *rsa.kid.bytes()
         } else if (variant_type_name == b"0x1::jwks::UnsupportedJWK") {
-            let unsupported = copyable_any::unpack<UnsupportedJWK>(jwk.variant);
+            let unsupported = jwk.variant.unpack<UnsupportedJWK>();
             unsupported.id
         } else {
             abort(error::invalid_argument(EUNKNOWN_JWK_VARIANT))
@@ -578,14 +576,14 @@ module aptos_framework::jwks {
         // NOTE: Using a linear-time search here because we do not expect too many providers.
         let found = false;
         let index = 0;
-        let num_entries = vector::length(&jwks.entries);
+        let num_entries = jwks.entries.length();
         while (index < num_entries) {
-            let cur_entry = vector::borrow(&jwks.entries, index);
+            let cur_entry = jwks.entries.borrow(index);
             let comparison = compare_u8_vector(provider_jwks.issuer, cur_entry.issuer);
-            if (is_greater_than(&comparison)) {
-                index = index + 1;
+            if (comparison.is_greater_than()) {
+                index += 1;
             } else {
-                found = is_equal(&comparison);
+                found = comparison.is_equal();
                 break
             }
         };
@@ -593,12 +591,12 @@ module aptos_framework::jwks {
         // Now if `found == true`, `index` points to the JWK we want to update/remove; otherwise, `index` points to
         // where we want to insert.
         let ret = if (found) {
-            let entry = vector::borrow_mut(&mut jwks.entries, index);
+            let entry = jwks.entries.borrow_mut(index);
             let old_entry = option::some(*entry);
             *entry = provider_jwks;
             old_entry
         } else {
-            vector::insert(&mut jwks.entries, index, provider_jwks);
+            jwks.entries.insert(index, provider_jwks);
             option::none()
         };
 
@@ -608,13 +606,13 @@ module aptos_framework::jwks {
     /// Remove the entry of an issuer from a `AllProvidersJWKs` and return the entry, if exists.
     /// Maintains the sorted-by-issuer invariant in `AllProvidersJWKs`.
     fun remove_issuer(jwks: &mut AllProvidersJWKs, issuer: vector<u8>): Option<ProviderJWKs> {
-        let (found, index) = vector::find(&jwks.entries, |obj| {
+        let (found, index) = jwks.entries.find(|obj| {
             let provider_jwk_set: &ProviderJWKs = obj;
             provider_jwk_set.issuer == issuer
         });
 
         let ret = if (found) {
-            option::some(vector::remove(&mut jwks.entries, index))
+            option::some(jwks.entries.remove(index))
         } else {
             option::none()
         };
@@ -626,14 +624,14 @@ module aptos_framework::jwks {
     fun upsert_jwk(set: &mut ProviderJWKs, jwk: JWK): Option<JWK> {
         let found = false;
         let index = 0;
-        let num_entries = vector::length(&set.jwks);
+        let num_entries = set.jwks.length();
         while (index < num_entries) {
-            let cur_entry = vector::borrow(&set.jwks, index);
+            let cur_entry = set.jwks.borrow(index);
             let comparison = compare_u8_vector(get_jwk_id(&jwk), get_jwk_id(cur_entry));
-            if (is_greater_than(&comparison)) {
-                index = index + 1;
+            if (comparison.is_greater_than()) {
+                index += 1;
             } else {
-                found = is_equal(&comparison);
+                found = comparison.is_equal();
                 break
             }
         };
@@ -641,12 +639,12 @@ module aptos_framework::jwks {
         // Now if `found == true`, `index` points to the JWK we want to update/remove; otherwise, `index` points to
         // where we want to insert.
         let ret = if (found) {
-            let entry = vector::borrow_mut(&mut set.jwks, index);
+            let entry = set.jwks.borrow_mut(index);
             let old_entry = option::some(*entry);
             *entry = jwk;
             old_entry
         } else {
-            vector::insert(&mut set.jwks, index, jwk);
+            set.jwks.insert(index, jwk);
             option::none()
         };
 
@@ -655,13 +653,13 @@ module aptos_framework::jwks {
 
     /// Remove the entry of a key ID from a `ProviderJWKs` and return the entry, if exists.
     fun remove_jwk(jwks: &mut ProviderJWKs, jwk_id: vector<u8>): Option<JWK> {
-        let (found, index) = vector::find(&jwks.jwks, |obj| {
+        let (found, index) = jwks.jwks.find(|obj| {
             let jwk: &JWK = obj;
             jwk_id == get_jwk_id(jwk)
         });
 
         let ret = if (found) {
-            option::some(vector::remove(&mut jwks.jwks, index))
+            option::some(jwks.jwks.remove(index))
         } else {
             option::none()
         };
@@ -672,29 +670,29 @@ module aptos_framework::jwks {
     /// Modify an `AllProvidersJWKs` object with a `Patch`.
     /// Maintains the sorted-by-issuer invariant in `AllProvidersJWKs`.
     fun apply_patch(jwks: &mut AllProvidersJWKs, patch: Patch) {
-        let variant_type_name = *string::bytes(copyable_any::type_name(&patch.variant));
+        let variant_type_name = *patch.variant.type_name().bytes();
         if (variant_type_name == b"0x1::jwks::PatchRemoveAll") {
             jwks.entries = vector[];
         } else if (variant_type_name == b"0x1::jwks::PatchRemoveIssuer") {
-            let cmd = copyable_any::unpack<PatchRemoveIssuer>(patch.variant);
+            let cmd = patch.variant.unpack<PatchRemoveIssuer>();
             remove_issuer(jwks, cmd.issuer);
         } else if (variant_type_name == b"0x1::jwks::PatchRemoveJWK") {
-            let cmd = copyable_any::unpack<PatchRemoveJWK>(patch.variant);
+            let cmd = patch.variant.unpack<PatchRemoveJWK>();
             // TODO: This is inefficient: we remove the issuer, modify its JWKs & and reinsert the updated issuer. Why
             // not just update it in place?
             let existing_jwk_set = remove_issuer(jwks, cmd.issuer);
-            if (option::is_some(&existing_jwk_set)) {
-                let jwk_set = option::extract(&mut existing_jwk_set);
+            if (existing_jwk_set.is_some()) {
+                let jwk_set = existing_jwk_set.extract();
                 remove_jwk(&mut jwk_set, cmd.jwk_id);
                 upsert_provider_jwks(jwks, jwk_set);
             };
         } else if (variant_type_name == b"0x1::jwks::PatchUpsertJWK") {
-            let cmd = copyable_any::unpack<PatchUpsertJWK>(patch.variant);
+            let cmd = patch.variant.unpack<PatchUpsertJWK>();
             // TODO: This is inefficient: we remove the issuer, modify its JWKs & and reinsert the updated issuer. Why
             // not just update it in place?
             let existing_jwk_set = remove_issuer(jwks, cmd.issuer);
-            let jwk_set = if (option::is_some(&existing_jwk_set)) {
-                option::extract(&mut existing_jwk_set)
+            let jwk_set = if (existing_jwk_set.is_some()) {
+                existing_jwk_set.extract()
             } else {
                 ProviderJWKs {
                     version: 0,

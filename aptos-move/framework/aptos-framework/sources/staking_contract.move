@@ -29,6 +29,7 @@ module aptos_framework::staking_contract {
     use std::error;
     use std::features;
     use std::signer;
+    #[test_only]
     use std::vector;
 
     use aptos_std::pool_u64::{Self, Pool};
@@ -272,7 +273,7 @@ module aptos_framework::staking_contract {
     public fun stake_pool_address(staker: address, operator: address): address acquires Store {
         assert_staking_contract_exists(staker, operator);
         let staking_contracts = &borrow_global<Store>(staker).staking_contracts;
-        simple_map::borrow(staking_contracts, &operator).pool_address
+        staking_contracts.borrow(&operator).pool_address
     }
 
     #[view]
@@ -301,7 +302,7 @@ module aptos_framework::staking_contract {
     ): u64 acquires Store {
         assert_staking_contract_exists(staker, operator);
         let staking_contracts = &borrow_global<Store>(staker).staking_contracts;
-        simple_map::borrow(staking_contracts, &operator).principal
+        staking_contracts.borrow(&operator).principal
     }
 
     #[view]
@@ -312,7 +313,7 @@ module aptos_framework::staking_contract {
     public fun commission_percentage(staker: address, operator: address): u64 acquires Store {
         assert_staking_contract_exists(staker, operator);
         let staking_contracts = &borrow_global<Store>(staker).staking_contracts;
-        simple_map::borrow(staking_contracts, &operator).commission_percentage
+        staking_contracts.borrow(&operator).commission_percentage
     }
 
     #[view]
@@ -327,7 +328,7 @@ module aptos_framework::staking_contract {
     ): (u64, u64, u64) acquires Store {
         assert_staking_contract_exists(staker, operator);
         let staking_contracts = &borrow_global<Store>(staker).staking_contracts;
-        let staking_contract = simple_map::borrow(staking_contracts, &operator);
+        let staking_contract = staking_contracts.borrow(&operator);
         get_staking_contract_amounts_internal(staking_contract)
     }
 
@@ -340,9 +341,7 @@ module aptos_framework::staking_contract {
     ): u64 acquires Store {
         assert_staking_contract_exists(staker, operator);
         let staking_contracts = &borrow_global<Store>(staker).staking_contracts;
-        pool_u64::shareholders_count(
-            &simple_map::borrow(staking_contracts, &operator).distribution_pool
-        )
+        staking_contracts.borrow(&operator).distribution_pool.shareholders_count()
     }
 
     #[view]
@@ -355,7 +354,7 @@ module aptos_framework::staking_contract {
         };
 
         let store = borrow_global<Store>(staker);
-        simple_map::contains_key(&store.staking_contracts, &operator)
+        store.staking_contracts.contains_key(&operator)
     }
 
     #[view]
@@ -432,7 +431,7 @@ module aptos_framework::staking_contract {
         let store = borrow_global_mut<Store>(staker_address);
         let staking_contracts = &mut store.staking_contracts;
         assert!(
-            !simple_map::contains_key(staking_contracts, &operator),
+            !staking_contracts.contains_key(&operator),
             error::already_exists(ESTAKING_CONTRACT_ALREADY_EXISTS)
         );
 
@@ -454,10 +453,7 @@ module aptos_framework::staking_contract {
 
         // Create the contract record.
         let pool_address = signer::address_of(&stake_pool_signer);
-        simple_map::add(
-            staking_contracts,
-            operator,
-            StakingContract {
+        staking_contracts.add(operator, StakingContract {
                 principal,
                 pool_address,
                 owner_cap,
@@ -467,8 +463,7 @@ module aptos_framework::staking_contract {
                 // many pending distributions. This can lead to out-of-gas failure whenever distribute() is called.
                 distribution_pool: pool_u64::create(MAXIMUM_PENDING_DISTRIBUTIONS),
                 signer_cap: stake_pool_signer_cap
-            }
-        );
+            });
 
         if (std::features::module_event_migration_enabled()) {
             emit(
@@ -504,13 +499,13 @@ module aptos_framework::staking_contract {
 
         let store = borrow_global_mut<Store>(staker_address);
         let staking_contract =
-            simple_map::borrow_mut(&mut store.staking_contracts, &operator);
+            store.staking_contracts.borrow_mut(&operator);
 
         // Add the stake to the stake pool.
         let staked_coins = coin::withdraw<AptosCoin>(staker, amount);
         stake::add_stake_with_cap(&staking_contract.owner_cap, staked_coins);
 
-        staking_contract.principal = staking_contract.principal + amount;
+        staking_contract.principal += amount;
         let pool_address = staking_contract.pool_address;
         if (std::features::module_event_migration_enabled()) {
             emit(AddStake { operator, pool_address, amount });
@@ -531,7 +526,7 @@ module aptos_framework::staking_contract {
 
         let store = borrow_global_mut<Store>(staker_address);
         let staking_contract =
-            simple_map::borrow_mut(&mut store.staking_contracts, &operator);
+            store.staking_contracts.borrow_mut(&operator);
         let pool_address = staking_contract.pool_address;
         let old_voter = stake::get_delegated_voter(pool_address);
         stake::set_delegated_voter_with_cap(&staking_contract.owner_cap, new_voter);
@@ -555,7 +550,7 @@ module aptos_framework::staking_contract {
 
         let store = borrow_global_mut<Store>(staker_address);
         let staking_contract =
-            simple_map::borrow_mut(&mut store.staking_contracts, &operator);
+            store.staking_contracts.borrow_mut(&operator);
         let pool_address = staking_contract.pool_address;
         stake::increase_lockup_with_cap(&staking_contract.owner_cap);
 
@@ -587,7 +582,7 @@ module aptos_framework::staking_contract {
 
         let store = borrow_global_mut<Store>(staker_address);
         let staking_contract =
-            simple_map::borrow_mut(&mut store.staking_contracts, &operator);
+            store.staking_contracts.borrow_mut(&operator);
         distribute_internal(
             staker_address,
             operator,
@@ -651,7 +646,7 @@ module aptos_framework::staking_contract {
 
         let store = borrow_global_mut<Store>(staker);
         let staking_contract =
-            simple_map::borrow_mut(&mut store.staking_contracts, &operator);
+            store.staking_contracts.borrow_mut(&operator);
         // Short-circuit if zero commission.
         if (staking_contract.commission_percentage == 0) { return };
 
@@ -738,7 +733,7 @@ module aptos_framework::staking_contract {
 
         let store = borrow_global_mut<Store>(staker_address);
         let staking_contract =
-            simple_map::borrow_mut(&mut store.staking_contracts, &operator);
+            store.staking_contracts.borrow_mut(&operator);
 
         // Force distribution of any already inactive stake.
         distribute_internal(
@@ -764,7 +759,7 @@ module aptos_framework::staking_contract {
         if (active < amount) {
             amount = active;
         };
-        staking_contract.principal = staking_contract.principal - amount;
+        staking_contract.principal -= amount;
 
         // Record a distribution for the staker.
         add_distribution(
@@ -840,11 +835,11 @@ module aptos_framework::staking_contract {
         let store = borrow_global_mut<Store>(staker_address);
         let staking_contracts = &mut store.staking_contracts;
         assert!(
-            !simple_map::contains_key(staking_contracts, &new_operator),
+            !staking_contracts.contains_key(&new_operator),
             error::invalid_state(ECANT_MERGE_STAKING_CONTRACTS)
         );
 
-        let (_, staking_contract) = simple_map::remove(staking_contracts, &old_operator);
+        let (_, staking_contract) = staking_contracts.remove(&old_operator);
         // Force distribution of any already inactive stake.
         distribute_internal(
             staker_address,
@@ -867,7 +862,7 @@ module aptos_framework::staking_contract {
         staking_contract.commission_percentage = new_commission_percentage;
 
         let pool_address = staking_contract.pool_address;
-        simple_map::add(staking_contracts, new_operator, staking_contract);
+        staking_contracts.add(new_operator, staking_contract);
         if (std::features::module_event_migration_enabled()) {
             emit(SwitchOperator { pool_address, old_operator, new_operator });
         } else {
@@ -919,7 +914,7 @@ module aptos_framework::staking_contract {
         assert_staking_contract_exists(staker, operator);
         let store = borrow_global_mut<Store>(staker);
         let staking_contract =
-            simple_map::borrow_mut(&mut store.staking_contracts, &operator);
+            store.staking_contracts.borrow_mut(&operator);
         distribute_internal(
             staker,
             operator,
@@ -963,12 +958,12 @@ module aptos_framework::staking_contract {
         );
 
         // Buy all recipients out of the distribution pool.
-        while (pool_u64::shareholders_count(distribution_pool) > 0) {
-            let recipients = pool_u64::shareholders(distribution_pool);
-            let recipient = *vector::borrow(&recipients, 0);
-            let current_shares = pool_u64::shares(distribution_pool, recipient);
+        while (distribution_pool.shareholders_count() > 0) {
+            let recipients = distribution_pool.shareholders();
+            let recipient = recipients[0];
+            let current_shares = distribution_pool.shares(recipient);
             let amount_to_distribute =
-                pool_u64::redeem_shares(distribution_pool, recipient, current_shares);
+                distribution_pool.redeem_shares(recipient, current_shares);
             // If the recipient is the operator, send the commission to the beneficiary instead.
             if (recipient == operator) {
                 recipient = beneficiary_for_operator(operator);
@@ -1002,7 +997,7 @@ module aptos_framework::staking_contract {
         // In case there's any dust left, send them all to the staker.
         if (coin::value(&coins) > 0) {
             aptos_account::deposit_coins(staker, coins);
-            pool_u64::update_total_coins(distribution_pool, 0);
+            distribution_pool.update_total_coins(0);
         } else {
             coin::destroy_zero(coins);
         }
@@ -1018,7 +1013,7 @@ module aptos_framework::staking_contract {
         );
         let staking_contracts = &borrow_global<Store>(staker).staking_contracts;
         assert!(
-            simple_map::contains_key(staking_contracts, &operator),
+            staking_contracts.contains_key(&operator),
             error::not_found(ENO_STAKING_CONTRACT_FOUND_FOR_OPERATOR)
         );
     }
@@ -1041,7 +1036,7 @@ module aptos_framework::staking_contract {
             staking_contract.commission_percentage
         );
 
-        pool_u64::buy_in(distribution_pool, recipient, coins_amount);
+        distribution_pool.buy_in(recipient, coins_amount);
         let pool_address = staking_contract.pool_address;
         if (std::features::module_event_migration_enabled()) {
             emit(AddDistribution { operator, pool_address, amount: coins_amount });
@@ -1102,43 +1097,29 @@ module aptos_framework::staking_contract {
         commission_percentage: u64
     ) {
         // Short-circuit and do nothing if the pool's total value has not changed.
-        if (pool_u64::total_coins(distribution_pool) == updated_total_coins) { return };
+        if (distribution_pool.total_coins() == updated_total_coins) { return };
 
         // Charge all stakeholders (except for the operator themselves) commission on any rewards earnt relatively to the
         // previous value of the distribution pool.
-        let shareholders = &pool_u64::shareholders(distribution_pool);
-        vector::for_each_ref(
-            shareholders,
-            |shareholder| {
+        let shareholders = &distribution_pool.shareholders();
+        shareholders.for_each_ref(|shareholder| {
                 let shareholder: address = *shareholder;
                 if (shareholder != operator) {
-                    let shares = pool_u64::shares(distribution_pool, shareholder);
-                    let previous_worth = pool_u64::balance(
-                        distribution_pool, shareholder
-                    );
+                    let shares = distribution_pool.shares(shareholder);
+                    let previous_worth = distribution_pool.balance(shareholder);
                     let current_worth =
-                        pool_u64::shares_to_amount_with_total_coins(
-                            distribution_pool, shares, updated_total_coins
-                        );
+                        distribution_pool.shares_to_amount_with_total_coins(shares, updated_total_coins);
                     let unpaid_commission =
                         (current_worth - previous_worth) * commission_percentage / 100;
                     // Transfer shares from current shareholder to the operator as payment.
                     // The value of the shares should use the updated pool's total value.
                     let shares_to_transfer =
-                        pool_u64::amount_to_shares_with_total_coins(
-                            distribution_pool, unpaid_commission, updated_total_coins
-                        );
-                    pool_u64::transfer_shares(
-                        distribution_pool,
-                        shareholder,
-                        operator,
-                        shares_to_transfer
-                    );
+                        distribution_pool.amount_to_shares_with_total_coins(unpaid_commission, updated_total_coins);
+                    distribution_pool.transfer_shares(shareholder, operator, shares_to_transfer);
                 };
-            }
-        );
+            });
 
-        pool_u64::update_total_coins(distribution_pool, updated_total_coins);
+        distribution_pool.update_total_coins(updated_total_coins);
     }
 
     /// Create the seed to derive the resource account address.
@@ -1146,12 +1127,12 @@ module aptos_framework::staking_contract {
         staker: address, operator: address, contract_creation_seed: vector<u8>
     ): vector<u8> {
         let seed = bcs::to_bytes(&staker);
-        vector::append(&mut seed, bcs::to_bytes(&operator));
+        seed.append(bcs::to_bytes(&operator));
         // Include a salt to avoid conflicts with any other modules out there that might also generate
         // deterministic resource accounts for the same staker + operator addresses.
-        vector::append(&mut seed, SALT);
+        seed.append(SALT);
         // Add an extra salt given by the staker in case an account with the same address has already been created.
-        vector::append(&mut seed, contract_creation_seed);
+        seed.append(contract_creation_seed);
         seed
     }
 
@@ -1295,7 +1276,7 @@ module aptos_framework::staking_contract {
         // Operator claims 10% of rewards so far as commissions.
         let expected_commission_1 =
             (new_balance - last_recorded_principal(staker_address, operator_address)) / 10;
-        new_balance = new_balance - expected_commission_1;
+        new_balance -= expected_commission_1;
         request_commission(operator, staker_address, operator_address);
         stake::assert_stake_pool(
             pool_address,
@@ -1358,7 +1339,7 @@ module aptos_framework::staking_contract {
         // Second round of commission request/withdrawal.
         let expected_commission_2 =
             (new_balance - last_recorded_principal(staker_address, operator_address)) / 10;
-        new_balance = new_balance - expected_commission_2;
+        new_balance -= expected_commission_2;
         request_commission(operator, staker_address, operator_address);
         assert_distribution(
             staker_address,
@@ -1373,7 +1354,7 @@ module aptos_framework::staking_contract {
         expected_commission_2 = with_rewards(expected_commission_2);
         distribute(staker_address, operator_address);
         operator_balance = coin::balance<AptosCoin>(operator_address);
-        expected_operator_balance = expected_operator_balance + expected_commission_2;
+        expected_operator_balance += expected_commission_2;
         assert!(operator_balance == expected_operator_balance, operator_balance);
         assert_no_pending_distributions(staker_address, operator_address);
         new_balance = with_rewards(new_balance);
@@ -1671,7 +1652,7 @@ module aptos_framework::staking_contract {
             commission_for_operator_1
         );
         // Unpaid commission should be unlocked from the stake pool.
-        new_balance = new_balance - commission_for_operator_1;
+        new_balance -= commission_for_operator_1;
         stake::assert_stake_pool(
             pool_address,
             new_balance,
@@ -1704,7 +1685,7 @@ module aptos_framework::staking_contract {
         let commission_for_operator_2 =
             (new_balance - last_recorded_principal(staker_address, operator_2_address))
                 / 5;
-        new_balance = new_balance - commission_for_operator_2;
+        new_balance -= commission_for_operator_2;
         request_commission(operator_2, staker_address, operator_2_address);
         assert_distribution(
             staker_address,
@@ -1846,7 +1827,7 @@ module aptos_framework::staking_contract {
         let expected_commission_1 =
             (new_balance - last_recorded_principal(staker_address, operator1_address))
                 / 10;
-        new_balance = new_balance - expected_commission_1;
+        new_balance -= expected_commission_1;
         request_commission(operator1, staker_address, operator1_address);
         stake::assert_stake_pool(
             pool_address,
@@ -1979,7 +1960,7 @@ module aptos_framework::staking_contract {
         // So the operator should receive 10% of the rewards on top of withdrawn_stake.
         let commission_on_withdrawn_stake =
             (with_rewards(withdrawn_stake) - withdrawn_stake) / 10;
-        unpaid_commission = unpaid_commission + commission_on_withdrawn_stake;
+        unpaid_commission += commission_on_withdrawn_stake;
         withdrawn_stake = with_rewards(withdrawn_stake) - commission_on_withdrawn_stake;
         stake::assert_stake_pool(
             pool_address,
@@ -2126,7 +2107,7 @@ module aptos_framework::staking_contract {
         new_balance = with_rewards(new_balance) - commission_on_new_balance;
         let new_withdrawn_stake = new_balance / 4;
         unlock_stake(staker, operator_address, new_withdrawn_stake);
-        new_balance = new_balance - new_withdrawn_stake;
+        new_balance -= new_withdrawn_stake;
         withdrawn_stake =
             with_rewards(withdrawn_stake) - commission_on_withdrawn_stake
                 + new_withdrawn_stake;
@@ -2220,9 +2201,7 @@ module aptos_framework::staking_contract {
         commission_percentage: u64
     ) acquires Store {
         let staking_contract =
-            simple_map::borrow(
-                &borrow_global<Store>(staker).staking_contracts, &operator
-            );
+            borrow_global<Store>(staker).staking_contracts.borrow(&operator);
         assert!(staking_contract.principal == principal, staking_contract.principal);
         assert!(
             staking_contract.commission_percentage == commission_percentage,
@@ -2235,13 +2214,11 @@ module aptos_framework::staking_contract {
         staker: address, operator: address
     ) acquires Store {
         let staking_contract =
-            simple_map::borrow(
-                &borrow_global<Store>(staker).staking_contracts, &operator
-            );
+            borrow_global<Store>(staker).staking_contracts.borrow(&operator);
         let distribution_pool = &staking_contract.distribution_pool;
-        let shareholders_count = pool_u64::shareholders_count(distribution_pool);
+        let shareholders_count = distribution_pool.shareholders_count();
         assert!(shareholders_count == 0, shareholders_count);
-        let total_coins_remaining = pool_u64::total_coins(distribution_pool);
+        let total_coins_remaining = distribution_pool.total_coins();
         assert!(total_coins_remaining == 0, total_coins_remaining);
     }
 
@@ -2253,11 +2230,9 @@ module aptos_framework::staking_contract {
         coins_amount: u64
     ) acquires Store {
         let staking_contract =
-            simple_map::borrow(
-                &borrow_global<Store>(staker).staking_contracts, &operator
-            );
+            borrow_global<Store>(staker).staking_contracts.borrow(&operator);
         let distribution_balance =
-            pool_u64::balance(&staking_contract.distribution_pool, recipient);
+            staking_contract.distribution_pool.balance(recipient);
         assert!(distribution_balance == coins_amount, distribution_balance);
     }
 }

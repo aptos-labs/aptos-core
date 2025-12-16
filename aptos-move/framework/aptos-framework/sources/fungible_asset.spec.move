@@ -144,8 +144,8 @@ spec aptos_framework::fungible_asset {
     }
 
     spec deposit {
-        modifies global<FungibleStore>(object::object_address(store));
-        modifies global<ConcurrentFungibleBalance>(object::object_address(store));
+        modifies global<FungibleStore>(store.object_address());
+        modifies global<ConcurrentFungibleBalance>(store.object_address());
     }
 
     spec unchecked_deposit {

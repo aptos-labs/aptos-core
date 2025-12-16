@@ -33,7 +33,6 @@ module aptos_framework::object_code_deployment {
     use std::error;
     use std::features;
     use std::signer;
-    use std::vector;
     use aptos_framework::account;
     use aptos_framework::code;
     use aptos_framework::code::PackageRegistry;
@@ -95,21 +94,21 @@ module aptos_framework::object_code_deployment {
         let publisher_address = signer::address_of(publisher);
         let object_seed = object_seed(publisher_address);
         let constructor_ref = &object::create_named_object(publisher, object_seed);
-        let code_signer = &object::generate_signer(constructor_ref);
+        let code_signer = &constructor_ref.generate_signer();
         code::publish_package_txn(code_signer, metadata_serialized, code);
 
         event::emit(Publish { object_address: signer::address_of(code_signer), });
 
         move_to(code_signer, ManagingRefs {
-            extend_ref: object::generate_extend_ref(constructor_ref),
+            extend_ref: constructor_ref.generate_extend_ref(),
         });
     }
 
     inline fun object_seed(publisher: address): vector<u8> {
         let sequence_number = account::get_sequence_number(publisher) + 1;
         let seeds = vector[];
-        vector::append(&mut seeds, bcs::to_bytes(&OBJECT_CODE_DEPLOYMENT_DOMAIN_SEPARATOR));
-        vector::append(&mut seeds, bcs::to_bytes(&sequence_number));
+        seeds.append(bcs::to_bytes(&OBJECT_CODE_DEPLOYMENT_DOMAIN_SEPARATOR));
+        seeds.append(bcs::to_bytes(&sequence_number));
         seeds
     }
 
@@ -126,15 +125,15 @@ module aptos_framework::object_code_deployment {
         code::check_code_publishing_permission(publisher);
         let publisher_address = signer::address_of(publisher);
         assert!(
-            object::is_owner(code_object, publisher_address),
+            code_object.is_owner(publisher_address),
             error::permission_denied(ENOT_CODE_OBJECT_OWNER),
         );
 
-        let code_object_address = object::object_address(&code_object);
+        let code_object_address = code_object.object_address();
         assert!(exists<ManagingRefs>(code_object_address), error::not_found(ECODE_OBJECT_DOES_NOT_EXIST));
 
         let extend_ref = &borrow_global<ManagingRefs>(code_object_address).extend_ref;
-        let code_signer = &object::generate_signer_for_extending(extend_ref);
+        let code_signer = &extend_ref.generate_signer_for_extending();
         code::publish_package_txn(code_signer, metadata_serialized, code);
 
         event::emit(Upgrade { object_address: signer::address_of(code_signer), });
@@ -146,6 +145,6 @@ module aptos_framework::object_code_deployment {
     public entry fun freeze_code_object(publisher: &signer, code_object: Object<PackageRegistry>) {
         code::freeze_code_object(publisher, code_object);
 
-        event::emit(Freeze { object_address: object::object_address(&code_object), });
+        event::emit(Freeze { object_address: code_object.object_address(), });
     }
 }

@@ -591,7 +591,7 @@ The <code>elem_deserializer</code> lambda expression is used sequentially to des
     <b>let</b> len = <a href="bcs_stream.md#0x1_bcs_stream_deserialize_uleb128">deserialize_uleb128</a>(stream);
     <b>let</b> v = <a href="../../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
 
-    for (i in 0..len) {
+    for (_i in 0..len) {
         v.push_back(elem_deserializer(stream));
     };
 
