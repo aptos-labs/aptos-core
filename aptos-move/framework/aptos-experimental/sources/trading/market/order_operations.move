@@ -125,10 +125,8 @@ module aptos_experimental::order_operations {
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
         let order_book = market.get_order_book_mut();
-        let maybe_order = order_book.get_single_order(order_id);
-        assert!(maybe_order.is_some(), EORDER_DOES_NOT_EXIST);
         order_book.decrease_single_order_size(account, order_id, size_delta);
-        let (order, _) = maybe_order.destroy_some().destroy_order_from_state();
+        let (order, _) = order_book.get_single_order(order_id).destroy_some().destroy_order_from_state();
         let (
             user,
             order_id,

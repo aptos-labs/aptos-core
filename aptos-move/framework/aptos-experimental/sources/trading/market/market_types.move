@@ -543,12 +543,34 @@ module aptos_experimental::market_types {
         }
     }
 
-    public fun update_market_config<M: store + copy + drop>(
-        self: &mut Market<M>,
-        new_config: MarketConfig
+    public fun set_allow_self_trade<M: store + copy + drop>(
+        self: &mut Market<M>, allow_self_trade: bool
     ) {
-        self.config = new_config;
+        self.config.allow_self_trade = allow_self_trade;
     }
+
+    public fun set_allow_events_emission<M: store + copy + drop>(
+        self: &mut Market<M>, allow_events_emission: bool
+    ) {
+        self.config.allow_events_emission = allow_events_emission;
+    }
+
+    public fun set_allow_dead_mans_switch<M: store + copy + drop>(
+        self: &mut Market<M>, enable_dead_mans_switch: bool
+    ) {
+        self.config.enable_dead_mans_switch = enable_dead_mans_switch;
+    }
+
+    public fun set_dead_mans_switch_min_keep_alive_time_secs<M: store + copy + drop>(
+        self: &mut Market<M>, min_keep_alive_time_secs: u64
+    ) {
+        self.config.min_keep_alive_time_secs = min_keep_alive_time_secs;
+        dead_mans_switch_tracker::set_min_keep_alive_time_secs(
+            self.get_dead_mans_switch_tracker_mut(),
+            min_keep_alive_time_secs
+        );
+    }
+
 
     public fun get_order_book<M: store + copy + drop>(self: &Market<M>): &OrderBook<M> {
         &self.order_book
