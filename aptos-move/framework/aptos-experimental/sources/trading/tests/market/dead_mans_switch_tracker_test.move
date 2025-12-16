@@ -1,5 +1,6 @@
 #[test_only]
 module aptos_experimental::dead_mans_switch_tracker_test {
+    use std::option;
     use std::signer;
     use aptos_framework::timestamp;
     use aptos_experimental::dead_mans_switch_tracker::{
@@ -34,11 +35,11 @@ module aptos_experimental::dead_mans_switch_tracker_test {
     }
 
     fun assert_order_valid(tracker: &DeadMansSwitchTracker, user_addr: address, order_time: u64) {
-        assert!(is_order_valid(tracker, user_addr, order_time), 0)
+        assert!(is_order_valid(tracker, user_addr, option::some(order_time)), 0)
     }
 
     fun assert_order_invalid(tracker: &DeadMansSwitchTracker, user_addr: address, order_time: u64) {
-        assert!(!is_order_valid(tracker, user_addr, order_time), 0)
+        assert!(!is_order_valid(tracker, user_addr, option::some(order_time)), 0)
     }
 
     #[test(aptos_framework = @0x1)]

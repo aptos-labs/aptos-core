@@ -85,7 +85,6 @@ TimeBased(time): The order is triggered when the current time is greater than or
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
-<b>use</b> <a href="../../aptos-framework/doc/timestamp.md#0x1_timestamp">0x1::timestamp</a>;
 <b>use</b> <a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context">0x1::transaction_context</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
 <b>use</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types">0x7::bulk_order_book_types</a>;
@@ -1073,7 +1072,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
 ): (Option&lt;OrderCancellationReason&gt;, CallbackResult&lt;R&gt;) {
     <b>let</b> dead_mans_switch_enabled = market.is_dead_mans_switch_enabled();
     <b>if</b> (dead_mans_switch_enabled) {
-        <b>if</b> (!is_order_valid(market.get_dead_mans_switch_tracker(), user_addr, <a href="../../aptos-framework/doc/timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>())) {
+        <b>if</b> (!is_order_valid(market.get_dead_mans_switch_tracker(), user_addr, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>())) {
             <b>let</b> taker_cancellation_reason = std::string::utf8(b"Order invalidated due <b>to</b> dead man's switch expiry");
             <a href="order_placement.md#0x7_order_placement_cancel_single_order_internal">cancel_single_order_internal</a>(
                 market,
@@ -1120,7 +1119,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         <b>return</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), new_callback_result_not_available());
     };
     <b>if</b> (dead_mans_switch_enabled) {
-        <b>if</b> (!is_order_valid(market.get_dead_mans_switch_tracker(), maker_order.get_account_from_match_details(),  maker_order.get_creation_time_micros_from_match_details() / 1000000)) {
+        <b>if</b> (!is_order_valid(market.get_dead_mans_switch_tracker(), maker_order.get_account_from_match_details(),  <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(maker_order.get_creation_time_micros_from_match_details() / 1000000))) {
             <a href="order_placement.md#0x7_order_placement_cancel_maker_order_internal">cancel_maker_order_internal</a>(
                 market,
                 &maker_order,

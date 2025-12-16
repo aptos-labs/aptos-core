@@ -61,7 +61,6 @@ module aptos_experimental::order_placement {
     use std::signer;
     use std::string::String;
     use std::vector;
-    use aptos_framework::timestamp;
     use aptos_experimental::market_clearinghouse_order_info::new_clearinghouse_order_info;
     use aptos_experimental::order_book::{new_single_order_request};
     use aptos_experimental::pre_cancellation_tracker::{
@@ -631,7 +630,7 @@ module aptos_experimental::order_placement {
     ): (Option<OrderCancellationReason>, CallbackResult<R>) {
         let dead_mans_switch_enabled = market.is_dead_mans_switch_enabled();
         if (dead_mans_switch_enabled) {
-            if (!is_order_valid(market.get_dead_mans_switch_tracker(), user_addr, timestamp::now_seconds())) {
+            if (!is_order_valid(market.get_dead_mans_switch_tracker(), user_addr, option::none())) {
                 let taker_cancellation_reason = std::string::utf8(b"Order invalidated due to dead man's switch expiry");
                 cancel_single_order_internal(
                     market,
@@ -678,7 +677,7 @@ module aptos_experimental::order_placement {
             return (option::none(), new_callback_result_not_available());
         };
         if (dead_mans_switch_enabled) {
-            if (!is_order_valid(market.get_dead_mans_switch_tracker(), maker_order.get_account_from_match_details(),  maker_order.get_creation_time_micros_from_match_details() / 1000000)) {
+            if (!is_order_valid(market.get_dead_mans_switch_tracker(), maker_order.get_account_from_match_details(),  option::some(maker_order.get_creation_time_micros_from_match_details() / 1000000))) {
                 cancel_maker_order_internal(
                     market,
                     &maker_order,

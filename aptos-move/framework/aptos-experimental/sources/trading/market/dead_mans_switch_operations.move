@@ -1,6 +1,7 @@
 /// This module provides dead man's switch operations for the market.
 /// It includes functions for cleaning up expired orders based on keep-alive timeouts.
 module aptos_experimental::dead_mans_switch_operations {
+    use std::option;
     use std::string;
     use aptos_experimental::market_types::{Self, MarketClearinghouseCallbacks, Market};
     use aptos_experimental::order_book_types::OrderIdType;
@@ -63,7 +64,7 @@ module aptos_experimental::dead_mans_switch_operations {
                 // Check if order is valid according to dead man's switch
                 // We get tracker each time to avoid borrowing conflicts
                 let tracker = market.get_dead_mans_switch_tracker();
-                let is_valid = is_order_valid(tracker, account, creation_time_secs);
+                let is_valid = is_order_valid(tracker, account, option::some(creation_time_secs));
 
                 if (!is_valid) {
                     // Cancel the order
@@ -112,7 +113,7 @@ module aptos_experimental::dead_mans_switch_operations {
 
         // Check if order is valid according to dead man's switch
         let tracker = market.get_dead_mans_switch_tracker();
-        let is_valid = is_order_valid(tracker, account, creation_time_secs);
+        let is_valid = is_order_valid(tracker, account, option::some(creation_time_secs));
 
         if (!is_valid) {
             // Cancel the bulk order

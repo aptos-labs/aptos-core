@@ -50,6 +50,7 @@ module aptos_experimental::dead_mans_switch_tracker {
     friend aptos_experimental::order_operations;
     friend aptos_experimental::market_types;
     friend aptos_experimental::dead_mans_switch_operations;
+    use std::option::Option;
     use aptos_std::big_ordered_map;
     use aptos_std::big_ordered_map::BigOrderedMap;
     use aptos_framework::event;
@@ -173,15 +174,20 @@ module aptos_experimental::dead_mans_switch_tracker {
     public fun is_order_valid(
         tracker: &DeadMansSwitchTracker,
         account: address,
-        order_creation_time_secs: u64,
+        order_creation_time_secs: Option<u64>,
     ): bool {
         let itr = tracker.state.internal_find(&account);
         if (itr.iter_is_end(&tracker.state)) {
             // No keep-alive set, so all orders are valid
             return true;
         };
-        let state = itr.iter_borrow(&tracker.state);
         let current_time = aptos_std::timestamp::now_seconds();
+        let order_creation_time_secs = if (order_creation_time_secs.is_some()) {
+            order_creation_time_secs.destroy_some()
+        } else {
+            current_time
+        };
+        let state = itr.iter_borrow(&tracker.state);
         if (state.session_start_time_secs > order_creation_time_secs) {
             // Order was placed before the session started, so it is invalid
             return false;
