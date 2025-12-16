@@ -1080,7 +1080,6 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 location,
                 code,
                 info,
-                ..
             } => match &location {
                 AbortLocation::Module(_) => info
                     .as_ref()
@@ -1097,10 +1096,10 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                         format!(
                             "Move abort in {}: {:#x}",
                             abort_location_to_str(location),
-                            code,
+                            code
                         )
                     }),
-                AbortLocation::Script => format!("Move abort: {:#x}", code),
+                AbortLocation::Script => format!("Move abort: code {:#x}", code),
             },
             ExecutionStatus::Success => "Executed successfully".to_owned(),
             ExecutionStatus::OutOfGas => "Out of gas".to_owned(),
