@@ -1,0 +1,12 @@
+remote_endpoint: ~
+name: "v1.38-enable-call-tree-and-instruction-vm-cache"
+proposals:
+  - name: enable_framework_for_option
+    metadata:
+      title: "Proposal to enable function caches"
+      description: "See https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-134.md"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - enable_call_tree_and_instruction_vm_cache
