@@ -283,11 +283,14 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 frame.check_local_tys_have_drop_ability()?;
             },
             Instruction::Abort => {
-                operand_stack.pop_ty()?;
+                let ty = operand_stack.pop_ty()?;
+                ty.paranoid_check_is_u64_ty()?;
             },
             Instruction::AbortMsg => {
-                operand_stack.pop_ty()?;
-                operand_stack.pop_ty()?;
+                let ty1 = operand_stack.pop_ty()?;
+                ty1.paranoid_check_is_vec_ref_ty::<false>(&Type::U8)?;
+                let ty2 = operand_stack.pop_ty()?;
+                ty2.paranoid_check_is_u64_ty()?;
             },
             // StLoc needs to check before execution as we need to check the drop ability of values.
             Instruction::StLoc(idx) => {
