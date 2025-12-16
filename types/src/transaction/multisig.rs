@@ -79,7 +79,9 @@ impl TryFrom<VMStatus> for ExecutionError {
             VMStatus::MoveAbort {
                 location: abort_location,
                 code: error_code,
-                ..
+                // Note that we ignore the message here because ExecutionError has to be serialized
+                // for multisig transactions and the serialization is not expected to fail.
+                message: _,
             } => Ok(ExecutionError {
                 error_type: String::from("MoveAbort"),
                 abort_location: format!("{:?}", abort_location),
