@@ -1,0 +1,658 @@
+
+Diagnostics:
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+  ┌─ tests/model_ast_lints/no_effect_op.move:6:9
+  │
+6 │         x;
+  │         ^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This statement has no effect and can be removed
+  ┌─ tests/model_ast_lints/no_effect_op.move:7:9
+  │
+7 │         42;
+  │         ^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This statement has no effect and can be removed
+  ┌─ tests/model_ast_lints/no_effect_op.move:8:9
+  │
+8 │         b"hello";
+  │         ^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+  ┌─ tests/model_ast_lints/no_effect_op.move:9:9
+  │
+9 │         vector<u64>[];
+  │         ^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:10:9
+   │
+10 │         vector[0];
+   │         ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:11:9
+   │
+11 │         vector[b"hello"];
+   │         ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:14:13
+   │
+14 │             x;
+   │             ^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This statement has no effect and can be removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:15:13
+   │
+15 │             42;
+   │             ^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This statement has no effect and can be removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:16:13
+   │
+16 │             b"hello";
+   │             ^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:17:13
+   │
+17 │             vector<u64>[];
+   │             ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:18:13
+   │
+18 │             vector[0];
+   │             ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:19:13
+   │
+19 │             vector[b"hello"];
+   │             ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:25:9
+   │
+25 │         *(&mut (x + 1)) = 1;
+   │         ^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This assignment has no effect and can be removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:26:9
+   │
+26 │         *(&mut 42) = 1;
+   │         ^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:27:9
+   │
+27 │         *(&mut 42) = x;
+   │         ^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:28:9
+   │
+28 │         *(&mut 42) = x + 1;
+   │         ^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:29:9
+   │
+29 │         *(&mut 42) = x + x;
+   │         ^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:30:9
+   │
+30 │         *(&mut 42) = x - 1;
+   │         ^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:31:9
+   │
+31 │         *(&mut 42) = x - x;
+   │         ^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:32:9
+   │
+32 │         *(&mut 42) = x * 2;
+   │         ^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:33:9
+   │
+33 │         *(&mut 42) = x * x;
+   │         ^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:34:9
+   │
+34 │         *(&mut 42) = x / 2;
+   │         ^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This operation always evaluates to `1`.
+   ┌─ tests/model_ast_lints/no_effect_op.move:35:22
+   │
+35 │         *(&mut 42) = x / x;
+   │                      ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:35:9
+   │
+35 │         *(&mut 42) = x / x;
+   │         ^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This operation always evaluates to the same value: `x | x` and `x & x` can be simplified to `x`.
+   ┌─ tests/model_ast_lints/no_effect_op.move:36:22
+   │
+36 │         *(&mut 42) = x & x;
+   │                      ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:36:9
+   │
+36 │         *(&mut 42) = x & x;
+   │         ^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This operation always evaluates to the same value: `x | x` and `x & x` can be simplified to `x`.
+   ┌─ tests/model_ast_lints/no_effect_op.move:37:22
+   │
+37 │         *(&mut 42) = x | x;
+   │                      ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:37:9
+   │
+37 │         *(&mut 42) = x | x;
+   │         ^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This operation always evaluates to `0`.
+   ┌─ tests/model_ast_lints/no_effect_op.move:38:22
+   │
+38 │         *(&mut 42) = x ^ x;
+   │                      ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:38:9
+   │
+38 │         *(&mut 42) = x ^ x;
+   │         ^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:39:9
+   │
+39 │         *(&mut 42) = x << x;
+   │         ^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:40:9
+   │
+40 │         *(&mut 42) = x >> x;
+   │         ^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This operation always evaluates to `true`.
+   ┌─ tests/model_ast_lints/no_effect_op.move:41:26
+   │
+41 │         *(&mut 42) = if (x == x){ 1 }else{ 0 };
+   │                          ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+
+warning: [lint] This operation always evaluates to `false`.
+   ┌─ tests/model_ast_lints/no_effect_op.move:42:26
+   │
+42 │         *(&mut 42) = if (x != x){ 1 }else{ 0 };
+   │                          ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+
+warning: [lint] This operation always evaluates to `false`.
+   ┌─ tests/model_ast_lints/no_effect_op.move:43:26
+   │
+43 │         *(&mut 42) = if (x >  x){ 1 }else{ 0 };
+   │                          ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+
+warning: [lint] This operation always evaluates to `true`.
+   ┌─ tests/model_ast_lints/no_effect_op.move:44:26
+   │
+44 │         *(&mut 42) = if (x >= x){ 1 }else{ 0 };
+   │                          ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+
+warning: [lint] This operation always evaluates to `false`.
+   ┌─ tests/model_ast_lints/no_effect_op.move:45:26
+   │
+45 │         *(&mut 42) = if (x <  x){ 1 }else{ 0 };
+   │                          ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+
+warning: [lint] This operation always evaluates to `true`.
+   ┌─ tests/model_ast_lints/no_effect_op.move:46:26
+   │
+46 │         *(&mut 42) = if (x <= x){ 1 }else{ 0 };
+   │                          ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+
+warning: [lint] This operation always evaluates to `true`.
+   ┌─ tests/model_ast_lints/no_effect_op.move:47:28
+   │
+47 │         *(&mut 42) = { if (x <= x){ 1 }else{ 0 } };
+   │                            ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:52:9
+   │
+52 │         *(&mut true) = !x;
+   │         ^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This boolean expression can be simplified using double negation law (`!!a` is equivalent to `a`).
+   ┌─ tests/model_ast_lints/no_effect_op.move:53:24
+   │
+53 │         *(&mut true) = !!x;
+   │                        ^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:53:9
+   │
+53 │         *(&mut true) = !!x;
+   │         ^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).
+   ┌─ tests/model_ast_lints/no_effect_op.move:54:24
+   │
+54 │         *(&mut true) = x && x;
+   │                        ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:54:9
+   │
+54 │         *(&mut true) = x && x;
+   │         ^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This boolean expression can be simplified using contradiction (`a && !a` is equivalent to `false`).
+   ┌─ tests/model_ast_lints/no_effect_op.move:55:24
+   │
+55 │         *(&mut true) = x && !x;
+   │                        ^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:55:9
+   │
+55 │         *(&mut true) = x && !x;
+   │         ^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).
+   ┌─ tests/model_ast_lints/no_effect_op.move:56:24
+   │
+56 │         *(&mut true) = x || x;
+   │                        ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:56:9
+   │
+56 │         *(&mut true) = x || x;
+   │         ^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This boolean expression can be simplified using tautology (`a || !a` is equivalent to `true`).
+   ┌─ tests/model_ast_lints/no_effect_op.move:57:24
+   │
+57 │         *(&mut true) = x || !x;
+   │                        ^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:57:9
+   │
+57 │         *(&mut true) = x || !x;
+   │         ^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This operation always evaluates to `true`.
+   ┌─ tests/model_ast_lints/no_effect_op.move:59:24
+   │
+59 │         *(&mut true) = y == y;
+   │                        ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:59:9
+   │
+59 │         *(&mut true) = y == y;
+   │         ^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This operation always evaluates to `false`.
+   ┌─ tests/model_ast_lints/no_effect_op.move:60:24
+   │
+60 │         *(&mut true) = y != y;
+   │                        ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:60:9
+   │
+60 │         *(&mut true) = y != y;
+   │         ^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This operation always evaluates to `false`.
+   ┌─ tests/model_ast_lints/no_effect_op.move:61:24
+   │
+61 │         *(&mut true) = y >  y;
+   │                        ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:61:9
+   │
+61 │         *(&mut true) = y >  y;
+   │         ^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This operation always evaluates to `true`.
+   ┌─ tests/model_ast_lints/no_effect_op.move:62:24
+   │
+62 │         *(&mut true) = y >= y;
+   │                        ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:62:9
+   │
+62 │         *(&mut true) = y >= y;
+   │         ^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This operation always evaluates to `false`.
+   ┌─ tests/model_ast_lints/no_effect_op.move:63:24
+   │
+63 │         *(&mut true) = y <  y;
+   │                        ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:63:9
+   │
+63 │         *(&mut true) = y <  y;
+   │         ^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This operation always evaluates to `true`.
+   ┌─ tests/model_ast_lints/no_effect_op.move:64:24
+   │
+64 │         *(&mut true) = y <= y;
+   │                        ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:64:9
+   │
+64 │         *(&mut true) = y <= y;
+   │         ^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:68:9
+   │
+68 │         *(&mut vector<u64>[]) = vector[0_u64];
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:88:13
+   │
+88 │             x;
+   │             ^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:92:17
+   │
+92 │                 x;
+   │                 ^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:95:13
+   │
+95 │             x;
+   │             ^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+   ┌─ tests/model_ast_lints/no_effect_op.move:97:13
+   │
+97 │             x;
+   │             ^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This operation always evaluates to `true`.
+    ┌─ tests/model_ast_lints/no_effect_op.move:123:9
+    │
+123 │         x == x
+    │         ^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+
+warning: [lint] This operation always evaluates to `true`.
+    ┌─ tests/model_ast_lints/no_effect_op.move:143:9
+    │
+143 │         x == x
+    │         ^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+    ┌─ tests/model_ast_lints/no_effect_op.move:167:9
+    │
+167 │         *(&mut r.x) = 5;
+    │         ^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+    ┌─ tests/model_ast_lints/no_effect_op.move:172:9
+    │
+172 │         *(&mut *x) = 7;
+    │         ^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed
+    ┌─ tests/model_ast_lints/no_effect_op.move:178:9
+    │
+178 │         *(&mut (*r).x) = 9;
+    │         ^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_effect_op)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_effect_op.
+
+warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
+    ┌─ tests/model_ast_lints/no_effect_op.move:155:24
+    │
+155 │     fun falsely_impure(x: &mut u64): u64{
+    │                        ^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.

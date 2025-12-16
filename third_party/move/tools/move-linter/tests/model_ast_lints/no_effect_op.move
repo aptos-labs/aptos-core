@@ -156,3 +156,25 @@ module 0xc0ffee::m {
         *x * 2
     }
 }
+
+#[lint::skip(needless_ref_in_field_access, needless_deref_ref, needless_mutable_reference)]
+module 0xc0ffee::no_op_mut_ref_effects {
+    struct S has copy, key, drop { x: u64 }
+
+    // Mutation through a field of a mutable global reference must not be treated as a no-op.
+    public fun assign_through_field(addr: address) acquires S {
+        let r = borrow_global_mut<S>(addr);
+        *(&mut r.x) = 5;
+    }
+
+    // Mutation through an extra deref of a mutable reference must not be treated as a no-op.
+    public fun assign_through_deref(x: &mut u64) {
+        *(&mut *x) = 7;
+    }
+
+    // Combine deref + field projection to cover both Operation::Deref and Operation::Select.
+    public fun assign_through_nested(addr: address) acquires S {
+        let r = borrow_global_mut<S>(addr);
+        *(&mut (*r).x) = 9;
+    }
+}

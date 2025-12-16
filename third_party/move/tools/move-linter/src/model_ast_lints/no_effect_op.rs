@@ -37,30 +37,24 @@ static NO_EFFECT_ASSIGN: &str = "This assignment has no effect and can be remove
 static NO_EFFECT_OR_ABORT_ASSIGN: &str = "This assignment has no effect besides possibly aborting due to arithmetic errors and might be refactored or removed";
 
 #[derive(Default)]
-pub struct NoOp {
+pub struct NoEffectOp {
     //Marks nodes to be skipped during visits.
     skip: HashSet<NodeId>,
 }
 
-impl ExpChecker for NoOp {
+impl ExpChecker for NoEffectOp {
     fn get_name(&self) -> String {
-        "no_op".to_string()
+        "no_effect_op".to_string()
     }
 
     fn visit_expr_pre(&mut self, function: &FunctionEnv, expr: &ExpData) {
-        match expr {
-            ExpData::Sequence(_, _) => {
-                self.visit_subexpression(function, expr, false, 0);
-            },
-            ExpData::Block(_, _, _, _) => {
-                self.visit_subexpression(function, expr, false, 0);
-            },
-            _ => {},
+        if matches!(expr, ExpData::Sequence(..)) || matches!(expr, ExpData::Block(..)) {
+            self.visit_subexpression(function, expr, false, 0);
         }
     }
 }
 
-impl NoOp {
+impl NoEffectOp {
     fn visit_subexpression(
         &mut self,
         function: &FunctionEnv,
