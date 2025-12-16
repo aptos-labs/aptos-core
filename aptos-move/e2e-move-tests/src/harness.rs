@@ -1319,7 +1319,6 @@ macro_rules! assert_move_abort {
             TransactionStatus::Keep(ExecutionStatus::MoveAbort {
                 location: _,
                 code: _,
-                message: _,
                 info,
             }) => info == $c,
             _ => false,
@@ -1353,7 +1352,6 @@ mod tests {
 
         let abort_13 = TransactionStatus::Keep(ExecutionStatus::MoveAbort {
             code: 13,
-            message: None,
             location: AbortLocation::Script,
             info: None,
         });
@@ -1384,7 +1382,6 @@ mod tests {
     fn test_asserts_variable_used() {
         let abort_13 = TransactionStatus::Keep(ExecutionStatus::MoveAbort {
             code: 13,
-            message: None,
             location: AbortLocation::Script,
             info: None,
         });
@@ -1398,7 +1395,6 @@ mod tests {
     fn test_asserts_variable_used_with_message() {
         let abort_13 = TransactionStatus::Keep(ExecutionStatus::MoveAbort {
             code: 13,
-            message: None,
             location: AbortLocation::Script,
             info: None,
         });

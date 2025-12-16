@@ -105,7 +105,6 @@ impl AUTransactionGen for CreateExistingAccountGen {
             TransactionStatus::Keep(ExecutionStatus::MoveAbort {
                 location: AbortLocation::Script,
                 code: 777_777,
-                message: None,
                 info: None,
             })
         } else {

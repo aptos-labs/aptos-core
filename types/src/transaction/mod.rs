@@ -1447,7 +1447,6 @@ pub enum ExecutionStatus {
     MoveAbort {
         location: AbortLocation,
         code: u64,
-        message: Option<String>,
         info: Option<AbortInfo>,
     },
     ExecutionFailure {
@@ -1478,8 +1477,10 @@ impl From<KeptVMStatus> for ExecutionStatus {
             } => ExecutionStatus::MoveAbort {
                 location,
                 code,
-                message,
-                info: None,
+                info: message.map(|message| AbortInfo {
+                    reason_name: "".to_string(), // will be populated later
+                    description: message,
+                }),
             },
             KeptVMStatus::ExecutionFailure {
                 location: loc,

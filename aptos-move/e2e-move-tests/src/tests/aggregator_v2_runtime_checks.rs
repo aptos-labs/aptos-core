@@ -96,7 +96,6 @@ fn test_serialization() {
         assert_eq!(status, ExecutionStatus::MoveAbort {
             location: bcs_location.clone(),
             code: NFE_BCS_SERIALIZATION_FAILURE,
-            message: None,
             info: None,
         });
     });
@@ -143,7 +142,6 @@ fn test_string_utils() {
         if let ExecutionStatus::MoveAbort {
             location: AbortLocation::Module(id),
             code: 3, // EUNABLE_TO_FORMAT_DELAYED_FIELD
-            message: _,
             info: Some(_),
         } = status
         {

@@ -89,7 +89,6 @@ impl AUTransactionGen for P2PTransferGen {
                         ident_str!("coin").to_owned(),
                     )),
                     code: 65542,
-                    message: None,
                     info: None,
                 });
             },
@@ -106,7 +105,6 @@ impl AUTransactionGen for P2PTransferGen {
                         ident_str!("coin").to_owned(),
                     )),
                     code: 65542,
-                    message: None,
                     info: None,
                 });
             },

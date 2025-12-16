@@ -246,7 +246,6 @@ pub fn txn_one_account_result(
                 TransactionStatus::Keep(ExecutionStatus::MoveAbort {
                     location: known_locations::core_account_module_abort(),
                     code: 6,
-                    message: None,
                     info: None,
                 }),
                 false,
@@ -262,7 +261,6 @@ pub fn txn_one_account_result(
                 TransactionStatus::Keep(ExecutionStatus::MoveAbort {
                     location: known_locations::core_account_module_abort(),
                     code: 10,
-                    message: None,
                     info: None,
                 }),
                 false,
