@@ -6,7 +6,7 @@ use crate::log::{
     FrameName, StorageFees, TransactionGasLog, WriteOpType, WriteStorage, WriteTransient,
 };
 use aptos_gas_algebra::{Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes, NumTypeNodes};
-use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
+use aptos_gas_meter::{AptosGasMeter, GasAlgebra, PeakMemoryUsage};
 use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_30;
 use aptos_types::{
     contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
@@ -702,9 +702,9 @@ where
     }
 
     fn charge_keyless(&mut self) -> VMResult<()> {
-        let (_cost, res) = self.delegate_charge(|base| base.charge_keyless());
+        let (cost, res) = self.delegate_charge(|base| base.charge_keyless());
 
-        // TODO: add keyless
+        self.keyless_cost = Some(cost);
 
         res
     }
@@ -712,7 +712,7 @@ where
 
 impl<G> GasProfiler<G>
 where
-    G: AptosGasMeter,
+    G: AptosGasMeter + PeakMemoryUsage,
 {
     pub fn finish(mut self) -> TransactionGasLog {
         while self.frames.len() > 1 {
@@ -748,6 +748,7 @@ where
             exec_io,
             storage,
             num_txns: 1,
+            peak_memory_usage: self.base.peak_memory_usage(),
         }
     }
 }
