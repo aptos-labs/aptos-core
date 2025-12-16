@@ -85,7 +85,6 @@ pub enum Instruction {
     Le,
     Ge,
     Abort,
-    AbortMsg,
     Nop,
     Exists(StructDefinitionIndex),
     ExistsGeneric(StructDefInstantiationIndex),
@@ -125,6 +124,7 @@ pub enum Instruction {
     CastI128,
     CastI256,
     Negate,
+    AbortMsg,
 }
 
 impl Instruction {
