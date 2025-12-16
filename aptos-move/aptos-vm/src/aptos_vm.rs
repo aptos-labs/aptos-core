@@ -668,9 +668,11 @@ impl AptosVM {
                 .and_then(|m| m.extract_abort_info(code));
 
             // If the abort had a message, override the description with the message.
-            let message = current_info.map(|info| info.description);
-            if let Some((info, message)) = info.as_mut().zip(message) {
-                info.description = message;
+            if let Some(mut current_info) = current_info {
+                if let Some(info) = info {
+                    current_info.reason_name = info.reason_name;
+                }
+                info = Some(current_info);
             }
 
             ExecutionStatus::MoveAbort {
