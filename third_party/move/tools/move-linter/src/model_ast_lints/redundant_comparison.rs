@@ -58,7 +58,7 @@ impl ExpChecker for RedundantComparison {
 }
 
 const COMPARISON_RULES: &[ComparisonRule] = &[
-    //1: Redundant with && — Le + Lt (x <= 400 && x < 500)
+    // 1: Redundant with && — Le + Lt (x <= 400 && x < 500)
     ComparisonRule {
         left_op: Le,
         right_op: Lt,
@@ -233,6 +233,86 @@ const COMPARISON_RULES: &[ComparisonRule] = &[
         condition: |left_val, right_val| left_val == right_val,
         relationship: RuleType::Redundant,
         applies_to: And,
+    },
+    // 23: Redundant with || — Ge + Gt (x >= 20 || x > 10)
+    ComparisonRule {
+        left_op: Ge,
+        right_op: Gt,
+        condition: |left_val, right_val| left_val > right_val,
+        relationship: RuleType::Redundant,
+        applies_to: Or,
+    },
+    // 24: Redundant with || — Le + Lt (x <= 3 || x < 5)
+    ComparisonRule {
+        left_op: Le,
+        right_op: Lt,
+        condition: |left_val, right_val| left_val < right_val,
+        relationship: RuleType::Redundant,
+        applies_to: Or,
+    },
+    // 25: Tautology with || — Lt + Gt (x < 10 || x > 5)
+    ComparisonRule {
+        left_op: Lt,
+        right_op: Gt,
+        condition: |left_val, right_val| left_val > right_val,
+        relationship: RuleType::Tautology,
+        applies_to: Or,
+    },
+    // 26: Tautology with || — Le + Ge (x <= 6 || x >= 4)
+    ComparisonRule {
+        left_op: Le,
+        right_op: Ge,
+        condition: |left_val, right_val| left_val >= right_val,
+        relationship: RuleType::Tautology,
+        applies_to: Or,
+    },
+    // 27: Contradiction with && — Eq + Lt (x == 5 && x < 5)
+    ComparisonRule {
+        left_op: Eq,
+        right_op: Lt,
+        condition: |left_val, right_val| left_val >= right_val,
+        relationship: RuleType::Contradiction,
+        applies_to: And,
+    },
+    // 28: Contradiction with && — Eq + Gt (x == 5 && x > 5)
+    ComparisonRule {
+        left_op: Eq,
+        right_op: Gt,
+        condition: |left_val, right_val| left_val <= right_val,
+        relationship: RuleType::Contradiction,
+        applies_to: And,
+    },
+    // 29: Redundant with || — Eq + Ge (x == 5 || x >= 5)
+    ComparisonRule {
+        left_op: Eq,
+        right_op: Ge,
+        condition: |left_val, right_val| left_val >= right_val,
+        relationship: RuleType::Redundant,
+        applies_to: Or,
+    },
+    // 30: Redundant with || — Eq + Le (x == 5 || x <= 5)
+    ComparisonRule {
+        left_op: Eq,
+        right_op: Le,
+        condition: |left_val, right_val| left_val <= right_val,
+        relationship: RuleType::Redundant,
+        applies_to: Or,
+    },
+    // 31: Tautology with || — Eq + Neq (x == 5 || x != 5)
+    ComparisonRule {
+        left_op: Eq,
+        right_op: Neq,
+        condition: |left_val, right_val| left_val == right_val,
+        relationship: RuleType::Tautology,
+        applies_to: Or,
+    },
+    // 32: Redundant with || — Eq + Eq (x == 5 || x == 5)
+    ComparisonRule {
+        left_op: Eq,
+        right_op: Eq,
+        condition: |left_val, right_val| left_val == right_val,
+        relationship: RuleType::Redundant,
+        applies_to: Or,
     },
 ];
 

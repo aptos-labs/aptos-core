@@ -21,6 +21,16 @@ module 0xc0ffee::m {
         if (x > 500 && x <= 400) { bar() };
     }
 
+    // 2c: Contradiction boundary with && — Le + Gt (x <= 5 && x > 5)
+    public fun test2c_warn(x: u64) {
+        if (x <= 5 && x > 5) { bar() };
+    }
+
+    // 2d: Contradiction boundary reverse — Gt + Le (x > 5 && x <= 5)
+    public fun test2d_warn(x: u64) {
+        if (x > 5 && x <= 5) { bar() };
+    }
+
     // 3: Redundant with || — Gt + Ge (x > 10 || x >= 5)
     public fun test3_warn(x: u64) {
         if (x > 10 || x >= 5) { bar() };
@@ -211,9 +221,120 @@ module 0xc0ffee::m {
         if (x != 5 && x != 5) { bar() };
     }
 
+    // 23: Redundant with || — Ge + Gt (x >= 20 || x > 10)
+    public fun test23_warn(x: u64) {
+        if (x >= 20 || x > 10) { bar() };
+    }
+
+    // 23b: reverse order — Gt + Ge (x > 10 || x >= 20)
+    public fun test23b_warn(x: u64) {
+        if (x > 10 || x >= 20) { bar() };
+    }
+
+    // 24: Redundant with || — Le + Lt (x <= 3 || x < 5)
+    public fun test24_warn(x: u64) {
+        if (x <= 3 || x < 5) { bar() };
+    }
+
+    // 24b: reverse order — Lt + Le (x < 5 || x <= 3)
+    public fun test24b_warn(x: u64) {
+        if (x < 5 || x <= 3) { bar() };
+    }
+
+    // 25: Tautology with || — Lt + Gt (x < 10 || x > 5)
+    public fun test25_warn(x: u64) {
+        if (x < 10 || x > 5) { bar() };
+    }
+
+    // 25b: reverse order — Gt + Lt (x > 5 || x < 10)
+    public fun test25b_warn(x: u64) {
+        if (x > 5 || x < 10) { bar() };
+    }
+
+    // 26: Tautology with || — Le + Ge (x <= 6 || x >= 4)
+    public fun test26_warn(x: u64) {
+        if (x <= 6 || x >= 4) { bar() };
+    }
+
+    // 26b: reverse order — Ge + Le (x >= 4 || x <= 6)
+    public fun test26b_warn(x: u64) {
+        if (x >= 4 || x <= 6) { bar() };
+    }
+
+    // 27: Contradiction with && — Eq + Lt (x == 5 && x < 5)
+    public fun test27_warn(x: u64) {
+        if (x == 5 && x < 5) { bar() };
+    }
+
+    // 27b: reverse order — Lt + Eq (x < 5 && x == 5)
+    public fun test27b_warn(x: u64) {
+        if (x < 5 && x == 5) { bar() };
+    }
+
+    // 28: Contradiction with && — Eq + Gt (x == 5 && x > 5)
+    public fun test28_warn(x: u64) {
+        if (x == 5 && x > 5) { bar() };
+    }
+
+    // 28b: reverse order — Gt + Eq (x > 5 && x == 5)
+    public fun test28b_warn(x: u64) {
+        if (x > 5 && x == 5) { bar() };
+    }
+
+    // 29: Redundant with || — Eq + Ge (x == 5 || x >= 5)
+    public fun test29_warn(x: u64) {
+        if (x == 5 || x >= 5) { bar() };
+    }
+
+    // 29b: reverse order — Ge + Eq (x >= 5 || x == 5)
+    public fun test29b_warn(x: u64) {
+        if (x >= 5 || x == 5) { bar() };
+    }
+
+    // 30: Redundant with || — Eq + Le (x == 5 || x <= 5)
+    public fun test30_warn(x: u64) {
+        if (x == 5 || x <= 5) { bar() };
+    }
+
+    // 30b: reverse order — Le + Eq (x <= 5 || x == 5)
+    public fun test30b_warn(x: u64) {
+        if (x <= 5 || x == 5) { bar() };
+    }
+
+    // 31: Tautology with || — Eq + Neq (x == 5 || x != 5)
+    public fun test31_warn(x: u64) {
+        if (x == 5 || x != 5) { bar() };
+    }
+
+    // 31b: reverse order — Neq + Eq (x != 5 || x == 5)
+    public fun test31b_warn(x: u64) {
+        if (x != 5 || x == 5) { bar() };
+    }
+
+    // 32: Redundant with || — Eq + Eq (x == 5 || x == 5)
+    public fun test32_warn(x: u64) {
+        if (x == 5 || x == 5) { bar() };
+    }
+
+    // Cases that should NOT trigger warnings for this lint
+    public fun safe1_ok(x: u64) {
+        // Similar pattern to rule 2 but bounds do not overlap
+        if (x <= 600 && x > 500) { bar() };
+    }
+
+    public fun safe2_ok(x: u64) {
+        // Pattern for rule 13 (Lt + Neq) but values do not imply redundancy
+        if (x < 10 && x != 9) { bar() };
+    }
+
+    public fun safe3_ok(x: u64) {
+        // Pattern for rule 14 (Gt + Neq) but values do not imply redundancy
+        if (x > 10 && x != 9) { bar() };
+    }
+
     // Skip lint
     #[lint::skip(redundant_comparison)]
-    public fun test23_warn(x: u64) {
+    public fun test_skip_lint(x: u64) {
         if (x < 5 || x <= 10) { bar() };
     }
 
@@ -241,15 +362,5 @@ module 0xc0ffee::m {
     public fun or_nested_right(x: u64) {
         let y = 100;
         if (x >= 5 || (x > 10 || x > y)) { bar() };
-    }
-
-    // 2c: Contradiction boundary with && — Le + Gt (x <= 5 && x > 5)
-    public fun test2c_warn(x: u64) {
-        if (x <= 5 && x > 5) { bar() };
-    }
-
-    // 2d: Contradiction boundary reverse — Gt + Le (x > 5 && x <= 5)
-    public fun test2d_warn(x: u64) {
-        if (x > 5 && x <= 5) { bar() };
     }
 }
