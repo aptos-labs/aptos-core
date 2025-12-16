@@ -6,7 +6,7 @@ use super::ids::{Id, IdSet, OssifiedIdSet};
 use crate::{
     errors::BatchEncryptionError,
     group::{Fr, G1Affine, G1Projective, G2Affine, G2Projective, PairingSetting},
-    shared::{algebra::fk_algorithm::FKDomain, ark_serialize::*},
+    shared::{algebra::fk_algorithm::FKDomain},
 };
 use anyhow::{anyhow, Result};
 use ark_ec::{pairing::Pairing, AffineRepr, ScalarMul, VariableBaseMSM};
@@ -17,6 +17,7 @@ use ark_std::{
 use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use aptos_crypto::arkworks::serialization::{ark_se, ark_de};
 
 /// The digest public parameters.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

@@ -4,7 +4,7 @@ use super::symmetric;
 use crate::{
     errors::BatchEncryptionError,
     group::{Fr, G1Affine, G2Affine, PairingSetting},
-    shared::{ark_serialize::*, digest::Digest},
+    shared::{digest::Digest},
     traits::{DecryptionKeyShare, VerificationKey},
 };
 use anyhow::Result;
@@ -16,6 +16,7 @@ use ark_ec::{pairing::Pairing as _, AffineRepr};
 use ark_ff::UniformRand as _;
 use ark_std::rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
+use aptos_crypto::arkworks::serialization::{ark_se, ark_de};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BIBEMasterSecretKeyShare {

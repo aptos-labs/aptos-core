@@ -3,9 +3,7 @@
 use crate::{
     errors::BatchEncryptionError,
     group::*,
-    schemes::fptx::{self, EncryptionKey},
     shared::{
-        ark_serialize::*,
         ciphertext::{CTDecrypt, CTEncrypt, Ciphertext, PreparedCiphertext},
         digest::{Digest, DigestKey, EvalProofs, EvalProofsPromise},
         ids::{
@@ -32,6 +30,40 @@ use ark_ff::UniformRand as _;
 use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 use rayon::iter::{IntoParallelIterator, ParallelIterator as _};
 use serde::{Deserialize, Serialize};
+use crate::shared::ciphertext::BIBEEncryptionKey;
+use aptos_crypto::arkworks::serialization::{ark_se, ark_de};
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EncryptionKey {
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
+    sig_mpk_g2: G2Affine,
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
+    tau_g2: G2Affine,
+}
+
+impl EncryptionKey {
+    pub fn new(sig_mpk_g2: G2Affine, tau_g2: G2Affine) -> Self {
+        Self { sig_mpk_g2, tau_g2 }
+    }
+
+    pub fn verify_decryption_key(
+        &self,
+        digest: &Digest,
+        decryption_key: &BIBEDecryptionKey,
+    ) -> Result<()> {
+        BIBEMasterPublicKey(self.sig_mpk_g2).verify_decryption_key(digest, decryption_key)
+    }
+}
+
+impl BIBEEncryptionKey for EncryptionKey {
+    fn sig_mpk_g2(&self) -> G2Affine {
+        self.sig_mpk_g2
+    }
+
+    fn tau_g2(&self) -> G2Affine {
+        self.tau_g2
+    }
+}
 
 pub struct FPTXWeighted {}
 
@@ -214,7 +246,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
     type DecryptionKeyShare = WeightedBIBEDecryptionKeyShare;
     type Digest = Digest;
     type DigestKey = DigestKey;
-    type EncryptionKey = fptx::EncryptionKey;
+    type EncryptionKey = EncryptionKey;
     type EvalProof = G1Affine;
     type EvalProofs = EvalProofs<FreeRootIdSet<ComputedCoeffs>>;
     type EvalProofsPromise = EvalProofsPromise<FreeRootIdSet<ComputedCoeffs>>;

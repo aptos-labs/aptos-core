@@ -7,7 +7,6 @@
 use aptos_crypto::{SecretSharingConfig, Uniform};
 use aptos_dkg::{
     pvss::{
-        chunky::UnsignedUnweightedTranscript as ChunkyTranscript,
         das,
         test_utils::{
             self, get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
@@ -20,7 +19,6 @@ use aptos_dkg::{
         WeightedConfigBlstrs,
     },
 };
-use ark_bn254::Bn254;
 use criterion::{
     criterion_group, criterion_main,
     measurement::{Measurement, WallTime},
@@ -31,9 +29,9 @@ use rand::{rngs::ThreadRng, thread_rng, Rng};
 
 pub fn all_groups(c: &mut Criterion) {
     // unweighted BN254 PVSS with aggregatable subtranscript; only doing 2 because large configs are a bit slow and not relevant anyway
-    for tc in get_threshold_configs_for_benchmarking().into_iter().take(2) {
-        subaggregatable_pvss_group::<ChunkyTranscript<Bn254>>(&tc, c);
-    }
+    // for tc in get_threshold_configs_for_benchmarking().into_iter().take(2) {
+    //     subaggregatable_pvss_group::<ChunkyTranscript<Bn254>>(&tc, c);
+    // }
 
     // unweighted aggregatable PVSS
     for tc in get_threshold_configs_for_benchmarking() {

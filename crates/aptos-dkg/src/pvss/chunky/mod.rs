@@ -13,14 +13,14 @@ mod input_secret;
 mod keys;
 mod public_parameters;
 mod scalar_mul;
-mod transcript;
+//mod transcript;
 mod weighted_transcript;
 mod weighted_transcriptv2;
 
 pub use public_parameters::DEFAULT_ELL_FOR_TESTING;
-pub use transcript::{
-    SubTranscript as UnweightedSubtranscript, Transcript as UnsignedUnweightedTranscript,
-};
+// pub use transcript::{
+//     SubTranscript as UnweightedSubtranscript, Transcript as UnsignedUnweightedTranscript,
+// };
 pub use weighted_transcript::{
     Subtranscript as WeightedSubtranscript, Transcript as UnsignedWeightedTranscript,
 };

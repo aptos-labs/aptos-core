@@ -57,26 +57,26 @@ fn test_pvss_all_unweighted() {
     }
 
     // Restarting the loop here because now it'll grab **arkworks** `ThresholdConfig`s over BN254 instead
-    let tcs = test_utils::get_threshold_configs_for_testing_smaller();
-    for tc in tcs.iter().take(20) {
-        // Reduce the number of tcs to make it a bit faster?
-        println!("\nTesting {tc} PVSS");
+    // let tcs = test_utils::get_threshold_configs_for_testing_smaller();
+    // for tc in tcs.iter().take(20) {
+    //     // Reduce the number of tcs to make it a bit faster?
+    //     println!("\nTesting {tc} PVSS");
 
-        let seed = random_scalar(&mut rng);
+    //     let seed = random_scalar(&mut rng);
 
-        type ChunkyTranscriptBn254 = chunky::UnsignedUnweightedTranscript<ark_bn254::Bn254>;
+    //     type ChunkyTranscriptBn254 = chunky::UnsignedUnweightedTranscript<ark_bn254::Bn254>;
 
-        // Chunky
-        nonaggregatable_pvss_deal_verify_and_reconstruct::<ChunkyTranscriptBn254>(
-            &tc,
-            seed.to_bytes_le(),
-        );
+    //     // Chunky
+    //     nonaggregatable_pvss_deal_verify_and_reconstruct::<ChunkyTranscriptBn254>(
+    //         &tc,
+    //         seed.to_bytes_le(),
+    //     );
 
-        pvss_deal_verify_and_reconstruct_from_subtranscript::<ChunkyTranscriptBn254>(
-            &tc,
-            seed.to_bytes_le(),
-        );
-    }
+    //     pvss_deal_verify_and_reconstruct_from_subtranscript::<ChunkyTranscriptBn254>(
+    //         &tc,
+    //         seed.to_bytes_le(),
+    //     );
+    // }
 }
 
 #[test]
@@ -165,27 +165,27 @@ fn test_pvss_transcript_size() {
     // Restarting the loop here because now it'll grab **arkworks** `ThresholdConfig`s with BN254
     // uses default chunk sizes, so probably want to modify this at some point to allow a wider range
     // Ideally should iterate over a vec of (t, n), not the actual threshold configs... but won't be a bottleneck
-    for sc in get_threshold_configs_for_benchmarking().iter().take(1) {
+    for sc in get_weighted_configs_for_benchmarking().iter().take(1) {
         // Only trying 1 for now to keep tests fast (also the second one has the same n, which means it would yield the same size...)
         println!();
         let actual_size =
-            actual_transcript_size::<chunky::UnsignedUnweightedTranscript<ark_bn254::Bn254>>(&sc);
-        print_transcript_size::<chunky::UnsignedUnweightedTranscript<ark_bn254::Bn254>>(
+            actual_transcript_size::<chunky::UnsignedWeightedTranscript<ark_bn254::Bn254>>(&sc);
+        print_transcript_size::<chunky::UnsignedWeightedTranscript<ark_bn254::Bn254>>(
             "Actual for BN254",
             &sc,
             actual_size,
-        );
+        ); // TODO: also do signed here? or only do signed?
     }
 
     // Restarting so it grabs BLS12-381 instead of BN254... TODO: could get rid of this with some work
-    for sc in get_threshold_configs_for_benchmarking().iter().take(1) {
+    for sc in get_weighted_configs_for_benchmarking().iter().take(1) {
         // Only trying 1 for now to keep tests fast (also the second one has the same n, which means it would yield the same size...)
 
         println!();
         let actual_size = actual_transcript_size::<
-            chunky::UnsignedUnweightedTranscript<ark_bls12_381::Bls12_381>,
+            chunky::UnsignedWeightedTranscript<ark_bls12_381::Bls12_381>,
         >(&sc);
-        print_transcript_size::<chunky::UnsignedUnweightedTranscript<ark_bls12_381::Bls12_381>>(
+        print_transcript_size::<chunky::UnsignedWeightedTranscript<ark_bls12_381::Bls12_381>>(
             "Actual for BLS12_381",
             &sc,
             actual_size,

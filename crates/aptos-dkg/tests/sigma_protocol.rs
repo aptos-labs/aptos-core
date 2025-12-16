@@ -35,7 +35,7 @@ where
     let mut rng = thread_rng();
 
     let statement = hom.apply(&witness);
-
+    
     let proof = hom.prove(&witness, &statement, CNTXT, &mut rng);
 
     hom.verify(&statement, &proof, CNTXT)
@@ -122,7 +122,9 @@ mod schnorr {
         }
 
         fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
-            input.bases()[0] * input.scalars()[0] // No need to do an MSM here
+            // for the homomorphism we only need `input.bases()[0] * input.scalars()[0]`
+            // but the verification needs a 3-term MSM... so we should really do a custom MSM which dispatches based on length TODO
+            C::msm(input.bases(), input.scalars()).expect("MSM failed in Schnorr")
         }
     }
 
@@ -238,7 +240,7 @@ fn test_chaum_pedersen() {
     
     let ell = 16u8;
 
-    let scalars = sample_field_elements(16, &mut rng);
+    let scalars = sample_field_elements(1, &mut rng);
 
     use ark_bn254::Fr;
 

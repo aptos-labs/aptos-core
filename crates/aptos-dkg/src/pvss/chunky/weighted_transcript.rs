@@ -451,6 +451,8 @@ type SokContext<'a, A: Serialize + Clone> = (
     Vec<u8>, // This is for the DST
 );
 
+use crate::pvss::chunky::chunked_elgamal::decrypt_chunked_scalars;
+
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Transcript
     for Transcript<E>
 {
@@ -565,61 +567,32 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         dk: &Self::DecryptPrivKey,
         pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        let weight = sc.get_player_weight(player);
-
         let Cs = &self.subtrs.Cs[player.id];
+        debug_assert_eq!(Cs.len(), sc.get_player_weight(player));
 
-        // TODO: put an assert here saying that len(Cs) = weight
-
-        let ephemeral_keys: Vec<_> = self
-            .subtrs
-            .Rs
-            .iter()
-            .take(weight)
-            .map(|R_i_vec| R_i_vec.iter().map(|R_i| R_i.mul(dk.dk)).collect::<Vec<_>>())
-            .collect();
-
-        if let Some(first_key) = ephemeral_keys.first() {
-            debug_assert_eq!(
-                first_key.len(),
-                Cs[0].len(),
-                "Number of ephemeral keys does not match the number of ciphertext chunks"
-            );
+        if Cs.len() > 0 {
+            if let Some(first_key) = self.subtrs.Rs.first() {
+                debug_assert_eq!(
+                    first_key.len(),
+                    Cs[0].len(),
+                    "Number of ephemeral keys does not match the number of ciphertext chunks"
+                );
+            }
         }
 
-        let mut sk_shares: Vec<Scalar<E::ScalarField>> = Vec::with_capacity(weight);
         let pk_shares = self.get_public_key_share(sc, player);
 
-        for i in 0..weight {
-            // TODO: should really put this in a separate function
-            let dealt_encrypted_secret_key_share_chunks: Vec<_> = Cs[i]
-                .iter()
-                .zip(ephemeral_keys[i].iter())
-                .map(|(C_ij, ephemeral_key)| C_ij.sub(ephemeral_key))
-                .collect();
-
-            let dealt_chunked_secret_key_share = bsgs::dlog_vec(
-                pp.pp_elgamal.G.into_group(),
-                &dealt_encrypted_secret_key_share_chunks,
-                &pp.table,
-                pp.get_dlog_range_bound(),
-            )
-            .expect("BSGS dlog failed");
-
-            let dealt_chunked_secret_key_share_fr: Vec<E::ScalarField> =
-                dealt_chunked_secret_key_share
-                    .iter()
-                    .map(|&x| E::ScalarField::from(x))
-                    .collect();
-
-            let dealt_secret_key_share =
-                chunks::le_chunks_to_scalar(pp.ell, &dealt_chunked_secret_key_share_fr);
-
-            sk_shares.push(Scalar(dealt_secret_key_share));
-        }
+        let sk_shares: Vec<_> = decrypt_chunked_scalars(
+            &Cs,
+            &self.subtrs.Rs,
+            &dk.dk,
+            &pp.pp_elgamal,
+            &pp.table,
+            pp.ell,
+        );
 
         (
-            sk_shares, pk_shares, // TODO: review this formalism... wh ydo we need this here?
+            Scalar::vec_from_inner(sk_shares), pk_shares, // TODO: review this formalism... wh ydo we need this here?
         )
     }
 

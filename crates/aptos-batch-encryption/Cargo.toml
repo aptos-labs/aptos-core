@@ -56,9 +56,9 @@ harness = false
 name = "multi_point_eval"
 harness = false
 
-[[bench]]
-name = "fptx"
-harness = false
+# [[bench]]
+# name = "fptx"
+# harness = false
 
 [[bench]]
 name = "msm"

@@ -32,3 +32,53 @@ where
     let a = A::deserialize_with_mode(s.as_slice(), Compress::Yes, Validate::Yes);
     a.map_err(serde::de::Error::custom)
 }
+
+/// This module contains unit tests for serializing and deserializing
+/// elliptic curve points on the BN254 curve using Serde with custom
+/// serialization and deserialization functions (`ark_se` and `ark_de`).
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use ark_bn254::{G1Projective, G1Affine, G2Projective, G2Affine};
+    use ark_ec::AffineRepr as _;
+    use ark_ff::{BigInteger, PrimeField};
+    use serde::{Deserialize, Serialize};
+
+    #[test]
+    fn test_g1_serialization() {
+        #[derive(Serialize, Deserialize)]
+        struct A(#[serde(serialize_with = "ark_se", deserialize_with = "ark_de")] G1Affine);
+
+        let g1 = G1Affine::zero();
+        println!("{:?}", bcs::to_bytes(&A(g1)));
+        let mut g1 = G1Affine::generator();
+        println!("{:?}", bcs::to_bytes(&A(g1)));
+        g1 = (g1 + G1Projective::from(g1)).into();
+        println!("{:?}", bcs::to_bytes(&A(g1)));
+        g1 = (g1 + G1Projective::from(g1)).into();
+        println!("{:?}", bcs::to_bytes(&A(g1)));
+        g1 = (g1 + G1Projective::from(g1)).into();
+        println!("{:?}", bcs::to_bytes(&A(g1)));
+    }
+
+    #[test]
+    fn test_g2_serialization() {
+        #[derive(Serialize, Deserialize)]
+        struct A(#[serde(serialize_with = "ark_se", deserialize_with = "ark_de")] G2Affine);
+
+        let g2 = G2Affine::zero();
+        println!("{:?}", bcs::to_bytes(&A(g2)));
+        let mut g2 = G2Affine::generator();
+        println!("{:?}", bcs::to_bytes(&A(g2)));
+        println!("{:?}", g2.x.c1.into_bigint().to_bytes_le());
+        g2 = (g2 + G2Projective::from(g2)).into();
+        println!("{:?}", bcs::to_bytes(&A(g2)));
+        println!("{:?}", g2.x.c1.into_bigint().to_bytes_le());
+        g2 = (g2 + G2Projective::from(g2)).into();
+        println!("{:?}", bcs::to_bytes(&A(g2)));
+        println!("{:?}", g2.x.c1.into_bigint().to_bytes_le());
+        g2 = (g2 + G2Projective::from(g2)).into();
+        println!("{:?}", bcs::to_bytes(&A(g2)));
+        println!("{:?}", g2.x.c1.into_bigint().to_bytes_le());
+    }
+}
