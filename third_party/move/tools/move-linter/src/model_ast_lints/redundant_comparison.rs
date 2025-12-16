@@ -329,29 +329,47 @@ impl RedundantComparison {
                     && rule.right_op == *right_op
                     && (rule.condition)(*left_val, *right_val)
                 {
-                    let msg = match rule.relationship {
+                    let (msg, target_expr) = match rule.relationship {
                         RuleType::Redundant => {
-                            format!(
-                                "Redundant comparison: x {} {} is implied by x {} {}",
-                                self.op_to_string(&rule.right_op),
-                                right_val,
-                                self.op_to_string(&rule.left_op),
-                                left_val
-                            )
+                            let msg = match logical_op {
+                                Or => format!(
+                                    "Redundant comparison: x {} {} implies x {} {}",
+                                    self.op_to_string(left_op),
+                                    left_val,
+                                    self.op_to_string(right_op),
+                                    right_val
+                                ),
+                                _ => format!(
+                                    "Redundant comparison: x {} {} is implied by x {} {}",
+                                    self.op_to_string(&rule.right_op),
+                                    right_val,
+                                    self.op_to_string(&rule.left_op),
+                                    left_val
+                                ),
+                            };
+                            let target_expr = match logical_op {
+                                Or => left_expr,
+                                _ => right_expr,
+                            };
+                            (msg, target_expr)
                         },
                         RuleType::Contradiction => {
-                            format!(
+                            let msg = format!(
                                 "Contradiction: x {} {} and x {} {}",
                                 self.op_to_string(left_op),
                                 left_val,
                                 self.op_to_string(right_op),
                                 right_val
-                            )
+                            );
+                            (msg, right_expr)
                         },
-                        RuleType::Tautology => "Tautology: condition is always true".to_string(),
+                        RuleType::Tautology => (
+                            "Tautology: condition is always true".to_string(),
+                            right_expr,
+                        ),
                     };
 
-                    report(msg, right_expr);
+                    report(msg, target_expr);
                     return;
                 }
                 // Check reverse pattern
@@ -359,29 +377,47 @@ impl RedundantComparison {
                     && rule.right_op == *left_op
                     && (rule.condition)(*right_val, *left_val)
                 {
-                    let msg = match rule.relationship {
+                    let (msg, target_expr) = match rule.relationship {
                         RuleType::Redundant => {
-                            format!(
-                                "Redundant comparison: x {} {} is implied by x {} {}",
-                                self.op_to_string(&rule.right_op),
-                                left_val,
-                                self.op_to_string(&rule.left_op),
-                                right_val
-                            )
+                            let msg = match logical_op {
+                                Or => format!(
+                                    "Redundant comparison: x {} {} implies x {} {}",
+                                    self.op_to_string(right_op),
+                                    right_val,
+                                    self.op_to_string(left_op),
+                                    left_val
+                                ),
+                                _ => format!(
+                                    "Redundant comparison: x {} {} is implied by x {} {}",
+                                    self.op_to_string(&rule.right_op),
+                                    left_val,
+                                    self.op_to_string(&rule.left_op),
+                                    right_val
+                                ),
+                            };
+                            let target_expr = match logical_op {
+                                Or => right_expr,
+                                _ => left_expr,
+                            };
+                            (msg, target_expr)
                         },
                         RuleType::Contradiction => {
-                            format!(
+                            let msg = format!(
                                 "Contradiction: x {} {} and x {} {}",
                                 self.op_to_string(left_op),
                                 left_val,
                                 self.op_to_string(right_op),
                                 right_val
-                            )
+                            );
+                            (msg, left_expr)
                         },
-                        RuleType::Tautology => "Tautology: condition is always true".to_string(),
+                        RuleType::Tautology => (
+                            "Tautology: condition is always true".to_string(),
+                            left_expr,
+                        ),
                     };
 
-                    report(msg, left_expr);
+                    report(msg, target_expr);
                     return;
                 }
             }
