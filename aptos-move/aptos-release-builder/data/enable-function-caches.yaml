@@ -1,7 +1,7 @@
 remote_endpoint: ~
 name: "v1.38-enable-call-tree-and-instruction-vm-cache"
 proposals:
-  - name: enable_call_tree_and_instruction_vm_cache
+  - name: enable_call_tree_and_instruction_v_m_cache
     metadata:
       title: "Proposal to enable function caches"
       description: "See https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-134.md"
@@ -9,4 +9,4 @@ proposals:
     update_sequence:
       - FeatureFlag:
           enabled:
-            - enable_call_tree_and_instruction_vm_cache
+            - enable_call_tree_and_instruction_v_m_cache
