@@ -106,6 +106,10 @@ pub trait EntrywiseMap<T> {
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
 }
 
+// ===============================================================================
+// ============================= BEGIN: TRIVIAL SHAPE ============================
+// ===============================================================================
+
 /// A trivial wrapper type for a single value. Should be used to wrap when the codomain of a homomorphism is something like E::G1
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct TrivialShape<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq>(pub T);
@@ -137,3 +141,48 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> IntoIter
         std::iter::once(self.0)
     }
 }
+
+// ===============================================================================
+// ============================= END: TRIVIAL SHAPE ==============================
+// ===============================================================================
+
+// ==============================================================================
+// ============================= BEGIN: VECTOR SHAPE ============================
+// ==============================================================================
+// Not in use at the moment, can be removed
+
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
+pub struct VectorShape<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq>(
+    pub Vec<T>,
+);
+
+/// Implements `EntrywiseMap` for `VectorShape`, mapping each element of the vector.
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> EntrywiseMap<T>
+    for VectorShape<T>
+{
+    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> = VectorShape<U>;
+
+    fn map<U, F>(self, f: F) -> Self::Output<U>
+    where
+        F: Fn(T) -> U,
+        U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
+    {
+        VectorShape(self.0.into_iter().map(f).collect())
+    }
+}
+
+/// Implements `IntoIterator` for `VectorShape`, producing an iterator over T.
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> IntoIterator
+    for VectorShape<T>
+{
+    type IntoIter = std::vec::IntoIter<T>;
+    type Item = T;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+// ==============================================================================
+// ============================= END: VECTOR SHAPE ==============================
+// ==============================================================================

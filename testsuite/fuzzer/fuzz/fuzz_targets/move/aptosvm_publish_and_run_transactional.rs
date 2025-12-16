@@ -1,7 +1,7 @@
 #![no_main]
 
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_block_executor::code_cache_global_manager::AptosModuleCacheManager;
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};

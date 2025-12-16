@@ -9,6 +9,7 @@ use aptos_crypto::{
 };
 use aptos_crypto_derive::{SilentDebug, SilentDisplay};
 use ark_ec::{pairing::Pairing, CurveGroup};
+use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use serde::{Deserialize, Serialize};
 use std::ops::Mul;
@@ -72,9 +73,10 @@ impl<E: Pairing> traits::Convert<EncryptPubKey<E>, chunked_elgamal::PublicParame
 }
 
 #[allow(non_snake_case)]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct DealtPubKey<E: Pairing> {
     /// A group element $G$ \in G_2$
+    #[serde(serialize_with = "ark_se")]
     G: E::G2Affine,
 }
 
@@ -82,6 +84,10 @@ pub struct DealtPubKey<E: Pairing> {
 impl<E: Pairing> DealtPubKey<E> {
     pub fn new(G: E::G2Affine) -> Self {
         Self { G }
+    }
+
+    pub fn as_g2(&self) -> E::G2Affine {
+        self.G
     }
 }
 
@@ -92,10 +98,14 @@ impl<E: Pairing> DealtPubKeyShare<E> {
     pub fn new(dealt_pk: DealtPubKey<E>) -> Self {
         DealtPubKeyShare(dealt_pk)
     }
+
+    pub fn as_g2(&self) -> E::G2Affine {
+        self.0.as_g2()
+    }
 }
 
 // TODO: maybe make these actual structs
 #[allow(type_alias_bounds)]
-pub type DealtSecretKey<E: Pairing> = Scalar<E>;
+pub type DealtSecretKey<F: PrimeField> = Scalar<F>;
 #[allow(type_alias_bounds)]
-pub type DealtSecretKeyShare<E: Pairing> = Scalar<E>;
+pub type DealtSecretKeyShare<F: PrimeField> = Scalar<F>;

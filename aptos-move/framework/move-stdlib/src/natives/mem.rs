@@ -5,10 +5,8 @@
 
 use aptos_gas_schedule::gas_params::natives::move_stdlib::MEM_SWAP_BASE;
 use aptos_native_interface::{
-    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
-    SafeNativeResult,
+    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
 };
-use aptos_types::error;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
@@ -31,15 +29,6 @@ fn native_swap(
     _ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    if !context
-        .get_feature_flags()
-        .is_native_memory_operations_enabled()
-    {
-        return Err(SafeNativeError::Abort {
-            abort_code: error::unavailable(EFEATURE_NOT_ENABLED),
-        });
-    }
-
     debug_assert!(args.len() == 2);
 
     context.charge(MEM_SWAP_BASE)?;

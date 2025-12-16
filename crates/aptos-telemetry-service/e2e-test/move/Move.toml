@@ -1,0 +1,15 @@
+[package]
+name = "TelemetryRegistry"
+version = "1.0.0"
+authors = ["Aptos Labs"]
+
+[addresses]
+telemetry_deployer = "_"
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-framework.git"
+rev = "devnet"
+subdir = "aptos-framework"
+
+[dev-dependencies]
+

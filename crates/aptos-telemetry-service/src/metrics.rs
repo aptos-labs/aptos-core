@@ -11,8 +11,8 @@ use crate::{
 };
 use anyhow::anyhow;
 use aptos_metrics_core::{
-    register_histogram_vec, register_int_counter, register_int_counter_vec, HistogramVec,
-    IntCounter, IntCounterVec,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge,
+    register_int_gauge_vec, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
 use flate2::{write::GzEncoder, Compression};
 use once_cell::sync::Lazy;
@@ -22,6 +22,66 @@ use warp::hyper::body::Bytes;
 
 const METRICS_EXPORT_FREQUENCY: Duration = Duration::from_secs(15);
 
+// =============================================================================
+// Cache Operation Enums (type-safe metric labels)
+// =============================================================================
+
+/// Challenge cache operation types for metrics
+#[derive(Debug, Clone, Copy)]
+pub enum ChallengeCacheOp {
+    Store,
+    VerifySuccess,
+    VerifyNotFound,
+    VerifyExpired,
+    Evicted,
+}
+
+impl ChallengeCacheOp {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Store => "store",
+            Self::VerifySuccess => "verify_success",
+            Self::VerifyNotFound => "verify_not_found",
+            Self::VerifyExpired => "verify_expired",
+            Self::Evicted => "evicted",
+        }
+    }
+}
+
+/// Allowlist cache operation types for metrics
+#[derive(Debug, Clone, Copy)]
+pub enum AllowlistCacheOp {
+    Hit,
+    Miss,
+    Update,
+}
+
+impl AllowlistCacheOp {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Hit => "hit",
+            Self::Miss => "miss",
+            Self::Update => "update",
+        }
+    }
+}
+
+/// Validator cache peer types for metrics
+#[derive(Debug, Clone, Copy)]
+pub enum ValidatorCachePeerType {
+    Validator,
+    ValidatorFullnode,
+}
+
+impl ValidatorCachePeerType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Validator => "validator",
+            Self::ValidatorFullnode => "validator_fullnode",
+        }
+    }
+}
+
 pub(crate) static SERVICE_ERROR_COUNTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "telemetry_web_service_internal_error_counts",
@@ -30,6 +90,80 @@ pub(crate) static SERVICE_ERROR_COUNTS: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Custom contract endpoint error counter with contract_name label.
+/// This allows distinguishing errors between different custom contracts and
+/// separating them from standard telemetry endpoint errors.
+pub(crate) static CUSTOM_CONTRACT_ERROR_COUNTS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "telemetry_web_service_custom_contract_error_counts",
+        "Errors from custom contract endpoints by contract name and error type",
+        &["contract_name", "endpoint", "error_type"]
+    )
+    .unwrap()
+});
+
+/// Custom contract endpoint types for error metrics
+#[derive(Debug, Clone, Copy)]
+pub enum CustomContractEndpoint {
+    AuthChallenge,
+    Auth,
+    MetricsIngest,
+    LogsIngest,
+    EventsIngest,
+}
+
+impl CustomContractEndpoint {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::AuthChallenge => "auth_challenge",
+            Self::Auth => "auth",
+            Self::MetricsIngest => "metrics_ingest",
+            Self::LogsIngest => "logs_ingest",
+            Self::EventsIngest => "events_ingest",
+        }
+    }
+}
+
+/// Custom contract error types for metrics (simplified from ServiceErrorCode)
+#[derive(Debug, Clone, Copy)]
+pub enum CustomContractErrorType {
+    ContractNotConfigured,
+    ChallengeFailed,
+    SignatureInvalid,
+    NotInAllowlist,
+    #[allow(dead_code)]
+    TokenInvalid,
+    TokenMismatch,
+    IngestionFailed,
+    InvalidPayload,
+}
+
+impl CustomContractErrorType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::ContractNotConfigured => "contract_not_configured",
+            Self::ChallengeFailed => "challenge_failed",
+            Self::SignatureInvalid => "signature_invalid",
+            Self::NotInAllowlist => "not_in_allowlist",
+            Self::TokenInvalid => "token_invalid",
+            Self::TokenMismatch => "token_mismatch",
+            Self::IngestionFailed => "ingestion_failed",
+            Self::InvalidPayload => "invalid_payload",
+        }
+    }
+}
+
+/// Helper to record custom contract errors with all relevant labels
+pub fn record_custom_contract_error(
+    contract_name: &str,
+    endpoint: CustomContractEndpoint,
+    error_type: CustomContractErrorType,
+) {
+    CUSTOM_CONTRACT_ERROR_COUNTS
+        .with_label_values(&[contract_name, endpoint.as_str(), error_type.as_str()])
+        .inc();
+}
 
 pub(crate) static LOG_INGEST_BACKEND_REQUEST_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
@@ -97,6 +231,127 @@ pub(crate) static VALIDATOR_SET_UPDATE_FAILED_COUNT: Lazy<IntCounterVec> = Lazy:
         "telemetry_web_service_validator_set_update_failed_count",
         "Number of metrics validator set update failures",
         &["chain_id", "error_code"]
+    )
+    .unwrap()
+});
+
+// =============================================================================
+// Cache Observability Metrics
+// =============================================================================
+// These metrics provide visibility into cache health and staleness.
+// Alert on: now() - last_update_timestamp > threshold to detect stuck components.
+
+/// Last update timestamp for validator set cache (unix seconds per chain_id)
+pub(crate) static VALIDATOR_CACHE_LAST_UPDATE_TIMESTAMP: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "telemetry_web_service_validator_cache_last_update_timestamp_seconds",
+        "Unix timestamp of last successful validator cache update (use now() - value for staleness)",
+        &["chain_id"]
+    )
+    .unwrap()
+});
+
+/// Size of validator cache (number of peers per chain_id)
+pub(crate) static VALIDATOR_CACHE_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "telemetry_web_service_validator_cache_size",
+        "Number of peers in validator cache",
+        &["chain_id", "peer_type"]
+    )
+    .unwrap()
+});
+
+/// Challenge cache metrics - size and operation counts (per contract)
+pub(crate) static CHALLENGE_CACHE_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "telemetry_web_service_challenge_cache_size",
+        "Total number of pending challenges in cache",
+        &["contract_name"]
+    )
+    .unwrap()
+});
+
+pub(crate) static CHALLENGE_CACHE_KEYS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "telemetry_web_service_challenge_cache_keys",
+        "Number of unique keys (contract/chain/address combinations) in challenge cache",
+        &["contract_name"]
+    )
+    .unwrap()
+});
+
+pub(crate) static CHALLENGE_CACHE_OPERATIONS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "telemetry_web_service_challenge_cache_operations_total",
+        "Challenge cache operations by type and contract",
+        &["contract_name", "operation"] // operation: use ChallengeCacheOp enum
+    )
+    .unwrap()
+});
+
+/// Last time a challenge was stored (for detecting stuck issuers per contract)
+pub(crate) static CHALLENGE_CACHE_LAST_STORE_TIMESTAMP: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "telemetry_web_service_challenge_cache_last_store_timestamp_seconds",
+        "Unix timestamp of last challenge store operation",
+        &["contract_name"]
+    )
+    .unwrap()
+});
+
+/// Allowlist cache metrics - size and operation counts
+pub(crate) static ALLOWLIST_CACHE_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "telemetry_web_service_allowlist_cache_size",
+        "Number of addresses in allowlist cache",
+        &["contract_name", "chain_id"]
+    )
+    .unwrap()
+});
+
+pub(crate) static ALLOWLIST_CACHE_ENTRIES: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "telemetry_web_service_allowlist_cache_entries",
+        "Total number of contract/chain entries in allowlist cache"
+    )
+    .unwrap()
+});
+
+pub(crate) static ALLOWLIST_CACHE_OPERATIONS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "telemetry_web_service_allowlist_cache_operations_total",
+        "Allowlist cache operations by type and contract",
+        &["contract_name", "chain_id", "operation"] // operation: use AllowlistCacheOp enum
+    )
+    .unwrap()
+});
+
+/// Last time allowlist cache was updated (per contract/chain)
+pub(crate) static ALLOWLIST_CACHE_LAST_UPDATE_TIMESTAMP: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "telemetry_web_service_allowlist_cache_last_update_timestamp_seconds",
+        "Unix timestamp of last allowlist cache update (use now() - value for staleness)",
+        &["contract_name", "chain_id"]
+    )
+    .unwrap()
+});
+
+/// Allowlist cache update success counter (similar to validator set)
+pub(crate) static ALLOWLIST_CACHE_UPDATE_SUCCESS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "telemetry_web_service_allowlist_cache_update_success_count",
+        "Number of successful allowlist cache updates by contract",
+        &["contract_name"]
+    )
+    .unwrap()
+});
+
+/// Allowlist cache update failure counter (similar to validator set)
+pub(crate) static ALLOWLIST_CACHE_UPDATE_FAILED_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "telemetry_web_service_allowlist_cache_update_failed_count",
+        "Number of failed allowlist cache updates by contract and error type",
+        &["contract_name", "error_type"]
     )
     .unwrap()
 });

@@ -5,6 +5,7 @@
 //! these caches is tied to the code cache, and is managed externally.
 
 use crate::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndex};
+use move_core_types::ability::AbilitySet;
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use triomphe::Arc;
@@ -47,6 +48,9 @@ enum TypeRepr {
     Function {
         args: TypeVecId,
         results: TypeVecId,
+        // Function types MUST carry abilities in order to be used correctly as type arguments.
+        // That is, `|| has drop` and `||` are different types.
+        abilities: AbilitySet,
     },
 }
 
@@ -281,7 +285,11 @@ impl InternedTypePool {
                     .collect::<Vec<_>>();
                 self.instantiated_struct_of(*idx, ty_args)
             },
-            Function { args, results, .. } => {
+            Function {
+                args,
+                results,
+                abilities,
+            } => {
                 let args = args
                     .iter()
                     .map(|t| self.instantiate_and_intern(t, subst))
@@ -293,6 +301,7 @@ impl InternedTypePool {
                 self.ty_interner.intern(TypeRepr::Function {
                     args: self.ty_vec_interner.intern_vec(args),
                     results: self.ty_vec_interner.intern_vec(results),
+                    abilities: *abilities,
                 })
             },
         }
@@ -465,7 +474,7 @@ mod test {
             abilities: AbilitySet::ALL,
         };
         let id4 = ctx.instantiate_and_intern(&func_ty, &[]);
-        assert_eq!(id3, id4);
+        assert_ne!(id3, id4);
     }
 
     #[test]

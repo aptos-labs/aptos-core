@@ -1,9 +1,13 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum BatchEncryptionError {
+    #[error("Tried to setup w/ happy path MPK that doesn't match slow path MPK")]
+    HappySlowPathMismatchError,
+    #[error("Tried to setup w/ VK that does not match MSK share")]
+    VKMSKMismatchError,
     #[error("Serialization error")]
     SerializationError,
     #[error("Deserialization error")]

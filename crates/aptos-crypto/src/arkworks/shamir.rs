@@ -33,7 +33,7 @@ pub trait Reconstructable<SSC: traits::SecretSharingConfig>: Sized {
     /// itself corresponds more closely to the definition of a share
     type ShareValue: Clone;
 
-    /// The reconstruct function
+    /// The reconstruct function: given some shares, it attempts to reconstructs the underlying secret.
     fn reconstruct(sc: &SSC, shares: &[ShamirShare<Self::ShareValue>]) -> Result<Self>;
 }
 
@@ -299,15 +299,23 @@ impl<F: FftField> ShamirThresholdConfig<F> {
 impl<T: WeightedSum> Reconstructable<ShamirThresholdConfig<T::Scalar>> for T {
     type ShareValue = T;
 
+    // Can receive more than `sc.t` shares, but will only use the first `sc.t` shares for efficiency
     fn reconstruct(
         sc: &ShamirThresholdConfig<T::Scalar>,
         shares: &[ShamirShare<Self::ShareValue>],
     ) -> Result<Self> {
-        if shares.len() != sc.t {
-            Err(anyhow!("Incorrect number of shares provided"))
+        if shares.len() < sc.t {
+            Err(anyhow!(
+                "Incorrect number of shares provided, received {} but expected at least {}",
+                shares.len(),
+                sc.t
+            ))
         } else {
-            let (roots_of_unity_indices, bases): (Vec<usize>, Vec<Self::ShareValue>) =
-                shares.iter().map(|(p, g_y)| (p.get_id(), g_y)).collect();
+            let (roots_of_unity_indices, bases): (Vec<usize>, Vec<Self::ShareValue>) = shares
+                [..sc.t]
+                .iter()
+                .map(|(p, g_y)| (p.get_id(), g_y))
+                .collect();
 
             let lagrange_coeffs = sc.lagrange_for_subset(&roots_of_unity_indices);
 

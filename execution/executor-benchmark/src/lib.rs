@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 mod account_generator;
 pub mod block_preparation;
@@ -165,6 +164,7 @@ fn init_indexer_wrapper(
         processor_batch_size: config.indexer_grpc.processor_batch_size,
         output_batch_size: config.indexer_grpc.output_batch_size,
         transaction_channel_size: config.indexer_grpc.transaction_channel_size,
+        max_transaction_filter_size_bytes: config.indexer_grpc.max_transaction_filter_size_bytes,
     };
 
     // Spawn table_info_service in tokio runtime

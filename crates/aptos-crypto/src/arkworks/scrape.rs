@@ -5,7 +5,13 @@
 //! corresponds to a polynomial of bounded degree. It implements the dual code word
 //! approach of the SCRAPE protocol [CD17e].
 
-use crate::{arkworks, arkworks::random};
+use crate::{
+    arkworks,
+    arkworks::{
+        msm::{IsMsmInput, MsmInput},
+        random,
+    },
+};
 use anyhow::{bail, ensure, Context};
 use ark_ec::CurveGroup;
 use ark_ff::{FftField, PrimeField};
@@ -71,14 +77,14 @@ impl<'a, F: PrimeField> LowDegreeTest<'a, F> {
 
     /// Creates a new LDT by picking a random polynomial `f` of expected degree `n-t-1`.
     pub fn random<R: rand::RngCore + rand::CryptoRng>(
-        mut rng: &mut R,
+        rng: &mut R,
         t: usize,
         n: usize,
         includes_zero: bool,
         batch_dom: &'a Radix2EvaluationDomain<F>,
     ) -> Self {
         Self::new(
-            random::sample_field_elements(n - t, &mut rng),
+            random::sample_field_elements(n - t, rng),
             t,
             n,
             includes_zero,
@@ -131,28 +137,54 @@ impl<'a, F: PrimeField> LowDegreeTest<'a, F> {
         ))
     }
 
-    /// Performs the LDT given group elements $G^{p(\omega^i)} \in
-    pub fn low_degree_test_group<C: CurveGroup<ScalarField = F>>(
-        self,
+    /// Constructs the MSM input used by the LDT: the normalized group elements and
+    /// the corresponding dual-codeword scalars.
+    pub fn ldt_msm_input<C: CurveGroup<ScalarField = F>>(
+        &self,
         evals: &[C],
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<MsmInput<C::Affine, F>> {
         if evals.len() != self.n {
             bail!("Expected {} evaluations; got {}", self.n, evals.len())
         }
 
         if self.t == self.n {
-            return Ok(());
+            // In this case the MSM is known to evaluate to zero, but we return an empty input
+            // so that the caller can still follow a uniform pipeline.
+            return Ok(MsmInput {
+                bases: vec![],
+                scalars: vec![],
+            });
         }
 
         let v_times_f = self.dual_code_word();
 
-        debug_assert_eq!(evals.len(), v_times_f.len());
-        let msm_result = C::msm(&C::normalize_batch(evals), v_times_f.as_slice()).unwrap();
+        let bases = C::normalize_batch(evals);
+        let scalars = v_times_f;
 
+        Ok(MsmInput::new(bases, scalars).expect("Could not construct MsmInput"))
+    }
+
+    /// Performs the LDT given group elements $G^{p(\omega^i)} \in
+    pub fn low_degree_test_group<C: CurveGroup<ScalarField = F>>(
+        &self,
+        evals: &[C],
+    ) -> anyhow::Result<()> {
+        // Step 1: build MSM input
+        let msm_input = self.ldt_msm_input(evals)?;
+
+        // Early return in the trivial case
+        if msm_input.bases.is_empty() {
+            return Ok(());
+        }
+
+        // Step 2: perform MSM
+        let result = C::msm(&msm_input.bases, &msm_input.scalars).unwrap();
+
+        // Step 3: enforce expected zero
         ensure!(
-            msm_result == C::ZERO,
+            result == C::ZERO,
             "the LDT MSM should have returned zero, but returned {}",
-            msm_result
+            result
         );
 
         Ok(())

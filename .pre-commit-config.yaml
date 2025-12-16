@@ -22,14 +22,6 @@ repos:
         args:
           - --license-filepath
           - devtools/assets/innovation_license_header.txt
-          - --license-filepath
-          - devtools/assets/license_header.txt
-          - --license-filepath
-          - devtools/assets/shared_license_header.txt
-          - --license-filepath
-          - devtools/assets/license_header_utf8.txt
-          - --license-filepath
-          - devtools/assets/shared_license_header_utf8.txt
           - --comment-style
           - //
       - id: insert-license
