@@ -7,6 +7,8 @@
 use aptos_crypto::{SecretSharingConfig, Uniform};
 use aptos_dkg::{
     pvss::{
+        chunky::UnsignedWeightedTranscriptv2 as ChunkyTranscriptv2,
+        chunky::UnsignedWeightedTranscript as ChunkyTranscript,
         das,
         test_utils::{
             self, get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
@@ -26,12 +28,17 @@ use criterion::{
 };
 use more_asserts::assert_le;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
+use ark_bn254::Bn254;
+use criterion::black_box;
 
 pub fn all_groups(c: &mut Criterion) {
     // unweighted BN254 PVSS with aggregatable subtranscript; only doing 2 because large configs are a bit slow and not relevant anyway
-    // for tc in get_threshold_configs_for_benchmarking().into_iter().take(2) {
-    //     subaggregatable_pvss_group::<ChunkyTranscript<Bn254>>(&tc, c);
-    // }
+    for tc in get_weighted_configs_for_benchmarking().into_iter().take(2) {
+        subaggregatable_pvss_group::<ChunkyTranscript<Bn254>>(&tc, c);
+    }
+    for tc in get_weighted_configs_for_benchmarking().into_iter().take(2) {
+        subaggregatable_pvss_group::<ChunkyTranscriptv2<Bn254>>(&tc, c);
+    }
 
     // unweighted aggregatable PVSS
     for tc in get_threshold_configs_for_benchmarking() {
@@ -96,6 +103,7 @@ where
     // pvss_transcript_random::<T, WallTime>(sc, &mut group);
     pvss_deal::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
     pvss_subaggregate::<T, WallTime>(sc, &mut group);
+    pvss_nonaggregate_serialize::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
     pvss_nonaggregate_verify::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
     pvss_decrypt_own_share::<T, WallTime>(
         sc, &d.pp, &d.ssks, &d.spks, &d.dks, &d.eks, &d.s, &mut group,
@@ -251,6 +259,42 @@ fn pvss_verify<T: AggregatableTranscript, M: Measurement>(
             |trx| {
                 trx.verify(&sc, &pp, &[spks[0].clone()], &eks, &[NoAux])
                     .expect("PVSS transcript verification should succeed");
+            },
+        )
+    });
+}
+
+fn pvss_nonaggregate_serialize<T: HasAggregatableSubtranscript, M: Measurement>(
+    sc: &T::SecretSharingConfig,
+    pp: &T::PublicParameters,
+    ssks: &[T::SigningSecretKey],
+    spks: &[T::SigningPubKey],
+    eks: &[T::EncryptPubKey],
+    g: &mut BenchmarkGroup<M>,
+) {
+    g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
+
+    let mut rng = thread_rng();
+
+    g.bench_function(format!("serialize/{}", sc), move |b| {
+        b.iter_with_setup(
+            || {
+                let s = T::InputSecret::generate(&mut rng);
+                T::deal(
+                    &sc,
+                    &pp,
+                    &ssks[0],
+                    &spks[0],
+                    &eks,
+                    &s,
+                    &NoAux,
+                    &sc.get_player(0),
+                    &mut rng,
+                ) // TODO: we should probably serialize and deserialize here?
+            },
+            |trs| {
+                let bytes = trs.to_bytes();
+                black_box(&bytes);
             },
         )
     });

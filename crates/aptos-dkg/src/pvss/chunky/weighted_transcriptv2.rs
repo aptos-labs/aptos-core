@@ -219,51 +219,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         // use aptos_crypto::arkworks::msm::verify_msm_terms_with_start;
         // verify_msm_terms_with_start(ldt_msm_terms, sigma_bases, sigma_scalars, beta_powers);
 
-        // Now compute the final MSM // TODO: merge this multi_exp with the PoK verification, as in YOLO YOSO? // TODO2: and use the iterate stuff you developed? it's being forgotten here
-        let mut base_vec = Vec::new();
-        let mut exp_vec = Vec::new();
-
-        let beta = sample_field_element(&mut rng);
-        let powers_of_beta = utils::powers(beta, sc.get_total_weight() + 1);
-
-        let Cs_flat: Vec<_> = self.subtrs.Cs.iter().flatten().cloned().collect();
-        assert_eq!(
-            Cs_flat.len(),
-            sc.get_total_weight(),
-            "Number of ciphertexts does not equal number of weights"
-        ); // TODO what if zero weight?
-           // could add an assert_eq here with sc.get_total_weight()
-
-        for i in 0..Cs_flat.len() {
-            for j in 0..Cs_flat[i].len() {
-                let base = Cs_flat[i][j];
-                let exp = pp.powers_of_radix[j] * powers_of_beta[i];
-                base_vec.push(base);
-                exp_vec.push(exp);
-            }
-        }
-
-        let weighted_Cs = E::G1::msm(&E::G1::normalize_batch(&base_vec), &exp_vec)
-            .expect("Failed to compute MSM of Cs in chunky");
-
-        let weighted_Vs = E::G2::msm(
-            &E::G2::normalize_batch(&Vs_flat[..sc.get_total_weight()]), // Don't use the last entry of `Vs_flat`
-            &powers_of_beta[..sc.get_total_weight()],
-        )
-        .expect("Failed to compute MSM of Vs in chunky");
-
-        let res = E::multi_pairing(
-            [
-                weighted_Cs.into_affine(),
-                *pp.get_encryption_public_params().message_base(),
-            ],
-            [pp.get_commitment_base(), (-weighted_Vs).into_affine()],
-        ); // Making things affine here rather than converting the two bases to group elements, since that's probably what they would be converted to anyway: https://github.com/arkworks-rs/algebra/blob/c1f4f5665504154a9de2345f464b0b3da72c28ec/ec/src/models/bls12/g1.rs#L14
-
-        if PairingOutput::<E>::ZERO != res {
-            return Err(anyhow::anyhow!("Expected zero during multi-pairing check"));
-        }
-
         Ok(())
     }
 }
@@ -427,7 +382,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     type SigningSecretKey = bls12381::PrivateKey;
 
     fn scheme_name() -> String {
-        "chunky_pvss".to_string()
+        "chunky_pvss_v2".to_string()
     }
 
     /// Fetches the domain-separation tag (DST)
