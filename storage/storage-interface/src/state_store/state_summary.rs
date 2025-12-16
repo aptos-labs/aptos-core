@@ -14,12 +14,18 @@ use aptos_crypto::{
     hash::{CryptoHash, CORRUPTION_SENTINEL},
     HashValue,
 };
+use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::{ProofRead, SparseMerkleTree};
-use aptos_types::{proof::SparseMerkleProofExt, transaction::Version};
+use aptos_types::{
+    proof::SparseMerkleProofExt,
+    state_store::{state_key::StateKey, state_value::StateValue},
+    transaction::Version,
+};
 use derive_more::Deref;
 use itertools::Itertools;
 use rayon::prelude::*;
+use std::collections::HashMap;
 
 /// The data structure through which the entire state at a given
 /// version can be summarized to a concise digest (the root hash).
@@ -56,6 +62,10 @@ impl StateSummary {
         self.global_state_summary.root_hash()
     }
 
+    pub fn hot_root_hash(&self) -> HashValue {
+        self.hot_state_summary.root_hash()
+    }
+
     pub fn next_version(&self) -> Version {
         self.next_version
     }
@@ -65,38 +75,42 @@ impl StateSummary {
     }
 
     pub fn is_descendant_of(&self, other: &Self) -> bool {
-        self.global_state_summary
-            .is_descendant_of(&other.global_state_summary)
+        self.hot_state_summary
+            .is_descendant_of(&other.hot_state_summary)
+            && self
+                .global_state_summary
+                .is_descendant_of(&other.global_state_summary)
     }
 
     pub fn update(
         &self,
-        persisted: &ProvableStateSummary,
-        updates: &BatchedStateUpdateRefs,
+        hot_persisted: &ProvableStateSummary,
+        cold_persisted: &ProvableStateSummary,
+        hot_inserted: &[HashMap<StateKey, Option<StateValue>>; 16],
+        hot_evicted: &[HashMap<StateKey, Option<StateValue>>; 16],
+        new_next_version: Version,
     ) -> Result<Self> {
         let _timer = TIMER.timer_with(&["state_summary__update"]);
 
+        assert_ne!(self.hot_state_summary.root_hash(), *CORRUPTION_SENTINEL);
         assert_ne!(self.global_state_summary.root_hash(), *CORRUPTION_SENTINEL);
 
         // Persisted must be before or at my version.
-        assert!(persisted.next_version() <= self.next_version());
+        assert!(hot_persisted.next_version() <= self.next_version());
+        assert!(cold_persisted.next_version() <= self.next_version());
         // Updates must start at exactly my version.
-        assert_eq!(updates.first_version(), self.next_version());
+        // assert_eq!(updates.first_version(), self.next_version());
 
-        let smt_updates = updates
-            .shards
+        // info!("start compute hot smt updates");
+        let hot_smt_updates = hot_inserted
             .par_iter() // clone hashes and sort items in parallel
+            .zip(hot_evicted.par_iter())
             // TODO(aldenhu): smt per shard?
-            .flat_map(|shard| {
-                shard
+            .flat_map(|(inserted, evicted)| {
+                inserted
                     .iter()
-                    .filter_map(|(k, u)| {
-                        // Filter out `MakeHot` ops.
-                        u.state_op
-                            .as_state_value_opt()
-                            .map(|value_opt| (k, value_opt))
-                    })
-                    .map(|(k, value_opt)| (*k, value_opt.map(|v| v.hash())))
+                    .map(|(k, value_opt)| (k, value_opt.as_ref().map(|v| v.hash())))
+                    .chain(evicted.keys().map(|k| (k, None)))
                     // The keys in the shard are already unique, and shards are ordered by the
                     // first nibble of the key hash. `batch_update_sorted_uniq` can be
                     // called if within each shard items are sorted by key hash.
@@ -104,19 +118,45 @@ impl StateSummary {
                     .collect_vec()
             })
             .collect::<Vec<_>>();
+        // info!("done compute hot smt updates");
 
-        let smt = self
-            .global_state_summary
-            .freeze(&persisted.global_state_summary)
-            .batch_update_sorted_uniq(&smt_updates, persisted)?
+        let hot_smt = self
+            .hot_state_summary
+            .freeze(&hot_persisted.hot_state_summary)
+            .batch_update_sorted_uniq(&hot_smt_updates, hot_persisted)?
             .unfreeze();
+        // info!("done computing hot smt");
+
+        // info!("start compute cold smt updates");
+        let cold_smt_updates = hot_evicted
+            .par_iter() // clone hashes and sort items in parallel
+            // TODO(aldenhu): smt per shard?
+            .flat_map(|shard| {
+                shard
+                    .iter()
+                    .map(|(k, value_opt)| (k, value_opt.as_ref().map(|v| v.hash())))
+                    // The keys in the shard are already unique, and shards are ordered by the
+                    // first nibble of the key hash. `batch_update_sorted_uniq` can be
+                    // called if within each shard items are sorted by key hash.
+                    .sorted_by_key(|(k, _v)| k.crypto_hash_ref())
+                    .collect_vec()
+            })
+            .collect::<Vec<_>>();
+        // info!("done compute cold smt updates");
+
+        let cold_smt = self
+            .global_state_summary
+            .freeze(&cold_persisted.global_state_summary)
+            .batch_update_sorted_uniq(&cold_smt_updates, cold_persisted)?
+            .unfreeze();
+        // info!("done computing cold smt");
 
         // TODO(HotState): compute new hot state from the `self.hot_state_summary` and
         // `updates`.
         Ok(Self {
-            next_version: updates.next_version(),
-            hot_state_summary: SparseMerkleTree::new_empty(),
-            global_state_summary: smt,
+            next_version: new_next_version,
+            hot_state_summary: hot_smt,
+            global_state_summary: cold_smt,
         })
     }
 }
@@ -166,29 +206,26 @@ impl LedgerStateSummary {
 
     pub fn update(
         &self,
-        persisted: &ProvableStateSummary,
-        updates: &StateUpdateRefs,
+        hot_persisted: &ProvableStateSummary,
+        cold_persisted: &ProvableStateSummary,
+        hot_inserted: &[HashMap<StateKey, Option<StateValue>>; 16],
+        hot_evicted: &[HashMap<StateKey, Option<StateValue>>; 16],
+        new_next_version: Version,
     ) -> Result<Self> {
         let _timer = TIMER.timer_with(&["ledger_state_summary__update"]);
+        assert_eq!(
+            self.latest.next_version(),
+            self.last_checkpoint.next_version()
+        );
 
-        let last_checkpoint = if let Some(updates) = updates.for_last_checkpoint_batched() {
-            self.latest.update(persisted, updates)?
-        } else {
-            self.last_checkpoint.clone()
-        };
-
-        let base_of_latest = if updates.for_last_checkpoint_batched().is_none() {
-            self.latest()
-        } else {
-            &last_checkpoint
-        };
-        let latest = if let Some(updates) = updates.for_latest_batched() {
-            base_of_latest.update(persisted, updates)?
-        } else {
-            base_of_latest.clone()
-        };
-
-        Ok(Self::new(last_checkpoint, latest))
+        let new_ckpt = self.latest.update(
+            hot_persisted,
+            cold_persisted,
+            hot_inserted,
+            hot_evicted,
+            new_next_version,
+        )?;
+        Ok(Self::new(new_ckpt.clone(), new_ckpt))
     }
 }
 
@@ -197,15 +234,20 @@ pub struct ProvableStateSummary<'db> {
     #[deref]
     state_summary: StateSummary,
     db: &'db (dyn DbReader + Sync),
+    is_hot: bool,
 }
 
 impl<'db> ProvableStateSummary<'db> {
-    pub fn new_persisted(db: &'db (dyn DbReader + Sync)) -> Result<Self> {
-        Ok(Self::new(db.get_persisted_state_summary()?, db))
+    pub fn new_persisted(db: &'db (dyn DbReader + Sync), is_hot: bool) -> Result<Self> {
+        Ok(Self::new(db.get_persisted_state_summary()?, db, is_hot))
     }
 
-    pub fn new(state_summary: StateSummary, db: &'db (dyn DbReader + Sync)) -> Self {
-        Self { state_summary, db }
+    pub fn new(state_summary: StateSummary, db: &'db (dyn DbReader + Sync), is_hot: bool) -> Self {
+        Self {
+            state_summary,
+            db,
+            is_hot,
+        }
     }
 
     fn get_proof(
@@ -219,9 +261,13 @@ impl<'db> ProvableStateSummary<'db> {
             let (val_opt, proof) = self
                 .db
                 // check the full proof
-                .get_state_value_with_proof_by_version_ext(key, version, 0)?;
+                .get_state_value_with_proof_by_version_ext(key, version, 0, self.is_hot)?;
             proof.verify(
-                self.state_summary.global_state_summary.root_hash(),
+                if self.is_hot {
+                    self.state_summary.hot_state_summary.root_hash()
+                } else {
+                    self.state_summary.global_state_summary.root_hash()
+                },
                 *key,
                 val_opt.as_ref(),
             )?;
@@ -229,7 +275,7 @@ impl<'db> ProvableStateSummary<'db> {
         } else {
             Ok(self
                 .db
-                .get_state_proof_by_version_ext(key, version, root_depth)?)
+                .get_state_proof_by_version_ext(key, version, root_depth, self.is_hot)?)
         }
     }
 }
