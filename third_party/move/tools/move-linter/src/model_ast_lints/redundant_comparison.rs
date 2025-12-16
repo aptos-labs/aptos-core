@@ -268,7 +268,7 @@ impl RedundantComparison {
 
     fn extract_comparison(&self, expr: &move_model::ast::Exp) -> Option<(ExpData, Operation, i64)> {
         if let ExpData::Call(_, op, args) = expr.as_ref() {
-            if args.len() != 2 {
+            if args.len() != 2 || !Self::is_comparison_op(op) {
                 return None;
             }
             match (
@@ -294,6 +294,10 @@ impl RedundantComparison {
             Neq => Neq,
             _ => return None,
         })
+    }
+
+    fn is_comparison_op(op: &Operation) -> bool {
+        matches!(op, Lt | Le | Gt | Ge | Eq | Neq)
     }
 
     fn same_variable(&self, var1: &ExpData, var2: &ExpData) -> bool {
@@ -411,10 +415,9 @@ impl RedundantComparison {
                             );
                             (msg, left_expr)
                         },
-                        RuleType::Tautology => (
-                            "Tautology: condition is always true".to_string(),
-                            left_expr,
-                        ),
+                        RuleType::Tautology => {
+                            ("Tautology: condition is always true".to_string(), left_expr)
+                        },
                     };
 
                     report(msg, target_expr);
