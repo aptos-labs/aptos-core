@@ -94,7 +94,7 @@ const COMPARISON_RULES: &[ComparisonRule] = &[
     ComparisonRule {
         left_op: Lt,
         right_op: Ge,
-        condition: |left_val, right_val| left_val <= right_val,
+        condition: |left_val, right_val| left_val >= right_val,
         relationship: RuleType::Tautology,
         applies_to: Or,
     },
@@ -102,7 +102,7 @@ const COMPARISON_RULES: &[ComparisonRule] = &[
     ComparisonRule {
         left_op: Le,
         right_op: Gt,
-        condition: |left_val, right_val| left_val <= right_val,
+        condition: |left_val, right_val| left_val >= right_val,
         relationship: RuleType::Tautology,
         applies_to: Or,
     },
