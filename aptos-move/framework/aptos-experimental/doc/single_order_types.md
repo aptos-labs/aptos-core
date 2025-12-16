@@ -34,10 +34,12 @@
 -  [Function `is_active_order`](#0x7_single_order_types_is_active_order)
 -  [Function `get_price`](#0x7_single_order_types_get_price)
 -  [Function `is_bid`](#0x7_single_order_types_is_bid)
+-  [Function `get_creation_time_micros`](#0x7_single_order_types_get_creation_time_micros)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
+<b>use</b> <a href="../../aptos-framework/doc/timestamp.md#0x1_timestamp">0x1::timestamp</a>;
 <b>use</b> <a href="order_book_types.md#0x7_order_book_types">0x7::order_book_types</a>;
 </code></pre>
 
@@ -129,6 +131,12 @@
 </dd>
 <dt>
 <code>metadata: M</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>creation_time_micros: u64</code>
 </dt>
 <dd>
 
@@ -267,7 +275,7 @@
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_new_single_order">new_single_order</a>&lt;M: <b>copy</b>, drop, store&gt;(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, price: u64, orig_size: u64, size: u64, is_bid: bool, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, metadata: M): <a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_new_single_order">new_single_order</a>&lt;M: <b>copy</b>, drop, store&gt;(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, price: u64, orig_size: u64, size: u64, is_bid: bool, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, creation_time_micros_opt: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, metadata: M): <a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;
 </code></pre>
 
 
@@ -287,8 +295,14 @@
     is_bid: bool,
     trigger_condition: Option&lt;TriggerCondition&gt;,
     time_in_force: TimeInForce,
+    creation_time_micros_opt: Option&lt;u64&gt;,
     metadata: M
 ): <a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt; {
+    <b>let</b> creation_time_micros = <b>if</b> (creation_time_micros_opt.is_some()) {
+        creation_time_micros_opt.destroy_some()
+    } <b>else</b> {
+        <a href="../../aptos-framework/doc/timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>()
+    };
     SingleOrder::V1 {
         order_id,
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
@@ -300,7 +314,8 @@
         is_bid,
         trigger_condition,
         time_in_force,
-        metadata
+        metadata,
+        creation_time_micros,
     }
 }
 </code></pre>
@@ -799,7 +814,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_destroy_single_order">destroy_single_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): (<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, u64, u64, u64, bool, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, M)
+<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_destroy_single_order">destroy_single_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): (<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, u64, u64, u64, bool, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, M, u64)
 </code></pre>
 
 
@@ -811,7 +826,7 @@
 <pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_destroy_single_order">destroy_single_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: <a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;
 ): (
-    <b>address</b>, OrderIdType, Option&lt;String&gt;, UniqueIdxType, u64, u64, u64, bool, Option&lt;TriggerCondition&gt;, TimeInForce, M
+    <b>address</b>, OrderIdType, Option&lt;String&gt;, UniqueIdxType, u64, u64, u64, bool, Option&lt;TriggerCondition&gt;, TimeInForce, M, u64
 ) {
     <b>let</b> SingleOrder::V1 {
         order_id,
@@ -824,7 +839,8 @@
         is_bid,
         trigger_condition,
         time_in_force,
-        metadata
+        metadata,
+        creation_time_micros,
     } = self;
     (
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
@@ -837,7 +853,8 @@
         is_bid,
         trigger_condition,
         time_in_force,
-        metadata
+        metadata,
+        creation_time_micros,
     )
 }
 </code></pre>
@@ -913,6 +930,30 @@
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_is_bid">is_bid</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;): bool {
     self.is_bid
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_single_order_types_get_creation_time_micros"></a>
+
+## Function `get_creation_time_micros`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_creation_time_micros">get_creation_time_micros</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_creation_time_micros">get_creation_time_micros</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;): u64 {
+    self.creation_time_micros
 }
 </code></pre>
 
