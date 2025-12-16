@@ -161,6 +161,8 @@ pub enum FeatureFlag {
     SESSION_CONTINUATION = 104,
     /// Enables function value reflection in the stdlib
     ENABLE_FUNCTION_REFLECTION = 105,
+    /// Whether SLH-DSA-SHA2-128s signature scheme is enabled for transaction authentication.
+    SLH_DSA_SHA2_128S_SIGNATURE = 106,
 }
 
 impl FeatureFlag {
@@ -267,6 +269,7 @@ impl FeatureFlag {
             FeatureFlag::VM_BINARY_FORMAT_V9,
             FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION,
             FeatureFlag::ENABLE_FUNCTION_REFLECTION,
+            FeatureFlag::SLH_DSA_SHA2_128S_SIGNATURE,
         ]
     }
 }
