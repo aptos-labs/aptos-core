@@ -11,6 +11,7 @@ module aptos_experimental::market_types {
     use aptos_std::table;
     use aptos_std::table::Table;
     use aptos_framework::event;
+    use aptos_experimental::dead_mans_switch_tracker;
     use aptos_experimental::dead_mans_switch_tracker::{DeadMansSwitchTracker, new_dead_mans_switch_tracker};
     use aptos_experimental::market_clearinghouse_order_info::MarketClearinghouseOrderInfo;
     use aptos_experimental::single_order_types::SingleOrder;
@@ -19,8 +20,6 @@ module aptos_experimental::market_types {
     use aptos_experimental::order_book_types::TriggerCondition;
     use aptos_experimental::order_book::{OrderBook, new_order_book};
     use aptos_experimental::pre_cancellation_tracker::{PreCancellationTracker, new_pre_cancellation_tracker};
-    #[test_only]
-    use aptos_experimental::dead_mans_switch_tracker;
 
     #[test_only]
     use aptos_experimental::pre_cancellation_tracker::destroy_tracker;
