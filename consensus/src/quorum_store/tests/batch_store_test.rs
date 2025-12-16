@@ -283,3 +283,49 @@ async fn test_get_local_batch() {
     assert_err!(store.get_batch_from_local(&digest_2));
     assert_err!(store.get_batch_from_local(&digest_3));
 }
+
+#[tokio::test]
+async fn test_batch_store_bootstrap_gc_expiry() {
+    let tmp_dir = TempPath::new();
+    let digest_1 = HashValue::random();
+    let memory_quota = 10;
+    {
+        let db = Arc::new(QuorumStoreDB::new(&tmp_dir));
+        let (signers, _validator_verifier) = random_validator_verifier(4, None, false);
+
+        let store = Arc::new(BatchStore::new(
+            10, // epoch
+            false,
+            10, // last committed round
+            db,
+            memory_quota, // memory_quota
+            2001,         // db quota
+            2001,         // batch quota
+            signers[0].clone(),
+            0,
+        ));
+
+        let request_1 = request_for_test(&digest_1, 50, 20, Some(vec![]));
+        // Should be stored in memory and DB.
+        assert!(!store.persist(vec![request_1]).is_empty());
+    }
+
+    {
+        let db = Arc::new(QuorumStoreDB::new(&tmp_dir));
+        let (signers, _validator_verifier) = random_validator_verifier(4, None, false);
+
+        let store = Arc::new(BatchStore::new(
+            10, // epoch
+            false,
+            45, // last committed round
+            db,
+            memory_quota, // memory_quota
+            2001,         // db quota
+            2001,         // batch quota
+            signers[0].clone(),
+            10,
+        ));
+
+        store.get_batch_from_local(&digest_1).unwrap();
+    }
+}
