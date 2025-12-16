@@ -3,6 +3,11 @@
 //! This module detects redundant, contradictory, and tautological
 //! numerical comparisons over the same variable in boolean expressions
 //! combined with `&&` and `||`.
+//!
+//! Examples (all over the same variable `x`):
+//! - Redundant: `x <= 400 && x < 500` (`x < 500` is implied by `x <= 400`), `x > 10 || x >= 5` (`x > 10` is implied by `x >= 5`)
+//! - Contradiction: `x <= 5 && x > 5` (no value satisfies both), `x < 10 && x >= 10` (disjoint ranges)
+//! - Tautology: `x < 5 || x >= 5` (always true), `x <= 5 || x > 5` (always true)
 
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
