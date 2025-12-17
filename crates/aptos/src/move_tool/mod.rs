@@ -364,7 +364,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
 /// Compiles a Move script into bytecode
 ///
 /// Compiles a script into bytecode and provides a hash of the bytecode.
-/// This can then be run with `aptos move run-script`
+/// This can then be run with `supra move tool run-script`
 #[derive(Parser)]
 pub struct CompileScript {
     #[clap(long, value_parser)]

@@ -172,7 +172,7 @@ fn compile_coverage(
 /// Computes coverage for a package
 ///
 /// Computes coverage on a previous unit test run for a package.  Coverage input must
-/// first be built with `aptos move test --coverage`
+/// first be built with `supra move tool test --coverage`
 #[derive(Subcommand)]
 pub enum CoveragePackage {
     Summary(SummaryCoverage),

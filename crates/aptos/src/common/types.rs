@@ -1969,9 +1969,10 @@ impl MultisigAccountWithSequenceNumber {
 
 #[derive(Clone, Debug, Parser)]
 pub struct TypeArgVec {
-    /// TypeTag arguments separated by spaces.
+    /// Type arguments for generic type parameters in Move functions, separated by spaces.
+    /// Commonly used to specify coin types, resource types, or other struct types.
     ///
-    /// Example: `u8 u16 u32 u64 u128 u256 bool address vector signer`
+    /// Example: `0x1::supra_coin::SupraCoin`
     #[clap(long, num_args = 0..)]
     pub(crate) type_args: Vec<MoveType>,
 }
