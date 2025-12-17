@@ -158,7 +158,7 @@ jobs:
       - build-linux-arm-binary
       - build-macos-arm-binary
       - build-macos-x86_64-binary
-    runs-on: ubuntu-latest
+    runs-on: 2cpu-gh-ubuntu24-x64
     permissions:
       contents: "write"
       pull-requests: "read"
@@ -183,7 +183,7 @@ jobs:
     name: "Make PR to bump version in Homebrew"
     needs:
       - release-binaries
-    runs-on: ubuntu-latest
+    runs-on: 2cpu-gh-ubuntu24-x64
     steps:
       - uses: mislav/bump-homebrew-formula-action@v3
         with:

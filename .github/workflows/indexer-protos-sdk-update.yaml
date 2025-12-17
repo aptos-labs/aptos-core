@@ -9,7 +9,7 @@ name: Checks the proto changes and release
 
 jobs:
   check-protos:
-    runs-on: ubuntu-latest
+    runs-on: 2cpu-gh-ubuntu24-x64
     steps:
       - uses: actions/checkout@v4
       # Install buf, which we use to generate code from the protos for Rust and TS.
@@ -49,7 +49,7 @@ jobs:
           fi
 
   update-sdk:
-    runs-on: ubuntu-latest
+    runs-on: 2cpu-gh-ubuntu24-x64
     permissions:
       contents: read
       id-token: write
