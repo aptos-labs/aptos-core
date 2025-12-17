@@ -2,44 +2,33 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#[cfg(feature = "debugging")]
-use crate::debug::DebugContext;
-#[cfg(feature = "debugging")]
-use crate::{interpreter::InterpreterDebugInterface, loader::LoadedFunction, RuntimeEnvironment};
-#[cfg(feature = "debugging")]
-use move_vm_types::instr::Instruction;
-#[cfg(feature = "debugging")]
-use ::{
-    move_vm_types::values::Locals,
-    once_cell::sync::Lazy,
-    std::{
-        env,
-        fs::{File, OpenOptions},
-        io::Write,
-        sync::Mutex,
-    },
+use crate::{
+    debug::DebugContext, interpreter::InterpreterDebugInterface, loader::LoadedFunction,
+    RuntimeEnvironment,
+};
+use move_vm_types::{instr::Instruction, values::Locals};
+use once_cell::sync::Lazy;
+use std::{
+    env,
+    fs::{File, OpenOptions},
+    io::Write,
+    sync::Mutex,
 };
 
-#[cfg(feature = "debugging")]
 const MOVE_VM_TRACING_ENV_VAR_NAME: &str = "MOVE_VM_TRACE";
 
-#[cfg(feature = "debugging")]
 const MOVE_VM_STEPPING_ENV_VAR_NAME: &str = "MOVE_VM_STEP";
 
-#[cfg(feature = "debugging")]
 static FILE_PATH: Lazy<String> = Lazy::new(|| {
     env::var(MOVE_VM_TRACING_ENV_VAR_NAME).unwrap_or_else(|_| "move_vm_trace.trace".to_string())
 });
 
-#[cfg(feature = "debugging")]
 pub static TRACING_ENABLED: Lazy<bool> =
     Lazy::new(|| env::var(MOVE_VM_TRACING_ENV_VAR_NAME).is_ok());
 
-#[cfg(feature = "debugging")]
 static DEBUGGING_ENABLED: Lazy<bool> =
     Lazy::new(|| env::var(MOVE_VM_STEPPING_ENV_VAR_NAME).is_ok());
 
-#[cfg(feature = "debugging")]
 pub static LOGGING_FILE_WRITER: Lazy<Mutex<std::io::BufWriter<File>>> = Lazy::new(|| {
     let file = OpenOptions::new()
         .create(true)
@@ -52,12 +41,9 @@ pub static LOGGING_FILE_WRITER: Lazy<Mutex<std::io::BufWriter<File>>> = Lazy::ne
     ))
 });
 
-#[cfg(feature = "debugging")]
 static DEBUG_CONTEXT: Lazy<Mutex<DebugContext>> = Lazy::new(|| Mutex::new(DebugContext::new()));
 
-// Only include in debug builds
-#[cfg(feature = "debugging")]
-pub(crate) fn trace(
+pub(crate) fn debug_trace(
     function: &LoadedFunction,
     locals: &Locals,
     pc: u16,
@@ -86,17 +72,4 @@ pub(crate) fn trace(
             interpreter,
         );
     }
-}
-
-#[macro_export]
-macro_rules! trace {
-    ($function_desc:expr, $locals:expr, $pc:expr, $instr:tt, $resolver:expr, $interp:expr) => {
-        // Only include this code in debug releases
-        #[cfg(feature = "debugging")]
-        $crate::tracing::trace(&$function_desc, $locals, $pc, &$instr, $resolver, $interp)
-    };
-}
-
-pub const fn assert_move_vm_tracing_feature_disabled(err_msg: &str) {
-    assert!(!cfg!(feature = "debugging"), "{}", err_msg)
 }

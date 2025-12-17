@@ -24,7 +24,7 @@ use crate::{
         loader::traits::Loader, ty_depth_checker::TypeDepthChecker,
         ty_layout_converter::LayoutConverter,
     },
-    trace, LoadedFunction, RuntimeEnvironment,
+    tracing, LoadedFunction, RuntimeEnvironment,
 };
 use fail::fail_point;
 use itertools::Itertools;
@@ -1021,7 +1021,7 @@ where
         )
         .map_err(|e| match function.module_id() {
             Some(id) => {
-                let e = if cfg!(feature = "testing") || cfg!(feature = "stacktrace") {
+                let e = if self.vm_config.enable_debugging {
                     e.with_exec_state(self.get_internal_state())
                 } else {
                     e
@@ -1970,7 +1970,7 @@ impl Frame {
             trace_recorder,
         )
         .map_err(|e| {
-            let e = if cfg!(feature = "testing") || cfg!(feature = "stacktrace") {
+            let e = if interpreter.vm_config.enable_debugging {
                 e.with_exec_state(interpreter.get_internal_state())
             } else {
                 e
@@ -2000,17 +2000,21 @@ impl Frame {
 
         let frame_cache = &mut *self.frame_cache.borrow_mut();
 
+        let enable_debugging = interpreter.vm_config.enable_debugging;
+
         let code = self.function.code();
         loop {
             for instruction in &code[self.pc as usize..] {
-                trace!(
-                    &self.function,
-                    &self.locals,
-                    self.pc,
-                    instruction,
-                    interpreter.loader.runtime_environment(),
-                    interpreter
-                );
+                if enable_debugging {
+                    tracing::debug_trace(
+                        &self.function,
+                        &self.locals,
+                        self.pc,
+                        instruction,
+                        interpreter.loader.runtime_environment(),
+                        interpreter,
+                    );
+                }
 
                 fail_point!("move_vm::interpreter_loop", |_| {
                     Err(

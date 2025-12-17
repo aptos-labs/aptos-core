@@ -87,7 +87,7 @@ move-model = { workspace = true }
 move-package = { workspace = true }
 move-prover-boogie-backend = { workspace = true }
 move-symbol-pool = { workspace = true }
-move-unit-test = { workspace = true, features = ["debugging"] }
+move-unit-test = { workspace = true }
 move-vm-runtime = { workspace = true, features = ["testing"] }
 open = { workspace = true }
 pathsearch = { workspace = true }
