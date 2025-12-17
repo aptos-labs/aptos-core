@@ -518,6 +518,10 @@ ConsensusMsg:
       ProofOfStoreMsgV2:
         NEWTYPE:
           TYPENAME: ProofOfStoreMsg
+    25:
+      SecretShareMsg:
+        NEWTYPE:
+          TYPENAME: SecretShareNetworkMessage
 ContractEvent:
   ENUM:
     0:
@@ -1096,6 +1100,10 @@ Secp256r1EcdsaPublicKey:
   NEWTYPESTRUCT: BYTES
 Secp256r1EcdsaSignature:
   NEWTYPESTRUCT: BYTES
+SecretShareNetworkMessage:
+  STRUCT:
+    - epoch: U64
+    - data: BYTES
 Signature:
   NEWTYPESTRUCT: BYTES
 SignedBatchInfo:

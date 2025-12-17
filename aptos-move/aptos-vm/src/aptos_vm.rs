@@ -6,7 +6,7 @@ use crate::{
     counters::*,
     data_cache::{AsMoveResolver, StorageAdapter},
     errors::{discarded_output, expect_only_successful_execution},
-    gas::{check_gas, make_prod_gas_meter, ProdGasMeter},
+    gas::{check_gas, make_prod_gas_meter, make_prod_gas_meter_impl},
     keyless_validation,
     move_vm_ext::{
         session::{
@@ -40,13 +40,14 @@ use aptos_block_executor::{
 use aptos_crypto::HashValue;
 use aptos_framework::natives::code::PublishRequest;
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
-use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
+use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::{
     gas_feature_versions,
     gas_feature_versions::{RELEASE_V1_10, RELEASE_V1_27, RELEASE_V1_38},
     AptosGasParameters, VMGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
+use aptos_memory_usage_tracker::{MemoryAlgebra, MemoryTrackedGasMeterImpl};
 use aptos_metrics_core::IntCounterVecHelper;
 #[cfg(any(test, feature = "testing"))]
 use aptos_types::state_store::StateViewId;
@@ -2188,7 +2189,7 @@ impl AptosVM {
     ///
     /// This can be useful for off-chain applications that wants to perform additional
     /// measurements or analysis while preserving the production gas behavior.
-    pub fn execute_user_transaction_with_modified_gas_meter<'a, G, F>(
+    pub fn execute_user_transaction_with_modified_gas_meter<'a, G, M, F>(
         &self,
         resolver: &'a impl AptosMoveResolver,
         code_storage: &'a (impl AptosCodeStorage + BlockSynchronizationKillSwitch),
@@ -2198,8 +2199,14 @@ impl AptosVM {
         auxiliary_info: &AuxiliaryInfo,
     ) -> Result<(VMStatus, VMOutput, G), VMStatus>
     where
-        F: FnOnce(ProdGasMeter<'a, NoopBlockSynchronizationKillSwitch>) -> G,
+        F: FnOnce(
+            MemoryTrackedGasMeterImpl<
+                StandardGasMeter<StandardGasAlgebra<'a, NoopBlockSynchronizationKillSwitch>>,
+                M,
+            >,
+        ) -> G,
         G: AptosGasMeter,
+        M: MemoryAlgebra,
     {
         self.execute_user_transaction_with_custom_gas_meter(
             resolver,
@@ -2212,7 +2219,7 @@ impl AptosVM {
              is_approved_gov_script,
              meter_balance,
              _maybe_block_synchronization_kill_switch| {
-                modify_gas_meter(make_prod_gas_meter(
+                modify_gas_meter(make_prod_gas_meter_impl::<_, M>(
                     gas_feature_version,
                     vm_gas_params,
                     storage_gas_params,
