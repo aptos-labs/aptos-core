@@ -4782,6 +4782,7 @@ version = "0.0.3"
 dependencies = [
  "ahash 0.8.11",
  "anyhow",
+ "aptos-batch-encryption",
  "aptos-bitvec",
  "aptos-crypto",
  "aptos-crypto-derive",
