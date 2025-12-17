@@ -101,7 +101,7 @@ fn test_load_module_native_result(enable_lazy_loading: bool) {
     )];
     let runtime_environment = RuntimeEnvironment::new_with_config(natives, VMConfig {
         enable_lazy_loading,
-        ..VMConfig::default()
+        ..VMConfig::default_for_test()
     });
     let mut storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
 

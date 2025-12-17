@@ -29,7 +29,7 @@ move-package = { workspace = true }
 move-prover = { workspace = true }
 move-stdlib = { path = "../../move-stdlib" }
 move-unit-test = { workspace = true }
-move-vm-runtime = { workspace = true, features = ["debugging"] }
+move-vm-runtime = { workspace = true }
 move-vm-test-utils = { workspace = true }
 once_cell = { workspace = true }
 tempfile = { workspace = true }

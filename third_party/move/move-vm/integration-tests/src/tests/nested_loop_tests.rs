@@ -21,7 +21,7 @@ fn initialize_storage(max_loop_depth: usize) -> InMemoryStorage {
             max_loop_depth: Some(max_loop_depth),
             ..Default::default()
         },
-        ..Default::default()
+        ..VMConfig::default_for_test()
     };
     let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
     InMemoryStorage::new_with_runtime_environment(runtime_environment)

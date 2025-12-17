@@ -53,6 +53,9 @@ pub struct VMConfig {
     pub enable_framework_for_option: bool,
     /// Same as enable_function_caches, but gates missed gating for native dynamic dispatch.
     pub enable_function_caches_for_native_dynamic_dispatch: bool,
+    /// Whether this VM should support debugging. If set, environment variables
+    /// `MOVE_VM_TRACE` and `MOVE_VM_STEP` will be recognized.
+    pub enable_debugging: bool,
 }
 
 impl Default for VMConfig {
@@ -81,6 +84,7 @@ impl Default for VMConfig {
             propagate_dependency_limit_error: true,
             enable_framework_for_option: true,
             enable_function_caches_for_native_dynamic_dispatch: true,
+            enable_debugging: false,
         }
     }
 }
@@ -91,6 +95,14 @@ impl VMConfig {
         Self {
             paranoid_ref_checks: enable,
             ..self
+        }
+    }
+
+    /// Default for use in tests.
+    pub fn default_for_test() -> Self {
+        Self {
+            enable_debugging: true,
+            ..Self::default()
         }
     }
 }

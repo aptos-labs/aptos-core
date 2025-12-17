@@ -575,7 +575,7 @@ mod tests {
         let vm_config = VMConfig {
             type_base_cost: 1,
             type_max_cost: 2,
-            ..Default::default()
+            ..VMConfig::default_for_test()
         };
         let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
         let ty_tag_converter = TypeTagConverter::new(&runtime_environment);
@@ -601,7 +601,7 @@ mod tests {
             type_base_cost: 1,
             type_byte_cost: 2,
             type_max_cost,
-            ..Default::default()
+            ..VMConfig::default_for_test()
         };
         let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
         let ty_tag_converter = TypeTagConverter::new(&runtime_environment);
@@ -638,7 +638,7 @@ mod tests {
             type_byte_cost: 2,
             // Use smaller limit, to test metering.
             type_max_cost: type_max_cost - 1,
-            ..Default::default()
+            ..VMConfig::default_for_test()
         };
         let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
         let mut gas_context = PseudoGasContext::new(runtime_environment.vm_config());
