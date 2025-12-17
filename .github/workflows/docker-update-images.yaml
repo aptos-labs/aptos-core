@@ -15,7 +15,7 @@ on:
 
 jobs:
   update:
-    runs-on: ubuntu-latest
+    runs-on: 2cpu-gh-ubuntu24-x64
 
     steps:
       - uses: actions/checkout@v4

@@ -336,10 +336,16 @@ impl TransactionBuilder {
     }
 
     pub fn raw(&self) -> RawTransaction {
+        let payload = self.program.clone().expect("transaction payload not set");
+        let sequence_number = if payload.replay_protection_nonce().is_some() {
+            u64::MAX
+        } else {
+            self.sequence_number.expect("sequence number not set")
+        };
         RawTransaction::new(
             *self.sender.address(),
-            self.sequence_number.expect("sequence number not set"),
-            self.program.clone().expect("transaction payload not set"),
+            sequence_number,
+            payload,
             self.max_gas_amount.unwrap_or(500_000),
             self.gas_unit_price.unwrap_or(0),
             self.ttl.unwrap_or(DEFAULT_EXPIRATION_TIME),

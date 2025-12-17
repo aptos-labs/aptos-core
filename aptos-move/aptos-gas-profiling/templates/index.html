@@ -130,7 +130,7 @@
         {{else}}
         (No operations to show.)
         {{/if}}
-        <br/>
+        <br />
         {{#if methods}}
         <table>
             <tr>
@@ -151,7 +151,7 @@
         {{else}}
         (No methods to show.)
         {{/if}}
-        <br/>
+        <br />
         {{#if methods_self}}
         <table>
             <tr>
@@ -300,6 +300,13 @@
         {{else}}
         (No events to show.)
         {{/if}}
+    </section>
+
+    <section>
+        <h2>Memory Usage</h2>
+        Peak memory usage during transaction execution: {{peak-memory-usage}}.<br><br>
+
+        Note: This is measured in abstract value size, which does not map 1:1 to bytes.
     </section>
 
     <section>
