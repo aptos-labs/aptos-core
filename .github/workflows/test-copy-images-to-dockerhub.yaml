@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   test-copy-images:
-    runs-on: ubuntu-latest
+    runs-on: 2cpu-gh-ubuntu24-x64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

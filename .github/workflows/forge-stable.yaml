@@ -135,7 +135,7 @@ env:
 
 jobs:
   generate-matrix:
-    runs-on: ubuntu-latest
+    runs-on: 2cpu-gh-ubuntu24-x64
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
       imageVariants: ${{ steps.set-matrix.outputs.imageVariants }}
@@ -199,7 +199,7 @@ jobs:
   # This job determines the image tag and branch to test, and passes them to the other jobs
   # NOTE: this may be better as a separate workflow as the logic is quite complex but generalizable
   determine-test-metadata:
-    runs-on: ubuntu-latest
+    runs-on: 2cpu-gh-ubuntu24-x64
     needs: ["generate-matrix"]
     outputs:
       IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}

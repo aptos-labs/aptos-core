@@ -11,7 +11,7 @@ permissions:
 jobs:
   permission-check:
     if: github.event.pull_request.merged == true && contains(join(github.event.pull_request.labels.*.name, ','), 'v1.')
-    runs-on: ubuntu-latest
+    runs-on: 2cpu-gh-ubuntu24-x64
     steps:
       - name: Check repository permission for user which triggered workflow
         uses: sushichop/action-repository-permission@13d208f5ae7a6a3fc0e5a7c2502c214983f0241c
@@ -22,7 +22,7 @@ jobs:
   backport:
     name: Backport PR
     needs: [permission-check]
-    runs-on: ubuntu-latest
+    runs-on: 2cpu-gh-ubuntu24-x64
     steps:
       - name: Backport Action
         uses: sorenlouv/backport-github-action@ad888e978060bc1b2798690dd9d03c4036560947
