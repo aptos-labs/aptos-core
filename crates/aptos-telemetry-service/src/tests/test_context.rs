@@ -45,7 +45,7 @@ pub async fn new_test_context_with_multiple_contracts(
                 .map(|(name, auth_config)| crate::CustomContractConfig {
                     name,
                     on_chain_auth: auth_config,
-                    metrics_sinks: None,
+                    metrics_sink: None,
                     logs_sink: None,
                     events_sink: None,
                 })
