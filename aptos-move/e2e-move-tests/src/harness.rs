@@ -340,17 +340,21 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         account: &Account,
         payload: TransactionPayload,
     ) -> TransactionBuilder {
-        let on_chain_seq_no = self.sequence_number_opt(account.address()).unwrap_or(0);
-        let seq_no_ref = self.txn_seq_no.entry(*account.address()).or_insert(0);
-        let seq_no = std::cmp::max(on_chain_seq_no, *seq_no_ref);
-        *seq_no_ref = seq_no + 1;
-        account
-            .transaction()
+        // Only manage sequence number for non-orderless transactions
+        let builder = if payload.replay_protection_nonce().is_none() {
+            let on_chain_seq_no = self.sequence_number_opt(account.address()).unwrap_or(0);
+            let seq_no_ref = self.txn_seq_no.entry(*account.address()).or_insert(0);
+            let seq_no = std::cmp::max(on_chain_seq_no, *seq_no_ref);
+            *seq_no_ref = seq_no + 1;
+            account.transaction().sequence_number(seq_no)
+        } else {
+            account.transaction()
+        };
+        builder
             .chain_id(self.executor.get_chain_id())
             .ttl(
                 self.executor.get_block_time() + 3_600_000_000, /* an hour after the current time */
             )
-            .sequence_number(seq_no)
             .max_gas_amount(self.max_gas_per_txn)
             .gas_unit_price(self.default_gas_unit_price)
             .payload(payload)
