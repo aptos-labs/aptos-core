@@ -42,7 +42,9 @@ use aptos_network::{application::interface::NetworkClient, protocols::network::E
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig},
+    on_chain_config::{
+        ConsensusConfigFromOnchain, OnChainExecutionConfig, OnChainRandomnessConfig,
+    },
     validator_signer::ValidatorSigner,
 };
 use fail::fail_point;
@@ -63,7 +65,7 @@ pub trait TExecutionClient: Send + Sync {
         epoch_state: Arc<EpochState>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         payload_manager: Arc<dyn TPayloadManager>,
-        onchain_consensus_config: &OnChainConsensusConfig,
+        onchain_consensus_config: &ConsensusConfigFromOnchain,
         onchain_execution_config: &OnChainExecutionConfig,
         onchain_randomness_config: &OnChainRandomnessConfig,
         rand_config: Option<RandConfig>,
@@ -201,7 +203,7 @@ impl ExecutionProxyClient {
         epoch_state: Arc<EpochState>,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
-        onchain_consensus_config: &OnChainConsensusConfig,
+        onchain_consensus_config: &ConsensusConfigFromOnchain,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_committed_round: Round,
         buffer_manager_back_pressure_enabled: bool,
@@ -279,7 +281,7 @@ impl ExecutionProxyClient {
             reset_buffer_manager_rx,
             epoch_state,
             self.bounded_executor.clone(),
-            onchain_consensus_config.order_vote_enabled(),
+            onchain_consensus_config.order_vote_enabled,
             buffer_manager_back_pressure_enabled,
             highest_committed_round,
             consensus_observer_config,
@@ -304,7 +306,7 @@ impl TExecutionClient for ExecutionProxyClient {
         epoch_state: Arc<EpochState>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         payload_manager: Arc<dyn TPayloadManager>,
-        onchain_consensus_config: &OnChainConsensusConfig,
+        onchain_consensus_config: &ConsensusConfigFromOnchain,
         onchain_execution_config: &OnChainExecutionConfig,
         onchain_randomness_config: &OnChainRandomnessConfig,
         rand_config: Option<RandConfig>,
@@ -339,7 +341,7 @@ impl TExecutionClient for ExecutionProxyClient {
             onchain_execution_config.block_executor_onchain_config();
         let transaction_deduper =
             create_transaction_deduper(onchain_execution_config.transaction_deduper_type());
-        let randomness_enabled = onchain_consensus_config.is_vtxn_enabled()
+        let randomness_enabled = onchain_consensus_config.vtxn_config.enabled()
             && onchain_randomness_config.randomness_enabled();
 
         let aux_version = onchain_execution_config.persisted_auxiliary_info_version();
@@ -533,7 +535,7 @@ impl TExecutionClient for DummyExecutionClient {
         _epoch_state: Arc<EpochState>,
         _commit_signer_provider: Arc<dyn CommitSignerProvider>,
         _payload_manager: Arc<dyn TPayloadManager>,
-        _onchain_consensus_config: &OnChainConsensusConfig,
+        _onchain_consensus_config: &ConsensusConfigFromOnchain,
         _onchain_execution_config: &OnChainExecutionConfig,
         _onchain_randomness_config: &OnChainRandomnessConfig,
         _rand_config: Option<RandConfig>,
