@@ -21,6 +21,12 @@ aptos_chains:
   devnet:
     waypoint_txt_url: https://devnet.aptoslabs.com/waypoint.txt
     genesis_blob_url: https://devnet.aptoslabs.com/genesis.blob
+  netna:
+    waypoint_txt_url: https://netna.data-staging.gcp.aptosdev.com/waypoint.txt
+    genesis_blob_url: https://netna.data-staging.gcp.aptosdev.com/genesis.blob
+  shelbynet:
+    waypoint_txt_url: https://shelbynet.data-staging.gcp.aptosdev.com/waypoint.txt
+    genesis_blob_url: https://shelbynet.data-staging.gcp.aptosdev.com/genesis.blob
   testnet:
     waypoint_txt_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/testnet/genesis_waypoint.txt
     genesis_blob_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/testnet/genesis.blob
@@ -60,6 +66,7 @@ resources:
 nodeSelector: {}
 tolerations: []
 affinity: {}
+topologySpreadConstraints: []
 
 storage:
   # -- Kubernetes storage class to use for fullnode persistent storage
@@ -78,11 +85,23 @@ service:
   exposeMetrics: false
   # -- Whether to expose the admin port on fullnodes
   exposeAdmin: false
+  # -- Whether to expose the gRPC port on the external service
+  exposeGrpcPort: false
   # -- The externalTrafficPolicy for the fullnode service
   externalTrafficPolicy:
   # -- If set and if the ServiceType is LoadBalancer, allow traffic to fullnode from these CIDRs
   loadBalancerSourceRanges: []
   annotations: {}
+  internal:
+    # -- The Kubernetes ServiceType to use for the internal service.
+    type: ClusterIP
+    annotations: {}
+    # -- If set, the hostname to use for the internal LB
+    hostname:
+    # -- Whether to expose the gRPC port on the internal service
+    exposeGrpcPort: false
+    # -- Whether to expose the node REST API on the internal service
+    exposeApi: false
 
 ingress:
   # -- Change enabled to true and fill out the rest of the fields to expose the REST API externally via your ingress controller
@@ -112,7 +131,7 @@ backup:
   image:
     # -- Image repo to use for backup images
     repo: aptoslabs/tools
-    # -- Image tag to use for backup images
+    # -- Image tag to use for backup images. If set, overrides `imageTag`
     tag:
     # -- Image pull policy to use for backup images
     pullPolicy: IfNotPresent
@@ -126,6 +145,7 @@ backup:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  topologySpreadConstraints: []
   # -- Whether to enable backup
   enable: false
   config:
@@ -157,11 +177,12 @@ backup_verify:
       cpu: 32
       memory: 60Gi
     requests:
-      cpu: 8
-      memory: 8Gi
+      cpu: 16
+      memory: 30Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  topologySpreadConstraints: []
   config:
     concurrent_downloads: 50
 
@@ -178,12 +199,13 @@ backup_compaction:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  topologySpreadConstraints: []
 
 restore:
   image:
     # -- Image repo to use for restore images
     repo: aptoslabs/tools
-    # -- Image tag to use for restore images
+    # -- Image tag to use for restore images. If set, overrides `imageTag`
     tag:
     # -- Image pull policy to use for restore images
     pullPolicy: IfNotPresent

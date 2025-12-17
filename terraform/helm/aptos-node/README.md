@@ -34,6 +34,7 @@ Aptos blockchain node deployment
 | fullnode.storage.size | string | `"2048Gi"` | Size of fullnode persistent storage |
 | fullnode.tolerations | list | `[]` |  |
 | genesis_blob_upload_url | string | `"https://us-west1-aptos-forge-gcp-0.cloudfunctions.net/signed-url?cluster_name=unknown&era=1"` |  |
+| genesis_bucket_path | string | `nil` |  |
 | haproxy.affinity | object | `{}` |  |
 | haproxy.config.send_proxy_protocol | bool | `false` | Whether to send Proxy Protocol v2 |
 | haproxy.config.user | string | `"nobody"` | System user to run HA |
@@ -43,10 +44,10 @@ Aptos blockchain node deployment
 | haproxy.image.tag | string | `"3.0.2@sha256:3fa2e323a2f422239a39eff345b41ab20a7a91aa4ad8c3c82b9ae85dd241214b"` | Image tag to use for HAProxy images |
 | haproxy.nodeSelector | object | `{}` |  |
 | haproxy.replicas | int | `1` | Number of HAProxy replicas |
-| haproxy.resources.limits.cpu | int | `7` |  |
-| haproxy.resources.limits.memory | string | `"16Gi"` |  |
-| haproxy.resources.requests.cpu | int | `7` |  |
-| haproxy.resources.requests.memory | string | `"16Gi"` |  |
+| haproxy.resources.limits.cpu | int | `2` |  |
+| haproxy.resources.limits.memory | string | `"2Gi"` |  |
+| haproxy.resources.requests.cpu | int | `1` |  |
+| haproxy.resources.requests.memory | string | `"1Gi"` |  |
 | haproxy.tls_secret | string | `nil` | Name of the Kubernetes TLS secret to use for HAProxy |
 | haproxy.tolerations | list | `[]` |  |
 | imageTag | string | `"devnet"` | Default image tag to use for all validator and fullnode images |
@@ -81,10 +82,16 @@ Aptos blockchain node deployment
 | service.validator.loadBalancerSourceRanges | string | `nil` | If set and if the ServiceType is LoadBalancer, allow traffic to validators from these CIDRs |
 | serviceAccount.create | bool | `true` | Specifies whether a service account should be created |
 | serviceAccount.name | string | `nil` | The name of the service account to use. If not set and create is true, a name is generated using the fullname template |
+| tools.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy to use for tools images |
+| tools.image.repo | string | `"aptoslabs/tools"` | Image repo to use for tools images |
+| tools.image.tag | string | `nil` | Image tag to use for tools images. If set, overrides `imageTag` |
 | validator.affinity | object | `{}` |  |
 | validator.config | object | `{}` | Validator configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs |
 | validator.enableNetworkPolicy | bool | `false` | Lock down network ingress and egress with Kubernetes NetworkPolicy |
 | validator.force_enable_telemetry | bool | `false` | Flag to force enable telemetry service (useful for forge tests) |
+| validator.healthChecks.enableLivenessProbe | bool | `false` |  |
+| validator.healthChecks.enabled | bool | `false` |  |
+| validator.healthChecks.filterReplicas | string | `nil` |  |
 | validator.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy to use for validator images |
 | validator.image.repo | string | `"aptoslabs/validator"` | Image repo to use for validator images |
 | validator.image.tag | string | `nil` | Image tag to use for validator images. If set, overrides `imageTag` |
@@ -99,7 +106,6 @@ Aptos blockchain node deployment
 | validator.storage.class | string | `nil` | Kubernetes storage class to use for validator persistent storage |
 | validator.storage.size | string | `"2048Gi"` | Size of validator persistent storage |
 | validator.tolerations | list | `[]` |  |
-| validator.useConsensusHealthCheckAsStartupProbe | bool | `false` |  |
 
 ## Resource Descriptions
 
