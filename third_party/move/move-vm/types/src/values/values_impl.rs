@@ -174,7 +174,7 @@ pub(crate) enum GlobalDataStatus {
 /// vectors of integers or an integer field in a struct.
 #[derive(Debug)]
 pub(crate) struct IndexedRef {
-    idx: u16,
+    idx: u32,
     container_ref: ContainerRef,
     tag: Option<u16>,
 }
@@ -1196,8 +1196,8 @@ impl IndexedRef {
         self.check_tag()?;
         other.check_tag()?;
         check_depth(depth, max_depth)?;
-        let self_index = usize::from(self.idx);
-        let other_index = usize::from(other.idx);
+        let self_index = self.idx as usize;
+        let other_index = other.idx as usize;
         let res = match (
             self.container_ref.container(),
             other.container_ref.container(),
@@ -1368,8 +1368,8 @@ impl IndexedRef {
 
         self.check_tag()?;
         other.check_tag()?;
-        let self_index = usize::from(self.idx);
-        let other_index = usize::from(other.idx);
+        let self_index = self.idx as usize;
+        let other_index = other.idx as usize;
 
         let res = match (
             self.container_ref.container(),
@@ -1548,7 +1548,7 @@ impl IndexedRef {
         use Container::*;
 
         self.check_tag()?;
-        let index = usize::from(self.idx);
+        let index = self.idx as usize;
         let res = match self.container_ref.container() {
             Vec(r) => r.borrow()[index].copy_value(depth + 1, max_depth)?,
             Struct(r) => r.borrow()[index].copy_value(depth + 1, max_depth)?,
@@ -1682,7 +1682,7 @@ impl IndexedRef {
     fn write_ref(self, x: Value) -> PartialVMResult<()> {
         x.check_valid_for_indexed_ref(&self)?;
         self.check_tag()?;
-        let index = usize::from(self.idx);
+        let index = self.idx as usize;
         match (self.container_ref.container(), &x) {
             (Container::Locals(r), _) | (Container::Vec(r), _) | (Container::Struct(r), _) => {
                 let mut v = r.borrow_mut();
@@ -1865,8 +1865,8 @@ impl IndexedRef {
 
         self.check_tag()?;
         other.check_tag()?;
-        let self_index = usize::from(self.idx);
-        let other_index = usize::from(other.idx);
+        let self_index = self.idx as usize;
+        let other_index = other.idx as usize;
 
         macro_rules! swap {
             ($r1:ident, $r2:ident) => {{
@@ -2065,11 +2065,6 @@ impl ContainerRef {
             );
         }
 
-        let idx_u16 = u16::try_from(idx).map_err(|_| {
-            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("index too large".to_string())
-        })?;
-
         macro_rules! container_ref {
             ($container:ident) => {
                 Value::ContainerRef(match self {
@@ -2085,7 +2080,7 @@ impl ContainerRef {
         macro_rules! indexed_ref {
             () => {
                 Value::IndexedRef(IndexedRef {
-                    idx: idx_u16,
+                    idx: idx as u32,
                     container_ref: self.copy_by_ref(),
                     tag,
                 })
@@ -2281,10 +2276,7 @@ impl Locals {
             | Value::Address(_)
             | Value::ClosureValue(_)
             | Value::DelayedFieldID { .. } => Ok(Value::IndexedRef(IndexedRef {
-                idx: u16::try_from(idx).map_err(|_| {
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message("index too large".to_string())
-                })?,
+                idx: idx as u32,
                 container_ref: ContainerRef::Local(Container::Locals(Rc::clone(&self.0))),
                 tag: None,
             })),
@@ -4764,7 +4756,7 @@ pub mod debug {
     }
 
     fn print_indexed_ref<B: Write>(buf: &mut B, r: &IndexedRef) -> PartialVMResult<()> {
-        let idx = usize::from(r.idx);
+        let idx = r.idx as usize;
         match r.container_ref.container() {
             Container::Locals(r) | Container::Vec(r) | Container::Struct(r) => {
                 print_slice_elem(buf, &r.borrow(), idx, print_value_impl)
@@ -5597,7 +5589,7 @@ impl IndexedRef {
         let container = self.container_ref.container();
 
         if visitor.visit_ref(depth, is_global)? {
-            container.visit_indexed(visitor, depth, usize::from(self.idx))?;
+            container.visit_indexed(visitor, depth, self.idx as usize)?;
         }
         Ok(())
     }
@@ -5722,7 +5714,7 @@ impl Reference {
                     IndexedRef(r) => {
                         r.container_ref
                             .container()
-                            .visit_indexed(visitor, 0, usize::from(r.idx))
+                            .visit_indexed(visitor, 0, r.idx as usize)
                     },
                 }
             }
