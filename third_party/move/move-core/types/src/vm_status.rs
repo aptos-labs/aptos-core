@@ -351,7 +351,11 @@ impl fmt::Display for KeptVMStatus {
             KeptVMStatus::OutOfGas => write!(f, "OUT_OF_GAS"),
             KeptVMStatus::MiscellaneousError => write!(f, "MISCELLANEOUS_ERROR"),
             KeptVMStatus::MoveAbort { location, code, message } => {
-                write!(f, "ABORTED with code {} and message {:?} in {}", code, message, location)
+                if let Some(message) = message {
+                    write!(f, "ABORTED with code {} and message {} in {}", code, message, location)
+                } else {
+                    write!(f, "ABORTED with code {} in {}", code, location)
+                }
             }
             KeptVMStatus::ExecutionFailure {
                 location,
