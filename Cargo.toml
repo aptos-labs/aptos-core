@@ -602,7 +602,7 @@ dirs = "5.0.1"
 dirs-next = "2.0.0"
 dudect-bencher = "0.6"
 dunce = "1.0.4"
-ed25519-dalek = { version = "1.0.1", features = ["asm", "rand_core", "std", "serde"] }
+ed25519-dalek = { version = "1.0.1", features = ["rand_core", "std", "serde"] }
 ed25519-dalek-bip32 = "0.2.0"
 either = "1.6.1"
 enum_dispatch = "0.3.12"
