@@ -2,6 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::native_models_for_runtime_ref_checks::NativeRuntimeRefChecksModel;
 use better_any::{Tid, TidAble, TidExt};
 use std::{any::TypeId, collections::HashMap};
 
@@ -64,6 +65,9 @@ where
 #[derive(Default)]
 pub struct NativeContextExtensions<'a> {
     map: HashMap<TypeId, Box<dyn NativeSessionListener<'a>>>,
+    /// To enable runtime reference checks, we include models for native functions that
+    /// return references. See documentation for `NativeRuntimeRefChecksModel` for details.
+    native_runtime_ref_checks_model: NativeRuntimeRefChecksModel,
 }
 
 impl<'a> NativeContextExtensions<'a> {
@@ -112,6 +116,23 @@ impl<'a> NativeContextExtensions<'a> {
         for extension in self.map.values_mut() {
             f(extension.as_mut());
         }
+    }
+
+    /// Get all the native runtime ref checks models.
+    pub fn get_native_runtime_ref_checks_model(&self) -> NativeRuntimeRefChecksModel {
+        self.native_runtime_ref_checks_model.clone()
+    }
+
+    /// Add a runtime ref checks model for the given native function.
+    #[allow(dead_code)]
+    pub fn add_native_runtime_ref_checks_model(
+        &mut self,
+        module_name: &'static str,
+        function_name: &'static str,
+        model: Vec<usize>,
+    ) {
+        self.native_runtime_ref_checks_model
+            .add_model_for_native_function(module_name, function_name, model);
     }
 }
 

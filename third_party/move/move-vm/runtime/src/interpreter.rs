@@ -235,7 +235,7 @@ where
             loader,
             ty_depth_checker,
             layout_converter,
-            ref_state: RefCheckState::new(),
+            ref_state: RefCheckState::new(extensions.get_native_runtime_ref_checks_model()),
         };
 
         // Tracing and runtime checks (full or partial) are mutually exclusive because if we record
@@ -980,7 +980,7 @@ where
                 }
             }
         }
-        RTRCheck::core_call_transition(num_param_tys, num_locals, mask, &mut self.ref_state)?;
+        RTRCheck::core_call_transition(&function, mask, &mut self.ref_state)?;
         Frame::make_new_frame::<RTTCheck>(
             gas_meter,
             call_type,
@@ -1141,6 +1141,8 @@ where
                         }
                     }
                 }
+                // Perform reference transition for native call-return.
+                RTRCheck::native_static_dispatch_transition(function, mask, &mut self.ref_state)?;
 
                 current_frame.pc += 1; // advance past the Call instruction in the caller
                 Ok(false)
@@ -1220,6 +1222,10 @@ where
                         self.operand_stack.push_ty(ty)?;
                     }
                 }
+
+                // Perform reference transition for native dynamic dispatch and preparation
+                // for calling the target function.
+                RTRCheck::native_dynamic_dispatch_transition(function, mask, &mut self.ref_state)?;
 
                 let frame_cache = if self
                     .vm_config
