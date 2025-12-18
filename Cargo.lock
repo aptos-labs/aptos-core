@@ -965,6 +965,7 @@ name = "aptos-consensus"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-batch-encryption",
  "aptos-bitvec",
  "aptos-bounded-executor",
  "aptos-cached-packages",
