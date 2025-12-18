@@ -7,6 +7,7 @@
 
 module aptos_std::table {
     friend aptos_std::table_with_length;
+    friend aptos_std::box_or_inline;
     friend aptos_std::storage_slots_allocator;
 
     /// Type of tables

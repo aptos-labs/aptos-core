@@ -8,8 +8,6 @@ module aptos_experimental::market_types {
     use std::option::Option;
     use std::signer;
     use std::string::String;
-    use aptos_std::table;
-    use aptos_std::table::Table;
     use aptos_framework::event;
     use aptos_experimental::dead_mans_switch_tracker::{DeadMansSwitchTracker, new_dead_mans_switch_tracker};
     use aptos_experimental::market_clearinghouse_order_info::MarketClearinghouseOrderInfo;
@@ -26,14 +24,12 @@ module aptos_experimental::market_types {
     use aptos_experimental::pre_cancellation_tracker::destroy_tracker;
     #[test_only]
     use aptos_experimental::order_book_types::new_order_id_type;
+    use aptos_framework::box_or_inline::{BoxOrInline, Self};
 
     const EINVALID_ADDRESS: u64 = 1;
     const EINVALID_SETTLE_RESULT: u64 = 2;
     const EINVALID_TIME_IN_FORCE: u64 = 3;
     const EORDER_DOES_NOT_EXIST: u64 = 6;
-
-    const PRE_CANCELLATION_TRACKER_KEY: u8 = 0;
-    const DEAD_MANS_SWITCH_TRACKER_KEY: u8 = 1;
 
     /// Reasons why an order was cancelled
     enum OrderCancellationReason has drop, copy, store {
@@ -388,8 +384,8 @@ module aptos_experimental::market_types {
             /// Pre cancellation tracker for the market, it is wrapped inside a table
             /// as otherwise any insertion/deletion from the tracker would cause conflict
             /// with the order book.
-            pre_cancellation_tracker: Table<u8, PreCancellationTracker>,
-            dead_mans_switch_tracker: Table<u8, DeadMansSwitchTracker>,
+            pre_cancellation_tracker: BoxOrInline<PreCancellationTracker>,
+            dead_mans_switch_tracker: BoxOrInline<DeadMansSwitchTracker>,
         }
     }
 
@@ -523,16 +519,8 @@ module aptos_experimental::market_types {
         // requiring signers, and not addresses, purely to guarantee different dexes
         // cannot polute events to each other, accidentally or maliciously.
         let pre_cancellation_window = config.pre_cancellation_window_secs;
-        let pre_cancellation_tracker = table::new();
-        pre_cancellation_tracker.add(
-            PRE_CANCELLATION_TRACKER_KEY,
-            new_pre_cancellation_tracker(pre_cancellation_window)
-        );
-        let dead_mans_switch_tracker = table::new();
-        dead_mans_switch_tracker.add(
-            DEAD_MANS_SWITCH_TRACKER_KEY,
-            new_dead_mans_switch_tracker(config.min_keep_alive_time_secs)
-        );
+        let pre_cancellation_tracker = box_or_inline::new_box(new_pre_cancellation_tracker(pre_cancellation_window));
+        let dead_mans_switch_tracker = box_or_inline::new_box(new_dead_mans_switch_tracker(config.min_keep_alive_time_secs));
         Market::V1 {
             parent: signer::address_of(parent),
             market: signer::address_of(market),
@@ -833,19 +821,19 @@ module aptos_experimental::market_types {
     public(friend) fun get_pre_cancellation_tracker_mut<M: store + copy + drop>(
         self: &mut Market<M>
     ): &mut PreCancellationTracker {
-        self.pre_cancellation_tracker.borrow_mut(PRE_CANCELLATION_TRACKER_KEY)
+        self.pre_cancellation_tracker.borrow_mut()
     }
 
     public(friend) fun get_dead_mans_switch_tracker<M: store + copy + drop>(
         self: &Market<M>
     ): &DeadMansSwitchTracker {
-        self.dead_mans_switch_tracker.borrow(DEAD_MANS_SWITCH_TRACKER_KEY)
+        self.dead_mans_switch_tracker.borrow()
     }
 
     public(friend) fun get_dead_mans_switch_tracker_mut<M: store + copy + drop>(
         self: &mut Market<M>
     ): &mut DeadMansSwitchTracker {
-        self.dead_mans_switch_tracker.borrow_mut(DEAD_MANS_SWITCH_TRACKER_KEY)
+        self.dead_mans_switch_tracker.borrow_mut()
     }
 
     public(friend) fun is_dead_mans_switch_enabled<M: store + copy + drop>(
@@ -866,10 +854,8 @@ module aptos_experimental::market_types {
             dead_mans_switch_tracker,
         } = self;
         let MarketConfig::V1 { allow_self_trade: _, allow_events_emission: _, pre_cancellation_window_secs: _, enable_dead_mans_switch: _, min_keep_alive_time_secs: _ } = config;
-        destroy_tracker(pre_cancellation_tracker.remove(PRE_CANCELLATION_TRACKER_KEY));
-        dead_mans_switch_tracker::destroy_tracker(dead_mans_switch_tracker.remove(DEAD_MANS_SWITCH_TRACKER_KEY));
-        pre_cancellation_tracker.drop_unchecked();
-        dead_mans_switch_tracker.drop_unchecked();
+        destroy_tracker(pre_cancellation_tracker.destroy());
+        dead_mans_switch_tracker::destroy_tracker(dead_mans_switch_tracker.destroy());
         order_book.destroy_order_book()
     }
 
