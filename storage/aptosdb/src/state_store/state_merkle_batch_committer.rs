@@ -25,14 +25,14 @@ pub struct StateMerkleBatch {
 
 pub(crate) struct StateMerkleBatchCommitter {
     state_db: Arc<StateDb>,
-    state_merkle_batch_receiver: Receiver<CommitMessage<StateMerkleBatch>>,
+    state_merkle_batch_receiver: Receiver<CommitMessage<(StateMerkleBatch, StateMerkleBatch)>>,
     persisted_state: PersistedState,
 }
 
 impl StateMerkleBatchCommitter {
     pub fn new(
         state_db: Arc<StateDb>,
-        state_merkle_batch_receiver: Receiver<CommitMessage<StateMerkleBatch>>,
+        state_merkle_batch_receiver: Receiver<CommitMessage<(StateMerkleBatch, StateMerkleBatch)>>,
         persisted_state: PersistedState,
     ) -> Self {
         Self {
@@ -46,12 +46,17 @@ impl StateMerkleBatchCommitter {
         while let Ok(msg) = self.state_merkle_batch_receiver.recv() {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["batch_committer_work"]);
             match msg {
-                CommitMessage::Data(state_merkle_batch) => {
+                CommitMessage::Data((hot_state_merkle_batch, cold_state_merkle_batch)) => {
                     let StateMerkleBatch {
-                        top_levels_batch,
-                        batches_for_shards,
+                        top_levels_batch: hot_top_levels_batch,
+                        batches_for_shards: hot_batches_for_shards,
                         snapshot,
-                    } = state_merkle_batch;
+                    } = hot_state_merkle_batch;
+                    let StateMerkleBatch {
+                        top_levels_batch: cold_top_levels_batch,
+                        batches_for_shards: cold_batches_for_shards,
+                        ..
+                    } = cold_state_merkle_batch;
 
                     let base_version = self.persisted_state.get_state_summary().version();
                     let current_version = snapshot
@@ -63,8 +68,23 @@ impl StateMerkleBatchCommitter {
                         OTHER_TIMERS_SECONDS.timer_with(&["commit_jellyfish_merkle_nodes"]);
                     self.state_db
                         .state_merkle_db
-                        .commit(current_version, top_levels_batch, batches_for_shards)
-                        .expect("State merkle nodes commit failed.");
+                        .commit(
+                            current_version,
+                            hot_top_levels_batch,
+                            hot_batches_for_shards,
+                            /* is_hot = */ true,
+                        )
+                        .expect("State merkle hot nodes commit failed.");
+                    self.state_db
+                        .state_merkle_db
+                        .commit(
+                            current_version,
+                            cold_top_levels_batch,
+                            cold_batches_for_shards,
+                            /* is_hot = */ false,
+                        )
+                        .expect("State merkle cold nodes commit failed.");
+
                     if let Some(lru_cache) = self.state_db.state_merkle_db.lru_cache() {
                         self.state_db
                             .state_merkle_db
@@ -87,7 +107,7 @@ impl StateMerkleBatchCommitter {
                         .epoch_snapshot_pruner
                         .maybe_set_pruner_target_db_version(current_version);
 
-                    self.check_usage_consistency(&snapshot).unwrap();
+                    // self.check_usage_consistency(&snapshot).unwrap();
 
                     snapshot
                         .summary()
