@@ -1331,7 +1331,6 @@ macro_rules! assert_move_abort {
                 TransactionStatus::Keep(ExecutionStatus::MoveAbort {
                     location: _,
                     code: _,
-                    message: _,
                     info,
                 }) => info == $c,
                 _ => false,
