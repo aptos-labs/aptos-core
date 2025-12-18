@@ -39,6 +39,7 @@ rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+# TODO: Fix compiler errors so we can use `workspace = true` here
 sha2 = { version = "0.10.6" }
 thiserror = { workspace = true }
 
