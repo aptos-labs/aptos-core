@@ -10,7 +10,7 @@ use prometheus::{
     proto::MetricFamily,
     Opts,
 };
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 use sysinfo::{DiskExt, RefreshKind, System, SystemExt};
 
 const DISK_SUBSYSTEM: &str = "disk";
@@ -82,9 +82,12 @@ impl Collector for DiskMetricsCollector {
         system.refresh_disks_list();
         system.refresh_disks();
 
+        let mut seen_devices: HashSet<String> = HashSet::new();
+
         system
             .disks()
             .iter()
+            .filter(|disk| seen_devices.insert(disk.name().to_string_lossy().into_owned()))
             .flat_map(|disk| {
                 let total_space = ConstMetric::new_counter(
                     self.total_space.clone(),
