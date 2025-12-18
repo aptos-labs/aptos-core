@@ -40,8 +40,8 @@ use move_vm_runtime::{
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
     AsFunctionValueExtension, AsUnsyncCodeStorage, AsUnsyncModuleStorage, CodeStorage,
-    InstantiatedFunctionLoader, LegacyLoaderConfig, RuntimeEnvironment, ScriptLoader,
-    StagingModuleStorage, TypeChecker,
+    InstantiatedFunctionLoader, InterpreterFunctionCaches, LegacyLoaderConfig, RuntimeEnvironment,
+    ScriptLoader, StagingModuleStorage, TypeChecker,
 };
 use move_vm_test_utils::{
     gas_schedule::{CostTable, Gas, GasStatus},
@@ -492,6 +492,7 @@ impl SimpleVMTestAdapter<'_> {
                     &mut extensions,
                     &loader,
                     &mut logger,
+                    &mut InterpreterFunctionCaches::new(),
                 );
                 let trace = logger.finish();
                 let replay_result = TypeChecker::new(code_storage).replay(&trace);
@@ -508,6 +509,7 @@ impl SimpleVMTestAdapter<'_> {
                     &mut traversal_context,
                     &mut extensions,
                     &loader,
+                    &mut InterpreterFunctionCaches::new(),
                 );
                 match result {
                     Ok(return_values) => (return_values, None),

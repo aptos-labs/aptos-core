@@ -32,7 +32,8 @@ use move_core_types::{
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
 use move_vm_runtime::{
-    logging::expect_no_verification_errors, module_traversal::TraversalContext, ModuleStorage,
+    logging::expect_no_verification_errors, module_traversal::TraversalContext,
+    InterpreterFunctionCaches, ModuleStorage,
 };
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
@@ -113,6 +114,7 @@ pub(crate) fn run_script_prologue(
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
+    function_caches: &mut InterpreterFunctionCaches,
 ) -> Result<(), VMStatus> {
     let txn_replay_protector = txn_data.replay_protector();
     let txn_authentication_key = txn_data.authentication_proof().optional_auth_key();
@@ -239,6 +241,7 @@ pub(crate) fn run_script_prologue(
                 &mut gas_meter,
                 traversal_context,
                 module_storage,
+                function_caches,
             )
             .map(|_return_vals| ())
             .map_err(expect_no_verification_errors)
@@ -383,6 +386,7 @@ pub(crate) fn run_script_prologue(
                 &mut gas_meter,
                 traversal_context,
                 module_storage,
+                function_caches,
             )
             .map(|_return_vals| ())
             .map_err(expect_no_verification_errors)
@@ -404,6 +408,7 @@ pub(crate) fn run_multisig_prologue(
     features: &Features,
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
+    function_caches: &mut InterpreterFunctionCaches,
 ) -> Result<(), VMStatus> {
     let unreachable_error = VMStatus::error(StatusCode::UNREACHABLE, None);
     // Note[Orderless]: Earlier the `provided_payload` was being calculated as bcs::to_bytes(MultisigTransactionPayload::EntryFunction(entry_function)).
@@ -441,6 +446,7 @@ pub(crate) fn run_multisig_prologue(
             &mut UnmeteredGasMeter,
             traversal_context,
             module_storage,
+            function_caches,
         )
         .map(|_return_vals| ())
         .map_err(expect_no_verification_errors)
@@ -457,6 +463,7 @@ fn run_epilogue(
     features: &Features,
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
+    function_caches: &mut InterpreterFunctionCaches,
 ) -> VMResult<()> {
     let txn_gas_price = txn_data.gas_unit_price();
     let txn_max_gas_units = txn_data.max_gas_amount();
@@ -503,6 +510,7 @@ fn run_epilogue(
             &mut UnmeteredGasMeter,
             traversal_context,
             module_storage,
+            function_caches,
         )
     } else {
         // We can unconditionally do this as this condition can only be true if the prologue
@@ -546,6 +554,7 @@ fn run_epilogue(
                 &mut UnmeteredGasMeter,
                 traversal_context,
                 module_storage,
+                function_caches,
             )
         } else {
             // Regular tx, run the normal epilogue
@@ -582,6 +591,7 @@ fn run_epilogue(
                 &mut UnmeteredGasMeter,
                 traversal_context,
                 module_storage,
+                function_caches,
             )
         }
     }
@@ -589,7 +599,13 @@ fn run_epilogue(
 
     // Emit the FeeStatement event
     if features.is_emit_fee_statement_enabled() {
-        emit_fee_statement(session, module_storage, fee_statement, traversal_context)?;
+        emit_fee_statement(
+            session,
+            module_storage,
+            fee_statement,
+            traversal_context,
+            function_caches,
+        )?;
     }
 
     maybe_raise_injected_error(InjectedError::EndOfRunEpilogue)?;
@@ -602,6 +618,7 @@ fn emit_fee_statement(
     module_storage: &impl ModuleStorage,
     fee_statement: FeeStatement,
     traversal_context: &mut TraversalContext,
+    function_caches: &mut InterpreterFunctionCaches,
 ) -> VMResult<()> {
     session.execute_function_bypass_visibility(
         &TRANSACTION_FEE_MODULE,
@@ -611,6 +628,7 @@ fn emit_fee_statement(
         &mut UnmeteredGasMeter,
         traversal_context,
         module_storage,
+        function_caches,
     )?;
     Ok(())
 }
@@ -628,6 +646,7 @@ pub(crate) fn run_success_epilogue(
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
+    function_caches: &mut InterpreterFunctionCaches,
 ) -> Result<(), VMStatus> {
     fail_point!("move_adapter::run_success_epilogue", |_| {
         Err(VMStatus::error(
@@ -646,6 +665,7 @@ pub(crate) fn run_success_epilogue(
         features,
         traversal_context,
         is_simulation,
+        function_caches,
     )
     .or_else(|err| convert_epilogue_error(err, log_context))
 }
@@ -663,6 +683,7 @@ pub(crate) fn run_failure_epilogue(
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
+    function_caches: &mut InterpreterFunctionCaches,
 ) -> Result<(), VMStatus> {
     run_epilogue(
         session,
@@ -674,6 +695,7 @@ pub(crate) fn run_failure_epilogue(
         features,
         traversal_context,
         is_simulation,
+        function_caches,
     )
     .or_else(|err| {
         expect_only_successful_execution(
