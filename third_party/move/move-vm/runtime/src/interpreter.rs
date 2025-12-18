@@ -2712,12 +2712,12 @@ impl Frame {
                         gas_meter.charge_simple_instr(S::Abort)?;
 
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let error_message = String::from_utf8(vec_ref.as_bytes_ref().to_owned())
-                            .map_err(|err| {
-                                PartialVMError::new_invariant_violation(format!(
-                                    "Invalid UTF-8 string: {err}",
-                                ))
-                            })?;
+                        let bytes = vec_ref.try_as_bytes_ref()?;
+                        let error_message = String::from_utf8(bytes.to_owned()).map_err(|err| {
+                            PartialVMError::new_invariant_violation(format!(
+                                "Invalid UTF-8 string: {err}",
+                            ))
+                        })?;
 
                         let error_code = interpreter.operand_stack.pop_as::<u64>()?;
 

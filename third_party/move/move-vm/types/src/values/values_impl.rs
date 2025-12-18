@@ -3627,6 +3627,15 @@ impl VectorRef {
         }
     }
 
+    pub fn try_as_bytes_ref(&self) -> PartialVMResult<std::cell::Ref<'_, Vec<u8>>> {
+        let c = self.0.container();
+        match c {
+            Container::VecU8(r) => Ok(r.borrow()),
+            _ => Err(PartialVMError::new(StatusCode::TYPE_MISMATCH)
+                .with_message(format!("expected vector<u8>, got {}", c))),
+        }
+    }
+
     // note(inline): too big and too cold to inline
     pub fn pop(&self) -> PartialVMResult<Value> {
         let c = self.0.container();
