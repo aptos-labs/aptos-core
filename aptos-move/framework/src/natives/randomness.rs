@@ -9,7 +9,10 @@ use aptos_native_interface::{
     RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
 use better_any::{Tid, TidAble};
-use move_vm_runtime::{native_extensions::SessionListener, native_functions::NativeFunction};
+use move_vm_runtime::{
+    native_extensions::{NativeRuntimeRefCheckModelsCompleted, SessionListener},
+    native_functions::NativeFunction,
+};
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
@@ -39,6 +42,10 @@ impl SessionListener for RandomnessContext {
     fn abort(&mut self) {
         // No state changes to abort. Context will be reset on new session's start.
     }
+}
+
+impl NativeRuntimeRefCheckModelsCompleted for RandomnessContext {
+    // No native functions in this context return references, so no models to add.
 }
 
 impl RandomnessContext {

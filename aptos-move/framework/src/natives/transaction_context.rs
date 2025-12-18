@@ -16,7 +16,10 @@ use aptos_types::{
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::{NumArgs, NumBytes};
-use move_vm_runtime::{native_extensions::SessionListener, native_functions::NativeFunction};
+use move_vm_runtime::{
+    native_extensions::{NativeRuntimeRefCheckModelsCompleted, SessionListener},
+    native_functions::NativeFunction,
+};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Struct, Value},
@@ -52,6 +55,10 @@ pub struct NativeTransactionContext {
     user_transaction_context_opt: Option<UserTransactionContext>,
     /// A number to represent the sessions inside the execution of a transaction. Used for computing the `monotonically_increasing_counter` method.
     session_counter: u8,
+}
+
+impl NativeRuntimeRefCheckModelsCompleted for NativeTransactionContext {
+    // No native functions in this context return references, so no models to add.
 }
 
 impl SessionListener for NativeTransactionContext {
