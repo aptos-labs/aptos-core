@@ -5583,7 +5583,6 @@ impl ContainerRef {
 
 impl IndexedRef {
     fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: u64) -> PartialVMResult<()> {
-
         // set is_global to false for now, replacing the enum match with a boolean literal
         let is_global = false;
         let container = self.container_ref.container();
