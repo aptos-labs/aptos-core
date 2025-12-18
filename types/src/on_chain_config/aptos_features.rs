@@ -161,6 +161,8 @@ pub enum FeatureFlag {
     SESSION_CONTINUATION = 104,
     /// Enables function value reflection in the stdlib
     ENABLE_FUNCTION_REFLECTION = 105,
+    /// Enables bytecode version v10
+    VM_BINARY_FORMAT_V10 = 106,
 }
 
 impl FeatureFlag {
@@ -477,7 +479,9 @@ impl Features {
     }
 
     pub fn get_max_binary_format_version(&self) -> u32 {
-        if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V9) {
+        if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V10) {
+            file_format_common::VERSION_10
+        } else if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V9) {
             file_format_common::VERSION_9
         } else if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V8) {
             file_format_common::VERSION_8
@@ -535,7 +539,7 @@ mod test {
             file_format_common::VERSION_MIN
         );
         assert_eq!(
-            file_format_common::VERSION_9,
+            file_format_common::VERSION_10,
             file_format_common::VERSION_MAX
         );
     }

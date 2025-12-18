@@ -3050,6 +3050,18 @@ pub enum Bytecode {
         ty_stack << ty
     "#]
     Negate,
+
+    #[group = "control_flow"]
+    #[description = r#"
+        Abort the transaction with an error code and message.
+    "#]
+    #[semantics = r#"
+        stack >> (error_message: &vector<u8>)
+        stack >> (error_code: u64)
+        abort transaction with error_code and error_message
+    "#]
+    #[runtime_check_prologue = "ty_stack >> _"]
+    AbortMsg,
 }
 
 impl ::std::fmt::Debug for Bytecode {
@@ -3149,6 +3161,7 @@ impl ::std::fmt::Debug for Bytecode {
             Bytecode::Le => write!(f, "Le"),
             Bytecode::Ge => write!(f, "Ge"),
             Bytecode::Abort => write!(f, "Abort"),
+            Bytecode::AbortMsg => write!(f, "AbortMsg"),
             Bytecode::Nop => write!(f, "Nop"),
             Bytecode::Exists(a) => write!(f, "Exists({:?})", a),
             Bytecode::ExistsGeneric(a) => write!(f, "ExistsGeneric({:?})", a),
@@ -3171,7 +3184,10 @@ impl ::std::fmt::Debug for Bytecode {
 impl Bytecode {
     /// Return true if this bytecode instruction always branches
     pub fn is_unconditional_branch(&self) -> bool {
-        matches!(self, Bytecode::Ret | Bytecode::Abort | Bytecode::Branch(_))
+        matches!(
+            self,
+            Bytecode::Ret | Bytecode::Abort | Bytecode::AbortMsg | Bytecode::Branch(_)
+        )
     }
 
     /// Return true if the branching behavior of this bytecode instruction depends on a runtime
@@ -3328,6 +3344,7 @@ impl Bytecode {
             | Le
             | Ge
             | Abort
+            | AbortMsg
             | Nop
             | ImmBorrowVariantField(_)
             | ImmBorrowVariantFieldGeneric(_)

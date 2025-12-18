@@ -3275,6 +3275,28 @@ impl FunctionTranslator<'_> {
                 emitln!(writer, "$abort_flag := true;");
                 emitln!(writer, "return;")
             },
+            AbortMsg(_, srcs) => {
+                // TODO: Do something with the message?
+                let num_oper_code = global_state
+                    .get_temp_index_oper(mid, fid, srcs[0], baseline_flag)
+                    .unwrap();
+                let int2bv_str = if *num_oper_code == Bitwise {
+                    format!(
+                        "$bv2int.{}({})",
+                        boogie_num_type_base(
+                            self.parent.env,
+                            Some(self.fun_target.get_bytecode_loc(attr_id)),
+                            &self.get_local_type(srcs[0])
+                        ),
+                        str_local(srcs[0])
+                    )
+                } else {
+                    str_local(srcs[0])
+                };
+                emitln!(writer, "$abort_code := {};", int2bv_str);
+                emitln!(writer, "$abort_flag := true;");
+                emitln!(writer, "return;")
+            },
             Nop(..) => {},
             SpecBlock(..) => {
                 // spec blocks should only appear in bytecode during compilation

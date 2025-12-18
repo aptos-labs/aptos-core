@@ -1,0 +1,17 @@
+processed 2 tasks
+task 0 lines 1-14:  publish [module 0x22::test]
+task 1 lines 16-16:  run --verbose 0x22::test::abort_instr --args 404u64 --display-trace
+instructions: 5
+fingerprint: 6802314543769209353
+branch_outcomes: 
+calls:
+  entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::abort_instr
+Error: Function execution failed with VMError: {
+    message: Hello, world!,
+    major_status: ABORTED,
+    sub_status: Some(404),
+    location: 0x22::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 4)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

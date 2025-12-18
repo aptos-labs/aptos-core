@@ -506,6 +506,7 @@ pub enum Bytecode {
     Jump(AttrId, Label),
     Label(AttrId, Label),
     Abort(AttrId, TempIndex),
+    AbortMsg(AttrId, [TempIndex; 2]),
     Nop(AttrId),
     SpecBlock(AttrId, Spec),
 
@@ -527,6 +528,7 @@ impl Bytecode {
             | Jump(id, ..)
             | Label(id, ..)
             | Abort(id, ..)
+            | AbortMsg(id, ..)
             | Nop(id)
             | SpecBlock(id, ..)
             | SaveMem(id, ..)
@@ -546,6 +548,7 @@ impl Bytecode {
             | Jump(id, ..)
             | Label(id, ..)
             | Abort(id, ..)
+            | AbortMsg(id, ..)
             | Nop(id)
             | SpecBlock(id, ..)
             | SaveMem(id, ..)
@@ -613,6 +616,7 @@ impl Bytecode {
             Bytecode::Abort(_, src) => {
                 vec![*src]
             },
+            Bytecode::AbortMsg(_, srcs) => srcs.to_vec(),
             Bytecode::Load(_, _, _)
             | Bytecode::Jump(_, _)
             | Bytecode::Label(_, _)
@@ -653,6 +657,7 @@ impl Bytecode {
             | Bytecode::Jump(_, _)
             | Bytecode::Label(_, _)
             | Bytecode::Abort(_, _)
+            | Bytecode::AbortMsg(_, _)
             | Bytecode::Nop(_)
             | Bytecode::SaveMem(_, _, _)
             | Bytecode::SaveSpecVar(_, _, _)
@@ -1084,6 +1089,14 @@ impl fmt::Display for BytecodeDisplay<'_> {
             },
             Abort(_, src) => {
                 write!(f, "abort({})", self.lstr(*src))?;
+            },
+            AbortMsg(_, srcs) => {
+                write!(
+                    f,
+                    "abort_msg({}, {})",
+                    self.lstr(srcs[0]),
+                    self.lstr(srcs[1])
+                )?;
             },
             Nop(_) => {
                 write!(f, "nop")?;

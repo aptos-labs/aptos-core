@@ -1201,6 +1201,9 @@ impl<'a> ExpSourcifier<'a> {
                 emit!(self.wr(), "abort ");
                 self.print_exp(Prio::General, false, &args[0])
             }),
+            Operation::AbortMsg => self.parenthesize(context_prio, Prio::General, || {
+                self.print_exp_list("abort(", ")", &args[0..2]);
+            }),
             Operation::Freeze(explicit) => {
                 if *explicit {
                     self.print_exp_list("freeze(", ")", &args[0..1]);

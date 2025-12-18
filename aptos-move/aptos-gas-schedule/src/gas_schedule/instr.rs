@@ -22,6 +22,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         // control flow
         [ret: InternalGas, "ret", 220],
         [abort: InternalGas, "abort", 220],
+        [abort_msg: InternalGas, "abort_msg", 220],
 
         // Note(Gas): The costs of the branch instructions have been jacked up a bit intentionally
         //            to prevent any single transaction from running for too long.

@@ -2709,7 +2709,7 @@ impl Frame {
                         return Err(error);
                     },
                     Instruction::AbortMsg => {
-                        gas_meter.charge_simple_instr(S::Abort)?;
+                        gas_meter.charge_simple_instr(S::AbortMsg)?;
 
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
                         let bytes = vec_ref.try_as_bytes_ref()?;

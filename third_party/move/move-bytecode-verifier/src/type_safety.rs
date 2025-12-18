@@ -641,6 +641,17 @@ fn verify_instr(
             }
         },
 
+        Bytecode::AbortMsg => {
+            let operand_message = safe_unwrap!(verifier.stack.pop());
+            let operand_code = safe_unwrap!(verifier.stack.pop());
+            if operand_code != ST::U64 {
+                return Err(verifier.error(StatusCode::ABORT_TYPE_MISMATCH_ERROR, offset));
+            }
+            if get_vector_element_type(operand_message, false) != Some(ST::U8) {
+                return Err(verifier.error(StatusCode::ABORT_TYPE_MISMATCH_ERROR, offset));
+            }
+        },
+
         Bytecode::Ret => {
             let return_ = &verifier.function_view.return_().0;
             for return_type in return_.iter().rev() {

@@ -697,6 +697,11 @@ impl Generator {
                         ExpData::Call(self.new_stm_node_id(ctx), Operation::Abort, vec![temp]);
                     self.add_stm(stm);
                 },
+                AbortMsg(_, temps) => {
+                    let temps = self.make_temps(ctx, *temps);
+                    let stm = ExpData::Call(self.new_stm_node_id(ctx), Operation::AbortMsg, temps);
+                    self.add_stm(stm);
+                },
                 Branch(_, if_true, if_false, cond) => {
                     self.gen_branch(ctx, next_block_label, *cond, *if_true, *if_false);
                 },
@@ -1322,8 +1327,15 @@ impl Generator {
         ExpData::LocalVar(id, name).into_exp()
     }
 
-    fn make_temps(&mut self, ctx: &Context, temps: impl Iterator<Item = TempIndex>) -> Vec<Exp> {
-        temps.map(|temp| self.make_temp(ctx, temp)).collect()
+    fn make_temps(
+        &mut self,
+        ctx: &Context,
+        temps: impl IntoIterator<Item = TempIndex>,
+    ) -> Vec<Exp> {
+        temps
+            .into_iter()
+            .map(|temp| self.make_temp(ctx, temp))
+            .collect()
     }
 
     fn make_temp_pat(&mut self, ctx: &Context, temp: TempIndex) -> Pattern {
@@ -2328,6 +2340,7 @@ impl AssignTransformer<'_> {
                 },
                 // [TODO] handle global resource operators after issue #17010 is fixed
                 Operation::Abort
+                | Operation::AbortMsg
                 | Operation::Closure(..)
                 | Operation::Vector
                 | Operation::Exists(..)

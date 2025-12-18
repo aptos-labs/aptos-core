@@ -1168,6 +1168,7 @@ fn serialize_instruction_inner(
         Bytecode::Le => binary.push(Opcodes::LE as u8),
         Bytecode::Ge => binary.push(Opcodes::GE as u8),
         Bytecode::Abort => binary.push(Opcodes::ABORT as u8),
+        Bytecode::AbortMsg => binary.push(Opcodes::ABORT_MSG as u8),
         Bytecode::Nop => binary.push(Opcodes::NOP as u8),
         Bytecode::Exists(class_idx) => {
             binary.push(Opcodes::EXISTS as u8)?;
