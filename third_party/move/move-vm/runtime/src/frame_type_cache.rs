@@ -12,7 +12,11 @@ use move_binary_format::{
 };
 use move_core_types::gas_algebra::NumTypeNodes;
 use move_vm_types::loaded_data::runtime_types::Type;
-use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::BTreeMap,
+    rc::{Rc, Weak},
+};
 
 /// Variants for each individual instruction cache. Should make sure
 /// that the memory footprint of each variant is small. This is an
@@ -20,12 +24,10 @@ use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 #[derive(Clone)]
 pub(crate) enum PerInstructionCache {
     Nothing,
-    #[allow(dead_code)]
-    Pack(u16),
-    #[allow(dead_code)]
-    PackGeneric(u16),
-    Call(Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>),
-    CallGeneric(Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>),
+    // Instruction cache is part of the frame cache, so it has to store weak references to prevent
+    // memory leaks for recursive functions.
+    Call(Rc<LoadedFunction>, Weak<RefCell<FrameTypeCache>>),
+    CallGeneric(Rc<LoadedFunction>, Weak<RefCell<FrameTypeCache>>),
 }
 
 #[derive(Default)]
@@ -58,10 +60,14 @@ pub(crate) struct FrameTypeCache {
     /// did the insertion.
     pub(crate) per_instruction_cache: Vec<PerInstructionCache>,
 
+    /// Caches function and its cache for non-generic handles. Uses weak reference for cache to
+    /// prevent memory leaks for recursive functions.
     pub(crate) function_cache:
-        BTreeMap<FunctionHandleIndex, (Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)>,
+        BTreeMap<FunctionHandleIndex, (Rc<LoadedFunction>, Weak<RefCell<FrameTypeCache>>)>,
+    /// Caches function and its cache for generic handles. Like function cache, uses weak reference
+    /// for cache to prevent memory leaks for recursive functions.
     pub(crate) generic_function_cache:
-        BTreeMap<FunctionInstantiationIndex, (Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)>,
+        BTreeMap<FunctionInstantiationIndex, (Rc<LoadedFunction>, Weak<RefCell<FrameTypeCache>>)>,
 
     /// Cached instantiated local types for generic functions.
     pub(crate) instantiated_local_tys: Option<Rc<[Type]>>,
