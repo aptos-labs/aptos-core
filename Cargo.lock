@@ -6793,10 +6793,11 @@ checksum = "a2698f953def977c68f935bb0dfa959375ad4638570e969e2f1e9f433cbf1af6"
 
 [[package]]
 name = "cc"
-version = "1.2.16"
+version = "1.2.50"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be714c154be609ec7f5dad223a33bf1482fff90472de28f7362806e6d4832b8c"
+checksum = "9f50d563227a1c37cc0a263f64eca3334388c01c5e4c4861a9def205c614383c"
 dependencies = [
+ "find-msvc-tools",
  "jobserver",
  "libc",
  "shlex",
@@ -9336,6 +9337,12 @@ dependencies = [
  "redox_syscall 0.4.1",
  "windows-sys 0.52.0",
 ]
+
+[[package]]
+name = "find-msvc-tools"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a3076410a55c90011c298b04d0cfa770b00fa04e1e3c97d3f6c9de105a03844"
 
 [[package]]
 name = "findshlibs"

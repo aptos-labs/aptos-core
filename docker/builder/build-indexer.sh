@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 set -e
 
+source "$(dirname -- "${BASH_SOURCE[0]}")/performance_rustflags.sh"
+
 PROFILE=${PROFILE:-release}
 
 echo "Building indexer and related binaries"
@@ -10,12 +12,11 @@ echo "PROFILE: $PROFILE"
 
 echo "CARGO_TARGET_DIR: $CARGO_TARGET_DIR"
 
-if [[ "$PROFILE" == "performance" ]]; then
-  EXTRA_CONFIGS=(--config 'build.rustflags=["-C", "linker-plugin-lto"]')
-fi
+CMD_ENV=()
+[[ "$PROFILE" == "performance" ]] && CMD_ENV=(RUSTFLAGS="$PERFORMANCE_RUSTFLAGS")
 
 # Build all the rust binaries
-cargo build "${EXTRA_CONFIGS[@]}" --locked --profile=$PROFILE \
+env "${CMD_ENV[@]}" cargo build --locked --profile=$PROFILE \
     -p aptos-indexer-grpc-cache-worker \
     -p aptos-indexer-grpc-file-store \
     -p aptos-indexer-grpc-data-service \
