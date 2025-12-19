@@ -255,7 +255,8 @@ l0: move_loc l2
 // Function definition at index 1
 fun test_v1()
     local l0: m::Data
-    local l1: &m::Data
+    local l1: bool
+    local l2: &m::Data
     ld_u64 43
     call m::pack$Data$V1
     st_loc l0
@@ -265,39 +266,35 @@ fun test_v1()
     read_ref
     ld_u64 43
     eq
-    br_false l0
-    borrow_loc l0
-    // @10
     st_loc l1
     copy_loc l1
+    // @10
+    br_false l0
+    borrow_loc l0
+    st_loc l2
+    copy_loc l2
     call m::test_variant$Data$V1
-    br_true l1
-    move_loc l1
     // @15
+    br_true l1
+    move_loc l2
     pop
     ld_u64 14566554180833181697
     abort
-l1: move_loc l1
-    call m::borrow$Data$0$0
     // @20
-    read_ref
-    ld_u64 43
-    eq
-    br_false l2
-    mut_borrow_loc l0
-    // @25
-    freeze_ref
+l1: move_loc l2
     call m::borrow$Data$0$0
     read_ref
     ld_u64 43
     eq
-    // @30
+    // @25
+    br_false l2
+    copy_loc l1
     br_false l3
     ret
 l3: ld_u64 3
+    // @30
     abort
 l2: ld_u64 2
-    // @35
     abort
 l0: ld_u64 1
     abort

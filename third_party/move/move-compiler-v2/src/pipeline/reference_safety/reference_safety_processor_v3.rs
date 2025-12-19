@@ -757,7 +757,7 @@ impl LifetimeAnalysisStep<'_, '_> {
         }
         let value = match kind {
             AssignKind::Move => self.move_(src),
-            AssignKind::Copy => self.copy(src),
+            AssignKind::Copy | AssignKind::Dup => self.copy(src),
             AssignKind::Inferred => self.move_or_copy(src, &[], &[dest]),
             AssignKind::Store => panic!("unexpected assign kind"),
         };

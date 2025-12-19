@@ -51,7 +51,7 @@ use move_stackless_bytecode::{
     dataflow_domains::{AbstractDomain, JoinResult, MapDomain},
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    stackless_bytecode::{AttrId, Bytecode},
+    stackless_bytecode::{AssignKind, AttrId, Bytecode},
     stackless_control_flow_graph::StacklessControlFlowGraph,
 };
 use std::{
@@ -341,9 +341,16 @@ impl TransferFunctions for LiveVarAnalysis<'_> {
     fn execute(&self, state: &mut LiveVarState, instr: &Bytecode, offset: CodeOffset) {
         use Bytecode::*;
         match instr {
-            Assign(id, dst, src, _) => {
-                state.livevars.remove(dst);
-                state.insert_or_update(*src, self.livevar_info(id, offset), self.track_all_usages);
+            Assign(id, dst, src, kind) => {
+                // `Dup` a value itself does not kill and re-gen it.
+                if !(*kind == AssignKind::Dup && dst == src) {
+                    state.livevars.remove(dst);
+                    state.insert_or_update(
+                        *src,
+                        self.livevar_info(id, offset),
+                        self.track_all_usages,
+                    );
+                }
             },
             Load(_, dst, _) => {
                 state.livevars.remove(dst);
