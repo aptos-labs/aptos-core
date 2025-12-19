@@ -72,7 +72,11 @@ impl FullnodeData for FullnodeDataService {
         let r = req.into_inner();
         let starting_version = match r.starting_version {
             Some(version) => version,
-            None => return Err(Status::invalid_argument("Starting version must be set")),
+            None => match self.service_context.context.db.get_synced_version() {
+                Ok(Some(version)) => version,
+                Ok(None) => return Err(Status::unavailable("No synced version available yet")),
+                Err(e) => return Err(Status::internal(format!("{e}"))),
+            },
         };
         let processor_task_count = self.service_context.processor_task_count;
         let processor_batch_size = self.service_context.processor_batch_size;

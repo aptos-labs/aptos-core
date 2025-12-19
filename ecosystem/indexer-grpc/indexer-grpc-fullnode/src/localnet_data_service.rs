@@ -42,7 +42,11 @@ impl RawData for LocalnetDataService {
         let r = req.into_inner();
         let starting_version = match r.starting_version {
             Some(version) => version,
-            None => return Err(Status::invalid_argument("Starting version must be set")),
+            None => match context.db.get_synced_version() {
+                Ok(Some(version)) => version,
+                Ok(None) => return Err(Status::unavailable("No synced version available yet")),
+                Err(e) => return Err(Status::internal(format!("{e}"))),
+            },
         };
         let ending_version = if let Some(count) = r.transactions_count {
             starting_version.saturating_add(count)
