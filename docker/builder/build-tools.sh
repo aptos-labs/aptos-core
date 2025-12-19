@@ -44,8 +44,10 @@ echo "Building the Aptos Move framework..."
 # We build everything above with `cli` profile, but building `aptos-debugger`
 # with `performance` profile, if specified, helps speed up replay-verify, so we
 # do it here separately.
+CMD_ENV=()
 if [[ "$PROFILE" == "performance" ]]; then
-  EXTRA_CONFIGS=(--config 'build.rustflags=["-C", "linker-plugin-lto"]')
+  source "$(dirname -- "${BASH_SOURCE[0]}")/performance_rustflags.sh"
+  CMD_ENV=(RUSTFLAGS="${PERFORMANCE_RUSTFLAGS[*]}")
 fi
-cargo build "${EXTRA_CONFIG[@]}" --locked --profile=$PROFILE -p aptos-debugger "$@"
+env "${CMD_ENV[@]}" cargo build --locked --profile=$PROFILE -p aptos-debugger "$@"
 cp $CARGO_TARGET_DIR/$PROFILE/aptos-debugger dist/aptos-debugger

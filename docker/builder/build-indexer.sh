@@ -10,12 +10,14 @@ echo "PROFILE: $PROFILE"
 
 echo "CARGO_TARGET_DIR: $CARGO_TARGET_DIR"
 
+CMD_ENV=()
 if [[ "$PROFILE" == "performance" ]]; then
-  EXTRA_CONFIGS=(--config 'build.rustflags=["-C", "linker-plugin-lto"]')
+  source "$(dirname -- "${BASH_SOURCE[0]}")/performance_rustflags.sh"
+  CMD_ENV=(RUSTFLAGS="${PERFORMANCE_RUSTFLAGS[*]}")
 fi
 
 # Build all the rust binaries
-cargo build "${EXTRA_CONFIGS[@]}" --locked --profile=$PROFILE \
+env "${CMD_ENV[@]}" cargo build --locked --profile=$PROFILE \
     -p aptos-indexer-grpc-cache-worker \
     -p aptos-indexer-grpc-file-store \
     -p aptos-indexer-grpc-data-service \
