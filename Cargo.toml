@@ -291,8 +291,9 @@ default-members = [
 [workspace.package]
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 edition = "2024"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
+homepage = "https://aptosnetwork.com/"
+license = "LicenseRef-Aptos"
+license-file = "LICENSE"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
 rust-version = "1.85"
