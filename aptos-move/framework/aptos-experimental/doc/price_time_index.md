@@ -21,7 +21,6 @@ This is internal module, which cannot be used directly, use OrderBook instead.
 -  [Function `get_slippage_price`](#0x7_price_time_index_get_slippage_price)
 -  [Function `get_tie_breaker`](#0x7_price_time_index_get_tie_breaker)
 -  [Function `cancel_active_order`](#0x7_price_time_index_cancel_active_order)
--  [Function `is_active_order`](#0x7_price_time_index_is_active_order)
 -  [Function `is_taker_order`](#0x7_price_time_index_is_taker_order)
 -  [Function `single_match_with_current_active_order`](#0x7_price_time_index_single_match_with_current_active_order)
 -  [Function `get_single_match_for_buy_order`](#0x7_price_time_index_get_single_match_for_buy_order)
@@ -186,6 +185,15 @@ There is a code bug that breaks internal invariant
 
 
 
+<a id="0x7_price_time_index_EINVALID_SLIPPAGE_BPS"></a>
+
+
+
+<pre><code><b>const</b> <a href="price_time_index.md#0x7_price_time_index_EINVALID_SLIPPAGE_BPS">EINVALID_SLIPPAGE_BPS</a>: u64 = 3;
+</code></pre>
+
+
+
 <a id="0x7_price_time_index_U64_MAX"></a>
 
 ========= Active OrderBook ===========
@@ -327,7 +335,7 @@ there are o buys / sells, returns None.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_slippage_price">get_slippage_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, is_bid: bool, slippage_pct: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_slippage_price">get_slippage_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, is_bid: bool, slippage_bps: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
 </code></pre>
 
 
@@ -337,15 +345,18 @@ there are o buys / sells, returns None.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_slippage_price">get_slippage_price</a>(
-    self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>, is_bid: bool, slippage_pct: u64
+    self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>, is_bid: bool, slippage_bps: u64
 ): Option&lt;u64&gt; {
+    <b>if</b> (!is_bid) {
+        <b>assert</b>!(slippage_bps &lt;= get_slippage_pct_precision() * 100, <a href="price_time_index.md#0x7_price_time_index_EINVALID_SLIPPAGE_BPS">EINVALID_SLIPPAGE_BPS</a>);
+    };
     <b>let</b> mid_price = self.<a href="price_time_index.md#0x7_price_time_index_get_mid_price">get_mid_price</a>();
     <b>if</b> (mid_price.is_none()) {
         <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
     };
     <b>let</b> mid_price = mid_price.destroy_some();
     <b>let</b> slippage = mul_div(
-        mid_price, slippage_pct, get_slippage_pct_precision() * 100
+        mid_price, slippage_bps, get_slippage_pct_precision() * 100
     );
     <b>if</b> (is_bid) {
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(mid_price + slippage)
@@ -416,41 +427,6 @@ there are o buys / sells, returns None.
         self.buys.remove(&key).size
     } <b>else</b> {
         self.sells.remove(&key).size
-    }
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_price_time_index_is_active_order"></a>
-
-## Function `is_active_order`
-
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_is_active_order">is_active_order</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, is_bid: bool): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_is_active_order">is_active_order</a>(
-    self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>,
-    price: u64,
-    unique_priority_idx: UniqueIdxType,
-    is_bid: bool
-): bool {
-    <b>let</b> tie_breaker = <a href="price_time_index.md#0x7_price_time_index_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_bid);
-    <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceTime">PriceTime</a> { price, tie_breaker };
-    <b>if</b> (is_bid) {
-        self.buys.contains(&key)
-    } <b>else</b> {
-        self.sells.contains(&key)
     }
 }
 </code></pre>

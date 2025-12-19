@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 set -e
 
+source "$(dirname -- "${BASH_SOURCE[0]}")/performance_rustflags.sh"
+
 PROFILE=${PROFILE:-release}
 FEATURES=${FEATURES:-""}
 
@@ -16,9 +18,8 @@ PACKAGES=(
     aptos-forge-cli
 )
 
-if [[ "$PROFILE" == "performance" ]]; then
-  EXTRA_CONFIGS=(--config 'build.rustflags=["-C", "linker-plugin-lto"]')
-fi
+CMD_ENV=()
+[[ "$PROFILE" == "performance" ]] && CMD_ENV=(RUSTFLAGS="$PERFORMANCE_RUSTFLAGS" CC_ENABLE_DEBUG_OUTPUT=1)
 
 # We have to do these separately because we need to avoid feature unification
 # between aptos-node and other binaries
@@ -26,10 +27,10 @@ for PACKAGE in "${PACKAGES[@]}"; do
     # Build and overwrite the aptos-node binary with features if specified
     if [ -n "$FEATURES" ] && [ "$PACKAGE" = "aptos-node" ]; then
         echo "Building aptos-node with features ${FEATURES}"
-        cargo build "${EXTRA_CONFIGS[@]}" --profile=$PROFILE --features=$FEATURES -p $PACKAGE "$@"
+        env "${CMD_ENV[@]}" cargo build -vv --profile=$PROFILE --features=$FEATURES -p $PACKAGE "$@"
     else 
         # Build aptos-node separately
-        cargo build "${EXTRA_CONFIGS[@]}" --locked --profile=$PROFILE -p $PACKAGE "$@"
+        env "${CMD_ENV[@]}" cargo build -vv --locked --profile=$PROFILE -p $PACKAGE "$@"
     fi
 done
 

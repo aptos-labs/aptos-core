@@ -44,7 +44,7 @@ module aptos_experimental::order_operations {
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
         let order =
-            market.get_order_book_mut().try_cancel_order_with_client_order_id(
+            market.get_order_book_mut().try_cancel_single_order_with_client_order_id(
                 user, client_order_id
             );
         if (order.is_some()) {
@@ -79,7 +79,7 @@ module aptos_experimental::order_operations {
         cancel_details: String,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ): SingleOrder<M> {
-        let order = market.get_order_book_mut().cancel_order(account, order_id);
+        let order = market.get_order_book_mut().cancel_single_order(account, order_id);
         cancel_single_order_helper(market, order, emit_event, cancellation_reason, cancel_details, callbacks);
         order
     }
@@ -96,7 +96,7 @@ module aptos_experimental::order_operations {
         cancel_reason: String,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ): option::Option<SingleOrder<M>> {
-        let maybe_order = market.get_order_book_mut().try_cancel_order(account, order_id);
+        let maybe_order = market.get_order_book_mut().try_cancel_single_order(account, order_id);
         if (maybe_order.is_some()) {
             let order = maybe_order.destroy_some();
             cancel_single_order_helper(market, order, emit_event, cancellation_reason, cancel_reason, callbacks);
@@ -125,10 +125,8 @@ module aptos_experimental::order_operations {
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
         let order_book = market.get_order_book_mut();
-        order_book.decrease_order_size(account, order_id, size_delta);
-        let maybe_order = order_book.get_order(order_id);
-        assert!(maybe_order.is_some(), EORDER_DOES_NOT_EXIST);
-        let (order, _) = maybe_order.destroy_some().destroy_order_from_state();
+        order_book.decrease_single_order_size(account, order_id, size_delta);
+        let (order, _) = order_book.get_single_order(order_id).destroy_some().destroy_order_from_state();
         let (
             user,
             order_id,

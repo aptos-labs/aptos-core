@@ -80,7 +80,7 @@ It it the caller's responsibility to ensure that the account is authorized to ca
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ) {
     <b>let</b> order =
-        market.get_order_book_mut().try_cancel_order_with_client_order_id(
+        market.get_order_book_mut().try_cancel_single_order_with_client_order_id(
             user, client_order_id
         );
     <b>if</b> (order.is_some()) {
@@ -135,7 +135,7 @@ It it the caller's responsibility to ensure that the account is authorized to ca
     cancel_details: String,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ): SingleOrder&lt;M&gt; {
-    <b>let</b> order = market.get_order_book_mut().<a href="order_operations.md#0x7_order_operations_cancel_order">cancel_order</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id);
+    <b>let</b> order = market.get_order_book_mut().cancel_single_order(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id);
     <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>(market, order, emit_event, cancellation_reason, cancel_details, callbacks);
     order
 }
@@ -172,7 +172,7 @@ if it was successfully cancelled, or None if the order does not exist.
     cancel_reason: String,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;SingleOrder&lt;M&gt;&gt; {
-    <b>let</b> maybe_order = market.get_order_book_mut().<a href="order_operations.md#0x7_order_operations_try_cancel_order">try_cancel_order</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id);
+    <b>let</b> maybe_order = market.get_order_book_mut().try_cancel_single_order(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id);
     <b>if</b> (maybe_order.is_some()) {
         <b>let</b> order = maybe_order.destroy_some();
         <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>(market, order, emit_event, cancellation_reason, cancel_reason, callbacks);
@@ -221,10 +221,8 @@ It it the caller's responsibility to ensure that the account is authorized to mo
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ) {
     <b>let</b> <a href="order_book.md#0x7_order_book">order_book</a> = market.get_order_book_mut();
-    <a href="order_book.md#0x7_order_book">order_book</a>.<a href="order_operations.md#0x7_order_operations_decrease_order_size">decrease_order_size</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, size_delta);
-    <b>let</b> maybe_order = <a href="order_book.md#0x7_order_book">order_book</a>.get_order(order_id);
-    <b>assert</b>!(maybe_order.is_some(), <a href="order_operations.md#0x7_order_operations_EORDER_DOES_NOT_EXIST">EORDER_DOES_NOT_EXIST</a>);
-    <b>let</b> (order, _) = maybe_order.destroy_some().destroy_order_from_state();
+    <a href="order_book.md#0x7_order_book">order_book</a>.decrease_single_order_size(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, size_delta);
+    <b>let</b> (order, _) = <a href="order_book.md#0x7_order_book">order_book</a>.get_single_order(order_id).destroy_some().destroy_order_from_state();
     <b>let</b> (
         user,
         order_id,

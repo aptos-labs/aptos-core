@@ -159,14 +159,14 @@ module aptos_experimental::bulk_order_book_types {
         let (cancelled_bid_prices, cancelled_bid_sizes, post_only_bid_prices, post_only_bid_sizes) = if (bid_price_crossing_idx > 0) {
             let post_only_bid_prices = bid_prices.trim(bid_price_crossing_idx);
             let post_only_bid_sizes = bid_sizes.trim(bid_price_crossing_idx);
-            (bid_prices.slice(0, bid_price_crossing_idx), bid_sizes.slice(0, bid_price_crossing_idx), post_only_bid_prices, post_only_bid_sizes)
+            (bid_prices, bid_sizes, post_only_bid_prices, post_only_bid_sizes)
         } else {
             (vector::empty<u64>(), vector::empty<u64>(), bid_prices, bid_sizes)
         };
         let (cancelled_ask_prices, cancelled_ask_sizes, post_only_ask_prices, post_only_ask_sizes) = if (ask_price_crossing_idx > 0) {
             let post_only_ask_prices = ask_prices.trim(ask_price_crossing_idx);
             let post_only_ask_sizes = ask_sizes.trim(ask_price_crossing_idx);
-            (ask_prices.slice(0, ask_price_crossing_idx), ask_sizes.slice(0, ask_price_crossing_idx), post_only_ask_prices, post_only_ask_sizes)
+            (ask_prices, ask_sizes, post_only_ask_prices, post_only_ask_sizes)
         } else {
             (vector::empty<u64>(), vector::empty<u64>(), ask_prices, ask_sizes)
         };
