@@ -1,0 +1,66 @@
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0x99::FunctionCall
+struct S has key
+  val: u64
+
+// Function definition at index 0
+fun bar_global(l0: &signer, l1: u64): u64
+    local l2: &u64
+    borrow_loc l1
+    st_loc l2
+    copy_loc l0
+    copy_loc l2
+    call foo_global
+    // @5
+    move_loc l0
+    move_loc l2
+    call foo_global
+    add
+    ret
+
+// Function definition at index 1
+fun bar_mut_ref(l0: u64): u64
+    local l1: &mut u64
+    mut_borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    call foo_mut_ref
+    move_loc l1
+    // @5
+    call foo_mut_ref
+    add
+    ret
+
+// Function definition at index 2
+fun foo_global(l0: &signer, l1: &u64): u64
+    move_loc l0
+    ld_u64 42
+    pack S
+    move_to S
+    move_loc l1
+    // @5
+    read_ref
+    ld_u64 1
+    add
+    ret
+
+// Function definition at index 3
+fun foo_mut_ref(l0: &mut u64): u64
+    move_loc l0
+    read_ref
+    ld_u64 1
+    add
+    ret
+
+// Function definition at index 4
+fun foo_ref(l0: &u64): u64
+    move_loc l0
+    read_ref
+    ld_u64 1
+    add
+    ret
+
+
+============ bytecode verification succeeded ========

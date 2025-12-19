@@ -1,0 +1,123 @@
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0x99::FiledAccess
+struct Inner has copy + drop
+  value: u64
+
+struct Outer has copy + drop
+  inner: Inner
+
+// Function definition at index 0
+fun get_inner_value1(l0: &Inner): u64
+    move_loc l0
+    borrow_field Inner, value
+    read_ref
+    ret
+
+// Function definition at index 1
+fun get_inner_value2(l0: &Inner): u64
+    move_loc l0
+    borrow_field Inner, value
+    read_ref
+    ret
+
+// Function definition at index 2
+fun get_value(l0: &Outer): u64
+    move_loc l0
+    borrow_field Outer, inner
+    borrow_field Inner, value
+    read_ref
+    ret
+
+// Function definition at index 3
+fun set_value(l0: &mut Outer, l1: u64)
+    local l2: &mut u64
+    move_loc l0
+    mut_borrow_field Outer, inner
+    mut_borrow_field Inner, value
+    st_loc l2
+    move_loc l1
+    // @5
+    move_loc l2
+    write_ref
+    ret
+
+// Function definition at index 4
+fun test_field_access(l0: Outer, l1: u64): u64
+    local l2: &mut u64
+    borrow_loc l0
+    borrow_field Outer, inner
+    borrow_field Inner, value
+    read_ref
+    mut_borrow_loc l0
+    // @5
+    mut_borrow_field Outer, inner
+    mut_borrow_field Inner, value
+    st_loc l2
+    copy_loc l2
+    read_ref
+    // @10
+    ld_u64 1
+    add
+    move_loc l2
+    write_ref
+    move_loc l1
+    // @15
+    add
+    borrow_loc l0
+    borrow_field Outer, inner
+    borrow_field Inner, value
+    read_ref
+    // @20
+    add
+    ret
+
+// Function definition at index 5
+fun test_field_access_mut_ref(l0: Outer, l1: u64): u64
+    mut_borrow_loc l0
+    copy_loc l1
+    call set_value
+    mut_borrow_loc l0
+    move_loc l1
+    // @5
+    call set_value
+    borrow_loc l0
+    borrow_field Outer, inner
+    borrow_field Inner, value
+    read_ref
+    // @10
+    ret
+
+// Function definition at index 6
+fun test_field_access_ref(l0: Outer, l1: u64): u64
+    local l2: &mut u64
+    borrow_loc l0
+    borrow_field Outer, inner
+    borrow_field Inner, value
+    read_ref
+    mut_borrow_loc l0
+    // @5
+    mut_borrow_field Outer, inner
+    mut_borrow_field Inner, value
+    st_loc l2
+    copy_loc l2
+    read_ref
+    // @10
+    ld_u64 1
+    add
+    move_loc l2
+    write_ref
+    move_loc l1
+    // @15
+    add
+    borrow_loc l0
+    borrow_field Outer, inner
+    borrow_field Inner, value
+    read_ref
+    // @20
+    add
+    ret
+
+
+============ bytecode verification succeeded ========
