@@ -429,7 +429,13 @@ where
                         if let PerInstructionCache::Call(ref function, ref frame_cache) =
                             current_frame_cache.per_instruction_cache[current_frame.pc as usize]
                         {
-                            (Rc::clone(function), Rc::clone(frame_cache))
+                            let frame_cache = frame_cache.upgrade().ok_or_else(|| {
+                                PartialVMError::new_invariant_violation(
+                                    "Frame cache is dropped during interpreter execution",
+                                )
+                                .finish(Location::Undefined)
+                            })?;
+                            (Rc::clone(function), frame_cache)
                         } else {
                             let (function, frame_cache) =
                                 match current_frame_cache.function_cache.entry(fh_idx) {
@@ -444,15 +450,25 @@ where
                                             .map(Rc::new)?;
                                         let frame_cache = function_caches
                                             .get_or_create_frame_cache_non_generic(&function);
-                                        e.insert((function.clone(), frame_cache.clone()));
+                                        e.insert((function.clone(), Rc::downgrade(&frame_cache)));
                                         (function, frame_cache)
                                     },
-                                    Entry::Occupied(e) => e.into_mut().clone(),
+                                    Entry::Occupied(e) => {
+                                        let (function, frame_cache) = e.get();
+                                        let frame_cache =
+                                            frame_cache.upgrade().ok_or_else(|| {
+                                                PartialVMError::new_invariant_violation(
+                                            "Frame cache is dropped during interpreter execution",
+                                        )
+                                        .finish(Location::Undefined)
+                                            })?;
+                                        (function.clone(), frame_cache)
+                                    },
                                 };
                             current_frame_cache.per_instruction_cache[current_frame.pc as usize] =
                                 PerInstructionCache::Call(
                                     Rc::clone(&function),
-                                    Rc::clone(&frame_cache),
+                                    Rc::downgrade(&frame_cache),
                                 );
                             (function, frame_cache)
                         }
@@ -523,30 +539,46 @@ where
                         if let PerInstructionCache::CallGeneric(ref function, ref frame_cache) =
                             current_frame_cache.per_instruction_cache[current_frame.pc as usize]
                         {
-                            (Rc::clone(function), Rc::clone(frame_cache))
+                            let frame_cache = frame_cache.upgrade().ok_or_else(|| {
+                                PartialVMError::new_invariant_violation(
+                                    "Frame cache is dropped during interpreter execution",
+                                )
+                                .finish(Location::Undefined)
+                            })?;
+                            (Rc::clone(function), frame_cache)
                         } else {
-                            let (function, frame_cache) =
-                                match current_frame_cache.generic_function_cache.entry(idx) {
-                                    Entry::Vacant(e) => {
-                                        let function = Rc::new(
-                                            self.load_generic_function_no_visibility_checks(
-                                                gas_meter,
-                                                traversal_context,
-                                                &current_frame,
-                                                idx,
-                                            )?,
-                                        );
-                                        let frame_cache = function_caches
-                                            .get_or_create_frame_cache_generic(&function);
-                                        e.insert((function.clone(), frame_cache.clone()));
-                                        (function, frame_cache)
-                                    },
-                                    Entry::Occupied(e) => e.into_mut().clone(),
-                                };
+                            let (function, frame_cache) = match current_frame_cache
+                                .generic_function_cache
+                                .entry(idx)
+                            {
+                                Entry::Vacant(e) => {
+                                    let function =
+                                        Rc::new(self.load_generic_function_no_visibility_checks(
+                                            gas_meter,
+                                            traversal_context,
+                                            &current_frame,
+                                            idx,
+                                        )?);
+                                    let frame_cache = function_caches
+                                        .get_or_create_frame_cache_generic(&function);
+                                    e.insert((function.clone(), Rc::downgrade(&frame_cache)));
+                                    (function, frame_cache)
+                                },
+                                Entry::Occupied(e) => {
+                                    let (function, frame_cache) = e.get();
+                                    let frame_cache = frame_cache.upgrade().ok_or_else(|| {
+                                        PartialVMError::new_invariant_violation(
+                                            "Frame cache is dropped during interpreter execution",
+                                        )
+                                        .finish(Location::Undefined)
+                                    })?;
+                                    (function.clone(), frame_cache)
+                                },
+                            };
                             current_frame_cache.per_instruction_cache[current_frame.pc as usize] =
                                 PerInstructionCache::CallGeneric(
                                     Rc::clone(&function),
-                                    Rc::clone(&frame_cache),
+                                    Rc::downgrade(&frame_cache),
                                 );
                             (function, frame_cache)
                         }
