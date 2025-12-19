@@ -7,7 +7,7 @@ use crate::{
     metrics::{LATEST_SNAPSHOT_VERSION, OTHER_TIMERS_SECONDS},
     pruner::PrunerManager,
     schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-    state_store::{buffered_state::CommitMessage, persisted_state::PersistedState, StateDb},
+    state_store::{persisted_state::PersistedState, StateDb},
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_jellyfish_merkle::node_type::NodeKey;
@@ -15,7 +15,7 @@ use aptos_logger::{info, trace};
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::batch::RawBatch;
 use aptos_storage_interface::state_store::{state::State, state_with_summary::StateWithSummary};
-use std::sync::{mpsc::Receiver, Arc};
+use std::sync::Arc;
 
 pub struct StateMerkleBatch {
     pub top_levels_batch: RawBatch,
@@ -25,82 +25,65 @@ pub struct StateMerkleBatch {
 
 pub(crate) struct StateMerkleBatchCommitter {
     state_db: Arc<StateDb>,
-    state_merkle_batch_receiver: Receiver<CommitMessage<StateMerkleBatch>>,
     persisted_state: PersistedState,
 }
 
 impl StateMerkleBatchCommitter {
-    pub fn new(
-        state_db: Arc<StateDb>,
-        state_merkle_batch_receiver: Receiver<CommitMessage<StateMerkleBatch>>,
-        persisted_state: PersistedState,
-    ) -> Self {
+    pub fn new(state_db: Arc<StateDb>, persisted_state: PersistedState) -> Self {
         Self {
             state_db,
-            state_merkle_batch_receiver,
             persisted_state,
         }
     }
 
-    pub fn run(self) {
-        while let Ok(msg) = self.state_merkle_batch_receiver.recv() {
-            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["batch_committer_work"]);
-            match msg {
-                CommitMessage::Data(state_merkle_batch) => {
-                    let StateMerkleBatch {
-                        top_levels_batch,
-                        batches_for_shards,
-                        snapshot,
-                    } = state_merkle_batch;
+    pub fn commit(&self, state_merkle_batch: StateMerkleBatch) {
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["batch_committer_work"]);
+        let StateMerkleBatch {
+            top_levels_batch,
+            batches_for_shards,
+            snapshot,
+        } = state_merkle_batch;
 
-                    let base_version = self.persisted_state.get_state_summary().version();
-                    let current_version = snapshot
-                        .version()
-                        .expect("Current version should not be None");
+        let base_version = self.persisted_state.get_state_summary().version();
+        let current_version = snapshot
+            .version()
+            .expect("Current version should not be None");
 
-                    // commit jellyfish merkle nodes
-                    let _timer =
-                        OTHER_TIMERS_SECONDS.timer_with(&["commit_jellyfish_merkle_nodes"]);
-                    self.state_db
-                        .state_merkle_db
-                        .commit(current_version, top_levels_batch, batches_for_shards)
-                        .expect("State merkle nodes commit failed.");
-                    if let Some(lru_cache) = self.state_db.state_merkle_db.lru_cache() {
-                        self.state_db
-                            .state_merkle_db
-                            .version_caches()
-                            .iter()
-                            .for_each(|(_, cache)| cache.maybe_evict_version(lru_cache));
-                    }
-
-                    info!(
-                        version = current_version,
-                        base_version = base_version,
-                        root_hash = snapshot.summary().root_hash(),
-                        "State snapshot committed."
-                    );
-                    LATEST_SNAPSHOT_VERSION.set(current_version as i64);
-                    self.state_db
-                        .state_merkle_pruner
-                        .maybe_set_pruner_target_db_version(current_version);
-                    self.state_db
-                        .epoch_snapshot_pruner
-                        .maybe_set_pruner_target_db_version(current_version);
-
-                    self.check_usage_consistency(&snapshot).unwrap();
-
-                    snapshot
-                        .summary()
-                        .global_state_summary
-                        .log_generation("buffered_state_commit");
-                    self.persisted_state.set(snapshot);
-                },
-                CommitMessage::Sync(finish_sender) => finish_sender.send(()).unwrap(),
-                CommitMessage::Exit => {
-                    break;
-                },
-            }
+        // commit jellyfish merkle nodes
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_jellyfish_merkle_nodes"]);
+        self.state_db
+            .state_merkle_db
+            .commit(current_version, top_levels_batch, batches_for_shards)
+            .expect("State merkle nodes commit failed.");
+        if let Some(lru_cache) = self.state_db.state_merkle_db.lru_cache() {
+            self.state_db
+                .state_merkle_db
+                .version_caches()
+                .iter()
+                .for_each(|(_, cache)| cache.maybe_evict_version(lru_cache));
         }
+
+        info!(
+            version = current_version,
+            base_version = base_version,
+            root_hash = snapshot.summary().root_hash(),
+            "State snapshot committed."
+        );
+        LATEST_SNAPSHOT_VERSION.set(current_version as i64);
+        self.state_db
+            .state_merkle_pruner
+            .maybe_set_pruner_target_db_version(current_version);
+        self.state_db
+            .epoch_snapshot_pruner
+            .maybe_set_pruner_target_db_version(current_version);
+
+        self.check_usage_consistency(&snapshot).unwrap();
+
+        snapshot
+            .summary()
+            .global_state_summary
+            .log_generation("buffered_state_commit");
+        self.persisted_state.set(snapshot);
         trace!("State merkle batch committing thread exit.")
     }
 

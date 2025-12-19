@@ -1303,7 +1303,6 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "serde",
- "static_assertions",
  "status-line",
  "tokio",
 ]
