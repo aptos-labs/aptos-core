@@ -91,7 +91,7 @@ Aborts:
         <b>let</b> order_id = order_ids[i];
 
         // Get the order from the order book
-        <b>let</b> order_opt = market.get_order_book().get_order(order_id);
+        <b>let</b> order_opt = market.get_order_book().get_single_order(order_id);
 
         <b>if</b> (order_opt.is_some()) {
             <b>let</b> order_with_state = order_opt.destroy_some();

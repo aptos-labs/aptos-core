@@ -11,6 +11,7 @@ module aptos_experimental::market_types {
     use aptos_std::table;
     use aptos_std::table::Table;
     use aptos_framework::event;
+    use aptos_experimental::dead_mans_switch_tracker;
     use aptos_experimental::dead_mans_switch_tracker::{DeadMansSwitchTracker, new_dead_mans_switch_tracker};
     use aptos_experimental::market_clearinghouse_order_info::MarketClearinghouseOrderInfo;
     use aptos_experimental::single_order_types::SingleOrder;
@@ -19,8 +20,6 @@ module aptos_experimental::market_types {
     use aptos_experimental::order_book_types::TriggerCondition;
     use aptos_experimental::order_book::{OrderBook, new_order_book};
     use aptos_experimental::pre_cancellation_tracker::{PreCancellationTracker, new_pre_cancellation_tracker};
-    #[test_only]
-    use aptos_experimental::dead_mans_switch_tracker;
 
     #[test_only]
     use aptos_experimental::pre_cancellation_tracker::destroy_tracker;
@@ -393,7 +392,7 @@ module aptos_experimental::market_types {
         }
     }
 
-    enum MarketConfig has store {
+    enum MarketConfig has store, drop {
         V1 {
             /// Weather to allow self matching orders
             allow_self_trade: bool,
@@ -543,6 +542,35 @@ module aptos_experimental::market_types {
         }
     }
 
+    public fun set_allow_self_trade<M: store + copy + drop>(
+        self: &mut Market<M>, allow_self_trade: bool
+    ) {
+        self.config.allow_self_trade = allow_self_trade;
+    }
+
+    public fun set_allow_events_emission<M: store + copy + drop>(
+        self: &mut Market<M>, allow_events_emission: bool
+    ) {
+        self.config.allow_events_emission = allow_events_emission;
+    }
+
+    public fun set_allow_dead_mans_switch<M: store + copy + drop>(
+        self: &mut Market<M>, enable_dead_mans_switch: bool
+    ) {
+        self.config.enable_dead_mans_switch = enable_dead_mans_switch;
+    }
+
+    public fun set_dead_mans_switch_min_keep_alive_time_secs<M: store + copy + drop>(
+        self: &mut Market<M>, min_keep_alive_time_secs: u64
+    ) {
+        self.config.min_keep_alive_time_secs = min_keep_alive_time_secs;
+        dead_mans_switch_tracker::set_min_keep_alive_time_secs(
+            self.get_dead_mans_switch_tracker_mut(),
+            min_keep_alive_time_secs
+        );
+    }
+
+
     public fun get_order_book<M: store + copy + drop>(self: &Market<M>): &OrderBook<M> {
         &self.order_book
     }
@@ -576,7 +604,7 @@ module aptos_experimental::market_types {
     public fun get_remaining_size<M: store + copy + drop>(
         self: &Market<M>, order_id: OrderIdType
     ): u64 {
-        self.order_book.get_remaining_size(order_id)
+        self.order_book.get_single_remaining_size(order_id)
     }
 
     public fun get_bulk_order_remaining_size<M: store + copy + drop>(
@@ -588,7 +616,7 @@ module aptos_experimental::market_types {
     public fun get_order_metadata<M: store + copy + drop>(
         self: &Market<M>, order_id: OrderIdType
     ): Option<M> {
-        self.order_book.get_order_metadata(order_id)
+        self.order_book.get_single_order_metadata(order_id)
     }
 
     /// Returns the order metadata for an order by order id.
@@ -596,7 +624,7 @@ module aptos_experimental::market_types {
     public fun set_order_metadata<M: store + copy + drop>(
         self: &mut Market<M>, order_id: OrderIdType, metadata: M
     ) {
-        self.order_book.set_order_metadata(order_id, metadata);
+        self.order_book.set_single_order_metadata(order_id, metadata);
     }
 
     public fun get_order_metadata_by_client_id<M: store + copy + drop>(

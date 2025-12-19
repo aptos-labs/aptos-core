@@ -96,6 +96,7 @@ An order is considered valid if:
     -  [Parameters](#@Parameters_8)
     -  [Returns](#@Returns_9)
     -  [Example](#@Example_10)
+-  [Function `set_min_keep_alive_time_secs`](#0x7_dead_mans_switch_tracker_set_min_keep_alive_time_secs)
 -  [Function `is_order_valid`](#0x7_dead_mans_switch_tracker_is_order_valid)
     -  [Parameters](#@Parameters_11)
     -  [Returns](#@Returns_12)
@@ -383,6 +384,33 @@ let tracker = new_dead_mans_switch_tracker(60); // 60 second minimum
         min_keep_alive_time_secs,
         state: <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_new_default_big_ordered_map">new_default_big_ordered_map</a>(),
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_dead_mans_switch_tracker_set_min_keep_alive_time_secs"></a>
+
+## Function `set_min_keep_alive_time_secs`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_set_min_keep_alive_time_secs">set_min_keep_alive_time_secs</a>(tracker: &<b>mut</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">dead_mans_switch_tracker::DeadMansSwitchTracker</a>, min_keep_alive_time_secs: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_set_min_keep_alive_time_secs">set_min_keep_alive_time_secs</a>(
+    tracker: &<b>mut</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">DeadMansSwitchTracker</a>,
+    min_keep_alive_time_secs: u64,
+) {
+    tracker.min_keep_alive_time_secs = min_keep_alive_time_secs;
 }
 </code></pre>
 

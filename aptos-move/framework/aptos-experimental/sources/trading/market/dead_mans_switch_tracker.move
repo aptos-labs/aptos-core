@@ -138,6 +138,13 @@ module aptos_experimental::dead_mans_switch_tracker {
         }
     }
 
+    public(friend) fun set_min_keep_alive_time_secs(
+        tracker: &mut DeadMansSwitchTracker,
+        min_keep_alive_time_secs: u64,
+    ) {
+        tracker.min_keep_alive_time_secs = min_keep_alive_time_secs;
+    }
+
     /// Checks if an order is valid based on the dead man's switch state
     ///
     /// An order is valid if:

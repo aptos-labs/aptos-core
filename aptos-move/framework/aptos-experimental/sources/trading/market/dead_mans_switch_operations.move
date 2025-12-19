@@ -43,7 +43,7 @@ module aptos_experimental::dead_mans_switch_operations {
             let order_id = order_ids[i];
 
             // Get the order from the order book
-            let order_opt = market.get_order_book().get_order(order_id);
+            let order_opt = market.get_order_book().get_single_order(order_id);
 
             if (order_opt.is_some()) {
                 let order_with_state = order_opt.destroy_some();
