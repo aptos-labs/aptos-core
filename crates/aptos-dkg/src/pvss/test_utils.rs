@@ -250,6 +250,8 @@ pub fn get_weighted_configs_for_testing<T: traits::ThresholdConfig>() -> Vec<Wei
 }
 
 pub const BENCHMARK_CONFIGS: &[(usize, usize)] = &[
+    // (t, n)
+    (129, 219), // See the mid-Nov 2025 weighted config below
     (143, 254),
     (184, 254),
     (548, 821),

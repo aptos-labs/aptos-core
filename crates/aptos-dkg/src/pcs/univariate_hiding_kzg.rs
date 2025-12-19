@@ -298,6 +298,7 @@ impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
     type MsmInput = MsmInput<E::G1Affine, E::ScalarField>;
     type MsmOutput = E::G1;
     type Scalar = E::ScalarField;
+    type Base = E::G1Affine;
 
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
         assert!(
@@ -321,6 +322,12 @@ impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
     fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
         E::G1::msm(input.bases(), &input.scalars())
             .expect("MSM computation failed in univariate KZG")
+    }
+
+    fn batch_normalize(
+            msm_output: Vec<Self::MsmOutput>
+        ) -> Vec<Self::Base> {
+        E::G1::normalize_batch(&msm_output)
     }
 }
 

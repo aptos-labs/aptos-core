@@ -4,14 +4,14 @@
 use crate::pvss::signed::GenericSigning;
 use ark_ec::pairing::Pairing;
 
-mod chunked_elgamal;
+pub mod chunked_elgamal;
 pub mod chunked_scalar_mul; // TODO: make non-pub??
 pub mod chunks;
 mod hkzg_chunked_elgamal;
 mod hkzg_chunked_elgamal_commit;
 mod input_secret;
 mod keys;
-mod public_parameters;
+pub mod public_parameters;
 mod scalar_mul;
 //mod transcript;
 mod weighted_transcript;

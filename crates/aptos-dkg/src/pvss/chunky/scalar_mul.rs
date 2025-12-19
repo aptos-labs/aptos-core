@@ -54,6 +54,7 @@ impl<C: CurveGroup> fixed_base_msms::Trait for Homomorphism<C> {
     type MsmInput = MsmInput<C::Affine, C::ScalarField>;
     type MsmOutput = C;
     type Scalar = C::ScalarField;
+    type Base = C::Affine;
 
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
         // Create one MsmInput per scalar, each with its own cloned base.
@@ -71,6 +72,12 @@ impl<C: CurveGroup> fixed_base_msms::Trait for Homomorphism<C> {
 
     fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
         input.bases()[0] * input.scalars()[0]
+    }
+
+    fn batch_normalize(
+            msm_output: Vec<Self::MsmOutput>
+        ) -> Vec<Self::Base> {
+        C::normalize_batch(&msm_output)
     }
 }
 

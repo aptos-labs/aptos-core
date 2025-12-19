@@ -163,12 +163,12 @@ where
     type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> =
         TupleCodomainShape<A::Output<U>, B::Output<U>>;
 
-    fn map<U, F>(self, f: F) -> Self::Output<U>
+    fn map<U, F>(self, mut f: F) -> Self::Output<U>
     where
-        F: Fn(T) -> U,
+        F: FnMut(T) -> U,
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
     {
-        TupleCodomainShape(self.0.map(&f), self.1.map(f))
+        TupleCodomainShape(self.0.map(&mut f), self.1.map(f))
     }
 }
 
@@ -197,6 +197,7 @@ where
     type MsmInput = H1::MsmInput;
     type MsmOutput = H1::MsmOutput;
     type Scalar = H1::Scalar;
+    type Base = H1::Base;
 
     /// Returns the MSM terms for each homomorphism, combined into a tuple.
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
@@ -207,6 +208,12 @@ where
 
     fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
         H1::msm_eval(input)
+    }
+
+    fn batch_normalize(
+            msm_output: Vec<Self::MsmOutput>
+        ) -> Vec<Self::Base> {
+        H1::batch_normalize(msm_output)
     }
 }
 

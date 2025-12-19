@@ -28,6 +28,7 @@ use std::fmt::Debug;
 pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOutput>> {
     // Type representing the scalar used in the `MsmInput`s. Convenient to repeat here
     type Scalar: ark_ff::PrimeField; // Probably need less here but this what it'll be in practice
+    type Base: Clone + CanonicalSerialize + CanonicalDeserialize  + Debug + Eq;
 
     /// Type representing a single MSM input (a set of bases and scalars). Normally, this would default
     /// to `MsmInput<..., ...>`, but stable Rust does not yet support associated type defaults,
@@ -35,7 +36,7 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
     type MsmInput: CanonicalSerialize
         + CanonicalDeserialize
         + Clone
-        + IsMsmInput<Scalar = Self::Scalar>
+        + IsMsmInput<Scalar = Self::Scalar, Base = Self::Base>
         + Debug
         + Eq;
 
@@ -66,6 +67,7 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
         + Eq
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
+        // for<'a> &'a mut Self::CodomainShape<T>: IntoIterator<Item = &'a mut T>;
 
     /// Returns the MSM terms corresponding to a given homomorphism input.
     ///
@@ -90,6 +92,34 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
     {
         msms.map(|msm_input| Self::msm_eval(msm_input))
     }
+
+    fn batch_normalize(
+        msm_output: Vec<Self::MsmOutput>
+    ) -> Vec<Self::Base>;
+
+    fn normalize_output(
+        projective_output: &mut Self::CodomainShape<Self::MsmOutput>
+    ) -> Self::CodomainShape<Self::Base> 
+    where
+        Self::CodomainShape<Self::MsmOutput>: EntrywiseMap<
+            Self::MsmOutput,
+            Output<Self::Base> = Self::CodomainShape<Self::Base>,
+        >,    
+    {
+    // 1. Collect all elements into a Vec
+    let msm_vec: Vec<Self::MsmOutput> = projective_output.clone().into_iter().collect();
+
+    // 2. Apply batch_normalize
+    let normalized_vec: Vec<Self::Base> = Self::batch_normalize(msm_vec);
+
+    // 3. Replace elements in projective_output with normalized values
+    let mut iter = normalized_vec.into_iter();
+
+    projective_output.clone().map(|_t| {
+        iter.next().expect("Not enough elements, somehow")
+    })
+
+    }
 }
 
 // Implements FixedBaseMsms for the LiftHomomorphism wrapper.
@@ -106,6 +136,7 @@ where
     type MsmInput = H::MsmInput;
     type MsmOutput = H::MsmOutput;
     type Scalar = H::Scalar;
+    type Base = H::Base;
 
     /// Returns the MSM terms corresponding to a given homomorphism input. The output is shaped so that applying the MSM elementwise yields the homomorphism output.
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
@@ -115,6 +146,12 @@ where
 
     fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
         H::msm_eval(input)
+    }
+
+    fn batch_normalize(
+        msm_output: Vec<Self::MsmOutput>
+    ) -> Vec<Self::Base> {
+        H::batch_normalize(msm_output)
     }
 }
 

@@ -33,9 +33,9 @@ use criterion::black_box;
 
 pub fn all_groups(c: &mut Criterion) {
     // unweighted BN254 PVSS with aggregatable subtranscript; only doing 2 because large configs are a bit slow and not relevant anyway
-    for tc in get_weighted_configs_for_benchmarking().into_iter().take(2) {
-        subaggregatable_pvss_group::<ChunkyTranscript<Bn254>>(&tc, c);
-    }
+    // for tc in get_weighted_configs_for_benchmarking().into_iter().take(2) {
+    //     subaggregatable_pvss_group::<ChunkyTranscript<Bn254>>(&tc, c);
+    // }
     for tc in get_weighted_configs_for_benchmarking().into_iter().take(2) {
         subaggregatable_pvss_group::<ChunkyTranscriptv2<Bn254>>(&tc, c);
     }
@@ -102,8 +102,8 @@ where
 
     // pvss_transcript_random::<T, WallTime>(sc, &mut group);
     pvss_deal::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
-    pvss_subaggregate::<T, WallTime>(sc, &mut group);
     pvss_nonaggregate_serialize::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
+    pvss_subaggregate::<T, WallTime>(sc, &mut group);
     pvss_nonaggregate_verify::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
     pvss_decrypt_own_share::<T, WallTime>(
         sc, &d.pp, &d.ssks, &d.spks, &d.dks, &d.eks, &d.s, &mut group,

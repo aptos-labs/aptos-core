@@ -567,33 +567,34 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         dk: &Self::DecryptPrivKey,
         pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        let Cs = &self.subtrs.Cs[player.id];
-        debug_assert_eq!(Cs.len(), sc.get_player_weight(player));
+        panic!("dsf")
+        // let Cs = &self.subtrs.Cs[player.id];
+        // debug_assert_eq!(Cs.len(), sc.get_player_weight(player));
 
-        if Cs.len() > 0 {
-            if let Some(first_key) = self.subtrs.Rs.first() {
-                debug_assert_eq!(
-                    first_key.len(),
-                    Cs[0].len(),
-                    "Number of ephemeral keys does not match the number of ciphertext chunks"
-                );
-            }
-        }
+        // if Cs.len() > 0 {
+        //     if let Some(first_key) = self.subtrs.Rs.first() {
+        //         debug_assert_eq!(
+        //             first_key.len(),
+        //             Cs[0].len(),
+        //             "Number of ephemeral keys does not match the number of ciphertext chunks"
+        //         );
+        //     }
+        // }
 
-        let pk_shares = self.get_public_key_share(sc, player);
+        // let pk_shares = self.get_public_key_share(sc, player);
 
-        let sk_shares: Vec<_> = decrypt_chunked_scalars(
-            &Cs,
-            &self.subtrs.Rs,
-            &dk.dk,
-            &pp.pp_elgamal,
-            &pp.table,
-            pp.ell,
-        );
+        // let sk_shares: Vec<_> = decrypt_chunked_scalars(
+        //     &Cs,
+        //     &self.subtrs.Rs,
+        //     &dk.dk,
+        //     &pp.pp_elgamal,
+        //     &pp.table,
+        //     pp.ell,
+        // );
 
-        (
-            Scalar::vec_from_inner(sk_shares), pk_shares, // TODO: review this formalism... wh ydo we need this here?
-        )
+        // (
+        //     Scalar::vec_from_inner(sk_shares), pk_shares, // TODO: review this formalism... wh ydo we need this here?
+        // )
     }
 
     #[allow(non_snake_case)]
