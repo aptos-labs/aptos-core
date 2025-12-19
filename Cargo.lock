@@ -8464,6 +8464,7 @@ dependencies = [
  "bcs 0.1.4",
  "claims",
  "hex",
+ "memory-stats",
  "move-binary-format",
  "move-core-types",
  "move-model",
@@ -11994,12 +11995,12 @@ dependencies = [
 
 [[package]]
 name = "memory-stats"
-version = "1.1.0"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34f79cf9964c5c9545493acda1263f1912f8d2c56c8a2ffee2606cb960acaacc"
+checksum = "c73f5c649995a115e1a0220b35e4df0a1294500477f97a91d0660fb5abeb574a"
 dependencies = [
  "libc",
- "winapi 0.3.9",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
