@@ -15,7 +15,7 @@
 -  [Function `take_ready_price_move_up_orders`](#0x7_pending_order_book_index_take_ready_price_move_up_orders)
 -  [Function `take_ready_price_move_down_orders`](#0x7_pending_order_book_index_take_ready_price_move_down_orders)
 -  [Function `take_ready_price_based_orders`](#0x7_pending_order_book_index_take_ready_price_based_orders)
--  [Function `take_time_time_based_orders`](#0x7_pending_order_book_index_take_time_time_based_orders)
+-  [Function `take_ready_time_based_orders`](#0x7_pending_order_book_index_take_ready_time_based_orders)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map">0x1::big_ordered_map</a>;
@@ -385,13 +385,13 @@
 
 </details>
 
-<a id="0x7_pending_order_book_index_take_time_time_based_orders"></a>
+<a id="0x7_pending_order_book_index_take_ready_time_based_orders"></a>
 
-## Function `take_time_time_based_orders`
+## Function `take_ready_time_based_orders`
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_take_time_time_based_orders">take_time_time_based_orders</a>(self: &<b>mut</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_PendingOrderBookIndex">pending_order_book_index::PendingOrderBookIndex</a>, order_limit: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_take_ready_time_based_orders">take_ready_time_based_orders</a>(self: &<b>mut</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_PendingOrderBookIndex">pending_order_book_index::PendingOrderBookIndex</a>, order_limit: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>&gt;
 </code></pre>
 
 
@@ -400,7 +400,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_take_time_time_based_orders">take_time_time_based_orders</a>(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_take_ready_time_based_orders">take_ready_time_based_orders</a>(
     self: &<b>mut</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_PendingOrderBookIndex">PendingOrderBookIndex</a>, order_limit: u64
 ): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;OrderIdType&gt; {
     <b>let</b> orders = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();

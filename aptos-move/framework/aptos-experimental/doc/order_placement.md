@@ -171,11 +171,38 @@ TimeBased(time): The order is triggered when the current time is greater than or
 
 
 
+<a id="0x7_order_placement_ECLEARINGHOUSE_SETTLEMENT_VIOLATION"></a>
+
+
+
+<pre><code><b>const</b> <a href="order_placement.md#0x7_order_placement_ECLEARINGHOUSE_SETTLEMENT_VIOLATION">ECLEARINGHOUSE_SETTLEMENT_VIOLATION</a>: u64 = 2;
+</code></pre>
+
+
+
+<a id="0x7_order_placement_ECLIENT_ORDER_ID_LENGTH_EXCEEDED"></a>
+
+
+
+<pre><code><b>const</b> <a href="order_placement.md#0x7_order_placement_ECLIENT_ORDER_ID_LENGTH_EXCEEDED">ECLIENT_ORDER_ID_LENGTH_EXCEEDED</a>: u64 = 3;
+</code></pre>
+
+
+
 <a id="0x7_order_placement_EINVALID_ORDER"></a>
 
 
 
 <pre><code><b>const</b> <a href="order_placement.md#0x7_order_placement_EINVALID_ORDER">EINVALID_ORDER</a>: u64 = 1;
+</code></pre>
+
+
+
+<a id="0x7_order_placement_MAX_CLIENT_ORDER_ID_LENGTH"></a>
+
+
+
+<pre><code><b>const</b> <a href="order_placement.md#0x7_order_placement_MAX_CLIENT_ORDER_ID_LENGTH">MAX_CLIENT_ORDER_ID_LENGTH</a>: u64 = 32;
 </code></pre>
 
 
@@ -856,7 +883,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     );
     // If the maker is invalid cancel the maker order and <b>continue</b> <b>to</b> the next maker order
     <b>if</b> (maker_order.get_remaining_size_from_match_details() != 0) {
-        market.get_order_book_mut().cancel_order(maker_address, order_id);
+        market.get_order_book_mut().cancel_single_order(maker_address, order_id);
     };
     <a href="order_placement.md#0x7_order_placement_cleanup_order_internal">cleanup_order_internal</a>(
         maker_address,
@@ -1227,6 +1254,13 @@ Places a market order - The order is guaranteed to be a taker order and will be 
 
     <b>let</b> maker_cancellation_reason_str = settle_result.get_maker_cancellation_reason();
     <b>let</b> taker_cancellation_reason_str = settle_result.get_taker_cancellation_reason();
+    <b>if</b> (settled_size &lt; maker_matched_size ) {
+        // If the order is partially settled, the expectation is that the clearinghouse
+        // provides cancellation reason for at least one of the orders.
+        <b>assert</b>!(maker_cancellation_reason_str.is_some() || taker_cancellation_reason_str.is_some(),
+           <a href="order_placement.md#0x7_order_placement_ECLEARINGHOUSE_SETTLEMENT_VIOLATION">ECLEARINGHOUSE_SETTLEMENT_VIOLATION</a>
+        );
+    };
     <b>let</b> taker_cancellation_reason = <b>if</b> (taker_cancellation_reason_str.is_some()) {
         <a href="order_placement.md#0x7_order_placement_cancel_single_order_internal">cancel_single_order_internal</a>(
             market,
@@ -1269,8 +1303,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         );
     } <b>else</b> {
         <b>if</b> (unsettled_maker_size &gt; 0) {
-            // If the taker is cancelled but the maker is not cancelled, then we need <b>to</b> re-insert
-            // the maker order back into the order book
+            //  we need <b>to</b> re-insert the maker order back into the order book
             <b>let</b> reinsertion_request = maker_order.new_order_match_details_with_modified_size(unsettled_maker_size);
             market.get_order_book_mut().reinsert_order(
                 reinsertion_request,
@@ -1337,11 +1370,14 @@ is done before calling this function if needed.
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ): <a href="order_placement.md#0x7_order_placement_OrderMatchResult">OrderMatchResult</a>&lt;R&gt; {
     <b>assert</b>!(
-        orig_size &gt; 0 && remaining_size &gt; 0,
+        orig_size &gt; 0 && remaining_size &gt; 0 && orig_size &gt;= remaining_size,
         <a href="order_placement.md#0x7_order_placement_EINVALID_ORDER">EINVALID_ORDER</a>
     );
     <b>assert</b>!(max_match_limit &gt; 0, <a href="order_placement.md#0x7_order_placement_EINVALID_ORDER">EINVALID_ORDER</a>);
     <b>assert</b>!(limit_price &gt; 0, <a href="order_placement.md#0x7_order_placement_EINVALID_ORDER">EINVALID_ORDER</a>);
+    <b>if</b> (client_order_id.is_some()) {
+        <b>assert</b>!(client_order_id.borrow().length() &lt;= <a href="order_placement.md#0x7_order_placement_MAX_CLIENT_ORDER_ID_LENGTH">MAX_CLIENT_ORDER_ID_LENGTH</a>, <a href="order_placement.md#0x7_order_placement_ECLIENT_ORDER_ID_LENGTH_EXCEEDED">ECLIENT_ORDER_ID_LENGTH_EXCEEDED</a>);
+    };
     <b>if</b> (order_id.is_none()) {
         // If order id is not provided, generate a new order id
         order_id = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(next_order_id());

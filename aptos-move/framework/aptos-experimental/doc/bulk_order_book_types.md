@@ -603,14 +603,14 @@ A tuple containing:
     <b>let</b> (cancelled_bid_prices, cancelled_bid_sizes, post_only_bid_prices, post_only_bid_sizes) = <b>if</b> (bid_price_crossing_idx &gt; 0) {
         <b>let</b> post_only_bid_prices = bid_prices.trim(bid_price_crossing_idx);
         <b>let</b> post_only_bid_sizes = bid_sizes.trim(bid_price_crossing_idx);
-        (bid_prices.slice(0, bid_price_crossing_idx), bid_sizes.slice(0, bid_price_crossing_idx), post_only_bid_prices, post_only_bid_sizes)
+        (bid_prices, bid_sizes, post_only_bid_prices, post_only_bid_sizes)
     } <b>else</b> {
         (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u64&gt;(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u64&gt;(), bid_prices, bid_sizes)
     };
     <b>let</b> (cancelled_ask_prices, cancelled_ask_sizes, post_only_ask_prices, post_only_ask_sizes) = <b>if</b> (ask_price_crossing_idx &gt; 0) {
         <b>let</b> post_only_ask_prices = ask_prices.trim(ask_price_crossing_idx);
         <b>let</b> post_only_ask_sizes = ask_sizes.trim(ask_price_crossing_idx);
-        (ask_prices.slice(0, ask_price_crossing_idx), ask_sizes.slice(0, ask_price_crossing_idx), post_only_ask_prices, post_only_ask_sizes)
+        (ask_prices, ask_sizes, post_only_ask_prices, post_only_ask_sizes)
     } <b>else</b> {
         (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u64&gt;(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u64&gt;(), ask_prices, ask_sizes)
     };
