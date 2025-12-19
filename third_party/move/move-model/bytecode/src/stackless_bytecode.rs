@@ -561,7 +561,10 @@ impl Bytecode {
     pub fn is_exit(&self) -> bool {
         matches!(
             self,
-            Bytecode::Ret(..) | Bytecode::Abort(..) | Bytecode::Call(_, _, Operation::Stop, _, _)
+            Bytecode::Ret(..)
+                | Bytecode::Abort(..)
+                | Bytecode::AbortMsg(..)
+                | Bytecode::Call(_, _, Operation::Stop, _, _)
         )
     }
 
@@ -575,6 +578,7 @@ impl Bytecode {
             Bytecode::Ret(..)
                 | Bytecode::Jump(..)
                 | Bytecode::Abort(..)
+                | Bytecode::AbortMsg(..)
                 | Bytecode::Branch(..)
                 | Bytecode::Call(_, _, Operation::Stop, _, _)
         )

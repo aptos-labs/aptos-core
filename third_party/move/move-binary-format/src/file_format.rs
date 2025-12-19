@@ -3060,7 +3060,10 @@ pub enum Bytecode {
         stack >> (error_code: u64)
         abort transaction with error_code and error_message
     "#]
-    #[runtime_check_prologue = "ty_stack >> _"]
+    #[runtime_check_prologue = r#"
+        ty_stack >> _
+        ty_stack >> _
+    "#]
     AbortMsg,
 }
 

@@ -614,9 +614,10 @@ impl Generator {
                 match ctx.code_for_block(blk).last() {
                     None => 0,
                     Some(Abort(..)) => 1,
-                    Some(Jump(..)) => 2,
-                    Some(Branch(..)) => 3,
-                    Some(Ret(..)) => 4,
+                    Some(AbortMsg(..)) => 2,
+                    Some(Jump(..)) => 3,
+                    Some(Branch(..)) => 4,
+                    Some(Ret(..)) => 5,
                     _ => panic!("unexpected block terminator"),
                 }
             };
@@ -969,6 +970,7 @@ impl Generator {
                 ExpData::LoopCont(..)
                     | ExpData::Return(..)
                     | ExpData::Call(_, Operation::Abort, ..)
+                    | ExpData::Call(_, Operation::AbortMsg, ..)
             );
         if needs_break {
             stms.push(ctx.builder.break_(&self.current_loc(ctx), 0))
@@ -1931,6 +1933,7 @@ impl IfElseTransformer<'_> {
                     ExpData::LoopCont(..)
                         | ExpData::Return(..)
                         | ExpData::Call(_, Operation::Abort, _)
+                        | ExpData::Call(_, Operation::AbortMsg, _)
                 )
             })
             .unwrap_or(stmts.len());
@@ -2912,7 +2915,10 @@ where
     fn is_terminator(&self, exp: &ExpData) -> bool {
         matches!(
             exp,
-            ExpData::LoopCont(..) | ExpData::Return(..) | ExpData::Call(_, Operation::Abort, ..)
+            ExpData::LoopCont(..)
+                | ExpData::Return(..)
+                | ExpData::Call(_, Operation::Abort, ..)
+                | ExpData::Call(_, Operation::AbortMsg, ..)
         )
     }
 
