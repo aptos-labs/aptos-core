@@ -50,8 +50,16 @@ impl TxnNotifier for MempoolNotifier {
         user_txns: &[SignedTransaction],
         user_txn_statuses: &[TransactionStatus],
     ) -> Result<(), MempoolError> {
-        let mut rejected_txns = vec![];
+        if user_txns.len() != user_txn_statuses.len() {
+            return Err(format_err!(
+                "[MempoolNotifier] {} != {}",
+                user_txns.len(),
+                user_txn_statuses.len()
+            )
+            .into());
+        }
 
+        let mut rejected_txns = vec![];
         for (txn, status) in user_txns.iter().zip_eq(user_txn_statuses) {
             if let TransactionStatus::Discard(reason) = status {
                 rejected_txns.push(RejectedTransactionSummary {
