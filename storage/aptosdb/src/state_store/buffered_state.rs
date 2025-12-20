@@ -104,6 +104,7 @@ impl BufferedState {
                     || self.buffered_versions() >= TARGET_SNAPSHOT_INTERVAL_IN_VERSION)
             {
                 self.enqueue_commit(checkpoint);
+                // self.drain_commits();
             }
         }
 
