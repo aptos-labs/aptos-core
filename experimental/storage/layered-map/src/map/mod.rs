@@ -43,8 +43,12 @@ where
         (base_layer, top_layer)
     }
 
-    pub(crate) fn base_layer(&self) -> u64 {
+    pub fn base_layer(&self) -> u64 {
         self.base_layer.layer()
+    }
+
+    pub fn top_layer(&self) -> u64 {
+        self.top_layer.layer()
     }
 }
 
