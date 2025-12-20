@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+// SPDX-License-Identifier: Apache-2.0
 
 //! Tests that interpreter caches frees all allocated data structures for recursively called
 //! functions.
