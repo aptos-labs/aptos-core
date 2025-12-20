@@ -72,6 +72,8 @@ impl FullnodeData for FullnodeDataService {
         let r = req.into_inner();
         let starting_version = match r.starting_version {
             Some(version) => version,
+            // Live mode unavailable for FullnodeDataService
+            // Enable use_data_service_interface in config to use LocalnetDataService instead
             None => return Err(Status::invalid_argument("Starting version must be set")),
         };
         let processor_task_count = self.service_context.processor_task_count;
