@@ -29,7 +29,7 @@ impl DbDir {
         let env = None;
         let block_cache = None;
         StateMerkleDb::new(
-            &StorageDirPaths::from_path(&self.db_dir),
+            &StorageDirPaths::from_path(&self.db_dir).state_merkle_db_metadata_root_path(),
             RocksdbConfigs {
                 enable_storage_sharding: self.sharding_config.enable_storage_sharding,
                 ..Default::default()

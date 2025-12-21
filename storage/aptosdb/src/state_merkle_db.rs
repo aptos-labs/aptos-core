@@ -14,7 +14,7 @@ use crate::{
     utils::truncation_helper::{get_state_merkle_commit_progress, truncate_state_merkle_db_shards},
     versioned_node_cache::VersionedNodeCache,
 };
-use aptos_config::config::{RocksdbConfig, RocksdbConfigs, StorageDirPaths};
+use aptos_config::config::{RocksdbConfig, RocksdbConfigs};
 use aptos_crypto::HashValue;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_jellyfish_merkle::{
@@ -69,7 +69,7 @@ pub struct StateMerkleDb {
 
 impl StateMerkleDb {
     pub(crate) fn new(
-        db_paths: &StorageDirPaths,
+        root_path: &Path,
         rocksdb_configs: RocksdbConfigs,
         env: Option<&Env>,
         block_cache: Option<&Cache>,
@@ -90,7 +90,7 @@ impl StateMerkleDb {
 
         if !sharding {
             info!("Sharded state merkle DB is not enabled!");
-            let state_merkle_db_path = db_paths.default_root_path().join(STATE_MERKLE_DB_NAME);
+            let state_merkle_db_path = root_path.join(STATE_MERKLE_DB_NAME);
             let db = Arc::new(Self::open_db(
                 state_merkle_db_path,
                 STATE_MERKLE_DB_NAME,
@@ -109,7 +109,7 @@ impl StateMerkleDb {
         }
 
         Self::open(
-            db_paths,
+            root_path,
             state_merkle_db_config,
             env,
             block_cache,
@@ -173,9 +173,8 @@ impl StateMerkleDb {
             enable_storage_sharding: sharding,
             ..Default::default()
         };
-        // TODO(grao): Support path override here.
         let state_merkle_db = Self::new(
-            &StorageDirPaths::from_path(db_root_path),
+            db_root_path.as_ref(),
             rocksdb_configs,
             /*env=*/ None,
             /*block_cache=*/ None,
@@ -559,7 +558,7 @@ impl StateMerkleDb {
     }
 
     fn open(
-        db_paths: &StorageDirPaths,
+        root_path: &Path,
         state_merkle_db_config: RocksdbConfig,
         env: Option<&Env>,
         block_cache: Option<&Cache>,
@@ -568,7 +567,7 @@ impl StateMerkleDb {
         lru_cache: Option<LruNodeCache>,
     ) -> Result<Self> {
         let state_merkle_metadata_db_path = Self::metadata_db_path(
-            db_paths.state_merkle_db_metadata_root_path(),
+            root_path,
             /*sharding=*/ true,
         );
 
@@ -589,9 +588,8 @@ impl StateMerkleDb {
         let state_merkle_db_shards = (0..NUM_STATE_SHARDS)
             .into_par_iter()
             .map(|shard_id| {
-                let shard_root_path = db_paths.state_merkle_db_shard_root_path(shard_id);
                 let db = Self::open_shard(
-                    shard_root_path,
+                    root_path,
                     shard_id,
                     &state_merkle_db_config,
                     env,

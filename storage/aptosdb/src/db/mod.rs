@@ -123,9 +123,8 @@ impl AptosDB {
             readonly,
             ledger_db.metadata_db_arc(),
         )?;
-        // FIXME: use a different path.
         let hot_state_merkle_db = StateMerkleDb::new(
-            db_paths,
+            db_paths.hot_state_merkle_db_shard_root_path(0),
             rocksdb_configs,
             env,
             block_cache,
@@ -133,7 +132,7 @@ impl AptosDB {
             max_num_nodes_per_lru_cache_shard,
         )?;
         let state_merkle_db = StateMerkleDb::new(
-            db_paths,
+            db_paths.state_merkle_db_metadata_root_path(),
             rocksdb_configs,
             env,
             block_cache,
