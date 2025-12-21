@@ -36,8 +36,9 @@ impl DbDir {
             },
             env,
             block_cache,
-            false,
-            0,
+            /* read_only = */ false,
+            /* max_nodes_per_lru_cache_shard = */ 0,
+            /* is_hot = */ false,
         )
     }
 
