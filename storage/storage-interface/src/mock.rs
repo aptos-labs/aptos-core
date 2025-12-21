@@ -28,6 +28,7 @@ impl DbReader for MockDbReaderWriter {
         _key_hash: &HashValue,
         _version: Version,
         _root_depth: usize,
+        _use_hot_state: bool,
     ) -> Result<SparseMerkleProofExt> {
         Ok(SparseMerkleProofExt::new(None, vec![]))
     }

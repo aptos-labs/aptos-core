@@ -107,7 +107,7 @@ impl AptosDB {
         block_cache: Option<&Cache>,
         readonly: bool,
         max_num_nodes_per_lru_cache_shard: usize,
-    ) -> Result<(LedgerDb, StateMerkleDb, StateKvDb)> {
+    ) -> Result<(LedgerDb, Option<StateMerkleDb>, StateMerkleDb, StateKvDb)> {
         let ledger_db = LedgerDb::new(
             db_paths.ledger_db_root_path(),
             rocksdb_configs,
@@ -123,6 +123,19 @@ impl AptosDB {
             readonly,
             ledger_db.metadata_db_arc(),
         )?;
+        let hot_state_merkle_db = if !readonly && rocksdb_configs.enable_storage_sharding {
+            Some(StateMerkleDb::new(
+                db_paths,
+                rocksdb_configs,
+                env,
+                block_cache,
+                readonly,
+                max_num_nodes_per_lru_cache_shard,
+                /* is_hot = */ true,
+            )?)
+        } else {
+            None
+        };
         let state_merkle_db = StateMerkleDb::new(
             db_paths,
             rocksdb_configs,
@@ -130,9 +143,10 @@ impl AptosDB {
             block_cache,
             readonly,
             max_num_nodes_per_lru_cache_shard,
+            /* is_hot = */ false,
         )?;
 
-        Ok((ledger_db, state_merkle_db, state_kv_db))
+        Ok((ledger_db, hot_state_merkle_db, state_merkle_db, state_kv_db))
     }
 
     pub fn add_version_update_subscriber(
@@ -161,8 +175,19 @@ impl AptosDB {
         LedgerDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref(), sharding)?;
         if sharding {
             StateKvDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
+            StateMerkleDb::create_checkpoint(
+                db_path.as_ref(),
+                cp_path.as_ref(),
+                sharding,
+                /* is_hot = */ true,
+            )?;
         }
-        StateMerkleDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref(), sharding)?;
+        StateMerkleDb::create_checkpoint(
+            db_path.as_ref(),
+            cp_path.as_ref(),
+            sharding,
+            /* is_hot = */ false,
+        )?;
 
         info!(
             db_path = db_path.as_ref(),
