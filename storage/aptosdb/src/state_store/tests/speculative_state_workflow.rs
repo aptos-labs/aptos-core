@@ -481,6 +481,7 @@ impl DbReader for StateByVersion {
         key_hash: &HashValue,
         version: Version,
         _root_depth: usize,
+        _use_hot_state: bool,
     ) -> DbResult<SparseMerkleProofExt> {
         Ok(self.get_state(Some(version)).summary.get_proof(key_hash))
     }

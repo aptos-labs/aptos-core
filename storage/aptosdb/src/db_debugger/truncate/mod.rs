@@ -70,7 +70,8 @@ impl Cmd {
         };
         let env = None;
         let block_cache = None;
-        let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
+        // TODO(HotState): handle hot state merkle db.
+        let (ledger_db, hot_state_merkle_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
             &StorageDirPaths::from_path(&self.db_dir),
             rocksdb_config,
             env,
@@ -80,6 +81,7 @@ impl Cmd {
         )?;
 
         let ledger_db = Arc::new(ledger_db);
+        let hot_state_merkle_db = Arc::new(hot_state_merkle_db);
         let state_merkle_db = Arc::new(state_merkle_db);
         let state_kv_db = Arc::new(state_kv_db);
         let overall_version = ledger_db
@@ -148,6 +150,7 @@ impl Cmd {
                 );
                 let version = StateStore::catch_up_state_merkle_db(
                     Arc::clone(&ledger_db),
+                    hot_state_merkle_db,
                     Arc::clone(&state_merkle_db),
                     Arc::clone(&state_kv_db),
                 )?;
@@ -248,7 +251,8 @@ mod test {
 
             let env = None;
             let block_cache = None;
-            let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
+            // TODO(HotState): handle `_hot_state_merkle_db` here.
+            let (ledger_db, _hot_state_merkle_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
                 &StorageDirPaths::from_path(tmp_dir.path()),
                 RocksdbConfigs {
                     enable_storage_sharding: input.1,

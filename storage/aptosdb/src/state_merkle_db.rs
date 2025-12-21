@@ -77,6 +77,7 @@ impl StateMerkleDb {
         // TODO(grao): Currently when this value is set to 0 we disable both caches. This is
         // hacky, need to revisit.
         max_nodes_per_lru_cache_shard: usize,
+        is_hot: bool,
     ) -> Result<Self> {
         let sharding = rocksdb_configs.enable_storage_sharding;
         let state_merkle_db_config = rocksdb_configs.state_merkle_db_config;
@@ -116,6 +117,7 @@ impl StateMerkleDb {
             readonly,
             version_caches,
             lru_cache,
+            is_hot,
         )
     }
 
@@ -168,6 +170,7 @@ impl StateMerkleDb {
         db_root_path: impl AsRef<Path>,
         cp_root_path: impl AsRef<Path>,
         sharding: bool,
+        is_hot: bool,
     ) -> Result<()> {
         let rocksdb_configs = RocksdbConfigs {
             enable_storage_sharding: sharding,
@@ -181,6 +184,7 @@ impl StateMerkleDb {
             /*block_cache=*/ None,
             /*readonly=*/ false,
             /*max_nodes_per_lru_cache_shard=*/ 0,
+            is_hot,
         )?;
         let cp_state_merkle_db_path = cp_root_path.as_ref().join(STATE_MERKLE_DB_FOLDER_NAME);
 
@@ -566,9 +570,14 @@ impl StateMerkleDb {
         readonly: bool,
         version_caches: HashMap<Option<usize>, VersionedNodeCache>,
         lru_cache: Option<LruNodeCache>,
+        is_hot: bool,
     ) -> Result<Self> {
         let state_merkle_metadata_db_path = Self::metadata_db_path(
-            db_paths.state_merkle_db_metadata_root_path(),
+            if is_hot {
+                db_paths.hot_state_merkle_db_metadata_root_path()
+            } else {
+                db_paths.state_merkle_db_metadata_root_path()
+            },
             /*sharding=*/ true,
         );
 
@@ -589,7 +598,11 @@ impl StateMerkleDb {
         let state_merkle_db_shards = (0..NUM_STATE_SHARDS)
             .into_par_iter()
             .map(|shard_id| {
-                let shard_root_path = db_paths.state_merkle_db_shard_root_path(shard_id);
+                let shard_root_path = if is_hot {
+                    db_paths.hot_state_merkle_db_shard_root_path(shard_id)
+                } else {
+                    db_paths.state_merkle_db_shard_root_path(shard_id)
+                };
                 let db = Self::open_shard(
                     shard_root_path,
                     shard_id,
