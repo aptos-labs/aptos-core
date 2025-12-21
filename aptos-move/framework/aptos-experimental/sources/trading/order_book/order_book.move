@@ -8,13 +8,12 @@ module aptos_experimental::order_book {
 
     use std::option::Option;
     use std::string::String;
-    use aptos_experimental::bulk_order_book_types::{BulkOrder, BulkOrderRequest, BulkOrderPlaceResponse};
+    use aptos_trading::order_book_types::{OrderIdType, TriggerCondition};
+    use aptos_trading::bulk_order_types::{BulkOrder, BulkOrderRequest, BulkOrderPlaceResponse};
+    use aptos_trading::order_match_types::{OrderMatch, OrderMatchDetails};
+    use aptos_trading::single_order_types::{SingleOrder, SingleOrderRequest};
     use aptos_experimental::bulk_order_book::{BulkOrderBook, new_bulk_order_book};
-    use aptos_experimental::single_order_book::{SingleOrderBook, new_single_order_book, SingleOrderRequest};
-    use aptos_experimental::order_book_types::{OrderIdType, OrderMatch, OrderMatchDetails};
-    use aptos_experimental::single_order_types::SingleOrder;
-    use aptos_experimental::order_book_types::TriggerCondition;
-    use aptos_experimental::order_book_types::TimeInForce;
+    use aptos_experimental::single_order_book::{SingleOrderBook, new_single_order_book};
     use aptos_experimental::price_time_index::{PriceTimeIndex, new_price_time_idx};
 
     const E_REINSERT_ORDER_MISMATCH: u64 = 8;
@@ -33,32 +32,6 @@ module aptos_experimental::order_book {
             bulk_order_book: new_bulk_order_book(),
             price_time_idx: new_price_time_idx(),
         }
-    }
-
-    public fun new_single_order_request<M: store + copy + drop>(
-        account: address,
-        order_id: OrderIdType,
-        client_order_id: Option<String>,
-        price: u64,
-        orig_size: u64,
-        remaining_size: u64,
-        is_bid: bool,
-        trigger_condition: Option<TriggerCondition>,
-        time_in_force: TimeInForce,
-        metadata: M
-    ): SingleOrderRequest<M> {
-        aptos_experimental::single_order_book::new_single_order_request(
-            account,
-            order_id,
-            client_order_id,
-            price,
-            orig_size,
-            remaining_size,
-            is_bid,
-            trigger_condition,
-            time_in_force,
-            metadata
-        )
     }
 
     // ============================= APIs relevant to single order only ====================================
@@ -90,7 +63,7 @@ module aptos_experimental::order_book {
 
     public fun get_single_order<M: store + copy + drop>(
         self: &OrderBook<M>, order_id: OrderIdType
-    ): Option<aptos_experimental::single_order_types::OrderWithState<M>> {
+    ): Option<aptos_trading::single_order_types::OrderWithState<M>> {
         self.single_order_book.get_order(order_id)
     }
 
@@ -190,7 +163,7 @@ module aptos_experimental::order_book {
         if (trigger_condition.is_some()) {
             return false;
         };
-        return self.price_time_idx.is_taker_order(price, is_bid)
+        self.price_time_idx.is_taker_order(price, is_bid)
     }
 
     public fun get_single_match_for_taker<M: store + copy + drop>(

@@ -5,6 +5,7 @@ module aptos_experimental::market_tests_common {
     use std::signer;
     use std::vector;
     use aptos_framework::timestamp;
+    use aptos_trading::order_book_types::{OrderIdType, good_till_cancelled, post_only, immediate_or_cancel};
     use aptos_experimental::market_bulk_order;
     use aptos_experimental::clearinghouse_test;
     use aptos_experimental::clearinghouse_test::{
@@ -23,8 +24,6 @@ module aptos_experimental::market_tests_common {
     use aptos_experimental::event_utils;
     use aptos_experimental::order_placement::{OrderMatchResult};
     use aptos_experimental::market_types::{new_market, new_market_config, Market};
-    use aptos_experimental::order_book_types::OrderIdType;
-    use aptos_experimental::order_book_types::{good_till_cancelled, post_only, immediate_or_cancel};
 
     const PRE_CANCEL_WINDOW_SECS: u64 = 1; // 1 second
     const U64_MAX: u64 = 0xFFFFFFFFFFFFFFFF;

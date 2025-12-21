@@ -4,6 +4,7 @@ module aptos_experimental::market_test_utils {
     use std::option::Option;
     use std::signer;
     use std::string::String;
+    use aptos_trading::order_book_types::{OrderIdType, TimeInForce};
     use aptos_experimental::clearinghouse_test;
     use aptos_experimental::event_utils::{latest_emitted_events, EventStore, new_event_store};
     use aptos_experimental::market_types::{
@@ -13,9 +14,6 @@ module aptos_experimental::market_test_utils {
         MarketClearinghouseCallbacks, Market, get_order_id_from_event, BulkOrderFilledEvent,
         BulkOrderModifiedEvent
     };
-    use aptos_experimental::order_book_types::OrderIdType;
-    use aptos_experimental::order_book_types::TimeInForce;
-
     use aptos_experimental::order_placement::{OrderMatchResult, place_limit_order, place_market_order};
     use aptos_experimental::market_types::{OrderEvent};
 

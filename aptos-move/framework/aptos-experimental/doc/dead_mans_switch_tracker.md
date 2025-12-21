@@ -91,7 +91,6 @@ An order is considered valid if:
 -  [Struct `KeepAliveState`](#0x7_dead_mans_switch_tracker_KeepAliveState)
 -  [Struct `DeadMansSwitchTracker`](#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker)
 -  [Constants](#@Constants_7)
--  [Function `new_default_big_ordered_map`](#0x7_dead_mans_switch_tracker_new_default_big_ordered_map)
 -  [Function `new_dead_mans_switch_tracker`](#0x7_dead_mans_switch_tracker_new_dead_mans_switch_tracker)
     -  [Parameters](#@Parameters_8)
     -  [Returns](#@Returns_9)
@@ -282,24 +281,6 @@ enum <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_KeepAlive
 ## Constants
 
 
-<a id="0x7_dead_mans_switch_tracker_BIG_MAP_INNER_DEGREE"></a>
-
-
-
-<pre><code><b>const</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_BIG_MAP_INNER_DEGREE">BIG_MAP_INNER_DEGREE</a>: u16 = 64;
-</code></pre>
-
-
-
-<a id="0x7_dead_mans_switch_tracker_BIG_MAP_LEAF_DEGREE"></a>
-
-
-
-<pre><code><b>const</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_BIG_MAP_LEAF_DEGREE">BIG_MAP_LEAF_DEGREE</a>: u16 = 32;
-</code></pre>
-
-
-
 <a id="0x7_dead_mans_switch_tracker_E_KEEP_ALIVE_TIMEOUT_TOO_SHORT"></a>
 
 Error code when the provided keep-alive timeout is shorter than the minimum allowed
@@ -309,35 +290,6 @@ Error code when the provided keep-alive timeout is shorter than the minimum allo
 </code></pre>
 
 
-
-<a id="0x7_dead_mans_switch_tracker_new_default_big_ordered_map"></a>
-
-## Function `new_default_big_ordered_map`
-
-Creates a new BigOrderedMap with default configuration
-
-
-<pre><code><b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_new_default_big_ordered_map">new_default_big_ordered_map</a>&lt;K: store, V: store&gt;(): <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_new_default_big_ordered_map">new_default_big_ordered_map</a>&lt;K: store, V: store&gt;(): BigOrderedMap&lt;K, V&gt; {
-    <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map_new_with_config">big_ordered_map::new_with_config</a>(
-        <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_BIG_MAP_INNER_DEGREE">BIG_MAP_INNER_DEGREE</a>,
-        <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_BIG_MAP_LEAF_DEGREE">BIG_MAP_LEAF_DEGREE</a>,
-        <b>true</b>
-    )
-}
-</code></pre>
-
-
-
-</details>
 
 <a id="0x7_dead_mans_switch_tracker_new_dead_mans_switch_tracker"></a>
 
@@ -382,7 +334,7 @@ let tracker = new_dead_mans_switch_tracker(60); // 60 second minimum
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_new_dead_mans_switch_tracker">new_dead_mans_switch_tracker</a>(min_keep_alive_time_secs: u64): <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">DeadMansSwitchTracker</a> {
     <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">DeadMansSwitchTracker</a> {
         min_keep_alive_time_secs,
-        state: <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_new_default_big_ordered_map">new_default_big_ordered_map</a>(),
+        state: <a href="order_book_utils.md#0x7_order_book_utils_new_default_big_ordered_map">order_book_utils::new_default_big_ordered_map</a>(),
     }
 }
 </code></pre>

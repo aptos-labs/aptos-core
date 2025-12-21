@@ -15,13 +15,13 @@ It includes functions for cleaning up expired orders based on keep-alive timeout
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
-<b>use</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types">0x7::bulk_order_book_types</a>;
+<b>use</b> <a href="">0x5::bulk_order_types</a>;
+<b>use</b> <a href="">0x5::order_book_types</a>;
+<b>use</b> <a href="">0x5::single_order_types</a>;
 <b>use</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker">0x7::dead_mans_switch_tracker</a>;
 <b>use</b> <a href="market_types.md#0x7_market_types">0x7::market_types</a>;
 <b>use</b> <a href="order_book.md#0x7_order_book">0x7::order_book</a>;
-<b>use</b> <a href="order_book_types.md#0x7_order_book_types">0x7::order_book_types</a>;
 <b>use</b> <a href="order_operations.md#0x7_order_operations">0x7::order_operations</a>;
-<b>use</b> <a href="single_order_types.md#0x7_single_order_types">0x7::single_order_types</a>;
 </code></pre>
 
 
@@ -68,7 +68,7 @@ Aborts:
 - E_DEAD_MANS_SWITCH_NOT_ENABLED: If dead man's switch is not enabled for this market
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_cleanup_expired_orders">cleanup_expired_orders</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, order_ids: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>&gt;, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_cleanup_expired_orders">cleanup_expired_orders</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, order_ids: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="_OrderIdType">order_book_types::OrderIdType</a>&gt;, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;)
 </code></pre>
 
 
@@ -103,10 +103,10 @@ Aborts:
                 <b>continue</b>;
             };
             // Get <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> from the order
-            <b>let</b> <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> = <a href="single_order_types.md#0x7_single_order_types_get_account">single_order_types::get_account</a>(&order);
+            <b>let</b> <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> = order.get_order_request().get_account();
 
             // Get creation <a href="../../aptos-framework/doc/timestamp.md#0x1_timestamp">timestamp</a> in microseconds and convert <b>to</b> seconds
-            <b>let</b> creation_time_micros = <a href="single_order_types.md#0x7_single_order_types_get_creation_time_micros">single_order_types::get_creation_time_micros</a>(&order);
+            <b>let</b> creation_time_micros = order.get_order_request().get_creation_time_micros();
             <b>let</b> creation_time_secs = creation_time_micros / <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_MICROS_PER_SECOND">MICROS_PER_SECOND</a>;
 
             // Check <b>if</b> order is valid according <b>to</b> dead man's switch
@@ -176,7 +176,7 @@ Aborts:
     <b>let</b> bulk_order = market.get_order_book().get_bulk_order(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
 
     // Get creation <a href="../../aptos-framework/doc/timestamp.md#0x1_timestamp">timestamp</a> in microseconds and convert <b>to</b> seconds
-    <b>let</b> creation_time_micros = <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_creation_time_micros">bulk_order_book_types::get_creation_time_micros</a>(&bulk_order);
+    <b>let</b> creation_time_micros = <a href="_get_creation_time_micros">bulk_order_types::get_creation_time_micros</a>(&bulk_order);
     <b>let</b> creation_time_secs = creation_time_micros / <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_MICROS_PER_SECOND">MICROS_PER_SECOND</a>;
 
     // Check <b>if</b> order is valid according <b>to</b> dead man's switch

@@ -1,12 +1,12 @@
 
 module aptos_experimental::market_clearinghouse_order_info {
-    use std::option::Option;
-    use std::string::String;
-    use aptos_experimental::order_book_types::{OrderIdType, TimeInForce, OrderType, TriggerCondition};
-
     friend aptos_experimental::market_types;
     friend aptos_experimental::order_operations;
     friend aptos_experimental::order_placement;
+
+    use std::option::Option;
+    use std::string::String;
+    use aptos_trading::order_book_types::{OrderIdType, TimeInForce, OrderType, TriggerCondition};
 
     enum MarketClearinghouseOrderInfo<M: copy + drop> has copy, drop {
         V1 {

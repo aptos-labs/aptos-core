@@ -1,34 +1,35 @@
 /// (work in progress)
 module aptos_experimental::pending_order_book_index {
+    friend aptos_experimental::single_order_book;
+
     use std::vector;
     use aptos_std::math64;
     use aptos_framework::timestamp;
     use aptos_framework::big_ordered_map::BigOrderedMap;
-    use aptos_experimental::order_book_types::{
-        OrderIdType,
-        UniqueIdxType,
-        new_default_big_ordered_map
-    };
-    use aptos_experimental::order_book_types::TriggerCondition;
+    use aptos_trading::order_book_types::{OrderIdType, IncreasingIdxType, TriggerCondition, DecreasingIdxType};
+    use aptos_experimental::order_book_utils;
 
-    friend aptos_experimental::single_order_book;
-
-    struct PendingOrderKey has store, copy, drop {
+    struct PendingUpOrderKey has store, copy, drop {
         price: u64,
-        tie_breaker: UniqueIdxType
+        tie_breaker: IncreasingIdxType
+    }
+
+    struct PendingDownOrderKey has store, copy, drop {
+        price: u64,
+        tie_breaker: DecreasingIdxType
     }
 
     struct PendingTimeKey has store, copy, drop {
         time: u64,
-        tie_breaker: UniqueIdxType
+        tie_breaker: IncreasingIdxType
     }
 
     enum PendingOrderBookIndex has store {
         V1 {
             // Order to trigger when the oracle price move less than
-            price_move_down_index: BigOrderedMap<PendingOrderKey, OrderIdType>,
+            price_move_down_index: BigOrderedMap<PendingDownOrderKey, OrderIdType>,
             // Orders to trigger whem the oracle price move greater than
-            price_move_up_index: BigOrderedMap<PendingOrderKey, OrderIdType>,
+            price_move_up_index: BigOrderedMap<PendingUpOrderKey, OrderIdType>,
             // Orders to trigger when the time is greater than
             time_based_index: BigOrderedMap<PendingTimeKey, OrderIdType>
         }
@@ -36,22 +37,22 @@ module aptos_experimental::pending_order_book_index {
 
     public(friend) fun new_pending_order_book_index(): PendingOrderBookIndex {
         PendingOrderBookIndex::V1 {
-            price_move_up_index: new_default_big_ordered_map(),
-            price_move_down_index: new_default_big_ordered_map(),
-            time_based_index: new_default_big_ordered_map()
+            price_move_up_index: order_book_utils::new_default_big_ordered_map(),
+            price_move_down_index: order_book_utils::new_default_big_ordered_map(),
+            time_based_index: order_book_utils::new_default_big_ordered_map()
         }
     }
 
     public(friend) fun cancel_pending_order(
         self: &mut PendingOrderBookIndex,
         trigger_condition: TriggerCondition,
-        unique_priority_idx: UniqueIdxType,
+        unique_priority_idx: IncreasingIdxType,
     ) {
         let (price_move_down_index, price_move_up_index, time_based_index) =
-            trigger_condition.index();
+            trigger_condition.get_trigger_condition_indices();
         if (price_move_up_index.is_some()) {
             self.price_move_up_index.remove(
-                &PendingOrderKey {
+                &PendingUpOrderKey {
                     price: price_move_up_index.destroy_some(),
                     tie_breaker: unique_priority_idx
                 }
@@ -59,9 +60,9 @@ module aptos_experimental::pending_order_book_index {
         };
         if (price_move_down_index.is_some()) {
             self.price_move_down_index.remove(
-                &PendingOrderKey {
+                &PendingDownOrderKey {
                     price: price_move_down_index.destroy_some(),
-                    tie_breaker: unique_priority_idx.descending_idx()
+                    tie_breaker: unique_priority_idx.into_decreasing_idx_type()
                 }
             );
         };
@@ -77,14 +78,14 @@ module aptos_experimental::pending_order_book_index {
         self: &mut PendingOrderBookIndex,
         order_id: OrderIdType,
         trigger_condition: TriggerCondition,
-        unique_priority_idx: UniqueIdxType,
+        unique_priority_idx: IncreasingIdxType,
     ) {
         // Add this order to the pending order book index
         let (price_move_down_index, price_move_up_index, time_based_index) =
-            trigger_condition.index();
+            trigger_condition.get_trigger_condition_indices();
         if (price_move_up_index.is_some()) {
             self.price_move_up_index.add(
-                PendingOrderKey {
+                PendingUpOrderKey {
                     price: price_move_up_index.destroy_some(),
                     tie_breaker: unique_priority_idx
                 },
@@ -92,11 +93,11 @@ module aptos_experimental::pending_order_book_index {
             );
         } else if (price_move_down_index.is_some()) {
             self.price_move_down_index.add(
-                PendingOrderKey {
+                PendingDownOrderKey {
                     price: price_move_down_index.destroy_some(),
                     // Use a descending tie breaker to ensure that for price move down orders,
                     // orders with the same price are processed in FIFO order
-                    tie_breaker: unique_priority_idx.descending_idx()
+                    tie_breaker: unique_priority_idx.into_decreasing_idx_type()
                 },
                 order_id
             );
@@ -190,14 +191,14 @@ module aptos_experimental::pending_order_book_index {
     #[test_only]
     public(friend) fun get_price_move_down_index(
         self: &PendingOrderBookIndex
-    ): &BigOrderedMap<PendingOrderKey, OrderIdType> {
+    ): &BigOrderedMap<PendingDownOrderKey, OrderIdType> {
         &self.price_move_down_index
     }
 
     #[test_only]
     public(friend) fun get_price_move_up_index(
         self: &PendingOrderBookIndex
-    ): &BigOrderedMap<PendingOrderKey, OrderIdType> {
+    ): &BigOrderedMap<PendingUpOrderKey, OrderIdType> {
         &self.price_move_up_index
     }
 
