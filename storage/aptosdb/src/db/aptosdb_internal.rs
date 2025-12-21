@@ -41,6 +41,7 @@ use std::{
 impl AptosDB {
     fn new_with_dbs(
         ledger_db: LedgerDb,
+        hot_state_merkle_db: StateMerkleDb,
         state_merkle_db: StateMerkleDb,
         state_kv_db: StateKvDb,
         pruner_config: PrunerConfig,
@@ -51,6 +52,7 @@ impl AptosDB {
         internal_indexer_db: Option<InternalIndexerDB>,
     ) -> Self {
         let ledger_db = Arc::new(ledger_db);
+        let hot_state_merkle_db = Arc::new(hot_state_merkle_db);
         let state_merkle_db = Arc::new(state_merkle_db);
         let state_kv_db = Arc::new(state_kv_db);
         let state_merkle_pruner = StateMerklePrunerManager::new(
@@ -65,6 +67,7 @@ impl AptosDB {
             StateKvPrunerManager::new(Arc::clone(&state_kv_db), pruner_config.ledger_pruner_config);
         let state_store = Arc::new(StateStore::new(
             Arc::clone(&ledger_db),
+            hot_state_merkle_db,
             Arc::clone(&state_merkle_db),
             Arc::clone(&state_kv_db),
             state_merkle_pruner,
@@ -128,7 +131,7 @@ impl AptosDB {
             /* estimated_entry_charge = */ 0,
         );
 
-        let (ledger_db, state_merkle_db, state_kv_db) = Self::open_dbs(
+        let (ledger_db, hot_state_merkle_db, state_merkle_db, state_kv_db) = Self::open_dbs(
             db_paths,
             rocksdb_configs,
             Some(&env),
@@ -139,6 +142,7 @@ impl AptosDB {
 
         let mut myself = Self::new_with_dbs(
             ledger_db,
+            hot_state_merkle_db,
             state_merkle_db,
             state_kv_db,
             pruner_config,

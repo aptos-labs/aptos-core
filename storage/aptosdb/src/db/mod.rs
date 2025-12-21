@@ -107,7 +107,7 @@ impl AptosDB {
         block_cache: Option<&Cache>,
         readonly: bool,
         max_num_nodes_per_lru_cache_shard: usize,
-    ) -> Result<(LedgerDb, StateMerkleDb, StateKvDb)> {
+    ) -> Result<(LedgerDb, StateMerkleDb, StateMerkleDb, StateKvDb)> {
         let ledger_db = LedgerDb::new(
             db_paths.ledger_db_root_path(),
             rocksdb_configs,
@@ -123,6 +123,15 @@ impl AptosDB {
             readonly,
             ledger_db.metadata_db_arc(),
         )?;
+        // FIXME: use a different path.
+        let hot_state_merkle_db = StateMerkleDb::new(
+            db_paths,
+            rocksdb_configs,
+            env,
+            block_cache,
+            readonly,
+            max_num_nodes_per_lru_cache_shard,
+        )?;
         let state_merkle_db = StateMerkleDb::new(
             db_paths,
             rocksdb_configs,
@@ -132,7 +141,7 @@ impl AptosDB {
             max_num_nodes_per_lru_cache_shard,
         )?;
 
-        Ok((ledger_db, state_merkle_db, state_kv_db))
+        Ok((ledger_db, hot_state_merkle_db, state_merkle_db, state_kv_db))
     }
 
     pub fn add_version_update_subscriber(

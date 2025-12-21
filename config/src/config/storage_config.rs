@@ -29,25 +29,26 @@ pub const BUFFERED_STATE_TARGET_ITEMS_FOR_TEST: usize = 10;
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct DbPathConfig {
-    pub ledger_db_path: Option<PathBuf>,
-    pub state_kv_db_path: Option<ShardedDbPathConfig>,
-    pub state_merkle_db_path: Option<ShardedDbPathConfig>,
-    pub hot_state_kv_db_path: Option<ShardedDbPathConfig>,
+struct DbPathConfig {
+    ledger_db_path: Option<PathBuf>,
+    state_kv_db_path: Option<ShardedDbPathConfig>,
+    state_merkle_db_path: Option<ShardedDbPathConfig>,
+    hot_state_kv_db_path: Option<ShardedDbPathConfig>,
+    hot_state_merkle_db_path: Option<ShardedDbPathConfig>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct ShardedDbPathConfig {
-    pub metadata_path: Option<PathBuf>,
-    pub shard_paths: Vec<ShardPathConfig>,
+struct ShardedDbPathConfig {
+    metadata_path: Option<PathBuf>,
+    shard_paths: Vec<ShardPathConfig>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct ShardPathConfig {
-    pub shards: String,
-    pub path: PathBuf,
+struct ShardPathConfig {
+    shards: String,
+    path: PathBuf,
 }
 
 impl ShardedDbPathConfig {
@@ -286,7 +287,7 @@ pub struct StorageConfig {
     /// Fine grained control for db paths of individal databases/shards.
     /// If not specificed, will use `dir` as default.
     /// Only allowed when sharding is enabled.
-    pub db_path_overrides: Option<DbPathConfig>,
+    db_path_overrides: Option<DbPathConfig>,
     /// ensure `ulimit -n`, set to 0 to not ensure.
     pub ensure_rlimit_nofile: u64,
     /// panic if failed to ensure `ulimit -n`
@@ -460,6 +461,7 @@ impl StorageConfig {
         let mut state_kv_db_paths = ShardedDbPaths::default();
         let mut state_merkle_db_paths = ShardedDbPaths::default();
         let mut hot_state_kv_db_paths = ShardedDbPaths::default();
+        let mut hot_state_merkle_db_paths = ShardedDbPaths::default();
 
         if let Some(db_path_overrides) = self.db_path_overrides.as_ref() {
             db_path_overrides
@@ -477,6 +479,12 @@ impl StorageConfig {
             if let Some(hot_state_kv_db_path) = db_path_overrides.hot_state_kv_db_path.as_ref() {
                 hot_state_kv_db_paths = ShardedDbPaths::new(hot_state_kv_db_path);
             }
+
+            if let Some(hot_state_merkle_db_path) =
+                db_path_overrides.hot_state_merkle_db_path.as_ref()
+            {
+                hot_state_merkle_db_paths = ShardedDbPaths::new(hot_state_merkle_db_path);
+            }
         }
 
         StorageDirPaths::new(
@@ -485,6 +493,7 @@ impl StorageConfig {
             state_kv_db_paths,
             state_merkle_db_paths,
             hot_state_kv_db_paths,
+            hot_state_merkle_db_paths,
         )
     }
 
@@ -505,6 +514,7 @@ pub struct StorageDirPaths {
     state_kv_db_paths: ShardedDbPaths,
     state_merkle_db_paths: ShardedDbPaths,
     hot_state_kv_db_paths: ShardedDbPaths,
+    hot_state_merkle_db_paths: ShardedDbPaths,
 }
 
 impl StorageDirPaths {
@@ -550,6 +560,12 @@ impl StorageDirPaths {
             .unwrap_or(&self.default_path)
     }
 
+    pub fn hot_state_merkle_db_shard_root_path(&self, shard_id: usize) -> &PathBuf {
+        self.hot_state_merkle_db_paths
+            .shard_path(shard_id)
+            .unwrap_or(&self.default_path)
+    }
+
     pub fn from_path<P: AsRef<Path>>(path: P) -> Self {
         Self {
             default_path: path.as_ref().to_path_buf(),
@@ -557,6 +573,7 @@ impl StorageDirPaths {
             state_kv_db_paths: Default::default(),
             state_merkle_db_paths: Default::default(),
             hot_state_kv_db_paths: Default::default(),
+            hot_state_merkle_db_paths: Default::default(),
         }
     }
 
@@ -566,6 +583,7 @@ impl StorageDirPaths {
         state_kv_db_paths: ShardedDbPaths,
         state_merkle_db_paths: ShardedDbPaths,
         hot_state_kv_db_paths: ShardedDbPaths,
+        hot_state_merkle_db_paths: ShardedDbPaths,
     ) -> Self {
         Self {
             default_path,
@@ -573,6 +591,7 @@ impl StorageDirPaths {
             state_kv_db_paths,
             state_merkle_db_paths,
             hot_state_kv_db_paths,
+            hot_state_merkle_db_paths,
         }
     }
 }
@@ -743,10 +762,8 @@ impl ConfigSanitizer for StorageConfig {
 
 #[cfg(test)]
 mod test {
-    use crate::config::{
-        config_optimizer::ConfigOptimizer, NodeConfig, NodeType, PrunerConfig, ShardPathConfig,
-        ShardedDbPathConfig, StorageConfig,
-    };
+    use super::{ShardPathConfig, ShardedDbPathConfig, StorageConfig};
+    use crate::config::{config_optimizer::ConfigOptimizer, NodeConfig, NodeType, PrunerConfig};
     use aptos_types::chain_id::ChainId;
 
     #[test]

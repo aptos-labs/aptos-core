@@ -43,7 +43,7 @@ impl Cmd {
         };
         let env = None;
         let block_cache = None;
-        let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
+        let (ledger_db, hot_state_merkle_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
             &StorageDirPaths::from_path(&self.db_dir),
             rocksdb_config,
             env,
@@ -70,6 +70,11 @@ impl Cmd {
         println!(
             "StateMerkle Progress: {:?}",
             get_state_merkle_commit_progress(&state_merkle_db),
+        );
+
+        println!(
+            "Hot StateMerkle Progress: {:?}",
+            get_state_merkle_commit_progress(&hot_state_merkle_db),
         );
 
         println!(
