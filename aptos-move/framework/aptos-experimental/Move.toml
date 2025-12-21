@@ -7,3 +7,4 @@ aptos_experimental = "0x7"
 
 [dependencies]
 AptosFramework = { local = "../aptos-framework" }
+AptosTrading = { local = "../aptos-trading" }

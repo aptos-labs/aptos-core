@@ -48,6 +48,7 @@ const APTOS_PACKAGES_DIR_NAMES: [&str; 6] = [
     "aptos-stdlib",
     "aptos-token",
     "aptos-token-objects",
+    "aptos-trading",
     "aptos-experimental",
 ];
 

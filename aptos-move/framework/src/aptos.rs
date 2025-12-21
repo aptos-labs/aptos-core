@@ -75,6 +75,7 @@ impl ReleaseTarget {
                 Some("cached-packages/src/aptos_token_objects_sdk_builder.rs"),
                 false,
             ),
+            ("aptos-trading", None, false),
             ("aptos-experimental", None, true),
         ];
         // Currently we don't have experimental packages only included in particular targets.

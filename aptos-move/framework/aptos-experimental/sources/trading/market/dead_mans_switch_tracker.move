@@ -51,17 +51,12 @@ module aptos_experimental::dead_mans_switch_tracker {
     friend aptos_experimental::market_types;
     friend aptos_experimental::dead_mans_switch_operations;
     use std::option::Option;
-    use aptos_std::big_ordered_map;
     use aptos_std::big_ordered_map::BigOrderedMap;
     use aptos_framework::event;
+    use aptos_experimental::order_book_utils;
 
     /// Error code when the provided keep-alive timeout is shorter than the minimum allowed
     const E_KEEP_ALIVE_TIMEOUT_TOO_SHORT: u64 = 0;
-
-    // Configuration for BigOrderedMap inner node degree
-    const BIG_MAP_INNER_DEGREE: u16 = 64;
-    // Configuration for BigOrderedMap leaf node degree
-    const BIG_MAP_LEAF_DEGREE: u16 = 32;
 
     // Event emitted when a trader updates their keep-alive state
     // Fields:
@@ -109,15 +104,6 @@ module aptos_experimental::dead_mans_switch_tracker {
         state: BigOrderedMap<address, KeepAliveState>
     }
 
-    /// Creates a new BigOrderedMap with default configuration
-    fun new_default_big_ordered_map<K: store, V: store>(): BigOrderedMap<K, V> {
-        big_ordered_map::new_with_config(
-            BIG_MAP_INNER_DEGREE,
-            BIG_MAP_LEAF_DEGREE,
-            true
-        )
-    }
-
     /// Creates a new dead man's switch tracker
     ///
     /// # Parameters
@@ -134,7 +120,7 @@ module aptos_experimental::dead_mans_switch_tracker {
     public(friend) fun new_dead_mans_switch_tracker(min_keep_alive_time_secs: u64): DeadMansSwitchTracker {
         DeadMansSwitchTracker {
             min_keep_alive_time_secs,
-            state: new_default_big_ordered_map(),
+            state: order_book_utils::new_default_big_ordered_map(),
         }
     }
 
