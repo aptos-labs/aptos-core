@@ -668,7 +668,12 @@ where
 
         let function_and_cache =
             if let Call(function, frame_cache) = &current_frame_cache.per_instruction_cache[pc] {
-                (Rc::clone(function), Rc::clone(frame_cache))
+                let frame_cache = frame_cache.upgrade().ok_or_else(|| {
+                    PartialVMError::new_invariant_violation(
+                        "Frame cache is dropped during interpreter execution",
+                    )
+                })?;
+                (Rc::clone(function), frame_cache)
             } else {
                 let (function, frame_cache) = match current_frame_cache.function_cache.entry(idx) {
                     Entry::Vacant(e) => {
@@ -676,14 +681,22 @@ where
                         let frame_cache = self
                             .function_caches
                             .get_or_create_frame_cache_non_generic(&function);
-                        e.insert((function.clone(), frame_cache.clone()));
+                        e.insert((function.clone(), Rc::downgrade(&frame_cache)));
                         (function, frame_cache)
                     },
-                    Entry::Occupied(e) => e.into_mut().clone(),
+                    Entry::Occupied(e) => {
+                        let (function, frame_cache) = e.get();
+                        let frame_cache = frame_cache.upgrade().ok_or_else(|| {
+                            PartialVMError::new_invariant_violation(
+                                "Frame cache is dropped during interpreter execution",
+                            )
+                        })?;
+                        (function.clone(), frame_cache)
+                    },
                 };
 
                 current_frame_cache.per_instruction_cache[pc] =
-                    Call(Rc::clone(&function), Rc::clone(&frame_cache));
+                    Call(Rc::clone(&function), Rc::downgrade(&frame_cache));
                 (function, frame_cache)
             };
         Ok(function_and_cache)
@@ -701,7 +714,12 @@ where
         let function_and_cache = if let PerInstructionCache::CallGeneric(function, frame_cache) =
             &current_frame_cache.per_instruction_cache[pc]
         {
-            (Rc::clone(function), Rc::clone(frame_cache))
+            let frame_cache = frame_cache.upgrade().ok_or_else(|| {
+                PartialVMError::new_invariant_violation(
+                    "Frame cache is dropped during interpreter execution",
+                )
+            })?;
+            (Rc::clone(function), frame_cache)
         } else {
             let (function, frame_cache) =
                 match current_frame_cache.generic_function_cache.entry(idx) {
@@ -711,14 +729,22 @@ where
                         let frame_cache = self
                             .function_caches
                             .get_or_create_frame_cache_generic(&function);
-                        e.insert((function.clone(), frame_cache.clone()));
+                        e.insert((function.clone(), Rc::downgrade(&frame_cache)));
                         (function, frame_cache)
                     },
-                    Entry::Occupied(e) => e.into_mut().clone(),
+                    Entry::Occupied(e) => {
+                        let (function, frame_cache) = e.get();
+                        let frame_cache = frame_cache.upgrade().ok_or_else(|| {
+                            PartialVMError::new_invariant_violation(
+                                "Frame cache is dropped during interpreter execution",
+                            )
+                        })?;
+                        (function.clone(), frame_cache)
+                    },
                 };
 
             current_frame_cache.per_instruction_cache[pc] =
-                PerInstructionCache::CallGeneric(Rc::clone(&function), Rc::clone(&frame_cache));
+                PerInstructionCache::CallGeneric(Rc::clone(&function), Rc::downgrade(&frame_cache));
             (function, frame_cache)
         };
         Ok(function_and_cache)

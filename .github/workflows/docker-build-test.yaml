@@ -89,7 +89,7 @@ jobs:
       contains(join(github.event.pull_request.labels.*.name, ','), 'CICD:run-') ||
       github.event.pull_request.auto_merge != null ||
       contains(github.event.pull_request.body, '#e2e')
-    runs-on: ubuntu-latest
+    runs-on: 2cpu-gh-ubuntu24-x64
     steps:
       - name: Check repository permission for user which triggered workflow
         uses: sushichop/action-repository-permission@13d208f5ae7a6a3fc0e5a7c2502c214983f0241c
@@ -101,7 +101,7 @@ jobs:
   # for the subsequent docker builds. Reusable workflows do not currently have the "env" context: https://github.com/orgs/community/discussions/26671
   determine-docker-build-metadata:
     needs: [permission-check]
-    runs-on: ubuntu-latest
+    runs-on: 2cpu-gh-ubuntu24-x64
     steps:
       - name: collect metadata
         run: |
@@ -116,7 +116,7 @@ jobs:
   # This job determines which files were changed
   file_change_determinator:
     needs: [permission-check]
-    runs-on: ubuntu-latest
+    runs-on: 2cpu-gh-ubuntu24-x64
     outputs:
       only_docs_changed: ${{ steps.determine_file_changes.outputs.only_docs_changed }}
     steps:
@@ -128,7 +128,7 @@ jobs:
   # This job determines which tests to run
   test-target-determinator:
     needs: [permission-check]
-    runs-on: ubuntu-latest
+    runs-on: 2cpu-gh-ubuntu24-x64
     outputs:
       run_framework_upgrade_test: ${{ steps.determine_test_targets.outputs.run_framework_upgrade_test }}
     steps:
@@ -293,7 +293,7 @@ jobs:
         github.event.pull_request.auto_merge != null ||
         contains(github.event.pull_request.body, '#e2e')
       )
-    runs-on: ubuntu-latest
+    runs-on: 2cpu-gh-ubuntu24-x64
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

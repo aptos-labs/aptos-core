@@ -18,7 +18,6 @@ types of pending orders are supported.
 
 -  [Enum `SingleOrderRequest`](#0x7_single_order_book_SingleOrderRequest)
 -  [Enum `SingleOrderBook`](#0x7_single_order_book_SingleOrderBook)
--  [Struct `TestMetadata`](#0x7_single_order_book_TestMetadata)
 -  [Constants](#@Constants_0)
 -  [Function `__lambda__1__get_single_match_for_taker`](#0x7_single_order_book___lambda__1__get_single_match_for_taker)
 -  [Function `__lambda__1__reinsert_order`](#0x7_single_order_book___lambda__1__reinsert_order)
@@ -27,7 +26,6 @@ types of pending orders are supported.
 -  [Function `new_single_order_request`](#0x7_single_order_book_new_single_order_request)
 -  [Function `new_order_request_from_match_details`](#0x7_single_order_book_new_order_request_from_match_details)
 -  [Function `new_single_order_book`](#0x7_single_order_book_new_single_order_book)
--  [Function `new_price_time_index`](#0x7_single_order_book_new_price_time_index)
 -  [Function `cancel_order`](#0x7_single_order_book_cancel_order)
 -  [Function `try_cancel_order_with_client_order_id`](#0x7_single_order_book_try_cancel_order_with_client_order_id)
 -  [Function `try_cancel_order`](#0x7_single_order_book_try_cancel_order)
@@ -208,33 +206,6 @@ types of pending orders are supported.
 </details>
 
 </details>
-
-</details>
-
-<a id="0x7_single_order_book_TestMetadata"></a>
-
-## Struct `TestMetadata`
-
-
-
-<pre><code><b>struct</b> <a href="single_order_book.md#0x7_single_order_book_TestMetadata">TestMetadata</a> <b>has</b> <b>copy</b>, drop, store
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>dummy_field: bool</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
 
 </details>
 
@@ -547,30 +518,6 @@ types of pending orders are supported.
 
 </details>
 
-<a id="0x7_single_order_book_new_price_time_index"></a>
-
-## Function `new_price_time_index`
-
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_new_price_time_index">new_price_time_index</a>(): <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_new_price_time_index">new_price_time_index</a>(): PriceTimeIndex {
-    new_price_time_idx()
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x7_single_order_book_cancel_order"></a>
 
 ## Function `cancel_order`
@@ -605,7 +552,7 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
             _order_id,
             client_order_id,
             unique_priority_idx,
-            bid_price,
+            price,
             _orig_size,
             _size,
             is_bid,
@@ -614,7 +561,7 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
             _,
             _
         ) = order.destroy_single_order();
-        price_time_idx.cancel_active_order(bid_price, unique_priority_idx, is_bid);
+        price_time_idx.cancel_active_order(price, unique_priority_idx, is_bid);
         <b>if</b> (client_order_id.is_some()) {
             self.client_order_ids.remove(
                 &new_account_client_order_id(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id.destroy_some())
@@ -772,7 +719,7 @@ else it is added to the active order book. The API aborts if it's not a maker or
     <b>let</b> ascending_idx =
         new_unique_idx_type(<a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">transaction_context::monotonically_increasing_counter</a>());
     <b>if</b> (order_req.trigger_condition.is_some()) {
-        <b>return</b> self.<a href="single_order_book.md#0x7_single_order_book_place_pending_order_internal">place_pending_order_internal</a>(order_req);
+        <b>return</b> self.<a href="single_order_book.md#0x7_single_order_book_place_pending_order_internal">place_pending_order_internal</a>(order_req, ascending_idx);
     };
     self.<a href="single_order_book.md#0x7_single_order_book_place_ready_maker_order_with_unique_idx">place_ready_maker_order_with_unique_idx</a>(price_time_idx, order_req, ascending_idx);
 }
@@ -900,7 +847,7 @@ it is added to the order book, if it exists, its size is updated.
 
 
 
-<pre><code><b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_pending_order_internal">place_pending_order_internal</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">single_order_book::SingleOrderBook</a>&lt;M&gt;, order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">single_order_book::SingleOrderRequest</a>&lt;M&gt;)
+<pre><code><b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_pending_order_internal">place_pending_order_internal</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">single_order_book::SingleOrderBook</a>&lt;M&gt;, order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">single_order_book::SingleOrderRequest</a>&lt;M&gt;, ascending_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>)
 </code></pre>
 
 
@@ -910,11 +857,11 @@ it is added to the order book, if it exists, its size is updated.
 
 
 <pre><code><b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_pending_order_internal">place_pending_order_internal</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">SingleOrderRequest</a>&lt;M&gt;
+    self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;,
+    order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">SingleOrderRequest</a>&lt;M&gt;,
+    ascending_idx: UniqueIdxType
 ) {
     <b>let</b> order_id = order_req.order_id;
-    <b>let</b> ascending_idx =
-        new_unique_idx_type(<a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">transaction_context::monotonically_increasing_counter</a>());
     <b>let</b> order =
         new_single_order(
             order_id,
@@ -1308,7 +1255,7 @@ Removes and returns the orders that are ready to be executed based on the time c
     self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, order_limit: u64
 ): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;SingleOrder&lt;M&gt;&gt; {
     <b>let</b> self_orders = &<b>mut</b> self.orders;
-    <b>let</b> order_ids = self.pending_orders.take_time_time_based_orders(order_limit);
+    <b>let</b> order_ids = self.pending_orders.<a href="single_order_book.md#0x7_single_order_book_take_ready_time_based_orders">take_ready_time_based_orders</a>(order_limit);
     <b>let</b> orders = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
 
     order_ids.for_each(|order_id| {

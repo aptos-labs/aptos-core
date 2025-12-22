@@ -60,7 +60,7 @@ jobs:
       DRY_RUN: ${{ inputs.DRY_RUN }}
 
   run-replay-verify:
-    runs-on: ubuntu-latest-32-core # consider moving this to a smaller machien since the compute runs on GKE
+    runs-on: 4cpu-gh-ubuntu24-x64
     timeout-minutes: 420 # 7 hours
     needs: build-images
     steps:

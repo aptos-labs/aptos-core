@@ -63,6 +63,10 @@
 -  [Function `get_order_metadata_bytes`](#0x7_market_types_get_order_metadata_bytes)
 -  [Function `new_market_config`](#0x7_market_types_new_market_config)
 -  [Function `new_market`](#0x7_market_types_new_market)
+-  [Function `set_allow_self_trade`](#0x7_market_types_set_allow_self_trade)
+-  [Function `set_allow_events_emission`](#0x7_market_types_set_allow_events_emission)
+-  [Function `set_allow_dead_mans_switch`](#0x7_market_types_set_allow_dead_mans_switch)
+-  [Function `set_dead_mans_switch_min_keep_alive_time_secs`](#0x7_market_types_set_dead_mans_switch_min_keep_alive_time_secs)
 -  [Function `get_order_book`](#0x7_market_types_get_order_book)
 -  [Function `get_market_address`](#0x7_market_types_get_market_address)
 -  [Function `best_bid_price`](#0x7_market_types_best_bid_price)
@@ -836,7 +840,7 @@ Reasons why an order was cancelled
 
 
 
-<pre><code>enum <a href="market_types.md#0x7_market_types_MarketConfig">MarketConfig</a> <b>has</b> store
+<pre><code>enum <a href="market_types.md#0x7_market_types_MarketConfig">MarketConfig</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -2599,6 +2603,114 @@ enum <a href="market_types.md#0x7_market_types_BulkOrderFilledEvent">BulkOrderFi
 
 </details>
 
+<a id="0x7_market_types_set_allow_self_trade"></a>
+
+## Function `set_allow_self_trade`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_set_allow_self_trade">set_allow_self_trade</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, allow_self_trade: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_set_allow_self_trade">set_allow_self_trade</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;, allow_self_trade: bool
+) {
+    self.config.allow_self_trade = allow_self_trade;
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_market_types_set_allow_events_emission"></a>
+
+## Function `set_allow_events_emission`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_set_allow_events_emission">set_allow_events_emission</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, allow_events_emission: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_set_allow_events_emission">set_allow_events_emission</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;, allow_events_emission: bool
+) {
+    self.config.allow_events_emission = allow_events_emission;
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_market_types_set_allow_dead_mans_switch"></a>
+
+## Function `set_allow_dead_mans_switch`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_set_allow_dead_mans_switch">set_allow_dead_mans_switch</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, enable_dead_mans_switch: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_set_allow_dead_mans_switch">set_allow_dead_mans_switch</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;, enable_dead_mans_switch: bool
+) {
+    self.config.enable_dead_mans_switch = enable_dead_mans_switch;
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_market_types_set_dead_mans_switch_min_keep_alive_time_secs"></a>
+
+## Function `set_dead_mans_switch_min_keep_alive_time_secs`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_set_dead_mans_switch_min_keep_alive_time_secs">set_dead_mans_switch_min_keep_alive_time_secs</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, min_keep_alive_time_secs: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_set_dead_mans_switch_min_keep_alive_time_secs">set_dead_mans_switch_min_keep_alive_time_secs</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;, min_keep_alive_time_secs: u64
+) {
+    self.config.min_keep_alive_time_secs = min_keep_alive_time_secs;
+    <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_set_min_keep_alive_time_secs">dead_mans_switch_tracker::set_min_keep_alive_time_secs</a>(
+        self.<a href="market_types.md#0x7_market_types_get_dead_mans_switch_tracker_mut">get_dead_mans_switch_tracker_mut</a>(),
+        min_keep_alive_time_secs
+    );
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x7_market_types_get_order_book"></a>
 
 ## Function `get_order_book`
@@ -2767,7 +2879,7 @@ Remaining size of the order in the order book.
 <pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_get_remaining_size">get_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;, order_id: OrderIdType
 ): u64 {
-    self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market_types.md#0x7_market_types_get_remaining_size">get_remaining_size</a>(order_id)
+    self.<a href="order_book.md#0x7_order_book">order_book</a>.get_single_remaining_size(order_id)
 }
 </code></pre>
 
@@ -2819,7 +2931,7 @@ Remaining size of the order in the order book.
 <pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_get_order_metadata">get_order_metadata</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;, order_id: OrderIdType
 ): Option&lt;M&gt; {
-    self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market_types.md#0x7_market_types_get_order_metadata">get_order_metadata</a>(order_id)
+    self.<a href="order_book.md#0x7_order_book">order_book</a>.get_single_order_metadata(order_id)
 }
 </code></pre>
 
@@ -2847,7 +2959,7 @@ It is up to the caller to perform necessary permissions checks
 <pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_set_order_metadata">set_order_metadata</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;, order_id: OrderIdType, metadata: M
 ) {
-    self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market_types.md#0x7_market_types_set_order_metadata">set_order_metadata</a>(order_id, metadata);
+    self.<a href="order_book.md#0x7_order_book">order_book</a>.set_single_order_metadata(order_id, metadata);
 }
 </code></pre>
 

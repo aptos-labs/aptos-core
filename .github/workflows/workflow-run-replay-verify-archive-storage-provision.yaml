@@ -16,7 +16,7 @@ on:
         required: true
 jobs:
   provision:
-    runs-on: ubuntu-latest
+    runs-on: 2cpu-gh-ubuntu24-x64
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

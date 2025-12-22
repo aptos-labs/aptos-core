@@ -2,7 +2,7 @@
 name = "move-ast-generator-tests"
 version = "0.1.0"
 edition = { workspace = true }
-license = { workspace = true }
+license = "Apache-2.0"
 
 [dev-dependencies]
 anyhow = { workspace = true }

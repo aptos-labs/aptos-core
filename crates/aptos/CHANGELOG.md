@@ -4,6 +4,9 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+## [7.12.1]
+- Fix link time optimization issues with Aptos CLI released via homebrew.
+
 ## [7.12.0]
 - Add support for passing signed integer transaction arguments through the Aptos CLI.
 
