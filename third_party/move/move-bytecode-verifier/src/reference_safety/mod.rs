@@ -484,8 +484,8 @@ fn execute_inner(
             safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
         },
         Bytecode::AbortMsg => {
-            // message reference
-            state.release_value(safe_unwrap!(verifier.stack.pop()));
+            // message value
+            safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
             // code value
             safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
         },

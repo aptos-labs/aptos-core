@@ -3056,7 +3056,7 @@ pub enum Bytecode {
         Abort the transaction with an error code and message.
     "#]
     #[semantics = r#"
-        stack >> (error_message: &vector<u8>)
+        stack >> (error_message: vector<u8>)
         stack >> (error_code: u64)
         abort transaction with error_code and error_message
     "#]
