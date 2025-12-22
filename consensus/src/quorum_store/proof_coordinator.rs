@@ -445,7 +445,7 @@ impl ProofCoordinator {
                             let signed_batch_infos = signed_batch_infos.take();
                             let Some(signed_batch_info) = signed_batch_infos.first() else {
                                 error!("Empty signed batch info received from {}", signer.short_str().as_str());
-                                return;
+                                continue;
                             };
                             let info = signed_batch_info.batch_info().clone();
                             let approx_created_ts_usecs = signed_batch_info
