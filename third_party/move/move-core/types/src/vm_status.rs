@@ -204,6 +204,7 @@ impl VMStatus {
         self,
         function_values_enabled: bool,
         memory_limit_exceeded_as_miscellaneous_error: bool,
+        abort_messages_enabled: bool,
     ) -> Result<KeptVMStatus, DiscardedVMStatus> {
         match self {
             VMStatus::Executed => Ok(KeptVMStatus::Executed),
@@ -214,7 +215,11 @@ impl VMStatus {
             } => Ok(KeptVMStatus::MoveAbort {
                 location,
                 code,
-                message,
+                message: if abort_messages_enabled {
+                    message
+                } else {
+                    None
+                },
             }),
             VMStatus::ExecutionFailure {
                 status_code: StatusCode::OUT_OF_GAS,
