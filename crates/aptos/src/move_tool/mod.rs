@@ -21,7 +21,7 @@ use crate::{
     governance::CompileScriptFunction,
     move_tool::{
         bytecode::{Decompile, Disassemble},
-        coverage::SummaryCoverage,
+        coverage::{CoverageCommon, SummaryCoverage},
         fmt::Fmt,
         lint::LintPackage,
         manifest::{Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo},
@@ -84,6 +84,7 @@ use std::{
 pub use stored_package::*;
 use tokio::task;
 use url::Url;
+
 pub mod aptos_debug_natives;
 mod bytecode;
 pub mod coverage;
@@ -648,6 +649,7 @@ impl CliCommand<&'static str> for TestPackage {
                 summarize_functions: false,
                 output_csv: false,
                 filter: self.filter,
+                common: CoverageCommon::default(),
                 move_options: self.move_options,
             };
             summary.coverage()?;
