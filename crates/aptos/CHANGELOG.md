@@ -3,6 +3,7 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # Unreleased
+- Updated default version of formatter to 1.4.5 and move mutation tests to 2.2.0.
 
 ## [7.12.1]
 - Fix link time optimization issues with Aptos CLI released via homebrew.
