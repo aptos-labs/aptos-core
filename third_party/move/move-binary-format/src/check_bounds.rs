@@ -673,8 +673,8 @@ impl<'a> BoundsChecker<'a> {
                 | LdI8(_) | LdI16(_) | LdI32(_) | LdI64(_) | LdI256(_) | LdI128(_) | CastI8
                 | CastI16 | CastI32 | CastI64 | CastI128 | CastI256 | LdTrue | LdFalse
                 | ReadRef | WriteRef | Add | Sub | Mul | Mod | Div | Negate | BitOr | BitAnd
-                | Xor | Shl | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge | Abort | AbortMsg | Nop => {
-                },
+                | Xor | Shl | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge | Abort
+                | AbortMsg | Nop => {},
             }
         }
         Ok(())

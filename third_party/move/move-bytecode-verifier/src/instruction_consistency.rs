@@ -151,9 +151,9 @@ impl<'a> InstructionConsistency<'a> {
                 | Xor | Shl | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge | CopyLoc(_)
                 | MoveLoc(_) | StLoc(_) | MutBorrowLoc(_) | ImmBorrowLoc(_) | VecLen(_)
                 | VecImmBorrow(_) | VecMutBorrow(_) | VecPushBack(_) | VecPopBack(_)
-                | VecSwap(_) | Abort | AbortMsg | Nop | LdI8(_) | LdI16(_) | LdI32(_) | LdI64(_)
-                | LdI128(_) | LdI256(_) | CastI8 | CastI16 | CastI32 | CastI64 | CastI128
-                | CastI256 => (),
+                | VecSwap(_) | Abort | AbortMsg | Nop | LdI8(_) | LdI16(_) | LdI32(_)
+                | LdI64(_) | LdI128(_) | LdI256(_) | CastI8 | CastI16 | CastI32 | CastI64
+                | CastI128 | CastI256 => (),
             }
         }
         Ok(())
