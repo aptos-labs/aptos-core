@@ -41,9 +41,9 @@ use aptos_types::{
     randomness::Randomness,
     state_store::StateViewId,
     transaction::{
-        signature_verified_transaction::{SignatureVerifiedTransaction, TransactionProvider},
-        AuxiliaryInfo, EphemeralAuxiliaryInfo, PersistedAuxiliaryInfo, SignedTransaction,
-        Transaction, TransactionExecutableRef,
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
+        EphemeralAuxiliaryInfo, PersistedAuxiliaryInfo, SignedTransaction, Transaction,
+        TransactionExecutableRef,
     },
     validator_signer::ValidatorSigner,
     vm::module_metadata::get_randomness_annotation_for_entry_function,
@@ -893,8 +893,11 @@ impl PipelineBuilder {
             // todo: avoid clone
             let txns: Vec<SignedTransaction> = user_txns
                 .iter()
-                .flat_map(|txn| txn.get_transaction().map(|t| t.try_as_signed_user_txn()))
-                .flatten()
+                .map(|txn| {
+                    txn.borrow_into_inner()
+                        .try_as_signed_user_txn()
+                        .expect("must be a user txn")
+                })
                 .cloned()
                 .collect();
 
