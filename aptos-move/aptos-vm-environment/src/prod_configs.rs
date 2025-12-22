@@ -179,7 +179,7 @@ pub fn aptos_prod_vm_config(
     ty_builder: TypeBuilder,
 ) -> VMConfig {
     let paranoid_type_checks = get_paranoid_type_checks();
-    let paranoid_ref_checks = get_paranoid_ref_checks();
+    let paranoid_ref_checks = true;
     let enable_layout_caches = get_layout_caches();
 
     let deserializer_config = aptos_prod_deserializer_config(features);
