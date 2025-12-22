@@ -32,18 +32,13 @@ impl GenesisRuntimeBuilder {
         let features = Features::default();
         let timed_features = TimedFeaturesBuilder::enable_all().build();
 
-        let mut vm_config = aptos_prod_vm_config(
+        let vm_config = aptos_prod_vm_config(
             chain_id,
             LATEST_GAS_FEATURE_VERSION,
             &features,
             &timed_features,
             aptos_default_ty_builder(),
         );
-
-        // Enable debugging in the genesis VM config. This is also the configuration
-        // of the VM used by e2e tests
-        vm_config.enable_debugging = true;
-        vm_config.paranoid_type_checks = true;
 
         // All genesis sessions run with unmetered gas meter, and here we set
         // the gas parameters for natives as zeros (because they do not matter).

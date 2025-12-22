@@ -12,6 +12,7 @@ edition = { workspace = true }
 
 [dependencies]
 ambassador = { workspace = true }
+arc-swap = { workspace = true }
 better_any = { workspace = true }
 bitvec = { workspace = true }
 bytes = { workspace = true }

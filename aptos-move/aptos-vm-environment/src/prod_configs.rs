@@ -34,6 +34,9 @@ static PARANOID_REF_CHECKS: OnceCell<bool> = OnceCell::new();
 static ASYNC_RUNTIME_CHECKS: OnceCell<bool> = OnceCell::new();
 static TIMED_FEATURE_OVERRIDE: OnceCell<TimedFeatureOverride> = OnceCell::new();
 
+/// Controls whether debugging is enabled.
+static DEBUGGING_ENABLED: OnceCell<bool> = OnceCell::new();
+
 /// If enabled, types layouts are cached in a global long-living cache. Caches ensure the behavior
 /// is the same as without caches, and so, using node config suffices.
 static LAYOUT_CACHES: OnceCell<bool> = OnceCell::new();
@@ -66,6 +69,17 @@ pub fn set_paranoid_ref_checks(enable: bool) {
 /// Returns the paranoid reference check flag if already set, and false otherwise.
 pub fn get_paranoid_ref_checks() -> bool {
     PARANOID_REF_CHECKS.get().cloned().unwrap_or(false)
+}
+
+/// Set whether debugging is enabled.
+pub fn set_debugging_enabled(enable: bool) {
+    DEBUGGING_ENABLED.set(enable).ok();
+}
+
+/// Returns whether debugging is enabled. Only accessed privately to construct
+/// VMConfig.
+fn get_debugging_enabled() -> bool {
+    DEBUGGING_ENABLED.get().cloned().unwrap_or(false)
 }
 
 /// Set the timed feature override.
@@ -181,6 +195,7 @@ pub fn aptos_prod_vm_config(
     let paranoid_type_checks = get_paranoid_type_checks();
     let paranoid_ref_checks = get_paranoid_ref_checks();
     let enable_layout_caches = get_layout_caches();
+    let enable_debugging = get_debugging_enabled();
 
     let deserializer_config = aptos_prod_deserializer_config(features);
     let verifier_config = aptos_prod_verifier_config(gas_feature_version, features);
@@ -237,7 +252,7 @@ pub fn aptos_prod_vm_config(
         propagate_dependency_limit_error: gas_feature_version >= RELEASE_V1_38,
         enable_framework_for_option,
         enable_function_caches_for_native_dynamic_dispatch,
-        enable_debugging: false, // production config no debugging
+        enable_debugging,
     };
 
     // Note: if max_value_nest_depth changed, make sure the constant is in-sync. Do not remove this

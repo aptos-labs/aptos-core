@@ -2959,6 +2959,7 @@ dependencies = [
  "move-binary-format",
  "move-command-line-common",
  "move-core-types",
+ "move-coverage",
  "move-ir-compiler",
  "move-model",
  "move-vm-runtime",
@@ -8539,9 +8540,11 @@ dependencies = [
  "memory-stats",
  "move-binary-format",
  "move-core-types",
+ "move-coverage",
  "move-model",
  "move-package",
  "move-symbol-pool",
+ "move-vm-runtime",
  "once_cell",
  "project-root",
  "proptest",
@@ -13230,6 +13233,7 @@ name = "move-vm-runtime"
 version = "0.1.0"
 dependencies = [
  "ambassador",
+ "arc-swap",
  "better_any",
  "bitvec",
  "bytes",

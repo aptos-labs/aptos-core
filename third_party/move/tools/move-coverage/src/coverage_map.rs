@@ -12,7 +12,7 @@ use move_core_types::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
+    collections::{btree_map::Entry, BTreeMap},
     fs::File,
     io::{BufRead, BufReader, Read, Write},
     path::Path,
@@ -21,7 +21,7 @@ use std::{
 /// Map from code offset in a function to the number of times it was executed.
 pub type FunctionCoverage = BTreeMap<u64, u64>;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct CoverageMap {
     pub exec_maps: BTreeMap<String, ExecCoverageMap>,
 }
@@ -148,6 +148,17 @@ impl CoverageMap {
         }
         unified_map
     }
+
+    pub fn merge(&mut self, other: Self) {
+        for (id, exec_map) in other.exec_maps {
+            match self.exec_maps.entry(id) {
+                Entry::Vacant(e) => {
+                    e.insert(exec_map);
+                },
+                Entry::Occupied(mut e) => e.get_mut().merge(exec_map),
+            }
+        }
+    }
 }
 
 impl ModuleCoverageMap {
@@ -211,6 +222,17 @@ impl ExecCoverageMap {
         pc: u64,
     ) {
         self.insert_multi(module_addr, module_name, func_name, pc, 1);
+    }
+
+    pub fn merge(&mut self, other: ExecCoverageMap) {
+        for (mod_id, mod_map) in other.module_maps {
+            match self.module_maps.entry(mod_id) {
+                Entry::Vacant(e) => {
+                    e.insert(mod_map);
+                },
+                Entry::Occupied(mut e) => e.get_mut().merge(mod_map),
+            }
+        }
     }
 
     pub fn into_coverage_map_with_modules(
