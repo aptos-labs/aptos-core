@@ -572,6 +572,10 @@ impl Bytecode {
         matches!(self, Bytecode::Ret(..))
     }
 
+    pub fn is_abort(&self) -> bool {
+        matches!(self, Bytecode::Abort(..) | Bytecode::AbortMsg(..))
+    }
+
     pub fn is_always_branching(&self) -> bool {
         matches!(
             self,
@@ -811,7 +815,7 @@ impl Bytecode {
                 Branch(attr, if_label, else_label, f(true, cond))
             },
             Abort(attr, cond) => Abort(attr, f(true, cond)),
-            AbortMsg(attr, conds, ) => AbortMsg(attr, conds.map(|cond| f(true, cond))),
+            AbortMsg(attr, conds) => AbortMsg(attr, conds.map(|cond| f(true, cond))),
             Prop(attr, kind, exp) => {
                 let new_exp = Bytecode::remap_exp(func_target, &mut |idx| f(true, idx), exp);
                 Prop(attr, kind, new_exp)

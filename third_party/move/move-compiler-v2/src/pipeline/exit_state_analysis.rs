@@ -100,7 +100,7 @@ impl TransferFunctions for ExitStateAnalysis {
 
     fn execute(&self, state: &mut Self::State, instr: &Bytecode, _offset: CodeOffset) {
         match instr {
-            Bytecode::Abort(..) => {
+            Bytecode::Abort(..) | Bytecode::AbortMsg(..) => {
                 *state = ExitState::singleton(ExitStatus::Abort);
             },
             Bytecode::Ret(..) => {

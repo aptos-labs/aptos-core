@@ -75,10 +75,7 @@ impl FunctionTargetProcessor for InconsistencyCheckInstrumenter {
         let mut builder = FunctionDataBuilder::new(fun_env, new_data);
         let old_code = std::mem::take(&mut builder.data.code);
         for bc in old_code {
-            if matches!(bc, Bytecode::Ret(..))
-                || (matches!(bc, Bytecode::Abort(..))
-                    && !options.unconditional_abort_as_inconsistency)
-            {
+            if bc.is_return() || (bc.is_abort() && !options.unconditional_abort_as_inconsistency) {
                 let loc = builder.fun_env.get_spec_loc();
                 builder.set_loc_and_vc_info(loc, EXPECTED_TO_FAIL);
                 let exp = builder.mk_bool_const(false);
