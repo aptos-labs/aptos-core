@@ -2732,6 +2732,10 @@ impl Frame {
                             )?;
                             eprintln!("trace abort({}): {}", error_code, str);
                         }
+
+                        // Important: do not attach a message here.
+                        // We rely on the presence of an error message to distinguish
+                        // aborts with explicit messages (see below) from those without.
                         let error =
                             PartialVMError::new(StatusCode::ABORTED).with_sub_status(error_code);
 
