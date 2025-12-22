@@ -176,9 +176,6 @@ module aptos_experimental::dead_mans_switch_operations_test {
         // Setup market WITHOUT dead man's switch
         let admin = account::create_signer_for_test(@0x1);
         let market_signer = account::create_signer_for_test(@0x2);
-        let trader = account::create_signer_for_test(@0x100);
-        let trader_addr = signer::address_of(&trader);
-
         timestamp::set_time_has_started_for_testing(&admin);
         let market = new_market(
             &admin,

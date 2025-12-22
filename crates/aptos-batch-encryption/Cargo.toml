@@ -30,7 +30,8 @@ ark-poly = { workspace = true }
 ark-serialize = { workspace = true }
 ark-std = { workspace = true }
 bcs = { workspace = true }
-ed25519-dalek = { version = "2.1.1", features = ["asm", "rand_core", "serde"] }
+# TODO: Fix compiler errors so we can use `workspace = true` here
+ed25519-dalek = { version = "2.1.1", features = ["serde"] }
 generic-array = { workspace = true }
 hmac = { workspace = true }
 num-traits = { workspace = true }
@@ -38,7 +39,8 @@ rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-sha2 = { version = "0.10.8", features = ["asm", "asm-aarch64", "sha2-asm"] }
+# TODO: Fix compiler errors so we can use `workspace = true` here
+sha2 = { version = "0.10.6" }
 thiserror = { workspace = true }
 
 [dev-dependencies]
