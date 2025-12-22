@@ -26,7 +26,12 @@ use move_core_types::{
         self, MoveStructLayout, MoveTypeLayout, MASTER_ADDRESS_FIELD_OFFSET, MASTER_SIGNER_VARIANT,
         PERMISSIONED_SIGNER_VARIANT, PERMISSION_ADDRESS_FIELD_OFFSET,
     },
-    vm_status::{sub_status::NFE_VECTOR_ERROR_BASE, StatusCode},
+    vm_status::{
+        sub_status::{
+            unknown_invariant_violation::EREFERENCE_SAFETY_FAILURE, NFE_VECTOR_ERROR_BASE,
+        },
+        StatusCode,
+    },
 };
 use serde::{
     de::{EnumAccess, Error as DeError, Unexpected, VariantAccess},
@@ -176,6 +181,7 @@ pub(crate) enum GlobalDataStatus {
 pub(crate) struct IndexedRef {
     idx: u32,
     container_ref: ContainerRef,
+    /// Only set for enums.
     tag: Option<u16>,
 }
 
@@ -402,6 +408,25 @@ impl Container {
             Self::VecAddress(r) => r.borrow().len(),
 
             Self::Locals(r) => r.borrow().len(),
+        }
+    }
+
+    fn get_enum_tag(&self) -> PartialVMResult<u16> {
+        match self {
+            Self::Struct(vals) => {
+                let vals = vals.borrow();
+                vals.first()
+                    .and_then(|v| match v {
+                        Value::U16(x) => Some(*x),
+                        _ => None,
+                    })
+                    .ok_or_else(|| {
+                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    })
+            },
+            _ => Err(PartialVMError::new(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+            )),
         }
     }
 
@@ -725,7 +750,7 @@ impl IndexedRef {
      *    - vec_swap<vector<Foo>> / mem::swap          // move containers; do not rewrite enum
      *    - read_ref r                                 // OK: tag unchanged
      *
-     * Relationship to the bytecodeverifier
+     * Relationship to the bytecode verifier
      * ---------------------------------------------------
      * If the verifier’s aliasing rules hold, this guard is redundant and always passes. If, however,
      * an implementation defect allows a destructive update through an alias (e.g., a bytecode verifier bug
@@ -739,45 +764,14 @@ impl IndexedRef {
      */
     fn check_tag(&self) -> PartialVMResult<()> {
         if let Some(tag) = self.tag {
-            let current_tag = match self.container_ref.container() {
-                Container::Struct(vals) => {
-                    let vals = vals.borrow();
-                    vals.first()
-                        .and_then(|v| match v {
-                            Value::U16(x) => Some(*x),
-                            _ => None,
-                        })
-                        .ok_or_else(|| {
-                            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        })
-                },
-                Container::Locals(_)
-                | Container::Vec(_)
-                | Container::VecU8(_)
-                | Container::VecU64(_)
-                | Container::VecU128(_)
-                | Container::VecBool(_)
-                | Container::VecAddress(_)
-                | Container::VecU16(_)
-                | Container::VecU32(_)
-                | Container::VecU256(_)
-                | Container::VecI8(_)
-                | Container::VecI16(_)
-                | Container::VecI32(_)
-                | Container::VecI64(_)
-                | Container::VecI128(_)
-                | Container::VecI256(_) => {
-                    return Err(PartialVMError::new(
-                        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                    ))
-                },
-            }?;
+            let current_tag = self.container_ref.container().get_enum_tag()?;
 
             if current_tag != tag {
                 let msg = "invalid enum tag".to_string();
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(msg),
+                        .with_message(msg)
+                        .with_sub_status(EREFERENCE_SAFETY_FAILURE),
                 );
             }
         }
@@ -2207,37 +2201,7 @@ impl StructRef {
     }
 
     fn get_variant_tag(&self) -> PartialVMResult<VariantIndex> {
-        match self.0.container() {
-            Container::Struct(vals) => {
-                let vals = vals.borrow();
-                vals.first()
-                    .and_then(|v| match v {
-                        Value::U16(x) => Some(*x),
-                        _ => None,
-                    })
-                    .ok_or_else(|| {
-                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    })
-            },
-            Container::Locals(_)
-            | Container::Vec(_)
-            | Container::VecU8(_)
-            | Container::VecU64(_)
-            | Container::VecU128(_)
-            | Container::VecBool(_)
-            | Container::VecAddress(_)
-            | Container::VecU16(_)
-            | Container::VecU32(_)
-            | Container::VecU256(_)
-            | Container::VecI8(_)
-            | Container::VecI16(_)
-            | Container::VecI32(_)
-            | Container::VecI64(_)
-            | Container::VecI128(_)
-            | Container::VecI256(_) => Err(PartialVMError::new(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            )),
-        }
+        self.0.container().get_enum_tag()
     }
 }
 
@@ -2291,7 +2255,10 @@ impl Locals {
 
 impl SignerRef {
     pub fn borrow_signer(&self) -> PartialVMResult<Value> {
-        self.0.borrow_elem(1, None)
+        // The signer is internally represented as an enum (Master or Permissioned), but both
+        // variants store the account address at index 1. Thus, we can access it without checking
+        // the variant tag.
+        self.0.borrow_elem(MASTER_ADDRESS_FIELD_OFFSET, None)
     }
 
     pub fn is_permissioned(&self) -> PartialVMResult<bool> {
