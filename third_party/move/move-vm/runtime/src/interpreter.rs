@@ -2732,6 +2732,10 @@ impl Frame {
                             )?;
                             eprintln!("trace abort({}): {}", error_code, str);
                         }
+
+                        // Important: do not attach a message here.
+                        // We rely on the presence of an error message to distinguish
+                        // aborts with explicit messages (see below) from those without.
                         let error =
                             PartialVMError::new(StatusCode::ABORTED).with_sub_status(error_code);
 
@@ -2743,9 +2747,9 @@ impl Frame {
                     Instruction::AbortMsg => {
                         gas_meter.charge_simple_instr(S::AbortMsg)?;
 
-                        let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let bytes = vec_ref.try_as_bytes_ref()?;
-                        let error_message = String::from_utf8(bytes.to_owned()).map_err(|err| {
+                        let vec = interpreter.operand_stack.pop_as::<Vector>()?;
+                        let bytes = vec.to_vec_u8()?;
+                        let error_message = String::from_utf8(bytes).map_err(|err| {
                             PartialVMError::new_invariant_violation(format!(
                                 "Invalid UTF-8 string: {err}",
                             ))

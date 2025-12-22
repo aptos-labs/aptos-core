@@ -288,7 +288,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             Instruction::AbortMsg => {
                 let ty1 = operand_stack.pop_ty()?;
-                ty1.paranoid_check_is_vec_ref_ty::<false>(&Type::U8)?;
+                ty1.paranoid_check_is_vec_ty(&Type::U8)?;
                 let ty2 = operand_stack.pop_ty()?;
                 ty2.paranoid_check_is_u64_ty()?;
             },
