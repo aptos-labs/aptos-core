@@ -55,6 +55,7 @@ const REFRESH_INTERVAL_VERSIONS: usize = 50;
 
 const TEST_CONFIG: HotStateConfig = HotStateConfig {
     max_items_per_shard: HOT_STATE_MAX_ITEMS_PER_SHARD,
+    delete_on_restart: true,
 };
 
 #[derive(Debug)]
@@ -480,6 +481,7 @@ impl DbReader for StateByVersion {
         key_hash: &HashValue,
         version: Version,
         _root_depth: usize,
+        _use_hot_state: bool,
     ) -> DbResult<SparseMerkleProofExt> {
         Ok(self.get_state(Some(version)).summary.get_proof(key_hash))
     }

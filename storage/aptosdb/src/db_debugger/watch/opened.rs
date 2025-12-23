@@ -27,6 +27,7 @@ impl Cmd {
         let _db = AptosDB::open(
             config.get_dir_paths(),
             false, /* readonly */
+            config.hot_state_config,
             config.storage_pruner_config,
             config.rocksdb_configs,
             config.enable_indexer,

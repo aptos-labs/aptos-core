@@ -11,7 +11,7 @@ pub(crate) mod stream;
 pub mod test_utils;
 
 use aptos_config::config::{
-    RocksdbConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
+    HotStateConfig, RocksdbConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_crypto::HashValue;
@@ -304,7 +304,8 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
             };
             let restore_handler = Arc::new(AptosDB::open_kv_only(
                 StorageDirPaths::from_path(db_dir),
-                false,                       /* read_only */
+                false, /* read_only */
+                HotStateConfig::default(),
                 NO_OP_STORAGE_PRUNER_CONFIG, /* pruner config */
                 opt.rocksdb_opt.clone().into(),
                 false, /* indexer */

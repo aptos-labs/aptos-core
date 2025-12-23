@@ -111,6 +111,7 @@ pub fn init_db(config: &NodeConfig) -> DbReaderWriter {
         AptosDB::open(
             config.storage.get_dir_paths(),
             false, /* readonly */
+            config.storage.hot_state_config,
             config.storage.storage_pruner_config,
             config.storage.rocksdb_configs,
             false,

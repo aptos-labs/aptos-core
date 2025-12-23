@@ -5,8 +5,8 @@ use anyhow::{bail, Error, Ok, Result};
 use aptos_backup_cli::utils::{ReplayConcurrencyLevelOpt, RocksdbOpt};
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_config::config::{
-    StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-    NO_OP_STORAGE_PRUNER_CONFIG,
+    HotStateConfig, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
+    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_db::{backup::backup_handler::BackupHandler, AptosDB};
 use aptos_logger::prelude::*;
@@ -154,6 +154,7 @@ impl Verifier {
                 AptosDB::open(
                     StorageDirPaths::from_path(config.db_dir.as_path()),
                     false,
+                    HotStateConfig::default(),
                     NO_OP_STORAGE_PRUNER_CONFIG,
                     config.rocksdb_opt.clone().into(),
                     false,
@@ -169,6 +170,10 @@ impl Verifier {
         let aptos_db = AptosDB::open(
             StorageDirPaths::from_path(config.db_dir.as_path()),
             true,
+            HotStateConfig {
+                delete_on_restart: false,
+                ..Default::default()
+            },
             NO_OP_STORAGE_PRUNER_CONFIG,
             config.rocksdb_opt.clone().into(),
             false,

@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{db_debugger::ShardingConfig, AptosDB};
-use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
+use aptos_config::config::{HotStateConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_storage_interface::Result;
 use clap::Parser;
 use std::path::PathBuf;
@@ -29,8 +29,12 @@ impl Cmd {
         let env = None;
         let block_cache = None;
 
-        let (ledger_db, _, _) = AptosDB::open_dbs(
+        let (ledger_db, _, _, _) = AptosDB::open_dbs(
             &StorageDirPaths::from_path(&self.db_dir),
+            HotStateConfig {
+                delete_on_restart: false,
+                ..Default::default()
+            },
             rocksdb_config,
             env,
             block_cache,

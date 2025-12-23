@@ -3,7 +3,7 @@
 
 use crate::{builder::GenesisConfiguration, config::ValidatorConfiguration};
 use aptos_config::config::{
-    RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
+    HotStateConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_db::AptosDB;
@@ -155,6 +155,7 @@ impl MainnetGenesisInfo {
         let aptosdb = AptosDB::open(
             StorageDirPaths::from_path(path),
             false,
+            HotStateConfig::default(),
             NO_OP_STORAGE_PRUNER_CONFIG,
             RocksdbConfigs::default(),
             false, /* indexer */
