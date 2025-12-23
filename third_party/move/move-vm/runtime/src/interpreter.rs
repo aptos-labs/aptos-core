@@ -2750,9 +2750,8 @@ impl Frame {
                         let vec = interpreter.operand_stack.pop_as::<Vector>()?;
                         let bytes = vec.to_vec_u8()?;
                         let error_message = String::from_utf8(bytes).map_err(|err| {
-                            PartialVMError::new_invariant_violation(format!(
-                                "Invalid UTF-8 string: {err}",
-                            ))
+                            PartialVMError::new(StatusCode::INVALID_ABORT_MESSAGE)
+                                .with_message(format!("Invalid UTF-8 string: {err}"))
                         })?;
 
                         let error_code = interpreter.operand_stack.pop_as::<u64>()?;
