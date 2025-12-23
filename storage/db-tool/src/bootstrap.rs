@@ -57,6 +57,7 @@ impl Command {
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             None,
+            /* reset_hot_state = */ false, // This is probably on an empty DB anyway?
         )
         .expect("Failed to open DB.");
         let db = DbReaderWriter::new(db);
