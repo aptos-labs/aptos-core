@@ -5,7 +5,7 @@ use crate::db::AptosDB;
 #[cfg(test)]
 use crate::state_merkle_db::StateMerkleDb;
 use aptos_config::config::{
-    RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+    HotStateConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_crypto::hash::CryptoHash;
@@ -51,6 +51,7 @@ impl AptosDB {
         Self::open(
             StorageDirPaths::from_path(db_root_path),
             false,
+            HotStateConfig::default(),
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
             db_config,
             false, /* indexer */

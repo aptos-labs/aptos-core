@@ -287,7 +287,7 @@ mod dbtool_tests {
         new_db_dir: PathBuf,
     ) -> (Runtime, String) {
         use aptos_config::config::{
-            RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+            HotStateConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
             NO_OP_STORAGE_PRUNER_CONFIG,
         };
         use aptos_db_indexer::utils::PrefixedStateValueIterator as IndexerPrefixedStateValueIterator;
@@ -462,6 +462,7 @@ mod dbtool_tests {
             AptosDB::open(
                 StorageDirPaths::from_path(new_db_dir),
                 false,
+                HotStateConfig::default(),
                 NO_OP_STORAGE_PRUNER_CONFIG,
                 RocksdbConfigs::default(),
                 false,

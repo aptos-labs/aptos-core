@@ -9,8 +9,8 @@ use aptos_backup_cli::{
     utils::{ConcurrentDownloadsOpt, ReplayConcurrencyLevelOpt, RocksdbOpt, TrustedWaypointOpt},
 };
 use aptos_config::config::{
-    StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-    NO_OP_STORAGE_PRUNER_CONFIG,
+    HotStateConfig, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
+    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_db::{get_restore_handler::GetRestoreHandler, AptosDB};
 use aptos_executor_types::VerifyExecutionMode;
@@ -63,7 +63,8 @@ impl Opt {
     pub async fn run(self) -> Result<()> {
         let restore_handler = Arc::new(AptosDB::open_kv_only(
             StorageDirPaths::from_path(self.db_dir),
-            false,                       /* read_only */
+            false, /* read_only */
+            HotStateConfig::default(),
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner config */
             self.rocksdb_opt.into(),
             false, /* indexer */
