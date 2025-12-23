@@ -20,11 +20,10 @@ use aptos_dkg::{
 use ark_bls12_381::Bls12_381;
 use ark_bn254::Bn254;
 use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup};
+use ark_ff::{Fp, FpConfig};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::thread_rng;
 use std::fmt::Debug;
-use ark_ff::FpConfig;
-use ark_ff::Fp;
 
 const CNTXT: &[u8; 32] = b"SIGMA-PROTOCOL-TESTS-SOK-CONTEXT";
 
@@ -37,7 +36,7 @@ where
     let mut rng = thread_rng();
 
     let statement = hom.apply(&witness);
-    
+
     let proof = hom.prove(&witness, &statement, CNTXT, &mut rng);
 
     hom.verify(&statement, &proof, CNTXT)
@@ -45,7 +44,11 @@ where
 }
 
 // TODO: Find a way to make this more modular
-fn test_imhomog_chaum_pedersen<E: Pairing<ScalarField = Fp<P, N>>, const N: usize, P: FpConfig<N>>(
+fn test_imhomog_chaum_pedersen<
+    E: Pairing<ScalarField = Fp<P, N>>,
+    const N: usize,
+    P: FpConfig<N>,
+>(
     hom: chaum_pedersen::InhomogChaumPedersen<E>,
     witness: E::ScalarField,
 ) {
@@ -96,7 +99,9 @@ mod schnorr {
         }
     }
 
-    impl<C: CurveGroup<ScalarField = Fp<P, N>>, const N: usize, P: FpConfig<N>> homomorphism::Trait for Schnorr<C> {
+    impl<C: CurveGroup<ScalarField = Fp<P, N>>, const N: usize, P: FpConfig<N>> homomorphism::Trait
+        for Schnorr<C>
+    {
         type Codomain = CodomainShape<C>;
         type Domain = Fp<P, N>;
 
@@ -105,7 +110,10 @@ mod schnorr {
         }
     }
 
-    impl<C: CurveGroup<ScalarField = Fp<P, N>>, const N: usize, P: FpConfig<N>> fixed_base_msms::Trait for Schnorr<C> {
+    impl<C: CurveGroup<ScalarField = Fp<P, N>>, const N: usize, P: FpConfig<N>>
+        fixed_base_msms::Trait for Schnorr<C>
+    {
+        type Base = C::Affine;
         type CodomainShape<T>
             = CodomainShape<T>
         where
@@ -113,7 +121,6 @@ mod schnorr {
         type MsmInput = MsmInput<C::Affine, C::ScalarField>;
         type MsmOutput = C;
         type Scalar = C::ScalarField;
-        type Base = C::Affine;
 
         fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
             CodomainShape(MsmInput {
@@ -128,14 +135,14 @@ mod schnorr {
             C::msm(input.bases(), input.scalars()).expect("MSM failed in Schnorr")
         }
 
-        fn batch_normalize(
-            msm_output: Vec<Self::MsmOutput>
-        ) -> Vec<Self::Base> {
-        C::normalize_batch(&msm_output)
+        fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
+            C::normalize_batch(&msm_output)
         }
     }
 
-    impl<C: CurveGroup<ScalarField = Fp<P, N>>, const N: usize, P: FpConfig<N>> sigma_protocol::Trait<C> for Schnorr<C> {
+    impl<C: CurveGroup<ScalarField = Fp<P, N>>, const N: usize, P: FpConfig<N>>
+        sigma_protocol::Trait<C> for Schnorr<C>
+    {
         fn dst(&self) -> Vec<u8> {
             b"SCHNORR_SIGMA_PROTOCOL_DST".to_vec()
         }
@@ -149,7 +156,11 @@ mod chaum_pedersen {
 
     // Implementing e.g. `Default` here would require a wrapper, but then `sigma_protocol::Trait` would have to get re-implemented...
     #[allow(non_snake_case)]
-    pub fn make_chaum_pedersen_instance<C: CurveGroup<ScalarField = Fp<P, N>>, const N: usize, P: FpConfig<N>>() -> ChaumPedersen<C> {
+    pub fn make_chaum_pedersen_instance<
+        C: CurveGroup<ScalarField = Fp<P, N>>,
+        const N: usize,
+        P: FpConfig<N>,
+    >() -> ChaumPedersen<C> {
         let G_1 = C::generator().into_affine();
         let G_2 = (G_1 * C::ScalarField::from(123456789u64)).into_affine();
 
@@ -166,7 +177,11 @@ mod chaum_pedersen {
         PairingTupleHomomorphism<E, Schnorr<<E as Pairing>::G1>, Schnorr<<E as Pairing>::G2>>;
 
     #[allow(non_snake_case)]
-    pub fn make_inhomogeneous_chaum_pedersen_instance<E: Pairing<ScalarField = Fp<P, N>>, const N: usize, P: FpConfig<N>>() -> InhomogChaumPedersen<E> {
+    pub fn make_inhomogeneous_chaum_pedersen_instance<
+        E: Pairing<ScalarField = Fp<P, N>>,
+        const N: usize,
+        P: FpConfig<N>,
+    >() -> InhomogChaumPedersen<E> {
         let G_1 = E::G1::generator().into_affine();
         let G_2 = E::G2::generator().into_affine();
 
@@ -185,8 +200,11 @@ mod scalar_mul {
     use super::*;
     use aptos_dkg::pvss::chunky::chunked_scalar_mul;
 
-    pub type InhomogScalarMul<E> =
-        PairingTupleHomomorphism<E, chunked_scalar_mul::Homomorphism<<E as Pairing>::G1>, chunked_scalar_mul::Homomorphism<<E as Pairing>::G2>>;
+    pub type InhomogScalarMul<E> = PairingTupleHomomorphism<
+        E,
+        chunked_scalar_mul::Homomorphism<<E as Pairing>::G1>,
+        chunked_scalar_mul::Homomorphism<<E as Pairing>::G2>,
+    >;
 
     #[allow(non_snake_case)]
     pub fn make_inhomogeneous_scalar_mul<E: Pairing>() -> InhomogScalarMul<E> {
@@ -228,7 +246,10 @@ fn test_chaum_pedersen() {
     // ---- Bn254 ----
     let witness_bn = sample_field_element(&mut rng);
     test_sigma_protocol::<<Bn254 as Pairing>::G1, _>(make_chaum_pedersen_instance(), witness_bn);
-    test_imhomog_chaum_pedersen::<Bn254, _, _>(make_inhomogeneous_chaum_pedersen_instance(), witness_bn);
+    test_imhomog_chaum_pedersen::<Bn254, _, _>(
+        make_inhomogeneous_chaum_pedersen_instance(),
+        witness_bn,
+    );
 
     // ---- Bls12_381 ----
     let witness_bls = sample_field_element(&mut rng);
@@ -241,10 +262,9 @@ fn test_chaum_pedersen() {
         witness_bls,
     );
 
-    use aptos_dkg::pvss::chunky::chunks;
-    use aptos_dkg::pvss::chunky::chunked_scalar_mul::Witness;
     use crate::scalar_mul::make_inhomogeneous_scalar_mul;
-    
+    use aptos_dkg::pvss::chunky::{chunked_scalar_mul::Witness, chunks};
+
     let ell = 16u8;
 
     let scalars = sample_field_elements(1, &mut rng);

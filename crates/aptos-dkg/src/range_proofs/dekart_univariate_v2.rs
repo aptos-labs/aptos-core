@@ -14,7 +14,8 @@ use aptos_crypto::arkworks::{
     self,
     msm::MsmInput,
     random::{
-        sample_field_element, sample_field_elements, unsafe_random_point, unsafe_random_points,
+        sample_field_element, sample_field_elements, unsafe_random_point,
+        unsafe_random_points_group,
     },
     GroupGenerators,
 };
@@ -46,10 +47,10 @@ impl<E: Pairing> Proof<E> {
     /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
     pub fn generate<R: rand::Rng + rand::CryptoRng>(ell: u8, rng: &mut R) -> Self {
         Self {
-            hatC: unsafe_random_point(rng),
+            hatC: unsafe_random_point::<E::G1Affine, _>(rng).into(),
             pi_PoK: two_term_msm::Proof::generate(rng),
-            Cs: unsafe_random_points(ell as usize, rng),
-            D: unsafe_random_point(rng),
+            Cs: unsafe_random_points_group(ell as usize, rng),
+            D: unsafe_random_point::<E::G1Affine, _>(rng).into(),
             a: sample_field_element(rng),
             a_h: sample_field_element(rng),
             a_js: sample_field_elements(ell as usize, rng),
@@ -892,9 +893,9 @@ pub mod two_term_msm {
         /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
         pub fn generate<R: rand::Rng + rand::CryptoRng>(rng: &mut R) -> Self {
             Self {
-                first_proof_item: FirstProofItem::Commitment(CodomainShape(unsafe_random_point(
-                    rng,
-                ))),
+                first_proof_item: FirstProofItem::Commitment(CodomainShape(
+                    unsafe_random_point::<C::Affine, _>(rng).into(),
+                )),
                 z: Witness {
                     poly_randomness: Scalar::rand(rng),
                     hiding_kzg_randomness: Scalar::rand(rng),
@@ -936,6 +937,7 @@ pub mod two_term_msm {
     }
 
     impl<C: CurveGroup> fixed_base_msms::Trait for Homomorphism<C> {
+        type Base = C::Affine;
         type CodomainShape<T>
             = CodomainShape<T>
         where
@@ -943,7 +945,6 @@ pub mod two_term_msm {
         type MsmInput = MsmInput<C::Affine, C::ScalarField>;
         type MsmOutput = C;
         type Scalar = C::ScalarField;
-        type Base = C::Affine;
 
         fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
             let mut scalars = Vec::with_capacity(2);
@@ -961,9 +962,7 @@ pub mod two_term_msm {
             C::msm(input.bases(), input.scalars()).expect("MSM failed in TwoTermMSM")
         }
 
-        fn batch_normalize(
-                msm_output: Vec<Self::MsmOutput>
-            ) -> Vec<Self::Base> {
+        fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
             C::normalize_batch(&msm_output)
         }
     }

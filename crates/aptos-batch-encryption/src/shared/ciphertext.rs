@@ -8,10 +8,11 @@ use super::{
 use crate::{
     errors::{BatchEncryptionError, CTVerifyError},
     group::{Fr, G1Affine, G2Affine, G2Prepared, PairingOutput, PairingSetting},
-    shared::{ids::Id},
+    shared::ids::Id,
     traits::{AssociatedData, Plaintext},
 };
 use anyhow::Result;
+use aptos_crypto::arkworks::serialization::{ark_de, ark_se};
 use ark_ec::{pairing::Pairing, AffineRepr};
 use ark_serialize::CanonicalSerialize;
 use ark_std::{
@@ -21,7 +22,6 @@ use ark_std::{
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey, SECRET_KEY_LENGTH};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
-use aptos_crypto::arkworks::serialization::{ark_se, ark_de};
 
 #[derive(Clone, Serialize, Deserialize, Debug, Hash, Eq, PartialEq)]
 pub struct BIBECiphertext<I: Id> {

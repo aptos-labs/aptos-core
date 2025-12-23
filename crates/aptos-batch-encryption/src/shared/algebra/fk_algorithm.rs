@@ -1,7 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use super::multi_point_eval::multi_point_eval;
-use crate::shared::{algebra::multi_point_eval::multi_point_eval_naive};
+use crate::shared::algebra::multi_point_eval::multi_point_eval_naive;
+use aptos_crypto::arkworks::serialization::{ark_de, ark_se};
 use ark_ec::VariableBaseMSM;
 use ark_ff::FftField;
 use ark_poly::{domain::DomainCoeff, EvaluationDomain, Radix2EvaluationDomain};
@@ -16,7 +17,6 @@ use serde::{
     Deserialize, Serialize,
 };
 use std::{fmt, marker::PhantomData, ops::Mul};
-use aptos_crypto::arkworks::serialization::{ark_se, ark_de};
 
 // TODO have a better error-handling story. Currently there are a lot of assert_eq! which
 // should be replaced with either compile-time guarantees on array sizes or with Results.

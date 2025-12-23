@@ -4,7 +4,7 @@ use crate::{
     errors::BatchEncryptionError,
     group::*,
     shared::{
-        ciphertext::{CTDecrypt, CTEncrypt, Ciphertext, PreparedCiphertext},
+        ciphertext::{BIBEEncryptionKey, CTDecrypt, CTEncrypt, Ciphertext, PreparedCiphertext},
         digest::{Digest, DigestKey, EvalProofs, EvalProofsPromise},
         ids::{
             free_roots::{ComputedCoeffs, UncomputedCoeffs},
@@ -20,7 +20,11 @@ use crate::{
     },
 };
 use anyhow::{anyhow, Result};
-use aptos_crypto::{weighted_config::WeightedConfigArkworks, SecretSharingConfig as _};
+use aptos_crypto::{
+    arkworks::serialization::{ark_de, ark_se},
+    weighted_config::WeightedConfigArkworks,
+    SecretSharingConfig as _,
+};
 use aptos_dkg::pvss::{
     traits::{Reconstructable as _, Subtranscript},
     Player,
@@ -30,8 +34,6 @@ use ark_ff::UniformRand as _;
 use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 use rayon::iter::{IntoParallelIterator, ParallelIterator as _};
 use serde::{Deserialize, Serialize};
-use crate::shared::ciphertext::BIBEEncryptionKey;
-use aptos_crypto::arkworks::serialization::{ark_se, ark_de};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct EncryptionKey {

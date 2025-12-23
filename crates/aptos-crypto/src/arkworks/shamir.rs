@@ -193,11 +193,11 @@ pub fn all_lagrange_denominators<F: FftField>(
         }
     }
 
-//    use std::time::Instant;
-//    let start = Instant::now();
+    //    use std::time::Instant;
+    //    let start = Instant::now();
     // This is **not** X^n - 1, because the \omega^i are not n-th roots of unity, they are N-th roots of unity where N is some power of 2
     let mut A = vanishing_poly::from_roots(&omegas);
-//    println!("vanishing_poly::from_roots took {:?}", start.elapsed());
+    //    println!("vanishing_poly::from_roots took {:?}", start.elapsed());
 
     // A'(X) = \sum_{i \in [0, n-1]} \prod_{j \ne i, j \in [0, n-1]} (X - \omega^j)
     A.differentiate_in_place();

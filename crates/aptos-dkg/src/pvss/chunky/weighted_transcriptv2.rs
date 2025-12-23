@@ -2,41 +2,52 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    Scalar, dlog::bsgs, pcs::univariate_hiding_kzg, pvss::{
-        Player, chunky::{
-            chunked_elgamal::{self, num_chunks_per_scalar}, chunks, hkzg_chunked_elgamal::{HkzgWeightedElgamalWitness}, hkzg_chunked_elgamal_commit, input_secret::InputSecret, keys, public_parameters::PublicParameters
-        }, traits::{
-            self, HasEncryptionPublicParams, transcript::{Aggregatable, HasAggregatableSubtranscript, MalleableTranscript}
-        }
-    }, range_proofs::{dekart_univariate_v2, traits::BatchedRangeProof}, sigma_protocol::{
+    dlog::bsgs,
+    pcs::univariate_hiding_kzg,
+    pvss::{
+        chunky::{
+            chunked_elgamal::{self, num_chunks_per_scalar},
+            chunked_scalar_mul, chunks,
+            hkzg_chunked_elgamal::HkzgWeightedElgamalWitness,
+            hkzg_chunked_elgamal_commit,
+            input_secret::InputSecret,
+            keys,
+            public_parameters::PublicParameters,
+        },
+        traits::{
+            self,
+            transcript::{Aggregatable, HasAggregatableSubtranscript, MalleableTranscript},
+        },
+        Player,
+    },
+    range_proofs::{dekart_univariate_v2, traits::BatchedRangeProof},
+    sigma_protocol::{
         self,
-        homomorphism::{Trait as _, tuple::TupleCodomainShape},
-    }
+        homomorphism::{tuple::TupleCodomainShape, Trait as _},
+    },
+    Scalar,
 };
-use crate::sigma_protocol::homomorphism::VectorShape;
-use crate::pvss::chunky::chunked_scalar_mul;
 use anyhow::bail;
 use aptos_crypto::{
     arkworks::{
         random::{
-            sample_field_element, sample_field_elements, unsafe_random_point, unsafe_random_points,
+            sample_field_elements, unsafe_random_point_group, unsafe_random_points_group,
             UniformRand,
         },
         scrape::LowDegreeTest,
         serialization::{ark_de, ark_se},
     },
     bls12381::{self},
-    utils,
     weighted_config::WeightedConfigArkworks,
     CryptoMaterialError, SecretSharingConfig as _, ValidCryptoMaterial,
 };
-use ark_ec::{
-    pairing::{Pairing, PairingOutput},
-    AffineRepr, CurveGroup, VariableBaseMSM,
-};
-use ark_ff::{AdditiveGroup, Fp, FpConfig};
+use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup};
+use ark_ff::{Fp, FpConfig};
 use ark_poly::EvaluationDomain;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_serialize::{
+    CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid, Validate,
+    Write,
+};
 use serde::{Deserialize, Serialize};
 use std::ops::{Mul, Sub};
 
@@ -57,22 +68,208 @@ pub struct Transcript<E: Pairing> {
 }
 
 #[allow(non_snake_case)]
-#[derive(
-    CanonicalSerialize, CanonicalDeserialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq,
-)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Subtranscript<E: Pairing> {
     // The dealt public key
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub V0: E::G2Affine,
+    pub V0: E::G2,
     // The dealt public key shares
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub Vs: Vec<Vec<E::G2Affine>>,
+    pub Vs: Vec<Vec<E::G2>>,
     /// First chunked ElGamal component: C[i][j] = s_{i,j} * G + r_j * ek_i. Here s_i = \sum_j s_{i,j} * B^j // TODO: change notation because B is not a group element?
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub Cs: Vec<Vec<Vec<E::G1Affine>>>, // TODO: maybe make this and the other fields affine? The verifier will have to do it anyway... and we are trying to speed that up
+    pub Cs: Vec<Vec<Vec<E::G1>>>, // TODO: maybe make this and the other fields affine? The verifier will have to do it anyway... and we are trying to speed that up
     /// Second chunked ElGamal component: R[j] = r_j * H
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub Rs: Vec<Vec<E::G1Affine>>,
+    pub Rs: Vec<Vec<E::G1>>,
+}
+
+#[allow(non_snake_case)]
+impl<E: Pairing> CanonicalSerialize for Subtranscript<E> {
+    fn serialize_with_mode<W: Write>(
+        &self,
+        mut writer: W,
+        compress: Compress,
+    ) -> Result<(), SerializationError> {
+        //
+        // 1. Collect all G2 and G1 elements for batch normalization
+        //
+        let mut g2_elems = Vec::with_capacity(1 + self.Vs.iter().map(|r| r.len()).sum::<usize>());
+        let mut g1_elems = Vec::new();
+
+        // V0
+        g2_elems.push(self.V0);
+
+        // Vs
+        for row in &self.Vs {
+            for v in row {
+                g2_elems.push(*v);
+            }
+        }
+
+        // Cs
+        for mat in &self.Cs {
+            for row in mat {
+                for c in row {
+                    g1_elems.push(*c);
+                }
+            }
+        }
+
+        // Rs
+        for row in &self.Rs {
+            for r in row {
+                g1_elems.push(*r);
+            }
+        }
+
+        //
+        // 2. Batch normalize
+        //
+        let g2_affine = E::G2::normalize_batch(&g2_elems);
+        let g1_affine = E::G1::normalize_batch(&g1_elems);
+
+        //
+        // 3. Reconstruct nested structures in affine form
+        //
+        let mut g2_iter = g2_affine.into_iter();
+        let mut g1_iter = g1_affine.into_iter();
+
+        // V0
+        let V0_affine = g2_iter.next().unwrap();
+
+        // Vs_affine
+        let Vs_affine: Vec<Vec<E::G2Affine>> = self
+            .Vs
+            .iter()
+            .map(|row| row.iter().map(|_| g2_iter.next().unwrap()).collect())
+            .collect();
+
+        // Cs_affine
+        let Cs_affine: Vec<Vec<Vec<E::G1Affine>>> = self
+            .Cs
+            .iter()
+            .map(|mat| {
+                mat.iter()
+                    .map(|row| row.iter().map(|_| g1_iter.next().unwrap()).collect())
+                    .collect()
+            })
+            .collect();
+
+        // Rs_affine
+        let Rs_affine: Vec<Vec<E::G1Affine>> = self
+            .Rs
+            .iter()
+            .map(|row| row.iter().map(|_| g1_iter.next().unwrap()).collect())
+            .collect();
+
+        //
+        // 4. Serialize in canonical order using nested structure
+        //
+        V0_affine.serialize_with_mode(&mut writer, compress)?;
+        Vs_affine.serialize_with_mode(&mut writer, compress)?;
+        Cs_affine.serialize_with_mode(&mut writer, compress)?;
+        Rs_affine.serialize_with_mode(&mut writer, compress)?;
+
+        Ok(())
+    }
+
+    fn serialized_size(&self, compress: Compress) -> usize {
+        // 1. V0
+        let mut size = <E::G2 as CurveGroup>::Affine::zero().serialized_size(compress);
+
+        // 2. Vs (Vec<Vec<E::G2Affine>>)
+        // Outer length
+        size += 4;
+        for row in &self.Vs {
+            size += 4; // inner row length
+            size += row.len() * <E::G2 as CurveGroup>::Affine::zero().serialized_size(compress);
+            // this is the weight of player i
+        }
+
+        // 3. Cs (Vec<Vec<Vec<E::G1Affine>>>)
+        size += 4; // outer length
+        for mat in &self.Cs {
+            size += 4; // inner matrix length
+            for row in mat {
+                size += 4; // row length
+                size += row.len() * <E::G1 as CurveGroup>::Affine::zero().serialized_size(compress);
+                // this can be done simpler
+            }
+        }
+
+        // 4. Rs (Vec<Vec<E::G1Affine>>)
+        size += 4; // outer length
+        for row in &self.Rs {
+            size += 4; // row length
+            size += row.len() * <E::G1 as CurveGroup>::Affine::zero().serialized_size(compress);
+            // same, something like 4 + Rs.len() * (4 + Rs[0].len() * zero().serialized_size(compress))
+        }
+
+        size
+    }
+}
+
+// `CanonicalDeserialize` needs `Valid`
+impl<E: Pairing> Valid for Subtranscript<E> {
+    fn check(&self) -> Result<(), SerializationError> {
+        Ok(())
+    }
+}
+
+#[allow(non_snake_case)]
+impl<E: Pairing> CanonicalDeserialize for Subtranscript<E> {
+    fn deserialize_with_mode<R: Read>(
+        mut reader: R,
+        compress: Compress,
+        validate: Validate,
+    ) -> Result<Self, SerializationError> {
+        //
+        // 1. Deserialize V0 (G2Affine -> G2 projective)
+        //
+        let V0_affine =
+            <E::G2 as CurveGroup>::Affine::deserialize_with_mode(&mut reader, compress, validate)?;
+        let V0 = V0_affine.into();
+
+        //
+        // 2. Deserialize Vs (Vec<Vec<E::G2Affine>>) -> Vec<Vec<E::G2>>
+        //
+        let Vs_affine: Vec<Vec<<E::G2 as CurveGroup>::Affine>> =
+            CanonicalDeserialize::deserialize_with_mode(&mut reader, compress, validate)?;
+        let Vs: Vec<Vec<E::G2>> = Vs_affine
+            .into_iter()
+            .map(|row| row.into_iter().map(|p| p.into()).collect())
+            .collect();
+
+        //
+        // 3. Deserialize Cs (Vec<Vec<Vec<E::G1Affine>>>) -> Vec<Vec<Vec<E::G1>>>
+        //
+        let Cs_affine: Vec<Vec<Vec<<E::G1 as CurveGroup>::Affine>>> =
+            CanonicalDeserialize::deserialize_with_mode(&mut reader, compress, validate)?;
+        let Cs: Vec<Vec<Vec<E::G1>>> = Cs_affine
+            .into_iter()
+            .map(|mat| {
+                mat.into_iter()
+                    .map(|row| row.into_iter().map(|p| p.into()).collect())
+                    .collect()
+            })
+            .collect();
+
+        //
+        // 4. Deserialize Rs (Vec<Vec<E::G1Affine>>) -> Vec<Vec<E::G1>>
+        //
+        let Rs_affine: Vec<Vec<<E::G1 as CurveGroup>::Affine>> =
+            CanonicalDeserialize::deserialize_with_mode(&mut reader, compress, validate)?;
+        let Rs: Vec<Vec<E::G1>> = Rs_affine
+            .into_iter()
+            .map(|row| row.into_iter().map(|p| p.into()).collect())
+            .collect();
+
+        //
+        // 5. Construct the Subtranscript
+        //
+        Ok(Subtranscript { V0, Vs, Cs, Rs })
+    }
 }
 
 impl<E: Pairing> ValidCryptoMaterial for Subtranscript<E> {
@@ -154,26 +351,19 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
                 &pp.pp_elgamal,
                 &eks_inner,
                 pp.get_commitment_base(),
-                pp.ell
+                pp.ell,
             );
-
-            use crate::sigma_protocol::homomorphism::EntrywiseMap;
-
-            let proj = chunked_elgamal::WeightedCodomainShape {
-                        chunks: self.subtrs.Cs.clone(),
-                        randomness: self.subtrs.Rs.clone(),
-                    }.map(|msm_input| msm_input.into_group());
-
             if let Err(err) = hom.verify(
-                &TupleCodomainShape(TupleCodomainShape(
-                    self.sharing_proof.range_proof_commitment.clone(),
-                    chunked_elgamal::WeightedCodomainShape {
-                        chunks: proj.chunks,
-                        randomness: proj.randomness,
-                    },
+                &TupleCodomainShape(
+                    TupleCodomainShape(
+                        self.sharing_proof.range_proof_commitment.clone(),
+                        chunked_elgamal::WeightedCodomainShape {
+                            chunks: self.subtrs.Cs.clone(),
+                            randomness: self.subtrs.Rs.clone(),
+                        },
+                    ),
+                    chunked_scalar_mul::CodomainShape(self.subtrs.Vs.clone()),
                 ),
-            chunked_scalar_mul::CodomainShape(self.subtrs.Vs.clone()).map(|msm_input| msm_input.into_group())
-            ),
                 &self.sharing_proof.SoK,
                 &sok_cntxt,
             ) {
@@ -203,9 +393,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         ); // includes_zero is true here means it includes a commitment to f(0), which is in V[n]
         let mut Vs_flat: Vec<_> = self.subtrs.Vs.iter().flatten().cloned().collect();
         Vs_flat.push(self.subtrs.V0);
-        let Vs_proj: Vec<_> = Vs_flat.into_iter().map(|a| a.into_group()).collect();
         // could add an assert_eq here with sc.get_total_weight()
-        ldt.low_degree_test_group(&Vs_proj)?;
+        ldt.low_degree_test_group(&Vs_flat)?;
 
         // let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
         // let hom = hkzg_chunked_elgamal::WeightedHomomorphism::new(
@@ -255,12 +444,12 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     ) -> Self::DealtPubKeyShare {
         self.Vs[player.id]
             .iter()
-            .map(|&V_i| keys::DealtPubKeyShare::<E>::new(keys::DealtPubKey::new(V_i)))
+            .map(|&V_i| keys::DealtPubKeyShare::<E>::new(keys::DealtPubKey::new(V_i.into_affine())))
             .collect()
     }
 
     fn get_dealt_public_key(&self) -> Self::DealtPubKey {
-        Self::DealtPubKey::new(self.V0)
+        Self::DealtPubKey::new(self.V0.into_affine())
     }
 
     #[allow(non_snake_case)]
@@ -286,17 +475,12 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         let pk_shares = self.get_public_key_share(sc, player);
 
-        let sk_shares: Vec<_> = decrypt_chunked_scalars(
-            &Cs,
-            &self.Rs,
-            &dk.dk,
-            &pp.pp_elgamal,
-            &pp.table,
-            pp.ell,
-        );
+        let sk_shares: Vec<_> =
+            decrypt_chunked_scalars(&Cs, &self.Rs, &dk.dk, &pp.pp_elgamal, &pp.table, pp.ell);
 
         (
-            Scalar::vec_from_inner(sk_shares), pk_shares, // TODO: review this formalism... why do we need this here?
+            Scalar::vec_from_inner(sk_shares),
+            pk_shares, // TODO: review this formalism... why do we need this here?
         )
     }
 }
@@ -306,35 +490,34 @@ impl<E: Pairing> Aggregatable for Subtranscript<E> {
 
     #[allow(non_snake_case)]
     fn aggregate_with(&mut self, sc: &SecretSharingConfig<E>, other: &Self) -> anyhow::Result<()> {
-        panic!("sdfdsf")
-        // debug_assert_eq!(self.Cs.len(), sc.get_total_num_players());
-        // debug_assert_eq!(self.Vs.len(), sc.get_total_num_players());
-        // debug_assert_eq!(self.Cs.len(), other.Cs.len());
-        // debug_assert_eq!(self.Rs.len(), other.Rs.len());
-        // debug_assert_eq!(self.Vs.len(), other.Vs.len());
+        debug_assert_eq!(self.Cs.len(), sc.get_total_num_players());
+        debug_assert_eq!(self.Vs.len(), sc.get_total_num_players());
+        debug_assert_eq!(self.Cs.len(), other.Cs.len());
+        debug_assert_eq!(self.Rs.len(), other.Rs.len());
+        debug_assert_eq!(self.Vs.len(), other.Vs.len());
 
-        // // Aggregate the V0s
-        // self.V0 += other.V0;
+        // Aggregate the V0s
+        self.V0 += other.V0;
 
-        // for i in 0..sc.get_total_num_players() {
-        //     for j in 0..self.Vs[i].len() {
-        //         // Aggregate the V_{i,j}s
-        //         self.Vs[i][j] += other.Vs[i][j];
-        //         for k in 0..self.Cs[i][j].len() {
-        //             // Aggregate the C_{i,j,k}s
-        //             self.Cs[i][j][k] += other.Cs[i][j][k];
-        //         }
-        //     }
-        // }
+        for i in 0..sc.get_total_num_players() {
+            for j in 0..self.Vs[i].len() {
+                // Aggregate the V_{i,j}s
+                self.Vs[i][j] += other.Vs[i][j];
+                for k in 0..self.Cs[i][j].len() {
+                    // Aggregate the C_{i,j,k}s
+                    self.Cs[i][j][k] += other.Cs[i][j][k];
+                }
+            }
+        }
 
-        // for j in 0..self.Rs.len() {
-        //     for (R_jk, other_R_jk) in self.Rs[j].iter_mut().zip(&other.Rs[j]) {
-        //         // Aggregate the R_{j,k}s
-        //         *R_jk += other_R_jk;
-        //     }
-        // }
+        for j in 0..self.Rs.len() {
+            for (R_jk, other_R_jk) in self.Rs[j].iter_mut().zip(&other.Rs[j]) {
+                // Aggregate the R_{j,k}s
+                *R_jk += other_R_jk;
+            }
+        }
 
-        // Ok(())
+        Ok(())
     }
 }
 
@@ -435,7 +618,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         debug_assert_eq!(f_evals.len(), sc.get_total_weight());
 
         // Encrypt the chunked shares and generate the sharing proof
-        let (Cs_proj, Rs_proj, Vs_proj, sharing_proof) =
+        let (Cs, Rs, Vs, sharing_proof) =
             Self::encrypt_chunked_shares(&f_evals, eks, pp, sc, sok_cntxt, rng);
 
         // Add constant term for the `\mathbb{G}_2` commitment (we're doing this **after** the previous step
@@ -452,27 +635,11 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         // let Vs = sc.group_by_player(&flattened_Vs); // This won't use the last item in `flattened_Vs` because of `sc`
         // let V0 = *flattened_Vs.last().unwrap();
 
-        let V0_proj = pp.get_commitment_base() * f[0];
-
-        let mut G2_elts: Vec<_> = Vs_proj.into_iter().flatten().collect();
-        G2_elts.push(V0_proj);
-        let G2_elts_affine = E::G2::normalize_batch(&G2_elts);
-        let Vs = sc.group_by_player(&G2_elts_affine);
-        let V0 = *G2_elts_affine.last().unwrap();
-
-        let mut G1_elts: Vec<_> = Cs_proj.into_iter().flatten().flatten().collect();
-        G1_elts.extend(Rs_proj.into_iter().flatten());
-        let G1_elts_affine = E::G1::normalize_batch(&G1_elts);
-        let G1_elts_affine_chunked: Vec<Vec<_>> = G1_elts_affine
-            .chunks(num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize)
-            .map(|chunk| chunk.to_vec()) 
-            .collect();
-        let Cs = sc.group_by_player(&G1_elts_affine_chunked);
-        let Rs = G1_elts_affine_chunked[G1_elts_affine_chunked.len().saturating_sub(sc.get_max_weight())..].to_vec();
+        let V0 = pp.get_commitment_base() * f[0];
 
         Transcript {
             dealer: *dealer,
-            subtrs: Subtranscript { V0, Vs, Cs, Rs},
+            subtrs: Subtranscript { V0, Vs, Cs, Rs },
             sharing_proof,
         }
     }
@@ -490,13 +657,15 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         self.subtrs.Vs[player.id]
             .iter()
             .map(|V_i| {
-                keys::DealtPubKeyShare::<E>::new(keys::DealtPubKey::new(V_i.clone()))
+                let affine = V_i.into_affine();
+
+                keys::DealtPubKeyShare::<E>::new(keys::DealtPubKey::new(affine))
             })
             .collect()
     }
 
     fn get_dealt_public_key(&self) -> Self::DealtPubKey {
-        Self::DealtPubKey::new(self.subtrs.V0)
+        Self::DealtPubKey::new(self.subtrs.V0.into_affine())
     }
 
     #[allow(non_snake_case)]
@@ -570,38 +739,36 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     where
         R: rand_core::RngCore + rand_core::CryptoRng,
     {
-        panic!("sdfdsf")
-    //     let num_chunks_per_share = num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize;
+        let num_chunks_per_share = num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize;
 
-    //     Transcript {
-    //         dealer: sc.get_player(0),
-    //         subtrs: Subtranscript {
-    //             V0: unsafe_random_point::<E::G2, _>(rng),
-    //             Vs: sc.group_by_player(&unsafe_random_points::<E::G2, _>(
-    //                 sc.get_total_weight(),
-    //                 rng,
-    //             )),
-    //             Cs: (0..sc.get_total_num_players())
-    //                 .map(|i| {
-    //                     let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
-    //                     (0..w)
-    //                         .map(|_| unsafe_random_points(num_chunks_per_share, rng))
-    //                         .collect() // todo: use vec![vec![]]... like in the generate functions
-    //                 })
-    //                 .collect(),
-    //             Rs: (0..sc.get_max_weight())
-    //                 .map(|_| unsafe_random_points(num_chunks_per_share, rng))
-    //                 .collect(),
-    //         },
-    //         sharing_proof: SharingProof {
-    //             range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
-    //                 unsafe_random_point(rng),
-    //             ),
-    //             SoK: hkzg_chunked_elgamal_commit::Proof::generate(sc, num_chunks_per_share, rng),
-    //             range_proof: dekart_univariate_v2::Proof::generate(pp.ell, rng),
-    //         },
-    //     }
-    // }
+        Transcript {
+            dealer: sc.get_player(0),
+            subtrs: Subtranscript {
+                V0: unsafe_random_point_group::<E::G2, _>(rng),
+                Vs: sc.group_by_player(&unsafe_random_points_group::<E::G2, _>(
+                    sc.get_total_weight(),
+                    rng,
+                )),
+                Cs: (0..sc.get_total_num_players())
+                    .map(|i| {
+                        let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
+                        (0..w)
+                            .map(|_| unsafe_random_points_group(num_chunks_per_share, rng))
+                            .collect() // todo: use vec![vec![]]... like in the generate functions
+                    })
+                    .collect(),
+                Rs: (0..sc.get_max_weight())
+                    .map(|_| unsafe_random_points_group(num_chunks_per_share, rng))
+                    .collect(),
+            },
+            sharing_proof: SharingProof {
+                range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
+                    unsafe_random_point_group(rng),
+                ),
+                SoK: hkzg_chunked_elgamal_commit::Proof::generate(sc, num_chunks_per_share, rng),
+                range_proof: dekart_univariate_v2::Proof::generate(pp.ell, rng),
+            },
+        }
     }
 }
 
@@ -621,7 +788,12 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         sc: &<Self as traits::Transcript>::SecretSharingConfig, // only for debugging purposes?
         sok_cntxt: SokContext<'a, A>,
         rng: &mut R,
-    ) -> (Vec<Vec<Vec<E::G1>>>, Vec<Vec<E::G1>>, Vec<Vec<E::G2>>, SharingProof<E>) {
+    ) -> (
+        Vec<Vec<Vec<E::G1>>>,
+        Vec<Vec<E::G1>>,
+        Vec<Vec<E::G2>>,
+        SharingProof<E>,
+    ) {
         // Generate the required randomness
         let hkzg_randomness = univariate_hiding_kzg::CommitmentRandomness::rand(rng);
         let elgamal_randomness = Scalar::vecvec_from_inner(
@@ -663,23 +835,24 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
             &pp.pp_elgamal,
             &eks_inner,
             pp.get_commitment_base(),
-            pp.ell
+            pp.ell,
         );
         //   (2b) Compute its image (the public statement), so the range proof commitment and chunked_elgamal encryptions
         let statement = hom.apply(&witness); // hmm slightly inefficient that we're unchunking here, so might be better to set up a "small" hom just for this part
-        //   (2c) Produce the SoK
+                                             //   (2c) Produce the SoK
         let SoK = PairingTupleHomomorphism::prove(&hom, &witness, &statement, &sok_cntxt, rng)
             .change_lifetime(); // Make sure the lifetime of the proof is not coupled to `hom` which has references
 
         // Destructure the "public statement" of the above sigma protocol
         let TupleCodomainShape(
-                TupleCodomainShape(
-                    range_proof_commitment,
-                    chunked_elgamal::WeightedCodomainShape {
-                        chunks: Cs,
-                        randomness: Rs,
-                    }),
-                chunked_scalar_mul::CodomainShape(Vs),
+            TupleCodomainShape(
+                range_proof_commitment,
+                chunked_elgamal::WeightedCodomainShape {
+                    chunks: Cs,
+                    randomness: Rs,
+                },
+            ),
+            chunked_scalar_mul::CodomainShape(Vs),
         ) = statement;
 
         // debug_assert_eq!(

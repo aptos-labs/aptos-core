@@ -3,10 +3,9 @@
 use super::{Id, IdSet, OssifiedIdSet};
 use crate::{
     group::{Fr, G1Affine, G1Projective},
-    shared::{
-        algebra::mult_tree::{compute_mult_tree, quotient},
-    },
+    shared::algebra::mult_tree::{compute_mult_tree, quotient},
 };
+use aptos_crypto::arkworks::serialization::{ark_de, ark_se};
 use ark_ec::VariableBaseMSM;
 use ark_ff::field_hashers::{DefaultFieldHasher, HashToField};
 use ark_poly::univariate::DensePolynomial;
@@ -15,7 +14,6 @@ use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::collections::HashMap;
-use aptos_crypto::arkworks::serialization::{ark_se, ark_de};
 
 /// An ID in an [`ArbXIdSet`].
 #[derive(PartialEq, Eq, Debug, Clone, Copy, Hash, Serialize, Deserialize)]

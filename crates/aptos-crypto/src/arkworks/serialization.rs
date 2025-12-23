@@ -39,7 +39,7 @@ where
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use ark_bn254::{G1Projective, G1Affine, G2Projective, G2Affine};
+    use ark_bn254::{G1Affine, G1Projective, G2Affine, G2Projective};
     use ark_ec::AffineRepr as _;
     use ark_ff::{BigInteger, PrimeField};
     use serde::{Deserialize, Serialize};

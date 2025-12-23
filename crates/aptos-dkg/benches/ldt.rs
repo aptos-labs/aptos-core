@@ -4,21 +4,14 @@
 #![allow(clippy::ptr_arg)]
 #![allow(clippy::needless_borrow)]
 
+use aptos_crypto::arkworks;
 use aptos_dkg::{
     algebra::evaluation_domain::BatchEvaluationDomain,
-    pvss::{
-        test_utils::{
-BENCHMARK_CONFIGS,
-        },
-        LowDegreeTest,
-    },
+    pvss::{test_utils::BENCHMARK_CONFIGS, LowDegreeTest},
 };
-use criterion::{
-    criterion_group, criterion_main, Criterion,
-};
-use rand::{thread_rng};
-use aptos_crypto::arkworks;
 use ark_poly::EvaluationDomain;
+use criterion::{criterion_group, criterion_main, Criterion};
+use rand::thread_rng;
 
 pub fn all_groups(c: &mut Criterion) {
     arkworks_ldt_group(c);
@@ -53,11 +46,13 @@ pub fn arkworks_ldt_group(c: &mut Criterion) {
         group.bench_function(format!("dual_code_word/t{}/n{}", t, n), |b| {
             b.iter_with_setup(
                 || {
-                    let batch_dom = ark_poly::Radix2EvaluationDomain::<ark_bn254::Fr>::new(n).unwrap();
+                    let batch_dom =
+                        ark_poly::Radix2EvaluationDomain::<ark_bn254::Fr>::new(n).unwrap();
                     (n, t, batch_dom)
                 },
                 |(n, t, batch_dom)| {
-                    let ldt = arkworks::scrape::LowDegreeTest::random(&mut rng, t, n, true, &batch_dom);
+                    let ldt =
+                        arkworks::scrape::LowDegreeTest::random(&mut rng, t, n, true, &batch_dom);
                     ldt.dual_code_word();
                 },
             )

@@ -268,7 +268,8 @@ pub fn get_threshold_configs_for_benchmarking<T: traits::ThresholdConfig>() -> V
         .collect()
 }
 
-pub fn get_weighted_configs_for_benchmarking<T: traits::ThresholdConfig>() -> Vec<WeightedConfig<T>> {
+pub fn get_weighted_configs_for_benchmarking<T: traits::ThresholdConfig>() -> Vec<WeightedConfig<T>>
+{
     let mut wcs = vec![];
 
     // This one was produced mid-Nov 2025

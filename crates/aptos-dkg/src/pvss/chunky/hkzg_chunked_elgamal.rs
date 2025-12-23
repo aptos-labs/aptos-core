@@ -16,18 +16,16 @@ use crate::{
 };
 use aptos_crypto::{
     arkworks::random::{
-        sample_field_element, sample_field_elements, unsafe_random_point, unsafe_random_points,
-        UniformRand,
+        sample_field_element, sample_field_elements, unsafe_random_point,
+        unsafe_random_point_group, unsafe_random_points, unsafe_random_points_group, UniformRand,
     },
     weighted_config::WeightedConfigArkworks,
     SecretSharingConfig,
 };
 use aptos_crypto_derive::SigmaProtocolWitness;
-use ark_ec::{pairing::Pairing, AdditiveGroup};
+use ark_ec::{pairing::Pairing, AdditiveGroup, AffineRepr, CurveGroup};
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_ec::CurveGroup;
-use ark_ec::AffineRepr;
 
 /// Witness data for the `chunked_elgamal_field` PVSS protocol.
 ///
@@ -141,8 +139,10 @@ type LiftedWeightedChunkedElgamal<'a, C> = LiftHomomorphism<
 // it would make more sense to say this is a tuple homomorphism consisting of (lifts of) the
 // DeKARTv2::commitment_homomorphism together with the chunked_elgamal::homomorphism.
 //pub type Homomorphism<'a, E> = TupleHomomorphism<LiftedHkzg<'a, E>, LiftedChunkedElgamal<'a, <E as Pairing>::G1>>;
-pub type WeightedHomomorphism<'a, E> =
-    TupleHomomorphism<LiftedHkzgWeighted<'a, E>, LiftedWeightedChunkedElgamal<'a, <E as Pairing>::G1>>;
+pub type WeightedHomomorphism<'a, E> = TupleHomomorphism<
+    LiftedHkzgWeighted<'a, E>,
+    LiftedWeightedChunkedElgamal<'a, <E as Pairing>::G1>,
+>;
 
 //pub type Proof<'a, E> = sigma_protocol::Proof<<E as Pairing>::ScalarField, Homomorphism<'a, E>>;
 pub type WeightedProof<'a, E> =
@@ -189,18 +189,20 @@ impl<'a, E: Pairing> WeightedProof<'a, E> {
         // or should number_of_chunks_per_share be a const?
         Self {
             first_proof_item: FirstProofItem::Commitment(TupleCodomainShape(
-                TrivialShape(unsafe_random_point(rng)), // because TrivialShape is the codomain of univariate_hiding_kzg::CommitmentHomomorphism. TODO: develop generate() methods there? Maybe make it part of sigma_protocol::Trait ?
+                TrivialShape(unsafe_random_point_group(rng)), // because TrivialShape is the codomain of univariate_hiding_kzg::CommitmentHomomorphism. TODO: develop generate() methods there? Maybe make it part of sigma_protocol::Trait ?
                 chunked_elgamal::WeightedCodomainShape {
                     chunks: (0..sc.get_total_num_players())
                         .map(|i| {
                             let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
                             (0..w)
-                                .map(|_| unsafe_random_points(number_of_chunks_per_share, rng))
+                                .map(|_| {
+                                    unsafe_random_points_group(number_of_chunks_per_share, rng)
+                                })
                                 .collect()
                         })
                         .collect(),
                     randomness: vec![
-                        unsafe_random_points(number_of_chunks_per_share, rng);
+                        unsafe_random_points_group(number_of_chunks_per_share, rng);
                         sc.get_max_weight()
                     ],
                 },
@@ -213,13 +215,19 @@ impl<'a, E: Pairing> WeightedProof<'a, E> {
                         let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
                         (0..w)
                             .map(|_| {
-                                Scalar::vec_from_inner(sample_field_elements(number_of_chunks_per_share, rng))
+                                Scalar::vec_from_inner(sample_field_elements(
+                                    number_of_chunks_per_share,
+                                    rng,
+                                ))
                             })
                             .collect()
                     })
                     .collect(),
                 elgamal_randomness: vec![
-                    vec![Scalar(sample_field_element(rng)); number_of_chunks_per_share];
+                    vec![
+                        Scalar(sample_field_element(rng));
+                        number_of_chunks_per_share
+                    ];
                     sc.get_max_weight()
                 ],
             },

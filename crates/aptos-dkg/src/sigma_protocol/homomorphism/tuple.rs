@@ -190,6 +190,7 @@ where
         MsmOutput = H1::MsmOutput,
     >,
 {
+    type Base = H1::Base;
     type CodomainShape<T>
         = TupleCodomainShape<H1::CodomainShape<T>, H2::CodomainShape<T>>
     where
@@ -197,7 +198,6 @@ where
     type MsmInput = H1::MsmInput;
     type MsmOutput = H1::MsmOutput;
     type Scalar = H1::Scalar;
-    type Base = H1::Base;
 
     /// Returns the MSM terms for each homomorphism, combined into a tuple.
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
@@ -210,9 +210,7 @@ where
         H1::msm_eval(input)
     }
 
-    fn batch_normalize(
-            msm_output: Vec<Self::MsmOutput>
-        ) -> Vec<Self::Base> {
+    fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
         H1::batch_normalize(msm_output)
     }
 }

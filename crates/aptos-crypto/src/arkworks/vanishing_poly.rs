@@ -3,9 +3,8 @@
 
 //! Auxiliary function for Lagrange interpolation
 
-use ark_ff::FftField;
+use ark_ff::{FftField, Field};
 use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
-use ark_ff::Field;
 
 const FFT_THRESH: usize = 64 * 16; // Given that our `n` is small in practice, we can increase this further, doesn't matter
 
@@ -24,12 +23,8 @@ pub fn from_roots<F: FftField>(roots: &[F]) -> DensePolynomial<F> {
         1 => DensePolynomial::from_coefficients_vec(vec![-roots[0], F::one()]),
         2 => {
             let (a, b) = (roots[0], roots[1]);
-            DensePolynomial::from_coefficients_vec(vec![
-                a * b,
-                -(a + b),
-                F::one(),
-            ])
-        }
+            DensePolynomial::from_coefficients_vec(vec![a * b, -(a + b), F::one()])
+        },
         3 => {
             let (a, b, c) = (roots[0], roots[1], roots[2]);
             DensePolynomial::from_coefficients_vec(vec![
@@ -38,13 +33,11 @@ pub fn from_roots<F: FftField>(roots: &[F]) -> DensePolynomial<F> {
                 -(a + b + c),
                 F::one(),
             ])
-        } // Not sure 2 and 3 are really useful
+        }, // Not sure 2 and 3 are really useful
         _ => {
             let mid = roots.len() / 2;
-            let (left, right) = rayon::join(
-                || from_roots(&roots[..mid]),
-                || from_roots(&roots[mid..]),
-            );
+            let (left, right) =
+                rayon::join(|| from_roots(&roots[..mid]), || from_roots(&roots[mid..]));
 
             let result_len = left.coeffs.len() + right.coeffs.len() - 1;
             let dom_size = result_len.next_power_of_two();
@@ -54,14 +47,11 @@ pub fn from_roots<F: FftField>(roots: &[F]) -> DensePolynomial<F> {
             } else {
                 &left * &right
             }
-        }
+        },
     }
 }
 
-fn naive_poly_mul<F: Field>(
-    a: &DensePolynomial<F>,
-    b: &DensePolynomial<F>,
-) -> DensePolynomial<F> {
+fn naive_poly_mul<F: Field>(a: &DensePolynomial<F>, b: &DensePolynomial<F>) -> DensePolynomial<F> {
     let a_coeffs = &a.coeffs;
     let b_coeffs = &b.coeffs;
 

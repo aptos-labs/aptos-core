@@ -48,8 +48,10 @@ impl<E: Pairing> OpeningProof<E> {
     /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
     pub fn generate<R: rand::Rng + rand::CryptoRng>(rng: &mut R) -> Self {
         Self {
-            pi_1: sigma_protocol::homomorphism::TrivialShape(unsafe_random_point(rng)),
-            pi_2: unsafe_random_point(rng),
+            pi_1: sigma_protocol::homomorphism::TrivialShape(
+                unsafe_random_point::<E::G1Affine, _>(rng).into(),
+            ),
+            pi_2: unsafe_random_point::<E::G1Affine, _>(rng).into(),
         }
     }
 }
@@ -286,11 +288,13 @@ impl<E: Pairing> homomorphism::Trait for CommitmentHomomorphism<'_, E> {
     type Domain = Witness<E::ScalarField>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
+        // CommitmentHomomorphism::<'_, E>::normalize_output(self.apply_msm(self.msm_terms(input)))
         self.apply_msm(self.msm_terms(input))
     }
 }
 
 impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
+    type Base = E::G1Affine;
     type CodomainShape<T>
         = CodomainShape<T>
     where
@@ -298,7 +302,6 @@ impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
     type MsmInput = MsmInput<E::G1Affine, E::ScalarField>;
     type MsmOutput = E::G1;
     type Scalar = E::ScalarField;
-    type Base = E::G1Affine;
 
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
         assert!(
@@ -324,9 +327,7 @@ impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
             .expect("MSM computation failed in univariate KZG")
     }
 
-    fn batch_normalize(
-            msm_output: Vec<Self::MsmOutput>
-        ) -> Vec<Self::Base> {
+    fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
         E::G1::normalize_batch(&msm_output)
     }
 }

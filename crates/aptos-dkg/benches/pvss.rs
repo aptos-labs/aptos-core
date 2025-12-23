@@ -5,31 +5,30 @@
 #![allow(clippy::needless_borrow)]
 
 use aptos_crypto::{SecretSharingConfig, Uniform};
-use aptos_dkg::{
-    pvss::{
-        chunky::UnsignedWeightedTranscriptv2 as ChunkyTranscriptv2,
-        chunky::UnsignedWeightedTranscript as ChunkyTranscript,
-        das,
-        test_utils::{
-            self, get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
-            DealingArgs, NoAux,
-        },
-        traits::transcript::{
-            Aggregatable, AggregatableTranscript, HasAggregatableSubtranscript,
-            MalleableTranscript, Transcript, WithMaxNumShares,
-        },
-        WeightedConfigBlstrs,
+use aptos_dkg::pvss::{
+    chunky::{
+        UnsignedWeightedTranscript as ChunkyTranscript,
+        UnsignedWeightedTranscriptv2 as ChunkyTranscriptv2,
     },
+    das,
+    test_utils::{
+        self, get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
+        DealingArgs, NoAux,
+    },
+    traits::transcript::{
+        Aggregatable, AggregatableTranscript, HasAggregatableSubtranscript, MalleableTranscript,
+        Transcript, WithMaxNumShares,
+    },
+    WeightedConfigBlstrs,
 };
+use ark_bn254::Bn254;
 use criterion::{
-    criterion_group, criterion_main,
+    black_box, criterion_group, criterion_main,
     measurement::{Measurement, WallTime},
     BenchmarkGroup, Criterion, Throughput,
 };
 use more_asserts::assert_le;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
-use ark_bn254::Bn254;
-use criterion::black_box;
 
 pub fn all_groups(c: &mut Criterion) {
     // unweighted BN254 PVSS with aggregatable subtranscript; only doing 2 because large configs are a bit slow and not relevant anyway

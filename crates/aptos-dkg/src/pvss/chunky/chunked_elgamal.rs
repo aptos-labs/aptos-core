@@ -12,13 +12,12 @@ use aptos_crypto::arkworks::{
     random::sample_field_element,
 };
 use aptos_crypto_derive::SigmaProtocolWitness;
+use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
 };
 use ark_std::fmt::Debug;
-use ark_ec::CurveGroup;
-use std::ops::Sub;
 
 pub const DST: &[u8; 35] = b"APTOS_CHUNKED_ELGAMAL_GENERATOR_DST"; // This is used to create public parameters, see `default()` below
 
@@ -351,6 +350,7 @@ pub fn chunks_vec_msm_terms<C: CurveGroup>(
 
 #[allow(non_snake_case)]
 impl<'a, C: CurveGroup> fixed_base_msms::Trait for WeightedHomomorphism<'a, C> {
+    type Base = C::Affine;
     type CodomainShape<T>
         = WeightedCodomainShape<T>
     where
@@ -358,7 +358,6 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for WeightedHomomorphism<'a, C> {
     type MsmInput = MsmInput<C::Affine, C::ScalarField>;
     type MsmOutput = C;
     type Scalar = C::ScalarField;
-    type Base = C::Affine;
 
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
         // C_{i,j} = z_{i,j} * G_1 + r_j * ek[i]
@@ -397,9 +396,7 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for WeightedHomomorphism<'a, C> {
         C::msm(input.bases(), input.scalars()).expect("MSM failed in ChunkedElgamal")
     }
 
-    fn batch_normalize(
-            msm_output: Vec<Self::MsmOutput>
-        ) -> Vec<Self::Base> {
+    fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
         C::normalize_batch(&msm_output)
     }
 }
@@ -448,13 +445,12 @@ pub fn num_chunks_per_scalar<F: PrimeField>(ell: u8) -> u32 {
     F::MODULUS_BIT_SIZE.div_ceil(ell as u32) // Maybe add `as usize` here?
 }
 
-use crate::{dlog, dlog::bsgs};
-use std::collections::HashMap;
+use crate::{dlog, dlog::bsgs, pvss::chunky::chunks};
 use ark_ec::AffineRepr;
-use crate::pvss::chunky::chunks;
+use std::collections::HashMap;
 
 /// Decrypt a vector of chunked ciphertexts using the corresponding committed randomness and decryption keys
-/// 
+///
 /// # Arguments
 /// - `Cs_rows`: slice of vectors, each inner vector contains chunks for one scalar.
 /// - `Rs_rows`: slice of vectors, same shape as `Cs_rows`, contains corresponding committed randomness/keys.
@@ -462,13 +458,13 @@ use crate::pvss::chunky::chunks;
 /// - `pp`: public parameters (provides group generator).
 /// - `table`: precomputed BSGS table for discrete log.
 /// - `radix_exponent`: exponent used to split/reconstruct chunks.
-/// 
+///
 /// # Returns
 /// - Vec of decrypted scalars.
 #[allow(non_snake_case)]
 pub fn decrypt_chunked_scalars<C: CurveGroup>(
-    Cs_rows: &[Vec<C::Affine>],
-    Rs_rows: &[Vec<C::Affine>],
+    Cs_rows: &[Vec<C>],
+    Rs_rows: &[Vec<C>],
     dk: &C::ScalarField,
     pp: &PublicParameters<C>,
     table: &HashMap<Vec<u8>, u32>,
@@ -485,16 +481,12 @@ pub fn decrypt_chunked_scalars<C: CurveGroup>(
             .collect();
 
         // Recover plaintext chunks
-        let chunk_values: Vec<_> = bsgs::dlog_vec(
-            pp.G.into_group(),
-            &exp_chunks,
-            &table,
-            1 << radix_exponent,
-        )
-        .expect("dlog_vec failed")
-        .into_iter()
-        .map(|x| C::ScalarField::from(x))
-        .collect();
+        let chunk_values: Vec<_> =
+            bsgs::dlog_vec(pp.G.into_group(), &exp_chunks, &table, 1 << radix_exponent)
+                .expect("dlog_vec failed")
+                .into_iter()
+                .map(|x| C::ScalarField::from(x))
+                .collect();
 
         // Convert chunks back to scalar
         let recovered = chunks::le_chunks_to_scalar(radix_exponent, &chunk_values);
@@ -510,11 +502,11 @@ mod tests {
     use super::*;
     use crate::{pvss::chunky::chunks, sigma_protocol::homomorphism::Trait as _};
     use aptos_crypto::{
-        arkworks::random::{sample_field_elements}};
-    use ark_ec::{CurveGroup};
+        arkworks::{random::sample_field_elements, shamir::ShamirThresholdConfig},
+        weighted_config::WeightedConfig,
+    };
+    use ark_ec::CurveGroup;
     use rand::thread_rng;
-    use aptos_crypto::weighted_config::WeightedConfig;
-    use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
 
     fn prepare_chunked_witness<F: PrimeField>(
         sc: WeightedConfig<ShamirThresholdConfig<F>>,

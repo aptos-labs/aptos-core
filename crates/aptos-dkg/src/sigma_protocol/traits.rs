@@ -15,17 +15,14 @@ use aptos_crypto::{
     utils,
 };
 use ark_ec::CurveGroup;
-use ark_ff::{Field, PrimeField};
+use ark_ff::{Field, Fp, FpConfig, PrimeField};
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Valid, Validate,
 };
 use ark_std::{io::Read, UniformRand};
+use rand_core::{CryptoRng, RngCore};
 use serde::Serialize;
 use std::{fmt::Debug, io::Write};
-use ark_ff::FpConfig;
-use ark_ff::Fp;
-use rand_core::RngCore;
-use rand_core::CryptoRng;
 
 // `CurveGroup` is needed because the code does `into_affine()`
 pub trait Trait<C: CurveGroup>:
