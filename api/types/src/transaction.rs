@@ -598,12 +598,19 @@ pub struct BlockMetadataExtensionRandomness {
     randomness: Option<HexEncodedBytes>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct BlockMetadataExtensionRandomnessAndDecKey {
+    randomness: Option<HexEncodedBytes>,
+    decryption_key: Option<HexEncodedBytes>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum BlockMetadataExtension {
     V0(BlockMetadataExtensionEmpty),
     V1(BlockMetadataExtensionRandomness),
+    V2(BlockMetadataExtensionRandomnessAndDecKey),
 }
 
 impl BlockMetadataExtension {
@@ -615,6 +622,16 @@ impl BlockMetadataExtension {
                     .randomness
                     .as_ref()
                     .map(|pr| HexEncodedBytes::from(pr.randomness_cloned())),
+            }),
+            BlockMetadataExt::V2(payload) => Self::V2(BlockMetadataExtensionRandomnessAndDecKey {
+                randomness: payload
+                    .randomness
+                    .as_ref()
+                    .map(|pr| HexEncodedBytes::from(pr.randomness_cloned())),
+                decryption_key: payload
+                    .decryption_key
+                    .as_ref()
+                    .map(|dk| HexEncodedBytes::from(bcs::to_bytes(dk).unwrap())),
             }),
         }
     }
@@ -664,6 +681,7 @@ impl BlockMetadataTransaction {
             None => "block_metadata_transaction",
             Some(BlockMetadataExtension::V0(_)) => "block_metadata_ext_transaction__v0",
             Some(BlockMetadataExtension::V1(_)) => "block_metadata_ext_transaction__v1",
+            Some(BlockMetadataExtension::V2(_)) => "block_metadata_ext_transaction__v2",
         }
     }
 }
