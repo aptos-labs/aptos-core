@@ -182,7 +182,21 @@ impl ModuleCoverageMap {
 
     pub fn merge(&mut self, another: ModuleCoverageMap) {
         for (key, val) in another.function_maps {
-            self.function_maps.entry(key).or_default().extend(val);
+            match self.function_maps.entry(key) {
+                Entry::Vacant(e) => {
+                    e.insert(val);
+                },
+                Entry::Occupied(mut e) => {
+                    for (pc, count) in val {
+                        match e.get_mut().entry(pc) {
+                            Entry::Vacant(c) => {
+                                c.insert(count);
+                            },
+                            Entry::Occupied(mut c) => *c.get_mut() += count,
+                        }
+                    }
+                },
+            }
         }
     }
 

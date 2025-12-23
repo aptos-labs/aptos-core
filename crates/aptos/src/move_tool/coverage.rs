@@ -187,7 +187,7 @@ impl CliCommand<()> for BytecodeCoverage {
 }
 
 fn compile_coverage(
-    mut coverage_common: CoverageCommon,
+    coverage_common: CoverageCommon,
     move_options: MovePackageOptions,
 ) -> CliTypedResult<(CoverageMap, CompiledPackage)> {
     let config = BuildConfig {
@@ -224,11 +224,11 @@ fn compile_coverage(
     let path = move_options.get_package_path()?;
     let unit_cov_file = path.join(".coverage_map.mvcov");
     let mut cov_files = if unit_cov_file.exists() {
-        vec![unit_cov_file]
+        vec![&unit_cov_file]
     } else {
         vec![]
     };
-    cov_files.append(&mut coverage_common.extra_coverage);
+    cov_files.extend(coverage_common.extra_coverage.iter());
     if cov_files.is_empty() {
         return Err(CliError::CommandArgumentError(
             "expected previous run of \
@@ -238,8 +238,8 @@ fn compile_coverage(
                 .to_owned(),
         ));
     }
-    let mut cov_map = read_cov_file(&cov_files[0])?;
-    for file in &cov_files[1..] {
+    let mut cov_map = read_cov_file(cov_files[0])?;
+    for file in cov_files.into_iter().skip(1) {
         cov_map.merge(read_cov_file(file)?);
     }
     let package = config
