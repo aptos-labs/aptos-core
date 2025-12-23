@@ -28,7 +28,7 @@ use move_core_types::{
     },
     vm_status::{
         sub_status::{
-            unknown_invariant_violation::EREFERENCE_SAFETY_FAILURE, NFE_VECTOR_ERROR_BASE,
+            unknown_invariant_violation::EINDEXED_REF_TAG_MISMATCH, NFE_VECTOR_ERROR_BASE,
         },
         StatusCode,
     },
@@ -422,11 +422,13 @@ impl Container {
                     })
                     .ok_or_else(|| {
                         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                            .with_sub_status(EINDEXED_REF_TAG_MISMATCH)
                     })
             },
-            _ => Err(PartialVMError::new(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            )),
+            _ => Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_sub_status(EINDEXED_REF_TAG_MISMATCH),
+            ),
         }
     }
 
@@ -733,9 +735,9 @@ impl IndexedRef {
      *
      * Error Semantics
      * ---------------
-     * - On mismatch we return `UNKNOWN_INVARIANT_VIOLATION_ERROR` with message "invalid enum tag".
-     *   This reflects an internal safety violation observable only when code mutates an enum
-     *   behind a live, tagged reference.
+     * - On mismatch we return `UNKNOWN_INVARIANT_VIOLATION_ERROR` with sub-status
+     *   `EINDEXED_REF_TAG_MISMATCH` and message "invalid enum tag". This reflects an internal
+     *   safety violation observable only when code mutates an enum behind a live, tagged reference.
      *
      * Examples
      * --------
@@ -771,7 +773,7 @@ impl IndexedRef {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(msg)
-                        .with_sub_status(EREFERENCE_SAFETY_FAILURE),
+                        .with_sub_status(EINDEXED_REF_TAG_MISMATCH),
                 );
             }
         }

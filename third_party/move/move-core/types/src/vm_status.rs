@@ -1086,6 +1086,9 @@ pub mod sub_status {
 
         /// Dynamic reference safety checks failure
         pub const EREFERENCE_SAFETY_FAILURE: u64 = 0x3;
+
+        /// Tagged IndexedRef saw an enum variant change
+        pub const EINDEXED_REF_TAG_MISMATCH: u64 = 0x4;
     }
 
     pub mod type_resolution_failure {
