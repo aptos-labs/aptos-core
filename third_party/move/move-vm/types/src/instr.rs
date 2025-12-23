@@ -124,6 +124,9 @@ pub enum Instruction {
     CastI128,
     CastI256,
     Negate,
+
+    // TODO: Add this instruction to the bytecode.
+    // Pops an error message (vector<u8>) and an error code (u64) off the stack.
     AbortMsg,
 }
 
