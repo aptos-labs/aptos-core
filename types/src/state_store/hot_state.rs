@@ -1,28 +1,6 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-// 256 MiB per shard
-pub const HOT_STATE_MAX_BYTES_PER_SHARD: usize = 256 * 1024 * 1024;
-// 250k items per shard
-pub const HOT_STATE_MAX_ITEMS_PER_SHARD: usize = 250_000;
-// 10KB, worst case the hot state still caches about 400K items (all shards)
-pub const HOT_STATE_MAX_SINGLE_VALUE_BYTES: usize = 10 * 1024;
-
-// TODO(HotState): later make this onchain config.
-#[derive(Clone, Copy, Debug)]
-pub struct HotStateConfig {
-    pub max_items_per_shard: usize,
-}
-
-// TODO(HotState): can be removed once we make it configurable.
-impl Default for HotStateConfig {
-    fn default() -> Self {
-        Self {
-            max_items_per_shard: HOT_STATE_MAX_ITEMS_PER_SHARD,
-        }
-    }
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LRUEntry<K> {
     /// The key that is slightly newer than the current entry. `None` for the newest entry.
