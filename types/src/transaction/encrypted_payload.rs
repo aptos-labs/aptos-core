@@ -2,7 +2,6 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    account_address::AccountAddressWithChecks,
     secret_sharing::{Ciphertext, EvalProof},
     transaction::{TransactionExecutable, TransactionExecutableRef, TransactionExtraConfig},
 };

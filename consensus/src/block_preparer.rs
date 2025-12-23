@@ -8,7 +8,7 @@ use crate::{
     transaction_shuffler::TransactionShuffler,
 };
 use aptos_config::config::BlockTransactionFilterConfig;
-use aptos_consensus_types::{block::Block, pipelined_block::TaskFuture, quorum_cert::QuorumCert};
+use aptos_consensus_types::{block::Block, quorum_cert::QuorumCert};
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_types::transaction::SignedTransaction;
@@ -50,8 +50,6 @@ impl BlockPreparer {
             thread::sleep(Duration::from_millis(10));
             Err(ExecutorError::CouldNotGetData)
         });
-        let start_time = Instant::now();
-
         let (txns, max_txns_from_block_to_execute, block_gas_limit) = tokio::select! {
                 // Poll the block qc future until a QC is received. Ignore None outcomes.
                 Some(qc) = block_qc_fut => {
