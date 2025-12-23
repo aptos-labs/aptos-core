@@ -41,6 +41,8 @@ pub trait TBatchInfo:
     fn gas_bucket_start(&self) -> u64;
 
     fn size(&self) -> PayloadTxnsSize;
+
+    fn batch_kind(&self) -> Option<BatchKind>;
 }
 
 #[derive(
@@ -162,6 +164,10 @@ impl TBatchInfo for BatchInfo {
 
     fn size(&self) -> PayloadTxnsSize {
         PayloadTxnsSize::new(self.num_txns, self.num_bytes)
+    }
+
+    fn batch_kind(&self) -> Option<BatchKind> {
+        None
     }
 }
 
@@ -312,6 +318,13 @@ impl TBatchInfo for BatchInfoExt {
     fn size(&self) -> PayloadTxnsSize {
         PayloadTxnsSize::new(self.info().num_txns(), self.info().num_bytes())
     }
+
+    fn batch_kind(&self) -> Option<BatchKind> {
+        match self {
+            BatchInfoExt::V1 { .. } => None,
+            BatchInfoExt::V2 { extra, .. } => Some(extra.batch_kind),
+        }
+    }
 }
 
 impl TDataInfo for BatchInfoExt {
@@ -340,7 +353,7 @@ pub struct ExtraBatchInfo {
 }
 
 #[derive(
-    Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
+    Copy, Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
 )]
 pub enum BatchKind {
     Normal,

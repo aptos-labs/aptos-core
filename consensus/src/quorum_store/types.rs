@@ -281,11 +281,38 @@ impl<T: TBatchInfo> Batch<T> {
                 txn.gas_unit_price() >= self.gas_bucket_start(),
                 "Payload gas unit price doesn't match batch info"
             );
-            ensure!(
-                !txn.payload().is_encrypted_variant(),
-                "Encrypted transaction is not supported yet"
-            );
         }
+
+        // For V2 batches, validate that BatchKind matches the transaction types
+        if let Some(batch_kind) = self.batch_info.batch_kind() {
+            match batch_kind {
+                BatchKind::Encrypted => {
+                    for txn in self.payload.txns() {
+                        ensure!(
+                            txn.is_encrypted_txn(),
+                            "Encrypted batch contains non-encrypted transaction"
+                        );
+                    }
+                },
+                BatchKind::Normal => {
+                    for txn in self.payload.txns() {
+                        ensure!(
+                            !txn.is_encrypted_txn(),
+                            "Normal batch contains encrypted transaction"
+                        );
+                    }
+                },
+            }
+        } else {
+            // V1 batches do not support encrypted transactions
+            for txn in self.payload.txns() {
+                ensure!(
+                    !txn.is_encrypted_txn(),
+                    "V1 batch contains encrypted transaction (only supported in V2)"
+                );
+            }
+        }
+
         Ok(())
     }
 
