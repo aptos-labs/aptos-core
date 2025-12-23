@@ -8553,7 +8553,6 @@ dependencies = [
  "move-model",
  "move-package",
  "move-symbol-pool",
- "move-vm-runtime",
  "once_cell",
  "project-root",
  "proptest",

@@ -279,11 +279,8 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
 
     cleanup_trace();
 
-    // If we need to compute test coverage set the VM tracking environment variable since we will
-    // need this trace to construct the coverage information.
+    // If we need to compute test coverage, enable tracing.
     if compute_coverage {
-        // Notice that this isn't thread safe UNLESS (as is the case for unit tests)
-        // trace_path is every time the same as called in the current process.
         tracing::enable_tracing(Some(&trace_path.display().to_string()))
     }
 

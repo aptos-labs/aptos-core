@@ -37,7 +37,6 @@ move-coverage = { workspace = true }
 move-model = { workspace = true }
 move-package = { workspace = true }
 move-symbol-pool = { workspace = true }
-move-vm-runtime = { workspace = true }
 once_cell = { workspace = true }
 project-root = { workspace = true }
 proptest = { workspace = true }

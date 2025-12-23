@@ -61,13 +61,17 @@ pub(crate) fn is_debugging_enabled() -> &'static AtomicBool {
 }
 
 pub fn flush_tracing_buffer() {
-    let buf_writer = &mut *get_logging_file_writer().lock().unwrap();
-    buf_writer.flush().unwrap();
+    if is_tracing_enabled().load(Ordering::Relaxed) {
+        let buf_writer = &mut *get_logging_file_writer().lock().unwrap();
+        buf_writer.flush().unwrap();
+    }
 }
 
 pub fn clear_tracing_buffer() {
-    let path = PathBuf::from(get_file_path().load_full().as_str());
-    *get_logging_file_writer().lock().unwrap() = create_buffered_output(&path);
+    if is_tracing_enabled().load(Ordering::Relaxed) {
+        let path = PathBuf::from(get_file_path().load_full().as_str());
+        *get_logging_file_writer().lock().unwrap() = create_buffered_output(&path);
+    }
 }
 
 fn get_logging_file_writer() -> &'static Mutex<BufWriter<File>> {
