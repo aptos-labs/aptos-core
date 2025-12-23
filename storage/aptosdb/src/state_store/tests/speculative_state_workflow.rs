@@ -3,6 +3,7 @@
 
 use crate::state_store::persisted_state::PersistedState;
 use aptos_block_executor::hot_state_op_accumulator::BlockHotStateOpAccumulator;
+use aptos_config::config::HotStateConfig;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::Mutex;
 use aptos_scratchpad::test_utils::naive_smt::NaiveSmt;
@@ -19,12 +20,9 @@ use aptos_storage_interface::{
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{
-        hot_state::{HotStateConfig, LRUEntry},
-        state_key::StateKey,
-        state_slot::StateSlot,
-        state_storage_usage::StateStorageUsage,
-        state_value::StateValue,
-        StateViewId, StateViewResult, TStateView, NUM_STATE_SHARDS,
+        hot_state::LRUEntry, state_key::StateKey, state_slot::StateSlot,
+        state_storage_usage::StateStorageUsage, state_value::StateValue, StateViewId,
+        StateViewResult, TStateView, NUM_STATE_SHARDS,
     },
     transaction::Version,
     write_set::{BaseStateOp, HotStateOp, WriteOp},
@@ -57,6 +55,7 @@ const REFRESH_INTERVAL_VERSIONS: usize = 50;
 
 const TEST_CONFIG: HotStateConfig = HotStateConfig {
     max_items_per_shard: HOT_STATE_MAX_ITEMS_PER_SHARD,
+    delete_on_restart: true,
 };
 
 #[derive(Debug)]
