@@ -45,6 +45,7 @@ fn make_module() -> CompiledModule {
                 name: IdentifierIndex(1),
                 abilities: AbilitySet::PRIMITIVES,
                 type_parameters: vec![],
+                visibility: Visibility::Private,
             },
             StructHandle {
                 module: ModuleHandleIndex(0),
@@ -54,12 +55,14 @@ fn make_module() -> CompiledModule {
                     constraints: AbilitySet::PRIMITIVES,
                     is_phantom: false,
                 }],
+                visibility: Visibility::Private,
             },
             StructHandle {
                 module: ModuleHandleIndex(0),
                 name: IdentifierIndex(3),
                 abilities: AbilitySet::EMPTY | Ability::Key,
                 type_parameters: vec![],
+                visibility: Visibility::Private,
             },
             StructHandle {
                 module: ModuleHandleIndex(0),
@@ -69,6 +72,7 @@ fn make_module() -> CompiledModule {
                     constraints: AbilitySet::PRIMITIVES,
                     is_phantom: false,
                 }],
+                visibility: Visibility::Private,
             },
         ],
         struct_defs: vec![

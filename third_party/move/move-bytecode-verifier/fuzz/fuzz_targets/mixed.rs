@@ -31,6 +31,7 @@ fuzz_target!(|mix: Mixed| {
         name: IdentifierIndex(1),
         abilities: mix.abilities,
         type_parameters: vec![],
+        visibility: Visibility::Private,
     });
 
     let fun_handle = FunctionHandle {

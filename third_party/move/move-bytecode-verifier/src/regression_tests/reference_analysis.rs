@@ -31,6 +31,7 @@ fn unbalanced_stack_crash() {
         name: IdentifierIndex(1),
         abilities: AbilitySet::ALL,
         type_parameters: vec![],
+        visibility: Visibility::Private,
     });
 
     let fun_handle = FunctionHandle {

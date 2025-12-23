@@ -8,7 +8,7 @@ use move_binary_format::{
         FunctionHandle, IdentifierIndex, ModuleHandleIndex, Signature, SignatureIndex,
         SignatureToken, StructDefinition, StructDefinitionIndex, StructFieldInformation,
         StructHandle, StructHandleIndex, StructVariantHandle, TypeSignature, VariantDefinition,
-        VariantFieldHandle, VariantFieldHandleIndex, VariantFieldInstantiation,
+        VariantFieldHandle, VariantFieldHandleIndex, VariantFieldInstantiation, Visibility,
     },
     CompiledModule,
 };
@@ -61,6 +61,7 @@ pub fn module_with_struct() -> CompiledModule {
         name: IdentifierIndex(1),
         abilities: AbilitySet::EMPTY,
         type_parameters: vec![],
+        visibility: Visibility::Private,
     };
     module.struct_handles.push(struct_handle);
 
@@ -122,6 +123,7 @@ pub fn module_with_enum() -> CompiledModule {
         name: IdentifierIndex(1),
         abilities: AbilitySet::EMPTY,
         type_parameters: vec![],
+        visibility: Visibility::Private,
     };
     module.struct_handles.push(struct_handle);
 

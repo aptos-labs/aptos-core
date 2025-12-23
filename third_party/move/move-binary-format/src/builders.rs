@@ -201,6 +201,7 @@ impl CompiledScriptBuilder {
                 name,
                 abilities: handle.abilities,
                 type_parameters: handle.type_parameters.clone(),
+                visibility: handle.visibility,
             },
             (module_id, name),
         )?;

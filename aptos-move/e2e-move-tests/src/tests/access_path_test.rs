@@ -12,7 +12,7 @@ use move_binary_format::{
         ModuleHandle, ModuleHandleIndex, Signature, SignatureIndex, SignatureToken,
         StructDefInstantiation, StructDefInstantiationIndex, StructDefinition,
         StructDefinitionIndex, StructFieldInformation, StructHandle, StructHandleIndex,
-        StructTypeParameter, TypeSignature,
+        StructTypeParameter, TypeSignature, Visibility,
     },
     CompiledModule,
 };
@@ -43,6 +43,7 @@ fn access_path_panic() {
                 constraints: AbilitySet::EMPTY,
                 is_phantom: true,
             }],
+            visibility: Visibility::Private,
         }],
         function_handles: vec![FunctionHandle {
             module: ModuleHandleIndex(0),

@@ -2,7 +2,12 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{check_bounds::BoundsChecker, errors::*, file_format::*, file_format_common::*};
+use crate::{
+    check_bounds::BoundsChecker,
+    errors::*,
+    file_format::*,
+    file_format_common::{VERSION_DEFAULT_LANG_V2_4, *},
+};
 use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
@@ -913,11 +918,23 @@ fn load_struct_handle(cursor: &mut VersionedCursor) -> Result<StructHandle, Part
     let name = load_identifier_index(cursor)?;
     let abilities = load_ability_set(cursor, AbilitySetPosition::StructHandle)?;
     let type_parameters = load_struct_type_parameters(cursor)?;
+    let visibility = if cursor.version() >= VERSION_DEFAULT_LANG_V2_4 {
+        let flags = cursor.read_u8().map_err(|_| {
+            PartialVMError::new(StatusCode::MALFORMED).with_message("Unexpected EOF".to_string())
+        })?;
+        flags.try_into().map_err(|_| {
+            PartialVMError::new(StatusCode::MALFORMED)
+                .with_message("Invalid visibility byte".to_string())
+        })?
+    } else {
+        Visibility::Private
+    };
     Ok(StructHandle {
         module,
         name,
         abilities,
         type_parameters,
+        visibility,
     })
 }
 

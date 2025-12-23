@@ -135,6 +135,7 @@ fn big_signature_test() {
             name: IdentifierIndex(1),
             abilities: AbilitySet::ALL,
             type_parameters: vec![type_param_constraints; N_TYPE_PARAMS],
+            visibility: Visibility::Private,
         }],
         function_handles: vec![FunctionHandle {
             module: ModuleHandleIndex(0),

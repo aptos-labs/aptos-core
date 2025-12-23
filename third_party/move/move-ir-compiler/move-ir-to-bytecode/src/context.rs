@@ -12,6 +12,7 @@ use move_binary_format::{
         FunctionSignature, IdentifierIndex, ModuleHandle, ModuleHandleIndex, Signature,
         SignatureIndex, SignatureToken, StructDefInstantiation, StructDefInstantiationIndex,
         StructDefinitionIndex, StructHandle, StructHandleIndex, StructTypeParameter, TableIndex,
+        Visibility,
     },
     CompiledModule,
 };
@@ -613,6 +614,7 @@ impl<'a> Context<'a> {
             name,
             abilities,
             type_parameters,
+            visibility: Visibility::Private,
         });
         Ok(StructHandleIndex(get_or_add_item_ref(
             &mut self.struct_handles,

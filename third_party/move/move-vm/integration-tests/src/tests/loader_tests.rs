@@ -127,6 +127,7 @@ fn load_phantom_module() {
             constraints: AbilitySet::EMPTY,
             is_phantom: false,
         }],
+        visibility: Visibility::Private,
     });
 
     module.identifiers.push(Identifier::new("foo").unwrap());
@@ -197,6 +198,7 @@ fn load_with_extra_ability() {
             constraints: AbilitySet::EMPTY,
             is_phantom: false,
         }],
+        visibility: Visibility::Private,
     });
 
     module.identifiers.push(Identifier::new("foo").unwrap());

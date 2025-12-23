@@ -76,6 +76,7 @@ fn test_struct_handle_type_instantiation() {
             10,
         )
         .collect(),
+        visibility: Visibility::Private,
     });
 
     assert_eq!(
@@ -104,6 +105,7 @@ fn test_struct_handle_type_instantiation() {
             10,
         )
         .collect(),
+        visibility: Visibility::Private,
     });
 
     assert_eq!(
@@ -216,6 +218,7 @@ fn big_vec_unpacks() {
             name: IdentifierIndex(1),
             abilities: AbilitySet::ALL,
             type_parameters: vec![type_param_constraints; N_TYPE_PARAMS],
+            visibility: Visibility::Private,
         }],
         function_handles: vec![FunctionHandle {
             module: ModuleHandleIndex(0),
@@ -618,6 +621,7 @@ fn multi_struct(module: &mut CompiledModule, count: usize) {
             name: IdentifierIndex((module.identifiers.len() - 1) as u16),
             abilities: AbilitySet::EMPTY,
             type_parameters: vec![],
+            visibility: Visibility::Private,
         });
         module.struct_defs.push(StructDefinition {
             struct_handle: StructHandleIndex((module.struct_handles.len() - 1) as u16),

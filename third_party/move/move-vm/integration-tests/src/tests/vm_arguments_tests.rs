@@ -98,6 +98,7 @@ fn make_script_with_non_linking_structs(parameters: Signature) -> Vec<u8> {
             name: IdentifierIndex(1),
             abilities: AbilitySet::EMPTY,
             type_parameters: vec![],
+            visibility: Visibility::Private,
         }],
         function_handles: vec![FunctionHandle {
             module: ModuleHandleIndex(0),
@@ -174,6 +175,7 @@ fn make_module_with_function(
             name: IdentifierIndex(1),
             abilities: AbilitySet::EMPTY,
             type_parameters: vec![],
+            visibility: Visibility::Private,
         }],
         function_handles: vec![FunctionHandle {
             module: ModuleHandleIndex(0),

@@ -6,7 +6,7 @@ use crate::{
     file_format::{
         FieldDefinition, IdentifierIndex, ModuleHandleIndex, SignatureToken, StructDefinition,
         StructFieldInformation, StructHandle, StructHandleIndex, StructTypeParameter, TableIndex,
-        TypeSignature, VariantDefinition,
+        TypeSignature, VariantDefinition, Visibility,
     },
     internals::ModuleIndex,
     proptest_types::{
@@ -140,6 +140,7 @@ impl StructHandleGen {
             name: IdentifierIndex(self.name_idx.index(identifiers_len) as TableIndex),
             abilities: self.abilities.materialize(),
             type_parameters,
+            visibility: Visibility::Private,
         }
     }
 }
@@ -217,6 +218,7 @@ impl StructDefinitionGen {
             name: IdentifierIndex(self.name_idx.index(state.identifiers_len) as TableIndex),
             abilities,
             type_parameters,
+            visibility: Visibility::Private,
         };
         match state.add_struct_handle(handle) {
             Some(struct_handle) => {

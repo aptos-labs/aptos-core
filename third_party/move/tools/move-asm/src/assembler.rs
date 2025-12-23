@@ -235,6 +235,7 @@ impl<'a> Assembler<'a> {
                 .map(|(_, constraints, is_phantom)| (*constraints, *is_phantom))
                 .collect(),
             str.abilities,
+            str.visibility,
         );
         self.add_diags(str.loc, res);
     }

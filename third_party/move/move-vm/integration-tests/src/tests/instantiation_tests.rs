@@ -6,6 +6,7 @@ use move_binary_format::file_format::{
     FunctionDefinition, FunctionHandle, FunctionHandleIndex, IdentifierIndex, ModuleHandle,
     ModuleHandleIndex, Signature, SignatureIndex, SignatureToken::*, StructDefinition,
     StructFieldInformation, StructHandle, StructHandleIndex, StructTypeParameter, TypeSignature,
+    Visibility,
 };
 use move_core_types::{
     ability::AbilitySet,
@@ -58,6 +59,7 @@ fn instantiation_err() {
                 };
                 N
             ],
+            visibility: Visibility::Private,
         }],
         function_handles: vec![FunctionHandle {
             module: ModuleHandleIndex(0),

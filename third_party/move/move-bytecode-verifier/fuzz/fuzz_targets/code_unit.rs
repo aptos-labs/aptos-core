@@ -21,6 +21,7 @@ fuzz_target!(|code_unit: CodeUnit| {
         name: IdentifierIndex(1),
         abilities: AbilitySet::ALL,
         type_parameters: vec![],
+        visibility: Visibility::Private,
     });
 
     let fun_handle = FunctionHandle {

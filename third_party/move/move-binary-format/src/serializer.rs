@@ -15,7 +15,10 @@
 //! not all of the newer language constructs might be supported for older versions, leading to
 //! serialization errors.
 
-use crate::{file_format::*, file_format_common::*};
+use crate::{
+    file_format::*,
+    file_format_common::{VERSION_DEFAULT_LANG_V2_4, *},
+};
 use anyhow::{anyhow, bail, Result};
 use move_core_types::{
     ability::AbilitySet, account_address::AccountAddress, function::ClosureMask,
@@ -496,11 +499,20 @@ fn serialize_module_handle(binary: &mut BinaryData, module_handle: &ModuleHandle
 /// - `StructHandle.module` as a ULEB128 (index into the `ModuleHandle` table)
 /// - `StructHandle.name` as a ULEB128 (index into the `IdentifierPool`)
 /// - `StructHandle.is_nominal_resource` as a 1 byte boolean (0 for false, 1 for true)
-fn serialize_struct_handle(binary: &mut BinaryData, struct_handle: &StructHandle) -> Result<()> {
+fn serialize_struct_handle(
+    major_version: u32,
+    binary: &mut BinaryData,
+    struct_handle: &StructHandle,
+) -> Result<()> {
     serialize_module_handle_index(binary, &struct_handle.module)?;
     serialize_identifier_index(binary, &struct_handle.name)?;
     serialize_ability_set(binary, struct_handle.abilities)?;
-    serialize_type_parameters(binary, &struct_handle.type_parameters)
+    let res = serialize_type_parameters(binary, &struct_handle.type_parameters);
+    if major_version >= VERSION_DEFAULT_LANG_V2_4 {
+        binary.push(struct_handle.visibility as u8)
+    } else {
+        res
+    }
 }
 
 fn serialize_type_parameters(
@@ -1539,7 +1551,7 @@ impl CommonSerializer {
             &mut table_count,
             binary,
             tables.get_struct_handles(),
-            serialize_struct_handle,
+            |binary, handle| serialize_struct_handle(self.major_version, binary, handle),
         )?;
         self.function_handles = serialize_table(
             &mut table_count,

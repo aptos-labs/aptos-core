@@ -287,6 +287,7 @@ pub struct StructHandle {
     pub abilities: AbilitySet,
     /// The type formals (identified by their index into the vec)
     pub type_parameters: Vec<StructTypeParameter>,
+    pub visibility: Visibility,
 }
 
 impl StructHandle {
@@ -3777,6 +3778,7 @@ pub fn basic_test_module() -> CompiledModule {
         name: IdentifierIndex(m.identifiers.len() as u16),
         abilities: AbilitySet::EMPTY,
         type_parameters: vec![],
+        visibility: Visibility::Private,
     });
     m.identifiers
         .push(Identifier::new("Bar".to_string()).unwrap());

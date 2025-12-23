@@ -5,7 +5,7 @@ use move_binary_format::{
     file_format::{
         AddressIdentifierIndex, FieldDefinition, IdentifierIndex, ModuleHandle, ModuleHandleIndex,
         Signature, SignatureToken, StructDefinition, StructFieldInformation, StructHandle,
-        StructHandleIndex, StructTypeParameter, TypeSignature, VariantDefinition,
+        StructHandleIndex, StructTypeParameter, TypeSignature, VariantDefinition, Visibility,
     },
     file_format_common::VERSION_7,
     CompiledModule,
@@ -37,6 +37,7 @@ fn test_variant_name() {
                 constraints: AbilitySet::EMPTY,
                 is_phantom: true,
             }],
+            visibility: Visibility::Private,
         }],
         function_handles: vec![],
         field_handles: vec![],

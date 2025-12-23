@@ -274,6 +274,7 @@ impl<'a> ModuleBuilder<'a> {
         name: Identifier,
         type_parameters: Vec<(AbilitySet, bool)>,
         abilities: AbilitySet,
+        visibility: Visibility,
     ) -> Result<StructDefinitionIndex> {
         if self.is_script() {
             bail!("script cannot have struct definitions")
@@ -301,6 +302,7 @@ impl<'a> ModuleBuilder<'a> {
                     is_phantom,
                 })
                 .collect(),
+            visibility,
         };
         let shdl_idx = self.index(
             &mut self.module.borrow_mut().struct_handles,
@@ -989,6 +991,7 @@ impl<'a> ModuleBuilder<'a> {
                 name,
                 abilities: shandle.abilities,
                 type_parameters: shandle.type_parameters.clone(),
+                visibility: shandle.visibility,
             })
         } else {
             bail!("unknown struct `{}` in module `{}`", id.id, mid)

@@ -1249,6 +1249,15 @@ impl ModuleGenerator {
         }
         let name = self.name_index(ctx, loc, struct_env.get_name());
         let module = self.module_index(ctx, loc, &struct_env.module_env);
+        let visibility = if ctx
+            .env
+            .language_version()
+            .language_version_for_public_struct()
+        {
+            struct_env.get_visibility()
+        } else {
+            FF::Visibility::Private
+        };
         let handle = FF::StructHandle {
             module,
             name,
@@ -1271,6 +1280,7 @@ impl ModuleGenerator {
                     },
                 )
                 .collect(),
+            visibility,
         };
         let idx = FF::StructHandleIndex(ctx.checked_bound(
             loc,

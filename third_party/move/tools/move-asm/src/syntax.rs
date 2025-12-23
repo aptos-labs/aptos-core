@@ -155,6 +155,7 @@ pub struct Struct {
     pub type_params: Vec<(Identifier, AbilitySet, bool)>,
     pub abilities: AbilitySet,
     pub layout: StructLayout,
+    pub visibility: Visibility,
 }
 
 #[derive(Debug)]
@@ -688,7 +689,7 @@ impl AsmParser {
         self.is_soft_kw("struct") || self.is_soft_kw("enum")
     }
 
-    fn struct_or_enum(&mut self) -> AsmResult<Struct> {
+    fn struct_or_enum(&mut self, visibility: Visibility) -> AsmResult<Struct> {
         if self.is_soft_kw("struct") {
             self.advance()?;
             let (loc, name, type_params, abilities) = self.struct_header()?;
@@ -705,6 +706,7 @@ impl AsmParser {
                 type_params,
                 abilities,
                 layout: StructLayout::Singleton(fields),
+                visibility,
             })
         } else {
             self.expect_soft_kw("enum")?;
@@ -744,6 +746,7 @@ impl AsmParser {
                 type_params,
                 abilities,
                 layout: StructLayout::Variants(variants),
+                visibility,
             })
         }
     }
@@ -777,6 +780,10 @@ impl AsmParser {
             || self.is_soft_kw("public")
             || self.is_soft_kw("friend")
             || self.is_special("#") && self.lookahead_special("[")
+    }
+
+    fn is_visibility(&self) -> bool {
+        self.is_soft_kw("public") || self.is_soft_kw("friend")
     }
 
     fn fun(&mut self) -> AsmResult<Fun> {
@@ -938,8 +945,16 @@ impl AsmParser {
         let mut functions = vec![];
 
         while !self.is_tok(&Token::End) {
-            if self.is_struct_or_enum() {
-                structs.push(self.struct_or_enum()?)
+            if (self.is_visibility()
+                && (self.lookahead_soft_kw("struct") || self.lookahead_soft_kw("enum")))
+                || self.is_struct_or_enum()
+            {
+                let visibility = if self.is_visibility() {
+                    self.visibility()?
+                } else {
+                    Visibility::Private
+                };
+                structs.push(self.struct_or_enum(visibility)?);
             } else if self.is_first_of_fun() {
                 functions.push(self.fun()?)
             } else {
