@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::render::Render;
-use aptos_gas_algebra::{Fee, GasScalingFactor, InternalGas, NumBytes};
+use aptos_gas_algebra::{AbstractValueSize, Fee, GasScalingFactor, InternalGas, NumBytes};
 use aptos_types::state_store::state_key::StateKey;
 use move_binary_format::{file_format::CodeOffset, file_format_common::Opcodes};
 use move_core_types::{
@@ -30,7 +30,6 @@ pub enum ExecutionGasEvent {
         module_id: ModuleId,
         fn_name: Identifier,
         ty_args: Vec<TypeTag>,
-        args: Vec<String>,
         cost: InternalGas,
     },
     LoadResource {
@@ -61,7 +60,6 @@ pub enum FrameName {
 #[derive(Debug, Clone)]
 pub struct CallFrame {
     pub name: FrameName,
-    pub args: Vec<String>,
     pub events: Vec<ExecutionGasEvent>,
     /// Accumulates gas charged by native functions. For frames of non-native functions, kept as 0.
     pub native_gas: InternalGas,
@@ -161,6 +159,7 @@ pub struct TransactionGasLog {
     pub exec_io: ExecutionAndIOCosts,
     pub storage: StorageFees,
     pub num_txns: usize,
+    pub peak_memory_usage: AbstractValueSize,
 }
 pub struct GasEventIter<'a> {
     stack: SmallVec<[(&'a CallFrame, usize); 16]>,
@@ -192,19 +191,13 @@ impl<'a> Iterator for GasEventIter<'a> {
 }
 
 impl CallFrame {
-    pub fn new_function(
-        module_id: ModuleId,
-        name: Identifier,
-        ty_args: Vec<TypeTag>,
-        args: Vec<String>,
-    ) -> Self {
+    pub fn new_function(module_id: ModuleId, name: Identifier, ty_args: Vec<TypeTag>) -> Self {
         Self {
             name: FrameName::Function {
                 module_id,
                 name,
                 ty_args,
             },
-            args,
             events: vec![],
             native_gas: 0.into(),
         }
@@ -213,7 +206,6 @@ impl CallFrame {
     pub fn new_script() -> Self {
         Self {
             name: FrameName::Script,
-            args: vec![],
             events: vec![],
             native_gas: 0.into(),
         }
@@ -222,7 +214,6 @@ impl CallFrame {
     pub fn new_transaction_batch() -> Self {
         Self {
             name: FrameName::TransactionBatch,
-            args: vec![],
             events: vec![],
             native_gas: 0.into(),
         }
@@ -306,7 +297,7 @@ impl ExecutionAndIOCosts {
             panic!(
                 "Execution & IO costs do not add up. Check if the gas meter & the gas profiler have been implemented correctly. From gas meter: {}. Calculated: {}.",
                 self.total, total
-            )
+            );
         }
     }
 }

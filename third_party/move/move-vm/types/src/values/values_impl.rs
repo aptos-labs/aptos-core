@@ -5537,7 +5537,6 @@ impl Struct {
 impl Vector {
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn elem_views(&self) -> impl ExactSizeIterator<Item = impl ValueView + '_> + Clone {
-        #[derive(Debug)]
         struct ElemView<'b> {
             container: &'b Container,
             idx: usize,
@@ -5560,7 +5559,6 @@ impl Vector {
 
 impl Reference {
     pub fn value_view(&self) -> impl ValueView + '_ {
-        #[derive(Debug)]
         struct ValueBehindRef<'b>(&'b ReferenceImpl);
 
         impl ValueView for ValueBehindRef<'_> {
@@ -5582,7 +5580,6 @@ impl GlobalValue {
     pub fn view(&self) -> Option<impl ValueView + '_> {
         use GlobalValueImpl as G;
 
-        #[derive(Debug)]
         struct Wrapper<'b>(&'b Rc<RefCell<Vec<Value>>>);
 
         impl ValueView for Wrapper<'_> {

@@ -63,7 +63,11 @@ use colored::Colorize;
 use itertools::Itertools;
 use move_cli::{self, base::test::UnitTestResult};
 use move_command_line_common::{address::NumericalAddress, env::MOVE_HOME};
-use move_core_types::{identifier::Identifier, int256::U256, language_storage::ModuleId};
+use move_core_types::{
+    identifier::Identifier,
+    int256::{I256, U256},
+    language_storage::ModuleId,
+};
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig};
 use move_unit_test::UnitTestingConfig;
@@ -2441,6 +2445,12 @@ pub(crate) enum FunctionArgType {
     U64,
     U128,
     U256,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    I256,
     Raw,
 }
 
@@ -2457,6 +2467,12 @@ impl Display for FunctionArgType {
             FunctionArgType::U64 => write!(f, "u64"),
             FunctionArgType::U128 => write!(f, "u128"),
             FunctionArgType::U256 => write!(f, "u256"),
+            FunctionArgType::I8 => write!(f, "i8"),
+            FunctionArgType::I16 => write!(f, "i16"),
+            FunctionArgType::I32 => write!(f, "i32"),
+            FunctionArgType::I64 => write!(f, "i64"),
+            FunctionArgType::I128 => write!(f, "i128"),
+            FunctionArgType::I256 => write!(f, "i256"),
             FunctionArgType::Raw => write!(f, "raw"),
         }
     }
@@ -2510,6 +2526,35 @@ impl FunctionArgType {
             FunctionArgType::U256 => bcs::to_bytes(
                 &U256::from_str(arg)
                     .map_err(|err| CliError::UnableToParse("u256", err.to_string()))?,
+            )
+            .map_err(|err| CliError::BCS("arg", err)),
+            FunctionArgType::I8 => bcs::to_bytes(
+                &i8::from_str(arg).map_err(|err| CliError::UnableToParse("i8", err.to_string()))?,
+            )
+            .map_err(|err| CliError::BCS("arg", err)),
+            FunctionArgType::I16 => bcs::to_bytes(
+                &i16::from_str(arg)
+                    .map_err(|err| CliError::UnableToParse("i16", err.to_string()))?,
+            )
+            .map_err(|err| CliError::BCS("arg", err)),
+            FunctionArgType::I32 => bcs::to_bytes(
+                &i32::from_str(arg)
+                    .map_err(|err| CliError::UnableToParse("i32", err.to_string()))?,
+            )
+            .map_err(|err| CliError::BCS("arg", err)),
+            FunctionArgType::I64 => bcs::to_bytes(
+                &i64::from_str(arg)
+                    .map_err(|err| CliError::UnableToParse("i64", err.to_string()))?,
+            )
+            .map_err(|err| CliError::BCS("arg", err)),
+            FunctionArgType::I128 => bcs::to_bytes(
+                &i128::from_str(arg)
+                    .map_err(|err| CliError::UnableToParse("i128", err.to_string()))?,
+            )
+            .map_err(|err| CliError::BCS("arg", err)),
+            FunctionArgType::I256 => bcs::to_bytes(
+                &I256::from_str(arg)
+                    .map_err(|err| CliError::UnableToParse("i256", err.to_string()))?,
             )
             .map_err(|err| CliError::BCS("arg", err)),
             FunctionArgType::Raw => Ok(HexEncodedBytes::from_str(arg)
@@ -2606,10 +2651,16 @@ impl FromStr for FunctionArgType {
             "u64" => Ok(FunctionArgType::U64),
             "u128" => Ok(FunctionArgType::U128),
             "u256" => Ok(FunctionArgType::U256),
+            "i8" => Ok(FunctionArgType::I8),
+            "i16" => Ok(FunctionArgType::I16),
+            "i32" => Ok(FunctionArgType::I32),
+            "i64" => Ok(FunctionArgType::I64),
+            "i128" => Ok(FunctionArgType::I128),
+            "i256" => Ok(FunctionArgType::I256),
             "raw" => Ok(FunctionArgType::Raw),
             str => {
                 Err(CliError::CommandArgumentError(format!(
-                    "Invalid arg type '{}'.  Must be one of: ['{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}']",
+                    "Invalid arg type '{}'.  Must be one of: ['{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}', '{}','{}','{}','{}','{}','{}']",
                     str,
                     FunctionArgType::Address,
                     FunctionArgType::Bool,
@@ -2621,6 +2672,12 @@ impl FromStr for FunctionArgType {
                     FunctionArgType::U64,
                     FunctionArgType::U128,
                     FunctionArgType::U256,
+                    FunctionArgType::I8,
+                    FunctionArgType::I16,
+                    FunctionArgType::I32,
+                    FunctionArgType::I64,
+                    FunctionArgType::I128,
+                    FunctionArgType::I256,
                     FunctionArgType::Raw)))
             }
         }
@@ -2673,6 +2730,9 @@ impl ArgWithType {
     ) -> CliTypedResult<serde_json::Value> {
         match self._vector_depth {
             0 => match self._ty.clone() {
+                // Why specially handle u64/u128/u256/i64/i128/i256:
+                // many JSON parsers (including browsers and Node.js) treat numbers as Double Precision Floating Point (IEEE 754)
+                // which can only safely represent integers range: $-(2^{53} - 1)$ to $2^{53} - 1$
                 FunctionArgType::U64 => {
                     serde_json::to_value(bcs::from_bytes::<u64>(&self.arg)?.to_string())
                         .map_err(|err| CliError::UnexpectedError(err.to_string()))
@@ -2683,6 +2743,18 @@ impl ArgWithType {
                 },
                 FunctionArgType::U256 => {
                     serde_json::to_value(bcs::from_bytes::<U256>(&self.arg)?.to_string())
+                        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+                },
+                FunctionArgType::I64 => {
+                    serde_json::to_value(bcs::from_bytes::<i64>(&self.arg)?.to_string())
+                        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+                },
+                FunctionArgType::I128 => {
+                    serde_json::to_value(bcs::from_bytes::<i128>(&self.arg)?.to_string())
+                        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+                },
+                FunctionArgType::I256 => {
+                    serde_json::to_value(bcs::from_bytes::<I256>(&self.arg)?.to_string())
                         .map_err(|err| CliError::UnexpectedError(err.to_string()))
                 },
                 FunctionArgType::Raw => serde_json::to_value(&self.arg)
@@ -2709,6 +2781,27 @@ impl ArgWithType {
                     let u256_vector: Vec<U256> = bcs::from_bytes::<Vec<U256>>(&self.arg)?;
                     let string_vector: Vec<String> =
                         u256_vector.iter().map(ToString::to_string).collect();
+                    serde_json::to_value(string_vector)
+                        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+                },
+                FunctionArgType::I64 => {
+                    let i64_vector: Vec<i64> = bcs::from_bytes::<Vec<i64>>(&self.arg)?;
+                    let string_vector: Vec<String> =
+                        i64_vector.iter().map(ToString::to_string).collect();
+                    serde_json::to_value(string_vector)
+                        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+                },
+                FunctionArgType::I128 => {
+                    let i128_vector: Vec<i128> = bcs::from_bytes::<Vec<i128>>(&self.arg)?;
+                    let string_vector: Vec<String> =
+                        i128_vector.iter().map(ToString::to_string).collect();
+                    serde_json::to_value(string_vector)
+                        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+                },
+                FunctionArgType::I256 => {
+                    let i256_vector: Vec<I256> = bcs::from_bytes::<Vec<I256>>(&self.arg)?;
+                    let string_vector: Vec<String> =
+                        i256_vector.iter().map(ToString::to_string).collect();
                     serde_json::to_value(string_vector)
                         .map_err(|err| CliError::UnexpectedError(err.to_string()))
                 },
@@ -2754,6 +2847,12 @@ impl ArgWithType {
             FunctionArgType::U64 => self.bcs_value_to_json::<u64>(),
             FunctionArgType::U128 => self.bcs_value_to_json::<u128>(),
             FunctionArgType::U256 => self.bcs_value_to_json::<U256>(),
+            FunctionArgType::I8 => self.bcs_value_to_json::<i8>(),
+            FunctionArgType::I16 => self.bcs_value_to_json::<i16>(),
+            FunctionArgType::I32 => self.bcs_value_to_json::<i32>(),
+            FunctionArgType::I64 => self.bcs_value_to_json::<i64>(),
+            FunctionArgType::I128 => self.bcs_value_to_json::<i128>(),
+            FunctionArgType::I256 => self.bcs_value_to_json::<I256>(),
             FunctionArgType::Raw => serde_json::to_value(&self.arg)
                 .map_err(|err| CliError::UnexpectedError(err.to_string())),
         }
@@ -2842,6 +2941,16 @@ impl TryInto<TransactionArgument> for &ArgWithType {
             )?)),
             FunctionArgType::Raw => Ok(TransactionArgument::U8Vector(txn_arg_parser(
                 &self.arg, "raw",
+            )?)),
+            FunctionArgType::I8 => Ok(TransactionArgument::I8(txn_arg_parser(&self.arg, "i8")?)),
+            FunctionArgType::I16 => Ok(TransactionArgument::I16(txn_arg_parser(&self.arg, "i16")?)),
+            FunctionArgType::I32 => Ok(TransactionArgument::I32(txn_arg_parser(&self.arg, "i32")?)),
+            FunctionArgType::I64 => Ok(TransactionArgument::I64(txn_arg_parser(&self.arg, "i64")?)),
+            FunctionArgType::I128 => Ok(TransactionArgument::I128(txn_arg_parser(
+                &self.arg, "i128",
+            )?)),
+            FunctionArgType::I256 => Ok(TransactionArgument::I256(txn_arg_parser(
+                &self.arg, "i256",
             )?)),
         }
     }

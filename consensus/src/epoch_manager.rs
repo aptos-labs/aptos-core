@@ -32,7 +32,7 @@ use crate::{
     network::{
         DeprecatedIncomingBlockRetrievalRequest, IncomingBatchRetrievalRequest,
         IncomingBlockRetrievalRequest, IncomingDAGRequest, IncomingRandGenRequest,
-        IncomingRpcRequest, NetworkReceivers, NetworkSender,
+        IncomingRpcRequest, IncomingSecretShareRequest, NetworkReceivers, NetworkSender,
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::{
@@ -147,6 +147,9 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     reconfig_events: ReconfigNotificationListener<P>,
     // channels to rand manager
     rand_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingRandGenRequest>>,
+    // channels to secret share manager
+    secret_share_manager_tx:
+        Option<aptos_channel::Sender<AccountAddress, IncomingSecretShareRequest>>,
     // channels to round manager
     round_manager_tx: Option<
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
@@ -226,6 +229,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             vtxn_pool,
             reconfig_events,
             rand_manager_msg_tx: None,
+            secret_share_manager_tx: None,
             round_manager_tx: None,
             round_manager_close_tx: None,
             buffered_proposal_tx: None,
@@ -657,6 +661,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         // Shutdown the previous rand manager
         self.rand_manager_msg_tx = None;
+
+        // Shutdown the previous secret share manager
+        self.secret_share_manager_tx = None;
 
         // Shutdown the previous buffer manager, to release the SafetyRule client
         self.execution_client.end_epoch().await;
@@ -1271,7 +1278,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         self.rand_manager_msg_tx = Some(rand_msg_tx);
 
+        // TODO(ibalajiarun): setup counters
+        let (secret_share_manager_tx, _secret_share_manager_rx) =
+            aptos_channel::new::<AccountAddress, IncomingSecretShareRequest>(
+                QueueStyle::KLAST,
+                self.config.internal_per_key_channel_size,
+                None,
+            );
+        self.secret_share_manager_tx = Some(secret_share_manager_tx);
+
         if consensus_config.is_dag_enabled() {
+            warn!("DAG doesn't support secret sharing");
             self.start_new_epoch_with_dag(
                 epoch_state,
                 loaded_consensus_key.clone(),
@@ -1857,6 +1874,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     error!("Round manager not started");
                     Ok(())
                 }
+            },
+            IncomingRpcRequest::SecretShareRequest(request) => {
+                let Some(tx) = &self.secret_share_manager_tx else {
+                    bail!("Secret share manager not started");
+                };
+                tx.push(peer_id, request)
             },
         }
     }

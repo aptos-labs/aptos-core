@@ -47,6 +47,7 @@ test-case = { workspace = true }
 [dev-dependencies]
 aptos-vm-types = { workspace = true }
 claims = { workspace = true }
+memory-stats = { workspace = true }
 test-case = { workspace = true }
 tokio = { workspace = true }
 

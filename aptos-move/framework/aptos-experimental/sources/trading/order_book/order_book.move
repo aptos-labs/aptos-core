@@ -3,6 +3,7 @@ module aptos_experimental::order_book {
     friend aptos_experimental::order_operations;
     friend aptos_experimental::market_types;
     friend aptos_experimental::market_bulk_order;
+    friend aptos_experimental::dead_mans_switch_operations;
     #[test_only] friend aptos_experimental::order_book_client_order_id;
 
     use std::option::Option;
@@ -69,7 +70,7 @@ module aptos_experimental::order_book {
         self.single_order_book.client_order_id_exists(order_creator, client_order_id)
     }
 
-    public fun get_order_metadata<M: store + copy + drop>(
+    public fun get_single_order_metadata<M: store + copy + drop>(
         self: &OrderBook<M>, order_id: OrderIdType
     ): Option<M> {
         self.single_order_book.get_order_metadata(order_id)
@@ -81,38 +82,38 @@ module aptos_experimental::order_book {
         self.single_order_book.get_order_id_by_client_id(order_creator, client_order_id)
     }
 
-    public fun is_active_order<M: store + copy + drop>(
+    public fun is_single_order_active<M: store + copy + drop>(
         self: &OrderBook<M>, order_id: OrderIdType
     ): bool {
         self.single_order_book.is_active_order(order_id)
     }
 
-    public fun get_order<M: store + copy + drop>(
+    public fun get_single_order<M: store + copy + drop>(
         self: &OrderBook<M>, order_id: OrderIdType
     ): Option<aptos_experimental::single_order_types::OrderWithState<M>> {
         self.single_order_book.get_order(order_id)
     }
 
-    public fun get_remaining_size<M: store + copy + drop>(
+    public fun get_single_remaining_size<M: store + copy + drop>(
         self: &OrderBook<M>, order_id: OrderIdType
     ): u64 {
         self.single_order_book.get_remaining_size(order_id)
     }
 
     //============================ Public(package) Write APIs ============================
-    public fun cancel_order<M: store + copy + drop>(
+    public fun cancel_single_order<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_creator: address, order_id: OrderIdType
     ): SingleOrder<M> {
         self.single_order_book.cancel_order(&mut self.price_time_idx, order_creator, order_id)
     }
 
-    public(friend) fun try_cancel_order<M: store + copy + drop>(
+    public(friend) fun try_cancel_single_order<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_creator: address, order_id: OrderIdType
     ): Option<SingleOrder<M>> {
         self.single_order_book.try_cancel_order(&mut self.price_time_idx, order_creator, order_id)
     }
 
-    public(friend) fun try_cancel_order_with_client_order_id<M: store + copy + drop>(
+    public(friend) fun try_cancel_single_order_with_client_order_id<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_creator: address, client_order_id: String
     ): Option<SingleOrder<M>> {
         self.single_order_book.try_cancel_order_with_client_order_id(&mut self.price_time_idx, order_creator, client_order_id)
@@ -127,13 +128,13 @@ module aptos_experimental::order_book {
         );
     }
 
-    public(friend) fun decrease_order_size<M: store + copy + drop>(
+    public(friend) fun decrease_single_order_size<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_creator: address, order_id: OrderIdType, size_delta: u64
     ) {
         self.single_order_book.decrease_order_size(&mut self.price_time_idx, order_creator, order_id, size_delta)
     }
 
-    public(friend) fun set_order_metadata<M: store + copy + drop>(
+    public(friend) fun set_single_order_metadata<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_id: OrderIdType, metadata: M
     ) {
         self.single_order_book.set_order_metadata(order_id, metadata)
@@ -166,9 +167,9 @@ module aptos_experimental::order_book {
     }
 
     public fun get_slippage_price<M: store + copy + drop>(
-        self: &OrderBook<M>, is_bid: bool, slippage_pct: u64
+        self: &OrderBook<M>, is_bid: bool, slippage_bps: u64
     ): Option<u64> {
-        self.price_time_idx.get_slippage_price(is_bid, slippage_pct)
+        self.price_time_idx.get_slippage_price(is_bid, slippage_bps)
     }
 
     public fun get_bulk_order_remaining_size<M: store + copy + drop>(
@@ -261,6 +262,7 @@ module aptos_experimental::order_book {
 
     #[test_only]
     public fun set_up_test_with_id(): OrderBook<u64> {
+        aptos_framework::timestamp::set_time_has_started_for_testing(&aptos_framework::account::create_signer_for_test(@0x1));
         new_order_book()
     }
 }
