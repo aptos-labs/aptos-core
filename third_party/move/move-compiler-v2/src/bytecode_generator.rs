@@ -289,6 +289,26 @@ impl<'env> Generator<'env> {
         }
     }
 
+    /// Require binary arguments. This has to clone the arg but thats fine because of
+    /// interning.
+    fn require_binary_args(&self, id: NodeId, args: &[Exp]) -> [Exp; 2] {
+        if args.len() != 2 {
+            self.internal_error(
+                id,
+                format!(
+                    "inconsistent expression argument arity: {} and 2",
+                    args.len()
+                ),
+            );
+            [
+                ExpData::Invalid(self.env().new_node_id()).into_exp(),
+                ExpData::Invalid(self.env().new_node_id()).into_exp(),
+            ]
+        } else {
+            [args[0].to_owned(), args[1].to_owned()]
+        }
+    }
+
     /// Finds the temporary index assigned to the local.
     fn find_local(&self, id: NodeId, sym: Symbol) -> TempIndex {
         for scope in self.scopes.iter().rev() {
@@ -885,6 +905,12 @@ impl Generator<'_> {
                 let arg = self.require_unary_arg(id, args);
                 let temp = self.gen_escape_auto_ref_arg(&arg, false);
                 self.emit_with(id, |attr| Bytecode::Abort(attr, temp))
+            },
+            Operation::AbortMsg => {
+                let args = self.require_binary_args(id, args);
+                let temp0 = self.gen_escape_auto_ref_arg(&args[0], false);
+                let temp1 = self.gen_escape_auto_ref_arg(&args[1], false);
+                self.emit_with(id, |attr| Bytecode::AbortMsg(attr, [temp0, temp1]));
             },
             Operation::Deref => self.gen_deref(targets, id, args),
             Operation::MoveFunction(m, f) => {

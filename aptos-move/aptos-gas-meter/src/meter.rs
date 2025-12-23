@@ -132,6 +132,7 @@ where
             Nop => NOP,
 
             Abort => ABORT,
+            AbortMsg => ABORT_MSG,
             Ret => RET,
 
             LdU8 => LD_U8,

@@ -614,9 +614,10 @@ impl Generator {
                 match ctx.code_for_block(blk).last() {
                     None => 0,
                     Some(Abort(..)) => 1,
-                    Some(Jump(..)) => 2,
-                    Some(Branch(..)) => 3,
-                    Some(Ret(..)) => 4,
+                    Some(AbortMsg(..)) => 2,
+                    Some(Jump(..)) => 3,
+                    Some(Branch(..)) => 4,
+                    Some(Ret(..)) => 5,
                     _ => panic!("unexpected block terminator"),
                 }
             };
@@ -695,6 +696,11 @@ impl Generator {
                     let temp = self.make_temp(ctx, *temp);
                     let stm =
                         ExpData::Call(self.new_stm_node_id(ctx), Operation::Abort, vec![temp]);
+                    self.add_stm(stm);
+                },
+                AbortMsg(_, temps) => {
+                    let temps = self.make_temps(ctx, *temps);
+                    let stm = ExpData::Call(self.new_stm_node_id(ctx), Operation::AbortMsg, temps);
                     self.add_stm(stm);
                 },
                 Branch(_, if_true, if_false, cond) => {
@@ -964,6 +970,7 @@ impl Generator {
                 ExpData::LoopCont(..)
                     | ExpData::Return(..)
                     | ExpData::Call(_, Operation::Abort, ..)
+                    | ExpData::Call(_, Operation::AbortMsg, ..)
             );
         if needs_break {
             stms.push(ctx.builder.break_(&self.current_loc(ctx), 0))
@@ -1322,8 +1329,15 @@ impl Generator {
         ExpData::LocalVar(id, name).into_exp()
     }
 
-    fn make_temps(&mut self, ctx: &Context, temps: impl Iterator<Item = TempIndex>) -> Vec<Exp> {
-        temps.map(|temp| self.make_temp(ctx, temp)).collect()
+    fn make_temps(
+        &mut self,
+        ctx: &Context,
+        temps: impl IntoIterator<Item = TempIndex>,
+    ) -> Vec<Exp> {
+        temps
+            .into_iter()
+            .map(|temp| self.make_temp(ctx, temp))
+            .collect()
     }
 
     fn make_temp_pat(&mut self, ctx: &Context, temp: TempIndex) -> Pattern {
@@ -1919,6 +1933,7 @@ impl IfElseTransformer<'_> {
                     ExpData::LoopCont(..)
                         | ExpData::Return(..)
                         | ExpData::Call(_, Operation::Abort, _)
+                        | ExpData::Call(_, Operation::AbortMsg, _)
                 )
             })
             .unwrap_or(stmts.len());
@@ -2328,6 +2343,7 @@ impl AssignTransformer<'_> {
                 },
                 // [TODO] handle global resource operators after issue #17010 is fixed
                 Operation::Abort
+                | Operation::AbortMsg
                 | Operation::Closure(..)
                 | Operation::Vector
                 | Operation::Exists(..)
@@ -2899,7 +2915,10 @@ where
     fn is_terminator(&self, exp: &ExpData) -> bool {
         matches!(
             exp,
-            ExpData::LoopCont(..) | ExpData::Return(..) | ExpData::Call(_, Operation::Abort, ..)
+            ExpData::LoopCont(..)
+                | ExpData::Return(..)
+                | ExpData::Call(_, Operation::Abort, ..)
+                | ExpData::Call(_, Operation::AbortMsg, ..)
         )
     }
 

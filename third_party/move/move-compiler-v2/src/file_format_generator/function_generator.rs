@@ -781,9 +781,14 @@ impl<'a> FunctionGenerator<'a> {
                 self.emit(FF::Bytecode::Branch(0));
             },
             Bytecode::Abort(_, temp) => {
-                self.balance_stack_end_of_block(ctx, vec![*temp]);
+                self.balance_stack_end_of_block(ctx, [*temp]);
                 self.emit(FF::Bytecode::Abort);
                 self.abstract_pop(ctx)
+            },
+            Bytecode::AbortMsg(_, temps) => {
+                self.balance_stack_end_of_block(ctx, temps);
+                self.emit(FF::Bytecode::AbortMsg);
+                self.abstract_pop_n(ctx, 2);
             },
             Bytecode::Nop(_) => {
                 // do nothing -- labels are relative

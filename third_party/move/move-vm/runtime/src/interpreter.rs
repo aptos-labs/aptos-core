@@ -2745,7 +2745,7 @@ impl Frame {
                         return Err(error);
                     },
                     Instruction::AbortMsg => {
-                        gas_meter.charge_simple_instr(S::Abort)?;
+                        gas_meter.charge_simple_instr(S::AbortMsg)?;
 
                         let vec = interpreter.operand_stack.pop_as::<Vector>()?;
                         let bytes = vec.to_vec_u8()?;

@@ -368,6 +368,11 @@ impl TransferFunctions for LiveVarAnalysis<'_> {
             Abort(id, src) => {
                 state.livevars.insert(*src, self.livevar_info(id, offset));
             },
+            AbortMsg(id, srcs) => {
+                for src in srcs {
+                    state.livevars.insert(*src, self.livevar_info(id, offset));
+                }
+            },
             Branch(id, _, _, src) => {
                 state.insert_or_update(*src, self.livevar_info(id, offset), self.track_all_usages);
             },

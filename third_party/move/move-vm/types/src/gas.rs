@@ -86,6 +86,8 @@ pub enum SimpleInstruction {
     CastI128,
     CastI256,
     Negate,
+
+    AbortMsg,
 }
 
 impl SimpleInstruction {
@@ -163,6 +165,8 @@ impl SimpleInstruction {
             CastI64 => CAST_I64,
             CastI128 => CAST_I128,
             CastI256 => CAST_I256,
+
+            AbortMsg => ABORT_MSG,
         }
     }
 }

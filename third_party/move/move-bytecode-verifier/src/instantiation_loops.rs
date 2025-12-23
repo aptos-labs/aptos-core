@@ -298,6 +298,7 @@ impl<'a> InstantiationLoopChecker<'a> {
                     | Bytecode::Le
                     | Bytecode::Ge
                     | Bytecode::Abort
+                    | Bytecode::AbortMsg
                     | Bytecode::Nop
                     | Bytecode::Exists(_)
                     | Bytecode::ExistsGeneric(_)

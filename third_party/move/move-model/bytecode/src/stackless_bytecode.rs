@@ -506,6 +506,7 @@ pub enum Bytecode {
     Jump(AttrId, Label),
     Label(AttrId, Label),
     Abort(AttrId, TempIndex),
+    AbortMsg(AttrId, [TempIndex; 2]),
     Nop(AttrId),
     SpecBlock(AttrId, Spec),
 
@@ -527,6 +528,7 @@ impl Bytecode {
             | Jump(id, ..)
             | Label(id, ..)
             | Abort(id, ..)
+            | AbortMsg(id, ..)
             | Nop(id)
             | SpecBlock(id, ..)
             | SaveMem(id, ..)
@@ -546,6 +548,7 @@ impl Bytecode {
             | Jump(id, ..)
             | Label(id, ..)
             | Abort(id, ..)
+            | AbortMsg(id, ..)
             | Nop(id)
             | SpecBlock(id, ..)
             | SaveMem(id, ..)
@@ -558,12 +561,19 @@ impl Bytecode {
     pub fn is_exit(&self) -> bool {
         matches!(
             self,
-            Bytecode::Ret(..) | Bytecode::Abort(..) | Bytecode::Call(_, _, Operation::Stop, _, _)
+            Bytecode::Ret(..)
+                | Bytecode::Abort(..)
+                | Bytecode::AbortMsg(..)
+                | Bytecode::Call(_, _, Operation::Stop, _, _)
         )
     }
 
     pub fn is_return(&self) -> bool {
         matches!(self, Bytecode::Ret(..))
+    }
+
+    pub fn is_abort(&self) -> bool {
+        matches!(self, Bytecode::Abort(..) | Bytecode::AbortMsg(..))
     }
 
     pub fn is_always_branching(&self) -> bool {
@@ -572,6 +582,7 @@ impl Bytecode {
             Bytecode::Ret(..)
                 | Bytecode::Jump(..)
                 | Bytecode::Abort(..)
+                | Bytecode::AbortMsg(..)
                 | Bytecode::Branch(..)
                 | Bytecode::Call(_, _, Operation::Stop, _, _)
         )
@@ -613,6 +624,7 @@ impl Bytecode {
             Bytecode::Abort(_, src) => {
                 vec![*src]
             },
+            Bytecode::AbortMsg(_, srcs) => srcs.to_vec(),
             Bytecode::Load(_, _, _)
             | Bytecode::Jump(_, _)
             | Bytecode::Label(_, _)
@@ -653,6 +665,7 @@ impl Bytecode {
             | Bytecode::Jump(_, _)
             | Bytecode::Label(_, _)
             | Bytecode::Abort(_, _)
+            | Bytecode::AbortMsg(_, _)
             | Bytecode::Nop(_)
             | Bytecode::SaveMem(_, _, _)
             | Bytecode::SaveSpecVar(_, _, _)
@@ -802,6 +815,7 @@ impl Bytecode {
                 Branch(attr, if_label, else_label, f(true, cond))
             },
             Abort(attr, cond) => Abort(attr, f(true, cond)),
+            AbortMsg(attr, conds) => AbortMsg(attr, conds.map(|cond| f(true, cond))),
             Prop(attr, kind, exp) => {
                 let new_exp = Bytecode::remap_exp(func_target, &mut |idx| f(true, idx), exp);
                 Prop(attr, kind, new_exp)
@@ -1084,6 +1098,14 @@ impl fmt::Display for BytecodeDisplay<'_> {
             },
             Abort(_, src) => {
                 write!(f, "abort({})", self.lstr(*src))?;
+            },
+            AbortMsg(_, srcs) => {
+                write!(
+                    f,
+                    "abort_msg({}, {})",
+                    self.lstr(srcs[0]),
+                    self.lstr(srcs[1])
+                )?;
             },
             Nop(_) => {
                 write!(f, "nop")?;
