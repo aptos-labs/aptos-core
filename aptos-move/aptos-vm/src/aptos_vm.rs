@@ -2490,6 +2490,12 @@ impl AptosVM {
         let block_metadata_with_randomness = match block_metadata_ext {
             BlockMetadataExt::V0(_) => unreachable!(),
             BlockMetadataExt::V1(v1) => v1,
+            BlockMetadataExt::V2(v2) => {
+                return Err(VMStatus::error(
+                    StatusCode::FEATURE_UNDER_GATING,
+                    Some(String::from("BlockMetadataExt::V2 is not supported yet")),
+                ));
+            },
         };
 
         let BlockMetadataWithRandomness {
