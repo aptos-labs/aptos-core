@@ -18,7 +18,7 @@ use crate::{
     },
     AptosDB,
 };
-use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
+use aptos_config::config::{HotStateConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_schemadb::{schema::Schema, DB};
 use aptos_storage_interface::Result;
 use aptos_types::{state_store::NUM_STATE_SHARDS, transaction::Version};
@@ -43,8 +43,13 @@ impl Cmd {
         };
         let env = None;
         let block_cache = None;
-        let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
+        // TODO(HotState): handle hot state merkle db.
+        let (ledger_db, _hot_state_merkle_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
             &StorageDirPaths::from_path(&self.db_dir),
+            HotStateConfig {
+                delete_on_restart: false,
+                ..Default::default()
+            },
             rocksdb_config,
             env,
             block_cache,

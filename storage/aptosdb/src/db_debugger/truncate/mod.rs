@@ -10,7 +10,7 @@ use crate::{
         get_current_version_in_state_merkle_db, get_state_kv_commit_progress,
     },
 };
-use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
+use aptos_config::config::{HotStateConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use claims::assert_le;
@@ -70,8 +70,13 @@ impl Cmd {
         };
         let env = None;
         let block_cache = None;
-        let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
+        // TODO(HotState): handle hot state merkle db.
+        let (ledger_db, hot_state_merkle_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
             &StorageDirPaths::from_path(&self.db_dir),
+            HotStateConfig {
+                delete_on_restart: false,
+                ..Default::default()
+            },
             rocksdb_config,
             env,
             block_cache,
@@ -80,6 +85,7 @@ impl Cmd {
         )?;
 
         let ledger_db = Arc::new(ledger_db);
+        let hot_state_merkle_db = hot_state_merkle_db.map(Arc::new);
         let state_merkle_db = Arc::new(state_merkle_db);
         let state_kv_db = Arc::new(state_kv_db);
         let overall_version = ledger_db
@@ -148,6 +154,7 @@ impl Cmd {
                 );
                 let version = StateStore::catch_up_state_merkle_db(
                     Arc::clone(&ledger_db),
+                    hot_state_merkle_db,
                     Arc::clone(&state_merkle_db),
                     Arc::clone(&state_kv_db),
                 )?;
@@ -248,8 +255,10 @@ mod test {
 
             let env = None;
             let block_cache = None;
-            let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
+            // TODO(HotState): handle `_hot_state_merkle_db` here.
+            let (ledger_db, _hot_state_merkle_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
                 &StorageDirPaths::from_path(tmp_dir.path()),
+                HotStateConfig::default(),
                 RocksdbConfigs {
                     enable_storage_sharding: input.1,
                     ..Default::default()

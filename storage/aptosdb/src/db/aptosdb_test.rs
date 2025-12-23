@@ -14,7 +14,7 @@ use crate::{
     schema::stale_node_index::StaleNodeIndexSchema,
 };
 use aptos_config::config::{
-    EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, RocksdbConfigs,
+    EpochSnapshotPrunerConfig, HotStateConfig, LedgerPrunerConfig, PrunerConfig, RocksdbConfigs,
     StateMerklePrunerConfig, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
 };
@@ -233,6 +233,10 @@ pub fn test_state_merkle_pruning_impl(
     let db = AptosDB::open(
         StorageDirPaths::from_path(tmp_dir),
         /*readonly=*/ false,
+        HotStateConfig {
+            delete_on_restart: false,
+            ..Default::default()
+        },
         PrunerConfig {
             ledger_pruner_config: LedgerPrunerConfig {
                 enable: true,
