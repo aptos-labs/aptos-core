@@ -394,12 +394,12 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         tracing::enable_tracing(Some(&trace_name));
     }
 
-    /// Saves code coverage information collected so far into a coverage file. If `append`
-    /// is true, an existing coverage file is extended. The file is located
+    /// Saves code coverage information collected so far into a coverage file.
+    /// An existing coverage file is extended, otherwise new is created. The file is located
     /// at `"{file_base_name}.mvcov"`. The information collected so far is cleared.
     ///
-    /// This function is idempotent, that is, if called multiple times in sequence in append
-    /// mode, it only adds information not yet collected so far to the coverage file.
+    /// This function is idempotent, that is, if called multiple times in sequence,
+    /// it only adds information not yet collected so far to the coverage file.
     ///
     /// A typical way how this is used from code is as follows:
     ///
@@ -425,15 +425,17 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
     /// `aptos move test --coverage`, such that both unit tests and e2e tests count
     /// for overall coverage.
     ///
-    pub fn save_code_coverage(&self, file_base_name: &str, append: bool) -> anyhow::Result<()> {
-        tracing::flush_tracing_buffer();
-        let trace_path = PathBuf::from(tracing::get_file_path().load_full().as_str());
+    pub fn save_code_coverage(&self, file_base_name: &str) -> anyhow::Result<()> {
+        let trace_path = PathBuf::from(tracing::get_file_path().load().as_str());
         let coverage_path = PathBuf::from(format!("{}.mvcov", file_base_name));
-        let map = if append && coverage_path.exists() {
+        let map = if coverage_path.exists() {
             CoverageMap::from_binary_file(&coverage_path)?
         } else {
             CoverageMap::default()
         };
+        // TODO: there is a chance of a racing condition: any entries traced after flush
+        // might be lost and not updated in the coverage map.
+        tracing::flush_tracing_buffer();
         let map = map.update_coverage_from_trace_file(&trace_path)?;
         tracing::clear_tracing_buffer(); // we covered what has been traced so far
         coverage_map::output_map_to_file(&coverage_path, &map)

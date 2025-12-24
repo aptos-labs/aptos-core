@@ -51,7 +51,7 @@ pub fn get_file_path() -> &'static ArcSwap<String> {
 
 #[inline]
 pub(crate) fn is_tracing_enabled() -> &'static AtomicBool {
-    TRACING_ENABLED.get_or_init(|| AtomicBool::new(!get_file_path().load_full().is_empty()))
+    TRACING_ENABLED.get_or_init(|| AtomicBool::new(!get_file_path().load().is_empty()))
 }
 
 #[inline]
@@ -69,7 +69,7 @@ pub fn flush_tracing_buffer() {
 
 pub fn clear_tracing_buffer() {
     if is_tracing_enabled().load(Ordering::Relaxed) {
-        let path = PathBuf::from(get_file_path().load_full().as_str());
+        let path = PathBuf::from(get_file_path().load().as_str());
         *get_logging_file_writer().lock().unwrap() = create_buffered_output(&path);
     }
 }
@@ -77,7 +77,7 @@ pub fn clear_tracing_buffer() {
 fn get_logging_file_writer() -> &'static Mutex<BufWriter<File>> {
     LOGGING_FILE_WRITER.get_or_init(|| {
         Mutex::new(create_buffered_output(&PathBuf::from(
-            get_file_path().load_full().as_str(),
+            get_file_path().load().as_str(),
         )))
     })
 }

@@ -22,6 +22,7 @@ use move_vm_types::{
     loaded_data::runtime_types::TypeBuilder, values::DEFAULT_MAX_VM_VALUE_NESTED_DEPTH,
 };
 use once_cell::sync::OnceCell;
+use std::sync::OnceLock;
 
 static PARANOID_TYPE_CHECKS: OnceCell<bool> = OnceCell::new();
 static PARANOID_REF_CHECKS: OnceCell<bool> = OnceCell::new();
@@ -34,8 +35,8 @@ static PARANOID_REF_CHECKS: OnceCell<bool> = OnceCell::new();
 static ASYNC_RUNTIME_CHECKS: OnceCell<bool> = OnceCell::new();
 static TIMED_FEATURE_OVERRIDE: OnceCell<TimedFeatureOverride> = OnceCell::new();
 
-/// Controls whether debugging is enabled.
-static DEBUGGING_ENABLED: OnceCell<bool> = OnceCell::new();
+/// Controls whether debugging is enabled. This is thread safe.
+static DEBUGGING_ENABLED: OnceLock<bool> = OnceLock::new();
 
 /// If enabled, types layouts are cached in a global long-living cache. Caches ensure the behavior
 /// is the same as without caches, and so, using node config suffices.
@@ -71,9 +72,18 @@ pub fn get_paranoid_ref_checks() -> bool {
     PARANOID_REF_CHECKS.get().cloned().unwrap_or(false)
 }
 
-/// Set whether debugging is enabled.
+/// Set whether debugging is enabled. This can be called from multiple threads. If there
+/// are multiple sets, all must have the same value. Notice that enabling debugging can
+/// make execution slower.
 pub fn set_debugging_enabled(enable: bool) {
-    DEBUGGING_ENABLED.set(enable).ok();
+    match DEBUGGING_ENABLED.set(enable) {
+        Err(old) if old != enable => panic!(
+            "tried to set \
+        enable_debugging to {}, but was already set to {}",
+            enable, old
+        ),
+        _ => {},
+    }
 }
 
 /// Returns whether debugging is enabled. Only accessed privately to construct
