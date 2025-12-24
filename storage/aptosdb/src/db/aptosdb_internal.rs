@@ -41,6 +41,7 @@ use std::{
 impl AptosDB {
     fn new_with_dbs(
         ledger_db: LedgerDb,
+        hot_state_merkle_db: Option<StateMerkleDb>,
         state_merkle_db: StateMerkleDb,
         state_kv_db: StateKvDb,
         pruner_config: PrunerConfig,
@@ -51,6 +52,7 @@ impl AptosDB {
         internal_indexer_db: Option<InternalIndexerDB>,
     ) -> Self {
         let ledger_db = Arc::new(ledger_db);
+        let hot_state_merkle_db = hot_state_merkle_db.map(Arc::new);
         let state_merkle_db = Arc::new(state_merkle_db);
         let state_kv_db = Arc::new(state_kv_db);
         let state_merkle_pruner = StateMerklePrunerManager::new(
@@ -65,6 +67,7 @@ impl AptosDB {
             StateKvPrunerManager::new(Arc::clone(&state_kv_db), pruner_config.ledger_pruner_config);
         let state_store = Arc::new(StateStore::new(
             Arc::clone(&ledger_db),
+            hot_state_merkle_db,
             Arc::clone(&state_merkle_db),
             Arc::clone(&state_kv_db),
             state_merkle_pruner,
@@ -113,6 +116,7 @@ impl AptosDB {
         max_num_nodes_per_lru_cache_shard: usize,
         empty_buffered_state_for_restore: bool,
         internal_indexer_db: Option<InternalIndexerDB>,
+        reset_hot_state: bool,
     ) -> Result<Self> {
         ensure!(
             pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
@@ -128,17 +132,19 @@ impl AptosDB {
             /* estimated_entry_charge = */ 0,
         );
 
-        let (ledger_db, state_merkle_db, state_kv_db) = Self::open_dbs(
+        let (ledger_db, hot_state_merkle_db, state_merkle_db, state_kv_db) = Self::open_dbs(
             db_paths,
             rocksdb_configs,
             Some(&env),
             Some(&block_cache),
             readonly,
             max_num_nodes_per_lru_cache_shard,
+            reset_hot_state,
         )?;
 
         let mut myself = Self::new_with_dbs(
             ledger_db,
+            hot_state_merkle_db,
             state_merkle_db,
             state_kv_db,
             pruner_config,
@@ -243,6 +249,7 @@ impl AptosDB {
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
             None,
+            /* reset_hot_state = */ false,
         )
         .expect("Unable to open AptosDB")
     }
