@@ -1,5 +1,8 @@
 use bytes::Bytes;
-use std::{str::FromStr, sync::{Arc, OnceLock}};
+use std::{
+    str::FromStr,
+    sync::{Arc, OnceLock},
+};
 
 #[derive(Debug)]
 pub enum OnChainConfig {
@@ -99,12 +102,19 @@ impl TryInto<Bytes> for OnChainConfigResType {
     }
 }
 
+/// Block number can be either latest or a specific number
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BlockNumber {
+    Latest,
+    Number(u64),
+}
+
 /// Trait to be implemented by a storage type from which to read on-chain configs
 pub trait ConfigStorage: Send + Sync + 'static {
     fn fetch_config_bytes(
         &self,
         config_name: OnChainConfig,
-        block_number: u64,
+        block_number: BlockNumber,
     ) -> Option<OnChainConfigResType>;
 }
 
