@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Tests for gating of Move language features
+//! Tests for FakeExecutor test coverage collection
 
 // Note: this module uses parameterized tests via the
 // [`rstest` crate](https://crates.io/crates/rstest)
@@ -44,7 +44,7 @@ fn test_coverage() {
         vec![],
         vec![bcs::to_bytes(&true).unwrap(),]
     ));
-    h.executor.save_code_coverage(&coverage_path, true).unwrap();
+    h.executor.save_code_coverage(&coverage_path).unwrap();
     assert!(is_function_called(&coverage_path, "bar"));
     assert!(!is_function_called(&coverage_path, "baz"));
 
@@ -55,7 +55,7 @@ fn test_coverage() {
         vec![],
         vec![bcs::to_bytes(&false).unwrap(),]
     ));
-    h.executor.save_code_coverage(&coverage_path, true).unwrap();
+    h.executor.save_code_coverage(&coverage_path).unwrap();
     assert!(is_function_called(&coverage_path, "bar"));
     assert!(is_function_called(&coverage_path, "baz"));
 }
