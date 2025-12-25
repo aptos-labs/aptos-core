@@ -109,6 +109,12 @@ pub enum BlockNumber {
     Number(u64),
 }
 
+impl From<u64> for BlockNumber {
+    fn from(value: u64) -> Self {
+        BlockNumber::Number(value)
+    }
+}
+
 /// Trait to be implemented by a storage type from which to read on-chain configs
 pub trait ConfigStorage: Send + Sync + 'static {
     fn fetch_config_bytes(

@@ -310,7 +310,7 @@ impl EventSubscriptionService {
         let gravity_config_storage = GLOBAL_CONFIG_STORAGE.get()
             .ok_or_else(|| Error::UnexpectedErrorEncountered("gravity config storage is not available".to_string()))?;
         let epoch_bytes = gravity_config_storage
-            .fetch_config_bytes(api_types::config_storage::OnChainConfig::Epoch, version)
+            .fetch_config_bytes(api_types::config_storage::OnChainConfig::Epoch, version.into())
             .ok_or_else(|| Error::UnexpectedErrorEncountered("no config epoch found in aptos root account state".to_string()))?;
 
         let epoch = TryInto::<u64>::try_into(epoch_bytes).unwrap();
@@ -424,7 +424,7 @@ impl OnChainConfigProvider for DbBackedOnChainConfig {
             .ok_or_else(|| Error::UnexpectedErrorEncountered("gravity config storage is not available".to_string()))?
             .fetch_config_bytes(
                 api_types::config_storage::OnChainConfig::from_str(T::TYPE_IDENTIFIER).unwrap(),
-                self.version,
+                self.version.into(),
             )
             .ok_or_else(|| {
                 anyhow!(
