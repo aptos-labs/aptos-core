@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{block_metadata::BlockMetadata, randomness::Randomness, secret_sharing::DecryptionKey};
+use crate::{
+    block_metadata::BlockMetadata, decryption::BlockTxnDecryptionKey, randomness::Randomness,
+};
 use aptos_crypto::HashValue;
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
@@ -45,7 +47,7 @@ pub struct BlockMetadataWithRandAndDecKey {
     pub failed_proposer_indices: Vec<u32>,
     pub timestamp_usecs: u64,
     pub randomness: Option<Randomness>,
-    pub decryption_key: Option<DecryptionKey>,
+    pub decryption_key: Option<BlockTxnDecryptionKey>,
 }
 
 impl BlockMetadataExt {
@@ -80,7 +82,7 @@ impl BlockMetadataExt {
         failed_proposer_indices: Vec<u32>,
         timestamp_usecs: u64,
         randomness: Option<Randomness>,
-        decryption_key: Option<DecryptionKey>,
+        decryption_key: Option<BlockTxnDecryptionKey>,
     ) -> Self {
         Self::V2(BlockMetadataWithRandAndDecKey {
             id,

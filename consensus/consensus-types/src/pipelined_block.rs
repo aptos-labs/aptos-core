@@ -20,9 +20,10 @@ use aptos_logger::{error, info, warn};
 use aptos_types::{
     block_info::BlockInfo,
     contract_event::ContractEvent,
+    decryption::BlockTxnDecryptionKey,
     ledger_info::LedgerInfoWithSignatures,
     randomness::Randomness,
-    secret_sharing::{DecryptionKey, SecretShare, SecretSharedKey},
+    secret_sharing::{SecretShare, SecretSharedKey},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
         TransactionStatus,
@@ -73,12 +74,12 @@ pub type DecryptionResult = (
     Vec<SignedTransaction>,
     Option<u64>,
     Option<u64>,
-    Option<DecryptionKey>,
+    Option<Option<BlockTxnDecryptionKey>>,
 );
 pub type PrepareResult = (
     Arc<Vec<SignatureVerifiedTransaction>>,
     Option<u64>,
-    Option<DecryptionKey>,
+    Option<Option<BlockTxnDecryptionKey>>,
 );
 // First Option is whether randomness is enabled
 // Second Option is whether randomness is skipped

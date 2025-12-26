@@ -797,19 +797,17 @@ impl PipelineBuilder {
     ) -> TaskResult<ExecuteResult> {
         let mut tracker = Tracker::start_waiting("execute", &block);
         parent_block_execute_fut.await?;
-        let (user_txns, block_gas_limit, decryption_key) = prepare_fut.await?;
+        let (user_txns, block_gas_limit, decryption_result) = prepare_fut.await?;
         let onchain_execution_config =
             onchain_execution_config.with_block_gas_limit_override(block_gas_limit);
 
         let (rand_result, _has_randomness) = rand_check.await?;
 
         tracker.start_working();
-        let metadata_txn = match (rand_result, decryption_key) {
-            (Some(maybe_rand), Some(decryption_key)) => block.new_metadata_with_rand_and_dec_key(
-                &validator,
-                maybe_rand,
-                Some(decryption_key),
-            ),
+        let metadata_txn = match (rand_result, decryption_result) {
+            (Some(maybe_rand), Some(maybe_dec_key)) => {
+                block.new_metadata_with_rand_and_dec_key(&validator, maybe_rand, maybe_dec_key)
+            },
             (Some(maybe_rand), None) => block.new_metadata_with_randomness(&validator, maybe_rand),
             (None, Some(_decryption_key)) => {
                 Err(anyhow!("Disabling only randomness is not supported yet"))?

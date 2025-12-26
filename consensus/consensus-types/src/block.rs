@@ -17,10 +17,10 @@ use aptos_types::{
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
     block_metadata_ext::BlockMetadataExt,
+    decryption::BlockTxnDecryptionKey,
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
     randomness::Randomness,
-    secret_sharing::DecryptionKey,
     transaction::{SignedTransaction, Transaction, Version},
     validator_signer::ValidatorSigner,
     validator_txn::ValidatorTransaction,
@@ -621,7 +621,7 @@ impl Block {
         &self,
         validators: &[AccountAddress],
         randomness: Option<Randomness>,
-        decryption_key: Option<DecryptionKey>,
+        decryption_key: Option<BlockTxnDecryptionKey>,
     ) -> BlockMetadataExt {
         BlockMetadataExt::new_v2(
             self.id(),

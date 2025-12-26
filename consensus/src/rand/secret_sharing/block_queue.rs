@@ -63,6 +63,7 @@ impl QueueItem {
 
     pub fn set_secret_shared_key(&mut self, round: Round, key: SecretSharedKey) {
         let offset = self.offset(round);
+        // TODO(ibalajiarun): revisit the importance of this hashset
         if self.pending_secret_key_rounds.contains(&round) {
             observe_block(
                 self.blocks()[offset].timestamp_usecs(),

@@ -631,7 +631,7 @@ impl BlockMetadataExtension {
                 decryption_key: payload
                     .decryption_key
                     .as_ref()
-                    .map(|dk| HexEncodedBytes::from(bcs::to_bytes(dk).unwrap())),
+                    .map(|dk| HexEncodedBytes::from(dk.decryption_key_cloned())),
             }),
         }
     }

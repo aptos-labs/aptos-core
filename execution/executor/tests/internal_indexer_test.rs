@@ -255,6 +255,7 @@ fn test_db_indexer_data() {
         ident_str!("bit_vector"),
         ident_str!("capability"),
         ident_str!("comparator"),
+        ident_str!("decryption"),
         ident_str!("math_fixed"),
         ident_str!("randomness"),
         ident_str!("simple_map"),

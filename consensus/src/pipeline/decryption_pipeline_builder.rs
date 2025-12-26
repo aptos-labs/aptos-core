@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::pipeline::pipeline_builder::{PipelineBuilder, Tracker};
+use anyhow::Context;
 use aptos_batch_encryption::{
     schemes::fptx_weighted::FPTXWeighted, traits::BatchThresholdEncryption,
 };
@@ -11,6 +12,7 @@ use aptos_consensus_types::{
     pipelined_block::{DecryptionResult, MaterializeResult, TaskFuture, TaskResult},
 };
 use aptos_types::{
+    decryption::{BlockTxnDecryptionKey, DecKeyMetadata},
     secret_sharing::{
         Ciphertext, DigestKey, MasterSecretKeyShare, SecretShare, SecretShareConfig,
         SecretShareMetadata, SecretSharedKey,
@@ -56,7 +58,7 @@ impl PipelineBuilder {
                 unencrypted_txns,
                 max_txns_from_block_to_execute,
                 block_gas_limit,
-                None,
+                Some(None),
             ));
         }
 
@@ -155,11 +157,19 @@ impl PipelineBuilder {
 
         let output_txns = [decrypted_txns, unencrypted_txns].concat();
 
+        let block_txn_dec_key = BlockTxnDecryptionKey::new(
+            DecKeyMetadata {
+                epoch: decryption_key.metadata.epoch,
+                round: decryption_key.metadata.round,
+            },
+            bcs::to_bytes(&decryption_key.key).context("Decryption key serialization failed")?,
+        );
+
         Ok((
             output_txns,
             max_txns_from_block_to_execute,
             block_gas_limit,
-            Some(decryption_key.key),
+            Some(Some(block_txn_dec_key)),
         ))
     }
 }
