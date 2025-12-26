@@ -156,6 +156,7 @@ pub(crate) fn truncate_state_merkle_db(
             break;
         }
 
+        unreachable!("SHOULD NOT TRUNCATE");
         let version_before = find_closest_node_version_at_or_before(
             state_merkle_db.metadata_db(),
             current_version - 1,
@@ -171,7 +172,11 @@ pub(crate) fn truncate_state_merkle_db(
             &mut top_levels_batch,
         )?;
 
-        state_merkle_db.commit_top_levels(version_before, top_levels_batch)?;
+        state_merkle_db.commit_top_levels(
+            version_before,
+            top_levels_batch,
+            /* is_hot = */ false,
+        )?;
 
         truncate_state_merkle_db_shards(state_merkle_db, version_before)?;
     }
