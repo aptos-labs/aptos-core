@@ -100,6 +100,8 @@ pub struct QuorumStoreConfig {
     pub opt_qs_minimum_batch_age_usecs: u64,
     pub enable_payload_v2: bool,
     pub enable_batch_v2: bool,
+    pub enable_opt_qs_v2_tx: bool,
+    pub enable_opt_qs_v2_rx: bool,
 }
 
 impl Default for QuorumStoreConfig {
@@ -142,6 +144,8 @@ impl Default for QuorumStoreConfig {
             opt_qs_minimum_batch_age_usecs: Duration::from_millis(50).as_micros() as u64,
             enable_payload_v2: false,
             enable_batch_v2: false,
+            enable_opt_qs_v2_tx: false,
+            enable_opt_qs_v2_rx: false,
         }
     }
 }

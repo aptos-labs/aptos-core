@@ -85,6 +85,7 @@ impl ProposalMsg {
         validator: &ValidatorVerifier,
         proof_cache: &ProofCache,
         quorum_store_enabled: bool,
+        opt_qs_v2_rx_enabled: bool,
     ) -> Result<()> {
         if let Some(proposal_author) = self.proposal.author() {
             ensure!(
@@ -97,7 +98,12 @@ impl ProposalMsg {
         let (payload_result, sig_result) = rayon::join(
             || {
                 self.proposal().payload().map_or(Ok(()), |p| {
-                    p.verify(validator, proof_cache, quorum_store_enabled)
+                    p.verify(
+                        validator,
+                        proof_cache,
+                        quorum_store_enabled,
+                        opt_qs_v2_rx_enabled,
+                    )
                 })
             },
             || {
