@@ -102,10 +102,6 @@ pub fn all_natives(
         "account_abstraction",
         account_abstraction::make_all(builder)
     );
-    add_natives_from_module!(
-        "fast_native_computations",
-        fast_native_computations::make_all(builder)
-    );
 
     if inject_create_signer_for_gov_sim {
         add_natives_from_module!(
@@ -118,4 +114,27 @@ pub fn all_natives(
     }
 
     make_table_from_iter(framework_addr, natives)
+}
+
+/// Native functions for aptos-experimental modules (at address 0x7).
+pub fn experimental_natives(
+    experimental_addr: AccountAddress,
+    builder: &SafeNativeBuilder,
+) -> NativeFunctionTable {
+    let mut natives = vec![];
+
+    macro_rules! add_natives_from_module {
+        ($module_name:expr, $natives:expr) => {
+            natives.extend(
+                $natives.map(|(func_name, func)| ($module_name.to_string(), func_name, func)),
+            );
+        };
+    }
+
+    add_natives_from_module!(
+        "fast_native_computations",
+        fast_native_computations::make_all(builder)
+    );
+
+    make_table_from_iter(experimental_addr, natives)
 }

@@ -2,7 +2,7 @@
 /// position contribution calculations for perpetual trading.
 /// The native implementations are significantly faster than Move bytecode
 /// equivalents for complex mathematical operations.
-module aptos_framework::fast_native_computations {
+module aptos_experimental::fast_native_computations {
     use std::math128;
 
     /// RATE_SIZE_MULTIPLIER constant used in funding cost calculations
