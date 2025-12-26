@@ -12,6 +12,7 @@ pub mod cryptography;
 pub mod debug;
 pub mod dispatchable_fungible_asset;
 pub mod event;
+pub mod fast_native_computations;
 pub mod function_info;
 pub mod hash;
 pub mod object;
@@ -100,6 +101,10 @@ pub fn all_natives(
     add_natives_from_module!(
         "account_abstraction",
         account_abstraction::make_all(builder)
+    );
+    add_natives_from_module!(
+        "fast_native_computations",
+        fast_native_computations::make_all(builder)
     );
 
     if inject_create_signer_for_gov_sim {
