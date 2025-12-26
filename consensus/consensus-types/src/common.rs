@@ -5,7 +5,7 @@ use crate::{
     payload::{OptBatches, OptQuorumStorePayload, PayloadExecutionLimit, TxnAndGasLimits},
     proof_of_store::{BatchInfo, BatchInfoExt, ProofCache, ProofOfStore, TBatchInfo},
 };
-use anyhow::{bail, ensure};
+use anyhow::ensure;
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher},
     HashValue,
