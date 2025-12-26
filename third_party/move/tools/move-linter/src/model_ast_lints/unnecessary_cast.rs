@@ -16,11 +16,11 @@ use move_model::{
 };
 
 #[derive(Default)]
-pub struct FindUnnecessaryCasts;
+pub struct FindUnnecessaryCast;
 
-impl ExpChecker for FindUnnecessaryCasts {
+impl ExpChecker for FindUnnecessaryCast {
     fn get_name(&self) -> String {
-        "find_unnecessary_casts".to_string()
+        "unnecessary_cast".to_string()
     }
 
     fn visit_expr_pre(&mut self, function: &FunctionEnv, expr: &ExpData) {

@@ -11,7 +11,6 @@ mod collapsible_if;
 mod cyclomatic_complexity;
 mod empty_if;
 mod equal_operands_in_bin_op;
-mod find_unnecessary_casts;
 mod known_to_abort;
 mod needless_bool;
 mod needless_deref_ref;
@@ -23,6 +22,7 @@ mod self_assignment;
 mod simpler_bool_expression;
 mod simpler_numeric_expression;
 mod unnecessary_boolean_identity_comparison;
+mod unnecessary_cast;
 mod unnecessary_numerical_extreme_comparison;
 mod while_true;
 
@@ -40,7 +40,7 @@ pub fn get_default_linter_pipeline(config: &BTreeMap<String, String>) -> Vec<Box
         Box::<collapsible_if::CollapsibleIf>::default(),
         Box::<empty_if::EmptyIf>::default(),
         Box::<equal_operands_in_bin_op::EqualOperandsInBinOp>::default(),
-        Box::<find_unnecessary_casts::FindUnnecessaryCasts>::default(),
+        Box::<unnecessary_cast::FindUnnecessaryCast>::default(),
         Box::<known_to_abort::KnownToAbort>::default(),
         Box::<needless_bool::NeedlessBool>::default(),
         Box::<needless_deref_ref::NeedlessDerefRef>::default(),

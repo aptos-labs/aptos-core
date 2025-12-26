@@ -123,8 +123,8 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
 56 │         (128u8 * 2) as u8
    │         ^^^^^^^^^^^^^^^^^
    │
-   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(find_unnecessary_casts)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#find_unnecessary_casts.
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort.move:60:9
@@ -141,8 +141,8 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
 60 │         (32768u16 * 2) as u16
    │         ^^^^^^^^^^^^^^^^^^^^^
    │
-   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(find_unnecessary_casts)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#find_unnecessary_casts.
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort.move:64:9
@@ -159,8 +159,8 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
 64 │         (128u8 + 128u8) as u8  // 256, overflows u8
    │         ^^^^^^^^^^^^^^^^^^^^^
    │
-   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(find_unnecessary_casts)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#find_unnecessary_casts.
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort.move:68:9
@@ -177,8 +177,8 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
 68 │         (32768u16 * 2 + 1u16) as u16  // 65537, overflows u16
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(find_unnecessary_casts)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#find_unnecessary_casts.
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort.move:72:9
@@ -195,8 +195,8 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
 72 │         (64u8 * 2 * 2) as u8  // 256, overflows u8
    │         ^^^^^^^^^^^^^^^^^^^^
    │
-   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(find_unnecessary_casts)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#find_unnecessary_casts.
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort.move:77:13
@@ -312,8 +312,8 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
 152 │         ((x + 1) * 2) as u8
     │         ^^^^^^^^^^^^^^^^^^^
     │
-    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(find_unnecessary_casts)]`.
-    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#find_unnecessary_casts.
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
     ┌─ tests/model_ast_lints/known_to_abort.move:172:9
@@ -321,8 +321,8 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
 172 │         (64u8 * 2 + 32) as u8  // 160, within u8 range
     │         ^^^^^^^^^^^^^^^^^^^^^
     │
-    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(find_unnecessary_casts)]`.
-    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#find_unnecessary_casts.
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
     ┌─ tests/model_ast_lints/known_to_abort.move:176:9
@@ -330,8 +330,8 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
 176 │         (16u8 * 4 * 2) as u8  // 128, within u8 range
     │         ^^^^^^^^^^^^^^^^^^^^
     │
-    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(find_unnecessary_casts)]`.
-    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#find_unnecessary_casts.
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
     ┌─ tests/model_ast_lints/known_to_abort.move:180:9
@@ -339,8 +339,8 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
 180 │         (32767u16 + 1 - 1) as u16  // 32767, within u16 range
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(find_unnecessary_casts)]`.
-    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#find_unnecessary_casts.
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
     ┌─ tests/model_ast_lints/known_to_abort.move:185:13
@@ -348,8 +348,8 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
 185 │             (x * 2) as u8
     │             ^^^^^^^^^^^^^
     │
-    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(find_unnecessary_casts)]`.
-    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#find_unnecessary_casts.
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
     ┌─ tests/model_ast_lints/known_to_abort.move:187:13
@@ -357,8 +357,8 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
 187 │             (y * 2) as u8
     │             ^^^^^^^^^^^^^
     │
-    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(find_unnecessary_casts)]`.
-    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#find_unnecessary_casts.
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
     ┌─ tests/model_ast_lints/known_to_abort.move:194:17
@@ -366,8 +366,8 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
 194 │                 (x + y) as u8
     │                 ^^^^^^^^^^^^^
     │
-    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(find_unnecessary_casts)]`.
-    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#find_unnecessary_casts.
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
     ┌─ tests/model_ast_lints/known_to_abort.move:196:17
@@ -375,8 +375,8 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
 196 │                 (x + z) as u8
     │                 ^^^^^^^^^^^^^
     │
-    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(find_unnecessary_casts)]`.
-    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#find_unnecessary_casts.
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
     ┌─ tests/model_ast_lints/known_to_abort.move:199:13
@@ -384,5 +384,5 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
 199 │             (y + z) as u8
     │             ^^^^^^^^^^^^^
     │
-    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(find_unnecessary_casts)]`.
-    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#find_unnecessary_casts.
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
