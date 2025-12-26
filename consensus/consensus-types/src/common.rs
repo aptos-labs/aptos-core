@@ -576,6 +576,7 @@ impl Payload {
         verifier: &ValidatorVerifier,
         proof_cache: &ProofCache,
         quorum_store_enabled: bool,
+        opt_qs_v2_rx_enabled: bool,
     ) -> anyhow::Result<()> {
         match (quorum_store_enabled, self) {
             (false, Payload::DirectMempool(_)) => Ok(()),
@@ -607,21 +608,19 @@ impl Payload {
                 Ok(())
             },
             (true, Payload::OptQuorumStore(OptQuorumStorePayload::V2(p))) => {
-                if true {
-                    bail!("OptQuorumStorePayload::V2 cannot be accepted yet");
-                }
-                #[allow(unreachable_code)]
-                {
-                    let proof_with_data = p.proof_with_data();
-                    Self::verify_with_cache(&proof_with_data.batch_summary, verifier, proof_cache)?;
-                    Self::verify_inline_batches(
-                        p.inline_batches()
-                            .iter()
-                            .map(|batch| (batch.info(), batch.transactions())),
-                    )?;
-                    Self::verify_opt_batches(verifier, p.opt_batches())?;
-                    Ok(())
-                }
+                ensure!(
+                    opt_qs_v2_rx_enabled,
+                    "OptQuorumStorePayload::V2 cannot be accepted yet"
+                );
+                let proof_with_data = p.proof_with_data();
+                Self::verify_with_cache(&proof_with_data.batch_summary, verifier, proof_cache)?;
+                Self::verify_inline_batches(
+                    p.inline_batches()
+                        .iter()
+                        .map(|batch| (batch.info(), batch.transactions())),
+                )?;
+                Self::verify_opt_batches(verifier, p.opt_batches())?;
+                Ok(())
             },
             (_, _) => Err(anyhow::anyhow!(
                 "Wrong payload type. Expected Payload::InQuorumStore {} got {} ",
