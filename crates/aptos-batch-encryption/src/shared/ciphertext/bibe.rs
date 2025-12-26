@@ -190,8 +190,7 @@ pub mod tests {
     fn test_bibe_ct_encrypt_decrypt() {
         let mut rng = thread_rng();
         let tc = ShamirThresholdConfig::new(1, 1);
-        let (ek, dk, _, msk_shares, _, _) =
-            FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc, &tc).unwrap();
+        let (ek, dk, _, msk_shares) = FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc).unwrap();
 
         let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
         let mut counter = Fr::zero();

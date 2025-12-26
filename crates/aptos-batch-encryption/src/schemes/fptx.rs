@@ -49,58 +49,37 @@ impl BatchThresholdEncryption for FPTX {
     fn setup(
         digest_key: &Self::DigestKey,
         pvss_public_params: &<Self::SubTranscript as Subtranscript>::PublicParameters,
-        subtranscript_happypath: &Self::SubTranscript,
-        subtranscript_slowpath: &Self::SubTranscript,
-        tc_happypath: &Self::ThresholdConfig,
-        tc_slowpath: &Self::ThresholdConfig,
+        subtranscript: &Self::SubTranscript,
+        threshold_config: &Self::ThresholdConfig,
         current_player: Player,
         msk_share_decryption_key: &<Self::SubTranscript as Subtranscript>::DecryptPrivKey,
     ) -> Result<(
         Self::EncryptionKey,
         Vec<Self::VerificationKey>,
         Self::MasterSecretKeyShare,
-        Vec<Self::VerificationKey>,
-        Self::MasterSecretKeyShare,
     )> {
-        (subtranscript_happypath.get_dealt_public_key()
-            == subtranscript_slowpath.get_dealt_public_key())
-        .then_some(())
-        .ok_or(BatchEncryptionError::HappySlowPathMismatchError)?;
-
-        let mpk_g2: G2Affine = subtranscript_happypath.get_dealt_public_key().as_g2();
+        let mpk_g2: G2Affine = subtranscript.get_dealt_public_key().as_g2();
 
         let ek = EncryptionKey::new(mpk_g2, digest_key.tau_g2);
 
-        let vks_happypath: Vec<Self::VerificationKey> = tc_happypath
+        let vks: Vec<Self::VerificationKey> = threshold_config
             .get_players()
             .into_iter()
             .map(|p| Self::VerificationKey {
                 player: p,
                 mpk_g2,
-                vk_g2: subtranscript_happypath
-                    .get_public_key_share(tc_happypath, &p)
+                vk_g2: subtranscript
+                    .get_public_key_share(threshold_config, &p)
                     .as_g2(),
             })
             .collect();
 
-        let vks_slowpath: Vec<Self::VerificationKey> = tc_slowpath
-            .get_players()
-            .into_iter()
-            .map(|p| Self::VerificationKey {
-                player: p,
-                mpk_g2,
-                vk_g2: subtranscript_slowpath
-                    .get_public_key_share(tc_slowpath, &p)
-                    .as_g2(),
-            })
-            .collect();
-
-        let msk_share_happypath = Self::MasterSecretKeyShare {
+        let msk_share = Self::MasterSecretKeyShare {
             mpk_g2,
             player: current_player,
-            shamir_share_eval: subtranscript_happypath
+            shamir_share_eval: subtranscript
                 .decrypt_own_share(
-                    tc_happypath,
+                    threshold_config,
                     &current_player,
                     msk_share_decryption_key,
                     pvss_public_params,
@@ -109,50 +88,22 @@ impl BatchThresholdEncryption for FPTX {
                 .into_fr(),
         };
 
-        let msk_share_slowpath = Self::MasterSecretKeyShare {
-            mpk_g2,
-            player: current_player,
-            shamir_share_eval: subtranscript_slowpath
-                .decrypt_own_share(
-                    tc_slowpath,
-                    &current_player,
-                    msk_share_decryption_key,
-                    pvss_public_params,
-                )
-                .0
-                .into_fr(),
-        };
+        (vks[msk_share.player.get_id()].vk_g2
+            == G2Affine::generator() * msk_share.shamir_share_eval)
+            .then_some(())
+            .ok_or(BatchEncryptionError::VKMSKMismatchError)?;
 
-        for (vks, msk_share) in [
-            (&vks_happypath, &msk_share_happypath),
-            (&vks_slowpath, &msk_share_slowpath),
-        ] {
-            (vks[msk_share.player.get_id()].vk_g2
-                == G2Affine::generator() * msk_share.shamir_share_eval)
-                .then_some(())
-                .ok_or(BatchEncryptionError::VKMSKMismatchError)?;
-        }
-
-        Ok((
-            ek,
-            vks_happypath,
-            msk_share_happypath,
-            vks_slowpath,
-            msk_share_slowpath,
-        ))
+        Ok((ek, vks, msk_share))
     }
 
     fn setup_for_testing(
         seed: u64,
         max_batch_size: usize,
         number_of_rounds: usize,
-        tc_happypath: &Self::ThresholdConfig,
-        tc_slowpath: &Self::ThresholdConfig,
+        threshold_config: &Self::ThresholdConfig,
     ) -> Result<(
         Self::EncryptionKey,
         Self::DigestKey,
-        Vec<Self::VerificationKey>,
-        Vec<Self::MasterSecretKeyShare>,
         Vec<Self::VerificationKey>,
         Vec<Self::MasterSecretKeyShare>,
     )> {
@@ -161,24 +112,15 @@ impl BatchThresholdEncryption for FPTX {
         let digest_key = DigestKey::new(&mut rng, max_batch_size, number_of_rounds)
             .ok_or(anyhow!("Failed to create digest key"))?;
         let msk = Fr::rand(&mut rng);
-        let (mpk, vks_happypath, msk_shares_happypath) =
-            key_derivation::gen_msk_shares(msk, &mut rng, tc_happypath);
-        let (_, vks_slowpath, msk_shares_slowpath) =
-            key_derivation::gen_msk_shares(msk, &mut rng, tc_slowpath);
+        let (mpk, vks, msk_shares) =
+            key_derivation::gen_msk_shares(msk, &mut rng, threshold_config);
 
         let ek = EncryptionKey {
             sig_mpk_g2: mpk.0,
             tau_g2: digest_key.tau_g2,
         };
 
-        Ok((
-            ek,
-            digest_key,
-            vks_happypath,
-            msk_shares_happypath,
-            vks_slowpath,
-            msk_shares_slowpath,
-        ))
+        Ok((ek, digest_key, vks, msk_shares))
     }
 
     fn encrypt<R: CryptoRng + RngCore>(

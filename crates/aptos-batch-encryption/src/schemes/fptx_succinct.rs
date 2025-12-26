@@ -46,16 +46,12 @@ impl BatchThresholdEncryption for FPTXSuccinct {
     fn setup(
         _digest_key: &Self::DigestKey,
         _pvss_public_params: &<Self::SubTranscript as Subtranscript>::PublicParameters,
-        _subtranscript_happypath: &Self::SubTranscript,
-        _subtranscript_slowpath: &Self::SubTranscript,
-        _tc_happypath: &Self::ThresholdConfig,
-        _tc_slowpath: &Self::ThresholdConfig,
+        _subtranscript: &Self::SubTranscript,
+        _tc: &Self::ThresholdConfig,
         _current_player: Player,
         _msk_share_decryption_key: &<Self::SubTranscript as Subtranscript>::DecryptPrivKey,
     ) -> Result<(
         Self::EncryptionKey,
-        Vec<Self::VerificationKey>,
-        Self::MasterSecretKeyShare,
         Vec<Self::VerificationKey>,
         Self::MasterSecretKeyShare,
     )> {
@@ -67,13 +63,10 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         seed: u64,
         max_batch_size: usize,
         number_of_rounds: usize,
-        tc_happypath: &Self::ThresholdConfig,
-        tc_slowpath: &Self::ThresholdConfig,
+        tc: &Self::ThresholdConfig,
     ) -> Result<(
         Self::EncryptionKey,
         Self::DigestKey,
-        Vec<Self::VerificationKey>,
-        Vec<Self::MasterSecretKeyShare>,
         Vec<Self::VerificationKey>,
         Vec<Self::MasterSecretKeyShare>,
     )> {
@@ -82,10 +75,7 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         let digest_key = DigestKey::new(&mut rng, max_batch_size, number_of_rounds)
             .ok_or(anyhow!("Failed to create digest key"))?;
         let msk = Fr::rand(&mut rng);
-        let (mpk, vks_happypath, msk_shares_happypath) =
-            key_derivation::gen_msk_shares(msk, &mut rng, tc_happypath);
-        let (_, vks_slowpath, msk_shares_slowpath) =
-            key_derivation::gen_msk_shares(msk, &mut rng, tc_slowpath);
+        let (mpk, vks, msk_shares) = key_derivation::gen_msk_shares(msk, &mut rng, tc);
 
         let ek = AugmentedEncryptionKey {
             sig_mpk_g2: mpk.0,
@@ -93,14 +83,7 @@ impl BatchThresholdEncryption for FPTXSuccinct {
             tau_mpk_g2: (digest_key.tau_g2 * msk).into(),
         };
 
-        Ok((
-            ek,
-            digest_key,
-            vks_happypath,
-            msk_shares_happypath,
-            vks_slowpath,
-            msk_shares_slowpath,
-        ))
+        Ok((ek, digest_key, vks, msk_shares))
     }
 
     fn encrypt<R: CryptoRng + RngCore>(
