@@ -1293,12 +1293,30 @@ impl TransactionsApi {
                             }
                         },
                     },
-                    TransactionPayload::EncryptedPayload(_) => {
-                        return Err(SubmitTransactionError::bad_request_with_code(
-                            "Encrypted Transaction is not supported yet",
-                            AptosErrorCode::InvalidInput,
-                            ledger_info,
-                        ));
+                    TransactionPayload::EncryptedPayload(payload) => {
+                        if !self.context.node_config.api.allow_encrypted_txns_submission {
+                            return Err(SubmitTransactionError::bad_request_with_code(
+                                "Encrypted Transaction submission is not allowed yet",
+                                AptosErrorCode::InvalidInput,
+                                ledger_info,
+                            ));
+                        }
+
+                        if !payload.is_encrypted() {
+                            return Err(SubmitTransactionError::bad_request_with_code(
+                                "Encrypted transaction must be in encrypted state",
+                                AptosErrorCode::InvalidInput,
+                                ledger_info,
+                            ));
+                        }
+
+                        if let Err(e) = payload.verify(signed_transaction.sender()) {
+                            return Err(SubmitTransactionError::bad_request_with_code(
+                                e.context("Encrypted transaction payload could not be verified"),
+                                AptosErrorCode::InvalidInput,
+                                ledger_info,
+                            ));
+                        }
                     },
                 }
                 // TODO: Verify script args?

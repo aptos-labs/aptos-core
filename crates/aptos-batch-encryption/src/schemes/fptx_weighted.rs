@@ -339,7 +339,6 @@ impl BatchThresholdEncryption for FPTXWeighted {
         seed: u64,
         max_batch_size: usize,
         number_of_rounds: usize,
-        tc_happypath: &Self::ThresholdConfig,
         tc_slowpath: &Self::ThresholdConfig,
     ) -> Result<(
         Self::EncryptionKey,
@@ -354,10 +353,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
         let digest_key = DigestKey::new(&mut rng, max_batch_size, number_of_rounds)
             .ok_or(anyhow!("Failed to create digest key"))?;
         let msk = Fr::rand(&mut rng);
-        let (mpk, vks_happypath, msk_shares_happypath) =
-            gen_weighted_msk_shares(msk, &mut rng, tc_happypath);
-
-        let (_, vks_slowpath, msk_shares_slowpath) =
+        let (mpk, vks_slowpath, msk_shares_slowpath) =
             gen_weighted_msk_shares(msk, &mut rng, tc_slowpath);
 
         let ek = EncryptionKey::new(mpk.0, digest_key.tau_g2);
@@ -365,8 +361,8 @@ impl BatchThresholdEncryption for FPTXWeighted {
         Ok((
             ek,
             digest_key,
-            vks_happypath,
-            msk_shares_happypath,
+            vks_slowpath.clone(),
+            msk_shares_slowpath.clone(),
             vks_slowpath,
             msk_shares_slowpath,
         ))

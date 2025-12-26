@@ -33,7 +33,12 @@ impl PipelineBuilder {
         tracker.start_working();
 
         if secret_share_config.is_none() {
-            return Ok((input_txns, max_txns_from_block_to_execute, block_gas_limit));
+            return Ok((
+                input_txns,
+                max_txns_from_block_to_execute,
+                block_gas_limit,
+                None,
+            ));
         }
 
         let (encrypted_txns, unencrypted_txns): (Vec<_>, Vec<_>) = input_txns
@@ -45,6 +50,7 @@ impl PipelineBuilder {
                 unencrypted_txns,
                 max_txns_from_block_to_execute,
                 block_gas_limit,
+                None,
             ));
         }
 
@@ -130,6 +136,11 @@ impl PipelineBuilder {
 
         let output_txns = [decrypted_txns, unencrypted_txns].concat();
 
-        Ok((output_txns, max_txns_from_block_to_execute, block_gas_limit))
+        Ok((
+            output_txns,
+            max_txns_from_block_to_execute,
+            block_gas_limit,
+            Some(decryption_key.key),
+        ))
     }
 }

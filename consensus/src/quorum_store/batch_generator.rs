@@ -75,6 +75,67 @@ pub struct BatchGenerator {
 }
 
 impl BatchGenerator {
+    /// Categorize a transaction to determine its batch kind.
+    /// This is the central place to add new categorization logic.
+    fn categorize_transaction(txn: &SignedTransaction) -> BatchKind {
+        if txn.is_encrypted_txn() {
+            BatchKind::Encrypted
+        } else {
+            BatchKind::Normal
+        }
+    }
+
+    /// Process a group of transactions with the same batch kind through the bucketing algorithm.
+    fn process_transaction_group(
+        &mut self,
+        batches: &mut Vec<Batch<BatchInfoExt>>,
+        txns: &mut Vec<SignedTransaction>,
+        expiry_time: u64,
+        reverse_buckets_excluding_zero: &[u64],
+        max_batches_remaining: &mut u64,
+        batch_kind: BatchKind,
+    ) {
+        for bucket_start in reverse_buckets_excluding_zero {
+            if txns.is_empty() || *max_batches_remaining == 0 {
+                break;
+            }
+
+            // Search for key in descending gas order
+            let num_txns_in_bucket = match txns
+                .binary_search_by_key(&(u64::MAX - (*bucket_start - 1), PeerId::ZERO), |txn| {
+                    (u64::MAX - txn.gas_unit_price(), txn.sender())
+                }) {
+                Ok(index) => index,
+                Err(index) => index,
+            };
+            if num_txns_in_bucket == 0 {
+                continue;
+            }
+
+            self.push_bucket_to_batches(
+                batches,
+                txns,
+                num_txns_in_bucket,
+                expiry_time,
+                *bucket_start,
+                max_batches_remaining,
+                batch_kind,
+            );
+        }
+        // Handle remaining transactions in the zero bucket
+        if !txns.is_empty() && *max_batches_remaining > 0 {
+            self.push_bucket_to_batches(
+                batches,
+                txns,
+                txns.len(),
+                expiry_time,
+                0,
+                max_batches_remaining,
+                batch_kind,
+            );
+        }
+    }
+
     pub(crate) fn new(
         epoch: u64,
         my_peer_id: PeerId,
@@ -175,6 +236,7 @@ impl BatchGenerator {
         txns: Vec<SignedTransaction>,
         expiry_time: u64,
         bucket_start: u64,
+        batch_kind: BatchKind,
     ) -> Batch<BatchInfoExt> {
         let batch_id = self.batch_id;
         self.batch_id.increment();
@@ -188,8 +250,6 @@ impl BatchGenerator {
         counters::num_txn_per_batch(bucket_start.to_string().as_str(), txns.len());
 
         if self.config.enable_batch_v2 {
-            // TODO(ibalajiarun): Specify accurate batch kind
-            let batch_kind = BatchKind::Normal;
             Batch::new_v2(
                 batch_id,
                 txns,
@@ -221,6 +281,7 @@ impl BatchGenerator {
         expiry_time: u64,
         bucket_start: u64,
         total_batches_remaining: &mut u64,
+        batch_kind: BatchKind,
     ) {
         let mut txns_remaining = num_txns_in_bucket;
         while txns_remaining > 0 {
@@ -244,7 +305,8 @@ impl BatchGenerator {
                 .count();
             if num_batch_txns > 0 {
                 let batch_txns: Vec<_> = txns.drain(0..num_batch_txns).collect();
-                let batch = self.create_new_batch(batch_txns, expiry_time, bucket_start);
+                let batch =
+                    self.create_new_batch(batch_txns, expiry_time, bucket_start, batch_kind);
                 batches.push(batch);
                 *total_batches_remaining = total_batches_remaining.saturating_sub(1);
                 txns_remaining -= num_batch_txns;
@@ -272,42 +334,59 @@ impl BatchGenerator {
 
         let mut max_batches_remaining = self.config.sender_max_num_batches as u64;
         let mut batches = vec![];
-        for bucket_start in &reverse_buckets_excluding_zero {
-            if pulled_txns.is_empty() || max_batches_remaining == 0 {
-                return batches;
+
+        // Only categorize and separate transactions when BatchV2 is enabled
+        if self.config.enable_batch_v2 {
+            // Group transactions by their batch kind
+            let mut txns_by_kind: HashMap<BatchKind, Vec<SignedTransaction>> = HashMap::new();
+
+            for txn in pulled_txns.drain(..) {
+                let batch_kind = Self::categorize_transaction(&txn);
+                txns_by_kind.entry(batch_kind).or_default().push(txn);
             }
 
-            // Search for key in descending gas order
-            let num_txns_in_bucket = match pulled_txns
-                .binary_search_by_key(&(u64::MAX - (*bucket_start - 1), PeerId::ZERO), |txn| {
-                    (u64::MAX - txn.gas_unit_price(), txn.sender())
-                }) {
-                Ok(index) => index,
-                Err(index) => index,
-            };
-            if num_txns_in_bucket == 0 {
-                continue;
+            // Sort each group by gas, in descending order. This is a stable sort on existing mempool ordering,
+            // so will not reorder accounts or their sequence numbers as long as they have the same gas.
+            for txns in txns_by_kind.values_mut() {
+                txns.sort_by_key(|txn| u64::MAX - txn.gas_unit_price());
             }
 
-            self.push_bucket_to_batches(
+            // Process each batch kind group. Processing order: Normal first, then others.
+            // This ensures backwards compatibility and prioritizes regular transactions.
+            let batch_kind_order = [BatchKind::Normal, BatchKind::Encrypted];
+
+            for &batch_kind in &batch_kind_order {
+                if let Some(mut txns) = txns_by_kind.remove(&batch_kind) {
+                    self.process_transaction_group(
+                        &mut batches,
+                        &mut txns,
+                        expiry_time,
+                        &reverse_buckets_excluding_zero,
+                        &mut max_batches_remaining,
+                        batch_kind,
+                    );
+                }
+            }
+        } else {
+            // Legacy path: filter out encrypted transactions (only supported in BatchV2)
+            // and treat remaining transactions as Normal
+            if pulled_txns.iter().any(|txn| txn.is_encrypted_txn()) {
+                error!(
+                    "QS: Found encrypted transaction(s) in pulled_txns when BatchV2 is disabled. These will be filtered out."
+                );
+            }
+            pulled_txns.retain(|txn| !txn.is_encrypted_txn());
+
+            self.process_transaction_group(
                 &mut batches,
                 pulled_txns,
-                num_txns_in_bucket,
                 expiry_time,
-                *bucket_start,
+                &reverse_buckets_excluding_zero,
                 &mut max_batches_remaining,
+                BatchKind::Normal,
             );
         }
-        if !pulled_txns.is_empty() && max_batches_remaining > 0 {
-            self.push_bucket_to_batches(
-                &mut batches,
-                pulled_txns,
-                pulled_txns.len(),
-                expiry_time,
-                0,
-                &mut max_batches_remaining,
-            );
-        }
+
         batches
     }
 
