@@ -301,7 +301,7 @@ pub mod tests {
         let mut rng = thread_rng();
         let tc = ShamirThresholdConfig::new(1, 1);
         let (ek, dk, _, msk_shares, _, _) =
-            FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc, &tc).unwrap();
+            FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc).unwrap();
 
         let mut ids = FreeRootIdSet::with_capacity(dk.capacity()).unwrap();
         let mut counter = Fr::zero();
@@ -338,7 +338,7 @@ pub mod tests {
         let mut rng = thread_rng();
         let tc = ShamirThresholdConfig::new(1, 1);
         let (ek, dk, _, msk_shares, _, _) =
-            FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc, &tc).unwrap();
+            FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc).unwrap();
 
         let plaintext = String::from("hi");
         let associated_data = String::from("");
@@ -366,7 +366,7 @@ pub mod tests {
     fn test_ct_verify() {
         let mut rng = thread_rng();
         let tc = ShamirThresholdConfig::new(1, 1);
-        let (ek, _, _, _, _, _) = FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc, &tc).unwrap();
+        let (ek, _, _, _, _, _) = FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc).unwrap();
 
         let plaintext = String::from("hi");
         let associated_data = String::from("associated data");

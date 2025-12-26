@@ -95,7 +95,7 @@ fn weighted_smoke_with_setup_for_testing() {
     let tc_slow = WeightedConfigArkworks::new(3, vec![1, 2, 5]).unwrap();
 
     let (ek, dk, vks_happy, msk_shares_happy, vks_slow, msk_shares_slow) =
-        FPTXWeighted::setup_for_testing(rng.r#gen(), 8, 1, &tc_happy, &tc_slow).unwrap();
+        FPTXWeighted::setup_for_testing(rng.r#gen(), 8, 1, &tc_slow).unwrap();
 
     weighted_smoke_with_setup(
         &mut rng,

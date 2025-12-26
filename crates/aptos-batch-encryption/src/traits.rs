@@ -82,7 +82,6 @@ pub trait BatchThresholdEncryption {
         seed: u64,
         max_batch_size: usize,
         number_of_rounds: usize,
-        tc_happypath: &Self::ThresholdConfig,
         tc_slowpath: &Self::ThresholdConfig,
     ) -> Result<(
         Self::EncryptionKey,

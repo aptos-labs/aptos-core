@@ -98,7 +98,7 @@ fn smoke_with_setup_for_testing() {
     let tc_slow = ShamirThresholdConfig::new(3, 8);
 
     let (ek, dk, vks_happy, msk_shares_happy, vks_slow, msk_shares_slow) =
-        FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc_happy, &tc_slow).unwrap();
+        FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc_slow).unwrap();
 
     smoke_with_setup(
         &mut rng,
@@ -234,10 +234,9 @@ fn smoke_with_pvss() {
 #[test]
 fn fptx_serialize_deserialize_setup() {
     let mut rng = thread_rng();
-    let tc_happy = ShamirThresholdConfig::new(5, 8);
     let tc_slow = ShamirThresholdConfig::new(3, 8);
 
-    let setup = FPTX::setup_for_testing(rng.r#gen(), 8, 2, &tc_happy, &tc_slow).unwrap();
+    let setup = FPTX::setup_for_testing(rng.r#gen(), 8, 2, &tc_slow).unwrap();
 
     let bytes = bcs::to_bytes(&setup).unwrap();
     let setup2: (
