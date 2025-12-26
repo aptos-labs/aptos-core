@@ -14,9 +14,6 @@ use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
-/// RATE_SIZE_MULTIPLIER constant - must match the Move constant
-const RATE_SIZE_MULTIPLIER: u128 = 1_000_000_000_000; // 10^12
-
 /***************************************************************************************************
  * native fun compute_position_contribution_internal
  *
@@ -37,18 +34,20 @@ fn native_compute_position_contribution_internal(
     _ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert_eq!(args.len(), 12);
     context.charge(FAST_NATIVE_COMPUTATIONS_COMPUTE_POSITION_CONTRIBUTION_BASE)?;
 
     // Pop arguments in reverse order (last argument first)
     let for_free_collateral = safely_pop_arg!(args, bool);
     let margin_leverage = safely_pop_arg!(args, u8);
     let haircut_bps = safely_pop_arg!(args, u64);
+    let rate_size_multiplier = safely_pop_arg!(args, u64);
     let size_multiplier = safely_pop_arg!(args, u64);
     let current_funding_index = safely_pop_arg!(args, i128);
     let mark_px = safely_pop_arg!(args, u64);
     let unrealized_funding_before_last_update = safely_pop_arg!(args, i64);
     let position_funding_index = safely_pop_arg!(args, i128);
-    let entry_px_times_size_sum = safely_pop_arg!(args, u128);
+    let position_entry_px_times_size_sum = safely_pop_arg!(args, u128);
     let position_is_long = safely_pop_arg!(args, bool);
     let position_size = safely_pop_arg!(args, u64);
 
@@ -62,56 +61,57 @@ fn native_compute_position_contribution_internal(
     }
 
     // Compute PnL with funding
-    let pnl = compute_pnl_with_funding(
+    let positons_pnl = compute_pnl_with_funding(
         position_size,
         position_is_long,
-        entry_px_times_size_sum,
+        position_entry_px_times_size_sum,
         position_funding_index,
         unrealized_funding_before_last_update,
         mark_px,
         current_funding_index,
         size_multiplier,
+        rate_size_multiplier,
     );
 
     // Apply haircut if for_free_collateral is true
-    let final_pnl = if for_free_collateral {
-        apply_pnl_haircut(pnl, haircut_bps)
+    let pnl = if for_free_collateral {
+        apply_pnl_haircut(positons_pnl, haircut_bps)
     } else {
-        pnl
+        positons_pnl
     };
 
     // Calculate margin required
     let margin = margin_required_formula(position_size, mark_px, size_multiplier, margin_leverage);
 
-    // Calculate notional value
-    let notional = (position_size as u128 * mark_px as u128 / size_multiplier as u128) as u64;
+    // Calculate notional value: (position_size * mark_px) / size_multiplier
+    let notional = mul_div(position_size, mark_px, size_multiplier);
 
     // Return the results as a tuple
     Ok(smallvec![
-        Value::i64(final_pnl),
+        Value::i64(pnl),
         Value::u64(margin),
         Value::u64(notional)
     ])
 }
 
-/// Computes PnL with funding for a position
 fn compute_pnl_with_funding(
     position_size: u64,
-    is_long: bool,
-    entry_px_times_size_sum: u128,
+    position_is_long: bool,
+    position_entry_px_times_size_sum: u128,
     position_funding_index: i128,
     unrealized_funding_before_last_update: i64,
     mark_price: u64,
     current_funding_index: i128,
     size_multiplier: u64,
+    rate_size_multiplier: u64,
 ) -> i64 {
     let current_px_times_size = (mark_price as u128) * (position_size as u128);
 
     // Calculate price difference and direction
-    let (is_positive, price_diff) = if current_px_times_size >= entry_px_times_size_sum {
-        (is_long, current_px_times_size - entry_px_times_size_sum)
+    let (is_positive, price_diff) = if current_px_times_size >= position_entry_px_times_size_sum {
+        (position_is_long, current_px_times_size - position_entry_px_times_size_sum)
     } else {
-        (!is_long, entry_px_times_size_sum - current_px_times_size)
+        (!position_is_long, position_entry_px_times_size_sum - current_px_times_size)
     };
 
     // Calculate absolute PnL with directional rounding
@@ -129,7 +129,8 @@ fn compute_pnl_with_funding(
         current_funding_index,
         position_size,
         size_multiplier,
-        is_long,
+        rate_size_multiplier,
+        position_is_long,
     );
 
     let total_funding_cost = unrealized_funding_before_last_update + unrealized_funding_cost;
@@ -137,7 +138,6 @@ fn compute_pnl_with_funding(
     pnl - total_funding_cost
 }
 
-/// Applies haircut to positive PnL
 fn apply_pnl_haircut(pnl: i64, haircut_bps: u64) -> i64 {
     if pnl > 0 {
         pnl * ((10000 - haircut_bps) as i64) / 10000
@@ -146,18 +146,17 @@ fn apply_pnl_haircut(pnl: i64, haircut_bps: u64) -> i64 {
     }
 }
 
-/// Calculates margin required for a position
 fn margin_required_formula(size: u64, price: u64, size_multiplier: u64, leverage: u8) -> u64 {
     let divisor = size_multiplier as u128 * leverage as u128;
     ceil_div_128((size as u128) * (price as u128), divisor) as u64
 }
 
-/// Calculates funding cost between two funding indices
 fn get_funding_cost(
     entry_index: i128,
     exit_index: i128,
     position_size: u64,
     position_size_multiplier: u64,
+    rate_size_multiplier: u64,
     for_long: bool,
 ) -> i64 {
     let mut index_delta = exit_index - entry_index;
@@ -167,32 +166,35 @@ fn get_funding_cost(
     }
 
     let (is_positive, delta_abs) = into_sign_and_amount_i128(index_delta);
-    let divisor = (position_size_multiplier as u128) * RATE_SIZE_MULTIPLIER;
+    let divisor = (position_size_multiplier as u128) * (rate_size_multiplier as u128);
     let cost_abs = div_direction_128(delta_abs * (position_size as u128), divisor, is_positive);
 
     from_sign_and_amount(is_positive, cost_abs as i64)
 }
 
-/// Division with directional rounding (ceil if `ceil` is true, floor otherwise)
 #[inline]
 fn div_direction_128(a: u128, b: u128, ceil: bool) -> u128 {
     if ceil {
         ceil_div_128(a, b)
     } else {
+        if b == 0 {
+            panic!("Division by zero");
+        }
         a / b
     }
 }
 
-/// Ceiling division for u128
 #[inline]
 fn ceil_div_128(a: u128, b: u128) -> u128 {
     if b == 0 {
         panic!("Division by zero");
+    } else if a == 0 {
+        0
+    } else {
+        (a - 1) / b + 1
     }
-    (a + b - 1) / b
 }
 
-/// Extracts sign and absolute value from i128
 #[inline]
 fn into_sign_and_amount_i128(value: i128) -> (bool, u128) {
     if value >= 0 {
@@ -202,7 +204,6 @@ fn into_sign_and_amount_i128(value: i128) -> (bool, u128) {
     }
 }
 
-/// Reconstructs i64 from sign and absolute value
 #[inline]
 fn from_sign_and_amount(is_positive: bool, amount: i64) -> i64 {
     if is_positive {
@@ -210,6 +211,12 @@ fn from_sign_and_amount(is_positive: bool, amount: i64) -> i64 {
     } else {
         -amount
     }
+}
+
+#[inline]
+fn mul_div(a: u64, b: u64, c: u64) -> u64 {
+    debug_assert!(c != 0, "Division by zero");
+    ((a as u128) * (b as u128) / (c as u128)) as u64
 }
 
 /***************************************************************************************************
@@ -281,14 +288,15 @@ mod tests {
     fn test_compute_pnl_with_funding_long_profit() {
         // Long position: entered at avg price 1000 (100 * 1000 = 100000), current price 1100
         let pnl = compute_pnl_with_funding(
-            100,     // position_size
-            true,    // is_long
-            100000,  // entry_px_times_size_sum (100 * 1000)
-            0,       // position_funding_index
-            0,       // unrealized_funding_before_last_update
-            1100,    // mark_price
-            0,       // current_funding_index
-            1,       // size_multiplier
+            100,                   // position_size
+            true,                  // is_long
+            100000,                // entry_px_times_size_sum (100 * 1000)
+            0,                     // position_funding_index
+            0,                     // unrealized_funding_before_last_update
+            1100,                  // mark_price
+            0,                     // current_funding_index
+            1,                     // size_multiplier
+            1_000_000_000_000,     // rate_size_multiplier (10^12)
         );
         // current_px_times_size = 100 * 1100 = 110000
         // price_diff = 110000 - 100000 = 10000
@@ -301,14 +309,15 @@ mod tests {
     fn test_compute_pnl_with_funding_short_profit() {
         // Short position: entered at avg price 1000, current price 900 (profit for short)
         let pnl = compute_pnl_with_funding(
-            100,     // position_size
-            false,   // is_long (short)
-            100000,  // entry_px_times_size_sum (100 * 1000)
-            0,       // position_funding_index
-            0,       // unrealized_funding_before_last_update
-            900,     // mark_price
-            0,       // current_funding_index
-            1,       // size_multiplier
+            100,                   // position_size
+            false,                 // is_long (short)
+            100000,                // entry_px_times_size_sum (100 * 1000)
+            0,                     // position_funding_index
+            0,                     // unrealized_funding_before_last_update
+            900,                   // mark_price
+            0,                     // current_funding_index
+            1,                     // size_multiplier
+            1_000_000_000_000,     // rate_size_multiplier (10^12)
         );
         // current_px_times_size = 100 * 900 = 90000
         // price_diff = 100000 - 90000 = 10000
