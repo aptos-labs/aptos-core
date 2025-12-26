@@ -429,6 +429,20 @@ impl OptQuorumStorePayload {
         })
     }
 
+    pub fn new_v2(
+        inline_batches: InlineBatches<BatchInfoExt>,
+        opt_batches: OptBatches<BatchInfoExt>,
+        proofs: ProofBatches<BatchInfoExt>,
+        execution_limits: PayloadExecutionLimit,
+    ) -> Self {
+        Self::V2(OptQuorumStorePayloadV1 {
+            inline_batches,
+            opt_batches,
+            proofs,
+            execution_limits,
+        })
+    }
+
     pub(crate) fn extend(self, other: Self) -> Self {
         match (self, other) {
             (Self::V1(p1), Self::V1(p2)) => Self::V1(p1.extend(p2)),

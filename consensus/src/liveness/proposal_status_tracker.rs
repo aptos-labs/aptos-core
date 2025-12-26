@@ -156,6 +156,7 @@ impl TOptQSPullParamsProvider for OptQSPullParamsProvider {
         Some(OptQSPayloadPullParams {
             exclude_authors,
             minimum_batch_age_usecs: self.minimum_batch_age_usecs,
+            use_batch_v2: false,
         })
     }
 }
