@@ -88,19 +88,21 @@ module aptos_experimental::order_placement {
     const U64_MAX: u64 = 0xffffffffffffffff;
     const MAX_CLIENT_ORDER_ID_LENGTH: u64 = 32;
 
-    struct OrderMatchResult<R: store + copy + drop> has drop {
-        order_id: OrderIdType,
-        remaining_size: u64,
-        cancel_reason: Option<OrderCancellationReason>,
-        callback_results: vector<R>,
-        fill_sizes: vector<u64>,
-        match_count: u32, // includes fills and cancels
+    enum OrderMatchResult<R: store + copy + drop> has drop {
+        V1 {
+            order_id: OrderIdType,
+            remaining_size: u64,
+            cancel_reason: Option<OrderCancellationReason>,
+            callback_results: vector<R>,
+            fill_sizes: vector<u64>,
+            match_count: u32, // includes fills and cancels
+        }
     }
 
     public fun destroy_order_match_result<R: store + copy + drop>(
         self: OrderMatchResult<R>
     ): (OrderIdType, u64, Option<OrderCancellationReason>, vector<R>, vector<u64>, u32) {
-        let OrderMatchResult { order_id, remaining_size, cancel_reason, callback_results,  fill_sizes, match_count } =
+        let OrderMatchResult::V1 { order_id, remaining_size, cancel_reason, callback_results,  fill_sizes, match_count } =
             self;
         (order_id, remaining_size, cancel_reason, callback_results, fill_sizes, match_count)
     }
@@ -295,7 +297,7 @@ module aptos_experimental::order_placement {
                     metadata
                 )
             );
-            return OrderMatchResult {
+            return OrderMatchResult::V1 {
                 order_id,
                 remaining_size,
                 cancel_reason: option::none(),
@@ -381,7 +383,7 @@ module aptos_experimental::order_placement {
                 metadata
             )
         );
-        return OrderMatchResult {
+        return OrderMatchResult::V1 {
             order_id,
             remaining_size,
             cancel_reason: option::none(),
@@ -571,7 +573,7 @@ module aptos_experimental::order_placement {
             size_delta,
             is_taker,
         );
-        return OrderMatchResult {
+        return OrderMatchResult::V1 {
             order_id,
             remaining_size: 0,
             cancel_reason: option::some(cancel_reason),
@@ -1089,7 +1091,7 @@ module aptos_experimental::order_placement {
                 callback_results.push_back(result.destroy_some());
             };
             if (taker_cancellation_reason.is_some()) {
-                return OrderMatchResult {
+                return OrderMatchResult::V1 {
                     order_id,
                     remaining_size: 0, // 0 because the order is cancelled
                     cancel_reason: taker_cancellation_reason,
@@ -1099,7 +1101,7 @@ module aptos_experimental::order_placement {
                 }
             };
             if (should_stop) {
-                return OrderMatchResult {
+                return OrderMatchResult::V1 {
                     order_id,
                     remaining_size,
                     cancel_reason: option::none(),
@@ -1188,7 +1190,7 @@ module aptos_experimental::order_placement {
                         callback_results
                     );
                 } else {
-                    return OrderMatchResult {
+                    return OrderMatchResult::V1 {
                         order_id,
                         remaining_size,
                         cancel_reason: option::some(
@@ -1201,7 +1203,7 @@ module aptos_experimental::order_placement {
                 };
             };
         };
-        OrderMatchResult {
+        OrderMatchResult::V1 {
             order_id,
             remaining_size,
             cancel_reason: option::none(),
