@@ -120,7 +120,7 @@ pub fn find_linearly_dependent_variables(
 
 /// We use the Least Squares solution to input into the LHS to get what we
 /// call as the Computed Time. We compare this against the LHS (the Actual Time) and
-/// check if it it varies by a certain amount.
+/// check if it varies by a certain amount.
 ///
 /// ### Arguments
 ///
