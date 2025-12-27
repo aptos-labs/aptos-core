@@ -14,7 +14,6 @@ bonding_curve_launchpad = "0x650"
 deployer = "0xaaa"
 swap = "0xcafe"
 
-
 [dependencies.AptosFramework]
 git = "https://github.com/aptos-labs/aptos-framework.git"
 rev = "bbf569abd260d94bc30fe96da297d2aecb193644"
