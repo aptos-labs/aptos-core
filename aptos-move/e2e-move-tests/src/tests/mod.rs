@@ -46,6 +46,7 @@ mod metadata;
 mod mint_nft;
 mod missing_gas_parameter;
 mod module_event;
+mod move_executor_coverage;
 mod move_feature_gating;
 mod new_integer_types;
 mod nft_dao;

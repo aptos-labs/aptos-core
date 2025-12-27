@@ -21,8 +21,6 @@ pub mod tracing;
 pub mod config;
 pub mod module_traversal;
 
-// Only include debugging functionality in debug builds
-#[cfg(any(debug_assertions, feature = "debugging"))]
 mod debug;
 
 mod access_control;

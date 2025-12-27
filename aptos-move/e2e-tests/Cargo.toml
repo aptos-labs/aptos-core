@@ -17,7 +17,7 @@ anyhow = { workspace = true }
 aptos-abstract-gas-usage = { workspace = true }
 aptos-bitvec = { workspace = true }
 aptos-block-executor = { workspace = true }
-aptos-cached-packages ={ workspace = true }
+aptos-cached-packages = { workspace = true }
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
 aptos-framework = { workspace = true }
 aptos-gas-algebra = { workspace = true }
@@ -42,6 +42,7 @@ goldenfile = { workspace = true }
 move-binary-format = { workspace = true }
 move-command-line-common = { workspace = true }
 move-core-types = { workspace = true, features = ["fuzzing"] }
+move-coverage = { workspace = true }
 move-ir-compiler = { workspace = true }
 move-model = { workspace = true }
 move-vm-runtime = { workspace = true }

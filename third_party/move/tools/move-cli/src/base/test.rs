@@ -22,7 +22,7 @@ use move_unit_test::{
     test_reporter::{UnitTestFactory, UnitTestFactoryWithCostTable},
     UnitTestingConfig,
 };
-use move_vm_runtime::tracing::{LOGGING_FILE_WRITER, TRACING_ENABLED};
+use move_vm_runtime::tracing;
 use move_vm_test_utils::gas_schedule::CostTable;
 // if unix
 #[cfg(target_family = "unix")]
@@ -38,6 +38,7 @@ use std::{
     path::{Path, PathBuf},
     process::ExitStatus,
 };
+
 // if not windows nor unix
 #[cfg(not(any(target_family = "windows", target_family = "unix")))]
 compile_error!("Unsupported OS, currently we only support windows and unix family");
@@ -278,11 +279,9 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
 
     cleanup_trace();
 
-    // If we need to compute test coverage set the VM tracking environment variable since we will
-    // need this trace to construct the coverage information.
+    // If we need to compute test coverage, enable tracing.
     if compute_coverage {
-        // TODO: Audit that the environment access only happens in single-threaded code.
-        unsafe { std::env::set_var("MOVE_VM_TRACE", &trace_path) };
+        tracing::enable_tracing(Some(&trace_path.display().to_string()))
     }
 
     // Run the tests. If any of the tests fail, then we don't produce a coverage report, so cleanup
@@ -306,10 +305,7 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
 
     // Compute the coverage map. This will be used by other commands after this.
     if compute_coverage && !no_tests {
-        if *TRACING_ENABLED {
-            let buf_writer = &mut *LOGGING_FILE_WRITER.lock().unwrap();
-            buf_writer.flush().unwrap();
-        }
+        tracing::flush_tracing_buffer();
         let coverage_map = CoverageMap::from_trace_file(&trace_path)?;
         output_map_to_file(&coverage_map_path, &coverage_map)?;
     }

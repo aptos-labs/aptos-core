@@ -645,7 +645,8 @@ impl TestRunConfig {
                 verifier_config: VerifierConfig::production(),
                 paranoid_type_checks: true,
                 enable_enum_option: false,
-                ..VMConfig::default()
+                enable_debugging: true,
+                ..VMConfig::default_for_test()
             },
             use_masm: true,
             echo: true,
