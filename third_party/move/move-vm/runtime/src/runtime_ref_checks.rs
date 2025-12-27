@@ -265,6 +265,7 @@ enum CallKind {
 pub(crate) trait RuntimeRefCheck {
     /// Transitions the reference check state before executing a bytecode instruction.
     fn pre_execution_transition(
+        function: &LoadedFunction,
         frame: &Frame,
         instruction: &Instruction,
         ref_state: &mut RefCheckState,
@@ -272,6 +273,7 @@ pub(crate) trait RuntimeRefCheck {
 
     /// Transitions the reference check state after executing a bytecode instruction.
     fn post_execution_transition(
+        function: &LoadedFunction,
         frame: &Frame,
         instruction: &Instruction,
         ref_state: &mut RefCheckState,
@@ -317,6 +319,7 @@ pub(crate) struct FullRuntimeRefCheck;
 
 impl RuntimeRefCheck for NoRuntimeRefCheck {
     fn pre_execution_transition(
+        _function: &LoadedFunction,
         _frame: &Frame,
         _instruction: &Instruction,
         _ref_state: &mut RefCheckState,
@@ -325,6 +328,7 @@ impl RuntimeRefCheck for NoRuntimeRefCheck {
     }
 
     fn post_execution_transition(
+        _function: &LoadedFunction,
         _frame: &Frame,
         _instruction: &Instruction,
         _ref_state: &mut RefCheckState,
@@ -369,6 +373,7 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
     /// It may be preferred to have as many transitions in the `post_execution_transition`, because
     /// gas is charged during execution, but we may want to validate this preference.
     fn pre_execution_transition(
+        function: &LoadedFunction,
         frame: &Frame,
         instruction: &Instruction,
         ref_state: &mut RefCheckState,
@@ -378,14 +383,48 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
             Call(_) | CallGeneric(_) | Branch(_) => {
                 // `Call` and `CallGeneric` are handled by calling `core_call_transition` elsewhere
             },
-            BrFalse(_) | BrTrue(_) | CallClosure(_) | Abort => {
+            BrFalse(_) | BrTrue(_) | CallClosure(_) => {
+                // If we are in borrow field mut api, we skip pre execution transition
+                if function
+                    .function
+                    .borrow_field_mut_api_offset_opt()
+                    .is_some()
+                {
+                    return Ok(());
+                }
                 // remove the top value from the shadow stack
                 let _ = ref_state.pop_from_shadow_stack()?;
             },
+            Abort => {
+                // If we are in borrow field mut api, we skip pre execution transition
+                if function
+                    .function
+                    .borrow_field_mut_api_offset_opt()
+                    .is_some()
+                {
+                    return Ok(());
+                }
+            },
             Ret => {
+                // If we are in borrow field mut api, we skip pre execution transition
+                if function
+                    .function
+                    .borrow_field_mut_api_offset_opt()
+                    .is_some()
+                {
+                    return Ok(());
+                }
                 ref_state.return_(frame.function.return_tys().len())?;
             },
             ReadRef => {
+                // If we are in borrow field mut api, we skip pre execution transition
+                if function
+                    .function
+                    .borrow_field_mut_api_offset_opt()
+                    .is_some()
+                {
+                    return Ok(());
+                }
                 ref_state.pop_ref_push_non_ref()?;
             },
             StLoc(_)
@@ -489,12 +528,21 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
     }
 
     fn post_execution_transition(
+        function: &LoadedFunction,
         frame: &Frame,
         instruction: &Instruction,
         ref_state: &mut RefCheckState,
         ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
         use Instruction::*;
+        // skip post execution transition if we are in borrow field mut api
+        if function
+            .function
+            .borrow_field_mut_api_offset_opt()
+            .is_some()
+        {
+            return Ok(());
+        }
         match instruction {
             Pop => {
                 let top = ref_state.pop_from_shadow_stack()?;
@@ -1783,6 +1831,10 @@ impl RefCheckState {
         function: &LoadedFunction,
         mask: ClosureMask,
     ) -> PartialVMResult<()> {
+        // when calling a borrow field mut api, we directly check mutably borrowing the field at offset
+        if let Some(offset) = function.function.borrow_field_mut_api_offset_opt() {
+            return self.borrow_child_with_label::<true>(offset as usize);
+        }
         // Keep track of all reference argument's IDs.
         let mut ref_arg_ids = Vec::new();
         // Keep track of mutable reference param indexes.
