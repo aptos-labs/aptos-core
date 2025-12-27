@@ -175,8 +175,11 @@ pub(crate) enum GlobalDataStatus {
     Dirty,
 }
 
-/// A Move reference pointing to an element in a container. Used only for primitive types, e.g.,
-/// vectors of integers or an integer field in a struct.
+/// A Move reference pointing to an element in a container.
+///
+/// This is used for non-container values stored directly in containers (e.g., primitive scalars,
+/// addresses, delayed values, or closures). Container values (structs/vectors/locals) use
+/// [`ContainerRef`] instead.
 #[derive(Debug)]
 pub(crate) struct IndexedRef {
     idx: u32,
@@ -423,11 +426,13 @@ impl Container {
                     .ok_or_else(|| {
                         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                             .with_sub_status(EINDEXED_REF_TAG_MISMATCH)
+                            .with_message("invalid enum tag".to_string())
                     })
             },
             _ => Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_sub_status(EINDEXED_REF_TAG_MISMATCH),
+                    .with_sub_status(EINDEXED_REF_TAG_MISMATCH)
+                    .with_message("expected struct enum container".to_string()),
             ),
         }
     }
@@ -690,80 +695,92 @@ impl Container {
 }
 
 impl IndexedRef {
-    /*
-     * Runtime enum-variant tag guard for IndexedRef
-     *
-     * Motivation
-     * ----------
-     * Move’s bytecode verifier enforces reference-safety (no aliasing violations, no destructive
-     * updates through aliases, etc.). However, if a verifier bug allows an enum value to be overwritten
-     * via a mutable alias while an immutable field reference to that enum is still live, a classic “stale field reference”
-     * can arise: the reference was created when the enum had variant A, but later the enum is rewritten to variant B, so reading
-     * the field at payload index 1 would be a type confusion.
-     *
-     * Idea
-     * ----
-     * Whenever a field reference is created via `borrow_variant_field`, the VM captures the
-     * current enum variant tag (a u16 stored at field 0 in the Struct backing the enum) and
-     * stores it in the `IndexedRef` (as `self.tag = Some(tag)`). On every later use of that
-     * `IndexedRef`, we re-read the current tag from the same Struct and compare it with the
-     * stored tag. If they differ, we abort with an invariant violation (“invalid enum tag”).
-     *
-     * Scope
-     * -----
-     * - Tagging applies only to `IndexedRef`s produced by `borrow_variant_field`. Other
-     *   `IndexedRef`s (e.g., from locals, generic/specialized vectors of primitives, closures)
-     *   have `self.tag = None` and skip this check.
-     * - The check is enforced at all observable uses of a tagged `IndexedRef`:
-     *   `read_ref`, `write_ref`, `equals`, `compare`, and value swaps that operate on
-     *   `IndexedRef`s.
-     *
-     * Precision and Non-Goals
-     * -----------------------
-     * - This is a local, value-layer guard. It does not replace the verifier or the runtime
-     *   alias checker; it simply makes the “stale enum-field reference” primitive harmless by
-     *   refusing to read/write through it after a variant change.
-     * - Moving containers (e.g., `mem::swap` of locals, `vec_swap` of inner vectors) does not
-     *   change the Struct content or its tag. Because `container_ref` points to the Struct
-     *   itself (not the outer vector slot), such moves do not trigger the guard and uses
-     *   continue to succeed.
-     * - Overwriting an enum in place through a mutable alias (e.g., `vec_mut_borrow` + `write_ref`,
-     *   or a mutable local/field ref) changes the tag. Any later use of the previously created,
-     *   tagged `IndexedRef` will abort before a type-confusing read or write can occur.
-     * - Reborrows/forwarding preserve the stored tag (we copy the `IndexedRef`, including its tag),
-     *   so the guard still triggers on use if the variant changes in the meantime.
-     *
-     * Error Semantics
-     * ---------------
-     * - On mismatch we return `UNKNOWN_INVARIANT_VIOLATION_ERROR` with sub-status
-     *   `EINDEXED_REF_TAG_MISMATCH` and message "invalid enum tag". This reflects an internal
-     *   safety violation observable only when code mutates an enum behind a live, tagged reference.
-     *
-     * Examples
-     * --------
-     * 1) Variant overwrite (should abort):
-     *    - r = borrow_variant_field Foo, A::x         // r.tag = Some(A)
-     *    - ... obtain &mut to the same enum ...
-     *    - pack_variant Foo, B; write_ref             // rewrite enum to variant B
-     *    - read_ref r                                 // abort: "invalid enum tag"
-     *
-     * 2) Container moves (should succeed):
-     *    - r = borrow_variant_field Foo, A::x         // r.tag = Some(A)
-     *    - vec_swap<vector<Foo>> / mem::swap          // move containers; do not rewrite enum
-     *    - read_ref r                                 // OK: tag unchanged
-     *
-     * Relationship to the bytecode verifier
-     * ---------------------------------------------------
-     * If the verifier’s aliasing rules hold, this guard is redundant and always passes. If, however,
-     * an implementation defect allows a destructive update through an alias (e.g., a bytecode verifier bug
-     * ), this guard dynamically prevents the resulting type confusion at the point of use.
-     *
-     * Clarification on “trusted code” (runtime)
-     * ------------------------------------------------------
-     * This tag guard is implemented in the value layer and is unconditional: it runs regardless
-     * of whether a function is marked trusted or which paranoid flags are enabled.
-     *
-     */
+    /// Runtime enum-variant tag guard for IndexedRef
+    ///
+    /// Motivation
+    /// ----------
+    /// In the absence of this guard, using a field reference from an enum after that enum has been
+    /// rewritten to a different variant can violate VM invariants: the stored index may no longer refer
+    /// to the same logical field (and if the new variant has fewer fields, it can even become out-of-bounds
+    /// and panic).
+    ///
+    /// Even when the index stays in-bounds, the value at that position may have a different type
+    /// (e.g., a struct B instead of a struct A). `IndexedRef` itself does not carry static type information; correctness
+    /// relies on runtime type checks in paranoid mode and on the bytecode verifier’s guarantees otherwise.
+    ///
+    /// Move’s bytecode verifier enforces reference-safety (no aliasing violations, no destructive
+    /// updates through aliases, etc.). However, if a verifier bug allows an enum value to be overwritten
+    /// via a mutable alias while a field reference to that enum is still live (either immutable or mutable), a classic “stale field reference”
+    /// can arise: the reference was created when the enum had variant A, but later that same enum value is rewritten in place to its B variant.
+    /// The stale `IndexedRef` still points into the enum container and would otherwise result in type confusion.
+    ///
+    /// Idea
+    /// ----
+    /// Whenever a field reference is created via `borrow_variant_field`, the VM captures the
+    /// current enum variant tag and stores it in the `IndexedRef` (as `self.tag = Some(tag)`).
+    ///
+    /// Note on Enum Layout:
+    /// Enums are represented as Structs where the first field (field 0) is a `u16` representing
+    /// the variant tag, followed by the fields of that variant.
+    ///
+    /// On every later use of that `IndexedRef`, we re-read the current tag from the same Struct
+    /// (checking field 0) and compare it with the stored tag. If they differ, we abort with an
+    /// invariant violation (“invalid enum tag”).
+    ///
+    /// Scope
+    /// -----
+    /// - Tagging applies only to `IndexedRef`s produced by `borrow_variant_field`. Other
+    ///   `IndexedRef`s (e.g., from locals, generic/specialized vectors of primitives, closures)
+    ///   have `self.tag = None` and skip this check.
+    /// - The check is enforced at all observable uses of a tagged `IndexedRef`:
+    ///   `read_ref`, `write_ref`, `equals`, `compare`, and value swaps that operate on
+    ///   `IndexedRef`s.
+    ///
+    /// Precision and Non-Goals
+    /// -----------------------
+    /// - This is a local, value-layer guard. It does not replace the verifier or the runtime
+    ///   alias checker; it simply makes the “stale enum-field reference” primitive harmless by
+    ///   refusing to read/write through it after a variant change.
+    /// - Moving the enum value around without rewriting it (e.g., `VecSwap`/`vec_swap` of elements inside a `vector<T>`,
+    ///   or host-side swaps such as Native `mem::swap`) does not change the underlying enum container or its tag. Because `container_ref`
+    ///   holds a reference-counted pointer to the underlying container (not to the variable slot where it is stored),
+    ///   such moves do not trigger the guard and uses continue to succeed.
+    /// - Overwriting an enum in place through a mutable alias (e.g., `vec_mut_borrow` + `write_ref`,
+    ///   or a mutable local/field ref) changes the tag. Any later use of the previously created,
+    ///   tagged `IndexedRef` will abort before a type-confusing read or write can occur.
+    /// - Reborrows/Copies preserve the stored tag (we copy the `IndexedRef`, including its tag),
+    ///   so the guard still triggers on use if the variant changes in the meantime.
+    ///
+    /// Error Semantics
+    /// ---------------
+    /// - On tag mismatch we return `UNKNOWN_INVARIANT_VIOLATION_ERROR` with sub-status
+    ///   `EINDEXED_REF_TAG_MISMATCH` and message "invalid enum tag". This reflects an internal
+    ///   safety violation observable only when code mutates an enum behind a live, tagged reference.
+    ///
+    /// Examples
+    /// --------
+    /// 1) Variant overwrite (should abort):
+    ///    - r = borrow_variant_field Foo, A::x         // r.tag = Some(A)
+    ///    - ... obtain &mut to the same enum ...       // because of a bug in the verifier or runtime
+    ///    - ... overwrite the enum with a different variant ...
+    ///    - read_ref r                                 // abort: "invalid enum tag"
+    ///
+    /// 2) Container moves (should succeed):
+    ///    - r = borrow_variant_field Foo, A::x         // r.tag = Some(A)
+    ///    - vec_swap<vector<Foo>> / Native `mem::swap`   // move containers; do not rewrite enum
+    ///    - read_ref r                                 // OK: tag unchanged
+    ///
+    /// Relationship to the bytecode verifier
+    /// -----------------------------------
+    /// If the verifier’s aliasing rules hold, this guard is redundant and always passes. If, however,
+    /// an implementation defect allows a destructive update through an alias (e.g., a bytecode verifier bug),
+    /// this guard dynamically prevents the resulting type confusion at the point of use.
+    ///
+    /// Clarification on “trusted code” (runtime)
+    /// ------------------------------------------------------
+    /// This tag guard is implemented in the value layer and is unconditional: it runs regardless
+    /// of whether a function is marked trusted or which paranoid flags are enabled.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn check_tag(&self) -> PartialVMResult<()> {
         if let Some(tag) = self.tag {
             let current_tag = self.container_ref.container().get_enum_tag()?;
@@ -2047,6 +2064,12 @@ impl Reference {
  **************************************************************************************/
 
 impl ContainerRef {
+    /// Borrows element `idx` from this container.
+    ///
+    /// `tag` is only used when producing an [`IndexedRef`]. When `Some(tag)`, it records the enum
+    /// variant tag observed at borrow time (used by `borrow_variant_field`) so that later uses of the
+    /// returned reference can detect if the enum was rewritten to a different variant. For non-variant
+    /// borrows, callers should pass `None`. (Ignored when this returns a [`ContainerRef`].)
     #[cfg_attr(feature = "force-inline", inline(always))]
     fn borrow_elem(&self, idx: usize, tag: Option<u16>) -> PartialVMResult<Value> {
         let len = self.container().len();
@@ -2118,8 +2141,8 @@ impl ContainerRef {
                 }
             },
 
-            // Borrowing from locals or structs produces IndexedRef only for primitive types. If
-            // element is also a container, we must produce ContainerRef.
+            // Borrowing from locals or structs produces IndexedRef for non-container values (e.g., primitives,
+            // closures, delayed values). If the element is a container, we must produce ContainerRef.
             Container::Locals(r) | Container::Struct(r) => {
                 let v = r.borrow();
                 match &v[idx] {
