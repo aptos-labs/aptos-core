@@ -89,8 +89,8 @@ module aptos_framework::dkg {
     /// Abort if DKG is not in progress.
     public(friend) fun finish(transcript: vector<u8>) acquires DKGState {
         let dkg_state = borrow_global_mut<DKGState>(@aptos_framework);
-        assert!(option::is_some(&dkg_state.in_progress), error::invalid_state(EDKG_NOT_IN_PROGRESS));
-        let session = option::extract(&mut dkg_state.in_progress);
+        assert!(dkg_state.in_progress.is_some(), error::invalid_state(EDKG_NOT_IN_PROGRESS));
+        let session = dkg_state.in_progress.extract();
         session.transcript = transcript;
         dkg_state.last_completed = option::some(session);
         dkg_state.in_progress = option::none();

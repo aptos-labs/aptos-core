@@ -32,7 +32,7 @@ module aptos_framework::rate_limiter {
     public fun request(limiter: &mut RateLimiter, num_token_requested: u64): bool {
         refill(limiter);
         if (limiter.current_amount >= num_token_requested) {
-            limiter.current_amount = limiter.current_amount - num_token_requested;
+            limiter.current_amount -= num_token_requested;
             true
         } else {
             false
@@ -50,7 +50,7 @@ module aptos_framework::rate_limiter {
             limiter.current_amount = limiter.capacity;
             limiter.fractional_accumulated = 0;
         } else {
-            limiter.current_amount = limiter.current_amount + new_tokens;
+            limiter.current_amount += new_tokens;
             // Update the fractional amount accumulated for the next refill cycle
             limiter.fractional_accumulated = accumulated_amount % limiter.refill_interval;
         };

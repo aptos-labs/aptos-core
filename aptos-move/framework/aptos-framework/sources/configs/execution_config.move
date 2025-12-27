@@ -3,7 +3,6 @@
 module aptos_framework::execution_config {
     use aptos_framework::config_buffer;
     use std::error;
-    use std::vector;
     use aptos_framework::chain_status;
 
     use aptos_framework::reconfiguration;
@@ -27,7 +26,7 @@ module aptos_framework::execution_config {
         system_addresses::assert_aptos_framework(account);
         chain_status::assert_genesis();
 
-        assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
+        assert!(config.length() > 0, error::invalid_argument(EINVALID_CONFIG));
 
         if (exists<ExecutionConfig>(@aptos_framework)) {
             let config_ref = &mut borrow_global_mut<ExecutionConfig>(@aptos_framework).config;
@@ -47,7 +46,7 @@ module aptos_framework::execution_config {
     /// ```
     public fun set_for_next_epoch(account: &signer, config: vector<u8>) {
         system_addresses::assert_aptos_framework(account);
-        assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
+        assert!(config.length() > 0, error::invalid_argument(EINVALID_CONFIG));
         config_buffer::upsert(ExecutionConfig { config });
     }
 

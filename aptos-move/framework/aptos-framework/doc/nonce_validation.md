@@ -327,7 +327,7 @@
 <pre><code><b>public</b> entry <b>fun</b> <a href="nonce_validation.md#0x1_nonce_validation_add_nonce_buckets">add_nonce_buckets</a>(count: u64) <b>acquires</b> <a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a> {
     <b>assert</b>!(<b>exists</b>&lt;<a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a>&gt;(@aptos_framework), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="nonce_validation.md#0x1_nonce_validation_E_NONCE_HISTORY_DOES_NOT_EXIST">E_NONCE_HISTORY_DOES_NOT_EXIST</a>));
     <b>let</b> nonce_history = &<b>mut</b> <a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a>[@aptos_framework];
-    for (i in 0..count) {
+    for (_i in 0..count) {
         <b>if</b> (nonce_history.next_key &lt;= <a href="nonce_validation.md#0x1_nonce_validation_NUM_BUCKETS">NUM_BUCKETS</a>) {
             <b>if</b> (!nonce_history.nonce_table.contains(nonce_history.next_key)) {
                 nonce_history.nonce_table.add(
@@ -335,7 +335,7 @@
                     <a href="nonce_validation.md#0x1_nonce_validation_empty_bucket">empty_bucket</a>(<b>true</b>)
                 );
             };
-            nonce_history.next_key = nonce_history.next_key + 1;
+            nonce_history.next_key += 1;
         }
     }
 }
@@ -381,7 +381,7 @@
             <a href="nonce_validation.md#0x1_nonce_validation_empty_bucket">empty_bucket</a>(<b>false</b>)
         );
     };
-    <b>let</b> bucket = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> nonce_history.nonce_table, bucket_index);
+    <b>let</b> bucket = nonce_history.nonce_table.borrow_mut(bucket_index);
 
     <b>let</b> existing_exp_time = bucket.nonce_to_exp_time_map.get(&nonce_key);
     <b>if</b> (existing_exp_time.is_some()) {
@@ -423,7 +423,7 @@
         } <b>else</b> {
             <b>break</b>;
         };
-        i = i + 1;
+        i += 1;
     };
 
     // Insert the (<b>address</b>, nonce) pair in the bucket.
