@@ -3,12 +3,13 @@
 /// in a single transaction, improving efficiency for market makers.
 module aptos_experimental::market_bulk_order {
     friend aptos_experimental::dead_mans_switch_operations;
+
     use std::signer;
-    use aptos_experimental::bulk_order_book_types::{
+    use aptos_trading::bulk_order_types::{
         new_bulk_order_request, destroy_bulk_order_place_response
     };
+    use aptos_trading::order_book_types::OrderIdType;
     use aptos_experimental::market_types::{Self, MarketClearinghouseCallbacks, Market};
-    use aptos_experimental::order_book_types::OrderIdType;
 
     const E_SEQUENCE_NUMBER_MISMATCH: u64 = 0;
     const E_CLEARINGHOUSE_VALIDATION_FAILED: u64 = 1;

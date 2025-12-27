@@ -1,26 +1,26 @@
 /// (work in progress)
 module aptos_experimental::pending_order_book_index {
+    friend aptos_experimental::single_order_book;
+
     use std::vector;
     use aptos_std::math64;
     use aptos_framework::timestamp;
     use aptos_framework::big_ordered_map::BigOrderedMap;
-    use aptos_experimental::order_book_types::{
+    use aptos_trading::order_book_types::{
         OrderIdType,
-        UniqueIdxType,
-        new_default_big_ordered_map
+        IncreasingIdxType,
+        TriggerCondition,
     };
-    use aptos_experimental::order_book_types::TriggerCondition;
-
-    friend aptos_experimental::single_order_book;
+    use aptos_experimental::order_book_utils;
 
     struct PendingOrderKey has store, copy, drop {
         price: u64,
-        tie_breaker: UniqueIdxType
+        tie_breaker: IncreasingIdxType
     }
 
     struct PendingTimeKey has store, copy, drop {
         time: u64,
-        tie_breaker: UniqueIdxType
+        tie_breaker: IncreasingIdxType
     }
 
     enum PendingOrderBookIndex has store {
@@ -36,16 +36,16 @@ module aptos_experimental::pending_order_book_index {
 
     public(friend) fun new_pending_order_book_index(): PendingOrderBookIndex {
         PendingOrderBookIndex::V1 {
-            price_move_up_index: new_default_big_ordered_map(),
-            price_move_down_index: new_default_big_ordered_map(),
-            time_based_index: new_default_big_ordered_map()
+            price_move_up_index: order_book_utils::new_default_big_ordered_map(),
+            price_move_down_index: order_book_utils::new_default_big_ordered_map(),
+            time_based_index: order_book_utils::new_default_big_ordered_map()
         }
     }
 
     public(friend) fun cancel_pending_order(
         self: &mut PendingOrderBookIndex,
         trigger_condition: TriggerCondition,
-        unique_priority_idx: UniqueIdxType,
+        unique_priority_idx: IncreasingIdxType,
     ) {
         let (price_move_down_index, price_move_up_index, time_based_index) =
             trigger_condition.index();
@@ -77,7 +77,7 @@ module aptos_experimental::pending_order_book_index {
         self: &mut PendingOrderBookIndex,
         order_id: OrderIdType,
         trigger_condition: TriggerCondition,
-        unique_priority_idx: UniqueIdxType,
+        unique_priority_idx: IncreasingIdxType,
     ) {
         // Add this order to the pending order book index
         let (price_move_down_index, price_move_up_index, time_based_index) =

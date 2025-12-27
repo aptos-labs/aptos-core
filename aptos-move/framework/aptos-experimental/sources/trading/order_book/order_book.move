@@ -8,13 +8,11 @@ module aptos_experimental::order_book {
 
     use std::option::Option;
     use std::string::String;
-    use aptos_experimental::bulk_order_book_types::{BulkOrder, BulkOrderRequest, BulkOrderPlaceResponse};
+    use aptos_trading::order_book_types::{OrderIdType, OrderMatch, OrderMatchDetails, TriggerCondition, TimeInForce};
+    use aptos_trading::bulk_order_types::{BulkOrder, BulkOrderRequest, BulkOrderPlaceResponse};
+    use aptos_trading::single_order_types::{SingleOrder, SingleOrderRequest};
     use aptos_experimental::bulk_order_book::{BulkOrderBook, new_bulk_order_book};
-    use aptos_experimental::single_order_book::{SingleOrderBook, new_single_order_book, SingleOrderRequest};
-    use aptos_experimental::order_book_types::{OrderIdType, OrderMatch, OrderMatchDetails};
-    use aptos_experimental::single_order_types::SingleOrder;
-    use aptos_experimental::order_book_types::TriggerCondition;
-    use aptos_experimental::order_book_types::TimeInForce;
+    use aptos_experimental::single_order_book::{SingleOrderBook, new_single_order_book};
     use aptos_experimental::price_time_index::{PriceTimeIndex, new_price_time_idx};
 
     const E_REINSERT_ORDER_MISMATCH: u64 = 8;

@@ -717,7 +717,7 @@ else it is added to the active order book. The API aborts if it's not a maker or
     self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> PriceTimeIndex, order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">SingleOrderRequest</a>&lt;M&gt;
 ) {
     <b>let</b> ascending_idx =
-        new_unique_idx_type(<a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">transaction_context::monotonically_increasing_counter</a>());
+        new_increasing_idx_type(<a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">transaction_context::monotonically_increasing_counter</a>());
     <b>if</b> (order_req.trigger_condition.is_some()) {
         <b>return</b> self.<a href="single_order_book.md#0x7_single_order_book_place_pending_order_internal">place_pending_order_internal</a>(order_req, ascending_idx);
     };
@@ -735,7 +735,7 @@ else it is added to the active order book. The API aborts if it's not a maker or
 
 
 
-<pre><code><b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_ready_maker_order_with_unique_idx">place_ready_maker_order_with_unique_idx</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">single_order_book::SingleOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">single_order_book::SingleOrderRequest</a>&lt;M&gt;, ascending_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>)
+<pre><code><b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_ready_maker_order_with_unique_idx">place_ready_maker_order_with_unique_idx</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">single_order_book::SingleOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">single_order_book::SingleOrderRequest</a>&lt;M&gt;, ascending_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdxType</a>)
 </code></pre>
 
 
@@ -748,7 +748,7 @@ else it is added to the active order book. The API aborts if it's not a maker or
     self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;,
     price_time_idx: &<b>mut</b> PriceTimeIndex,
     order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">SingleOrderRequest</a>&lt;M&gt;,
-    ascending_idx: UniqueIdxType
+    ascending_idx: IncreasingIdxType
 ) {
     <b>let</b> order =
         new_single_order(
@@ -847,7 +847,7 @@ it is added to the order book, if it exists, its size is updated.
 
 
 
-<pre><code><b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_pending_order_internal">place_pending_order_internal</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">single_order_book::SingleOrderBook</a>&lt;M&gt;, order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">single_order_book::SingleOrderRequest</a>&lt;M&gt;, ascending_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>)
+<pre><code><b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_pending_order_internal">place_pending_order_internal</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">single_order_book::SingleOrderBook</a>&lt;M&gt;, order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">single_order_book::SingleOrderRequest</a>&lt;M&gt;, ascending_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdxType</a>)
 </code></pre>
 
 
@@ -859,7 +859,7 @@ it is added to the order book, if it exists, its size is updated.
 <pre><code><b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_pending_order_internal">place_pending_order_internal</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;,
     order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">SingleOrderRequest</a>&lt;M&gt;,
-    ascending_idx: UniqueIdxType
+    ascending_idx: IncreasingIdxType
 ) {
     <b>let</b> order_id = order_req.order_id;
     <b>let</b> order =

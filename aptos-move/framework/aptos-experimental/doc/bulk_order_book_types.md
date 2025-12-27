@@ -1,7 +1,7 @@
 
 <a id="0x7_bulk_order_book_types"></a>
 
-# Module `0x7::bulk_order_book_types`
+# Module `0x7::bulk_order_types`
 
 
 <a id="@Bulk_Order_Book_Types_Module_0"></a>
@@ -42,9 +42,9 @@ price levels with associated sizes.
 
 ### Error Codes:
 
-- <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_EUNEXPECTED_MATCH_PRICE">EUNEXPECTED_MATCH_PRICE</a></code>: Unexpected price during order matching
-- <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_EUNEXPECTED_MATCH_SIZE">EUNEXPECTED_MATCH_SIZE</a></code>: Unexpected size during order matching
-- <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a></code>: Order mismatch during reinsertion validation
+- <code><a href="bulk_order_types.md#0x7_bulk_order_book_types_EUNEXPECTED_MATCH_PRICE">EUNEXPECTED_MATCH_PRICE</a></code>: Unexpected price during order matching
+- <code><a href="bulk_order_types.md#0x7_bulk_order_book_types_EUNEXPECTED_MATCH_SIZE">EUNEXPECTED_MATCH_SIZE</a></code>: Unexpected size during order matching
+- <code><a href="bulk_order_types.md#0x7_bulk_order_book_types_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a></code>: Order mismatch during reinsertion validation
 
 
 <a id="@Usage_Example:_5"></a>
@@ -53,7 +53,7 @@ price levels with associated sizes.
 
 ```move
 // Create a new bulk order
-let order = bulk_order_book_types::new_bulk_order(
+let order = bulk_order_types::new_bulk_order(
 order_id,
 @trader,
 unique_priority_idx,
@@ -167,7 +167,7 @@ Request structure for placing a new bulk order with multiple price levels.
 Bulk orders do not support TimeInForce options and behave as maker orders only
 
 
-<pre><code>enum <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequest">BulkOrderRequest</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> <b>copy</b>, drop
+<pre><code>enum <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderRequest">BulkOrderRequest</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> <b>copy</b>, drop
 </code></pre>
 
 
@@ -264,7 +264,7 @@ both original and remaining sizes for tracking purposes.
 - <code>metadata</code>: Additional metadata for the order
 
 
-<pre><code>enum <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> <b>copy</b>, drop, store
+<pre><code>enum <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -295,7 +295,7 @@ both original and remaining sizes for tracking purposes.
 
 </dd>
 <dt>
-<code>unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a></code>
+<code>unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdxType</a></code>
 </dt>
 <dd>
 
@@ -357,7 +357,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<pre><code><b>struct</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> <b>copy</b>, drop
+<pre><code><b>struct</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> <b>copy</b>, drop
 </code></pre>
 
 
@@ -368,7 +368,7 @@ both original and remaining sizes for tracking purposes.
 
 <dl>
 <dt>
-<code>order: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;</code>
+<code>order: <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;</code>
 </dt>
 <dd>
 
@@ -414,7 +414,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<pre><code><b>struct</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequestResponse">BulkOrderRequestResponse</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> <b>copy</b>, drop
+<pre><code><b>struct</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderRequestResponse">BulkOrderRequestResponse</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> <b>copy</b>, drop
 </code></pre>
 
 
@@ -425,7 +425,7 @@ both original and remaining sizes for tracking purposes.
 
 <dl>
 <dt>
-<code>request: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequest">bulk_order_book_types::BulkOrderRequest</a>&lt;M&gt;</code>
+<code>request: <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderRequest">bulk_order_types::BulkOrderRequest</a>&lt;M&gt;</code>
 </dt>
 <dd>
 
@@ -444,7 +444,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<pre><code><b>const</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>: u64 = 3;
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>: u64 = 3;
 </code></pre>
 
 
@@ -453,7 +453,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<pre><code><b>const</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_EINVLID_MM_ORDER_REQUEST">EINVLID_MM_ORDER_REQUEST</a>: u64 = 4;
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_EINVLID_MM_ORDER_REQUEST">EINVLID_MM_ORDER_REQUEST</a>: u64 = 4;
 </code></pre>
 
 
@@ -462,7 +462,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<pre><code><b>const</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_EPRICE_CROSSING">EPRICE_CROSSING</a>: u64 = 5;
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_EPRICE_CROSSING">EPRICE_CROSSING</a>: u64 = 5;
 </code></pre>
 
 
@@ -471,7 +471,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<pre><code><b>const</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_EUNEXPECTED_MATCH_PRICE">EUNEXPECTED_MATCH_PRICE</a>: u64 = 1;
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_EUNEXPECTED_MATCH_PRICE">EUNEXPECTED_MATCH_PRICE</a>: u64 = 1;
 </code></pre>
 
 
@@ -480,7 +480,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<pre><code><b>const</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_EUNEXPECTED_MATCH_SIZE">EUNEXPECTED_MATCH_SIZE</a>: u64 = 2;
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_EUNEXPECTED_MATCH_SIZE">EUNEXPECTED_MATCH_SIZE</a>: u64 = 2;
 </code></pre>
 
 
@@ -489,7 +489,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<pre><code><b>const</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_ASK_LENGTH_MISMATCH">E_ASK_LENGTH_MISMATCH</a>: u64 = 7;
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_E_ASK_LENGTH_MISMATCH">E_ASK_LENGTH_MISMATCH</a>: u64 = 7;
 </code></pre>
 
 
@@ -498,7 +498,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<pre><code><b>const</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_ASK_ORDER_INVALID">E_ASK_ORDER_INVALID</a>: u64 = 13;
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_E_ASK_ORDER_INVALID">E_ASK_ORDER_INVALID</a>: u64 = 13;
 </code></pre>
 
 
@@ -507,7 +507,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<pre><code><b>const</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_ASK_SIZE_ZERO">E_ASK_SIZE_ZERO</a>: u64 = 11;
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_E_ASK_SIZE_ZERO">E_ASK_SIZE_ZERO</a>: u64 = 11;
 </code></pre>
 
 
@@ -516,7 +516,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<pre><code><b>const</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_BID_LENGTH_MISMATCH">E_BID_LENGTH_MISMATCH</a>: u64 = 6;
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_E_BID_LENGTH_MISMATCH">E_BID_LENGTH_MISMATCH</a>: u64 = 6;
 </code></pre>
 
 
@@ -525,7 +525,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<pre><code><b>const</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_BID_ORDER_INVALID">E_BID_ORDER_INVALID</a>: u64 = 12;
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_E_BID_ORDER_INVALID">E_BID_ORDER_INVALID</a>: u64 = 12;
 </code></pre>
 
 
@@ -534,7 +534,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<pre><code><b>const</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_BID_SIZE_ZERO">E_BID_SIZE_ZERO</a>: u64 = 10;
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_E_BID_SIZE_ZERO">E_BID_SIZE_ZERO</a>: u64 = 10;
 </code></pre>
 
 
@@ -543,7 +543,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<pre><code><b>const</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_EMPTY_ORDER">E_EMPTY_ORDER</a>: u64 = 9;
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_E_EMPTY_ORDER">E_EMPTY_ORDER</a>: u64 = 9;
 </code></pre>
 
 
@@ -571,14 +571,14 @@ Creates a new bulk order with the specified parameters.
 ### Returns:
 
 A tuple containing:
-- <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;</code>: The created bulk order with non-crossing levels
+- <code><a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;</code>: The created bulk order with non-crossing levels
 - <code><a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>: Cancelled bid prices (levels that crossed the spread)
 - <code><a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>: Cancelled bid sizes corresponding to cancelled prices
 - <code><a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>: Cancelled ask prices (levels that crossed the spread)
 - <code><a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>: Cancelled ask sizes corresponding to cancelled prices
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order">new_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, order_req: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequest">bulk_order_book_types::BulkOrderRequest</a>&lt;M&gt;, best_bid_price: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, best_ask_price: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;): (<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_new_bulk_order">new_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdxType</a>, order_req: <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderRequest">bulk_order_types::BulkOrderRequest</a>&lt;M&gt;, best_bid_price: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, best_ask_price: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;): (<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
 </code></pre>
 
 
@@ -587,17 +587,17 @@ A tuple containing:
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order">new_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_new_bulk_order">new_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     order_id: OrderIdType,
-    unique_priority_idx: UniqueIdxType,
-    order_req: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequest">BulkOrderRequest</a>&lt;M&gt;,
+    unique_priority_idx: IncreasingIdxType,
+    order_req: <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderRequest">BulkOrderRequest</a>&lt;M&gt;,
     best_bid_price: Option&lt;u64&gt;,
     best_ask_price: Option&lt;u64&gt;,
-): (<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;) {
+): (<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;) {
     <b>let</b> BulkOrderRequest::V1 { <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, metadata } = order_req;
     <b>let</b> creation_time_micros = <a href="../../aptos-framework/doc/timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>();
-    <b>let</b> bid_price_crossing_idx = <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_discard_price_crossing_levels">discard_price_crossing_levels</a>(&bid_prices, best_ask_price, <b>true</b>);
-    <b>let</b> ask_price_crossing_idx = <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_discard_price_crossing_levels">discard_price_crossing_levels</a>(&ask_prices, best_bid_price, <b>false</b>);
+    <b>let</b> bid_price_crossing_idx = <a href="bulk_order_types.md#0x7_bulk_order_book_types_discard_price_crossing_levels">discard_price_crossing_levels</a>(&bid_prices, best_ask_price, <b>true</b>);
+    <b>let</b> ask_price_crossing_idx = <a href="bulk_order_types.md#0x7_bulk_order_book_types_discard_price_crossing_levels">discard_price_crossing_levels</a>(&ask_prices, best_bid_price, <b>false</b>);
 
     // Extract cancelled levels (the ones that were discarded)
     <b>let</b> (cancelled_bid_prices, cancelled_bid_sizes, post_only_bid_prices, post_only_bid_sizes) = <b>if</b> (bid_price_crossing_idx &gt; 0) {
@@ -657,7 +657,7 @@ Creates a new bulk order request with the specified price levels and sizes.
 
 ### Returns:
 
-A <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequest">BulkOrderRequest</a></code> instance.
+A <code><a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderRequest">BulkOrderRequest</a></code> instance.
 
 
 <a id="@Aborts:_14"></a>
@@ -668,7 +668,7 @@ A <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderReq
 - If ask_prices and ask_sizes have different lengths
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_request">new_bulk_order_request</a>&lt;M: <b>copy</b>, drop, store&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, sequence_number: u64, bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, metadata: M): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequest">bulk_order_book_types::BulkOrderRequest</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_new_bulk_order_request">new_bulk_order_request</a>&lt;M: <b>copy</b>, drop, store&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, sequence_number: u64, bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, metadata: M): <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderRequest">bulk_order_types::BulkOrderRequest</a>&lt;M&gt;
 </code></pre>
 
 
@@ -677,7 +677,7 @@ A <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderReq
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_request">new_bulk_order_request</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_new_bulk_order_request">new_bulk_order_request</a>&lt;M: store + <b>copy</b> + drop&gt;(
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
     sequence_number: u64,
     bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
@@ -685,23 +685,23 @@ A <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderReq
     ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     metadata: M
-): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequest">BulkOrderRequest</a>&lt;M&gt; {
+): <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderRequest">BulkOrderRequest</a>&lt;M&gt; {
     <b>let</b> num_bids = bid_prices.length();
     <b>let</b> num_asks = ask_prices.length();
 
     // Basic length validation
-    <b>assert</b>!(num_bids == bid_sizes.length(), <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_BID_LENGTH_MISMATCH">E_BID_LENGTH_MISMATCH</a>);
-    <b>assert</b>!(num_asks == ask_sizes.length(), <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_ASK_LENGTH_MISMATCH">E_ASK_LENGTH_MISMATCH</a>);
-    <b>assert</b>!(num_bids &gt; 0 || num_asks &gt; 0, <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_EMPTY_ORDER">E_EMPTY_ORDER</a>);
-    <b>assert</b>!(<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_validate_not_zero_sizes">validate_not_zero_sizes</a>(&bid_sizes), <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_BID_SIZE_ZERO">E_BID_SIZE_ZERO</a>);
-    <b>assert</b>!(<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_validate_not_zero_sizes">validate_not_zero_sizes</a>(&ask_sizes), <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_ASK_SIZE_ZERO">E_ASK_SIZE_ZERO</a>);
-    <b>assert</b>!(<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_validate_price_ordering">validate_price_ordering</a>(&bid_prices, <b>true</b>), <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_BID_ORDER_INVALID">E_BID_ORDER_INVALID</a>);
-    <b>assert</b>!(<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_validate_price_ordering">validate_price_ordering</a>(&ask_prices, <b>false</b>), <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_ASK_ORDER_INVALID">E_ASK_ORDER_INVALID</a>);
+    <b>assert</b>!(num_bids == bid_sizes.length(), <a href="bulk_order_types.md#0x7_bulk_order_book_types_E_BID_LENGTH_MISMATCH">E_BID_LENGTH_MISMATCH</a>);
+    <b>assert</b>!(num_asks == ask_sizes.length(), <a href="bulk_order_types.md#0x7_bulk_order_book_types_E_ASK_LENGTH_MISMATCH">E_ASK_LENGTH_MISMATCH</a>);
+    <b>assert</b>!(num_bids &gt; 0 || num_asks &gt; 0, <a href="bulk_order_types.md#0x7_bulk_order_book_types_E_EMPTY_ORDER">E_EMPTY_ORDER</a>);
+    <b>assert</b>!(<a href="bulk_order_types.md#0x7_bulk_order_book_types_validate_not_zero_sizes">validate_not_zero_sizes</a>(&bid_sizes), <a href="bulk_order_types.md#0x7_bulk_order_book_types_E_BID_SIZE_ZERO">E_BID_SIZE_ZERO</a>);
+    <b>assert</b>!(<a href="bulk_order_types.md#0x7_bulk_order_book_types_validate_not_zero_sizes">validate_not_zero_sizes</a>(&ask_sizes), <a href="bulk_order_types.md#0x7_bulk_order_book_types_E_ASK_SIZE_ZERO">E_ASK_SIZE_ZERO</a>);
+    <b>assert</b>!(<a href="bulk_order_types.md#0x7_bulk_order_book_types_validate_price_ordering">validate_price_ordering</a>(&bid_prices, <b>true</b>), <a href="bulk_order_types.md#0x7_bulk_order_book_types_E_BID_ORDER_INVALID">E_BID_ORDER_INVALID</a>);
+    <b>assert</b>!(<a href="bulk_order_types.md#0x7_bulk_order_book_types_validate_price_ordering">validate_price_ordering</a>(&ask_prices, <b>false</b>), <a href="bulk_order_types.md#0x7_bulk_order_book_types_E_ASK_ORDER_INVALID">E_ASK_ORDER_INVALID</a>);
 
     <b>if</b> (num_bids &gt; 0 && num_asks &gt; 0) {
         // First element in bids is the highest (descending order), first element in asks is the lowest (ascending
         // order).
-        <b>assert</b>!(bid_prices[0] &lt; ask_prices[0], <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_EPRICE_CROSSING">EPRICE_CROSSING</a>);
+        <b>assert</b>!(bid_prices[0] &lt; ask_prices[0], <a href="bulk_order_types.md#0x7_bulk_order_book_types_EPRICE_CROSSING">EPRICE_CROSSING</a>);
     };
 
     <b>let</b> req = BulkOrderRequest::V1 {
@@ -727,7 +727,7 @@ A <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderReq
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_account_from_order_request">get_account_from_order_request</a>&lt;M: <b>copy</b>, drop, store&gt;(order_req: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequest">bulk_order_book_types::BulkOrderRequest</a>&lt;M&gt;): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_account_from_order_request">get_account_from_order_request</a>&lt;M: <b>copy</b>, drop, store&gt;(order_req: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderRequest">bulk_order_types::BulkOrderRequest</a>&lt;M&gt;): <b>address</b>
 </code></pre>
 
 
@@ -736,8 +736,8 @@ A <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderReq
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_account_from_order_request">get_account_from_order_request</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    order_req: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequest">BulkOrderRequest</a>&lt;M&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_account_from_order_request">get_account_from_order_request</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    order_req: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderRequest">BulkOrderRequest</a>&lt;M&gt;
 ): <b>address</b> {
     order_req.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>
 }
@@ -753,7 +753,7 @@ A <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderReq
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_sequence_number_from_order_request">get_sequence_number_from_order_request</a>&lt;M: <b>copy</b>, drop, store&gt;(order_req: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequest">bulk_order_book_types::BulkOrderRequest</a>&lt;M&gt;): u64
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_sequence_number_from_order_request">get_sequence_number_from_order_request</a>&lt;M: <b>copy</b>, drop, store&gt;(order_req: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderRequest">bulk_order_types::BulkOrderRequest</a>&lt;M&gt;): u64
 </code></pre>
 
 
@@ -762,8 +762,8 @@ A <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderReq
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_sequence_number_from_order_request">get_sequence_number_from_order_request</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    order_req: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequest">BulkOrderRequest</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_sequence_number_from_order_request">get_sequence_number_from_order_request</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    order_req: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderRequest">BulkOrderRequest</a>&lt;M&gt;
 ): u64 {
     order_req.order_sequence_number
 }
@@ -779,7 +779,7 @@ A <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderReq
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_sequence_number_from_bulk_order">get_sequence_number_from_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(order: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;): u64
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_sequence_number_from_bulk_order">get_sequence_number_from_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(order: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;): u64
 </code></pre>
 
 
@@ -788,8 +788,8 @@ A <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderReq
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_sequence_number_from_bulk_order">get_sequence_number_from_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    order: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_sequence_number_from_bulk_order">get_sequence_number_from_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    order: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;
 ): u64 {
     order.order_sequence_number
 }
@@ -805,7 +805,7 @@ A <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderReq
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_place_response">new_bulk_order_place_response</a>&lt;M: <b>copy</b>, drop, store&gt;(order: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;, cancelled_bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, previous_seq_num: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">bulk_order_book_types::BulkOrderPlaceResponse</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_new_bulk_order_place_response">new_bulk_order_place_response</a>&lt;M: <b>copy</b>, drop, store&gt;(order: <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;, cancelled_bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, previous_seq_num: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;): <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">bulk_order_types::BulkOrderPlaceResponse</a>&lt;M&gt;
 </code></pre>
 
 
@@ -814,15 +814,15 @@ A <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderReq
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_place_response">new_bulk_order_place_response</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    order: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_new_bulk_order_place_response">new_bulk_order_place_response</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    order: <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
     cancelled_bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     cancelled_bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     cancelled_ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     cancelled_ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     previous_seq_num: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
-): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M&gt; {
-    <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a> {
+): <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M&gt; {
+    <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a> {
         order,
         cancelled_bid_prices,
         cancelled_bid_sizes,
@@ -843,7 +843,7 @@ A <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderReq
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_destroy_bulk_order_place_response">destroy_bulk_order_place_response</a>&lt;M: <b>copy</b>, drop, store&gt;(response: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">bulk_order_book_types::BulkOrderPlaceResponse</a>&lt;M&gt;): (<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_destroy_bulk_order_place_response">destroy_bulk_order_place_response</a>&lt;M: <b>copy</b>, drop, store&gt;(response: <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">bulk_order_types::BulkOrderPlaceResponse</a>&lt;M&gt;): (<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
 </code></pre>
 
 
@@ -852,10 +852,10 @@ A <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderReq
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_destroy_bulk_order_place_response">destroy_bulk_order_place_response</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    response: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M&gt;
-): (<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;) {
-    <b>let</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a> { order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num } = response;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_destroy_bulk_order_place_response">destroy_bulk_order_place_response</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    response: <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M&gt;
+): (<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;) {
+    <b>let</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a> { order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num } = response;
     (order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num)
 }
 </code></pre>
@@ -878,7 +878,7 @@ Validates that all sizes in the vector are greater than 0.
 - <code>sizes</code>: Vector of sizes to validate
 
 
-<pre><code><b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_validate_not_zero_sizes">validate_not_zero_sizes</a>(sizes: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): bool
+<pre><code><b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_validate_not_zero_sizes">validate_not_zero_sizes</a>(sizes: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): bool
 </code></pre>
 
 
@@ -887,7 +887,7 @@ Validates that all sizes in the vector are greater than 0.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_validate_not_zero_sizes">validate_not_zero_sizes</a>(sizes: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): bool {
+<pre><code><b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_validate_not_zero_sizes">validate_not_zero_sizes</a>(sizes: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): bool {
     <b>let</b> i = 0;
     <b>while</b> (i &lt; sizes.length()) {
         <b>if</b> (sizes[i] == 0) {
@@ -918,7 +918,7 @@ Validates that prices are in the correct order (descending for bids, ascending f
 - <code>is_descending</code>: True if prices should be in descending order, false for ascending
 
 
-<pre><code><b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_validate_price_ordering">validate_price_ordering</a>(prices: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, is_descending: bool): bool
+<pre><code><b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_validate_price_ordering">validate_price_ordering</a>(prices: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, is_descending: bool): bool
 </code></pre>
 
 
@@ -927,7 +927,7 @@ Validates that prices are in the correct order (descending for bids, ascending f
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_validate_price_ordering">validate_price_ordering</a>(
+<pre><code><b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_validate_price_ordering">validate_price_ordering</a>(
     prices: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     is_descending: bool
 ): bool {
@@ -961,7 +961,7 @@ Validates that prices are in the correct order (descending for bids, ascending f
 
 
 
-<pre><code><b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_discard_price_crossing_levels">discard_price_crossing_levels</a>(prices: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, best_price: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, is_bid: bool): u64
+<pre><code><b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_discard_price_crossing_levels">discard_price_crossing_levels</a>(prices: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, best_price: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, is_bid: bool): u64
 </code></pre>
 
 
@@ -970,7 +970,7 @@ Validates that prices are in the correct order (descending for bids, ascending f
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_discard_price_crossing_levels">discard_price_crossing_levels</a>(
+<pre><code><b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_discard_price_crossing_levels">discard_price_crossing_levels</a>(
     prices: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     best_price: Option&lt;u64&gt;,
     is_bid: bool,
@@ -1002,7 +1002,7 @@ Validates that prices are in the correct order (descending for bids, ascending f
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_match">new_bulk_order_match</a>&lt;M: <b>copy</b>, drop, store&gt;(order: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;, is_bid: bool, matched_size: u64): <a href="order_book_types.md#0x7_order_book_types_OrderMatch">order_book_types::OrderMatch</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_new_bulk_order_match">new_bulk_order_match</a>&lt;M: <b>copy</b>, drop, store&gt;(order: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;, is_bid: bool, matched_size: u64): <a href="order_book_types.md#0x7_order_book_types_OrderMatch">order_book_types::OrderMatch</a>&lt;M&gt;
 </code></pre>
 
 
@@ -1011,8 +1011,8 @@ Validates that prices are in the correct order (descending for bids, ascending f
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_match">new_bulk_order_match</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    order: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_new_bulk_order_match">new_bulk_order_match</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    order: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
     is_bid: bool,
     matched_size: u64
 ): OrderMatch&lt;M&gt; {
@@ -1048,7 +1048,7 @@ Validates that prices are in the correct order (descending for bids, ascending f
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_total_remaining_size">get_total_remaining_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;, is_bid: bool): u64
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_total_remaining_size">get_total_remaining_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;, is_bid: bool): u64
 </code></pre>
 
 
@@ -1057,8 +1057,8 @@ Validates that prices are in the correct order (descending for bids, ascending f
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>)  <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_total_remaining_size">get_total_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
+<pre><code><b>public</b>(<b>friend</b>)  <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_total_remaining_size">get_total_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
     is_bid: bool,
 ): u64 {
     <b>if</b> (is_bid) {
@@ -1094,7 +1094,7 @@ Gets the unique priority index of a bulk order.
 The unique priority index for time-based ordering.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_unique_priority_idx">get_unique_priority_idx</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_unique_priority_idx">get_unique_priority_idx</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdxType</a>
 </code></pre>
 
 
@@ -1103,9 +1103,9 @@ The unique priority index for time-based ordering.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_unique_priority_idx">get_unique_priority_idx</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
-): UniqueIdxType {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_unique_priority_idx">get_unique_priority_idx</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
+): IncreasingIdxType {
     self.unique_priority_idx
 }
 </code></pre>
@@ -1135,7 +1135,7 @@ Gets the order ID of a bulk order.
 The unique order identifier.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_order_id">get_order_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;): <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_order_id">get_order_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;): <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>
 </code></pre>
 
 
@@ -1144,8 +1144,8 @@ The unique order identifier.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_order_id">get_order_id</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_order_id">get_order_id</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
 ): OrderIdType {
     self.order_id
 }
@@ -1176,7 +1176,7 @@ Gets the account of a bulk order.
 The account that placed the order.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_account">get_account</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;): <b>address</b>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_account">get_account</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;): <b>address</b>
 </code></pre>
 
 
@@ -1185,8 +1185,8 @@ The account that placed the order.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_account">get_account</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_account">get_account</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
 ): <b>address</b> {
     self.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>
 }
@@ -1202,7 +1202,7 @@ The account that placed the order.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_sequence_number">get_sequence_number</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;): u64
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_sequence_number">get_sequence_number</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;): u64
 </code></pre>
 
 
@@ -1211,8 +1211,8 @@ The account that placed the order.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_sequence_number">get_sequence_number</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_sequence_number">get_sequence_number</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
 ): u64 {
     self.order_sequence_number
 }
@@ -1228,7 +1228,7 @@ The account that placed the order.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_creation_time_micros">get_creation_time_micros</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;): u64
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_creation_time_micros">get_creation_time_micros</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;): u64
 </code></pre>
 
 
@@ -1237,8 +1237,8 @@ The account that placed the order.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_creation_time_micros">get_creation_time_micros</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_creation_time_micros">get_creation_time_micros</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
 ): u64 {
     self.creation_time_micros
 }
@@ -1270,7 +1270,7 @@ Gets the active price for a specific side of a bulk order.
 An option containing the active price if available, none otherwise.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_active_price">get_active_price</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;, is_bid: bool): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_active_price">get_active_price</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;, is_bid: bool): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
 </code></pre>
 
 
@@ -1279,8 +1279,8 @@ An option containing the active price if available, none otherwise.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_active_price">get_active_price</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_active_price">get_active_price</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
     is_bid: bool,
 ): Option&lt;u64&gt; {
     <b>let</b> prices = <b>if</b> (is_bid) { &self.bid_prices } <b>else</b> { &self.ask_prices };
@@ -1302,7 +1302,7 @@ An option containing the active price if available, none otherwise.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_all_prices">get_all_prices</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;, is_bid: bool): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_all_prices">get_all_prices</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;, is_bid: bool): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
 </code></pre>
 
 
@@ -1311,8 +1311,8 @@ An option containing the active price if available, none otherwise.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_all_prices">get_all_prices</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_all_prices">get_all_prices</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
     is_bid: bool,
 ): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt; {
     <b>if</b> (is_bid) {
@@ -1333,7 +1333,7 @@ An option containing the active price if available, none otherwise.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_all_sizes">get_all_sizes</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;, is_bid: bool): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_all_sizes">get_all_sizes</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;, is_bid: bool): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
 </code></pre>
 
 
@@ -1342,8 +1342,8 @@ An option containing the active price if available, none otherwise.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_all_sizes">get_all_sizes</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_all_sizes">get_all_sizes</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
     is_bid: bool,
 ): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt; {
     <b>if</b> (is_bid) {
@@ -1380,7 +1380,7 @@ Gets the active size for a specific side of a bulk order.
 An option containing the active size if available, none otherwise.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_active_size">get_active_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;, is_bid: bool): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_active_size">get_active_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;, is_bid: bool): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
 </code></pre>
 
 
@@ -1389,8 +1389,8 @@ An option containing the active size if available, none otherwise.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_active_size">get_active_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_get_active_size">get_active_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
     is_bid: bool,
 ): Option&lt;u64&gt; {
     <b>let</b> sizes = <b>if</b> (is_bid) { &self.bid_sizes } <b>else</b> { &self.ask_sizes };
@@ -1431,7 +1431,7 @@ the size; otherwise, it inserts the new price level at the front.
 - <code>other</code>: Reference to the order result to reinsert
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_reinsert_order">reinsert_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;, other: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_reinsert_order">reinsert_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;, other: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;)
 </code></pre>
 
 
@@ -1440,8 +1440,8 @@ the size; otherwise, it inserts the new price level at the front.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_reinsert_order">reinsert_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_reinsert_order">reinsert_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
     other: &OrderMatchDetails&lt;M&gt;,
 ) {
     // Reinsert the order into the bulk order
@@ -1500,7 +1500,7 @@ A tuple containing the next active price and size as options.
 - If the matched size exceeds the available size at the first level
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_match_order_and_get_next">match_order_and_get_next</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;, is_bid: bool, matched_size: u64): (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_match_order_and_get_next">match_order_and_get_next</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;, is_bid: bool, matched_size: u64): (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
 </code></pre>
 
 
@@ -1509,8 +1509,8 @@ A tuple containing the next active price and size as options.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_match_order_and_get_next">match_order_and_get_next</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_match_order_and_get_next">match_order_and_get_next</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
     is_bid: bool,
     matched_size: u64,
 ): (Option&lt;u64&gt;, Option&lt;u64&gt;) {
@@ -1519,7 +1519,7 @@ A tuple containing the next active price and size as options.
     } <b>else</b> {
         (&<b>mut</b> self.ask_prices, &<b>mut</b> self.ask_sizes)
     };
-    <b>assert</b>!(matched_size &lt;= sizes[0], <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_EUNEXPECTED_MATCH_SIZE">EUNEXPECTED_MATCH_SIZE</a>); // Ensure the remaining size is not more than the size at the first price level
+    <b>assert</b>!(matched_size &lt;= sizes[0], <a href="bulk_order_types.md#0x7_bulk_order_book_types_EUNEXPECTED_MATCH_SIZE">EUNEXPECTED_MATCH_SIZE</a>); // Ensure the remaining size is not more than the size at the first price level
     sizes[0] -= matched_size; // Decrease the size at the first price level by the matched size
     <b>if</b> (sizes[0] == 0) {
         // If the size at the first price level is now 0, remove this price level
@@ -1552,7 +1552,7 @@ Sets the bulk order to empty state by clearing all sizes.
 - <code>self</code>: Mutable reference to the bulk order
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_set_empty">set_empty</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_set_empty">set_empty</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;)
 </code></pre>
 
 
@@ -1561,8 +1561,8 @@ Sets the bulk order to empty state by clearing all sizes.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_set_empty">set_empty</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_set_empty">set_empty</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;
 ) {
     self.bid_sizes = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
     self.ask_sizes = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
@@ -1581,7 +1581,7 @@ Sets the bulk order to empty state by clearing all sizes.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_destroy_bulk_order">destroy_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, u64, u64, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, M)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_destroy_bulk_order">destroy_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdxType</a>, u64, u64, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, M)
 </code></pre>
 
 
@@ -1590,12 +1590,12 @@ Sets the bulk order to empty state by clearing all sizes.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_destroy_bulk_order">destroy_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_destroy_bulk_order">destroy_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;
 ): (
     OrderIdType,
     <b>address</b>,
-    UniqueIdxType,
+    IncreasingIdxType,
     u64,
     u64,
     <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
