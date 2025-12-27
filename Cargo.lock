@@ -1700,6 +1700,7 @@ name = "aptos-executor-types"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-config",
  "aptos-crypto",
  "aptos-drop-helper",
  "aptos-infallible",
@@ -4243,6 +4244,7 @@ name = "aptos-storage-interface"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-config",
  "aptos-crypto",
  "aptos-experimental-layered-map",
  "aptos-logger",

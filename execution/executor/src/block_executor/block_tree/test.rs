@@ -5,13 +5,11 @@ use crate::{
     block_executor::block_tree::{epoch_genesis_block_id, BlockLookup, BlockTree},
     types::partial_state_compute_result::PartialStateComputeResult,
 };
+use aptos_config::config::HotStateConfig;
 use aptos_crypto::{hash::PRE_GENESIS_BLOCK_ID, HashValue};
 use aptos_infallible::Mutex;
 use aptos_storage_interface::LedgerSummary;
-use aptos_types::{
-    block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo,
-    state_store::hot_state::HotStateConfig,
-};
+use aptos_types::{block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo};
 use std::sync::Arc;
 
 impl BlockTree {

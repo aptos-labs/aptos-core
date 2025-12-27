@@ -29,13 +29,14 @@ impl Cmd {
         let env = None;
         let block_cache = None;
 
-        let (ledger_db, _, _) = AptosDB::open_dbs(
+        let (ledger_db, _, _, _) = AptosDB::open_dbs(
             &StorageDirPaths::from_path(&self.db_dir),
             rocksdb_config,
             env,
             block_cache,
             /*readonly=*/ true,
             /*max_num_nodes_per_lru_cache_shard=*/ 0,
+            /*reset_hot_state=*/ false,
         )?;
 
         println!(
