@@ -417,7 +417,7 @@ impl Parser {
             },
         )?;
 
-        let result_state = parent_state.update_with_memorized_reads(
+        let (result_state, hot_state_updates) = parent_state.update_with_memorized_reads(
             base_state_view.persisted_hot_state(),
             base_state_view.persisted_state(),
             to_commit.state_update_refs(),
@@ -437,6 +437,7 @@ impl Parser {
             block_end_info,
             next_epoch_state,
             Planned::place_holder(),
+            hot_state_updates,
         );
         let ret = out.clone();
         ret.subscribable_events
@@ -564,12 +565,12 @@ impl TStateView for WriteSetStateView<'_> {
 #[cfg(test)]
 mod tests {
     use super::Parser;
+    use aptos_config::config::HotStateConfig;
     use aptos_storage_interface::state_store::{
         state::LedgerState, state_view::cached_state_view::CachedStateView,
     };
     use aptos_types::{
         contract_event::ContractEvent,
-        state_store::hot_state::HotStateConfig,
         transaction::{
             AuxiliaryInfo, ExecutionStatus, PersistedAuxiliaryInfo, Transaction,
             TransactionAuxiliaryData, TransactionOutput, TransactionStatus,

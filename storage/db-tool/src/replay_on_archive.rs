@@ -160,6 +160,7 @@ impl Verifier {
                     BUFFERED_STATE_TARGET_ITEMS,
                     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
                     None,
+                    /* reset_hot_state = */ false,
                 )
             }) {
                 warn!("Unable to open AptosDB in write mode: {:?}", e);
@@ -175,6 +176,7 @@ impl Verifier {
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             None,
+            /* reset_hot_state = */ false,
         )?;
 
         let backup_handler = aptos_db.get_backup_handler();

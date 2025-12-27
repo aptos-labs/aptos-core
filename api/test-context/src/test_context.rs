@@ -176,6 +176,7 @@ pub fn new_test_context_inner(
             BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             None,
+            /* reset_hot_state = */ false,
         )
         .unwrap();
         if node_config
