@@ -36,6 +36,7 @@ aptos-ledger = { workspace = true }
 aptos-localnet = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-move-debugger = { workspace = true }
+aptos-move-linter = { workspace = true }
 aptos-network-checker = { workspace = true }
 aptos-node = { workspace = true }
 aptos-rest-client = { workspace = true }
