@@ -25,7 +25,7 @@ use move_core_types::{
 };
 pub use move_table_extension::{TableHandle, TableInfo, TableResolver};
 use move_vm_runtime::{
-    native_extensions::SessionListener,
+    native_extensions::{NativeRuntimeRefCheckModelsCompleted, SessionListener},
     native_functions::{LoaderContext, NativeFunctionTable},
 };
 use move_vm_types::{
@@ -123,6 +123,11 @@ impl<'a> SessionListener for NativeTableContext<'a> {
     fn abort(&mut self) {
         // TODO(sessions): implement
     }
+}
+
+impl<'a> NativeRuntimeRefCheckModelsCompleted for NativeTableContext<'a> {
+    // We have added runtime ref check models for native table functions that
+    // return references.
 }
 
 impl<'a> NativeTableContext<'a> {

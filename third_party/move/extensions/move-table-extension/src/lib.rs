@@ -19,7 +19,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
-    native_extensions::UnreachableSessionListener,
+    native_extensions::{NativeRuntimeRefCheckModelsCompleted, UnreachableSessionListener},
     native_functions,
     native_functions::{LoaderContext, NativeContext, NativeFunction, NativeFunctionTable},
 };
@@ -151,6 +151,11 @@ const HANDLE_FIELD_INDEX: usize = 0;
 // Implementation of Native Table Context
 
 impl<'a> UnreachableSessionListener for NativeTableContext<'a> {}
+
+impl<'a> NativeRuntimeRefCheckModelsCompleted for NativeTableContext<'a> {
+    // We have added runtime ref check models for native table functions that
+    // return references.
+}
 
 impl<'a> NativeTableContext<'a> {
     /// Create a new instance of a native table context. This must be passed in via an

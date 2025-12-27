@@ -77,8 +77,18 @@
 //! When we return references on the shadow stack, we ensure that they are derived from
 //! one of the reference parameters. They are also transformed to point to the
 //! corresponding access path tree node in the caller's frame (if it exists).
+//!
+//! Native functions implemented in Rust may also return references. Because such code
+//! is a black box as far the Move VM instruction semantics are concerned, we need
+//! their reference behavior to be modeled explicitly.
+//! See the module `native_models_for_runtime_ref_checks` for documentation on how to
+//! specify such models. These models are trusted but their reference safety is not
+//! checked by runtime reference checks.
 
-use crate::{frame::Frame, frame_type_cache::FrameTypeCache, LoadedFunction};
+use crate::{
+    frame::Frame, frame_type_cache::FrameTypeCache,
+    native_models_for_runtime_ref_checks::NativeRuntimeRefChecksModel, LoadedFunction,
+};
 use fxhash::FxBuildHasher;
 use hashbrown::HashMap;
 use move_binary_format::{
@@ -235,9 +245,20 @@ pub(crate) struct RefCheckState {
     /// Shadow stack of ref/non-ref values.
     /// This is shared between all the frames in the call stack.
     shadow_stack: Vec<Value>,
-
     /// Stack of per-frame reference states.
     frame_stack: Vec<FrameRefState>,
+    /// Models for native functions that return references.
+    /// These models do not change during execution.
+    native_models: NativeRuntimeRefChecksModel,
+}
+
+/// Different kinds of function calls.
+/// Used for const generics specialization of various call transitions.
+#[repr(u8)]
+enum CallKind {
+    Regular = 0,
+    NativeStaticDispatch = 1,
+    NativeDynamicDispatch = 2,
 }
 
 /// A trait for determining the behavior of the runtime reference checks.
@@ -257,10 +278,27 @@ pub(crate) trait RuntimeRefCheck {
         ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()>;
 
-    /// Transitions the reference check state during various forms of function calls.
+    /// Transitions the reference check state during various forms of function calls,
+    /// except native calls.
     fn core_call_transition(
-        num_params: usize,
-        num_locals: usize,
+        function: &LoadedFunction,
+        mask: ClosureMask,
+        ref_state: &mut RefCheckState,
+    ) -> PartialVMResult<()>;
+
+    /// Transitions the reference check state during native calls that are statically
+    /// dispatched. It accounts for the call, execution, and return of such functions.
+    fn native_static_dispatch_transition(
+        function: &LoadedFunction,
+        mask: ClosureMask,
+        ref_state: &mut RefCheckState,
+    ) -> PartialVMResult<()>;
+
+    /// Transitions the reference check state during native calls that are dynamically
+    /// dispatched. It accounts for the native call and transfer setup of the
+    /// dynamically dispatched function.
+    fn native_dynamic_dispatch_transition(
+        function: &LoadedFunction,
         mask: ClosureMask,
         ref_state: &mut RefCheckState,
     ) -> PartialVMResult<()>;
@@ -296,8 +334,23 @@ impl RuntimeRefCheck for NoRuntimeRefCheck {
     }
 
     fn core_call_transition(
-        _num_params: usize,
-        _num_locals: usize,
+        _function: &LoadedFunction,
+        _mask: ClosureMask,
+        _ref_state: &mut RefCheckState,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn native_static_dispatch_transition(
+        _function: &LoadedFunction,
+        _mask: ClosureMask,
+        _ref_state: &mut RefCheckState,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn native_dynamic_dispatch_transition(
+        _function: &LoadedFunction,
         _mask: ClosureMask,
         _ref_state: &mut RefCheckState,
     ) -> PartialVMResult<()> {
@@ -670,12 +723,27 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
     }
 
     fn core_call_transition(
-        num_params: usize,
-        num_locals: usize,
+        function: &LoadedFunction,
         mask: ClosureMask,
         ref_state: &mut RefCheckState,
     ) -> PartialVMResult<()> {
-        ref_state.core_call(num_params, num_locals, mask)
+        ref_state.core_call::<{ CallKind::Regular as u8 }>(function, mask)
+    }
+
+    fn native_static_dispatch_transition(
+        function: &LoadedFunction,
+        mask: ClosureMask,
+        ref_state: &mut RefCheckState,
+    ) -> PartialVMResult<()> {
+        ref_state.core_call::<{ CallKind::NativeStaticDispatch as u8 }>(function, mask)
+    }
+
+    fn native_dynamic_dispatch_transition(
+        function: &LoadedFunction,
+        mask: ClosureMask,
+        ref_state: &mut RefCheckState,
+    ) -> PartialVMResult<()> {
+        ref_state.core_call::<{ CallKind::NativeDynamicDispatch as u8 }>(function, mask)
     }
 
     fn init_entry(function: &LoadedFunction, ref_state: &mut RefCheckState) -> PartialVMResult<()> {
@@ -1244,11 +1312,12 @@ impl ReferenceInfo {
 }
 
 impl RefCheckState {
-    /// Create a new `RefCheckState` with empty stacks.
-    pub fn new() -> Self {
+    /// Create a new `RefCheckState` with empty stacks and the given native models.
+    pub fn new(native_models: NativeRuntimeRefChecksModel) -> Self {
         Self {
             shadow_stack: Vec::new(),
             frame_stack: Vec::new(),
+            native_models,
         }
     }
 
@@ -1706,11 +1775,12 @@ impl RefCheckState {
         Ok(())
     }
 
-    /// Transition for a function call (`Call`, `CallGeneric`, `CallClosure`).
-    fn core_call(
+    /// Common transition for various kinds of function calls.
+    /// `CALL_KIND` specifies the kind of call being made, and is known at compile time.
+    /// So any use of `CALL_KIND` should be optimized away.
+    fn core_call<const CALL_KIND: u8>(
         &mut self,
-        num_params: usize,
-        num_locals: usize,
+        function: &LoadedFunction,
         mask: ClosureMask,
     ) -> PartialVMResult<()> {
         // Keep track of all reference argument's IDs.
@@ -1721,19 +1791,27 @@ impl RefCheckState {
         let mut immut_ref_indexes = Vec::new();
         // Map from parameter index to the access path tree node of a reference parameter.
         let mut ref_param_map = UnorderedMap::with_hasher(FxBuildHasher::default());
+        // Copy of the parameter values on stack to restore later for native dynamic dispatch.
+        let mut param_values = Vec::new();
+        let num_params = function.param_tys().len();
         for i in (0..num_params).rev() {
             let is_captured = mask.is_captured(i);
             if !is_captured {
-                let Value::Ref(ref_id) = self.pop_from_shadow_stack()? else {
+                let top = self.pop_from_shadow_stack()?;
+                if CALL_KIND == CallKind::NativeDynamicDispatch as u8 {
+                    param_values.push(top);
+                }
+                let Value::Ref(ref_id) = top else {
                     continue;
                 };
-
                 // We have a reference argument to deal with.
                 let frame_state = self.get_mut_latest_frame_state()?;
                 let ref_info = frame_state.get_ref_info(&ref_id)?;
                 ref_info.poison_check()?;
                 let access_path_tree_node = ref_info.access_path_tree_node.clone();
                 // Make sure that there are no overlaps with a mutable reference.
+                // [TODO]: we don't need any locking if we don't have any mutable references as params,
+                // so we can optimize for that (common) case.
                 if ref_info.is_mutable {
                     frame_state.lock_node_subtree(&access_path_tree_node, Lock::Exclusive)?;
                     // Having a mutable reference argument is the same as performing a destructive write.
@@ -1753,16 +1831,110 @@ impl RefCheckState {
             let access_path_tree_node = ref_info.access_path_tree_node.clone();
             // Release locks so that they don't interfere with the next call.
             frame_state.release_lock_node_subtree(&access_path_tree_node)?;
-            frame_state.purge_reference(ref_id)?;
+            if CALL_KIND != CallKind::NativeDynamicDispatch as u8 {
+                // For native dynamic dispatch, the params will be restored back to the stack,
+                // so we don't purge references here.
+                frame_state.purge_reference(ref_id)?;
+            }
         }
 
-        self.push_new_frame(
-            num_locals,
-            mut_ref_indexes,
-            immut_ref_indexes,
-            ref_param_map,
-        )?;
+        if CALL_KIND == CallKind::Regular as u8 {
+            let num_locals = function.local_tys().len();
+            self.push_new_frame(
+                num_locals,
+                mut_ref_indexes,
+                immut_ref_indexes,
+                ref_param_map,
+            )?;
+        } else if CALL_KIND == CallKind::NativeStaticDispatch as u8 {
+            // For native static dispatch, instead of pushing a new frame,
+            // we just create the effect of executing and returning from the function.
+            self.native_static_dispatch_return(function, ref_param_map)?;
+        } else {
+            debug_assert!(CALL_KIND == CallKind::NativeDynamicDispatch as u8);
+            // For native dynamic dispatch, we restore the param values onto the stack.
+            // The stack is then setup for the dispatched function to be called next.
+            for value in param_values.into_iter().rev() {
+                self.push_to_shadow_stack(value);
+            }
+            self.native_dynamic_dispatch_prepare()?;
+        }
+        Ok(())
+    }
 
+    /// Emulate the execution and return from a native static dispatch function.
+    fn native_static_dispatch_return(
+        &mut self,
+        function: &LoadedFunction,
+        ref_param_map: UnorderedMap<usize, QualifiedNodeID>,
+    ) -> PartialVMResult<()> {
+        let return_tys = function.return_tys();
+        let references_returned = return_tys
+            .iter()
+            .any(|ty| matches!(ty, Type::Reference(_) | Type::MutableReference(_)));
+        if !references_returned {
+            self.push_non_refs_to_shadow_stack(return_tys.len());
+        } else {
+            // References are being returned, we have to create derived references according to
+            // the native modeling provided.
+            // Note that, as opposed to non-native functions, we do not perform:
+            // - poison check on returned references
+            // - tracking and checking that returned references are derived from reference parameters
+            // - check that returned mutable references are exclusive.
+            // These are properties expected to be upheld by the Rust implementation of the native function
+            // and are assumed to hold.
+            let module_name = safe_unwrap!(function.module_id()).name().as_str();
+            let function_name = function.name();
+            let model = safe_unwrap!(self
+                .native_models
+                .get_model_for_native_function(module_name, function_name));
+            // Index of the return value when only considering reference return types.
+            let mut return_ref_index = 0;
+            for ty in return_tys {
+                let mutable = match ty {
+                    Type::Reference(_) => false,
+                    Type::MutableReference(_) => true,
+                    _ => {
+                        self.push_non_refs_to_shadow_stack(1);
+                        continue;
+                    },
+                };
+                let ref_param_derived_from = safe_unwrap!(model.get(return_ref_index));
+                return_ref_index += 1;
+                let frame_state = self.get_mut_latest_frame_state()?;
+                let access_path_tree_node = safe_unwrap!(ref_param_map.get(ref_param_derived_from));
+                // Note that we use `0` to represent the label for the derived reference being returned.
+                // We can do this because for the existing native functions, each reference returned is
+                // from a different input parameter, so we can assume a single label (implicitly `0`)
+                // per returned reference.
+                // In the future, if we need a newly added native function to return multiple derived
+                // references from the same input reference, then the native function model entries
+                // should be extended to have (param_index, label) pairs instead.
+                let abstracted_label = 0;
+                let transformed_node = frame_state.get_or_create_descendant_node(
+                    access_path_tree_node,
+                    slice::from_ref(&abstracted_label),
+                )?;
+                let transformed_ref_id =
+                    frame_state.make_new_ref_to_existing_node(transformed_node, mutable)?;
+                self.push_ref_to_shadow_stack(transformed_ref_id);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Emulate the preparation for dispatching the target via native dynamic dispatch.
+    fn native_dynamic_dispatch_prepare(&mut self) -> PartialVMResult<()> {
+        // For native dynamic dispatch, the last argument (`&FunctionInfo`) is removed,
+        // and the remaining arguments are left on the stack. This prepares the stack
+        // for the dynamically dispatched function to be called next.
+        let Value::Ref(ref_id) = self.pop_from_shadow_stack()? else {
+            let msg = "Expected a reference (&FunctionInfo) on the stack".to_string();
+            return ref_check_failure!(msg);
+        };
+        let frame_state = self.get_mut_latest_frame_state()?;
+        frame_state.purge_reference(ref_id)?;
         Ok(())
     }
 

@@ -9,7 +9,10 @@ use aptos_types::{state_store::state_key::StateKey, vm_status::StatusCode};
 use aptos_vm_types::resolver::StateStorageView;
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMError;
-use move_vm_runtime::{native_extensions::SessionListener, native_functions::NativeFunction};
+use move_vm_runtime::{
+    native_extensions::{NativeRuntimeRefCheckModelsCompleted, SessionListener},
+    native_functions::NativeFunction,
+};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Struct, Value},
@@ -31,6 +34,10 @@ impl<'a> SessionListener for NativeStateStorageContext<'a> {
     fn finish(&mut self) {}
 
     fn abort(&mut self) {}
+}
+
+impl<'a> NativeRuntimeRefCheckModelsCompleted for NativeStateStorageContext<'a> {
+    // No native functions in this context return references, so no models to add.
 }
 
 impl<'a> NativeStateStorageContext<'a> {
