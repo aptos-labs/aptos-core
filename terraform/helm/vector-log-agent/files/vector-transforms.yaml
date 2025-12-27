@@ -7,50 +7,35 @@ transforms:
       .k8s = del(.kubernetes)
       .k8s.cluster = "${K8S_CLUSTER:?err}"
 
-      del(.k8s.container_id)
-
-      del(.k8s.namespace_labels)
-
       node_labels = del(.k8s.node_labels)
       .k8s.node_labels."node.kubernetes.io/instance-type" = node_labels."node.kubernetes.io/instance-type"
       .k8s.node_labels."topology.gke.io/zone" = node_labels."topology.gke.io/zone"
-
-      del(.k8s.labels."statefulset.kubernetes.io/pod-name")
-      del(.k8s.labels."pod-template-generation")
-      del(.k8s.labels."addonmanager.kubernetes.io/mode")
-      del(.k8s.container_image_id)
-      del(.k8s.pod_owner)
-      del(.k8s.labels."forge-image-tag")
-      del(.k8s.labels."controller-uid")
-
-      # del(.k8s.annotations."kubectl.kubernetes.io/last-applied-configuration")
-      # del(.k8s.annotations."seccomp.security.alpha.kubernetes.io/pod")
-      # del(.k8s.annotations."checksum/validator.yaml")
-      # del(.k8s.annotations."config-hash")
-      # del(.k8s.annotations."tls-secret-hash")
-      # del(.k8s.annotations."prometheus.io/port")
-      # del(.k8s.annotations."prometheus.io/scrape")
-
-      # if is_object(.k8s.annotations) && is_empty(object!(.k8s.annotations)) {
-      #   del(.k8s.annotations)
-      # }
+      .k8s.node_name = del(.k8s.pod_node_name)
 
       .min_log_level_to_retain = .k8s.annotations."aptos.dev/min-log-level-to-retain"
 
+      del(.k8s.container_id)
+      del(.k8s.container_image_id)
+      # TODO: add finops cost center label
+      del(.k8s.namespace_labels)
+      del(.k8s.pod_ips)
+      del(.k8s.pod_owner)
+      del(.k8s.pod_uid)
+
+      # Remove all annotations.
       del(.k8s.annotations)
 
-      del(.k8s.labels."app.kubernetes.io/managed-by")
-      del(.k8s.labels."app.kubernetes.io/part-of")
-      del(.k8s.labels."pod-template-hash")
-      del(.k8s.labels."controller-revision-hash")
-      .k8s.node_name = del(.k8s.pod_node_name)
-
-      del(.k8s.pod_ips)
-      del(.k8s.pod_uid)
+      # Retain only Forge labels.
+      k8s_labels = del(.k8s.labels)
+      if contains(.k8s.cluster, "forge") {
+        .k8s.labels.app.kubernetes."io/name" = k8s_labels.app.kubernetes."io/name"
+        .k8s.labels."forge-namespace" = k8s_labels."forge-namespace"
+      }
 
       del(."@timestamp.nanos")
       del(.source_type)
       del(.hostname)
+      del(.namespace)
       del(.file)
 
   normalized_logs:
@@ -119,13 +104,12 @@ transforms:
         (!has_log_level_annotation && is_error_log)
 
       retain_log
-  
+
   delete_temp_fields:
     type: remap
     inputs:
       - filter_forge_logs
-    source:
-      del(.min_log_level_to_retain)
+    source: del(.min_log_level_to_retain)
 
   final_logs:
     type: filter
@@ -133,46 +117,148 @@ transforms:
       - delete_temp_fields
     # temporarily filter out noisy logs in vector until https://github.com/aptos-labs/aptos-core/pull/13965 lands in mainnet release
     # temporarily filter out noisy logs from https://aptos-org.slack.com/archives/C06TH3DH7SB/p1721328005384169?thread_ts=1720695143.603089&cid=C06TH3DH7SB until lands in mainnet release
+    # temporarily filter out noisy logs from https://aptos-org.slack.com/archives/C08L5ETPN8Y/p1743105723097009 until code change lands to downgrade them to trace level
     condition: |
       if is_string(.message) {
         message = to_string!(.message)
-        if .level == "debug" && ( .message == "ReceiveProactiveRandShare" || .message == "ReceiveRandShareFastPath" ) {
+        if .level == "debug" && ( .message == "ReceiveOrderVote" || .message == "sent_peer_monitoring_response" ) {
           return false
         }
         if starts_with(message, "ReceiveVote") || starts_with(message, "OrderVote:") || starts_with(message, "Receive commit vote BlockInfo") {
           return false
         }
+        if .level == "debug" && contains(message, "Received response for expired request_id") {
+          return false
+        }
+        if starts_with(message, "Received an order vote not in the next 100 rounds") {
+          return false
+        }
+        if starts_with(message, "[Pipeline] Block") {
+          return false
+        }
+        if starts_with(message, "Advance execution root") {
+          return false
+        }
+        if starts_with(message, "Received block payload") {
+          return false
+        }
+        if starts_with(message, "Received commit decision") {
+          return false
+        }
+        if starts_with(message, "Received ordered block") {
+          return false
+        }
+        if starts_with(message, "Receive ") {
+          return false
+        }
+        if starts_with(message, "Advance head") {
+          return false
+        }
+        if starts_with(message, "Advance execution root") {
+          return false
+        }
+        if starts_with(message, "Advance signing root") {
+          return false
+        }
+        if starts_with(message, "Computed new use case tracking set") {
+          return false
+        }
+        if starts_with(message, "send_direct_send_message") {
+          return false
+        }
+        if starts_with(message, "Calculated ledger update") {
+          return false
+        }
+        if starts_with(message, "Enqueued transaction chunk") {
+          return false
+        }
+        if starts_with(message, "commit_ledger") {
+          return false
+        }
+        if starts_with(message, "ledger_update") {
+          return false
+        }
+        if starts_with(message, "execute_block") {
+          return false
+        }
+        if starts_with(message, "pre_commit_block") {
+          return false
+        }
+        if starts_with(message, "Updated with a new root block") {
+          return false
+        }
+        if starts_with(message, "Block dropped") {
+          return false
+        }
+        if starts_with(message, "Applied a new transaction output chunk") {
+          return false
+        }
+        if starts_with(message, "Committed a new transaction chunk") {
+          return false
+        }
+        if starts_with(message, "Write usage at version") {
+          return false
+        }
+        if starts_with(message, "Processing decisioned randomness") {
+          return false
+        }
+        if starts_with(message, "Received a consensus commit notification") {
+          return false
+        }
+        if starts_with(message, "[BlockSTM]: Parallel[2] execution completed") {
+          return false
+        }
+        # Moved this out of the indexers namespace filter since we sometimes stream off of PFNs, like in Shelbynet
+        if starts_with(message, "[Indexer Fullnode] Found new highest known version") {
+          return false
+        }
+        # Indexer Processors/GRPC
+        if contains(to_string!(.k8s.namespace), "indexer") {
+          if starts_with(message, "[Data Service] One chunk of transactions") {
+            return false
+          }
+          if starts_with(message, "[Data Service] All chunks of transactions") {
+            return false
+          }
+          if starts_with(message, "[Data Service] Fetching data from in-memory cache") {
+            return false
+          }
+          if starts_with(message, "In-memory cache lookup") {
+            return false
+          }
+          if starts_with(message, "Applied a new transaction output chunk") {
+            return false
+          }
+          if starts_with(message, "Committed a new transaction chunk") {
+            return false
+          }
+          if starts_with(message, "Split transactions into two epochs") {
+            return false
+          }
+          if starts_with(message, "Table info parsed successfully") {
+            return false
+          }
+          if starts_with(message, "Preparing to fetch transactions") {
+            return false
+          }
+          if starts_with(message, "Calculated ledger update") {
+            return false
+          }
+          if starts_with(message, "Enqueued transaction chunk") {
+            return false
+          }
+          if starts_with(message, "Write usage at version") {
+            return false
+          }
+          if starts_with(message, "Successfully converted transactions") {
+            return false
+          }
+          if starts_with(message, "[DB] Table handle written to the rocksdb successfully") {
+            return false
+          }
+          if starts_with(message, "Active discovered peers") {
+            return false
+          }
+        }
       }
       true
-
-  uptrace_logs:
-    type: remap
-    inputs:
-      - final_logs
-    source: |
-      . = flatten(., ".") # in order for fields to become individual, filterable top-level fields in uptrace we need to flatten nested objects into top-level keys.
-      .service_name = .k8s.labels.app
-      .repo = "k8s"
-
-  # datadog_logs:
-  #   type: remap
-  #   inputs:
-  #     - final_logs
-  #   source: |
-  #     .ddsource = "k8s"
-  #     if is_string(.k8s.labels.app) {
-  #       .service = .k8s.labels.app
-  #     }
-  #     .ddtags, _ = "kube_cluster_name:" + .k8s.cluster + ",kube_namespace:" + .k8s.namespace + ",pod_name:" + .k8s.pod_name
-
-  # signoz_logs:
-  #   type: remap
-  #   inputs:
-  #     - final_logs
-  #   source: |
-  #     .severity_text = del(.level)
-  #     .source_type = "k8s"
-  #     tmp = { "k8s": del(.k8s)}
-  #     resources_tmp = flatten(tmp, ".")
-  #     . = flatten(., ".")
-  #     .resources = resources_tmp
