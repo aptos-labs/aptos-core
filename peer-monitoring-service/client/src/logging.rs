@@ -44,8 +44,10 @@ pub enum LogEntry {
     MetadataUpdateLoop,
     NetworkInfoRequest,
     NodeInfoRequest,
+    TransactionInfoRequest,
     PeerMonitorLoop,
     SendRequest,
+    TraceCollectorUpdateLoop,
 }
 
 #[derive(Clone, Copy, Serialize)]
@@ -59,6 +61,7 @@ pub enum LogEvent {
     SendRequest,
     StartedMetadataUpdaterLoop,
     StartedPeerMonitorLoop,
+    StartedTraceCollectorUpdaterLoop,
     TooManyPingFailures,
     UnexpectedErrorEncountered,
 }
