@@ -11,7 +11,7 @@ use prometheus::{
     proto::MetricFamily,
     Opts,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 const LINUX_SYSTEM_CPU_USAGE: &str = "linux_system_cpu_usage";
 const LINUX_CPU_METRICS_COUNT: usize = 11;
@@ -284,8 +284,14 @@ impl Collector for LinuxDiskMetricsCollector {
                 },
             };
 
+        let mut seen_devices: HashSet<String> = HashSet::new();
+
         for mount in mounts {
             if let Some(disk_stat) = disk_stats.get(&mount.majmin) {
+                if !seen_devices.insert(disk_stat.name.clone()) {
+                    continue;
+                }
+
                 let labels = std::slice::from_ref(&disk_stat.name);
                 disk_stats_counter!(mfs, num_reads, disk_stat.reads, labels);
                 disk_stats_counter!(mfs, num_merged_reads, disk_stat.merged, labels);
