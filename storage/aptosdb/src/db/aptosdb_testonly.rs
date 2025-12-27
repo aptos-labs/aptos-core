@@ -57,6 +57,7 @@ impl AptosDB {
             BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
             max_node_cache,
             None,
+            /* reset_hot_state = */ false,
         )
         .expect("Unable to open AptosDB")
     }
