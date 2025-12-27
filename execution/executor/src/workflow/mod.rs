@@ -27,7 +27,8 @@ impl ApplyExecutionOutput {
         let state_checkpoint_output = DoStateCheckpoint::run(
             &execution_output,
             &base_view.state_summary,
-            &ProvableStateSummary::new_persisted(reader)?,
+            &ProvableStateSummary::new_persisted(reader, true)?,
+            &ProvableStateSummary::new_persisted(reader, false)?,
             None,
         )?;
         let ledger_update_output = DoLedgerUpdate::run(

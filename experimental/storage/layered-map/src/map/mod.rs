@@ -43,8 +43,12 @@ where
         (base_layer, top_layer)
     }
 
-    pub(crate) fn base_layer(&self) -> u64 {
+    pub fn base_layer(&self) -> u64 {
         self.base_layer.layer()
+    }
+
+    pub fn top_layer(&self) -> u64 {
+        self.top_layer.layer()
     }
 }
 
@@ -113,5 +117,22 @@ where
             .peak()
             .into_feet_iter()
             .flat_map(|node| DescendantIterator::new(node, self.base_layer()))
+    }
+
+    pub fn inner_maps(&self) -> Vec<Self> {
+        let mut ret = Vec::new();
+
+        let mut current_layer = self.top_layer.clone();
+        let mut current_layer_num = self.top_layer.layer();
+        let lowest_layer_num = self.base_layer.layer();
+        while current_layer_num > lowest_layer_num {
+            let next_high = current_layer.parent().expect("the next one must exist.");
+            ret.push(Self::new(next_high.clone(), current_layer));
+            current_layer = next_high;
+            current_layer_num = current_layer.layer();
+        }
+        ret.reverse();
+
+        ret
     }
 }

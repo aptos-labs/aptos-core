@@ -7,6 +7,7 @@ use crate::{
     metrics::{NODE_CACHE_SECONDS, OTHER_TIMERS_SECONDS},
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        hot_jellyfish_merkle_node::HotJellyfishMerkleNodeSchema,
         jellyfish_merkle_node::JellyfishMerkleNodeSchema,
         stale_node_index::StaleNodeIndexSchema,
         stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
@@ -49,6 +50,7 @@ use std::{
 pub const STATE_MERKLE_DB_FOLDER_NAME: &str = "state_merkle_db";
 pub const STATE_MERKLE_DB_NAME: &str = "state_merkle_db";
 pub const STATE_MERKLE_METADATA_DB_NAME: &str = "state_merkle_metadata_db";
+pub const HOT_STATE_MERKLE_METADATA_DB_NAME: &str = "state_merkle_metadata_db";
 
 pub(crate) type LeafNode = aptos_jellyfish_merkle::node_type::LeafNode<StateKey>;
 pub(crate) type Node = aptos_jellyfish_merkle::node_type::Node<StateKey>;
@@ -58,13 +60,20 @@ type NodeBatch = aptos_jellyfish_merkle::NodeBatch<StateKey>;
 pub struct StateMerkleDb {
     // Stores metadata and top levels (non-sharded part) of tree nodes.
     state_merkle_metadata_db: Arc<DB>,
+    hot_state_merkle_metadata_db: Arc<DB>,
     // Stores sharded part of tree nodes.
     state_merkle_db_shards: [Arc<DB>; NUM_STATE_SHARDS],
+    hot_state_merkle_db_shards: [Arc<DB>; NUM_STATE_SHARDS],
     enable_sharding: bool,
     // shard_id -> cache.
     version_caches: HashMap<Option<usize>, VersionedNodeCache>,
     // `None` means the cache is not enabled.
     lru_cache: Option<LruNodeCache>,
+}
+
+struct HotDBWrapper {
+    metadata_db: Arc<DB>,
+    shards: [Arc<DB>; NUM_STATE_SHARDS],
 }
 
 impl StateMerkleDb {
@@ -76,8 +85,11 @@ impl StateMerkleDb {
         readonly: bool,
         // TODO(grao): Currently when this value is set to 0 we disable both caches. This is
         // hacky, need to revisit.
-        max_nodes_per_lru_cache_shard: usize,
+        mut max_nodes_per_lru_cache_shard: usize,
     ) -> Result<Self> {
+        // Disable caches for now.
+        max_nodes_per_lru_cache_shard = 0;
+
         let sharding = rocksdb_configs.enable_storage_sharding;
         let state_merkle_db_config = rocksdb_configs.state_merkle_db_config;
 
@@ -89,23 +101,7 @@ impl StateMerkleDb {
         let lru_cache = NonZeroUsize::new(max_nodes_per_lru_cache_shard).map(LruNodeCache::new);
 
         if !sharding {
-            info!("Sharded state merkle DB is not enabled!");
-            let state_merkle_db_path = db_paths.default_root_path().join(STATE_MERKLE_DB_NAME);
-            let db = Arc::new(Self::open_db(
-                state_merkle_db_path,
-                STATE_MERKLE_DB_NAME,
-                &state_merkle_db_config,
-                env,
-                block_cache,
-                readonly,
-            )?);
-            return Ok(Self {
-                state_merkle_metadata_db: Arc::clone(&db),
-                state_merkle_db_shards: arr![Arc::clone(&db); 16],
-                enable_sharding: false,
-                version_caches,
-                lru_cache,
-            });
+            panic!("Sharded state merkle DB is not enabled!");
         }
 
         Self::open(
@@ -124,6 +120,7 @@ impl StateMerkleDb {
         version: Version,
         top_levels_batch: impl IntoRawBatch,
         batches_for_shards: Vec<impl IntoRawBatch + Send>,
+        is_hot: bool,
     ) -> Result<()> {
         ensure!(
             batches_for_shards.len() == NUM_STATE_SHARDS,
@@ -134,15 +131,18 @@ impl StateMerkleDb {
                 .into_par_iter()
                 .enumerate()
                 .for_each(|(shard_id, batch)| {
-                    self.db_shard(shard_id)
-                        .write_schemas(batch)
-                        .unwrap_or_else(|err| {
-                            panic!("Failed to commit state merkle shard {shard_id}: {err}")
-                        });
+                    let db = if is_hot {
+                        self.hot_db_shard(shard_id)
+                    } else {
+                        self.db_shard(shard_id)
+                    };
+                    db.write_schemas(batch).unwrap_or_else(|err| {
+                        panic!("Failed to commit state merkle shard {shard_id}: {err}")
+                    });
                 })
         });
 
-        self.commit_top_levels(version, top_levels_batch)
+        self.commit_top_levels(version, top_levels_batch, is_hot)
     }
 
     /// Only used by fast sync / restore.
@@ -191,15 +191,32 @@ impl StateMerkleDb {
             std::fs::create_dir_all(&cp_state_merkle_db_path).unwrap_or(());
         }
 
+        let mut metadata_db_path = Self::metadata_db_path(cp_root_path.as_ref(), sharding);
         state_merkle_db
             .metadata_db()
-            .create_checkpoint(Self::metadata_db_path(cp_root_path.as_ref(), sharding))?;
+            .create_checkpoint(metadata_db_path.clone())?;
+
+        metadata_db_path.set_file_name("hot_metadata");
+        state_merkle_db
+            .hot_metadata_db()
+            .create_checkpoint(metadata_db_path)?;
 
         if sharding {
             for shard_id in 0..NUM_STATE_SHARDS {
                 state_merkle_db
                     .db_shard(shard_id)
-                    .create_checkpoint(Self::db_shard_path(cp_root_path.as_ref(), shard_id))?;
+                    .create_checkpoint(Self::db_shard_path(
+                        cp_root_path.as_ref(),
+                        shard_id,
+                        /* is_hot = */ false,
+                    ))?;
+                state_merkle_db
+                    .hot_db_shard(shard_id)
+                    .create_checkpoint(Self::db_shard_path(
+                        cp_root_path.as_ref(),
+                        shard_id,
+                        /* is_hot = */ true,
+                    ))?;
             }
         }
 
@@ -210,12 +227,20 @@ impl StateMerkleDb {
         &self.state_merkle_metadata_db
     }
 
+    fn hot_metadata_db(&self) -> &DB {
+        &self.hot_state_merkle_metadata_db
+    }
+
     pub(crate) fn metadata_db_arc(&self) -> Arc<DB> {
         Arc::clone(&self.state_merkle_metadata_db)
     }
 
     pub(crate) fn db_shard(&self, shard_id: usize) -> &DB {
         &self.state_merkle_db_shards[shard_id]
+    }
+
+    pub(crate) fn hot_db_shard(&self, shard_id: usize) -> &DB {
+        &self.hot_state_merkle_db_shards[shard_id]
     }
 
     pub(crate) fn db_shard_arc(&self, shard_id: usize) -> Arc<DB> {
@@ -234,9 +259,14 @@ impl StateMerkleDb {
         &self,
         version: Version,
         batch: impl IntoRawBatch,
+        is_hot: bool,
     ) -> Result<()> {
         info!(version = version, "Committing StateMerkleDb.");
-        self.state_merkle_metadata_db.write_schemas(batch)
+        if is_hot {
+            self.hot_state_merkle_metadata_db.write_schemas(batch)
+        } else {
+            self.state_merkle_metadata_db.write_schemas(batch)
+        }
     }
 
     pub fn get_with_proof_ext(
@@ -244,11 +274,20 @@ impl StateMerkleDb {
         key: &HashValue,
         version: Version,
         root_depth: usize,
+        is_hot: bool,
     ) -> Result<(
         Option<(HashValue, (StateKey, Version))>,
         SparseMerkleProofExt,
     )> {
-        JellyfishMerkleTree::new(self).get_with_proof_ext(key, version, root_depth)
+        if is_hot {
+            let wrapper = HotDBWrapper {
+                metadata_db: self.hot_state_merkle_metadata_db.clone(),
+                shards: self.hot_state_merkle_db_shards.clone(),
+            };
+            JellyfishMerkleTree::new(&wrapper).get_with_proof_ext(key, version, root_depth)
+        } else {
+            JellyfishMerkleTree::new(self).get_with_proof_ext(key, version, root_depth)
+        }
     }
 
     pub fn get_range_proof(
@@ -261,6 +300,14 @@ impl StateMerkleDb {
 
     pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {
         JellyfishMerkleTree::new(self).get_root_hash(version)
+    }
+
+    pub fn get_hot_root_hash(&self, version: Version) -> Result<HashValue> {
+        let wrapper = HotDBWrapper {
+            metadata_db: self.hot_state_merkle_metadata_db.clone(),
+            shards: self.hot_state_merkle_db_shards.clone(),
+        };
+        JellyfishMerkleTree::new(&wrapper).get_root_hash(version)
     }
 
     pub fn get_leaf_count(&self, version: Version) -> Result<usize> {
@@ -279,6 +326,26 @@ impl StateMerkleDb {
             shard_id as u8,
             value_set,
             node_hashes,
+            persisted_version,
+            version,
+        )
+    }
+
+    pub fn batch_put_hot_value_set_for_shard(
+        &self,
+        shard_id: usize,
+        value_set: Vec<(HashValue, Option<&(HashValue, StateKey)>)>,
+        persisted_version: Option<Version>,
+        version: Version,
+    ) -> Result<(Node, TreeUpdateBatch<StateKey>)> {
+        let wrapper = HotDBWrapper {
+            metadata_db: self.hot_state_merkle_metadata_db.clone(),
+            shards: self.hot_state_merkle_db_shards.clone(),
+        };
+        JellyfishMerkleTree::new(&wrapper).batch_put_value_set_for_shard(
+            shard_id as u8,
+            value_set,
+            /* node_hashes = */ None,
             persisted_version,
             version,
         )
@@ -427,6 +494,7 @@ impl StateMerkleDb {
         base_version: Option<Version>,
         shard_persisted_version: Option<Version>,
         previous_epoch_ending_version: Option<Version>,
+        is_hot: bool,
     ) -> Result<(Node, RawBatch)> {
         if let Some(shard_persisted_version) = shard_persisted_version {
             assert!(shard_persisted_version <= base_version.expect("Must have base version."));
@@ -435,16 +503,25 @@ impl StateMerkleDb {
         let (shard_root_node, tree_update_batch) = {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["jmt_update"]);
 
-            self.batch_put_value_set_for_shard(
-                shard_id,
-                value_set,
-                node_hashes,
-                shard_persisted_version,
-                version,
-            )
+            if !is_hot {
+                self.batch_put_value_set_for_shard(
+                    shard_id,
+                    value_set,
+                    node_hashes,
+                    shard_persisted_version,
+                    version,
+                )
+            } else {
+                self.batch_put_hot_value_set_for_shard(
+                    shard_id,
+                    value_set,
+                    shard_persisted_version,
+                    version,
+                )
+            }
         }?;
 
-        if self.cache_enabled() {
+        if self.cache_enabled() && !is_hot {
             self.version_caches
                 .get(&Some(shard_id))
                 .unwrap()
@@ -511,6 +588,17 @@ impl StateMerkleDb {
         root_persisted_version: Option<Version>,
     ) -> Result<[Option<Version>; NUM_STATE_SHARDS]> {
         JellyfishMerkleTree::new(self).get_shard_persisted_versions(root_persisted_version)
+    }
+
+    pub(crate) fn get_hot_shard_persisted_versions(
+        &self,
+        root_persisted_version: Option<Version>,
+    ) -> Result<[Option<Version>; NUM_STATE_SHARDS]> {
+        let wrapper = HotDBWrapper {
+            metadata_db: self.hot_state_merkle_metadata_db.clone(),
+            shards: self.hot_state_merkle_db_shards.clone(),
+        };
+        JellyfishMerkleTree::new(&wrapper).get_shard_persisted_versions(root_persisted_version)
     }
 
     pub(crate) fn sharding_enabled(&self) -> bool {
@@ -581,6 +669,17 @@ impl StateMerkleDb {
             readonly,
         )?);
 
+        let mut hot_state_merkle_metadata_db_path = state_merkle_metadata_db_path.clone();
+        hot_state_merkle_metadata_db_path.set_file_name("hot_metadata");
+        let hot_state_merkle_metadata_db = Arc::new(Self::open_db(
+            hot_state_merkle_metadata_db_path,
+            HOT_STATE_MERKLE_METADATA_DB_NAME,
+            &state_merkle_db_config,
+            env,
+            block_cache,
+            readonly,
+        )?);
+
         info!(
             state_merkle_metadata_db_path = state_merkle_metadata_db_path,
             "Opened state merkle metadata db!"
@@ -597,6 +696,29 @@ impl StateMerkleDb {
                     env,
                     block_cache,
                     readonly,
+                    /* is_hot = */ false,
+                )
+                .unwrap_or_else(|e| {
+                    panic!("Failed to open state merkle db shard {shard_id}: {e:?}.")
+                });
+                Arc::new(db)
+            })
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
+
+        let hot_state_merkle_db_shards = (0..NUM_STATE_SHARDS)
+            .into_par_iter()
+            .map(|shard_id| {
+                let shard_root_path = db_paths.state_merkle_db_shard_root_path(shard_id);
+                let db = Self::open_shard(
+                    shard_root_path,
+                    shard_id,
+                    &state_merkle_db_config,
+                    env,
+                    block_cache,
+                    readonly,
+                    /* is_hot = */ true,
                 )
                 .unwrap_or_else(|e| {
                     panic!("Failed to open state merkle db shard {shard_id}: {e:?}.")
@@ -609,7 +731,9 @@ impl StateMerkleDb {
 
         let state_merkle_db = Self {
             state_merkle_metadata_db,
+            hot_state_merkle_metadata_db,
             state_merkle_db_shards,
+            hot_state_merkle_db_shards,
             enable_sharding: true,
             version_caches,
             lru_cache,
@@ -636,10 +760,15 @@ impl StateMerkleDb {
         env: Option<&Env>,
         block_cache: Option<&Cache>,
         readonly: bool,
+        is_hot: bool,
     ) -> Result<DB> {
-        let db_name = format!("state_merkle_db_shard_{}", shard_id);
+        let db_name = if is_hot {
+            format!("hot_state_merkle_db_shard_{}", shard_id)
+        } else {
+            format!("state_merkle_db_shard_{}", shard_id)
+        };
         Self::open_db(
-            Self::db_shard_path(db_root_path, shard_id),
+            Self::db_shard_path(db_root_path, shard_id, is_hot),
             &db_name,
             state_merkle_db_config,
             env,
@@ -673,8 +802,12 @@ impl StateMerkleDb {
         })
     }
 
-    fn db_shard_path<P: AsRef<Path>>(db_root_path: P, shard_id: usize) -> PathBuf {
-        let shard_sub_path = format!("shard_{}", shard_id);
+    fn db_shard_path<P: AsRef<Path>>(db_root_path: P, shard_id: usize, is_hot: bool) -> PathBuf {
+        let shard_sub_path = format!(
+            "{}_{}",
+            if is_hot { "hot_shard" } else { "shard" },
+            shard_id
+        );
         db_root_path
             .as_ref()
             .join(STATE_MERKLE_DB_FOLDER_NAME)
@@ -784,6 +917,22 @@ impl StateMerkleDb {
             }
         }
         Ok(ret)
+    }
+}
+
+impl TreeReader<StateKey> for HotDBWrapper {
+    fn get_node_option(&self, node_key: &NodeKey, _tag: &str) -> Result<Option<Node>> {
+        let db = if let Some(shard_id) = node_key.get_shard_id() {
+            &self.shards[shard_id]
+        } else {
+            &self.metadata_db
+        };
+        let node_opt = db.get::<HotJellyfishMerkleNodeSchema>(node_key)?;
+        Ok(node_opt)
+    }
+
+    fn get_rightmost_leaf(&self, _version: Version) -> Result<Option<(NodeKey, LeafNode)>> {
+        unimplemented!()
     }
 }
 
