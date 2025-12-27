@@ -1,0 +1,54 @@
+// Purpose: stale indexed ref should fail after vec element is rewritten to new variant.
+// Flow:
+//   (1) build data = [Foo::A(10), Foo::B(77)]
+//   (2) borrow payload_ref = &data[0].A::x
+//   (3) replace data[0] with Foo::B(99) via vec_mut_borrow/write_ref
+//   (4) read payload_ref -> aborts (tag changed from A to B)
+// Diagram (step 2)                    Diagram (step 3)
+//   data[0] ──▶ Foo::A { x:10 } ◀── payload_ref   data[0] ──▶ Foo::B { x:99 }
+//   data[1] ──▶ Foo::B { x:77 }                  payload_ref ──▶ stale expectation (tag A)
+
+//# publish
+module 0xc0ffe3::vec_replace_confusion
+
+enum Foo has drop
+  A
+    x: u64
+  B
+    x: u64
+
+public fun stale_vec_replace()
+    local data: vector<Foo>
+    local payload_ref: &u64
+
+    // Build vector [Foo::A {10}, Foo::B {77}]
+    ld_u64 10
+    pack_variant Foo, A
+    ld_u64 77
+    pack_variant Foo, B
+    vec_pack<Foo> 2
+    st_loc data
+
+    // Borrow field from first element
+    borrow_loc data
+    ld_u64 0
+    vec_borrow<Foo>
+    borrow_variant_field Foo, A::x
+    st_loc payload_ref
+
+    // Attempt to replace element 0 while stale field ref still exists
+    ld_u64 99
+    pack_variant Foo, B
+    mut_borrow_loc data
+    ld_u64 0
+    vec_mut_borrow<Foo>
+    write_ref
+
+    // Attempt to read stale ref (should never succeed)
+    move_loc payload_ref
+    read_ref
+    pop
+    ret
+
+//# run 0xc0ffe3::vec_replace_confusion::stale_vec_replace --verbose
+
