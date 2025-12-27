@@ -7,6 +7,7 @@ use crate::{
     planned::Planned,
     transactions_with_output::{TransactionsToKeep, TransactionsWithOutput},
 };
+use aptos_config::config::HotStateConfig;
 use aptos_drop_helper::DropHelper;
 use aptos_storage_interface::state_store::{
     state::LedgerState, state_view::cached_state_view::ShardedStateCache,
@@ -14,7 +15,6 @@ use aptos_storage_interface::state_store::{
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
-    state_store::hot_state::HotStateConfig,
     transaction::{
         block_epilogue::BlockEndInfo, ExecutionStatus, Transaction, TransactionStatus, Version,
     },
