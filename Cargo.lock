@@ -3180,6 +3180,7 @@ dependencies = [
  "e2e-move-tests",
  "rand 0.7.3",
  "serde_json",
+ "tikv-jemallocator",
  "tokio",
 ]
 
