@@ -79,7 +79,11 @@ impl AptosVM {
                 // Pretend we are inside Move, and expected failures are like Move aborts.
                 debug!("Processing dkg transaction expected failure: {:?}", failure);
                 Ok((
-                    VMStatus::MoveAbort(AbortLocation::Script, failure as u64),
+                    VMStatus::MoveAbort {
+                        location: AbortLocation::Script,
+                        code: failure as u64,
+                        message: None,
+                    },
                     VMOutput::empty_with_status(TransactionStatus::Discard(StatusCode::ABORTED)),
                 ))
             },

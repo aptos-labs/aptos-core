@@ -2738,13 +2738,45 @@ impl Frame {
                             )?;
                             eprintln!("trace abort({}): {}", error_code, str);
                         }
+
+                        // Important: do not attach a message here.
+                        // We rely on the presence of an error message to distinguish
+                        // aborts with explicit messages (see below) from those without.
+                        let error =
+                            PartialVMError::new(StatusCode::ABORTED).with_sub_status(error_code);
+
+                        // Before returning an abort error, ensure the instruction is recorded in
+                        // the trace, so the trace is full.
+                        trace_recorder.record_successful_instruction(instruction);
+                        return Err(error);
+                    },
+                    Instruction::AbortMsg => {
+                        gas_meter.charge_simple_instr(S::Abort)?;
+
+                        let vec = interpreter.operand_stack.pop_as::<Vector>()?;
+                        let bytes = vec.to_vec_u8()?;
+                        // TODO(aborts): Add a test that triggers this error.
+                        let error_message = String::from_utf8(bytes).map_err(|err| {
+                            PartialVMError::new(StatusCode::INVALID_ABORT_MESSAGE)
+                                .with_message(format!("Invalid UTF-8 string: {err}"))
+                        })?;
+
+                        let error_code = interpreter.operand_stack.pop_as::<u64>()?;
+
+                        if is_tracing_for!(TraceCategory::Abort(error_code)) {
+                            let mut str = String::new();
+                            interpreter.debug_print_stack_trace(
+                                &mut str,
+                                interpreter.loader.runtime_environment(),
+                            )?;
+                            eprintln!(
+                                "trace abort_msg({}, {}): {}",
+                                error_code, error_message, str
+                            );
+                        }
                         let error = PartialVMError::new(StatusCode::ABORTED)
                             .with_sub_status(error_code)
-                            .with_message(format!(
-                                "{} at offset {}",
-                                self.function.name_as_pretty_string(),
-                                self.pc,
-                            ));
+                            .with_message(error_message);
 
                         // Before returning an abort error, ensure the instruction is recorded in
                         // the trace, so the trace is full.

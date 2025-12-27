@@ -104,11 +104,15 @@ impl VMError {
                 debug_assert!(sub_status.is_none());
                 VMStatus::Executed
             },
-            (StatusCode::ABORTED, Some(code), Location::Script) => {
-                VMStatus::MoveAbort(vm_status::AbortLocation::Script, code)
+            (StatusCode::ABORTED, Some(code), Location::Script) => VMStatus::MoveAbort {
+                location: vm_status::AbortLocation::Script,
+                code,
+                message,
             },
-            (StatusCode::ABORTED, Some(code), Location::Module(id)) => {
-                VMStatus::MoveAbort(vm_status::AbortLocation::Module(id), code)
+            (StatusCode::ABORTED, Some(code), Location::Module(id)) => VMStatus::MoveAbort {
+                location: vm_status::AbortLocation::Module(id),
+                code,
+                message,
             },
 
             (StatusCode::ABORTED, sub_status, location) => {

@@ -150,8 +150,9 @@ fn test_err_output_equality_with_deltas() {
 
     // Aggregator errors lead to aborts. Because an overflow happens,
     // the code must be 131073.
-    assert_matches!(
-        vm_status_1,
-        VMStatus::MoveAbort(AbortLocation::Module(_), 131073)
-    );
+    assert_matches!(vm_status_1, VMStatus::MoveAbort {
+        location: AbortLocation::Module(_),
+        code: 131073,
+        ..
+    });
 }

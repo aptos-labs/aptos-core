@@ -1470,10 +1470,17 @@ impl From<KeptVMStatus> for ExecutionStatus {
         match kept_status {
             KeptVMStatus::Executed => ExecutionStatus::Success,
             KeptVMStatus::OutOfGas => ExecutionStatus::OutOfGas,
-            KeptVMStatus::MoveAbort(location, code) => ExecutionStatus::MoveAbort {
+            KeptVMStatus::MoveAbort {
                 location,
                 code,
-                info: None,
+                message,
+            } => ExecutionStatus::MoveAbort {
+                location,
+                code,
+                info: message.map(|message| AbortInfo {
+                    reason_name: "".to_string(), // will be populated later
+                    description: message,
+                }),
             },
             KeptVMStatus::ExecutionFailure {
                 location: loc,
@@ -1575,6 +1582,7 @@ impl TransactionStatus {
         match vm_status.keep_or_discard(
             features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES),
             memory_limit_exceeded_as_miscellaneous_error,
+            false,
         ) {
             Ok(recorded) => match recorded {
                 // TODO(bowu):status code should be removed from transaction status
