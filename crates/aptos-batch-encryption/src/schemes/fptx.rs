@@ -6,7 +6,7 @@ use crate::{
     shared::{
         ark_serialize::*,
         ciphertext::{BIBEEncryptionKey, CTDecrypt, CTEncrypt, Ciphertext, PreparedCiphertext},
-        digest::{Digest, DigestKey, EvalProofs, EvalProofsPromise},
+        digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise},
         ids::{
             free_roots::{ComputedCoeffs, UncomputedCoeffs},
             FreeRootId, FreeRootIdSet, IdSet,
@@ -71,7 +71,7 @@ impl BatchThresholdEncryption for FPTX {
     type Digest = Digest;
     type DigestKey = DigestKey;
     type EncryptionKey = EncryptionKey;
-    type EvalProof = G1Affine;
+    type EvalProof = EvalProof;
     type EvalProofs = EvalProofs<FreeRootIdSet<ComputedCoeffs>>;
     type EvalProofsPromise = EvalProofsPromise<FreeRootIdSet<ComputedCoeffs>>;
     type Id = FreeRootId;
@@ -267,7 +267,7 @@ impl BatchThresholdEncryption for FPTX {
         proofs: &Self::EvalProofs,
         ct: &Self::Ciphertext,
     ) -> Option<Self::EvalProof> {
-        proofs.get(&ct.id())
+        proofs.get(&ct.id()).map(Self::EvalProof::from)
     }
 
     fn derive_decryption_key_share(
