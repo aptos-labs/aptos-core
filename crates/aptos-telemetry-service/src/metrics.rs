@@ -2,11 +2,11 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    clients::victoria_metrics_api,
     constants::{
         GCP_CLOUD_RUN_INSTANCE_ID_ENV, GCP_CLOUD_RUN_REVISION_ENV, GCP_CLOUD_RUN_SERVICE_ENV,
         GCP_SERVICE_PROJECT_ID_ENV,
     },
+    context::MetricsIngestClient,
     debug, error,
 };
 use anyhow::anyhow;
@@ -361,11 +361,11 @@ pub struct PrometheusExporter {
     service: String,
     revision: String,
     instance_id: String,
-    client: victoria_metrics_api::Client,
+    client: MetricsIngestClient,
 }
 
 impl PrometheusExporter {
-    pub fn new(client: victoria_metrics_api::Client) -> Self {
+    pub fn new(client: MetricsIngestClient) -> Self {
         let service = env::var(GCP_CLOUD_RUN_SERVICE_ENV).unwrap_or_else(|_| "Unknown".into());
         let revision = env::var(GCP_CLOUD_RUN_REVISION_ENV).unwrap_or_else(|_| "Unknown".into());
         let instance_id =

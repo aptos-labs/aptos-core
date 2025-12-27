@@ -29,20 +29,60 @@ struct LokiStream {
     values: Vec<[String; 2]>,
 }
 
+/// Authentication configuration for Loki
+#[derive(Clone, Debug)]
+pub enum LokiAuth {
+    /// No authentication
+    None,
+    /// Bearer token authentication
+    Bearer(String),
+    /// Basic authentication (username, password)
+    Basic(String, String),
+}
+
+impl LokiAuth {
+    /// Create from optional bearer token (for backward compatibility)
+    pub fn from_bearer_token(token: Option<String>) -> Self {
+        match token {
+            Some(t) if !t.is_empty() => LokiAuth::Bearer(t),
+            _ => LokiAuth::None,
+        }
+    }
+
+    /// Create basic auth from "username:password" string
+    pub fn from_basic_auth_string(creds: &str) -> Option<Self> {
+        let parts: Vec<&str> = creds.splitn(2, ':').collect();
+        if parts.len() == 2 {
+            Some(LokiAuth::Basic(parts[0].to_string(), parts[1].to_string()))
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct LokiIngestClient {
     inner: DebugIgnore<ClientWithMiddleware>,
     base_url: Url,
-    auth_token: Option<String>,
+    auth: LokiAuth,
 }
 
 impl LokiIngestClient {
-    /// Create a new Loki ingest client
+    /// Create a new Loki ingest client with optional bearer token (backward compatible)
     ///
     /// # Arguments
     /// * `base_url` - Base URL of Loki (e.g., http://loki:3100)
     /// * `auth_token` - Optional bearer token for authentication
     pub fn new(base_url: Url, auth_token: Option<String>) -> Self {
+        Self::with_auth(base_url, LokiAuth::from_bearer_token(auth_token))
+    }
+
+    /// Create a new Loki ingest client with custom auth configuration
+    ///
+    /// # Arguments
+    /// * `base_url` - Base URL of Loki (e.g., http://loki:3100)
+    /// * `auth` - Authentication configuration
+    pub fn with_auth(base_url: Url, auth: LokiAuth) -> Self {
         let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
         let inner = ClientBuilder::new(ReqwestClient::new())
             .with(RetryTransientMiddleware::new_with_policy(retry_policy))
@@ -50,7 +90,7 @@ impl LokiIngestClient {
         Self {
             inner: DebugIgnore(inner),
             base_url,
-            auth_token,
+            auth,
         }
     }
 
@@ -89,17 +129,19 @@ impl LokiIngestClient {
         let json_body = serde_json::to_string(&request)
             .map_err(|e| anyhow!("unable to serialize json: {}", e))?;
 
-        let mut req = self
+        let req = self
             .inner
             .0
             .post(self.base_url.join("/loki/api/v1/push")?)
             .header("Content-Type", "application/json")
             .body(json_body);
 
-        // Add authentication if provided
-        if let Some(token) = &self.auth_token {
-            req = req.bearer_auth(token);
-        }
+        // Add authentication based on configured auth type
+        let req = match &self.auth {
+            LokiAuth::None => req,
+            LokiAuth::Bearer(token) => req.bearer_auth(token),
+            LokiAuth::Basic(username, password) => req.basic_auth(username, Some(password)),
+        };
 
         req.send()
             .await
