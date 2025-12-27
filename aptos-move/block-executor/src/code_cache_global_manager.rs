@@ -375,6 +375,13 @@ fn prefetch_aptos_framework(
         guard
             .module_cache_mut()
             .insert_verified(verified_module_code_iter)?;
+        unsafe {
+            guard
+                .environment()
+                .runtime_environment()
+                .ty_pool()
+                .publish_unchecked();
+        }
     }
     Ok(())
 }
