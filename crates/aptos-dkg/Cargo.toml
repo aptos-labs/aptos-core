@@ -59,11 +59,19 @@ name = "lagrange"
 harness = false
 
 [[bench]]
+name = "ldt"
+harness = false
+
+[[bench]]
 name = "pvss"
 harness = false
 
 [[bench]]
 name = "range_proof"
+harness = false
+
+[[bench]]
+name = "serialization"
 harness = false
 
 [[bench]]
