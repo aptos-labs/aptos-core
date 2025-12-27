@@ -666,7 +666,7 @@ module aptos_std::big_ordered_map {
     ///
     /// For a large enough BigOrderedMap this function will fail due to execution gas limits,
     /// use iterartor or next_key/prev_key to iterate over across portion of the map.
-    public fun keys<K: store + copy + drop, V: store + copy>(self: &BigOrderedMap<K, V>): vector<K> {
+    public fun keys<K: store + copy + drop, V: store>(self: &BigOrderedMap<K, V>): vector<K> {
         let result = vector[];
         self.for_each_ref(|k, _v| {
             result.push_back(*k);
