@@ -986,6 +986,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                 allow_fallback: self.allow_block_executor_fallback,
                 discard_failed_blocks: false,
                 module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
+                enable_pre_write: true,
             },
             onchain: onchain_config.clone(),
         };
