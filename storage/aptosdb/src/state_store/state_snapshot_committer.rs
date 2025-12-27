@@ -13,6 +13,7 @@ use crate::{
     },
     versioned_node_cache::VersionedNodeCache,
 };
+use aptos_crypto::hash::CryptoHash;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::trace;
 use aptos_metrics_core::TimerHelper;
@@ -36,7 +37,8 @@ pub(crate) struct StateSnapshotCommitter {
     /// Last snapshot merklized and sent for persistence, not guaranteed to have committed already.
     last_snapshot: StateWithSummary,
     state_snapshot_commit_receiver: Receiver<CommitMessage<StateWithSummary>>,
-    state_merkle_batch_commit_sender: SyncSender<CommitMessage<StateMerkleBatch>>,
+    state_merkle_batch_commit_sender:
+        SyncSender<CommitMessage<(StateMerkleBatch, StateMerkleBatch)>>,
     join_handle: Option<JoinHandle<()>>,
 }
 
@@ -91,10 +93,20 @@ impl StateSnapshotCommitter {
                         .unwrap()
                         .map(|(v, _e)| v);
 
-                    let (shard_root_nodes, batches_for_shards) = {
+                    let (
+                        (hot_shard_root_nodes, hot_batches_for_shards),
+                        (shard_root_nodes, batches_for_shards),
+                    ) = {
                         let _timer =
                             OTHER_TIMERS_SECONDS.timer_with(&["calculate_batches_for_shards"]);
 
+                        let hot_shard_persisted_versions = self
+                            .state_db
+                            .hot_state_merkle_db
+                            .as_ref()
+                            .unwrap()
+                            .get_shard_persisted_versions(base_version)
+                            .unwrap();
                         let shard_persisted_versions = self
                             .state_db
                             .state_merkle_db
@@ -110,6 +122,11 @@ impl StateSnapshotCommitter {
                                 .par_iter()
                                 .enumerate()
                                 .map(|(shard_id, updates)| {
+                                    let hot_node_hashes =
+                                        snapshot.summary().hot_state_summary.new_node_hashes_since(
+                                            &self.last_snapshot.summary().hot_state_summary,
+                                            shard_id as u8,
+                                        );
                                     let node_hashes = snapshot
                                         .summary()
                                         .global_state_summary
@@ -118,6 +135,16 @@ impl StateSnapshotCommitter {
                                             shard_id as u8,
                                         );
                                     // TODO(aldenhu): iterator of refs
+                                    let hot_updates = updates
+                                        .iter()
+                                        .filter_map(|(key, slot)| {
+                                            if slot.is_hot() {
+                                                slot.maybe_update_jmt(key, min_version)
+                                            } else {
+                                                Some((CryptoHash::hash(&key), None))
+                                            }
+                                        })
+                                        .collect_vec();
                                     let updates = {
                                         let _timer =
                                             OTHER_TIMERS_SECONDS.timer_with(&["hash_jmt_updates"]);
@@ -130,15 +157,33 @@ impl StateSnapshotCommitter {
                                             .collect_vec()
                                     };
 
-                                    self.state_db.state_merkle_db.merklize_value_set_for_shard(
-                                        shard_id,
-                                        jmt_update_refs(&updates),
-                                        Some(&node_hashes),
-                                        version,
-                                        base_version,
-                                        shard_persisted_versions[shard_id],
-                                        previous_epoch_ending_version,
-                                    )
+                                    let hot_stuff = self
+                                        .state_db
+                                        .hot_state_merkle_db
+                                        .as_ref()
+                                        .unwrap()
+                                        .merklize_value_set_for_shard(
+                                            shard_id,
+                                            jmt_update_refs(&hot_updates),
+                                            Some(&hot_node_hashes),
+                                            version,
+                                            base_version,
+                                            hot_shard_persisted_versions[shard_id],
+                                            previous_epoch_ending_version,
+                                        )?;
+                                    let cold_stuff = self
+                                        .state_db
+                                        .state_merkle_db
+                                        .merklize_value_set_for_shard(
+                                            shard_id,
+                                            jmt_update_refs(&updates),
+                                            Some(&node_hashes),
+                                            version,
+                                            base_version,
+                                            shard_persisted_versions[shard_id],
+                                            previous_epoch_ending_version,
+                                        )?;
+                                    Ok((hot_stuff, cold_stuff))
                                 })
                                 .collect::<Result<Vec<_>>>()
                                 .expect("Error calculating StateMerkleBatch for shards.")
@@ -146,6 +191,29 @@ impl StateSnapshotCommitter {
                                 .unzip()
                         })
                     };
+
+                    let (hot_root_hash, hot_leaf_count, hot_top_levels_batch) = {
+                        let _timer =
+                            OTHER_TIMERS_SECONDS.timer_with(&["calculate_hot_top_levels_batch"]);
+                        self.state_db
+                            .hot_state_merkle_db
+                            .as_ref()
+                            .unwrap()
+                            .calculate_top_levels(
+                                hot_shard_root_nodes,
+                                version,
+                                base_version,
+                                previous_epoch_ending_version,
+                            )
+                            .expect("Error calculating hot StateMerkleBatch for top levels.")
+                    };
+                    assert_eq!(
+                        hot_root_hash,
+                        snapshot.summary().hot_root_hash(),
+                        "root hash mismatch: jmt: {}, smt: {}",
+                        hot_root_hash,
+                        snapshot.summary().hot_root_hash(),
+                    );
 
                     let (root_hash, leaf_count, top_levels_batch) = {
                         let _timer =
@@ -182,11 +250,18 @@ impl StateSnapshotCommitter {
                     self.last_snapshot = snapshot.clone();
 
                     self.state_merkle_batch_commit_sender
-                        .send(CommitMessage::Data(StateMerkleBatch {
-                            top_levels_batch,
-                            batches_for_shards,
-                            snapshot,
-                        }))
+                        .send(CommitMessage::Data((
+                            StateMerkleBatch {
+                                top_levels_batch: hot_top_levels_batch,
+                                batches_for_shards: hot_batches_for_shards,
+                                snapshot: snapshot.clone(),
+                            },
+                            StateMerkleBatch {
+                                top_levels_batch,
+                                batches_for_shards,
+                                snapshot,
+                            },
+                        )))
                         .unwrap();
                 },
                 CommitMessage::Sync(finish_sender) => {
