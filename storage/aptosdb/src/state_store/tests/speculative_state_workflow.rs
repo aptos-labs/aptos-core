@@ -701,7 +701,7 @@ fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, bool)>) -> (Vec<Txn>, StateByVers
                         Some(v) => (k, WriteOp::modification_to_value(v).into_base_op()),
                     })
                     .collect(),
-                is_checkpoint: false,
+                is_checkpoint,
             });
         }
         if append_epilogue {
