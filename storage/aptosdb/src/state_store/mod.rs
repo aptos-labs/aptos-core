@@ -597,56 +597,57 @@ impl StateStore {
 
         // Replaying the committed write sets after the latest snapshot.
         if snapshot_next_version < num_transactions {
-            if check_max_versions_after_snapshot {
-                ensure!(
-                    num_transactions - snapshot_next_version <= MAX_WRITE_SETS_AFTER_SNAPSHOT,
-                    "Too many versions after state snapshot. snapshot_next_version: {}, num_transactions: {}",
-                    snapshot_next_version,
-                    num_transactions,
-                );
-            }
-            let write_sets = state_db
-                .ledger_db
-                .write_set_db()
-                .get_write_sets(snapshot_next_version, num_transactions)?;
-            let txn_info_iter = state_db
-                .ledger_db
-                .transaction_info_db()
-                .get_transaction_info_iter(snapshot_next_version, write_sets.len())?;
-            let all_checkpoint_indices = txn_info_iter
-                .into_iter()
-                .collect::<Result<Vec<_>>>()?
-                .into_iter()
-                .positions(|txn_info| txn_info.has_state_checkpoint_hash())
-                .collect();
+            unimplemented!();
+            // if check_max_versions_after_snapshot {
+            //     ensure!(
+            //         num_transactions - snapshot_next_version <= MAX_WRITE_SETS_AFTER_SNAPSHOT,
+            //         "Too many versions after state snapshot. snapshot_next_version: {}, num_transactions: {}",
+            //         snapshot_next_version,
+            //         num_transactions,
+            //     );
+            // }
+            // let write_sets = state_db
+            //     .ledger_db
+            //     .write_set_db()
+            //     .get_write_sets(snapshot_next_version, num_transactions)?;
+            // let txn_info_iter = state_db
+            //     .ledger_db
+            //     .transaction_info_db()
+            //     .get_transaction_info_iter(snapshot_next_version, write_sets.len())?;
+            // let all_checkpoint_indices = txn_info_iter
+            //     .into_iter()
+            //     .collect::<Result<Vec<_>>>()?
+            //     .into_iter()
+            //     .positions(|txn_info| txn_info.has_state_checkpoint_hash())
+            //     .collect();
 
-            let state_update_refs = StateUpdateRefs::index_write_sets(
-                state.next_version(),
-                &write_sets,
-                write_sets.len(),
-                all_checkpoint_indices,
-            );
-            let current_state = out_current_state.lock().clone();
-            let (hot_state, state) = out_persisted_state.get_state();
-            let (new_state, _state_reads) = current_state.ledger_state().update_with_db_reader(
-                &state,
-                hot_state,
-                &state_update_refs,
-                state_db.clone(),
-            )?;
-            let state_summary = out_persisted_state.get_state_summary();
-            let new_state_summary = current_state.ledger_state_summary().update(
-                &ProvableStateSummary::new(state_summary, state_db.as_ref()),
-                &state_update_refs,
-            )?;
-            let updated =
-                LedgerStateWithSummary::from_state_and_summary(new_state, new_state_summary);
+            // let state_update_refs = StateUpdateRefs::index_write_sets(
+            //     state.next_version(),
+            //     &write_sets,
+            //     write_sets.len(),
+            //     all_checkpoint_indices,
+            // );
+            // let current_state = out_current_state.lock().clone();
+            // let (hot_state, state) = out_persisted_state.get_state();
+            // let (new_state, _state_reads) = current_state.ledger_state().update_with_db_reader(
+            //     &state,
+            //     hot_state,
+            //     &state_update_refs,
+            //     state_db.clone(),
+            // )?;
+            // let state_summary = out_persisted_state.get_state_summary();
+            // let new_state_summary = current_state.ledger_state_summary().update(
+            //     &ProvableStateSummary::new(state_summary, state_db.as_ref()),
+            //     &state_update_refs,
+            // )?;
+            // let updated =
+            //     LedgerStateWithSummary::from_state_and_summary(new_state, new_state_summary);
 
-            // synchronously commit the snapshot at the last checkpoint here if not committed to disk yet.
-            buffered_state.update(
-                updated, 0,    /* estimated_items, doesn't matter since we sync-commit */
-                true, /* sync_commit */
-            )?;
+            // // synchronously commit the snapshot at the last checkpoint here if not committed to disk yet.
+            // buffered_state.update(
+            //     updated, 0,    /* estimated_items, doesn't matter since we sync-commit */
+            //     true, /* sync_commit */
+            // )?;
         }
 
         let current_state = out_current_state.lock().clone();
@@ -1403,27 +1404,29 @@ mod test_only {
             let current = self.current_state_locked().ledger_state_summary();
             let persisted = self.persisted_state.get_state_summary();
 
-            let new_state_summary = current
-                .update(
-                    &ProvableStateSummary::new(persisted, self.state_db.as_ref()),
-                    &state_update_refs,
-                )
-                .unwrap();
-            let root_hash = new_state_summary.root_hash();
+            unimplemented!();
 
-            self.buffered_state
-                .lock()
-                .update(
-                    LedgerStateWithSummary::from_state_and_summary(
-                        new_ledger_state,
-                        new_state_summary,
-                    ),
-                    0,    /* estimated_items, doesn't matter since we sync-commit */
-                    true, /* sync_commit */
-                )
-                .unwrap();
+            // let new_state_summary = current
+            //     .update(
+            //         &ProvableStateSummary::new(persisted, self.state_db.as_ref()),
+            //         &state_update_refs,
+            //     )
+            //     .unwrap();
+            // let root_hash = new_state_summary.root_hash();
 
-            root_hash
+            // self.buffered_state
+            //     .lock()
+            //     .update(
+            //         LedgerStateWithSummary::from_state_and_summary(
+            //             new_ledger_state,
+            //             new_state_summary,
+            //         ),
+            //         0,    /* estimated_items, doesn't matter since we sync-commit */
+            //         true, /* sync_commit */
+            //     )
+            //     .unwrap();
+
+            // root_hash
         }
     }
 }
