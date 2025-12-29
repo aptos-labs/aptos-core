@@ -1,0 +1,45 @@
+// Purpose: Verify that setup for indexed_ref_tag_vec_replace.masm is valid if the stale ref is NOT used.
+// This confirms that the error in the original test comes from the read_ref, not the mutation itself.
+
+//# publish
+module 0xc0ffe3::vec_replace_confusion_ok
+
+enum Foo has drop
+  A
+    x: u64
+  B
+    x: u64
+
+public fun stale_vec_replace_ok()
+    local data: vector<Foo>
+    local payload_ref: &u64
+
+    // Build vector [Foo::A {10}, Foo::B {77}]
+    ld_u64 10
+    pack_variant Foo, A
+    ld_u64 77
+    pack_variant Foo, B
+    vec_pack<Foo> 2
+    st_loc data
+
+    // Borrow field from first element
+    borrow_loc data
+    ld_u64 0
+    vec_borrow<Foo>
+    borrow_variant_field Foo, A::x
+    st_loc payload_ref
+
+    // Attempt to replace element 0 while stale field ref still exists
+    ld_u64 99
+    pack_variant Foo, B
+    mut_borrow_loc data
+    ld_u64 0
+    vec_mut_borrow<Foo>
+    write_ref
+
+    // We do NOT read the stale payload_ref.
+    // Instead we just return.
+    ret
+
+//# run 0xc0ffe3::vec_replace_confusion_ok::stale_vec_replace_ok --verbose
+
