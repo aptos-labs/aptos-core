@@ -149,6 +149,10 @@ impl<'kv> StateUpdateRefs<'kv> {
         self.for_latest.as_ref().map(|x| &x.1)
     }
 
+    pub fn has_for_latest(&self) -> bool {
+        self.for_latest.is_some()
+    }
+
     pub fn index_write_sets(
         first_version: Version,
         write_sets: impl IntoIterator<Item = &'kv WriteSet>,

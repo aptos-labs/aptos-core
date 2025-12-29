@@ -25,14 +25,14 @@ pub struct StateMerkleBatch {
 
 pub(crate) struct StateMerkleBatchCommitter {
     state_db: Arc<StateDb>,
-    state_merkle_batch_receiver: Receiver<CommitMessage<StateMerkleBatch>>,
+    state_merkle_batch_receiver: Receiver<CommitMessage<(StateMerkleBatch, StateMerkleBatch)>>,
     persisted_state: PersistedState,
 }
 
 impl StateMerkleBatchCommitter {
     pub fn new(
         state_db: Arc<StateDb>,
-        state_merkle_batch_receiver: Receiver<CommitMessage<StateMerkleBatch>>,
+        state_merkle_batch_receiver: Receiver<CommitMessage<(StateMerkleBatch, StateMerkleBatch)>>,
         persisted_state: PersistedState,
     ) -> Self {
         Self {
@@ -46,7 +46,12 @@ impl StateMerkleBatchCommitter {
         while let Ok(msg) = self.state_merkle_batch_receiver.recv() {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["batch_committer_work"]);
             match msg {
-                CommitMessage::Data(state_merkle_batch) => {
+                CommitMessage::Data((hot_state_merkle_batch, state_merkle_batch)) => {
+                    let StateMerkleBatch {
+                        top_levels_batch: hot_top_levels_batch,
+                        batches_for_shards: hot_batches_for_shards,
+                        snapshot,
+                    } = hot_state_merkle_batch;
                     let StateMerkleBatch {
                         top_levels_batch,
                         batches_for_shards,
@@ -61,6 +66,31 @@ impl StateMerkleBatchCommitter {
                     // commit jellyfish merkle nodes
                     let _timer =
                         OTHER_TIMERS_SECONDS.timer_with(&["commit_jellyfish_merkle_nodes"]);
+                    self.state_db
+                        .hot_state_merkle_db
+                        .as_ref()
+                        .unwrap()
+                        .commit(
+                            current_version,
+                            hot_top_levels_batch,
+                            hot_batches_for_shards,
+                        )
+                        .expect("Hot state merkle nodes commit failed.");
+                    if let Some(lru_cache) = self
+                        .state_db
+                        .hot_state_merkle_db
+                        .as_ref()
+                        .unwrap()
+                        .lru_cache()
+                    {
+                        self.state_db
+                            .hot_state_merkle_db
+                            .as_ref()
+                            .unwrap()
+                            .version_caches()
+                            .iter()
+                            .for_each(|(_, cache)| cache.maybe_evict_version(lru_cache));
+                    }
                     self.state_db
                         .state_merkle_db
                         .commit(current_version, top_levels_batch, batches_for_shards)
