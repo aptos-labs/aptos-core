@@ -8,7 +8,9 @@ use crate::{
     ast::{Operation, TraceKind, Value},
     builder::model_builder::{ConstEntry, EntryVisibility, ModelBuilder, SpecOrBuiltinFunEntry},
     metadata::{
-        lang_feature_versions::{COMPILE_FOR_TESTING_VALUE, SINT_LANGUAGE_VERSION_VALUE},
+        lang_feature_versions::{
+            LANGUAGE_VERSION_FOR_COMPILE_FOR_TESTING, LANGUAGE_VERSION_FOR_SINT,
+        },
         LanguageVersion,
     },
     model::{Parameter, TypeParameter, TypeParameterKind},
@@ -68,7 +70,7 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
     {
         if options
             .language_version
-            .is_at_least(COMPILE_FOR_TESTING_VALUE)
+            .is_at_least(LANGUAGE_VERSION_FOR_COMPILE_FOR_TESTING)
         {
             use EntryVisibility::SpecAndImpl;
             // Compiler builtin constants.
@@ -590,7 +592,7 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
         );
         if options
             .language_version
-            .is_at_least(SINT_LANGUAGE_VERSION_VALUE)
+            .is_at_least(LANGUAGE_VERSION_FOR_SINT)
         {
             trans.define_spec_or_builtin_fun(
                 trans.unary_op_symbol(&PA::UnaryOp_::Negate),

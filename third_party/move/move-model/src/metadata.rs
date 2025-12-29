@@ -15,22 +15,28 @@ use std::{
 };
 
 const UNSTABLE_MARKER: &str = "-unstable";
-// 2.2, even though stable, produces several warnings in the frameworks which we first need to fix
-// before we can make it the default
+
+pub const LATEST_LANGUAGE_VERSION_VALUE: LanguageVersion = LanguageVersion::V2_5;
+
+/// Only stable versions are allowed on production networks
 pub const LATEST_STABLE_LANGUAGE_VERSION_VALUE: LanguageVersion = LanguageVersion::V2_2;
-pub const LATEST_STABLE_COMPILER_VERSION_VALUE: CompilerVersion = CompilerVersion::V2_0;
 pub const LATEST_STABLE_LANGUAGE_VERSION: &str = LATEST_STABLE_LANGUAGE_VERSION_VALUE.to_str();
+
+pub const LATEST_STABLE_COMPILER_VERSION_VALUE: CompilerVersion = CompilerVersion::V2_0;
 pub const LATEST_STABLE_COMPILER_VERSION: &str = LATEST_STABLE_COMPILER_VERSION_VALUE.to_str();
 
 pub static COMPILATION_METADATA_KEY: &[u8] = "compilation_metadata".as_bytes();
 
-// Language versions enabling specific features
+/// Language versions enabling specific features
 pub mod lang_feature_versions {
     use crate::LanguageVersion;
-    pub const COMPILE_FOR_TESTING_VALUE: LanguageVersion = LanguageVersion::V2_2;
-    pub const SINT_LANGUAGE_VERSION_VALUE: LanguageVersion = LanguageVersion::V2_3;
+    /// This version guards built-in constant `__COMPILE_FOR_TESTING__`,
+    /// which is set to `true` when the code is compiled for testing purposes.
+    pub const LANGUAGE_VERSION_FOR_COMPILE_FOR_TESTING: LanguageVersion = LanguageVersion::V2_2;
+    pub const LANGUAGE_VERSION_FOR_SINT: LanguageVersion = LanguageVersion::V2_3;
     pub const LANGUAGE_VERSION_FOR_PUBLIC_STRUCT: LanguageVersion = LanguageVersion::V2_4;
-    pub const LANGUAGE_VERSION_FOR_RAC: LanguageVersion = LanguageVersion::V2_5;
+    pub const LANGUAGE_VERSION_FOR_RAC: LanguageVersion =
+        crate::metadata::LATEST_LANGUAGE_VERSION_VALUE;
 }
 
 // ================================================================================'
@@ -205,7 +211,8 @@ pub enum LanguageVersion {
     V2_1,
     /// The 2.2 version of Move
     V2_2,
-    /// The currently unstable 2.3 version of Move
+    /// The 2.3 version of Move, which adds support for
+    /// - signed integer types
     V2_3,
     /// The currently unstable 2.4 version of Move
     V2_4,
@@ -280,17 +287,18 @@ impl From<LanguageVersion> for CompilerLanguageVersion {
 impl LanguageVersion {
     /// Whether the language version is unstable. An unstable version
     /// should not be allowed on production networks.
+    /// 2.3 is marked as stable to allow signed integers on production; remove this comment after making it the default.
     pub const fn unstable(self) -> bool {
         use LanguageVersion::*;
         match self {
-            V1 | V2_0 | V2_1 | V2_2 => false,
-            V2_3 | V2_4 | V2_5 => true,
+            V1 | V2_0 | V2_1 | V2_2 | V2_3 => false,
+            V2_4 | V2_5 => true,
         }
     }
 
     /// The latest language version.
     pub const fn latest() -> Self {
-        LanguageVersion::V2_5
+        LATEST_LANGUAGE_VERSION_VALUE
     }
 
     /// The latest stable language version.
