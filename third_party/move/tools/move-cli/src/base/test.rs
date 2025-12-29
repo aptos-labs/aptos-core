@@ -139,6 +139,7 @@ impl Test {
 #[derive(PartialEq, Eq, Debug)]
 pub enum UnitTestResult {
     Success,
+    NoTests,
     Failure,
 }
 
@@ -314,13 +315,17 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
         output_map_to_file(&coverage_map_path, &coverage_map)?;
     }
     cleanup_trace();
-    Ok(UnitTestResult::Success)
+    if no_tests {
+        Ok(UnitTestResult::NoTests)
+    } else {
+        Ok(UnitTestResult::Success)
+    }
 }
 
 impl From<UnitTestResult> for ExitStatus {
     fn from(result: UnitTestResult) -> Self {
         match result {
-            UnitTestResult::Success => ExitStatus::from_raw(0),
+            UnitTestResult::Success | UnitTestResult::NoTests => ExitStatus::from_raw(0),
             UnitTestResult::Failure => ExitStatus::from_raw(1),
         }
     }
