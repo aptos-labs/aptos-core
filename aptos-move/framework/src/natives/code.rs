@@ -14,7 +14,10 @@ use aptos_types::{
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{account_address::AccountAddress, gas_algebra::NumBytes};
-use move_vm_runtime::{native_extensions::SessionListener, native_functions::NativeFunction};
+use move_vm_runtime::{
+    native_extensions::{NativeRuntimeRefCheckModelsCompleted, SessionListener},
+    native_functions::NativeFunction,
+};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Struct, Value},
@@ -186,6 +189,10 @@ impl SessionListener for NativeCodeContext {
     fn abort(&mut self) {
         // No state changes to abort. Context will be reset on new session's start.
     }
+}
+
+impl NativeRuntimeRefCheckModelsCompleted for NativeCodeContext {
+    // No native functions in this context return references, so no models to add.
 }
 
 impl NativeCodeContext {

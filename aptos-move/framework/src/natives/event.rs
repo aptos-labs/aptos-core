@@ -14,7 +14,10 @@ use aptos_types::event::EventKey;
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{language_storage::TypeTag, value::MoveTypeLayout, vm_status::StatusCode};
-use move_vm_runtime::{native_extensions::SessionListener, native_functions::NativeFunction};
+use move_vm_runtime::{
+    native_extensions::{NativeRuntimeRefCheckModelsCompleted, SessionListener},
+    native_functions::NativeFunction,
+};
 #[cfg(feature = "testing")]
 use move_vm_types::values::{Reference, Struct, StructRef};
 use move_vm_types::{
@@ -44,6 +47,10 @@ impl SessionListener for NativeEventContext {
     fn abort(&mut self) {
         // TODO(sessions): implement
     }
+}
+
+impl NativeRuntimeRefCheckModelsCompleted for NativeEventContext {
+    // No native functions in this context return references, so no models to add.
 }
 
 impl NativeEventContext {

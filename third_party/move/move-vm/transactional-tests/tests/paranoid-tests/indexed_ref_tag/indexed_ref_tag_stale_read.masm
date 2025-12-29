@@ -1,0 +1,42 @@
+// Purpose: demonstrate tag-mismatch failure when enum payload changes after borrow.
+// Flow:
+//   (1) create Foo::A(11) -> store in foo
+//   (2) borrow x_ref = &foo.A::x (tag-protected reference)
+//   (3) overwrite foo with Foo::B(99) via mut_borrow/write_ref
+//   (4) read_ref x_ref -> aborts because Foo::A tag no longer present
+// Diagram (before step 3)            Diagram (after step 3)
+//   foo ──▶ Foo::A { x:11 } ◀── x_ref   foo ──▶ Foo::B { y:99 }
+//                                        x_ref ──▶ stale expectation (tag A)
+
+//# publish
+module 0xc0ffee::indexed_tag
+
+enum Foo has drop
+  A
+    x: u64
+  B
+    y: u64
+
+public fun stale_read_ref(): u64
+    local foo: Foo
+    local x_ref: &u64
+
+    ld_u64 11
+    pack_variant Foo, A
+    st_loc foo
+
+    borrow_loc foo
+    borrow_variant_field Foo, A::x
+    st_loc x_ref
+
+    ld_u64 99
+    pack_variant Foo, B
+    mut_borrow_loc foo
+    write_ref
+
+    move_loc x_ref
+    read_ref
+    ret
+
+//# run 0xc0ffee::indexed_tag::stale_read_ref --verbose
+
