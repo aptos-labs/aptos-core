@@ -641,7 +641,7 @@ impl AptosVM {
         if let ExecutionStatus::MoveAbort {
             location: AbortLocation::Module(module_id),
             code,
-            ..
+            info: current_info,
         } = status
         {
             // Note: in general, this module should have been charged for (because the location is
@@ -661,12 +661,20 @@ impl AptosVM {
                 );
             }
 
-            let info = module_storage
+            let mut info = module_storage
                 .unmetered_get_deserialized_module(module_id.address(), module_id.name())
                 .ok()
                 .flatten()
                 .and_then(|module| get_metadata(&module.metadata))
                 .and_then(|m| m.extract_abort_info(code));
+
+            // If the abort had a message, override the description with the message.
+            if let Some(mut current_info) = current_info {
+                if let Some(info) = info {
+                    current_info.reason_name = info.reason_name;
+                }
+                info = Some(current_info);
+            }
 
             ExecutionStatus::MoveAbort {
                 location: AbortLocation::Module(module_id),
@@ -2678,7 +2686,7 @@ impl AptosVM {
             Err(e) => {
                 let vm_status = e.clone().into_vm_status();
                 match vm_status {
-                    VMStatus::MoveAbort(_, _) => {},
+                    VMStatus::MoveAbort { .. } => {},
                     _ => {
                         let message = e
                             .message()
