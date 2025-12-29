@@ -15,7 +15,7 @@ use crate::{
         module_builder::{ModuleBuilder, SpecBlockContext},
     },
     metadata::{
-        lang_feature_versions::{LANGUAGE_VERSION_FOR_RAC, SINT_LANGUAGE_VERSION_VALUE},
+        lang_feature_versions::{LANGUAGE_VERSION_FOR_RAC, LANGUAGE_VERSION_FOR_SINT},
         LanguageVersion,
     },
     model::{
@@ -947,11 +947,11 @@ impl ExpTranslator<'_, '_, '_> {
                         if !self
                             .env()
                             .language_version
-                            .is_at_least(SINT_LANGUAGE_VERSION_VALUE)
+                            .is_at_least(LANGUAGE_VERSION_FOR_SINT)
                         {
                             et.error(
                                 loc,
-                                &format!("signed integer types not supported prior to language version {}", SINT_LANGUAGE_VERSION_VALUE.to_str()),
+                                &format!("signed integer types not supported prior to language version {}", LANGUAGE_VERSION_FOR_SINT.to_str()),
                             );
                             Type::Error
                         } else {
