@@ -44,7 +44,7 @@ fn compute_powers_of_radix<E: Pairing>(ell: u8) -> Vec<E::ScalarField> {
 #[allow(non_snake_case)]
 pub struct PublicParameters<E: Pairing> {
     #[serde(serialize_with = "ark_se")]
-    pub pp_elgamal: chunked_elgamal::PublicParameters<E::G1>, // TODO: make this <E::G1> or <E::G1Affine> instead of <E>?
+    pub pp_elgamal: chunked_elgamal::PublicParameters<E::G1>,
 
     #[serde(serialize_with = "ark_se")]
     pub pk_range_proof: dekart_univariate_v2::ProverKey<E>,

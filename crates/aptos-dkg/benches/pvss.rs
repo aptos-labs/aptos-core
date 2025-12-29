@@ -32,9 +32,9 @@ use rand::{rngs::ThreadRng, thread_rng, Rng};
 
 pub fn all_groups(c: &mut Criterion) {
     // unweighted BN254 PVSS with aggregatable subtranscript; only doing 2 because large configs are a bit slow and not relevant anyway
-    // for tc in get_weighted_configs_for_benchmarking().into_iter().take(2) {
-    //     subaggregatable_pvss_group::<ChunkyTranscript<Bn254>>(&tc, c);
-    // }
+    for tc in get_weighted_configs_for_benchmarking().into_iter().take(2) {
+        subaggregatable_pvss_group::<ChunkyTranscript<Bn254>>(&tc, c);
+    }
     for tc in get_weighted_configs_for_benchmarking().into_iter().take(2) {
         subaggregatable_pvss_group::<ChunkyTranscriptv2<Bn254>>(&tc, c);
     }
@@ -289,7 +289,7 @@ fn pvss_nonaggregate_serialize<T: HasAggregatableSubtranscript, M: Measurement>(
                     &NoAux,
                     &sc.get_player(0),
                     &mut rng,
-                ) // TODO: we should probably serialize and deserialize here?
+                )
             },
             |trs| {
                 let bytes = trs.to_bytes();
@@ -315,7 +315,7 @@ fn pvss_nonaggregate_verify<T: HasAggregatableSubtranscript, M: Measurement>(
         b.iter_with_setup(
             || {
                 let s = T::InputSecret::generate(&mut rng);
-                T::deal(
+                let trs = T::deal(
                     &sc,
                     &pp,
                     &ssks[0],
@@ -325,7 +325,9 @@ fn pvss_nonaggregate_verify<T: HasAggregatableSubtranscript, M: Measurement>(
                     &NoAux,
                     &sc.get_player(0),
                     &mut rng,
-                ) // TODO: we should probably serialize and deserialize here?
+                );
+                T::try_from(trs.to_bytes().as_slice())
+        .expect("serialized transcript should deserialize correctly") // we have to serialize and deserialize because otherwise verify gets a transcript with "non-normalised" projective group elements
             },
             |trx| {
                 trx.verify(&sc, &pp, &[spks[0].clone()], &eks, &NoAux)

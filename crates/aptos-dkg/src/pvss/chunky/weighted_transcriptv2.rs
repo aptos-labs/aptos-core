@@ -53,7 +53,7 @@ use std::ops::{Mul, Sub};
 
 /// Domain-separation tag (DST) used to ensure that all cryptographic hashes and
 /// transcript operations within the protocol are uniquely namespaced
-pub const DST: &[u8; 39] = b"APTOS_WEIGHTED_CHUNKY_FIELD_PVSS_FS_DST";
+pub const DST: &[u8; 42] = b"APTOS_WEIGHTED_CHUNKY_FIELD_PVSS_v2_FS_DST";
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

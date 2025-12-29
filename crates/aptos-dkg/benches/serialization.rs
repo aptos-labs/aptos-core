@@ -28,6 +28,8 @@ use serde::Serialize;
 // (ii) Whilst we're at it, see how arkworks and blstrs differ speedwise by timing the serialisation of the same amount of elts (note that we are NOT using the same curve atm)
 // blstrs doesn't have a proper normalize_batch() function implemented, so we've commented out those benches for now
 
+// One of the results is that arkworks seems significantly slower than blstrs, at least with our settings. TODO: what happens if `Compress` and `Validate` are disabled?
+
 // `blstrs` seems to be missing a `normalize_batch()` implementation, so let's do that first
 fn blstrs_normalize_batch_g1(v: &[BlstrsG1Projective]) -> Vec<BlstrsG1Affine> {
     // Collect all z coordinates
