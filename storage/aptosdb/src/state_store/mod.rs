@@ -41,7 +41,11 @@ use aptos_db_indexer_schemas::{
     schema::indexer_metadata::InternalIndexerMetadataSchema,
 };
 use aptos_infallible::Mutex;
-use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
+use aptos_jellyfish_merkle::{
+    iterator::JellyfishMerkleIterator,
+    node_type::{Node, NodeKey},
+    TreeWriter,
+};
 use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::batch::{NativeBatch, SchemaBatch, WriteBatch};
@@ -58,6 +62,7 @@ use aptos_storage_interface::{
         },
         state_with_summary::{LedgerStateWithSummary, StateWithSummary},
         versioned_state_value::StateUpdateRef,
+        HotStateShardUpdates,
     },
     AptosDbError, DbReader, Result, StateSnapshotReceiver,
 };
@@ -79,6 +84,7 @@ use claims::{assert_ge, assert_le};
 use itertools::Itertools;
 use rayon::prelude::*;
 use std::{
+    collections::HashMap,
     ops::Deref,
     sync::{Arc, MutexGuard},
 };
@@ -554,6 +560,7 @@ impl StateStore {
             latest_snapshot_version = latest_snapshot_version,
             "Initializing BufferedState."
         );
+        // TODO(HotState): read hot root hash from DB.
         let latest_snapshot_root_hash = if let Some(version) = latest_snapshot_version {
             state_db
                 .state_merkle_db
@@ -595,6 +602,18 @@ impl StateStore {
             );
         }
 
+        if snapshot_next_version > 0 {
+            let prev_version = snapshot_next_version - 1;
+            let node_key = NodeKey::new_empty_path(prev_version);
+            let node = Node::Null;
+            let mut node_batch = HashMap::new();
+            node_batch.insert(node_key, node);
+            if let Some(db) = &state_db.hot_state_merkle_db {
+                db.write_node_batch(&node_batch)?;
+            }
+            info!("Wrote null node for hot state at version {prev_version}");
+        }
+
         // Replaying the committed write sets after the latest snapshot.
         if snapshot_next_version < num_transactions {
             if check_max_versions_after_snapshot {
@@ -605,6 +624,8 @@ impl StateStore {
                     num_transactions,
                 );
             }
+            info!("Replaying writesets from {snapshot_next_version} to {num_transactions} to let state Merkle DB catch up.");
+
             let write_sets = state_db
                 .ledger_db
                 .write_set_db()
@@ -628,17 +649,28 @@ impl StateStore {
             );
             let current_state = out_current_state.lock().clone();
             let (hot_state, state) = out_persisted_state.get_state();
-            let (new_state, _state_reads) = current_state.ledger_state().update_with_db_reader(
-                &state,
-                hot_state,
-                &state_update_refs,
-                state_db.clone(),
-            )?;
+            let (new_state, _state_reads, hot_state_updates) = current_state
+                .ledger_state()
+                .update_with_db_reader(&state, hot_state, &state_update_refs, state_db.clone())?;
             let state_summary = out_persisted_state.get_state_summary();
             let new_state_summary = current_state.ledger_state_summary().update(
-                &ProvableStateSummary::new(state_summary, state_db.as_ref()),
+                &ProvableStateSummary::new(
+                    state_summary.clone(),
+                    state_db.as_ref(),
+                    /* is_hot = */ true,
+                ),
+                &hot_state_updates,
+                &ProvableStateSummary::new(
+                    state_summary,
+                    state_db.as_ref(),
+                    /* is_hot = */ false,
+                ),
                 &state_update_refs,
             )?;
+            info!(
+                "new hot state summary root hash: {}",
+                new_state_summary.hot_root_hash()
+            );
             let updated =
                 LedgerStateWithSummary::from_state_and_summary(new_state, new_state_summary);
 
@@ -720,7 +752,7 @@ impl StateStore {
     ) -> Result<LedgerState> {
         let current = self.current_state_locked().ledger_state();
         let (hot_state, persisted) = self.get_persisted_state()?;
-        let (new_state, reads) = current.update_with_db_reader(
+        let (new_state, reads, _hot_state_updates) = current.update_with_db_reader(
             &persisted,
             hot_state,
             state_update_refs,
@@ -1403,27 +1435,29 @@ mod test_only {
             let current = self.current_state_locked().ledger_state_summary();
             let persisted = self.persisted_state.get_state_summary();
 
-            let new_state_summary = current
-                .update(
-                    &ProvableStateSummary::new(persisted, self.state_db.as_ref()),
-                    &state_update_refs,
-                )
-                .unwrap();
-            let root_hash = new_state_summary.root_hash();
+            unimplemented!();
 
-            self.buffered_state
-                .lock()
-                .update(
-                    LedgerStateWithSummary::from_state_and_summary(
-                        new_ledger_state,
-                        new_state_summary,
-                    ),
-                    0,    /* estimated_items, doesn't matter since we sync-commit */
-                    true, /* sync_commit */
-                )
-                .unwrap();
+            // let new_state_summary = current
+            //     .update(
+            //         &ProvableStateSummary::new(persisted, self.state_db.as_ref()),
+            //         &state_update_refs,
+            //     )
+            //     .unwrap();
+            // let root_hash = new_state_summary.root_hash();
 
-            root_hash
+            // self.buffered_state
+            //     .lock()
+            //     .update(
+            //         LedgerStateWithSummary::from_state_and_summary(
+            //             new_ledger_state,
+            //             new_state_summary,
+            //         ),
+            //         0,    /* estimated_items, doesn't matter since we sync-commit */
+            //         true, /* sync_commit */
+            //     )
+            //     .unwrap();
+
+            // root_hash
         }
     }
 }
