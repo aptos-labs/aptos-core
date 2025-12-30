@@ -2759,7 +2759,6 @@ impl Frame {
 
                         let vec = interpreter.operand_stack.pop_as::<Vector>()?;
                         let bytes = vec.to_vec_u8()?;
-                        // TODO(aborts): Add a test that triggers this error.
                         let error_message = String::from_utf8(bytes).map_err(|err| {
                             PartialVMError::new(StatusCode::INVALID_ABORT_MESSAGE)
                                 .with_message(format!("Invalid UTF-8 string: {err}"))
