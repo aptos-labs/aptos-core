@@ -18,6 +18,17 @@ use move_coverage::{
 use move_disassembler::disassembler::Disassembler;
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{compilation::compiled_package::CompiledPackage, BuildConfig, CompilerConfig};
+use std::path::PathBuf;
+
+/// Options common to all coverage commands
+#[derive(Debug, Parser, Default)]
+pub struct CoverageCommon {
+    /// Path to extra Move coverage files (`.mvcov`) to include, in addition to, or instead
+    /// of the file produced by unit tests run with `--coverage` and stored at
+    /// `./.coverage_map.mvcov`.
+    #[arg(long, num_args = 0..)]
+    extra_coverage: Vec<PathBuf>,
+}
 
 /// Display a coverage summary for all modules in a package
 ///
@@ -35,12 +46,14 @@ pub struct SummaryCoverage {
     #[clap(long, short)]
     pub filter: Option<String>,
     #[clap(flatten)]
+    pub common: CoverageCommon,
+    #[clap(flatten)]
     pub move_options: MovePackageOptions,
 }
 
 impl SummaryCoverage {
     pub fn coverage(self) -> CliTypedResult<()> {
-        let (coverage_map, package) = compile_coverage(self.move_options)?;
+        let (coverage_map, package) = compile_coverage(self.common, self.move_options)?;
         let modules: Vec<_> = package
             .root_modules()
             .filter_map(|unit| {
@@ -106,6 +119,9 @@ pub struct SourceCoverage {
     pub tag: TextIndicator,
 
     #[clap(flatten)]
+    pub common: CoverageCommon,
+
+    #[clap(flatten)]
     pub move_options: MovePackageOptions,
 }
 
@@ -116,7 +132,7 @@ impl CliCommand<()> for SourceCoverage {
     }
 
     async fn execute(self) -> CliTypedResult<()> {
-        let (coverage_map, package) = compile_coverage(self.move_options)?;
+        let (coverage_map, package) = compile_coverage(self.common, self.move_options)?;
         let unit = package.get_module_by_name_from_root(&self.module_name)?;
         let source_path = &unit.source_path;
         let source_map = match &unit.unit {
@@ -146,6 +162,10 @@ impl CliCommand<()> for SourceCoverage {
 pub struct BytecodeCoverage {
     #[clap(long = "module")]
     pub module_name: String,
+
+    #[clap(flatten)]
+    pub common: CoverageCommon,
+
     #[clap(flatten)]
     pub move_options: MovePackageOptions,
 }
@@ -157,7 +177,7 @@ impl CliCommand<()> for BytecodeCoverage {
     }
 
     async fn execute(self) -> CliTypedResult<()> {
-        let (coverage_map, package) = compile_coverage(self.move_options)?;
+        let (coverage_map, package) = compile_coverage(self.common, self.move_options)?;
         let unit = package.get_module_by_name_from_root(&self.module_name)?;
         let mut disassembler = Disassembler::from_unit(&unit.unit);
         disassembler.add_coverage_map(coverage_map.to_unified_exec_map());
@@ -167,6 +187,7 @@ impl CliCommand<()> for BytecodeCoverage {
 }
 
 fn compile_coverage(
+    coverage_common: CoverageCommon,
     move_options: MovePackageOptions,
 ) -> CliTypedResult<(CoverageMap, CompiledPackage)> {
     let config = BuildConfig {
@@ -195,16 +216,37 @@ fn compile_coverage(
         ..Default::default()
     };
 
-    let path = move_options.get_package_path()?;
-    let coverage_map =
-        CoverageMap::from_binary_file(&path.join(".coverage_map.mvcov")).map_err(|err| {
+    let read_cov_file = |path: &PathBuf| {
+        CoverageMap::from_binary_file(path).map_err(|err| {
             CliError::UnexpectedError(format!("Failed to retrieve coverage map {}", err))
-        })?;
+        })
+    };
+    let path = move_options.get_package_path()?;
+    let unit_cov_file = path.join(".coverage_map.mvcov");
+    let mut cov_files = if unit_cov_file.exists() {
+        vec![&unit_cov_file]
+    } else {
+        vec![]
+    };
+    cov_files.extend(coverage_common.extra_coverage.iter());
+    if cov_files.is_empty() {
+        return Err(CliError::CommandArgumentError(
+            "expected previous run of \
+        `aptos move test --coverage` to have stored coverage map at \
+        `<package>/.coverage_map.mvcov`, or alternatively coverage maps provided via \
+        `--extra-coverage`"
+                .to_owned(),
+        ));
+    }
+    let mut cov_map = read_cov_file(cov_files[0])?;
+    for file in cov_files.into_iter().skip(1) {
+        cov_map.merge(read_cov_file(file)?);
+    }
     let package = config
         .compile_package(path.as_path(), &mut Vec::new())
         .map_err(|err| CliError::MoveCompilationError(err.to_string()))?;
 
-    Ok((coverage_map, package))
+    Ok((cov_map, package))
 }
 
 /// Computes coverage for a package
