@@ -907,9 +907,9 @@ impl Generator<'_> {
                 self.emit_with(id, |attr| Bytecode::Abort(attr, temp, None))
             },
             Operation::AbortMsg => {
-                let args = self.require_binary_args(id, args);
-                let temp0 = self.gen_escape_auto_ref_arg(&args[0], false);
-                let temp1 = self.gen_escape_auto_ref_arg(&args[1], false);
+                let [arg0, arg1] = self.require_binary_args(id, args);
+                let temp0 = self.gen_escape_auto_ref_arg(&arg0, false);
+                let temp1 = self.gen_escape_auto_ref_arg(&arg1, false);
                 self.emit_with(id, |attr| Bytecode::Abort(attr, temp0, Some(temp1)));
             },
             Operation::Deref => self.gen_deref(targets, id, args),
