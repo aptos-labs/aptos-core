@@ -365,12 +365,10 @@ impl TransferFunctions for LiveVarAnalysis<'_> {
                     state.livevars.insert(*src, self.livevar_info(id, offset));
                 }
             },
-            Abort(id, src) => {
-                state.livevars.insert(*src, self.livevar_info(id, offset));
-            },
-            AbortMsg(id, srcs) => {
-                for src in srcs {
-                    state.livevars.insert(*src, self.livevar_info(id, offset));
+            Abort(id, src0, src1) => {
+                state.livevars.insert(*src0, self.livevar_info(id, offset));
+                if let Some(src1) = src1 {
+                    state.livevars.insert(*src1, self.livevar_info(id, offset));
                 }
             },
             Branch(id, _, _, src) => {

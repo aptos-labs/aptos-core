@@ -425,11 +425,14 @@ impl TransferFunctions for LiveVarAnalysis<'_> {
             Ret(_, srcs) => {
                 state.insert(srcs);
             },
-            Abort(_, src) | Branch(_, _, _, src) => {
+            Branch(_, _, _, src) => {
                 state.insert(&[*src]);
             },
-            AbortMsg(_, srcs) => {
-                state.insert(srcs);
+            Abort(_, src0, src1) => {
+                state.insert(&[*src0]);
+                if let Some(src1) = src1 {
+                    state.insert(&[*src1]);
+                }
             },
             Prop(_, _, exp) => {
                 for (idx, _) in exp.used_temporaries_with_types(self.func_target.global_env()) {

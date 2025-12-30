@@ -505,8 +505,7 @@ pub enum Bytecode {
     Branch(AttrId, Label, Label, TempIndex),
     Jump(AttrId, Label),
     Label(AttrId, Label),
-    Abort(AttrId, TempIndex),
-    AbortMsg(AttrId, [TempIndex; 2]),
+    Abort(AttrId, TempIndex, Option<TempIndex>),
     Nop(AttrId),
     SpecBlock(AttrId, Spec),
 
@@ -528,7 +527,6 @@ impl Bytecode {
             | Jump(id, ..)
             | Label(id, ..)
             | Abort(id, ..)
-            | AbortMsg(id, ..)
             | Nop(id)
             | SpecBlock(id, ..)
             | SaveMem(id, ..)
@@ -548,7 +546,6 @@ impl Bytecode {
             | Jump(id, ..)
             | Label(id, ..)
             | Abort(id, ..)
-            | AbortMsg(id, ..)
             | Nop(id)
             | SpecBlock(id, ..)
             | SaveMem(id, ..)
@@ -561,10 +558,7 @@ impl Bytecode {
     pub fn is_exit(&self) -> bool {
         matches!(
             self,
-            Bytecode::Ret(..)
-                | Bytecode::Abort(..)
-                | Bytecode::AbortMsg(..)
-                | Bytecode::Call(_, _, Operation::Stop, _, _)
+            Bytecode::Ret(..) | Bytecode::Abort(..) | Bytecode::Call(_, _, Operation::Stop, _, _)
         )
     }
 
@@ -573,7 +567,7 @@ impl Bytecode {
     }
 
     pub fn is_abort(&self) -> bool {
-        matches!(self, Bytecode::Abort(..) | Bytecode::AbortMsg(..))
+        matches!(self, Bytecode::Abort(..))
     }
 
     pub fn is_always_branching(&self) -> bool {
@@ -582,7 +576,6 @@ impl Bytecode {
             Bytecode::Ret(..)
                 | Bytecode::Jump(..)
                 | Bytecode::Abort(..)
-                | Bytecode::AbortMsg(..)
                 | Bytecode::Branch(..)
                 | Bytecode::Call(_, _, Operation::Stop, _, _)
         )
@@ -621,10 +614,12 @@ impl Bytecode {
             Bytecode::Branch(_, _, _, cond) => {
                 vec![*cond]
             },
-            Bytecode::Abort(_, src) => {
+            Bytecode::Abort(_, src, None) => {
                 vec![*src]
             },
-            Bytecode::AbortMsg(_, srcs) => srcs.to_vec(),
+            Bytecode::Abort(_, src0, Some(src1)) => {
+                vec![*src0, *src1]
+            },
             Bytecode::Load(_, _, _)
             | Bytecode::Jump(_, _)
             | Bytecode::Label(_, _)
@@ -664,8 +659,7 @@ impl Bytecode {
             | Bytecode::Branch(_, _, _, _)
             | Bytecode::Jump(_, _)
             | Bytecode::Label(_, _)
-            | Bytecode::Abort(_, _)
-            | Bytecode::AbortMsg(_, _)
+            | Bytecode::Abort(_, _, _)
             | Bytecode::Nop(_)
             | Bytecode::SaveMem(_, _, _)
             | Bytecode::SaveSpecVar(_, _, _)
@@ -814,8 +808,7 @@ impl Bytecode {
             Branch(attr, if_label, else_label, cond) => {
                 Branch(attr, if_label, else_label, f(true, cond))
             },
-            Abort(attr, cond) => Abort(attr, f(true, cond)),
-            AbortMsg(attr, conds) => AbortMsg(attr, conds.map(|cond| f(true, cond))),
+            Abort(attr, cond0, cond1) => Abort(attr, f(true, cond0), cond1.map(|c| f(true, c))),
             Prop(attr, kind, exp) => {
                 let new_exp = Bytecode::remap_exp(func_target, &mut |idx| f(true, idx), exp);
                 Prop(attr, kind, new_exp)
@@ -1096,16 +1089,11 @@ impl fmt::Display for BytecodeDisplay<'_> {
             Label(_, label) => {
                 write!(f, "label L{}", label.as_usize())?;
             },
-            Abort(_, src) => {
-                write!(f, "abort({})", self.lstr(*src))?;
+            Abort(_, src0, None) => {
+                write!(f, "abort({})", self.lstr(*src0))?;
             },
-            AbortMsg(_, srcs) => {
-                write!(
-                    f,
-                    "abort_msg({}, {})",
-                    self.lstr(srcs[0]),
-                    self.lstr(srcs[1])
-                )?;
+            Abort(_, src0, Some(src1)) => {
+                write!(f, "abort({}, {})", self.lstr(*src0), self.lstr(*src1))?;
             },
             Nop(_) => {
                 write!(f, "nop")?;

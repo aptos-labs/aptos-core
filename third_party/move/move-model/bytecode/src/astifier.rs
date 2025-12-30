@@ -614,10 +614,9 @@ impl Generator {
                 match ctx.code_for_block(blk).last() {
                     None => 0,
                     Some(Abort(..)) => 1,
-                    Some(AbortMsg(..)) => 2,
-                    Some(Jump(..)) => 3,
-                    Some(Branch(..)) => 4,
-                    Some(Ret(..)) => 5,
+                    Some(Jump(..)) => 2,
+                    Some(Branch(..)) => 3,
+                    Some(Ret(..)) => 4,
                     _ => panic!("unexpected block terminator"),
                 }
             };
@@ -692,14 +691,14 @@ impl Generator {
                     );
                     self.add_stm(stm);
                 },
-                Abort(_, temp) => {
+                Abort(_, temp, None) => {
                     let temp = self.make_temp(ctx, *temp);
                     let stm =
                         ExpData::Call(self.new_stm_node_id(ctx), Operation::Abort, vec![temp]);
                     self.add_stm(stm);
                 },
-                AbortMsg(_, temps) => {
-                    let temps = self.make_temps(ctx, *temps);
+                Abort(_, temp0, Some(temp1)) => {
+                    let temps = self.make_temps(ctx, [*temp0, *temp1]);
                     let stm = ExpData::Call(self.new_stm_node_id(ctx), Operation::AbortMsg, temps);
                     self.add_stm(stm);
                 },

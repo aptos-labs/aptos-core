@@ -63,15 +63,9 @@ impl FunctionTargetProcessor for DebugInstrumenter {
                     }
                     builder.emit(bc);
                 },
-                Abort(id, l) => {
+                Abort(id, l, _) => {
                     builder.set_loc_from_attr(*id);
                     builder.emit_with(|id| Call(id, vec![], Operation::TraceAbort, vec![*l], None));
-                    builder.emit(bc);
-                },
-                AbortMsg(id, ls) => {
-                    builder.set_loc_from_attr(*id);
-                    builder
-                        .emit_with(|id| Call(id, vec![], Operation::TraceAbort, ls.to_vec(), None));
                     builder.emit(bc);
                 },
                 Call(_, _, Operation::WriteRef, srcs, _)
