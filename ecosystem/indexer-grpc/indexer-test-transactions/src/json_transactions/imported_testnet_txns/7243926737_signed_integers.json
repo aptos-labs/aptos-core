@@ -1,0 +1,245 @@
+{
+  "timestamp": {
+    "seconds": "1767051573",
+    "nanos": 543173000
+  },
+  "version": "7243926737",
+  "info": {
+    "hash": "VTWnUC6AFd5Obw9hZzLClM1iNjfbkJ6qsf8LKUYPDM0=",
+    "stateChangeHash": "iz/90xZa+sb2q7lHI94rO//aim3Dlwa0gtNzCPa/wvU=",
+    "eventRootHash": "K5TDpCAHNh50ZmfaA+EXxA5Hq1xMcnVA0d4Tf47RnTM=",
+    "gasUsed": "3",
+    "success": true,
+    "vmStatus": "Executed successfully",
+    "accumulatorRootHash": "ls3Cvf01F9XF0kIEfYk3G5an2lN9iEpJJpTARPptchY=",
+    "changes": [
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xa",
+          "stateKeyHash": "HbVEHY+kIpxYRPc/1m2krYF2y4eT2LOn9sqFhyIDAEM=",
+          "type": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "PairedCoinType"
+          },
+          "typeStr": "0x1::coin::PairedCoinType",
+          "data": "{\"type\":{\"account_address\":\"0x1\",\"module_name\":\"0x6170746f735f636f696e\",\"struct_name\":\"0x4170746f73436f696e\"}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xa",
+          "stateKeyHash": "HbVEHY+kIpxYRPc/1m2krYF2y4eT2LOn9sqFhyIDAEM=",
+          "type": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "PairedFungibleAssetRefs"
+          },
+          "typeStr": "0x1::coin::PairedFungibleAssetRefs",
+          "data": "{\"burn_ref_opt\":{\"vec\":[{\"metadata\":{\"inner\":\"0xa\"}}]},\"mint_ref_opt\":{\"vec\":[{\"metadata\":{\"inner\":\"0xa\"}}]},\"transfer_ref_opt\":{\"vec\":[{\"metadata\":{\"inner\":\"0xa\"}}]}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xa",
+          "stateKeyHash": "HbVEHY+kIpxYRPc/1m2krYF2y4eT2LOn9sqFhyIDAEM=",
+          "type": {
+            "address": "0x1",
+            "module": "fungible_asset",
+            "name": "ConcurrentSupply"
+          },
+          "typeStr": "0x1::fungible_asset::ConcurrentSupply",
+          "data": "{\"current\":{\"max_value\":\"340282366920938463463374607431768211455\",\"value\":\"29253108430890014335\"}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xa",
+          "stateKeyHash": "HbVEHY+kIpxYRPc/1m2krYF2y4eT2LOn9sqFhyIDAEM=",
+          "type": {
+            "address": "0x1",
+            "module": "fungible_asset",
+            "name": "Metadata"
+          },
+          "typeStr": "0x1::fungible_asset::Metadata",
+          "data": "{\"decimals\":8,\"icon_uri\":\"\",\"name\":\"Aptos Coin\",\"project_uri\":\"\",\"symbol\":\"APT\"}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xa",
+          "stateKeyHash": "HbVEHY+kIpxYRPc/1m2krYF2y4eT2LOn9sqFhyIDAEM=",
+          "type": {
+            "address": "0x1",
+            "module": "object",
+            "name": "ObjectCore"
+          },
+          "typeStr": "0x1::object::ObjectCore",
+          "data": "{\"allow_ungated_transfer\":true,\"guid_creation_num\":\"1125899906842625\",\"owner\":\"0x1\",\"transfer_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xa\",\"creation_num\":\"1125899906842624\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xa",
+          "stateKeyHash": "HbVEHY+kIpxYRPc/1m2krYF2y4eT2LOn9sqFhyIDAEM=",
+          "type": {
+            "address": "0x1",
+            "module": "primary_fungible_store",
+            "name": "DeriveRefPod"
+          },
+          "typeStr": "0x1::primary_fungible_store::DeriveRefPod",
+          "data": "{\"metadata_derive_ref\":{\"self\":\"0xa\"}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x772189834e21c5cc0dd31b9a1cfe8a78051f52b45647a0059c1515ce599d49d3",
+          "stateKeyHash": "hiZewYBJTAnJ+pknjq0EW7XkyvtyVkdW9oSsk/mo/wk=",
+          "type": {
+            "address": "0x1",
+            "module": "account",
+            "name": "Account"
+          },
+          "typeStr": "0x1::account::Account",
+          "data": "{\"authentication_key\":\"0x772189834e21c5cc0dd31b9a1cfe8a78051f52b45647a0059c1515ce599d49d3\",\"coin_register_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x772189834e21c5cc0dd31b9a1cfe8a78051f52b45647a0059c1515ce599d49d3\",\"creation_num\":\"0\"}}},\"guid_creation_num\":\"2\",\"key_rotation_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x772189834e21c5cc0dd31b9a1cfe8a78051f52b45647a0059c1515ce599d49d3\",\"creation_num\":\"1\"}}},\"rotation_capability_offer\":{\"for\":{\"vec\":[]}},\"sequence_number\":\"2\",\"signer_capability_offer\":{\"for\":{\"vec\":[]}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xb851aec3bb947fca6c6b809999e2c1a4e2d86dad880573b4519304ac60c83162",
+          "stateKeyHash": "WNFtfyyvIkqeLzrj0Lp5uBNicp6B3ziDTrq+2PPI5l0=",
+          "type": {
+            "address": "0x1",
+            "module": "fungible_asset",
+            "name": "FungibleStore"
+          },
+          "typeStr": "0x1::fungible_asset::FungibleStore",
+          "data": "{\"balance\":\"99817800\",\"frozen\":false,\"metadata\":{\"inner\":\"0xa\"}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xb851aec3bb947fca6c6b809999e2c1a4e2d86dad880573b4519304ac60c83162",
+          "stateKeyHash": "WNFtfyyvIkqeLzrj0Lp5uBNicp6B3ziDTrq+2PPI5l0=",
+          "type": {
+            "address": "0x1",
+            "module": "object",
+            "name": "ObjectCore"
+          },
+          "typeStr": "0x1::object::ObjectCore",
+          "data": "{\"allow_ungated_transfer\":false,\"guid_creation_num\":\"1125899906842625\",\"owner\":\"0x772189834e21c5cc0dd31b9a1cfe8a78051f52b45647a0059c1515ce599d49d3\",\"transfer_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xb851aec3bb947fca6c6b809999e2c1a4e2d86dad880573b4519304ac60c83162\",\"creation_num\":\"1125899906842624\"}}}}"
+        }
+      }
+    ]
+  },
+  "epoch": "29475",
+  "blockHeight": "604020569",
+  "type": "TRANSACTION_TYPE_USER",
+  "sizeInfo": {
+    "transactionBytes": 293,
+    "eventSizeInfo": [
+      {
+        "typeTagBytes": 58,
+        "totalBytes": 119
+      },
+      {
+        "typeTagBytes": 63,
+        "totalBytes": 103
+      }
+    ],
+    "writeOpSizeInfo": [
+      {
+        "keyBytes": 87,
+        "valueBytes": 687
+      },
+      {
+        "keyBytes": 84,
+        "valueBytes": 147
+      },
+      {
+        "keyBytes": 87,
+        "valueBytes": 246
+      }
+    ]
+  },
+  "user": {
+    "request": {
+      "sender": "0x772189834e21c5cc0dd31b9a1cfe8a78051f52b45647a0059c1515ce599d49d3",
+      "sequenceNumber": "1",
+      "maxGasAmount": "4",
+      "gasUnitPrice": "100",
+      "expirationTimestampSecs": {
+        "seconds": "1767051603"
+      },
+      "payload": {
+        "type": "TYPE_ENTRY_FUNCTION_PAYLOAD",
+        "entryFunctionPayload": {
+          "function": {
+            "module": {
+              "address": "0x772189834e21c5cc0dd31b9a1cfe8a78051f52b45647a0059c1515ce599d49d3",
+              "name": "signed_integers"
+            },
+            "name": "emit_event"
+          },
+          "arguments": [
+            "-127",
+            "\"-9223372036854775808\"",
+            "\"-170141183460469231731687303715884105728\"",
+            "\"-100\"",
+            "50"
+          ],
+          "entryFunctionIdStr": "0x772189834e21c5cc0dd31b9a1cfe8a78051f52b45647a0059c1515ce599d49d3::signed_integers::emit_event"
+        },
+        "extraConfigV1": {}
+      },
+      "signature": {
+        "type": "TYPE_ED25519",
+        "ed25519": {
+          "publicKey": "q1QQjNrlCD8U1C9VleZzzuPMDNTRT4UL/fDvbd8glrg=",
+          "signature": "PPv9sVmTmhBdHyOW/BWOIzxmN2JtsRzw52xhgoZHUdqIaQVpbmwgz6IQrrjVoxNL3qzmbb6Md6vMdPdCotYmAA=="
+        }
+      }
+    },
+    "events": [
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x772189834e21c5cc0dd31b9a1cfe8a78051f52b45647a0059c1515ce599d49d3",
+            "module": "signed_integers",
+            "name": "MyEvent"
+          }
+        },
+        "typeStr": "0x772189834e21c5cc0dd31b9a1cfe8a78051f52b45647a0059c1515ce599d49d3::signed_integers::MyEvent",
+        "data": "{\"a\":-127,\"b\":\"-9223372036854775808\",\"c\":\"-170141183460469231731687303715884105728\",\"d\":\"-100\",\"e\":50}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "transaction_fee",
+            "name": "FeeStatement"
+          }
+        },
+        "typeStr": "0x1::transaction_fee::FeeStatement",
+        "data": "{\"execution_gas_units\":\"3\",\"io_gas_units\":\"1\",\"storage_fee_octas\":\"0\",\"storage_fee_refund_octas\":\"0\",\"total_charge_gas_units\":\"3\"}"
+      }
+    ]
+  }
+}

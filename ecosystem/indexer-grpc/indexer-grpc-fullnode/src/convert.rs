@@ -264,6 +264,12 @@ pub fn convert_move_type(move_type: &MoveType) -> transaction::MoveType {
         MoveType::U64 => transaction::MoveTypes::U64,
         MoveType::U128 => transaction::MoveTypes::U128,
         MoveType::U256 => transaction::MoveTypes::U256,
+        MoveType::I8 => transaction::MoveTypes::I8,
+        MoveType::I16 => transaction::MoveTypes::I16,
+        MoveType::I32 => transaction::MoveTypes::I32,
+        MoveType::I64 => transaction::MoveTypes::I64,
+        MoveType::I128 => transaction::MoveTypes::I128,
+        MoveType::I256 => transaction::MoveTypes::I256,
         MoveType::Address => transaction::MoveTypes::Address,
         MoveType::Signer => transaction::MoveTypes::Signer,
         MoveType::Vector { .. } => transaction::MoveTypes::Vector,
@@ -272,15 +278,6 @@ pub fn convert_move_type(move_type: &MoveType) -> transaction::MoveType {
         MoveType::Reference { .. } => transaction::MoveTypes::Reference,
         MoveType::Function { .. } => transaction::MoveTypes::Unparsable,
         MoveType::Unparsable(_) => transaction::MoveTypes::Unparsable,
-        MoveType::I8
-        | MoveType::I16
-        | MoveType::I32
-        | MoveType::I64
-        | MoveType::I128
-        | MoveType::I256 => {
-            //TODO(#17645): support signed integers
-            transaction::MoveTypes::Unparsable
-        },
     };
     let content = match move_type {
         MoveType::Bool => None,
@@ -290,6 +287,12 @@ pub fn convert_move_type(move_type: &MoveType) -> transaction::MoveType {
         MoveType::U64 => None,
         MoveType::U128 => None,
         MoveType::U256 => None,
+        MoveType::I8 => None,
+        MoveType::I16 => None,
+        MoveType::I32 => None,
+        MoveType::I64 => None,
+        MoveType::I128 => None,
+        MoveType::I256 => None,
         MoveType::Address => None,
         MoveType::Signer => None,
         MoveType::Vector { items } => Some(transaction::move_type::Content::Vector(Box::from(
@@ -312,15 +315,6 @@ pub fn convert_move_type(move_type: &MoveType) -> transaction::MoveType {
         )),
         MoveType::Unparsable(string) => {
             Some(transaction::move_type::Content::Unparsable(string.clone()))
-        },
-        MoveType::I8
-        | MoveType::I16
-        | MoveType::I32
-        | MoveType::I64
-        | MoveType::I128
-        | MoveType::I256 => {
-            //TODO(#17645): make sure `None` is enough here
-            None
         },
     };
     transaction::MoveType {
