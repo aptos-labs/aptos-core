@@ -522,7 +522,7 @@ impl<'a> FunctionGenerator<'a> {
     ) {
         let visibility = struct_env.get_visibility();
         assert!(visibility.is_public_or_friend());
-        if struct_env.is_empty_struct() {
+        if struct_env.is_empty_struct().unwrap_or(false) {
             return;
         }
         let type_parameters = TypeParameter::vec_to_formals(struct_env.get_type_parameters());

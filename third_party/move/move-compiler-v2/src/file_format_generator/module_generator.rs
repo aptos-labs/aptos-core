@@ -12,7 +12,11 @@ use crate::{
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
-use move_binary_format::{file_format as FF, file_format::Visibility, file_format_common};
+use move_binary_format::{
+    file_format as FF,
+    file_format::{VariantIndex, Visibility},
+    file_format_common,
+};
 use move_bytecode_source_map::source_map::{SourceMap, SourceName};
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, metadata::Metadata,
@@ -685,6 +689,47 @@ impl ModuleGenerator {
             let name_sym = struct_env.env().symbol_pool().make(&name);
             let name_idx = self.name_index(ctx, loc, name_sym);
 
+            // Attach attributes according to the operation
+            let attributes = if op_prefix == well_known::PACK {
+                if variant_opt.is_some() {
+                    let variant_index = struct_env
+                        .get_variants()
+                        .position(|v| v == variant_opt.unwrap())
+                        .unwrap();
+                    vec![FF::FunctionAttribute::PackVariant(
+                        variant_index as VariantIndex,
+                    )]
+                } else {
+                    vec![FF::FunctionAttribute::Pack]
+                }
+            } else if op_prefix == well_known::UNPACK {
+                if variant_opt.is_some() {
+                    let variant_index = struct_env
+                        .get_variants()
+                        .position(|v| v == variant_opt.unwrap())
+                        .unwrap();
+                    vec![FF::FunctionAttribute::UnpackVariant(
+                        variant_index as VariantIndex,
+                    )]
+                } else {
+                    vec![FF::FunctionAttribute::Unpack]
+                }
+            } else if op_prefix == well_known::TEST_VARIANT {
+                assert!(
+                    variant_opt.is_some(),
+                    "test_variant must be a concrete variant"
+                );
+                let variant_index = struct_env
+                    .get_variants()
+                    .position(|v| v == variant_opt.unwrap())
+                    .unwrap();
+                vec![FF::FunctionAttribute::TestVariant(
+                    variant_index as VariantIndex,
+                )]
+            } else {
+                vec![]
+            };
+
             let handle = FF::FunctionHandle {
                 module,
                 name: name_idx,
@@ -692,7 +737,7 @@ impl ModuleGenerator {
                 parameters: params_sig,
                 return_: return_sig,
                 access_specifiers: None,
-                attributes: vec![],
+                attributes,
             };
 
             self.module.function_handles.push(handle);
@@ -971,6 +1016,15 @@ impl ModuleGenerator {
             for (name, ty, variant_vec, offset) in handle_elements {
                 let return_: FF::SignatureIndex =
                     self.signature(ctx, loc, vec![ty.wrap_in_reference(!is_imm)]);
+                // max field number is constant FF::MemberCount so we can safely use MemberCount for offset
+                // as long as the program is well-formed.
+                let attributes = vec![
+                    if is_imm {
+                        FF::FunctionAttribute::BorrowFieldImmutable(*offset as FF::MemberCount)
+                    } else {
+                        FF::FunctionAttribute::BorrowFieldMutable(*offset as FF::MemberCount)
+                    },
+                ];
                 let handle: FF::FunctionHandle = FF::FunctionHandle {
                     module,
                     name: self.name_index(ctx, loc, struct_env.env().symbol_pool().make(&name)),
@@ -978,7 +1032,7 @@ impl ModuleGenerator {
                     parameters,
                     return_,
                     access_specifiers: None,
-                    attributes: vec![],
+                    attributes,
                 };
                 let idx = FF::FunctionHandleIndex(ctx.checked_bound(
                     loc,
@@ -1006,6 +1060,13 @@ impl ModuleGenerator {
                     MAX_FUNCTION_COUNT,
                     "used function",
                 ));
+                let attributes = vec![
+                    if is_imm {
+                        FF::FunctionAttribute::BorrowFieldImmutable(offset as FF::MemberCount)
+                    } else {
+                        FF::FunctionAttribute::BorrowFieldMutable(offset as FF::MemberCount)
+                    },
+                ];
                 let handle: FF::FunctionHandle = FF::FunctionHandle {
                     module,
                     name: self.name_index(ctx, loc, struct_env.env().symbol_pool().make(&name)),
@@ -1013,7 +1074,7 @@ impl ModuleGenerator {
                     parameters,
                     return_,
                     access_specifiers: None,
-                    attributes: vec![],
+                    attributes,
                 };
                 self.module.function_handles.push(handle);
                 ret.push(((None, offset, ref_type.clone()), idx));
