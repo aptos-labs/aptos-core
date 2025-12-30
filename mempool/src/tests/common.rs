@@ -27,7 +27,7 @@ use std::collections::BTreeMap;
 pub(crate) fn setup_mempool() -> (CoreMempool, ConsensusMock) {
     let mut config = NodeConfig::generate_random_config();
     config.mempool.broadcast_buckets = vec![0];
-    (CoreMempool::new(&config), ConsensusMock::new())
+    (CoreMempool::new_for_testing(&config), ConsensusMock::new())
 }
 
 pub(crate) fn setup_mempool_with_broadcast_buckets(
@@ -35,7 +35,7 @@ pub(crate) fn setup_mempool_with_broadcast_buckets(
 ) -> (CoreMempool, ConsensusMock) {
     let mut config = NodeConfig::generate_random_config();
     config.mempool.broadcast_buckets = buckets;
-    (CoreMempool::new(&config), ConsensusMock::new())
+    (CoreMempool::new_for_testing(&config), ConsensusMock::new())
 }
 
 static ACCOUNTS: Lazy<Vec<AccountAddress>> = Lazy::new(|| {
