@@ -5638,6 +5638,12 @@ impl ValueView for Vector {
     }
 }
 
+impl ValueView for Vec<u8> {
+    fn visit(&self, visitor: &mut impl ValueVisitor) -> PartialVMResult<()> {
+        visitor.visit_vec_u8(0, self)
+    }
+}
+
 impl ValueView for Reference {
     fn visit(&self, visitor: &mut impl ValueVisitor) -> PartialVMResult<()> {
         use ReferenceImpl::*;

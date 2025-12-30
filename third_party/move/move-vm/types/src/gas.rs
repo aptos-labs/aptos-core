@@ -86,8 +86,6 @@ pub enum SimpleInstruction {
     CastI128,
     CastI256,
     Negate,
-
-    AbortMsg,
 }
 
 impl SimpleInstruction {
@@ -165,8 +163,6 @@ impl SimpleInstruction {
             CastI64 => CAST_I64,
             CastI128 => CAST_I128,
             CastI256 => CAST_I256,
-
-            AbortMsg => ABORT_MSG,
         }
     }
 }
@@ -391,6 +387,10 @@ pub trait GasMeter: NativeGasMeter {
     ) -> PartialVMResult<()>;
 
     fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()>;
+
+    fn charge_abort_message(&mut self, bytes: &Vec<u8>) -> PartialVMResult<()>;
+
+    fn charge_abort_message_after_validation(&mut self) -> PartialVMResult<()>;
 }
 
 /// A dummy gas meter that does not meter anything.
@@ -643,6 +643,14 @@ impl GasMeter for UnmeteredGasMeter {
     }
 
     fn charge_create_ty(&mut self, _num_nodes: NumTypeNodes) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn charge_abort_message(&mut self, _bytes: &Vec<u8>) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn charge_abort_message_after_validation(&mut self) -> PartialVMResult<()> {
         Ok(())
     }
 }

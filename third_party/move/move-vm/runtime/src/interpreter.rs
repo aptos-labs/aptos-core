@@ -2755,14 +2755,18 @@ impl Frame {
                         return Err(error);
                     },
                     Instruction::AbortMsg => {
-                        gas_meter.charge_simple_instr(S::Abort)?;
-
                         let vec = interpreter.operand_stack.pop_as::<Vector>()?;
                         let bytes = vec.to_vec_u8()?;
+
+                        // Gas is charged per byte to account for the cost of UTF-8 validation.
+                        gas_meter.charge_abort_message(&bytes)?;
+
                         let error_message = String::from_utf8(bytes).map_err(|err| {
                             PartialVMError::new(StatusCode::INVALID_ABORT_MESSAGE)
                                 .with_message(format!("Invalid UTF-8 string: {err}"))
                         })?;
+
+                        gas_meter.charge_abort_message_after_validation()?;
 
                         let error_code = interpreter.operand_stack.pop_as::<u64>()?;
 

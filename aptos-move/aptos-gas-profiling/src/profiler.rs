@@ -235,6 +235,9 @@ where
             &mut self,
             locals: impl Iterator<Item = impl ValueView> + Clone,
         ) -> PartialVMResult<()>;
+
+        // Note: we don't use this to charge gas so no need to record anything.
+        fn charge_abort_message_after_validation(&mut self) -> PartialVMResult<()>;
     }
 
     record_bytecode! {
@@ -367,6 +370,9 @@ where
 
         [VEC_SWAP]
         fn charge_vec_swap(&mut self) -> PartialVMResult<()>;
+
+        [ABORT_MSG]
+        fn charge_abort_message(&mut self, bytes: &Vec<u8>) -> PartialVMResult<()>;
     }
 
     fn balance_internal(&self) -> InternalGas {

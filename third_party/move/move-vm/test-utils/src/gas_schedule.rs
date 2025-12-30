@@ -538,6 +538,14 @@ impl GasMeter for GasStatus {
     fn charge_create_ty(&mut self, _num_nodes: NumTypeNodes) -> PartialVMResult<()> {
         Ok(())
     }
+
+    fn charge_abort_message(&mut self, _bytes: &Vec<u8>) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn charge_abort_message_after_validation(&mut self) -> PartialVMResult<()> {
+        Ok(())
+    }
 }
 
 pub fn new_from_instructions(mut instrs: Vec<(Bytecode, GasCost)>) -> CostTable {
