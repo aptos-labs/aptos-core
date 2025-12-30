@@ -22,6 +22,12 @@ class MoveTypes(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     MOVE_TYPES_U64: _ClassVar[MoveTypes]
     MOVE_TYPES_U128: _ClassVar[MoveTypes]
     MOVE_TYPES_U256: _ClassVar[MoveTypes]
+    MOVE_TYPES_I8: _ClassVar[MoveTypes]
+    MOVE_TYPES_I16: _ClassVar[MoveTypes]
+    MOVE_TYPES_I32: _ClassVar[MoveTypes]
+    MOVE_TYPES_I64: _ClassVar[MoveTypes]
+    MOVE_TYPES_I128: _ClassVar[MoveTypes]
+    MOVE_TYPES_I256: _ClassVar[MoveTypes]
     MOVE_TYPES_ADDRESS: _ClassVar[MoveTypes]
     MOVE_TYPES_SIGNER: _ClassVar[MoveTypes]
     MOVE_TYPES_VECTOR: _ClassVar[MoveTypes]
@@ -46,6 +52,12 @@ MOVE_TYPES_U32: MoveTypes
 MOVE_TYPES_U64: MoveTypes
 MOVE_TYPES_U128: MoveTypes
 MOVE_TYPES_U256: MoveTypes
+MOVE_TYPES_I8: MoveTypes
+MOVE_TYPES_I16: MoveTypes
+MOVE_TYPES_I32: MoveTypes
+MOVE_TYPES_I64: MoveTypes
+MOVE_TYPES_I128: MoveTypes
+MOVE_TYPES_I256: MoveTypes
 MOVE_TYPES_ADDRESS: MoveTypes
 MOVE_TYPES_SIGNER: MoveTypes
 MOVE_TYPES_VECTOR: MoveTypes
