@@ -824,9 +824,10 @@ pub enum StatusCode {
     // When publishing a module bundle, all friends declared there must be in this bundle. If it is
     // not the case, an error with this status code is returned.
     FRIEND_NOT_FOUND_IN_MODULE_BUNDLE = 1135,
+    // The struct API code does not have the correct implementation
+    INVALID_STRUCT_API_CODE = 1136,
 
     // Reserved error code for future use
-    RESERVED_VERIFICATION_ERROR_1 = 1136,
     RESERVED_VERIFICATION_ERROR_2 = 1137,
     RESERVED_VERIFICATION_ERROR_3 = 1138,
     RESERVED_VERIFICATION_ERROR_4 = 1139,
