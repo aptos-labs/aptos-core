@@ -120,6 +120,7 @@ impl TExecutionClient for MockExecutionClient {
         _rand_config: Option<RandConfig>,
         _fast_rand_config: Option<RandConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        _secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
         _highest_committed_round: Round,
     ) {
     }

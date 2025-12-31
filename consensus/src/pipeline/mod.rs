@@ -35,6 +35,7 @@ pub mod persisting_phase;
 pub mod pipeline_phase;
 pub mod signing_phase;
 
+pub mod decryption_pipeline_builder;
 pub mod execution_client;
 pub mod pipeline_builder;
 #[cfg(test)]
