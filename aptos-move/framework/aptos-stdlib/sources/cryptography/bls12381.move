@@ -660,7 +660,7 @@ module aptos_std::bls12381 {
             // Generate key pairs.
             let signing_keys = vector[];
             let public_keys = vector[];
-            for (i in 0..signer_count) {
+            for (_i in 0..signer_count) {
                 let (sk, pk) = generate_keys();
                 signing_keys.push_back(sk);
                 public_keys.push_back(pk);

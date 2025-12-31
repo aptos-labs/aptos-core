@@ -99,8 +99,8 @@ module aptos_framework::genesis {
 
         // put reserved framework reserved accounts under aptos governance
         let framework_reserved_addresses = vector<address>[@0x2, @0x3, @0x4, @0x5, @0x6, @0x7, @0x8, @0x9, @0xa];
-        while (!vector::is_empty(&framework_reserved_addresses)) {
-            let address = vector::pop_back<address>(&mut framework_reserved_addresses);
+        while (!framework_reserved_addresses.is_empty()) {
+            let address = framework_reserved_addresses.pop_back<address>();
             let (_, framework_signer_cap) = account::create_framework_reserved_account(address);
             aptos_governance::store_signer_cap(&aptos_framework_account, address, framework_signer_cap);
         };
@@ -174,13 +174,13 @@ module aptos_framework::genesis {
 
     fun create_accounts(aptos_framework: &signer, accounts: vector<AccountMap>) {
         let unique_accounts = vector::empty();
-        vector::for_each_ref(&accounts, |account_map| {
+        accounts.for_each_ref(|account_map| {
             let account_map: &AccountMap = account_map;
             assert!(
-                !vector::contains(&unique_accounts, &account_map.account_address),
+                !unique_accounts.contains(&account_map.account_address),
                 error::already_exists(EDUPLICATE_ACCOUNT),
             );
-            vector::push_back(&mut unique_accounts, account_map.account_address);
+            unique_accounts.push_back(account_map.account_address);
 
             create_account(
                 aptos_framework,
@@ -213,39 +213,39 @@ module aptos_framework::genesis {
     ) {
         let unique_accounts = vector::empty();
 
-        vector::for_each_ref(&employees, |employee_group| {
+        employees.for_each_ref(|employee_group| {
             let j = 0;
             let employee_group: &EmployeeAccountMap = employee_group;
-            let num_employees_in_group = vector::length(&employee_group.accounts);
+            let num_employees_in_group = employee_group.accounts.length();
 
             let buy_ins = simple_map::create();
 
             while (j < num_employees_in_group) {
-                let account = vector::borrow(&employee_group.accounts, j);
+                let account = employee_group.accounts.borrow(j);
                 assert!(
-                    !vector::contains(&unique_accounts, account),
+                    !unique_accounts.contains(account),
                     error::already_exists(EDUPLICATE_ACCOUNT),
                 );
-                vector::push_back(&mut unique_accounts, *account);
+                unique_accounts.push_back(*account);
 
                 let employee = create_signer(*account);
                 let total = coin::balance<AptosCoin>(*account);
                 let coins = coin::withdraw<AptosCoin>(&employee, total);
-                simple_map::add(&mut buy_ins, *account, coins);
+                buy_ins.add(*account, coins);
 
-                j = j + 1;
+                j += 1;
             };
 
             let j = 0;
-            let num_vesting_events = vector::length(&employee_group.vesting_schedule_numerator);
+            let num_vesting_events = employee_group.vesting_schedule_numerator.length();
             let schedule = vector::empty();
 
             while (j < num_vesting_events) {
-                let numerator = vector::borrow(&employee_group.vesting_schedule_numerator, j);
+                let numerator = employee_group.vesting_schedule_numerator.borrow(j);
                 let event = fixed_point32::create_from_rational(*numerator, employee_group.vesting_schedule_denominator);
-                vector::push_back(&mut schedule, event);
+                schedule.push_back(event);
 
-                j = j + 1;
+                j += 1;
             };
 
             let vesting_schedule = vesting::create_vesting_schedule(
@@ -299,7 +299,7 @@ module aptos_framework::genesis {
         use_staking_contract: bool,
         validators: vector<ValidatorConfigurationWithCommission>,
     ) {
-        vector::for_each_ref(&validators, |validator| {
+        validators.for_each_ref(|validator| {
             let validator: &ValidatorConfigurationWithCommission = validator;
             create_initialize_validator(aptos_framework, validator, use_staking_contract);
         });
@@ -323,13 +323,13 @@ module aptos_framework::genesis {
     /// encoded in a single BCS byte array.
     fun create_initialize_validators(aptos_framework: &signer, validators: vector<ValidatorConfiguration>) {
         let validators_with_commission = vector::empty();
-        vector::for_each_reverse(validators, |validator| {
+        validators.for_each_reverse(|validator| {
             let validator_with_commission = ValidatorConfigurationWithCommission {
                 validator_config: validator,
                 commission_percentage: 0,
                 join_during_genesis: true,
             };
-            vector::push_back(&mut validators_with_commission, validator_with_commission);
+            validators_with_commission.push_back(validator_with_commission);
         });
 
         create_initialize_validators_with_commission(aptos_framework, false, validators_with_commission);
