@@ -59,7 +59,7 @@ a sell order it's triggered when the market price is greater than or equal to th
 TimeBased(time): The order is triggered when the current time is greater than or equal to the time.
 
 
--  [Struct `OrderMatchResult`](#0x7_order_placement_OrderMatchResult)
+-  [Enum `OrderMatchResult`](#0x7_order_placement_OrderMatchResult)
 -  [Constants](#@Constants_0)
 -  [Function `destroy_order_match_result`](#0x7_order_placement_destroy_order_match_result)
 -  [Function `number_of_fills`](#0x7_order_placement_number_of_fills)
@@ -102,13 +102,21 @@ TimeBased(time): The order is triggered when the current time is greater than or
 
 <a id="0x7_order_placement_OrderMatchResult"></a>
 
-## Struct `OrderMatchResult`
+## Enum `OrderMatchResult`
 
 
 
-<pre><code><b>struct</b> <a href="order_placement.md#0x7_order_placement_OrderMatchResult">OrderMatchResult</a>&lt;R: <b>copy</b>, drop, store&gt; <b>has</b> drop
+<pre><code>enum <a href="order_placement.md#0x7_order_placement_OrderMatchResult">OrderMatchResult</a>&lt;R: <b>copy</b>, drop, store&gt; <b>has</b> drop
 </code></pre>
 
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>V1</summary>
 
 
 <details>
@@ -154,6 +162,10 @@ TimeBased(time): The order is triggered when the current time is greater than or
 </dd>
 </dl>
 
+
+</details>
+
+</details>
 
 </details>
 
@@ -225,7 +237,7 @@ TimeBased(time): The order is triggered when the current time is greater than or
 <pre><code><b>public</b> <b>fun</b> <a href="order_placement.md#0x7_order_placement_destroy_order_match_result">destroy_order_match_result</a>&lt;R: store + <b>copy</b> + drop&gt;(
     self: <a href="order_placement.md#0x7_order_placement_OrderMatchResult">OrderMatchResult</a>&lt;R&gt;
 ): (OrderIdType, u64, Option&lt;OrderCancellationReason&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;R&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, u32) {
-    <b>let</b> <a href="order_placement.md#0x7_order_placement_OrderMatchResult">OrderMatchResult</a> { order_id, remaining_size, cancel_reason, callback_results,  fill_sizes, match_count } =
+    <b>let</b> OrderMatchResult::V1 { order_id, remaining_size, cancel_reason, callback_results,  fill_sizes, match_count } =
         self;
     (order_id, remaining_size, cancel_reason, callback_results, fill_sizes, match_count)
 }
@@ -660,7 +672,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
                 metadata
             )
         );
-        <b>return</b> <a href="order_placement.md#0x7_order_placement_OrderMatchResult">OrderMatchResult</a> {
+        <b>return</b> OrderMatchResult::V1 {
             order_id,
             remaining_size,
             cancel_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
@@ -746,7 +758,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
             metadata
         )
     );
-    <b>return</b> <a href="order_placement.md#0x7_order_placement_OrderMatchResult">OrderMatchResult</a> {
+    <b>return</b> OrderMatchResult::V1 {
         order_id,
         remaining_size,
         cancel_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
@@ -996,7 +1008,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         size_delta,
         is_taker,
     );
-    <b>return</b> <a href="order_placement.md#0x7_order_placement_OrderMatchResult">OrderMatchResult</a> {
+    <b>return</b> OrderMatchResult::V1 {
         order_id,
         remaining_size: 0,
         cancel_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(cancel_reason),
@@ -1574,7 +1586,7 @@ is done before calling this function if needed.
             callback_results.push_back(result.destroy_some());
         };
         <b>if</b> (taker_cancellation_reason.is_some()) {
-            <b>return</b> <a href="order_placement.md#0x7_order_placement_OrderMatchResult">OrderMatchResult</a> {
+            <b>return</b> OrderMatchResult::V1 {
                 order_id,
                 remaining_size: 0, // 0 because the order is cancelled
                 cancel_reason: taker_cancellation_reason,
@@ -1584,7 +1596,7 @@ is done before calling this function if needed.
             }
         };
         <b>if</b> (should_stop) {
-            <b>return</b> <a href="order_placement.md#0x7_order_placement_OrderMatchResult">OrderMatchResult</a> {
+            <b>return</b> OrderMatchResult::V1 {
                 order_id,
                 remaining_size,
                 cancel_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
@@ -1673,7 +1685,7 @@ is done before calling this function if needed.
                     callback_results
                 );
             } <b>else</b> {
-                <b>return</b> <a href="order_placement.md#0x7_order_placement_OrderMatchResult">OrderMatchResult</a> {
+                <b>return</b> OrderMatchResult::V1 {
                     order_id,
                     remaining_size,
                     cancel_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(
@@ -1686,7 +1698,7 @@ is done before calling this function if needed.
             };
         };
     };
-    <a href="order_placement.md#0x7_order_placement_OrderMatchResult">OrderMatchResult</a> {
+    OrderMatchResult::V1 {
         order_id,
         remaining_size,
         cancel_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
