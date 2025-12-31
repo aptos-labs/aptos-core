@@ -2,8 +2,7 @@
 module aptos_experimental::order_book_client_order_id {
     use std::option;
     use std::signer;
-    use aptos_experimental::order_book_types::{new_order_id_type, price_move_up_condition};
-    use aptos_experimental::order_book_types::good_till_cancelled;
+    use aptos_trading::order_book_types::{good_till_cancelled, new_order_id_type, price_move_up_condition};
     use aptos_experimental::order_book::{new_single_order_request, destroy_order_book, set_up_test_with_id};
 
     #[test(user1 = @0x456)]

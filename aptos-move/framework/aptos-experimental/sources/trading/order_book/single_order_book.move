@@ -18,23 +18,21 @@ module aptos_experimental::single_order_book {
     use std::option::{Self, Option};
     use std::string::String;
     use aptos_framework::big_ordered_map::BigOrderedMap;
-    use aptos_framework::transaction_context;
-    use aptos_experimental::order_book_types::{
+    use aptos_trading::order_book_types::{
         OrderIdType,
         AccountClientOrderId,
-        new_unique_idx_type,
+        new_increasing_idx_type,
         new_account_client_order_id,
-        new_default_big_ordered_map, OrderMatch, new_order_match, new_single_order_match_details, OrderMatchDetails,
-        UniqueIdxType, single_order_type
+        OrderMatch, new_order_match, new_single_order_match_details, OrderMatchDetails,
+        IncreasingIdxType, single_order_type,
+        ActiveMatchedOrder
     };
-    use aptos_experimental::single_order_types::{
+    use aptos_trading::single_order_types::{
         OrderWithState,
         new_single_order,
         new_order_with_state,
         SingleOrder
     };
-    use aptos_experimental::order_book_types::ActiveMatchedOrder;
-    use aptos_experimental::order_book_types::{TimeInForce, TriggerCondition};
     use aptos_experimental::price_time_index::{PriceTimeIndex, new_price_time_idx};
     use aptos_experimental::pending_order_book_index::{
         PendingOrderBookIndex,
@@ -42,12 +40,11 @@ module aptos_experimental::single_order_book {
     };
 
     #[test_only]
-    use aptos_experimental::order_book_types::{
+    use aptos_trading::order_book_types::{
         new_order_id_type,
-        new_time_based_trigger_condition
+        new_time_based_trigger_condition,
+        price_move_up_condition, price_move_down_condition
     };
-    #[test_only]
-    use aptos_experimental::order_book_types::{good_till_cancelled, price_move_up_condition, price_move_down_condition};
     #[test_only]
     use aptos_framework::timestamp;
     #[test_only]
@@ -64,85 +61,11 @@ module aptos_experimental::single_order_book {
     const ENOT_SINGLE_ORDER_BOOK: u64 = 10;
     const ETRIGGER_COND_NOT_FOUND: u64 = 11;
 
-    enum SingleOrderRequest<M: store + copy + drop> has copy, drop {
-        V1 {
-            account: address,
-            order_id: OrderIdType,
-            client_order_id: Option<String>,
-            price: u64,
-            orig_size: u64,
-            remaining_size: u64,
-            is_bid: bool,
-            trigger_condition: Option<TriggerCondition>,
-            time_in_force: TimeInForce,
-            creation_time_micros: Option<u64>,
-            metadata: M
-        }
-    }
-
     enum SingleOrderBook<M: store + copy + drop> has store {
         V1 {
             orders: BigOrderedMap<OrderIdType, OrderWithState<M>>,
             client_order_ids: BigOrderedMap<AccountClientOrderId, OrderIdType>,
             pending_orders: PendingOrderBookIndex
-        }
-    }
-
-    public(friend) fun new_single_order_request<M: store + copy + drop>(
-        account: address,
-        order_id: OrderIdType,
-        client_order_id: Option<String>,
-        price: u64,
-        orig_size: u64,
-        remaining_size: u64,
-        is_bid: bool,
-        trigger_condition: Option<TriggerCondition>,
-        time_in_force: TimeInForce,
-        metadata: M
-    ): SingleOrderRequest<M> {
-        SingleOrderRequest::V1 {
-            account,
-            order_id,
-            client_order_id,
-            price,
-            orig_size,
-            remaining_size,
-            is_bid,
-            trigger_condition,
-            time_in_force,
-            creation_time_micros: option::none(),
-            metadata
-        }
-    }
-
-    fun new_order_request_from_match_details<M: store + copy + drop>(
-        order_match_details: OrderMatchDetails<M>
-    ): SingleOrderRequest<M> {
-        let (
-            order_id,
-            account,
-            client_order_id,
-            _unique_priority_idx,
-            price,
-            orig_size,
-            remaining_size,
-            is_bid,
-            time_in_force,
-            creation_time_micros,
-            metadata
-        ) = order_match_details.destroy_single_order_match_details();
-        SingleOrderRequest::V1 {
-            account,
-            order_id,
-            client_order_id,
-            price,
-            orig_size,
-            remaining_size,
-            is_bid,
-            trigger_condition: option::none(),
-            time_in_force,
-            creation_time_micros: option::some(creation_time_micros),
-            metadata,
         }
     }
 
@@ -257,8 +180,7 @@ module aptos_experimental::single_order_book {
     public(friend) fun place_maker_or_pending_order<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, order_req: SingleOrderRequest<M>
     ) {
-        let ascending_idx =
-            new_unique_idx_type(transaction_context::monotonically_increasing_counter());
+        let ascending_idx = new_increasing_idx_type();
         if (order_req.trigger_condition.is_some()) {
             return self.place_pending_order_internal(order_req, ascending_idx);
         };
@@ -269,7 +191,7 @@ module aptos_experimental::single_order_book {
         self: &mut SingleOrderBook<M>,
         price_time_idx: &mut PriceTimeIndex,
         order_req: SingleOrderRequest<M>,
-        ascending_idx: UniqueIdxType
+        ascending_idx: IncreasingIdxType
     ) {
         let order =
             new_single_order(
@@ -341,7 +263,7 @@ module aptos_experimental::single_order_book {
     fun place_pending_order_internal<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>,
         order_req: SingleOrderRequest<M>,
-        ascending_idx: UniqueIdxType
+        ascending_idx: IncreasingIdxType
     ) {
         let order_id = order_req.order_id;
         let order =
@@ -565,7 +487,7 @@ module aptos_experimental::single_order_book {
     #[test_only]
     public(friend) fun get_unique_priority_idx<M: store + copy + drop>(
         self: &SingleOrderBook<M>, order_id: OrderIdType
-    ): Option<UniqueIdxType> {
+    ): Option<IncreasingIdxType> {
         self.orders.get_and_map(&order_id, |order| order.get_unique_priority_idx_from_state())
     }
 
@@ -590,27 +512,16 @@ module aptos_experimental::single_order_book {
         let remaining_size = order_req.remaining_size;
         while (remaining_size > 0) {
             if (!is_taker_order(
-                price_time_idx, order_req.price, order_req.is_bid, order_req.trigger_condition
+                price_time_idx, order_req.get_price(), order_req.is_bid(), order_req.get_trigger_condition()
             )) {
+                *order_req.get_remaining_size_mut() = remaining_size;
                 self.place_maker_or_pending_order(
                     price_time_idx,
-                    SingleOrderRequest::V1 {
-                        account: order_req.account,
-                        order_id: order_req.order_id,
-                        client_order_id: order_req.client_order_id,
-                        price: order_req.price,
-                        orig_size: order_req.orig_size,
-                        remaining_size,
-                        is_bid: order_req.is_bid,
-                        trigger_condition: order_req.trigger_condition,
-                        time_in_force: order_req.time_in_force,
-                        creation_time_micros: option::none(),
-                        metadata: order_req.metadata
-                    }
+                    order_req
                 );
                 return match_results;
             };
-            let result = price_time_idx.get_single_match_result( order_req.price, remaining_size, order_req.is_bid);
+            let result = price_time_idx.get_single_match_result(order_req.get_price(), remaining_size, order_req.is_bid());
             let match_result =
                 self.get_single_match_for_taker(result);
             let matched_size = match_result.get_matched_size();
@@ -624,22 +535,9 @@ module aptos_experimental::single_order_book {
     public(friend) fun update_order_and_get_matches<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, order_req: SingleOrderRequest<M>
     ): vector<OrderMatch<M>> {
-        let unique_priority_idx = self.get_unique_priority_idx(order_req.order_id);
+        let unique_priority_idx = self.get_unique_priority_idx(order_req.get_order_id());
         assert!(unique_priority_idx.is_some(), EORDER_NOT_FOUND);
-        self.cancel_order(price_time_idx, order_req.account, order_req.order_id);
-        let order_req = SingleOrderRequest::V1 {
-            account: order_req.account,
-            order_id: order_req.order_id,
-            client_order_id: order_req.client_order_id,
-            price: order_req.price,
-            orig_size: order_req.orig_size,
-            remaining_size: order_req.remaining_size,
-            is_bid: order_req.is_bid,
-            trigger_condition: order_req.trigger_condition,
-            time_in_force: order_req.time_in_force,
-            creation_time_micros: option::none(),
-            metadata: order_req.metadata
-        };
+        self.cancel_order(price_time_idx, order_req.get_account(), order_req.get_order_id());
         self.place_order_and_get_matches(price_time_idx, order_req)
     }
 
@@ -653,33 +551,11 @@ module aptos_experimental::single_order_book {
         while (i < ready_orders.length()) {
             let order = ready_orders[i];
             let (
-                account,
-                order_id,
-                client_order_id,
+                order_request,
                 _unique_priority_idx,
-                price,
-                orig_size,
-                remaining_size,
-                is_bid,
-                _,
-                time_in_force,
-                metadata,
-                _
             ) = order.destroy_single_order();
-            let order_req = SingleOrderRequest::V1 {
-                account,
-                order_id,
-                client_order_id,
-                price,
-                orig_size,
-                remaining_size,
-                is_bid,
-                trigger_condition: option::none(),
-                time_in_force,
-                creation_time_micros: option::none(),
-                metadata
-            };
-            let match_results = self.place_order_and_get_matches(price_time_idx, order_req);
+            *order_request.get_trigger_condition_mut() = option::none();
+            let match_results = self.place_order_and_get_matches(price_time_idx, order_request);
             all_matches.append(match_results);
             i += 1;
         };
@@ -724,78 +600,6 @@ module aptos_experimental::single_order_book {
     }
 
     // ============================= Test Helper Functions ====================================
-
-    #[test_only]
-    public fun create_test_order_request<M: store + copy + drop>(
-        account: address,
-        order_id: OrderIdType,
-        client_order_id: Option<String>,
-        price: u64,
-        orig_size: u64,
-        remaining_size: u64,
-        is_bid: bool,
-        trigger_condition: Option<TriggerCondition>,
-        metadata: M
-    ): SingleOrderRequest<M> {
-        SingleOrderRequest::V1 {
-            account,
-            order_id,
-            client_order_id,
-            price,
-            orig_size,
-            remaining_size,
-            is_bid,
-            trigger_condition,
-            time_in_force: good_till_cancelled(),
-            creation_time_micros: option::none(),
-            metadata
-        }
-    }
-
-    #[test_only]
-    public fun create_simple_test_order_request<M: store + copy + drop>(
-        account: address,
-        order_id: OrderIdType,
-        price: u64,
-        size: u64,
-        is_bid: bool,
-        metadata: M
-    ): SingleOrderRequest<M> {
-        create_test_order_request(
-            account,
-            order_id,
-            option::none(),
-            price,
-            size,
-            size,
-            is_bid,
-            option::none(),
-            metadata
-        )
-    }
-
-    #[test_only]
-    public fun create_test_order_request_with_client_id<M: store + copy + drop>(
-        account: address,
-        order_id: OrderIdType,
-        client_order_id: String,
-        price: u64,
-        size: u64,
-        is_bid: bool,
-        metadata: M
-    ): SingleOrderRequest<M> {
-        create_test_order_request(
-            account,
-            order_id,
-            option::some(client_order_id),
-            price,
-            size,
-            size,
-            is_bid,
-            option::none(),
-            metadata
-        )
-    }
 
     #[test_only]
     public fun verify_order_state<M: store + copy + drop>(

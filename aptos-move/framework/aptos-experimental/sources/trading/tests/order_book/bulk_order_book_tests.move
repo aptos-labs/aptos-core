@@ -1,15 +1,15 @@
 #[test_only]
 module aptos_experimental::bulk_order_book_tests {
-    use aptos_experimental::order_book_types::OrderMatch;
-    use aptos_experimental::bulk_order_book::{BulkOrderBook, new_bulk_order_book};
     use std::vector;
-    use aptos_experimental::bulk_order_book_types::{
+    use aptos_framework::timestamp;
+    use aptos_framework::account;
+    use aptos_trading::order_book_types::OrderMatch;
+    use aptos_trading::bulk_order_types::{
         BulkOrderRequest, new_bulk_order_request,
         destroy_bulk_order_place_response,
     };
+    use aptos_experimental::bulk_order_book::{BulkOrderBook, new_bulk_order_book};
     use aptos_experimental::price_time_index;
-    use aptos_framework::timestamp;
-    use aptos_framework::account;
 
     // Test accounts
     const TEST_ACCOUNT_1: address = @0x1;
@@ -901,7 +901,7 @@ module aptos_experimental::bulk_order_book_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book_types::E_BID_ORDER_INVALID)]
+    #[expected_failure(abort_code = aptos_experimental::bulk_order_types::E_BID_ORDER_INVALID)]
     fun test_invalid_bid_prices_not_descending() {
         // Test placing an order with bid prices not in descending order - should return rejection
         // Bid prices in ascending order (invalid - should be descending)
@@ -922,7 +922,7 @@ module aptos_experimental::bulk_order_book_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book_types::E_ASK_ORDER_INVALID)]
+    #[expected_failure(abort_code = aptos_experimental::bulk_order_types::E_ASK_ORDER_INVALID)]
     fun test_invalid_ask_prices_not_ascending() {
         // Test placing an order with ask prices not in ascending order - should return rejection
         // Ask prices in descending order (invalid - should be ascending)
@@ -943,7 +943,7 @@ module aptos_experimental::bulk_order_book_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book_types::E_BID_SIZE_ZERO)]
+    #[expected_failure(abort_code = aptos_experimental::bulk_order_types::E_BID_SIZE_ZERO)]
     fun test_zero_bid_size() {
         // Test placing an order with zero bid size - should return rejection
         let bid_prices = vector[BID_PRICE_1, BID_PRICE_2];
@@ -963,7 +963,7 @@ module aptos_experimental::bulk_order_book_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book_types::E_ASK_SIZE_ZERO)]
+    #[expected_failure(abort_code = aptos_experimental::bulk_order_types::E_ASK_SIZE_ZERO)]
     fun test_zero_ask_size() {
         // Test placing an order with zero ask size - should return rejection
         let bid_prices = vector[BID_PRICE_1, BID_PRICE_2];
@@ -983,7 +983,7 @@ module aptos_experimental::bulk_order_book_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book_types::E_BID_SIZE_ZERO)]
+    #[expected_failure(abort_code = aptos_experimental::bulk_order_types::E_BID_SIZE_ZERO)]
     fun test_all_zero_sizes() {
         // Test placing an order with all zero sizes - should return rejection
         let bid_prices = vector[BID_PRICE_1];
@@ -1003,7 +1003,7 @@ module aptos_experimental::bulk_order_book_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book_types::E_BID_LENGTH_MISMATCH)]
+    #[expected_failure(abort_code = aptos_experimental::bulk_order_types::E_BID_LENGTH_MISMATCH)]
     fun test_mismatched_bid_prices_and_sizes() {
         // Test placing an order with mismatched bid prices and sizes lengths - should return rejection
         let bid_prices = vector[BID_PRICE_1, BID_PRICE_2]; // 2 prices
@@ -1023,7 +1023,7 @@ module aptos_experimental::bulk_order_book_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book_types::E_ASK_LENGTH_MISMATCH)]
+    #[expected_failure(abort_code = aptos_experimental::bulk_order_types::E_ASK_LENGTH_MISMATCH)]
     fun test_mismatched_ask_prices_and_sizes() {
         // Test placing an order with mismatched ask prices and sizes lengths - should return rejection
         let bid_prices = vector[BID_PRICE_1, BID_PRICE_2];
@@ -1069,7 +1069,7 @@ module aptos_experimental::bulk_order_book_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book_types::E_BID_ORDER_INVALID)]
+    #[expected_failure(abort_code = aptos_experimental::bulk_order_types::E_BID_ORDER_INVALID)]
     fun test_duplicate_bid_prices() {
         // Test placing an order with duplicate bid prices (not strictly descending) - should return rejection
         let bid_prices = vector[BID_PRICE_1, BID_PRICE_1]; // Duplicate prices
@@ -1089,7 +1089,7 @@ module aptos_experimental::bulk_order_book_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book_types::E_ASK_ORDER_INVALID)]
+    #[expected_failure(abort_code = aptos_experimental::bulk_order_types::E_ASK_ORDER_INVALID)]
     fun test_duplicate_ask_prices() {
         // Test placing an order with duplicate ask prices (not strictly ascending) - should return rejection
         let bid_prices = vector[BID_PRICE_1, BID_PRICE_2];
@@ -1109,7 +1109,7 @@ module aptos_experimental::bulk_order_book_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book_types::EPRICE_CROSSING)]
+    #[expected_failure(abort_code = aptos_experimental::bulk_order_types::EPRICE_CROSSING)]
     fun test_price_crossing() {
         // Test placing an order where bid and ask prices cross - should return rejection
         // This should be prevented to avoid self-matching within a single order
@@ -1132,7 +1132,7 @@ module aptos_experimental::bulk_order_book_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book_types::EPRICE_CROSSING)]
+    #[expected_failure(abort_code = aptos_experimental::bulk_order_types::EPRICE_CROSSING)]
     fun test_price_crossing_equal_prices() {
         // Test placing an order where bid and ask prices are equal (also crossing) - should return rejection
         // Bid price 100, Ask price 100 - this also crosses (bid == ask)
@@ -1153,7 +1153,7 @@ module aptos_experimental::bulk_order_book_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book_types::EPRICE_CROSSING)]
+    #[expected_failure(abort_code = aptos_experimental::bulk_order_types::EPRICE_CROSSING)]
     fun test_price_crossing_multiple_levels() {
         // Test placing an order with multiple price levels where the highest bid crosses the lowest ask - should return rejection
         // Bid prices: 100, 99 (descending)

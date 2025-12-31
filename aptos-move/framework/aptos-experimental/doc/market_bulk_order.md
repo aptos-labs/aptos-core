@@ -16,7 +16,7 @@ in a single transaction, improving efficiency for market makers.
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
-<b>use</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types">0x7::bulk_order_book_types</a>;
+<b>use</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types">0x7::bulk_order_types</a>;
 <b>use</b> <a href="market_types.md#0x7_market_types">0x7::market_types</a>;
 <b>use</b> <a href="order_book.md#0x7_order_book">0x7::order_book</a>;
 <b>use</b> <a href="order_book_types.md#0x7_order_book_types">0x7::order_book_types</a>;

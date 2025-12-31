@@ -61,16 +61,14 @@ module aptos_experimental::order_placement {
     use std::signer;
     use std::string::String;
     use std::vector;
+    use aptos_trading::order_book_types::{
+        OrderIdType, OrderMatchDetails, TriggerCondition, TimeInForce, immediate_or_cancel, post_only, single_order_type, next_order_id, OrderType
+    };
     use aptos_experimental::market_clearinghouse_order_info::new_clearinghouse_order_info;
     use aptos_experimental::order_book::{new_single_order_request};
     use aptos_experimental::pre_cancellation_tracker::{
         is_pre_cancelled
     };
-    use aptos_experimental::order_book_types::{
-        OrderIdType, OrderMatchDetails, single_order_type, next_order_id, OrderType
-    };
-    use aptos_experimental::order_book_types::TriggerCondition;
-    use aptos_experimental::order_book_types::{TimeInForce, immediate_or_cancel, post_only};
     use aptos_experimental::market_types::{
         Self,
         MarketClearinghouseCallbacks,

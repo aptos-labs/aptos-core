@@ -3,12 +3,12 @@
 module aptos_experimental::dead_mans_switch_operations {
     use std::option;
     use std::string;
+    use aptos_trading::order_book_types::OrderIdType;
+    use aptos_trading::single_order_types;
+    use aptos_trading::bulk_order_types;
     use aptos_experimental::market_types::{Self, MarketClearinghouseCallbacks, Market};
-    use aptos_experimental::order_book_types::OrderIdType;
     use aptos_experimental::dead_mans_switch_tracker::{Self, is_order_valid};
     use aptos_experimental::order_operations;
-    use aptos_experimental::single_order_types;
-    use aptos_experimental::bulk_order_book_types;
     use aptos_experimental::market_bulk_order;
 
     // Error codes
@@ -108,7 +108,7 @@ module aptos_experimental::dead_mans_switch_operations {
         let bulk_order = market.get_order_book().get_bulk_order(account);
 
         // Get creation timestamp in microseconds and convert to seconds
-        let creation_time_micros = bulk_order_book_types::get_creation_time_micros(&bulk_order);
+        let creation_time_micros = bulk_order_types::get_creation_time_micros(&bulk_order);
         let creation_time_secs = creation_time_micros / MICROS_PER_SECOND;
 
         // Check if order is valid according to dead man's switch

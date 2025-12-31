@@ -1,22 +1,11 @@
 /// Order book type definitions
-module aptos_experimental::order_book_types {
-    friend aptos_experimental::order_book;
-    friend aptos_experimental::single_order_book;
-    friend aptos_experimental::bulk_order_book;
-    friend aptos_experimental::price_time_index;
-    friend aptos_experimental::pending_order_book_index;
-    friend aptos_experimental::order_placement;
-    friend aptos_experimental::order_operations;
-    friend aptos_experimental::market_types;
-    friend aptos_experimental::market_bulk_order;
-    friend aptos_experimental::single_order_types;
-    friend aptos_experimental::bulk_order_book_types;
-    #[test_only] friend aptos_experimental::bulk_order_book_tests;
-    #[test_only] friend aptos_experimental::order_book_client_order_id;
+module aptos_trading::order_book_types {
+    friend aptos_trading::bulk_order_types;
+    friend aptos_trading::single_order_types;
+
     use std::option;
     use std::option::Option;
     use std::string::String;
-    use aptos_framework::big_ordered_map::{Self, BigOrderedMap};
     use aptos_framework::transaction_context;
 
     const U128_MAX: u128 = 0xffffffffffffffffffffffffffffffff;
@@ -38,7 +27,11 @@ module aptos_experimental::order_book_types {
     }
 
     // Internal type representing order in which trades are placed.
-    struct UniqueIdxType has store, copy, drop {
+    struct IncreasingIdxType has store, copy, drop {
+        idx: u128
+    }
+
+    struct DecreasingIdxType has store, copy, drop {
         idx: u128
     }
 
@@ -64,14 +57,6 @@ module aptos_experimental::order_book_types {
         order_type.type == SINGLE_ORDER_TYPE
     }
 
-    public(friend) fun new_default_big_ordered_map<K: store, V: store>(): BigOrderedMap<K, V> {
-        big_ordered_map::new_with_config(
-            BIG_MAP_INNER_DEGREE,
-            BIG_MAP_LEAF_DEGREE,
-            true
-        )
-    }
-
     public fun next_order_id(): OrderIdType {
         // reverse bits to make order ids random, so indices on top of them are shuffled.
         OrderIdType { order_id: reverse_bits(transaction_context::monotonically_increasing_counter()) }
@@ -87,12 +72,17 @@ module aptos_experimental::order_book_types {
         AccountClientOrderId { account, client_order_id }
     }
 
-    public(friend) fun new_unique_idx_type(idx: u128): UniqueIdxType {
-        UniqueIdxType { idx }
+    public fun next_increasing_idx_type(): IncreasingIdxType {
+        IncreasingIdxType { idx: transaction_context::monotonically_increasing_counter() }
     }
 
-    public(friend) fun descending_idx(self: &UniqueIdxType): UniqueIdxType {
-        UniqueIdxType { idx: U128_MAX - self.idx }
+    #[test_only]
+    public fun new_increasing_idx_type(idx: u128): IncreasingIdxType {
+        IncreasingIdxType { idx }
+    }
+
+    public fun into_decreasing_idx_type(self: &IncreasingIdxType): DecreasingIdxType {
+        DecreasingIdxType { idx: U128_MAX - self.idx }
     }
 
     public fun get_order_id_value(self: &OrderIdType): u128 {
@@ -165,21 +155,21 @@ module aptos_experimental::order_book_types {
         TriggerCondition::PriceMoveBelow(price)
     }
 
-    // Returns the price move down index and price move up index for a particular trigger condition
-    public(friend) fun index(self: &TriggerCondition):
-        (option::Option<u64>, option::Option<u64>, option::Option<u64>) {
-        match(self) {
-            TriggerCondition::PriceMoveAbove(price) => {
-                (option::none(), option::some(*price), option::none())
-            }
-            TriggerCondition::PriceMoveBelow(price) => {
-                (option::some(*price), option::none(), option::none())
-            }
-            TriggerCondition::TimeBased(time) => {
-                (option::none(), option::none(), option::some(*time))
-            }
-        }
-    }
+    // // Returns the price move down index and price move up index for a particular trigger condition
+    // public(friend) fun index(self: &TriggerCondition):
+    //     (option::Option<u64>, option::Option<u64>, option::Option<u64>) {
+    //     match(self) {
+    //         TriggerCondition::PriceMoveAbove(price) => {
+    //             (option::none(), option::some(*price), option::none())
+    //         }
+    //         TriggerCondition::PriceMoveBelow(price) => {
+    //             (option::some(*price), option::none(), option::none())
+    //         }
+    //         TriggerCondition::TimeBased(time) => {
+    //             (option::none(), option::none(), option::some(*time))
+    //         }
+    //     }
+    // }
 
     /// Represents the details of a matched order.
     ///
@@ -199,7 +189,7 @@ module aptos_experimental::order_book_types {
             order_id: OrderIdType,
             account: address,
             client_order_id: Option<String>, // for client to track orders
-            unique_priority_idx: UniqueIdxType,
+            unique_priority_idx: IncreasingIdxType,
             price: u64,
             orig_size: u64,
             remaining_size: u64,
@@ -211,7 +201,7 @@ module aptos_experimental::order_book_types {
         BulkOrder {
             order_id: OrderIdType,
             account: address,
-            unique_priority_idx: UniqueIdxType,
+            unique_priority_idx: IncreasingIdxType,
             price: u64,
             remaining_size: u64,
             is_bid: bool,
@@ -245,7 +235,7 @@ module aptos_experimental::order_book_types {
 
     public(friend) fun destroy_single_order_match_details<M: store + copy + drop>(
         self: OrderMatchDetails<M>,
-    ): (OrderIdType, address, Option<String>, UniqueIdxType, u64, u64, u64, bool, TimeInForce, u64, M) {
+    ): (OrderIdType, address, Option<String>, IncreasingIdxType, u64, u64, u64, bool, TimeInForce, u64, M) {
         let OrderMatchDetails::SingleOrder {
             order_id,
             account,
@@ -264,7 +254,7 @@ module aptos_experimental::order_book_types {
 
     public(friend) fun destroy_bulk_order_match_details<M: store + copy + drop>(
         self: OrderMatchDetails<M>,
-    ): (OrderIdType, address, UniqueIdxType, u64, u64, bool, u64, u64, M) {
+    ): (OrderIdType, address, IncreasingIdxType, u64, u64, bool, u64, u64, M) {
         let OrderMatchDetails::BulkOrder {
             order_id,
             account,
@@ -301,7 +291,7 @@ module aptos_experimental::order_book_types {
 
     public(friend) fun get_unique_priority_idx_from_match_details<M: store + copy + drop>(
         self: &OrderMatchDetails<M>,
-    ): UniqueIdxType {
+    ): IncreasingIdxType {
         self.unique_priority_idx
     }
 
@@ -395,7 +385,7 @@ module aptos_experimental::order_book_types {
         order_id: OrderIdType,
         account: address,
         client_order_id: Option<String>,
-        unique_priority_idx: UniqueIdxType,
+        unique_priority_idx: IncreasingIdxType,
         price: u64,
         orig_size: u64,
         remaining_size: u64,
@@ -422,7 +412,7 @@ module aptos_experimental::order_book_types {
     public(friend) fun new_bulk_order_match_details<M: store + copy + drop>(
         order_id: OrderIdType,
         account: address,
-        unique_priority_idx: UniqueIdxType,
+        unique_priority_idx: IncreasingIdxType,
         price: u64,
         remaining_size: u64,
         is_bid: bool,

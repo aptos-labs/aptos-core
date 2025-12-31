@@ -2,6 +2,7 @@
 module aptos_experimental::market_bulk_order_tests {
     use std::option;
     use std::signer;
+    use aptos_trading::order_book_types::{good_till_cancelled};
     use aptos_experimental::clearinghouse_test::{
         test_market_callbacks,
         new_test_order_metadata,
@@ -10,7 +11,6 @@ module aptos_experimental::market_bulk_order_tests {
         place_taker_order_and_verify_fill,
     };
     use aptos_experimental::event_utils;
-    use aptos_experimental::order_book_types::{good_till_cancelled};
     use aptos_experimental::market_types;
 
     // Import common functions from market_tests

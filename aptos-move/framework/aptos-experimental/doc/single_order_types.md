@@ -88,7 +88,7 @@
 
 </dd>
 <dt>
-<code>unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a></code>
+<code>unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdxType</a></code>
 </dt>
 <dd>
 
@@ -275,7 +275,7 @@
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_new_single_order">new_single_order</a>&lt;M: <b>copy</b>, drop, store&gt;(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, price: u64, orig_size: u64, size: u64, is_bid: bool, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, creation_time_micros_opt: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, metadata: M): <a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_new_single_order">new_single_order</a>&lt;M: <b>copy</b>, drop, store&gt;(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdxType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, price: u64, orig_size: u64, size: u64, is_bid: bool, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, creation_time_micros_opt: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, metadata: M): <a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;
 </code></pre>
 
 
@@ -287,7 +287,7 @@
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_new_single_order">new_single_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     order_id: OrderIdType,
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
-    unique_priority_idx: UniqueIdxType,
+    unique_priority_idx: IncreasingIdxType,
     client_order_id: Option&lt;String&gt;,
     price: u64,
     orig_size: u64,
@@ -482,7 +482,7 @@
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_unique_priority_idx">get_unique_priority_idx</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_unique_priority_idx">get_unique_priority_idx</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdxType</a>
 </code></pre>
 
 
@@ -493,7 +493,7 @@
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_unique_priority_idx">get_unique_priority_idx</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;
-): UniqueIdxType {
+): IncreasingIdxType {
     self.unique_priority_idx
 }
 </code></pre>
@@ -689,7 +689,7 @@
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_unique_priority_idx_from_state">get_unique_priority_idx_from_state</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_unique_priority_idx_from_state">get_unique_priority_idx_from_state</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdxType</a>
 </code></pre>
 
 
@@ -700,7 +700,7 @@
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_unique_priority_idx_from_state">get_unique_priority_idx_from_state</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="single_order_types.md#0x7_single_order_types_OrderWithState">OrderWithState</a>&lt;M&gt;
-): UniqueIdxType {
+): IncreasingIdxType {
     self.order.unique_priority_idx
 }
 </code></pre>
@@ -814,7 +814,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_destroy_single_order">destroy_single_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): (<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, u64, u64, u64, bool, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, M, u64)
+<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_destroy_single_order">destroy_single_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): (<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdxType</a>, u64, u64, u64, bool, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, M, u64)
 </code></pre>
 
 
@@ -826,7 +826,7 @@
 <pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_destroy_single_order">destroy_single_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: <a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;
 ): (
-    <b>address</b>, OrderIdType, Option&lt;String&gt;, UniqueIdxType, u64, u64, u64, bool, Option&lt;TriggerCondition&gt;, TimeInForce, M, u64
+    <b>address</b>, OrderIdType, Option&lt;String&gt;, IncreasingIdxType, u64, u64, u64, bool, Option&lt;TriggerCondition&gt;, TimeInForce, M, u64
 ) {
     <b>let</b> SingleOrder::V1 {
         order_id,
