@@ -358,7 +358,7 @@ pub struct PrunerConfig {
 impl Default for LedgerPrunerConfig {
     fn default() -> Self {
         LedgerPrunerConfig {
-            enable: true,
+            enable: false,
             prune_window: 90_000_000,
             batch_size: 5_000,
             user_pruning_window_offset: 200_000,
@@ -369,7 +369,7 @@ impl Default for LedgerPrunerConfig {
 impl Default for StateMerklePrunerConfig {
     fn default() -> Self {
         StateMerklePrunerConfig {
-            enable: true,
+            enable: false,
             // This allows a block / chunk being executed to have access to a non-latest state tree.
             // It needs to be greater than the number of versions the state committing thread is
             // able to commit during the execution of the block / chunk. If the bad case indeed
@@ -386,7 +386,7 @@ impl Default for StateMerklePrunerConfig {
 impl Default for EpochSnapshotPrunerConfig {
     fn default() -> Self {
         Self {
-            enable: true,
+            enable: false,
             // This is based on ~5K TPS * 2h/epoch * 2 epochs. -- epoch ending snapshots are used
             // by state sync in fast sync mode.
             // The setting is in versions, not epochs, because this makes it behave more like other

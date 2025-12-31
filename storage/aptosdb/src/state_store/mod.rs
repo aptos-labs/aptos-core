@@ -180,10 +180,11 @@ impl DbReader for StateDb {
         key_hash: &HashValue,
         version: Version,
         root_depth: usize,
+        is_hot: bool,
     ) -> Result<SparseMerkleProofExt> {
         let (_, proof) = self
             .state_merkle_db
-            .get_with_proof_ext(key_hash, version, root_depth)?;
+            .get_with_proof_ext(key_hash, version, root_depth, is_hot)?;
         Ok(proof)
     }
 
@@ -193,10 +194,11 @@ impl DbReader for StateDb {
         key_hash: &HashValue,
         version: Version,
         root_depth: usize,
+        is_hot: bool,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
         let (leaf_data, proof) = self
             .state_merkle_db
-            .get_with_proof_ext(key_hash, version, root_depth)?;
+            .get_with_proof_ext(key_hash, version, root_depth, is_hot)?;
         Ok((
             match leaf_data {
                 Some((_val_hash, (key, ver))) => Some(self.expect_value_by_version(&key, ver)?),
@@ -264,9 +266,10 @@ impl DbReader for StateStore {
         key_hash: &HashValue,
         version: Version,
         root_depth: usize,
+        is_hot: bool,
     ) -> Result<SparseMerkleProofExt> {
         self.deref()
-            .get_state_proof_by_version_ext(key_hash, version, root_depth)
+            .get_state_proof_by_version_ext(key_hash, version, root_depth, is_hot)
     }
 
     /// Get the state value with proof extension given the state key and version
@@ -275,9 +278,10 @@ impl DbReader for StateStore {
         key_hash: &HashValue,
         version: Version,
         root_depth: usize,
+        is_hot: bool,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
         self.deref()
-            .get_state_value_with_proof_by_version_ext(key_hash, version, root_depth)
+            .get_state_value_with_proof_by_version_ext(key_hash, version, root_depth, is_hot)
     }
 }
 
@@ -531,18 +535,32 @@ impl StateStore {
             latest_snapshot_version = latest_snapshot_version,
             "Initializing BufferedState."
         );
-        let latest_snapshot_root_hash = if let Some(version) = latest_snapshot_version {
-            state_db
-                .state_merkle_db
-                .get_root_hash(version)
-                .expect("Failed to query latest checkpoint root hash on initialization.")
-        } else {
-            *SPARSE_MERKLE_PLACEHOLDER_HASH
-        };
+        let (latest_snapshot_root_hash, latest_snapshot_hot_root_hash) =
+            if let Some(version) = latest_snapshot_version {
+                info!("version: {}", version);
+                let root_hash = state_db
+                    .state_merkle_db
+                    .get_root_hash(version)
+                    .expect("Failed to query latest checkpoint root hash on initialization.");
+                let hot_root_hash = state_db
+                    .state_merkle_db
+                    .get_hot_root_hash(version)
+                    .expect("Failed");
+                (root_hash, hot_root_hash)
+            } else {
+                (
+                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
+                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
+                )
+            };
+        info!(
+            "Got root hash from DB: {}, hot root hash: {}",
+            latest_snapshot_root_hash, latest_snapshot_hot_root_hash
+        );
         let usage = state_db.get_state_storage_usage(latest_snapshot_version)?;
         let state = StateWithSummary::new_at_version(
             latest_snapshot_version,
-            *SPARSE_MERKLE_PLACEHOLDER_HASH, // TODO(HotState): for now hot state always starts from empty upon restart.
+            latest_snapshot_hot_root_hash,
             latest_snapshot_root_hash,
             usage,
             HotStateConfig::default(),
@@ -574,56 +592,57 @@ impl StateStore {
 
         // Replaying the committed write sets after the latest snapshot.
         if snapshot_next_version < num_transactions {
-            if check_max_versions_after_snapshot {
-                ensure!(
-                    num_transactions - snapshot_next_version <= MAX_WRITE_SETS_AFTER_SNAPSHOT,
-                    "Too many versions after state snapshot. snapshot_next_version: {}, num_transactions: {}",
-                    snapshot_next_version,
-                    num_transactions,
-                );
-            }
-            let write_sets = state_db
-                .ledger_db
-                .write_set_db()
-                .get_write_sets(snapshot_next_version, num_transactions)?;
-            let txn_info_iter = state_db
-                .ledger_db
-                .transaction_info_db()
-                .get_transaction_info_iter(snapshot_next_version, write_sets.len())?;
-            let all_checkpoint_indices = txn_info_iter
-                .into_iter()
-                .collect::<Result<Vec<_>>>()?
-                .into_iter()
-                .positions(|txn_info| txn_info.has_state_checkpoint_hash())
-                .collect();
+            panic!("not implemented right now");
+            // if check_max_versions_after_snapshot {
+            //     ensure!(
+            //         num_transactions - snapshot_next_version <= MAX_WRITE_SETS_AFTER_SNAPSHOT,
+            //         "Too many versions after state snapshot. snapshot_next_version: {}, num_transactions: {}",
+            //         snapshot_next_version,
+            //         num_transactions,
+            //     );
+            // }
+            // let write_sets = state_db
+            //     .ledger_db
+            //     .write_set_db()
+            //     .get_write_sets(snapshot_next_version, num_transactions)?;
+            // let txn_info_iter = state_db
+            //     .ledger_db
+            //     .transaction_info_db()
+            //     .get_transaction_info_iter(snapshot_next_version, write_sets.len())?;
+            // let all_checkpoint_indices = txn_info_iter
+            //     .into_iter()
+            //     .collect::<Result<Vec<_>>>()?
+            //     .into_iter()
+            //     .positions(|txn_info| txn_info.has_state_checkpoint_hash())
+            //     .collect();
 
-            let state_update_refs = StateUpdateRefs::index_write_sets(
-                state.next_version(),
-                &write_sets,
-                write_sets.len(),
-                all_checkpoint_indices,
-            );
-            let current_state = out_current_state.lock().clone();
-            let (hot_state, state) = out_persisted_state.get_state();
-            let (new_state, _state_reads) = current_state.ledger_state().update_with_db_reader(
-                &state,
-                hot_state,
-                &state_update_refs,
-                state_db.clone(),
-            )?;
-            let state_summary = out_persisted_state.get_state_summary();
-            let new_state_summary = current_state.ledger_state_summary().update(
-                &ProvableStateSummary::new(state_summary, state_db.as_ref()),
-                &state_update_refs,
-            )?;
-            let updated =
-                LedgerStateWithSummary::from_state_and_summary(new_state, new_state_summary);
+            // let state_update_refs = StateUpdateRefs::index_write_sets(
+            //     state.next_version(),
+            //     &write_sets,
+            //     write_sets.len(),
+            //     all_checkpoint_indices,
+            // );
+            // let current_state = out_current_state.lock().clone();
+            // let (hot_state, state) = out_persisted_state.get_state();
+            // let (new_state, _state_reads) = current_state.ledger_state().update_with_db_reader(
+            //     &state,
+            //     hot_state,
+            //     &state_update_refs,
+            //     state_db.clone(),
+            // )?;
+            // let state_summary = out_persisted_state.get_state_summary();
+            // let new_state_summary = current_state.ledger_state_summary().update(
+            //     &ProvableStateSummary::new(state_summary, state_db.as_ref()),
+            //     &state_update_refs,
+            // )?;
+            // let updated =
+            //     LedgerStateWithSummary::from_state_and_summary(new_state, new_state_summary);
 
-            // synchronously commit the snapshot at the last checkpoint here if not committed to disk yet.
-            buffered_state.update(
-                updated, 0,    /* estimated_items, doesn't matter since we sync-commit */
-                true, /* sync_commit */
-            )?;
+            // // synchronously commit the snapshot at the last checkpoint here if not committed to disk yet.
+            // buffered_state.update(
+            //     updated, 0,    /* estimated_items, doesn't matter since we sync-commit */
+            //     true, /* sync_commit */
+            // )?;
         }
 
         let current_state = out_current_state.lock().clone();

@@ -432,7 +432,7 @@ fn verify_snapshots(
         );
         for (state_key, state_value) in &updates {
             let (state_value_in_db, proof) = db
-                .get_state_value_with_proof_by_version(state_key, snapshot_version)
+                .get_state_value_with_proof_by_version(state_key, snapshot_version, false)
                 .unwrap();
             assert_eq!(state_value_in_db.as_ref(), state_value.as_ref());
             proof

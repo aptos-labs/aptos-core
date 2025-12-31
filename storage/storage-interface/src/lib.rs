@@ -390,6 +390,7 @@ pub trait DbReader: Send + Sync {
             key_hash: &HashValue,
             version: Version,
             root_depth: usize,
+            is_hot: bool,
         ) -> Result<SparseMerkleProofExt>;
 
         /// Gets a state value by state key along with the proof, out of the ledger state indicated by the state
@@ -405,6 +406,7 @@ pub trait DbReader: Send + Sync {
             key_hash: &HashValue,
             version: Version,
             root_depth: usize,
+            is_hot: bool,
         ) -> Result<(Option<StateValue>, SparseMerkleProofExt)>;
 
         /// Gets the latest LedgerView no matter if db has been bootstrapped.
@@ -545,9 +547,15 @@ pub trait DbReader: Send + Sync {
         &self,
         state_key: &StateKey,
         version: Version,
+        is_hot: bool,
     ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
-        self.get_state_value_with_proof_by_version_ext(state_key.crypto_hash_ref(), version, 0)
-            .map(|(value, proof_ext)| (value, proof_ext.into()))
+        self.get_state_value_with_proof_by_version_ext(
+            state_key.crypto_hash_ref(),
+            version,
+            0,
+            is_hot,
+        )
+        .map(|(value, proof_ext)| (value, proof_ext.into()))
     }
 
     fn ensure_synced_version(&self) -> Result<Version> {
