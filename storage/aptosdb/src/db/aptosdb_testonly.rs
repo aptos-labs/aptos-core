@@ -166,7 +166,7 @@ impl AptosDB {
 
         let current = self.state_store.current_state_locked().clone();
         let (hot_state, persisted_state) = self.state_store.get_persisted_state()?;
-        let (new_state, reads) = current.ledger_state().update_with_db_reader(
+        let (new_state, reads, hot_state_updates) = current.ledger_state().update_with_db_reader(
             &persisted_state,
             hot_state,
             transactions_to_keep.state_update_refs(),
@@ -174,7 +174,9 @@ impl AptosDB {
         )?;
         let persisted_summary = self.state_store.get_persisted_state_summary()?;
         let new_state_summary = current.ledger_state_summary().update(
-            &ProvableStateSummary::new(persisted_summary, self),
+            &ProvableStateSummary::new(persisted_summary.clone(), self, /* is_hot = */ true),
+            &hot_state_updates,
+            &ProvableStateSummary::new(persisted_summary, self, /* is_hot = */ false),
             transactions_to_keep.state_update_refs(),
         )?;
 
