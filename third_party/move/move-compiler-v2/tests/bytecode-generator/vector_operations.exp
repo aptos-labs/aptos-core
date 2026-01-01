@@ -1,0 +1,1224 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::vector_ops {
+    use std::vector;
+    struct Container {
+        items: vector<u64>,
+        count: u64,
+    }
+    private fun add_item(container: &mut Container,item: u64) {
+        vector::push_back<u64>(Borrow(Mutable)(select vector_ops::Container.items<&mut Container>(container)), item);
+        select vector_ops::Container.count<&mut Container>(container) = Add<u64>(select vector_ops::Container.count<&mut Container>(container), 1);
+        Tuple()
+    }
+    private fun count_in_range(v: vector<u64>,min: u64,max: u64): u64 {
+        {
+          let count: u64 = 0;
+          {
+            let len: u64 = vector::length<u64>(Borrow(Immutable)(v));
+            {
+              let i: u64 = 0;
+              loop {
+                if Lt<u64>(i, len) {
+                  {
+                    let val: u64 = Deref(vector::borrow<u64>(Borrow(Immutable)(v), i));
+                    if Ge<u64>(val, min) {
+                      if Le<u64>(val, max) {
+                        count: u64 = Add<u64>(count, 1);
+                        Tuple()
+                      } else {
+                        Tuple()
+                      };
+                      Tuple()
+                    } else {
+                      Tuple()
+                    };
+                    i: u64 = Add<u64>(i, 1);
+                    Tuple()
+                  }
+                } else {
+                  break
+                }
+              };
+              count
+            }
+          }
+        }
+    }
+    private fun create_container(items: vector<u64>): Container {
+        {
+          let count: u64 = vector::length<u64>(Borrow(Immutable)(items));
+          pack vector_ops::Container(items, count)
+        }
+    }
+    private fun filter_greater_than(v: vector<u64>,threshold: u64): vector<u64> {
+        {
+          let result: vector<u64> = vector::empty<u64>();
+          {
+            let len: u64 = vector::length<u64>(Borrow(Immutable)(v));
+            {
+              let i: u64 = 0;
+              loop {
+                if Lt<u64>(i, len) {
+                  {
+                    let val: u64 = Deref(vector::borrow<u64>(Borrow(Immutable)(v), i));
+                    if Gt<u64>(val, threshold) {
+                      vector::push_back<u64>(Borrow(Mutable)(result), val);
+                      Tuple()
+                    } else {
+                      Tuple()
+                    };
+                    i: u64 = Add<u64>(i, 1);
+                    Tuple()
+                  }
+                } else {
+                  break
+                }
+              };
+              result
+            }
+          }
+        }
+    }
+    private fun find_first_greater(v: vector<u64>,threshold: u64): u64 {
+        {
+          let len: u64 = vector::length<u64>(Borrow(Immutable)(v));
+          {
+            let i: u64 = 0;
+            loop {
+              if Lt<u64>(i, len) {
+                {
+                  let val: u64 = Deref(vector::borrow<u64>(Borrow(Immutable)(v), i));
+                  if Gt<u64>(val, threshold) {
+                    return val
+                  } else {
+                    Tuple()
+                  };
+                  i: u64 = Add<u64>(i, 1);
+                  Tuple()
+                }
+              } else {
+                break
+              }
+            };
+            0
+          }
+        }
+    }
+    private fun has_value(v: vector<u64>,target: u64): bool {
+        {
+          let len: u64 = vector::length<u64>(Borrow(Immutable)(v));
+          {
+            let i: u64 = 0;
+            loop {
+              if Lt<u64>(i, len) {
+                if Eq<u64>(Deref(vector::borrow<u64>(Borrow(Immutable)(v), i)), target) {
+                  return true
+                } else {
+                  Tuple()
+                };
+                i: u64 = Add<u64>(i, 1);
+                Tuple()
+              } else {
+                break
+              }
+            };
+            false
+          }
+        }
+    }
+    private fun sum_vector(v: vector<u64>): u64 {
+        {
+          let sum: u64 = 0;
+          {
+            let len: u64 = vector::length<u64>(Borrow(Immutable)(v));
+            {
+              let i: u64 = 0;
+              loop {
+                if Lt<u64>(i, len) {
+                  sum: u64 = Add<u64>(sum, Deref(vector::borrow<u64>(Borrow(Immutable)(v), i)));
+                  i: u64 = Add<u64>(i, 1);
+                  Tuple()
+                } else {
+                  break
+                }
+              };
+              sum
+            }
+          }
+        }
+    }
+} // end 0x42::vector_ops
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::vector_ops {
+    use std::vector;
+    struct Container has drop {
+        items: vector<u64>,
+        count: u64,
+    }
+    fun add_item(container: &mut Container, item: u64) {
+        0x1::vector::push_back<u64>(&mut container.items, item);
+        container.count = container.count + 1;
+    }
+    fun count_in_range(v: vector<u64>, min: u64, max: u64): u64 {
+        let count = 0;
+        let len = 0x1::vector::length<u64>(&v);
+        let i = 0;
+        while (i < len) {
+            let val = *0x1::vector::borrow<u64>(&v, i);
+            if (val >= min) {
+                if (val <= max) {
+                    count = count + 1;
+                };
+            };
+            i = i + 1;
+        };
+        count
+    }
+    fun create_container(items: vector<u64>): Container {
+        let count = 0x1::vector::length<u64>(&items);
+        Container{items: items, count: count}
+    }
+    fun filter_greater_than(v: vector<u64>, threshold: u64): vector<u64> {
+        let result = 0x1::vector::empty<u64>();
+        let len = 0x1::vector::length<u64>(&v);
+        let i = 0;
+        while (i < len) {
+            let val = *0x1::vector::borrow<u64>(&v, i);
+            if (val > threshold) {
+                0x1::vector::push_back<u64>(&mut result, val);
+            };
+            i = i + 1;
+        };
+        result
+    }
+    fun find_first_greater(v: vector<u64>, threshold: u64): u64 {
+        let len = 0x1::vector::length<u64>(&v);
+        let i = 0;
+        while (i < len) {
+            let val = *0x1::vector::borrow<u64>(&v, i);
+            if (val > threshold) return val;
+            i = i + 1;
+        };
+        0
+    }
+    fun has_value(v: vector<u64>, target: u64): bool {
+        let len = 0x1::vector::length<u64>(&v);
+        let i = 0;
+        while (i < len) {
+            if (*0x1::vector::borrow<u64>(&v, i) == target) return true;
+            i = i + 1;
+        };
+        false
+    }
+    fun sum_vector(v: vector<u64>): u64 {
+        let sum = 0;
+        let len = 0x1::vector::length<u64>(&v);
+        let i = 0;
+        while (i < len) {
+            sum = sum + *0x1::vector::borrow<u64>(&v, i);
+            i = i + 1;
+        };
+        sum
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun vector_ops::add_item($t0: &mut 0x42::vector_ops::Container, $t1: u64) {
+     var $t2: &mut vector<u64>
+     var $t3: u64
+     var $t4: u64
+     var $t5: &u64
+     var $t6: u64
+     var $t7: &mut u64
+  0: $t2 := borrow_field<0x42::vector_ops::Container>.items($t0)
+  1: vector::push_back<u64>($t2, $t1)
+  2: $t5 := borrow_field<0x42::vector_ops::Container>.count($t0)
+  3: $t4 := read_ref($t5)
+  4: $t6 := 1
+  5: $t3 := +($t4, $t6)
+  6: $t7 := borrow_field<0x42::vector_ops::Container>.count($t0)
+  7: write_ref($t7, $t3)
+  8: return ()
+}
+
+
+[variant baseline]
+fun vector_ops::count_in_range($t0: vector<u64>, $t1: u64, $t2: u64): u64 {
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: &vector<u64>
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: u64
+     var $t11: &u64
+     var $t12: &vector<u64>
+     var $t13: bool
+     var $t14: u64
+     var $t15: bool
+     var $t16: u64
+     var $t17: u64
+     var $t18: u64
+     var $t19: u64
+     var $t20: u64
+     var $t21: u64
+     var $t22: u64
+  0: $t4 := 0
+  1: $t6 := borrow_local($t0)
+  2: $t5 := vector::length<u64>($t6)
+  3: $t7 := 0
+  4: label L0
+  5: $t9 := infer($t7)
+  6: $t8 := <($t9, $t5)
+  7: if ($t8) goto 8 else goto 35
+  8: label L2
+  9: $t12 := borrow_local($t0)
+ 10: $t11 := vector::borrow<u64>($t12, $t7)
+ 11: $t10 := read_ref($t11)
+ 12: $t14 := infer($t10)
+ 13: $t13 := >=($t14, $t1)
+ 14: if ($t13) goto 15 else goto 28
+ 15: label L5
+ 16: $t16 := infer($t10)
+ 17: $t15 := <=($t16, $t2)
+ 18: if ($t15) goto 19 else goto 25
+ 19: label L8
+ 20: $t18 := infer($t4)
+ 21: $t19 := 1
+ 22: $t17 := +($t18, $t19)
+ 23: $t4 := infer($t17)
+ 24: goto 26
+ 25: label L9
+ 26: label L10
+ 27: goto 29
+ 28: label L6
+ 29: label L7
+ 30: $t21 := infer($t7)
+ 31: $t22 := 1
+ 32: $t20 := +($t21, $t22)
+ 33: $t7 := infer($t20)
+ 34: goto 37
+ 35: label L3
+ 36: goto 39
+ 37: label L4
+ 38: goto 4
+ 39: label L1
+ 40: $t3 := infer($t4)
+ 41: return $t3
+}
+
+
+[variant baseline]
+fun vector_ops::create_container($t0: vector<u64>): 0x42::vector_ops::Container {
+     var $t1: 0x42::vector_ops::Container
+     var $t2: u64
+     var $t3: &vector<u64>
+     var $t4: vector<u64>
+  0: $t3 := borrow_local($t0)
+  1: $t2 := vector::length<u64>($t3)
+  2: $t4 := infer($t0)
+  3: $t1 := pack 0x42::vector_ops::Container($t4, $t2)
+  4: return $t1
+}
+
+
+[variant baseline]
+fun vector_ops::filter_greater_than($t0: vector<u64>, $t1: u64): vector<u64> {
+     var $t2: vector<u64>
+     var $t3: vector<u64>
+     var $t4: u64
+     var $t5: &vector<u64>
+     var $t6: u64
+     var $t7: bool
+     var $t8: u64
+     var $t9: u64
+     var $t10: &u64
+     var $t11: &vector<u64>
+     var $t12: bool
+     var $t13: u64
+     var $t14: &mut vector<u64>
+     var $t15: u64
+     var $t16: u64
+     var $t17: u64
+  0: $t3 := vector::empty<u64>()
+  1: $t5 := borrow_local($t0)
+  2: $t4 := vector::length<u64>($t5)
+  3: $t6 := 0
+  4: label L0
+  5: $t8 := infer($t6)
+  6: $t7 := <($t8, $t4)
+  7: if ($t7) goto 8 else goto 26
+  8: label L2
+  9: $t11 := borrow_local($t0)
+ 10: $t10 := vector::borrow<u64>($t11, $t6)
+ 11: $t9 := read_ref($t10)
+ 12: $t13 := infer($t9)
+ 13: $t12 := >($t13, $t1)
+ 14: if ($t12) goto 15 else goto 19
+ 15: label L5
+ 16: $t14 := borrow_local($t3)
+ 17: vector::push_back<u64>($t14, $t9)
+ 18: goto 20
+ 19: label L6
+ 20: label L7
+ 21: $t16 := infer($t6)
+ 22: $t17 := 1
+ 23: $t15 := +($t16, $t17)
+ 24: $t6 := infer($t15)
+ 25: goto 28
+ 26: label L3
+ 27: goto 30
+ 28: label L4
+ 29: goto 4
+ 30: label L1
+ 31: $t2 := infer($t3)
+ 32: return $t2
+}
+
+
+[variant baseline]
+fun vector_ops::find_first_greater($t0: vector<u64>, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: &vector<u64>
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: u64
+     var $t9: &u64
+     var $t10: &vector<u64>
+     var $t11: bool
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+     var $t15: u64
+  0: $t4 := borrow_local($t0)
+  1: $t3 := vector::length<u64>($t4)
+  2: $t5 := 0
+  3: label L0
+  4: $t7 := infer($t5)
+  5: $t6 := <($t7, $t3)
+  6: if ($t6) goto 7 else goto 25
+  7: label L2
+  8: $t10 := borrow_local($t0)
+  9: $t9 := vector::borrow<u64>($t10, $t5)
+ 10: $t8 := read_ref($t9)
+ 11: $t12 := infer($t8)
+ 12: $t11 := >($t12, $t1)
+ 13: if ($t11) goto 14 else goto 18
+ 14: label L5
+ 15: $t2 := infer($t8)
+ 16: return $t2
+ 17: goto 19
+ 18: label L6
+ 19: label L7
+ 20: $t14 := infer($t5)
+ 21: $t15 := 1
+ 22: $t13 := +($t14, $t15)
+ 23: $t5 := infer($t13)
+ 24: goto 27
+ 25: label L3
+ 26: goto 29
+ 27: label L4
+ 28: goto 3
+ 29: label L1
+ 30: $t2 := 0
+ 31: return $t2
+}
+
+
+[variant baseline]
+fun vector_ops::has_value($t0: vector<u64>, $t1: u64): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &vector<u64>
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: &u64
+     var $t11: &vector<u64>
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+  0: $t4 := borrow_local($t0)
+  1: $t3 := vector::length<u64>($t4)
+  2: $t5 := 0
+  3: label L0
+  4: $t7 := infer($t5)
+  5: $t6 := <($t7, $t3)
+  6: if ($t6) goto 7 else goto 24
+  7: label L2
+  8: $t11 := borrow_local($t0)
+  9: $t10 := vector::borrow<u64>($t11, $t5)
+ 10: $t9 := read_ref($t10)
+ 11: $t8 := ==($t9, $t1)
+ 12: if ($t8) goto 13 else goto 17
+ 13: label L5
+ 14: $t2 := true
+ 15: return $t2
+ 16: goto 18
+ 17: label L6
+ 18: label L7
+ 19: $t13 := infer($t5)
+ 20: $t14 := 1
+ 21: $t12 := +($t13, $t14)
+ 22: $t5 := infer($t12)
+ 23: goto 26
+ 24: label L3
+ 25: goto 28
+ 26: label L4
+ 27: goto 3
+ 28: label L1
+ 29: $t2 := false
+ 30: return $t2
+}
+
+
+[variant baseline]
+fun vector_ops::sum_vector($t0: vector<u64>): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: &vector<u64>
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: &u64
+     var $t12: &vector<u64>
+     var $t13: u64
+     var $t14: u64
+     var $t15: u64
+  0: $t2 := 0
+  1: $t4 := borrow_local($t0)
+  2: $t3 := vector::length<u64>($t4)
+  3: $t5 := 0
+  4: label L0
+  5: $t7 := infer($t5)
+  6: $t6 := <($t7, $t3)
+  7: if ($t6) goto 8 else goto 20
+  8: label L2
+  9: $t9 := infer($t2)
+ 10: $t12 := borrow_local($t0)
+ 11: $t11 := vector::borrow<u64>($t12, $t5)
+ 12: $t10 := read_ref($t11)
+ 13: $t8 := +($t9, $t10)
+ 14: $t2 := infer($t8)
+ 15: $t14 := infer($t5)
+ 16: $t15 := 1
+ 17: $t13 := +($t14, $t15)
+ 18: $t5 := infer($t13)
+ 19: goto 22
+ 20: label L3
+ 21: goto 24
+ 22: label L4
+ 23: goto 4
+ 24: label L1
+ 25: $t1 := infer($t2)
+ 26: return $t1
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::vector_ops {
+    use std::vector;
+    struct Container {
+        items: vector<u64>,
+        count: u64,
+    }
+    private fun add_item(container: &mut Container,item: u64) {
+        vector::push_back<u64>(Borrow(Mutable)(select vector_ops::Container.items<&mut Container>(container)), item);
+        select vector_ops::Container.count<&mut Container>(container) = Add<u64>(select vector_ops::Container.count<&mut Container>(container), 1);
+        Tuple()
+    }
+    private fun count_in_range(v: vector<u64>,min: u64,max: u64): u64 {
+        {
+          let count: u64 = 0;
+          {
+            let len: u64 = vector::length<u64>(Borrow(Immutable)(v));
+            {
+              let i: u64 = 0;
+              loop {
+                if Lt<u64>(i, len) {
+                  {
+                    let val: u64 = Deref(vector::borrow<u64>(Borrow(Immutable)(v), i));
+                    if Ge<u64>(val, min) {
+                      if Le<u64>(val, max) {
+                        count: u64 = Add<u64>(count, 1);
+                        Tuple()
+                      } else {
+                        Tuple()
+                      };
+                      Tuple()
+                    } else {
+                      Tuple()
+                    };
+                    i: u64 = Add<u64>(i, 1);
+                    Tuple()
+                  }
+                } else {
+                  break
+                }
+              };
+              count
+            }
+          }
+        }
+    }
+    private fun create_container(items: vector<u64>): Container {
+        {
+          let count: u64 = vector::length<u64>(Borrow(Immutable)(items));
+          pack vector_ops::Container(items, count)
+        }
+    }
+    private fun filter_greater_than(v: vector<u64>,threshold: u64): vector<u64> {
+        {
+          let result: vector<u64> = vector::empty<u64>();
+          {
+            let len: u64 = vector::length<u64>(Borrow(Immutable)(v));
+            {
+              let i: u64 = 0;
+              loop {
+                if Lt<u64>(i, len) {
+                  {
+                    let val: u64 = Deref(vector::borrow<u64>(Borrow(Immutable)(v), i));
+                    if Gt<u64>(val, threshold) {
+                      vector::push_back<u64>(Borrow(Mutable)(result), val);
+                      Tuple()
+                    } else {
+                      Tuple()
+                    };
+                    i: u64 = Add<u64>(i, 1);
+                    Tuple()
+                  }
+                } else {
+                  break
+                }
+              };
+              result
+            }
+          }
+        }
+    }
+    private fun find_first_greater(v: vector<u64>,threshold: u64): u64 {
+        {
+          let len: u64 = vector::length<u64>(Borrow(Immutable)(v));
+          {
+            let i: u64 = 0;
+            loop {
+              if Lt<u64>(i, len) {
+                {
+                  let val: u64 = Deref(vector::borrow<u64>(Borrow(Immutable)(v), i));
+                  if Gt<u64>(val, threshold) {
+                    return val
+                  } else {
+                    Tuple()
+                  };
+                  i: u64 = Add<u64>(i, 1);
+                  Tuple()
+                }
+              } else {
+                break
+              }
+            };
+            0
+          }
+        }
+    }
+    private fun has_value(v: vector<u64>,target: u64): bool {
+        {
+          let len: u64 = vector::length<u64>(Borrow(Immutable)(v));
+          {
+            let i: u64 = 0;
+            loop {
+              if Lt<u64>(i, len) {
+                if Eq<u64>(Deref(vector::borrow<u64>(Borrow(Immutable)(v), i)), target) {
+                  return true
+                } else {
+                  Tuple()
+                };
+                i: u64 = Add<u64>(i, 1);
+                Tuple()
+              } else {
+                break
+              }
+            };
+            false
+          }
+        }
+    }
+    private fun sum_vector(v: vector<u64>): u64 {
+        {
+          let sum: u64 = 0;
+          {
+            let len: u64 = vector::length<u64>(Borrow(Immutable)(v));
+            {
+              let i: u64 = 0;
+              loop {
+                if Lt<u64>(i, len) {
+                  sum: u64 = Add<u64>(sum, Deref(vector::borrow<u64>(Borrow(Immutable)(v), i)));
+                  i: u64 = Add<u64>(i, 1);
+                  Tuple()
+                } else {
+                  break
+                }
+              };
+              sum
+            }
+          }
+        }
+    }
+} // end 0x42::vector_ops
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun vector_ops::add_item($t0: &mut 0x42::vector_ops::Container, $t1: u64) {
+     var $t2: &mut vector<u64>
+     var $t3: u64
+     var $t4: u64
+     var $t5: &u64
+     var $t6: u64
+     var $t7: &mut u64
+  0: $t2 := borrow_field<0x42::vector_ops::Container>.items($t0)
+  1: vector::push_back<u64>($t2, $t1)
+  2: $t5 := borrow_field<0x42::vector_ops::Container>.count($t0)
+  3: $t4 := read_ref($t5)
+  4: $t6 := 1
+  5: $t3 := +($t4, $t6)
+  6: $t7 := borrow_field<0x42::vector_ops::Container>.count($t0)
+  7: write_ref($t7, $t3)
+  8: return ()
+}
+
+
+[variant baseline]
+fun vector_ops::count_in_range($t0: vector<u64>, $t1: u64, $t2: u64): u64 {
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: &vector<u64>
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: u64
+     var $t11: &u64
+     var $t12: &vector<u64>
+     var $t13: bool
+     var $t14: u64
+     var $t15: bool
+     var $t16: u64
+     var $t17: u64
+     var $t18: u64
+     var $t19: u64
+     var $t20: u64
+     var $t21: u64
+     var $t22: u64
+  0: $t4 := 0
+  1: $t6 := borrow_local($t0)
+  2: $t5 := vector::length<u64>($t6)
+  3: $t7 := 0
+  4: label L0
+  5: $t9 := infer($t7)
+  6: $t8 := <($t9, $t5)
+  7: if ($t8) goto 8 else goto 35
+  8: label L2
+  9: $t12 := borrow_local($t0)
+ 10: $t11 := vector::borrow<u64>($t12, $t7)
+ 11: $t10 := read_ref($t11)
+ 12: $t14 := infer($t10)
+ 13: $t13 := >=($t14, $t1)
+ 14: if ($t13) goto 15 else goto 28
+ 15: label L5
+ 16: $t16 := infer($t10)
+ 17: $t15 := <=($t16, $t2)
+ 18: if ($t15) goto 19 else goto 25
+ 19: label L8
+ 20: $t18 := infer($t4)
+ 21: $t19 := 1
+ 22: $t17 := +($t18, $t19)
+ 23: $t4 := infer($t17)
+ 24: goto 26
+ 25: label L9
+ 26: label L10
+ 27: goto 29
+ 28: label L6
+ 29: label L7
+ 30: $t21 := infer($t7)
+ 31: $t22 := 1
+ 32: $t20 := +($t21, $t22)
+ 33: $t7 := infer($t20)
+ 34: goto 37
+ 35: label L3
+ 36: goto 39
+ 37: label L4
+ 38: goto 4
+ 39: label L1
+ 40: $t3 := infer($t4)
+ 41: return $t3
+}
+
+
+[variant baseline]
+fun vector_ops::create_container($t0: vector<u64>): 0x42::vector_ops::Container {
+     var $t1: 0x42::vector_ops::Container
+     var $t2: u64
+     var $t3: &vector<u64>
+     var $t4: vector<u64>
+  0: $t3 := borrow_local($t0)
+  1: $t2 := vector::length<u64>($t3)
+  2: $t4 := infer($t0)
+  3: $t1 := pack 0x42::vector_ops::Container($t4, $t2)
+  4: return $t1
+}
+
+
+[variant baseline]
+fun vector_ops::filter_greater_than($t0: vector<u64>, $t1: u64): vector<u64> {
+     var $t2: vector<u64>
+     var $t3: vector<u64>
+     var $t4: u64
+     var $t5: &vector<u64>
+     var $t6: u64
+     var $t7: bool
+     var $t8: u64
+     var $t9: u64
+     var $t10: &u64
+     var $t11: &vector<u64>
+     var $t12: bool
+     var $t13: u64
+     var $t14: &mut vector<u64>
+     var $t15: u64
+     var $t16: u64
+     var $t17: u64
+  0: $t3 := vector::empty<u64>()
+  1: $t5 := borrow_local($t0)
+  2: $t4 := vector::length<u64>($t5)
+  3: $t6 := 0
+  4: label L0
+  5: $t8 := infer($t6)
+  6: $t7 := <($t8, $t4)
+  7: if ($t7) goto 8 else goto 26
+  8: label L2
+  9: $t11 := borrow_local($t0)
+ 10: $t10 := vector::borrow<u64>($t11, $t6)
+ 11: $t9 := read_ref($t10)
+ 12: $t13 := infer($t9)
+ 13: $t12 := >($t13, $t1)
+ 14: if ($t12) goto 15 else goto 19
+ 15: label L5
+ 16: $t14 := borrow_local($t3)
+ 17: vector::push_back<u64>($t14, $t9)
+ 18: goto 20
+ 19: label L6
+ 20: label L7
+ 21: $t16 := infer($t6)
+ 22: $t17 := 1
+ 23: $t15 := +($t16, $t17)
+ 24: $t6 := infer($t15)
+ 25: goto 28
+ 26: label L3
+ 27: goto 30
+ 28: label L4
+ 29: goto 4
+ 30: label L1
+ 31: $t2 := infer($t3)
+ 32: return $t2
+}
+
+
+[variant baseline]
+fun vector_ops::find_first_greater($t0: vector<u64>, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: &vector<u64>
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: u64
+     var $t9: &u64
+     var $t10: &vector<u64>
+     var $t11: bool
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+     var $t15: u64
+  0: $t4 := borrow_local($t0)
+  1: $t3 := vector::length<u64>($t4)
+  2: $t5 := 0
+  3: label L0
+  4: $t7 := infer($t5)
+  5: $t6 := <($t7, $t3)
+  6: if ($t6) goto 7 else goto 25
+  7: label L2
+  8: $t10 := borrow_local($t0)
+  9: $t9 := vector::borrow<u64>($t10, $t5)
+ 10: $t8 := read_ref($t9)
+ 11: $t12 := infer($t8)
+ 12: $t11 := >($t12, $t1)
+ 13: if ($t11) goto 14 else goto 18
+ 14: label L5
+ 15: $t2 := infer($t8)
+ 16: return $t2
+ 17: goto 19
+ 18: label L6
+ 19: label L7
+ 20: $t14 := infer($t5)
+ 21: $t15 := 1
+ 22: $t13 := +($t14, $t15)
+ 23: $t5 := infer($t13)
+ 24: goto 27
+ 25: label L3
+ 26: goto 29
+ 27: label L4
+ 28: goto 3
+ 29: label L1
+ 30: $t2 := 0
+ 31: return $t2
+}
+
+
+[variant baseline]
+fun vector_ops::has_value($t0: vector<u64>, $t1: u64): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &vector<u64>
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: &u64
+     var $t11: &vector<u64>
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+  0: $t4 := borrow_local($t0)
+  1: $t3 := vector::length<u64>($t4)
+  2: $t5 := 0
+  3: label L0
+  4: $t7 := infer($t5)
+  5: $t6 := <($t7, $t3)
+  6: if ($t6) goto 7 else goto 24
+  7: label L2
+  8: $t11 := borrow_local($t0)
+  9: $t10 := vector::borrow<u64>($t11, $t5)
+ 10: $t9 := read_ref($t10)
+ 11: $t8 := ==($t9, $t1)
+ 12: if ($t8) goto 13 else goto 17
+ 13: label L5
+ 14: $t2 := true
+ 15: return $t2
+ 16: goto 18
+ 17: label L6
+ 18: label L7
+ 19: $t13 := infer($t5)
+ 20: $t14 := 1
+ 21: $t12 := +($t13, $t14)
+ 22: $t5 := infer($t12)
+ 23: goto 26
+ 24: label L3
+ 25: goto 28
+ 26: label L4
+ 27: goto 3
+ 28: label L1
+ 29: $t2 := false
+ 30: return $t2
+}
+
+
+[variant baseline]
+fun vector_ops::sum_vector($t0: vector<u64>): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: &vector<u64>
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: &u64
+     var $t12: &vector<u64>
+     var $t13: u64
+     var $t14: u64
+     var $t15: u64
+  0: $t2 := 0
+  1: $t4 := borrow_local($t0)
+  2: $t3 := vector::length<u64>($t4)
+  3: $t5 := 0
+  4: label L0
+  5: $t7 := infer($t5)
+  6: $t6 := <($t7, $t3)
+  7: if ($t6) goto 8 else goto 20
+  8: label L2
+  9: $t9 := infer($t2)
+ 10: $t12 := borrow_local($t0)
+ 11: $t11 := vector::borrow<u64>($t12, $t5)
+ 12: $t10 := read_ref($t11)
+ 13: $t8 := +($t9, $t10)
+ 14: $t2 := infer($t8)
+ 15: $t14 := infer($t5)
+ 16: $t15 := 1
+ 17: $t13 := +($t14, $t15)
+ 18: $t5 := infer($t13)
+ 19: goto 22
+ 20: label L3
+ 21: goto 24
+ 22: label L4
+ 23: goto 4
+ 24: label L1
+ 25: $t1 := infer($t2)
+ 26: return $t1
+}
+
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0x42::vector_ops
+struct Container has drop
+  items: vector<u64>
+  count: u64
+
+// Function definition at index 0
+fun add_item(l0: &mut Container, l1: u64)
+    copy_loc l0
+    mut_borrow_field Container, items
+    move_loc l1
+    vec_push_back <u64>
+    copy_loc l0
+    // @5
+    borrow_field Container, count
+    read_ref
+    ld_u64 1
+    add
+    move_loc l0
+    // @10
+    mut_borrow_field Container, count
+    write_ref
+    ret
+
+// Function definition at index 1
+fun count_in_range(l0: vector<u64>, l1: u64, l2: u64): u64
+    local l3: u64
+    local l4: u64
+    local l5: u64
+    local l6: u64
+    ld_u64 0
+    st_loc l3
+    borrow_loc l0
+    vec_len <u64>
+    st_loc l4
+    // @5
+    ld_u64 0
+    st_loc l5
+l4: copy_loc l5
+    copy_loc l4
+    lt
+    // @10
+    br_false l0
+    borrow_loc l0
+    copy_loc l5
+    vec_borrow <u64>
+    read_ref
+    // @15
+    st_loc l6
+    copy_loc l6
+    copy_loc l1
+    ge
+    br_true l1
+    // @20
+    branch l2
+l1: move_loc l6
+    copy_loc l2
+    le
+    br_true l3
+    // @25
+    branch l2
+l3: move_loc l3
+    ld_u64 1
+    add
+    st_loc l3
+    // @30
+l2: move_loc l5
+    ld_u64 1
+    add
+    st_loc l5
+    branch l4
+    // @35
+l0: move_loc l3
+    ret
+
+// Function definition at index 2
+fun create_container(l0: vector<u64>): Container
+    local l1: u64
+    borrow_loc l0
+    vec_len <u64>
+    st_loc l1
+    move_loc l0
+    move_loc l1
+    // @5
+    pack Container
+    ret
+
+// Function definition at index 3
+fun filter_greater_than(l0: vector<u64>, l1: u64): vector<u64>
+    local l2: vector<u64>
+    local l3: u64
+    local l4: u64
+    local l5: u64
+    vec_pack <u64>, 0
+    st_loc l2
+    borrow_loc l0
+    vec_len <u64>
+    st_loc l3
+    // @5
+    ld_u64 0
+    st_loc l4
+l3: copy_loc l4
+    copy_loc l3
+    lt
+    // @10
+    br_false l0
+    borrow_loc l0
+    copy_loc l4
+    vec_borrow <u64>
+    read_ref
+    // @15
+    st_loc l5
+    copy_loc l5
+    copy_loc l1
+    gt
+    br_true l1
+    // @20
+    branch l2
+l1: mut_borrow_loc l2
+    move_loc l5
+    vec_push_back <u64>
+l2: move_loc l4
+    // @25
+    ld_u64 1
+    add
+    st_loc l4
+    branch l3
+l0: move_loc l2
+    // @30
+    ret
+
+// Function definition at index 4
+fun find_first_greater(l0: vector<u64>, l1: u64): u64
+    local l2: u64
+    local l3: u64
+    local l4: u64
+    borrow_loc l0
+    vec_len <u64>
+    st_loc l2
+    ld_u64 0
+    st_loc l3
+    // @5
+l2: copy_loc l3
+    copy_loc l2
+    lt
+    br_false l0
+    borrow_loc l0
+    // @10
+    copy_loc l3
+    vec_borrow <u64>
+    read_ref
+    st_loc l4
+    copy_loc l4
+    // @15
+    copy_loc l1
+    gt
+    br_false l1
+    move_loc l4
+    ret
+    // @20
+l1: move_loc l3
+    ld_u64 1
+    add
+    st_loc l3
+    branch l2
+    // @25
+l0: ld_u64 0
+    ret
+
+// Function definition at index 5
+fun has_value(l0: vector<u64>, l1: u64): bool
+    local l2: u64
+    local l3: u64
+    borrow_loc l0
+    vec_len <u64>
+    st_loc l2
+    ld_u64 0
+    st_loc l3
+    // @5
+l2: copy_loc l3
+    copy_loc l2
+    lt
+    br_false l0
+    borrow_loc l0
+    // @10
+    copy_loc l3
+    vec_borrow <u64>
+    read_ref
+    copy_loc l1
+    eq
+    // @15
+    br_false l1
+    ld_true
+    ret
+l1: move_loc l3
+    ld_u64 1
+    // @20
+    add
+    st_loc l3
+    branch l2
+l0: ld_false
+    ret
+
+// Function definition at index 6
+fun sum_vector(l0: vector<u64>): u64
+    local l1: u64
+    local l2: u64
+    local l3: u64
+    ld_u64 0
+    st_loc l1
+    borrow_loc l0
+    vec_len <u64>
+    st_loc l2
+    // @5
+    ld_u64 0
+    st_loc l3
+l1: copy_loc l3
+    copy_loc l2
+    lt
+    // @10
+    br_false l0
+    move_loc l1
+    borrow_loc l0
+    copy_loc l3
+    vec_borrow <u64>
+    // @15
+    read_ref
+    add
+    st_loc l1
+    move_loc l3
+    ld_u64 1
+    // @20
+    add
+    st_loc l3
+    branch l1
+l0: move_loc l1
+    ret
+
+
+============ bytecode verification succeeded ========
