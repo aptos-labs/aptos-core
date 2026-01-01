@@ -14,6 +14,7 @@ use aptos_storage_interface::{
         state_update_refs::StateUpdateRefs,
         state_view::cached_state_view::CachedStateView,
         state_with_summary::{LedgerStateWithSummary, StateWithSummary},
+        HotStateUpdates,
     },
     DbReader, Result as DbResult,
 };
@@ -56,6 +57,7 @@ const REFRESH_INTERVAL_VERSIONS: usize = 50;
 const TEST_CONFIG: HotStateConfig = HotStateConfig {
     max_items_per_shard: HOT_STATE_MAX_ITEMS_PER_SHARD,
     delete_on_restart: false,
+    compute_root_hash: true,
 };
 
 #[derive(Debug)]
@@ -168,6 +170,7 @@ struct VersionState {
     usage: StateStorageUsage,
     hot_state: [LruCache<StateKey, StateSlot>; NUM_STATE_SHARDS],
     state: HashMap<StateKey, (Version, StateValue)>,
+    hot_summary: NaiveSmt,
     summary: NaiveSmt,
     next_version: Version,
 }
@@ -178,6 +181,7 @@ impl VersionState {
             usage: StateStorageUsage::zero(),
             hot_state: [(); NUM_STATE_SHARDS].map(|_| LruCache::unbounded()),
             state: HashMap::new(),
+            hot_summary: NaiveSmt::default(),
             summary: NaiveSmt::default(),
             next_version: 0,
         }
@@ -194,6 +198,7 @@ impl VersionState {
 
         let mut hot_state = self.hot_state.clone();
         let mut state = self.state.clone();
+        let mut hot_smt_updates = vec![];
         let mut smt_updates = vec![];
 
         for (k, v_opt) in writes {
@@ -206,6 +211,7 @@ impl VersionState {
                     };
                     hot_state[shard_id].put(k.clone(), slot);
                     state.remove(k);
+                    hot_smt_updates.push((k.hash(), None));
                     smt_updates.push((k.hash(), None));
                 },
                 Some(v) => {
@@ -217,6 +223,7 @@ impl VersionState {
                     };
                     hot_state[shard_id].put(k.clone(), slot);
                     state.insert(k.clone(), (version, v.clone()));
+                    hot_smt_updates.push((k.hash(), Some(v.hash())));
                     smt_updates.push((k.hash(), Some(v.hash())));
                 },
             }
@@ -241,17 +248,20 @@ impl VersionState {
                     lru_info: LRUEntry::uninitialized(),
                 },
             };
+            hot_smt_updates.push((k.hash(), slot.as_state_value_opt().map(|v| v.hash())));
             hot_state[shard_id].put(k.clone(), slot);
         }
 
         if is_checkpoint {
             for shard in hot_state.iter_mut() {
                 while shard.len() > HOT_STATE_MAX_ITEMS_PER_SHARD {
-                    shard.pop_lru();
+                    let (k, _) = shard.pop_lru().unwrap();
+                    hot_smt_updates.push((k.hash(), None));
                 }
             }
         }
 
+        let hot_summary = self.hot_summary.clone().update(&hot_smt_updates);
         let summary = self.summary.clone().update(&smt_updates);
 
         let items = state.len();
@@ -262,6 +272,7 @@ impl VersionState {
             usage,
             hot_state,
             state,
+            hot_summary,
             summary,
             next_version: version + 1,
         }
@@ -373,6 +384,12 @@ impl StateByVersion {
     }
 
     fn assert_state_summary(&self, state_summary: &StateSummary) {
+        assert_eq!(
+            state_summary.hot_root_hash(),
+            self.get_state(state_summary.version())
+                .hot_summary
+                .get_root_hash()
+        );
         assert_eq!(
             state_summary.root_hash(),
             self.get_state(state_summary.version())
@@ -492,7 +509,7 @@ fn update_state(
     state_by_version: Arc<StateByVersion>,
     empty: LedgerStateWithSummary,
     persisted_state: PersistedState,
-    to_summary_update: Sender<(Chunk, LedgerState)>,
+    to_summary_update: Sender<(Chunk, LedgerState, HotStateUpdates)>,
 ) {
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(4)
@@ -524,7 +541,7 @@ fn update_state(
         });
         let memorized_reads = state_view.into_memorized_reads();
 
-        let next_state = parent_state.update_with_memorized_reads(
+        let (next_state, hot_state_updates) = parent_state.update_with_memorized_reads(
             hot_state.clone(),
             &persisted_state,
             block.update_refs(),
@@ -536,7 +553,7 @@ fn update_state(
         parent_state = next_state.clone();
 
         to_summary_update
-            .send((block, next_state))
+            .send((block, next_state, hot_state_updates))
             .expect("send() failed.");
     }
 
@@ -548,17 +565,18 @@ fn update_state_summary(
     state_by_version: Arc<StateByVersion>,
     empty: LedgerStateWithSummary,
     persisted_state: PersistedState,
-    from_state_update: Receiver<(Chunk, LedgerState)>,
+    from_state_update: Receiver<(Chunk, LedgerState, HotStateUpdates)>,
     to_db_commit: Sender<LedgerStateWithSummary>,
 ) {
     let mut parent_summary = empty.ledger_state_summary();
 
-    while let Ok((block, ledger_state)) = from_state_update.recv() {
+    while let Ok((block, ledger_state, hot_state_updates)) = from_state_update.recv() {
         let persisted_summary = persisted_state.get_state_summary();
 
         let next_summary = parent_summary
             .update(
                 &ProvableStateSummary::new(persisted_summary, state_by_version.as_ref()),
+                &hot_state_updates,
                 block.update_refs(),
             )
             .unwrap();
@@ -667,7 +685,7 @@ fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, bool)>) -> (Vec<Txn>, StateByVers
                         Some(v) => (k, WriteOp::modification_to_value(v).into_base_op()),
                     })
                     .collect(),
-                is_checkpoint: false,
+                is_checkpoint,
             });
         }
         if append_epilogue {

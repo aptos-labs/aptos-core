@@ -28,7 +28,7 @@ impl PersistedState {
     pub fn new_empty_with_config(config: HotStateConfig) -> Self {
         let state = State::new_empty(config);
         let hot_state = Arc::new(HotState::new(state, config));
-        let summary = Arc::new(Mutex::new(StateSummary::new_empty()));
+        let summary = Arc::new(Mutex::new(StateSummary::new_empty(config)));
         Self { hot_state, summary }
     }
 
