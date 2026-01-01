@@ -564,12 +564,12 @@ impl TStateView for WriteSetStateView<'_> {
 #[cfg(test)]
 mod tests {
     use super::Parser;
+    use aptos_config::config::HotStateConfig;
     use aptos_storage_interface::state_store::{
         state::LedgerState, state_view::cached_state_view::CachedStateView,
     };
     use aptos_types::{
         contract_event::ContractEvent,
-        state_store::hot_state::HotStateConfig,
         transaction::{
             AuxiliaryInfo, ExecutionStatus, PersistedAuxiliaryInfo, Transaction,
             TransactionAuxiliaryData, TransactionOutput, TransactionStatus,

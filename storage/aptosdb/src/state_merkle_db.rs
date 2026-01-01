@@ -46,9 +46,23 @@ use std::{
     time::Instant,
 };
 
-pub const STATE_MERKLE_DB_FOLDER_NAME: &str = "state_merkle_db";
 pub const STATE_MERKLE_DB_NAME: &str = "state_merkle_db";
-pub const STATE_MERKLE_METADATA_DB_NAME: &str = "state_merkle_metadata_db";
+
+fn db_folder_name(is_hot: bool) -> &'static str {
+    if is_hot {
+        "hot_state_merkle_db"
+    } else {
+        "state_merkle_db"
+    }
+}
+
+fn metadata_db_name(is_hot: bool) -> &'static str {
+    if is_hot {
+        "hot_state_merkle_metadata_db"
+    } else {
+        "state_merkle_metadata_db"
+    }
+}
 
 pub(crate) type LeafNode = aptos_jellyfish_merkle::node_type::LeafNode<StateKey>;
 pub(crate) type Node = aptos_jellyfish_merkle::node_type::Node<StateKey>;
@@ -77,7 +91,14 @@ impl StateMerkleDb {
         // TODO(grao): Currently when this value is set to 0 we disable both caches. This is
         // hacky, need to revisit.
         max_nodes_per_lru_cache_shard: usize,
+        is_hot: bool,
+        delete_on_restart: bool,
     ) -> Result<Self> {
+        assert!(
+            !delete_on_restart || is_hot,
+            "Only hot state can be cleared on restart"
+        );
+
         let sharding = rocksdb_configs.enable_storage_sharding;
         let state_merkle_db_config = rocksdb_configs.state_merkle_db_config;
 
@@ -89,6 +110,7 @@ impl StateMerkleDb {
         let lru_cache = NonZeroUsize::new(max_nodes_per_lru_cache_shard).map(LruNodeCache::new);
 
         if !sharding {
+            assert!(!is_hot, "Hot state not supported for unsharded db.");
             info!("Sharded state merkle DB is not enabled!");
             let state_merkle_db_path = db_paths.default_root_path().join(STATE_MERKLE_DB_NAME);
             let db = Arc::new(Self::open_db(
@@ -98,6 +120,7 @@ impl StateMerkleDb {
                 env,
                 block_cache,
                 readonly,
+                delete_on_restart,
             )?);
             return Ok(Self {
                 state_merkle_metadata_db: Arc::clone(&db),
@@ -116,6 +139,8 @@ impl StateMerkleDb {
             readonly,
             version_caches,
             lru_cache,
+            is_hot,
+            delete_on_restart,
         )
     }
 
@@ -168,6 +193,7 @@ impl StateMerkleDb {
         db_root_path: impl AsRef<Path>,
         cp_root_path: impl AsRef<Path>,
         sharding: bool,
+        is_hot: bool,
     ) -> Result<()> {
         let rocksdb_configs = RocksdbConfigs {
             enable_storage_sharding: sharding,
@@ -181,8 +207,10 @@ impl StateMerkleDb {
             /*block_cache=*/ None,
             /*readonly=*/ false,
             /*max_nodes_per_lru_cache_shard=*/ 0,
+            is_hot,
+            /* delete_on_restart = */ false,
         )?;
-        let cp_state_merkle_db_path = cp_root_path.as_ref().join(STATE_MERKLE_DB_FOLDER_NAME);
+        let cp_state_merkle_db_path = cp_root_path.as_ref().join(db_folder_name(is_hot));
 
         info!("Creating state_merkle_db checkpoint at: {cp_state_merkle_db_path:?}");
 
@@ -193,13 +221,21 @@ impl StateMerkleDb {
 
         state_merkle_db
             .metadata_db()
-            .create_checkpoint(Self::metadata_db_path(cp_root_path.as_ref(), sharding))?;
+            .create_checkpoint(Self::metadata_db_path(
+                cp_root_path.as_ref(),
+                sharding,
+                is_hot,
+            ))?;
 
         if sharding {
             for shard_id in 0..NUM_STATE_SHARDS {
                 state_merkle_db
                     .db_shard(shard_id)
-                    .create_checkpoint(Self::db_shard_path(cp_root_path.as_ref(), shard_id))?;
+                    .create_checkpoint(Self::db_shard_path(
+                        cp_root_path.as_ref(),
+                        shard_id,
+                        is_hot,
+                    ))?;
             }
         }
 
@@ -566,19 +602,27 @@ impl StateMerkleDb {
         readonly: bool,
         version_caches: HashMap<Option<usize>, VersionedNodeCache>,
         lru_cache: Option<LruNodeCache>,
+        is_hot: bool,
+        delete_on_restart: bool,
     ) -> Result<Self> {
         let state_merkle_metadata_db_path = Self::metadata_db_path(
-            db_paths.state_merkle_db_metadata_root_path(),
+            if is_hot {
+                db_paths.hot_state_merkle_db_metadata_root_path()
+            } else {
+                db_paths.state_merkle_db_metadata_root_path()
+            },
             /*sharding=*/ true,
+            is_hot,
         );
 
         let state_merkle_metadata_db = Arc::new(Self::open_db(
             state_merkle_metadata_db_path.clone(),
-            STATE_MERKLE_METADATA_DB_NAME,
+            metadata_db_name(is_hot),
             &state_merkle_db_config,
             env,
             block_cache,
             readonly,
+            delete_on_restart,
         )?);
 
         info!(
@@ -589,7 +633,11 @@ impl StateMerkleDb {
         let state_merkle_db_shards = (0..NUM_STATE_SHARDS)
             .into_par_iter()
             .map(|shard_id| {
-                let shard_root_path = db_paths.state_merkle_db_shard_root_path(shard_id);
+                let shard_root_path = if is_hot {
+                    db_paths.hot_state_merkle_db_shard_root_path(shard_id)
+                } else {
+                    db_paths.state_merkle_db_shard_root_path(shard_id)
+                };
                 let db = Self::open_shard(
                     shard_root_path,
                     shard_id,
@@ -597,6 +645,8 @@ impl StateMerkleDb {
                     env,
                     block_cache,
                     readonly,
+                    is_hot,
+                    delete_on_restart,
                 )
                 .unwrap_or_else(|e| {
                     panic!("Failed to open state merkle db shard {shard_id}: {e:?}.")
@@ -636,15 +686,22 @@ impl StateMerkleDb {
         env: Option<&Env>,
         block_cache: Option<&Cache>,
         readonly: bool,
+        is_hot: bool,
+        delete_on_restart: bool,
     ) -> Result<DB> {
-        let db_name = format!("state_merkle_db_shard_{}", shard_id);
+        let db_name = if is_hot {
+            format!("hot_state_merkle_db_shard_{}", shard_id)
+        } else {
+            format!("state_merkle_db_shard_{}", shard_id)
+        };
         Self::open_db(
-            Self::db_shard_path(db_root_path, shard_id),
+            Self::db_shard_path(db_root_path, shard_id, is_hot),
             &db_name,
             state_merkle_db_config,
             env,
             block_cache,
             readonly,
+            delete_on_restart,
         )
     }
 
@@ -655,7 +712,14 @@ impl StateMerkleDb {
         env: Option<&Env>,
         block_cache: Option<&Cache>,
         readonly: bool,
+        delete_on_restart: bool,
     ) -> Result<DB> {
+        if delete_on_restart {
+            ensure!(!readonly, "Should not reset DB in read-only mode.");
+            info!("delete_on_restart is true. Removing {path:?} entirely.");
+            std::fs::remove_dir_all(&path).unwrap_or(());
+        }
+
         Ok(if readonly {
             DB::open_cf_readonly(
                 &gen_rocksdb_options(state_merkle_db_config, env, true),
@@ -673,21 +737,22 @@ impl StateMerkleDb {
         })
     }
 
-    fn db_shard_path<P: AsRef<Path>>(db_root_path: P, shard_id: usize) -> PathBuf {
+    fn db_shard_path<P: AsRef<Path>>(db_root_path: P, shard_id: usize, is_hot: bool) -> PathBuf {
         let shard_sub_path = format!("shard_{}", shard_id);
         db_root_path
             .as_ref()
-            .join(STATE_MERKLE_DB_FOLDER_NAME)
+            .join(db_folder_name(is_hot))
             .join(Path::new(&shard_sub_path))
     }
 
-    fn metadata_db_path<P: AsRef<Path>>(db_root_path: P, sharding: bool) -> PathBuf {
+    fn metadata_db_path<P: AsRef<Path>>(db_root_path: P, sharding: bool, is_hot: bool) -> PathBuf {
         if sharding {
             db_root_path
                 .as_ref()
-                .join(STATE_MERKLE_DB_FOLDER_NAME)
+                .join(db_folder_name(is_hot))
                 .join("metadata")
         } else {
+            assert!(!is_hot, "Hot state not supported for unsharded db.");
             db_root_path.as_ref().join(STATE_MERKLE_DB_NAME)
         }
     }
