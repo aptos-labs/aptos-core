@@ -18,13 +18,16 @@ impl DoStateCheckpoint {
     pub fn run(
         execution_output: &ExecutionOutput,
         parent_state_summary: &LedgerStateSummary,
-        persisted_state_summary: &ProvableStateSummary,
+        hot_persisted_state_summary: &ProvableStateSummary,
+        cold_persisted_state_summary: &ProvableStateSummary,
         known_state_checkpoints: Option<Vec<Option<HashValue>>>,
     ) -> Result<StateCheckpointOutput> {
         let _timer = OTHER_TIMERS.timer_with(&["do_state_checkpoint"]);
 
         let state_summary = parent_state_summary.update(
-            persisted_state_summary,
+            hot_persisted_state_summary,
+            &execution_output.hot_state_updates,
+            cold_persisted_state_summary,
             execution_output.to_commit.state_update_refs(),
         )?;
 
