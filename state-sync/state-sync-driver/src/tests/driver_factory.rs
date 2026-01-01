@@ -41,6 +41,7 @@ fn test_new_initialized_configs() {
         BUFFERED_STATE_TARGET_ITEMS,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
         None,
+        /* reset_hot_state = */ true,
     )
     .unwrap();
     let (_, db_rw) = DbReaderWriter::wrap(db);
