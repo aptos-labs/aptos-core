@@ -346,7 +346,14 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         let state_checkpoint_output = DoStateCheckpoint::run(
             &output.execution_output,
             &parent_state_summary,
-            &ProvableStateSummary::new_persisted(self.db.reader.as_ref())?,
+            &ProvableStateSummary::new_persisted(
+                self.db.reader.as_ref(),
+                /* is_hot = */ true,
+            )?,
+            &ProvableStateSummary::new_persisted(
+                self.db.reader.as_ref(),
+                /* is_hot = */ false,
+            )?,
             Some(
                 chunk_verifier
                     .transaction_infos()
