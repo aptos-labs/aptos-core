@@ -10,7 +10,7 @@ use crate::{
 use aptos_config::config::HotStateConfig;
 use aptos_drop_helper::DropHelper;
 use aptos_storage_interface::state_store::{
-    state::LedgerState, state_view::cached_state_view::ShardedStateCache,
+    state::LedgerState, state_view::cached_state_view::ShardedStateCache, HotStateUpdates,
 };
 use aptos_types::{
     contract_event::ContractEvent,
@@ -41,6 +41,7 @@ impl ExecutionOutput {
         block_end_info: Option<BlockEndInfo>,
         next_epoch_state: Option<EpochState>,
         subscribable_events: Planned<Vec<ContractEvent>>,
+        hot_state_updates: HotStateUpdates,
     ) -> Self {
         let next_version = first_version + to_commit.len() as Version;
         assert_eq!(next_version, result_state.latest().next_version());
@@ -65,6 +66,7 @@ impl ExecutionOutput {
             block_end_info,
             next_epoch_state,
             subscribable_events,
+            hot_state_updates,
         })
     }
 
@@ -81,6 +83,7 @@ impl ExecutionOutput {
             block_end_info: None,
             next_epoch_state: None,
             subscribable_events: Planned::ready(vec![]),
+            hot_state_updates: HotStateUpdates::new_empty(),
         })
     }
 
@@ -99,6 +102,7 @@ impl ExecutionOutput {
             block_end_info: None,
             next_epoch_state: None,
             subscribable_events: Planned::ready(vec![]),
+            hot_state_updates: HotStateUpdates::new_empty(),
         })
     }
 
@@ -119,6 +123,7 @@ impl ExecutionOutput {
             block_end_info: None,
             next_epoch_state: self.next_epoch_state.clone(),
             subscribable_events: Planned::ready(vec![]),
+            hot_state_updates: HotStateUpdates::new_empty(),
         })
     }
 
@@ -166,6 +171,8 @@ pub struct Inner {
     /// state cache.
     pub next_epoch_state: Option<EpochState>,
     pub subscribable_events: Planned<Vec<ContractEvent>>,
+    /// Per checkpoint and optionally a partial block.
+    pub hot_state_updates: HotStateUpdates,
 }
 
 impl Inner {
