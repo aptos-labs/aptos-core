@@ -12,6 +12,12 @@ export enum MoveTypes {
   MOVE_TYPES_U64 = 3,
   MOVE_TYPES_U128 = 4,
   MOVE_TYPES_U256 = 14,
+  MOVE_TYPES_I8 = 15,
+  MOVE_TYPES_I16 = 16,
+  MOVE_TYPES_I32 = 17,
+  MOVE_TYPES_I64 = 18,
+  MOVE_TYPES_I128 = 19,
+  MOVE_TYPES_I256 = 20,
   MOVE_TYPES_ADDRESS = 5,
   MOVE_TYPES_SIGNER = 6,
   /** MOVE_TYPES_VECTOR - `{ items: Box<MoveType> }`, */
@@ -53,6 +59,24 @@ export function moveTypesFromJSON(object: any): MoveTypes {
     case 14:
     case "MOVE_TYPES_U256":
       return MoveTypes.MOVE_TYPES_U256;
+    case 15:
+    case "MOVE_TYPES_I8":
+      return MoveTypes.MOVE_TYPES_I8;
+    case 16:
+    case "MOVE_TYPES_I16":
+      return MoveTypes.MOVE_TYPES_I16;
+    case 17:
+    case "MOVE_TYPES_I32":
+      return MoveTypes.MOVE_TYPES_I32;
+    case 18:
+    case "MOVE_TYPES_I64":
+      return MoveTypes.MOVE_TYPES_I64;
+    case 19:
+    case "MOVE_TYPES_I128":
+      return MoveTypes.MOVE_TYPES_I128;
+    case 20:
+    case "MOVE_TYPES_I256":
+      return MoveTypes.MOVE_TYPES_I256;
     case 5:
     case "MOVE_TYPES_ADDRESS":
       return MoveTypes.MOVE_TYPES_ADDRESS;
@@ -99,6 +123,18 @@ export function moveTypesToJSON(object: MoveTypes): string {
       return "MOVE_TYPES_U128";
     case MoveTypes.MOVE_TYPES_U256:
       return "MOVE_TYPES_U256";
+    case MoveTypes.MOVE_TYPES_I8:
+      return "MOVE_TYPES_I8";
+    case MoveTypes.MOVE_TYPES_I16:
+      return "MOVE_TYPES_I16";
+    case MoveTypes.MOVE_TYPES_I32:
+      return "MOVE_TYPES_I32";
+    case MoveTypes.MOVE_TYPES_I64:
+      return "MOVE_TYPES_I64";
+    case MoveTypes.MOVE_TYPES_I128:
+      return "MOVE_TYPES_I128";
+    case MoveTypes.MOVE_TYPES_I256:
+      return "MOVE_TYPES_I256";
     case MoveTypes.MOVE_TYPES_ADDRESS:
       return "MOVE_TYPES_ADDRESS";
     case MoveTypes.MOVE_TYPES_SIGNER:

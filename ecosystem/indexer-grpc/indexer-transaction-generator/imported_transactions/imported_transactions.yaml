@@ -29,6 +29,9 @@ testnet:
     6617300504: 6617300504_account_restoration_verified_key_rotation_to_multi_ed_txn
     6617355090: 6617355090_multi_ed_txn
 
+    # signed integers
+    7243926737: 7243926737_signed_integers
+
 mainnet:
   transaction_stream_endpoint: https://grpc.mainnet.aptoslabs.com:443
   api_key: MAINNET_API_KEY
