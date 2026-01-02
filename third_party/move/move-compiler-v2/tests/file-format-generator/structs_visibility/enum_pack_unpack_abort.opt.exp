@@ -1,6 +1,6 @@
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0x42::m1
 enum Result<T0: copy + drop, T1: copy + drop> has copy + drop
   Ok
@@ -78,7 +78,7 @@ public fun borrow_mut$Result$0$1<T0: copy + drop, T1: copy + drop>(l0: &mut Resu
     mut_borrow_variant_field Result<T0, T1>, Err::_0
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0x42::m2
 use 0x42::m1
 // Function definition at index 0

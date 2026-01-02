@@ -2035,6 +2035,7 @@ pub enum Operation {
     MoveFrom,
     Freeze(/*explicit*/ bool),
     Abort,
+    AbortMsg,
     Vector,
 
     // Builtin functions (spec only)
@@ -2857,6 +2858,7 @@ impl Operation {
             MoveFrom => false,         // Move-related
             Freeze(_) => false,        // Move-related
             Abort => false,            // Move-related
+            AbortMsg => false,         // Move-related
             Vector => false,           // Move-related
 
             // Builtin functions (spec only)

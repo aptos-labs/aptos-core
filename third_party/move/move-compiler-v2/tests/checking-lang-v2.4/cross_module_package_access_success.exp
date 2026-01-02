@@ -685,7 +685,7 @@ fun n_friend::test_pack_friend_struct(): 0xc0ffee::m_friend::T {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::m
 friend 0xc0ffee::n
 friend 0xc0ffee::n2
@@ -860,7 +860,7 @@ friend fun borrow_mut$Wrapper$0$0(l0: &mut Wrapper): &mut u64
     pack_variant Wrapper, V1
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::m_friend
 friend 0xc0ffee::n_friend
 struct T
@@ -894,7 +894,7 @@ friend fun borrow_mut$T$0(l0: &mut T): &mut u64
     mut_borrow_field T, x
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n
 use 0xc0ffee::m
 // Function definition at index 0
@@ -915,7 +915,7 @@ fun test()
 l0: ld_u64 1
     abort
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n2
 use 0xc0ffee::m
 // Function definition at index 0
@@ -925,7 +925,7 @@ fun test_pack()
     pop
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n3
 use 0xc0ffee::m
 // Function definition at index 0
@@ -935,7 +935,7 @@ fun test_unpack(l0: m::Wrapper)
     pop
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n4
 use 0xc0ffee::m
 // Function definition at index 0
@@ -945,7 +945,7 @@ fun test_select_variant(l0: m::Wrapper): u64
     read_ref
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n5
 use 0xc0ffee::m
 // Function definition at index 0
@@ -954,7 +954,7 @@ fun test_test_variant(l0: m::Wrapper): bool
     call m::test_variant$Wrapper$V1
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n6
 use 0xc0ffee::m
 // Function definition at index 0
@@ -987,7 +987,7 @@ l0: move_loc l1
 l1: ld_u64 14566554180833181697
     abort
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n7
 use 0xc0ffee::m
 // Function definition at index 0
@@ -996,7 +996,7 @@ fun test_pack_struct(): m::S
     call m::pack$S
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n8
 use 0xc0ffee::m
 // Function definition at index 0
@@ -1005,7 +1005,7 @@ fun test_pack_struct(): m::S
     call m::pack$S
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n9
 use 0xc0ffee::m
 // Function definition at index 0
@@ -1021,7 +1021,7 @@ fun test_pack_unpack_struct_in_lambda()
     pop
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n_friend
 use 0xc0ffee::m_friend
 // Function definition at index 0

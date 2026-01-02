@@ -589,7 +589,7 @@ fn borrow_vector_element(
     // check vector and update stack
     // The declared element type must be exactly the same as the element type of the vector
     // operand. (No co-variance.)
-    let element_type = match get_vector_element_type(operand_vec, mut_ref_only) {
+    let element_type = match get_vector_ref_element_type(operand_vec, mut_ref_only) {
         Some(ty) if declared_element_type == &ty => ty,
         _ => return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset)),
     };
@@ -637,6 +637,14 @@ fn verify_instr(
         Bytecode::Abort => {
             let operand = safe_unwrap!(verifier.stack.pop());
             if operand != ST::U64 {
+                return Err(verifier.error(StatusCode::ABORT_TYPE_MISMATCH_ERROR, offset));
+            }
+        },
+
+        Bytecode::AbortMsg => {
+            let operand_message = safe_unwrap!(verifier.stack.pop());
+            let operand_code = safe_unwrap!(verifier.stack.pop());
+            if operand_code != ST::U64 || get_vector_element_type(operand_message) != Some(ST::U8) {
                 return Err(verifier.error(StatusCode::ABORT_TYPE_MISMATCH_ERROR, offset));
             }
         },
@@ -1187,7 +1195,7 @@ fn verify_instr(
         Bytecode::VecLen(idx) => {
             let operand = safe_unwrap!(verifier.stack.pop());
             let declared_element_type = &verifier.resolver.signature_at(*idx).0[0];
-            match get_vector_element_type(operand, false) {
+            match get_vector_ref_element_type(operand, false) {
                 // The derived and declared element types must be equal (no co-variance)
                 Some(derived_element_type) if &derived_element_type == declared_element_type => {
                     verifier.push(meter, ST::U64)?;
@@ -1213,7 +1221,7 @@ fn verify_instr(
             if !declared_element_type.is_assignable_from(&operand_elem) {
                 return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset));
             }
-            match get_vector_element_type(operand_vec, true) {
+            match get_vector_ref_element_type(operand_vec, true) {
                 // Derived and declared element types must be equal.
                 Some(derived_element_type) if &derived_element_type == declared_element_type => {},
                 _ => return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset)),
@@ -1223,7 +1231,7 @@ fn verify_instr(
         Bytecode::VecPopBack(idx) => {
             let operand_vec = safe_unwrap!(verifier.stack.pop());
             let declared_element_type = &verifier.resolver.signature_at(*idx).0[0];
-            match get_vector_element_type(operand_vec, true) {
+            match get_vector_ref_element_type(operand_vec, true) {
                 // Derived and declared element types must be equal.
                 Some(derived_element_type) if &derived_element_type == declared_element_type => {
                     verifier.push(meter, derived_element_type)?;
@@ -1251,7 +1259,7 @@ fn verify_instr(
                 return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset));
             }
             let declared_element_type = &verifier.resolver.signature_at(*idx).0[0];
-            match get_vector_element_type(operand_vec, true) {
+            match get_vector_ref_element_type(operand_vec, true) {
                 // Derived and declared element types must be equal
                 Some(derived_element_type) if &derived_element_type == declared_element_type => {},
                 _ => return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset)),
@@ -1380,7 +1388,15 @@ fn instantiate(token: &SignatureToken, subst: &Signature) -> SignatureToken {
     }
 }
 
-fn get_vector_element_type(
+fn get_vector_element_type(vector_ty: SignatureToken) -> Option<SignatureToken> {
+    if let ST::Vector(element_type) = vector_ty {
+        Some(*element_type)
+    } else {
+        None
+    }
+}
+
+fn get_vector_ref_element_type(
     vector_ref_ty: SignatureToken,
     mut_ref_only: bool,
 ) -> Option<SignatureToken> {

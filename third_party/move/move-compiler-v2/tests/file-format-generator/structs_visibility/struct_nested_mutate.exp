@@ -1,6 +1,6 @@
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::m
 struct T has copy + drop
   y: u64
@@ -64,7 +64,7 @@ public fun borrow_mut$S$0(l0: &mut S): &mut T
     mut_borrow_field S, x
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::test_m
 use 0xc0ffee::m
 // Function definition at index 0

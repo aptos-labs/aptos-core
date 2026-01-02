@@ -335,7 +335,9 @@ pub enum Opcodes {
     CAST_I64                    = 0x64,
     CAST_I128                   = 0x65,
     CAST_I256                   = 0x66,
-    NEGATE                      = 0x67
+    NEGATE                      = 0x67,
+    // Since bytecode version 10
+    ABORT_MSG                   = 0x68,
 }
 
 /// Upper limit on the binary size
@@ -552,8 +554,12 @@ pub const VERSION_8: u32 = 8;
 /// + allow `$` in identifiers
 pub const VERSION_9: u32 = 9;
 
+/// Version 10: changes compared to version 9
+/// + abort with message instruction
+pub const VERSION_10: u32 = 10;
+
 /// Mark which version is the latest version.
-pub const VERSION_MAX: u32 = VERSION_9;
+pub const VERSION_MAX: u32 = VERSION_10;
 
 /// Mark which version is the default version. This is the version used by default by tools like
 /// the compiler. Notice that this version might be different from the one supported on nodes.
@@ -798,6 +804,7 @@ pub fn instruction_key(instruction: &Bytecode) -> u8 {
         Le => Opcodes::LE,
         Ge => Opcodes::GE,
         Abort => Opcodes::ABORT,
+        AbortMsg => Opcodes::ABORT_MSG,
         Nop => Opcodes::NOP,
         Exists(_) => Opcodes::EXISTS,
         ExistsGeneric(_) => Opcodes::EXISTS_GENERIC,

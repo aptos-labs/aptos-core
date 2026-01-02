@@ -112,6 +112,7 @@ impl<'a> AcquiresVerifier<'a> {
             | Bytecode::BrTrue(_)
             | Bytecode::BrFalse(_)
             | Bytecode::Abort
+            | Bytecode::AbortMsg
             | Bytecode::Branch(_)
             | Bytecode::Nop
             | Bytecode::Ret

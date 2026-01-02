@@ -505,7 +505,7 @@ pub enum Bytecode {
     Branch(AttrId, Label, Label, TempIndex),
     Jump(AttrId, Label),
     Label(AttrId, Label),
-    Abort(AttrId, TempIndex),
+    Abort(AttrId, TempIndex, Option<TempIndex>),
     Nop(AttrId),
     SpecBlock(AttrId, Spec),
 
@@ -566,6 +566,10 @@ impl Bytecode {
         matches!(self, Bytecode::Ret(..))
     }
 
+    pub fn is_abort(&self) -> bool {
+        matches!(self, Bytecode::Abort(..))
+    }
+
     pub fn is_always_branching(&self) -> bool {
         matches!(
             self,
@@ -610,8 +614,11 @@ impl Bytecode {
             Bytecode::Branch(_, _, _, cond) => {
                 vec![*cond]
             },
-            Bytecode::Abort(_, src) => {
+            Bytecode::Abort(_, src, None) => {
                 vec![*src]
+            },
+            Bytecode::Abort(_, src0, Some(src1)) => {
+                vec![*src0, *src1]
             },
             Bytecode::Load(_, _, _)
             | Bytecode::Jump(_, _)
@@ -652,7 +659,7 @@ impl Bytecode {
             | Bytecode::Branch(_, _, _, _)
             | Bytecode::Jump(_, _)
             | Bytecode::Label(_, _)
-            | Bytecode::Abort(_, _)
+            | Bytecode::Abort(_, _, _)
             | Bytecode::Nop(_)
             | Bytecode::SaveMem(_, _, _)
             | Bytecode::SaveSpecVar(_, _, _)
@@ -801,7 +808,7 @@ impl Bytecode {
             Branch(attr, if_label, else_label, cond) => {
                 Branch(attr, if_label, else_label, f(true, cond))
             },
-            Abort(attr, cond) => Abort(attr, f(true, cond)),
+            Abort(attr, cond0, cond1) => Abort(attr, f(true, cond0), cond1.map(|c| f(true, c))),
             Prop(attr, kind, exp) => {
                 let new_exp = Bytecode::remap_exp(func_target, &mut |idx| f(true, idx), exp);
                 Prop(attr, kind, new_exp)
@@ -1082,8 +1089,11 @@ impl fmt::Display for BytecodeDisplay<'_> {
             Label(_, label) => {
                 write!(f, "label L{}", label.as_usize())?;
             },
-            Abort(_, src) => {
-                write!(f, "abort({})", self.lstr(*src))?;
+            Abort(_, src0, None) => {
+                write!(f, "abort({})", self.lstr(*src0))?;
+            },
+            Abort(_, src0, Some(src1)) => {
+                write!(f, "abort({}, {})", self.lstr(*src0), self.lstr(*src1))?;
             },
             Nop(_) => {
                 write!(f, "nop")?;

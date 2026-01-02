@@ -619,6 +619,7 @@ impl<T: fmt::Write> Disassembler<T> {
             Le => write!(self.out, "le")?,
             Ge => write!(self.out, "ge")?,
             Abort => write!(self.out, "abort")?,
+            AbortMsg => write!(self.out, "abort_msg")?,
             Nop => write!(self.out, "nop")?,
             Shl => write!(self.out, "shl")?,
             Shr => write!(self.out, "shr")?,

@@ -1,6 +1,6 @@
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::m_friend
 friend 0xc0ffee::n_friend
 struct S<T0: copy>
@@ -34,7 +34,7 @@ friend fun borrow_mut$S$0<T0: copy>(l0: &mut S<T0>): &mut T0
     mut_borrow_field S<T0>, f
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::m_friend_2
 friend 0xc0ffee::n_friend
 struct S<T0: copy>
@@ -68,7 +68,7 @@ friend fun borrow_mut$S$0<T0: copy>(l0: &mut S<T0>): &mut T0
     mut_borrow_field S<T0>, f
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n_friend
 use 0xc0ffee::m_friend
 use 0xc0ffee::m_friend_2

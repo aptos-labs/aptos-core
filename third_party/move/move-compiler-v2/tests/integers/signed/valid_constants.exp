@@ -3706,7 +3706,7 @@ public fun constants::test_i8(): i8 {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0x42::constants
 // Function definition at index 0
 #[persistent] public fun test_i128(): i128

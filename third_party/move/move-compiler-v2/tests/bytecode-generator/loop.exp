@@ -421,7 +421,7 @@ fun loops::while_loop_with_break_and_continue($t0: u64): u64 {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0x42::loops
 // Function definition at index 0
 fun nested_loop(l0: u64): u64
