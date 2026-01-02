@@ -41,6 +41,8 @@ module aptos_framework::sui_derivable_account {
     const EINVALID_PUBLIC_KEY: u64 = 6;
     /// Account address mismatch.
     const EACCOUNT_ADDRESS_MISMATCH: u64 = 7;
+    /// Malformed data with trailing bytes.
+    const EMALFORMED_DATA: u64 = 8;
 
     enum SuiAbstractSignature has drop {
         MessageV1 {
@@ -110,6 +112,7 @@ module aptos_framework::sui_derivable_account {
         let stream = bcs_stream::new(*abstract_public_key);
         let sui_account_address = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
         let domain = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
+        assert!(!bcs_stream::has_remaining(&mut stream), EMALFORMED_DATA);
         SuiAbstractPublicKey { sui_account_address, domain }
     }
 
@@ -119,6 +122,7 @@ module aptos_framework::sui_derivable_account {
         let signature_type = bcs_stream::deserialize_u8(&mut stream);
         if (signature_type == 0x00) {
             let signature = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
+            assert!(!bcs_stream::has_remaining(&mut stream), EMALFORMED_DATA);
             SuiAbstractSignature::MessageV1 { signature }
         } else {
             abort(EINVALID_SIGNATURE_TYPE)
@@ -189,7 +193,7 @@ module aptos_framework::sui_derivable_account {
         pragma verify = false;
     }
 
-    public fun authenticate_auth_data(
+    fun authenticate_auth_data(
         aa_auth_data: AbstractionAuthData,
         entry_function_name: &vector<u8>
     ) {
@@ -384,6 +388,35 @@ module aptos_framework::sui_derivable_account {
         let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
 
         authenticate_auth_data(auth_data, &entry_function_name);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = EMALFORMED_DATA)]
+    fun test_deserialize_abstract_signature_with_trailing_bytes() {
+        let signature_bytes = vector[0, 151, 47, 171, 144, 115, 16, 129, 17, 202, 212, 180, 155, 213, 223, 249, 203, 195, 0, 84, 142, 121, 167, 29, 113, 159, 33, 177, 108, 137, 113, 160, 118, 41, 246, 199, 202, 79, 151, 27, 86, 235, 219, 123, 168, 152, 38, 124, 147, 146, 118, 101, 37, 187, 223, 206, 120, 101, 148, 33, 141, 80, 60, 155, 13, 25, 200, 235, 92, 139, 72, 175, 189, 40, 0, 65, 76, 215, 148, 94, 194, 78, 134, 60, 189, 212, 116, 40, 134, 179, 104, 31, 249, 222, 84, 104, 202];
+        let abstract_signature = create_raw_signature(signature_bytes);
+        // Append trailing bytes to simulate griefing attack
+        abstract_signature.push_back(0xDE);
+        abstract_signature.push_back(0xAD);
+        abstract_signature.push_back(0xBE);
+        abstract_signature.push_back(0xEF);
+        // This should fail with EMALFORMED_DATA due to trailing bytes
+        deserialize_abstract_signature(&abstract_signature);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = EMALFORMED_DATA)]
+    fun test_deserialize_abstract_public_key_with_trailing_bytes() {
+        let sui_account_address = b"0x8d6ce7a3c13617b29aaf7ec58bee5a611606a89c62c5efbea32e06d8d167bd49";
+        let domain = b"localhost:3001";
+        let abstract_public_key = create_abstract_public_key(sui_account_address, domain);
+        // Append trailing bytes to simulate griefing attack
+        abstract_public_key.push_back(0xDE);
+        abstract_public_key.push_back(0xAD);
+        abstract_public_key.push_back(0xBE);
+        abstract_public_key.push_back(0xEF);
+        // This should fail with EMALFORMED_DATA due to trailing bytes
+        deserialize_abstract_public_key(&abstract_public_key);
     }
 
 }
