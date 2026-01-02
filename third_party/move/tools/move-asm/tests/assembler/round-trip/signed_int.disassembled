@@ -1,7 +1,7 @@
 //**** Cross-compiled for `masm` syntax from `tests/assembler/signed_int.masm`
 
 //# publish --print-bytecode
-// Bytecode version v8
+// Bytecode version v9
 module 0x66::test_ok_i8
 // Function definition at index 0
 public fun f(l0: i8): i8
@@ -16,7 +16,7 @@ public fun f(l0: i8): i8
 
 
 //# publish --print-bytecode
-// Bytecode version v8
+// Bytecode version v9
 module 0x66::test_ok_i16
 // Function definition at index 0
 public fun f(l0: i16): i16
@@ -31,7 +31,7 @@ public fun f(l0: i16): i16
 
 
 //# publish --print-bytecode
-// Bytecode version v8
+// Bytecode version v9
 module 0x66::test_ok_i32
 // Function definition at index 0
 public fun f(l0: i32): i32
@@ -46,7 +46,7 @@ public fun f(l0: i32): i32
 
 
 //# publish --print-bytecode
-// Bytecode version v8
+// Bytecode version v9
 module 0x66::test_ok_i64
 // Function definition at index 0
 public fun f(l0: i64): i64
@@ -61,7 +61,7 @@ public fun f(l0: i64): i64
 
 
 //# publish --print-bytecode
-// Bytecode version v8
+// Bytecode version v9
 module 0x66::test_some_err_i64
 // Function definition at index 0
 public fun f(l0: i64): i64
@@ -76,7 +76,7 @@ public fun f(l0: i64): i64
 
 
 //# publish --print-bytecode
-// Bytecode version v8
+// Bytecode version v9
 module 0x66::test_ok_i128
 // Function definition at index 0
 public fun f(l0: i128): i128
@@ -91,7 +91,7 @@ public fun f(l0: i128): i128
 
 
 //# publish --print-bytecode
-// Bytecode version v8
+// Bytecode version v9
 module 0x66::test_some_err_i128
 // Function definition at index 0
 public fun f(l0: i128): i128
@@ -106,7 +106,7 @@ public fun f(l0: i128): i128
 
 
 //# publish --print-bytecode
-// Bytecode version v8
+// Bytecode version v9
 module 0x66::test_ok_i256
 // Function definition at index 0
 public fun f(l0: i256): i256
@@ -121,7 +121,7 @@ public fun f(l0: i256): i256
 
 
 //# publish --print-bytecode
-// Bytecode version v8
+// Bytecode version v9
 module 0x66::test_some_err_i256
 // Function definition at index 0
 public fun f(l0: i256): i256
