@@ -398,6 +398,16 @@ https://github.com/MystenLabs/sui/blob/main/crates/shared-crypto/src/intent.rs#L
 ## Constants
 
 
+<a id="0x1_sui_derivable_account_EMALFORMED_DATA"></a>
+
+Malformed data with trailing bytes.
+
+
+<pre><code><b>const</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_EMALFORMED_DATA">EMALFORMED_DATA</a>: u64 = 8;
+</code></pre>
+
+
+
 <a id="0x1_sui_derivable_account_EINVALID_PUBLIC_KEY"></a>
 
 Invalid public key.
@@ -515,6 +525,7 @@ serialized <code><a href="sui_derivable_account.md#0x1_sui_derivable_account_Sui
     <b>let</b> stream = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_new">bcs_stream::new</a>(*abstract_public_key);
     <b>let</b> sui_account_address = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x));
     <b>let</b> domain = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x));
+    <b>assert</b>!(!<a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_has_remaining">bcs_stream::has_remaining</a>(&<b>mut</b> stream), <a href="sui_derivable_account.md#0x1_sui_derivable_account_EMALFORMED_DATA">EMALFORMED_DATA</a>);
     <a href="sui_derivable_account.md#0x1_sui_derivable_account_SuiAbstractPublicKey">SuiAbstractPublicKey</a> { sui_account_address, domain }
 }
 </code></pre>
@@ -544,6 +555,7 @@ Returns a tuple of the signature.
     <b>let</b> signature_type = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_u8">bcs_stream::deserialize_u8</a>(&<b>mut</b> stream);
     <b>if</b> (signature_type == 0x00) {
         <b>let</b> signature = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x));
+        <b>assert</b>!(!<a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_has_remaining">bcs_stream::has_remaining</a>(&<b>mut</b> stream), <a href="sui_derivable_account.md#0x1_sui_derivable_account_EMALFORMED_DATA">EMALFORMED_DATA</a>);
         SuiAbstractSignature::MessageV1 { signature }
     } <b>else</b> {
         <b>abort</b>(<a href="sui_derivable_account.md#0x1_sui_derivable_account_EINVALID_SIGNATURE_TYPE">EINVALID_SIGNATURE_TYPE</a>)
@@ -654,7 +666,7 @@ Derives the account address from the public key and returns it is a hex string w
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(aa_auth_data: <a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code><b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(aa_auth_data: <a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
 </code></pre>
 
 
@@ -663,7 +675,7 @@ Derives the account address from the public key and returns it is a hex string w
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(
+<pre><code><b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(
     aa_auth_data: AbstractionAuthData,
     entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 ) {
@@ -773,7 +785,7 @@ Authorization function for domain account abstraction.
 ### Function `authenticate_auth_data`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(aa_auth_data: <a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code><b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(aa_auth_data: <a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
 </code></pre>
 
 
