@@ -2766,8 +2766,6 @@ impl Frame {
                                 .with_message(format!("Invalid UTF-8 string: {err}"))
                         })?;
 
-                        gas_meter.charge_abort_message_after_validation()?;
-
                         let error_code = interpreter.operand_stack.pop_as::<u64>()?;
 
                         if is_tracing_for!(TraceCategory::Abort(error_code)) {

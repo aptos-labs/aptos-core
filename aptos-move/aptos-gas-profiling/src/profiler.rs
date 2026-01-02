@@ -35,7 +35,6 @@ use move_vm_types::{
 pub struct GasProfiler<G> {
     base: G,
 
-    abort_message_validation_cost: Option<InternalGas>,
     intrinsic_cost: Option<InternalGas>,
     keyless_cost: Option<InternalGas>,
     dependencies: Vec<Dependency>,
@@ -93,7 +92,6 @@ impl<G> GasProfiler<G> {
         Self {
             base,
 
-            abort_message_validation_cost: None,
             intrinsic_cost: None,
             keyless_cost: None,
             dependencies: vec![],
@@ -114,7 +112,6 @@ impl<G> GasProfiler<G> {
         Self {
             base,
 
-            abort_message_validation_cost: None,
             intrinsic_cost: None,
             keyless_cost: None,
             dependencies: vec![],
@@ -370,6 +367,9 @@ where
 
         [VEC_SWAP]
         fn charge_vec_swap(&mut self) -> PartialVMResult<()>;
+
+        [ABORT_MSG]
+        fn charge_abort_message(&mut self, bytes: &[u8]) -> PartialVMResult<()>;
     }
 
     fn balance_internal(&self) -> InternalGas {
@@ -543,28 +543,6 @@ where
         let (cost, res) = self.delegate_charge(|base| base.charge_create_ty(num_nodes));
 
         self.record_gas_event(ExecutionGasEvent::CreateTy { cost });
-
-        res
-    }
-
-    fn charge_abort_message(&mut self, bytes: &Vec<u8>) -> PartialVMResult<()> {
-        let (cost, res) = self.delegate_charge(|base| base.charge_abort_message(bytes));
-
-        self.abort_message_validation_cost = Some(cost);
-
-        res
-    }
-
-    fn charge_abort_message_after_validation(&mut self) -> PartialVMResult<()> {
-        let validation_cost = self
-            .abort_message_validation_cost
-            .take()
-            .expect("Abort message validation cost must exist");
-
-        let (base_cost, res) =
-            self.delegate_charge(|base| base.charge_abort_message_after_validation());
-
-        self.record_bytecode(Opcodes::ABORT_MSG, validation_cost + base_cost);
 
         res
     }

@@ -388,10 +388,7 @@ pub trait GasMeter: NativeGasMeter {
 
     fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()>;
 
-    #[allow(clippy::ptr_arg)]
-    fn charge_abort_message(&mut self, bytes: &Vec<u8>) -> PartialVMResult<()>;
-
-    fn charge_abort_message_after_validation(&mut self) -> PartialVMResult<()>;
+    fn charge_abort_message(&mut self, bytes: &[u8]) -> PartialVMResult<()>;
 }
 
 /// A dummy gas meter that does not meter anything.
@@ -647,11 +644,7 @@ impl GasMeter for UnmeteredGasMeter {
         Ok(())
     }
 
-    fn charge_abort_message(&mut self, _bytes: &Vec<u8>) -> PartialVMResult<()> {
-        Ok(())
-    }
-
-    fn charge_abort_message_after_validation(&mut self) -> PartialVMResult<()> {
+    fn charge_abort_message(&mut self, _bytes: &[u8]) -> PartialVMResult<()> {
         Ok(())
     }
 }

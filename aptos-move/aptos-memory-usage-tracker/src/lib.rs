@@ -291,8 +291,6 @@ where
         fn charge_vec_swap(&mut self) -> PartialVMResult<()>;
 
         fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()>;
-
-        fn charge_abort_message_after_validation(&mut self) -> PartialVMResult<()>;
     }
 
     #[inline]
@@ -345,7 +343,7 @@ where
             .charge_native_function_before_execution(ty_args, args)
     }
 
-    fn charge_abort_message(&mut self, bytes: &Vec<u8>) -> PartialVMResult<()> {
+    fn charge_abort_message(&mut self, bytes: &[u8]) -> PartialVMResult<()> {
         self.release_heap_memory(
             self.vm_gas_params()
                 .misc

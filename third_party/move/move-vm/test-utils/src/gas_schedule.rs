@@ -539,11 +539,7 @@ impl GasMeter for GasStatus {
         Ok(())
     }
 
-    fn charge_abort_message(&mut self, _bytes: &Vec<u8>) -> PartialVMResult<()> {
-        Ok(())
-    }
-
-    fn charge_abort_message_after_validation(&mut self) -> PartialVMResult<()> {
+    fn charge_abort_message(&mut self, _bytes: &[u8]) -> PartialVMResult<()> {
         Ok(())
     }
 }

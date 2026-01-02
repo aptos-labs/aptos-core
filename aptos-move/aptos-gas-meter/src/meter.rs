@@ -548,14 +548,10 @@ where
         self.algebra.charge_execution(cost)
     }
 
-    fn charge_abort_message(&mut self, bytes: &Vec<u8>) -> PartialVMResult<()> {
+    fn charge_abort_message(&mut self, bytes: &[u8]) -> PartialVMResult<()> {
         let num_bytes = NumBytes::new(bytes.len() as u64);
-        let cost = ABORT_MSG_PER_BYTE * num_bytes;
+        let cost = ABORT_MSG_BASE + ABORT_MSG_PER_BYTE * num_bytes;
         self.algebra.charge_execution(cost)
-    }
-
-    fn charge_abort_message_after_validation(&mut self) -> PartialVMResult<()> {
-        self.algebra.charge_execution(ABORT_MSG_BASE)
     }
 }
 
