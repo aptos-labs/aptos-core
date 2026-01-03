@@ -126,6 +126,150 @@ async fn test_multisig_script_transaction_with_payload_succeeds(
     case(true, false),
     case(true, true)
 )]
+async fn test_multisig_script_transaction_with_existing_account(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let multisig_account = &mut context.create_account().await;
+    let owner_account_1 = &mut context.create_account().await;
+    let owner_account_2 = &mut context.create_account().await;
+    let owner_account_3 = &mut context.create_account().await;
+    let owners = vec![
+        owner_account_1.address(),
+        owner_account_2.address(),
+        owner_account_3.address(),
+    ];
+    context
+        .create_multisig_account_with_existing_account(multisig_account, owners.clone(), 2, 1000)
+        .await;
+    assert_owners(&context, multisig_account.address(), owners).await;
+    assert_signature_threshold(&context, multisig_account.address(), 2).await;
+
+    let multisig_payload = construct_multisig_txn_script_payload(owner_account_1.address(), 1000);
+    context
+        .create_multisig_transaction(
+            owner_account_1,
+            multisig_account.address(),
+            multisig_payload.clone(),
+        )
+        .await;
+    // Owner 2 approves and owner 3 rejects. There are still 2 approvals total (owners 1 and 2) so
+    // the transaction can still be executed.
+    context
+        .approve_multisig_transaction(owner_account_2, multisig_account.address(), 1)
+        .await;
+    context
+        .reject_multisig_transaction(owner_account_3, multisig_account.address(), 1)
+        .await;
+
+    let org_multisig_balance = context.get_apt_balance(multisig_account.address()).await;
+    let org_owner_1_balance = context.get_apt_balance(owner_account_1.address()).await;
+
+    context
+        .execute_multisig_transaction(owner_account_2, multisig_account.address(), 202)
+        .await;
+
+    // The multisig tx that transfers away 1000 APT should have succeeded.
+    assert_eq!(
+        org_multisig_balance - 1000,
+        context.get_apt_balance(multisig_account.address()).await
+    );
+    assert_eq!(
+        org_owner_1_balance + 1000,
+        context.get_apt_balance(owner_account_1.address()).await
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_script_transaction_with_failing_execution(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let owner_account = &mut context.create_account().await;
+    let multisig_account = context
+        .create_multisig_account(owner_account, vec![], 1, 1000)
+        .await;
+    assert_eq!(1000, context.get_apt_balance(multisig_account).await);
+    // Try to transfer more than available - this should fail
+    let multisig_payload = construct_multisig_txn_script_payload(owner_account.address(), 2000);
+    context
+        .create_multisig_transaction(owner_account, multisig_account, multisig_payload.clone())
+        .await;
+    // Target transaction execution should fail because the multisig account only has 1000 APT but
+    // is requested to send 2000.
+    // The transaction should still succeed with the failure tracked on chain.
+    context
+        .execute_multisig_transaction(owner_account, multisig_account, 202)
+        .await;
+
+    // Balance didn't change since the target transaction failed.
+    assert_eq!(1000, context.get_apt_balance(multisig_account).await);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_script_transaction_with_insufficient_balance_to_cover_gas(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let owner_account_1 = &mut context.create_account().await;
+    // Owner 2 has no APT balance.
+    let owner_account_2 = &mut context.gen_account();
+    let multisig_account = context
+        .create_multisig_account(
+            owner_account_1,
+            vec![owner_account_2.address()],
+            1,
+            1000, /* initial balance */
+        )
+        .await;
+
+    let multisig_payload = construct_multisig_txn_script_payload(owner_account_1.address(), 1000);
+    context
+        .create_multisig_transaction(owner_account_1, multisig_account, multisig_payload)
+        .await;
+    // Target transaction execution should fail because the owner 2 account has no balance for gas.
+    context
+        .execute_multisig_transaction(owner_account_2, multisig_account, 400)
+        .await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
 async fn test_multisig_transaction_with_existing_account(
     use_txn_payload_v2_format: bool,
     use_orderless_transactions: bool,
