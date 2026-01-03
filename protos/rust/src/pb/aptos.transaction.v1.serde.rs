@@ -6068,12 +6068,15 @@ impl<'de> serde::Deserialize<'de> for MultisigTransactionPayload {
             "type",
             "entry_function_payload",
             "entryFunctionPayload",
+            "script_payload",
+            "scriptPayload",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Type,
             EntryFunctionPayload,
+            ScriptPayload,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -6097,6 +6100,7 @@ impl<'de> serde::Deserialize<'de> for MultisigTransactionPayload {
                         match value {
                             "type" => Ok(GeneratedField::Type),
                             "entryFunctionPayload" | "entry_function_payload" => Ok(GeneratedField::EntryFunctionPayload),
+                            "scriptPayload" | "script_payload" => Ok(GeneratedField::ScriptPayload),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -6131,6 +6135,13 @@ impl<'de> serde::Deserialize<'de> for MultisigTransactionPayload {
                                 return Err(serde::de::Error::duplicate_field("entryFunctionPayload"));
                             }
                             payload__ = map.next_value::<::std::option::Option<_>>()?.map(multisig_transaction_payload::Payload::EntryFunctionPayload)
+;
+                        }
+                        GeneratedField::ScriptPayload => {
+                            if payload__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("scriptPayload"));
+                            }
+                            payload__ = map.next_value::<::std::option::Option<_>>()?.map(multisig_transaction_payload::Payload::ScriptPayload)
 ;
                         }
                     }

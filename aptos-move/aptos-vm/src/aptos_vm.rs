@@ -909,8 +909,8 @@ impl AptosVM {
         // Note: cannot use AptosGasMeter because it is not implemented for
         //       UnmeteredGasMeter.
         gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext<'a>,
-        serialized_script: &'a Script,
+        traversal_context: &mut TraversalContext,
+        serialized_script: &Script,
         trace_recorder: &mut impl TraceRecorder,
     ) -> Result<(), VMStatus> {
         if !self
@@ -1468,6 +1468,7 @@ impl AptosVM {
                 gas_meter,
                 traversal_context,
                 payload,
+                &mut NoOpTraceRecorder,
             )
         })?;
 

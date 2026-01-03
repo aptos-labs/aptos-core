@@ -692,7 +692,7 @@ pub struct MultisigPayload {
 pub struct MultisigTransactionPayload {
     #[prost(enumeration="multisig_transaction_payload::Type", tag="1")]
     pub r#type: i32,
-    #[prost(oneof="multisig_transaction_payload::Payload", tags="2")]
+    #[prost(oneof="multisig_transaction_payload::Payload", tags="2, 3")]
     pub payload: ::core::option::Option<multisig_transaction_payload::Payload>,
 }
 /// Nested message and enum types in `MultisigTransactionPayload`.
