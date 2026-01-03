@@ -114,6 +114,17 @@ impl<'a> RecursiveStructChecker<'a> {
                         self.report_invalid_field(&struct_env, &field_env);
                     }
                 },
+                Type::Tuple(ty_vec) => {
+                    // Check each element of the tuple for the struct
+                    // Note: Tuples are not allowed as field types and will be rejected during
+                    // type checking, but we handle them here for robustness
+                    for ty in ty_vec.iter() {
+                        if self.ty_contains_struct(path, ty, loc.clone(), struct_id, checked) {
+                            self.report_invalid_field(&struct_env, &field_env);
+                            break;
+                        }
+                    }
+                },
                 Type::Primitive(_) | Type::TypeParameter(_) => {},
                 _ => unreachable!("invalid field type"),
             }
