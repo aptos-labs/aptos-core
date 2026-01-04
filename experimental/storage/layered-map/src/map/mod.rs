@@ -114,4 +114,27 @@ where
             .into_feet_iter()
             .flat_map(|node| DescendantIterator::new(node, self.base_layer()))
     }
+
+    /// For example, if `self` is `(2, 5]`, this returns `(2, 3], (3, 4], (4, 5]` as a list.
+    pub fn inner_maps(&self) -> Vec<Self> {
+        let num_layers = (self.top_layer.layer() - self.base_layer.layer()) as usize;
+        let mut ret = Vec::with_capacity(num_layers);
+
+        let mut current = self.top_layer.clone();
+        while current.layer() > self.base_layer.layer() {
+            let parent = current.parent().expect("The lower layer must exist.");
+            ret.push(Self::new(parent.clone(), current));
+            current = parent;
+        }
+        ret.reverse();
+
+        assert_eq!(
+            ret.len(),
+            num_layers,
+            "The number of inner maps ({}) does not match num_layers ({})",
+            ret.len(),
+            num_layers
+        );
+        ret
+    }
 }

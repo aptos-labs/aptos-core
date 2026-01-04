@@ -32,6 +32,8 @@ pub enum AptosDbError {
     RecvError(String),
     #[error("AptosDB ParseInt Error: {0}")]
     ParseIntError(String),
+    #[error("Hot state not configured properly")]
+    HotStateError,
 }
 
 impl From<anyhow::Error> for AptosDbError {
