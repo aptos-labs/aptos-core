@@ -1186,8 +1186,14 @@ impl StateStore {
             ledger_state.last_checkpoint().version(),
             hot_smt.clone(),
             smt.clone(),
+            HotStateConfig::default(),
         );
-        let summary = StateSummary::new_at_version(ledger_state.version(), hot_smt, smt);
+        let summary = StateSummary::new_at_version(
+            ledger_state.version(),
+            hot_smt,
+            smt,
+            HotStateConfig::default(),
+        );
 
         let last_checkpoint = StateWithSummary::new(
             ledger_state.last_checkpoint().clone(),

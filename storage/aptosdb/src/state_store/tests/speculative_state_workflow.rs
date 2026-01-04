@@ -57,6 +57,7 @@ const REFRESH_INTERVAL_VERSIONS: usize = 50;
 const TEST_CONFIG: HotStateConfig = HotStateConfig {
     max_items_per_shard: HOT_STATE_MAX_ITEMS_PER_SHARD,
     delete_on_restart: false,
+    compute_root_hash: true,
 };
 
 #[derive(Debug)]

@@ -11,6 +11,7 @@ use crate::{
     DbReader,
 };
 use anyhow::Result;
+use aptos_config::config::HotStateConfig;
 use aptos_crypto::{
     hash::{CryptoHash, CORRUPTION_SENTINEL},
     HashValue,
@@ -33,6 +34,7 @@ pub struct StateSummary {
     next_version: Version,
     pub hot_state_summary: SparseMerkleTree,
     pub global_state_summary: SparseMerkleTree,
+    hot_state_config: HotStateConfig,
 }
 
 impl StateSummary {
@@ -40,19 +42,22 @@ impl StateSummary {
         version: Option<Version>,
         hot_state_summary: SparseMerkleTree,
         global_state_summary: SparseMerkleTree,
+        hot_state_config: HotStateConfig,
     ) -> Self {
         Self {
             next_version: version.map_or(0, |v| v + 1),
             hot_state_summary,
             global_state_summary,
+            hot_state_config,
         }
     }
 
-    pub fn new_empty() -> Self {
+    pub fn new_empty(hot_state_config: HotStateConfig) -> Self {
         Self {
             next_version: 0,
             hot_state_summary: SparseMerkleTree::new_empty(),
             global_state_summary: SparseMerkleTree::new_empty(),
+            hot_state_config,
         }
     }
 
@@ -150,6 +155,7 @@ impl StateSummary {
             next_version: updates.next_version(),
             hot_state_summary: hot_smt,
             global_state_summary: smt,
+            hot_state_config: self.hot_state_config,
         })
     }
 }
@@ -172,8 +178,8 @@ impl LedgerStateSummary {
         }
     }
 
-    pub fn new_empty() -> Self {
-        let state_summary = StateSummary::new_empty();
+    pub fn new_empty(hot_state_config: HotStateConfig) -> Self {
+        let state_summary = StateSummary::new_empty(hot_state_config);
         Self::new(state_summary.clone(), state_summary)
     }
 
