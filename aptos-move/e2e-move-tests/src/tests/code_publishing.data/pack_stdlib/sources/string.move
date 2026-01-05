@@ -35,8 +35,9 @@ module std::string {
     }
 
     /// Returns the underlying byte vector.
-    public fun into_bytes(s: String): vector<u8> {
-        s.bytes
+    public fun into_bytes(self: String): vector<u8> {
+        let String { bytes } = self;
+        bytes
     }
 
     /// Checks whether this string is empty.
