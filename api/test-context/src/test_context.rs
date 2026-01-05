@@ -10,8 +10,9 @@ use aptos_api_types::{
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::{
     config::{
-        NodeConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
-        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
+        HotStateConfig, NodeConfig, RocksdbConfigs, StorageDirPaths,
+        BUFFERED_STATE_TARGET_ITEMS_FOR_TEST, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+        NO_OP_STORAGE_PRUNER_CONFIG,
     },
     keys::ConfigKey,
 };
@@ -176,7 +177,7 @@ pub fn new_test_context_inner(
             BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             None,
-            /* reset_hot_state = */ true,
+            HotStateConfig::default(),
         )
         .unwrap();
         if node_config
