@@ -43,6 +43,7 @@ use aptos_vm_environment::prod_configs::{
 use clap::{Parser, Subcommand, ValueEnum};
 use once_cell::sync::Lazy;
 use std::{
+    ffi::c_char,
     net::SocketAddr,
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
@@ -51,6 +52,11 @@ use std::{
 #[cfg(unix)]
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
+#[cfg(unix)]
+#[used]
+#[unsafe(no_mangle)]
+pub static mut malloc_conf: *const c_char = c"prof:true,lg_prof_sample:23".as_ptr().cast();
 
 /// This is needed for filters on the Grafana dashboard working as its used to populate the filter
 /// variables.
