@@ -13,7 +13,7 @@ pub mod test_utils;
 
 use crate::{builder::GenesisConfiguration, config::ValidatorConfiguration};
 use aptos_config::config::{
-    RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
+    HotStateConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_crypto::ed25519::Ed25519PublicKey;
@@ -177,7 +177,7 @@ impl GenesisInfo {
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             None,
-            /* reset_hot_state = */ true,
+            HotStateConfig::default(),
         )?;
         let db_rw = DbReaderWriter::new(aptosdb);
         aptos_executor::db_bootstrapper::generate_waypoint::<AptosVMBlockExecutor>(&db_rw, genesis)
