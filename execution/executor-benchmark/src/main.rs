@@ -52,6 +52,10 @@ use std::{
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
+#[cfg(unix)]
+#[unsafe(no_mangle)]
+static malloc_conf: &[u8] = b"prof:true,lg_prof_sample:23\0";
+
 /// This is needed for filters on the Grafana dashboard working as its used to populate the filter
 /// variables.
 pub static START_TIME: Lazy<IntGauge> =
