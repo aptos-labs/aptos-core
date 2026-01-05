@@ -41,7 +41,11 @@ use aptos_db_indexer_schemas::{
     schema::indexer_metadata::InternalIndexerMetadataSchema,
 };
 use aptos_infallible::Mutex;
-use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
+use aptos_jellyfish_merkle::{
+    iterator::JellyfishMerkleIterator,
+    node_type::{Node, NodeKey},
+    TreeWriter,
+};
 use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::batch::{NativeBatch, SchemaBatch, WriteBatch};
@@ -58,6 +62,7 @@ use aptos_storage_interface::{
         },
         state_with_summary::{LedgerStateWithSummary, StateWithSummary},
         versioned_state_value::StateUpdateRef,
+        HotStateUpdates,
     },
     AptosDbError, DbReader, Result, StateSnapshotReceiver,
 };
@@ -79,6 +84,7 @@ use claims::{assert_ge, assert_le};
 use itertools::Itertools;
 use rayon::prelude::*;
 use std::{
+    collections::HashMap,
     ops::Deref,
     sync::{Arc, MutexGuard},
 };
@@ -183,10 +189,8 @@ impl DbReader for StateDb {
         root_depth: usize,
         use_hot_state: bool,
     ) -> Result<SparseMerkleProofExt> {
-        let db = if use_hot_state {
-            self.hot_state_merkle_db
-                .as_ref()
-                .ok_or(AptosDbError::HotStateError)?
+        let db = if use_hot_state && let Some(db) = &self.hot_state_merkle_db {
+            db
         } else {
             &self.state_merkle_db
         };
@@ -202,10 +206,8 @@ impl DbReader for StateDb {
         root_depth: usize,
         use_hot_state: bool,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
-        let db = if use_hot_state {
-            self.hot_state_merkle_db
-                .as_ref()
-                .ok_or(AptosDbError::HotStateError)?
+        let db = if use_hot_state && let Some(db) = &self.hot_state_merkle_db {
+            db
         } else {
             &self.state_merkle_db
         };
@@ -319,7 +321,7 @@ impl StateDb {
 }
 
 impl StateStore {
-    pub fn new(
+    pub(crate) fn new(
         ledger_db: Arc<LedgerDb>,
         hot_state_merkle_db: Option<Arc<StateMerkleDb>>,
         state_merkle_db: Arc<StateMerkleDb>,
@@ -332,6 +334,7 @@ impl StateStore {
         empty_buffered_state_for_restore: bool,
         skip_usage: bool,
         internal_indexer_db: Option<InternalIndexerDB>,
+        hot_state_config: HotStateConfig,
     ) -> Self {
         if !hack_for_tests && !empty_buffered_state_for_restore {
             Self::sync_commit_progress(
@@ -352,11 +355,10 @@ impl StateStore {
             skip_usage,
         });
         // TODO(HotState): probably fetch onchain config from storage.
-        let hot_state_config = HotStateConfig::default();
         let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty(
             hot_state_config,
         )));
-        let persisted_state = PersistedState::new_empty();
+        let persisted_state = PersistedState::new_empty(hot_state_config);
         let buffered_state = if empty_buffered_state_for_restore {
             BufferedState::new_at_snapshot(
                 &state_db,
@@ -373,6 +375,7 @@ impl StateStore {
                 /*check_max_versions_after_snapshot=*/ true,
                 current_state.clone(),
                 persisted_state.clone(),
+                hot_state_config,
             )
             .expect("buffered state creation failed.")
         };
@@ -517,7 +520,7 @@ impl StateStore {
         let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty(
             HotStateConfig::default(),
         )));
-        let persisted_state = PersistedState::new_empty();
+        let persisted_state = PersistedState::new_empty(HotStateConfig::default());
         let _ = Self::create_buffered_state_from_latest_snapshot(
             &state_db,
             0,
@@ -525,6 +528,7 @@ impl StateStore {
             /*check_max_versions_after_snapshot=*/ false,
             current_state.clone(),
             persisted_state,
+            HotStateConfig::default(),
         )?;
         let base_version = current_state.lock().version();
         Ok(base_version)
@@ -537,6 +541,7 @@ impl StateStore {
         check_max_versions_after_snapshot: bool,
         out_current_state: Arc<Mutex<LedgerStateWithSummary>>,
         out_persisted_state: PersistedState,
+        hot_state_config: HotStateConfig,
     ) -> Result<BufferedState> {
         let num_transactions = state_db
             .ledger_db
@@ -554,6 +559,7 @@ impl StateStore {
             latest_snapshot_version = latest_snapshot_version,
             "Initializing BufferedState."
         );
+        // TODO(HotState): read hot root hash from DB.
         let latest_snapshot_root_hash = if let Some(version) = latest_snapshot_version {
             state_db
                 .state_merkle_db
@@ -568,7 +574,7 @@ impl StateStore {
             *SPARSE_MERKLE_PLACEHOLDER_HASH, // TODO(HotState): for now hot state always starts from empty upon restart.
             latest_snapshot_root_hash,
             usage,
-            HotStateConfig::default(),
+            hot_state_config,
         );
         let mut buffered_state = BufferedState::new_at_snapshot(
             state_db,
@@ -595,6 +601,19 @@ impl StateStore {
             );
         }
 
+        if snapshot_next_version > 0 {
+            // TODO(HotState): not sure if this is done properly, but we need to write something to
+            // form a valid tree in the previous version, otherwise some code would panic.
+            let prev_version = snapshot_next_version - 1;
+            let node_key = NodeKey::new_empty_path(prev_version);
+            let mut node_batch = HashMap::new();
+            node_batch.insert(node_key, Node::Null);
+            if let Some(db) = &state_db.hot_state_merkle_db {
+                db.write_node_batch(&node_batch)?;
+            }
+            info!("Wrote null node for hot state at version {prev_version}");
+        }
+
         // Replaying the committed write sets after the latest snapshot.
         if snapshot_next_version < num_transactions {
             if check_max_versions_after_snapshot {
@@ -605,6 +624,8 @@ impl StateStore {
                     num_transactions,
                 );
             }
+            info!("Replaying writesets from {snapshot_next_version} to {num_transactions} to let state Merkle DB catch up.");
+
             let write_sets = state_db
                 .ledger_db
                 .write_set_db()
@@ -628,15 +649,13 @@ impl StateStore {
             );
             let current_state = out_current_state.lock().clone();
             let (hot_state, state) = out_persisted_state.get_state();
-            let (new_state, _state_reads) = current_state.ledger_state().update_with_db_reader(
-                &state,
-                hot_state,
-                &state_update_refs,
-                state_db.clone(),
-            )?;
+            let (new_state, _state_reads, hot_state_updates) = current_state
+                .ledger_state()
+                .update_with_db_reader(&state, hot_state, &state_update_refs, state_db.clone())?;
             let state_summary = out_persisted_state.get_state_summary();
             let new_state_summary = current_state.ledger_state_summary().update(
                 &ProvableStateSummary::new(state_summary, state_db.as_ref()),
+                &hot_state_updates,
                 &state_update_refs,
             )?;
             let updated =
@@ -652,8 +671,11 @@ impl StateStore {
         let current_state = out_current_state.lock().clone();
         info!(
             latest_in_memory_version = current_state.version(),
+            latest_in_memory_hot_root_hash = current_state.summary().hot_root_hash(),
             latest_in_memory_root_hash = current_state.summary().root_hash(),
             latest_snapshot_version = current_state.last_checkpoint().version(),
+            latest_snapshot_hot_root_hash =
+                current_state.last_checkpoint().summary().hot_root_hash(),
             latest_snapshot_root_hash = current_state.last_checkpoint().summary().root_hash(),
             "StateStore initialization finished.",
         );
@@ -669,6 +691,7 @@ impl StateStore {
             true,
             self.current_state.clone(),
             self.persisted_state.clone(),
+            HotStateConfig::default(),
         )
         .expect("buffered state creation failed.");
     }
@@ -717,10 +740,10 @@ impl StateStore {
         state_update_refs: &StateUpdateRefs,
         ledger_batch: &mut SchemaBatch,
         sharded_state_kv_batches: &mut ShardedStateKvSchemaBatch,
-    ) -> Result<LedgerState> {
+    ) -> Result<(LedgerState, HotStateUpdates)> {
         let current = self.current_state_locked().ledger_state();
         let (hot_state, persisted) = self.get_persisted_state()?;
-        let (new_state, reads) = current.update_with_db_reader(
+        let (new_state, reads, hot_state_updates) = current.update_with_db_reader(
             &persisted,
             hot_state,
             state_update_refs,
@@ -735,7 +758,7 @@ impl StateStore {
             sharded_state_kv_batches,
         )?;
 
-        Ok(new_state)
+        Ok((new_state, hot_state_updates))
     }
 
     pub fn put_state_updates(
@@ -1167,8 +1190,14 @@ impl StateStore {
             ledger_state.last_checkpoint().version(),
             hot_smt.clone(),
             smt.clone(),
+            HotStateConfig::default(),
         );
-        let summary = StateSummary::new_at_version(ledger_state.version(), hot_smt, smt);
+        let summary = StateSummary::new_at_version(
+            ledger_state.version(),
+            hot_smt,
+            smt,
+            HotStateConfig::default(),
+        );
 
         let last_checkpoint = StateWithSummary::new(
             ledger_state.last_checkpoint().clone(),
@@ -1384,7 +1413,7 @@ mod test_only {
             let mut ledger_batch = SchemaBatch::new();
             let mut sharded_state_kv_batches = self.state_kv_db.new_sharded_native_batches();
 
-            let new_ledger_state = self
+            let (new_ledger_state, hot_state_updates) = self
                 .calculate_state_and_put_updates(
                     &state_update_refs,
                     &mut ledger_batch,
@@ -1406,6 +1435,7 @@ mod test_only {
             let new_state_summary = current
                 .update(
                     &ProvableStateSummary::new(persisted, self.state_db.as_ref()),
+                    &hot_state_updates,
                     &state_update_refs,
                 )
                 .unwrap();
