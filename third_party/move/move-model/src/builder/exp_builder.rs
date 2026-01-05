@@ -2012,12 +2012,25 @@ impl ExpTranslator<'_, '_, '_> {
                 self.check_type(&loc, &ty, expected_type, context);
                 exp
             },
-            EA::Exp_::Abort(code) => {
+            EA::Exp_::Abort(code, message) => {
                 let code = self.translate_exp(code, &Type::new_prim(PrimitiveType::U64));
+                let (operation, args) = match message {
+                    None => (Operation::Abort, vec![code.into_exp()]),
+                    Some(message) => {
+                        let message = self.translate_exp(
+                            message,
+                            &Type::Vector(Box::new(Type::new_prim(PrimitiveType::U8))),
+                        );
+                        (Operation::AbortMsg, vec![
+                            code.into_exp(),
+                            message.into_exp(),
+                        ])
+                    },
+                };
                 ExpData::Call(
                     self.new_node_id_with_type_loc(expected_type, &loc),
-                    Operation::Abort,
-                    vec![code.into_exp()],
+                    operation,
+                    args,
                 )
             },
             EA::Exp_::Spec(spec_id, ..) => {

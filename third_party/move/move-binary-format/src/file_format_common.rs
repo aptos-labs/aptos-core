@@ -572,7 +572,7 @@ pub const VERSION_DEFAULT: u32 = VERSION_9;
 
 /// Mark which bytecode version is the default if compiling with language version 2.4 -
 /// In general, these are used to set up the default bytecode version for language versions higher than the default.
-pub const VERSION_DEFAULT_LANG_V2_4: u32 = VERSION_9;
+pub const VERSION_DEFAULT_LANG_V2_4: u32 = VERSION_10;
 
 pub(crate) mod versioned_data {
     use crate::{errors::*, file_format_common::*};

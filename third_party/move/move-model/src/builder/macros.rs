@@ -53,7 +53,7 @@ impl ExpTranslator<'_, '_, '_> {
         EA::Exp_::IfElse(
             Box::new(cond),
             Box::new(sp(loc, EA::Exp_::Unit { trailing: false })),
-            Box::new(sp(loc, EA::Exp_::Abort(Box::new(abort_code)))),
+            Box::new(sp(loc, EA::Exp_::Abort(Box::new(abort_code), None))),
         )
     }
 }

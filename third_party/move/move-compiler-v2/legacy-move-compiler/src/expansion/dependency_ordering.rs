@@ -548,12 +548,16 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
             exp(context, e);
         },
 
-        E::Loop(_, e)
-        | E::Return(e)
-        | E::Abort(e)
-        | E::Dereference(e)
-        | E::UnaryExp(_, e)
-        | E::Borrow(_, e) => exp(context, e),
+        E::Loop(_, e) | E::Return(e) | E::Dereference(e) | E::UnaryExp(_, e) | E::Borrow(_, e) => {
+            exp(context, e)
+        },
+
+        E::Abort(ec, em) => {
+            exp(context, ec);
+            if let Some(em) = em {
+                exp(context, em)
+            }
+        },
 
         E::ExpList(es) => es.iter().for_each(|e| exp(context, e)),
 
