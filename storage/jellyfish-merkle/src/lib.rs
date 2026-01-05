@@ -475,6 +475,7 @@ where
                         }
                     }
                 },
+                Node::Null => (),
                 _ => {
                     unreachable!("Assume the db doesn't have exactly 1 state.")
                 },
