@@ -68,7 +68,7 @@ target "debian-base" {
   dockerfile = "docker/builder/debian-base.Dockerfile"
   contexts = {
     # Run `docker buildx imagetools inspect debian:bullseye` to find the latest multi-platform hash
-    debian = "docker-image://debian:bullseye@sha256:1b1fd1445c1d0ed68123cf76c2d7c7cb47dfdab3df56f7ff9303063110d43291"
+    debian = "docker-image://debian:bullseye@sha256:3bbe51d205c8c0ea0473bb33fa6c18c836ca49ac3032c0bf71413cda8515354f"
   }
 }
 
