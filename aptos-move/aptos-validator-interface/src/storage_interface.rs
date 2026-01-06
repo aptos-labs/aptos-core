@@ -4,7 +4,7 @@
 use crate::{AptosValidatorInterface, FilterCondition};
 use anyhow::{ensure, Result};
 use aptos_config::config::{
-    RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
+    HotStateConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_db::AptosDB;
@@ -32,7 +32,7 @@ impl DBDebuggerInterface {
                 BUFFERED_STATE_TARGET_ITEMS,
                 DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
                 None,
-                /* reset_hot_state = */ true,
+                HotStateConfig::default(),
             )
             .map_err(anyhow::Error::from)?,
         )))
