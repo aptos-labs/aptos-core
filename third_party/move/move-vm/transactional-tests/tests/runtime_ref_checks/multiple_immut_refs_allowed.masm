@@ -1,0 +1,46 @@
+//# publish
+module 0xc0ffee::multi_immut_test
+
+struct Data has drop
+    field1: u64
+    field2: u64
+
+public fun callee(x: &u64, y: &u64, z: &u64)
+    ret
+
+// Test: Multiple immutable references to same location should be allowed
+public fun test_multiple_immut_refs_ok(): u64
+    local data: Data
+    local ref1: &u64
+    local ref2: &u64
+    local ref3: &u64
+
+    // Create data
+    ld_u64 10
+    ld_u64 20
+    pack Data
+    st_loc data
+
+    // Create three immutable references to same field
+    borrow_loc data
+    borrow_field Data, field1
+    st_loc ref1
+
+    borrow_loc data
+    borrow_field Data, field1
+    st_loc ref2
+
+    borrow_loc data
+    borrow_field Data, field1
+    st_loc ref3
+
+    // Call function with all three refs (should succeed - shared locks OK)
+    move_loc ref1
+    move_loc ref2
+    move_loc ref3
+    call callee
+
+    ld_u64 42
+    ret
+
+//# run 0xc0ffee::multi_immut_test::test_multiple_immut_refs_ok --verbose

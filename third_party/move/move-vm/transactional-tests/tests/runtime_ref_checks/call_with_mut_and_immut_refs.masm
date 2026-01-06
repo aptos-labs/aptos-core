@@ -1,0 +1,39 @@
+//# publish
+module 0xc0ffee::lock_mix_test
+
+struct Data has drop
+    value: u64
+
+public fun callee(x: &mut u64, y: &u64)
+    ret
+
+// Test: Cannot call function with mut ref and immut ref to overlapping locations
+public fun test_call_mut_and_immut_refs(): u64
+    local data: Data
+    local mut_ref: &mut u64
+    local immut_ref: &u64
+
+    // Create data
+    ld_u64 42
+    pack Data
+    st_loc data
+
+    // Get mutable reference to field
+    mut_borrow_loc data
+    mut_borrow_field Data, value
+    st_loc mut_ref
+
+    // Get immutable reference to same field
+    borrow_loc data
+    borrow_field Data, value
+    st_loc immut_ref
+
+    // Try to call with both references (should fail - exclusive lock conflict)
+    move_loc mut_ref
+    move_loc immut_ref
+    call callee
+
+    ld_u64 0
+    ret
+
+//# run 0xc0ffee::lock_mix_test::test_call_mut_and_immut_refs --verbose

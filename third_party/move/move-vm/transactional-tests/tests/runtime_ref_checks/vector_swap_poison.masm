@@ -1,0 +1,49 @@
+//# publish
+module 0xc0ffee::vec_swap_test
+
+// Test: VecSwap poisons existing references to vector elements
+public fun test_vec_swap_poisons_elem_refs(): u64
+    local vec: vector<u64>
+    local elem_ref1: &u64
+    local elem_ref2: &u64
+    local vec_ref: &mut vector<u64>
+
+    // Create a vector with 3 elements
+    ld_u64 100
+    ld_u64 200
+    ld_u64 300
+    vec_pack<u64> 3
+    st_loc vec
+
+    // Borrow immutable references to first two elements
+    mut_borrow_loc vec
+    ld_u64 0
+    vec_borrow<u64>
+    st_loc elem_ref1
+
+    mut_borrow_loc vec
+    ld_u64 1
+    vec_borrow<u64>
+    st_loc elem_ref2
+
+    // Get mutable reference to vector
+    mut_borrow_loc vec
+    st_loc vec_ref
+
+    // Swap elements (should poison both elem_ref1 and elem_ref2)
+    move_loc vec_ref
+    ld_u64 0
+    ld_u64 1
+    vec_swap<u64>
+
+    // Try to read from first poisoned element reference (should fail)
+    move_loc elem_ref1
+    read_ref
+
+    // Clean up second reference
+    move_loc elem_ref2
+    pop
+
+    ret
+
+//# run 0xc0ffee::vec_swap_test::test_vec_swap_poisons_elem_refs --verbose

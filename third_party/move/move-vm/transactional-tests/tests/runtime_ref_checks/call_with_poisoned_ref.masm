@@ -1,0 +1,36 @@
+//# publish
+module 0xc0ffee::poisoned_arg_test
+
+public fun callee(x: &u64)
+    ret
+
+// Test: Cannot call function with poisoned reference argument
+public fun test_call_with_poisoned_ref(): u64
+    local x: u64
+    local ref1: &u64
+    local ref2: &mut u64
+
+    ld_u64 42
+    st_loc x
+
+    // Create immutable reference
+    borrow_loc x
+    st_loc ref1
+
+    // Create mutable reference
+    mut_borrow_loc x
+    st_loc ref2
+
+    // Write via mutable ref (poisons ref1)
+    ld_u64 999
+    move_loc ref2
+    write_ref
+
+    // Try to call with poisoned ref1 (should fail at poison check)
+    move_loc ref1
+    call callee
+
+    ld_u64 0
+    ret
+
+//# run 0xc0ffee::poisoned_arg_test::test_call_with_poisoned_ref --verbose

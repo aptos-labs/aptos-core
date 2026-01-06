@@ -1,0 +1,12 @@
+processed 2 tasks
+task 0 lines 1-59:  publish [module 0xc0ffee::closure_ref_safety_test]
+task 1 lines 61-61:  run 0xc0ffee::closure_ref_safety_test::test_closure_creation_with_ref_poison --verbose
+Error: Function execution failed with VMError: {
+    message: Poisoned reference accessed,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(3),
+    location: 0xc0ffee::closure_ref_safety_test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(2), 19)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

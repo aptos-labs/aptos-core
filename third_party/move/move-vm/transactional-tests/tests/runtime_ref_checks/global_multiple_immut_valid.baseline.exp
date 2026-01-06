@@ -1,0 +1,4 @@
+processed 2 tasks
+task 0 lines 1-55:  publish [module 0xc0ffee::global_multi_immut_test]
+task 1 lines 57-57:  run 0xc0ffee::global_multi_immut_test::test_multiple_immut_global_borrows --signers 0x1 --verbose
+return values: 30

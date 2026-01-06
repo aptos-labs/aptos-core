@@ -1,0 +1,28 @@
+//# publish
+module 0xc0ffee::move_to_test
+
+struct Resource has key+drop
+    value: u64
+
+// Test: MoveTo consumes signer reference correctly
+public fun test_move_to(s: &signer)
+    local signer_ref: &signer
+    local resource: Resource
+
+    // Get signer reference
+    move_loc s
+    st_loc signer_ref
+
+    // Create resource
+    ld_u64 42
+    pack Resource
+    st_loc resource
+
+    // MoveTo (should consume signer ref)
+    move_loc signer_ref
+    move_loc resource
+    move_to Resource
+
+    ret
+
+//# run 0xc0ffee::move_to_test::test_move_to --signers 0x1 --verbose

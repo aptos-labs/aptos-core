@@ -1,0 +1,38 @@
+//# publish
+module 0xc0ffee::lock_conflict_test
+
+struct Data has drop
+    value: u64
+
+public fun callee(x: &mut u64, y: &mut u64)
+    ret
+
+// Test: Cannot call function with two mutable references to same location (exclusive lock conflict)
+public fun test_call_overlapping_mut_refs(): u64
+    local data: Data
+    local ref1: &mut u64
+    local ref2: &mut u64
+
+    // Create data
+    ld_u64 42
+    pack Data
+    st_loc data
+
+    // Get two mutable references to the same field
+    mut_borrow_loc data
+    mut_borrow_field Data, value
+    st_loc ref1
+
+    mut_borrow_loc data
+    mut_borrow_field Data, value
+    st_loc ref2
+
+    // Try to call with both references (should fail - exclusive lock conflict)
+    move_loc ref1
+    move_loc ref2
+    call callee
+
+    ld_u64 0
+    ret
+
+//# run 0xc0ffee::lock_conflict_test::test_call_overlapping_mut_refs --verbose

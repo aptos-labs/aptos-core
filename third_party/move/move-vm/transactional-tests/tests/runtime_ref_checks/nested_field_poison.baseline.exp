@@ -1,0 +1,19 @@
+processed 2 tasks
+task 0 lines 1-44:  publish [module 0xc0ffee::nested_field_test]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000c0ffee::nested_field_test'. Got VMError: {
+    major_status: WRITEREF_EXISTS_BORROW_ERROR,
+    sub_status: None,
+    location: 0xc0ffee::nested_field_test,
+    indices: [(FunctionDefinition, 0)],
+    offsets: [(FunctionDefinitionIndex(0), 15)],
+}
+task 1 lines 46-46:  run 0xc0ffee::nested_field_test::test_nested_field_poison --verbose
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000c0ffee::nested_field_test doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}

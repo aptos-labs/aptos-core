@@ -1,0 +1,12 @@
+processed 2 tasks
+task 0 lines 1-70:  publish [module 0xc0ffee::interleaved_ops]
+task 1 lines 72-72:  run 0xc0ffee::interleaved_ops::test_interleaved_operations --verbose
+Error: Function execution failed with VMError: {
+    message: Poisoned reference accessed,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(3),
+    location: 0xc0ffee::interleaved_ops,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 30)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

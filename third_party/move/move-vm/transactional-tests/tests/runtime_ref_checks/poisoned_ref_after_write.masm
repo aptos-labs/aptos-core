@@ -1,0 +1,41 @@
+//# publish
+module 0xc0ffee::poison_test
+
+struct Container has drop
+    field1: u64
+    field2: u64
+
+// Test: Create an immutable reference to a field, then write via mutable reference
+// The immutable reference should be poisoned and reading it should fail
+public fun test_poison_via_write(): u64
+    local container: Container
+    local mut_ref: &mut u64
+    local immut_ref: &u64
+
+    // Create a container
+    ld_u64 10
+    ld_u64 20
+    pack Container
+    st_loc container
+
+    // Create immutable reference to field1
+    borrow_loc container
+    borrow_field Container, field1
+    st_loc immut_ref
+
+    // Create mutable reference to field1
+    mut_borrow_loc container
+    mut_borrow_field Container, field1
+    st_loc mut_ref
+
+    // Write via mutable reference (this should poison immut_ref)
+    ld_u64 999
+    move_loc mut_ref
+    write_ref
+
+    // Try to read from poisoned immutable reference (should fail)
+    move_loc immut_ref
+    read_ref
+    ret
+
+//# run 0xc0ffee::poison_test::test_poison_via_write --verbose

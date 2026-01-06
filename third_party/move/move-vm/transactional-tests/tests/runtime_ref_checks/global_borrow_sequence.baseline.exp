@@ -1,0 +1,4 @@
+processed 2 tasks
+task 0 lines 1-45:  publish [module 0xc0ffee::global_seq_test]
+task 1 lines 47-47:  run 0xc0ffee::global_seq_test::test_global_borrow_sequence --signers 0x1 --verbose
+return values: 200
