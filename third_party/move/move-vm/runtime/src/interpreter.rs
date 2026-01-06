@@ -1767,7 +1767,7 @@ const OPERAND_STACK_SIZE_LIMIT: usize = 1024;
 const CALL_STACK_SIZE_LIMIT: usize = 1024;
 pub(crate) const ACCESS_STACK_SIZE_LIMIT: usize = 256;
 
-const ABORT_MESSAGE_SIZE_LIMIT: usize = 4096;
+const ABORT_MESSAGE_SIZE_LIMIT: usize = 1024;
 
 /// The operand and runtime-type stacks.
 pub(crate) struct Stack {

@@ -13,7 +13,7 @@ public fun big_vec(): vector<u8>
 
 L0:
     copy_loc i
-    ld_u64 4097
+    ld_u64 1025
     lt
     br_false L1
 
