@@ -23,6 +23,7 @@ mod approved_execution_hashes;
 mod aptos_features;
 mod aptos_version;
 mod chain_id;
+mod chunky_dkg_config;
 mod commit_history;
 mod consensus_config;
 mod execution_config;
@@ -41,6 +42,7 @@ pub use self::{
     aptos_version::{
         AptosVersion, APTOS_MAX_KNOWN_VERSION, APTOS_VERSION_2, APTOS_VERSION_3, APTOS_VERSION_4,
     },
+    chunky_dkg_config::{ChunkyDKGConfigMoveStruct, OnChainChunkyDKGConfig},
     commit_history::CommitHistoryResource,
     consensus_config::{
         AnchorElectionMode, ConsensusAlgorithmConfig, ConsensusConfigV1, DagConsensusConfigV1,

@@ -10,7 +10,7 @@ use crate::pvss::{
 };
 use aptos_crypto::{
     arkworks::shamir::Reconstructable,
-    traits::{self, SecretSharingConfig as _, ThresholdConfig as _},
+    traits::{self, TSecretSharingConfig as _, ThresholdConfig as _},
     weighted_config::{WeightedConfig, WeightedConfigArkworks},
     SigningKey, Uniform,
 };

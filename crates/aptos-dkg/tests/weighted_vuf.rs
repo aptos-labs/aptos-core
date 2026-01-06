@@ -4,7 +4,7 @@
 #![allow(clippy::ptr_arg)]
 #![allow(clippy::needless_borrow)]
 
-use aptos_crypto::{blstrs::random_scalar, traits::SecretSharingConfig as _};
+use aptos_crypto::{blstrs::random_scalar, traits::TSecretSharingConfig as _};
 use aptos_dkg::{
     pvss::{
         self,
