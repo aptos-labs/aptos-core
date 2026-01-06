@@ -17,7 +17,9 @@ use crate::{
     Scalar,
 };
 use aptos_crypto::{
-    arkworks::random::unsafe_random_points, weighted_config::WeightedConfigArkworks,
+    arkworks::random::{unsafe_random_points, unsafe_random_points_group},
+    weighted_config::WeightedConfigArkworks,
+    SecretSharingConfig,
 };
 use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup};
 
@@ -33,8 +35,6 @@ pub type Homomorphism<'a, E> = PairingTupleHomomorphism<
     LiftedCommitHomomorphism<<E as Pairing>::G2>,
 >;
 pub type Proof<'a, E> = sigma_protocol::Proof<<E as Pairing>::ScalarField, Homomorphism<'a, E>>;
-
-use aptos_crypto::{arkworks::random::unsafe_random_points_group, SecretSharingConfig};
 
 impl<'a, E: Pairing> Proof<'a, E> {
     /// Generates a random looking proof (but not a valid one).

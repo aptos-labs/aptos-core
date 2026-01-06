@@ -24,7 +24,7 @@ use rand_core::{CryptoRng, RngCore};
 use serde::Serialize;
 use std::{fmt::Debug, io::Write};
 
-// `CurveGroup` is needed because the code does `into_affine()`
+// `CurveGroup` is needed here because the code does `into_affine()`
 pub trait Trait<C: CurveGroup>:
     fixed_base_msms::Trait<
         Domain: Witness<C::ScalarField>,
@@ -148,6 +148,7 @@ pub trait Trait<C: CurveGroup>:
         let mut final_scalars = Vec::new();
 
         // Collect all projective points to batch normalize
+        // TODO: remove this stuff... we may assume things are deserialised and hence essentially affine, so into_affine() should do
         let mut all_points_to_normalize = Vec::new();
         for (A, P) in prover_first_message.clone().into_iter()
             .zip(statement.clone().into_iter())

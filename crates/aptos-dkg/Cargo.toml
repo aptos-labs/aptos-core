@@ -14,6 +14,7 @@ ark-bn254 = { workspace = true }
 ark-ec = { workspace = true }
 ark-ff = { workspace = true }
 ark-poly = { workspace = true }
+ark-poly-commit = "0.5.0"
 ark-serialize = { workspace = true }
 ark-std = { workspace = true }
 bcs = { workspace = true }
@@ -24,6 +25,8 @@ derive_more = { workspace = true }
 ff = { workspace = true }
 group = { workspace = true }
 hex = { workspace = true }
+itertools.workspace = true
+#jolt-core = { git = "https://github.com/a16z/jolt.git", package = "jolt-core" }
 merlin = { workspace = true }
 more-asserts = { workspace = true }
 num-bigint = { workspace = true }
@@ -31,12 +34,14 @@ num-integer = { workspace = true }
 num-traits = { workspace = true }
 pairing = { workspace = true }
 rand = { workspace = true }
+rand_chacha = "0.9.0"
 rand_core = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
 sha3 = { workspace = true }
 static_assertions = { workspace = true }
+thiserror.workspace = true
 
 [dev-dependencies]
 num_cpus = { workspace = true }
@@ -60,6 +65,10 @@ harness = false
 
 [[bench]]
 name = "ldt"
+harness = false
+
+[[bench]]
+name = "pcs"
 harness = false
 
 [[bench]]

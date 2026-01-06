@@ -3,7 +3,7 @@
 
 use crate::{
     dlog::bsgs,
-    pcs::univariate_hiding_kzg,
+    pcs::{univariate_hiding_kzg, univariate_hiding_kzg::MsmBasis},
     pvss::{
         chunky::{
             chunked_elgamal::{self, num_chunks_per_scalar},
@@ -162,8 +162,14 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         {
             // Verify the PoK
             let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
+            let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
+                MsmBasis::Lagrange { lagr_g1 } => lagr_g1,
+                MsmBasis::PowersOfTau { .. } => {
+                    bail!("Expected a Lagrange basis, received powers of tau basis instead")
+                },
+            };
             let hom = hkzg_chunked_elgamal::WeightedHomomorphism::<E>::new(
-                &pp.pk_range_proof.ck_S.lagr_g1,
+                lagr_g1,
                 pp.pk_range_proof.ck_S.xi_1,
                 &pp.pp_elgamal,
                 &eks_inner,
@@ -685,8 +691,14 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         // (2) Compute its image under the corresponding homomorphism, and produce an SoK
         //   (2a) Set up the tuple homomorphism
         let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect(); // TODO: this is a bit ugly
+        let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
+            MsmBasis::Lagrange { lagr_g1 } => lagr_g1,
+            MsmBasis::PowersOfTau { .. } => {
+                panic!("Expected a Lagrange basis, received powers of tau basis instead")
+            },
+        };
         let hom = hkzg_chunked_elgamal::WeightedHomomorphism::<E>::new(
-            &pp.pk_range_proof.ck_S.lagr_g1,
+            lagr_g1,
             pp.pk_range_proof.ck_S.xi_1,
             &pp.pp_elgamal,
             &eks_inner,

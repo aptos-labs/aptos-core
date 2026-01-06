@@ -298,7 +298,10 @@ impl<'a, E: Pairing> WeightedHomomorphism<'a, E> {
     ) -> Self {
         // Set up the HKZG homomorphism, and use a projection map to lift it to HkzgElgamalWitness
         let lifted_hkzg = LiftedHkzgWeighted::<E> {
-            hom: univariate_hiding_kzg::CommitmentHomomorphism { lagr_g1, xi_1 },
+            hom: univariate_hiding_kzg::CommitmentHomomorphism {
+                msm_basis: lagr_g1,
+                xi_1,
+            },
             // The projection map ignores the `elgamal_randomness` component, and flattens the vector of chunked plaintexts after adding a zero
             projection: |dom: &HkzgWeightedElgamalWitness<E::ScalarField>| {
                 let HkzgWeightedElgamalWitness {

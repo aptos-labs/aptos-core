@@ -3,7 +3,7 @@
 
 use crate::{
     dlog::bsgs,
-    pcs::univariate_hiding_kzg,
+    pcs::{univariate_hiding_kzg, univariate_hiding_kzg::MsmBasis},
     pvss::{
         chunky::{
             chunked_elgamal::{self, num_chunks_per_scalar},
@@ -35,7 +35,7 @@ use aptos_crypto::{
             UniformRand,
         },
         scrape::LowDegreeTest,
-        serialization::{ark_de, ark_se},
+        serialization::{ark_de, ark_se, BatchSerializable},
     },
     bls12381::{self},
     weighted_config::WeightedConfigArkworks,
@@ -68,84 +68,64 @@ pub struct Transcript<E: Pairing> {
 }
 
 #[allow(non_snake_case)]
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Subtranscript<E: Pairing> {
     // The dealt public key
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
+    #[serde(deserialize_with = "ark_de")]
     pub V0: E::G2,
     // The dealt public key shares
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
+    #[serde(deserialize_with = "ark_de")]
     pub Vs: Vec<Vec<E::G2>>,
     /// First chunked ElGamal component: C[i][j] = s_{i,j} * G + r_j * ek_i. Here s_i = \sum_j s_{i,j} * B^j // TODO: change notation because B is not a group element?
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
+    #[serde(deserialize_with = "ark_de")]
     pub Cs: Vec<Vec<Vec<E::G1>>>, // TODO: maybe make this and the other fields affine? The verifier will have to do it anyway... and we are trying to speed that up
     /// Second chunked ElGamal component: R[j] = r_j * H
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
+    #[serde(deserialize_with = "ark_de")]
     pub Rs: Vec<Vec<E::G1>>,
 }
 
 #[allow(non_snake_case)]
-impl<E: Pairing> CanonicalSerialize for Subtranscript<E> {
-    fn serialize_with_mode<W: Write>(
+impl<E: Pairing> BatchSerializable<E> for Subtranscript<E> {
+    fn collect_points(&self, g1: &mut Vec<E::G1>, g2: &mut Vec<E::G2>) {
+        g2.push(self.V0);
+
+        for player_Vs in &self.Vs {
+            g2.extend(player_Vs.iter().copied());
+        }
+
+        for player_Cs in &self.Cs {
+            for chunks in player_Cs {
+                g1.extend(chunks.iter().copied());
+            }
+        }
+
+        for weight_Rs in &self.Rs {
+            g1.extend(weight_Rs.iter().copied());
+        }
+    }
+
+    fn serialize_from_affine<W: Write>(
         &self,
-        mut writer: W,
+        mut writer: &mut W,
         compress: Compress,
+        g1_iter: &mut impl Iterator<Item = E::G1Affine>,
+        g2_iter: &mut impl Iterator<Item = E::G2Affine>,
     ) -> Result<(), SerializationError> {
         //
-        // 1. Collect all G2 and G1 elements for batch normalization
+        // 1. Reconstruct nested affine structures
         //
-        let mut g2_elems = Vec::with_capacity(1 + self.Vs.iter().map(|r| r.len()).sum::<usize>());
-        let mut g1_elems = Vec::new();
-
-        // V0
-        g2_elems.push(self.V0);
-
-        // Vs
-        for row in &self.Vs {
-            for v in row {
-                g2_elems.push(*v);
-            }
-        }
-
-        // Cs
-        for mat in &self.Cs {
-            for row in mat {
-                for c in row {
-                    g1_elems.push(*c);
-                }
-            }
-        }
-
-        // Rs
-        for row in &self.Rs {
-            for r in row {
-                g1_elems.push(*r);
-            }
-        }
-
-        //
-        // 2. Batch normalize
-        //
-        let g2_affine = E::G2::normalize_batch(&g2_elems);
-        let g1_affine = E::G1::normalize_batch(&g1_elems);
-
-        //
-        // 3. Reconstruct nested structures in affine form
-        //
-        let mut g2_iter = g2_affine.into_iter();
-        let mut g1_iter = g1_affine.into_iter();
 
         // V0
         let V0_affine = g2_iter.next().unwrap();
 
-        // Vs_affine
+        // Vs
         let Vs_affine: Vec<Vec<E::G2Affine>> = self
             .Vs
             .iter()
             .map(|row| row.iter().map(|_| g2_iter.next().unwrap()).collect())
             .collect();
 
-        // Cs_affine
+        // Cs
         let Cs_affine: Vec<Vec<Vec<E::G1Affine>>> = self
             .Cs
             .iter()
@@ -156,7 +136,7 @@ impl<E: Pairing> CanonicalSerialize for Subtranscript<E> {
             })
             .collect();
 
-        // Rs_affine
+        // Rs
         let Rs_affine: Vec<Vec<E::G1Affine>> = self
             .Rs
             .iter()
@@ -164,12 +144,44 @@ impl<E: Pairing> CanonicalSerialize for Subtranscript<E> {
             .collect();
 
         //
-        // 4. Serialize in canonical order using nested structure
+        // 2. Serialize using canonical implementations
         //
         V0_affine.serialize_with_mode(&mut writer, compress)?;
         Vs_affine.serialize_with_mode(&mut writer, compress)?;
         Cs_affine.serialize_with_mode(&mut writer, compress)?;
         Rs_affine.serialize_with_mode(&mut writer, compress)?;
+
+        Ok(())
+    }
+}
+
+impl<E: Pairing> CanonicalSerialize for Subtranscript<E> {
+    fn serialize_with_mode<W: Write>(
+        &self,
+        mut writer: W,
+        compress: Compress,
+    ) -> Result<(), SerializationError> {
+        let mut g1 = Vec::new();
+        let mut g2 = Vec::new();
+
+        self.collect_points(&mut g1, &mut g2);
+
+        let g1_affine = E::G1::normalize_batch(&g1);
+        let g2_affine = E::G2::normalize_batch(&g2);
+
+        let mut g1_iter = g1_affine.into_iter();
+        let mut g2_iter = g2_affine.into_iter();
+
+        <Self as BatchSerializable<E>>::serialize_from_affine(
+            self,
+            &mut writer,
+            compress,
+            &mut g1_iter,
+            &mut g2_iter,
+        )?;
+
+        debug_assert!(g1_iter.next().is_none());
+        debug_assert!(g2_iter.next().is_none());
 
         Ok(())
     }
@@ -209,6 +221,145 @@ impl<E: Pairing> CanonicalSerialize for Subtranscript<E> {
         size
     }
 }
+
+impl<E: Pairing> Serialize for Subtranscript<E> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut bytes = Vec::with_capacity(self.serialized_size(Compress::Yes));
+        self.serialize_with_mode(&mut bytes, Compress::Yes)
+            .map_err(serde::ser::Error::custom)?;
+
+        serializer.serialize_bytes(&bytes)
+    }
+}
+
+// #[allow(non_snake_case)]
+// impl<E: Pairing> CanonicalSerialize for Subtranscript<E> {
+//     fn serialize_with_mode<W: Write>(
+//         &self,
+//         mut writer: W,
+//         compress: Compress,
+//     ) -> Result<(), SerializationError> {
+//         //
+//         // 1. Collect all G2 and G1 elements for batch normalization
+//         //
+//         let mut g2_elems = Vec::with_capacity(1 + self.Vs.iter().map(|r| r.len()).sum::<usize>());
+//         let mut g1_elems = Vec::new();
+
+//         // V0
+//         g2_elems.push(self.V0);
+
+//         // Vs
+//         for row in &self.Vs {
+//             for v in row {
+//                 g2_elems.push(*v);
+//             }
+//         }
+
+//         // Cs
+//         for mat in &self.Cs {
+//             for row in mat {
+//                 for c in row {
+//                     g1_elems.push(*c);
+//                 }
+//             }
+//         }
+
+//         // Rs
+//         for row in &self.Rs {
+//             for r in row {
+//                 g1_elems.push(*r);
+//             }
+//         }
+
+//         //
+//         // 2. Batch normalize
+//         //
+//         let g2_affine = E::G2::normalize_batch(&g2_elems);
+//         let g1_affine = E::G1::normalize_batch(&g1_elems);
+
+//         //
+//         // 3. Reconstruct nested structures in affine form
+//         //
+//         let mut g2_iter = g2_affine.into_iter();
+//         let mut g1_iter = g1_affine.into_iter();
+
+//         // V0
+//         let V0_affine = g2_iter.next().unwrap();
+
+//         // Vs_affine
+//         let Vs_affine: Vec<Vec<E::G2Affine>> = self
+//             .Vs
+//             .iter()
+//             .map(|row| row.iter().map(|_| g2_iter.next().unwrap()).collect())
+//             .collect();
+
+//         // Cs_affine
+//         let Cs_affine: Vec<Vec<Vec<E::G1Affine>>> = self
+//             .Cs
+//             .iter()
+//             .map(|mat| {
+//                 mat.iter()
+//                     .map(|row| row.iter().map(|_| g1_iter.next().unwrap()).collect())
+//                     .collect()
+//             })
+//             .collect();
+
+//         // Rs_affine
+//         let Rs_affine: Vec<Vec<E::G1Affine>> = self
+//             .Rs
+//             .iter()
+//             .map(|row| row.iter().map(|_| g1_iter.next().unwrap()).collect())
+//             .collect();
+
+//         //
+//         // 4. Serialize in canonical order using nested structure
+//         //
+//         V0_affine.serialize_with_mode(&mut writer, compress)?;
+//         Vs_affine.serialize_with_mode(&mut writer, compress)?;
+//         Cs_affine.serialize_with_mode(&mut writer, compress)?;
+//         Rs_affine.serialize_with_mode(&mut writer, compress)?;
+
+//         Ok(())
+//     }
+
+//     fn serialized_size(&self, compress: Compress) -> usize {
+//         // 1. V0
+//         let mut size = <E::G2 as CurveGroup>::Affine::zero().serialized_size(compress);
+
+//         // 2. Vs (Vec<Vec<E::G2Affine>>)
+//         // Outer length
+//         size += 4;
+//         for row in &self.Vs {
+//             size += 4; // inner row length
+//             size += row.len() * <E::G2 as CurveGroup>::Affine::zero().serialized_size(compress);
+//             // this is the weight of player i
+//         }
+
+//         // 3. Cs (Vec<Vec<Vec<E::G1Affine>>>)
+//         size += 4; // outer length
+//         for mat in &self.Cs {
+//             size += 4; // inner matrix length
+//             for row in mat {
+//                 size += 4; // row length
+//                 size += row.len() * <E::G1 as CurveGroup>::Affine::zero().serialized_size(compress);
+//                 // this can be done simpler
+//             }
+//         }
+
+//         // 4. Rs (Vec<Vec<E::G1Affine>>)
+//         size += 4; // outer length
+//         for row in &self.Rs {
+//             size += 4; // row length
+//             size += row.len() * <E::G1 as CurveGroup>::Affine::zero().serialized_size(compress);
+//             // same, something like 4 + Rs.len() * (4 + Rs[0].len() * zero().serialized_size(compress))
+//         }
+
+//         size
+//     }
+// }
 
 // `CanonicalDeserialize` needs `Valid`
 impl<E: Pairing> Valid for Subtranscript<E> {
@@ -345,8 +496,14 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         {
             // Verify the PoK
             let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
+            let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
+                MsmBasis::Lagrange { lagr_g1 } => lagr_g1,
+                MsmBasis::PowersOfTau { .. } => {
+                    bail!("Expected a Lagrange basis, received powers of tau basis instead")
+                },
+            };
             let hom = hkzg_chunked_elgamal_commit::Homomorphism::<E>::new(
-                &pp.pk_range_proof.ck_S.lagr_g1,
+                lagr_g1,
                 pp.pk_range_proof.ck_S.xi_1,
                 &pp.pp_elgamal,
                 &eks_inner,
@@ -829,8 +986,14 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         // (2) Compute its image under the corresponding homomorphism, and produce an SoK
         //   (2a) Set up the tuple homomorphism
         let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect(); // TODO: this is a bit ugly
+        let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
+            MsmBasis::Lagrange { lagr_g1 } => lagr_g1,
+            MsmBasis::PowersOfTau { .. } => {
+                panic!("Expected a Lagrange basis, received powers of tau basis instead")
+            },
+        };
         let hom = hkzg_chunked_elgamal_commit::Homomorphism::<E>::new(
-            &pp.pk_range_proof.ck_S.lagr_g1,
+            lagr_g1,
             pp.pk_range_proof.ck_S.xi_1,
             &pp.pp_elgamal,
             &eks_inner,

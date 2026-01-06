@@ -327,7 +327,8 @@ fn pvss_nonaggregate_verify<T: HasAggregatableSubtranscript, M: Measurement>(
                     &mut rng,
                 );
                 T::try_from(trs.to_bytes().as_slice())
-        .expect("serialized transcript should deserialize correctly") // we have to serialize and deserialize because otherwise verify gets a transcript with "non-normalised" projective group elements
+                    .expect("serialized transcript should deserialize correctly")
+                // we have to serialize and deserialize because otherwise verify gets a transcript with "non-normalised" projective group elements
             },
             |trx| {
                 trx.verify(&sc, &pp, &[spks[0].clone()], &eks, &NoAux)
