@@ -10,6 +10,7 @@ use anyhow::{anyhow, Context};
 use aptos_sdk_builder::rust;
 use aptos_types::transaction::EntryABI;
 use clap::Parser;
+use rayon::prelude::*;
 use std::path::{Path, PathBuf};
 
 pub const RELEASE_BUNDLE_EXTENSION: &str = "mrb";
@@ -51,51 +52,56 @@ impl ReleaseOptions {
             package_use_latest_language,
             output,
         } = self;
-        let mut released_packages = vec![];
-        let mut source_paths = vec![];
-        for ((package_path, rust_binding_path), use_latest_language) in packages
-            .into_iter()
-            .zip(rust_bindings.into_iter())
-            .zip(package_use_latest_language.into_iter())
-        {
-            let cur_build_options = if use_latest_language {
-                build_options.clone().set_latest_language()
-            } else {
-                build_options.clone()
-            };
-            let built = BuiltPackage::build(package_path.clone(), cur_build_options).with_context(
-                || {
-                    format!(
-                        "Failed to build package at path: {}",
-                        package_path.display()
-                    )
+        let mut results = packages
+            .into_par_iter()
+            .zip(rust_bindings.into_par_iter())
+            .zip(package_use_latest_language.into_par_iter())
+            .enumerate()
+            .map(
+                |(idx, ((package_path, rust_binding_path), use_latest_language))| {
+                    let cur_build_options = if use_latest_language {
+                        build_options.clone().set_latest_language()
+                    } else {
+                        build_options.clone()
+                    };
+                    let built = BuiltPackage::build(package_path.clone(), cur_build_options)
+                        .with_context(|| {
+                            format!(
+                                "Failed to build package at path: {}",
+                                package_path.display()
+                            )
+                        })?;
+                    if !rust_binding_path.is_empty() {
+                        let abis = built
+                            .extract_abis()
+                            .ok_or_else(|| anyhow!("ABIs not available, can't generate sdk"))?;
+                        let binding_path = rust_binding_path.clone();
+                        Self::generate_rust_bindings(&abis, &PathBuf::from(rust_binding_path))
+                            .with_context(|| {
+                                format!(
+                                    "Failed to generate Rust bindings for {} at binding path {}",
+                                    package_path.display(),
+                                    binding_path
+                                )
+                            })?;
+                    }
+                    let released = ReleasePackage::new(built)?;
+                    let size = bcs::to_bytes(&released)?.len();
+                    println!(
+                        "Including package `{}` size {}k",
+                        released.name(),
+                        size / 1000,
+                    );
+                    let relative_path = path_relative_to_crate(package_path.join("sources"));
+                    Ok((idx, released, relative_path.display().to_string()))
                 },
-            )?;
-            if !rust_binding_path.is_empty() {
-                let abis = built
-                    .extract_abis()
-                    .ok_or_else(|| anyhow!("ABIs not available, can't generate sdk"))?;
-                let binding_path = rust_binding_path.clone();
-                Self::generate_rust_bindings(&abis, &PathBuf::from(rust_binding_path))
-                    .with_context(|| {
-                        format!(
-                            "Failed to generate Rust bindings for {} at binding path {}",
-                            package_path.display(),
-                            binding_path
-                        )
-                    })?;
-            }
-            let released = ReleasePackage::new(built)?;
-            let size = bcs::to_bytes(&released)?.len();
-            println!(
-                "Including package `{}` size {}k",
-                released.name(),
-                size / 1000,
-            );
-            released_packages.push(released);
-            let relative_path = path_relative_to_crate(package_path.join("sources"));
-            source_paths.push(relative_path.display().to_string());
-        }
+            )
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        results.sort_by_key(|(idx, _, _)| *idx);
+        let (released_packages, source_paths) = results
+            .into_iter()
+            .map(|(_, released, path)| (released, path))
+            .unzip();
         let bundle = ReleaseBundle::new(released_packages, source_paths);
         let parent = output.parent().expect("Failed to get parent directory");
         std::fs::create_dir_all(parent).context("Failed to create dirs")?;
