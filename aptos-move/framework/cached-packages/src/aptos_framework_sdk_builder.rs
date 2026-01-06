@@ -708,6 +708,15 @@ pub enum EntryFunctionCall {
         unlock_duration: u64,
     },
 
+    PboDelegationPoolUpdateUnlockingScheduleUnchecked {
+        pool_address: AccountAddress,
+        unlock_numerators: Vec<u64>,
+        unlock_denominator: u64,
+        unlock_start_time: u64,
+        unlock_duration: u64,
+        last_unlock_period: u64,
+    },
+
     /// Withdraw `amount` of owned inactive stake from the delegation pool at `pool_address`.
     PboDelegationPoolWithdraw {
         pool_address: AccountAddress,
@@ -1735,6 +1744,21 @@ impl EntryFunctionCall {
                 unlock_denominator,
                 unlock_start_time,
                 unlock_duration,
+            ),
+            PboDelegationPoolUpdateUnlockingScheduleUnchecked {
+                pool_address,
+                unlock_numerators,
+                unlock_denominator,
+                unlock_start_time,
+                unlock_duration,
+                last_unlock_period,
+            } => pbo_delegation_pool_update_unlocking_schedule_unchecked(
+                pool_address,
+                unlock_numerators,
+                unlock_denominator,
+                unlock_start_time,
+                unlock_duration,
+                last_unlock_period,
             ),
             PboDelegationPoolWithdraw {
                 pool_address,
@@ -3920,6 +3944,35 @@ pub fn pbo_delegation_pool_update_unlocking_schedule(
             bcs::to_bytes(&unlock_denominator).unwrap(),
             bcs::to_bytes(&unlock_start_time).unwrap(),
             bcs::to_bytes(&unlock_duration).unwrap(),
+        ],
+    ))
+}
+
+pub fn pbo_delegation_pool_update_unlocking_schedule_unchecked(
+    pool_address: AccountAddress,
+    unlock_numerators: Vec<u64>,
+    unlock_denominator: u64,
+    unlock_start_time: u64,
+    unlock_duration: u64,
+    last_unlock_period: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("pbo_delegation_pool").to_owned(),
+        ),
+        ident_str!("update_unlocking_schedule_unchecked").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&pool_address).unwrap(),
+            bcs::to_bytes(&unlock_numerators).unwrap(),
+            bcs::to_bytes(&unlock_denominator).unwrap(),
+            bcs::to_bytes(&unlock_start_time).unwrap(),
+            bcs::to_bytes(&unlock_duration).unwrap(),
+            bcs::to_bytes(&last_unlock_period).unwrap(),
         ],
     ))
 }
@@ -6699,6 +6752,25 @@ mod decoder {
         }
     }
 
+    pub fn pbo_delegation_pool_update_unlocking_schedule_unchecked(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::PboDelegationPoolUpdateUnlockingScheduleUnchecked {
+                    pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    unlock_numerators: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    unlock_denominator: bcs::from_bytes(script.args().get(2)?).ok()?,
+                    unlock_start_time: bcs::from_bytes(script.args().get(3)?).ok()?,
+                    unlock_duration: bcs::from_bytes(script.args().get(4)?).ok()?,
+                    last_unlock_period: bcs::from_bytes(script.args().get(5)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn pbo_delegation_pool_withdraw(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::PboDelegationPoolWithdraw {
@@ -8030,6 +8102,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "pbo_delegation_pool_update_unlocking_schedule".to_string(),
             Box::new(decoder::pbo_delegation_pool_update_unlocking_schedule),
+        );
+        map.insert(
+            "pbo_delegation_pool_update_unlocking_schedule_unchecked".to_string(),
+            Box::new(decoder::pbo_delegation_pool_update_unlocking_schedule_unchecked),
         );
         map.insert(
             "pbo_delegation_pool_withdraw".to_string(),
