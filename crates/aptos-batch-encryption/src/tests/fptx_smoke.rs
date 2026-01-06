@@ -10,7 +10,7 @@ use crate::{
     traits::BatchThresholdEncryption,
 };
 use anyhow::Result;
-use aptos_crypto::{arkworks::shamir::ShamirThresholdConfig, SecretSharingConfig as _};
+use aptos_crypto::{arkworks::shamir::ShamirThresholdConfig, TSecretSharingConfig as _};
 use ark_ec::AffineRepr as _;
 use ark_std::rand::{seq::SliceRandom, thread_rng, CryptoRng, Rng as _, RngCore};
 

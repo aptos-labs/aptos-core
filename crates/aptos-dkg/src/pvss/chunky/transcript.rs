@@ -42,7 +42,7 @@ use aptos_crypto::{
         shamir::ShamirThresholdConfig,
     },
     bls12381::{self, PrivateKey},
-    utils, CryptoMaterialError, SecretSharingConfig as _, Signature, SigningKey, Uniform,
+    utils, CryptoMaterialError, TSecretSharingConfig as _, Signature, SigningKey, Uniform,
     ValidCryptoMaterial,
 };
 use ark_ec::{
@@ -570,7 +570,7 @@ type SokContext<'a, A: Serialize + Clone, E: Pairing> = (
 );
 
 // Not sure this alias is very useful
-type SecretSharingConfig<F> = ShamirThresholdConfig<F>;
+pub type SecretSharingConfig<F> = ShamirThresholdConfig<F>;
 
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Transcript
     for Transcript<E>

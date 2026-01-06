@@ -7,7 +7,7 @@
 
 //! PVSS scheme-independent testing
 #[cfg(test)]
-use aptos_crypto::SecretSharingConfig;
+use aptos_crypto::TSecretSharingConfig;
 use aptos_crypto::{
     blstrs::{random_scalar, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES},
     weighted_config::WeightedConfigArkworks,

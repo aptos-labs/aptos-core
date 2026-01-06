@@ -231,6 +231,7 @@ pub trait DKGTrait: Debug {
     fn get_dealers(transcript: &Self::Transcript) -> BTreeSet<u64>;
 }
 
+pub mod chunky_dkg;
 pub mod dummy_dkg;
 pub mod real_dkg;
 

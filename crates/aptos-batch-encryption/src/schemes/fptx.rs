@@ -19,7 +19,7 @@ use crate::{
     traits::{AssociatedData, BatchThresholdEncryption, Plaintext},
 };
 use anyhow::{anyhow, Result};
-use aptos_crypto::SecretSharingConfig as _;
+use aptos_crypto::TSecretSharingConfig as _;
 use aptos_dkg::pvss::{
     traits::{Reconstructable as _, Subtranscript},
     Player,

@@ -22,7 +22,7 @@ use crate::{
     },
 };
 use anyhow::{anyhow, Result};
-use aptos_crypto::{weighted_config::WeightedConfigArkworks, SecretSharingConfig as _};
+use aptos_crypto::{weighted_config::WeightedConfigArkworks, TSecretSharingConfig as _};
 use aptos_dkg::pvss::{
     traits::{Reconstructable as _, Subtranscript},
     Player,

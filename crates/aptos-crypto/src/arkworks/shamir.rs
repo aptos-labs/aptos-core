@@ -7,7 +7,7 @@ use crate::{
     arkworks::{differentiate::DifferentiableFn, vanishing_poly, weighted_sum::WeightedSum},
     player::Player,
     traits,
-    traits::SecretSharingConfig,
+    traits::TSecretSharingConfig,
 };
 use anyhow::{anyhow, Result};
 use ark_ec::CurveGroup;
@@ -27,7 +27,7 @@ pub type ShamirShare<F: WeightedSum> = (Player, F);
 pub type ShamirGroupShare<G: CurveGroup> = ShamirShare<G>;
 
 /// All dealt secret keys should be reconstructable from a subset of \[dealt secret key\] shares.
-pub trait Reconstructable<SSC: traits::SecretSharingConfig>: Sized {
+pub trait Reconstructable<SSC: traits::TSecretSharingConfig>: Sized {
     /// The "share" type. Minor nit: this is a slight misnomer; you can't actually reconstruct
     /// using just a vec of shares, you need a vec of pairs (Player, Self::Share). So the pair
     /// itself corresponds more closely to the definition of a share
@@ -52,7 +52,7 @@ pub struct ShamirThresholdConfig<F: FftField> {
     pub domain: Radix2EvaluationDomain<F>,
 }
 
-impl<F: FftField> traits::SecretSharingConfig for ShamirThresholdConfig<F> {
+impl<F: FftField> traits::TSecretSharingConfig for ShamirThresholdConfig<F> {
     /// For testing only.
     fn get_random_player<R>(&self, rng: &mut R) -> Player
     where

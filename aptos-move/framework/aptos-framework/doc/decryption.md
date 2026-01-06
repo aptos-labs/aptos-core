@@ -3,6 +3,9 @@
 
 # Module `0x1::decryption`
 
+This module provides a decryption key unique to every block. This resource
+is updated in every block prologue. The decryption key is the key used to
+decrypt the encrypted transactions in the block.
 
 
 -  [Resource `PerBlockDecryptionKey`](#0x1_decryption_PerBlockDecryptionKey)

@@ -13,7 +13,7 @@ mod public_parameters;
 mod transcript;
 mod weighted_transcript;
 
-pub use public_parameters::DEFAULT_ELL_FOR_TESTING;
+pub use public_parameters::{PublicParameters, DEFAULT_ELL_FOR_TESTING};
 pub use transcript::{
     SubTranscript as UnweightedSubtranscript, Transcript as UnsignedUnweightedTranscript,
 };

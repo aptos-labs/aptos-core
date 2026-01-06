@@ -4,7 +4,7 @@
 #![allow(clippy::ptr_arg)]
 #![allow(clippy::needless_borrow)]
 
-use aptos_crypto::traits::SecretSharingConfig as _;
+use aptos_crypto::traits::TSecretSharingConfig as _;
 use aptos_dkg::pvss::test_utils::get_weighted_configs_for_benchmarking;
 use rand::thread_rng;
 
