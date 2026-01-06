@@ -3,9 +3,7 @@
 
 use anyhow::bail;
 use legacy_move_compiler::shared::LanguageVersion as CompilerLanguageVersion;
-use move_binary_format::file_format_common::{
-    VERSION_DEFAULT, VERSION_DEFAULT_LANG_V2, VERSION_DEFAULT_LANG_V2_3,
-};
+use move_binary_format::file_format_common::{VERSION_DEFAULT, VERSION_DEFAULT_LANG_V2_4};
 use move_command_line_common::env;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -19,7 +17,7 @@ const UNSTABLE_MARKER: &str = "-unstable";
 pub const LATEST_LANGUAGE_VERSION_VALUE: LanguageVersion = LanguageVersion::V2_5;
 
 /// Only stable versions are allowed on production networks
-pub const LATEST_STABLE_LANGUAGE_VERSION_VALUE: LanguageVersion = LanguageVersion::V2_2;
+pub const LATEST_STABLE_LANGUAGE_VERSION_VALUE: LanguageVersion = LanguageVersion::V2_3;
 pub const LATEST_STABLE_LANGUAGE_VERSION: &str = LATEST_STABLE_LANGUAGE_VERSION_VALUE.to_str();
 
 pub const LATEST_STABLE_COMPILER_VERSION_VALUE: CompilerVersion = CompilerVersion::V2_0;
@@ -287,7 +285,6 @@ impl From<LanguageVersion> for CompilerLanguageVersion {
 impl LanguageVersion {
     /// Whether the language version is unstable. An unstable version
     /// should not be allowed on production networks.
-    /// 2.3 is marked as stable to allow signed integers on production; remove this comment after making it the default.
     pub const fn unstable(self) -> bool {
         use LanguageVersion::*;
         match self {
@@ -320,12 +317,11 @@ impl LanguageVersion {
     pub fn infer_bytecode_version(&self, version: Option<u32>) -> u32 {
         env::get_bytecode_version_from_env(version).unwrap_or(match self {
             LanguageVersion::V1 => VERSION_DEFAULT,
-            LanguageVersion::V2_0 | LanguageVersion::V2_1 | LanguageVersion::V2_2 => {
-                VERSION_DEFAULT_LANG_V2
-            },
-            LanguageVersion::V2_3 | LanguageVersion::V2_4 | LanguageVersion::V2_5 => {
-                VERSION_DEFAULT_LANG_V2_3
-            },
+            LanguageVersion::V2_0
+            | LanguageVersion::V2_1
+            | LanguageVersion::V2_2
+            | LanguageVersion::V2_3 => VERSION_DEFAULT,
+            LanguageVersion::V2_4 | LanguageVersion::V2_5 => VERSION_DEFAULT_LANG_V2_4,
         })
     }
 
