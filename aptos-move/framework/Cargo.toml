@@ -66,6 +66,7 @@ num-traits = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }
 rand_core = { workspace = true }
+rayon = { workspace = true }
 ripemd = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
