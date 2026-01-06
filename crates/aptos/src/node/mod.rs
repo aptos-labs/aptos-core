@@ -953,6 +953,7 @@ impl From<&ValidatorInfoSummary> for ValidatorInfo {
                 bcs::to_bytes(&config.fullnode_network_addresses).unwrap(),
                 config.validator_index,
             ),
+            Vec::new(),
         )
     }
 }

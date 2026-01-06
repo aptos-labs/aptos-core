@@ -260,6 +260,7 @@ mod tests {
                 fullnode_encoded_addresses,
                 0,
             ),
+            Vec::new(),
         );
         let validator_set = ValidatorSet::new(vec![validator]);
         let mut configs = HashMap::new();

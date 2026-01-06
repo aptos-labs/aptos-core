@@ -10,7 +10,7 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use crate::u256_define::{self, AccountAddress};
+use crate::u256_define::AccountAddress;
 
 use super::validator_config::ValidatorConfig;
 
@@ -30,6 +30,8 @@ pub struct ValidatorInfo {
     pub consensus_voting_power: u64,
     // Validator config
     pub config: ValidatorConfig,
+    // Reth account address
+    pub reth_account_address: Vec<u8>,
 }
 
 impl fmt::Display for ValidatorInfo {
@@ -47,11 +49,13 @@ impl ValidatorInfo {
         account_address: AccountAddress,
         consensus_voting_power: u64,
         config: ValidatorConfig,
+        reth_account_address: Vec<u8>,
     ) -> Self {
         ValidatorInfo {
             account_address,
             consensus_voting_power,
             config,
+            reth_account_address,
         }
     }
 

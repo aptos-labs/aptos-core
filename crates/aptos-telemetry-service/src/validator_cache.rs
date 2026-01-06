@@ -200,6 +200,7 @@ mod tests {
             PeerId::random(),
             10,
             ValidatorConfig::new(keypair.public_key, vec![0, 0], vec![0, 0], 2),
+            Vec::new(),
         );
         let validator_set = ValidatorSet::new(vec![validator_info]);
 
@@ -248,6 +249,7 @@ mod tests {
                 bcs::to_bytes(&vec![NetworkAddress::from_str("/dns/fullnode0.testnet.aptoslabs.com/tcp/6182/noise-ik/0xea19ab47ed9191865f15d85d751ed0663205c0b2f0f465714b1947c023715973/handshake/0").unwrap()]).unwrap(),
                 2,
             ),
+            Vec::new(),
         );
         let validator_set = ValidatorSet::new(vec![validator_info.clone()]);
 

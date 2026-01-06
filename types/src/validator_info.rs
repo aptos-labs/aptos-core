@@ -27,6 +27,8 @@ pub struct ValidatorInfo {
     consensus_voting_power: u64,
     // Validator config
     config: ValidatorConfig,
+    // Reth account address
+    pub reth_account_address: Vec<u8>,
 }
 
 impl fmt::Display for ValidatorInfo {
@@ -44,11 +46,13 @@ impl ValidatorInfo {
         account_address: AccountAddress,
         consensus_voting_power: u64,
         config: ValidatorConfig,
+        reth_account_address: Vec<u8>,
     ) -> Self {
         ValidatorInfo {
             account_address,
             consensus_voting_power,
             config,
+            reth_account_address,
         }
     }
 
@@ -71,6 +75,7 @@ impl ValidatorInfo {
             account_address,
             consensus_voting_power,
             config,
+            reth_account_address: Vec::new(),
         }
     }
 
