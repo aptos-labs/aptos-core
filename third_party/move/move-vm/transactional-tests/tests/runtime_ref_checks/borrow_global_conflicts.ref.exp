@@ -1,0 +1,12 @@
+processed 2 tasks
+task 0 lines 1-35:  publish [module 0xc0ffee::global_test]
+task 1 lines 37-37:  run 0xc0ffee::global_test::test_mut_borrow_with_existing_immut --signers 0x1 --verbose
+Error: Function execution failed with VMError: {
+    message: Cannot borrow_global_mut while there are existing references,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(3),
+    location: 0xc0ffee::global_test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 10)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

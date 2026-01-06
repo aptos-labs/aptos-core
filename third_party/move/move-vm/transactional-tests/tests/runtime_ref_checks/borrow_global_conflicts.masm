@@ -1,0 +1,37 @@
+//# publish
+module 0xc0ffee::global_test
+
+struct Resource has key+drop
+    value: u64
+
+// Test: Cannot borrow_global_mut while immutable reference exists
+public fun test_mut_borrow_with_existing_immut(s: &signer) acquires Resource
+    local res: Resource
+    local immut_ref: &Resource
+    local mut_ref: &mut Resource
+
+    // Setup: publish a resource
+    ld_u64 42
+    pack Resource
+    st_loc res
+    copy_loc s
+    move_loc res
+    move_to Resource
+
+    // Create immutable global reference
+    ld_const<address> 0x1
+    borrow_global Resource
+    st_loc immut_ref
+
+    // Try to create mutable global reference (should fail)
+    ld_const<address> 0x1
+    mut_borrow_global Resource
+    st_loc mut_ref
+
+    move_loc immut_ref
+    pop
+    move_loc mut_ref
+    pop
+    ret
+
+//# run 0xc0ffee::global_test::test_mut_borrow_with_existing_immut --signers 0x1 --verbose

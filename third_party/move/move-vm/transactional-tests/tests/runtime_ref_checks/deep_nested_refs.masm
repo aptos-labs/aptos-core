@@ -1,0 +1,92 @@
+//# publish
+module 0xc0ffee::deep_nesting
+
+struct Level0 has drop
+    value: u64
+
+struct Level1 has drop
+    inner: Level0
+    data: u64
+
+struct Level2 has drop
+    inner: Level1
+    data: u64
+
+struct Level3 has drop
+    inner: Level2
+    data: u64
+
+// Test: Deep nesting with references at multiple levels
+public fun test_deep_nested_poisoning(): u64
+    local root: Level3
+    local ref_l0: &u64
+    local ref_l1: &u64
+    local ref_l2: &u64
+    local mut_ref_l1: &mut Level1
+
+    // Build deeply nested structure
+    // Level0
+    ld_u64 1
+    pack Level0
+    // Level1
+    ld_u64 2
+    pack Level1
+    // Level2
+    ld_u64 3
+    pack Level2
+    // Level3
+    ld_u64 4
+    pack Level3
+    st_loc root
+
+    // Get reference to deepest field (Level3.Level2.Level1.Level0.value)
+    borrow_loc root
+    borrow_field Level3, inner
+    borrow_field Level2, inner
+    borrow_field Level1, inner
+    borrow_field Level0, value
+    st_loc ref_l0
+
+    // Get reference to Level2.data
+    borrow_loc root
+    borrow_field Level3, inner
+    borrow_field Level2, data
+    st_loc ref_l2
+
+    // Get reference to Level1.data
+    borrow_loc root
+    borrow_field Level3, inner
+    borrow_field Level2, inner
+    borrow_field Level1, data
+    st_loc ref_l1
+
+    // Get mutable reference to Level1 and write (should poison ref_l0 and ref_l1)
+    mut_borrow_loc root
+    mut_borrow_field Level3, inner
+    mut_borrow_field Level2, inner
+    st_loc mut_ref_l1
+
+    // Write to Level1 (poisons descendants ref_l0 and ref_l1)
+    ld_u64 999
+    pack Level0
+    ld_u64 888
+    pack Level1
+    move_loc mut_ref_l1
+    write_ref
+
+    // ref_l2 should still be valid (different branch)
+    move_loc ref_l2
+    read_ref
+    pop
+
+    // Try to read from poisoned ref_l0 (should fail)
+    move_loc ref_l0
+    read_ref
+
+    // Cleanup
+    move_loc ref_l1
+    pop
+
+    ret
+
+//# run 0xc0ffee::deep_nesting::test_deep_nested_poisoning --verbose

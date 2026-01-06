@@ -1,0 +1,40 @@
+//# publish
+module 0xc0ffee::ancestor_poison_test
+
+struct Container has drop
+    field1: u64
+    field2: u64
+
+// Test: Writing to a field via mut ref poisons immutable references to parent
+public fun test_write_field_poisons_parent(): u64
+    local container: Container
+    local parent_ref: &Container
+    local field_ref: &mut u64
+
+    // Create container
+    ld_u64 10
+    ld_u64 20
+    pack Container
+    st_loc container
+
+    // Create immutable reference to parent
+    borrow_loc container
+    st_loc parent_ref
+
+    // Create mutable reference to field
+    mut_borrow_loc container
+    mut_borrow_field Container, field1
+    st_loc field_ref
+
+    // Write to field (should poison parent_ref)
+    ld_u64 999
+    move_loc field_ref
+    write_ref
+
+    // Try to read from poisoned parent reference (should fail)
+    move_loc parent_ref
+    borrow_field Container, field2
+    read_ref
+    ret
+
+//# run 0xc0ffee::ancestor_poison_test::test_write_field_poisons_parent --verbose
