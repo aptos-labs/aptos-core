@@ -90,10 +90,13 @@ fn main() -> Result<()> {
 
         let path =
             PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR defined")).join("head.mrb");
+        println!("cargo:warning=path: {path:?}");
 
+        let start = std::time::Instant::now();
         ReleaseTarget::Head
             .create_release(true, Some(path))
             .context("Failed to create release")?;
+        println!("cargo:warning=time: {:?}", start.elapsed());
     }
 
     Ok(())
