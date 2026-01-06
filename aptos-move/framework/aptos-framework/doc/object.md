@@ -814,7 +814,7 @@ derivation to produce an object address.
 
 
 <pre><code>#[view]
-<b>public</b> <b>fun</b> <a href="object.md#0x1_object_is_untransferable">is_untransferable</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
+<b>public</b> <b>fun</b> <a href="object.md#0x1_object_is_untransferable">is_untransferable</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
 </code></pre>
 
 
@@ -823,8 +823,8 @@ derivation to produce an object address.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_is_untransferable">is_untransferable</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): bool {
-    <b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(<a href="object.md#0x1_object">object</a>.inner)
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_is_untransferable">is_untransferable</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): bool {
+    <b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(self.inner)
 }
 </code></pre>
 
@@ -839,7 +839,7 @@ derivation to produce an object address.
 
 
 <pre><code>#[view]
-<b>public</b> <b>fun</b> <a href="object.md#0x1_object_is_burnt">is_burnt</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
+<b>public</b> <b>fun</b> <a href="object.md#0x1_object_is_burnt">is_burnt</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
 </code></pre>
 
 
@@ -848,8 +848,8 @@ derivation to produce an object address.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_is_burnt">is_burnt</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): bool {
-    <b>exists</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(<a href="object.md#0x1_object">object</a>.inner)
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_is_burnt">is_burnt</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): bool {
+    <b>exists</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(self.inner)
 }
 </code></pre>
 
@@ -952,8 +952,8 @@ Derives an object address from source material: sha3_256([creator address | seed
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_object_address">create_object_address</a>(source: &<b>address</b>, seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b> {
     <b>let</b> bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(source);
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> bytes, seed);
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> bytes, <a href="object.md#0x1_object_OBJECT_FROM_SEED_ADDRESS_SCHEME">OBJECT_FROM_SEED_ADDRESS_SCHEME</a>);
+    bytes.append(seed);
+    bytes.push_back(<a href="object.md#0x1_object_OBJECT_FROM_SEED_ADDRESS_SCHEME">OBJECT_FROM_SEED_ADDRESS_SCHEME</a>);
     <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash_sha3_256">hash::sha3_256</a>(bytes))
 }
 </code></pre>
@@ -1028,7 +1028,7 @@ Derives an object from an Account GUID.
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_guid_object_address">create_guid_object_address</a>(source: <b>address</b>, creation_num: u64): <b>address</b> {
     <b>let</b> id = <a href="guid.md#0x1_guid_create_id">guid::create_id</a>(source, creation_num);
     <b>let</b> bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&id);
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> bytes, <a href="object.md#0x1_object_OBJECT_FROM_GUID_ADDRESS_SCHEME">OBJECT_FROM_GUID_ADDRESS_SCHEME</a>);
+    bytes.push_back(<a href="object.md#0x1_object_OBJECT_FROM_GUID_ADDRESS_SCHEME">OBJECT_FROM_GUID_ADDRESS_SCHEME</a>);
     <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash_sha3_256">hash::sha3_256</a>(bytes))
 }
 </code></pre>
@@ -1066,7 +1066,7 @@ Derives an object from an Account GUID.
 Returns the address of within an ObjectId.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_address">object_address</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_address">object_address</a>&lt;T: key&gt;(self: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b>
 </code></pre>
 
 
@@ -1075,8 +1075,8 @@ Returns the address of within an ObjectId.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_address">object_address</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: &<a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): <b>address</b> {
-    <a href="object.md#0x1_object">object</a>.inner
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_address">object_address</a>&lt;T: key&gt;(self: &<a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): <b>address</b> {
+    self.inner
 }
 </code></pre>
 
@@ -1091,7 +1091,7 @@ Returns the address of within an ObjectId.
 Convert Object<X> to Object<Y>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_convert">convert</a>&lt;X: key, Y: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;X&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;Y&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_convert">convert</a>&lt;X: key, Y: key&gt;(self: <a href="object.md#0x1_object_Object">object::Object</a>&lt;X&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;Y&gt;
 </code></pre>
 
 
@@ -1100,8 +1100,8 @@ Convert Object<X> to Object<Y>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_convert">convert</a>&lt;X: key, Y: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;X&gt;): <a href="object.md#0x1_object_Object">Object</a>&lt;Y&gt; {
-    <a href="object.md#0x1_object_address_to_object">address_to_object</a>&lt;Y&gt;(<a href="object.md#0x1_object">object</a>.inner)
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_convert">convert</a>&lt;X: key, Y: key&gt;(self: <a href="object.md#0x1_object_Object">Object</a>&lt;X&gt;): <a href="object.md#0x1_object_Object">Object</a>&lt;Y&gt; {
+    <a href="object.md#0x1_object_address_to_object">address_to_object</a>&lt;Y&gt;(self.inner)
 }
 </code></pre>
 
@@ -1328,7 +1328,7 @@ doesn't have the same bottlenecks.
 
 <pre><code><b>fun</b> <a href="object.md#0x1_object_create_object_from_guid">create_object_from_guid</a>(creator_address: <b>address</b>, <a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a>): <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> {
     <b>let</b> bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&<a href="guid.md#0x1_guid">guid</a>);
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> bytes, <a href="object.md#0x1_object_OBJECT_FROM_GUID_ADDRESS_SCHEME">OBJECT_FROM_GUID_ADDRESS_SCHEME</a>);
+    bytes.push_back(<a href="object.md#0x1_object_OBJECT_FROM_GUID_ADDRESS_SCHEME">OBJECT_FROM_GUID_ADDRESS_SCHEME</a>);
     <b>let</b> obj_addr = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash_sha3_256">hash::sha3_256</a>(bytes));
     <a href="object.md#0x1_object_create_object_internal">create_object_internal</a>(creator_address, obj_addr, <b>true</b>)
 }
@@ -1388,7 +1388,7 @@ doesn't have the same bottlenecks.
 Generates the DeleteRef, which can be used to remove ObjectCore from global storage.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_delete_ref">generate_delete_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_DeleteRef">object::DeleteRef</a>
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_delete_ref">generate_delete_ref</a>(self: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_DeleteRef">object::DeleteRef</a>
 </code></pre>
 
 
@@ -1397,9 +1397,9 @@ Generates the DeleteRef, which can be used to remove ObjectCore from global stor
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_delete_ref">generate_delete_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): <a href="object.md#0x1_object_DeleteRef">DeleteRef</a> {
-    <b>assert</b>!(ref.can_delete, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ECANNOT_DELETE">ECANNOT_DELETE</a>));
-    <a href="object.md#0x1_object_DeleteRef">DeleteRef</a> { self: ref.self }
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_delete_ref">generate_delete_ref</a>(self: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): <a href="object.md#0x1_object_DeleteRef">DeleteRef</a> {
+    <b>assert</b>!(self.can_delete, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ECANNOT_DELETE">ECANNOT_DELETE</a>));
+    <a href="object.md#0x1_object_DeleteRef">DeleteRef</a> { self: self.self }
 }
 </code></pre>
 
@@ -1414,7 +1414,7 @@ Generates the DeleteRef, which can be used to remove ObjectCore from global stor
 Generates the ExtendRef, which can be used to add new events and resources to the object.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_extend_ref">generate_extend_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_ExtendRef">object::ExtendRef</a>
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_extend_ref">generate_extend_ref</a>(self: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_ExtendRef">object::ExtendRef</a>
 </code></pre>
 
 
@@ -1423,8 +1423,8 @@ Generates the ExtendRef, which can be used to add new events and resources to th
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_extend_ref">generate_extend_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): <a href="object.md#0x1_object_ExtendRef">ExtendRef</a> {
-    <a href="object.md#0x1_object_ExtendRef">ExtendRef</a> { self: ref.self }
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_extend_ref">generate_extend_ref</a>(self: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): <a href="object.md#0x1_object_ExtendRef">ExtendRef</a> {
+    <a href="object.md#0x1_object_ExtendRef">ExtendRef</a> { self: self.self }
 }
 </code></pre>
 
@@ -1439,7 +1439,7 @@ Generates the ExtendRef, which can be used to add new events and resources to th
 Generates the TransferRef, which can be used to manage object transfers.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_transfer_ref">generate_transfer_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_TransferRef">object::TransferRef</a>
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_transfer_ref">generate_transfer_ref</a>(self: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_TransferRef">object::TransferRef</a>
 </code></pre>
 
 
@@ -1448,9 +1448,9 @@ Generates the TransferRef, which can be used to manage object transfers.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_transfer_ref">generate_transfer_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): <a href="object.md#0x1_object_TransferRef">TransferRef</a> {
-    <b>assert</b>!(!<b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_EOBJECT_NOT_TRANSFERRABLE">EOBJECT_NOT_TRANSFERRABLE</a>));
-    <a href="object.md#0x1_object_TransferRef">TransferRef</a> { self: ref.self }
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_transfer_ref">generate_transfer_ref</a>(self: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): <a href="object.md#0x1_object_TransferRef">TransferRef</a> {
+    <b>assert</b>!(!<b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(self.self), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_EOBJECT_NOT_TRANSFERRABLE">EOBJECT_NOT_TRANSFERRABLE</a>));
+    <a href="object.md#0x1_object_TransferRef">TransferRef</a> { self: self.self }
 }
 </code></pre>
 
@@ -1465,7 +1465,7 @@ Generates the TransferRef, which can be used to manage object transfers.
 Generates the DeriveRef, which can be used to create determnistic derived objects from the current object.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_derive_ref">generate_derive_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_DeriveRef">object::DeriveRef</a>
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_derive_ref">generate_derive_ref</a>(self: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_DeriveRef">object::DeriveRef</a>
 </code></pre>
 
 
@@ -1474,8 +1474,8 @@ Generates the DeriveRef, which can be used to create determnistic derived object
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_derive_ref">generate_derive_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): <a href="object.md#0x1_object_DeriveRef">DeriveRef</a> {
-    <a href="object.md#0x1_object_DeriveRef">DeriveRef</a> { self: ref.self }
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_derive_ref">generate_derive_ref</a>(self: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): <a href="object.md#0x1_object_DeriveRef">DeriveRef</a> {
+    <a href="object.md#0x1_object_DeriveRef">DeriveRef</a> { self: self.self }
 }
 </code></pre>
 
@@ -1490,7 +1490,7 @@ Generates the DeriveRef, which can be used to create determnistic derived object
 Create a signer for the ConstructorRef
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_signer">generate_signer</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_signer">generate_signer</a>(self: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
 </code></pre>
 
 
@@ -1499,8 +1499,8 @@ Create a signer for the ConstructorRef
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_signer">generate_signer</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
-    <a href="create_signer.md#0x1_create_signer">create_signer</a>(ref.self)
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_signer">generate_signer</a>(self: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
+    <a href="create_signer.md#0x1_create_signer">create_signer</a>(self.self)
 }
 </code></pre>
 
@@ -1515,7 +1515,7 @@ Create a signer for the ConstructorRef
 Returns the address associated with the constructor
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_constructor_ref">address_from_constructor_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_constructor_ref">address_from_constructor_ref</a>(self: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <b>address</b>
 </code></pre>
 
 
@@ -1524,8 +1524,8 @@ Returns the address associated with the constructor
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_constructor_ref">address_from_constructor_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): <b>address</b> {
-    ref.self
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_constructor_ref">address_from_constructor_ref</a>(self: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): <b>address</b> {
+    self.self
 }
 </code></pre>
 
@@ -1540,7 +1540,7 @@ Returns the address associated with the constructor
 Returns an Object<T> from within a ConstructorRef
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_constructor_ref">object_from_constructor_ref</a>&lt;T: key&gt;(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_constructor_ref">object_from_constructor_ref</a>&lt;T: key&gt;(self: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;
 </code></pre>
 
 
@@ -1549,8 +1549,8 @@ Returns an Object<T> from within a ConstructorRef
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_constructor_ref">object_from_constructor_ref</a>&lt;T: key&gt;(ref: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; {
-    <a href="object.md#0x1_object_address_to_object">address_to_object</a>&lt;T&gt;(ref.self)
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_constructor_ref">object_from_constructor_ref</a>&lt;T: key&gt;(self: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; {
+    <a href="object.md#0x1_object_address_to_object">address_to_object</a>&lt;T&gt;(self.self)
 }
 </code></pre>
 
@@ -1565,7 +1565,7 @@ Returns an Object<T> from within a ConstructorRef
 Returns whether or not the ConstructorRef can be used to create DeleteRef
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_can_generate_delete_ref">can_generate_delete_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_can_generate_delete_ref">can_generate_delete_ref</a>(self: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): bool
 </code></pre>
 
 
@@ -1574,8 +1574,8 @@ Returns whether or not the ConstructorRef can be used to create DeleteRef
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_can_generate_delete_ref">can_generate_delete_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): bool {
-    ref.can_delete
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_can_generate_delete_ref">can_generate_delete_ref</a>(self: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): bool {
+    self.can_delete
 }
 </code></pre>
 
@@ -1644,7 +1644,7 @@ Generate a new event handle.
 Returns the address associated with the constructor
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_delete_ref">address_from_delete_ref</a>(ref: &<a href="object.md#0x1_object_DeleteRef">object::DeleteRef</a>): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_delete_ref">address_from_delete_ref</a>(self: &<a href="object.md#0x1_object_DeleteRef">object::DeleteRef</a>): <b>address</b>
 </code></pre>
 
 
@@ -1653,8 +1653,8 @@ Returns the address associated with the constructor
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_delete_ref">address_from_delete_ref</a>(ref: &<a href="object.md#0x1_object_DeleteRef">DeleteRef</a>): <b>address</b> {
-    ref.self
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_delete_ref">address_from_delete_ref</a>(self: &<a href="object.md#0x1_object_DeleteRef">DeleteRef</a>): <b>address</b> {
+    self.self
 }
 </code></pre>
 
@@ -1669,7 +1669,7 @@ Returns the address associated with the constructor
 Returns an Object<T> from within a DeleteRef.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_delete_ref">object_from_delete_ref</a>&lt;T: key&gt;(ref: &<a href="object.md#0x1_object_DeleteRef">object::DeleteRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_delete_ref">object_from_delete_ref</a>&lt;T: key&gt;(self: &<a href="object.md#0x1_object_DeleteRef">object::DeleteRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;
 </code></pre>
 
 
@@ -1678,8 +1678,8 @@ Returns an Object<T> from within a DeleteRef.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_delete_ref">object_from_delete_ref</a>&lt;T: key&gt;(ref: &<a href="object.md#0x1_object_DeleteRef">DeleteRef</a>): <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; {
-    <a href="object.md#0x1_object_address_to_object">address_to_object</a>&lt;T&gt;(ref.self)
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_delete_ref">object_from_delete_ref</a>&lt;T: key&gt;(self: &<a href="object.md#0x1_object_DeleteRef">DeleteRef</a>): <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; {
+    <a href="object.md#0x1_object_address_to_object">address_to_object</a>&lt;T&gt;(self.self)
 }
 </code></pre>
 
@@ -1694,7 +1694,7 @@ Returns an Object<T> from within a DeleteRef.
 Removes from the specified Object from global storage.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_delete">delete</a>(ref: <a href="object.md#0x1_object_DeleteRef">object::DeleteRef</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_delete">delete</a>(self: <a href="object.md#0x1_object_DeleteRef">object::DeleteRef</a>)
 </code></pre>
 
 
@@ -1703,8 +1703,8 @@ Removes from the specified Object from global storage.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_delete">delete</a>(ref: <a href="object.md#0x1_object_DeleteRef">DeleteRef</a>) <b>acquires</b> <a href="object.md#0x1_object_Untransferable">Untransferable</a>, <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
-    <b>let</b> object_core = <b>move_from</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_delete">delete</a>(self: <a href="object.md#0x1_object_DeleteRef">DeleteRef</a>) <b>acquires</b> <a href="object.md#0x1_object_Untransferable">Untransferable</a>, <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+    <b>let</b> object_core = <b>move_from</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self);
     <b>let</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
         guid_creation_num: _,
         owner: _,
@@ -1712,8 +1712,8 @@ Removes from the specified Object from global storage.
         transfer_events,
     } = object_core;
 
-    <b>if</b> (<b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self)) {
-        <b>let</b> <a href="object.md#0x1_object_Untransferable">Untransferable</a> {} = <b>move_from</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self);
+    <b>if</b> (<b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(self.self)) {
+        <b>let</b> <a href="object.md#0x1_object_Untransferable">Untransferable</a> {} = <b>move_from</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(self.self);
     };
 
     <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(transfer_events);
@@ -1731,7 +1731,7 @@ Removes from the specified Object from global storage.
 Create a signer for the ExtendRef
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_signer_for_extending">generate_signer_for_extending</a>(ref: &<a href="object.md#0x1_object_ExtendRef">object::ExtendRef</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_signer_for_extending">generate_signer_for_extending</a>(self: &<a href="object.md#0x1_object_ExtendRef">object::ExtendRef</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
 </code></pre>
 
 
@@ -1740,8 +1740,8 @@ Create a signer for the ExtendRef
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_signer_for_extending">generate_signer_for_extending</a>(ref: &<a href="object.md#0x1_object_ExtendRef">ExtendRef</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
-    <a href="create_signer.md#0x1_create_signer">create_signer</a>(ref.self)
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_signer_for_extending">generate_signer_for_extending</a>(self: &<a href="object.md#0x1_object_ExtendRef">ExtendRef</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
+    <a href="create_signer.md#0x1_create_signer">create_signer</a>(self.self)
 }
 </code></pre>
 
@@ -1756,7 +1756,7 @@ Create a signer for the ExtendRef
 Returns an address from within a ExtendRef.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_extend_ref">address_from_extend_ref</a>(ref: &<a href="object.md#0x1_object_ExtendRef">object::ExtendRef</a>): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_extend_ref">address_from_extend_ref</a>(self: &<a href="object.md#0x1_object_ExtendRef">object::ExtendRef</a>): <b>address</b>
 </code></pre>
 
 
@@ -1765,8 +1765,8 @@ Returns an address from within a ExtendRef.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_extend_ref">address_from_extend_ref</a>(ref: &<a href="object.md#0x1_object_ExtendRef">ExtendRef</a>): <b>address</b> {
-    ref.self
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_extend_ref">address_from_extend_ref</a>(self: &<a href="object.md#0x1_object_ExtendRef">ExtendRef</a>): <b>address</b> {
+    self.self
 }
 </code></pre>
 
@@ -1781,7 +1781,7 @@ Returns an address from within a ExtendRef.
 Disable direct transfer, transfers can only be triggered via a TransferRef
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_disable_ungated_transfer">disable_ungated_transfer</a>(ref: &<a href="object.md#0x1_object_TransferRef">object::TransferRef</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_disable_ungated_transfer">disable_ungated_transfer</a>(self: &<a href="object.md#0x1_object_TransferRef">object::TransferRef</a>)
 </code></pre>
 
 
@@ -1790,8 +1790,8 @@ Disable direct transfer, transfers can only be triggered via a TransferRef
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_disable_ungated_transfer">disable_ungated_transfer</a>(ref: &<a href="object.md#0x1_object_TransferRef">TransferRef</a>) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
-    <b>let</b> <a href="object.md#0x1_object">object</a> = <b>borrow_global_mut</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_disable_ungated_transfer">disable_ungated_transfer</a>(self: &<a href="object.md#0x1_object_TransferRef">TransferRef</a>) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+    <b>let</b> <a href="object.md#0x1_object">object</a> = <b>borrow_global_mut</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self);
     <a href="object.md#0x1_object">object</a>.allow_ungated_transfer = <b>false</b>;
 }
 </code></pre>
@@ -1807,7 +1807,7 @@ Disable direct transfer, transfers can only be triggered via a TransferRef
 Prevent moving of the object
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_set_untransferable">set_untransferable</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_set_untransferable">set_untransferable</a>(self: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>)
 </code></pre>
 
 
@@ -1816,10 +1816,10 @@ Prevent moving of the object
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_set_untransferable">set_untransferable</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
-    <b>let</b> <a href="object.md#0x1_object">object</a> = <b>borrow_global_mut</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_set_untransferable">set_untransferable</a>(self: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+    <b>let</b> <a href="object.md#0x1_object">object</a> = <b>borrow_global_mut</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self);
     <a href="object.md#0x1_object">object</a>.allow_ungated_transfer = <b>false</b>;
-    <b>let</b> object_signer = <a href="object.md#0x1_object_generate_signer">generate_signer</a>(ref);
+    <b>let</b> object_signer = self.<a href="object.md#0x1_object_generate_signer">generate_signer</a>();
     <b>move_to</b>(&object_signer, <a href="object.md#0x1_object_Untransferable">Untransferable</a> {});
 }
 </code></pre>
@@ -1835,7 +1835,7 @@ Prevent moving of the object
 Enable direct transfer.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_enable_ungated_transfer">enable_ungated_transfer</a>(ref: &<a href="object.md#0x1_object_TransferRef">object::TransferRef</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_enable_ungated_transfer">enable_ungated_transfer</a>(self: &<a href="object.md#0x1_object_TransferRef">object::TransferRef</a>)
 </code></pre>
 
 
@@ -1844,9 +1844,9 @@ Enable direct transfer.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_enable_ungated_transfer">enable_ungated_transfer</a>(ref: &<a href="object.md#0x1_object_TransferRef">TransferRef</a>) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
-    <b>assert</b>!(!<b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_EOBJECT_NOT_TRANSFERRABLE">EOBJECT_NOT_TRANSFERRABLE</a>));
-    <b>let</b> <a href="object.md#0x1_object">object</a> = <b>borrow_global_mut</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_enable_ungated_transfer">enable_ungated_transfer</a>(self: &<a href="object.md#0x1_object_TransferRef">TransferRef</a>) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+    <b>assert</b>!(!<b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(self.self), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_EOBJECT_NOT_TRANSFERRABLE">EOBJECT_NOT_TRANSFERRABLE</a>));
+    <b>let</b> <a href="object.md#0x1_object">object</a> = <b>borrow_global_mut</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self);
     <a href="object.md#0x1_object">object</a>.allow_ungated_transfer = <b>true</b>;
 }
 </code></pre>
@@ -1863,7 +1863,7 @@ Create a LinearTransferRef for a one-time transfer. This requires that the owner
 time of generation is the owner at the time of transferring.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_linear_transfer_ref">generate_linear_transfer_ref</a>(ref: &<a href="object.md#0x1_object_TransferRef">object::TransferRef</a>): <a href="object.md#0x1_object_LinearTransferRef">object::LinearTransferRef</a>
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_linear_transfer_ref">generate_linear_transfer_ref</a>(self: &<a href="object.md#0x1_object_TransferRef">object::TransferRef</a>): <a href="object.md#0x1_object_LinearTransferRef">object::LinearTransferRef</a>
 </code></pre>
 
 
@@ -1872,11 +1872,11 @@ time of generation is the owner at the time of transferring.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_linear_transfer_ref">generate_linear_transfer_ref</a>(ref: &<a href="object.md#0x1_object_TransferRef">TransferRef</a>): <a href="object.md#0x1_object_LinearTransferRef">LinearTransferRef</a> <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
-    <b>assert</b>!(!<b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_EOBJECT_NOT_TRANSFERRABLE">EOBJECT_NOT_TRANSFERRABLE</a>));
-    <b>let</b> owner = <a href="object.md#0x1_object_owner">owner</a>(<a href="object.md#0x1_object_Object">Object</a>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt; { inner: ref.self });
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_linear_transfer_ref">generate_linear_transfer_ref</a>(self: &<a href="object.md#0x1_object_TransferRef">TransferRef</a>): <a href="object.md#0x1_object_LinearTransferRef">LinearTransferRef</a> <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+    <b>assert</b>!(!<b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(self.self), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_EOBJECT_NOT_TRANSFERRABLE">EOBJECT_NOT_TRANSFERRABLE</a>));
+    <b>let</b> owner = <a href="object.md#0x1_object_Object">Object</a>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt; { inner: self.self }.<a href="object.md#0x1_object_owner">owner</a>();
     <a href="object.md#0x1_object_LinearTransferRef">LinearTransferRef</a> {
-        self: ref.self,
+        self: self.self,
         owner,
     }
 }
@@ -1893,7 +1893,7 @@ time of generation is the owner at the time of transferring.
 Transfer to the destination address using a LinearTransferRef.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_transfer_with_ref">transfer_with_ref</a>(ref: <a href="object.md#0x1_object_LinearTransferRef">object::LinearTransferRef</a>, <b>to</b>: <b>address</b>)
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_transfer_with_ref">transfer_with_ref</a>(self: <a href="object.md#0x1_object_LinearTransferRef">object::LinearTransferRef</a>, <b>to</b>: <b>address</b>)
 </code></pre>
 
 
@@ -1902,23 +1902,23 @@ Transfer to the destination address using a LinearTransferRef.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_transfer_with_ref">transfer_with_ref</a>(ref: <a href="object.md#0x1_object_LinearTransferRef">LinearTransferRef</a>, <b>to</b>: <b>address</b>) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a>, <a href="object.md#0x1_object_TombStone">TombStone</a> {
-    <b>assert</b>!(!<b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_EOBJECT_NOT_TRANSFERRABLE">EOBJECT_NOT_TRANSFERRABLE</a>));
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_transfer_with_ref">transfer_with_ref</a>(self: <a href="object.md#0x1_object_LinearTransferRef">LinearTransferRef</a>, <b>to</b>: <b>address</b>) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a>, <a href="object.md#0x1_object_TombStone">TombStone</a> {
+    <b>assert</b>!(!<b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(self.self), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_EOBJECT_NOT_TRANSFERRABLE">EOBJECT_NOT_TRANSFERRABLE</a>));
 
     // Undo soft burn <b>if</b> present <b>as</b> we don't want the original owner <b>to</b> be able <b>to</b> reclaim by calling unburn later.
-    <b>if</b> (<b>exists</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(ref.self)) {
-        <b>let</b> <a href="object.md#0x1_object_TombStone">TombStone</a> { original_owner: _ } = <b>move_from</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(ref.self);
+    <b>if</b> (<b>exists</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(self.self)) {
+        <b>let</b> <a href="object.md#0x1_object_TombStone">TombStone</a> { original_owner: _ } = <b>move_from</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(self.self);
     };
 
-    <b>let</b> <a href="object.md#0x1_object">object</a> = <b>borrow_global_mut</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
+    <b>let</b> <a href="object.md#0x1_object">object</a> = <b>borrow_global_mut</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self);
     <b>assert</b>!(
-        <a href="object.md#0x1_object">object</a>.owner == ref.owner,
+        <a href="object.md#0x1_object">object</a>.owner == self.owner,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_OBJECT_OWNER">ENOT_OBJECT_OWNER</a>),
     );
     <b>if</b> (std::features::module_event_migration_enabled()) {
         <a href="event.md#0x1_event_emit">event::emit</a>(
             <a href="object.md#0x1_object_Transfer">Transfer</a> {
-                <a href="object.md#0x1_object">object</a>: ref.self,
+                <a href="object.md#0x1_object">object</a>: self.self,
                 from: <a href="object.md#0x1_object">object</a>.owner,
                 <b>to</b>,
             },
@@ -1927,7 +1927,7 @@ Transfer to the destination address using a LinearTransferRef.
         <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
             &<b>mut</b> <a href="object.md#0x1_object">object</a>.transfer_events,
             <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {
-                <a href="object.md#0x1_object">object</a>: ref.self,
+                <a href="object.md#0x1_object">object</a>: self.self,
                 from: <a href="object.md#0x1_object">object</a>.owner,
                 <b>to</b>,
             },
@@ -2146,7 +2146,7 @@ objects may have cyclic dependencies.
     <b>let</b> current_address = <a href="object.md#0x1_object">object</a>.owner;
     <b>let</b> count = 0;
     <b>while</b> (owner != current_address) {
-        count = count + 1;
+        count += 1;
         <b>assert</b>!(count &lt; <a href="object.md#0x1_object_MAXIMUM_OBJECT_NESTING">MAXIMUM_OBJECT_NESTING</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="object.md#0x1_object_EMAXIMUM_NESTING">EMAXIMUM_NESTING</a>));
         // At this point, the first <a href="object.md#0x1_object">object</a> <b>exists</b> and so the more likely case is that the
         // <a href="object.md#0x1_object">object</a>'s owner is not an <a href="object.md#0x1_object">object</a>. So we <b>return</b> a more sensible <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a>.
@@ -2189,7 +2189,7 @@ Please use the test only [<code>object::burn_object_with_transfer</code>] for te
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_burn">burn</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
     <b>let</b> original_owner = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
-    <b>assert</b>!(<a href="object.md#0x1_object_is_owner">is_owner</a>(<a href="object.md#0x1_object">object</a>, original_owner), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_OBJECT_OWNER">ENOT_OBJECT_OWNER</a>));
+    <b>assert</b>!(<a href="object.md#0x1_object">object</a>.<a href="object.md#0x1_object_is_owner">is_owner</a>(original_owner), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_OBJECT_OWNER">ENOT_OBJECT_OWNER</a>));
     <b>let</b> object_addr = <a href="object.md#0x1_object">object</a>.inner;
     <b>assert</b>!(!<b>exists</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(object_addr), <a href="object.md#0x1_object_EOBJECT_ALREADY_BURNT">EOBJECT_ALREADY_BURNT</a>);
     <b>move_to</b>(&<a href="create_signer.md#0x1_create_signer">create_signer</a>(object_addr), <a href="object.md#0x1_object_TombStone">TombStone</a> { original_owner });
@@ -2257,7 +2257,7 @@ Accessors
 Return true if ungated transfer is allowed.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_ungated_transfer_allowed">ungated_transfer_allowed</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_ungated_transfer_allowed">ungated_transfer_allowed</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
 </code></pre>
 
 
@@ -2266,12 +2266,12 @@ Return true if ungated transfer is allowed.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_ungated_transfer_allowed">ungated_transfer_allowed</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): bool <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_ungated_transfer_allowed">ungated_transfer_allowed</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): bool <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
     <b>assert</b>!(
-        <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner),
+        <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.inner),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="object.md#0x1_object_EOBJECT_DOES_NOT_EXIST">EOBJECT_DOES_NOT_EXIST</a>),
     );
-    <b>borrow_global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner).allow_ungated_transfer
+    <b>borrow_global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.inner).allow_ungated_transfer
 }
 </code></pre>
 
@@ -2287,7 +2287,7 @@ Return the current owner.
 
 
 <pre><code>#[view]
-<b>public</b> <b>fun</b> <a href="object.md#0x1_object_owner">owner</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b>
+<b>public</b> <b>fun</b> <a href="object.md#0x1_object_owner">owner</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b>
 </code></pre>
 
 
@@ -2296,12 +2296,12 @@ Return the current owner.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_owner">owner</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): <b>address</b> <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_owner">owner</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): <b>address</b> <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
     <b>assert</b>!(
-        <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner),
+        <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.inner),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="object.md#0x1_object_EOBJECT_DOES_NOT_EXIST">EOBJECT_DOES_NOT_EXIST</a>),
     );
-    <b>borrow_global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner).owner
+    <b>borrow_global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.inner).owner
 }
 </code></pre>
 
@@ -2317,7 +2317,7 @@ Return true if the provided address is the current owner.
 
 
 <pre><code>#[view]
-<b>public</b> <b>fun</b> <a href="object.md#0x1_object_is_owner">is_owner</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, owner: <b>address</b>): bool
+<b>public</b> <b>fun</b> <a href="object.md#0x1_object_is_owner">is_owner</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, owner: <b>address</b>): bool
 </code></pre>
 
 
@@ -2326,8 +2326,8 @@ Return true if the provided address is the current owner.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_is_owner">is_owner</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;, owner: <b>address</b>): bool <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
-    <a href="object.md#0x1_object_owner">owner</a>(<a href="object.md#0x1_object">object</a>) == owner
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_is_owner">is_owner</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;, owner: <b>address</b>): bool <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+    self.<a href="object.md#0x1_object_owner">owner</a>() == owner
 }
 </code></pre>
 
@@ -2343,7 +2343,7 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 <pre><code>#[view]
-<b>public</b> <b>fun</b> <a href="object.md#0x1_object_owns">owns</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, owner: <b>address</b>): bool
+<b>public</b> <b>fun</b> <a href="object.md#0x1_object_owns">owns</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, owner: <b>address</b>): bool
 </code></pre>
 
 
@@ -2352,8 +2352,8 @@ Return true if the provided address has indirect or direct ownership of the prov
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_owns">owns</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;, owner: <b>address</b>): bool <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
-    <b>let</b> current_address = <a href="object.md#0x1_object_object_address">object_address</a>(&<a href="object.md#0x1_object">object</a>);
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_owns">owns</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;, owner: <b>address</b>): bool <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+    <b>let</b> current_address = self.<a href="object.md#0x1_object_object_address">object_address</a>();
 
     <b>assert</b>!(
         <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(current_address),
@@ -2369,7 +2369,7 @@ Return true if the provided address has indirect or direct ownership of the prov
 
     <b>let</b> count = 0;
     <b>while</b> (owner != current_address) {
-        count = count + 1;
+        count += 1;
         <b>assert</b>!(count &lt; <a href="object.md#0x1_object_MAXIMUM_OBJECT_NESTING">MAXIMUM_OBJECT_NESTING</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="object.md#0x1_object_EMAXIMUM_NESTING">EMAXIMUM_NESTING</a>));
         <b>if</b> (!<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(current_address)) {
             <b>return</b> <b>false</b>
@@ -2395,7 +2395,7 @@ to determine the identity of the starting point of ownership.
 
 
 <pre><code>#[view]
-<b>public</b> <b>fun</b> <a href="object.md#0x1_object_root_owner">root_owner</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b>
+<b>public</b> <b>fun</b> <a href="object.md#0x1_object_root_owner">root_owner</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b>
 </code></pre>
 
 
@@ -2404,10 +2404,10 @@ to determine the identity of the starting point of ownership.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_root_owner">root_owner</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): <b>address</b> <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
-    <b>let</b> obj_owner = <a href="object.md#0x1_object_owner">owner</a>(<a href="object.md#0x1_object">object</a>);
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_root_owner">root_owner</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): <b>address</b> <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+    <b>let</b> obj_owner = self.<a href="object.md#0x1_object_owner">owner</a>();
     <b>while</b> (<a href="object.md#0x1_object_is_object">is_object</a>(obj_owner)) {
-        obj_owner = <a href="object.md#0x1_object_owner">owner</a>(<a href="object.md#0x1_object_address_to_object">address_to_object</a>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_owner));
+        obj_owner = <a href="object.md#0x1_object_address_to_object">address_to_object</a>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_owner).<a href="object.md#0x1_object_owner">owner</a>();
     };
     obj_owner
 }
@@ -2684,14 +2684,14 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 ### Function `object_address`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_address">object_address</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_address">object_address</a>&lt;T: key&gt;(self: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b>
 </code></pre>
 
 
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == <a href="object.md#0x1_object">object</a>.inner;
+<b>ensures</b> result == self.inner;
 </code></pre>
 
 
@@ -2701,15 +2701,15 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 ### Function `convert`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_convert">convert</a>&lt;X: key, Y: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;X&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;Y&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_convert">convert</a>&lt;X: key, Y: key&gt;(self: <a href="object.md#0x1_object_Object">object::Object</a>&lt;X&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;Y&gt;
 </code></pre>
 
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner);
-<b>aborts_if</b> !<a href="object.md#0x1_object_spec_exists_at">spec_exists_at</a>&lt;Y&gt;(<a href="object.md#0x1_object">object</a>.inner);
-<b>ensures</b> result == <a href="object.md#0x1_object_Object">Object</a>&lt;Y&gt; { inner: <a href="object.md#0x1_object">object</a>.inner };
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.inner);
+<b>aborts_if</b> !<a href="object.md#0x1_object_spec_exists_at">spec_exists_at</a>&lt;Y&gt;(self.inner);
+<b>ensures</b> result == <a href="object.md#0x1_object_Object">Object</a>&lt;Y&gt; { inner: self.inner };
 </code></pre>
 
 
@@ -3030,14 +3030,14 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 ### Function `generate_delete_ref`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_delete_ref">generate_delete_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_DeleteRef">object::DeleteRef</a>
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_delete_ref">generate_delete_ref</a>(self: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_DeleteRef">object::DeleteRef</a>
 </code></pre>
 
 
 
 
-<pre><code><b>aborts_if</b> !ref.can_delete;
-<b>ensures</b> result == <a href="object.md#0x1_object_DeleteRef">DeleteRef</a> { self: ref.self };
+<pre><code><b>aborts_if</b> !self.can_delete;
+<b>ensures</b> result == <a href="object.md#0x1_object_DeleteRef">DeleteRef</a> { self: self.self };
 </code></pre>
 
 
@@ -3047,15 +3047,15 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 ### Function `generate_transfer_ref`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_transfer_ref">generate_transfer_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_TransferRef">object::TransferRef</a>
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_transfer_ref">generate_transfer_ref</a>(self: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_TransferRef">object::TransferRef</a>
 </code></pre>
 
 
 
 
-<pre><code><b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self);
+<pre><code><b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(self.self);
 <b>ensures</b> result == <a href="object.md#0x1_object_TransferRef">TransferRef</a> {
-    self: ref.self,
+    self: self.self,
 };
 </code></pre>
 
@@ -3066,15 +3066,15 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 ### Function `object_from_constructor_ref`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_constructor_ref">object_from_constructor_ref</a>&lt;T: key&gt;(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_constructor_ref">object_from_constructor_ref</a>&lt;T: key&gt;(self: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;
 </code></pre>
 
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
-<b>aborts_if</b> !<a href="object.md#0x1_object_spec_exists_at">spec_exists_at</a>&lt;T&gt;(ref.self);
-<b>ensures</b> result == <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; { inner: ref.self };
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self);
+<b>aborts_if</b> !<a href="object.md#0x1_object_spec_exists_at">spec_exists_at</a>&lt;T&gt;(self.self);
+<b>ensures</b> result == <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; { inner: self.self };
 </code></pre>
 
 
@@ -3136,15 +3136,15 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 ### Function `object_from_delete_ref`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_delete_ref">object_from_delete_ref</a>&lt;T: key&gt;(ref: &<a href="object.md#0x1_object_DeleteRef">object::DeleteRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_delete_ref">object_from_delete_ref</a>&lt;T: key&gt;(self: &<a href="object.md#0x1_object_DeleteRef">object::DeleteRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;
 </code></pre>
 
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
-<b>aborts_if</b> !<a href="object.md#0x1_object_spec_exists_at">spec_exists_at</a>&lt;T&gt;(ref.self);
-<b>ensures</b> result == <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; { inner: ref.self };
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self);
+<b>aborts_if</b> !<a href="object.md#0x1_object_spec_exists_at">spec_exists_at</a>&lt;T&gt;(self.self);
+<b>ensures</b> result == <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; { inner: self.self };
 </code></pre>
 
 
@@ -3154,14 +3154,14 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 ### Function `delete`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_delete">delete</a>(ref: <a href="object.md#0x1_object_DeleteRef">object::DeleteRef</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_delete">delete</a>(self: <a href="object.md#0x1_object_DeleteRef">object::DeleteRef</a>)
 </code></pre>
 
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
-<b>ensures</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self);
+<b>ensures</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self);
 </code></pre>
 
 
@@ -3171,14 +3171,14 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 ### Function `generate_signer_for_extending`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_signer_for_extending">generate_signer_for_extending</a>(ref: &<a href="object.md#0x1_object_ExtendRef">object::ExtendRef</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_signer_for_extending">generate_signer_for_extending</a>(self: &<a href="object.md#0x1_object_ExtendRef">object::ExtendRef</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
 </code></pre>
 
 
 
 
 <pre><code><b>pragma</b> opaque;
-<b>ensures</b> result == <a href="object.md#0x1_object_spec_generate_signer_for_extending">spec_generate_signer_for_extending</a>(ref);
+<b>ensures</b> result == <a href="object.md#0x1_object_spec_generate_signer_for_extending">spec_generate_signer_for_extending</a>(self);
 </code></pre>
 
 
@@ -3188,14 +3188,14 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 ### Function `disable_ungated_transfer`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_disable_ungated_transfer">disable_ungated_transfer</a>(ref: &<a href="object.md#0x1_object_TransferRef">object::TransferRef</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_disable_ungated_transfer">disable_ungated_transfer</a>(self: &<a href="object.md#0x1_object_TransferRef">object::TransferRef</a>)
 </code></pre>
 
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
-<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self).allow_ungated_transfer == <b>false</b>;
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self);
+<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self).allow_ungated_transfer == <b>false</b>;
 </code></pre>
 
 
@@ -3205,16 +3205,16 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 ### Function `set_untransferable`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_set_untransferable">set_untransferable</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_set_untransferable">set_untransferable</a>(self: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>)
 </code></pre>
 
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
-<b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self);
-<b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self);
-<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self).allow_ungated_transfer == <b>false</b>;
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self);
+<b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(self.self);
+<b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(self.self);
+<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self).allow_ungated_transfer == <b>false</b>;
 </code></pre>
 
 
@@ -3224,15 +3224,15 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 ### Function `enable_ungated_transfer`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_enable_ungated_transfer">enable_ungated_transfer</a>(ref: &<a href="object.md#0x1_object_TransferRef">object::TransferRef</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_enable_ungated_transfer">enable_ungated_transfer</a>(self: &<a href="object.md#0x1_object_TransferRef">object::TransferRef</a>)
 </code></pre>
 
 
 
 
-<pre><code><b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
-<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self).allow_ungated_transfer == <b>true</b>;
+<pre><code><b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(self.self);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self);
+<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self).allow_ungated_transfer == <b>true</b>;
 </code></pre>
 
 
@@ -3242,17 +3242,17 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 ### Function `generate_linear_transfer_ref`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_linear_transfer_ref">generate_linear_transfer_ref</a>(ref: &<a href="object.md#0x1_object_TransferRef">object::TransferRef</a>): <a href="object.md#0x1_object_LinearTransferRef">object::LinearTransferRef</a>
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_linear_transfer_ref">generate_linear_transfer_ref</a>(self: &<a href="object.md#0x1_object_TransferRef">object::TransferRef</a>): <a href="object.md#0x1_object_LinearTransferRef">object::LinearTransferRef</a>
 </code></pre>
 
 
 
 
-<pre><code><b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
-<b>let</b> owner = <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self).owner;
+<pre><code><b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(self.self);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self);
+<b>let</b> owner = <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self).owner;
 <b>ensures</b> result == <a href="object.md#0x1_object_LinearTransferRef">LinearTransferRef</a> {
-    self: ref.self,
+    self: self.self,
     owner,
 };
 </code></pre>
@@ -3264,18 +3264,18 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 ### Function `transfer_with_ref`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_transfer_with_ref">transfer_with_ref</a>(ref: <a href="object.md#0x1_object_LinearTransferRef">object::LinearTransferRef</a>, <b>to</b>: <b>address</b>)
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_transfer_with_ref">transfer_with_ref</a>(self: <a href="object.md#0x1_object_LinearTransferRef">object::LinearTransferRef</a>, <b>to</b>: <b>address</b>)
 </code></pre>
 
 
 
 
-<pre><code><b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self);
-<b>let</b> <a href="object.md#0x1_object">object</a> = <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
+<pre><code><b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(self.self);
+<b>let</b> <a href="object.md#0x1_object">object</a> = <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self);
 // This enforces <a id="high-level-req-5" href="#high-level-req">high-level requirement 5</a>:
-<b>aborts_if</b> <a href="object.md#0x1_object">object</a>.owner != ref.owner;
-<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self).owner == <b>to</b>;
+<b>aborts_if</b> <a href="object.md#0x1_object">object</a>.owner != self.owner;
+<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self).owner == <b>to</b>;
 </code></pre>
 
 
@@ -3426,14 +3426,14 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 ### Function `ungated_transfer_allowed`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_ungated_transfer_allowed">ungated_transfer_allowed</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_ungated_transfer_allowed">ungated_transfer_allowed</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
 </code></pre>
 
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner);
-<b>ensures</b> result == <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner).allow_ungated_transfer;
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.inner);
+<b>ensures</b> result == <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.inner).allow_ungated_transfer;
 </code></pre>
 
 
@@ -3444,14 +3444,14 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 
 
 <pre><code>#[view]
-<b>public</b> <b>fun</b> <a href="object.md#0x1_object_owner">owner</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b>
+<b>public</b> <b>fun</b> <a href="object.md#0x1_object_owner">owner</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b>
 </code></pre>
 
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner);
-<b>ensures</b> result == <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner).owner;
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.inner);
+<b>ensures</b> result == <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.inner).owner;
 </code></pre>
 
 
@@ -3462,14 +3462,14 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 
 
 <pre><code>#[view]
-<b>public</b> <b>fun</b> <a href="object.md#0x1_object_is_owner">is_owner</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, owner: <b>address</b>): bool
+<b>public</b> <b>fun</b> <a href="object.md#0x1_object_is_owner">is_owner</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, owner: <b>address</b>): bool
 </code></pre>
 
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner);
-<b>ensures</b> result == (<b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner).owner == owner);
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.inner);
+<b>ensures</b> result == (<b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.inner).owner == owner);
 </code></pre>
 
 
@@ -3480,17 +3480,17 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 
 
 <pre><code>#[view]
-<b>public</b> <b>fun</b> <a href="object.md#0x1_object_owns">owns</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, owner: <b>address</b>): bool
+<b>public</b> <b>fun</b> <a href="object.md#0x1_object_owns">owns</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, owner: <b>address</b>): bool
 </code></pre>
 
 
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
-<b>let</b> current_address_0 = <a href="object.md#0x1_object">object</a>.inner;
+<b>let</b> current_address_0 = self.inner;
 <b>let</b> object_0 = <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(current_address_0);
 <b>let</b> current_address = object_0.owner;
-<b>aborts_if</b> <a href="object.md#0x1_object">object</a>.inner != owner && !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner);
+<b>aborts_if</b> self.inner != owner && !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.inner);
 <b>ensures</b> current_address_0 == owner ==&gt; result == <b>true</b>;
 </code></pre>
 
@@ -3502,7 +3502,7 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 
 
 <pre><code>#[view]
-<b>public</b> <b>fun</b> <a href="object.md#0x1_object_root_owner">root_owner</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b>
+<b>public</b> <b>fun</b> <a href="object.md#0x1_object_root_owner">root_owner</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b>
 </code></pre>
 
 

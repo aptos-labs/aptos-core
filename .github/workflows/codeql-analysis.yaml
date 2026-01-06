@@ -7,7 +7,7 @@ on:
 jobs:
   analyze:
     name: Analyze
-    runs-on: ubuntu-latest
+    runs-on: 2cpu-gh-ubuntu24-x64
     permissions:
       actions: read
       contents: read

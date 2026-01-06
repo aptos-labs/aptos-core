@@ -20,7 +20,7 @@ jobs:
   # triggered the workflow or on 'pull_request's which have set auto_merge=true
   # or have the label "CICD:run-e2e-tests".
   permission-check:
-    runs-on: ubuntu-latest
+    runs-on: 2cpu-gh-ubuntu24-x64
     steps:
       - name: Check repository permission for user which triggered workflow
         uses: sushichop/action-repository-permission@13d208f5ae7a6a3fc0e5a7c2502c214983f0241c

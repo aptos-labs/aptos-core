@@ -39,6 +39,11 @@ impl BlockStage {
     pub const ROUND_MANAGER_RECEIVED: &'static str = "round_manager_received";
     pub const ROUND_MANAGER_RECEIVED_OPT_PROPOSAL: &'static str =
         "round_manager_received_opt_proposal";
+    // Secret sharing stages
+    pub const SECRET_SHARING_ADD_DECISION: &'static str = "ss_add_decision";
+    pub const SECRET_SHARING_ADD_ENOUGH_SHARE: &'static str = "ss_add_enough_share";
+    pub const SECRET_SHARING_ENTER: &'static str = "ss_enter";
+    pub const SECRET_SHARING_READY: &'static str = "ss_ready";
     pub const SIGNED: &'static str = "signed";
     pub const SYNCED: &'static str = "synced";
     pub const SYNCED_OPT_BLOCK: &'static str = "synced_opt_block";

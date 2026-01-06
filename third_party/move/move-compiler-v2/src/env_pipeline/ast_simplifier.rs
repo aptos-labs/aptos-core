@@ -1113,8 +1113,8 @@ impl ExpRewriterFunctions for SimplifierRewriter<'_> {
                 },
                 _ => None,
             } {
-                if !self.after_inlining_optimization {
-                    let loc = self.env().get_node_loc(eliminated_id);
+                let loc = self.env().get_node_loc(eliminated_id);
+                if !self.after_inlining_optimization && !loc.is_inlined() {
                     let cond_loc = self.env().get_node_loc(cond.node_id());
                     self.env().diag_with_labels(
                         Severity::Warning,
@@ -1152,8 +1152,8 @@ impl ExpRewriterFunctions for SimplifierRewriter<'_> {
             let side_effecting_elts_refs = siter
                 .filter(|exp|
                         if exp.as_ref().is_ok_to_remove_from_code() {
-                            if !self.after_inlining_optimization {
-                                let loc = self.env().get_node_loc(exp.node_id());
+                            let loc = self.env().get_node_loc(exp.node_id());
+                            if !self.after_inlining_optimization && !loc.is_inlined() {
                                 self.env().diag(
                                     Severity::Warning,
                                     &loc,

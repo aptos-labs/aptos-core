@@ -55,6 +55,7 @@ Order book type definitions
 -  [Function `is_bulk_order_from_match_details`](#0x7_order_book_types_is_bulk_order_from_match_details)
 -  [Function `is_single_order_from_match_details`](#0x7_order_book_types_is_single_order_from_match_details)
 -  [Function `get_sequence_number_from_match_details`](#0x7_order_book_types_get_sequence_number_from_match_details)
+-  [Function `get_creation_time_micros_from_match_details`](#0x7_order_book_types_get_creation_time_micros_from_match_details)
 -  [Function `new_single_order_match_details`](#0x7_order_book_types_new_single_order_match_details)
 -  [Function `new_bulk_order_match_details`](#0x7_order_book_types_new_bulk_order_match_details)
 -  [Function `new_order_match_details_with_modified_size`](#0x7_order_book_types_new_order_match_details_with_modified_size)
@@ -435,6 +436,12 @@ identifier, account, priority index, price, sizes, and side.
 
 </dd>
 <dt>
+<code>creation_time_micros: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
 <code>metadata: M</code>
 </dt>
 <dd>
@@ -494,6 +501,12 @@ identifier, account, priority index, price, sizes, and side.
 </dd>
 <dt>
 <code>sequence_number: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>creation_time_micros: u64</code>
 </dt>
 <dd>
 
@@ -1198,7 +1211,7 @@ particular match operation.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_single_order_match_details">destroy_single_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <b>address</b>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, u64, u64, u64, bool, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, M)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_single_order_match_details">destroy_single_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <b>address</b>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, u64, u64, u64, bool, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, u64, M)
 </code></pre>
 
 
@@ -1209,7 +1222,7 @@ particular match operation.
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_single_order_match_details">destroy_single_order_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
-): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, <b>address</b>, Option&lt;String&gt;, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a>, u64, u64, u64, bool, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">TimeInForce</a>, M) {
+): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, <b>address</b>, Option&lt;String&gt;, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a>, u64, u64, u64, bool, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">TimeInForce</a>, u64, M) {
     <b>let</b> OrderMatchDetails::SingleOrder {
         order_id,
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
@@ -1220,9 +1233,10 @@ particular match operation.
         remaining_size,
         is_bid,
         time_in_force,
+        creation_time_micros,
         metadata,
     } = self;
-    (order_id, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id, unique_priority_idx, price, orig_size, remaining_size, is_bid, time_in_force, metadata)
+    (order_id, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id, unique_priority_idx, price, orig_size, remaining_size, is_bid, time_in_force, creation_time_micros, metadata)
 }
 </code></pre>
 
@@ -1236,7 +1250,7 @@ particular match operation.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_bulk_order_match_details">destroy_bulk_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, u64, u64, bool, u64, M)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_bulk_order_match_details">destroy_bulk_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, u64, u64, bool, u64, u64, M)
 </code></pre>
 
 
@@ -1247,7 +1261,7 @@ particular match operation.
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_bulk_order_match_details">destroy_bulk_order_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
-): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a>, u64, u64, bool, u64, M) {
+): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a>, u64, u64, bool, u64, u64, M) {
     <b>let</b> OrderMatchDetails::BulkOrder {
         order_id,
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
@@ -1256,9 +1270,10 @@ particular match operation.
         remaining_size,
         is_bid,
         sequence_number,
+        creation_time_micros,
         metadata,
     } = self;
-    (order_id, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, unique_priority_idx, price, remaining_size, is_bid, sequence_number, metadata)
+    (order_id, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, unique_priority_idx, price, remaining_size, is_bid, sequence_number, creation_time_micros, metadata)
 }
 </code></pre>
 
@@ -1670,13 +1685,39 @@ This should only be called on bulk orders, aborts if called for non-bulk order.
 
 </details>
 
+<a id="0x7_order_book_types_get_creation_time_micros_from_match_details"></a>
+
+## Function `get_creation_time_micros_from_match_details`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_get_creation_time_micros_from_match_details">get_creation_time_micros_from_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_get_creation_time_micros_from_match_details">get_creation_time_micros_from_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
+): u64 {
+    self.creation_time_micros
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x7_order_book_types_new_single_order_match_details"></a>
 
 ## Function `new_single_order_match_details`
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_single_order_match_details">new_single_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, metadata: M): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_single_order_match_details">new_single_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, creation_time_micros: u64, metadata: M): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;
 </code></pre>
 
 
@@ -1695,6 +1736,7 @@ This should only be called on bulk orders, aborts if called for non-bulk order.
     remaining_size: u64,
     is_bid: bool,
     time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">TimeInForce</a>,
+    creation_time_micros: u64,
     metadata: M
 ): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt; {
     OrderMatchDetails::SingleOrder {
@@ -1707,6 +1749,7 @@ This should only be called on bulk orders, aborts if called for non-bulk order.
         remaining_size,
         is_bid,
         time_in_force,
+        creation_time_micros,
         metadata,
     }
 }
@@ -1722,7 +1765,7 @@ This should only be called on bulk orders, aborts if called for non-bulk order.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_bulk_order_match_details">new_bulk_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, price: u64, remaining_size: u64, is_bid: bool, sequence_number: u64, metadata: M): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_bulk_order_match_details">new_bulk_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, price: u64, remaining_size: u64, is_bid: bool, sequence_number: u64, creation_time_micros: u64, metadata: M): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;
 </code></pre>
 
 
@@ -1739,6 +1782,7 @@ This should only be called on bulk orders, aborts if called for non-bulk order.
     remaining_size: u64,
     is_bid: bool,
     sequence_number: u64,
+    creation_time_micros: u64,
     metadata: M
 ): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt; {
     OrderMatchDetails::BulkOrder {
@@ -1749,6 +1793,7 @@ This should only be called on bulk orders, aborts if called for non-bulk order.
         remaining_size,
         is_bid,
         sequence_number,
+        creation_time_micros,
         metadata,
     }
 }

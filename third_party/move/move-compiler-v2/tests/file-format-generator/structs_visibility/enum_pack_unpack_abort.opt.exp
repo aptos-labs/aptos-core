@@ -1,0 +1,110 @@
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0x42::m1
+enum Result<T0: copy + drop, T1: copy + drop> has copy + drop
+  Ok
+    _0: T0
+  Err
+    _0: T1
+
+// Function definition at index 0
+public fun test_variant$Result$Ok<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): bool
+    local l1: &Result<T0, T1>
+    move_loc l0
+    test_variant Result<T0, T1>, Ok
+    ret
+
+// Function definition at index 1
+public fun test_variant$Result$Err<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): bool
+    local l1: &Result<T0, T1>
+    move_loc l0
+    test_variant Result<T0, T1>, Err
+    ret
+
+// Function definition at index 2
+public fun pack$Result$Ok<T0: copy + drop, T1: copy + drop>(l0: T0): Result<T0, T1>
+    local l1: T0
+    move_loc l0
+    pack_variant Result<T0, T1>, Ok
+    ret
+
+// Function definition at index 3
+public fun pack$Result$Err<T0: copy + drop, T1: copy + drop>(l0: T1): Result<T0, T1>
+    local l1: T1
+    move_loc l0
+    pack_variant Result<T0, T1>, Err
+    ret
+
+// Function definition at index 4
+public fun unpack$Result$Ok<T0: copy + drop, T1: copy + drop>(l0: Result<T0, T1>): T0
+    local l1: Result<T0, T1>
+    move_loc l0
+    unpack_variant Result<T0, T1>, Ok
+    ret
+
+// Function definition at index 5
+public fun unpack$Result$Err<T0: copy + drop, T1: copy + drop>(l0: Result<T0, T1>): T1
+    local l1: Result<T0, T1>
+    move_loc l0
+    unpack_variant Result<T0, T1>, Err
+    ret
+
+// Function definition at index 6
+public fun borrow$Result$0$0<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): &T0
+    local l1: &Result<T0, T1>
+    move_loc l0
+    borrow_variant_field Result<T0, T1>, Ok::_0
+    ret
+
+// Function definition at index 7
+public fun borrow$Result$0$1<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): &T1
+    local l1: &Result<T0, T1>
+    move_loc l0
+    borrow_variant_field Result<T0, T1>, Err::_0
+    ret
+
+// Function definition at index 8
+public fun borrow_mut$Result$0$0<T0: copy + drop, T1: copy + drop>(l0: &mut Result<T0, T1>): &mut T0
+    local l1: &mut Result<T0, T1>
+    move_loc l0
+    mut_borrow_variant_field Result<T0, T1>, Ok::_0
+    ret
+
+// Function definition at index 9
+public fun borrow_mut$Result$0$1<T0: copy + drop, T1: copy + drop>(l0: &mut Result<T0, T1>): &mut T1
+    local l1: &mut Result<T0, T1>
+    move_loc l0
+    mut_borrow_variant_field Result<T0, T1>, Err::_0
+    ret
+
+// Bytecode version v9
+module 0x42::m2
+use 0x42::m1
+// Function definition at index 0
+#[persistent] public fun test_pack_unpack_abort()
+    local l0: m1::Result<u64, u64>
+    ld_u64 42
+    call m1::pack$Result$Ok<u64, u64>
+    st_loc l0
+    copy_loc l0
+    ld_u64 42
+    // @5
+    call m1::pack$Result$Ok<u64, u64>
+    eq
+    br_false l0
+    move_loc l0
+    call m1::unpack$Result$Err<u64, u64>
+    // @10
+    ld_u64 42
+    eq
+    br_false l1
+    ret
+l1: ld_u64 2
+    // @15
+    abort
+l0: ld_u64 1
+    abort
+
+
+============ bytecode verification succeeded ========

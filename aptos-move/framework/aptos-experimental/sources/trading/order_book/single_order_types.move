@@ -2,6 +2,7 @@
 module aptos_experimental::single_order_types {
     use std::option::Option;
     use std::string::String;
+    use aptos_std::timestamp;
     use aptos_experimental::order_book_types::{
         OrderIdType, UniqueIdxType,
         TimeInForce, TriggerCondition
@@ -12,6 +13,7 @@ module aptos_experimental::single_order_types {
     friend aptos_experimental::order_placement;
     friend aptos_experimental::order_book;
     friend aptos_experimental::order_operations;
+    friend aptos_experimental::dead_mans_switch_operations;
 
     const EORDER_ALREADY_EXISTS: u64 = 1;
     const EINVALID_TRIGGER_CONDITION: u64 = 2;
@@ -31,7 +33,8 @@ module aptos_experimental::single_order_types {
             is_bid: bool,
             trigger_condition: Option<TriggerCondition>,
             time_in_force: TimeInForce,
-            metadata: M
+            metadata: M,
+            creation_time_micros: u64,
         }
     }
 
@@ -57,8 +60,14 @@ module aptos_experimental::single_order_types {
         is_bid: bool,
         trigger_condition: Option<TriggerCondition>,
         time_in_force: TimeInForce,
+        creation_time_micros_opt: Option<u64>,
         metadata: M
     ): SingleOrder<M> {
+        let creation_time_micros = if (creation_time_micros_opt.is_some()) {
+            creation_time_micros_opt.destroy_some()
+        } else {
+            timestamp::now_microseconds()
+        };
         SingleOrder::V1 {
             order_id,
             account,
@@ -70,7 +79,8 @@ module aptos_experimental::single_order_types {
             is_bid,
             trigger_condition,
             time_in_force,
-            metadata
+            metadata,
+            creation_time_micros,
         }
     }
 
@@ -181,7 +191,7 @@ module aptos_experimental::single_order_types {
     public fun destroy_single_order<M: store + copy + drop>(
         self: SingleOrder<M>
     ): (
-        address, OrderIdType, Option<String>, UniqueIdxType, u64, u64, u64, bool, Option<TriggerCondition>, TimeInForce, M
+        address, OrderIdType, Option<String>, UniqueIdxType, u64, u64, u64, bool, Option<TriggerCondition>, TimeInForce, M, u64
     ) {
         let SingleOrder::V1 {
             order_id,
@@ -194,7 +204,8 @@ module aptos_experimental::single_order_types {
             is_bid,
             trigger_condition,
             time_in_force,
-            metadata
+            metadata,
+            creation_time_micros,
         } = self;
         (
             account,
@@ -207,7 +218,8 @@ module aptos_experimental::single_order_types {
             is_bid,
             trigger_condition,
             time_in_force,
-            metadata
+            metadata,
+            creation_time_micros,
         )
     }
 
@@ -223,5 +235,9 @@ module aptos_experimental::single_order_types {
 
     public(friend) fun is_bid<M: store + copy + drop>(self: &SingleOrder<M>): bool {
         self.is_bid
+    }
+
+    public(friend) fun get_creation_time_micros<M: store + copy + drop>(self: &SingleOrder<M>): u64 {
+        self.creation_time_micros
     }
 }

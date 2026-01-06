@@ -50,6 +50,7 @@ impl TransactionGasLog {
             exec_io: self.exec_io.combine(&other.exec_io),
             storage: self.storage.combine(&other.storage),
             num_txns: self.num_txns + other.num_txns,
+            peak_memory_usage: self.peak_memory_usage.max(other.peak_memory_usage),
         }
     }
 }
@@ -163,7 +164,6 @@ impl UniqueStackFoldedCallFrame {
                     fn_name,
                     ty_args,
                     cost,
-                    ..
                 } => (
                     InstructionKey::CallNative {
                         module_id,
@@ -205,7 +205,6 @@ impl UniqueStackFoldedCallFrame {
                     module_id,
                     fn_name,
                     ty_args,
-                    args: vec![],
                     cost,
                 },
                 InstructionKey::LoadResource { addr, ty } => {
@@ -228,7 +227,6 @@ impl UniqueStackFoldedCallFrame {
         events.reverse();
         CallFrame {
             name,
-            args: vec![],
             events,
             native_gas: self.self_gas,
         }

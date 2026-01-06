@@ -27,6 +27,7 @@ module aptos_experimental::price_time_index {
     const EINVALID_MAKER_ORDER: u64 = 1;
     /// There is a code bug that breaks internal invariant
     const EINTERNAL_INVARIANT_BROKEN: u64 = 2;
+    const EINVALID_SLIPPAGE_BPS: u64 = 3;
 
     friend aptos_experimental::single_order_book;
     friend aptos_experimental::order_book;
@@ -113,15 +114,18 @@ module aptos_experimental::price_time_index {
     }
 
     public(friend) fun get_slippage_price(
-        self: &PriceTimeIndex, is_bid: bool, slippage_pct: u64
+        self: &PriceTimeIndex, is_bid: bool, slippage_bps: u64
     ): Option<u64> {
+        if (!is_bid) {
+            assert!(slippage_bps <= get_slippage_pct_precision() * 100, EINVALID_SLIPPAGE_BPS);
+        };
         let mid_price = self.get_mid_price();
         if (mid_price.is_none()) {
             return option::none();
         };
         let mid_price = mid_price.destroy_some();
         let slippage = mul_div(
-            mid_price, slippage_pct, get_slippage_pct_precision() * 100
+            mid_price, slippage_bps, get_slippage_pct_precision() * 100
         );
         if (is_bid) {
             option::some(mid_price + slippage)
@@ -152,21 +156,6 @@ module aptos_experimental::price_time_index {
             self.buys.remove(&key).size
         } else {
             self.sells.remove(&key).size
-        }
-    }
-
-    public(friend) fun is_active_order(
-        self: &PriceTimeIndex,
-        price: u64,
-        unique_priority_idx: UniqueIdxType,
-        is_bid: bool
-    ): bool {
-        let tie_breaker = get_tie_breaker(unique_priority_idx, is_bid);
-        let key = PriceTime { price, tie_breaker };
-        if (is_bid) {
-            self.buys.contains(&key)
-        } else {
-            self.sells.contains(&key)
         }
     }
 
@@ -671,6 +660,7 @@ module aptos_experimental::price_time_index {
         assert!(active_order_book.get_mid_price().destroy_some() == 100);
         // Slippage 10% for buy order should give price of mid price (100) + 10% = 110
         assert!(active_order_book.get_slippage_price(true, 1000).destroy_some() == 110);
+        assert!(active_order_book.get_slippage_price(true, 300).destroy_some() == 103);
         assert!(active_order_book.get_slippage_price(true, 100).destroy_some() == 101);
         assert!(active_order_book.get_slippage_price(true, 10).destroy_some() == 100);
 

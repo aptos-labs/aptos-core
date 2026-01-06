@@ -109,7 +109,7 @@ impl DiffCommand {
             .begin_version()
             .expect("Begin version must be set");
 
-        let diff_builder = TransactionDiffBuilder::new(self.allow_different_gas_usage);
+        let diff_builder = TransactionDiffBuilder::new(self.allow_different_gas_usage, false);
         let mut diffs = Vec::with_capacity(outputs.len());
 
         println!(
