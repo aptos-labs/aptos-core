@@ -696,8 +696,9 @@ impl ConfigSanitizer for StorageConfig {
                 if !ledger_db_path.is_absolute() {
                     return Err(Error::ConfigSanitizerFailed(
                         sanitizer_name,
-                        "Path {ledger_db_path:?} in db_path_overrides is not an absolute path."
-                            .to_string(),
+                        format!(
+                            "Path {ledger_db_path:?} in db_path_overrides is not an absolute path."
+                        ),
                     ));
                 }
             }
@@ -707,8 +708,7 @@ impl ConfigSanitizer for StorageConfig {
                     if !metadata_path.is_absolute() {
                         return Err(Error::ConfigSanitizerFailed(
                             sanitizer_name,
-                            "Path {metadata_path:?} in db_path_overrides is not an absolute path."
-                                .to_string(),
+                            format!("Path {metadata_path:?} in db_path_overrides is not an absolute path."),
                         ));
                     }
                 }
@@ -723,8 +723,7 @@ impl ConfigSanitizer for StorageConfig {
                     if !metadata_path.is_absolute() {
                         return Err(Error::ConfigSanitizerFailed(
                             sanitizer_name,
-                            "Path {metadata_path:?} in db_path_overrides is not an absolute path."
-                                .to_string(),
+                            format!("Path {metadata_path:?} in db_path_overrides is not an absolute path."),
                         ));
                     }
                 }
