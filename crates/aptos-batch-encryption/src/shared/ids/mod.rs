@@ -30,10 +30,6 @@ impl Id {
         self.root_x
     }
 
-    pub fn y(&self) -> Fr {
-        Fr::zero()
-    }
-
     pub fn from_verifying_key(vk: &VerifyingKey) -> Self {
         // using empty domain separator b/c this is a test implementation
         let field_hasher = <DefaultFieldHasher<Sha256> as HashToField<Fr>>::new(&[]);

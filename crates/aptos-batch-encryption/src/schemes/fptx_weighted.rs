@@ -3,8 +3,8 @@
 use crate::{
     errors::BatchEncryptionError,
     group::*,
-    schemes::fptx::{self, EncryptionKey},
     shared::{
+        encryption_key::EncryptionKey,
         ark_serialize::*,
         ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, StandardCiphertext},
         digest::{Digest, DigestKey, EvalProofs, EvalProofsPromise},
@@ -213,7 +213,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
     type DecryptionKeyShare = WeightedBIBEDecryptionKeyShare;
     type Digest = Digest;
     type DigestKey = DigestKey;
-    type EncryptionKey = fptx::EncryptionKey;
+    type EncryptionKey = EncryptionKey;
     type EvalProof = G1Affine;
     type EvalProofs = EvalProofs;
     type EvalProofsPromise = EvalProofsPromise;

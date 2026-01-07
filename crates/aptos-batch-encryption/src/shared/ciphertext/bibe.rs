@@ -8,7 +8,7 @@ use super::super::{
 use crate::{
     errors::BatchEncryptionError,
     group::{Fr, G1Affine, G2Affine, G2Prepared, PairingOutput, PairingSetting},
-    shared::{ark_serialize::*, ids::Id},
+    shared::{ark_serialize::*, encryption_key::EncryptionKey, ids::Id},
     traits::Plaintext,
 };
 use anyhow::Result;
@@ -57,10 +57,6 @@ pub struct PreparedBIBECiphertext {
     pub(crate) symmetric_ciphertext: SymmetricCiphertext,
 }
 
-pub trait BIBEEncryptionKey {
-    fn sig_mpk_g2(&self) -> G2Affine;
-    fn tau_g2(&self) -> G2Affine;
-}
 
 pub trait BIBECTEncrypt {
     type CT: InnerCiphertext;
@@ -114,7 +110,7 @@ impl InnerCiphertext for BIBECiphertext {
 }
 
 
-impl<T: BIBEEncryptionKey> BIBECTEncrypt for T {
+impl BIBECTEncrypt for EncryptionKey {
     type CT = BIBECiphertext;
 
     fn bibe_encrypt<R: RngCore + CryptoRng>(
@@ -124,17 +120,16 @@ impl<T: BIBEEncryptionKey> BIBECTEncrypt for T {
         id: Id,
     ) -> Result<BIBECiphertext> {
         let r = [Fr::rand(rng), Fr::rand(rng)];
-        let hashed_encryption_key: G1Affine = symmetric::hash_g2_element(self.sig_mpk_g2())?;
+        let hashed_encryption_key: G1Affine = symmetric::hash_g2_element(self.sig_mpk_g2)?;
 
         let ct_g2 = [
-            (G2Affine::generator() * r[0] + self.sig_mpk_g2() * r[1]).into(),
-            ((G2Affine::generator() * id.x() - self.tau_g2()) * r[0]).into(),
+            (G2Affine::generator() * r[0] + self.sig_mpk_g2 * r[1]).into(),
+            ((G2Affine::generator() * id.x() - self.tau_g2) * r[0]).into(),
             (-(G2Affine::generator() * r[1])).into(),
         ];
 
         let otp_source_gt: PairingOutput =
-            PairingSetting::pairing(G1Affine::generator() * id.y(), G2Affine::generator()) * r[0]
-                - PairingSetting::pairing(hashed_encryption_key, self.sig_mpk_g2()) * r[1];
+                - PairingSetting::pairing(hashed_encryption_key, self.sig_mpk_g2) * r[1];
 
         let mut otp_source_bytes = Vec::new();
         otp_source_gt.serialize_compressed(&mut otp_source_bytes)?;
