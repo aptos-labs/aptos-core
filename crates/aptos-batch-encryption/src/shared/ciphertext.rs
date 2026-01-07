@@ -63,6 +63,7 @@ pub trait BIBECTDecrypt<P: Plaintext> {
 pub struct Ciphertext<I: Id> {
     vk: VerifyingKey,
     bibe_ct: BIBECiphertext<I>,
+    #[serde(with = "serde_bytes")]
     associated_data_bytes: Vec<u8>,
     signature: Signature,
 }
@@ -111,7 +112,7 @@ impl<I: Id, EK: BIBEEncryptionKey> CTEncrypt<I> for EK {
         rng.fill_bytes(&mut signing_key_bytes);
 
         let signing_key: SigningKey = SigningKey::from_bytes(&signing_key_bytes);
-        let vk = signing_key.verifying_key();
+        let vk: VerifyingKey = signing_key.verifying_key().into();
         let hashed_id = I::from_verifying_key(&vk);
         let bibe_ct = self.bibe_encrypt(rng, plaintext, hashed_id)?;
 
@@ -208,7 +209,7 @@ impl<I: Id> Ciphertext<I> {
         eval_proofs: &EvalProofs<<I as Id>::OssifiedSet>,
     ) -> Result<PreparedCiphertext> {
         Ok(PreparedCiphertext {
-            vk: self.vk,
+            vk: self.vk.clone(),
             bibe_ct: self.bibe_ct.prepare(digest, eval_proofs)?,
             signature: self.signature,
         })
@@ -220,7 +221,7 @@ impl<I: Id> Ciphertext<I> {
         eval_proof: &G1Affine,
     ) -> Result<PreparedCiphertext> {
         Ok(PreparedCiphertext {
-            vk: self.vk,
+            vk: self.vk.clone(),
             bibe_ct: self.bibe_ct.prepare_individual(digest, eval_proof)?,
             signature: self.signature,
         })

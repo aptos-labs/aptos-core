@@ -706,6 +706,7 @@ dependencies = [
  "ark-serialize 0.5.0",
  "ark-std 0.5.0",
  "bcs 0.1.4",
+ "bytes",
  "criterion",
  "ed25519-dalek 2.1.1",
  "generic-array",
@@ -715,6 +716,7 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "serde",
+ "serde_bytes",
  "serde_json",
  "sha2 0.10.8",
  "thiserror 1.0.69",
@@ -9814,6 +9816,7 @@ name = "generate-format"
 version = "0.1.0"
 dependencies = [
  "aptos-api-types",
+ "aptos-batch-encryption",
  "aptos-config",
  "aptos-consensus",
  "aptos-consensus-types",

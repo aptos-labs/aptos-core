@@ -3,6 +3,7 @@
 //! copied from https://github.com/arkworks-rs/algebra/issues/178#issuecomment-1413219278
 //!
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
+use bytes::{Buf, Bytes};
 
 pub fn ark_se<S, A: CanonicalSerialize>(a: &A, s: S) -> Result<S::Ok, S::Error>
 where
@@ -18,8 +19,8 @@ pub fn ark_de<'de, D, A: CanonicalDeserialize>(data: D) -> Result<A, D::Error>
 where
     D: serde::de::Deserializer<'de>,
 {
-    let s: Vec<u8> = serde::de::Deserialize::deserialize(data)?;
-    let a = A::deserialize_with_mode(s.as_slice(), Compress::Yes, Validate::Yes);
+    let s: Bytes = serde::de::Deserialize::deserialize(data)?;
+    let a = A::deserialize_with_mode(s.reader(), Compress::Yes, Validate::Yes);
     a.map_err(serde::de::Error::custom)
 }
 

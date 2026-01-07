@@ -30,6 +30,7 @@ ark-poly = { workspace = true }
 ark-serialize = { workspace = true }
 ark-std = { workspace = true }
 bcs = { workspace = true }
+bytes = { workspace = true }
 # TODO: Fix compiler errors so we can use `workspace = true` here
 ed25519-dalek = { version = "2.1.1", features = ["serde"] }
 generic-array = { workspace = true }
@@ -39,6 +40,7 @@ rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+serde_bytes = { workspace = true }
 # TODO: Fix compiler errors so we can use `workspace = true` here
 sha2 = { version = "0.10.6" }
 thiserror = { workspace = true }

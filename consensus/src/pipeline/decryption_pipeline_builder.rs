@@ -2,7 +2,9 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::pipeline::pipeline_builder::{PipelineBuilder, Tracker};
-use aptos_batch_encryption::{schemes::fptx::FPTX, traits::BatchThresholdEncryption};
+use aptos_batch_encryption::{
+    schemes::fptx_weighted::FPTXWeighted, traits::BatchThresholdEncryption,
+};
 use aptos_consensus_types::{
     block::Block,
     common::Author,
@@ -88,7 +90,7 @@ impl PipelineBuilder {
         // TODO(ibalajiarun): Consider using commit block height to reduce trusted setup size
         let encryption_round = block.round();
         let (digest, proofs_promise) =
-            FPTX::digest(&digest_key, &txn_ciphertexts, encryption_round)?;
+            FPTXWeighted::digest(&digest_key, &txn_ciphertexts, encryption_round)?;
 
         let metadata = SecretShareMetadata::new(
             block.epoch(),
@@ -98,7 +100,7 @@ impl PipelineBuilder {
             digest.clone(),
         );
 
-        let derived_key_share = FPTX::derive_decryption_key_share(&msk_share, &digest)?;
+        let derived_key_share = FPTXWeighted::derive_decryption_key_share(&msk_share, &digest)?;
         derived_self_key_share_tx
             .send(Some(SecretShare::new(
                 author,
@@ -108,7 +110,7 @@ impl PipelineBuilder {
             .expect("must send properly");
 
         // TODO(ibalajiarun): improve perf
-        let proofs = FPTX::eval_proofs_compute_all(&proofs_promise, &digest_key);
+        let proofs = FPTXWeighted::eval_proofs_compute_all(&proofs_promise, &digest_key);
 
         let maybe_decryption_key = secret_shared_key_rx
             .await
@@ -121,7 +123,7 @@ impl PipelineBuilder {
             .zip(txn_ciphertexts)
             .map(|(mut txn, ciphertext)| {
                 let eval_proof = proofs.get(&ciphertext.id()).expect("must exist").into();
-                if let Ok(payload) = FPTX::decrypt_individual::<DecryptedPayload>(
+                if let Ok(payload) = FPTXWeighted::decrypt_individual::<DecryptedPayload>(
                     &decryption_key.key,
                     &ciphertext,
                     &digest,
