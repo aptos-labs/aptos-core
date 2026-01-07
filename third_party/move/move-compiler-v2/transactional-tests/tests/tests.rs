@@ -180,6 +180,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
 const SEPARATE_BASELINE: &[&str] = &[
     // Offsets are different depending on optimizations
     "control_flow/abort_complex.move",
+    "control_flow/abort_invalid.move",
     "control_flow/abort_vector.move",
     // Runs into too-many-locals or stack overflow if not optimized
     "constants/large_vectors.move",
