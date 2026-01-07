@@ -23,7 +23,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [ret: InternalGas, "ret", 220],
         [abort: InternalGas, "abort", 220],
         [abort_msg_base: InternalGas, "abort_msg.base", 440],
-        [abort_msg_per_byte: InternalGasPerByte, "abort_msg.per_byte", 128],
+        [abort_msg_per_byte: InternalGasPerByte, "abort_msg.per_byte", 45],
 
         // Note(Gas): The costs of the branch instructions have been jacked up a bit intentionally
         //            to prevent any single transaction from running for too long.
