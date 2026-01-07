@@ -4,8 +4,8 @@ use crate::{
     errors::BatchEncryptionError,
     group::{self, *},
     shared::{
-        ark_serialize::*, ciphertext::{BIBEEncryptionKey, CTDecrypt, CTEncrypt, PreparedCiphertext, StandardCiphertext}, digest::{Digest, DigestKey, EvalProofs, EvalProofsPromise}, ids::{Id, IdSet, UncomputedCoeffs}, key_derivation::{
-            self, BIBEDecryptionKey, BIBEDecryptionKeyShare, BIBEMasterPublicKey,
+        ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, StandardCiphertext}, digest::{Digest, DigestKey, EvalProofs, EvalProofsPromise}, encryption_key::EncryptionKey, ids::{Id, IdSet, UncomputedCoeffs}, key_derivation::{
+            self, BIBEDecryptionKey, BIBEDecryptionKeyShare,
             BIBEMasterSecretKeyShare, BIBEVerificationKey,
         }
     },
@@ -21,41 +21,8 @@ use ark_ec::AffineRepr as _;
 use ark_ff::UniformRand as _;
 use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 use rayon::iter::{IntoParallelIterator, ParallelIterator as _};
-use serde::{Deserialize, Serialize};
 
 pub struct FPTX {}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct EncryptionKey {
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    sig_mpk_g2: G2Affine,
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    tau_g2: G2Affine,
-}
-
-impl EncryptionKey {
-    pub fn new(sig_mpk_g2: G2Affine, tau_g2: G2Affine) -> Self {
-        Self { sig_mpk_g2, tau_g2 }
-    }
-
-    pub fn verify_decryption_key(
-        &self,
-        digest: &Digest,
-        decryption_key: &BIBEDecryptionKey,
-    ) -> Result<()> {
-        BIBEMasterPublicKey(self.sig_mpk_g2).verify_decryption_key(digest, decryption_key)
-    }
-}
-
-impl BIBEEncryptionKey for EncryptionKey {
-    fn sig_mpk_g2(&self) -> G2Affine {
-        self.sig_mpk_g2
-    }
-
-    fn tau_g2(&self) -> G2Affine {
-        self.tau_g2
-    }
-}
 
 impl BatchThresholdEncryption for FPTX {
     type Ciphertext = StandardCiphertext;

@@ -16,14 +16,10 @@ use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey, SECRE
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::hash::Hash;
 
-mod bibe;
-mod bibe_succinct;
+pub(crate) mod bibe;
+pub(crate) mod bibe_succinct;
 
 use bibe::*;
-
-
-pub use bibe::BIBEEncryptionKey;
-
 
 
 
@@ -169,16 +165,16 @@ pub mod tests {
 
     use crate::{
         errors::{BatchEncryptionError, CTVerifyError},
+        group::Fr,
         schemes::fptx::FPTX,
         shared::{
-            ciphertext::{CTDecrypt, CTEncrypt, StandardCiphertext},
-            ids::{IdSet},
-            key_derivation::BIBEDecryptionKey,
+            ciphertext::{CTDecrypt, CTEncrypt, StandardCiphertext, SuccinctCiphertext}, digest::DigestKey, encryption_key::AugmentedEncryptionKey, ids::IdSet, key_derivation::{self, BIBEDecryptionKey}
         },
         traits::BatchThresholdEncryption as _,
     };
     use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
     use aptos_dkg::pvss::traits::Reconstructable as _;
+    use ark_ff::UniformRand as _;
     use ark_std::{
         rand::{thread_rng, Rng},
     };
@@ -194,6 +190,40 @@ pub mod tests {
         let plaintext = String::from("hi");
         let associated_data = String::from("");
         let ct: StandardCiphertext =
+            ek.encrypt(&mut rng, &plaintext, &associated_data).unwrap();
+
+        let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
+        ids.add(&ct.id());
+
+        ids.compute_poly_coeffs();
+        let (digest, pfs) = dk.digest(&mut ids, 0).unwrap();
+        let pfs = pfs.compute_all(&dk);
+
+        let dk = BIBEDecryptionKey::reconstruct(&tc, &[msk_shares[0]
+            .derive_decryption_key_share(&digest)
+            .unwrap()])
+        .unwrap();
+
+        let decrypted_plaintext: String = dk.decrypt(&ct.prepare(&digest, &pfs).unwrap()).unwrap();
+
+        assert_eq!(decrypted_plaintext, plaintext);
+    }
+
+    #[test]
+    fn test_succinct_ct_encrypt_decrypt() {
+        let mut rng = thread_rng();
+        let tc = ShamirThresholdConfig::new(1, 1);
+
+        let dk = DigestKey::new(&mut rng, 8, 1).unwrap();
+        let msk = Fr::rand(&mut rng);
+        let (mpk, _, msk_shares) =
+            key_derivation::gen_msk_shares(msk, &mut rng, &tc);
+
+        let ek = AugmentedEncryptionKey::new( mpk.0, dk.tau_g2, (dk.tau_g2 * msk).into());
+
+        let plaintext = String::from("hi");
+        let associated_data = String::from("");
+        let ct: SuccinctCiphertext =
             ek.encrypt(&mut rng, &plaintext, &associated_data).unwrap();
 
         let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();

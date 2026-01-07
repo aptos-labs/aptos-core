@@ -137,7 +137,7 @@ impl DigestKey {
             pf,
             self.tau_g2 - G2Projective::from(G2Affine::generator() * id.x()),
         ) == PairingSetting::pairing(
-            digest.as_g1() - G1Affine::generator() * id.y(),
+            digest.as_g1(),
             G2Affine::generator(),
         ))
         .then_some(())
@@ -209,9 +209,8 @@ impl EvalProofs {
 
 #[cfg(test)]
 pub(crate) mod tests {
-
     use super::*;
-    use crate::shared::ids::{Id, IdSet, UncomputedCoeffs, ComputedCoeffs};
+    use crate::shared::ids::{Id, IdSet};
     use ark_std::rand::thread_rng;
 
     #[allow(unused)]
