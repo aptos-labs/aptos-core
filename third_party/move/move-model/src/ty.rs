@@ -798,6 +798,10 @@ pub enum TypeUnificationError {
     FunResultTypeMismatch(Type, Type),
     /// The arity  of some construct mismatches: `ArityMismatch(for_type_args, actual, expected)`
     ArityMismatch(/*for_type_args*/ bool, usize, usize),
+    /// Arity mismatch in function argument types: `FunArgArityMismatch(actual, expected)`
+    FunArgArityMismatch(usize, usize),
+    /// Arity mismatch in function result types: `FunResultArityMismatch(actual, expected)`
+    FunResultArityMismatch(usize, usize),
     /// Two types have different mutability: `MutabilityMismatch(actual, expected)`.
     MutabilityMismatch(Type, Type),
     /// A generic representation of the error that a constraint wasn't satisfied, with
@@ -3194,7 +3198,13 @@ impl TypeUnificationError {
         match self {
             TypeUnificationError::TypeMismatch(t1, t2)
             | TypeUnificationError::MutabilityMismatch(t1, t2) => {
-                TypeUnificationError::FunArgTypeMismatch(t1, t2)
+                // Swap because function type arguments are unified with `order.swap()` (contra-variance), which causes
+                // `TypeMismatch`/`MutabilityMismatch` with swapped actual/expected values
+                TypeUnificationError::FunArgTypeMismatch(t2, t1)
+            },
+            TypeUnificationError::ArityMismatch(_for_type_args, actual, expected) => {
+                // Swap for the same reason as above
+                TypeUnificationError::FunArgArityMismatch(expected, actual)
             },
             _ => self,
         }
@@ -3205,6 +3215,9 @@ impl TypeUnificationError {
             TypeUnificationError::TypeMismatch(t1, t2)
             | TypeUnificationError::MutabilityMismatch(t1, t2) => {
                 TypeUnificationError::FunResultTypeMismatch(t1, t2)
+            },
+            TypeUnificationError::ArityMismatch(_for_type_args, actual, expected) => {
+                TypeUnificationError::FunResultArityMismatch(actual, expected)
             },
             _ => self,
         }
@@ -3254,8 +3267,7 @@ impl TypeUnificationError {
                 vec![],
                 vec![],
             ),
-            TypeUnificationError::FunArgTypeMismatch(expected, actual) => (
-                // Because of contra-variance, switches actual/expected order
+            TypeUnificationError::FunArgTypeMismatch(actual, expected) => (
                 format!(
                     "expected function type has argument of type `{}` but `{}` was provided",
                     expected.display(display_context),
@@ -3275,6 +3287,28 @@ impl TypeUnificationError {
             ),
             TypeUnificationError::ArityMismatch(for_type_args, actual, expected) => (
                 error_context.arity_mismatch(*for_type_args, *actual, *expected),
+                vec![],
+                vec![],
+            ),
+            TypeUnificationError::FunArgArityMismatch(actual, expected) => (
+                format!(
+                    "expected function type has {} {} but {} {} provided",
+                    expected,
+                    pluralize("argument", *expected),
+                    actual,
+                    if *actual == 1 { "was" } else { "were" }
+                ),
+                vec![],
+                vec![],
+            ),
+            TypeUnificationError::FunResultArityMismatch(actual, expected) => (
+                format!(
+                    "expected function type returns {} {} but {} {} provided",
+                    expected,
+                    pluralize("value", *expected),
+                    actual,
+                    if *actual == 1 { "was" } else { "were" }
+                ),
                 vec![],
                 vec![],
             ),
