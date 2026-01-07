@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: the function takes 0 arguments but 1 were provided
+error: the function takes 0 arguments but 1 was provided
    ┌─ tests/checking/typing/module_call_wrong_arity.move:27:9
    │
 27 │         X::foo(1);
@@ -30,7 +30,7 @@ error: the function takes 2 arguments but 0 were provided
 31 │         X::baz<u64, u64>();
    │         ^^^^^^^^^^^^^^^^^^
 
-error: the function takes 2 arguments but 1 were provided
+error: the function takes 2 arguments but 1 was provided
    ┌─ tests/checking/typing/module_call_wrong_arity.move:32:9
    │
 32 │         X::baz<u64, u64>(1);
@@ -42,7 +42,7 @@ error: the function takes 2 arguments but 3 were provided
 33 │         X::baz(1, 2, 3);
    │         ^^^^^^^^^^^^^^^
 
-error: the function takes 0 arguments but 1 were provided
+error: the function takes 0 arguments but 1 was provided
    ┌─ tests/checking/typing/module_call_wrong_arity.move:37:9
    │
 37 │         foo(1);
@@ -72,7 +72,7 @@ error: the function takes 2 arguments but 0 were provided
 41 │         baz<u64, u64>();
    │         ^^^^^^^^^^^^^^^
 
-error: the function takes 2 arguments but 1 were provided
+error: the function takes 2 arguments but 1 was provided
    ┌─ tests/checking/typing/module_call_wrong_arity.move:42:9
    │
 42 │         baz<u64, u64>(1);

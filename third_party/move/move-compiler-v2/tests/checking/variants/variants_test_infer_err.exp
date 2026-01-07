@@ -24,7 +24,7 @@ error: expected variant of enum type but found type `0x815::m::S2`
 11 │         s is S2;
    │              ^^
 
-error: expected 0 type arguments but 1 were provided
+error: expected 0 type arguments but 1 was provided
    ┌─ tests/checking/variants/variants_test_infer_err.move:15:14
    │
 15 │         s is S2<u8>;
