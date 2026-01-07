@@ -2015,7 +2015,7 @@ impl ExpTranslator<'_, '_, '_> {
                 self.check_type(&loc, &ty, expected_type, context);
                 exp
             },
-            EA::Exp_::Abort(exp) => self.translate_abort(loc, context, expected_type, exp),
+            EA::Exp_::Abort(exp) => self.translate_abort(context, expected_type, exp),
             EA::Exp_::Spec(spec_id, ..) => {
                 let rt = self.check_type(&loc, &Type::unit(), expected_type, context);
                 let id = self.new_node_id_with_type_loc(&rt, &loc);
@@ -5787,11 +5787,11 @@ impl ExpTranslator<'_, '_, '_> {
     /// Translates an abort expression.
     fn translate_abort(
         &mut self,
-        loc: Loc,
         context: &ErrorMessageContext,
         expected_type: &Type,
         exp: &EA::Exp,
     ) -> ExpData {
+        let loc = self.to_loc(&exp.loc);
         let (ty, exp) = self.translate_exp_free(exp);
 
         let (operation, args) = match ty {
