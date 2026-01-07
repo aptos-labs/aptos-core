@@ -7,13 +7,13 @@ use super::{
 use crate::{
     errors::{BatchEncryptionError, CTVerifyError},
     group::G1Affine,
-    shared::ids::Id,
+    shared::{ciphertext::bibe_succinct::BIBESuccinctCiphertext, ids::Id},
     traits::{AssociatedData, Plaintext},
 };
 use anyhow::Result;
 use ark_std::rand::{CryptoRng, RngCore};
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey, SECRET_KEY_LENGTH};
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::hash::Hash;
 
 mod bibe;
@@ -21,16 +21,24 @@ mod bibe_succinct;
 
 use bibe::*;
 
+
 pub use bibe::BIBEEncryptionKey;
 
 
+
+
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
-pub struct Ciphertext<I: Id> {
+#[serde(bound(deserialize = "PCT: DeserializeOwned"))]
+pub struct Ciphertext<PCT: InnerCiphertext> {
     vk: VerifyingKey,
-    bibe_ct: BIBECiphertext<I>,
+    bibe_ct: PCT,
     associated_data_bytes: Vec<u8>,
     signature: Signature,
 }
+
+pub type StandardCiphertext = Ciphertext<BIBECiphertext>;
+pub type SuccinctCiphertext = Ciphertext<BIBESuccinctCiphertext>;
+
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct PreparedCiphertext {
@@ -39,7 +47,7 @@ pub struct PreparedCiphertext {
     signature: Signature,
 }
 
-impl<I: Id> Hash for Ciphertext<I> {
+impl<PCT: InnerCiphertext> Hash for Ciphertext<PCT> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.vk.hash(state);
         self.associated_data_bytes.hash(state);
@@ -48,13 +56,13 @@ impl<I: Id> Hash for Ciphertext<I> {
     }
 }
 
-pub trait CTEncrypt<I: Id> {
+pub trait CTEncrypt<PCT: InnerCiphertext> {
     fn encrypt<R: RngCore + CryptoRng>(
         &self,
         rng: &mut R,
         msg: &impl Plaintext,
         associated_data: &impl AssociatedData,
-    ) -> Result<Ciphertext<I>>;
+    ) -> Result<Ciphertext<PCT>>;
 }
 
 pub trait CTDecrypt<P: Plaintext> {
@@ -64,20 +72,20 @@ pub trait CTDecrypt<P: Plaintext> {
     fn decrypt(&self, ct: &PreparedCiphertext) -> Result<P>;
 }
 
-impl<I: Id, EK: BIBEEncryptionKey> CTEncrypt<I> for EK {
+impl<EK: BIBECTEncrypt> CTEncrypt<EK::CT> for EK {
     fn encrypt<R: RngCore + CryptoRng>(
         &self,
         rng: &mut R,
         plaintext: &impl Plaintext,
         associated_data: &impl AssociatedData,
-    ) -> Result<Ciphertext<I>> {
+    ) -> Result<Ciphertext<EK::CT>> {
         // Doing this to avoid rand dependency hell
         let mut signing_key_bytes: [u8; SECRET_KEY_LENGTH] = [0; SECRET_KEY_LENGTH];
         rng.fill_bytes(&mut signing_key_bytes);
 
         let signing_key: SigningKey = SigningKey::from_bytes(&signing_key_bytes);
         let vk = signing_key.verifying_key();
-        let hashed_id = I::from_verifying_key(&vk);
+        let hashed_id = Id::from_verifying_key(&vk);
         let bibe_ct = self.bibe_encrypt(rng, plaintext, hashed_id)?;
 
         // So that Ciphertext doesn't have to be generic over some AD: AssociatedData
@@ -95,11 +103,11 @@ impl<I: Id, EK: BIBEEncryptionKey> CTEncrypt<I> for EK {
     }
 }
 
-impl<I: Id> Ciphertext<I> {
+impl<PCT: InnerCiphertext> Ciphertext<PCT> {
     pub fn verify(&self, associated_data: &impl AssociatedData) -> Result<()> {
-        let hashed_id = I::from_verifying_key(&self.vk);
+        let hashed_id = Id::from_verifying_key(&self.vk);
 
-        (self.bibe_ct.id == hashed_id)
+        (self.bibe_ct.id() == hashed_id)
             .then_some(())
             .ok_or(BatchEncryptionError::CTVerifyError(
                 CTVerifyError::IdDoesNotMatchHashedVK,
@@ -121,14 +129,14 @@ impl<I: Id> Ciphertext<I> {
         Ok(())
     }
 
-    pub fn id(&self) -> I {
-        self.bibe_ct.id
+    pub fn id(&self) -> Id {
+        self.bibe_ct.id()
     }
 
     pub fn prepare(
         &self,
         digest: &Digest,
-        eval_proofs: &EvalProofs<<I as Id>::OssifiedSet>,
+        eval_proofs: &EvalProofs,
     ) -> Result<PreparedCiphertext> {
         Ok(PreparedCiphertext {
             vk: self.vk,
@@ -163,8 +171,8 @@ pub mod tests {
         errors::{BatchEncryptionError, CTVerifyError},
         schemes::fptx::FPTX,
         shared::{
-            ciphertext::{CTDecrypt, CTEncrypt, Ciphertext},
-            ids::{FreeRootId, FreeRootIdSet, IdSet as _},
+            ciphertext::{CTDecrypt, CTEncrypt, StandardCiphertext},
+            ids::{IdSet},
             key_derivation::BIBEDecryptionKey,
         },
         traits::BatchThresholdEncryption as _,
@@ -185,10 +193,10 @@ pub mod tests {
 
         let plaintext = String::from("hi");
         let associated_data = String::from("");
-        let ct: Ciphertext<FreeRootId> =
+        let ct: StandardCiphertext =
             ek.encrypt(&mut rng, &plaintext, &associated_data).unwrap();
 
-        let mut ids = FreeRootIdSet::with_capacity(dk.capacity()).unwrap();
+        let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
         ids.add(&ct.id());
 
         ids.compute_poly_coeffs();
@@ -213,7 +221,7 @@ pub mod tests {
 
         let plaintext = String::from("hi");
         let associated_data = String::from("associated data");
-        let mut ct: Ciphertext<FreeRootId> =
+        let mut ct: StandardCiphertext =
             ek.encrypt(&mut rng, &plaintext, &associated_data).unwrap();
 
         // Verification with the correct associated data should succeed.

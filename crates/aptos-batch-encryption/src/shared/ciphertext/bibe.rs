@@ -18,12 +18,29 @@ use ark_std::{
     rand::{CryptoRng, RngCore},
     UniformRand,
 };
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::hash::Hash;
 
+pub trait InnerCiphertext : Sized + Clone + Serialize + DeserializeOwned + Eq + PartialEq + Hash {
+
+    fn id(&self) -> Id;
+
+    fn prepare_individual(
+        &self,
+        digest: &Digest,
+        eval_proof: &G1Affine,
+    ) -> Result<PreparedBIBECiphertext>;
+
+    fn prepare(
+        &self,
+        digest: &Digest,
+        eval_proofs: &EvalProofs,
+    ) -> Result<PreparedBIBECiphertext>;
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug, Hash, Eq, PartialEq)]
-pub struct BIBECiphertext<I: Id> {
-    pub id: I,
+pub struct BIBECiphertext {
+    pub id: Id,
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     ct_g2: [G2Affine; 3],
     padded_key: OneTimePaddedKey,
@@ -45,33 +62,40 @@ pub trait BIBEEncryptionKey {
     fn tau_g2(&self) -> G2Affine;
 }
 
-pub trait BIBECTEncrypt<I: Id> {
+pub trait BIBECTEncrypt {
+    type CT: InnerCiphertext;
+
     fn bibe_encrypt<R: RngCore + CryptoRng>(
         &self,
         rng: &mut R,
         msg: &impl Plaintext,
-        id: I,
-    ) -> Result<BIBECiphertext<I>>;
+        id: Id,
+    ) -> Result<Self::CT>;
 }
 
 pub trait BIBECTDecrypt<P: Plaintext> {
     fn bibe_decrypt(&self, ct: &PreparedBIBECiphertext) -> Result<P>;
 }
 
-impl<I: Id> BIBECiphertext<I> {
-    pub fn prepare(
+impl InnerCiphertext for BIBECiphertext {
+    fn id(&self) -> Id {
+        self.id
+    }
+
+
+    fn prepare(
         &self,
         digest: &Digest,
-        eval_proofs: &EvalProofs<<I as Id>::OssifiedSet>,
+        eval_proofs: &EvalProofs,
     ) -> Result<PreparedBIBECiphertext> {
         let pf = eval_proofs
             .get(&self.id)
             .ok_or(BatchEncryptionError::UncomputedEvalProofError)?;
 
-        self.prepare_individual(digest, &pf)
+        self.prepare_individual(&digest, &pf)
     }
 
-    pub fn prepare_individual(
+    fn prepare_individual(
         &self,
         digest: &Digest,
         eval_proof: &G1Affine,
@@ -86,16 +110,19 @@ impl<I: Id> BIBECiphertext<I> {
             symmetric_ciphertext: self.symmetric_ciphertext.clone(),
         })
     }
+
 }
 
 
-impl<I: Id, T: BIBEEncryptionKey> BIBECTEncrypt<I> for T {
+impl<T: BIBEEncryptionKey> BIBECTEncrypt for T {
+    type CT = BIBECiphertext;
+
     fn bibe_encrypt<R: RngCore + CryptoRng>(
         &self,
         rng: &mut R,
         plaintext: &impl Plaintext,
-        id: I,
-    ) -> Result<BIBECiphertext<I>> {
+        id: Id,
+    ) -> Result<BIBECiphertext> {
         let r = [Fr::rand(rng), Fr::rand(rng)];
         let hashed_encryption_key: G1Affine = symmetric::hash_g2_element(self.sig_mpk_g2())?;
 
@@ -150,8 +177,7 @@ pub mod tests {
         group::*,
         schemes::fptx::FPTX,
         shared::{
-            ids::{FreeRootId, FreeRootIdSet, IdSet as _},
-            key_derivation::BIBEDecryptionKey,
+            ciphertext::bibe::InnerCiphertext as _, ids::{Id, IdSet}, key_derivation::BIBEDecryptionKey
         },
         traits::BatchThresholdEncryption as _,
     };
@@ -169,11 +195,11 @@ pub mod tests {
         let (ek, dk, _, msk_shares, _, _) =
             FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc, &tc).unwrap();
 
-        let mut ids = FreeRootIdSet::with_capacity(dk.capacity()).unwrap();
+        let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
         let mut counter = Fr::zero();
 
         for _ in 0..dk.capacity() {
-            ids.add(&FreeRootId::new(counter));
+            ids.add(&Id::new(counter));
             counter += Fr::one();
         }
 
@@ -183,7 +209,7 @@ pub mod tests {
 
         let plaintext = String::from("hi");
 
-        let id = FreeRootId::new(Fr::zero());
+        let id = Id::new(Fr::zero());
 
         let ct = ek.bibe_encrypt(&mut rng, &plaintext, id).unwrap();
 
