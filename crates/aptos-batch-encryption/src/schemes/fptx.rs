@@ -14,7 +14,7 @@ use crate::{
         key_derivation::{
             self, BIBEDecryptionKey, BIBEDecryptionKeyShare, BIBEMasterPublicKey,
             BIBEMasterSecretKeyShare, BIBEVerificationKey,
-        },
+        }
     },
     traits::{AssociatedData, BatchThresholdEncryption, Plaintext},
 };
@@ -65,16 +65,16 @@ impl BIBEEncryptionKey for EncryptionKey {
 }
 
 impl BatchThresholdEncryption for FPTX {
-    type Ciphertext = Ciphertext<FreeRootId>;
+    type Ciphertext = StandardCiphertext;
     type DecryptionKey = BIBEDecryptionKey;
     type DecryptionKeyShare = BIBEDecryptionKeyShare;
     type Digest = Digest;
     type DigestKey = DigestKey;
     type EncryptionKey = EncryptionKey;
-    type EvalProof = EvalProof;
-    type EvalProofs = EvalProofs<FreeRootIdSet<ComputedCoeffs>>;
-    type EvalProofsPromise = EvalProofsPromise<FreeRootIdSet<ComputedCoeffs>>;
-    type Id = FreeRootId;
+    type EvalProof = G1Affine;
+    type EvalProofs = EvalProofs;
+    type EvalProofsPromise = EvalProofsPromise;
+    type Id = Id;
     type MasterSecretKeyShare = BIBEMasterSecretKeyShare;
     type PreparedCiphertext = PreparedCiphertext;
     type Round = u64;
@@ -231,8 +231,8 @@ impl BatchThresholdEncryption for FPTX {
         cts: &[Self::Ciphertext],
         round: Self::Round,
     ) -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise)> {
-        let mut ids: FreeRootIdSet<UncomputedCoeffs> =
-            FreeRootIdSet::from_slice(&cts.iter().map(|ct| ct.id()).collect::<Vec<FreeRootId>>())
+        let mut ids: IdSet<UncomputedCoeffs> =
+            IdSet::from_slice(&cts.iter().map(|ct| ct.id()).collect::<Vec<Id>>())
                 .ok_or(anyhow!(""))?;
 
         digest_key.digest(&mut ids, round)
