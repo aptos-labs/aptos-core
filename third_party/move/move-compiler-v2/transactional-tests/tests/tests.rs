@@ -178,6 +178,9 @@ const TEST_CONFIGS: &[TestConfig] = &[
 // `test.move`.  If there is such an entry, then each config "foo" will have a
 /// separate baseline output file `test.foo.exp`.
 const SEPARATE_BASELINE: &[&str] = &[
+    // Offsets are different depending on optimizations
+    "control_flow/abort_complex.move",
+    "control_flow/abort_vector.move",
     // Runs into too-many-locals or stack overflow if not optimized
     "constants/large_vectors.move",
     // Printing bytecode is different depending on optimizations

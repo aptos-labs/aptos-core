@@ -1,0 +1,19 @@
+//**** Cross-compiled for `move` syntax from `tests/control_flow/abort_complex.move`
+
+//# publish
+module 0x42::test {
+    use 0x1::vector;
+    fun concat(p0: vector<u8>, p1: vector<u8>): vector<u8> {
+        vector::append<u8>(&mut p0, p1);
+        p0
+    }
+    fun main() {
+        let _v0 = concat(vector[119u8, 111u8, 114u8, 108u8, 100u8], vector[33u8]);
+        let _v1 = concat(vector[44u8, 32u8], _v0);
+        let _v2 = concat(vector[72u8, 101u8, 108u8, 108u8, 111u8], _v1);
+        abort _v2
+    }
+}
+
+
+//# run --verbose 0x42::test::main

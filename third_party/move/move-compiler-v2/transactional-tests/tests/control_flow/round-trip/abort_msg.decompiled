@@ -1,8 +1,0 @@
-//**** Cross-compiled for `move` syntax from `tests/control_flow/abort_msg.move`
-
-//# run
-script {
-    fun main() {
-        abort vector[72u8, 101u8, 108u8, 108u8, 111u8, 44u8, 32u8, 119u8, 111u8, 114u8, 108u8, 100u8]
-    }
-}
