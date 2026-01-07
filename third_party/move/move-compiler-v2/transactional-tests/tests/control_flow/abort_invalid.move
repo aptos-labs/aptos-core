@@ -4,4 +4,3 @@ script {
         abort vector[128]
     }
 }
-
