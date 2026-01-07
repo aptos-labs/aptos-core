@@ -548,7 +548,7 @@ pub enum Exp_ {
     Mutate(Box<Exp>, Box<Exp>),
 
     Return(Box<Exp>),
-    Abort(Box<Exp>, Option<Box<Exp>>),
+    Abort(Box<Exp>),
     Break(Option<Label>),
     Continue(Option<Label>),
 
@@ -1780,13 +1780,9 @@ impl AstDebug for Exp_ {
                 w.write("return ");
                 e.ast_debug(w);
             },
-            E::Abort(c, m) => {
+            E::Abort(e) => {
                 w.write("abort ");
-                c.ast_debug(w);
-                if let Some(m) = m {
-                    w.write(" ");
-                    m.ast_debug(w);
-                }
+                e.ast_debug(w);
             },
             E::Break(l) => {
                 w.write("break");

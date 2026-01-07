@@ -2739,11 +2739,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
             };
             EE::Return(ev)
         },
-        PE::Abort(pc, pm) => {
-            let ec = exp(context, *pc);
-            let em = pm.map(|pm| exp(context, *pm));
-            EE::Abort(ec, em)
-        },
+        PE::Abort(pe) => EE::Abort(exp(context, *pe)),
         PE::Break(l) => EE::Break(l),
         PE::Continue(l) => EE::Continue(l),
         PE::Dereference(pe) => EE::Dereference(exp(context, *pe)),
@@ -3397,18 +3393,13 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
             unbound_names_assigns(unbound, ls);
         },
         EE::Return(e)
+        | EE::Abort(e)
         | EE::Dereference(e)
         | EE::UnaryExp(_, e)
         | EE::Borrow(_, e)
         | EE::Cast(e, _)
         | EE::Test(e, _)
         | EE::Annotate(e, _) => unbound_names_exp(unbound, e),
-        EE::Abort(ec, em) => {
-            unbound_names_exp(unbound, ec);
-            if let Some(em) = em {
-                unbound_names_exp(unbound, em);
-            }
-        },
         EE::FieldMutate(ed, er) => {
             unbound_names_exp(unbound, er);
             unbound_names_dotted(unbound, ed)

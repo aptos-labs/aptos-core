@@ -28,7 +28,10 @@ use crate::{
         ReceiverFunctionInstance, ReferenceKind, Substitution, Type, TypeDisplayContext,
         TypeUnificationError, UnificationContext, Variance, WideningOrder, BOOL_TYPE,
     },
-    well_known::{BORROW_MUT_NAME, BORROW_NAME, VECTOR_FUNCS_WITH_BYTECODE_INSTRS, VECTOR_MODULE},
+    well_known::{
+        BORROW_MUT_NAME, BORROW_NAME, UNSPECIFIED_ABORT_CODE, VECTOR_FUNCS_WITH_BYTECODE_INSTRS,
+        VECTOR_MODULE,
+    },
     FunId,
 };
 use codespan_reporting::diagnostic::Severity;
@@ -2012,27 +2015,7 @@ impl ExpTranslator<'_, '_, '_> {
                 self.check_type(&loc, &ty, expected_type, context);
                 exp
             },
-            EA::Exp_::Abort(code, message) => {
-                let code = self.translate_exp(code, &Type::new_prim(PrimitiveType::U64));
-                let (operation, args) = match message {
-                    None => (Operation::Abort, vec![code.into_exp()]),
-                    Some(message) => {
-                        let message = self.translate_exp(
-                            message,
-                            &Type::Vector(Box::new(Type::new_prim(PrimitiveType::U8))),
-                        );
-                        (Operation::AbortMsg, vec![
-                            code.into_exp(),
-                            message.into_exp(),
-                        ])
-                    },
-                };
-                ExpData::Call(
-                    self.new_node_id_with_type_loc(expected_type, &loc),
-                    operation,
-                    args,
-                )
-            },
+            EA::Exp_::Abort(exp) => self.translate_abort(loc, context, expected_type, exp),
             EA::Exp_::Spec(spec_id, ..) => {
                 let rt = self.check_type(&loc, &Type::unit(), expected_type, context);
                 let id = self.new_node_id_with_type_loc(&rt, &loc);
@@ -5799,5 +5782,59 @@ impl ExpTranslator<'_, '_, '_> {
             }
             self.new_error_exp()
         }
+    }
+
+    /// Translates an abort expression.
+    fn translate_abort(
+        &mut self,
+        loc: Loc,
+        context: &ErrorMessageContext,
+        expected_type: &Type,
+        exp: &EA::Exp,
+    ) -> ExpData {
+        let (ty, exp) = self.translate_exp_free(exp);
+
+        let (operation, args) = match ty {
+            Type::Primitive(PrimitiveType::U64) => {
+                // Handle the `abort(u64)` case.
+                (Operation::Abort, vec![exp.into_exp()])
+            },
+
+            Type::Vector(elem_ty) => {
+                // Handle the `abort(vector<u8>)` case, which represents aborting with a message.
+                // When the element type is unknown, it is required to be `u8`.
+                self.check_type(&loc, &elem_ty, &Type::Primitive(PrimitiveType::U8), context);
+
+                if !self.test_language_version(&loc, "abort(vector<u8>)", LanguageVersion::V2_4) {
+                    return self.new_error_exp();
+                }
+
+                // Use the default unspecified abort code when aborting with a message.
+                let code = ExpData::Value(
+                    self.new_node_id_with_type_loc(&Type::Primitive(PrimitiveType::U64), &loc),
+                    Value::Number(UNSPECIFIED_ABORT_CODE.into()),
+                );
+
+                (Operation::AbortMsg, vec![code.into_exp(), exp.into_exp()])
+            },
+
+            Type::Var(_) => {
+                // If the type is unknown at this point, we default to `u64` in order to preserve
+                // backwards compatibility with earlier language versions.
+                self.check_type(&loc, &ty, &Type::Primitive(PrimitiveType::U64), context);
+                (Operation::Abort, vec![exp.into_exp()])
+            },
+
+            _ => {
+                self.error(&loc, "invalid type for abort");
+                return self.new_error_exp();
+            },
+        };
+
+        ExpData::Call(
+            self.new_node_id_with_type_loc(expected_type, &loc),
+            operation,
+            args,
+        )
     }
 }

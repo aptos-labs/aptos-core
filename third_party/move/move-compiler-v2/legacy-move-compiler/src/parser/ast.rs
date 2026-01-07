@@ -741,8 +741,7 @@ pub enum Exp_ {
     // return e
     Return(Option<Box<Exp>>),
     // abort e
-    // abort e1: e2
-    Abort(Box<Exp>, Option<Box<Exp>>),
+    Abort(Box<Exp>),
     // break
     Break(Option<Label>),
     // continue
@@ -1991,13 +1990,9 @@ impl AstDebug for Exp_ {
                     v.ast_debug(w);
                 }
             },
-            E::Abort(c, m) => {
+            E::Abort(e) => {
                 w.write("abort ");
-                c.ast_debug(w);
-                if let Some(m) = m {
-                    w.write(" ");
-                    m.ast_debug(w);
-                }
+                e.ast_debug(w);
             },
             E::Break(l) => {
                 w.write("break");

@@ -16,6 +16,7 @@ use crate::{
     },
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type, TypeDisplayContext},
+    well_known::UNSPECIFIED_ABORT_CODE,
 };
 use itertools::Itertools;
 use move_core_types::ability::AbilitySet;
@@ -1202,10 +1203,15 @@ impl<'a> ExpSourcifier<'a> {
                 self.print_exp(Prio::General, false, &args[0])
             }),
             Operation::AbortMsg => self.parenthesize(context_prio, Prio::General, || {
-                emit!(self.wr(), "abort ");
-                self.print_exp(Prio::General, false, &args[0]);
-                emit!(self.wr(), " ");
-                self.print_exp(Prio::General, false, &args[1]);
+                if Self::is_unspecified_abort_code(&args[0]) {
+                    emit!(self.wr(), "abort ");
+                    self.print_exp(Prio::General, false, &args[1]);
+                } else {
+                    emit!(
+                        self.wr(),
+                        "/* unsupported abort with explicit code and message */"
+                    );
+                }
             }),
             Operation::Freeze(explicit) => {
                 if *explicit {
@@ -1521,5 +1527,12 @@ impl<'a> ExpSourcifier<'a> {
             }
         }
         panic!("too many fruitless attempts to generate unique name")
+    }
+
+    fn is_unspecified_abort_code(exp: &Exp) -> bool {
+        match exp.as_ref() {
+            ExpData::Value(_, Value::Number(n)) => *n == UNSPECIFIED_ABORT_CODE.into(),
+            _ => false,
+        }
     }
 }

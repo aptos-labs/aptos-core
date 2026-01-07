@@ -1,6 +1,6 @@
 //# run
 script {
     fun main() {
-        abort 42 b"Hello, world";
+        abort b"Hello, world";
     }
 }

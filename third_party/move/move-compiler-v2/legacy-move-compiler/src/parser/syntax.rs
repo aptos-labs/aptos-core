@@ -1159,7 +1159,8 @@ fn parse_sequence(context: &mut Context) -> Result<Sequence, Box<Diagnostic>> {
 //          | <Match>
 //          | "return" "{" <Exp> "}"
 //          | "return" <Exp>?
-//          | "abort" <ExpOrSequence> <ExpOrSequence>?
+//          | "abort" "{" <Exp> "}"
+//          | "abort" <Exp>
 //          | "for" "(" <Exp> "in" <Exp> ".." <Exp> ")" "{" <Exp> "}"
 //          | <NameExp>
 fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
@@ -1361,8 +1362,6 @@ fn is_control_exp(tok: Tok) -> bool {
     )
 }
 
-// Parse either an expression or control sequence:
-//      ExpOrSequence = "{" <Sequence> | <Exp>
 fn parse_exp_or_control_sequence(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>> {
     if let Tok::LBrace = context.tokens.peek() {
         let start_loc = context.tokens.start_loc();
@@ -1483,19 +1482,8 @@ fn parse_control_exp(context: &mut Context) -> Result<(Exp, bool), Box<Diagnosti
         },
         Tok::Abort => {
             context.tokens.advance()?;
-            let (c, ends_in_block) = parse_exp_or_control_sequence(context)?;
-            if at_start_of_exp(context) {
-                require_language_version(
-                    context,
-                    current_token_loc(context.tokens),
-                    LanguageVersion::V2_4,
-                    "Abort with message is",
-                );
-                let (m, ends_in_block) = parse_exp_or_control_sequence(context)?;
-                (Exp_::Abort(Box::new(c), Some(Box::new(m))), ends_in_block)
-            } else {
-                (Exp_::Abort(Box::new(c), None), ends_in_block)
-            }
+            let (e, ends_in_block) = parse_exp_or_control_sequence(context)?;
+            (Exp_::Abort(Box::new(e)), ends_in_block)
         },
         _ => unreachable!(),
     };

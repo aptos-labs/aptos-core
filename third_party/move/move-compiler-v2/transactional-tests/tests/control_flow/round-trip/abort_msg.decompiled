@@ -3,6 +3,6 @@
 //# run
 script {
     fun main() {
-        abort 42 vector[72u8, 101u8, 108u8, 108u8, 111u8, 44u8, 32u8, 119u8, 111u8, 114u8, 108u8, 100u8]
+        abort vector[72u8, 101u8, 108u8, 108u8, 111u8, 44u8, 32u8, 119u8, 111u8, 114u8, 108u8, 100u8]
     }
 }
