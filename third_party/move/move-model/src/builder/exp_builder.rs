@@ -2015,7 +2015,17 @@ impl ExpTranslator<'_, '_, '_> {
                 self.check_type(&loc, &ty, expected_type, context);
                 exp
             },
-            EA::Exp_::Abort(exp) => self.translate_abort(context, expected_type, exp),
+            EA::Exp_::Abort(exp) => {
+                if let Some((operation, args)) = self.translate_abort(context, exp) {
+                    ExpData::Call(
+                        self.new_node_id_with_type_loc(expected_type, &loc),
+                        operation,
+                        args,
+                    )
+                } else {
+                    self.new_error_exp()
+                }
+            },
             EA::Exp_::Spec(spec_id, ..) => {
                 let rt = self.check_type(&loc, &Type::unit(), expected_type, context);
                 let id = self.new_node_id_with_type_loc(&rt, &loc);
@@ -5788,16 +5798,15 @@ impl ExpTranslator<'_, '_, '_> {
     fn translate_abort(
         &mut self,
         context: &ErrorMessageContext,
-        expected_type: &Type,
         exp: &EA::Exp,
-    ) -> ExpData {
+    ) -> Option<(Operation, Vec<Exp>)> {
         let loc = self.to_loc(&exp.loc);
         let (ty, exp) = self.translate_exp_free(exp);
 
-        let (operation, args) = match ty {
+        match ty {
             Type::Primitive(PrimitiveType::U64) => {
                 // Handle the `abort(u64)` case.
-                (Operation::Abort, vec![exp.into_exp()])
+                Some((Operation::Abort, vec![exp.into_exp()]))
             },
 
             Type::Vector(elem_ty) => {
@@ -5805,9 +5814,7 @@ impl ExpTranslator<'_, '_, '_> {
                 // When the element type is unknown, it is required to be `u8`.
                 self.check_type(&loc, &elem_ty, &Type::Primitive(PrimitiveType::U8), context);
 
-                if !self.test_language_version(&loc, "abort(vector<u8>)", LanguageVersion::V2_4) {
-                    return self.new_error_exp();
-                }
+                self.check_language_version(&loc, "abort(vector<u8>)", LanguageVersion::V2_4)?;
 
                 // Use the default unspecified abort code when aborting with a message.
                 let code = ExpData::Value(
@@ -5815,26 +5822,20 @@ impl ExpTranslator<'_, '_, '_> {
                     Value::Number(UNSPECIFIED_ABORT_CODE.into()),
                 );
 
-                (Operation::AbortMsg, vec![code.into_exp(), exp.into_exp()])
+                Some((Operation::AbortMsg, vec![code.into_exp(), exp.into_exp()]))
             },
 
             Type::Var(_) => {
                 // If the type is unknown at this point, we default to `u64` in order to preserve
                 // backwards compatibility with earlier language versions.
                 self.check_type(&loc, &ty, &Type::Primitive(PrimitiveType::U64), context);
-                (Operation::Abort, vec![exp.into_exp()])
+                Some((Operation::Abort, vec![exp.into_exp()]))
             },
 
             _ => {
                 self.error(&loc, "invalid type for abort");
-                return self.new_error_exp();
+                None
             },
-        };
-
-        ExpData::Call(
-            self.new_node_id_with_type_loc(expected_type, &loc),
-            operation,
-            args,
-        )
+        }
     }
 }
