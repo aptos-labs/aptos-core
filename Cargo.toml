@@ -662,13 +662,13 @@ inferno = "0.11.14"
 internment = { version = "0.5.0", features = ["arc"] }
 ipnet = "2.5.0"
 itertools = "0.13"
-jemallocator = { package = "tikv-jemallocator", version = "0.6.0", features = [
+jemallocator = { package = "tikv-jemallocator", version = "0.6.1", features = [
     "profiling",
     "stats",
     "unprefixed_malloc_on_supported_platforms",
 ] }
-jemalloc-ctl = { package = "tikv-jemalloc-ctl", version = "0.6.0" }
-jemalloc-sys = { package = "tikv-jemalloc-sys", version = "0.6.0" }
+jemalloc-ctl = { package = "tikv-jemalloc-ctl", version = "0.6.1" }
+jemalloc-sys = { package = "tikv-jemalloc-sys", version = "0.6.1" }
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
 jwt = "0.16.0"
