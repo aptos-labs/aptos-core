@@ -4,7 +4,7 @@
 
 use crate::{
     ast::{
-        AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Exp, ExpData,
+        AbortKind, AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Exp, ExpData,
         LambdaCaptureKind, MatchArm, ModuleName, Operation, Pattern, QualifiedSymbol, QuantKind,
         ResourceSpecifier, RewriteResult, Spec, TempIndex, Value,
     },
@@ -2016,10 +2016,10 @@ impl ExpTranslator<'_, '_, '_> {
                 exp
             },
             EA::Exp_::Abort(exp) => {
-                if let Some((operation, args)) = self.translate_abort(context, exp) {
+                if let Some((abort_kind, args)) = self.translate_abort(context, exp) {
                     ExpData::Call(
                         self.new_node_id_with_type_loc(expected_type, &loc),
-                        operation,
+                        Operation::Abort(abort_kind),
                         args,
                     )
                 } else {
@@ -5799,14 +5799,14 @@ impl ExpTranslator<'_, '_, '_> {
         &mut self,
         context: &ErrorMessageContext,
         exp: &EA::Exp,
-    ) -> Option<(Operation, Vec<Exp>)> {
+    ) -> Option<(AbortKind, Vec<Exp>)> {
         let loc = self.to_loc(&exp.loc);
         let (ty, exp) = self.translate_exp_free(exp);
 
         match ty {
             Type::Primitive(PrimitiveType::U64) => {
                 // Handle the `abort(u64)` case.
-                Some((Operation::Abort, vec![exp.into_exp()]))
+                Some((AbortKind::Code, vec![exp.into_exp()]))
             },
 
             Type::Vector(elem_ty) => {
@@ -5822,14 +5822,14 @@ impl ExpTranslator<'_, '_, '_> {
                     Value::Number(UNSPECIFIED_ABORT_CODE.into()),
                 );
 
-                Some((Operation::AbortMsg, vec![code.into_exp(), exp.into_exp()]))
+                Some((AbortKind::Message, vec![code.into_exp(), exp.into_exp()]))
             },
 
             Type::Var(_) => {
                 // If the type is unknown at this point, we default to `u64` in order to preserve
                 // backwards compatibility with earlier language versions.
                 self.check_type(&loc, &ty, &Type::Primitive(PrimitiveType::U64), context);
-                Some((Operation::Abort, vec![exp.into_exp()]))
+                Some((AbortKind::Code, vec![exp.into_exp()]))
             },
 
             _ => {

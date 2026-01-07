@@ -57,7 +57,7 @@ impl AssertConst {
     }
 
     fn abort_block(block: &ExpData) -> bool {
-        matches!(block, ExpData::Call(_, Operation::Abort, _))
+        matches!(block, ExpData::Call(_, Operation::Abort(_), _))
     }
 
     /// Returns true if the then and else blocks of an if statements might have

@@ -4,8 +4,8 @@
 
 use crate::{
     ast::{
-        AccessSpecifierKind, AddressSpecifier, Exp, ExpData, LambdaCaptureKind, Operation, Pattern,
-        ResourceSpecifier, TempIndex, Value,
+        AbortKind, AccessSpecifierKind, AddressSpecifier, Exp, ExpData, LambdaCaptureKind,
+        Operation, Pattern, ResourceSpecifier, TempIndex, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -1198,21 +1198,25 @@ impl<'a> ExpSourcifier<'a> {
                 emit!(self.wr(), "move ");
                 self.print_exp(Prio::General, false, &args[0])
             }),
-            Operation::Abort => self.parenthesize(context_prio, Prio::General, || {
-                emit!(self.wr(), "abort ");
-                self.print_exp(Prio::General, false, &args[0])
-            }),
-            Operation::AbortMsg => self.parenthesize(context_prio, Prio::General, || {
-                if Self::is_unspecified_abort_code(&args[0]) {
-                    emit!(self.wr(), "abort ");
-                    self.print_exp(Prio::General, false, &args[1]);
-                } else {
-                    emit!(
-                        self.wr(),
-                        "/* unsupported abort with explicit code and message */"
-                    );
-                }
-            }),
+            Operation::Abort(kind) => {
+                self.parenthesize(context_prio, Prio::General, || match kind {
+                    AbortKind::Code => {
+                        emit!(self.wr(), "abort ");
+                        self.print_exp(Prio::General, false, &args[0])
+                    },
+                    AbortKind::Message => {
+                        if Self::is_unspecified_abort_code(&args[0]) {
+                            emit!(self.wr(), "abort ");
+                            self.print_exp(Prio::General, false, &args[1]);
+                        } else {
+                            emit!(
+                                self.wr(),
+                                "/* unsupported abort with explicit code and message */"
+                            );
+                        }
+                    },
+                })
+            },
             Operation::Freeze(explicit) => {
                 if *explicit {
                     self.print_exp_list("freeze(", ")", &args[0..1]);
@@ -1339,7 +1343,7 @@ impl<'a> ExpSourcifier<'a> {
             _ => return false,
         };
         let abort_code = match then_.as_ref() {
-            ExpData::Call(_, Operation::Abort, args) if args.len() == 1 => args[0].clone(),
+            ExpData::Call(_, Operation::Abort(_), args) if args.len() == 1 => args[0].clone(),
             _ => return false,
         };
         if !else_.is_unit_exp() {
