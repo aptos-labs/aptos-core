@@ -9,7 +9,9 @@ use itertools::Itertools;
 use move_binary_format::file_format::Visibility;
 use move_core_types::ability::Ability;
 use move_model::{
-    ast::{Exp, ExpData, MatchArm, Operation, Pattern, SpecBlockTarget, TempIndex, Value},
+    ast::{
+        AbortKind, Exp, ExpData, MatchArm, Operation, Pattern, SpecBlockTarget, TempIndex, Value,
+    },
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     metadata::LanguageVersion,
     model::{
@@ -32,7 +34,6 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
 };
-use move_model::ast::AbortKind;
 // ======================================================================================
 // Entry
 
@@ -908,13 +909,13 @@ impl Generator<'_> {
                         let arg = self.require_unary_arg(id, args);
                         let temp = self.gen_escape_auto_ref_arg(&arg, false);
                         (temp, None)
-                    }
+                    },
                     AbortKind::Message => {
                         let [arg0, arg1] = self.require_binary_args(id, args);
                         let temp0 = self.gen_escape_auto_ref_arg(&arg0, false);
                         let temp1 = self.gen_escape_auto_ref_arg(&arg1, false);
                         (temp0, Some(temp1))
-                    }
+                    },
                 };
                 self.emit_with(id, |attr| Bytecode::Abort(attr, temp0, temp1))
             },
