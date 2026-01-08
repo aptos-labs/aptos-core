@@ -1,0 +1,46 @@
+// Mock implementation of the formatting functions used in the macros.
+module aptos_std::string_utils {
+    use std::string::String;
+
+    public fun format1<T0: drop>(_fmt: &vector<u8>, _a: T0): String {
+        abort 0
+    }
+
+    public fun format2<T0: drop, T1: drop>(_fmt: &vector<u8>, _a: T0, _b: T1): String {
+        abort 0
+    }
+
+    public fun format3<T0: drop, T1: drop, T2: drop>(_fmt: &vector<u8>, _a: T0, _b: T1, _c: T2): String {
+        abort 0
+    }
+
+    public fun format4<T0: drop, T1: drop, T2: drop, T3: drop>(_fmt: &vector<u8>, _a: T0, _b: T1, _c: T2, _d: T3): String {
+        abort 0
+    }
+}
+
+module 0x42::M {
+    fun foo1<T: drop>(left: T, right: T) {
+        assert_eq!(left, right)
+    }
+
+    fun foo2<T: drop>(left: T, right: T, message: vector<u8>) {
+        assert_eq!(left, right, message)
+    }
+
+    fun foo3<T: drop, T0: drop>(left: T, right: T, fmt: &vector<u8>, a: T0) {
+        assert_eq!(left, right, fmt, a)
+    }
+
+    fun foo4<T: drop, T0: drop, T1: drop>(left: T, right: T, fmt: &vector<u8>, a: T0, b: T1) {
+        assert_eq!(left, right, fmt, a, b)
+    }
+
+    fun foo5<T: drop, T0: drop, T1: drop, T2: drop>(left: T, right: T, fmt: &vector<u8>, a: T0, b: T1, c: T2) {
+        assert_eq!(left, right, fmt, a, b, c)
+    }
+
+    fun foo6<T: drop, T0: drop, T1: drop, T2: drop, T3: drop>(left: T, right: T, fmt: &vector<u8>, a: T0, b: T1, c: T2, d: T3) {
+        assert_eq!(left, right, fmt, a, b, c, d)
+    }
+}
