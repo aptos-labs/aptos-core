@@ -18,7 +18,7 @@ error: expected `bool` but found a value of type `integer`
 7 │         (assert!(42, true): ());
   │                  ^^
 
-error: expected `u64` but found a value of type `bool`
+error: invalid argument to `abort`: unsupported type `bool`
   ┌─ tests/checking/typing/other_builtins_invalid.move:7:22
   │
 7 │         (assert!(42, true): ());
@@ -30,7 +30,7 @@ error: expected `bool` but found a value of type `()`
 8 │         (assert!(true && false, *x): bool);
   │          ^^^^^^
 
-error: expected `u64` but found a value of type `u8`
+error: invalid argument to `abort`: unsupported type `u8`
   ┌─ tests/checking/typing/other_builtins_invalid.move:9:32
   │
 9 │         assert!(true || false, 0u8);

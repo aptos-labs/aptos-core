@@ -5833,7 +5833,13 @@ impl ExpTranslator<'_, '_, '_> {
             },
 
             _ => {
-                self.error(&loc, "invalid type for abort");
+                self.error(
+                    &loc,
+                    &format!(
+                        "invalid argument to `abort`: unsupported type `{}`",
+                        ty.display(&self.type_display_context())
+                    ),
+                );
                 None
             },
         }
