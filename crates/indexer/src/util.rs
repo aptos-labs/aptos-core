@@ -139,8 +139,17 @@ pub fn convert_bcs_hex(typ: String, value: String) -> Option<String> {
     match typ.as_str() {
         "0x1::string::String" => bcs::from_bytes::<String>(decoded.as_slice()),
         "u8" => bcs::from_bytes::<u8>(decoded.as_slice()).map(|e| e.to_string()),
+        "u16" => bcs::from_bytes::<u16>(decoded.as_slice()).map(|e| e.to_string()),
+        "u32" => bcs::from_bytes::<u32>(decoded.as_slice()).map(|e| e.to_string()),
         "u64" => bcs::from_bytes::<u64>(decoded.as_slice()).map(|e| e.to_string()),
         "u128" => bcs::from_bytes::<u128>(decoded.as_slice()).map(|e| e.to_string()),
+        "u256" => bcs::from_bytes::<BigDecimal>(decoded.as_slice()).map(|e| e.to_string()),
+        "i8" => bcs::from_bytes::<i8>(decoded.as_slice()).map(|e| e.to_string()),
+        "i16" => bcs::from_bytes::<i16>(decoded.as_slice()).map(|e| e.to_string()),
+        "i32" => bcs::from_bytes::<i32>(decoded.as_slice()).map(|e| e.to_string()),
+        "i64" => bcs::from_bytes::<i64>(decoded.as_slice()).map(|e| e.to_string()),
+        "i128" => bcs::from_bytes::<i128>(decoded.as_slice()).map(|e| e.to_string()),
+        "i256" => bcs::from_bytes::<BigDecimal>(decoded.as_slice()).map(|e| e.to_string()),
         "bool" => bcs::from_bytes::<bool>(decoded.as_slice()).map(|e| e.to_string()),
         "address" => bcs::from_bytes::<Address>(decoded.as_slice()).map(|e| e.to_string()),
         _ => Ok(value),
@@ -152,6 +161,8 @@ pub fn convert_bcs_hex(typ: String, value: String) -> Option<String> {
 pub fn convert_bcs_hex_new(typ: u8, value: String) -> Option<String> {
     let decoded = hex::decode(value.strip_prefix("0x").unwrap_or(&*value)).ok()?;
 
+    // Signed integers are not supported in token v2 property maps right now:
+    // https://github.com/aptos-labs/aptos-core/blob/5f5d138562dd0732e14c3e4265d3aa1218144145/aptos-move/framework/aptos-token-objects/sources/property_map.move#L37
     match typ {
         0 /* bool */ => bcs::from_bytes::<bool>(decoded.as_slice()).map(|e| e.to_string()),
         1 /* u8 */ => bcs::from_bytes::<u8>(decoded.as_slice()).map(|e| e.to_string()),

@@ -21,7 +21,7 @@ use curve25519_dalek::{
     traits::{Identity, VartimeMultiscalarMul},
 };
 use move_core_types::gas_algebra::{NumArgs, NumBytes};
-use move_vm_runtime::native_extensions::SessionListener;
+use move_vm_runtime::native_extensions::{NativeRuntimeRefCheckModelsCompleted, SessionListener};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Reference, StructRef, Value, VectorRef},
@@ -93,6 +93,10 @@ impl SessionListener for NativeRistrettoPointContext {
     fn abort(&mut self) {
         // No state changes to abort. Context will be reset on new session's start.
     }
+}
+
+impl NativeRuntimeRefCheckModelsCompleted for NativeRistrettoPointContext {
+    // No native functions in this context return references, so no models to add.
 }
 
 impl NativeRistrettoPointContext {

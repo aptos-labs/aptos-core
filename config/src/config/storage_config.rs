@@ -237,12 +237,29 @@ impl Default for RocksdbConfigs {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct HotStateConfig {
+    /// Max number of items in each shard.
+    pub max_items_per_shard: usize,
+}
+
+impl Default for HotStateConfig {
+    fn default() -> Self {
+        Self {
+            max_items_per_shard: 250_000,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct StorageConfig {
     pub backup_service_address: SocketAddr,
     /// Top level directory to store the RocksDB
     pub dir: PathBuf,
+    /// Hot state configuration
+    pub hot_state_config: HotStateConfig,
     /// Storage pruning configuration
     pub storage_pruner_config: PrunerConfig,
     /// Subdirectory for storage in tests only
@@ -406,6 +423,7 @@ impl Default for StorageConfig {
         StorageConfig {
             backup_service_address: SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6186),
             dir: PathBuf::from("db"),
+            hot_state_config: HotStateConfig::default(),
             // The prune window must at least out live a RPC request because its sub requests are
             // to return a consistent view of the DB at exactly same version. Considering a few
             // thousand TPS we are potentially going to achieve, and a few minutes a consistent view
@@ -678,8 +696,9 @@ impl ConfigSanitizer for StorageConfig {
                 if !ledger_db_path.is_absolute() {
                     return Err(Error::ConfigSanitizerFailed(
                         sanitizer_name,
-                        "Path {ledger_db_path:?} in db_path_overrides is not an absolute path."
-                            .to_string(),
+                        format!(
+                            "Path {ledger_db_path:?} in db_path_overrides is not an absolute path."
+                        ),
                     ));
                 }
             }
@@ -689,8 +708,7 @@ impl ConfigSanitizer for StorageConfig {
                     if !metadata_path.is_absolute() {
                         return Err(Error::ConfigSanitizerFailed(
                             sanitizer_name,
-                            "Path {metadata_path:?} in db_path_overrides is not an absolute path."
-                                .to_string(),
+                            format!("Path {metadata_path:?} in db_path_overrides is not an absolute path."),
                         ));
                     }
                 }
@@ -705,8 +723,7 @@ impl ConfigSanitizer for StorageConfig {
                     if !metadata_path.is_absolute() {
                         return Err(Error::ConfigSanitizerFailed(
                             sanitizer_name,
-                            "Path {metadata_path:?} in db_path_overrides is not an absolute path."
-                                .to_string(),
+                            format!("Path {metadata_path:?} in db_path_overrides is not an absolute path."),
                         ));
                     }
                 }

@@ -491,24 +491,26 @@ module aptos_experimental::order_book_types {
         self.sequence_number == other.sequence_number
     }
 
-    struct ActiveMatchedOrder has copy, drop {
-        order_id: OrderIdType,
-        matched_size: u64,
-        /// Remaining size of the maker order
-        remaining_size: u64,
-        order_book_type: OrderType,
+    enum ActiveMatchedOrder has copy, drop {
+        V1 {
+            order_id: OrderIdType,
+            matched_size: u64,
+            /// Remaining size of the maker order
+            remaining_size: u64,
+            order_book_type: OrderType,
+        }
     }
 
     public(friend) fun new_active_matched_order(
         order_id: OrderIdType, matched_size: u64, remaining_size: u64, order_book_type: OrderType
     ): ActiveMatchedOrder {
-        ActiveMatchedOrder { order_id, matched_size, remaining_size, order_book_type }
+        ActiveMatchedOrder::V1 { order_id, matched_size, remaining_size, order_book_type }
     }
 
     public(friend) fun destroy_active_matched_order(
         self: ActiveMatchedOrder
     ): (OrderIdType, u64, u64, OrderType) {
-        let ActiveMatchedOrder { order_id, matched_size, remaining_size, order_book_type } = self;
+        let ActiveMatchedOrder::V1 { order_id, matched_size, remaining_size, order_book_type } = self;
         (order_id, matched_size, remaining_size, order_book_type)
     }
 

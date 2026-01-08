@@ -4,6 +4,10 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+## [7.13.0]
+- Set language version 2.3 and bytecode version v9 as default, adding support for signed integer types.
+- Update default version of formatter to 1.4.5 and move mutation tests to 2.2.0.
+
 ## [7.12.1]
 - Fix link time optimization issues with Aptos CLI released via homebrew.
 

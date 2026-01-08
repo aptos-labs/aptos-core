@@ -24,7 +24,7 @@ use crate::{
         loader::traits::Loader, ty_depth_checker::TypeDepthChecker,
         ty_layout_converter::LayoutConverter,
     },
-    trace, LoadedFunction, RuntimeEnvironment,
+    tracing, LoadedFunction, RuntimeEnvironment,
 };
 use fail::fail_point;
 use itertools::Itertools;
@@ -235,7 +235,7 @@ where
             loader,
             ty_depth_checker,
             layout_converter,
-            ref_state: RefCheckState::new(),
+            ref_state: RefCheckState::new(extensions.get_native_runtime_ref_checks_model()),
         };
 
         // Tracing and runtime checks (full or partial) are mutually exclusive because if we record
@@ -980,7 +980,7 @@ where
                 }
             }
         }
-        RTRCheck::core_call_transition(num_param_tys, num_locals, mask, &mut self.ref_state)?;
+        RTRCheck::core_call_transition(&function, mask, &mut self.ref_state)?;
         Frame::make_new_frame::<RTTCheck>(
             gas_meter,
             call_type,
@@ -1021,7 +1021,7 @@ where
         )
         .map_err(|e| match function.module_id() {
             Some(id) => {
-                let e = if cfg!(feature = "testing") || cfg!(feature = "stacktrace") {
+                let e = if self.vm_config.enable_debugging {
                     e.with_exec_state(self.get_internal_state())
                 } else {
                     e
@@ -1141,6 +1141,8 @@ where
                         }
                     }
                 }
+                // Perform reference transition for native call-return.
+                RTRCheck::native_static_dispatch_transition(function, mask, &mut self.ref_state)?;
 
                 current_frame.pc += 1; // advance past the Call instruction in the caller
                 Ok(false)
@@ -1220,6 +1222,10 @@ where
                         self.operand_stack.push_ty(ty)?;
                     }
                 }
+
+                // Perform reference transition for native dynamic dispatch and preparation
+                // for calling the target function.
+                RTRCheck::native_dynamic_dispatch_transition(function, mask, &mut self.ref_state)?;
 
                 let frame_cache = if self
                     .vm_config
@@ -1964,7 +1970,7 @@ impl Frame {
             trace_recorder,
         )
         .map_err(|e| {
-            let e = if cfg!(feature = "testing") || cfg!(feature = "stacktrace") {
+            let e = if interpreter.vm_config.enable_debugging {
                 e.with_exec_state(interpreter.get_internal_state())
             } else {
                 e
@@ -1994,17 +2000,21 @@ impl Frame {
 
         let frame_cache = &mut *self.frame_cache.borrow_mut();
 
+        let enable_debugging = interpreter.vm_config.enable_debugging;
+
         let code = self.function.code();
         loop {
             for instruction in &code[self.pc as usize..] {
-                trace!(
-                    &self.function,
-                    &self.locals,
-                    self.pc,
-                    instruction,
-                    interpreter.loader.runtime_environment(),
-                    interpreter
-                );
+                if enable_debugging {
+                    tracing::debug_trace(
+                        &self.function,
+                        &self.locals,
+                        self.pc,
+                        instruction,
+                        interpreter.loader.runtime_environment(),
+                        interpreter,
+                    );
+                }
 
                 fail_point!("move_vm::interpreter_loop", |_| {
                     Err(
@@ -2732,13 +2742,45 @@ impl Frame {
                             )?;
                             eprintln!("trace abort({}): {}", error_code, str);
                         }
+
+                        // Important: do not attach a message here.
+                        // We rely on the presence of an error message to distinguish
+                        // aborts with explicit messages (see below) from those without.
+                        let error =
+                            PartialVMError::new(StatusCode::ABORTED).with_sub_status(error_code);
+
+                        // Before returning an abort error, ensure the instruction is recorded in
+                        // the trace, so the trace is full.
+                        trace_recorder.record_successful_instruction(instruction);
+                        return Err(error);
+                    },
+                    Instruction::AbortMsg => {
+                        gas_meter.charge_simple_instr(S::Abort)?;
+
+                        let vec = interpreter.operand_stack.pop_as::<Vector>()?;
+                        let bytes = vec.to_vec_u8()?;
+                        // TODO(aborts): Add a test that triggers this error.
+                        let error_message = String::from_utf8(bytes).map_err(|err| {
+                            PartialVMError::new(StatusCode::INVALID_ABORT_MESSAGE)
+                                .with_message(format!("Invalid UTF-8 string: {err}"))
+                        })?;
+
+                        let error_code = interpreter.operand_stack.pop_as::<u64>()?;
+
+                        if is_tracing_for!(TraceCategory::Abort(error_code)) {
+                            let mut str = String::new();
+                            interpreter.debug_print_stack_trace(
+                                &mut str,
+                                interpreter.loader.runtime_environment(),
+                            )?;
+                            eprintln!(
+                                "trace abort_msg({}, {}): {}",
+                                error_code, error_message, str
+                            );
+                        }
                         let error = PartialVMError::new(StatusCode::ABORTED)
                             .with_sub_status(error_code)
-                            .with_message(format!(
-                                "{} at offset {}",
-                                self.function.name_as_pretty_string(),
-                                self.pc,
-                            ));
+                            .with_message(error_message);
 
                         // Before returning an abort error, ensure the instruction is recorded in
                         // the trace, so the trace is full.

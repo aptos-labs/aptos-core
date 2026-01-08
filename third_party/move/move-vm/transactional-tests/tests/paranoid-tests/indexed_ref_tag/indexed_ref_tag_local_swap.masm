@@ -1,0 +1,57 @@
+// Purpose: ensure swapping locals that own enum values does not invalidate a
+//          previously borrowed indexed reference when the underlying tag stays put.
+// Flow:
+//   (1) create Foo::A(11) -> store in f1
+//   (2) create Foo::B(22) -> store in f2
+//   (3) borrow payload_ref = &f1.A::x (tag-protected reference)
+//   (4) swap f1 <-> f2 via manual move sequence (no std::mem::swap involved)
+//   (5) read payload_ref; succeeds because Foo::A instance never mutated
+// Diagram (after step 3)             Diagram (after step 4 swap)
+//   f1 ──▶ Foo::A { x:11 } ◀── payload_ref   f1 ──▶ Foo::B { x:22 }
+//   f2 ──▶ Foo::B { x:22 }                  f2 ──▶ Foo::A { x:11 } ◀── payload_ref
+//   tmp empty                               tmp empty
+
+//# publish
+module 0xc0ffe4::local_swap
+
+enum Foo has drop
+  A
+    x: u64
+  B
+    x: u64
+
+public fun stale_mem_swap()
+    local f1: Foo
+    local f2: Foo
+    local tmp: Foo
+    local payload_ref: &u64
+
+    ld_u64 11
+    pack_variant Foo, A
+    st_loc f1
+
+    ld_u64 22
+    pack_variant Foo, B
+    st_loc f2
+
+    // Borrow field from f1
+    borrow_loc f1
+    borrow_variant_field Foo, A::x
+    st_loc payload_ref
+
+    // Attempt to swap f1 and f2 while stale ref exists (manual swap)
+    move_loc f1
+    st_loc tmp
+    move_loc f2
+    st_loc f1
+    move_loc tmp
+    st_loc f2
+
+    // Attempt to read stale ref
+    move_loc payload_ref
+    read_ref
+    pop
+    ret
+
+//# run 0xc0ffe4::local_swap::stale_mem_swap --verbose
+

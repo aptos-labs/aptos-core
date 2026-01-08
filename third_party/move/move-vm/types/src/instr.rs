@@ -124,6 +124,10 @@ pub enum Instruction {
     CastI128,
     CastI256,
     Negate,
+
+    // TODO(aborts): Add this instruction to the bytecode.
+    // Pops an error message (vector<u8>) and an error code (u64) off the stack.
+    AbortMsg,
 }
 
 impl Instruction {
@@ -193,6 +197,7 @@ impl Instruction {
             Instruction::Le => "le",
             Instruction::Ge => "ge",
             Instruction::Abort => "abort",
+            Instruction::AbortMsg => "abort_msg",
             Instruction::Nop => "nop",
             Instruction::Exists(_) => "exists",
             Instruction::ExistsGeneric(_) => "exists_generic",

@@ -6,23 +6,25 @@
 ////////////////////////////////////////////////////////////
 
 use crate::{account_address::AccountAddress, validator_verifier::ValidatorVerifier};
-use aptos_batch_encryption::{schemes::fptx::FPTX, traits::BatchThresholdEncryption};
+use aptos_batch_encryption::{
+    schemes::fptx_weighted::FPTXWeighted, traits::BatchThresholdEncryption,
+};
 use aptos_crypto::hash::HashValue;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 
-pub type EncryptionKey = <FPTX as BatchThresholdEncryption>::EncryptionKey;
-pub type DigestKey = <FPTX as BatchThresholdEncryption>::DigestKey;
-pub type Ciphertext = <FPTX as BatchThresholdEncryption>::Ciphertext;
-pub type Id = <FPTX as BatchThresholdEncryption>::Id;
-pub type Round = <FPTX as BatchThresholdEncryption>::Round;
-pub type Digest = <FPTX as BatchThresholdEncryption>::Digest;
-pub type EvalProofsPromise = <FPTX as BatchThresholdEncryption>::EvalProofsPromise;
-pub type EvalProofs = <FPTX as BatchThresholdEncryption>::EvalProofs;
-pub type MasterSecretKeyShare = <FPTX as BatchThresholdEncryption>::MasterSecretKeyShare;
-pub type VerificationKey = <FPTX as BatchThresholdEncryption>::VerificationKey;
-pub type SecretKeyShare = <FPTX as BatchThresholdEncryption>::DecryptionKeyShare;
-pub type DecryptionKey = <FPTX as BatchThresholdEncryption>::DecryptionKey;
+pub type EncryptionKey = <FPTXWeighted as BatchThresholdEncryption>::EncryptionKey;
+pub type DigestKey = <FPTXWeighted as BatchThresholdEncryption>::DigestKey;
+pub type Ciphertext = <FPTXWeighted as BatchThresholdEncryption>::Ciphertext;
+pub type Id = <FPTXWeighted as BatchThresholdEncryption>::Id;
+pub type Round = <FPTXWeighted as BatchThresholdEncryption>::Round;
+pub type Digest = <FPTXWeighted as BatchThresholdEncryption>::Digest;
+pub type EvalProofsPromise = <FPTXWeighted as BatchThresholdEncryption>::EvalProofsPromise;
+pub type EvalProofs = <FPTXWeighted as BatchThresholdEncryption>::EvalProofs;
+pub type MasterSecretKeyShare = <FPTXWeighted as BatchThresholdEncryption>::MasterSecretKeyShare;
+pub type VerificationKey = <FPTXWeighted as BatchThresholdEncryption>::VerificationKey;
+pub type SecretKeyShare = <FPTXWeighted as BatchThresholdEncryption>::DecryptionKeyShare;
+pub type DecryptionKey = <FPTXWeighted as BatchThresholdEncryption>::DecryptionKey;
 
 pub type Author = AccountAddress;
 
@@ -87,10 +89,11 @@ impl SecretShare {
             .map(|dec_share| dec_share.share.clone())
             .take(threshold as usize)
             .collect();
-        let decryption_key = <FPTX as BatchThresholdEncryption>::reconstruct_decryption_key(
-            &shares,
-            &config.config,
-        )?;
+        let decryption_key =
+            <FPTXWeighted as BatchThresholdEncryption>::reconstruct_decryption_key(
+                &shares,
+                &config.config,
+            )?;
         Ok(decryption_key)
     }
 
@@ -136,7 +139,7 @@ pub struct SecretShareConfig {
     digest_key: DigestKey,
     msk_share: MasterSecretKeyShare,
     verification_keys: Vec<VerificationKey>,
-    config: <FPTX as BatchThresholdEncryption>::ThresholdConfig,
+    config: <FPTXWeighted as BatchThresholdEncryption>::ThresholdConfig,
     encryption_key: EncryptionKey,
     weights: HashMap<Author, u64>,
 }
@@ -149,7 +152,7 @@ impl SecretShareConfig {
         digest_key: DigestKey,
         msk_share: MasterSecretKeyShare,
         verification_keys: Vec<VerificationKey>,
-        config: <FPTX as BatchThresholdEncryption>::ThresholdConfig,
+        config: <FPTXWeighted as BatchThresholdEncryption>::ThresholdConfig,
         encryption_key: EncryptionKey,
     ) -> Self {
         Self {
@@ -182,11 +185,11 @@ impl SecretShareConfig {
     }
 
     pub fn threshold(&self) -> u64 {
-        self.config.t as u64
+        self.config.get_threshold_config().t as u64
     }
 
     pub fn number_of_validators(&self) -> u64 {
-        self.config.n as u64
+        self.config.get_threshold_config().n as u64
     }
 
     pub fn get_peer_weight(&self, _peer: &Author) -> u64 {
