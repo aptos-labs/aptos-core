@@ -44,7 +44,7 @@ pub const DST: &[u8; 35] = b"APTOS_CHUNKED_ELGAMAL_GENERATOR_DST"; // This is us
 #[allow(non_snake_case)]
 pub struct WeightedHomomorphism<'a, C: CurveGroup> {
     pub pp: &'a PublicParameters<C::Affine>, // These are small so no harm in copying them here
-    pub eks: &'a [C::Affine],
+    pub eks: &'a [C::Affine], // TODO: capitalize to EKs ? 
 }
 
 #[allow(non_snake_case)]

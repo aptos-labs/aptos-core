@@ -5,8 +5,8 @@
 
 use crate::{
     algebra::polynomials,
-    pcs::univariate_hiding_kzg::{self, BasisType},
-    range_proofs::{dekart_univariate_v2::univariate_hiding_kzg::MsmBasis, traits},
+    pcs::univariate_hiding_kzg::{self, SrsType},
+    range_proofs::{dekart_univariate_v2::univariate_hiding_kzg::SrsBasis, traits},
     sigma_protocol::{
         self,
         homomorphism::{self, Trait as _},
@@ -266,10 +266,9 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         let (vk_hkzg, ck_S) = univariate_hiding_kzg::setup(
             max_n + 1,
-            BasisType::Lagrange,
+            SrsType::Lagrange,
             group_generators.clone(),
             trapdoor,
-            rng,
         );
 
         let h_denom_eval = compute_h_denom_eval::<E>(&ck_S.roots_of_unity_in_eval_dom);
@@ -287,8 +286,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         };
 
         let lagr_0: E::G1Affine = match &ck_S.msm_basis {
-            MsmBasis::Lagrange { lagr_g1 } => lagr_g1[0],
-            MsmBasis::PowersOfTau { .. } => panic!("Wrong basis, this should not happen"),
+            SrsBasis::Lagrange { lagr_g1 } => lagr_g1[0],
+            SrsBasis::PowersOfTau { .. } => panic!("Wrong basis, this should not happen"),
         };
 
         let vk = VerificationKey {
@@ -369,8 +368,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         } = ck_S;
 
         let lagr_g1: &[E::G1Affine] = match msm_basis {
-            MsmBasis::Lagrange { lagr_g1 } => lagr_g1,
-            MsmBasis::PowersOfTau { .. } => panic!("Expected Lagrange basis, got powers-of-tau"),
+            SrsBasis::Lagrange { lagr_g1 } => lagr_g1,
+            SrsBasis::PowersOfTau { .. } => panic!("Expected Lagrange basis, somehow got PowersOfTau basis instead"),
         };
 
         debug_assert_eq!(

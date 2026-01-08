@@ -550,10 +550,9 @@ where
         let trapdoor = univariate_hiding_kzg::Trapdoor::<P>::rand(rng);
         let (kzg_vk_pp, kzg_commit_pp) = univariate_hiding_kzg::setup_extra(
             number_of_coefficients,
-            univariate_hiding_kzg::BasisType::PowersOfTau,
+            univariate_hiding_kzg::SrsType::PowersOfTau,
             GroupGenerators::default(),
             trapdoor,
-            rng,
         );
         //let open_pp = commit_pp;
 
