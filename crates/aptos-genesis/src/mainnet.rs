@@ -154,13 +154,14 @@ impl MainnetGenesisInfo {
         let path = TempPath::new();
         let aptosdb = AptosDB::open(
             StorageDirPaths::from_path(path),
-            false,
+            /* readonly = */ false,
             NO_OP_STORAGE_PRUNER_CONFIG,
             RocksdbConfigs::default(),
-            false, /* indexer */
+            /* enable_indexer = */ false,
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-            None,
+            /* internal_indexer_db = */ None,
+            /* reset_hot_state = */ true,
         )?;
         let db_rw = DbReaderWriter::new(aptosdb);
         aptos_executor::db_bootstrapper::generate_waypoint::<AptosVMBlockExecutor>(&db_rw, genesis)
