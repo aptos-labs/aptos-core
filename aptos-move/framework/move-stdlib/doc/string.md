@@ -186,7 +186,8 @@ Returns the underlying byte vector.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="string.md#0x1_string_into_bytes">into_bytes</a>(self: <a href="string.md#0x1_string_String">String</a>): <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    self.bytes
+    <b>let</b> <a href="string.md#0x1_string_String">String</a> { bytes } = self;
+    bytes
 }
 </code></pre>
 
