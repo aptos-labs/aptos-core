@@ -6,7 +6,7 @@ use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_push_metrics::MetricsPusher;
 use aptos_rest_client::{AptosBaseUrl, Client};
 pub use benchmark::BenchmarkCommand;
-use clap::Parser;
+use clap::Args;
 pub use diff::DiffCommand;
 pub use download::DownloadCommand;
 pub use initialize::InitializeCommand;
@@ -38,14 +38,18 @@ pub(crate) fn build_debugger(
     AptosDebugger::rest_client(client)
 }
 
-#[derive(Parser)]
+pub(crate) fn build_debugger_with_db(db_path: String) -> anyhow::Result<AptosDebugger> {
+    AptosDebugger::db(db_path)
+}
+
+#[derive(Args)]
 pub struct RestAPI {
     #[clap(
         long,
         help = "Fullnode's REST API query endpoint, e.g., https://api.mainnet.aptoslabs.com/v1 \
                 for mainnet"
     )]
-    rest_endpoint: String,
+    rest_endpoint: Option<String>,
 
     #[clap(
         long,
