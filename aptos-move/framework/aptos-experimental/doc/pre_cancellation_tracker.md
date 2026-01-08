@@ -12,7 +12,7 @@ which means specify that this order with a client order id is cancelled even bef
 This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 
 
--  [Struct `PreCancellationTracker`](#0x7_pre_cancellation_tracker_PreCancellationTracker)
+-  [Enum `PreCancellationTracker`](#0x7_pre_cancellation_tracker_PreCancellationTracker)
 -  [Struct `ExpirationAndOrderId`](#0x7_pre_cancellation_tracker_ExpirationAndOrderId)
 -  [Constants](#@Constants_0)
 -  [Function `new_default_big_ordered_map`](#0x7_pre_cancellation_tracker_new_default_big_ordered_map)
@@ -33,13 +33,21 @@ This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 
 <a id="0x7_pre_cancellation_tracker_PreCancellationTracker"></a>
 
-## Struct `PreCancellationTracker`
+## Enum `PreCancellationTracker`
 
 
 
-<pre><code><b>struct</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_PreCancellationTracker">PreCancellationTracker</a> <b>has</b> store
+<pre><code>enum <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_PreCancellationTracker">PreCancellationTracker</a> <b>has</b> store
 </code></pre>
 
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>V1</summary>
 
 
 <details>
@@ -67,6 +75,10 @@ This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 </dd>
 </dl>
 
+
+</details>
+
+</details>
 
 </details>
 
@@ -188,7 +200,7 @@ This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_new_pre_cancellation_tracker">new_pre_cancellation_tracker</a>(expiration_time_secs: u64): <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_PreCancellationTracker">PreCancellationTracker</a> {
-    <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_PreCancellationTracker">PreCancellationTracker</a> {
+    PreCancellationTracker::V1 {
         pre_cancellation_window_secs: expiration_time_secs,
         expiration_with_order_ids: <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_new_default_big_ordered_map">new_default_big_ordered_map</a>(),
         account_order_ids: <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_new_default_big_ordered_map">new_default_big_ordered_map</a>(),

@@ -142,6 +142,15 @@ AssertionSignature:
         STRUCT:
           - signature:
               TYPENAME: Secp256r1EcdsaSignature
+BIBECiphertext:
+  STRUCT:
+    - id:
+        TYPENAME: FreeRootId
+    - ct_g2: BYTES
+    - padded_key:
+        TYPENAME: OneTimePaddedKey
+    - symmetric_ciphertext:
+        TYPENAME: SymmetricCiphertext
 BitVec:
   STRUCT:
     - inner: BYTES
@@ -218,6 +227,16 @@ ChangeSet:
     - events:
         SEQ:
           TYPENAME: ContractEvent
+Ciphertext:
+  STRUCT:
+    - vk: BYTES
+    - bibe_ct:
+        TYPENAME: BIBECiphertext
+    - associated_data_bytes: BYTES
+    - signature:
+        TUPLEARRAY:
+          CONTENT: U8
+          SIZE: 64
 CoinStoreResource:
   STRUCT:
     - coin: U64
@@ -274,7 +293,8 @@ EncryptedPayload:
     0:
       Encrypted:
         STRUCT:
-          - ciphertext: BYTES
+          - ciphertext:
+              TYPENAME: Ciphertext
           - extra_config:
               TYPENAME: TransactionExtraConfig
           - payload_hash:
@@ -282,21 +302,25 @@ EncryptedPayload:
     1:
       FailedDecryption:
         STRUCT:
-          - ciphertext: BYTES
+          - ciphertext:
+              TYPENAME: Ciphertext
           - extra_config:
               TYPENAME: TransactionExtraConfig
           - payload_hash:
               TYPENAME: HashValue
-          - eval_proof: BYTES
+          - eval_proof:
+              TYPENAME: EvalProof
     2:
       Decrypted:
         STRUCT:
-          - ciphertext: BYTES
+          - ciphertext:
+              TYPENAME: Ciphertext
           - extra_config:
               TYPENAME: TransactionExtraConfig
           - payload_hash:
               TYPENAME: HashValue
-          - eval_proof: BYTES
+          - eval_proof:
+              TYPENAME: EvalProof
           - executable:
               TYPENAME: TransactionExecutable
           - decryption_nonce: U64
@@ -328,11 +352,6 @@ EphemeralPublicKey:
         STRUCT:
           - public_key:
               TYPENAME: Ed25519PublicKey
-    1:
-      Secp256r1Ecdsa:
-        STRUCT:
-          - public_key:
-              TYPENAME: Secp256r1EcdsaPublicKey
 EphemeralSignature:
   ENUM:
     0:
@@ -345,6 +364,8 @@ EphemeralSignature:
         STRUCT:
           - signature:
               TYPENAME: PartialAuthenticatorAssertionResponse
+EvalProof:
+  NEWTYPESTRUCT: BYTES
 EventHandle:
   STRUCT:
     - count: U64
@@ -396,6 +417,9 @@ FeeDistribution:
               MAP:
                 KEY: U64
                 VALUE: U64
+FreeRootId:
+  STRUCT:
+    - root_x: BYTES
 FunctionInfo:
   STRUCT:
     - module_address:
@@ -511,6 +535,11 @@ MultisigTransactionPayload:
       EntryFunction:
         NEWTYPE:
           TYPENAME: EntryFunction
+OneTimePaddedKey:
+  NEWTYPESTRUCT:
+    TUPLEARRAY:
+      CONTENT: U8
+      SIZE: 16
 OpenIdSig:
   STRUCT:
     - jwt_sig: BYTES
@@ -658,6 +687,13 @@ StructTag:
     - type_args:
         SEQ:
           TYPENAME: TypeTag
+SymmetricCiphertext:
+  STRUCT:
+    - nonce:
+        TUPLEARRAY:
+          CONTENT: U8
+          SIZE: 12
+    - ct_body: BYTES
 TableHandle:
   NEWTYPESTRUCT:
     TYPENAME: AccountAddress

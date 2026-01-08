@@ -68,6 +68,7 @@ pub fn start_consensus(
         state_sync_notifier,
         node_config.transaction_filters.execution_filter.clone(),
         node_config.consensus.enable_pre_commit,
+        None,
     );
 
     let time_service = Arc::new(ClockTimeService::new(runtime.handle().clone()));
@@ -160,6 +161,7 @@ pub fn start_consensus_observer(
             state_sync_notifier,
             node_config.transaction_filters.execution_filter.clone(),
             node_config.consensus.enable_pre_commit,
+            None,
         );
 
         // Create the execution proxy client

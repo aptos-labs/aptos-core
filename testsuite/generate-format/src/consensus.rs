@@ -11,11 +11,11 @@ use aptos_crypto::{
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
+    aggregate_signature::AggregateSignature,
     block_metadata_ext::BlockMetadataExt,
     contract_event, event,
     state_store::{state_key::StateKey, state_value::PersistedStateValueMetadata},
-    transaction,
-    transaction::block_epilogue::BlockEpiloguePayload,
+    transaction::{self, block_epilogue::BlockEpiloguePayload},
     validator_txn::ValidatorTransaction,
     write_set,
 };
@@ -69,25 +69,28 @@ fn trace_crypto_values(tracer: &mut Tracer, samples: &mut Samples) -> Result<()>
     tracer.trace_value(samples, &secp256r1_ecdsa_signature)?;
 
     crate::trace_keyless_structs(tracer, samples, public_key, signature)?;
+    crate::trace_encrypted_txn_structs(tracer, samples)?;
 
     Ok(())
 }
 
 /// Create a registry for consensus types.
 pub fn get_registry() -> Result<Registry> {
-    let mut tracer =
-        Tracer::new(TracerConfig::default().is_human_readable(bcs::is_human_readable()));
+    let mut tracer = Tracer::new(
+        TracerConfig::default()
+            .record_samples_for_structs(true)
+            .is_human_readable(bcs::is_human_readable()),
+    );
     let mut samples = Samples::new();
+
     // 1. Record samples for types with custom deserializers.
     trace_crypto_values(&mut tracer, &mut samples)?;
-    tracer.trace_value(
-        &mut samples,
-        &aptos_consensus_types::block::Block::make_genesis_block(),
-    )?;
     tracer.trace_value(&mut samples, &event::EventKey::random())?;
     tracer.trace_value(&mut samples, &write_set::WriteOp::legacy_deletion())?;
 
     // 2. Trace the main entry point(s) + every enum separately.
+    tracer.trace_type::<AggregateSignature>(&samples)?;
+    tracer.trace_type::<aptos_consensus_types::block::Block>(&samples)?;
     tracer.trace_type::<contract_event::ContractEvent>(&samples)?;
     tracer.trace_type::<language_storage::FunctionParamOrReturnTag>(&samples)?;
     tracer.trace_type::<language_storage::TypeTag>(&samples)?;

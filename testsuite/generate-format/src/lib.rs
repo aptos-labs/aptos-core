@@ -4,10 +4,11 @@
 //! How and where to record the Serde format of interesting Aptos types.
 //! See API documentation with `cargo doc -p serde-reflection --open`
 
+use aptos_batch_encryption::shared::ids::FreeRootId;
 use aptos_crypto::ed25519::{Ed25519PublicKey, Ed25519Signature};
 use aptos_types::{
-    keyless,
-    keyless::{EphemeralCertificate, Groth16Proof, IdCommitment, Pepper, ZeroKnowledgeSig},
+    keyless::{self, EphemeralCertificate, Groth16Proof, IdCommitment, Pepper, ZeroKnowledgeSig},
+    secret_sharing::{Ciphertext, EvalProof},
     transaction::authenticator::{EphemeralPublicKey, EphemeralSignature},
 };
 use clap::{Parser, ValueEnum};
@@ -87,6 +88,9 @@ pub(crate) fn trace_keyless_structs(
     public_key: Ed25519PublicKey,
     signature: Ed25519Signature,
 ) -> serde_reflection::Result<()> {
+    tracer.trace_type::<ZeroKnowledgeSig>(samples)?;
+    tracer.trace_type::<EphemeralSignature>(samples)?;
+
     let keyless_public_key = keyless::KeylessPublicKey {
         iss_val: "".to_string(),
         idc: IdCommitment::new_from_preimage(&Pepper::from_number(2), "", "", "").unwrap(),
@@ -106,6 +110,18 @@ pub(crate) fn trace_keyless_structs(
     };
     tracer.trace_value(samples, &keyless_public_key)?;
     tracer.trace_value(samples, &keyless_signature)?;
+
+    Ok(())
+}
+
+// TODO(ibalajiarun): Revisit recording struct sample values
+fn trace_encrypted_txn_structs(
+    tracer: &mut Tracer,
+    samples: &mut Samples,
+) -> serde_reflection::Result<()> {
+    tracer.trace_value(samples, &Ciphertext::random())?;
+    tracer.trace_value(samples, &FreeRootId::zero())?;
+    tracer.trace_value(samples, &EvalProof::random())?;
 
     Ok(())
 }

@@ -63,6 +63,7 @@ pub trait BIBECTDecrypt<P: Plaintext> {
 pub struct Ciphertext<I: Id> {
     vk: VerifyingKey,
     bibe_ct: BIBECiphertext<I>,
+    #[serde(with = "serde_bytes")]
     associated_data_bytes: Vec<u8>,
     signature: Signature,
 }
@@ -111,7 +112,7 @@ impl<I: Id, EK: BIBEEncryptionKey> CTEncrypt<I> for EK {
         rng.fill_bytes(&mut signing_key_bytes);
 
         let signing_key: SigningKey = SigningKey::from_bytes(&signing_key_bytes);
-        let vk = signing_key.verifying_key();
+        let vk: VerifyingKey = signing_key.verifying_key();
         let hashed_id = I::from_verifying_key(&vk);
         let bibe_ct = self.bibe_encrypt(rng, plaintext, hashed_id)?;
 
@@ -161,6 +162,18 @@ impl<I: Id> BIBECiphertext<I> {
 }
 
 impl<I: Id> Ciphertext<I> {
+    pub fn random() -> Self {
+        use crate::schemes::fptx::EncryptionKey;
+        use ark_std::rand::thread_rng;
+
+        let mut rng = thread_rng();
+        let enc_key = EncryptionKey::new(G2Affine::generator(), G2Affine::generator());
+
+        enc_key
+            .encrypt(&mut rng, &String::from("random"), &String::from("data"))
+            .unwrap()
+    }
+
     pub fn verify(&self, associated_data: &impl AssociatedData) -> Result<()> {
         let hashed_id = I::from_verifying_key(&self.vk);
 

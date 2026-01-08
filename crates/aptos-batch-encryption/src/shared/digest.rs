@@ -16,7 +16,10 @@ use ark_std::{
 };
 use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    ops::{Deref, DerefMut},
+};
 
 /// The digest public parameters.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -202,7 +205,37 @@ pub struct EvalProofs<IS: OssifiedIdSet> {
 
 impl<IS: OssifiedIdSet> EvalProofs<IS> {
     pub fn get(&self, i: &IS::Id) -> Option<G1Affine> {
+        // TODO(ibalajiarun): No need to copy here
         self.computed_proofs.get(i).copied()
+    }
+}
+
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct EvalProof(#[serde(serialize_with = "ark_se", deserialize_with = "ark_de")] G1Affine);
+
+impl Deref for EvalProof {
+    type Target = G1Affine;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for EvalProof {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl From<G1Affine> for EvalProof {
+    fn from(value: G1Affine) -> Self {
+        Self(value)
+    }
+}
+
+impl EvalProof {
+    pub fn random() -> Self {
+        Self(G1Affine::generator())
     }
 }
 
