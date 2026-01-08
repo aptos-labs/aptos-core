@@ -43,6 +43,8 @@ module aptos_framework::sui_derivable_account {
     const EACCOUNT_ADDRESS_MISMATCH: u64 = 7;
     /// Malformed data with trailing bytes.
     const EMALFORMED_DATA: u64 = 8;
+    /// Function is deprecated and should not be called.
+    const EDEPRECATED: u64 = 9;
 
     enum SuiAbstractSignature has drop {
         MessageV1 {
@@ -193,7 +195,21 @@ module aptos_framework::sui_derivable_account {
         pragma verify = false;
     }
 
-    fun authenticate_auth_data(
+    /// @deprecated This function is deprecated and will always abort.
+    public fun authenticate_auth_data(
+        _aa_auth_data: AbstractionAuthData,
+        _entry_function_name: &vector<u8>
+    ) {
+        abort(EDEPRECATED)
+    }
+
+    spec authenticate_auth_data_internal {
+        // TODO: Issue with `cannot appear in both arithmetic and bitwise
+        // operation`
+        pragma verify = false;
+    }
+
+    fun authenticate_auth_data_internal(
         aa_auth_data: AbstractionAuthData,
         entry_function_name: &vector<u8>
     ) {
@@ -248,13 +264,13 @@ module aptos_framework::sui_derivable_account {
     }
 
     spec authenticate {
-        // TODO: Issue with spec for authenticate_auth_data
+        // TODO: Issue with spec for authenticate_auth_data_internal
         pragma verify = false;
     }
 
     /// Authorization function for domain account abstraction.
     public fun authenticate(account: signer, aa_auth_data: AbstractionAuthData): signer {
-        daa_authenticate(account, aa_auth_data, |auth_data, entry_name| authenticate_auth_data(auth_data, entry_name))
+        daa_authenticate(account, aa_auth_data, |auth_data, entry_name| authenticate_auth_data_internal(auth_data, entry_name))
     }
 
     #[test_only]
@@ -326,7 +342,7 @@ module aptos_framework::sui_derivable_account {
 
         let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
 
-        authenticate_auth_data(auth_data, &entry_function_name);
+        authenticate_auth_data_internal(auth_data, &entry_function_name);
     }
 
     #[test(framework = @0x1)]
@@ -346,7 +362,7 @@ module aptos_framework::sui_derivable_account {
 
         let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
 
-        authenticate_auth_data(auth_data, &entry_function_name);
+        authenticate_auth_data_internal(auth_data, &entry_function_name);
     }
 
     #[test(framework = @0x1)]
@@ -366,7 +382,7 @@ module aptos_framework::sui_derivable_account {
 
         let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
 
-        authenticate_auth_data(auth_data, &entry_function_name);
+        authenticate_auth_data_internal(auth_data, &entry_function_name);
     }
 
 
@@ -387,7 +403,7 @@ module aptos_framework::sui_derivable_account {
 
         let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
 
-        authenticate_auth_data(auth_data, &entry_function_name);
+        authenticate_auth_data_internal(auth_data, &entry_function_name);
     }
 
     #[test]
