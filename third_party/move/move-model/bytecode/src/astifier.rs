@@ -691,20 +691,15 @@ impl Generator {
                     );
                     self.add_stm(stm);
                 },
-                Abort(_, temp, None) => {
-                    let temp = self.make_temp(ctx, *temp);
+                Abort(_, temp0, temp1) => {
+                    let abort_kind = match temp1 {
+                        None => AbortKind::Code,
+                        Some(_) => AbortKind::Message,
+                    };
+                    let temps = self.make_temps(ctx, std::iter::once(*temp0).chain(*temp1));
                     let stm = ExpData::Call(
                         self.new_stm_node_id(ctx),
-                        Operation::Abort(AbortKind::Code),
-                        vec![temp],
-                    );
-                    self.add_stm(stm);
-                },
-                Abort(_, temp0, Some(temp1)) => {
-                    let temps = self.make_temps(ctx, [*temp0, *temp1]);
-                    let stm = ExpData::Call(
-                        self.new_stm_node_id(ctx),
-                        Operation::Abort(AbortKind::Message),
+                        Operation::Abort(abort_kind),
                         temps,
                     );
                     self.add_stm(stm);

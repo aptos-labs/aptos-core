@@ -1534,9 +1534,6 @@ impl<'a> ExpSourcifier<'a> {
     }
 
     fn is_unspecified_abort_code(exp: &Exp) -> bool {
-        match exp.as_ref() {
-            ExpData::Value(_, Value::Number(n)) => *n == UNSPECIFIED_ABORT_CODE.into(),
-            _ => false,
-        }
+        matches!(exp.as_ref(), ExpData::Value(_, Value::Number(n)) if *n == UNSPECIFIED_ABORT_CODE.into())
     }
 }
