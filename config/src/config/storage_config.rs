@@ -34,6 +34,7 @@ struct DbPathConfig {
     state_kv_db_path: Option<ShardedDbPathConfig>,
     state_merkle_db_path: Option<ShardedDbPathConfig>,
     hot_state_kv_db_path: Option<ShardedDbPathConfig>,
+    hot_state_merkle_db_path: Option<ShardedDbPathConfig>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -242,12 +243,15 @@ impl Default for RocksdbConfigs {
 pub struct HotStateConfig {
     /// Max number of items in each shard.
     pub max_items_per_shard: usize,
+    /// Whether to delete persisted data on disk on restart. Used during development.
+    pub delete_on_restart: bool,
 }
 
 impl Default for HotStateConfig {
     fn default() -> Self {
         Self {
             max_items_per_shard: 250_000,
+            delete_on_restart: true,
         }
     }
 }
@@ -458,6 +462,7 @@ impl StorageConfig {
         let mut state_kv_db_paths = ShardedDbPaths::default();
         let mut state_merkle_db_paths = ShardedDbPaths::default();
         let mut hot_state_kv_db_paths = ShardedDbPaths::default();
+        let mut hot_state_merkle_db_paths = ShardedDbPaths::default();
 
         if let Some(db_path_overrides) = self.db_path_overrides.as_ref() {
             db_path_overrides
@@ -475,6 +480,12 @@ impl StorageConfig {
             if let Some(hot_state_kv_db_path) = db_path_overrides.hot_state_kv_db_path.as_ref() {
                 hot_state_kv_db_paths = ShardedDbPaths::new(hot_state_kv_db_path);
             }
+
+            if let Some(hot_state_merkle_db_path) =
+                db_path_overrides.hot_state_merkle_db_path.as_ref()
+            {
+                hot_state_merkle_db_paths = ShardedDbPaths::new(hot_state_merkle_db_path);
+            }
         }
 
         StorageDirPaths::new(
@@ -483,6 +494,7 @@ impl StorageConfig {
             state_kv_db_paths,
             state_merkle_db_paths,
             hot_state_kv_db_paths,
+            hot_state_merkle_db_paths,
         )
     }
 
@@ -503,6 +515,7 @@ pub struct StorageDirPaths {
     state_kv_db_paths: ShardedDbPaths,
     state_merkle_db_paths: ShardedDbPaths,
     hot_state_kv_db_paths: ShardedDbPaths,
+    hot_state_merkle_db_paths: ShardedDbPaths,
 }
 
 impl StorageDirPaths {
@@ -548,6 +561,18 @@ impl StorageDirPaths {
             .unwrap_or(&self.default_path)
     }
 
+    pub fn hot_state_merkle_db_metadata_root_path(&self) -> &PathBuf {
+        self.hot_state_merkle_db_paths
+            .metadata_path()
+            .unwrap_or(&self.default_path)
+    }
+
+    pub fn hot_state_merkle_db_shard_root_path(&self, shard_id: usize) -> &PathBuf {
+        self.hot_state_merkle_db_paths
+            .shard_path(shard_id)
+            .unwrap_or(&self.default_path)
+    }
+
     pub fn from_path<P: AsRef<Path>>(path: P) -> Self {
         Self {
             default_path: path.as_ref().to_path_buf(),
@@ -555,6 +580,7 @@ impl StorageDirPaths {
             state_kv_db_paths: Default::default(),
             state_merkle_db_paths: Default::default(),
             hot_state_kv_db_paths: Default::default(),
+            hot_state_merkle_db_paths: Default::default(),
         }
     }
 
@@ -564,6 +590,7 @@ impl StorageDirPaths {
         state_kv_db_paths: ShardedDbPaths,
         state_merkle_db_paths: ShardedDbPaths,
         hot_state_kv_db_paths: ShardedDbPaths,
+        hot_state_merkle_db_paths: ShardedDbPaths,
     ) -> Self {
         Self {
             default_path,
@@ -571,6 +598,7 @@ impl StorageDirPaths {
             state_kv_db_paths,
             state_merkle_db_paths,
             hot_state_kv_db_paths,
+            hot_state_merkle_db_paths,
         }
     }
 }
@@ -729,6 +757,23 @@ impl ConfigSanitizer for StorageConfig {
                 }
 
                 if let Err(e) = state_merkle_db_path.get_shard_paths() {
+                    return Err(Error::ConfigSanitizerFailed(sanitizer_name, e.to_string()));
+                }
+            }
+
+            if let Some(hot_state_merkle_db_path) =
+                db_path_overrides.hot_state_merkle_db_path.as_ref()
+            {
+                if let Some(metadata_path) = hot_state_merkle_db_path.metadata_path.as_ref() {
+                    if !metadata_path.is_absolute() {
+                        return Err(Error::ConfigSanitizerFailed(
+                            sanitizer_name,
+                            format!("Path {metadata_path:?} in db_path_overrides is not an absolute path."),
+                        ));
+                    }
+                }
+
+                if let Err(e) = hot_state_merkle_db_path.get_shard_paths() {
                     return Err(Error::ConfigSanitizerFailed(sanitizer_name, e.to_string()));
                 }
             }
