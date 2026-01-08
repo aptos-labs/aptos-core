@@ -2,17 +2,18 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! For what it's worth, I don't understand why the `merlin` library wants the user to first define
-//! a trait with their 'append' operations and then implement that trait on `merlin::Transcript`.
+//! a trait with their 'append' operations and then implement that trait on `Transcript`.
 //! I also don't understand how that doesn't break the orphan rule in Rust.
 //! I suspect the reason they want the developer to do things these ways is to force them to cleanly
 //! define all the things that are appended to the transcript.
 
 use crate::{
-    range_proofs::traits::BatchedRangeProof, sigma_protocol, sigma_protocol::homomorphism, Scalar,
+    range_proofs::traits::BatchedRangeProof, sigma_protocol, sigma_protocol::homomorphism,
 };
-use ark_ec::pairing::Pairing;
+use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_ff::PrimeField;
 use ark_serialize::CanonicalSerialize;
+use merlin::Transcript;
 use serde::Serialize;
 
 /// Helper trait for deriving random scalars from a transcript.
@@ -24,35 +25,33 @@ use serde::Serialize;
 /// ⚠️ This trait is intentionally private: functions like `challenge_scalars`
 /// should **only** be used internally to ensure properly
 /// labelled scalar generation across Fiat-Shamir protocols.
-//
-// TODO: Again, seems that ideally Scalar<F> should become Scalar<F> instead
 trait ScalarProtocol<F: PrimeField> {
-    fn challenge_full_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<Scalar<F>>;
+    fn challenge_full_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<F>;
 
-    fn challenge_full_scalar(&mut self, label: &[u8]) -> Scalar<F> {
+    fn challenge_full_scalar(&mut self, label: &[u8]) -> F {
         self.challenge_full_scalars(label, 1)[0]
     }
 
-    fn challenge_128bit_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<Scalar<F>>;
+    fn challenge_128bit_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<F>;
 }
 
-impl<F: PrimeField> ScalarProtocol<F> for merlin::Transcript {
-    fn challenge_full_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<Scalar<F>> {
+impl<F: PrimeField> ScalarProtocol<F> for Transcript {
+    fn challenge_full_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<F> {
         let byte_size = (F::MODULUS_BIT_SIZE as usize) / 8;
         let mut buf = vec![0u8; 2 * num_scalars * byte_size];
         self.challenge_bytes(label, &mut buf);
 
         buf.chunks(2 * byte_size)
-            .map(|chunk| Scalar(F::from_le_bytes_mod_order(chunk)))
+            .map(|chunk| F::from_le_bytes_mod_order(chunk))
             .collect()
     }
 
-    fn challenge_128bit_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<Scalar<F>> {
+    fn challenge_128bit_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<F> {
         let mut buf = vec![0u8; num_scalars * 16];
         self.challenge_bytes(label, &mut buf);
 
         buf.chunks(16)
-            .map(|chunk| Scalar(F::from_le_bytes_mod_order(chunk.try_into().unwrap())))
+            .map(|chunk| F::from_le_bytes_mod_order(chunk.try_into().unwrap()))
             .collect()
     }
 }
@@ -97,8 +96,17 @@ pub trait SigmaProtocol<F: PrimeField, H: homomorphism::Trait>: ScalarProtocol<F
     fn challenge_for_sigma_protocol(&mut self) -> F;
 }
 
+// These may or may not need a pairing, so for we're moving the generic parameters to the methods
+pub trait PolynomialCommitmentScheme {
+    fn append_sep(&mut self, dst: &[u8]);
+
+    fn append_point<C: CurveGroup>(&mut self, point: &C);
+
+    fn challenge_scalar<F: PrimeField>(&mut self) -> F;
+}
+
 #[allow(non_snake_case)]
-impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcript {
+impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for Transcript {
     fn append_sep(&mut self, dst: &[u8]) {
         self.append_message(b"dom-sep", dst);
     }
@@ -123,7 +131,7 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcrip
         commitment
             .serialize_compressed(&mut commitment_bytes)
             .expect("hat_f_commitment serialization should succeed");
-        self.append_message(b"hat_f_commitment", commitment_bytes.as_slice());
+        self.append_message(b"hat-f-commitment", commitment_bytes.as_slice());
     }
 
     fn append_sigma_proof<A: CanonicalSerialize>(&mut self, sigma_proof: &A) {
@@ -131,7 +139,7 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcrip
         sigma_proof
             .serialize_compressed(&mut sigma_proof_bytes)
             .expect("sigma proof serialization should succeed");
-        self.append_message(b"sigma_proof_commitment", sigma_proof_bytes.as_slice());
+        self.append_message(b"sigma-proof-commitment", sigma_proof_bytes.as_slice());
     }
 
     fn append_f_j_commitments<A: CanonicalSerialize>(&mut self, f_j_commitments: &A) {
@@ -139,7 +147,7 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcrip
         f_j_commitments
             .serialize_compressed(&mut f_j_commitments_bytes)
             .expect("f_j_commitments serialization should succeed");
-        self.append_message(b"f_j_commitments", f_j_commitments_bytes.as_slice());
+        self.append_message(b"f-j-commitments", f_j_commitments_bytes.as_slice());
     }
 
     fn append_h_commitment<A: CanonicalSerialize>(&mut self, commitment: &A) {
@@ -147,42 +155,34 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcrip
         commitment
             .serialize_compressed(&mut commitment_bytes)
             .expect("h_commitment serialization should succeed");
-        self.append_message(b"h_commitment", commitment_bytes.as_slice());
+        self.append_message(b"h-commitment", commitment_bytes.as_slice());
     }
 
     fn challenges_for_quotient_polynomials(&mut self, ell: usize) -> Vec<E::ScalarField> {
-        let challenges =
-            <merlin::Transcript as ScalarProtocol<E::ScalarField>>::challenge_128bit_scalars(
-                self,
-                b"challenge_for_quotient_polynomials",
-                ell + 1,
-            );
-
-        Scalar::<E::ScalarField>::vec_into_inner(challenges)
+        <Transcript as ScalarProtocol<E::ScalarField>>::challenge_128bit_scalars(
+            self,
+            b"challenge-for-quotient-polynomials",
+            ell + 1,
+        )
     }
 
     fn challenges_for_linear_combination(&mut self, num: usize) -> Vec<E::ScalarField> {
-        let challenges =
-            <merlin::Transcript as ScalarProtocol<E::ScalarField>>::challenge_128bit_scalars(
-                self,
-                b"challenge_for_linear_combination",
-                num,
-            );
-
-        Scalar::<E::ScalarField>::vec_into_inner(challenges)
+        <Transcript as ScalarProtocol<E::ScalarField>>::challenge_128bit_scalars(
+            self,
+            b"challenge-for-linear-combination",
+            num,
+        )
     }
 
     fn challenge_from_verifier(&mut self) -> E::ScalarField {
-        <merlin::Transcript as ScalarProtocol<E::ScalarField>>::challenge_full_scalar(
+        <Transcript as ScalarProtocol<E::ScalarField>>::challenge_full_scalar(
             self,
-            b"verifier_challenge_for_linear_combination",
+            b"verifier-challenge-for-linear-combination",
         )
-        .0
     }
 }
 
-impl<F: PrimeField, H: homomorphism::Trait + CanonicalSerialize> SigmaProtocol<F, H>
-    for merlin::Transcript
+impl<F: PrimeField, H: homomorphism::Trait + CanonicalSerialize> SigmaProtocol<F, H> for Transcript
 where
     H::Domain: sigma_protocol::Witness<F>,
     H::Codomain: sigma_protocol::Statement,
@@ -219,10 +219,27 @@ where
     }
 
     fn challenge_for_sigma_protocol(&mut self) -> F {
-        <merlin::Transcript as ScalarProtocol<F>>::challenge_full_scalar(
+        <Transcript as ScalarProtocol<F>>::challenge_full_scalar(
             self,
-            b"challenge_sigma_protocol",
+            b"challenge-for-sigma-protocol",
         )
-        .0
+    }
+}
+
+impl PolynomialCommitmentScheme for Transcript {
+    fn append_sep(&mut self, dst: &[u8]) {
+        self.append_message(b"dom-sep", dst);
+    }
+
+    fn append_point<C: CurveGroup>(&mut self, point: &C) {
+        let mut buf = Vec::new();
+        point
+            .serialize_compressed(&mut buf)
+            .expect("Point serialization failed");
+        self.append_message(b"point", &buf);
+    }
+
+    fn challenge_scalar<F: PrimeField>(&mut self) -> F {
+        <Transcript as ScalarProtocol<F>>::challenge_full_scalar(self, b"challenge-for-pcs")
     }
 }

@@ -11,17 +11,17 @@ read -p "Delete past benchmark results and re-run? (Otherwise, will use extant d
 
 if [ "$ANS" == "y" ]; then
     echo "Cleaning previous Bulletproof criterion benchmark results..."
-    rm -r $repo_root/target/criterion/bulletproofs
+    rm -rf $repo_root/target/criterion/bulletproofs
 
     echo "Benchmarking Bulletproofs..."
-    RAYON_NUM_THREADS=1 cargo bench -- bulletproofs
+    RAYON_NUM_THREADS=1 cargo bench --bench bulletproofs
 
     echo "Cleaning previous DeKART criterion benchmark results..."
-    rm -r $repo_root/target/criterion/dekart*
+    rm -rf $repo_root/target/criterion/dekart*
 
     echo "Benchmarking DeKART..."
     cd $repo_root/crates/aptos-dkg/
-    RAYON_NUM_THREADS=1 cargo bench -- dekart-rs/bls12-381
+    RAYON_NUM_THREADS=1 cargo bench --bench dekart-rs/bls12-381
     cd - &>/dev/null
 fi
 
