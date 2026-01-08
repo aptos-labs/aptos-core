@@ -47,7 +47,7 @@ module aptos_framework::auth_data {
     }
 
     public fun derivable_abstract_signature(self: &AbstractionAuthData): &vector<u8> {
-        assert!(self is DerivableV1, error::invalid_argument(ENOT_REGULAR_AUTH_DATA));
+        assert!(self is DerivableV1, error::invalid_argument(ENOT_DERIVABLE_AUTH_DATA));
         &self.abstract_signature
     }
 
