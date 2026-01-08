@@ -2,6 +2,8 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    dlog::bsgs,
+    pvss::chunky::chunks,
     sigma_protocol,
     sigma_protocol::homomorphism::{self, fixed_base_msms, fixed_base_msms::Trait, EntrywiseMap},
     Scalar,
@@ -12,53 +14,21 @@ use aptos_crypto::arkworks::{
     random::sample_field_element,
 };
 use aptos_crypto_derive::SigmaProtocolWitness;
-use ark_ec::CurveGroup;
+use ark_ec::{AffineRepr, CurveGroup};
 use ark_ff::PrimeField;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
 };
 use ark_std::fmt::Debug;
+use std::collections::HashMap;
 
 pub const DST: &[u8; 35] = b"APTOS_CHUNKED_ELGAMAL_GENERATOR_DST"; // This is used to create public parameters, see `default()` below
-
-// TODO: Change this to PublicParameters<E: CurveGroup>. Would first require changing Scalar<C: CurveGroup> to Scalar<F: PrimeField>, which would be a bit of work
-#[derive(CanonicalSerialize, CanonicalDeserialize, PartialEq, Clone, Eq, Debug)]
-#[allow(non_snake_case)]
-pub struct PublicParameters<C: CurveGroup> {
-    /// A group element $G$ that is raised to the encrypted message
-    pub G: C::Affine,
-    /// A group element $H$ that is used to exponentiate both
-    /// (1) the ciphertext randomness and (2) the DSK when computing its EK.
-    pub H: C::Affine,
-}
-
-#[allow(non_snake_case)]
-impl<C: CurveGroup> PublicParameters<C> {
-    pub fn new(G: C::Affine, H: C::Affine) -> Self {
-        Self { G, H }
-    }
-
-    pub fn message_base(&self) -> &C::Affine {
-        &self.G
-    }
-
-    pub fn pubkey_base(&self) -> &C::Affine {
-        &self.H
-    }
-
-    pub fn default() -> Self {
-        let G = hashing::unsafe_hash_to_affine(b"G", DST);
-        let H = hashing::unsafe_hash_to_affine(b"H", DST);
-        debug_assert_ne!(G, H);
-        Self { G, H }
-    }
-}
 
 /// Formally, given:
 /// - `G_1, H_1` ∈ G₁ (group generators)
 /// - `ek_i` ∈ G₁ (encryption keys)
-/// - `z_i,j` ∈ Scalar<E> (plaintext scalars z_i, chunked into z_i,j)
-/// - `r_j` ∈ Scalar<E> (randomness for each `column` of chunks z_i,j)
+/// - `z_i,j` ∈ Scalar<E> (from plaintext scalars `z_i`, each chunked into a vector z_i,j)
+/// - `r_j` ∈ Scalar<E> (randomness for `j` in a vector of chunks z_i,j)
 ///
 /// The homomorphism maps input `[z_i,j]` and randomness `[r_j]` to
 /// the following codomain elements:
@@ -70,48 +40,46 @@ impl<C: CurveGroup> PublicParameters<C> {
 ///
 /// The `C_i,j` represent "chunked" homomorphic encryptions of the plaintexts,
 /// and `R_j` carry the corresponding randomness contributions.
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// #[allow(non_snake_case)]
-// pub struct Homomorphism<'a, C: CurveGroup> {
-//     pub pp: &'a PublicParameters<C>, // This is small so could clone it here, then no custom `CanonicalSerialize` is needed
-//     pub eks: &'a [C::Affine],
-// }
-
-// Identical to the previous struct as the bases are identical, but the witness will be different
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(non_snake_case)]
 pub struct WeightedHomomorphism<'a, C: CurveGroup> {
-    pub pp: &'a PublicParameters<C>,
+    pub pp: &'a PublicParameters<C::Affine>, // These are small so no harm in copying them here
     pub eks: &'a [C::Affine],
 }
 
+#[allow(non_snake_case)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, PartialEq, Clone, Eq, Debug)]
+pub struct PublicParameters<A: AffineRepr> {
+    /// A group element $G$ that is raised to the encrypted message
+    pub G: A,
+    /// A group element $H$ that is used to exponentiate both
+    /// (1) the ciphertext randomness and (2) the DSK when computing its EK.
+    pub H: A,
+}
+
+#[allow(non_snake_case)]
+impl<A: AffineRepr> PublicParameters<A> {
+    pub fn new(G: A, H: A) -> Self {
+        Self { G, H }
+    }
+
+    pub fn message_base(&self) -> &A {
+        &self.G
+    }
+
+    pub fn pubkey_base(&self) -> &A {
+        &self.H
+    }
+
+    pub fn default() -> Self {
+        let G = hashing::unsafe_hash_to_affine(b"G", DST);
+        let H = hashing::unsafe_hash_to_affine(b"H", DST);
+        debug_assert_ne!(G, H);
+        Self { G, H }
+    }
+}
+
 // Need to manually implement `CanonicalSerialize` because `Homomorphism` has references instead of owned values
-// impl<'a, C: CurveGroup> CanonicalSerialize for Homomorphism<'a, C> {
-//     fn serialize_with_mode<W: Write>(
-//         &self,
-//         mut writer: W,
-//         compress: Compress,
-//     ) -> Result<(), SerializationError> {
-//         self.pp.G.serialize_with_mode(&mut writer, compress)?;
-//         self.pp.H.serialize_with_mode(&mut writer, compress)?;
-//         for ek in self.eks {
-//             ek.serialize_with_mode(&mut writer, compress)?;
-//         }
-//         Ok(())
-//     }
-
-//     fn serialized_size(&self, compress: Compress) -> usize {
-//         self.pp.G.serialized_size(compress)
-//             + self.pp.H.serialized_size(compress)
-//             + self
-//                 .eks
-//                 .iter()
-//                 .map(|ek| ek.serialized_size(compress))
-//                 .sum::<usize>()
-//     }
-// }
-
-// TODO: get rid of this copy-paste with a marker...
 impl<'a, C: CurveGroup> CanonicalSerialize for WeightedHomomorphism<'a, C> {
     fn serialize_with_mode<W: Write>(
         &self,
@@ -138,12 +106,6 @@ impl<'a, C: CurveGroup> CanonicalSerialize for WeightedHomomorphism<'a, C> {
 }
 
 /// This struct is used as `CodomainShape<T>`, but the same layout also applies to the `Witness` type.
-// #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
-// pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone> {
-//     pub chunks: Vec<Vec<T>>, // Depending on T these can be chunked ciphertexts, or their MSM representations
-//     pub randomness: Vec<T>,  // Same story, depending on T
-// }
-
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct WeightedCodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone> {
     pub chunks: Vec<Vec<Vec<T>>>, // Depending on T these can be chunked ciphertexts, or their MSM representations
@@ -153,14 +115,6 @@ pub struct WeightedCodomainShape<T: CanonicalSerialize + CanonicalDeserialize + 
 // Witness shape happens to be identical to CodomainShape, this is mostly coincidental
 // Setting `type Witness = CodomainShape<Scalar<E>>` would later require deriving SigmaProtocolWitness for CodomainShape<T>
 // (and would be overkill anyway), but this leads to issues as it expects `T` to be a Pairing, so we'll simply redefine it:
-// #[derive(
-//     SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq,
-// )]
-// pub struct Witness<F: PrimeField> {
-//     pub plaintext_chunks: Vec<Vec<Scalar<F>>>,
-//     pub plaintext_randomness: Vec<Scalar<F>>, // PlaintextRandomness<E>,
-// }
-
 #[derive(
     SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq,
 )]
@@ -316,7 +270,7 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator
 // Given a chunked scalar [z_j] and vector of randomness [r_j], returns a vector of MSM terms
 // of the vector C_j = z_j * G_1 + r_j * ek, so a vector with entries [(G_1, ek), (z_j, r_j)]_j
 fn chunks_msm_terms<C: CurveGroup>(
-    pp: &PublicParameters<C>,
+    pp: &PublicParameters<C::Affine>,
     ek: C::Affine,
     chunks: &[Scalar<C::ScalarField>],
     correlated_randomness: &[Scalar<C::ScalarField>],
@@ -334,7 +288,7 @@ fn chunks_msm_terms<C: CurveGroup>(
 // Given a vector of chunked scalar [[z_j]] and vector of randomness [[r_j]], returns a vector of
 // vector of MSM terms. This is used for the weighted PVSS, where each player gets a vector of chunks
 pub fn chunks_vec_msm_terms<C: CurveGroup>(
-    pp: &PublicParameters<C>,
+    pp: &PublicParameters<C::Affine>,
     ek: C::Affine,
     chunks_vec: &[Vec<Scalar<C::ScalarField>>],
     correlated_randomness_vec: &[Vec<Scalar<C::ScalarField>>],
@@ -343,7 +297,7 @@ pub fn chunks_vec_msm_terms<C: CurveGroup>(
         .iter()
         .zip(correlated_randomness_vec.iter())
         .map(|(chunks, correlated_randomness)| {
-            chunks_msm_terms(pp, ek, chunks, correlated_randomness)
+            chunks_msm_terms::<C>(pp, ek, chunks, correlated_randomness)
         })
         .collect()
 }
@@ -367,7 +321,7 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for WeightedHomomorphism<'a, C> {
             .enumerate()
             .map(|(i, z_i)| {
                 // here `i` is the player's id
-                chunks_vec_msm_terms(self.pp, self.eks[i], z_i, &input.plaintext_randomness)
+                chunks_vec_msm_terms::<C>(self.pp, self.eks[i], z_i, &input.plaintext_randomness)
             })
             .collect();
 
@@ -445,10 +399,6 @@ pub fn num_chunks_per_scalar<F: PrimeField>(ell: u8) -> u32 {
     F::MODULUS_BIT_SIZE.div_ceil(ell as u32) // Maybe add `as usize` here?
 }
 
-use crate::{dlog, dlog::bsgs, pvss::chunky::chunks};
-use ark_ec::AffineRepr;
-use std::collections::HashMap;
-
 /// Decrypt a vector of chunked ciphertexts using the corresponding committed randomness and decryption keys
 ///
 /// # Arguments
@@ -466,7 +416,7 @@ pub fn decrypt_chunked_scalars<C: CurveGroup>(
     Cs_rows: &[Vec<C>],
     Rs_rows: &[Vec<C>],
     dk: &C::ScalarField,
-    pp: &PublicParameters<C>,
+    pp: &PublicParameters<C::Affine>,
     table: &HashMap<Vec<u8>, u32>,
     radix_exponent: u8,
 ) -> Vec<C::ScalarField> {
@@ -500,7 +450,7 @@ pub fn decrypt_chunked_scalars<C: CurveGroup>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{pvss::chunky::chunks, sigma_protocol::homomorphism::Trait as _};
+    use crate::{dlog, pvss::chunky::chunks, sigma_protocol::homomorphism::Trait as _};
     use aptos_crypto::{
         arkworks::{random::sample_field_elements, shamir::ShamirThresholdConfig},
         weighted_config::WeightedConfig,
@@ -540,59 +490,61 @@ mod tests {
         (zs, witness, ell, number_of_chunks)
     }
 
-    // #[allow(non_snake_case)]
-    // fn test_decrypt_roundtrip<C: CurveGroup>() {
-    //     // 2-out-of-3, weights 2 1
-    //     let sc = WeightedConfig::<ShamirThresholdConfig<C::ScalarField>>::new(2, vec![2, 1]).unwrap();
+    #[allow(non_snake_case)]
+    fn test_decrypt_roundtrip<C: CurveGroup>() {
+        // 2-out-of-3, weights 2 1
+        let sc =
+            WeightedConfig::<ShamirThresholdConfig<C::ScalarField>>::new(2, vec![2, 1]).unwrap();
 
-    //     let (zs, witness, radix_exponent, _num_chunks) = prepare_chunked_witness::<C::ScalarField>(sc, 16);
+        let (zs, witness, radix_exponent, _num_chunks) =
+            prepare_chunked_witness::<C::ScalarField>(sc, 16);
 
-    //     // 6. Initialize the homomorphism
-    //     let pp: PublicParameters<C> = PublicParameters::default();
-    //     let dks: Vec<C::ScalarField> = sample_field_elements(2, &mut thread_rng());
+        // 6. Initialize the homomorphism
+        let pp: PublicParameters<C::Affine> = PublicParameters::default();
+        let dks: Vec<C::ScalarField> = sample_field_elements(2, &mut thread_rng());
 
-    //     let hom = WeightedHomomorphism::<C> {
-    //         pp: &pp,
-    //         eks: &C::normalize_batch(&[pp.H * dks[0], pp.H * dks[1]]), // 2 players
-    //     };
+        let hom = WeightedHomomorphism::<C> {
+            pp: &pp,
+            eks: &C::normalize_batch(&[pp.H * dks[0], pp.H * dks[1]]), // 2 players
+        };
 
-    //     // 7. Apply homomorphism to obtain chunked ciphertexts
-    //     let WeightedCodomainShape::<C> {
-    //         chunks: Cs,
-    //         randomness: Rs,
-    //     } = hom.apply(&witness);
+        // 7. Apply homomorphism to obtain chunked ciphertexts
+        let WeightedCodomainShape::<C> {
+            chunks: Cs,
+            randomness: Rs,
+        } = hom.apply(&witness);
 
-    //     // 8. Build a baby-step giant-step table for computing discrete logs
-    //     let table = dlog::table::build::<C>(pp.G.into(), 1u32 << (radix_exponent / 2));
+        // 8. Build a baby-step giant-step table for computing discrete logs
+        let table = dlog::table::build::<C>(pp.G.into(), 1u32 << (radix_exponent / 2));
 
-    //     // 9. Perform decryption of each ciphertext and reconstruct plaintexts
-    //     // TODO: call some built-in function for this instead
-    //     let mut decrypted_scalars = Vec::new();
-    //     for player_id in 0..Cs.len() {
-    //         let decrypted_for_player = decrypt_chunked_scalars(
-    //             &Cs[player_id],
-    //             &Rs,
-    //             &dks[player_id],
-    //             &pp,
-    //             &table,
-    //             radix_exponent,
-    //         );
+        // 9. Perform decryption of each ciphertext and reconstruct plaintexts
+        // TODO: call some built-in function for this instead
+        let mut decrypted_scalars = Vec::new();
+        for player_id in 0..Cs.len() {
+            let decrypted_for_player = decrypt_chunked_scalars(
+                &Cs[player_id],
+                &Rs,
+                &dks[player_id],
+                &pp,
+                &table,
+                radix_exponent,
+            );
 
-    //         decrypted_scalars.extend(decrypted_for_player);
-    //     }
+            decrypted_scalars.extend(decrypted_for_player);
+        }
 
-    //     // 10. Compare decrypted scalars to original plaintexts
-    //     for (i, (orig, recovered)) in zs.iter().zip(decrypted_scalars.iter()).enumerate() {
-    //         assert_eq!(
-    //             orig, recovered,
-    //             "Decrypted plaintext {} does not match original",
-    //             i
-    //         );
-    //     }
-    // }
+        // 10. Compare decrypted scalars to original plaintexts
+        for (i, (orig, recovered)) in zs.iter().zip(decrypted_scalars.iter()).enumerate() {
+            assert_eq!(
+                orig, recovered,
+                "Decrypted plaintext {} does not match original",
+                i
+            );
+        }
+    }
 
-    // #[test]
-    // fn test_decrypt_roundtrip_bn254() {
-    //     test_decrypt_roundtrip::<ark_bn254::G1Projective>();
-    // }
+    #[test]
+    fn test_decrypt_roundtrip_bn254() {
+        test_decrypt_roundtrip::<ark_bn254::G1Projective>();
+    }
 }
