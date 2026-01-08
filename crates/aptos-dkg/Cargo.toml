@@ -67,9 +67,9 @@ harness = false
 name = "ldt"
 harness = false
 
-[[bench]]
-name = "pcs"
-harness = false
+# [[bench]]
+# name = "pcs"
+# harness = false
 
 [[bench]]
 name = "pvss"
