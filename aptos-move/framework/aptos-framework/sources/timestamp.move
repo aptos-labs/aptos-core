@@ -83,6 +83,6 @@ module aptos_framework::timestamp {
 
     #[test_only]
     public fun fast_forward_seconds(timestamp_seconds: u64) acquires CurrentTimeMicroseconds {
-        update_global_time_for_test_secs(now_seconds() + timestamp_seconds);
+        update_global_time_for_test(now_microseconds() + timestamp_seconds * MICRO_CONVERSION_FACTOR);
     }
 }
