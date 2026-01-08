@@ -3770,6 +3770,7 @@ impl fmt::Display for OperationDisplay<'_> {
                 write!(f, "update {}", self.field_str(mid, sid, fid))
             },
             Result(t) => write!(f, "result{}", t),
+            Abort(_) => write!(f, "Abort"),
             _ => write!(f, "{:?}", self.oper),
         }?;
 
