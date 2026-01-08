@@ -1,0 +1,62 @@
+# .cursorignore - Safety and Privacy Protection for Cursor AI
+# This file restricts AI agent access to sensitive files and directories
+
+# ==============================================================================
+# SECRETS AND CREDENTIALS
+# ==============================================================================
+
+# Private keys and credentials
+**/*.key
+**/*.pub
+**/*.pem
+**/*.mnemonic
+**/*.env
+gha-creds-*.json
+
+# Terraform state (contains secrets)
+**/*.tfstate*
+.terraform/
+
+# Certificates
+**/*.crt
+**/*.cert
+
+# Wallet and account data
+.aptos/
+
+# ==============================================================================
+# LARGE GENERATED FILES (Performance)
+# ==============================================================================
+
+# Build artifacts
+**/target/
+**/build/
+**/node_modules/
+
+# Move artifacts
+**/*.mrb
+**/*.mvcov
+.trace
+
+# Profiling outputs
+gas-profiling/
+**/*.log
+metadata-cache/
+
+# ==============================================================================
+# SECURITY-CRITICAL CODE (Strict Mode)
+# ==============================================================================
+# AI agents should NOT access or modify these directories without explicit
+# user confirmation. Changes here can compromise network security.
+
+# Consensus safety (Byzantine fault tolerance critical)
+consensus/safety-rules/
+
+# Cryptographic implementations
+crates/aptos-crypto/
+
+# Security module
+secure/
+
+# Keyless authentication
+keyless/
