@@ -797,6 +797,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             });
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn start_round_manager(
         &mut self,
         consensus_key: Arc<PrivateKey>,
@@ -812,6 +813,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
     ) {
         let epoch = epoch_state.epoch;
         info!(
@@ -871,6 +873,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_config,
                 fast_rand_config.clone(),
                 rand_msg_rx,
+                secret_sharing_msg_rx,
                 recovery_data.commit_root_block().round(),
             )
             .await;
@@ -1279,7 +1282,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.rand_manager_msg_tx = Some(rand_msg_tx);
 
         // TODO(ibalajiarun): setup counters
-        let (secret_share_manager_tx, _secret_share_manager_rx) =
+        let (secret_share_manager_tx, secret_share_manager_rx) =
             aptos_channel::new::<AccountAddress, IncomingSecretShareRequest>(
                 QueueStyle::KLAST,
                 self.config.internal_per_key_channel_size,
@@ -1302,6 +1305,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_config,
                 fast_rand_config,
                 rand_msg_rx,
+                secret_share_manager_rx,
             )
             .await
         } else {
@@ -1318,6 +1322,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_config,
                 fast_rand_config,
                 rand_msg_rx,
+                secret_share_manager_rx,
             )
             .await
         }
@@ -1373,6 +1378,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        secret_share_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
     ) {
         match self.storage.start(
             consensus_config.order_vote_enabled(),
@@ -1394,6 +1400,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     rand_config,
                     fast_rand_config,
                     rand_msg_rx,
+                    secret_share_msg_rx,
                 )
                 .await
             },
@@ -1424,6 +1431,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        secret_share_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
     ) {
         let epoch = epoch_state.epoch;
         let signer = Arc::new(ValidatorSigner::new(
@@ -1456,6 +1464,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_config,
                 fast_rand_config,
                 rand_msg_rx,
+                secret_share_msg_rx,
                 highest_committed_round,
             )
             .await;

@@ -468,6 +468,7 @@ mod dbtool_tests {
                 BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
                 1000,
                 Some(internal_indexer_db.clone()),
+                /* reset_hot_state = */ false,
             )
             .unwrap(),
         );

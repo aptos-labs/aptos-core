@@ -28,6 +28,10 @@ impl FreeRootId {
     pub fn new(root_x: Fr) -> Self {
         Self { root_x }
     }
+
+    pub fn zero() -> Self {
+        Self { root_x: Fr::zero() }
+    }
 }
 
 impl Id for FreeRootId {
