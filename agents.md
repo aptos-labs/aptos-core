@@ -91,9 +91,15 @@ This file provides guidance for AI coding agents working autonomously in this re
 ### Move VM (`third_party/move/move-vm/`)
 
 - **Highly sensitive**: Changes affect all Move execution
+- Platform agnostic part of Move execution
 - Always test with: `cargo test -p move-vm-runtime`
-- Check parallel execution: `cargo test -p aptos-vm`
 - Verify gas metering isn't affected unintentionally
+
+### Aptos VM (`aptos-move/aptos-vm/`)
+
+- **Highly sensitive**: Changes affect all Move execution
+- Aptos specific part of Move execution: parallel, gas, prologue, epilogue
+- Check parallel execution: `cargo test -p aptos-vm`
 
 ### Block Executor (`aptos-move/block-executor/`)
 
