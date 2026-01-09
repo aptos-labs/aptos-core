@@ -33,19 +33,19 @@ module 0x42::M {
         assert!(cond, message)
     }
 
-    fun foo4<T0: drop>(cond: bool, fmt: &vector<u8>, a: T0) {
+    fun foo4<T0: drop>(cond: bool, fmt: vector<u8>, a: T0) {
         assert!(cond, fmt, a)
     }
 
-    fun foo5<T0: drop, T1: drop>(cond: bool, fmt: &vector<u8>, a: T0, b: T1) {
+    fun foo5<T0: drop, T1: drop>(cond: bool, fmt: vector<u8>, a: T0, b: T1) {
         assert!(cond, fmt, a, b)
     }
 
-    fun foo6<T0: drop, T1: drop, T2: drop>(cond: bool, fmt: &vector<u8>, a: T0, b: T1, c: T2) {
+    fun foo6<T0: drop, T1: drop, T2: drop>(cond: bool, fmt: vector<u8>, a: T0, b: T1, c: T2) {
         assert!(cond, fmt, a, b, c)
     }
 
-    fun foo7<T0: drop, T1: drop, T2: drop, T3: drop>(cond: bool, fmt: &vector<u8>, a: T0, b: T1, c: T2, d: T3) {
+    fun foo7<T0: drop, T1: drop, T2: drop, T3: drop>(cond: bool, fmt: vector<u8>, a: T0, b: T1, c: T2, d: T3) {
         assert!(cond, fmt, a, b, c, d)
     }
 }

@@ -107,7 +107,7 @@ impl ExpTranslator<'_, '_, '_> {
     /// if (cond) {
     ///     ()
     /// } else {
-    ///     abort string::into_bytes(string_utils::format<N>(fmt, arg1, ..., argN))
+    ///     abort string::into_bytes(string_utils::format<N>(&fmt, arg1, ..., argN))
     /// }
     /// ```
     fn expand_assert(&self, loc: Loc, args: &Spanned<Vec<Exp>>) -> Exp_ {
@@ -146,7 +146,7 @@ impl ExpTranslator<'_, '_, '_> {
                     "`assert!` macro with string formatting",
                     LanguageVersion::V2_4,
                 );
-                Self::into_bytes(loc, Self::format(loc, rest.to_vec()))
+                Self::into_bytes(loc, Self::format(loc, rest[0].clone(), rest[1..].to_vec()))
             },
             _ => {
                 self.error(
@@ -214,7 +214,7 @@ impl ExpTranslator<'_, '_, '_> {
     ///         if (_left == _right) {
     ///             ()
     ///         } else {
-    ///             abort string::into_bytes(string_utils::format3(<assertion_failed_message>, string_utils::format<N>(fmt, arg1, ..., argN), _left, _right))
+    ///             abort string::into_bytes(string_utils::format3(<assertion_failed_message>, string_utils::format<N>(&fmt, arg1, ..., argN), _left, _right))
     ///         }
     ///     }
     /// }
@@ -268,7 +268,7 @@ impl ExpTranslator<'_, '_, '_> {
                 let assertion_failed_message = Self::assertion_failed_message(loc, kind, false);
                 Self::into_bytes(
                     loc,
-                    Self::format(loc, vec![assertion_failed_message, left, right]),
+                    Self::format(loc, assertion_failed_message, vec![left, right]),
                 )
             },
             1 => {
@@ -277,16 +277,16 @@ impl ExpTranslator<'_, '_, '_> {
                 let message = Self::utf8(loc, rest[0].clone());
                 Self::into_bytes(
                     loc,
-                    Self::format(loc, vec![assertion_failed_message, message, left, right]),
+                    Self::format(loc, assertion_failed_message, vec![message, left, right]),
                 )
             },
             n if n <= MAX_ARGS => {
                 // assert_eq!(left, right, fmt, arg1, ..., argN)
                 let assertion_failed_message = Self::assertion_failed_message(loc, kind, true);
-                let message = Self::format(loc, rest.to_vec());
+                let message = Self::format(loc, rest[0].clone(), rest[1..].to_vec());
                 Self::into_bytes(
                     loc,
-                    Self::format(loc, vec![assertion_failed_message, message, left, right]),
+                    Self::format(loc, assertion_failed_message, vec![message, left, right]),
                 )
             },
             _ => {
@@ -317,11 +317,17 @@ impl ExpTranslator<'_, '_, '_> {
         )])
     }
 
-    /// Calls `std::string_utils::format<N>(arg0, arg1, ..., argN)` for 1 ≤ N ≤ 4.
-    fn format(loc: Loc, args: Vec<Exp>) -> Exp {
+    /// Calls `std::string_utils::format<N>(&fmt, arg1, ..., argN)` for 1 ≤ N ≤ 4.
+    fn format(loc: Loc, fmt: Exp, args: Vec<Exp>) -> Exp {
         let n = args.len();
-        debug_assert!((2..=MAX_ARGS).contains(&n));
-        Self::call_std_function(loc, "string_utils", format!("format{}", n - 1), args)
+        debug_assert!((1..MAX_ARGS).contains(&n));
+        let borrow_fmt = sp(loc, Exp_::Borrow(false, Box::new(fmt)));
+        Self::call_std_function(
+            loc,
+            "string_utils",
+            format!("format{}", n),
+            std::iter::once(borrow_fmt).chain(args).collect(),
+        )
     }
 
     /// Calls `std::string::into_bytes(s)`.
@@ -389,13 +395,7 @@ impl ExpTranslator<'_, '_, '_> {
     fn string_value(loc: Loc, str: String) -> Exp {
         sp(
             loc,
-            Exp_::Borrow(
-                false,
-                Box::new(sp(
-                    loc,
-                    Exp_::Value(sp(loc, Value_::Bytearray(str.into_bytes()))),
-                )),
-            ),
+            Exp_::Value(sp(loc, Value_::Bytearray(str.into_bytes()))),
         )
     }
 }
