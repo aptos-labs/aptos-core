@@ -1168,6 +1168,11 @@ pub enum EntryFunctionCall {
         contract_addresses: Vec<AccountAddress>,
     },
 
+    VestingWithoutStakingAdminDelayVesting {
+        contract_address: AccountAddress,
+        delay_periods: u64,
+    },
+
     /// Withdraw all funds to the preset vesting contract's withdrawal address. This can only be called if the contract
     /// has already been terminated.
     VestingWithoutStakingAdminWithdraw {
@@ -2011,6 +2016,10 @@ impl EntryFunctionCall {
             } => vesting_update_voter(contract_address, new_voter),
             VestingVest { contract_address } => vesting_vest(contract_address),
             VestingVestMany { contract_addresses } => vesting_vest_many(contract_addresses),
+            VestingWithoutStakingAdminDelayVesting {
+                contract_address,
+                delay_periods,
+            } => vesting_without_staking_admin_delay_vesting(contract_address, delay_periods),
             VestingWithoutStakingAdminWithdraw { contract_address } => {
                 vesting_without_staking_admin_withdraw(contract_address)
             },
@@ -5447,6 +5456,27 @@ pub fn vesting_vest_many(contract_addresses: Vec<AccountAddress>) -> Transaction
     ))
 }
 
+pub fn vesting_without_staking_admin_delay_vesting(
+    contract_address: AccountAddress,
+    delay_periods: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("vesting_without_staking").to_owned(),
+        ),
+        ident_str!("admin_delay_vesting").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&contract_address).unwrap(),
+            bcs::to_bytes(&delay_periods).unwrap(),
+        ],
+    ))
+}
+
 /// Withdraw all funds to the preset vesting contract's withdrawal address. This can only be called if the contract
 /// has already been terminated.
 pub fn vesting_without_staking_admin_withdraw(
@@ -7635,6 +7665,19 @@ mod decoder {
         }
     }
 
+    pub fn vesting_without_staking_admin_delay_vesting(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::VestingWithoutStakingAdminDelayVesting {
+                contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                delay_periods: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn vesting_without_staking_admin_withdraw(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -8396,6 +8439,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "vesting_vest_many".to_string(),
             Box::new(decoder::vesting_vest_many),
+        );
+        map.insert(
+            "vesting_without_staking_admin_delay_vesting".to_string(),
+            Box::new(decoder::vesting_without_staking_admin_delay_vesting),
         );
         map.insert(
             "vesting_without_staking_admin_withdraw".to_string(),
