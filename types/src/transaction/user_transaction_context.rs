@@ -13,7 +13,8 @@ pub enum TransactionIndexKind {
     /// The reserved byte in the counter will be 1.
     ValidationOrSimulation { transaction_index: u32 },
     /// Not available (PersistedAuxiliaryInfo::None).
-    /// Will abort with ETRANSACTION_INDEX_NOT_AVAILABLE.
+    /// Calling the monotonically increasing counter native function
+    /// will abort with ETRANSACTION_INDEX_NOT_AVAILABLE.
     NotAvailable,
 }
 
