@@ -28,19 +28,19 @@ module 0x42::M {
         assert_eq!(left, right, message)
     }
 
-    fun foo3<T: drop, T0: drop>(left: T, right: T, fmt: &vector<u8>, a: T0) {
+    fun foo3<T: drop, T0: drop>(left: T, right: T, fmt: vector<u8>, a: T0) {
         assert_eq!(left, right, fmt, a)
     }
 
-    fun foo4<T: drop, T0: drop, T1: drop>(left: T, right: T, fmt: &vector<u8>, a: T0, b: T1) {
+    fun foo4<T: drop, T0: drop, T1: drop>(left: T, right: T, fmt: vector<u8>, a: T0, b: T1) {
         assert_eq!(left, right, fmt, a, b)
     }
 
-    fun foo5<T: drop, T0: drop, T1: drop, T2: drop>(left: T, right: T, fmt: &vector<u8>, a: T0, b: T1, c: T2) {
+    fun foo5<T: drop, T0: drop, T1: drop, T2: drop>(left: T, right: T, fmt: vector<u8>, a: T0, b: T1, c: T2) {
         assert_eq!(left, right, fmt, a, b, c)
     }
 
-    fun foo6<T: drop, T0: drop, T1: drop, T2: drop, T3: drop>(left: T, right: T, fmt: &vector<u8>, a: T0, b: T1, c: T2, d: T3) {
+    fun foo6<T: drop, T0: drop, T1: drop, T2: drop, T3: drop>(left: T, right: T, fmt: vector<u8>, a: T0, b: T1, c: T2, d: T3) {
         assert_eq!(left, right, fmt, a, b, c, d)
     }
 }
