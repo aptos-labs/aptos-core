@@ -17,7 +17,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::{state_key::StateKey, TStateView},
     transaction::{
-        AuxiliaryInfo, PersistedAuxiliaryInfo, SignedTransaction, TransactionExecutable,
+        AuxiliaryInfo, AuxiliaryInfoTrait, SignedTransaction, TransactionExecutable,
         TransactionOutput, TransactionPayload, TransactionPayloadInner, TransactionStatus,
     },
     vm_status::VMStatus,
@@ -284,12 +284,7 @@ impl Session {
             &code_storage,
             &txn,
             &log_context,
-            &AuxiliaryInfo::new(
-                PersistedAuxiliaryInfo::V1 {
-                    transaction_index: 0,
-                },
-                None,
-            ),
+            &AuxiliaryInfo::new_empty(),
         );
         let txn_output = vm_output.try_materialize_into_transaction_output(&resolver)?;
 

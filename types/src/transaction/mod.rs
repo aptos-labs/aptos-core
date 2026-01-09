@@ -3249,6 +3249,9 @@ impl AuxiliaryInfoTrait for AuxiliaryInfo {
 )]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub enum PersistedAuxiliaryInfo {
+    // No auxiliary info available
+    // For transaction simulation and validation, use AuxiliaryInfo::new_empty().
+    // When empty AuxiliaryInfo is used, monotonically_increasing_counter native function will set the most significant bit (reserve bit) to 1.
     None,
     // The index of the transaction in a block (after shuffler, before execution).
     // Note that this would be slightly different from the index of transactions that get committed
