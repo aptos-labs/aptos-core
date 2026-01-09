@@ -11,12 +11,16 @@ use aptos_crypto::HashValue;
 use aptos_drop_helper::ArcAsyncDrop;
 use aptos_infallible::Mutex;
 use aptos_metrics_core::IntGaugeVecHelper;
-use std::{marker::PhantomData, sync::Arc};
+use std::{
+    marker::PhantomData,
+    sync::{Arc, Weak},
+};
 
 #[derive(Debug)]
 struct LayerInner<K: ArcAsyncDrop, V: ArcAsyncDrop> {
     peak: FlattenPerfectTree<K, V>,
-    children: Mutex<Vec<Arc<LayerInner<K, V>>>>,
+    parent: Weak<Self>,
+    children: Mutex<Vec<Arc<Self>>>,
     use_case: &'static str,
     family: HashValue,
     layer: u64,
@@ -50,6 +54,7 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> LayerInner<K, V> {
         let family = HashValue::random();
         Arc::new(Self {
             peak: FlattenPerfectTree::new_with_empty_nodes(1),
+            parent: Weak::new(),
             children: Mutex::new(Vec::new()),
             use_case,
             family,
@@ -61,6 +66,7 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> LayerInner<K, V> {
     fn spawn(self: &Arc<Self>, child_peak: FlattenPerfectTree<K, V>, base_layer: u64) -> Arc<Self> {
         let child = Arc::new(Self {
             peak: child_peak,
+            parent: Arc::downgrade(self),
             children: Mutex::new(Vec::new()),
             use_case: self.use_case,
             family: self.family,
@@ -106,6 +112,10 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> MapLayer<K, V> {
             inner,
             _hash_builder: PhantomData,
         }
+    }
+
+    pub(crate) fn parent(&self) -> Option<Self> {
+        self.inner.parent.upgrade().map(Self::new)
     }
 
     pub fn into_layers_view_after(self, base_layer: MapLayer<K, V>) -> LayeredMap<K, V> {
