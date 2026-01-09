@@ -28,19 +28,19 @@ module 0x42::M {
         assert_ne!(left, right, message)
     }
 
-    fun foo3<T: drop, T0: drop>(left: T, right: T, fmt: vector<u8>, a: T0) {
-        assert_ne!(left, right, fmt, a)
+    fun foo3<T: drop, T0: drop>(left: T, right: T, a: T0) {
+        assert_ne!(left, right, b"a = {}", a)
     }
 
-    fun foo4<T: drop, T0: drop, T1: drop>(left: T, right: T, fmt: vector<u8>, a: T0, b: T1) {
-        assert_ne!(left, right, fmt, a, b)
+    fun foo4<T: drop, T0: drop, T1: drop>(left: T, right: T, a: T0, b: T1) {
+        assert_ne!(left, right, b"a = {}, b = {}", a, b)
     }
 
-    fun foo5<T: drop, T0: drop, T1: drop, T2: drop>(left: T, right: T, fmt: vector<u8>, a: T0, b: T1, c: T2) {
-        assert_ne!(left, right, fmt, a, b, c)
+    fun foo5<T: drop, T0: drop, T1: drop, T2: drop>(left: T, right: T, a: T0, b: T1, c: T2) {
+        assert_ne!(left, right, b"a = {}, b = {}, c = {}", a, b, c)
     }
 
-    fun foo6<T: drop, T0: drop, T1: drop, T2: drop, T3: drop>(left: T, right: T, fmt: vector<u8>, a: T0, b: T1, c: T2, d: T3) {
-        assert_ne!(left, right, fmt, a, b, c, d)
+    fun foo6<T: drop, T0: drop, T1: drop, T2: drop, T3: drop>(left: T, right: T, a: T0, b: T1, c: T2, d: T3) {
+        assert_ne!(left, right, b"a = {}, b = {}, c = {}, d = {}", a, b, c, d)
     }
 }

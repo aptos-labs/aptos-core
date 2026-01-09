@@ -146,6 +146,7 @@ impl ExpTranslator<'_, '_, '_> {
                     "`assert!` macro with string formatting",
                     LanguageVersion::V2_4,
                 );
+                self.check_string_literal(&rest[0]);
                 Self::into_bytes(loc, Self::format(loc, rest[0].clone(), rest[1..].to_vec()))
             },
             _ => {
@@ -283,6 +284,7 @@ impl ExpTranslator<'_, '_, '_> {
             n if n <= MAX_ARGS => {
                 // assert_eq!(left, right, fmt, arg1, ..., argN)
                 let assertion_failed_message = Self::assertion_failed_message(loc, kind, true);
+                self.check_string_literal(&rest[0]);
                 let message = Self::format(loc, rest[0].clone(), rest[1..].to_vec());
                 Self::into_bytes(
                     loc,
@@ -389,13 +391,26 @@ impl ExpTranslator<'_, '_, '_> {
         } else {
             format!("assertion `left {op} right` failed\n  left: {{}}\n right: {{}}")
         };
-        Self::string_value(loc, str)
+        Self::string_literal(loc, str)
     }
 
-    fn string_value(loc: Loc, str: String) -> Exp {
+    fn string_literal(loc: Loc, str: String) -> Exp {
         sp(
             loc,
             Exp_::Value(sp(loc, Value_::Bytearray(str.into_bytes()))),
         )
+    }
+
+    /// Checks that the expression is a string literal.
+    /// If so, returns the byte array. Otherwise, reports an error and returns `None`.
+    fn check_string_literal<'a>(&self, exp: &'a Exp) -> Option<&'a Vec<u8>> {
+        if let Exp_::Value(val) = &exp.value
+            && let Value_::Bytearray(bytes) = &val.value
+        {
+            Some(bytes)
+        } else {
+            self.error(&self.to_loc(&exp.loc), "Expected a string literal");
+            None
+        }
     }
 }
