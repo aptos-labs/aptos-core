@@ -103,6 +103,7 @@ pub const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 1_000_000;
 
 pub(crate) struct StateDb {
     pub ledger_db: Arc<LedgerDb>,
+    pub hot_state_merkle_db: Option<Arc<StateMerkleDb>>,
     pub state_merkle_db: Arc<StateMerkleDb>,
     pub state_kv_db: Arc<StateKvDb>,
     pub state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
@@ -180,10 +181,16 @@ impl DbReader for StateDb {
         key_hash: &HashValue,
         version: Version,
         root_depth: usize,
+        use_hot_state: bool,
     ) -> Result<SparseMerkleProofExt> {
-        let (_, proof) = self
-            .state_merkle_db
-            .get_with_proof_ext(key_hash, version, root_depth)?;
+        let db = if use_hot_state {
+            self.hot_state_merkle_db
+                .as_ref()
+                .ok_or(AptosDbError::HotStateError)?
+        } else {
+            &self.state_merkle_db
+        };
+        let (_, proof) = db.get_with_proof_ext(key_hash, version, root_depth)?;
         Ok(proof)
     }
 
@@ -193,10 +200,16 @@ impl DbReader for StateDb {
         key_hash: &HashValue,
         version: Version,
         root_depth: usize,
+        use_hot_state: bool,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
-        let (leaf_data, proof) = self
-            .state_merkle_db
-            .get_with_proof_ext(key_hash, version, root_depth)?;
+        let db = if use_hot_state {
+            self.hot_state_merkle_db
+                .as_ref()
+                .ok_or(AptosDbError::HotStateError)?
+        } else {
+            &self.state_merkle_db
+        };
+        let (leaf_data, proof) = db.get_with_proof_ext(key_hash, version, root_depth)?;
         Ok((
             match leaf_data {
                 Some((_val_hash, (key, ver))) => Some(self.expect_value_by_version(&key, ver)?),
@@ -264,9 +277,10 @@ impl DbReader for StateStore {
         key_hash: &HashValue,
         version: Version,
         root_depth: usize,
+        use_hot_state: bool,
     ) -> Result<SparseMerkleProofExt> {
         self.deref()
-            .get_state_proof_by_version_ext(key_hash, version, root_depth)
+            .get_state_proof_by_version_ext(key_hash, version, root_depth, use_hot_state)
     }
 
     /// Get the state value with proof extension given the state key and version
@@ -275,9 +289,14 @@ impl DbReader for StateStore {
         key_hash: &HashValue,
         version: Version,
         root_depth: usize,
+        use_hot_state: bool,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
-        self.deref()
-            .get_state_value_with_proof_by_version_ext(key_hash, version, root_depth)
+        self.deref().get_state_value_with_proof_by_version_ext(
+            key_hash,
+            version,
+            root_depth,
+            use_hot_state,
+        )
     }
 }
 
@@ -302,6 +321,7 @@ impl StateDb {
 impl StateStore {
     pub fn new(
         ledger_db: Arc<LedgerDb>,
+        hot_state_merkle_db: Option<Arc<StateMerkleDb>>,
         state_merkle_db: Arc<StateMerkleDb>,
         state_kv_db: Arc<StateKvDb>,
         state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
@@ -323,6 +343,7 @@ impl StateStore {
         }
         let state_db = Arc::new(StateDb {
             ledger_db,
+            hot_state_merkle_db,
             state_merkle_db,
             state_kv_db,
             state_merkle_pruner,
@@ -465,6 +486,7 @@ impl StateStore {
     #[cfg(feature = "db-debugger")]
     pub fn catch_up_state_merkle_db(
         ledger_db: Arc<LedgerDb>,
+        hot_state_merkle_db: Option<Arc<StateMerkleDb>>,
         state_merkle_db: Arc<StateMerkleDb>,
         state_kv_db: Arc<StateKvDb>,
     ) -> Result<Option<Version>> {
@@ -484,6 +506,7 @@ impl StateStore {
         );
         let state_db = Arc::new(StateDb {
             ledger_db,
+            hot_state_merkle_db,
             state_merkle_db,
             state_kv_db,
             state_merkle_pruner,

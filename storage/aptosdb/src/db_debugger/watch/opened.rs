@@ -33,6 +33,7 @@ impl Cmd {
             config.buffered_state_target_items,
             config.max_num_nodes_per_lru_cache_shard,
             None,
+            /* reset_hot_state = */ false,
         )
         .expect("Failed to open AptosDB");
 

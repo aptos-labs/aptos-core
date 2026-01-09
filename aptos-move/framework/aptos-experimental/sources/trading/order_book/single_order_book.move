@@ -537,12 +537,21 @@ module aptos_experimental::single_order_book {
         self: &mut SingleOrderBook<M>, order_limit: u64
     ): vector<SingleOrder<M>> {
         let self_orders = &mut self.orders;
+        let self_client_order_ids = &mut self.client_order_ids;
         let order_ids = self.pending_orders.take_ready_time_based_orders(order_limit);
         let orders = vector::empty();
 
         order_ids.for_each(|order_id| {
             let order_with_state = self_orders.remove(&order_id);
             let (order, _) = order_with_state.destroy_order_from_state();
+            let client_order_id = order.get_client_order_id();
+            if (client_order_id.is_some()) {
+                self_client_order_ids.remove(
+                    &new_account_client_order_id(
+                        order.get_account(), client_order_id.destroy_some()
+                    )
+                );
+            };
             orders.push_back(order);
         });
         orders
