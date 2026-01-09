@@ -9,7 +9,9 @@ module aptos_framework::permissioned_delegation {
         UnvalidatedPublicKey
     };
     use aptos_std::big_ordered_map::{Self, BigOrderedMap};
-    use aptos_framework::auth_data::{Self, AbstractionAuthData};
+    use aptos_framework::auth_data::AbstractionAuthData;
+    #[test_only]
+    use aptos_framework::auth_data::Self;
     use aptos_framework::bcs_stream::{Self, deserialize_u8};
     use aptos_framework::permissioned_signer::{Self, is_permissioned_signer, StorablePermissionedHandle};
     use aptos_framework::rate_limiter;
@@ -107,7 +109,7 @@ module aptos_framework::permissioned_delegation {
         abstraction_auth_data: AbstractionAuthData
     ): signer acquires RegisteredDelegations {
         let addr = signer::address_of(&account);
-        let stream = bcs_stream::new(*auth_data::authenticator(&abstraction_auth_data));
+        let stream = bcs_stream::new(*abstraction_auth_data.authenticator());
         let public_key = new_unvalidated_public_key_from_bytes(
             bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x))
         );
@@ -118,7 +120,7 @@ module aptos_framework::permissioned_delegation {
             ed25519::signature_verify_strict(
                 &signature,
                 &public_key,
-                *auth_data::digest(&abstraction_auth_data),
+                *abstraction_auth_data.digest(),
             ),
             error::permission_denied(EINVALID_SIGNATURE)
         );

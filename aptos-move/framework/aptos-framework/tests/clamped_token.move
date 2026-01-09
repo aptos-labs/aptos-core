@@ -59,17 +59,11 @@ module 0xcafe::clamped_token {
     }
 
     public fun derived_balance<T: key>(store: Object<T>): u64 acquires BalanceStore {
-        fungible_asset::balance_with_ref(
-            &borrow_global<BalanceStore>(@0xcafe).balance_ref,
-            store
-        )
+        borrow_global<BalanceStore>(@0xcafe).balance_ref.balance_with_ref(store)
     }
 
     public fun derived_supply<T: key>(metadata: Object<T>): Option<u128> acquires BalanceStore {
-        option::some(option::extract(&mut fungible_asset::supply_with_ref(
-            &borrow_global<BalanceStore>(@0xcafe).supply_ref,
-            metadata
-        )))
+        option::some(borrow_global<BalanceStore>(@0xcafe).supply_ref.supply_with_ref(metadata).extract())
     }
 
     public fun withdraw<T: key>(
@@ -79,7 +73,7 @@ module 0xcafe::clamped_token {
     ): FungibleAsset {
         // Clamp the max amount of asset to withdraw: at most 10 can be withdrawn each call.
         assert!(amount <= 10, 0);
-        fungible_asset::withdraw_with_ref(transfer_ref, store, amount)
+        transfer_ref.withdraw_with_ref(store, amount)
     }
 
     public fun deposit<T: key>(
@@ -87,6 +81,6 @@ module 0xcafe::clamped_token {
         fa: FungibleAsset,
         transfer_ref: &TransferRef,
     ) {
-        fungible_asset::deposit_with_ref(transfer_ref, store, fa)
+        transfer_ref.deposit_with_ref(store, fa)
     }
 }
