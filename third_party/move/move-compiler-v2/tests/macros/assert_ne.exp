@@ -39,49 +39,49 @@ module 0x42::M {
         }
 
     }
-    private fun foo3<T,T0>(left: T,right: T,fmt: vector<u8>,a: T0) {
+    private fun foo3<T,T0>(left: T,right: T,a: T0) {
         match (Tuple(left, right)) {
           (_left: T, _right: T): (T, T) => {
             if Neq<T>(_left, _right) {
               Tuple()
             } else {
-              Abort(14566554180833181696, string::into_bytes(string_utils::format3<0x1::string::String, T, T>(Borrow(Immutable)([97, 115, 115, 101, 114, 116, 105, 111, 110, 32, 96, 108, 101, 102, 116, 32, 33, 61, 32, 114, 105, 103, 104, 116, 96, 32, 102, 97, 105, 108, 101, 100, 58, 32, 123, 125, 10, 32, 32, 108, 101, 102, 116, 58, 32, 123, 125, 10, 32, 114, 105, 103, 104, 116, 58, 32, 123, 125]), string_utils::format1<T0>(Borrow(Immutable)(fmt), a), _left, _right)))
+              Abort(14566554180833181696, string::into_bytes(string_utils::format3<0x1::string::String, T, T>(Borrow(Immutable)([97, 115, 115, 101, 114, 116, 105, 111, 110, 32, 96, 108, 101, 102, 116, 32, 33, 61, 32, 114, 105, 103, 104, 116, 96, 32, 102, 97, 105, 108, 101, 100, 58, 32, 123, 125, 10, 32, 32, 108, 101, 102, 116, 58, 32, 123, 125, 10, 32, 114, 105, 103, 104, 116, 58, 32, 123, 125]), string_utils::format1<T0>(Borrow(Immutable)([97, 32, 61, 32, 123, 125]), a), _left, _right)))
             }
           }
         }
 
     }
-    private fun foo4<T,T0,T1>(left: T,right: T,fmt: vector<u8>,a: T0,b: T1) {
+    private fun foo4<T,T0,T1>(left: T,right: T,a: T0,b: T1) {
         match (Tuple(left, right)) {
           (_left: T, _right: T): (T, T) => {
             if Neq<T>(_left, _right) {
               Tuple()
             } else {
-              Abort(14566554180833181696, string::into_bytes(string_utils::format3<0x1::string::String, T, T>(Borrow(Immutable)([97, 115, 115, 101, 114, 116, 105, 111, 110, 32, 96, 108, 101, 102, 116, 32, 33, 61, 32, 114, 105, 103, 104, 116, 96, 32, 102, 97, 105, 108, 101, 100, 58, 32, 123, 125, 10, 32, 32, 108, 101, 102, 116, 58, 32, 123, 125, 10, 32, 114, 105, 103, 104, 116, 58, 32, 123, 125]), string_utils::format2<T0, T1>(Borrow(Immutable)(fmt), a, b), _left, _right)))
+              Abort(14566554180833181696, string::into_bytes(string_utils::format3<0x1::string::String, T, T>(Borrow(Immutable)([97, 115, 115, 101, 114, 116, 105, 111, 110, 32, 96, 108, 101, 102, 116, 32, 33, 61, 32, 114, 105, 103, 104, 116, 96, 32, 102, 97, 105, 108, 101, 100, 58, 32, 123, 125, 10, 32, 32, 108, 101, 102, 116, 58, 32, 123, 125, 10, 32, 114, 105, 103, 104, 116, 58, 32, 123, 125]), string_utils::format2<T0, T1>(Borrow(Immutable)([97, 32, 61, 32, 123, 125, 44, 32, 98, 32, 61, 32, 123, 125]), a, b), _left, _right)))
             }
           }
         }
 
     }
-    private fun foo5<T,T0,T1,T2>(left: T,right: T,fmt: vector<u8>,a: T0,b: T1,c: T2) {
+    private fun foo5<T,T0,T1,T2>(left: T,right: T,a: T0,b: T1,c: T2) {
         match (Tuple(left, right)) {
           (_left: T, _right: T): (T, T) => {
             if Neq<T>(_left, _right) {
               Tuple()
             } else {
-              Abort(14566554180833181696, string::into_bytes(string_utils::format3<0x1::string::String, T, T>(Borrow(Immutable)([97, 115, 115, 101, 114, 116, 105, 111, 110, 32, 96, 108, 101, 102, 116, 32, 33, 61, 32, 114, 105, 103, 104, 116, 96, 32, 102, 97, 105, 108, 101, 100, 58, 32, 123, 125, 10, 32, 32, 108, 101, 102, 116, 58, 32, 123, 125, 10, 32, 114, 105, 103, 104, 116, 58, 32, 123, 125]), string_utils::format3<T0, T1, T2>(Borrow(Immutable)(fmt), a, b, c), _left, _right)))
+              Abort(14566554180833181696, string::into_bytes(string_utils::format3<0x1::string::String, T, T>(Borrow(Immutable)([97, 115, 115, 101, 114, 116, 105, 111, 110, 32, 96, 108, 101, 102, 116, 32, 33, 61, 32, 114, 105, 103, 104, 116, 96, 32, 102, 97, 105, 108, 101, 100, 58, 32, 123, 125, 10, 32, 32, 108, 101, 102, 116, 58, 32, 123, 125, 10, 32, 114, 105, 103, 104, 116, 58, 32, 123, 125]), string_utils::format3<T0, T1, T2>(Borrow(Immutable)([97, 32, 61, 32, 123, 125, 44, 32, 98, 32, 61, 32, 123, 125, 44, 32, 99, 32, 61, 32, 123, 125]), a, b, c), _left, _right)))
             }
           }
         }
 
     }
-    private fun foo6<T,T0,T1,T2,T3>(left: T,right: T,fmt: vector<u8>,a: T0,b: T1,c: T2,d: T3) {
+    private fun foo6<T,T0,T1,T2,T3>(left: T,right: T,a: T0,b: T1,c: T2,d: T3) {
         match (Tuple(left, right)) {
           (_left: T, _right: T): (T, T) => {
             if Neq<T>(_left, _right) {
               Tuple()
             } else {
-              Abort(14566554180833181696, string::into_bytes(string_utils::format3<0x1::string::String, T, T>(Borrow(Immutable)([97, 115, 115, 101, 114, 116, 105, 111, 110, 32, 96, 108, 101, 102, 116, 32, 33, 61, 32, 114, 105, 103, 104, 116, 96, 32, 102, 97, 105, 108, 101, 100, 58, 32, 123, 125, 10, 32, 32, 108, 101, 102, 116, 58, 32, 123, 125, 10, 32, 114, 105, 103, 104, 116, 58, 32, 123, 125]), string_utils::format4<T0, T1, T2, T3>(Borrow(Immutable)(fmt), a, b, c, d), _left, _right)))
+              Abort(14566554180833181696, string::into_bytes(string_utils::format3<0x1::string::String, T, T>(Borrow(Immutable)([97, 115, 115, 101, 114, 116, 105, 111, 110, 32, 96, 108, 101, 102, 116, 32, 33, 61, 32, 114, 105, 103, 104, 116, 96, 32, 102, 97, 105, 108, 101, 100, 58, 32, 123, 125, 10, 32, 32, 108, 101, 102, 116, 58, 32, 123, 125, 10, 32, 114, 105, 103, 104, 116, 58, 32, 123, 125]), string_utils::format4<T0, T1, T2, T3>(Borrow(Immutable)([97, 32, 61, 32, 123, 125, 44, 32, 98, 32, 61, 32, 123, 125, 44, 32, 99, 32, 61, 32, 123, 125, 44, 32, 100, 32, 61, 32, 123, 125]), a, b, c, d), _left, _right)))
             }
           }
         }
@@ -116,24 +116,24 @@ module 0x42::M {
             (_left,_right) => if (_left != _right) () else abort 0x1::string::into_bytes(0x1::string_utils::format3<0x1::string::String,T,T>(&vector[97u8, 115u8, 115u8, 101u8, 114u8, 116u8, 105u8, 111u8, 110u8, 32u8, 96u8, 108u8, 101u8, 102u8, 116u8, 32u8, 33u8, 61u8, 32u8, 114u8, 105u8, 103u8, 104u8, 116u8, 96u8, 32u8, 102u8, 97u8, 105u8, 108u8, 101u8, 100u8, 58u8, 32u8, 123u8, 125u8, 10u8, 32u8, 32u8, 108u8, 101u8, 102u8, 116u8, 58u8, 32u8, 123u8, 125u8, 10u8, 32u8, 114u8, 105u8, 103u8, 104u8, 116u8, 58u8, 32u8, 123u8, 125u8], 0x1::string::utf8(message), _left, _right)),
         }
     }
-    fun foo3<T: drop, T0: drop>(left: T, right: T, fmt: vector<u8>, a: T0) {
+    fun foo3<T: drop, T0: drop>(left: T, right: T, a: T0) {
         match ((left, right)) {
-            (_left,_right) => if (_left != _right) () else abort 0x1::string::into_bytes(0x1::string_utils::format3<0x1::string::String,T,T>(&vector[97u8, 115u8, 115u8, 101u8, 114u8, 116u8, 105u8, 111u8, 110u8, 32u8, 96u8, 108u8, 101u8, 102u8, 116u8, 32u8, 33u8, 61u8, 32u8, 114u8, 105u8, 103u8, 104u8, 116u8, 96u8, 32u8, 102u8, 97u8, 105u8, 108u8, 101u8, 100u8, 58u8, 32u8, 123u8, 125u8, 10u8, 32u8, 32u8, 108u8, 101u8, 102u8, 116u8, 58u8, 32u8, 123u8, 125u8, 10u8, 32u8, 114u8, 105u8, 103u8, 104u8, 116u8, 58u8, 32u8, 123u8, 125u8], 0x1::string_utils::format1<T0>(&fmt, a), _left, _right)),
+            (_left,_right) => if (_left != _right) () else abort 0x1::string::into_bytes(0x1::string_utils::format3<0x1::string::String,T,T>(&vector[97u8, 115u8, 115u8, 101u8, 114u8, 116u8, 105u8, 111u8, 110u8, 32u8, 96u8, 108u8, 101u8, 102u8, 116u8, 32u8, 33u8, 61u8, 32u8, 114u8, 105u8, 103u8, 104u8, 116u8, 96u8, 32u8, 102u8, 97u8, 105u8, 108u8, 101u8, 100u8, 58u8, 32u8, 123u8, 125u8, 10u8, 32u8, 32u8, 108u8, 101u8, 102u8, 116u8, 58u8, 32u8, 123u8, 125u8, 10u8, 32u8, 114u8, 105u8, 103u8, 104u8, 116u8, 58u8, 32u8, 123u8, 125u8], 0x1::string_utils::format1<T0>(&vector[97u8, 32u8, 61u8, 32u8, 123u8, 125u8], a), _left, _right)),
         }
     }
-    fun foo4<T: drop, T0: drop, T1: drop>(left: T, right: T, fmt: vector<u8>, a: T0, b: T1) {
+    fun foo4<T: drop, T0: drop, T1: drop>(left: T, right: T, a: T0, b: T1) {
         match ((left, right)) {
-            (_left,_right) => if (_left != _right) () else abort 0x1::string::into_bytes(0x1::string_utils::format3<0x1::string::String,T,T>(&vector[97u8, 115u8, 115u8, 101u8, 114u8, 116u8, 105u8, 111u8, 110u8, 32u8, 96u8, 108u8, 101u8, 102u8, 116u8, 32u8, 33u8, 61u8, 32u8, 114u8, 105u8, 103u8, 104u8, 116u8, 96u8, 32u8, 102u8, 97u8, 105u8, 108u8, 101u8, 100u8, 58u8, 32u8, 123u8, 125u8, 10u8, 32u8, 32u8, 108u8, 101u8, 102u8, 116u8, 58u8, 32u8, 123u8, 125u8, 10u8, 32u8, 114u8, 105u8, 103u8, 104u8, 116u8, 58u8, 32u8, 123u8, 125u8], 0x1::string_utils::format2<T0,T1>(&fmt, a, b), _left, _right)),
+            (_left,_right) => if (_left != _right) () else abort 0x1::string::into_bytes(0x1::string_utils::format3<0x1::string::String,T,T>(&vector[97u8, 115u8, 115u8, 101u8, 114u8, 116u8, 105u8, 111u8, 110u8, 32u8, 96u8, 108u8, 101u8, 102u8, 116u8, 32u8, 33u8, 61u8, 32u8, 114u8, 105u8, 103u8, 104u8, 116u8, 96u8, 32u8, 102u8, 97u8, 105u8, 108u8, 101u8, 100u8, 58u8, 32u8, 123u8, 125u8, 10u8, 32u8, 32u8, 108u8, 101u8, 102u8, 116u8, 58u8, 32u8, 123u8, 125u8, 10u8, 32u8, 114u8, 105u8, 103u8, 104u8, 116u8, 58u8, 32u8, 123u8, 125u8], 0x1::string_utils::format2<T0,T1>(&vector[97u8, 32u8, 61u8, 32u8, 123u8, 125u8, 44u8, 32u8, 98u8, 32u8, 61u8, 32u8, 123u8, 125u8], a, b), _left, _right)),
         }
     }
-    fun foo5<T: drop, T0: drop, T1: drop, T2: drop>(left: T, right: T, fmt: vector<u8>, a: T0, b: T1, c: T2) {
+    fun foo5<T: drop, T0: drop, T1: drop, T2: drop>(left: T, right: T, a: T0, b: T1, c: T2) {
         match ((left, right)) {
-            (_left,_right) => if (_left != _right) () else abort 0x1::string::into_bytes(0x1::string_utils::format3<0x1::string::String,T,T>(&vector[97u8, 115u8, 115u8, 101u8, 114u8, 116u8, 105u8, 111u8, 110u8, 32u8, 96u8, 108u8, 101u8, 102u8, 116u8, 32u8, 33u8, 61u8, 32u8, 114u8, 105u8, 103u8, 104u8, 116u8, 96u8, 32u8, 102u8, 97u8, 105u8, 108u8, 101u8, 100u8, 58u8, 32u8, 123u8, 125u8, 10u8, 32u8, 32u8, 108u8, 101u8, 102u8, 116u8, 58u8, 32u8, 123u8, 125u8, 10u8, 32u8, 114u8, 105u8, 103u8, 104u8, 116u8, 58u8, 32u8, 123u8, 125u8], 0x1::string_utils::format3<T0,T1,T2>(&fmt, a, b, c), _left, _right)),
+            (_left,_right) => if (_left != _right) () else abort 0x1::string::into_bytes(0x1::string_utils::format3<0x1::string::String,T,T>(&vector[97u8, 115u8, 115u8, 101u8, 114u8, 116u8, 105u8, 111u8, 110u8, 32u8, 96u8, 108u8, 101u8, 102u8, 116u8, 32u8, 33u8, 61u8, 32u8, 114u8, 105u8, 103u8, 104u8, 116u8, 96u8, 32u8, 102u8, 97u8, 105u8, 108u8, 101u8, 100u8, 58u8, 32u8, 123u8, 125u8, 10u8, 32u8, 32u8, 108u8, 101u8, 102u8, 116u8, 58u8, 32u8, 123u8, 125u8, 10u8, 32u8, 114u8, 105u8, 103u8, 104u8, 116u8, 58u8, 32u8, 123u8, 125u8], 0x1::string_utils::format3<T0,T1,T2>(&vector[97u8, 32u8, 61u8, 32u8, 123u8, 125u8, 44u8, 32u8, 98u8, 32u8, 61u8, 32u8, 123u8, 125u8, 44u8, 32u8, 99u8, 32u8, 61u8, 32u8, 123u8, 125u8], a, b, c), _left, _right)),
         }
     }
-    fun foo6<T: drop, T0: drop, T1: drop, T2: drop, T3: drop>(left: T, right: T, fmt: vector<u8>, a: T0, b: T1, c: T2, d: T3) {
+    fun foo6<T: drop, T0: drop, T1: drop, T2: drop, T3: drop>(left: T, right: T, a: T0, b: T1, c: T2, d: T3) {
         match ((left, right)) {
-            (_left,_right) => if (_left != _right) () else abort 0x1::string::into_bytes(0x1::string_utils::format3<0x1::string::String,T,T>(&vector[97u8, 115u8, 115u8, 101u8, 114u8, 116u8, 105u8, 111u8, 110u8, 32u8, 96u8, 108u8, 101u8, 102u8, 116u8, 32u8, 33u8, 61u8, 32u8, 114u8, 105u8, 103u8, 104u8, 116u8, 96u8, 32u8, 102u8, 97u8, 105u8, 108u8, 101u8, 100u8, 58u8, 32u8, 123u8, 125u8, 10u8, 32u8, 32u8, 108u8, 101u8, 102u8, 116u8, 58u8, 32u8, 123u8, 125u8, 10u8, 32u8, 114u8, 105u8, 103u8, 104u8, 116u8, 58u8, 32u8, 123u8, 125u8], 0x1::string_utils::format4<T0,T1,T2,T3>(&fmt, a, b, c, d), _left, _right)),
+            (_left,_right) => if (_left != _right) () else abort 0x1::string::into_bytes(0x1::string_utils::format3<0x1::string::String,T,T>(&vector[97u8, 115u8, 115u8, 101u8, 114u8, 116u8, 105u8, 111u8, 110u8, 32u8, 96u8, 108u8, 101u8, 102u8, 116u8, 32u8, 33u8, 61u8, 32u8, 114u8, 105u8, 103u8, 104u8, 116u8, 96u8, 32u8, 102u8, 97u8, 105u8, 108u8, 101u8, 100u8, 58u8, 32u8, 123u8, 125u8, 10u8, 32u8, 32u8, 108u8, 101u8, 102u8, 116u8, 58u8, 32u8, 123u8, 125u8, 10u8, 32u8, 114u8, 105u8, 103u8, 104u8, 116u8, 58u8, 32u8, 123u8, 125u8], 0x1::string_utils::format4<T0,T1,T2,T3>(&vector[97u8, 32u8, 61u8, 32u8, 123u8, 125u8, 44u8, 32u8, 98u8, 32u8, 61u8, 32u8, 123u8, 125u8, 44u8, 32u8, 99u8, 32u8, 61u8, 32u8, 123u8, 125u8, 44u8, 32u8, 100u8, 32u8, 61u8, 32u8, 123u8, 125u8], a, b, c, d), _left, _right)),
         }
     }
 }

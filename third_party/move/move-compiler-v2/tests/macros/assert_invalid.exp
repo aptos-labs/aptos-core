@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: Macro `assert!` must have at least one argument
+   ┌─ tests/macros/assert_invalid.move:24:16
+   │
+24 │         assert!()
+   │                ^^
+
+error: Macro `assert!` cannot take more than 6 arguments
+   ┌─ tests/macros/assert_invalid.move:28:16
+   │
+28 │         assert!(cond, b"a = {}, b = {}, c = {}, d = {}, e = {}", a, b, c, d, e)
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: Expected a string literal
+   ┌─ tests/macros/assert_invalid.move:33:23
+   │
+33 │         assert!(cond, fmt, a)
+   │                       ^^^
