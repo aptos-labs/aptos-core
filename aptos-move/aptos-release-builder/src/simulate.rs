@@ -38,7 +38,7 @@ use aptos_types::{
     on_chain_config::{ApprovedExecutionHashes, GasScheduleV2, OnChainConfig},
     state_store::TStateView,
     transaction::{
-        AuxiliaryInfo, ExecutionStatus, PersistedAuxiliaryInfo, Script, TransactionArgument,
+        AuxiliaryInfo, AuxiliaryInfoTrait, ExecutionStatus, Script, TransactionArgument,
         TransactionStatus,
     },
 };
@@ -496,12 +496,7 @@ pub async fn simulate_multistep_proposal(
                 &code_storage,
                 &txn,
                 &log_context,
-                &AuxiliaryInfo::new(
-                    PersistedAuxiliaryInfo::V1 {
-                        transaction_index: 0,
-                    },
-                    None,
-                ),
+                &AuxiliaryInfo::new_empty(),
             );
             vm_output
         } else {
@@ -512,12 +507,7 @@ pub async fn simulate_multistep_proposal(
                     &txn,
                     &log_context,
                     GasProfiler::new_script,
-                    &AuxiliaryInfo::new(
-                        PersistedAuxiliaryInfo::V1 {
-                            transaction_index: 0,
-                        },
-                        None,
-                    ),
+                    &AuxiliaryInfo::new_empty(),
                 )?;
 
             let gas_log = gas_profiler.finish();
