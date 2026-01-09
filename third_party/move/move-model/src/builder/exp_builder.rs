@@ -4,7 +4,7 @@
 
 use crate::{
     ast::{
-        AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Exp, ExpData,
+        AbortKind, AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Exp, ExpData,
         LambdaCaptureKind, MatchArm, ModuleName, Operation, Pattern, QualifiedSymbol, QuantKind,
         ResourceSpecifier, RewriteResult, Spec, TempIndex, Value,
     },
@@ -28,7 +28,10 @@ use crate::{
         ReceiverFunctionInstance, ReferenceKind, Substitution, Type, TypeDisplayContext,
         TypeUnificationError, UnificationContext, Variance, WideningOrder, BOOL_TYPE,
     },
-    well_known::{BORROW_MUT_NAME, BORROW_NAME, VECTOR_FUNCS_WITH_BYTECODE_INSTRS, VECTOR_MODULE},
+    well_known::{
+        BORROW_MUT_NAME, BORROW_NAME, UNSPECIFIED_ABORT_CODE, VECTOR_FUNCS_WITH_BYTECODE_INSTRS,
+        VECTOR_MODULE,
+    },
     FunId,
 };
 use codespan_reporting::diagnostic::Severity;
@@ -2012,13 +2015,16 @@ impl ExpTranslator<'_, '_, '_> {
                 self.check_type(&loc, &ty, expected_type, context);
                 exp
             },
-            EA::Exp_::Abort(code) => {
-                let code = self.translate_exp(code, &Type::new_prim(PrimitiveType::U64));
-                ExpData::Call(
-                    self.new_node_id_with_type_loc(expected_type, &loc),
-                    Operation::Abort,
-                    vec![code.into_exp()],
-                )
+            EA::Exp_::Abort(exp) => {
+                if let Some((abort_kind, args)) = self.translate_abort(context, exp) {
+                    ExpData::Call(
+                        self.new_node_id_with_type_loc(expected_type, &loc),
+                        Operation::Abort(abort_kind),
+                        args,
+                    )
+                } else {
+                    self.new_error_exp()
+                }
             },
             EA::Exp_::Spec(spec_id, ..) => {
                 let rt = self.check_type(&loc, &Type::unit(), expected_type, context);
@@ -5785,6 +5791,57 @@ impl ExpTranslator<'_, '_, '_> {
                 self.error(loc, "macro invocation must use simple name");
             }
             self.new_error_exp()
+        }
+    }
+
+    /// Translates an abort expression.
+    fn translate_abort(
+        &mut self,
+        context: &ErrorMessageContext,
+        exp: &EA::Exp,
+    ) -> Option<(AbortKind, Vec<Exp>)> {
+        let loc = self.to_loc(&exp.loc);
+        let (ty, exp) = self.translate_exp_free(exp);
+
+        match ty {
+            Type::Primitive(PrimitiveType::U64) => {
+                // Handle the `abort(u64)` case.
+                Some((AbortKind::Code, vec![exp.into_exp()]))
+            },
+
+            Type::Vector(elem_ty) => {
+                // Handle the `abort(vector<u8>)` case, which represents aborting with a message.
+                // When the element type is unknown, it is required to be `u8`.
+                self.check_type(&loc, &elem_ty, &Type::Primitive(PrimitiveType::U8), context);
+
+                self.check_language_version(&loc, "abort(vector<u8>)", LanguageVersion::V2_4)?;
+
+                // Use the default unspecified abort code when aborting with a message.
+                let code = ExpData::Value(
+                    self.new_node_id_with_type_loc(&Type::Primitive(PrimitiveType::U64), &loc),
+                    Value::Number(UNSPECIFIED_ABORT_CODE.into()),
+                );
+
+                Some((AbortKind::Message, vec![code.into_exp(), exp.into_exp()]))
+            },
+
+            Type::Var(_) => {
+                // If the type is unknown at this point, we default to `u64` in order to preserve
+                // backwards compatibility with earlier language versions.
+                self.check_type(&loc, &ty, &Type::Primitive(PrimitiveType::U64), context);
+                Some((AbortKind::Code, vec![exp.into_exp()]))
+            },
+
+            _ => {
+                self.error(
+                    &loc,
+                    &format!(
+                        "invalid argument to `abort`: unsupported type `{}`",
+                        ty.display(&self.type_display_context())
+                    ),
+                );
+                None
+            },
         }
     }
 }

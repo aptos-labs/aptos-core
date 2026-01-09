@@ -449,7 +449,7 @@ impl ExpRewriterFunctions for SpecConverter<'_> {
             let exp = match exp.as_ref() {
                 IfElse(id, _, if_true, if_false)
                     if matches!(if_true.as_ref(), Call(_, Tuple, _))
-                        && matches!(if_false.as_ref(), Call(_, Abort, _)) =>
+                        && matches!(if_false.as_ref(), Call(_, Abort(_), _)) =>
                 {
                     // The code pattern produced by an `assert!`: `if (c) () else abort`.
                     // Reduce to unit
@@ -515,7 +515,7 @@ impl ExpRewriterFunctions for SpecConverter<'_> {
                 },
                 IfElse(id, _, if_true, if_false)
                     if matches!(if_true.as_ref(), Call(_, Tuple, _))
-                        && matches!(if_false.as_ref(), Call(_, Abort, _)) =>
+                        && matches!(if_false.as_ref(), Call(_, Abort(_), _)) =>
                 {
                     // The code pattern produced by an `assert!`: `if (c) () else abort`.
                     // Reduce to unit as well
@@ -529,7 +529,7 @@ impl ExpRewriterFunctions for SpecConverter<'_> {
                         .flat_map(|e| {
                             if matches!(
                                 e.as_ref(),
-                                SpecBlock(..) | Call(_, Abort, _) | Call(_, Tuple, _)
+                                SpecBlock(..) | Call(_, Abort(_), _) | Call(_, Tuple, _)
                             ) {
                                 None
                             } else {

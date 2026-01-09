@@ -1,0 +1,8 @@
+//**** Cross-compiled for `move` syntax from `tests/control_flow/abort_invalid.move`
+
+//# run --verbose
+script {
+    fun main() {
+        abort vector[128u8]
+    }
+}

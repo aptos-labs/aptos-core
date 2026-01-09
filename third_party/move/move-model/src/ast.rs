@@ -1971,6 +1971,14 @@ impl ExpRewriterFunctions for LoopNestRewriter {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum AbortKind {
+    /// Code only
+    Code,
+    /// Code and message
+    Message,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Operation {
     MoveFunction(ModuleId, FunId),
     Pack(ModuleId, StructId, /*variant*/ Option<Symbol>),
@@ -2034,8 +2042,7 @@ pub enum Operation {
     MoveTo,
     MoveFrom,
     Freeze(/*explicit*/ bool),
-    Abort,
-    AbortMsg,
+    Abort(AbortKind),
     Vector,
 
     // Builtin functions (spec only)
@@ -2857,8 +2864,7 @@ impl Operation {
             MoveTo => false,           // Move-related
             MoveFrom => false,         // Move-related
             Freeze(_) => false,        // Move-related
-            Abort => false,            // Move-related
-            AbortMsg => false,         // Move-related
+            Abort(_) => false,         // Move-related
             Vector => false,           // Move-related
 
             // Builtin functions (spec only)
@@ -3764,6 +3770,7 @@ impl fmt::Display for OperationDisplay<'_> {
                 write!(f, "update {}", self.field_str(mid, sid, fid))
             },
             Result(t) => write!(f, "result{}", t),
+            Abort(_) => write!(f, "Abort"),
             _ => write!(f, "{:?}", self.oper),
         }?;
 

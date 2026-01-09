@@ -1,0 +1,12 @@
+processed 2 tasks
+task 0 lines 3-16:  publish [module 0x42::test {]
+task 1 lines 19-19:  run --verbose 0x42::test::main
+Error: Function execution failed with VMError: {
+    message: Hello, world!,
+    major_status: ABORTED,
+    sub_status: Some(14566554180833181696),
+    location: 0x42::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 14)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

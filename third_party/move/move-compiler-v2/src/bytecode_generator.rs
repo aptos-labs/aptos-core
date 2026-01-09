@@ -9,7 +9,9 @@ use itertools::Itertools;
 use move_binary_format::file_format::Visibility;
 use move_core_types::ability::Ability;
 use move_model::{
-    ast::{Exp, ExpData, MatchArm, Operation, Pattern, SpecBlockTarget, TempIndex, Value},
+    ast::{
+        AbortKind, Exp, ExpData, MatchArm, Operation, Pattern, SpecBlockTarget, TempIndex, Value,
+    },
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     metadata::LanguageVersion,
     model::{
@@ -901,16 +903,21 @@ impl Generator<'_> {
                 }
                 self.gen_borrow(target, id, *kind, &arg)
             },
-            Operation::Abort => {
-                let arg = self.require_unary_arg(id, args);
-                let temp = self.gen_escape_auto_ref_arg(&arg, false);
-                self.emit_with(id, |attr| Bytecode::Abort(attr, temp, None))
-            },
-            Operation::AbortMsg => {
-                let [arg0, arg1] = self.require_binary_args(id, args);
-                let temp0 = self.gen_escape_auto_ref_arg(&arg0, false);
-                let temp1 = self.gen_escape_auto_ref_arg(&arg1, false);
-                self.emit_with(id, |attr| Bytecode::Abort(attr, temp0, Some(temp1)));
+            Operation::Abort(kind) => {
+                let (temp0, temp1) = match kind {
+                    AbortKind::Code => {
+                        let arg = self.require_unary_arg(id, args);
+                        let temp = self.gen_escape_auto_ref_arg(&arg, false);
+                        (temp, None)
+                    },
+                    AbortKind::Message => {
+                        let [arg0, arg1] = self.require_binary_args(id, args);
+                        let temp0 = self.gen_escape_auto_ref_arg(&arg0, false);
+                        let temp1 = self.gen_escape_auto_ref_arg(&arg1, false);
+                        (temp0, Some(temp1))
+                    },
+                };
+                self.emit_with(id, |attr| Bytecode::Abort(attr, temp0, temp1))
             },
             Operation::Deref => self.gen_deref(targets, id, args),
             Operation::MoveFunction(m, f) => {
