@@ -1255,12 +1255,21 @@ Removes and returns the orders that are ready to be executed based on the time c
     self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, order_limit: u64
 ): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;SingleOrder&lt;M&gt;&gt; {
     <b>let</b> self_orders = &<b>mut</b> self.orders;
+    <b>let</b> self_client_order_ids = &<b>mut</b> self.client_order_ids;
     <b>let</b> order_ids = self.pending_orders.<a href="single_order_book.md#0x7_single_order_book_take_ready_time_based_orders">take_ready_time_based_orders</a>(order_limit);
     <b>let</b> orders = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
 
     order_ids.for_each(|order_id| {
         <b>let</b> order_with_state = self_orders.remove(&order_id);
         <b>let</b> (order, _) = order_with_state.destroy_order_from_state();
+        <b>let</b> client_order_id = order.get_client_order_id();
+        <b>if</b> (client_order_id.is_some()) {
+            self_client_order_ids.remove(
+                &new_account_client_order_id(
+                    order.get_account(), client_order_id.destroy_some()
+                )
+            );
+        };
         orders.push_back(order);
     });
     orders
