@@ -1,6 +1,6 @@
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0x42::m1
 struct T<T0: drop + store> has copy + drop + store
   h: T0
@@ -81,7 +81,7 @@ public fun borrow_mut$S$1<T0: drop + store>(l0: &mut S<T0>): &mut T<T0>
     mut_borrow_field S<T0>, g
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0x42::m2
 use 0x42::m1
 // Function definition at index 0

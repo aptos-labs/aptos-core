@@ -547,6 +547,12 @@ where
 
         self.algebra.charge_execution(cost)
     }
+
+    fn charge_abort_message(&mut self, bytes: &[u8]) -> PartialVMResult<()> {
+        let num_bytes = NumBytes::new(bytes.len() as u64);
+        let cost = ABORT_MSG_BASE + ABORT_MSG_PER_BYTE * num_bytes;
+        self.algebra.charge_execution(cost)
+    }
 }
 
 impl<A> AptosGasMeter for StandardGasMeter<A>

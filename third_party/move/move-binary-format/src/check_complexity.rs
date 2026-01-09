@@ -376,6 +376,7 @@ impl BinaryComplexityMeter<'_> {
                 | MoveTo(_)
                 | MoveFrom(_)
                 | Abort
+                | AbortMsg
                 | Nop => (),
             }
         }

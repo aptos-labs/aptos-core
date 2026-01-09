@@ -1767,6 +1767,8 @@ const OPERAND_STACK_SIZE_LIMIT: usize = 1024;
 const CALL_STACK_SIZE_LIMIT: usize = 1024;
 pub(crate) const ACCESS_STACK_SIZE_LIMIT: usize = 256;
 
+const ABORT_MESSAGE_SIZE_LIMIT: usize = 1024;
+
 /// The operand and runtime-type stacks.
 pub(crate) struct Stack {
     pub(crate) value: Vec<Value>,
@@ -2755,11 +2757,23 @@ impl Frame {
                         return Err(error);
                     },
                     Instruction::AbortMsg => {
-                        gas_meter.charge_simple_instr(S::Abort)?;
-
                         let vec = interpreter.operand_stack.pop_as::<Vector>()?;
                         let bytes = vec.to_vec_u8()?;
-                        // TODO(aborts): Add a test that triggers this error.
+
+                        // Gas is charged per byte to account for the cost of UTF-8 validation.
+                        gas_meter.charge_abort_message(&bytes)?;
+
+                        if bytes.len() > ABORT_MESSAGE_SIZE_LIMIT {
+                            return Err(PartialVMError::new(
+                                StatusCode::ABORT_MESSAGE_LIMIT_EXCEEDED,
+                            )
+                            .with_message(format!(
+                                "Expected at most {} bytes, got {} bytes",
+                                ABORT_MESSAGE_SIZE_LIMIT,
+                                bytes.len()
+                            )));
+                        }
+
                         let error_message = String::from_utf8(bytes).map_err(|err| {
                             PartialVMError::new(StatusCode::INVALID_ABORT_MESSAGE)
                                 .with_message(format!("Invalid UTF-8 string: {err}"))

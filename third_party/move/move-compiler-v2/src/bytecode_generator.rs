@@ -289,6 +289,26 @@ impl<'env> Generator<'env> {
         }
     }
 
+    /// Require binary arguments. This has to clone the arg but thats fine because of
+    /// interning.
+    fn require_binary_args(&self, id: NodeId, args: &[Exp]) -> [Exp; 2] {
+        if args.len() != 2 {
+            self.internal_error(
+                id,
+                format!(
+                    "inconsistent expression argument arity: {} and 2",
+                    args.len()
+                ),
+            );
+            [
+                ExpData::Invalid(self.env().new_node_id()).into_exp(),
+                ExpData::Invalid(self.env().new_node_id()).into_exp(),
+            ]
+        } else {
+            [args[0].to_owned(), args[1].to_owned()]
+        }
+    }
+
     /// Finds the temporary index assigned to the local.
     fn find_local(&self, id: NodeId, sym: Symbol) -> TempIndex {
         for scope in self.scopes.iter().rev() {
@@ -884,7 +904,13 @@ impl Generator<'_> {
             Operation::Abort => {
                 let arg = self.require_unary_arg(id, args);
                 let temp = self.gen_escape_auto_ref_arg(&arg, false);
-                self.emit_with(id, |attr| Bytecode::Abort(attr, temp))
+                self.emit_with(id, |attr| Bytecode::Abort(attr, temp, None))
+            },
+            Operation::AbortMsg => {
+                let [arg0, arg1] = self.require_binary_args(id, args);
+                let temp0 = self.gen_escape_auto_ref_arg(&arg0, false);
+                let temp1 = self.gen_escape_auto_ref_arg(&arg1, false);
+                self.emit_with(id, |attr| Bytecode::Abort(attr, temp0, Some(temp1)));
             },
             Operation::Deref => self.gen_deref(targets, id, args),
             Operation::MoveFunction(m, f) => {
@@ -1939,7 +1965,7 @@ impl Generator<'_> {
                 Constant::U64(well_known::INCOMPLETE_MATCH_ABORT_CODE),
             )
         });
-        self.emit_with(id, |attr| Bytecode::Abort(attr, abort_code));
+        self.emit_with(id, |attr| Bytecode::Abort(attr, abort_code, None));
         // Here we end if some path was successful
         self.emit_with(id, |attr| Bytecode::Label(attr, success_path));
         // Finally check exhaustiveness of match

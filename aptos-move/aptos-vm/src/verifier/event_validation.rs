@@ -235,6 +235,7 @@ pub(crate) fn validate_emit_calls(
                     | Le
                     | Ge
                     | Abort
+                    | AbortMsg
                     | Nop
                     | ImmBorrowVariantField(_)
                     | ImmBorrowVariantFieldGeneric(_)

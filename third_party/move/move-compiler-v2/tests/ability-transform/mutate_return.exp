@@ -468,7 +468,7 @@ fun m::g<#0>($t0: &mut vector<#0>) {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::m
 // Function definition at index 0
 #[persistent] public fun singleton<T0>(l0: T0): vector<T0>
