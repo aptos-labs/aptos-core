@@ -10,7 +10,9 @@ use aptos_types::{
     error,
     transaction::{
         authenticator::AuthenticationKey,
-        user_transaction_context::{EntryFunctionPayload, UserTransactionContext},
+        user_transaction_context::{
+            EntryFunctionPayload, TransactionIndexKind, UserTransactionContext,
+        },
     },
 };
 use better_any::{Tid, TidAble};
@@ -182,14 +184,28 @@ fn native_monotonically_increasing_counter_internal(
     let user_transaction_context_opt: &Option<UserTransactionContext> =
         get_user_transaction_context_opt_from_context(context);
     if let Some(user_transaction_context) = user_transaction_context_opt {
-        // monotonically_increasing_counter (128 bits) = `<reserved_byte (8 bits) = 0 for block/chunk execution, 1 for validation/simulation> || timestamp_us (64 bits) || transaction_index (32 bits) || session counter (8 bits) || local_counter (16 bits)`
+        // monotonically_increasing_counter (128 bits) = `<reserved_byte (8 bits)> || timestamp_us (64 bits) || transaction_index (32 bits) || session counter (8 bits) || local_counter (16 bits)`
+        // reserved_byte: 0 for block/chunk execution (V1), 1 for validation/simulation (TimestampNotYetAssignedV1)
         let timestamp_us = safely_pop_arg!(args, u64);
-        let transaction_index = user_transaction_context.transaction_index();
+        let transaction_index_kind = user_transaction_context.transaction_index_kind();
 
-        let mut monotonically_increasing_counter: u128 =
-            (transaction_index.is_none() as u128) << 120;
+        let (reserved_byte, transaction_index) = match transaction_index_kind {
+            TransactionIndexKind::BlockExecution { transaction_index } => {
+                (0u128, transaction_index)
+            },
+            TransactionIndexKind::ValidationOrSimulation { transaction_index } => {
+                (1u128, transaction_index)
+            },
+            TransactionIndexKind::NotAvailable => {
+                return Err(SafeNativeError::Abort {
+                    abort_code: error::invalid_state(abort_codes::ETRANSACTION_INDEX_NOT_AVAILABLE),
+                });
+            },
+        };
+
+        let mut monotonically_increasing_counter: u128 = reserved_byte << 120;
         monotonically_increasing_counter |= (timestamp_us as u128) << 56;
-        monotonically_increasing_counter |= (transaction_index.unwrap_or(0) as u128) << 24;
+        monotonically_increasing_counter |= (transaction_index as u128) << 24;
         monotonically_increasing_counter |= session_counter << 16;
         monotonically_increasing_counter |= local_counter;
         Ok(smallvec![Value::u128(monotonically_increasing_counter)])
