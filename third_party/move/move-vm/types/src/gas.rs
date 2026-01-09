@@ -387,6 +387,8 @@ pub trait GasMeter: NativeGasMeter {
     ) -> PartialVMResult<()>;
 
     fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()>;
+
+    fn charge_abort_message(&mut self, bytes: &[u8]) -> PartialVMResult<()>;
 }
 
 /// A dummy gas meter that does not meter anything.
@@ -639,6 +641,10 @@ impl GasMeter for UnmeteredGasMeter {
     }
 
     fn charge_create_ty(&mut self, _num_nodes: NumTypeNodes) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn charge_abort_message(&mut self, _bytes: &[u8]) -> PartialVMResult<()> {
         Ok(())
     }
 }

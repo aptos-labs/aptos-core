@@ -962,11 +962,13 @@ pub enum StatusCode {
     UNABLE_TO_CAPTURE_DELAYED_FIELDS = 4041,
     // The abort message is not a valid UTF-8 string.
     INVALID_ABORT_MESSAGE = 4042,
+    // The abort message exceeded the size limit.
+    ABORT_MESSAGE_LIMIT_EXCEEDED = 4043,
 
     // Reserved error code for future use. Always keep this buffer of well-defined new codes.
-    RESERVED_RUNTIME_ERROR_1 = 4043,
-    RESERVED_RUNTIME_ERROR_2 = 4044,
-    RESERVED_RUNTIME_ERROR_3 = 4045,
+    RESERVED_RUNTIME_ERROR_1 = 4044,
+    RESERVED_RUNTIME_ERROR_2 = 4045,
+    RESERVED_RUNTIME_ERROR_3 = 4046,
 
     // A reserved status to represent an unknown vm status.
     // this is u64::MAX, but we can't pattern match on that, so put the hardcoded value in

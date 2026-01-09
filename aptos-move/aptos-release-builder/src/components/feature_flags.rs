@@ -157,6 +157,7 @@ pub enum FeatureFlag {
     EnableFrameworkForOption,
     SessionContinuation,
     EnableFunctionReflection,
+    VMBinaryFormatV10,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -413,6 +414,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::EnableFrameworkForOption => AptosFeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION,
             FeatureFlag::SessionContinuation => AptosFeatureFlag::SESSION_CONTINUATION,
             FeatureFlag::EnableFunctionReflection => AptosFeatureFlag::ENABLE_FUNCTION_REFLECTION,
+            FeatureFlag::VMBinaryFormatV10 => AptosFeatureFlag::VM_BINARY_FORMAT_V10,
         }
     }
 }
@@ -596,6 +598,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION => FeatureFlag::EnableFrameworkForOption,
             AptosFeatureFlag::SESSION_CONTINUATION => FeatureFlag::SessionContinuation,
             AptosFeatureFlag::ENABLE_FUNCTION_REFLECTION => FeatureFlag::EnableFunctionReflection,
+            AptosFeatureFlag::VM_BINARY_FORMAT_V10 => FeatureFlag::VMBinaryFormatV10,
         }
     }
 }

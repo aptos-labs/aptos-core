@@ -343,6 +343,17 @@ where
             .charge_native_function_before_execution(ty_args, args)
     }
 
+    fn charge_abort_message(&mut self, bytes: &[u8]) -> PartialVMResult<()> {
+        self.release_heap_memory(
+            self.vm_gas_params()
+                .misc
+                .abs_val
+                .abstract_heap_size(bytes, self.feature_version())?,
+        );
+
+        self.base.charge_abort_message(bytes)
+    }
+
     #[inline]
     fn charge_native_function(
         &mut self,

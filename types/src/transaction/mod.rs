@@ -1600,7 +1600,7 @@ impl TransactionStatus {
         match vm_status.keep_or_discard(
             features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES),
             memory_limit_exceeded_as_miscellaneous_error,
-            false,
+            features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V10),
         ) {
             Ok(recorded) => match recorded {
                 // TODO(bowu):status code should be removed from transaction status

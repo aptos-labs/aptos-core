@@ -2,7 +2,8 @@
 module aptos_experimental::order_book_client_order_id {
     use std::option;
     use std::signer;
-    use aptos_experimental::order_book_types::{new_order_id_type, price_move_up_condition};
+    use aptos_framework::timestamp;
+    use aptos_experimental::order_book_types::{new_order_id_type, price_move_up_condition, new_time_based_trigger_condition};
     use aptos_experimental::order_book_types::good_till_cancelled;
     use aptos_experimental::order_book::{new_single_order_request, destroy_order_book, set_up_test_with_id};
 
@@ -526,6 +527,53 @@ module aptos_experimental::order_book_client_order_id {
 
         // This should remove the pending order from the pending orders map
         order_book.take_ready_price_based_orders(1025, 1);
+
+        // Try cancelling the order - should return none since it was already removed from pending orders
+        let cancel_result =
+            order_book.try_cancel_single_order_with_client_order_id(user1_addr, client_order_id);
+        assert!(cancel_result.is_none());
+
+        order_book.destroy_order_book();
+    }
+
+    #[test(user1 = @0x456, aptos = @0x1)]
+    public fun test_client_order_id_cleanup_for_time_based_pending_order(
+        user1: &signer,
+        aptos: &signer
+    ) {
+        // Setup timestamp for time-based triggers
+        timestamp::set_time_has_started_for_testing(aptos);
+        timestamp::update_global_time_for_test_secs(1000);
+
+        // Setup a basic order book
+        let order_book = set_up_test_with_id();
+        let user1_addr = signer::address_of(user1);
+        let client_order_id = std::string::utf8(b"time_order_1");
+        let order_id = new_order_id_type(1);
+
+        // Create an order request with client order ID and time-based trigger
+        let order_req =
+            new_single_order_request(
+                user1_addr,
+                order_id,
+                option::some(client_order_id),
+                1000, // price
+                100, // orig_size
+                100, // remaining_size
+                true, // is_bid
+                option::some(new_time_based_trigger_condition(1500)), // trigger_condition - time-based
+                good_till_cancelled(),
+                42 // metadata
+            );
+
+        // Place the maker order
+        order_book.place_maker_order(order_req);
+
+        // Advance time to trigger the condition
+        timestamp::update_global_time_for_test_secs(1600);
+
+        // This should remove the pending order from the pending orders map
+        order_book.take_ready_time_based_orders(1);
 
         // Try cancelling the order - should return none since it was already removed from pending orders
         let cancel_result =

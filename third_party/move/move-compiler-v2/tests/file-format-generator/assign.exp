@@ -14,7 +14,7 @@ warning: Unused value of parameter `h`. Consider removing the parameter, or pref
 
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0x42::assign
 struct T has drop
   h: u64

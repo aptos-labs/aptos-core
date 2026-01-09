@@ -211,11 +211,12 @@ impl<'a> StackUsageVerifier<'a> {
             // Vector indexing operations (pop twice and push once)
             Bytecode::VecImmBorrow(_) | Bytecode::VecMutBorrow(_) => (2, 1),
 
-            // MoveTo, WriteRef, and VecPushBack pop twice but do not push
+            // MoveTo, WriteRef, VecPushBack, and AbortMsg pop twice but do not push
             Bytecode::MoveTo(_)
             | Bytecode::MoveToGeneric(_)
             | Bytecode::WriteRef
-            | Bytecode::VecPushBack(_) => (2, 0),
+            | Bytecode::VecPushBack(_)
+            | Bytecode::AbortMsg => (2, 0),
 
             // VecSwap pops three times but does not push
             Bytecode::VecSwap(_) => (3, 0),

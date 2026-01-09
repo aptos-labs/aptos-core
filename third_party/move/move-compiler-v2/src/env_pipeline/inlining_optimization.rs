@@ -543,7 +543,7 @@ fn has_abort(function: &FunctionEnv, caller: &FunctionEnv) -> bool {
     }
     let mut found = false;
     exp.visit_pre_order(&mut |e: &ExpData| {
-        if let ExpData::Call(_, Operation::Abort, _) = e {
+        if let ExpData::Call(_, Operation::Abort(_), _) = e {
             found = true;
         }
         // Keep going if not yet found

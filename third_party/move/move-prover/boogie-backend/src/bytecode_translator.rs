@@ -3254,7 +3254,7 @@ impl FunctionTranslator<'_> {
                     emitln!(writer, "}");
                 }
             },
-            Abort(_, src) => {
+            Abort(_, src, _) => {
                 let num_oper_code = global_state
                     .get_temp_index_oper(mid, fid, *src, baseline_flag)
                     .unwrap();

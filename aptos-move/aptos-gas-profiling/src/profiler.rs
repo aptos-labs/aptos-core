@@ -367,6 +367,9 @@ where
 
         [VEC_SWAP]
         fn charge_vec_swap(&mut self) -> PartialVMResult<()>;
+
+        [ABORT_MSG]
+        fn charge_abort_message(&mut self, bytes: &[u8]) -> PartialVMResult<()>;
     }
 
     fn balance_internal(&self) -> InternalGas {

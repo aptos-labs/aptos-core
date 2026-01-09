@@ -68,7 +68,7 @@ warning: This assignment/binding to the left-hand-side variable `s` is unused. C
 
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0x42::constant
 // Function definition at index 0
 fun test_constans()

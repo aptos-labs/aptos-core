@@ -483,6 +483,12 @@ fn execute_inner(
         Bytecode::BrTrue(_) | Bytecode::BrFalse(_) | Bytecode::Abort => {
             safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
         },
+        Bytecode::AbortMsg => {
+            // message value
+            safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
+            // code value
+            safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
+        },
         Bytecode::MoveTo(_) | Bytecode::MoveToGeneric(_) => {
             // resource value
             safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
