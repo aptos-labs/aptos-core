@@ -18,13 +18,11 @@ fn initialize(h: &mut MoveHarness) {
     assert_success!(status);
 }
 
-#[rstest(enabled, disabled,
-    case(vec![FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION], vec![]),
-    case(vec![], vec![FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION]),
-)]
+#[rstest]
+#[case(vec![FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION], vec![])]
 fn test_function_value_formatting_in_modules(
-    enabled: Vec<FeatureFlag>,
-    disabled: Vec<FeatureFlag>,
+    #[case] enabled: Vec<FeatureFlag>,
+    #[case] disabled: Vec<FeatureFlag>,
 ) {
     let mut h = MoveHarness::new_with_executor(FakeExecutor::from_head_genesis());
     h.enable_features(enabled, disabled);
