@@ -1,0 +1,61 @@
+//# publish
+module 0xc0ffee::closure_ref_safety_test
+
+// Test: Pack a closure that captures a value, while also having references
+// that get poisoned. This tests that reference checking works with closures.
+public fun make_closure_with_captured_value(x: u64): |u64|u64 has drop
+    // Pack closure that captures x
+    move_loc x
+    pack_closure action, 1
+    ret
+
+#[persistent] fun action(captured: u64, arg: u64): u64
+    move_loc captured
+    move_loc arg
+    add
+    ret
+
+// Test: Create a closure while holding references, then poison one reference
+public fun test_closure_creation_with_ref_poison(): u64
+    local x: u64
+    local y: u64
+    local immut_ref: &u64
+    local mut_ref: &mut u64
+    local closure: |u64|u64 has drop
+
+    ld_u64 10
+    st_loc x
+
+    ld_u64 20
+    st_loc y
+
+    // Create immutable reference to y
+    borrow_loc y
+    st_loc immut_ref
+
+    // Create mutable reference to y
+    mut_borrow_loc y
+    st_loc mut_ref
+
+    // Create a closure that captures x (independent value)
+    copy_loc x
+    call make_closure_with_captured_value
+    st_loc closure
+
+    // Write via mutable ref (poisons immut_ref)
+    ld_u64 999
+    move_loc mut_ref
+    write_ref
+
+    // Use the closure (argument first, then closure)
+    ld_u64 5
+    move_loc closure
+    call_closure<|u64|u64>
+    pop
+
+    // Try to read from poisoned immutable ref (should fail)
+    move_loc immut_ref
+    read_ref
+    ret
+
+//# run 0xc0ffee::closure_ref_safety_test::test_closure_creation_with_ref_poison --verbose

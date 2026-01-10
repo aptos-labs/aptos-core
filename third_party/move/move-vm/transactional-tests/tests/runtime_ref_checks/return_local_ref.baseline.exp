@@ -1,0 +1,19 @@
+processed 2 tasks
+task 0 lines 1-18:  publish [module 0xc0ffee::return_test]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000c0ffee::return_test'. Got VMError: {
+    major_status: UNSAFE_RET_LOCAL_OR_RESOURCE_STILL_BORROWED,
+    sub_status: None,
+    location: 0xc0ffee::return_test,
+    indices: [(FunctionDefinition, 0)],
+    offsets: [(FunctionDefinitionIndex(0), 5)],
+}
+task 1 lines 20-20:  run 0xc0ffee::return_test::test_return_local_ref --args 0 --verbose
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000c0ffee::return_test doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}

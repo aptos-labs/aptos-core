@@ -1,0 +1,27 @@
+//# publish
+module 0xc0ffee::freeze_test
+
+// Test: FreezeRef should work correctly - converting mut ref to immut ref
+public fun test_freeze_ref_valid(): u64
+    local x: u64
+    local mut_ref: &mut u64
+    local immut_ref: &u64
+
+    ld_u64 42
+    st_loc x
+
+    // Create mutable reference
+    mut_borrow_loc x
+    st_loc mut_ref
+
+    // Freeze it to immutable
+    move_loc mut_ref
+    freeze_ref
+    st_loc immut_ref
+
+    // Read from frozen reference (should work)
+    move_loc immut_ref
+    read_ref
+    ret
+
+//# run 0xc0ffee::freeze_test::test_freeze_ref_valid --verbose

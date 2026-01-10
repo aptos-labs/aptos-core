@@ -1,0 +1,4 @@
+processed 2 tasks
+task 0 lines 1-50:  publish [module 0xc0ffee::multi_return_test]
+task 1 lines 52-52:  run 0xc0ffee::multi_return_test::caller --verbose
+return values: 300

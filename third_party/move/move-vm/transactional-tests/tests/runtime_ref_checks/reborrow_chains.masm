@@ -1,0 +1,66 @@
+//# publish
+module 0xc0ffee::reborrow_test
+
+struct Inner has drop+copy
+    value: u64
+
+struct Outer has drop+copy
+    inner: Inner
+
+// Test: Chain of reborrows with poisoning
+public fun test_reborrow_chain(): u64
+    local outer: Outer
+    local ref_outer: &Outer
+    local ref_inner: &Inner
+    local ref_value: &u64
+    local mut_ref_inner: &mut Inner
+
+    // Create nested structure
+    ld_u64 42
+    pack Inner
+    pack Outer
+    st_loc outer
+
+    // Create chain of immutable borrows
+    borrow_loc outer
+    st_loc ref_outer
+
+    copy_loc ref_outer
+    borrow_field Outer, inner
+    st_loc ref_inner
+
+    copy_loc ref_inner
+    borrow_field Inner, value
+    st_loc ref_value
+
+    // Verify all refs work
+    copy_loc ref_value
+    read_ref
+    pop
+
+    // Now get mutable ref to inner and write (should poison all downstream refs)
+    mut_borrow_loc outer
+    mut_borrow_field Outer, inner
+    st_loc mut_ref_inner
+
+    ld_u64 999
+    pack Inner
+    move_loc mut_ref_inner
+    write_ref
+
+    // ref_outer should be poisoned (ancestor poisoning via immutable ref rules)
+    move_loc ref_outer
+    borrow_field Outer, inner
+    pop  // Just access the field (will fail if poisoned)
+
+    // Cleanup other refs
+    move_loc ref_inner
+    pop
+    move_loc ref_value
+    pop
+
+    // Return dummy value (test should fail before reaching here in ref mode)
+    ld_u64 0
+    ret
+
+//# run 0xc0ffee::reborrow_test::test_reborrow_chain --verbose

@@ -1,0 +1,51 @@
+//# publish
+module 0xc0ffee::return_transform_test
+
+struct Inner has drop
+    value: u64
+
+struct Outer has drop
+    inner1: Inner
+    inner2: Inner
+
+// Test: Return deeply nested reference with caller transformation
+public fun get_inner_value(outer_ref: &Outer): &u64
+    local inner_ref: &Inner
+    local value_ref: &u64
+
+    // Navigate to inner1.value
+    move_loc outer_ref
+    borrow_field Outer, inner1
+    st_loc inner_ref
+
+    move_loc inner_ref
+    borrow_field Inner, value
+    st_loc value_ref
+
+    // Return the deeply nested reference
+    move_loc value_ref
+    ret
+
+public fun caller_with_nesting(): u64
+    local outer: Outer
+    local result_ref: &u64
+
+    // Create nested structure
+    ld_u64 42
+    pack Inner
+    ld_u64 84
+    pack Inner
+    pack Outer
+    st_loc outer
+
+    // Call function that returns nested reference
+    borrow_loc outer
+    call get_inner_value
+    st_loc result_ref
+
+    // Read the value
+    move_loc result_ref
+    read_ref
+    ret
+
+//# run 0xc0ffee::return_transform_test::caller_with_nesting --verbose

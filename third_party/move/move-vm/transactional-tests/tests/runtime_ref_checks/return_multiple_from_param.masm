@@ -1,0 +1,52 @@
+//# publish
+module 0xc0ffee::multi_return_test
+
+struct Pair has drop
+    first: u64
+    second: u64
+
+// Test: Return multiple references derived from same parameter (should work)
+public fun get_both_fields(pair_ref: &Pair): (&u64, &u64)
+    local ref1: &u64
+    local ref2: &u64
+
+    // Get reference to first field
+    copy_loc pair_ref
+    borrow_field Pair, first
+    st_loc ref1
+
+    // Get reference to second field
+    move_loc pair_ref
+    borrow_field Pair, second
+    st_loc ref2
+
+    // Return both (should work - both derived from same param, no overlap)
+    move_loc ref1
+    move_loc ref2
+    ret
+
+public fun caller(): u64
+    local pair: Pair
+    local ref1: &u64
+    local ref2: &u64
+
+    ld_u64 100
+    ld_u64 200
+    pack Pair
+    st_loc pair
+
+    borrow_loc pair
+    call get_both_fields
+    st_loc ref2
+    st_loc ref1
+
+    // Read both
+    move_loc ref1
+    read_ref
+    move_loc ref2
+    read_ref
+    add
+
+    ret
+
+//# run 0xc0ffee::multi_return_test::caller --verbose

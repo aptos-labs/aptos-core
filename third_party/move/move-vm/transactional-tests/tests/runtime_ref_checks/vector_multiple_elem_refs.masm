@@ -1,0 +1,59 @@
+//# publish
+module 0xc0ffee::vec_multi_ref_test
+
+// Test: Multiple references to vector elements with abstracted label (0)
+// All vector element refs use label 0, so they should conflict
+public fun test_vec_multiple_elem_refs(): u64
+    local vec: vector<u64>
+    local ref1: &u64
+    local ref2: &u64
+    local vec_ref: &mut vector<u64>
+
+    // Create vector with 3 elements
+    ld_u64 10
+    ld_u64 20
+    ld_u64 30
+    vec_pack<u64> 3
+    st_loc vec
+
+    // Get reference to element 0
+    mut_borrow_loc vec
+    ld_u64 0
+    vec_borrow<u64>
+    st_loc ref1
+
+    // Get reference to element 1 (uses same abstracted label 0)
+    mut_borrow_loc vec
+    ld_u64 1
+    vec_borrow<u64>
+    st_loc ref2
+
+    // Both refs should be valid now
+    copy_loc ref1
+    read_ref
+    pop
+
+    copy_loc ref2
+    read_ref
+    pop
+
+    // Get mutable vector ref and swap elements (poisons both refs)
+    mut_borrow_loc vec
+    st_loc vec_ref
+
+    move_loc vec_ref
+    ld_u64 0
+    ld_u64 1
+    vec_swap<u64>
+
+    // Try to read from ref1 (should fail - poisoned by swap)
+    move_loc ref1
+    read_ref
+
+    // Cleanup
+    move_loc ref2
+    pop
+
+    ret
+
+//# run 0xc0ffee::vec_multi_ref_test::test_vec_multiple_elem_refs --verbose

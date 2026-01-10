@@ -1,0 +1,25 @@
+//# publish
+module 0xc0ffee::copy_immut_test
+
+// Test: CopyLoc does NOT poison immutable references (only mutable ones)
+public fun test_copy_loc_immut_refs_ok(): u64
+    local x: u64
+    local immut_ref: &u64
+
+    ld_u64 42
+    st_loc x
+
+    // Create immutable reference to x
+    borrow_loc x
+    st_loc immut_ref
+
+    // CopyLoc x (should NOT poison immut_ref, only mutable refs)
+    copy_loc x
+    pop
+
+    // Read from immut_ref should work
+    move_loc immut_ref
+    read_ref
+    ret
+
+//# run 0xc0ffee::copy_immut_test::test_copy_loc_immut_refs_ok --verbose

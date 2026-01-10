@@ -1,0 +1,72 @@
+//# publish
+module 0xc0ffee::interleaved_ops
+
+struct Data has drop
+    field1: u64
+    field2: u64
+    field3: u64
+
+// Test: Complex interleaved reference operations
+public fun test_interleaved_operations(): u64
+    local data: Data
+    local ref1: &u64
+    local ref2: &u64
+    local ref3: &u64
+    local mut_ref: &mut u64
+
+    // Create data
+    ld_u64 10
+    ld_u64 20
+    ld_u64 30
+    pack Data
+    st_loc data
+
+    // Create multiple immutable refs to different fields
+    borrow_loc data
+    borrow_field Data, field1
+    st_loc ref1
+
+    borrow_loc data
+    borrow_field Data, field2
+    st_loc ref2
+
+    borrow_loc data
+    borrow_field Data, field3
+    st_loc ref3
+
+    // Read from ref1 (should work)
+    copy_loc ref1
+    read_ref
+    pop
+
+    // Get mutable ref to field2
+    mut_borrow_loc data
+    mut_borrow_field Data, field2
+    st_loc mut_ref
+
+    // Write via mut_ref (should poison ref2 but not ref1 or ref3)
+    ld_u64 999
+    move_loc mut_ref
+    write_ref
+
+    // Read from ref1 (should still work - different field)
+    copy_loc ref1
+    read_ref
+    pop
+
+    // Read from ref3 (should still work - different field)
+    move_loc ref3
+    read_ref
+    pop
+
+    // Try to read from poisoned ref2 (should fail)
+    move_loc ref2
+    read_ref
+
+    // Cleanup
+    move_loc ref1
+    pop
+
+    ret
+
+//# run 0xc0ffee::interleaved_ops::test_interleaved_operations --verbose

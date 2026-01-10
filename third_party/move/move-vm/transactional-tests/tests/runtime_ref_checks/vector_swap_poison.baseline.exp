@@ -1,0 +1,19 @@
+processed 2 tasks
+task 0 lines 1-47:  publish [module 0xc0ffee::vec_swap_test]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000c0ffee::vec_swap_test'. Got VMError: {
+    major_status: VEC_UPDATE_EXISTS_MUTABLE_BORROW_ERROR,
+    sub_status: None,
+    location: 0xc0ffee::vec_swap_test,
+    indices: [(FunctionDefinition, 0)],
+    offsets: [(FunctionDefinitionIndex(0), 18)],
+}
+task 1 lines 49-49:  run 0xc0ffee::vec_swap_test::test_vec_swap_poisons_elem_refs --verbose
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000c0ffee::vec_swap_test doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}

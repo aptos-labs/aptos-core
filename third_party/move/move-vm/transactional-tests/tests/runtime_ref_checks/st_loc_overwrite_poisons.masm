@@ -1,0 +1,35 @@
+//# publish
+module 0xc0ffee::st_loc_test
+
+// Test: StLoc overwrites local, poisoning all references to it
+public fun test_st_loc_poisons_refs(): u64
+    local x: u64
+    local ref1: &u64
+    local ref2: &u64
+
+    // Initialize x
+    ld_u64 10
+    st_loc x
+
+    // Create references to x
+    borrow_loc x
+    st_loc ref1
+
+    borrow_loc x
+    st_loc ref2
+
+    // Overwrite x with StLoc (should poison both refs)
+    ld_u64 999
+    st_loc x
+
+    // Try to read from poisoned reference (should fail)
+    move_loc ref1
+    read_ref
+
+    // Clean up
+    move_loc ref2
+    pop
+
+    ret
+
+//# run 0xc0ffee::st_loc_test::test_st_loc_poisons_refs --verbose
