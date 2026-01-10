@@ -1950,7 +1950,7 @@ Apply the function to a mutable reference of each key-value pair in the map.
 
 <pre><code>inline <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_new_iter">new_iter</a>(index: u64): <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">IteratorPtr</a> {
     IteratorPtr::Position {
-        index: index,
+        index,
     }
 }
 </code></pre>
