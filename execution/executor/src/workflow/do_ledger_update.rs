@@ -63,6 +63,7 @@ impl DoLedgerUpdate {
                     PersistedAuxiliaryInfo::V1 { .. } => {
                         Some(CryptoHash::hash(persisted_auxiliary_info))
                     },
+                    PersistedAuxiliaryInfo::TimestampNotYetAssignedV1 { .. } => None,
                 };
                 let state_checkpoint_hash = state_checkpoint_hashes[i];
                 let event_hashes = txn_output
