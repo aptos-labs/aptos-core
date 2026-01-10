@@ -6,19 +6,19 @@
 
 use crate::{
     boogie_helpers::{
-        boogie_address, boogie_address_blob, boogie_bv_type, boogie_byte_blob,
-        boogie_closure_pack_name, boogie_constant_blob, boogie_debug_track_abort,
-        boogie_debug_track_local, boogie_debug_track_return, boogie_equality_for_type,
-        boogie_field_sel, boogie_field_update, boogie_fun_apply_name, boogie_function_bv_name,
-        boogie_function_name, boogie_make_vec_from_strings, boogie_modifies_memory_name,
-        boogie_num_literal, boogie_num_type_base, boogie_num_type_string_capital,
-        boogie_reflection_type_info, boogie_reflection_type_name, boogie_resource_memory_name,
-        boogie_struct_name, boogie_struct_variant_name, boogie_temp, boogie_temp_from_suffix,
-        boogie_type, boogie_type_for_struct_field, boogie_type_param, boogie_type_suffix,
-        boogie_type_suffix_bv, boogie_type_suffix_for_struct,
-        boogie_type_suffix_for_struct_variant, boogie_variant_field_update,
-        boogie_well_formed_check, boogie_well_formed_expr_bv, field_bv_flag_global_state,
-        TypeIdentToken,
+        boogie_address, boogie_address_blob, boogie_arbitrary_value, boogie_bv_type,
+        boogie_byte_blob, boogie_closure_pack_name, boogie_constant_blob, boogie_debug_track_abort,
+        boogie_debug_track_local, boogie_debug_track_return, boogie_derived_spec_function_name,
+        boogie_equality_for_type, boogie_field_sel, boogie_field_update, boogie_fun_apply_name,
+        boogie_fun_spec_apply_name, boogie_function_bv_name, boogie_function_name,
+        boogie_make_vec_from_strings, boogie_modifies_memory_name, boogie_num_literal,
+        boogie_num_type_base, boogie_num_type_string_capital, boogie_reflection_type_info,
+        boogie_reflection_type_name, boogie_resource_memory_name, boogie_struct_name,
+        boogie_struct_variant_name, boogie_temp, boogie_temp_from_suffix, boogie_type,
+        boogie_type_for_struct_field, boogie_type_param, boogie_type_suffix, boogie_type_suffix_bv,
+        boogie_type_suffix_for_struct, boogie_type_suffix_for_struct_variant,
+        boogie_variant_field_update, boogie_well_formed_check, boogie_well_formed_expr_bv,
+        field_bv_flag_global_state, TypeIdentToken,
     },
     options::BoogieOptions,
     spec_translator::SpecTranslator,
@@ -512,7 +512,7 @@ impl<'env> BoogieTranslator<'env> {
     ) {
         emitln!(
             self.writer,
-            "// Function type `{}`",
+            "\n// Function type `{}`",
             fun_type.display(&self.env.get_type_display_ctx())
         );
 
@@ -566,23 +566,38 @@ impl<'env> BoogieTranslator<'env> {
             fun_ty_boogie_name
         );
 
-        // Create an apply procedure.
+        // Create an apply procedure and specification function.
+
+        let Type::Fun(params, results, _abilities) = fun_type else {
+            panic!("expected function type")
+        };
+        let flatten_types = |ty: &Box<Type>| {
+            ty.clone()
+                .flatten()
+                .into_iter()
+                .map(|ty: Type| {
+                    if ty.is_immutable_reference() {
+                        // Immutable references are eliminated in the compilation scheme, so skip
+                        ty.skip_reference().clone()
+                    } else {
+                        ty
+                    }
+                })
+                .collect_vec()
+        };
+        let params = flatten_types(params);
+        let results = flatten_types(results);
+
+        // 1) procedure
         emit!(
             self.writer,
             "procedure {{:inline 1}} {}(",
             boogie_fun_apply_name(self.env, fun_type),
         );
-        let Type::Fun(params, results, _abilities) = fun_type else {
-            panic!("expected function type")
-        };
-        let params = params.clone().flatten();
-        for (pos, mut ty) in params.iter().enumerate() {
+
+        for (pos, ty) in params.iter().enumerate() {
             if pos > 0 {
                 emit!(self.writer, ", ")
-            }
-            if ty.is_immutable_reference() {
-                // Immutable references are eliminated in the compilation scheme, so skip
-                ty = ty.skip_reference();
             }
             emit!(self.writer, "p{}: {}", pos, boogie_type(self.env, ty))
         }
@@ -592,11 +607,8 @@ impl<'env> BoogieTranslator<'env> {
         emit!(self.writer, "fun: {}", fun_ty_boogie_name);
         emit!(self.writer, ") returns (");
         let mut result_locals = vec![];
-        for (pos, mut ty) in results
-            .clone()
-            .flatten()
+        for (pos, ty) in results
             .iter()
-            // Mutable input parameters become output, so append them
             .chain(params.iter().filter(|p| p.is_mutable_reference()))
             .enumerate()
         {
@@ -604,10 +616,6 @@ impl<'env> BoogieTranslator<'env> {
                 emit!(self.writer, ",")
             }
             let local_name = format!("r{}", pos);
-            if ty.is_immutable_reference() {
-                // Immutable references are eliminated in the compilation scheme, so skip
-                ty = ty.skip_reference();
-            }
             emit!(self.writer, "{}: {}", local_name, boogie_type(self.env, ty));
             result_locals.push(local_name)
         }
@@ -651,6 +659,73 @@ impl<'env> BoogieTranslator<'env> {
         }
         self.writer.unindent();
         emitln!(self.writer, "}");
+
+        // 2) specification function, uninterpreted
+        if results.len() == 1 {
+            emit!(
+                self.writer,
+                //"function {{:inline}} {}(",
+                "function {}(",
+                boogie_fun_spec_apply_name(self.env, fun_type),
+            );
+
+            for (pos, ty) in params.iter().enumerate() {
+                if pos > 0 {
+                    emit!(self.writer, ", ")
+                }
+                emit!(self.writer, "p{}: {}", pos, boogie_type(self.env, ty))
+            }
+            if !params.is_empty() {
+                emit!(self.writer, ", ")
+            }
+            emit!(self.writer, "fun: {}", fun_ty_boogie_name);
+            emit!(self.writer, "): {}", boogie_type(self.env, &results[0]));
+            emitln!(self.writer, ";");
+            /*
+            emitln!(self.writer, "{");
+            self.writer.indent();
+            for info in closure_infos {
+                if self
+                    .env
+                    .get_function(info.fun.to_qualified_id())
+                    .get_spec_fun()
+                    .is_none()
+                {
+                    // No derived specification function available
+                    continue;
+                }
+                let ctor_name = boogie_closure_pack_name(self.env, &info.fun, info.mask);
+                emitln!(self.writer, "if (fun is {}) then ", ctor_name);
+                self.writer.indent();
+                let fun_env = &self.env.get_function(info.fun.to_qualified_id());
+                let fun_name = boogie_derived_spec_function_name(fun_env, &info.fun.inst);
+                let args = (0..info.mask.captured_count())
+                    .map(|pos| format!("fun->p{}", pos))
+                    .chain((0..params.len()).map(|pos| format!("p{}", pos)))
+                    .join(", ");
+                emitln!(self.writer, "{}({})", fun_name, args);
+                self.writer.unindent();
+                emitln!(self.writer, "else");
+            }
+            self.writer.indent();
+            emitln!(self.writer, "// Havoc result");
+            emitln!(
+                self.writer,
+                "{}",
+                boogie_arbitrary_value(self.env, &results[0], false)
+            );
+            self.writer.unindent();
+            self.writer.unindent();
+            emitln!(self.writer, "}");
+             */
+        }
+
+        // DNS DNS
+
+        // 3) axiom relating the two applies via the id in the 'uninterpreted' case
+        //       forall<T> id: int @
+        //          y := call $unknown_function'T'(id)(x)  where
+        //               y == spec call $unknown_function'T'(id)(x)
     }
 }
 
@@ -2167,7 +2242,8 @@ impl FunctionTranslator<'_> {
                     },
                     Invoke => {
                         // Function is last argument
-                        let fun_type = self.inst(fun_target.get_local_type(*srcs.last().unwrap()));
+                        let fun_idx = *srcs.last().unwrap();
+                        let fun_type = self.inst(fun_target.get_local_type(fun_idx));
                         let args_str = srcs.iter().cloned().map(str_local).join(", ");
                         let dest_str = dests
                             .iter()
@@ -2189,6 +2265,16 @@ impl FunctionTranslator<'_> {
                             format!("{dest_str} := ")
                         };
                         emitln!(writer, "call {}{}({});", call_prefix, apply_fun, args_str);
+                        if dests.len() == 1 {
+                            let spec_apply_fun = boogie_fun_spec_apply_name(env, &fun_type);
+                            emitln!(
+                                writer,
+                                "assume {} == {}({}); ",
+                                str_local(dests[0]),
+                                spec_apply_fun,
+                                args_str
+                            )
+                        }
                     },
                     Pack(mid, sid, inst) => {
                         let inst = &self.inst_slice(inst);
