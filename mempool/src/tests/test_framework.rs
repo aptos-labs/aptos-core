@@ -44,6 +44,7 @@ use aptos_network::{
     ProtocolId,
 };
 use aptos_storage_interface::mock::MockDbReaderWriter;
+use aptos_transaction_tracing::trace_collector::TransactionTraceCollector;
 use aptos_types::{
     account_address::AccountAddress,
     mempool_status::MempoolStatusCode,
@@ -636,7 +637,7 @@ fn setup_mempool(
     let (mempool_notifier, mempool_listener) =
         aptos_mempool_notifications::new_mempool_notifier_listener_pair(100);
 
-    let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
+    let mempool = Arc::new(Mutex::new(CoreMempool::new_for_testing(&config)));
     let vm_validator = Arc::new(RwLock::new(MockVMValidator));
     let db_ro = Arc::new(MockDbReaderWriter);
 
@@ -653,6 +654,7 @@ fn setup_mempool(
             ),
         })
         .unwrap();
+    let transaction_trace_collector = Arc::new(TransactionTraceCollector::new_empty());
 
     start_shared_mempool(
         &Handle::current(),
@@ -668,6 +670,7 @@ fn setup_mempool(
         vm_validator,
         vec![sender],
         peers_and_metadata,
+        transaction_trace_collector,
     );
 
     (
