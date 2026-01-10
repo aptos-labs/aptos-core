@@ -2416,6 +2416,11 @@ impl From<aptos_types::transaction::PersistedAuxiliaryInfo> for PersistedAuxilia
             aptos_types::transaction::PersistedAuxiliaryInfo::V1 { transaction_index } => Self {
                 transaction_index: Some(transaction_index),
             },
+            aptos_types::transaction::PersistedAuxiliaryInfo::TimestampNotYetAssignedV1 {
+                transaction_index,
+            } => Self {
+                transaction_index: Some(transaction_index),
+            },
         }
     }
 }

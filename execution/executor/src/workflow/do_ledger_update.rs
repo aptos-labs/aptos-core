@@ -104,6 +104,7 @@ impl DoLedgerUpdate {
                     PersistedAuxiliaryInfo::V1 { .. } => {
                         Some(CryptoHash::hash(persisted_auxiliary_info))
                     },
+                    PersistedAuxiliaryInfo::TimestampNotYetAssignedV1 { .. } => None,
                 };
 
                 TransactionInfo::new(
