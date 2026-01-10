@@ -7,7 +7,7 @@ use crate::{
     state_kv_db::StateKvDb, state_merkle_db::StateMerkleDb, state_store::StateStore,
     transaction_store::TransactionStore,
 };
-use aptos_config::config::{PrunerConfig, RocksdbConfigs, StorageDirPaths};
+use aptos_config::config::{HotStateConfig, PrunerConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_db_indexer::{db_indexer::InternalIndexerDB, Indexer};
 use aptos_logger::prelude::*;
 use aptos_schemadb::{batch::SchemaBatch, Cache, Env};
@@ -63,7 +63,7 @@ impl AptosDB {
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
         internal_indexer_db: Option<InternalIndexerDB>,
-        reset_hot_state: bool,
+        hot_state_config: HotStateConfig,
     ) -> Result<Self> {
         Self::open_internal(
             &db_paths,
@@ -75,7 +75,7 @@ impl AptosDB {
             max_num_nodes_per_lru_cache_shard,
             false,
             internal_indexer_db,
-            reset_hot_state,
+            hot_state_config,
         )
     }
 
@@ -99,7 +99,7 @@ impl AptosDB {
             max_num_nodes_per_lru_cache_shard,
             true,
             internal_indexer_db,
-            /* reset_hot_state = */ true,
+            HotStateConfig::default(),
         )
     }
 

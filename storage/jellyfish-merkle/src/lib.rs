@@ -475,6 +475,7 @@ where
                         }
                     }
                 },
+                Node::Null => (), // Possible in hot state since we start from a non-zero version.
                 _ => {
                     unreachable!("Assume the db doesn't have exactly 1 state.")
                 },
