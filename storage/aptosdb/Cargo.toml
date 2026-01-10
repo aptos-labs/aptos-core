@@ -53,7 +53,6 @@ proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 rayon = { workspace = true }
 serde = { workspace = true }
-static_assertions = { workspace = true }
 status-line = { workspace = true }
 tokio = { workspace = true }
 
