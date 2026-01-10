@@ -492,24 +492,24 @@ spec aptos_framework::object {
         pragma aborts_if_is_partial;
         let object_address = object.inner;
         aborts_if !exists<ObjectCore>(object_address);
-        aborts_if owner(object) != signer::address_of(owner);
+        aborts_if object.owner() != signer::address_of(owner);
         ensures exists<TombStone>(object_address);
-        ensures is_owner(object, signer::address_of(owner));
+        ensures object.is_owner(signer::address_of(owner));
     }
 
     spec burn_object_with_transfer<T: key>(owner: &signer, object: Object<T>) {
         pragma aborts_if_is_partial;
         let object_address = object.inner;
         aborts_if !exists<ObjectCore>(object_address);
-        aborts_if owner(object) != signer::address_of(owner);
-        aborts_if is_burnt(object);
+        aborts_if object.owner() != signer::address_of(owner);
+        aborts_if object.is_burnt();
     }
 
     spec unburn<T: key>(original_owner: &signer, object: Object<T>) {
         pragma aborts_if_is_partial;
         let object_address = object.inner;
         aborts_if !exists<ObjectCore>(object_address);
-        aborts_if !is_burnt(object);
+        aborts_if !object.is_burnt();
         let tomb_stone = borrow_global<TombStone>(object_address);
         let original_owner_address = signer::address_of(original_owner);
         let object_current_owner = borrow_global<ObjectCore>(object_address).owner;

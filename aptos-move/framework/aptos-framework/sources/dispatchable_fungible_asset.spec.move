@@ -22,12 +22,12 @@ spec aptos_framework::dispatchable_fungible_asset {
 
     spec withdraw {
         modifies global<permissioned_signer::PermissionStorage>(permissioned_signer::spec_permission_address(owner));
-        modifies global<fungible_asset::FungibleStore>(object::object_address(store));
-        modifies global<fungible_asset::ConcurrentFungibleBalance>(object::object_address(store));
+        modifies global<fungible_asset::FungibleStore>(store.object_address());
+        modifies global<fungible_asset::ConcurrentFungibleBalance>(store.object_address());
     }
 
     spec deposit {
-        modifies global<fungible_asset::FungibleStore>(object::object_address(store));
-        modifies global<fungible_asset::ConcurrentFungibleBalance>(object::object_address(store));
+        modifies global<fungible_asset::FungibleStore>(store.object_address());
+        modifies global<fungible_asset::ConcurrentFungibleBalance>(store.object_address());
     }
 }
