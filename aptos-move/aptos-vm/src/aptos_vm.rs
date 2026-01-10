@@ -78,11 +78,11 @@ use aptos_types::{
         authenticator::{AbstractAuthenticationData, AnySignature, AuthenticationProof},
         block_epilogue::{BlockEpiloguePayload, FeeDistribution},
         signature_verified_transaction::SignatureVerifiedTransaction,
-        AuxiliaryInfo, AuxiliaryInfoTrait, BlockOutput, EntryFunction, ExecutionError,
-        ExecutionStatus, ModuleBundle, MultisigTransactionPayload, ReplayProtector, Script,
-        SignedTransaction, Transaction, TransactionArgument, TransactionExecutableRef,
-        TransactionExtraConfig, TransactionOutput, TransactionPayload, TransactionStatus,
-        VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
+        AuxiliaryInfo, BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle,
+        MultisigTransactionPayload, ReplayProtector, Script, SignedTransaction, Transaction,
+        TransactionArgument, TransactionExecutableRef, TransactionExtraConfig, TransactionOutput,
+        TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
+        WriteSetPayload,
     },
     vm::module_metadata::{
         get_compilation_metadata, get_metadata, get_randomness_annotation_for_entry_function,
@@ -2949,6 +2949,7 @@ impl AptosVM {
                             },
                         // Paranoid mode failure but with reference safety checks
                         StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
+<<<<<<< HEAD
                         if vm_status.sub_status()
                             == Some(unknown_invariant_violation::EREFERENCE_SAFETY_FAILURE) =>
                             {
@@ -2959,6 +2960,23 @@ impl AptosVM {
                                 vm_status,
                             );
                             },
+=======
+                        if matches!(
+                            vm_status.sub_status(),
+                            Some(
+                                unknown_invariant_violation::EREFERENCE_SAFETY_FAILURE
+                                | unknown_invariant_violation::EINDEXED_REF_TAG_MISMATCH
+                            )
+                        ) =>
+                        {
+                            error!(
+                            *log_context,
+                            "[aptos_vm] Transaction breaking paranoid reference safety check (including enum tag guard). txn: {:?}, status: {:?}",
+                            bcs::to_bytes::<SignedTransaction>(txn),
+                            vm_status,
+                            );
+                        }
+>>>>>>> ac16a37f86 (Set reserve bit in monotonically increasing counters (#18418))
                         // Ignore DelayedFields speculative errors as it can be intentionally triggered by parallel execution.
                         StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR => (),
                         // We will log the rest of invariant violation directly with regular logger as they shouldn't happen.
@@ -3186,14 +3204,13 @@ impl VMValidator for AptosVM {
         if transaction.payload().is_encrypted_variant() {
             return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
         }
-
         let txn = match transaction.check_signature() {
             Ok(t) => t,
             _ => {
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
             },
         };
-        let auxiliary_info = AuxiliaryInfo::new_empty();
+        let auxiliary_info = AuxiliaryInfo::new_timestamp_not_yet_assigned(0);
         let txn_data = TransactionMetadata::new(&txn, &auxiliary_info);
 
         let resolver = self.as_move_resolver(&state_view);
@@ -3327,7 +3344,7 @@ impl AptosSimulationVM {
             &code_storage,
             transaction,
             &log_context,
-            &AuxiliaryInfo::new_empty(),
+            &AuxiliaryInfo::new_timestamp_not_yet_assigned(0),
         );
         let txn_output = vm_output
             .try_materialize_into_transaction_output(&resolver)

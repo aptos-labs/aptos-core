@@ -2775,7 +2775,8 @@ fn verify_auxiliary_infos_against_transaction_infos(
         .zip_eq(transaction_infos.par_iter())
         .map(|(aux_info, txn_info)| {
             match aux_info {
-                PersistedAuxiliaryInfo::None => {
+                PersistedAuxiliaryInfo::None
+                | PersistedAuxiliaryInfo::TimestampNotYetAssignedV1 { .. } => {
                     ensure!(
                         txn_info.auxiliary_info_hash().is_none(),
                         "The transaction info has an auxiliary info hash: {:?}, \
@@ -3175,7 +3176,8 @@ impl AuxiliaryInfo {
     pub fn persisted_info_hash(&self) -> Option<HashValue> {
         match self.persisted_info {
             PersistedAuxiliaryInfo::V1 { .. } => Some(self.persisted_info.hash()),
-            PersistedAuxiliaryInfo::None => None,
+            PersistedAuxiliaryInfo::None
+            | PersistedAuxiliaryInfo::TimestampNotYetAssignedV1 { .. } => None,
         }
     }
 }
@@ -3185,6 +3187,30 @@ impl Default for AuxiliaryInfo {
         Self {
             persisted_info: PersistedAuxiliaryInfo::None, // Use None by default for compatibility
             ephemeral_info: None,
+        }
+    }
+}
+
+impl AuxiliaryInfo {
+    pub fn new_timestamp_not_yet_assigned(transaction_index: u32) -> Self {
+        Self {
+            persisted_info: PersistedAuxiliaryInfo::TimestampNotYetAssignedV1 { transaction_index },
+            ephemeral_info: None,
+        }
+    }
+
+    pub fn transaction_index_kind(
+        &self,
+    ) -> crate::transaction::user_transaction_context::TransactionIndexKind {
+        use crate::transaction::user_transaction_context::TransactionIndexKind;
+        match self.persisted_info {
+            PersistedAuxiliaryInfo::V1 { transaction_index } => {
+                TransactionIndexKind::BlockExecution { transaction_index }
+            },
+            PersistedAuxiliaryInfo::TimestampNotYetAssignedV1 { transaction_index } => {
+                TransactionIndexKind::ValidationOrSimulation { transaction_index }
+            },
+            PersistedAuxiliaryInfo::None => TransactionIndexKind::NotAvailable,
         }
     }
 }
@@ -3199,7 +3225,10 @@ impl AuxiliaryInfoTrait for AuxiliaryInfo {
 
     fn transaction_index(&self) -> Option<u32> {
         match self.persisted_info {
-            PersistedAuxiliaryInfo::V1 { transaction_index } => Some(transaction_index),
+            PersistedAuxiliaryInfo::V1 { transaction_index }
+            | PersistedAuxiliaryInfo::TimestampNotYetAssignedV1 { transaction_index } => {
+                Some(transaction_index)
+            },
             PersistedAuxiliaryInfo::None => None,
         }
     }
@@ -3229,6 +3258,11 @@ pub enum PersistedAuxiliaryInfo {
     // Note that this would be slightly different from the index of transactions that get committed
     // onchain, as this considers transactions that may get discarded.
     V1 { transaction_index: u32 },
+    // When we are doing a simulation or validation of transactions, the transaction is not executed
+    // within the context of a block. The timestamp is not yet assigned, but we still track the
+    // transaction index for multi-transaction simulations. For single transaction simulation or
+    // validation, the transaction index is set to 0.
+    TimestampNotYetAssignedV1 { transaction_index: u32 },
 }
 
 pub trait AuxiliaryInfoTrait: Clone {
