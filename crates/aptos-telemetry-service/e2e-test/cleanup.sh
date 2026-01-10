@@ -46,6 +46,26 @@ else
         echo -e "${YELLOW}No node process found${NC}"
     fi
 fi
+
+# Stop telemetry service
+if [ -f "$TEST_DIR/telemetry.pid" ]; then
+    TELEMETRY_PID=$(cat "$TEST_DIR/telemetry.pid")
+    if ps -p $TELEMETRY_PID > /dev/null 2>&1; then
+        kill $TELEMETRY_PID
+        echo -e "${GREEN}✓ Telemetry service stopped (PID: $TELEMETRY_PID)${NC}"
+    else
+        echo -e "${YELLOW}Telemetry process not running${NC}"
+    fi
+    rm "$TEST_DIR/telemetry.pid"
+else
+    # Try to find and kill any telemetry service process on port 8082
+    if lsof -Pi :8082 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        kill $(lsof -t -i:8082) 2>/dev/null || true
+        echo -e "${GREEN}✓ Stopped process on port 8082${NC}"
+    else
+        echo -e "${YELLOW}No telemetry service process found${NC}"
+    fi
+fi
 echo ""
 
 # Ask about data removal

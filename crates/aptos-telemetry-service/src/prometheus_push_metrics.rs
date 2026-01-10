@@ -208,7 +208,10 @@ fn peer_location_labels(context: &Context, peer_id: &PeerId) -> Vec<String> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{peer_location::PeerLocation, tests::test_context, MetricsClient};
+    use crate::{
+        clients::victoria_metrics::VictoriaMetricsClient, context::MetricsIngestClient,
+        peer_location::PeerLocation, tests::test_context,
+    };
     use aptos_types::{chain_id::ChainId, PeerId};
     use httpmock::MockServer;
     use reqwest::Url;
@@ -283,11 +286,17 @@ mod test {
         let clients = test_context.inner.metrics_client_mut();
         clients.ingest_metrics_client.insert(
             "default1".into(),
-            MetricsClient::new(Url::parse(&server1.base_url()).unwrap(), "token1".into()),
+            MetricsIngestClient::VictoriaMetrics(VictoriaMetricsClient::new(
+                Url::parse(&format!("{}/api/v1/import/prometheus", server1.base_url())).unwrap(),
+                "token1".into(),
+            )),
         );
         clients.ingest_metrics_client.insert(
             "default2".into(),
-            MetricsClient::new(Url::parse(&server2.base_url()).unwrap(), "token2".into()),
+            MetricsIngestClient::VictoriaMetrics(VictoriaMetricsClient::new(
+                Url::parse(&format!("{}/api/v1/import/prometheus", server2.base_url())).unwrap(),
+                "token2".into(),
+            )),
         );
 
         let result =
@@ -319,11 +328,17 @@ mod test {
         let clients = test_context.inner.metrics_client_mut();
         clients.ingest_metrics_client.insert(
             "default1".into(),
-            MetricsClient::new(Url::parse(&server1.base_url()).unwrap(), "token1".into()),
+            MetricsIngestClient::VictoriaMetrics(VictoriaMetricsClient::new(
+                Url::parse(&format!("{}/api/v1/import/prometheus", server1.base_url())).unwrap(),
+                "token1".into(),
+            )),
         );
         clients.ingest_metrics_client.insert(
             "default2".into(),
-            MetricsClient::new(Url::parse(&server2.base_url()).unwrap(), "token2".into()),
+            MetricsIngestClient::VictoriaMetrics(VictoriaMetricsClient::new(
+                Url::parse(&format!("{}/api/v1/import/prometheus", server2.base_url())).unwrap(),
+                "token2".into(),
+            )),
         );
 
         let result =
@@ -355,11 +370,17 @@ mod test {
         let clients = test_context.inner.metrics_client_mut();
         clients.ingest_metrics_client.insert(
             "default1".into(),
-            MetricsClient::new(Url::parse(&server1.base_url()).unwrap(), "token1".into()),
+            MetricsIngestClient::VictoriaMetrics(VictoriaMetricsClient::new(
+                Url::parse(&format!("{}/api/v1/import/prometheus", server1.base_url())).unwrap(),
+                "token1".into(),
+            )),
         );
         clients.ingest_metrics_client.insert(
             "default2".into(),
-            MetricsClient::new(Url::parse(&server2.base_url()).unwrap(), "token2".into()),
+            MetricsIngestClient::VictoriaMetrics(VictoriaMetricsClient::new(
+                Url::parse(&format!("{}/api/v1/import/prometheus", server2.base_url())).unwrap(),
+                "token2".into(),
+            )),
         );
 
         let result =

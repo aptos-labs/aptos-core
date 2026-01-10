@@ -10,7 +10,7 @@ use crate::{
     log_ingest,
     metrics::SERVICE_ERROR_COUNTS,
     prometheus_push_metrics, remote_config,
-    types::response::{ErrorResponse, IndexResponse},
+    types::response::{ErrorResponse, HealthResponse, IndexResponse},
 };
 use std::convert::Infallible;
 use warp::{
@@ -30,6 +30,7 @@ pub fn routes(
 
     let v1_api = v1_api_prefix.and(
         index(context.clone())
+            .or(health())
             .or(auth::check_chain_access(context.clone()))
             .or(auth::auth(context.clone()))
             .or(custom_event::custom_event_ingest(context.clone()))
@@ -69,6 +70,19 @@ async fn handle_index(context: Context) -> anyhow::Result<impl Reply, Rejection>
         public_key: context.noise_config().public_key(),
     };
     Ok(reply::json(&resp_payload))
+}
+
+/// Health check endpoint for liveness/readiness probes
+/// GET /api/v1/health
+fn health() -> BoxedFilter<(impl Reply,)> {
+    warp::path!("health")
+        .and(warp::get())
+        .map(|| {
+            reply::json(&HealthResponse {
+                status: "ok".to_string(),
+            })
+        })
+        .boxed()
 }
 
 pub async fn handle_rejection(err: Rejection) -> std::result::Result<impl Reply, Infallible> {

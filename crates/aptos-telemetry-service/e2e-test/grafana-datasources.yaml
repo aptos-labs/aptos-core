@@ -1,10 +1,16 @@
 # Grafana datasources for E2E testing
-# Auto-configures VictoriaMetrics and Loki datasources
+#
+# Architecture:
+# - VictoriaMetrics (default): Receives telemetry metrics via text format import
+# - Prometheus: Scrapes VictoriaMetrics, provides alternative PromQL endpoint
+# - Loki: Receives telemetry logs
+#
+# Both VictoriaMetrics and Prometheus support PromQL, so queries work on either.
 
 apiVersion: 1
 
 datasources:
-  # VictoriaMetrics (Prometheus-compatible) datasource
+  # VictoriaMetrics - Primary metrics backend (receives telemetry via import)
   - name: VictoriaMetrics
     type: prometheus
     access: proxy
@@ -15,7 +21,18 @@ datasources:
       timeInterval: 10s
     editable: true
 
-  # Loki datasource
+  # Prometheus - Secondary metrics backend (receives telemetry via remote write)
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: false
+    jsonData:
+      httpMethod: POST
+      timeInterval: 15s
+    editable: true
+
+  # Loki datasource - log aggregation
   - name: Loki
     type: loki
     access: proxy

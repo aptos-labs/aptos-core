@@ -55,40 +55,73 @@ custom_contract_configs:
       # Custom node type for JWT claims
       node_type_name: "TelemetryTestNode"
     
-    # Metrics sink - local VictoriaMetrics
+    # Multiple metrics sinks - supports different backend types simultaneously
+    # Use `metrics_sink` (singular) for backwards compatibility with single sink
+    # Use `metrics_sinks` (array) for multiple sinks with different backend types
+    #
+    # Backend types (specify FULL endpoint path in URL):
+    # - victoria_metrics: Prometheus text format (e.g., http://host:8428/api/v1/import/prometheus)
+    # - prometheus_remote_write: Protobuf + snappy (e.g., http://host:9090/api/v1/write)
+    #
+    # Authentication options (auth_type field):
+    # - bearer: Bearer token auth (default) - use keys_env_var
+    # - basic: Basic auth (username:password) - use basic_auth_env_var
+    # - none: No authentication
     metrics_sinks:
-      endpoint_urls:
-        local: "http://127.0.0.1:8428/api/v1/import/prometheus"
-      # No auth required for local testing
-      keys_env_var: "TEST_METRICS_KEYS"
+      # VictoriaMetrics sink (Prometheus text format)
+      - endpoint_urls:
+          victoria_metrics: "http://127.0.0.1:8428/api/v1/import/prometheus"
+        auth_type: none
+        keys_env_var: "TEST_METRICS_KEYS"
+        backend_type: victoria_metrics
+      
+      # Prometheus Remote Write sink (protobuf + snappy)
+      - endpoint_urls:
+          prometheus_remote_write: "http://127.0.0.1:9090/api/v1/write"
+        auth_type: none
+        keys_env_var: "TEST_METRICS_KEYS"
+        backend_type: prometheus_remote_write
     
     # Logs sink - local Loki
+    # Authentication options same as metrics: auth_type (bearer/basic/none)
     logs_sink:
       endpoint_url: "http://127.0.0.1:3100/loki/api/v1/push"
-      # No auth required for local testing
-      key_env_var: "TEST_LOKI_TOKEN"
+      auth_type: none  # No auth for local testing
+      key_env_var: "TEST_LOKI_TOKEN"  # Used when auth_type: bearer
+      # basic_auth_env_var: "LOKI_BASIC_AUTH"  # Used when auth_type: basic
+      # Format for basic_auth_env_var: "username:password"
       backend_type: loki
 
 # Standard telemetry endpoints (required but not used in custom contract testing)
+# Authentication options for all endpoints:
+# - auth_type: bearer (default) | basic | none
+# - keys_env_var: JSON map for bearer tokens ({"endpoint_name": "token"})
+# - basic_auth_env_var: JSON map for basic auth ({"endpoint_name": "user:pass"})
 metrics_endpoints_config:
   telemetry_service_metrics:
     endpoint_urls:
       local: "http://127.0.0.1:8428/api/v1/import/prometheus"
+    auth_type: none  # No auth for local testing
     keys_env_var: "TEST_METRICS_KEYS"
   ingest_metrics:
     endpoint_urls: {}
+    auth_type: none
     keys_env_var: "TEST_METRICS_KEYS"
   untrusted_ingest_metrics:
     endpoint_urls: {}
+    auth_type: none
     keys_env_var: "TEST_METRICS_KEYS"
 
 humio_ingest_config:
+  # Log endpoints also support auth_type: bearer | basic | none
   known_logs_endpoint:
     endpoint_url: "http://127.0.0.1:3100/loki/api/v1/push"
+    auth_type: none  # No auth for local testing
     key_env_var: "TEST_LOKI_TOKEN"
     backend_type: loki
   unknown_logs_endpoint:
     endpoint_url: "http://127.0.0.1:3100/loki/api/v1/push"
+    auth_type: none
     key_env_var: "TEST_LOKI_TOKEN"
     backend_type: loki
 

@@ -91,6 +91,12 @@ pub mod response {
         pub public_key: x25519::PublicKey,
     }
 
+    /// Health check response for liveness/readiness probes
+    #[derive(Serialize, Deserialize)]
+    pub struct HealthResponse {
+        pub status: String,
+    }
+
     #[derive(Serialize, Deserialize)]
     pub struct ErrorResponse {
         code: u16,
