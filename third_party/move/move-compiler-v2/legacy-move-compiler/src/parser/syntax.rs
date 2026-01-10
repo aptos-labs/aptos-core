@@ -2010,6 +2010,7 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
             parse_lambda(context, start_loc, LambdaCaptureKind::default(), token)?
         },
         Tok::Identifier if is_quant(context) => parse_quant(context)?,
+        Tok::Identifier if is_behavior_predicate(context) => parse_behavior(context)?,
         _ => {
             // This could be either an assignment, operator assignment (e.g., +=), or a binary operator
             // expression, or a cast or test
@@ -2384,6 +2385,106 @@ fn is_quant(context: &mut Context) -> bool {
         Err(_) => false,
         Ok((tok1, tok2)) => tok1 == Tok::Identifier && matches!(tok2, Tok::Colon | Tok::Identifier),
     }
+}
+
+// Returns the BehaviorKind if the given identifier is a behavior predicate keyword.
+fn behavior_kind_from_str(s: &str) -> Option<BehaviorKind> {
+    match s {
+        "requires_of" => Some(BehaviorKind::RequiresOf),
+        "aborts_of" => Some(BehaviorKind::AbortsOf),
+        "ensures_of" => Some(BehaviorKind::EnsuresOf),
+        "modifies_of" => Some(BehaviorKind::ModifiesOf),
+        _ => None,
+    }
+}
+
+// Check if we're looking at a behavior predicate expression.
+// This can be either:
+//   - `identifier @ behavior_keyword < ...`  (with pre-state label)
+//   - `behavior_keyword < ...`               (without pre-state label)
+fn is_behavior_predicate(context: &mut Context) -> bool {
+    // Behavior predicates are only available in V2_4 and later
+    if context.env.flags().language_version() < LanguageVersion::V2_4 {
+        return false;
+    }
+    if context.tokens.peek() != Tok::Identifier {
+        return false;
+    }
+
+    let content = context.tokens.content();
+
+    // Check for direct behavior keyword followed by `<`
+    if behavior_kind_from_str(content).is_some() {
+        return matches!(context.tokens.lookahead(), Ok(Tok::Less));
+    }
+
+    // Check for `label @ behavior_keyword < ...` pattern
+    match context.tokens.lookahead2() {
+        Ok((Tok::AtSign, Tok::Identifier)) => {
+            // Need to check the third token - it should be a behavior keyword
+            // We can't easily lookahead 3, so we accept this pattern and validate during parse
+            true
+        },
+        _ => false,
+    }
+}
+
+// Parses a behavior predicate expression:
+//   [pre_label@]behavior_kind<fn_exp>(args)[@post_label]
+fn parse_behavior(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
+    // Parse optional pre-state label
+    let pre_label = if context.tokens.peek() == Tok::Identifier
+        && matches!(context.tokens.lookahead(), Ok(Tok::AtSign))
+    {
+        let label_name = parse_identifier(context)?;
+        let label = Label(label_name);
+        consume_token(context.tokens, Tok::AtSign)?;
+        Some(label)
+    } else {
+        None
+    };
+
+    // Parse behavior kind
+    let kind_content = context.tokens.content();
+    let kind = behavior_kind_from_str(kind_content).ok_or_else(|| {
+        Box::new(
+            diag!(
+                Syntax::UnexpectedToken,
+                (
+                    current_token_loc(context.tokens),
+                    format!(
+                        "expected a behavior predicate keyword (requires_of, aborts_of, ensures_of, modifies_of), found '{}'",
+                        kind_content
+                    )
+                )
+            )
+        )
+    })?;
+    context.tokens.advance()?;
+
+    // Parse `<` fn_name [type_args] `>`
+    // We parse a name access chain (not a full expression) to avoid ambiguity with `>`
+    consume_token(context.tokens, Tok::Less)?;
+    let fn_name = parse_name_access_chain(context, false, || "a function name")?;
+    // Parse optional type arguments for the function
+    let type_args = parse_optional_type_args(context)?;
+    consume_token(context.tokens, Tok::Greater)?;
+
+    // Parse `(` args `)`
+    let args = parse_call_args(context)?;
+
+    // Parse optional post-state label
+    let post_label = if context.tokens.peek() == Tok::AtSign {
+        context.tokens.advance()?;
+        let label_name = parse_identifier(context)?;
+        Some(Label(label_name))
+    } else {
+        None
+    };
+
+    Ok(Exp_::Behavior(
+        kind, pre_label, fn_name, type_args, args, post_label,
+    ))
 }
 
 // Parses a quantifier expressions, assuming is_quant(context) is true.
