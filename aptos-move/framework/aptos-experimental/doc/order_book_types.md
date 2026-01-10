@@ -8,7 +8,7 @@ Order book type definitions
 
 -  [Struct `OrderIdType`](#0x7_order_book_types_OrderIdType)
 -  [Struct `AccountClientOrderId`](#0x7_order_book_types_AccountClientOrderId)
--  [Struct `UniqueIdxType`](#0x7_order_book_types_UniqueIdxType)
+-  [Struct `IncreasingIdxType`](#0x7_order_book_types_UniqueIdxType)
 -  [Struct `OrderType`](#0x7_order_book_types_OrderType)
 -  [Enum `TimeInForce`](#0x7_order_book_types_TimeInForce)
 -  [Enum `TriggerCondition`](#0x7_order_book_types_TriggerCondition)
@@ -26,7 +26,7 @@ Order book type definitions
 -  [Function `next_order_id`](#0x7_order_book_types_next_order_id)
 -  [Function `new_order_id_type`](#0x7_order_book_types_new_order_id_type)
 -  [Function `new_account_client_order_id`](#0x7_order_book_types_new_account_client_order_id)
--  [Function `new_unique_idx_type`](#0x7_order_book_types_new_unique_idx_type)
+-  [Function `new_increasing_idx_type`](#0x7_order_book_types_new_unique_idx_type)
 -  [Function `descending_idx`](#0x7_order_book_types_descending_idx)
 -  [Function `get_order_id_value`](#0x7_order_book_types_get_order_id_value)
 -  [Function `time_in_force_from_index`](#0x7_order_book_types_time_in_force_from_index)
@@ -139,11 +139,11 @@ Order book type definitions
 
 <a id="0x7_order_book_types_UniqueIdxType"></a>
 
-## Struct `UniqueIdxType`
+## Struct `IncreasingIdxType`
 
 
 
-<pre><code><b>struct</b> <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a> <b>has</b> <b>copy</b>, drop, store
+<pre><code><b>struct</b> <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">IncreasingIdxType</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -400,7 +400,7 @@ identifier, account, priority index, price, sizes, and side.
 
 </dd>
 <dt>
-<code>unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a></code>
+<code>unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdxType</a></code>
 </dt>
 <dd>
 
@@ -476,7 +476,7 @@ identifier, account, priority index, price, sizes, and side.
 
 </dd>
 <dt>
-<code>unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a></code>
+<code>unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdxType</a></code>
 </dt>
 <dd>
 
@@ -909,11 +909,11 @@ particular match operation.
 
 <a id="0x7_order_book_types_new_unique_idx_type"></a>
 
-## Function `new_unique_idx_type`
+## Function `new_increasing_idx_type`
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_unique_idx_type">new_unique_idx_type</a>(idx: u128): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_unique_idx_type">new_increasing_idx_type</a>(idx: u128): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdxType</a>
 </code></pre>
 
 
@@ -922,8 +922,8 @@ particular match operation.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_unique_idx_type">new_unique_idx_type</a>(idx: u128): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a> {
-    <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a> { idx }
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_unique_idx_type">new_increasing_idx_type</a>(idx: u128): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">IncreasingIdxType</a> {
+    <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">IncreasingIdxType</a> { idx }
 }
 </code></pre>
 
@@ -937,7 +937,7 @@ particular match operation.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_descending_idx">descending_idx</a>(self: &<a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_descending_idx">descending_idx</a>(self: &<a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdxType</a>): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdxType</a>
 </code></pre>
 
 
@@ -946,8 +946,8 @@ particular match operation.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_descending_idx">descending_idx</a>(self: &<a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a>): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a> {
-    <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a> { idx: <a href="order_book_types.md#0x7_order_book_types_U128_MAX">U128_MAX</a> - self.idx }
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_descending_idx">descending_idx</a>(self: &<a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">IncreasingIdxType</a>): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">IncreasingIdxType</a> {
+    <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">IncreasingIdxType</a> { idx: <a href="order_book_types.md#0x7_order_book_types_U128_MAX">U128_MAX</a> - self.idx }
 }
 </code></pre>
 
@@ -1223,7 +1223,7 @@ particular match operation.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_single_order_match_details">destroy_single_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <b>address</b>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, u64, u64, u64, bool, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, u64, M)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_single_order_match_details">destroy_single_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <b>address</b>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdxType</a>, u64, u64, u64, bool, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, u64, M)
 </code></pre>
 
 
@@ -1234,7 +1234,7 @@ particular match operation.
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_single_order_match_details">destroy_single_order_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
-): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, <b>address</b>, Option&lt;String&gt;, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a>, u64, u64, u64, bool, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">TimeInForce</a>, u64, M) {
+): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, <b>address</b>, Option&lt;String&gt;, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">IncreasingIdxType</a>, u64, u64, u64, bool, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">TimeInForce</a>, u64, M) {
     <b>let</b> OrderMatchDetails::SingleOrder {
         order_id,
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
@@ -1262,7 +1262,7 @@ particular match operation.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_bulk_order_match_details">destroy_bulk_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, u64, u64, bool, u64, u64, M)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_bulk_order_match_details">destroy_bulk_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdxType</a>, u64, u64, bool, u64, u64, M)
 </code></pre>
 
 
@@ -1273,7 +1273,7 @@ particular match operation.
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_bulk_order_match_details">destroy_bulk_order_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
-): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a>, u64, u64, bool, u64, u64, M) {
+): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">IncreasingIdxType</a>, u64, u64, bool, u64, u64, M) {
     <b>let</b> OrderMatchDetails::BulkOrder {
         order_id,
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
@@ -1378,7 +1378,7 @@ Validates that a reinsertion request is valid for the given original order.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_get_unique_priority_idx_from_match_details">get_unique_priority_idx_from_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_get_unique_priority_idx_from_match_details">get_unique_priority_idx_from_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdxType</a>
 </code></pre>
 
 
@@ -1389,7 +1389,7 @@ Validates that a reinsertion request is valid for the given original order.
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_get_unique_priority_idx_from_match_details">get_unique_priority_idx_from_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
-): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a> {
+): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">IncreasingIdxType</a> {
     self.unique_priority_idx
 }
 </code></pre>
@@ -1729,7 +1729,7 @@ This should only be called on bulk orders, aborts if called for non-bulk order.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_single_order_match_details">new_single_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, creation_time_micros: u64, metadata: M): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_single_order_match_details">new_single_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdxType</a>, price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, creation_time_micros: u64, metadata: M): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;
 </code></pre>
 
 
@@ -1742,7 +1742,7 @@ This should only be called on bulk orders, aborts if called for non-bulk order.
     order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>,
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
     client_order_id: Option&lt;String&gt;,
-    unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a>,
+    unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">IncreasingIdxType</a>,
     price: u64,
     orig_size: u64,
     remaining_size: u64,
@@ -1777,7 +1777,7 @@ This should only be called on bulk orders, aborts if called for non-bulk order.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_bulk_order_match_details">new_bulk_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, price: u64, remaining_size: u64, is_bid: bool, sequence_number: u64, creation_time_micros: u64, metadata: M): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_bulk_order_match_details">new_bulk_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdxType</a>, price: u64, remaining_size: u64, is_bid: bool, sequence_number: u64, creation_time_micros: u64, metadata: M): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;
 </code></pre>
 
 
@@ -1789,7 +1789,7 @@ This should only be called on bulk orders, aborts if called for non-bulk order.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_bulk_order_match_details">new_bulk_order_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
     order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>,
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
-    unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a>,
+    unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">IncreasingIdxType</a>,
     price: u64,
     remaining_size: u64,
     is_bid: bool,
