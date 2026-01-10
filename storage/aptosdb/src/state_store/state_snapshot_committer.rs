@@ -14,7 +14,7 @@ use crate::{
     versioned_node_cache::VersionedNodeCache,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
-use aptos_logger::trace;
+use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{
     jmt_update_refs, state_store::state_with_summary::StateWithSummary, Result,
@@ -201,8 +201,8 @@ impl StateSnapshotCommitter {
                     break;
                 },
             }
-            trace!("State snapshot committing thread exit.")
         }
+        info!("State snapshot committing thread exit.");
     }
 }
 
