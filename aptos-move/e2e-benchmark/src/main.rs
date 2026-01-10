@@ -19,6 +19,10 @@ use rand::{rngs::StdRng, SeedableRng};
 use serde_json::json;
 use std::{collections::HashMap, process::exit};
 
+#[cfg(unix)]
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
 // bump after a bigger test or perf change, so you can easily distinguish runs
 // that are on top of this commit
 const CODE_PERF_VERSION: &str = "v1";
