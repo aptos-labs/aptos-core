@@ -204,6 +204,48 @@ spec:
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if $.Values.haproxy.compactPlacement }}
+        podAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/part-of
+                  operator: In
+                  values:
+                  - aptos-node
+                - key: app.kubernetes.io/instance
+                  operator: In
+                  values:
+                  - validator-{{$i}}
+                - key: chain_name
+                  operator: In
+                  values:
+                  - {{ $.Values.chain.name }}
+          - weight: 50
+            podAffinityTerm:
+              topologyKey: topology.kubernetes.io/zone
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/part-of
+                  operator: In
+                  values:
+                  - aptos-node
+                - key: app.kubernetes.io/instance
+                  operator: In
+                  values:
+                  - validator-{{$i}}
+                - key: chain_name
+                  operator: In
+                  values:
+                  - {{ $.Values.chain.name }}
+      {{- end }}
+      {{- with .topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
