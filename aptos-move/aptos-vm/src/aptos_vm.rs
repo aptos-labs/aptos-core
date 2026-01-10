@@ -2964,7 +2964,6 @@ impl AptosVM {
                             },
                         // Paranoid mode failure but with reference safety checks
                         StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
-<<<<<<< HEAD
                         if vm_status.sub_status()
                             == Some(unknown_invariant_violation::EREFERENCE_SAFETY_FAILURE) =>
                             {
@@ -2975,23 +2974,6 @@ impl AptosVM {
                                 vm_status,
                             );
                             },
-=======
-                        if matches!(
-                            vm_status.sub_status(),
-                            Some(
-                                unknown_invariant_violation::EREFERENCE_SAFETY_FAILURE
-                                | unknown_invariant_violation::EINDEXED_REF_TAG_MISMATCH
-                            )
-                        ) =>
-                        {
-                            error!(
-                            *log_context,
-                            "[aptos_vm] Transaction breaking paranoid reference safety check (including enum tag guard). txn: {:?}, status: {:?}",
-                            bcs::to_bytes::<SignedTransaction>(txn),
-                            vm_status,
-                            );
-                        }
->>>>>>> ac16a37f86 (Set reserve bit in monotonically increasing counters (#18418))
                         // Ignore DelayedFields speculative errors as it can be intentionally triggered by parallel execution.
                         StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR => (),
                         // We will log the rest of invariant violation directly with regular logger as they shouldn't happen.
@@ -3216,12 +3198,6 @@ impl VMValidator for AptosVM {
             }
         }
 
-<<<<<<< HEAD
-=======
-        if transaction.payload().is_encrypted_variant() {
-            return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
-        }
->>>>>>> ac16a37f86 (Set reserve bit in monotonically increasing counters (#18418))
         let txn = match transaction.check_signature() {
             Ok(t) => t,
             _ => {
