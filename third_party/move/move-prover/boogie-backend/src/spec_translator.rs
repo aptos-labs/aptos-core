@@ -1156,6 +1156,7 @@ impl SpecTranslator<'_> {
             | Operation::MoveTo
             | Operation::MoveFrom
             | Operation::Closure(..)
+            | Operation::Behavior(..)
             | Operation::Old => {
                 self.env.error(
                     &self.env.get_node_loc(node_id),
