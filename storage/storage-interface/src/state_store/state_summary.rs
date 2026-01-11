@@ -125,8 +125,8 @@ impl StateSummary {
                 shard
                     .insertions
                     .iter()
-                    .map(|(k, value_opt)| (k, value_opt.as_ref().map(|v| v.hash())))
-                    .chain(shard.evictions.keys().map(|k| (k, None)))
+                    .map(|(k, item)| (k, Some(item.hash())))
+                    .chain(shard.evictions.iter().map(|k| (k, None)))
                     .sorted_by_key(|(k, _)| k.crypto_hash_ref())
                     .collect_vec()
             })
