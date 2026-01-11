@@ -2806,6 +2806,22 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
             } = unbound_names;
             EE::Spec(spec_id, unbound_vars, unbound_func_ptrs)
         },
+        PE::Behavior(kind, pre_label, fn_exp, sp!(args_loc, args), post_label) => {
+            if !context.in_spec_context {
+                context.env.add_diag(diag!(
+                    Syntax::SpecContextRestricted,
+                    (
+                        loc,
+                        "behavior predicate expression only allowed in specifications"
+                    )
+                ));
+                EE::UnresolvedError
+            } else {
+                let e_fn = exp(context, *fn_exp);
+                let e_args = sp(args_loc, exps(context, args));
+                EE::Behavior(kind, pre_label, e_fn, e_args, post_label)
+            }
+        },
         PE::UnresolvedError => panic!("ICE error should have been thrown"),
     };
     sp(loc, e_)
@@ -3418,6 +3434,10 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
         EE::Spec(_, unbound_vars, unbound_func_ptrs) => {
             unbound.vars.extend(unbound_vars);
             unbound.func_ptrs.extend(unbound_func_ptrs);
+        },
+        EE::Behavior(_, _, fn_exp, sp!(_, args), _) => {
+            unbound_names_exp(unbound, fn_exp);
+            unbound_names_exps(unbound, args);
         },
     }
 }

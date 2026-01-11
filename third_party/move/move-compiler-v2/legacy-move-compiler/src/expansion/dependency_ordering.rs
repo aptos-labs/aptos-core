@@ -591,6 +591,10 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
             eopt.iter().for_each(|e| exp(context, e));
             exp(context, e)
         },
+        E::Behavior(_, _, fn_exp, sp!(_, args), _) => {
+            exp(context, fn_exp);
+            args.iter().for_each(|e| exp(context, e))
+        },
     }
 }
 
