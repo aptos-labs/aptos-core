@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: requires_of expects 2 argument(s), but 1 were provided
+   ┌─ tests/checking/specs/behavior_predicates_type_err.move:19:17
+   │
+19 │         ensures requires_of<binary>(a);
+   │                 ^^^^^^^^^^^^^^^^^^^^^^
+
+error: ensures_of expects 2 argument(s), but 1 were provided
+   ┌─ tests/checking/specs/behavior_predicates_type_err.move:32:17
+   │
+32 │         ensures ensures_of<unary>(x);
+   │                 ^^^^^^^^^^^^^^^^^^^^
+
+error: unknown function `M::nonexistent_function` in behavior predicate
+   ┌─ tests/checking/specs/behavior_predicates_type_err.move:45:17
+   │
+45 │         ensures requires_of<nonexistent_function>(x);
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

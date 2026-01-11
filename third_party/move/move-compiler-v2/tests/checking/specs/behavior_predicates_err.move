@@ -1,6 +1,7 @@
-// Tests for behavior predicate parsing and error messages.
+// Tests for behavior predicate type checking.
 // Behavior predicates (requires_of, aborts_of, ensures_of, modifies_of)
-// are parsed but not yet supported in the model builder.
+// are parsed and type-checked. This test verifies correct type checking
+// and expected error messages for invalid usage.
 
 module 0x42::M {
 

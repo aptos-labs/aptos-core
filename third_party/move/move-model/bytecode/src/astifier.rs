@@ -2377,6 +2377,7 @@ impl AssignTransformer<'_> {
                 | Operation::EventStoreIncludedIn
                 | Operation::EventStoreIncludes
                 | Operation::ExtendEventStore
+                | Operation::Behavior(..)
                 | Operation::NoOp => false,
             },
             ExpData::Value(..)
