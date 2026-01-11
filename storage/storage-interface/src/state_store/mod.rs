@@ -10,22 +10,18 @@ pub mod state_view;
 pub mod state_with_summary;
 pub mod versioned_state_value;
 
-use aptos_types::state_store::{state_key::StateKey, state_value::StateValue, NUM_STATE_SHARDS};
-use std::collections::HashMap;
+use aptos_types::state_store::{hot_state::HotStateItem, state_key::StateKey, NUM_STATE_SHARDS};
+use std::collections::{HashMap, HashSet};
 
-// TODO(HotState): this isn't the final form yet. For instance, `HotVacant` entries probably should
-// be included, but right now they are `None` in these and will be removed from the Merkle trees.
 #[derive(Debug)]
 pub(crate) struct HotStateShardUpdates {
-    insertions: HashMap<StateKey, Option<StateValue>>,
-    evictions: HashMap<StateKey, Option<StateValue>>,
+    insertions: HashMap<StateKey, HotStateItem>,
+    // TODO(HotState): only keys are needed for now, since evictions do not affect cold state.
+    evictions: HashSet<StateKey>,
 }
 
 impl HotStateShardUpdates {
-    pub fn new(
-        insertions: HashMap<StateKey, Option<StateValue>>,
-        evictions: HashMap<StateKey, Option<StateValue>>,
-    ) -> Self {
+    pub fn new(insertions: HashMap<StateKey, HotStateItem>, evictions: HashSet<StateKey>) -> Self {
         Self {
             insertions,
             evictions,
