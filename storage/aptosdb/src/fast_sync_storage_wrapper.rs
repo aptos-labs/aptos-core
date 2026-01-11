@@ -54,7 +54,7 @@ impl FastSyncStorageWrapper {
             config.storage.buffered_state_target_items,
             config.storage.max_num_nodes_per_lru_cache_shard,
             internal_indexer_db,
-            config.storage.hot_state_config.delete_on_restart,
+            config.storage.hot_state_config,
         )
         .map_err(|err| anyhow!("fast sync DB failed to open {}", err))?;
         if let Some(sender) = update_sender {
@@ -85,7 +85,7 @@ impl FastSyncStorageWrapper {
                 config.storage.buffered_state_target_items,
                 config.storage.max_num_nodes_per_lru_cache_shard,
                 None,
-                config.storage.hot_state_config.delete_on_restart,
+                config.storage.hot_state_config,
             )
             .map_err(|err| anyhow!("Secondary DB failed to open {}", err))?;
 

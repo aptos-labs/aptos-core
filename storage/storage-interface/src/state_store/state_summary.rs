@@ -6,17 +6,21 @@ use crate::{
     state_store::{
         state::LedgerState,
         state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
+        HotStateShardUpdates, HotStateUpdates,
     },
     DbReader,
 };
 use anyhow::Result;
+use aptos_config::config::HotStateConfig;
 use aptos_crypto::{
     hash::{CryptoHash, CORRUPTION_SENTINEL},
     HashValue,
 };
 use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::{ProofRead, SparseMerkleTree};
-use aptos_types::{proof::SparseMerkleProofExt, transaction::Version};
+use aptos_types::{
+    proof::SparseMerkleProofExt, state_store::NUM_STATE_SHARDS, transaction::Version,
+};
 use derive_more::Deref;
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -29,6 +33,7 @@ pub struct StateSummary {
     next_version: Version,
     pub hot_state_summary: SparseMerkleTree,
     pub global_state_summary: SparseMerkleTree,
+    hot_state_config: HotStateConfig,
 }
 
 impl StateSummary {
@@ -36,20 +41,27 @@ impl StateSummary {
         version: Option<Version>,
         hot_state_summary: SparseMerkleTree,
         global_state_summary: SparseMerkleTree,
+        hot_state_config: HotStateConfig,
     ) -> Self {
         Self {
             next_version: version.map_or(0, |v| v + 1),
             hot_state_summary,
             global_state_summary,
+            hot_state_config,
         }
     }
 
-    pub fn new_empty() -> Self {
+    pub fn new_empty(hot_state_config: HotStateConfig) -> Self {
         Self {
             next_version: 0,
             hot_state_summary: SparseMerkleTree::new_empty(),
             global_state_summary: SparseMerkleTree::new_empty(),
+            hot_state_config,
         }
+    }
+
+    pub fn hot_root_hash(&self) -> HashValue {
+        self.hot_state_summary.root_hash()
     }
 
     pub fn root_hash(&self) -> HashValue {
@@ -69,13 +81,15 @@ impl StateSummary {
             .is_descendant_of(&other.global_state_summary)
     }
 
-    pub fn update(
+    fn update(
         &self,
         persisted: &ProvableStateSummary,
+        hot_updates: &[HotStateShardUpdates; NUM_STATE_SHARDS],
         updates: &BatchedStateUpdateRefs,
     ) -> Result<Self> {
         let _timer = TIMER.timer_with(&["state_summary__update"]);
 
+        assert_ne!(self.hot_state_summary.root_hash(), *CORRUPTION_SENTINEL);
         assert_ne!(self.global_state_summary.root_hash(), *CORRUPTION_SENTINEL);
 
         // Persisted must be before or at my version.
@@ -83,6 +97,53 @@ impl StateSummary {
         // Updates must start at exactly my version.
         assert_eq!(updates.first_version(), self.next_version());
 
+        let (hot_smt_result, smt_result) = rayon::join(
+            || self.update_hot_state_summary(persisted, hot_updates),
+            || self.update_global_state_summary(persisted, updates),
+        );
+
+        Ok(Self {
+            next_version: updates.next_version(),
+            hot_state_summary: hot_smt_result?,
+            global_state_summary: smt_result?,
+            hot_state_config: self.hot_state_config,
+        })
+    }
+
+    fn update_hot_state_summary(
+        &self,
+        persisted: &ProvableStateSummary,
+        hot_updates: &[HotStateShardUpdates; NUM_STATE_SHARDS],
+    ) -> Result<SparseMerkleTree> {
+        if !self.hot_state_config.compute_root_hash {
+            return Ok(SparseMerkleTree::new_empty());
+        }
+
+        let hot_smt_updates = hot_updates
+            .par_iter()
+            .flat_map(|shard| {
+                shard
+                    .insertions
+                    .iter()
+                    .map(|(k, value_opt)| (k, value_opt.as_ref().map(|v| v.hash())))
+                    .chain(shard.evictions.keys().map(|k| (k, None)))
+                    .sorted_by_key(|(k, _)| k.crypto_hash_ref())
+                    .collect_vec()
+            })
+            .collect::<Vec<_>>();
+
+        Ok(self
+            .hot_state_summary
+            .freeze(&persisted.hot_state_summary)
+            .batch_update_sorted_uniq(&hot_smt_updates, &HotProvableStateSummary::new(persisted))?
+            .unfreeze())
+    }
+
+    fn update_global_state_summary(
+        &self,
+        persisted: &ProvableStateSummary,
+        updates: &BatchedStateUpdateRefs,
+    ) -> Result<SparseMerkleTree> {
         let smt_updates = updates
             .shards
             .par_iter() // clone hashes and sort items in parallel
@@ -105,19 +166,11 @@ impl StateSummary {
             })
             .collect::<Vec<_>>();
 
-        let smt = self
+        Ok(self
             .global_state_summary
             .freeze(&persisted.global_state_summary)
-            .batch_update_sorted_uniq(&smt_updates, persisted)?
-            .unfreeze();
-
-        // TODO(HotState): compute new hot state from the `self.hot_state_summary` and
-        // `updates`.
-        Ok(Self {
-            next_version: updates.next_version(),
-            hot_state_summary: SparseMerkleTree::new_empty(),
-            global_state_summary: smt,
-        })
+            .batch_update_sorted_uniq(&smt_updates, &ColdProvableStateSummary::new(persisted))?
+            .unfreeze())
     }
 }
 
@@ -139,8 +192,8 @@ impl LedgerStateSummary {
         }
     }
 
-    pub fn new_empty() -> Self {
-        let state_summary = StateSummary::new_empty();
+    pub fn new_empty(hot_state_config: HotStateConfig) -> Self {
+        let state_summary = StateSummary::new_empty(hot_state_config);
         Self::new(state_summary.clone(), state_summary)
     }
 
@@ -167,12 +220,17 @@ impl LedgerStateSummary {
     pub fn update(
         &self,
         persisted: &ProvableStateSummary,
+        hot_state_updates: &HotStateUpdates,
         updates: &StateUpdateRefs,
     ) -> Result<Self> {
         let _timer = TIMER.timer_with(&["ledger_state_summary__update"]);
 
         let last_checkpoint = if let Some(updates) = updates.for_last_checkpoint_batched() {
-            self.latest.update(persisted, updates)?
+            self.latest.update(
+                persisted,
+                hot_state_updates.for_last_checkpoint.as_ref().unwrap(),
+                updates,
+            )?
         } else {
             self.last_checkpoint.clone()
         };
@@ -183,12 +241,36 @@ impl LedgerStateSummary {
             &last_checkpoint
         };
         let latest = if let Some(updates) = updates.for_latest_batched() {
-            base_of_latest.update(persisted, updates)?
+            base_of_latest.update(
+                persisted,
+                hot_state_updates.for_latest.as_ref().unwrap(),
+                updates,
+            )?
         } else {
             base_of_latest.clone()
         };
 
         Ok(Self::new(last_checkpoint, latest))
+    }
+}
+
+struct HotProvableStateSummary<'a, 'db> {
+    inner: &'a ProvableStateSummary<'db>,
+}
+
+impl<'a, 'db> HotProvableStateSummary<'a, 'db> {
+    fn new(inner: &'a ProvableStateSummary<'db>) -> Self {
+        Self { inner }
+    }
+}
+
+struct ColdProvableStateSummary<'a, 'db> {
+    inner: &'a ProvableStateSummary<'db>,
+}
+
+impl<'a, 'db> ColdProvableStateSummary<'a, 'db> {
+    fn new(inner: &'a ProvableStateSummary<'db>) -> Self {
+        Self { inner }
     }
 }
 
@@ -213,6 +295,7 @@ impl<'db> ProvableStateSummary<'db> {
         key: &HashValue,
         version: Version,
         root_depth: usize,
+        use_hot_state: bool,
     ) -> Result<SparseMerkleProofExt> {
         if rand::random::<usize>() % 10000 == 0 {
             // 1 out of 10000 times, verify the proof.
@@ -220,29 +303,50 @@ impl<'db> ProvableStateSummary<'db> {
                 .db
                 // check the full proof
                 .get_state_value_with_proof_by_version_ext(
-                    key, version, /* root_depth = */ 0, /* use_hot_state = */ false,
+                    key,
+                    version,
+                    /* root_depth = */ 0,
+                    use_hot_state,
                 )?;
             proof.verify(
-                self.state_summary.global_state_summary.root_hash(),
+                if use_hot_state {
+                    self.state_summary.hot_state_summary.root_hash()
+                } else {
+                    self.state_summary.global_state_summary.root_hash()
+                },
                 *key,
                 val_opt.as_ref(),
             )?;
             Ok(proof)
         } else {
-            Ok(self.db.get_state_proof_by_version_ext(
-                key, version, root_depth, /* use_hot_state = */ false,
-            )?)
+            Ok(self
+                .db
+                .get_state_proof_by_version_ext(key, version, root_depth, use_hot_state)?)
         }
     }
 }
 
-impl ProofRead for ProvableStateSummary<'_> {
+impl ProofRead for HotProvableStateSummary<'_, '_> {
     // TODO(aldenhu): return error
     fn get_proof(&self, key: &HashValue, root_depth: usize) -> Option<SparseMerkleProofExt> {
-        self.version().map(|ver| {
-            let _timer = TIMER.timer_with(&["provable_state_summary__get_proof"]);
+        let inner = &self.inner;
+        inner.version().map(|ver| {
+            let _timer = TIMER.timer_with(&["hot_provable_state_summary__get_proof"]);
+            inner
+                .get_proof(key, ver, root_depth, /* use_hot_state = */ true)
+                .expect("Failed to get account state with proof by version.")
+        })
+    }
+}
 
-            self.get_proof(key, ver, root_depth)
+impl ProofRead for ColdProvableStateSummary<'_, '_> {
+    // TODO(aldenhu): return error
+    fn get_proof(&self, key: &HashValue, root_depth: usize) -> Option<SparseMerkleProofExt> {
+        let inner = &self.inner;
+        inner.version().map(|ver| {
+            let _timer = TIMER.timer_with(&["provable_state_summary__get_proof"]);
+            inner
+                .get_proof(key, ver, root_depth, /* use_hot_state = */ false)
                 .expect("Failed to get account state with proof by version.")
         })
     }

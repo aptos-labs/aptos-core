@@ -25,7 +25,8 @@ use crate::{
 };
 use aptos_api::context::Context;
 use aptos_config::config::{
-    get_default_processor_task_count, NodeConfig, PrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG,
+    get_default_processor_task_count, HotStateConfig, NodeConfig, PrunerConfig,
+    NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_db::AptosDB;
 use aptos_db_indexer::{db_ops::open_db, db_v2::IndexerAsyncV2, indexer_reader::IndexerReaders};
@@ -117,7 +118,7 @@ pub fn init_db(config: &NodeConfig) -> DbReaderWriter {
             config.storage.buffered_state_target_items,
             config.storage.max_num_nodes_per_lru_cache_shard,
             None,
-            /* reset_hot_state = */ true,
+            HotStateConfig::default(),
         )
         .expect("DB should open."),
     )

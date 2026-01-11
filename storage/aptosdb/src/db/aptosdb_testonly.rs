@@ -5,7 +5,7 @@ use crate::db::AptosDB;
 #[cfg(test)]
 use crate::state_merkle_db::StateMerkleDb;
 use aptos_config::config::{
-    RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+    HotStateConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_crypto::hash::CryptoHash;
@@ -57,7 +57,7 @@ impl AptosDB {
             BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
             max_node_cache,
             None,
-            /* reset_hot_state = */ true,
+            HotStateConfig::default(),
         )
         .expect("Unable to open AptosDB")
     }
@@ -166,7 +166,7 @@ impl AptosDB {
 
         let current = self.state_store.current_state_locked().clone();
         let (hot_state, persisted_state) = self.state_store.get_persisted_state()?;
-        let (new_state, reads) = current.ledger_state().update_with_db_reader(
+        let (new_state, reads, hot_state_updates) = current.ledger_state().update_with_db_reader(
             &persisted_state,
             hot_state,
             transactions_to_keep.state_update_refs(),
@@ -175,6 +175,7 @@ impl AptosDB {
         let persisted_summary = self.state_store.get_persisted_state_summary()?;
         let new_state_summary = current.ledger_state_summary().update(
             &ProvableStateSummary::new(persisted_summary, self),
+            &hot_state_updates,
             transactions_to_keep.state_update_refs(),
         )?;
 

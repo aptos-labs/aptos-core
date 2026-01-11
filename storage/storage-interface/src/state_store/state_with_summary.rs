@@ -27,7 +27,7 @@ impl StateWithSummary {
     pub fn new_empty(hot_state_config: HotStateConfig) -> Self {
         Self::new(
             State::new_empty(hot_state_config),
-            StateSummary::new_empty(),
+            StateSummary::new_empty(hot_state_config),
         )
     }
 
@@ -44,6 +44,7 @@ impl StateWithSummary {
                 version,
                 SparseMerkleTree::new(hot_state_root_hash),
                 SparseMerkleTree::new(global_state_root_hash),
+                hot_state_config,
             ),
         )
     }
