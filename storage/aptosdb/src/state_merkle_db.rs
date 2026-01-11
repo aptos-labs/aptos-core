@@ -347,7 +347,7 @@ impl StateMerkleDb {
         Ok(None)
     }
 
-    fn create_jmt_commit_batch_for_shard(
+    pub(crate) fn create_jmt_commit_batch_for_shard(
         &self,
         version: Version,
         shard_id: Option<usize>,

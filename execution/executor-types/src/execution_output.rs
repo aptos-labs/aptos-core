@@ -10,7 +10,7 @@ use crate::{
 use aptos_config::config::HotStateConfig;
 use aptos_drop_helper::DropHelper;
 use aptos_storage_interface::state_store::{
-    state::LedgerState, state_view::cached_state_view::ShardedStateCache,
+    state::LedgerState, state_view::cached_state_view::ShardedStateCache, HotStateUpdates,
 };
 use aptos_types::{
     contract_event::ContractEvent,
@@ -38,6 +38,7 @@ impl ExecutionOutput {
         to_retry: TransactionsWithOutput,
         result_state: LedgerState,
         state_reads: ShardedStateCache,
+        hot_state_updates: HotStateUpdates,
         block_end_info: Option<BlockEndInfo>,
         next_epoch_state: Option<EpochState>,
         subscribable_events: Planned<Vec<ContractEvent>>,
@@ -62,6 +63,7 @@ impl ExecutionOutput {
             to_retry,
             result_state,
             state_reads,
+            hot_state_updates,
             block_end_info,
             next_epoch_state,
             subscribable_events,
@@ -78,6 +80,7 @@ impl ExecutionOutput {
             to_retry: TransactionsWithOutput::new_empty(),
             state_reads: ShardedStateCache::new_empty(state.version()),
             result_state: state,
+            hot_state_updates: HotStateUpdates::new_empty(),
             block_end_info: None,
             next_epoch_state: None,
             subscribable_events: Planned::ready(vec![]),
@@ -96,6 +99,7 @@ impl ExecutionOutput {
             to_retry: TransactionsWithOutput::new_empty(),
             result_state: LedgerState::new_empty(HotStateConfig::default()),
             state_reads: ShardedStateCache::new_empty(None),
+            hot_state_updates: HotStateUpdates::new_empty(),
             block_end_info: None,
             next_epoch_state: None,
             subscribable_events: Planned::ready(vec![]),
@@ -116,6 +120,7 @@ impl ExecutionOutput {
             to_retry: TransactionsWithOutput::new_empty(),
             result_state: self.result_state.clone(),
             state_reads: ShardedStateCache::new_empty(self.next_version().checked_sub(1)),
+            hot_state_updates: HotStateUpdates::new_empty(),
             block_end_info: None,
             next_epoch_state: self.next_epoch_state.clone(),
             subscribable_events: Planned::ready(vec![]),
@@ -158,6 +163,8 @@ pub struct Inner {
     /// State items read during execution, useful for calculating the state storge usage and
     /// indices used by the db pruner.
     pub state_reads: ShardedStateCache,
+    /// Updates to hot state, mainly used to compute hot state root hashes.
+    pub hot_state_updates: HotStateUpdates,
 
     /// Optional StateCheckpoint payload
     pub block_end_info: Option<BlockEndInfo>,

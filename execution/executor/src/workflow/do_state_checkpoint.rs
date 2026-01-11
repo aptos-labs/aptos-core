@@ -25,6 +25,7 @@ impl DoStateCheckpoint {
 
         let state_summary = parent_state_summary.update(
             persisted_state_summary,
+            &execution_output.hot_state_updates,
             execution_output.to_commit.state_update_refs(),
         )?;
 

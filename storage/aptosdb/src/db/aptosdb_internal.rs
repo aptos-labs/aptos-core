@@ -14,7 +14,8 @@ use crate::{
     transaction_store::TransactionStore,
 };
 use aptos_config::config::{
-    PrunerConfig, RocksdbConfig, RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG,
+    HotStateConfig, PrunerConfig, RocksdbConfig, RocksdbConfigs, StorageDirPaths,
+    NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_db_indexer::{db_indexer::InternalIndexerDB, Indexer};
 use aptos_logger::prelude::*;
@@ -50,6 +51,7 @@ impl AptosDB {
         empty_buffered_state_for_restore: bool,
         skip_index_and_usage: bool,
         internal_indexer_db: Option<InternalIndexerDB>,
+        hot_state_config: HotStateConfig,
     ) -> Self {
         let ledger_db = Arc::new(ledger_db);
         let hot_state_merkle_db = hot_state_merkle_db.map(Arc::new);
@@ -78,6 +80,7 @@ impl AptosDB {
             empty_buffered_state_for_restore,
             skip_index_and_usage,
             internal_indexer_db.clone(),
+            hot_state_config,
         ));
 
         let ledger_pruner = LedgerPrunerManager::new(
@@ -116,7 +119,7 @@ impl AptosDB {
         max_num_nodes_per_lru_cache_shard: usize,
         empty_buffered_state_for_restore: bool,
         internal_indexer_db: Option<InternalIndexerDB>,
-        reset_hot_state: bool,
+        hot_state_config: HotStateConfig,
     ) -> Result<Self> {
         ensure!(
             pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
@@ -139,7 +142,7 @@ impl AptosDB {
             Some(&block_cache),
             readonly,
             max_num_nodes_per_lru_cache_shard,
-            reset_hot_state,
+            hot_state_config.delete_on_restart,
         )?;
 
         let mut myself = Self::new_with_dbs(
@@ -153,6 +156,7 @@ impl AptosDB {
             empty_buffered_state_for_restore,
             rocksdb_configs.enable_storage_sharding,
             internal_indexer_db,
+            hot_state_config,
         );
 
         if !readonly {
@@ -249,7 +253,7 @@ impl AptosDB {
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
             None,
-            /* reset_hot_state = */ true,
+            HotStateConfig::default(),
         )
         .expect("Unable to open AptosDB")
     }
