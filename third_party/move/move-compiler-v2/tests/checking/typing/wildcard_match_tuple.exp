@@ -1,0 +1,49 @@
+// -- Model dump before first bytecode pipeline
+module 0x8675309::M {
+    enum X {
+        A,
+        B,
+    }
+    private fun bar(x: X): u64 {
+        match (Tuple(x, x)) {
+          (M::X::A, M::X::A): (X, X) => {
+            1
+          }
+          _: (X, X) => {
+            2
+          }
+        }
+
+    }
+    private fun foo(x: X): u64 {
+        match (Tuple(x, x)) {
+          (M::X::A, M::X::A): (X, X) => {
+            1
+          }
+          (_: X, _: X): (X, X) => {
+            2
+          }
+        }
+
+    }
+} // end 0x8675309::M
+
+// -- Sourcified model before first bytecode pipeline
+module 0x8675309::M {
+    enum X has copy, drop {
+        A,
+        B,
+    }
+    fun bar(x: X): u64 {
+        match ((x, x)) {
+            (X::A{},X::A{}) => 1,
+            _ => 2,
+        }
+    }
+    fun foo(x: X): u64 {
+        match ((x, x)) {
+            (X::A{},X::A{}) => 1,
+            (_,_) => 2,
+        }
+    }
+}
