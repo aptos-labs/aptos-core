@@ -100,6 +100,44 @@ impl<'env> SpecTranslator<'env> {
         }
     }
 
+    // ========================================================================
+    // Helper methods for GlobalNumberOperationState access
+    // ========================================================================
+
+    /// Get the global number operation state for bitvector analysis.
+    fn global_bv_state(&self) -> Rc<GlobalNumberOperationState> {
+        self.env
+            .get_extension::<GlobalNumberOperationState>()
+            .expect("global number operation state")
+    }
+
+    /// Check if a node uses bitwise operations.
+    fn is_node_bitwise(&self, node_id: NodeId) -> bool {
+        self.global_bv_state().get_node_num_oper(node_id) == Bitwise
+    }
+
+    /// Get the bv_flag (bitwise flag) for a node.
+    fn node_bv_flag(&self, node_id: NodeId) -> bool {
+        self.is_node_bitwise(node_id)
+    }
+
+    /// Check if a spec function's first return value uses bitwise operations.
+    fn is_spec_fun_result_bitwise(&self, mid: ModuleId, sid: SpecFunId) -> bool {
+        let global_state = self.global_bv_state();
+        if let Some((_, ret_oper_map)) = global_state.spec_fun_operation_map.get(&(mid, sid)) {
+            !ret_oper_map.is_empty() && ret_oper_map[0] == Bitwise
+        } else {
+            false
+        }
+    }
+
+    /// Get boogie type suffix for a node's type, considering its bitwise flag.
+    fn node_type_suffix(&self, node_id: NodeId) -> String {
+        let binding = self.get_node_type(node_id);
+        let ty = binding.skip_reference();
+        boogie_type_suffix(self.env, ty, self.node_bv_flag(node_id))
+    }
+
     /// Emits a translation error.
     pub fn error(&self, loc: &Loc, msg: &str) {
         self.env.error(loc, &format!("[boogie translator] {}", msg));
@@ -390,23 +428,7 @@ impl SpecTranslator<'_> {
             if recursive { "recursive " } else { "" },
             fun.loc.display(self.env)
         );
-        let global_state = &self
-            .env
-            .get_extension::<GlobalNumberOperationState>()
-            .expect("global number operation state");
-        let bv_flag_result = if global_state
-            .spec_fun_operation_map
-            .contains_key(&(module_env.get_id(), id))
-        {
-            let ret_oper_map = &global_state
-                .spec_fun_operation_map
-                .get(&(module_env.get_id(), id))
-                .unwrap()
-                .1;
-            ret_oper_map[0] == Bitwise
-        } else {
-            false
-        };
+        let bv_flag_result = self.is_spec_fun_result_bitwise(module_env.get_id(), id);
         let type_info_params = if type_reflection {
             let mut covered = BTreeSet::new();
             (0..fun.type_params.len())
@@ -454,6 +476,7 @@ impl SpecTranslator<'_> {
                 format!("__unused_{}", param_repr)
             }
         });
+        let global_state = self.global_bv_state();
         let params = fun
             .params
             .iter()
@@ -881,20 +904,16 @@ impl SpecTranslator<'_> {
     }
 
     fn translate_value(&self, node_id: NodeId, val: &Value) {
-        let global_state = &self
-            .env
-            .get_extension::<GlobalNumberOperationState>()
-            .expect("global number operation state");
-        let num_oper = global_state.get_node_num_oper(node_id);
-        let mut suffix = "".to_string();
-        let bv_flag = num_oper == Bitwise;
-        if bv_flag {
-            suffix = boogie_type(
+        let bv_flag = self.node_bv_flag(node_id);
+        let suffix = if bv_flag {
+            boogie_type(
                 self.env,
                 self.env.get_node_type(node_id).skip_reference(),
                 true,
-            );
-        }
+            )
+        } else {
+            "".to_string()
+        };
         match val {
             Value::Address(addr) => emit!(self.writer, "{}", boogie_address(self.env, addr)),
             Value::Number(val) => emit!(self.writer, "{}{}", val, suffix),
@@ -1032,10 +1051,6 @@ impl SpecTranslator<'_> {
 
     fn translate_call(&self, node_id: NodeId, oper: &Operation, args: &[Exp]) {
         let loc = self.env.get_node_loc(node_id);
-        let global_state = &self
-            .env
-            .get_extension::<GlobalNumberOperationState>()
-            .expect("global number operation state");
         match oper {
             // Operators we introduced in the top level public entry `SpecTranslator::translate`,
             // mapping between Boogies single value domain and our typed world.
@@ -1131,8 +1146,8 @@ impl SpecTranslator<'_> {
             Operation::Not => self.translate_logical_unary_op("!", args),
             Operation::Cast => self.translate_cast(node_id, args),
             Operation::Int2Bv => {
-                let exp_arith_flag = global_state.get_node_num_oper(args[0].node_id()) != Bitwise;
-                if exp_arith_flag {
+                let is_arith = !self.is_node_bitwise(args[0].node_id());
+                if is_arith {
                     let arg_node_type = self.env.get_node_type(args[0].node_id());
                     let literal = boogie_num_type_base(
                         self.env,
@@ -1143,13 +1158,13 @@ impl SpecTranslator<'_> {
                     emit!(self.writer, "$int2bv.{}(", literal);
                 }
                 self.translate_exp(&args[0]);
-                if exp_arith_flag {
+                if is_arith {
                     emit!(self.writer, ")");
                 }
             },
             Operation::Bv2Int => {
-                let exp_bv_flag = global_state.get_node_num_oper(args[0].node_id()) == Bitwise;
-                if exp_bv_flag {
+                let is_bv = self.is_node_bitwise(args[0].node_id());
+                if is_bv {
                     let arg_node_type = self.env.get_node_type(args[0].node_id());
                     let literal = boogie_num_type_base(
                         self.env,
@@ -1160,7 +1175,7 @@ impl SpecTranslator<'_> {
                     emit!(self.writer, "$bv2int.{}(", literal);
                 }
                 self.translate_exp(&args[0]);
-                if exp_bv_flag {
+                if is_bv {
                     emit!(self.writer, ")");
                 }
             },
@@ -1232,13 +1247,9 @@ impl SpecTranslator<'_> {
                 emit!(self.writer, &")".repeat(count));
             },
             Operation::Abort(_) => {
-                let exp_bv_flag = global_state.get_node_num_oper(node_id) == Bitwise;
                 emit!(
                     self.writer,
-                    &format!(
-                        "$Arbitrary_value_of'{}'()",
-                        boogie_type_suffix(self.env, &self.get_node_type(node_id), exp_bv_flag)
-                    )
+                    &format!("$Arbitrary_value_of'{}'()", self.node_type_suffix(node_id))
                 );
             },
             Operation::MoveFunction(_, _)
@@ -1361,16 +1372,12 @@ impl SpecTranslator<'_> {
         }
 
         // regular path
-        let global_state = &self
-            .env
-            .get_extension::<GlobalNumberOperationState>()
-            .expect("global number operation state");
         let is_vector_table_cmp_module =
             module_env.is_std_vector() || module_env.is_table() || module_env.is_cmp();
         let bv_flag = if is_vector_table_cmp_module && !args.is_empty() {
-            global_state.get_node_num_oper(args[0].node_id()) == Bitwise
+            self.is_node_bitwise(args[0].node_id())
         } else {
-            global_state.get_node_num_oper(node_id) == Bitwise
+            self.is_node_bitwise(node_id)
         };
         let name = boogie_spec_fun_name(module_env, fun_id, inst, bv_flag);
         emit!(self.writer, "{}(", name);
@@ -1532,17 +1539,10 @@ impl SpecTranslator<'_> {
             }
         }
         emit!(self.writer, " else ");
-        let global_state = &self
-            .env
-            .get_extension::<GlobalNumberOperationState>()
-            .expect("global number operation state");
-        let exp_bv_flag = global_state.get_node_num_oper(node_id) == Bitwise;
+        let type_suffix = self.node_type_suffix(node_id);
         emit!(
             self.writer,
-            &format!(
-                "$Arbitrary_value_of'{}'()",
-                boogie_type_suffix(self.env, &self.get_node_type(node_id), exp_bv_flag)
-            )
+            &format!("$Arbitrary_value_of'{}'()", type_suffix)
         );
         emit!(self.writer, ")");
     }
@@ -1725,10 +1725,6 @@ impl SpecTranslator<'_> {
         condition: &Option<Exp>,
         body: &Exp,
     ) {
-        let global_state = &self
-            .env
-            .get_extension::<GlobalNumberOperationState>()
-            .expect("global number operation state");
         assert!(!kind.is_choice());
         // Translate range expressions. While doing, check for currently unsupported
         // type quantification
@@ -1768,8 +1764,7 @@ impl SpecTranslator<'_> {
             let (_, var_name) = self.require_range_var(var);
             let var_name_str = self.env.symbol_pool().string(var_name);
             let quant_ty = self.get_node_type(range.node_id());
-            let num_oper = global_state.get_node_num_oper(range.node_id());
-            let bv_flag = num_oper == Bitwise;
+            let bv_flag = self.node_bv_flag(range.node_id());
             match quant_ty.skip_reference() {
                 Type::TypeDomain(ty) => {
                     emit!(
@@ -1853,8 +1848,7 @@ impl SpecTranslator<'_> {
             let (_, var_name) = self.require_range_var(var);
             let var_name_str = self.env.symbol_pool().string(var_name);
             let quant_ty = self.get_node_type(range.node_id());
-            let num_oper = global_state.get_node_num_oper(range.node_id());
-            let bv_flag = num_oper == Bitwise;
+            let bv_flag = self.node_bv_flag(range.node_id());
             match quant_ty.skip_reference() {
                 Type::TypeDomain(domain_ty) => {
                     let mut type_check =
@@ -1887,7 +1881,7 @@ impl SpecTranslator<'_> {
                             "{}ContainsTable({}, $EncodeKey'{}'({}))",
                             separator,
                             range_tmps.get(&var_name).unwrap(),
-                            boogie_type_suffix(self.env, &targs[0], num_oper == Bitwise),
+                            boogie_type_suffix(self.env, &targs[0], bv_flag),
                             var_name_str,
                         );
                     } else {
@@ -2037,16 +2031,7 @@ impl SpecTranslator<'_> {
             }
         }
 
-        let global_state = &self
-            .env
-            .get_extension::<GlobalNumberOperationState>()
-            .expect("global number operation state");
-        let num_oper = global_state.get_node_num_oper(args[0].node_id());
-        let suffix = boogie_type_suffix(
-            self.env,
-            self.get_node_type(args[0].node_id()).skip_reference(),
-            num_oper == Bitwise,
-        );
+        let suffix = self.node_type_suffix(args[0].node_id());
         emit!(self.writer, "{}'{}'(", boogie_val_fun, suffix);
         self.translate_exp(&args[0]);
         emit!(self.writer, ", ");
@@ -2071,12 +2056,7 @@ impl SpecTranslator<'_> {
     }
 
     fn translate_op(&self, boogie_op: &str, bv_op: &str, args: &[Exp]) {
-        let global_state = &self
-            .env
-            .get_extension::<GlobalNumberOperationState>()
-            .expect("global number operation state");
-        let num_oper = global_state.get_node_num_oper(args[0].node_id());
-        if num_oper == Bitwise {
+        if self.is_node_bitwise(args[0].node_id()) {
             let oper_base = boogie_num_type_base(
                 self.env,
                 Some(self.env.get_node_loc(args[0].node_id())),
@@ -2096,10 +2076,6 @@ impl SpecTranslator<'_> {
     }
 
     fn translate_bit_op(&self, boogie_op: &str, args: &[Exp]) {
-        let global_state = &self
-            .env
-            .get_extension::<GlobalNumberOperationState>()
-            .expect("global number operation state");
         let binding = self.env.get_node_type(args[0].node_id());
         let common_type = binding.skip_reference();
         let oper_base = boogie_num_type_base(
@@ -2110,9 +2086,9 @@ impl SpecTranslator<'_> {
         );
         emit!(self.writer, "{}'{}'(", boogie_op, oper_base);
         self.translate_seq(args.iter(), ", ", |e| {
-            let num_oper_e = global_state.get_node_num_oper(e.node_id());
+            let is_bitwise = self.is_node_bitwise(e.node_id());
             let ty_e = self.env.get_node_type(e.node_id());
-            if num_oper_e != Bitwise {
+            if !is_bitwise {
                 if matches!(ty_e, Type::Primitive(PrimitiveType::Num)) || ty_e == *common_type {
                     emit!(
                         self.writer,
@@ -2132,7 +2108,7 @@ impl SpecTranslator<'_> {
                 }
             }
             self.translate_exp(e);
-            if num_oper_e != Bitwise {
+            if !is_bitwise {
                 emit!(self.writer, ")")
             }
         });
@@ -2156,13 +2132,8 @@ impl SpecTranslator<'_> {
     }
 
     fn translate_arithmetic_unary_op(&self, boogie_op: &str, args: &[Exp]) {
-        let global_state = &self
-            .env
-            .get_extension::<GlobalNumberOperationState>()
-            .expect("global number operation state");
-        let num_oper_e = global_state.get_node_num_oper(args[0].node_id());
         assert!(
-            num_oper_e != Bitwise,
+            !self.is_node_bitwise(args[0].node_id()),
             "no bitwise unary arithmetic ops supported"
         );
         emit!(self.writer, "{}", boogie_op);
@@ -2217,12 +2188,7 @@ impl SpecTranslator<'_> {
     }
 
     fn translate_primitive_call_shr(&self, fun: &str, args: &[Exp]) {
-        let global_state = &self
-            .env
-            .get_extension::<GlobalNumberOperationState>()
-            .expect("global number operation state");
-        let num_oper = global_state.get_node_num_oper(args[0].node_id());
-        if num_oper == Bitwise {
+        if self.is_node_bitwise(args[0].node_id()) {
             let oper_left_base = boogie_num_type_base(
                 self.env,
                 Some(self.env.get_node_loc(args[0].node_id())),
@@ -2265,12 +2231,7 @@ impl SpecTranslator<'_> {
     }
 
     fn translate_primitive_call_shl(&self, fun: &str, args: &[Exp], loc: &Loc) {
-        let global_state = &self
-            .env
-            .get_extension::<GlobalNumberOperationState>()
-            .expect("global number operation state");
-        let num_oper = global_state.get_node_num_oper(args[0].node_id());
-        if num_oper == Bitwise {
+        if self.is_node_bitwise(args[0].node_id()) {
             let oper_left_base = boogie_num_type_base(
                 self.env,
                 Some(self.env.get_node_loc(args[0].node_id())),
@@ -2328,12 +2289,8 @@ impl SpecTranslator<'_> {
     }
 
     fn translate_well_formed(&self, exp: &Exp) {
-        let global_state = &self
-            .env
-            .get_extension::<GlobalNumberOperationState>()
-            .expect("global number state");
         let ty = self.get_node_type(exp.node_id());
-        let bv_flag = global_state.get_node_num_oper(exp.node_id()) == Bitwise;
+        let bv_flag = self.node_bv_flag(exp.node_id());
         match exp.as_ref() {
             ExpData::Temporary(_, idx) => {
                 // For the special case of a temporary which can represent a
