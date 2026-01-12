@@ -52,12 +52,12 @@ pub fn setup_dealing<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng
     mut rng: &mut R,
 ) -> DealingArgs<T> {
     println!(
-        "Setting up dealing for {} PVSS, with {}",
+        "Setting up dealing for {} PVSS, with {} (and some elliptic curve)",
         T::scheme_name(),
         sc
     );
 
-    let pp = T::PublicParameters::with_max_num_shares(sc.get_total_num_players());
+    let pp = T::PublicParameters::with_max_num_shares(sc.get_total_num_shares());
 
     let (ssks, spks, dks, eks, iss, s, dsk, dpk) =
         generate_keys_and_secrets::<T, R>(sc, &pp, &mut rng);
@@ -75,7 +75,7 @@ pub fn setup_dealing<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng
     }
 }
 
-// TODO: Possible way to merge this would be to make `SecretSharingConfig`s implement `WeightedConfig` with all weights set to 1
+// TODO: I think this can be deleted
 pub fn setup_dealing_weighted<
     F: FftField,
     T: Transcript<SecretSharingConfig = WeightedConfigArkworks<F>>,
@@ -282,8 +282,9 @@ pub fn get_weighted_configs_for_benchmarking<T: traits::ThresholdConfig>() -> Ve
     ];
     let threshold = 129; // slow path
     wcs.push(WeightedConfig::<T>::new(threshold, weights.clone()).unwrap());
-    let threshold = 166; // fast path
-    wcs.push(WeightedConfig::<T>::new(threshold, weights).unwrap());
+    // let threshold = 166; // fast path; not including this at the moment because
+    //                         threshold size barely influences benchmarks
+    // wcs.push(WeightedConfig::<T>::new(threshold, weights).unwrap());
 
     let weights = vec![
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,

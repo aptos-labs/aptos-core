@@ -21,7 +21,7 @@ if [ "$ANS" == "y" ]; then
 
     echo "Benchmarking DeKART..."
     cd $repo_root/crates/aptos-dkg/
-    RAYON_NUM_THREADS=1 cargo bench --bench dekart-rs/bls12-381
+    RAYON_NUM_THREADS=1 cargo bench --bench range_proof -- dekart-rs/bls12-381
     cd - &>/dev/null
 fi
 
@@ -29,10 +29,10 @@ cd $repo_root
 csv_data=`cargo criterion-means | grep -E '^(bulletproofs|dekart-rs|Group)'`
 
 csv_file=`mktemp`
-echo "Wrote CSV file to $csv_file..."
 echo "$csv_data" >$csv_file
+echo "Wrote CSV file to $csv_file..."
 
-md_tables=`$scriptdir/print-markdown-table.py $csv_file`
+md_tables=`$scriptdir/print-range-proof-markdown-table.py $csv_file`
 
 echo "$md_tables"
 

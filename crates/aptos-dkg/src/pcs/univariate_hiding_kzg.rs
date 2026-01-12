@@ -17,8 +17,10 @@ use aptos_crypto::{
     arkworks::{
         msm::{IsMsmInput, MsmInput},
         random::{sample_field_element, unsafe_random_point},
+        srs::{lagrange_basis, powers_of_tau, SrsBasis, SrsType},
         GroupGenerators,
     },
+    utils,
 };
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{
@@ -29,14 +31,10 @@ use ark_ff::{Field, PrimeField};
 use ark_poly::{
     polynomial::univariate::DensePolynomial, univariate::DenseOrSparsePolynomial, EvaluationDomain,
 };
-use ark_serialize::{
-    CanonicalDeserialize, CanonicalSerialize
-};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::{CryptoRng, RngCore};
 use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
 use std::{borrow::Cow, fmt::Debug};
-use aptos_crypto::utils::assert_power_of_two;
-pub use srs::*;
 
 pub type Commitment<E> = CodomainShape<<E as Pairing>::G1>;
 
@@ -79,7 +77,7 @@ pub struct VerificationKeyExtra<E: Pairing> {
 pub struct CommitmentKey<E: Pairing> {
     pub xi_1: E::G1Affine,
     pub tau_1: E::G1Affine,
-    pub msm_basis: SrsBasis<E::G1Affine>,
+    pub msm_basis: SrsBasis<E::G1>,
     pub eval_dom: ark_poly::Radix2EvaluationDomain<E::ScalarField>,
     pub roots_of_unity_in_eval_dom: Vec<E::ScalarField>,
     pub g1: E::G1Affine,
@@ -106,11 +104,8 @@ pub fn setup<E: Pairing>(
     basis_type: SrsType,
     group_generators: GroupGenerators<E>,
     trapdoor: Trapdoor<E>,
-) -> (
-    VerificationKey<E>,
-    CommitmentKey<E>,
-) {
-    assert_power_of_two(m);
+) -> (VerificationKey<E>, CommitmentKey<E>) {
+    utils::assert_power_of_two(m);
 
     let GroupGenerators { g1, g2 } = group_generators;
     let Trapdoor { xi, tau } = trapdoor;
@@ -118,16 +113,15 @@ pub fn setup<E: Pairing>(
     let (xi_1, tau_1) = ((g1 * xi).into_affine(), (g1 * tau).into_affine());
     let (xi_2, tau_2) = ((g2 * xi).into_affine(), (g2 * tau).into_affine());
 
-    let eval_dom =
-        ark_poly::Radix2EvaluationDomain::<E::ScalarField>::new(m)
-            .expect("Could not construct evaluation domain");
+    let eval_dom = ark_poly::Radix2EvaluationDomain::<E::ScalarField>::new(m)
+        .expect("Could not construct evaluation domain");
 
     let msm_basis = match basis_type {
         SrsType::Lagrange => SrsBasis::Lagrange {
-            lagr_g1: lagrange_basis::<E::G1>(m, g1, eval_dom, tau),
+            lagr: lagrange_basis::<E::G1>(g1.into(), tau, m, eval_dom),
         },
         SrsType::PowersOfTau => SrsBasis::PowersOfTau {
-            tau_powers_g1: powers_of_tau::<E::G1Affine>(g1, tau, m),
+            tau_powers: powers_of_tau::<E::G1>(g1.into(), tau, m),
         },
     };
 
@@ -162,16 +156,9 @@ pub fn setup_extra<E: Pairing>(
 
     let (vk, ck) = setup(m, basis_type, group_generators, trapdoor);
 
-    let g2_powers = powers_of_tau::<E::G2Affine>(
-        vk.group_generators.g2,
-        tau,
-        m,
-    );
+    let g2_powers = powers_of_tau::<E::G2>(vk.group_generators.g2.into(), tau, m);
 
-    (
-        VerificationKeyExtra { vk, g2_powers },
-        ck,
-    )
+    (VerificationKeyExtra { vk, g2_powers }, ck)
 }
 
 pub fn commit_with_randomness<E: Pairing>(
@@ -189,8 +176,10 @@ pub fn commit_with_randomness_and_offset<E: Pairing>(
     offset: usize,
 ) -> Commitment<E> {
     let msm_basis: &[E::G1Affine] = match &ck.msm_basis {
-        SrsBasis::Lagrange { lagr_g1 } => &lagr_g1[offset..],
-        SrsBasis::PowersOfTau { tau_powers_g1 } => &tau_powers_g1[offset..],
+        SrsBasis::Lagrange { lagr: lagr_g1 } => &lagr_g1[offset..],
+        SrsBasis::PowersOfTau {
+            tau_powers: tau_powers_g1,
+        } => &tau_powers_g1[offset..],
     };
     let commitment_hom: CommitmentHomomorphism<'_, E> = CommitmentHomomorphism {
         msm_basis,
@@ -281,132 +270,6 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
         );
 
         Ok(())
-    }
-}
-
-pub mod srs {
-    use ark_ec::AffineRepr;
-    use ark_serialize::CanonicalSerialize;
-    use ark_serialize::SerializationError;
-    use ark_serialize::Write;
-    use ark_serialize::Valid;
-    use ark_serialize::Compress;
-    use ark_serialize::CanonicalDeserialize;
-    use ark_serialize::Validate;
-    use ark_serialize::Read;
-    use ark_ec::CurveGroup;
-    use aptos_crypto::utils;
-    use ark_poly::EvaluationDomain;
-    use ark_ff::Field;
-
-    pub enum SrsType {
-        Lagrange,
-        PowersOfTau,
-    }
-
-    #[derive(Clone, Debug, PartialEq, Eq)]
-    pub enum SrsBasis<A: AffineRepr> {
-        Lagrange { lagr_g1: Vec<A> },
-        PowersOfTau { tau_powers_g1: Vec<A> },
-    }
-
-    impl<A: AffineRepr> CanonicalSerialize for SrsBasis<A> {
-        fn serialize_with_mode<W: Write>(
-            &self,
-            mut writer: W,
-            compress: Compress,
-        ) -> Result<(), SerializationError> {
-            match self {
-                SrsBasis::Lagrange { lagr_g1 } => {
-                    0u8.serialize_with_mode(&mut writer, compress)?; // variant tag
-                    lagr_g1.serialize_with_mode(&mut writer, compress)?;
-                },
-                SrsBasis::PowersOfTau { tau_powers_g1 } => {
-                    1u8.serialize_with_mode(&mut writer, compress)?; // variant tag
-                    tau_powers_g1.serialize_with_mode(&mut writer, compress)?;
-                },
-            }
-            Ok(())
-        }
-
-        fn serialized_size(&self, compress: Compress) -> usize {
-            1 + match self {
-                SrsBasis::Lagrange { lagr_g1 } => lagr_g1.serialized_size(compress),
-                SrsBasis::PowersOfTau { tau_powers_g1 } => tau_powers_g1.serialized_size(compress),
-            }
-        }
-    }
-
-    impl<A: AffineRepr> Valid for SrsBasis<A> {
-        fn check(&self) -> Result<(), SerializationError> {
-            match self {
-                SrsBasis::Lagrange { lagr_g1 } => {
-                    for g in lagr_g1 {
-                        g.check()?;
-                    }
-                },
-                SrsBasis::PowersOfTau { tau_powers_g1 } => {
-                    for g in tau_powers_g1 {
-                        g.check()?;
-                    }
-                },
-            }
-            Ok(())
-        }
-    }
-
-    impl<A: AffineRepr> CanonicalDeserialize for SrsBasis<A> {
-        fn deserialize_with_mode<R: Read>(
-            mut reader: R,
-            compress: Compress,
-            validate: Validate,
-        ) -> Result<Self, SerializationError> {
-            // Read the variant tag first
-            let tag = u8::deserialize_with_mode(&mut reader, compress, validate)?;
-
-            match tag {
-                0 => {
-                    // Lagrange variant
-                    let lagr_g1 =
-                        Vec::<A>::deserialize_with_mode(&mut reader, compress, validate)?;
-                    Ok(SrsBasis::Lagrange { lagr_g1 })
-                },
-                1 => {
-                    // Powers-of-Tau variant
-                    let tau_powers_g1 =
-                        Vec::<A>::deserialize_with_mode(&mut reader, compress, validate)?;
-                    Ok(SrsBasis::PowersOfTau { tau_powers_g1 })
-                },
-                _ => Err(SerializationError::InvalidData),
-            }
-        }
-    }
-
-    pub fn lagrange_basis<C: CurveGroup>(
-        n: usize,
-        g1: C::Affine,
-        eval_dom: ark_poly::Radix2EvaluationDomain<C::ScalarField>,
-        tau: C::ScalarField,
-    ) -> Vec<C::Affine> {
-        let powers_of_tau = utils::powers(tau, n);
-        let lagr_basis_scalars = eval_dom.ifft(&powers_of_tau);
-        debug_assert!(lagr_basis_scalars.iter().sum::<C::ScalarField>() == C::ScalarField::ONE);
-
-        let lagr_g1_proj: Vec<C> = lagr_basis_scalars.iter().map(|s| g1 * s).collect();
-        C::normalize_batch(&lagr_g1_proj)
-    }
-
-    pub fn powers_of_tau<A: AffineRepr>(
-        base: A,
-        tau: A::ScalarField,
-        m: usize,
-    ) -> Vec<A> {
-        let mut proj = Vec::with_capacity(m + 1);
-        proj.push(base.into_group());
-        for i in 0..m {
-            proj.push(proj[i] * tau);
-        }
-        A::Group::normalize_batch(&proj)
     }
 }
 
@@ -539,12 +402,7 @@ mod tests {
         let m = 64;
         let xi = sample_field_element(&mut rng);
         let tau = sample_field_element(&mut rng);
-        let (vk, ck) = setup::<E>(
-            m,
-            SrsType::Lagrange,
-            group_data,
-            Trapdoor { xi, tau },
-        );
+        let (vk, ck) = setup::<E>(m, SrsType::Lagrange, group_data, Trapdoor { xi, tau });
 
         let f_coeffs: Vec<Fr<E>> = sample_field_elements(m, &mut rng);
         let poly = DensePolynomial::<Fr<E>> { coeffs: f_coeffs };

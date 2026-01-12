@@ -21,3 +21,9 @@ Run the Bulletproof and DeKART benchmarks in one line via:
 This will generate CSV data with the benchmark data, format it as Markdown and copy it to your clipboard!
 
 ## Chunky PVSS
+
+Follow the same steps, but run the benchmarks via:
+
+```
+./run-pvss-benches.sh
+```

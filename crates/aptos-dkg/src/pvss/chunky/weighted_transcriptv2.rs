@@ -3,7 +3,7 @@
 
 use crate::{
     dlog::bsgs,
-    pcs::{univariate_hiding_kzg, univariate_hiding_kzg::SrsBasis},
+    pcs::univariate_hiding_kzg,
     pvss::{
         chunky::{
             chunked_elgamal::{self, num_chunks_per_scalar},
@@ -36,6 +36,7 @@ use aptos_crypto::{
         },
         scrape::LowDegreeTest,
         serialization::{ark_de, ark_se, BatchSerializable},
+        srs::SrsBasis,
     },
     bls12381::{self},
     weighted_config::WeightedConfigArkworks,
@@ -497,7 +498,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             // Verify the PoK
             let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
             let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
-                SrsBasis::Lagrange { lagr_g1 } => lagr_g1,
+                SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,
                 SrsBasis::PowersOfTau { .. } => {
                     bail!("Expected a Lagrange basis, received powers of tau basis instead")
                 },
@@ -733,7 +734,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     type SigningSecretKey = bls12381::PrivateKey;
 
     fn scheme_name() -> String {
-        "chunky_pvss_v2".to_string()
+        "chunky_v2".to_string()
     }
 
     /// Fetches the domain-separation tag (DST)
@@ -758,6 +759,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             sc.get_total_num_players(),
             "Number of encryption keys must equal total weight"
         );
+
+        println!("Rayon num threads: {}", rayon::current_num_threads());
 
         // Initialize the PVSS SoK context
         let sok_cntxt = (spk.clone(), session_id, dealer.id, DST.to_vec()); // This is a bit hacky; also get rid of DST here and use self.dst? Would require making `self` input of `deal()`
@@ -987,7 +990,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         //   (2a) Set up the tuple homomorphism
         let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect(); // TODO: this is a bit ugly
         let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
-            SrsBasis::Lagrange { lagr_g1 } => lagr_g1,
+            SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,
             SrsBasis::PowersOfTau { .. } => {
                 panic!("Expected a Lagrange basis, received powers of tau basis instead")
             },

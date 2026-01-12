@@ -5,8 +5,8 @@
 
 use crate::{
     algebra::polynomials,
-    pcs::univariate_hiding_kzg::{self, SrsType},
-    range_proofs::{dekart_univariate_v2::univariate_hiding_kzg::SrsBasis, traits},
+    pcs::univariate_hiding_kzg,
+    range_proofs::traits,
     sigma_protocol::{
         self,
         homomorphism::{self, Trait as _},
@@ -21,6 +21,7 @@ use aptos_crypto::arkworks::{
         sample_field_element, sample_field_elements, unsafe_random_point,
         unsafe_random_points_group,
     },
+    srs::{SrsBasis, SrsType},
     GroupGenerators,
 };
 use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup, VariableBaseMSM};
@@ -286,7 +287,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         };
 
         let lagr_0: E::G1Affine = match &ck_S.msm_basis {
-            SrsBasis::Lagrange { lagr_g1 } => lagr_g1[0],
+            SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1[0],
             SrsBasis::PowersOfTau { .. } => panic!("Wrong basis, this should not happen"),
         };
 
@@ -368,8 +369,10 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         } = ck_S;
 
         let lagr_g1: &[E::G1Affine] = match msm_basis {
-            SrsBasis::Lagrange { lagr_g1 } => lagr_g1,
-            SrsBasis::PowersOfTau { .. } => panic!("Expected Lagrange basis, somehow got PowersOfTau basis instead"),
+            SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,
+            SrsBasis::PowersOfTau { .. } => {
+                panic!("Expected Lagrange basis, somehow got PowersOfTau basis instead")
+            },
         };
 
         debug_assert_eq!(

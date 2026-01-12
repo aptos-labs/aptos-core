@@ -10,6 +10,7 @@ use crate::{
 };
 use aptos_crypto::arkworks::{
     random::{sample_field_element, sample_field_elements},
+    srs::SrsType,
     GroupGenerators,
 };
 use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup, VariableBaseMSM};
@@ -550,7 +551,7 @@ where
         let trapdoor = univariate_hiding_kzg::Trapdoor::<P>::rand(rng);
         let (kzg_vk_pp, kzg_commit_pp) = univariate_hiding_kzg::setup_extra(
             number_of_coefficients,
-            univariate_hiding_kzg::SrsType::PowersOfTau,
+            SrsType::PowersOfTau,
             GroupGenerators::default(),
             trapdoor,
         );

@@ -6,10 +6,7 @@
 
 use aptos_crypto::{SecretSharingConfig, Uniform};
 use aptos_dkg::pvss::{
-    chunky::{
-        UnsignedWeightedTranscript as ChunkyTranscript,
-        UnsignedWeightedTranscriptv2 as ChunkyTranscriptv2,
-    },
+    chunky::{UnsignedWeightedTranscript as Chunky_v1, UnsignedWeightedTranscriptv2 as Chunky_v2},
     das,
     test_utils::{
         self, get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
@@ -21,6 +18,7 @@ use aptos_dkg::pvss::{
     },
     WeightedConfigBlstrs,
 };
+use ark_bls12_381::Bls12_381;
 use ark_bn254::Bn254;
 use criterion::{
     black_box, criterion_group, criterion_main,
@@ -30,21 +28,31 @@ use criterion::{
 use more_asserts::assert_le;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
 
+const BN254: &str = "bn254";
+const BLS12_381: &str = "bls12-381";
+
 pub fn all_groups(c: &mut Criterion) {
-    // unweighted BN254 PVSS with aggregatable subtranscript; only doing 2 because large configs are a bit slow and not relevant anyway
+    // weighted PVSS with aggregatable subtranscript; only doing 3 because large configs are a bit slow and not relevant anyway
     for tc in get_weighted_configs_for_benchmarking().into_iter().take(2) {
-        subaggregatable_pvss_group::<ChunkyTranscript<Bn254>>(&tc, c);
+        subaggregatable_pvss_group::<Chunky_v1<Bn254>>(&tc, c, BN254);
     }
     for tc in get_weighted_configs_for_benchmarking().into_iter().take(2) {
-        subaggregatable_pvss_group::<ChunkyTranscriptv2<Bn254>>(&tc, c);
+        subaggregatable_pvss_group::<Chunky_v1<Bn254>>(&tc, c, BLS12_381);
     }
 
-    // unweighted aggregatable PVSS
+    for tc in get_weighted_configs_for_benchmarking().into_iter().take(2) {
+        subaggregatable_pvss_group::<Chunky_v2<Bls12_381>>(&tc, c, BN254);
+    }
+    for tc in get_weighted_configs_for_benchmarking().into_iter().take(2) {
+        subaggregatable_pvss_group::<Chunky_v2<Bls12_381>>(&tc, c, BLS12_381);
+    }
+
+    // unweighted aggregatable PVSS, `blstrs` only so this is BLS12-381
     for tc in get_threshold_configs_for_benchmarking() {
         aggregatable_pvss_group::<das::Transcript>(&tc, c);
     }
 
-    // weighted PVSS
+    // weighted aggregatable PVSS, `blstrs` only so this is BLS12-381
     for wc in get_weighted_configs_for_benchmarking() {
         let d = aggregatable_pvss_group::<das::WeightedTranscript>(&wc, c);
         weighted_pvss_group(&wc, d, c);
@@ -83,6 +91,7 @@ pub fn aggregatable_pvss_group<T: AggregatableTranscript + MalleableTranscript>(
 pub fn subaggregatable_pvss_group<T>(
     sc: &T::SecretSharingConfig,
     c: &mut Criterion,
+    curve_name: &str,
 ) -> DealingArgs<T>
 where
     T: MalleableTranscript
@@ -93,7 +102,7 @@ where
         >,
 {
     let name = T::scheme_name();
-    let mut group = c.benchmark_group(format!("pvss/{}", name));
+    let mut group = c.benchmark_group(format!("pvss/{}/{}", name, curve_name));
     let mut rng = thread_rng();
 
     // TODO: use a lazy pattern to avoid this expensive step when no benchmarks are run
