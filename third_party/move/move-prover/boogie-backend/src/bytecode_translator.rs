@@ -6,19 +6,17 @@
 
 use crate::{
     boogie_helpers::{
-        boogie_address, boogie_address_blob, boogie_bv_type, boogie_byte_blob,
-        boogie_closure_pack_name, boogie_constant_blob, boogie_debug_track_abort,
-        boogie_debug_track_local, boogie_debug_track_return, boogie_equality_for_type,
-        boogie_field_sel, boogie_field_update, boogie_fun_apply_name, boogie_function_bv_name,
-        boogie_function_name, boogie_make_vec_from_strings, boogie_modifies_memory_name,
-        boogie_num_literal, boogie_num_type_base, boogie_num_type_string_capital,
-        boogie_reflection_type_info, boogie_reflection_type_name, boogie_resource_memory_name,
-        boogie_struct_name, boogie_struct_variant_name, boogie_temp, boogie_temp_from_suffix,
-        boogie_type, boogie_type_for_struct_field, boogie_type_param, boogie_type_suffix,
-        boogie_type_suffix_bv, boogie_type_suffix_for_struct,
-        boogie_type_suffix_for_struct_variant, boogie_variant_field_update,
-        boogie_well_formed_check, boogie_well_formed_expr_bv, field_bv_flag_global_state,
-        TypeIdentToken,
+        boogie_address, boogie_address_blob, boogie_byte_blob, boogie_closure_pack_name,
+        boogie_constant_blob, boogie_debug_track_abort, boogie_debug_track_local,
+        boogie_debug_track_return, boogie_equality_for_type, boogie_field_sel, boogie_field_update,
+        boogie_fun_apply_name, boogie_function_name, boogie_make_vec_from_strings,
+        boogie_modifies_memory_name, boogie_num_literal, boogie_num_type_base,
+        boogie_num_type_string_capital, boogie_reflection_type_info, boogie_reflection_type_name,
+        boogie_resource_memory_name, boogie_struct_name, boogie_struct_variant_name, boogie_temp,
+        boogie_temp_from_suffix, boogie_type, boogie_type_for_struct_field, boogie_type_param,
+        boogie_type_suffix, boogie_type_suffix_for_struct, boogie_type_suffix_for_struct_variant,
+        boogie_variant_field_update, boogie_well_formed_check, boogie_well_formed_expr,
+        field_bv_flag_global_state, TypeIdentToken,
     },
     options::BoogieOptions,
     spec_translator::SpecTranslator,
@@ -297,7 +295,7 @@ impl<'env> BoogieTranslator<'env> {
         emitln!(writer, "\n\n// Given Types for Type Parameters\n");
         for idx in &mono_info.type_params {
             let param_type = boogie_type_param(env, *idx);
-            let suffix = boogie_type_suffix(env, &Type::TypeParameter(*idx));
+            let suffix = boogie_type_suffix(env, &Type::TypeParameter(*idx), false);
             emitln!(writer, "type {};", param_type);
             emitln!(
                 writer,
@@ -377,7 +375,7 @@ impl<'env> BoogieTranslator<'env> {
                     .get(&struct_env.get_qualified_id())
                     .unwrap_or(empty)
                 {
-                    let struct_name = boogie_struct_name(struct_env, type_inst);
+                    let struct_name = boogie_struct_name(struct_env, type_inst, false);
                     if !translated_types.insert(struct_name) {
                         continue;
                     }
@@ -470,7 +468,7 @@ impl<'env> BoogieTranslator<'env> {
                             ))
                             .unwrap_or(empty)
                         {
-                            let fun_name = boogie_function_name(fun_env, type_inst);
+                            let fun_name = boogie_function_name(fun_env, type_inst, &[]);
                             if !translated_funs.insert(fun_name) {
                                 continue;
                             }
@@ -517,7 +515,7 @@ impl<'env> BoogieTranslator<'env> {
         );
 
         // Create data type for the function type.
-        let fun_ty_boogie_name = boogie_type(self.env, fun_type);
+        let fun_ty_boogie_name = boogie_type(self.env, fun_type, false);
         emitln!(self.writer, "datatype {} {{", fun_ty_boogie_name);
         self.writer.indent();
         for info in closure_infos {
@@ -542,7 +540,7 @@ impl<'env> BoogieTranslator<'env> {
                     self.writer,
                     "p{}: {}",
                     pos,
-                    boogie_type(self.env, captured_ty)
+                    boogie_type(self.env, captured_ty, false)
                 )
             }
             emitln!(self.writer, "),")
@@ -555,14 +553,14 @@ impl<'env> BoogieTranslator<'env> {
         emitln!(
             self.writer,
             "$unknown_function'{}'(id: int)",
-            boogie_type_suffix(self.env, fun_type),
+            boogie_type_suffix(self.env, fun_type, false),
         );
         self.writer.unindent();
         emitln!(self.writer, "}");
         emitln!(
             self.writer,
             "function $IsValid'{}'(x: {}): bool {{ true }}",
-            boogie_type_suffix(self.env, fun_type),
+            boogie_type_suffix(self.env, fun_type, false),
             fun_ty_boogie_name
         );
 
@@ -584,7 +582,12 @@ impl<'env> BoogieTranslator<'env> {
                 // Immutable references are eliminated in the compilation scheme, so skip
                 ty = ty.skip_reference();
             }
-            emit!(self.writer, "p{}: {}", pos, boogie_type(self.env, ty))
+            emit!(
+                self.writer,
+                "p{}: {}",
+                pos,
+                boogie_type(self.env, ty, false)
+            )
         }
         if !params.is_empty() {
             emit!(self.writer, ", ")
@@ -608,7 +611,12 @@ impl<'env> BoogieTranslator<'env> {
                 // Immutable references are eliminated in the compilation scheme, so skip
                 ty = ty.skip_reference();
             }
-            emit!(self.writer, "{}: {}", local_name, boogie_type(self.env, ty));
+            emit!(
+                self.writer,
+                "{}: {}",
+                local_name,
+                boogie_type(self.env, ty, false)
+            );
             result_locals.push(local_name)
         }
         emitln!(self.writer, ") {");
@@ -619,7 +627,7 @@ impl<'env> BoogieTranslator<'env> {
             emitln!(self.writer, "if (fun is {}) {{", ctor_name);
             self.writer.indent();
             let fun_env = &self.env.get_function(info.fun.to_qualified_id());
-            let fun_name = boogie_function_name(fun_env, &info.fun.inst);
+            let fun_name = boogie_function_name(fun_env, &info.fun.inst, &[]);
             let args = (0..info.mask.captured_count())
                 .map(|pos| format!("fun->p{}", pos))
                 .chain((0..params.len()).map(|pos| format!("p{}", pos)))
@@ -666,8 +674,7 @@ impl StructTranslator<'_> {
     pub fn boogie_field_is_equal(&self, f: &FieldEnv<'_>, sep: &str) -> String {
         let field_sel = boogie_field_sel(f);
         let bv_flag = self.field_bv_flag(f);
-        let field_suffix =
-            boogie_type_suffix_bv(self.parent.env, &self.inst(&f.get_type()), bv_flag);
+        let field_suffix = boogie_type_suffix(self.parent.env, &self.inst(&f.get_type()), bv_flag);
         format!(
             "{}$IsEqual'{}'(s1->{}, s2->{})",
             sep, field_suffix, field_sel, field_sel,
@@ -682,7 +689,7 @@ impl StructTranslator<'_> {
         format!(
             "{}{}",
             sep,
-            boogie_well_formed_expr_bv(self.parent.env, &sel, ty, bv_flag)
+            boogie_well_formed_expr(self.parent.env, &sel, ty, bv_flag)
         )
     }
 
@@ -707,7 +714,7 @@ impl StructTranslator<'_> {
         let suffix_variant =
             boogie_type_suffix_for_struct_variant(struct_env, self.type_inst, &variant);
         let struct_variant_name = boogie_struct_variant_name(struct_env, self.type_inst, variant);
-        let struct_name = boogie_struct_name(struct_env, self.type_inst);
+        let struct_name = boogie_struct_name(struct_env, self.type_inst, false);
         let fields = struct_env.get_fields_of_variant(variant).collect_vec();
         // Emit $Update function for each field in `variant`.
         for (pos, field_env) in struct_env.get_fields_of_variant(variant).enumerate() {
@@ -980,7 +987,7 @@ impl StructTranslator<'_> {
                 } else {
                     for (pos, field) in struct_env.get_fields_of_variant(variant).enumerate() {
                         let bv_flag = self.field_bv_flag(&field);
-                        let field_type_name = boogie_type_suffix_bv(
+                        let field_type_name = boogie_type_suffix(
                             self.parent.env,
                             &self.inst(&field.get_type()),
                             bv_flag,
@@ -1034,11 +1041,7 @@ impl StructTranslator<'_> {
         ty: &Type,
     ) -> String {
         let bv_flag = self.field_bv_flag(field);
-        if bv_flag {
-            boogie_bv_type(env, ty)
-        } else {
-            boogie_type(env, ty)
-        }
+        boogie_type(env, ty, bv_flag)
     }
 
     /// Translates the given struct.
@@ -1067,7 +1070,7 @@ impl StructTranslator<'_> {
         writer.set_location(&env.internal_loc());
 
         // Emit data type
-        let struct_name = boogie_struct_name(struct_env, self.type_inst);
+        let struct_name = boogie_struct_name(struct_env, self.type_inst, false);
         emitln!(writer, "datatype {} {{", struct_name);
 
         // Emit constructor
@@ -1195,7 +1198,7 @@ impl StructTranslator<'_> {
                             || {
                                 for (pos, field) in struct_env.get_fields().enumerate() {
                                     let bv_flag = self.field_bv_flag(&field);
-                                    let suffix_ty = boogie_type_suffix_bv(
+                                    let suffix_ty = boogie_type_suffix(
                                         self.parent.env,
                                         &self.inst(&field.get_type()),
                                         bv_flag,
@@ -1302,11 +1305,7 @@ impl FunctionTranslator<'_> {
         num_oper: &NumOperation,
     ) -> String {
         let bv_flag = self.bv_flag(num_oper);
-        if bv_flag {
-            boogie_bv_type(env, ty)
-        } else {
-            boogie_type(env, ty)
-        }
+        boogie_type(env, ty, bv_flag)
     }
 
     fn inst(&self, ty: &Type) -> Type {
@@ -1387,7 +1386,7 @@ impl FunctionTranslator<'_> {
             writer,
             "procedure {}{}{}({}) returns ({})",
             attribs,
-            boogie_function_name(fun_target.func_env, self.type_inst),
+            boogie_function_name(fun_target.func_env, self.type_inst, &[]),
             suffix,
             args,
             rets,
@@ -1544,15 +1543,15 @@ impl FunctionTranslator<'_> {
         // Declare temporaries for debug tracing and other purposes.
         for (_, (ty, ref bv_flag, cnt)) in self.compute_needed_temps() {
             for i in 0..cnt {
-                let bv_type = if *bv_flag {
-                    boogie_bv_type
-                } else {
-                    boogie_type
-                };
                 let temp_name =
-                    boogie_temp_from_suffix(env, &boogie_type_suffix_bv(env, &ty, *bv_flag), i);
+                    boogie_temp_from_suffix(env, &boogie_type_suffix(env, &ty, *bv_flag), i);
                 if !dup.contains(&temp_name) {
-                    emitln!(writer, "var {}: {};", temp_name.clone(), bv_type(env, &ty));
+                    emitln!(
+                        writer,
+                        "var {}: {};",
+                        temp_name.clone(),
+                        boogie_type(env, &ty, *bv_flag)
+                    );
                     dup.push(temp_name);
                 }
             }
@@ -1578,7 +1577,7 @@ impl FunctionTranslator<'_> {
                 writer,
                 "var {}: $Memory {};",
                 name,
-                boogie_struct_name(&env.get_struct_qid(mem.to_qualified_id()), &mem.inst)
+                boogie_struct_name(&env.get_struct_qid(mem.to_qualified_id()), &mem.inst, false)
             );
         }
 
@@ -2025,7 +2024,7 @@ impl FunctionTranslator<'_> {
                                 !self.fun_target.func_env.is_explicitly_not_verified(
                                     &ProverOptions::get(self.fun_target.global_env()).verify_scope,
                                 );
-                            let mut fun_name = boogie_function_name(&callee_env, inst);
+                            let mut fun_name = boogie_function_name(&callee_env, inst, &[]);
                             // Helper function to check whether the idx corresponds to a bitwise operation
                             let compute_flag = |idx: TempIndex| {
                                 targeted
@@ -2051,7 +2050,8 @@ impl FunctionTranslator<'_> {
                                             boogie_num_type_base(
                                                 self.parent.env,
                                                 Some(self.fun_target.get_bytecode_loc(attr_id)),
-                                                &local_ty_srcs_1
+                                                &local_ty_srcs_1,
+                                                false,
                                             ),
                                             args_src_1_str
                                         );
@@ -2070,27 +2070,25 @@ impl FunctionTranslator<'_> {
                                         instrument_bv2int(srcs[2], &mut args_str_vec);
                                         args_str = args_str_vec.iter().cloned().join(", ");
                                     }
-                                    fun_name =
-                                        boogie_function_bv_name(&callee_env, inst, &[bv_flag]);
+                                    fun_name = boogie_function_name(&callee_env, inst, &[bv_flag]);
                                 } else if module_env.is_table() {
-                                    fun_name = boogie_function_bv_name(&callee_env, inst, &[
-                                        false, bv_flag,
-                                    ]);
+                                    fun_name =
+                                        boogie_function_name(&callee_env, inst, &[false, bv_flag]);
                                 }
                                 emitln!(writer, "call {}({});", fun_name, args_str);
                             } else {
                                 let dest_bv_flag = !dests.is_empty() && compute_flag(dests[0]);
                                 let bv_flag = !srcs.is_empty() && compute_flag(srcs[0]);
                                 if module_env.is_cmp() {
-                                    fun_name = boogie_function_bv_name(&callee_env, inst, &[
-                                        bv_flag || dest_bv_flag,
+                                    fun_name = boogie_function_name(&callee_env, inst, &[
+                                        bv_flag || dest_bv_flag
                                     ]);
                                 }
                                 // Handle the case where the return value of length is assigned to a bv int because
                                 // length always returns a non-bv result
                                 if module_env.is_std_vector() {
-                                    fun_name = boogie_function_bv_name(&callee_env, inst, &[
-                                        bv_flag || dest_bv_flag,
+                                    fun_name = boogie_function_name(&callee_env, inst, &[
+                                        bv_flag || dest_bv_flag
                                     ]);
                                     // Handle the case where the return value of length is assigned to a bv int because
                                     // length always returns a non-bv result
@@ -2107,7 +2105,8 @@ impl FunctionTranslator<'_> {
                                             boogie_num_type_base(
                                                 self.parent.env,
                                                 Some(self.fun_target.get_bytecode_loc(attr_id)),
-                                                &local_ty
+                                                &local_ty,
+                                                false,
                                             ),
                                             fun_name,
                                             args_str
@@ -2125,7 +2124,7 @@ impl FunctionTranslator<'_> {
                                         args_str = args_str_vec.iter().cloned().join(", ");
                                     }
                                 } else if module_env.is_table() {
-                                    fun_name = boogie_function_bv_name(&callee_env, inst, &[
+                                    fun_name = boogie_function_name(&callee_env, inst, &[
                                         false,
                                         bv_flag || dest_bv_flag,
                                     ]);
@@ -2150,7 +2149,8 @@ impl FunctionTranslator<'_> {
                                             boogie_num_type_base(
                                                 self.parent.env,
                                                 Some(self.fun_target.get_bytecode_loc(attr_id)),
-                                                &local_ty
+                                                &local_ty,
+                                                false,
                                             ),
                                             fun_name,
                                             args_str
@@ -2199,7 +2199,7 @@ impl FunctionTranslator<'_> {
                             writer,
                             "{} := {}({});",
                             dest_str,
-                            boogie_struct_name(&struct_env, inst),
+                            boogie_struct_name(&struct_env, inst, false),
                             args
                         );
                     },
@@ -2507,6 +2507,7 @@ impl FunctionTranslator<'_> {
                                 self.parent.env,
                                 Some(self.fun_target.get_bytecode_loc(attr_id)),
                                 &src_type,
+                                false,
                             );
                             emitln!(
                                 writer,
@@ -2549,6 +2550,7 @@ impl FunctionTranslator<'_> {
                                 self.parent.env,
                                 Some(self.fun_target.get_bytecode_loc(attr_id)),
                                 &src_type,
+                                false,
                             );
                             emitln!(
                                 writer,
@@ -2957,6 +2959,7 @@ impl FunctionTranslator<'_> {
                                 self.parent.env,
                                 Some(self.fun_target.get_bytecode_loc(attr_id)),
                                 &self.get_local_type(op2),
+                                false,
                             );
                             emitln!(
                                 writer,
@@ -3138,7 +3141,8 @@ impl FunctionTranslator<'_> {
                                         boogie_num_type_base(
                                             self.parent.env,
                                             Some(self.fun_target.get_bytecode_loc(attr_id)),
-                                            op1_ty
+                                            op1_ty,
+                                            false,
                                         ),
                                         str_local(op1)
                                     )
@@ -3151,7 +3155,8 @@ impl FunctionTranslator<'_> {
                                         boogie_num_type_base(
                                             self.parent.env,
                                             Some(self.fun_target.get_bytecode_loc(attr_id)),
-                                            op2_ty
+                                            op2_ty,
+                                            false,
                                         ),
                                         str_local(op2)
                                     )
@@ -3203,7 +3208,7 @@ impl FunctionTranslator<'_> {
                     EmitEvent => {
                         let msg = srcs[0];
                         let handle = srcs[1];
-                        let suffix = boogie_type_suffix(env, &self.get_local_type(msg));
+                        let suffix = boogie_type_suffix(env, &self.get_local_type(msg), false);
                         emit!(
                             writer,
                             "$es := ${}ExtendEventStore'{}'($es, ",
@@ -3240,7 +3245,8 @@ impl FunctionTranslator<'_> {
                             boogie_num_type_base(
                                 self.parent.env,
                                 Some(self.fun_target.get_bytecode_loc(attr_id)),
-                                &self.get_local_type(*code)
+                                &self.get_local_type(*code),
+                                false,
                             )
                         )
                     } else {
@@ -3264,7 +3270,8 @@ impl FunctionTranslator<'_> {
                         boogie_num_type_base(
                             self.parent.env,
                             Some(self.fun_target.get_bytecode_loc(attr_id)),
-                            &self.get_local_type(*src)
+                            &self.get_local_type(*src),
+                            false,
                         ),
                         str_local(*src)
                     )
@@ -3690,7 +3697,7 @@ impl FunctionTranslator<'_> {
         let mut need = |ty: &Type, bv_flag: bool, n: usize| {
             // Index by type suffix, which is more coarse grained then type.
             let ty = ty.skip_reference();
-            let suffix = boogie_type_suffix(env, ty);
+            let suffix = boogie_type_suffix(env, ty, false);
             let cnt = res
                 .entry((suffix, bv_flag))
                 .or_insert_with(|| (ty.to_owned(), bv_flag, 0));
