@@ -32,5 +32,10 @@ module M {
     fun unexpected_abort_in_other_function() {
         abort_in_other_function()
     }
+
+    #[test]
+    public fun unexpected_abort_with_canonical_error_code() {
+        abort std::error::invalid_state(42)
+    }
 }
 }
