@@ -21,9 +21,12 @@ use aptos_storage_interface::{
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{
-        hot_state::LRUEntry, state_key::StateKey, state_slot::StateSlot,
-        state_storage_usage::StateStorageUsage, state_value::StateValue, StateViewId,
-        StateViewResult, TStateView, NUM_STATE_SHARDS,
+        hot_state::{HotStateValueRef, LRUEntry},
+        state_key::StateKey,
+        state_slot::StateSlot,
+        state_storage_usage::StateStorageUsage,
+        state_value::StateValue,
+        StateViewId, StateViewResult, TStateView, NUM_STATE_SHARDS,
     },
     transaction::Version,
     write_set::{BaseStateOp, HotStateOp, WriteOp},
@@ -209,10 +212,11 @@ impl VersionState {
                         hot_since_version: version,
                         lru_info: LRUEntry::uninitialized(),
                     };
+                    hot_smt_updates
+                        .push((k.hash(), Some(HotStateValueRef::from_slot(&slot).hash())));
                     hot_state[shard_id].put(k.clone(), slot);
-                    state.remove(k);
-                    hot_smt_updates.push((k.hash(), None));
                     smt_updates.push((k.hash(), None));
+                    state.remove(k);
                 },
                 Some(v) => {
                     let slot = StateSlot::HotOccupied {
@@ -221,10 +225,11 @@ impl VersionState {
                         hot_since_version: version,
                         lru_info: LRUEntry::uninitialized(),
                     };
+                    hot_smt_updates
+                        .push((k.hash(), Some(HotStateValueRef::from_slot(&slot).hash())));
                     hot_state[shard_id].put(k.clone(), slot);
-                    state.insert(k.clone(), (version, v.clone()));
-                    hot_smt_updates.push((k.hash(), Some(v.hash())));
                     smt_updates.push((k.hash(), Some(v.hash())));
+                    state.insert(k.clone(), (version, v.clone()));
                 },
             }
         }
@@ -232,24 +237,28 @@ impl VersionState {
         for k in promotions {
             assert!(is_checkpoint, "No promotions unless in checkpoints");
             let shard_id = k.get_shard_id();
+
+            let hot_value_hash;
             if let Some(slot) = hot_state[shard_id].get_mut(k) {
                 slot.refresh(version);
-                continue;
+                hot_value_hash = HotStateValueRef::from_slot(slot).hash();
+            } else {
+                let slot = match state.get(k) {
+                    Some((value_version, value)) => StateSlot::HotOccupied {
+                        value_version: *value_version,
+                        value: value.clone(),
+                        hot_since_version: version,
+                        lru_info: LRUEntry::uninitialized(),
+                    },
+                    None => StateSlot::HotVacant {
+                        hot_since_version: version,
+                        lru_info: LRUEntry::uninitialized(),
+                    },
+                };
+                hot_value_hash = HotStateValueRef::from_slot(&slot).hash();
+                hot_state[shard_id].put(k.clone(), slot);
             }
-            let slot = match state.get(k) {
-                Some((value_version, value)) => StateSlot::HotOccupied {
-                    value_version: *value_version,
-                    value: value.clone(),
-                    hot_since_version: version,
-                    lru_info: LRUEntry::uninitialized(),
-                },
-                None => StateSlot::HotVacant {
-                    hot_since_version: version,
-                    lru_info: LRUEntry::uninitialized(),
-                },
-            };
-            hot_smt_updates.push((k.hash(), slot.as_state_value_opt().map(|v| v.hash())));
-            hot_state[shard_id].put(k.clone(), slot);
+            hot_smt_updates.push((k.hash(), Some(hot_value_hash)));
         }
 
         if is_checkpoint {
@@ -267,6 +276,11 @@ impl VersionState {
         let items = state.len();
         let bytes = state.iter().map(|(k, v)| k.size() + v.1.size()).sum();
         let usage = StateStorageUsage::new(items, bytes);
+
+        assert_eq!(
+            hot_state.iter().map(|x| x.len()).sum::<usize>(),
+            hot_summary.leaves.len()
+        );
 
         Self {
             usage,
