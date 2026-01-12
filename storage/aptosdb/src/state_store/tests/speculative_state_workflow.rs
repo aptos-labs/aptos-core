@@ -21,9 +21,12 @@ use aptos_storage_interface::{
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{
-        hot_state::LRUEntry, state_key::StateKey, state_slot::StateSlot,
-        state_storage_usage::StateStorageUsage, state_value::StateValue, StateViewId,
-        StateViewResult, TStateView, NUM_STATE_SHARDS,
+        hot_state::{HotStateValue, HotStateValueRef, LRUEntry},
+        state_key::StateKey,
+        state_slot::StateSlot,
+        state_storage_usage::StateStorageUsage,
+        state_value::StateValue,
+        StateViewId, StateViewResult, TStateView, NUM_STATE_SHARDS,
     },
     transaction::Version,
     write_set::{BaseStateOp, HotStateOp, WriteOp},
@@ -209,10 +212,11 @@ impl VersionState {
                         hot_since_version: version,
                         lru_info: LRUEntry::uninitialized(),
                     };
+                    hot_smt_updates
+                        .push((k.hash(), Some(HotStateValueRef::from_slot(&slot).hash())));
                     hot_state[shard_id].put(k.clone(), slot);
-                    state.remove(k);
-                    hot_smt_updates.push((k.hash(), None));
                     smt_updates.push((k.hash(), None));
+                    state.remove(k);
                 },
                 Some(v) => {
                     let slot = StateSlot::HotOccupied {
@@ -221,10 +225,11 @@ impl VersionState {
                         hot_since_version: version,
                         lru_info: LRUEntry::uninitialized(),
                     };
+                    hot_smt_updates
+                        .push((k.hash(), Some(HotStateValueRef::from_slot(&slot).hash())));
                     hot_state[shard_id].put(k.clone(), slot);
-                    state.insert(k.clone(), (version, v.clone()));
-                    hot_smt_updates.push((k.hash(), Some(v.hash())));
                     smt_updates.push((k.hash(), Some(v.hash())));
+                    state.insert(k.clone(), (version, v.clone()));
                 },
             }
         }
@@ -234,7 +239,7 @@ impl VersionState {
             let shard_id = k.get_shard_id();
             if let Some(slot) = hot_state[shard_id].get_mut(k) {
                 slot.refresh(version);
-                continue;
+                // continue;
             }
             let slot = match state.get(k) {
                 Some((value_version, value)) => StateSlot::HotOccupied {
@@ -248,7 +253,7 @@ impl VersionState {
                     lru_info: LRUEntry::uninitialized(),
                 },
             };
-            hot_smt_updates.push((k.hash(), slot.as_state_value_opt().map(|v| v.hash())));
+            hot_smt_updates.push((k.hash(), Some(HotStateValue::clone_from_slot(&slot).hash())));
             hot_state[shard_id].put(k.clone(), slot);
         }
 
@@ -267,6 +272,11 @@ impl VersionState {
         let items = state.len();
         let bytes = state.iter().map(|(k, v)| k.size() + v.1.size()).sum();
         let usage = StateStorageUsage::new(items, bytes);
+
+        assert_eq!(
+            hot_state.iter().map(|x| x.len()).sum::<usize>(),
+            hot_summary.leaves.len()
+        );
 
         Self {
             usage,
