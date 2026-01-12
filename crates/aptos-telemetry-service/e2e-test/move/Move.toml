@@ -4,6 +4,7 @@ version = "1.0.0"
 authors = ["Aptos Labs"]
 
 [addresses]
+# The address gets replaced by the test setup script
 telemetry_deployer = "_"
 
 [dependencies.AptosFramework]
