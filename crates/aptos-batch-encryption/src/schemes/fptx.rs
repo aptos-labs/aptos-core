@@ -4,10 +4,14 @@ use crate::{
     errors::BatchEncryptionError,
     group::{self, *},
     shared::{
-        ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, StandardCiphertext}, digest::{Digest, DigestKey, EvalProofs, EvalProofsPromise}, encryption_key::EncryptionKey, ids::{Id, IdSet, UncomputedCoeffs}, key_derivation::{
-            self, BIBEDecryptionKey, BIBEDecryptionKeyShare,
-            BIBEMasterSecretKeyShare, BIBEVerificationKey,
-        }
+        ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, StandardCiphertext},
+        digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise},
+        encryption_key::EncryptionKey,
+        ids::{Id, IdSet, UncomputedCoeffs},
+        key_derivation::{
+            self, BIBEDecryptionKey, BIBEDecryptionKeyShare, BIBEMasterSecretKeyShare,
+            BIBEVerificationKey,
+        },
     },
     traits::{AssociatedData, BatchThresholdEncryption, Plaintext},
 };
@@ -31,7 +35,7 @@ impl BatchThresholdEncryption for FPTX {
     type Digest = Digest;
     type DigestKey = DigestKey;
     type EncryptionKey = EncryptionKey;
-    type EvalProof = G1Affine;
+    type EvalProof = EvalProof;
     type EvalProofs = EvalProofs;
     type EvalProofsPromise = EvalProofsPromise;
     type Id = Id;
@@ -227,7 +231,7 @@ impl BatchThresholdEncryption for FPTX {
         proofs: &Self::EvalProofs,
         ct: &Self::Ciphertext,
     ) -> Option<Self::EvalProof> {
-        proofs.get(&ct.id()).map(Self::EvalProof::from)
+        proofs.get(&ct.id())
     }
 
     fn derive_decryption_key_share(

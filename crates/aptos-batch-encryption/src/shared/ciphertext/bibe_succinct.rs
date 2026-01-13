@@ -1,14 +1,22 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
-use super::super::{
-    digest::{EvalProofs},
-    symmetric::{self, OneTimePad, OneTimePaddedKey, SymmetricCiphertext, SymmetricKey},
+use super::{
+    super::{
+        digest::EvalProofs,
+        symmetric::{self, OneTimePad, OneTimePaddedKey, SymmetricCiphertext, SymmetricKey},
+    },
+    PreparedBIBECiphertext,
 };
-use super::PreparedBIBECiphertext;
 use crate::{
     errors::BatchEncryptionError,
     group::{Fr, G1Affine, G2Affine, PairingOutput, PairingSetting},
-    shared::{ark_serialize::*, ciphertext::bibe::{BIBECTEncrypt, InnerCiphertext}, digest::Digest, encryption_key::AugmentedEncryptionKey, ids::Id},
+    shared::{
+        ark_serialize::*,
+        ciphertext::bibe::{BIBECTEncrypt, InnerCiphertext},
+        digest::{Digest, EvalProof},
+        encryption_key::AugmentedEncryptionKey,
+        ids::Id,
+    },
     traits::Plaintext,
 };
 use anyhow::Result;
@@ -21,7 +29,6 @@ use ark_std::{
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
-
 #[derive(Clone, Serialize, Deserialize, Debug, Hash, Eq, PartialEq)]
 pub struct BIBESuccinctCiphertext {
     pub id: Id,
@@ -32,24 +39,22 @@ pub struct BIBESuccinctCiphertext {
 }
 
 impl InnerCiphertext for BIBESuccinctCiphertext {
-    fn prepare(
-        &self,
-        digest: &Digest,
-        eval_proofs: &EvalProofs,
-    ) -> Result<PreparedBIBECiphertext> {
+    type EncryptionKey = AugmentedEncryptionKey;
+
+    fn prepare(&self, digest: &Digest, eval_proofs: &EvalProofs) -> Result<PreparedBIBECiphertext> {
         let pf = eval_proofs
             .get(&self.id)
             .ok_or(BatchEncryptionError::UncomputedEvalProofError)?;
 
-        self.prepare_individual(&digest, &pf)
+        self.prepare_individual(digest, &pf)
     }
 
     fn prepare_individual(
         &self,
         _digest: &Digest,
-        eval_proof: &G1Affine,
+        eval_proof: &EvalProof,
     ) -> Result<PreparedBIBECiphertext> {
-        let pairing_output = PairingSetting::pairing(eval_proof, self.ct_g2[1]);
+        let pairing_output = PairingSetting::pairing(**eval_proof, self.ct_g2[1]);
 
         Ok(PreparedBIBECiphertext {
             pairing_output,
@@ -64,9 +69,16 @@ impl InnerCiphertext for BIBESuccinctCiphertext {
     }
 }
 
-
 impl BIBECTEncrypt for AugmentedEncryptionKey {
     type CT = BIBESuccinctCiphertext;
+
+    fn for_testing() -> Self {
+        Self {
+            sig_mpk_g2: G2Affine::generator(),
+            tau_g2: G2Affine::generator(),
+            tau_mpk_g2: G2Affine::generator(),
+        }
+    }
 
     fn bibe_encrypt<R: RngCore + CryptoRng>(
         &self,
@@ -83,7 +95,7 @@ impl BIBECTEncrypt for AugmentedEncryptionKey {
         ];
 
         let otp_source_gt: PairingOutput =
-                PairingSetting::pairing(hashed_encryption_key, self.sig_mpk_g2) * r;
+            PairingSetting::pairing(hashed_encryption_key, self.sig_mpk_g2) * r;
 
         let mut otp_source_bytes = Vec::new();
         otp_source_gt.serialize_compressed(&mut otp_source_bytes)?;
@@ -108,17 +120,17 @@ pub mod tests {
     use crate::{
         group::*,
         shared::{
-            ciphertext::bibe::{BIBECTDecrypt as _, BIBECTEncrypt as _, InnerCiphertext as _}, digest::DigestKey, encryption_key::AugmentedEncryptionKey, ids::{Id, IdSet}, key_derivation::{self, BIBEDecryptionKey},
+            ciphertext::bibe::{BIBECTDecrypt as _, BIBECTEncrypt as _, InnerCiphertext as _},
+            digest::DigestKey,
+            encryption_key::AugmentedEncryptionKey,
+            ids::{Id, IdSet},
+            key_derivation::{self, BIBEDecryptionKey},
         },
     };
     use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
     use aptos_dkg::pvss::traits::Reconstructable as _;
     use ark_ff::UniformRand as _;
-    use ark_std::{
-        rand::{thread_rng},
-        One, Zero,
-    };
-
+    use ark_std::{rand::thread_rng, One, Zero};
 
     #[test]
     fn test_bibe_ct_encrypt_decrypt() {
@@ -127,10 +139,9 @@ pub mod tests {
 
         let dk = DigestKey::new(&mut rng, 8, 1).unwrap();
         let msk = Fr::rand(&mut rng);
-        let (mpk, _, msk_shares) =
-            key_derivation::gen_msk_shares(msk, &mut rng, &tc);
+        let (mpk, _, msk_shares) = key_derivation::gen_msk_shares(msk, &mut rng, &tc);
 
-        let ek = AugmentedEncryptionKey::new( mpk.0, dk.tau_g2, (dk.tau_g2 * msk).into());
+        let ek = AugmentedEncryptionKey::new(mpk.0, dk.tau_g2, (dk.tau_g2 * msk).into());
 
         let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
         let mut counter = Fr::zero();
@@ -154,7 +165,6 @@ pub mod tests {
             .derive_decryption_key_share(&digest)
             .unwrap()])
         .unwrap();
-
 
         let decrypted_plaintext: String = dk
             .bibe_decrypt(&ct.prepare(&digest, &pfs).unwrap())

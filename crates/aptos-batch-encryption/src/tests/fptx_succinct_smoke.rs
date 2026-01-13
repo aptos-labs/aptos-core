@@ -6,7 +6,7 @@ use crate::{
     traits::BatchThresholdEncryption,
 };
 use anyhow::Result;
-use aptos_crypto::{arkworks::shamir::ShamirThresholdConfig};
+use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
 use ark_std::rand::{seq::SliceRandom, thread_rng, CryptoRng, Rng as _, RngCore};
 
 fn smoke_with_setup<R: RngCore + CryptoRng>(
@@ -35,10 +35,11 @@ fn smoke_with_setup<R: RngCore + CryptoRng>(
     ]
     .into_iter()
     .map(|(tc, vks, msk_shares)| {
-        let dk_shares: Vec<<FPTXSuccinct as BatchThresholdEncryption>::DecryptionKeyShare> = msk_shares
-            .into_iter()
-            .map(|msk_share| msk_share.derive_decryption_key_share(&d).unwrap())
-            .collect();
+        let dk_shares: Vec<<FPTXSuccinct as BatchThresholdEncryption>::DecryptionKeyShare> =
+            msk_shares
+                .into_iter()
+                .map(|msk_share| msk_share.derive_decryption_key_share(&d).unwrap())
+                .collect();
 
         dk_shares
             .iter()

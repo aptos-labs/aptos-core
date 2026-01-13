@@ -1,18 +1,20 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
-use crate::{group::{Fr, G1Affine, G1Projective}, shared::algebra::mult_tree::{compute_mult_tree, quotient}};
-use crate::shared::ark_serialize::*;
+use crate::{
+    group::{Fr, G1Affine, G1Projective},
+    shared::{
+        algebra::mult_tree::{compute_mult_tree, quotient},
+        ark_serialize::*,
+    },
+};
 use ark_ec::VariableBaseMSM as _;
 use ark_ff::field_hashers::{DefaultFieldHasher, HashToField};
 use ark_poly::univariate::DensePolynomial;
+use ark_std::{One, Zero};
 use ed25519_dalek::VerifyingKey;
+use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::{collections::HashMap, hash::Hash};
-use ark_std::Zero;
-
-
-use serde::{Deserialize, Serialize};
-
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy, Hash, Serialize, Deserialize)]
 pub struct Id {
@@ -20,8 +22,11 @@ pub struct Id {
     root_x: Fr,
 }
 
-
 impl Id {
+    pub fn one() -> Self {
+        Self::new(Fr::one())
+    }
+
     pub fn new(root_x: Fr) -> Self {
         Self { root_x }
     }
@@ -56,8 +61,7 @@ pub struct ComputedCoeffs {
     mult_tree: Vec<Vec<DensePolynomial<Fr>>>,
 }
 
-
-impl IdSet<UncomputedCoeffs>  {
+impl IdSet<UncomputedCoeffs> {
     pub fn from_slice(ids: &[Id]) -> Option<Self> {
         let mut result = Self::with_capacity(ids.len())?;
         for id in ids {
@@ -108,7 +112,6 @@ impl IdSet<UncomputedCoeffs>  {
 }
 
 impl IdSet<ComputedCoeffs> {
-
     pub fn as_vec(&self) -> Vec<Id> {
         self.poly_roots
             .iter()

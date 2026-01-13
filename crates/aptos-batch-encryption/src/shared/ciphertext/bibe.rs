@@ -8,7 +8,7 @@ use super::super::{
 use crate::{
     errors::BatchEncryptionError,
     group::{Fr, G1Affine, G2Affine, G2Prepared, PairingOutput, PairingSetting},
-    shared::{ark_serialize::*, encryption_key::EncryptionKey, ids::Id},
+    shared::{ark_serialize::*, digest::EvalProof, encryption_key::EncryptionKey, ids::Id},
     traits::Plaintext,
 };
 use anyhow::Result;
@@ -21,21 +21,20 @@ use ark_std::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::hash::Hash;
 
-pub trait InnerCiphertext : Sized + Clone + Serialize + DeserializeOwned + Eq + PartialEq + Hash {
+pub trait InnerCiphertext:
+    Sized + Clone + Serialize + DeserializeOwned + Eq + PartialEq + Hash
+{
+    type EncryptionKey: BIBECTEncrypt<CT = Self>;
 
     fn id(&self) -> Id;
 
     fn prepare_individual(
         &self,
         digest: &Digest,
-        eval_proof: &G1Affine,
+        eval_proof: &EvalProof,
     ) -> Result<PreparedBIBECiphertext>;
 
-    fn prepare(
-        &self,
-        digest: &Digest,
-        eval_proofs: &EvalProofs,
-    ) -> Result<PreparedBIBECiphertext>;
+    fn prepare(&self, digest: &Digest, eval_proofs: &EvalProofs) -> Result<PreparedBIBECiphertext>;
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Hash, Eq, PartialEq)]
@@ -57,9 +56,10 @@ pub struct PreparedBIBECiphertext {
     pub(crate) symmetric_ciphertext: SymmetricCiphertext,
 }
 
-
 pub trait BIBECTEncrypt {
     type CT: InnerCiphertext;
+
+    fn for_testing() -> Self;
 
     fn bibe_encrypt<R: RngCore + CryptoRng>(
         &self,
@@ -74,30 +74,27 @@ pub trait BIBECTDecrypt<P: Plaintext> {
 }
 
 impl InnerCiphertext for BIBECiphertext {
+    type EncryptionKey = EncryptionKey;
+
     fn id(&self) -> Id {
         self.id
     }
 
-
-    fn prepare(
-        &self,
-        digest: &Digest,
-        eval_proofs: &EvalProofs,
-    ) -> Result<PreparedBIBECiphertext> {
+    fn prepare(&self, digest: &Digest, eval_proofs: &EvalProofs) -> Result<PreparedBIBECiphertext> {
         let pf = eval_proofs
             .get(&self.id)
             .ok_or(BatchEncryptionError::UncomputedEvalProofError)?;
 
-        self.prepare_individual(&digest, &pf)
+        self.prepare_individual(digest, &pf)
     }
 
     fn prepare_individual(
         &self,
         digest: &Digest,
-        eval_proof: &G1Affine,
+        eval_proof: &EvalProof,
     ) -> Result<PreparedBIBECiphertext> {
         let pairing_output = PairingSetting::pairing(digest.as_g1(), self.ct_g2[0])
-            + PairingSetting::pairing(eval_proof, self.ct_g2[1]);
+            + PairingSetting::pairing(**eval_proof, self.ct_g2[1]);
 
         Ok(PreparedBIBECiphertext {
             pairing_output,
@@ -106,12 +103,17 @@ impl InnerCiphertext for BIBECiphertext {
             symmetric_ciphertext: self.symmetric_ciphertext.clone(),
         })
     }
-
 }
-
 
 impl BIBECTEncrypt for EncryptionKey {
     type CT = BIBECiphertext;
+
+    fn for_testing() -> Self {
+        Self {
+            sig_mpk_g2: G2Affine::generator(),
+            tau_g2: G2Affine::generator(),
+        }
+    }
 
     fn bibe_encrypt<R: RngCore + CryptoRng>(
         &self,
@@ -129,7 +131,7 @@ impl BIBECTEncrypt for EncryptionKey {
         ];
 
         let otp_source_gt: PairingOutput =
-                - PairingSetting::pairing(hashed_encryption_key, self.sig_mpk_g2) * r[1];
+            -PairingSetting::pairing(hashed_encryption_key, self.sig_mpk_g2) * r[1];
 
         let mut otp_source_bytes = Vec::new();
         otp_source_gt.serialize_compressed(&mut otp_source_bytes)?;
@@ -164,7 +166,6 @@ impl<P: Plaintext> BIBECTDecrypt<P> for BIBEDecryptionKey {
     }
 }
 
-
 #[cfg(test)]
 pub mod tests {
     use super::{BIBECTDecrypt, BIBECTEncrypt};
@@ -172,7 +173,9 @@ pub mod tests {
         group::*,
         schemes::fptx::FPTX,
         shared::{
-            ciphertext::bibe::InnerCiphertext as _, ids::{Id, IdSet}, key_derivation::BIBEDecryptionKey
+            ciphertext::bibe::InnerCiphertext as _,
+            ids::{Id, IdSet},
+            key_derivation::BIBEDecryptionKey,
         },
         traits::BatchThresholdEncryption as _,
     };

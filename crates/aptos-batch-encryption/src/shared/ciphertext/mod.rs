@@ -6,8 +6,7 @@ use super::{
 };
 use crate::{
     errors::{BatchEncryptionError, CTVerifyError},
-    group::G1Affine,
-    shared::{ciphertext::bibe_succinct::BIBESuccinctCiphertext, ids::Id},
+    shared::{ciphertext::bibe_succinct::BIBESuccinctCiphertext, digest::EvalProof, ids::Id},
     traits::{AssociatedData, Plaintext},
 };
 use anyhow::Result;
@@ -21,8 +20,6 @@ pub(crate) mod bibe_succinct;
 
 use bibe::*;
 
-
-
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 #[serde(bound(deserialize = "PCT: DeserializeOwned"))]
 pub struct Ciphertext<PCT: InnerCiphertext> {
@@ -34,7 +31,6 @@ pub struct Ciphertext<PCT: InnerCiphertext> {
 
 pub type StandardCiphertext = Ciphertext<BIBECiphertext>;
 pub type SuccinctCiphertext = Ciphertext<BIBESuccinctCiphertext>;
-
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct PreparedCiphertext {
@@ -100,14 +96,23 @@ impl<EK: BIBECTEncrypt> CTEncrypt<EK::CT> for EK {
 }
 
 impl<PCT: InnerCiphertext> Ciphertext<PCT> {
+    pub fn random() -> Self {
+        use ark_std::rand::thread_rng;
+
+        let mut rng = thread_rng();
+        let enc_key = PCT::EncryptionKey::for_testing();
+
+        enc_key
+            .encrypt(&mut rng, &String::from("random"), &String::from("data"))
+            .unwrap()
+    }
+
     pub fn verify(&self, associated_data: &impl AssociatedData) -> Result<()> {
         let hashed_id = Id::from_verifying_key(&self.vk);
 
-        (self.bibe_ct.id() == hashed_id)
-            .then_some(())
-            .ok_or(BatchEncryptionError::CTVerifyError(
-                CTVerifyError::IdDoesNotMatchHashedVK,
-            ))?;
+        (self.bibe_ct.id() == hashed_id).then_some(()).ok_or(
+            BatchEncryptionError::CTVerifyError(CTVerifyError::IdDoesNotMatchHashedVK),
+        )?;
         (self.associated_data_bytes == bcs::to_bytes(associated_data)?)
             .then_some(())
             .ok_or(BatchEncryptionError::CTVerifyError(
@@ -129,11 +134,7 @@ impl<PCT: InnerCiphertext> Ciphertext<PCT> {
         self.bibe_ct.id()
     }
 
-    pub fn prepare(
-        &self,
-        digest: &Digest,
-        eval_proofs: &EvalProofs,
-    ) -> Result<PreparedCiphertext> {
+    pub fn prepare(&self, digest: &Digest, eval_proofs: &EvalProofs) -> Result<PreparedCiphertext> {
         Ok(PreparedCiphertext {
             vk: self.vk,
             bibe_ct: self.bibe_ct.prepare(digest, eval_proofs)?,
@@ -144,7 +145,7 @@ impl<PCT: InnerCiphertext> Ciphertext<PCT> {
     pub fn prepare_individual(
         &self,
         digest: &Digest,
-        eval_proof: &G1Affine,
+        eval_proof: &EvalProof,
     ) -> Result<PreparedCiphertext> {
         Ok(PreparedCiphertext {
             vk: self.vk,
@@ -168,17 +169,18 @@ pub mod tests {
         group::Fr,
         schemes::fptx::FPTX,
         shared::{
-            ciphertext::{CTDecrypt, CTEncrypt, StandardCiphertext, SuccinctCiphertext}, digest::DigestKey, encryption_key::AugmentedEncryptionKey, ids::IdSet, key_derivation::{self, BIBEDecryptionKey}
+            ciphertext::{CTDecrypt, CTEncrypt, StandardCiphertext, SuccinctCiphertext},
+            digest::DigestKey,
+            encryption_key::AugmentedEncryptionKey,
+            ids::IdSet,
+            key_derivation::{self, BIBEDecryptionKey},
         },
         traits::BatchThresholdEncryption as _,
     };
     use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
     use aptos_dkg::pvss::traits::Reconstructable as _;
     use ark_ff::UniformRand as _;
-    use ark_std::{
-        rand::{thread_rng, Rng},
-    };
-
+    use ark_std::rand::{thread_rng, Rng};
 
     #[test]
     fn test_ct_encrypt_decrypt() {
@@ -189,8 +191,7 @@ pub mod tests {
 
         let plaintext = String::from("hi");
         let associated_data = String::from("");
-        let ct: StandardCiphertext =
-            ek.encrypt(&mut rng, &plaintext, &associated_data).unwrap();
+        let ct: StandardCiphertext = ek.encrypt(&mut rng, &plaintext, &associated_data).unwrap();
 
         let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
         ids.add(&ct.id());
@@ -216,15 +217,13 @@ pub mod tests {
 
         let dk = DigestKey::new(&mut rng, 8, 1).unwrap();
         let msk = Fr::rand(&mut rng);
-        let (mpk, _, msk_shares) =
-            key_derivation::gen_msk_shares(msk, &mut rng, &tc);
+        let (mpk, _, msk_shares) = key_derivation::gen_msk_shares(msk, &mut rng, &tc);
 
-        let ek = AugmentedEncryptionKey::new( mpk.0, dk.tau_g2, (dk.tau_g2 * msk).into());
+        let ek = AugmentedEncryptionKey::new(mpk.0, dk.tau_g2, (dk.tau_g2 * msk).into());
 
         let plaintext = String::from("hi");
         let associated_data = String::from("");
-        let ct: SuccinctCiphertext =
-            ek.encrypt(&mut rng, &plaintext, &associated_data).unwrap();
+        let ct: SuccinctCiphertext = ek.encrypt(&mut rng, &plaintext, &associated_data).unwrap();
 
         let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
         ids.add(&ct.id());

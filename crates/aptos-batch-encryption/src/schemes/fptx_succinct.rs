@@ -3,10 +3,14 @@
 use crate::{
     group::{self, *},
     shared::{
-        ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, SuccinctCiphertext}, digest::{Digest, DigestKey, EvalProofs, EvalProofsPromise}, encryption_key::{AugmentedEncryptionKey}, ids::{Id, IdSet, UncomputedCoeffs}, key_derivation::{
-            self, BIBEDecryptionKey, BIBEDecryptionKeyShare,
-            BIBEMasterSecretKeyShare, BIBEVerificationKey,
-        }
+        ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, SuccinctCiphertext},
+        digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise},
+        encryption_key::AugmentedEncryptionKey,
+        ids::{Id, IdSet, UncomputedCoeffs},
+        key_derivation::{
+            self, BIBEDecryptionKey, BIBEDecryptionKeyShare, BIBEMasterSecretKeyShare,
+            BIBEVerificationKey,
+        },
     },
     traits::{AssociatedData, BatchThresholdEncryption, Plaintext},
 };
@@ -28,7 +32,7 @@ impl BatchThresholdEncryption for FPTXSuccinct {
     type Digest = Digest;
     type DigestKey = DigestKey;
     type EncryptionKey = AugmentedEncryptionKey;
-    type EvalProof = G1Affine;
+    type EvalProof = EvalProof;
     type EvalProofs = EvalProofs;
     type EvalProofsPromise = EvalProofsPromise;
     type Id = Id;
@@ -87,7 +91,6 @@ impl BatchThresholdEncryption for FPTXSuccinct {
             sig_mpk_g2: mpk.0,
             tau_g2: digest_key.tau_g2,
             tau_mpk_g2: (digest_key.tau_g2 * msk).into(),
-
         };
 
         Ok((

@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 //! This module deals with computing and generating opening proofs for "digests",
 //! which are KZG polynomial commitments which commit to a set of IDs.
-use super::ids::{Id, IdSet, ComputedCoeffs};
+use super::ids::{ComputedCoeffs, Id, IdSet};
 use crate::{
     errors::BatchEncryptionError,
     group::{Fr, G1Affine, G1Projective, G2Affine, G2Projective, PairingSetting},
@@ -139,29 +139,17 @@ impl DigestKey {
         Ok((PairingSetting::pairing(
             pf,
             self.tau_g2 - G2Projective::from(G2Affine::generator() * id.x()),
-        ) == PairingSetting::pairing(
-            digest.as_g1(),
-            G2Affine::generator(),
-        ))
+        ) == PairingSetting::pairing(digest.as_g1(), G2Affine::generator()))
         .then_some(())
         .ok_or(BatchEncryptionError::EvalProofVerifyError)?)
     }
 
-    pub fn verify(
-        &self,
-        digest: &Digest,
-        pfs: &EvalProofs,
-        id: Id,
-    ) -> Result<()> {
+    pub fn verify(&self, digest: &Digest, pfs: &EvalProofs, id: Id) -> Result<()> {
         let pf = pfs.computed_proofs[&id];
         self.verify_pf(digest, id, pf)
     }
 
-    pub fn verify_all(
-        &self,
-        digest: &Digest,
-        pfs: &EvalProofs,
-    ) -> Result<()> {
+    pub fn verify_all(&self, digest: &Digest, pfs: &EvalProofs) -> Result<()> {
         pfs.computed_proofs
             .iter()
             .try_for_each(|(id, pf)| self.verify_pf(digest, *id, *pf))
@@ -205,12 +193,13 @@ pub struct EvalProofs {
 }
 
 impl EvalProofs {
-    pub fn get(&self, i: &Id) -> Option<G1Affine> {
+    pub fn get(&self, i: &Id) -> Option<EvalProof> {
         // TODO(ibalajiarun): No need to copy here
-        self.computed_proofs.get(i).copied()
+        Some(EvalProof(self.computed_proofs.get(i).copied()?))
     }
 }
 
+/// Wrapper struct to allow for easy use of serde
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct EvalProof(#[serde(serialize_with = "ark_se", deserialize_with = "ark_de")] G1Affine);
 
@@ -247,9 +236,7 @@ pub(crate) mod tests {
     use ark_std::rand::thread_rng;
 
     #[allow(unused)]
-    pub(crate) fn digest_and_pfs_for_testing(
-        dk: &DigestKey,
-    ) -> (Digest, EvalProofsPromise) {
+    pub(crate) fn digest_and_pfs_for_testing(dk: &DigestKey) -> (Digest, EvalProofsPromise) {
         let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
         let mut counter = Fr::zero();
 

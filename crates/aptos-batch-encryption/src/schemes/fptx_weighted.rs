@@ -4,12 +4,15 @@ use crate::{
     errors::BatchEncryptionError,
     group::*,
     shared::{
-        ark_serialize::*, ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, StandardCiphertext}, digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise}, encryption_key::EncryptionKey, ids::{
-            Id, IdSet, UncomputedCoeffs
-        }, key_derivation::{
+        ark_serialize::*,
+        ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, StandardCiphertext},
+        digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise},
+        encryption_key::EncryptionKey,
+        ids::{Id, IdSet, UncomputedCoeffs},
+        key_derivation::{
             self, BIBEDecryptionKey, BIBEDecryptionKeyShareValue, BIBEMasterPublicKey,
             BIBEMasterSecretKeyShare, BIBEVerificationKey,
-        }
+        },
     },
     traits::{
         AssociatedData, BatchThresholdEncryption, DecryptionKeyShare, Plaintext, VerificationKey,
@@ -416,7 +419,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
         proofs: &Self::EvalProofs,
         ct: &Self::Ciphertext,
     ) -> Option<Self::EvalProof> {
-        proofs.get(&ct.id()).map(EvalProof::from)
+        proofs.get(&ct.id())
     }
 
     fn derive_decryption_key_share(
