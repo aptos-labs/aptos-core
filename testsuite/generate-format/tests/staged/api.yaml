@@ -232,8 +232,7 @@ Ciphertext:
     - vk: BYTES
     - bibe_ct:
         TYPENAME: BIBECiphertext
-    - associated_data_bytes:
-        SEQ: U8
+    - associated_data_bytes: BYTES
     - signature:
         TUPLEARRAY:
           CONTENT: U8
