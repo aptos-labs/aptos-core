@@ -145,7 +145,7 @@ AssertionSignature:
 BIBECiphertext:
   STRUCT:
     - id:
-        TYPENAME: FreeRootId
+        TYPENAME: Id
     - ct_g2: BYTES
     - padded_key:
         TYPENAME: OneTimePaddedKey
@@ -232,7 +232,8 @@ Ciphertext:
     - vk: BYTES
     - bibe_ct:
         TYPENAME: BIBECiphertext
-    - associated_data_bytes: BYTES
+    - associated_data_bytes:
+        SEQ: U8
     - signature:
         TUPLEARRAY:
           CONTENT: U8
@@ -417,9 +418,6 @@ FeeDistribution:
               MAP:
                 KEY: U64
                 VALUE: U64
-FreeRootId:
-  STRUCT:
-    - root_x: BYTES
 FunctionInfo:
   STRUCT:
     - module_address:
@@ -474,6 +472,9 @@ HashValue:
         TUPLEARRAY:
           CONTENT: U8
           SIZE: 32
+Id:
+  STRUCT:
+    - root_x: BYTES
 IdCommitment:
   NEWTYPESTRUCT: BYTES
 Identifier:
