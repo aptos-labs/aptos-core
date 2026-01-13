@@ -18,6 +18,7 @@ mod resource_groups;
 mod secp256k1_ecdsa;
 mod signed_int_test;
 mod simulation_test;
+mod slh_dsa_sha2_128s;
 mod state_test;
 mod string_resource_test;
 mod transaction_vector_test;
