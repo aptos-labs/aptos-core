@@ -4,6 +4,9 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+## [7.14.0]
+- Add support for code object deployment and upgrade in Transaction Simulation Sessions
+
 ## [7.13.0]
 - Set language version 2.3 and bytecode version v9 as default, adding support for signed integer types.
 - Update default version of formatter to 1.4.5 and move mutation tests to 2.2.0.
