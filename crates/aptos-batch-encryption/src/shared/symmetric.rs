@@ -7,7 +7,7 @@ use crate::{
 };
 use aes_gcm::{aead::Aead as _, aes::Aes128, AeadCore, Aes128Gcm, AesGcm, Key, KeySizeUser, Nonce};
 use anyhow::Result;
-use ark_ec::short_weierstrass::SWCurveConfig;
+use ark_ec::{short_weierstrass::SWCurveConfig, AffineRepr};
 use ark_ff::{
     field_hashers::{DefaultFieldHasher, HashToField},
     Field,
@@ -167,7 +167,9 @@ pub fn hash_g2_element(g2_element: G2Affine) -> Result<G1Affine> {
 
         // TODO vary the sign of y??
         if let Some(x3b_sqrt) = x3b.sqrt() {
-            return Ok(G1Affine::new(x, x3b_sqrt));
+            let p = G1Affine::new_unchecked(x, x3b_sqrt).mul_by_cofactor();
+            assert!(p.is_in_correct_subgroup_assuming_on_curve());
+            return Ok(p);
         }
     }
 
