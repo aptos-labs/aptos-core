@@ -25,6 +25,7 @@ use bibe::*;
 pub struct Ciphertext<PCT: InnerCiphertext> {
     vk: VerifyingKey,
     bibe_ct: PCT,
+    #[serde(with = "serde_bytes")]
     associated_data_bytes: Vec<u8>,
     signature: Signature,
 }
