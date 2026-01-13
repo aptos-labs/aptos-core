@@ -1,10 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use aptos_batch_encryption::group::{
-    Fr, G1Affine, G1Projective, G2Affine, G2Prepared, PairingSetting,
+    Fr, G1Affine, G1Projective, G2Affine, G2Prepared, PairingOutput, PairingSetting
 };
 use ark_ec::{
-    pairing::{Pairing, PairingOutput},
+    pairing::Pairing,
     VariableBaseMSM,
 };
 use ark_std::{rand::thread_rng, UniformRand};
@@ -50,7 +50,7 @@ pub fn pairing(c: &mut Criterion) {
 
                             PairingSetting::final_exponentiation(pad_ml).unwrap()
                         })
-                        .collect::<Vec<PairingOutput<ark_bn254::Bn254>>>()
+                        .collect::<Vec<PairingOutput>>()
                 });
             },
         );

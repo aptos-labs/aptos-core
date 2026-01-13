@@ -7,7 +7,7 @@ use crate::{
 };
 use aes_gcm::{aead::Aead as _, aes::Aes128, AeadCore, Aes128Gcm, AesGcm, Key, KeySizeUser, Nonce};
 use anyhow::Result;
-use ark_ec::{bn::BnConfig, short_weierstrass::SWCurveConfig};
+use ark_ec::short_weierstrass::SWCurveConfig;
 use ark_ff::{
     field_hashers::{DefaultFieldHasher, HashToField},
     Field,
@@ -159,9 +159,10 @@ pub fn hash_g2_element(g2_element: G2Affine) -> Result<G1Affine> {
         let [x]: [Fq; 1] = field_hasher.hash_to_field::<1>(&hash_source_bytes);
 
         // Rust does not optimise away addition with zero
-        let mut x3b = <ark_bn254::Config as BnConfig>::G1Config::add_b(x.square() * x);
-        if !<ark_bn254::Config as BnConfig>::G1Config::COEFF_A.is_zero() {
-            x3b += <ark_bn254::Config as BnConfig>::G1Config::mul_by_a(x);
+        use crate::group::G1Config;
+        let mut x3b = G1Config::add_b(x.square() * x);
+        if !G1Config::COEFF_A.is_zero() {
+            x3b += G1Config::mul_by_a(x);
         };
 
         // TODO vary the sign of y??
