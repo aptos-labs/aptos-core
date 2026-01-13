@@ -13,6 +13,8 @@ use move_core_types::{
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumString, FromRepr};
 
+
+
 /// The feature flags defined in the Move source. This must stay aligned with the constants there.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromRepr, EnumString)]
 #[allow(non_camel_case_types)]
