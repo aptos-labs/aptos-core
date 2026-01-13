@@ -78,11 +78,11 @@ use aptos_types::{
         authenticator::{AbstractAuthenticationData, AnySignature, AuthenticationProof},
         block_epilogue::{BlockEpiloguePayload, FeeDistribution},
         signature_verified_transaction::SignatureVerifiedTransaction,
-        AuxiliaryInfo, AuxiliaryInfoTrait, BlockOutput, EntryFunction, ExecutionError,
-        ExecutionStatus, ModuleBundle, MultisigTransactionPayload, ReplayProtector, Script,
-        SignedTransaction, Transaction, TransactionArgument, TransactionExecutableRef,
-        TransactionExtraConfig, TransactionOutput, TransactionPayload, TransactionStatus,
-        VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
+        AuxiliaryInfo, BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle,
+        MultisigTransactionPayload, ReplayProtector, Script, SignedTransaction, Transaction,
+        TransactionArgument, TransactionExecutableRef, TransactionExtraConfig, TransactionOutput,
+        TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
+        WriteSetPayload,
     },
     vm::module_metadata::{
         get_compilation_metadata, get_metadata, get_randomness_annotation_for_entry_function,
@@ -3204,7 +3204,7 @@ impl VMValidator for AptosVM {
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
             },
         };
-        let auxiliary_info = AuxiliaryInfo::new_empty();
+        let auxiliary_info = AuxiliaryInfo::new_timestamp_not_yet_assigned(0);
         let txn_data = TransactionMetadata::new(&txn, &auxiliary_info);
 
         let resolver = self.as_move_resolver(&state_view);
@@ -3338,7 +3338,7 @@ impl AptosSimulationVM {
             &code_storage,
             transaction,
             &log_context,
-            &AuxiliaryInfo::new_empty(),
+            &AuxiliaryInfo::new_timestamp_not_yet_assigned(0),
         );
         let txn_output = vm_output
             .try_materialize_into_transaction_output(&resolver)
