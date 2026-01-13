@@ -22,8 +22,6 @@ pub(crate) mod bibe_succinct;
 use bibe::*;
 
 
-pub use bibe::BIBEEncryptionKey;
-
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 #[serde(bound(deserialize = "PCT: DeserializeOwned"))]
