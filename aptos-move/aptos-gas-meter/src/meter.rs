@@ -625,7 +625,7 @@ where
     }
 
     fn charge_slh_dsa_sha2_128s(&mut self) -> VMResult<()> {
-        if self.feature_version() < RELEASE_V1_40 {
+        if self.feature_version() < RELEASE_V1_41 {
             return Ok(());
         }
 
