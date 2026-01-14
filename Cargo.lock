@@ -304,7 +304,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "7.13.0"
+version = "7.14.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -4472,6 +4472,7 @@ dependencies = [
  "jsonwebtoken 8.3.0",
  "once_cell",
  "prometheus",
+ "prost 0.13.4",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "reqwest 0.11.23",
@@ -4480,6 +4481,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
+ "snap",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
@@ -17667,6 +17669,12 @@ dependencies = [
  "quote",
  "syn 1.0.109",
 ]
+
+[[package]]
+name = "snap"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b6b67fb9a61334225b5b790716f609cd58395f895b3fe8b328786812a40bc3b"
 
 [[package]]
 name = "socket2"

@@ -16,6 +16,7 @@ use crate::{
     types::{
         common::EventIdentity, common::NodeType, humio::UnstructuredLog, telemetry::TelemetryDump,
     },
+    warn,
 };
 use aptos_types::{chain_id::ChainId, PeerId};
 use flate2::read::GzDecoder;
@@ -105,14 +106,33 @@ async fn handle_metrics_ingest(
     // Send metrics to all configured sinks for this custom contract
     for (name, client) in metrics_client {
         debug!(
-            "forwarding custom contract '{}' metrics to sink: {}",
-            contract_name, name
+            "forwarding custom contract '{}' metrics to sink '{}' (url: {})",
+            contract_name,
+            name,
+            client.base_url()
         );
-        if let Err(e) = client
+        match client
             .post_prometheus_metrics(body.clone(), extra_labels.clone(), encoding.clone())
             .await
         {
-            debug!("failed to forward metrics to {}: {}", name, e);
+            Ok(resp) => {
+                let status = resp.status();
+                if !status.is_success() {
+                    let body = resp.text().await.unwrap_or_default();
+                    warn!(
+                        "metrics sink '{}' returned non-success status: {} body: '{}' for contract '{}'",
+                        name, status, body, contract_name
+                    );
+                } else {
+                    debug!(
+                        "metrics sink '{}' returned success status: {} for contract '{}'",
+                        name, status, contract_name
+                    );
+                }
+            },
+            Err(e) => {
+                warn!("failed to forward metrics to sink '{}': {}", name, e);
+            },
         }
     }
 

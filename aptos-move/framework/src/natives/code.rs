@@ -13,7 +13,13 @@ use aptos_types::{
 };
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::{account_address::AccountAddress, gas_algebra::NumBytes};
+use move_core_types::{
+    account_address::AccountAddress,
+    gas_algebra::NumBytes,
+    ident_str,
+    identifier::IdentStr,
+    move_resource::{MoveResource, MoveStructType},
+};
 use move_vm_runtime::{
     native_extensions::{NativeRuntimeRefCheckModelsCompleted, SessionListener},
     native_functions::NativeFunction,
@@ -41,6 +47,13 @@ impl OnChainConfig for PackageRegistry {
     const MODULE_IDENTIFIER: &'static str = "code";
     const TYPE_IDENTIFIER: &'static str = "PackageRegistry";
 }
+
+impl MoveStructType for PackageRegistry {
+    const MODULE_NAME: &'static IdentStr = ident_str!("code");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("PackageRegistry");
+}
+
+impl MoveResource for PackageRegistry {}
 
 /// The PackageMetadata type. This must be kept in sync with `code.move`. Documentation is
 /// also found there.

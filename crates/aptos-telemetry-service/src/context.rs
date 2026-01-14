@@ -4,7 +4,7 @@
 use crate::{
     allowlist_cache::AllowlistCache,
     challenge_cache::ChallengeCache,
-    clients::{big_query::TableWriteClient, humio, victoria_metrics_api::Client as MetricsClient},
+    clients::{big_query::TableWriteClient, humio, prometheus_remote_write, victoria_metrics},
     peer_location::PeerLocation,
     types::common::EpochedPeerStore,
     LogIngestConfig, MetricsEndpointsConfig,
@@ -21,16 +21,75 @@ use std::{
 };
 use warp::Filter;
 
+/// Metrics backend client - abstracts over VictoriaMetrics and Prometheus Remote Write
+#[derive(Clone, Debug)]
+pub enum MetricsIngestClient {
+    /// VictoriaMetrics client - uses text format via /api/v1/import/prometheus
+    VictoriaMetrics(victoria_metrics::VictoriaMetricsClient),
+    /// Prometheus Remote Write client - uses protobuf+snappy via /api/v1/write
+    PrometheusRemoteWrite(prometheus_remote_write::PrometheusRemoteWriteClient),
+}
+
+impl MetricsIngestClient {
+    /// Posts Prometheus text-format metrics to the backend.
+    ///
+    /// - VictoriaMetrics: Sends text format directly
+    /// - PrometheusRemoteWrite: Parses text, converts to protobuf+snappy
+    pub async fn post_prometheus_metrics(
+        &self,
+        raw_metrics_body: warp::hyper::body::Bytes,
+        extra_labels: Vec<String>,
+        encoding: String,
+    ) -> Result<reqwest::Response, anyhow::Error> {
+        match self {
+            MetricsIngestClient::VictoriaMetrics(client) => {
+                client
+                    .post_prometheus_metrics(raw_metrics_body, extra_labels, encoding)
+                    .await
+            },
+            MetricsIngestClient::PrometheusRemoteWrite(client) => {
+                client
+                    .post_prometheus_metrics(raw_metrics_body, extra_labels, encoding)
+                    .await
+            },
+        }
+    }
+
+    /// Returns true if this is a self-hosted VM/Prometheus client
+    pub fn is_selfhosted_vm_client(&self) -> bool {
+        match self {
+            MetricsIngestClient::VictoriaMetrics(client) => client.is_selfhosted_vm_client(),
+            MetricsIngestClient::PrometheusRemoteWrite(client) => client.is_selfhosted_vm_client(),
+        }
+    }
+
+    /// Returns the backend name for logging/metrics
+    pub fn backend_name(&self) -> &'static str {
+        match self {
+            MetricsIngestClient::VictoriaMetrics(_) => "victoria_metrics",
+            MetricsIngestClient::PrometheusRemoteWrite(_) => "prometheus_remote_write",
+        }
+    }
+
+    /// Returns the base URL for this client (for logging/debugging)
+    pub fn base_url(&self) -> &url::Url {
+        match self {
+            MetricsIngestClient::VictoriaMetrics(client) => client.base_url(),
+            MetricsIngestClient::PrometheusRemoteWrite(client) => client.base_url(),
+        }
+    }
+}
+
 /// Container that holds various metric clients used for sending metrics from
 /// various sources to appropriate backends (node telemetry only).
 #[derive(Clone, Default)]
 pub struct GroupedMetricsClients {
     /// Client(s) for exporting metrics of the running telemetry service
-    pub telemetry_service_metrics_clients: HashMap<String, MetricsClient>,
+    pub telemetry_service_metrics_clients: HashMap<String, MetricsIngestClient>,
     /// Clients for sending metrics from authenticated known nodes
-    pub ingest_metrics_client: HashMap<String, MetricsClient>,
+    pub ingest_metrics_client: HashMap<String, MetricsIngestClient>,
     /// Clients for sending metrics from authenticated unknown nodes
-    pub untrusted_ingest_metrics_clients: HashMap<String, MetricsClient>,
+    pub untrusted_ingest_metrics_clients: HashMap<String, MetricsIngestClient>,
 }
 
 impl GroupedMetricsClients {
@@ -128,7 +187,7 @@ impl PeerStoreTuple {
 #[derive(Clone)]
 pub struct CustomContractInstance {
     pub config: crate::OnChainAuthConfig,
-    pub metrics_clients: HashMap<String, MetricsClient>,
+    pub metrics_clients: HashMap<String, MetricsIngestClient>,
     pub logs_client: Option<LogIngestClient>,
     pub bigquery_client: Option<TableWriteClient>,
 }
