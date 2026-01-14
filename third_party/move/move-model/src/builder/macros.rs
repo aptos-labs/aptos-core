@@ -7,7 +7,12 @@
 //! which generates the "well-known" abort code `UNSPECIFIED_ABORT_CODE`.
 
 use crate::{
-    builder::exp_builder::ExpTranslator, well_known::UNSPECIFIED_ABORT_CODE, LanguageVersion,
+    builder::exp_builder::ExpTranslator,
+    well_known::{
+        INTO_BYTES_FUNCTION_NAME, STRING_MODULE, STRING_UTILS_MODULE, UNSPECIFIED_ABORT_CODE,
+        UTF8_FUNCTION_NAME,
+    },
+    LanguageVersion,
 };
 use legacy_move_compiler::{
     expansion::ast::{Address, Exp, Exp_, LValue, LValue_, ModuleAccess_, ModuleIdent_, Value_},
@@ -16,7 +21,6 @@ use legacy_move_compiler::{
 };
 use move_core_types::account_address::AccountAddress;
 use move_ir_types::location::{sp, Loc, Spanned};
-use move_symbol_pool::Symbol;
 use std::fmt::Display;
 
 /// Maximum number of arguments we can format using `std::string_utils::format<N>`.
@@ -147,7 +151,10 @@ impl ExpTranslator<'_, '_, '_> {
                     LanguageVersion::V2_4,
                 );
                 self.check_string_literal(&rest[0]);
-                Self::into_bytes(loc, Self::format(loc, rest[0].clone(), rest[1..].to_vec()))
+                self.call_into_bytes(
+                    loc,
+                    self.call_format(loc, rest[0].clone(), rest[1..].to_vec()),
+                )
             },
             _ => {
                 self.error(
@@ -267,28 +274,28 @@ impl ExpTranslator<'_, '_, '_> {
             0 => {
                 // assert_eq!(left, right)
                 let assertion_failed_message = Self::assertion_failed_message(loc, kind, false);
-                Self::into_bytes(
+                self.call_into_bytes(
                     loc,
-                    Self::format(loc, assertion_failed_message, vec![left, right]),
+                    self.call_format(loc, assertion_failed_message, vec![left, right]),
                 )
             },
             1 => {
                 // assert_eq!(left, right, bytes)
                 let assertion_failed_message = Self::assertion_failed_message(loc, kind, true);
-                let message = Self::utf8(loc, rest[0].clone());
-                Self::into_bytes(
+                let message = self.call_utf8(loc, rest[0].clone());
+                self.call_into_bytes(
                     loc,
-                    Self::format(loc, assertion_failed_message, vec![message, left, right]),
+                    self.call_format(loc, assertion_failed_message, vec![message, left, right]),
                 )
             },
             n if n <= MAX_ARGS => {
                 // assert_eq!(left, right, fmt, arg1, ..., argN)
                 let assertion_failed_message = Self::assertion_failed_message(loc, kind, true);
                 self.check_string_literal(&rest[0]);
-                let message = Self::format(loc, rest[0].clone(), rest[1..].to_vec());
-                Self::into_bytes(
+                let message = self.call_format(loc, rest[0].clone(), rest[1..].to_vec());
+                self.call_into_bytes(
                     loc,
-                    Self::format(loc, assertion_failed_message, vec![message, left, right]),
+                    self.call_format(loc, assertion_failed_message, vec![message, left, right]),
                 )
             },
             _ => {
@@ -313,6 +320,10 @@ impl ExpTranslator<'_, '_, '_> {
             ),
         );
 
+        // We use a `match` expression for two reasons:
+        // 1. To ensure the `left` and `right` expressions are evaluated only once, instead of twice (once for the condition and once for the error message).
+        // 2. To introduce a new scope for the temporary bindings `_left` and `_right`, avoiding name clashes with variables in the surrounding scope.
+        // This mirrors how Rust expands similar macros.
         Exp_::Match(Box::new(discriminator), vec![sp(
             loc,
             (lvalues, None, assert),
@@ -320,35 +331,40 @@ impl ExpTranslator<'_, '_, '_> {
     }
 
     /// Calls `std::string_utils::format<N>(&fmt, arg1, ..., argN)` for 1 ≤ N ≤ 4.
-    fn format(loc: Loc, fmt: Exp, args: Vec<Exp>) -> Exp {
+    fn call_format(&self, loc: Loc, fmt: Exp, args: Vec<Exp>) -> Exp {
         let n = args.len();
         debug_assert!((1..MAX_ARGS).contains(&n));
         let borrow_fmt = sp(loc, Exp_::Borrow(false, Box::new(fmt)));
-        Self::call_std_function(
+        self.call_stdlib_function(
             loc,
-            "string_utils",
-            format!("format{}", n),
+            STRING_UTILS_MODULE,
+            &format!("format{}", n),
             std::iter::once(borrow_fmt).chain(args).collect(),
         )
     }
 
     /// Calls `std::string::into_bytes(s)`.
-    fn into_bytes(loc: Loc, s: Exp) -> Exp {
-        Self::call_std_function(loc, "string", "into_bytes", vec![s])
+    fn call_into_bytes(&self, loc: Loc, s: Exp) -> Exp {
+        self.call_stdlib_function(loc, STRING_MODULE, INTO_BYTES_FUNCTION_NAME, vec![s])
     }
 
     /// Calls `std::string::utf8(bytes)`.
-    fn utf8(loc: Loc, bytes: Exp) -> Exp {
-        Self::call_std_function(loc, "string", "utf8", vec![bytes])
+    fn call_utf8(&self, loc: Loc, bytes: Exp) -> Exp {
+        self.call_stdlib_function(loc, STRING_MODULE, UTF8_FUNCTION_NAME, vec![bytes])
     }
 
     /// Calls a standard library function `std::module_name::function_name(args)`.
-    fn call_std_function(
+    fn call_stdlib_function(
+        &self,
         loc: Loc,
-        module_name: impl Into<Symbol>,
-        function_name: impl Into<Symbol>,
+        module_name: &str,
+        function_name: &str,
         args: Vec<Exp>,
     ) -> Exp {
+        if !self.check_stdlib_module(loc, module_name) {
+            return sp(loc, Exp_::UnresolvedError);
+        }
+
         let address = sp(
             loc,
             NumericalAddress::from_account_address(AccountAddress::ONE),
@@ -370,6 +386,25 @@ impl ExpTranslator<'_, '_, '_> {
             loc,
             Exp_::Call(module_access, CallKind::Regular, None, sp(loc, args)),
         )
+    }
+
+    /// Checks that the given standard library module is available in the environment.
+    /// If not, reports an error and returns `false`.
+    fn check_stdlib_module(&self, loc: Loc, module_name_str: &str) -> bool {
+        let module_name = crate::ast::ModuleName::new(
+            crate::ast::Address::Numerical(AccountAddress::ONE),
+            self.env().symbol_pool().make(module_name_str),
+        );
+        match self.env().find_module(&module_name) {
+            Some(_) => true,
+            None => {
+                self.env().error(
+                    &self.to_loc(&loc),
+                    &format!("Cannot find `{}` module", module_name_str),
+                );
+                false
+            },
+        }
     }
 
     /// Creates a binding for a fresh local variable and an expression to read it.
