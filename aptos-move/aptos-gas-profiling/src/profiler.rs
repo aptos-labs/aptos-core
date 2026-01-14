@@ -718,11 +718,8 @@ where
     fn charge_slh_dsa_sha2_128s(&mut self) -> VMResult<()> {
         let (cost, res) = self.delegate_charge(|base| base.charge_slh_dsa_sha2_128s());
 
-        // TODO: Is this right? (Do not understand the semantics here.)
-        if res.is_ok() {
-            self.slh_dsa_sha2_128s_cost =
-                Some(self.slh_dsa_sha2_128s_cost.unwrap_or_else(|| 0.into()) + cost);
-        }
+        self.slh_dsa_sha2_128s_cost =
+            Some(self.slh_dsa_sha2_128s_cost.unwrap_or_else(|| 0.into()) + cost);
 
         res
     }

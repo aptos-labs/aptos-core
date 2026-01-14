@@ -8,7 +8,7 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
-/// - V41:
+/// - V40:
 ///    - Gas charging for SLH-DSA-SHA2-128s signature verification
 /// - V31:
 ///    - Gas charging for modules used in type tags
@@ -73,7 +73,7 @@
 ///       global operations.
 /// - V1
 ///   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = gas_feature_versions::RELEASE_V1_41;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = gas_feature_versions::RELEASE_V1_40;
 
 pub mod gas_feature_versions {
     pub const RELEASE_V1_8: u64 = 11;
@@ -108,5 +108,4 @@ pub mod gas_feature_versions {
     pub const RELEASE_V1_38: u64 = 42;
     pub const RELEASE_V1_39: u64 = 43;
     pub const RELEASE_V1_40: u64 = 44;
-    pub const RELEASE_V1_41: u64 = 45;
 }
