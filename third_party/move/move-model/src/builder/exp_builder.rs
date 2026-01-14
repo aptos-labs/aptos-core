@@ -2039,6 +2039,13 @@ impl ExpTranslator<'_, '_, '_> {
                 }
                 ExpData::Call(id, Operation::NoOp, vec![])
             },
+            EA::Exp_::Behavior(..) => {
+                self.error(
+                    &loc,
+                    "behavior predicates for function values (requires_of, aborts_of, ensures_of, modifies_of) are not yet supported in the model"
+                );
+                self.new_error_exp()
+            },
             EA::Exp_::UnresolvedError => {
                 // Error reported
                 self.new_error_exp()
