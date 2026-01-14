@@ -2,11 +2,11 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 //! This module deals with computing and generating opening proofs for "digests",
 //! which are KZG polynomial commitments which commit to a set of IDs.
-use super::ids::{Id, IdSet, OssifiedIdSet};
+use super::ids::{ComputedCoeffs, Id, IdSet};
 use crate::{
     errors::BatchEncryptionError,
     group::{Fr, G1Affine, G1Projective, G2Affine, G2Projective, PairingSetting},
-    shared::{algebra::fk_algorithm::FKDomain, ark_serialize::*},
+    shared::{algebra::fk_algorithm::FKDomain, ark_serialize::*, ids::UncomputedCoeffs},
 };
 use anyhow::{anyhow, Result};
 use ark_ec::{pairing::Pairing, AffineRepr, ScalarMul, VariableBaseMSM};
@@ -102,11 +102,11 @@ impl DigestKey {
         self.tau_powers_g1[0].len() - 1
     }
 
-    pub fn digest<IS: IdSet>(
+    pub fn digest(
         &self,
-        ids: &mut IS,
+        ids: &mut IdSet<UncomputedCoeffs>,
         round: u64,
-    ) -> Result<(Digest, EvalProofsPromise<IS::OssifiedSet>)> {
+    ) -> Result<(Digest, EvalProofsPromise)> {
         let round: usize = round as usize;
         if round >= self.tau_powers_g1.len() {
             Err(anyhow!(
@@ -134,34 +134,22 @@ impl DigestKey {
         }
     }
 
-    fn verify_pf(&self, digest: &Digest, id: impl Id, pf: G1Affine) -> Result<()> {
+    fn verify_pf(&self, digest: &Digest, id: Id, pf: G1Affine) -> Result<()> {
         // TODO use multipairing here?
         Ok((PairingSetting::pairing(
             pf,
             self.tau_g2 - G2Projective::from(G2Affine::generator() * id.x()),
-        ) == PairingSetting::pairing(
-            digest.as_g1() - G1Affine::generator() * id.y(),
-            G2Affine::generator(),
-        ))
+        ) == PairingSetting::pairing(digest.as_g1(), G2Affine::generator()))
         .then_some(())
         .ok_or(BatchEncryptionError::EvalProofVerifyError)?)
     }
 
-    pub fn verify<IS: OssifiedIdSet>(
-        &self,
-        digest: &Digest,
-        pfs: &EvalProofs<IS>,
-        id: IS::Id,
-    ) -> Result<()> {
+    pub fn verify(&self, digest: &Digest, pfs: &EvalProofs, id: Id) -> Result<()> {
         let pf = pfs.computed_proofs[&id];
         self.verify_pf(digest, id, pf)
     }
 
-    pub fn verify_all<IS: OssifiedIdSet>(
-        &self,
-        digest: &Digest,
-        pfs: &EvalProofs<IS>,
-    ) -> Result<()> {
+    pub fn verify_all(&self, digest: &Digest, pfs: &EvalProofs) -> Result<()> {
         pfs.computed_proofs
             .iter()
             .try_for_each(|(id, pf)| self.verify_pf(digest, *id, *pf))
@@ -169,17 +157,17 @@ impl DigestKey {
 }
 
 #[derive(Clone)]
-pub struct EvalProofsPromise<IS: OssifiedIdSet> {
+pub struct EvalProofsPromise {
     pub digest: Digest,
-    pub ids: IS,
+    pub ids: IdSet<ComputedCoeffs>,
 }
 
-impl<IS: OssifiedIdSet> EvalProofsPromise<IS> {
-    pub fn new(digest: Digest, ids: IS) -> Self {
+impl EvalProofsPromise {
+    pub fn new(digest: Digest, ids: IdSet<ComputedCoeffs>) -> Self {
         Self { digest, ids }
     }
 
-    pub fn compute_all(&self, digest_key: &DigestKey) -> EvalProofs<IS> {
+    pub fn compute_all(&self, digest_key: &DigestKey) -> EvalProofs {
         EvalProofs {
             computed_proofs: self
                 .ids
@@ -187,7 +175,7 @@ impl<IS: OssifiedIdSet> EvalProofsPromise<IS> {
         }
     }
 
-    pub fn compute_all_vgzz_multi_point_eval(&self, digest_key: &DigestKey) -> EvalProofs<IS> {
+    pub fn compute_all_vgzz_multi_point_eval(&self, digest_key: &DigestKey) -> EvalProofs {
         EvalProofs {
             computed_proofs: self
                 .ids
@@ -199,17 +187,19 @@ impl<IS: OssifiedIdSet> EvalProofsPromise<IS> {
     }
 }
 
-pub struct EvalProofs<IS: OssifiedIdSet> {
-    pub computed_proofs: HashMap<IS::Id, G1Affine>,
+#[derive(Clone)]
+pub struct EvalProofs {
+    pub computed_proofs: HashMap<Id, G1Affine>,
 }
 
-impl<IS: OssifiedIdSet> EvalProofs<IS> {
-    pub fn get(&self, i: &IS::Id) -> Option<G1Affine> {
+impl EvalProofs {
+    pub fn get(&self, i: &Id) -> Option<EvalProof> {
         // TODO(ibalajiarun): No need to copy here
-        self.computed_proofs.get(i).copied()
+        Some(EvalProof(self.computed_proofs.get(i).copied()?))
     }
 }
 
+/// Wrapper struct to allow for easy use of serde
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct EvalProof(#[serde(serialize_with = "ark_se", deserialize_with = "ark_de")] G1Affine);
 
@@ -241,20 +231,17 @@ impl EvalProof {
 
 #[cfg(test)]
 pub(crate) mod tests {
-
     use super::*;
-    use crate::shared::ids::{free_roots::ComputedCoeffs, FreeRootId, FreeRootIdSet};
+    use crate::shared::ids::{Id, IdSet};
     use ark_std::rand::thread_rng;
 
     #[allow(unused)]
-    pub(crate) fn digest_and_pfs_for_testing(
-        dk: &DigestKey,
-    ) -> (Digest, EvalProofsPromise<FreeRootIdSet<ComputedCoeffs>>) {
-        let mut ids = FreeRootIdSet::with_capacity(dk.capacity()).unwrap();
+    pub(crate) fn digest_and_pfs_for_testing(dk: &DigestKey) -> (Digest, EvalProofsPromise) {
+        let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
         let mut counter = Fr::zero();
 
         for _ in 0..dk.capacity() {
-            ids.add(&FreeRootId::new(counter));
+            ids.add(&Id::new(counter));
             counter += Fr::one();
         }
 
@@ -270,11 +257,11 @@ pub(crate) mod tests {
         let setup = DigestKey::new(&mut rng, batch_capacity, num_rounds * batch_capacity).unwrap();
 
         for current_batch_size in 1..=batch_capacity {
-            let mut ids = FreeRootIdSet::with_capacity(batch_capacity).unwrap();
+            let mut ids = IdSet::with_capacity(batch_capacity).unwrap();
             let mut counter = Fr::zero();
 
             for _ in 0..current_batch_size {
-                ids.add(&FreeRootId::new(counter));
+                ids.add(&Id::new(counter));
                 counter += Fr::one();
             }
 

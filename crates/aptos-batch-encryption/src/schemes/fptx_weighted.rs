@@ -3,15 +3,12 @@
 use crate::{
     errors::BatchEncryptionError,
     group::*,
-    schemes::fptx::{self, EncryptionKey},
     shared::{
         ark_serialize::*,
-        ciphertext::{CTDecrypt, CTEncrypt, Ciphertext, PreparedCiphertext},
+        ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, StandardCiphertext},
         digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise},
-        ids::{
-            free_roots::{ComputedCoeffs, UncomputedCoeffs},
-            FreeRootId, FreeRootIdSet, IdSet,
-        },
+        encryption_key::EncryptionKey,
+        ids::{Id, IdSet, UncomputedCoeffs},
         key_derivation::{
             self, BIBEDecryptionKey, BIBEDecryptionKeyShareValue, BIBEMasterPublicKey,
             BIBEMasterSecretKeyShare, BIBEVerificationKey,
@@ -209,16 +206,16 @@ fn gen_weighted_msk_shares<R: RngCore + CryptoRng>(
 }
 
 impl BatchThresholdEncryption for FPTXWeighted {
-    type Ciphertext = Ciphertext<FreeRootId>;
+    type Ciphertext = StandardCiphertext;
     type DecryptionKey = BIBEDecryptionKey;
     type DecryptionKeyShare = WeightedBIBEDecryptionKeyShare;
     type Digest = Digest;
     type DigestKey = DigestKey;
-    type EncryptionKey = fptx::EncryptionKey;
+    type EncryptionKey = EncryptionKey;
     type EvalProof = EvalProof;
-    type EvalProofs = EvalProofs<FreeRootIdSet<ComputedCoeffs>>;
-    type EvalProofsPromise = EvalProofsPromise<FreeRootIdSet<ComputedCoeffs>>;
-    type Id = FreeRootId;
+    type EvalProofs = EvalProofs;
+    type EvalProofsPromise = EvalProofsPromise;
+    type Id = Id;
     type MasterSecretKeyShare = WeightedBIBEMasterSecretKeyShare;
     type PreparedCiphertext = PreparedCiphertext;
     type Round = u64;
@@ -386,8 +383,8 @@ impl BatchThresholdEncryption for FPTXWeighted {
         cts: &[Self::Ciphertext],
         round: Self::Round,
     ) -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise)> {
-        let mut ids: FreeRootIdSet<UncomputedCoeffs> =
-            FreeRootIdSet::from_slice(&cts.iter().map(|ct| ct.id()).collect::<Vec<FreeRootId>>())
+        let mut ids: IdSet<UncomputedCoeffs> =
+            IdSet::from_slice(&cts.iter().map(|ct| ct.id()).collect::<Vec<Id>>())
                 .ok_or(anyhow!(""))?;
 
         digest_key.digest(&mut ids, round)
@@ -422,7 +419,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
         proofs: &Self::EvalProofs,
         ct: &Self::Ciphertext,
     ) -> Option<Self::EvalProof> {
-        proofs.get(&ct.id()).map(EvalProof::from)
+        proofs.get(&ct.id())
     }
 
     fn derive_decryption_key_share(
