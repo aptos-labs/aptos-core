@@ -33,7 +33,7 @@ use std::{convert::Infallible, fmt::Debug, ops::Deref, sync::Arc};
 // Default port for the pepper service
 pub const DEFAULT_PEPPER_SERVICE_PORT: u16 = 8000;
 
-// The list of endpoints/paths offered by the Pepper Service.
+// The list of endpoints/paths offered by the Pepper Service. NO OP!
 // Note: if you update these paths, please also update the "ALL_PATHS" array below.
 pub const ABOUT_PATH: &str = "/about";
 pub const DELEGATED_FETCH_PATH: &str = "/v0/delegated-fetch";
