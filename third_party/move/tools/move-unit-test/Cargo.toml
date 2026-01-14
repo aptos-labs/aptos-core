@@ -29,7 +29,7 @@ move-resource-viewer = { workspace = true }
 move-stdlib = { path = "../../move-stdlib", features = ["testing"] }
 move-symbol-pool = { workspace = true }
 move-table-extension = { path = "../../extensions/move-table-extension" }
-move-vm-runtime = { workspace = true, features = ["stacktrace"] }
+move-vm-runtime = { workspace = true }
 move-vm-test-utils = { workspace = true }
 move-vm-types = { workspace = true }
 once_cell = { workspace = true }
@@ -57,4 +57,3 @@ harness = false
 table-extension = [
     "move-vm-test-utils/table-extension"
 ]
-debugging = ["move-vm-runtime/debugging"]

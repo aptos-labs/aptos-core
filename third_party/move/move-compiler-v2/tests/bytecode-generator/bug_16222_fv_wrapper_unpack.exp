@@ -223,19 +223,112 @@ public fun n::test_friend() {
 }
 
 
-Diagnostics:
-bug: compiler internal error: struct not defined
-   ┌─ tests/bytecode-generator/bug_16222_fv_wrapper_unpack.move:20:16
-   │
-20 │     public fun test() {
-   │                ^^^^
-   │
-   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0xc0ffee::m
+friend 0xc0ffee::n
+struct Lazy has drop
+  _0: || has drop
 
-bug: compiler internal error: struct not defined
-   ┌─ tests/bytecode-generator/bug_16222_fv_wrapper_unpack.move:25:16
-   │
-25 │     public fun test_friend() {
-   │                ^^^^^^^^^^^
-   │
-   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+// Function definition at index 0
+friend fun pack$Lazy(l0: || has drop): Lazy
+    local l1: || has drop
+    move_loc l0
+    pack Lazy
+    ret
+
+// Function definition at index 1
+friend fun unpack$Lazy(l0: Lazy): || has drop
+    local l1: Lazy
+    move_loc l0
+    unpack Lazy
+    ret
+
+// Function definition at index 2
+friend fun borrow$Lazy$0(l0: &Lazy): &|| has drop
+    local l1: &Lazy
+    move_loc l0
+    borrow_field Lazy, _0
+    ret
+
+// Function definition at index 3
+friend fun borrow_mut$Lazy$0(l0: &mut Lazy): &mut || has drop
+    local l1: &mut Lazy
+    move_loc l0
+    mut_borrow_field Lazy, _0
+    ret
+
+// Function definition at index 4
+#[persistent] public fun make_lazy(): Lazy
+    pack_closure __lambda__1__make_lazy, 0
+    pack Lazy
+    ret
+
+// Function definition at index 5
+fun __lambda__1__make_lazy()
+    ret
+
+// Bytecode version v10
+module 0xc0ffee::m_friend
+friend 0xc0ffee::n
+struct Lazy has drop
+  _0: || has drop
+
+// Function definition at index 0
+friend fun pack$Lazy(l0: || has drop): Lazy
+    local l1: || has drop
+    move_loc l0
+    pack Lazy
+    ret
+
+// Function definition at index 1
+friend fun unpack$Lazy(l0: Lazy): || has drop
+    local l1: Lazy
+    move_loc l0
+    unpack Lazy
+    ret
+
+// Function definition at index 2
+friend fun borrow$Lazy$0(l0: &Lazy): &|| has drop
+    local l1: &Lazy
+    move_loc l0
+    borrow_field Lazy, _0
+    ret
+
+// Function definition at index 3
+friend fun borrow_mut$Lazy$0(l0: &mut Lazy): &mut || has drop
+    local l1: &mut Lazy
+    move_loc l0
+    mut_borrow_field Lazy, _0
+    ret
+
+// Function definition at index 4
+#[persistent] public fun make_lazy(): Lazy
+    pack_closure __lambda__1__make_lazy, 0
+    pack Lazy
+    ret
+
+// Function definition at index 5
+fun __lambda__1__make_lazy()
+    ret
+
+// Bytecode version v10
+module 0xc0ffee::n
+use 0xc0ffee::m
+use 0xc0ffee::m_friend
+// Function definition at index 0
+#[persistent] public fun test()
+    call m::make_lazy
+    call m::unpack$Lazy
+    call_closure <|| has drop>
+    ret
+
+// Function definition at index 1
+#[persistent] public fun test_friend()
+    call m_friend::make_lazy
+    call m_friend::unpack$Lazy
+    call_closure <|| has drop>
+    ret
+
+
+============ bytecode verification succeeded ========

@@ -15,15 +15,42 @@ pub const PEER_ROLE_TAG_NAME: &str = "peer_role";
 pub const CHAIN_ID_TAG_NAME: &str = "chain_id";
 pub const RUN_UUID_TAG_NAME: &str = "run_uuid";
 
+/// Authentication configuration for Humio
+#[derive(Clone, Debug)]
+pub enum HumioAuth {
+    /// Bearer token authentication (default for Humio)
+    Bearer(String),
+    /// Basic authentication (username, password)
+    Basic(String, String),
+}
+
+impl HumioAuth {
+    /// Create basic auth from "username:password" string
+    pub fn from_basic_auth_string(creds: &str) -> Option<Self> {
+        let parts: Vec<&str> = creds.splitn(2, ':').collect();
+        if parts.len() == 2 {
+            Some(HumioAuth::Basic(parts[0].to_string(), parts[1].to_string()))
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct IngestClient {
     inner: DebugIgnore<ClientWithMiddleware>,
     base_url: Url,
-    auth_token: String,
+    auth: HumioAuth,
 }
 
 impl IngestClient {
+    /// Create a new Humio ingest client with bearer token (backward compatible)
     pub fn new(base_url: Url, auth_token: String) -> Self {
+        Self::with_auth(base_url, HumioAuth::Bearer(auth_token))
+    }
+
+    /// Create a new Humio ingest client with custom auth configuration
+    pub fn with_auth(base_url: Url, auth: HumioAuth) -> Self {
         let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
         let inner = ClientBuilder::new(ReqwestClient::new())
             .with(RetryTransientMiddleware::new_with_policy(retry_policy))
@@ -31,7 +58,7 @@ impl IngestClient {
         Self {
             inner: DebugIgnore(inner),
             base_url,
-            auth_token,
+            auth,
         }
     }
 
@@ -44,14 +71,21 @@ impl IngestClient {
             .map_err(|e| anyhow!("unable to serialize json: {}", e))?;
         let compressed_bytes = gzip_encoder.finish()?;
 
-        self.inner
+        let req = self
+            .inner
             .0
             .post(self.base_url.join("api/v1/ingest/humio-unstructured")?)
-            .bearer_auth(self.auth_token.clone())
             .header("Content-Encoding", "gzip")
-            .body(compressed_bytes)
-            .send()
+            .body(compressed_bytes);
+
+        // Add authentication based on configured auth type
+        let req = match &self.auth {
+            HumioAuth::Bearer(token) => req.bearer_auth(token),
+            HumioAuth::Basic(username, password) => req.basic_auth(username, Some(password)),
+        };
+
+        req.send()
             .await
-            .map_err(|e| anyhow!("failed to post metrics: {}", e))
+            .map_err(|e| anyhow!("failed to post logs: {}", e))
     }
 }

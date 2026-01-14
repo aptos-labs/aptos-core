@@ -53,6 +53,7 @@ impl OneTimePaddedKey {
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub struct SymmetricCiphertext {
     nonce: SymmetricNonce,
+    #[serde(with = "serde_bytes")]
     ct_body: Vec<u8>,
 }
 

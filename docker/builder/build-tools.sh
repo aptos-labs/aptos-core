@@ -1,7 +1,7 @@
 #!/bin/bash
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
-set -e
+set -ex
 
 echo "Building tools and services docker images"
 echo "PROFILE: $PROFILE"
@@ -44,8 +44,10 @@ echo "Building the Aptos Move framework..."
 # We build everything above with `cli` profile, but building `aptos-debugger`
 # with `performance` profile, if specified, helps speed up replay-verify, so we
 # do it here separately.
+BUILD_ENV=()
 if [[ "$PROFILE" == "performance" ]]; then
-  EXTRA_CONFIGS=(--config 'build.rustflags=["-C", "linker-plugin-lto"]')
+  source "$(dirname -- "${BASH_SOURCE[0]}")/performance_rustflags.sh"
+  BUILD_ENV=(RUSTFLAGS="${PERFORMANCE_RUSTFLAGS[*]}")
 fi
-cargo build "${EXTRA_CONFIG[@]}" --locked --profile=$PROFILE -p aptos-debugger "$@"
+env "${BUILD_ENV[@]}" cargo build --locked --profile=$PROFILE -p aptos-debugger "$@"
 cp $CARGO_TARGET_DIR/$PROFILE/aptos-debugger dist/aptos-debugger

@@ -124,6 +124,7 @@ pub enum Instruction {
     CastI128,
     CastI256,
     Negate,
+    AbortMsg,
 }
 
 impl Instruction {
@@ -193,6 +194,7 @@ impl Instruction {
             Instruction::Le => "le",
             Instruction::Ge => "ge",
             Instruction::Abort => "abort",
+            Instruction::AbortMsg => "abort_msg",
             Instruction::Nop => "nop",
             Instruction::Exists(_) => "exists",
             Instruction::ExistsGeneric(_) => "exists_generic",
@@ -306,6 +308,7 @@ impl From<Bytecode> for Instruction {
             B::Le => O::Le,
             B::Ge => O::Ge,
             B::Abort => O::Abort,
+            B::AbortMsg => O::AbortMsg,
             B::Nop => O::Nop,
             B::Exists(idx) => O::Exists(idx),
             B::ExistsGeneric(idx) => O::ExistsGeneric(idx),

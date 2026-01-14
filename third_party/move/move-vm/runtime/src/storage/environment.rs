@@ -93,7 +93,7 @@ impl RuntimeEnvironment {
             paranoid_type_checks: true,
             enable_enum_option,
             enable_framework_for_option,
-            ..VMConfig::default()
+            ..VMConfig::default_for_test()
         };
         Self::new_with_config(natives, vm_config)
     }

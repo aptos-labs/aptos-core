@@ -849,6 +849,10 @@ impl<'a> Assembler<'a> {
                 self.args0(instr)?;
                 Abort
             },
+            "abort_msg" => {
+                self.args0(instr)?;
+                AbortMsg
+            },
             "nop" => {
                 self.args0(instr)?;
                 Nop

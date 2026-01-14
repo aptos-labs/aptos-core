@@ -135,7 +135,7 @@ env:
 
 jobs:
   generate-matrix:
-    runs-on: ubuntu-latest
+    runs-on: 2cpu-gh-ubuntu24-x64
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
       imageVariants: ${{ steps.set-matrix.outputs.imageVariants }}
@@ -168,7 +168,7 @@ jobs:
               { TEST_NAME: 'changing-working-quorum-test-high-load', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'changing_working_quorum_test_high_load', FORGE_ENABLE_FAILPOINTS: true },
               { TEST_NAME: 'pfn-const-tps-realistic-env', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'pfn_const_tps_with_realistic_env' },
               { TEST_NAME: 'realistic-env-max-load-long', FORGE_RUNNER_DURATION_SECS: 7200, FORGE_TEST_SUITE: 'realistic_env_max_load_large' },
-              { TEST_NAME: 'etna', FORGE_RUNNER_DURATION_SECS: 7200, FORGE_TEST_SUITE: 'etna', FORGE_IMAGE_NAME: 'etna-rust' }
+              { TEST_NAME: 'etna', FORGE_RUNNER_DURATION_SECS: 7200, FORGE_TEST_SUITE: 'etna', FORGE_IMAGE_NAME: 'etna-rust', GIT_SHA: '4e3b3ac2f88f7db927048edc1c006361cd908e33' }
             ];
 
             const matrix = testName != "all" ? tests.filter(test => test.TEST_NAME === testName) : tests;
@@ -199,7 +199,7 @@ jobs:
   # This job determines the image tag and branch to test, and passes them to the other jobs
   # NOTE: this may be better as a separate workflow as the logic is quite complex but generalizable
   determine-test-metadata:
-    runs-on: ubuntu-latest
+    runs-on: 2cpu-gh-ubuntu24-x64
     needs: ["generate-matrix"]
     outputs:
       IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}
@@ -277,7 +277,7 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
-      IMAGE_TAG: ${{ ((matrix.FORGE_TEST_SUITE == 'compat' && needs.determine-test-metadata.outputs.IMAGE_TAG_FOR_COMPAT_TEST) || needs.determine-test-metadata.outputs.IMAGE_TAG) }}
+      IMAGE_TAG: ${{ ((inputs.GIT_SHA && needs.determine-test-metadata.outputs.IMAGE_TAG) || matrix.GIT_SHA || (matrix.FORGE_TEST_SUITE == 'compat' && needs.determine-test-metadata.outputs.IMAGE_TAG_FOR_COMPAT_TEST) || needs.determine-test-metadata.outputs.IMAGE_TAG) }}
       FORGE_NAMESPACE: forge-${{ matrix.TEST_NAME }}-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
       FORGE_TEST_SUITE: ${{ matrix.FORGE_TEST_SUITE }}
       FORGE_RUNNER_DURATION_SECS: ${{ matrix.FORGE_RUNNER_DURATION_SECS }}

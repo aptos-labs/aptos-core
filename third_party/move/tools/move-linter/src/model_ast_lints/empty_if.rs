@@ -37,7 +37,7 @@ impl ExpChecker for EmptyIf {
             return;
         }
 
-        if let ExpData::Call(_, Operation::Abort, _) = else_branch.as_ref() {
+        if let ExpData::Call(_, Operation::Abort(_), _) = else_branch.as_ref() {
             return;
         }
 

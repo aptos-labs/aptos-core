@@ -28,7 +28,10 @@ use ark_serialize::CanonicalDeserialize;
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{language_storage::TypeTag, vm_status::StatusCode};
-use move_vm_runtime::{native_extensions::SessionListener, native_functions::NativeFunction};
+use move_vm_runtime::{
+    native_extensions::{NativeRuntimeRefCheckModelsCompleted, SessionListener},
+    native_functions::NativeFunction,
+};
 use once_cell::sync::Lazy;
 use std::{any::Any, hash::Hash, rc::Rc};
 
@@ -203,6 +206,10 @@ impl SessionListener for AlgebraContext {
     fn abort(&mut self) {
         // No state changes to abort. Context will be reset on new session's start.
     }
+}
+
+impl NativeRuntimeRefCheckModelsCompleted for AlgebraContext {
+    // No native functions in this context return references, so no models to add.
 }
 
 impl AlgebraContext {

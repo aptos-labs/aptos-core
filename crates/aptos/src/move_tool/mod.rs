@@ -21,7 +21,7 @@ use crate::{
     governance::CompileScriptFunction,
     move_tool::{
         bytecode::{Decompile, Disassemble},
-        coverage::SummaryCoverage,
+        coverage::{CoverageCommon, SummaryCoverage},
         fmt::Fmt,
         lint::LintPackage,
         manifest::{Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo},
@@ -37,7 +37,7 @@ use aptos_framework::{
     },
     docgen::DocgenOptions,
     extended_checks,
-    natives::code::UpgradePolicy,
+    natives::code::{PackageRegistry, UpgradePolicy},
     prover::ProverOptions,
     BuildOptions, BuiltPackage,
 };
@@ -48,22 +48,30 @@ use aptos_rest_client::{
     error::RestError,
     AptosBaseUrl, Client,
 };
+use aptos_transaction_simulation::SimulationStateStore;
+use aptos_transaction_simulation_session::Session;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
     object_address::create_object_code_deployment_address,
     on_chain_config::aptos_test_feature_flags_genesis,
+    state_store::state_key::StateKey,
     transaction::{
         ReplayProtector, Transaction, TransactionArgument, TransactionPayload, TransactionStatus,
     },
 };
 use aptos_vm::data_cache::AsMoveResolver;
+use aptos_vm_types::resolver::TResourceView;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand, ValueEnum};
 use colored::Colorize;
 use itertools::Itertools;
 use move_cli::{self, base::test::UnitTestResult};
 use move_command_line_common::{address::NumericalAddress, env::MOVE_HOME};
-use move_core_types::{identifier::Identifier, int256::U256, language_storage::ModuleId};
+use move_core_types::{
+    identifier::Identifier,
+    int256::{I256, U256},
+    language_storage::{ModuleId, StructTag},
+};
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig};
 use move_unit_test::UnitTestingConfig;
@@ -80,6 +88,7 @@ use std::{
 pub use stored_package::*;
 use tokio::task;
 use url::Url;
+
 pub mod aptos_debug_natives;
 mod bytecode;
 pub mod coverage;
@@ -154,8 +163,8 @@ impl MoveTool {
                 tool.execute_serialized_success().await
             },
             MoveTool::UpgradeObjectPackage(tool) => tool.execute_serialized_success().await,
-            MoveTool::DeployObject(tool) => tool.execute_serialized_success().await,
-            MoveTool::UpgradeObject(tool) => tool.execute_serialized_success().await,
+            MoveTool::DeployObject(tool) => tool.execute_serialized().await,
+            MoveTool::UpgradeObject(tool) => tool.execute_serialized().await,
             MoveTool::CreateResourceAccountAndPublishPackage(tool) => {
                 tool.execute_serialized_success().await
             },
@@ -644,6 +653,7 @@ impl CliCommand<&'static str> for TestPackage {
                 summarize_functions: false,
                 output_csv: false,
                 filter: self.filter,
+                common: CoverageCommon::default(),
                 move_options: self.move_options,
             };
             summary.coverage()?;
@@ -855,7 +865,7 @@ impl AsyncTryInto<ChunkedPublishPayloads> for &PublishPackage {
             None,
             self.chunked_publish_option
                 .large_packages_module
-                .large_packages_module_address(&self.txn_options.rest_client()?)
+                .large_packages_module_address(&self.txn_options)
                 .await?,
             self.chunked_publish_option.chunk_size,
         )?;
@@ -1059,7 +1069,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
                 &self.txn_options,
                 self.chunked_publish_option
                     .large_packages_module
-                    .large_packages_module_address(&self.txn_options.rest_client()?)
+                    .large_packages_module_address(&self.txn_options)
                     .await?,
             )
             .await
@@ -1161,7 +1171,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 Some(
                     self.chunked_publish_option
                         .large_packages_module
-                        .large_packages_module_address(&self.txn_options.rest_client()?)
+                        .large_packages_module_address(&self.txn_options)
                         .await?,
                 )
             } else {
@@ -1318,7 +1328,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
             let chunked_publish_large_packages_module_address = self
                 .chunked_publish_option
                 .large_packages_module
-                .large_packages_module_address(&self.txn_options.rest_client()?)
+                .large_packages_module_address(&self.txn_options)
                 .await?;
 
             let payloads = create_chunked_publish_payloads(
@@ -1413,7 +1423,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
                 Some(
                     self.chunked_publish_option
                         .large_packages_module
-                        .large_packages_module_address(&self.txn_options.rest_client()?)
+                        .large_packages_module_address(&self.txn_options)
                         .await?,
                 )
             } else {
@@ -1427,7 +1437,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
             self.move_options
                 .add_named_address(self.address_name.clone(), mock_object_address.to_string());
             let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
-            let mock_payloads = create_chunked_publish_payloads(
+            let mock_payloads: Vec<TransactionPayload> = create_chunked_publish_payloads(
                 package,
                 PublishType::AccountDeploy,
                 None,
@@ -1453,7 +1463,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
         );
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
-        let result = if self.chunked_publish_option.chunked_publish {
+        let mut result = if self.chunked_publish_option.chunked_publish {
             let payloads = create_chunked_publish_payloads(
                 package,
                 PublishType::ObjectDeploy,
@@ -1496,18 +1506,19 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
                     MAX_PUBLISH_PACKAGE_SIZE,
                 ));
             }
-            self.txn_options
-                .submit_transaction(payload)
-                .await
-                .map(TransactionSummary::from)
+            dispatch_transaction(payload, &self.txn_options).await
         };
 
-        if result.is_ok() {
-            println!(
-                "Code was successfully deployed to object address {}",
-                object_address
-            );
+        if let Ok(tx_summary) = &mut result {
+            if let Some(true) = tx_summary.success {
+                println!(
+                    "Code was successfully deployed to object address {}",
+                    object_address
+                );
+                tx_summary.deployed_object_address = Some(object_address);
+            }
         }
+
         result
     }
 }
@@ -1547,19 +1558,53 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
             .add_named_address(self.address_name, self.object_address.to_string());
 
         let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
-        let url = self
-            .txn_options
-            .rest_options
-            .url(&self.txn_options.profile_options)?;
 
         // Get the `PackageRegistry` at the given code object address.
-        let registry = CachedPackageRegistry::create(url, self.object_address, false).await?;
-        let package_info = registry
-            .get_package(package.name())
-            .await
-            .map_err(|s| CliError::CommandArgumentError(s.to_string()))?;
+        let upgrade_policy = match &self.txn_options.session {
+            None => {
+                let url = self
+                    .txn_options
+                    .rest_options
+                    .url(&self.txn_options.profile_options)?;
 
-        if package_info.upgrade_policy() == UpgradePolicy::immutable() {
+                let registry =
+                    CachedPackageRegistry::create(url, self.object_address, false).await?;
+                let package_info = registry
+                    .get_package(package.name())
+                    .await
+                    .map_err(|s| CliError::CommandArgumentError(s.to_string()))?;
+                package_info.upgrade_policy()
+            },
+            Some(session_path) => {
+                let sess = Session::load(session_path)?;
+
+                let package_registry = sess
+                    .state_store()
+                    .get_resource::<PackageRegistry>(self.object_address)?
+                    .ok_or_else(|| {
+                        CliError::CommandArgumentError(format!(
+                            "Package registry not found at object address {}",
+                            self.object_address
+                        ))
+                    })?;
+
+                let metadata = package_registry
+                    .packages
+                    .iter()
+                    .find(|p| p.name == package.name())
+                    .ok_or_else(|| {
+                        CliError::CommandArgumentError(format!(
+                            "Package {} not found at object address {}",
+                            package.name(),
+                            self.object_address
+                        ))
+                    })?;
+
+                metadata.upgrade_policy
+            },
+        };
+
+        if upgrade_policy == UpgradePolicy::immutable() {
             return Err(CliError::CommandArgumentError(
                 "A code package with upgrade policy `immutable` cannot be upgraded".to_owned(),
             ));
@@ -1567,7 +1612,7 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
 
         let message = format!(
             "Do you want to upgrade the code package '{}' at object address {}",
-            package_info.name(),
+            package.name(),
             self.object_address
         );
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
@@ -1576,7 +1621,7 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
             let chunked_publish_large_packages_module_address = self
                 .chunked_publish_option
                 .large_packages_module
-                .large_packages_module_address(&self.txn_options.rest_client()?)
+                .large_packages_module_address(&self.txn_options)
                 .await?;
 
             let payloads = create_chunked_publish_payloads(
@@ -1620,10 +1665,7 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
                     MAX_PUBLISH_PACKAGE_SIZE,
                 ));
             }
-            self.txn_options
-                .submit_transaction(payload)
-                .await
-                .map(TransactionSummary::from)
+            dispatch_transaction(payload, &self.txn_options).await
         };
 
         if result.is_ok() {
@@ -1673,10 +1715,7 @@ async fn submit_chunked_publish_transactions(
 
     for (idx, payload) in payloads.into_iter().enumerate() {
         println!("Transaction {} of {}", idx + 1, payloads_length);
-        let result = txn_options
-            .submit_transaction(payload)
-            .await
-            .map(TransactionSummary::from);
+        let result = dispatch_transaction(payload, txn_options).await;
 
         match result {
             Ok(tx_summary) => {
@@ -1723,30 +1762,55 @@ async fn is_staging_area_empty(
     txn_options: &TransactionOptions,
     large_packages_module_address: AccountAddress,
 ) -> CliTypedResult<bool> {
-    let client = txn_options.rest_client()?;
-
     let (_, account_address) = txn_options.get_public_key_and_address()?;
-    let staging_area_response = client
-        .get_account_resource(
-            account_address,
-            &format!(
-                "{}::large_packages::StagingArea",
-                large_packages_module_address
-            ),
-        )
-        .await;
 
-    match staging_area_response {
-        Ok(response) => match response.into_inner() {
-            Some(_) => Ok(false), // StagingArea is not empty
-            None => Ok(true),     // TODO: determine which case this is
+    let staging_area_type_name = format!(
+        "{}::large_packages::StagingArea",
+        large_packages_module_address
+    );
+
+    match &txn_options.session {
+        None => {
+            let client = txn_options.rest_client()?;
+
+            let staging_area_response = client
+                .get_account_resource(account_address, &staging_area_type_name)
+                .await;
+
+            match staging_area_response {
+                Ok(response) => match response.into_inner() {
+                    Some(_) => Ok(false), // StagingArea is not empty
+                    None => Ok(true),     // TODO: determine which case this is
+                },
+                Err(RestError::Api(aptos_error_response))
+                    if aptos_error_response.error.error_code
+                        == AptosErrorCode::ResourceNotFound =>
+                {
+                    Ok(true) // The resource doesn't exist
+                },
+                Err(rest_err) => Err(CliError::from(rest_err)),
+            }
         },
-        Err(RestError::Api(aptos_error_response))
-            if aptos_error_response.error.error_code == AptosErrorCode::ResourceNotFound =>
-        {
-            Ok(true) // The resource doesn't exist
+        Some(session_path) => {
+            let sess = Session::load(session_path)?;
+
+            let staging_area_bytes = sess
+                .state_store()
+                .get_resource_bytes(
+                    &StateKey::resource(
+                        &account_address,
+                        &StructTag::from_str(&staging_area_type_name)
+                            .expect("Should be able to construct staging area tag"),
+                    )
+                    .expect("Should be able to construct staging area state key"),
+                    None,
+                )
+                .map_err(|e| {
+                    CliError::UnexpectedError(format!("Failed to get staging area: {}", e))
+                })?;
+
+            Ok(staging_area_bytes.is_none())
         },
-        Err(rest_err) => Err(CliError::from(rest_err)),
     }
 }
 
@@ -1771,7 +1835,7 @@ impl CliCommand<TransactionSummary> for ClearStagingArea {
 
         let large_packages_module_address = self
             .large_packages_module
-            .large_packages_module_address(&self.txn_options.rest_client()?)
+            .large_packages_module_address(&self.txn_options)
             .await?;
         println!(
             "Cleaning up resource {}::large_packages::StagingArea under account {}.",
@@ -2423,6 +2487,7 @@ impl CliCommand<TransactionSummary> for Replay {
             timestamp_us: None,
             version: Some(self.txn_id),
             vm_status: Some(vm_status.to_string()),
+            deployed_object_address: None,
         };
 
         Ok(summary)
@@ -2441,6 +2506,12 @@ pub(crate) enum FunctionArgType {
     U64,
     U128,
     U256,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    I256,
     Raw,
 }
 
@@ -2457,6 +2528,12 @@ impl Display for FunctionArgType {
             FunctionArgType::U64 => write!(f, "u64"),
             FunctionArgType::U128 => write!(f, "u128"),
             FunctionArgType::U256 => write!(f, "u256"),
+            FunctionArgType::I8 => write!(f, "i8"),
+            FunctionArgType::I16 => write!(f, "i16"),
+            FunctionArgType::I32 => write!(f, "i32"),
+            FunctionArgType::I64 => write!(f, "i64"),
+            FunctionArgType::I128 => write!(f, "i128"),
+            FunctionArgType::I256 => write!(f, "i256"),
             FunctionArgType::Raw => write!(f, "raw"),
         }
     }
@@ -2510,6 +2587,35 @@ impl FunctionArgType {
             FunctionArgType::U256 => bcs::to_bytes(
                 &U256::from_str(arg)
                     .map_err(|err| CliError::UnableToParse("u256", err.to_string()))?,
+            )
+            .map_err(|err| CliError::BCS("arg", err)),
+            FunctionArgType::I8 => bcs::to_bytes(
+                &i8::from_str(arg).map_err(|err| CliError::UnableToParse("i8", err.to_string()))?,
+            )
+            .map_err(|err| CliError::BCS("arg", err)),
+            FunctionArgType::I16 => bcs::to_bytes(
+                &i16::from_str(arg)
+                    .map_err(|err| CliError::UnableToParse("i16", err.to_string()))?,
+            )
+            .map_err(|err| CliError::BCS("arg", err)),
+            FunctionArgType::I32 => bcs::to_bytes(
+                &i32::from_str(arg)
+                    .map_err(|err| CliError::UnableToParse("i32", err.to_string()))?,
+            )
+            .map_err(|err| CliError::BCS("arg", err)),
+            FunctionArgType::I64 => bcs::to_bytes(
+                &i64::from_str(arg)
+                    .map_err(|err| CliError::UnableToParse("i64", err.to_string()))?,
+            )
+            .map_err(|err| CliError::BCS("arg", err)),
+            FunctionArgType::I128 => bcs::to_bytes(
+                &i128::from_str(arg)
+                    .map_err(|err| CliError::UnableToParse("i128", err.to_string()))?,
+            )
+            .map_err(|err| CliError::BCS("arg", err)),
+            FunctionArgType::I256 => bcs::to_bytes(
+                &I256::from_str(arg)
+                    .map_err(|err| CliError::UnableToParse("i256", err.to_string()))?,
             )
             .map_err(|err| CliError::BCS("arg", err)),
             FunctionArgType::Raw => Ok(HexEncodedBytes::from_str(arg)
@@ -2606,10 +2712,16 @@ impl FromStr for FunctionArgType {
             "u64" => Ok(FunctionArgType::U64),
             "u128" => Ok(FunctionArgType::U128),
             "u256" => Ok(FunctionArgType::U256),
+            "i8" => Ok(FunctionArgType::I8),
+            "i16" => Ok(FunctionArgType::I16),
+            "i32" => Ok(FunctionArgType::I32),
+            "i64" => Ok(FunctionArgType::I64),
+            "i128" => Ok(FunctionArgType::I128),
+            "i256" => Ok(FunctionArgType::I256),
             "raw" => Ok(FunctionArgType::Raw),
             str => {
                 Err(CliError::CommandArgumentError(format!(
-                    "Invalid arg type '{}'.  Must be one of: ['{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}']",
+                    "Invalid arg type '{}'.  Must be one of: ['{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}', '{}','{}','{}','{}','{}','{}']",
                     str,
                     FunctionArgType::Address,
                     FunctionArgType::Bool,
@@ -2621,6 +2733,12 @@ impl FromStr for FunctionArgType {
                     FunctionArgType::U64,
                     FunctionArgType::U128,
                     FunctionArgType::U256,
+                    FunctionArgType::I8,
+                    FunctionArgType::I16,
+                    FunctionArgType::I32,
+                    FunctionArgType::I64,
+                    FunctionArgType::I128,
+                    FunctionArgType::I256,
                     FunctionArgType::Raw)))
             }
         }
@@ -2673,6 +2791,9 @@ impl ArgWithType {
     ) -> CliTypedResult<serde_json::Value> {
         match self._vector_depth {
             0 => match self._ty.clone() {
+                // Why specially handle u64/u128/u256/i64/i128/i256:
+                // many JSON parsers (including browsers and Node.js) treat numbers as Double Precision Floating Point (IEEE 754)
+                // which can only safely represent integers range: $-(2^{53} - 1)$ to $2^{53} - 1$
                 FunctionArgType::U64 => {
                     serde_json::to_value(bcs::from_bytes::<u64>(&self.arg)?.to_string())
                         .map_err(|err| CliError::UnexpectedError(err.to_string()))
@@ -2683,6 +2804,18 @@ impl ArgWithType {
                 },
                 FunctionArgType::U256 => {
                     serde_json::to_value(bcs::from_bytes::<U256>(&self.arg)?.to_string())
+                        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+                },
+                FunctionArgType::I64 => {
+                    serde_json::to_value(bcs::from_bytes::<i64>(&self.arg)?.to_string())
+                        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+                },
+                FunctionArgType::I128 => {
+                    serde_json::to_value(bcs::from_bytes::<i128>(&self.arg)?.to_string())
+                        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+                },
+                FunctionArgType::I256 => {
+                    serde_json::to_value(bcs::from_bytes::<I256>(&self.arg)?.to_string())
                         .map_err(|err| CliError::UnexpectedError(err.to_string()))
                 },
                 FunctionArgType::Raw => serde_json::to_value(&self.arg)
@@ -2709,6 +2842,27 @@ impl ArgWithType {
                     let u256_vector: Vec<U256> = bcs::from_bytes::<Vec<U256>>(&self.arg)?;
                     let string_vector: Vec<String> =
                         u256_vector.iter().map(ToString::to_string).collect();
+                    serde_json::to_value(string_vector)
+                        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+                },
+                FunctionArgType::I64 => {
+                    let i64_vector: Vec<i64> = bcs::from_bytes::<Vec<i64>>(&self.arg)?;
+                    let string_vector: Vec<String> =
+                        i64_vector.iter().map(ToString::to_string).collect();
+                    serde_json::to_value(string_vector)
+                        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+                },
+                FunctionArgType::I128 => {
+                    let i128_vector: Vec<i128> = bcs::from_bytes::<Vec<i128>>(&self.arg)?;
+                    let string_vector: Vec<String> =
+                        i128_vector.iter().map(ToString::to_string).collect();
+                    serde_json::to_value(string_vector)
+                        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+                },
+                FunctionArgType::I256 => {
+                    let i256_vector: Vec<I256> = bcs::from_bytes::<Vec<I256>>(&self.arg)?;
+                    let string_vector: Vec<String> =
+                        i256_vector.iter().map(ToString::to_string).collect();
                     serde_json::to_value(string_vector)
                         .map_err(|err| CliError::UnexpectedError(err.to_string()))
                 },
@@ -2754,6 +2908,12 @@ impl ArgWithType {
             FunctionArgType::U64 => self.bcs_value_to_json::<u64>(),
             FunctionArgType::U128 => self.bcs_value_to_json::<u128>(),
             FunctionArgType::U256 => self.bcs_value_to_json::<U256>(),
+            FunctionArgType::I8 => self.bcs_value_to_json::<i8>(),
+            FunctionArgType::I16 => self.bcs_value_to_json::<i16>(),
+            FunctionArgType::I32 => self.bcs_value_to_json::<i32>(),
+            FunctionArgType::I64 => self.bcs_value_to_json::<i64>(),
+            FunctionArgType::I128 => self.bcs_value_to_json::<i128>(),
+            FunctionArgType::I256 => self.bcs_value_to_json::<I256>(),
             FunctionArgType::Raw => serde_json::to_value(&self.arg)
                 .map_err(|err| CliError::UnexpectedError(err.to_string())),
         }
@@ -2842,6 +3002,16 @@ impl TryInto<TransactionArgument> for &ArgWithType {
             )?)),
             FunctionArgType::Raw => Ok(TransactionArgument::U8Vector(txn_arg_parser(
                 &self.arg, "raw",
+            )?)),
+            FunctionArgType::I8 => Ok(TransactionArgument::I8(txn_arg_parser(&self.arg, "i8")?)),
+            FunctionArgType::I16 => Ok(TransactionArgument::I16(txn_arg_parser(&self.arg, "i16")?)),
+            FunctionArgType::I32 => Ok(TransactionArgument::I32(txn_arg_parser(&self.arg, "i32")?)),
+            FunctionArgType::I64 => Ok(TransactionArgument::I64(txn_arg_parser(&self.arg, "i64")?)),
+            FunctionArgType::I128 => Ok(TransactionArgument::I128(txn_arg_parser(
+                &self.arg, "i128",
+            )?)),
+            FunctionArgType::I256 => Ok(TransactionArgument::I256(txn_arg_parser(
+                &self.arg, "i256",
             )?)),
         }
     }

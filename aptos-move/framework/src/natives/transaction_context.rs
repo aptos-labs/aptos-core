@@ -10,13 +10,18 @@ use aptos_types::{
     error,
     transaction::{
         authenticator::AuthenticationKey,
-        user_transaction_context::{EntryFunctionPayload, UserTransactionContext},
+        user_transaction_context::{
+            EntryFunctionPayload, TransactionIndexKind, UserTransactionContext,
+        },
     },
 };
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::{NumArgs, NumBytes};
-use move_vm_runtime::{native_extensions::SessionListener, native_functions::NativeFunction};
+use move_vm_runtime::{
+    native_extensions::{NativeRuntimeRefCheckModelsCompleted, SessionListener},
+    native_functions::NativeFunction,
+};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Struct, Value},
@@ -52,6 +57,10 @@ pub struct NativeTransactionContext {
     user_transaction_context_opt: Option<UserTransactionContext>,
     /// A number to represent the sessions inside the execution of a transaction. Used for computing the `monotonically_increasing_counter` method.
     session_counter: u8,
+}
+
+impl NativeRuntimeRefCheckModelsCompleted for NativeTransactionContext {
+    // No native functions in this context return references, so no models to add.
 }
 
 impl SessionListener for NativeTransactionContext {
@@ -172,23 +181,34 @@ fn native_monotonically_increasing_counter_internal(
     let local_counter = transaction_context.local_counter as u128;
     let session_counter = transaction_context.session_counter as u128;
 
-    let user_transaction_context_opt = get_user_transaction_context_opt_from_context(context);
+    let user_transaction_context_opt: &Option<UserTransactionContext> =
+        get_user_transaction_context_opt_from_context(context);
     if let Some(user_transaction_context) = user_transaction_context_opt {
-        // monotonically_increasing_counter (128 bits) = `<reserved_byte (8 bits) = 0 for block/chunk execution, 1 for validation/simulation> || timestamp_us (64 bits) || transaction_index (32 bits) || session counter (8 bits) || local_counter (16 bits)`
+        // monotonically_increasing_counter (128 bits) = `<reserved_byte (8 bits)> || timestamp_us (64 bits) || transaction_index (32 bits) || session counter (8 bits) || local_counter (16 bits)`
+        // reserved_byte: 0 for block/chunk execution (V1), 1 for validation/simulation (TimestampNotYetAssignedV1)
         let timestamp_us = safely_pop_arg!(args, u64);
-        let transaction_index = user_transaction_context.transaction_index();
+        let transaction_index_kind = user_transaction_context.transaction_index_kind();
 
-        if let Some(transaction_index) = transaction_index {
-            let mut monotonically_increasing_counter: u128 = (timestamp_us as u128) << 56;
-            monotonically_increasing_counter |= (transaction_index as u128) << 24;
-            monotonically_increasing_counter |= session_counter << 16;
-            monotonically_increasing_counter |= local_counter;
-            Ok(smallvec![Value::u128(monotonically_increasing_counter)])
-        } else {
-            Err(SafeNativeError::Abort {
-                abort_code: error::invalid_state(abort_codes::ETRANSACTION_INDEX_NOT_AVAILABLE),
-            })
-        }
+        let (reserved_byte, transaction_index) = match transaction_index_kind {
+            TransactionIndexKind::BlockExecution { transaction_index } => {
+                (0u128, transaction_index)
+            },
+            TransactionIndexKind::ValidationOrSimulation { transaction_index } => {
+                (1u128, transaction_index)
+            },
+            TransactionIndexKind::NotAvailable => {
+                return Err(SafeNativeError::Abort {
+                    abort_code: error::invalid_state(abort_codes::ETRANSACTION_INDEX_NOT_AVAILABLE),
+                });
+            },
+        };
+
+        let mut monotonically_increasing_counter: u128 = reserved_byte << 120;
+        monotonically_increasing_counter |= (timestamp_us as u128) << 56;
+        monotonically_increasing_counter |= (transaction_index as u128) << 24;
+        monotonically_increasing_counter |= session_counter << 16;
+        monotonically_increasing_counter |= local_counter;
+        Ok(smallvec![Value::u128(monotonically_increasing_counter)])
     } else {
         // When transaction context is not available, return an error
         Err(SafeNativeError::Abort {

@@ -35,6 +35,7 @@ gcp-bigquery-client = { workspace = true }
 jsonwebtoken = { workspace = true }
 once_cell = { workspace = true }
 prometheus = { workspace = true }
+prost = { workspace = true }
 rand = { workspace = true }
 rand_core = { workspace = true }
 reqwest = { workspace = true }
@@ -43,6 +44,7 @@ reqwest-retry = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
+snap = "1.1"
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

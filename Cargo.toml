@@ -210,7 +210,6 @@ members = [
     "third_party/move/move-bytecode-spec",
     "third_party/move/move-bytecode-verifier",
     "third_party/move/move-bytecode-verifier/bytecode-verifier-tests",
-    "third_party/move/move-bytecode-verifier/fuzz",
     "third_party/move/move-bytecode-verifier/invalid-mutations",
     "third_party/move/move-bytecode-verifier/transactional-tests",
     "third_party/move/move-command-line-common",
@@ -291,8 +290,9 @@ default-members = [
 [workspace.package]
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 edition = "2024"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
+homepage = "https://aptosnetwork.com/"
+license = "LicenseRef-Aptos"
+license-file = "LICENSE"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
 rust-version = "1.85"
@@ -309,6 +309,7 @@ aptos-api-test-context = { path = "api/test-context" }
 aptos-api-types = { path = "api/types" }
 aptos-backup-cli = { path = "storage/backup/backup-cli" }
 aptos-backup-service = { path = "storage/backup/backup-service" }
+aptos-batch-encryption = { path = "crates/aptos-batch-encryption" }
 aptos-bcs-utils = { path = "crates/aptos-bcs-utils" }
 aptos-bounded-executor = { path = "crates/bounded-executor" }
 aptos-block-executor = { path = "aptos-move/block-executor" }
@@ -602,7 +603,7 @@ dirs = "5.0.1"
 dirs-next = "2.0.0"
 dudect-bencher = "0.6"
 dunce = "1.0.4"
-ed25519-dalek = { version = "1.0.1", features = ["asm", "rand_core", "std", "serde"] }
+ed25519-dalek = { version = "1.0.1", features = ["rand_core", "std", "serde"] }
 ed25519-dalek-bip32 = "0.2.0"
 either = "1.6.1"
 enum_dispatch = "0.3.12"
@@ -661,13 +662,13 @@ inferno = "0.11.14"
 internment = { version = "0.5.0", features = ["arc"] }
 ipnet = "2.5.0"
 itertools = "0.13"
-jemallocator = { package = "tikv-jemallocator", version = "0.6.0", features = [
+jemallocator = { package = "tikv-jemallocator", version = "0.6.1", features = [
     "profiling",
     "stats",
     "unprefixed_malloc_on_supported_platforms",
 ] }
-jemalloc-ctl = { package = "tikv-jemalloc-ctl", version = "0.6.0" }
-jemalloc-sys = { package = "tikv-jemalloc-sys", version = "0.6.0" }
+jemalloc-ctl = { package = "tikv-jemalloc-ctl", version = "0.6.1" }
+jemalloc-sys = { package = "tikv-jemalloc-sys", version = "0.6.1" }
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
 jwt = "0.16.0"

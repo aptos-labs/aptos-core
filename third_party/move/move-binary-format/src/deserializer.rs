@@ -1831,6 +1831,14 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
                     )),
                 );
             },
+            Opcodes::ABORT_MSG if cursor.version() < VERSION_10 => {
+                return Err(
+                    PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
+                        "aborting with message not available before bytecode version {}",
+                        VERSION_10
+                    )),
+                );
+            },
             _ => {},
         };
 
@@ -1943,6 +1951,7 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
             Opcodes::LE => Bytecode::Le,
             Opcodes::GE => Bytecode::Ge,
             Opcodes::ABORT => Bytecode::Abort,
+            Opcodes::ABORT_MSG => Bytecode::AbortMsg,
             Opcodes::NOP => Bytecode::Nop,
             Opcodes::EXISTS => Bytecode::Exists(load_struct_def_index(cursor)?),
             Opcodes::EXISTS_GENERIC => Bytecode::ExistsGeneric(load_struct_def_inst_index(cursor)?),
@@ -2226,6 +2235,8 @@ impl Opcodes {
             0x65 => Ok(Opcodes::CAST_I128),
             0x66 => Ok(Opcodes::CAST_I256),
             0x67 => Ok(Opcodes::NEGATE),
+            // Since bytecode version 10
+            0x68 => Ok(Opcodes::ABORT_MSG),
             _ => Err(PartialVMError::new(StatusCode::UNKNOWN_OPCODE)
                 .with_message(format!("code {:X}", value))),
         }

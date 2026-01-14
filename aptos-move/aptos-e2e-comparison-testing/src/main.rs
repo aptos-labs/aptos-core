@@ -7,10 +7,11 @@ use aptos_comparison_testing::{
     APTOS_COMMONS, DISABLE_SPEC_CHECK,
 };
 use aptos_rest_client::Client;
+use aptos_types::on_chain_config::FeatureFlag;
 use clap::{Parser, Subcommand};
 use itertools::Itertools;
 use move_core_types::account_address::AccountAddress;
-use std::path::PathBuf;
+use std::{collections::BTreeSet, path::PathBuf};
 use url::Url;
 
 const BATCH_SIZE: u64 = 500;
@@ -40,12 +41,6 @@ pub enum Cmd {
         /// With this set, only dump transactions that are sent to this account
         #[clap(long)]
         target_account: Option<AccountAddress>,
-        /// Branch of framework
-        #[clap(long)]
-        branch: Option<String>,
-        /// force override the framework,
-        #[clap(long, default_value_t = false)]
-        force_override_framework: bool,
     },
     /// Collect and execute txns without dumping the state data
     Online {
@@ -66,21 +61,12 @@ pub enum Cmd {
         /// Used when execution_only is true
         #[clap(long)]
         execution_mode: Option<ExecutionMode>,
-        /// Branch of framework
-        #[clap(long)]
-        branch: Option<String>,
         /// Base experiments
         #[clap(long)]
         base_experiments: Option<String>,
         /// Compared experiments
         #[clap(long)]
         compared_experiments: Option<String>,
-        /// disable aa and fa related features for handling old txn data which is incompatible with new VM
-        #[clap(long, default_value_t = false)]
-        disable_aa_fa: bool,
-        /// force override the framework,
-        #[clap(long, default_value_t = false)]
-        force_override_framework: bool,
     },
     /// Execution of txns
     Execute {
@@ -89,21 +75,12 @@ pub enum Cmd {
         /// Whether to execute against V1, V2 alone or both compilers for comparison
         #[clap(long)]
         execution_mode: Option<ExecutionMode>,
-        /// Branch of framework
-        #[clap(long)]
-        branch: Option<String>,
         /// Base experiments
         #[clap(long)]
         base_experiments: Option<String>,
         /// Compared experiments
         #[clap(long)]
         compared_experiments: Option<String>,
-        /// disable aa and fa related features for handling old txn data which is incompatible with new VM
-        #[clap(long, default_value_t = false)]
-        disable_aa_fa: bool,
-        /// force override the framework,
-        #[clap(long, default_value_t = false)]
-        force_override_framework: bool,
     },
 }
 
@@ -112,6 +89,22 @@ pub struct Argument {
     #[clap(subcommand)]
     cmd: Cmd,
 
+    /// Branch of framework
+    #[clap(long)]
+    branch: Option<String>,
+
+    /// List of comma-separated feature flags to enable
+    #[clap(long, num_args = 1, value_delimiter = ',')]
+    enable_features: Vec<FeatureFlag>,
+
+    /// List of comma-separated feature flags to disable
+    #[clap(long, num_args = 1, value_delimiter = ',')]
+    disable_features: Vec<FeatureFlag>,
+
+    /// Force override the framework
+    #[clap(long, default_value_t = false)]
+    force_override_framework: bool,
+
     /// Scan/execute from the txn of this version
     #[clap(long)]
     begin_version: u64,
@@ -119,6 +112,29 @@ pub struct Argument {
     /// Number of txns to scan/execute
     #[clap(long)]
     limit: u64,
+}
+
+impl Argument {
+    fn validate(&self) -> Result<(), String> {
+        let overlap = Self::overlapping_features(&self.enable_features, &self.disable_features);
+        if overlap.is_empty() {
+            Ok(())
+        } else {
+            Err(format!(
+                "feature flags cannot be both enabled and disabled: {:?}",
+                overlap
+            ))
+        }
+    }
+
+    fn overlapping_features(enable: &[FeatureFlag], disable: &[FeatureFlag]) -> Vec<FeatureFlag> {
+        let enabled: BTreeSet<_> = enable.iter().cloned().collect();
+        disable
+            .iter()
+            .filter(|f| enabled.contains(*f))
+            .cloned()
+            .collect()
+    }
 }
 
 #[tokio::main]
@@ -136,6 +152,7 @@ async fn main() -> Result<()> {
         experiments
     };
     let args = Argument::parse();
+    args.validate().map_err(|e| anyhow::anyhow!("{}", e))?;
     match args.cmd {
         Cmd::Dump {
             endpoint,
@@ -145,8 +162,6 @@ async fn main() -> Result<()> {
             skip_source_code_check: skip_source_code,
             dump_write_set,
             target_account,
-            branch,
-            force_override_framework,
         } => {
             let batch_size = BATCH_SIZE;
             let output = if let Some(path) = output_path {
@@ -160,8 +175,8 @@ async fn main() -> Result<()> {
             if !skip_source_code {
                 prepare_aptos_packages(
                     output.join(APTOS_COMMONS),
-                    branch,
-                    force_override_framework,
+                    args.branch,
+                    args.force_override_framework,
                 )
                 .await;
             }
@@ -174,6 +189,8 @@ async fn main() -> Result<()> {
                 dump_write_set,
                 skip_source_code,
                 target_account,
+                args.enable_features,
+                args.disable_features,
             )?;
             let experiments = parse_experiments(None);
             data_collector
@@ -187,10 +204,7 @@ async fn main() -> Result<()> {
             skip_publish_txns,
             execution_mode,
             base_experiments,
-            branch,
             compared_experiments,
-            disable_aa_fa,
-            force_override_framework,
         } => {
             let batch_size = BATCH_SIZE;
             let output = if let Some(path) = output_path {
@@ -201,8 +215,12 @@ async fn main() -> Result<()> {
             if !output.exists() {
                 std::fs::create_dir_all(output.as_path()).unwrap();
             }
-            prepare_aptos_packages(output.join(APTOS_COMMONS), branch, force_override_framework)
-                .await;
+            prepare_aptos_packages(
+                output.join(APTOS_COMMONS),
+                args.branch,
+                args.force_override_framework,
+            )
+            .await;
             let online = OnlineExecutor::new_with_rest_client(
                 Client::new(Url::parse(&endpoint)?),
                 output.clone(),
@@ -211,7 +229,8 @@ async fn main() -> Result<()> {
                 skip_publish_txns,
                 execution_mode.unwrap_or_default(),
                 endpoint,
-                disable_aa_fa,
+                args.enable_features,
+                args.disable_features,
             )?;
             let base_experiments = parse_experiments(base_experiments);
             let compared_experiments = parse_experiments(compared_experiments);
@@ -227,11 +246,8 @@ async fn main() -> Result<()> {
         Cmd::Execute {
             input_path,
             execution_mode,
-            branch,
             base_experiments,
             compared_experiments,
-            disable_aa_fa,
-            force_override_framework,
         } => {
             let input = if let Some(path) = input_path {
                 path
@@ -239,11 +255,20 @@ async fn main() -> Result<()> {
                 PathBuf::from(".")
             };
             let exec_mode = execution_mode.unwrap_or_default();
-            prepare_aptos_packages(input.join(APTOS_COMMONS), branch, force_override_framework)
-                .await;
+            prepare_aptos_packages(
+                input.join(APTOS_COMMONS),
+                args.branch,
+                args.force_override_framework,
+            )
+            .await;
             let base_experiments = parse_experiments(base_experiments);
             let compared_experiments = parse_experiments(compared_experiments);
-            let executor = Execution::new(input, exec_mode, disable_aa_fa);
+            let executor = Execution::new(
+                input,
+                exec_mode,
+                args.enable_features,
+                args.disable_features,
+            );
             executor
                 .execute_txns(
                     args.begin_version,

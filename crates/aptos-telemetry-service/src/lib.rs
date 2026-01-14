@@ -3,8 +3,11 @@
 
 use crate::{
     allowlist_cache::AllowlistCacheUpdater,
-    clients::{big_query, victoria_metrics_api::Client as MetricsClient},
-    context::{ClientTuple, Context, JsonWebTokenService, LogIngestClients, PeerStoreTuple},
+    clients::{big_query, humio, loki, prometheus_remote_write, victoria_metrics},
+    context::{
+        ClientTuple, Context, JsonWebTokenService, LogIngestClients, MetricsIngestClient,
+        PeerStoreTuple,
+    },
     index::routes,
     metrics::PrometheusExporter,
     peer_location::PeerLocationUpdater,
@@ -129,11 +132,17 @@ impl AptosTelemetryServiceArgs {
             let mut instances = HashMap::new();
 
             for cc_config in &config.custom_contract_configs {
-                let metrics_clients = cc_config
-                    .metrics_sinks
-                    .as_ref()
-                    .map(|s| s.make_clients())
-                    .unwrap_or_default();
+                // Validate that the contract name is unique
+                if instances.contains_key(&cc_config.name) {
+                    panic!(
+                        "Duplicate custom contract name '{}' found in configuration. \
+                         Each custom contract must have a unique name.",
+                        cc_config.name
+                    );
+                }
+
+                // Merge metrics clients from both metrics_sink and metrics_sinks
+                let metrics_clients = cc_config.make_metrics_clients();
 
                 let logs_client = cc_config.logs_sink.as_ref().map(|s| s.make_client());
 
@@ -250,14 +259,33 @@ impl AptosTelemetryServiceArgs {
     }
 }
 
-/// Per metric endpoint configuration.
+/// Per-metric endpoint configuration.
+///
+/// Supports multiple named endpoints (e.g., for failover or multi-region) and
+/// configurable backend type. Authentication can be bearer tokens OR basic auth.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct MetricsEndpoint {
-    /// Map of endpoint canonical name to Urls
+    /// Map of endpoint name to URL (e.g., {"default": "http://vm:8428/..."})
     endpoint_urls: HashMap<String, Url>,
-    /// Environment variable that holds the secrets
+
+    /// Authentication type (bearer, basic, or none). Defaults to bearer.
+    #[serde(default)]
+    auth_type: SinkAuthType,
+
+    /// Environment variable containing JSON map of endpoint names to bearer tokens.
+    /// Used when auth_type is "bearer" (default).
     keys_env_var: String,
+
+    /// Environment variable containing JSON map of endpoint names to basic auth creds.
+    /// Format: {"endpoint_name": "username:password", ...}
+    /// Used when auth_type is "basic".
+    #[serde(default)]
+    basic_auth_env_var: Option<String>,
+
+    /// Backend type (victoria_metrics or prometheus_remote_write). Defaults to victoria_metrics.
+    #[serde(default)]
+    backend_type: MetricsBackendType,
 }
 
 impl MetricsEndpoint {
@@ -265,48 +293,102 @@ impl MetricsEndpoint {
     fn default_for_test() -> Self {
         Self {
             endpoint_urls: HashMap::new(),
+            auth_type: SinkAuthType::Bearer,
             keys_env_var: "".into(),
+            basic_auth_env_var: None,
+            backend_type: MetricsBackendType::VictoriaMetrics,
         }
     }
 
-    fn make_client(&self) -> HashMap<String, MetricsClient> {
-        let secrets: HashMap<String, String> =
-            serde_json::from_str(&env::var(&self.keys_env_var).unwrap_or_else(|_| {
-                panic!(
-                    "environment variable {} must be set and be a map of endpoint names to token",
-                    self.keys_env_var.clone()
-                )
-            }))
-            .unwrap_or_else(|_| {
-                panic!(
-                    "environment variable {} must be a map of name to secret",
-                    self.keys_env_var
-                )
-            });
-
+    fn make_client(&self) -> HashMap<String, MetricsIngestClient> {
         self.endpoint_urls
             .iter()
             .map(|(name, url)| {
-                let secret = secrets.get(name).unwrap_or_else(|| {
-                    panic!(
-                        "environment variable {} is missing secret for {}",
-                        self.keys_env_var.clone(),
-                        name
-                    )
-                });
-                (name.clone(), MetricsClient::new(url.clone(), secret.into()))
+                let auth_token = self.get_auth_token(name);
+                let client = match self.backend_type {
+                    MetricsBackendType::VictoriaMetrics => MetricsIngestClient::VictoriaMetrics(
+                        victoria_metrics::VictoriaMetricsClient::new(url.clone(), auth_token),
+                    ),
+                    MetricsBackendType::PrometheusRemoteWrite => {
+                        MetricsIngestClient::PrometheusRemoteWrite(
+                            prometheus_remote_write::PrometheusRemoteWriteClient::new(
+                                url.clone(),
+                                auth_token,
+                            ),
+                        )
+                    },
+                };
+                (name.clone(), client)
             })
             .collect()
     }
+
+    /// Get auth token for a specific endpoint based on auth_type
+    fn get_auth_token(&self, endpoint_name: &str) -> victoria_metrics::AuthToken {
+        match self.auth_type {
+            SinkAuthType::Bearer => {
+                let secrets: HashMap<String, String> =
+                    serde_json::from_str(&env::var(&self.keys_env_var).unwrap_or_else(|_| {
+                        panic!(
+                            "environment variable {} must be set for bearer auth",
+                            self.keys_env_var
+                        )
+                    }))
+                    .unwrap_or_else(|_| {
+                        panic!(
+                            "environment variable {} must be a JSON map of name to secret",
+                            self.keys_env_var
+                        )
+                    });
+                let secret = secrets.get(endpoint_name).unwrap_or_else(|| {
+                    panic!(
+                        "environment variable {} is missing secret for {}",
+                        self.keys_env_var, endpoint_name
+                    )
+                });
+                victoria_metrics::AuthToken::Bearer(secret.clone())
+            },
+            SinkAuthType::Basic => {
+                let creds: HashMap<String, String> = self
+                    .basic_auth_env_var
+                    .as_ref()
+                    .and_then(|env_var| env::var(env_var).ok())
+                    .and_then(|json_str| serde_json::from_str(&json_str).ok())
+                    .expect("basic_auth_env_var must be set and contain valid JSON for basic auth");
+                let cred = creds.get(endpoint_name).unwrap_or_else(|| {
+                    panic!(
+                        "basic_auth_env_var is missing credentials for {}",
+                        endpoint_name
+                    )
+                });
+                let parts: Vec<&str> = cred.splitn(2, ':').collect();
+                if parts.len() == 2 {
+                    victoria_metrics::AuthToken::Basic(parts[0].to_string(), parts[1].to_string())
+                } else {
+                    panic!(
+                        "basic auth for {} must be in 'username:password' format",
+                        endpoint_name
+                    )
+                }
+            },
+            SinkAuthType::None => victoria_metrics::AuthToken::None,
+        }
+    }
 }
 
-/// Metrics endpoints configuration for metrics from
-/// different datasources (node telemetry only)
+/// Metrics endpoints configuration for different data sources (node telemetry only).
+///
+/// Supports multiple backends (victoria_metrics, prometheus) via `backend_type` field in each endpoint.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct MetricsEndpointsConfig {
+    /// Endpoint for telemetry service's own metrics (self-monitoring)
     pub telemetry_service_metrics: MetricsEndpoint,
+
+    /// Endpoint for metrics from known/trusted nodes (validators, whitelisted)
     pub ingest_metrics: MetricsEndpoint,
+
+    /// Endpoint for metrics from unknown/untrusted nodes
     pub untrusted_ingest_metrics: MetricsEndpoint,
 }
 
@@ -328,6 +410,30 @@ pub enum LogBackendType {
     #[default]
     Humio,
     Loki,
+}
+
+/// Metrics backend type
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MetricsBackendType {
+    /// VictoriaMetrics - uses text format via /api/v1/import/prometheus (default)
+    #[default]
+    VictoriaMetrics,
+    /// Prometheus Remote Write - uses protobuf+snappy via /api/v1/write
+    PrometheusRemoteWrite,
+}
+
+/// Authentication type for sink endpoints
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SinkAuthType {
+    /// Bearer token authentication (default)
+    #[default]
+    Bearer,
+    /// Basic authentication (username:password)
+    Basic,
+    /// No authentication
+    None,
 }
 
 /// Authentication method for on-chain verification
@@ -393,65 +499,274 @@ fn default_chain_id() -> u8 {
     1
 }
 
-/// Metrics sink configuration (subset of MetricsEndpoint)
+/// Metrics sink configuration for custom contracts.
+///
+/// Supports multiple endpoints with a shared backend type.
+/// Authentication can be configured via bearer tokens OR basic auth.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct MetricsSinkConfig {
     /// Map of sink name to endpoint URL
+    #[serde(alias = "endpoints")]
     pub endpoint_urls: HashMap<String, String>,
-    /// Environment variable containing JSON map of sink names to auth keys
+
+    /// Authentication type (bearer, basic, or none). Defaults to bearer.
     #[serde(default)]
+    pub auth_type: SinkAuthType,
+
+    /// Environment variable containing JSON map of sink names to bearer tokens.
+    /// Used when auth_type is "bearer" (default).
+    #[serde(default, alias = "keys_env")]
     pub keys_env_var: Option<String>,
+
+    /// Environment variable containing JSON map of sink names to basic auth credentials.
+    /// Format: {"sink_name": "username:password", ...}
+    /// Used when auth_type is "basic".
+    #[serde(default)]
+    pub basic_auth_env_var: Option<String>,
+
+    /// Backend type (victoria_metrics or prometheus_remote_write). Defaults to victoria_metrics.
+    #[serde(default)]
+    pub backend_type: MetricsBackendType,
 }
 
 impl MetricsSinkConfig {
-    /// Convert to MetricsClient instances
-    pub fn make_clients(&self) -> HashMap<String, MetricsClient> {
-        let keys: HashMap<String, String> = self
-            .keys_env_var
-            .as_ref()
-            .and_then(|env_var| std::env::var(env_var).ok())
-            .and_then(|json_str| serde_json::from_str(&json_str).ok())
-            .unwrap_or_default();
-
+    /// Convert to MetricsIngestClient instances
+    pub fn make_clients(&self) -> HashMap<String, MetricsIngestClient> {
         self.endpoint_urls
             .iter()
             .map(|(name, url)| {
-                let secret: clients::victoria_metrics_api::AuthToken = keys
-                    .get(name)
-                    .map(|k| clients::victoria_metrics_api::AuthToken::Bearer(k.clone()))
-                    .unwrap_or_else(|| {
-                        clients::victoria_metrics_api::AuthToken::Bearer("".to_string())
-                    });
+                let auth_token = self.get_auth_token(name);
                 let parsed_url = Url::parse(url).expect("valid URL in metrics sink config");
-                (name.clone(), MetricsClient::new(parsed_url, secret))
+                let client = match self.backend_type {
+                    MetricsBackendType::VictoriaMetrics => MetricsIngestClient::VictoriaMetrics(
+                        victoria_metrics::VictoriaMetricsClient::new(parsed_url, auth_token),
+                    ),
+                    MetricsBackendType::PrometheusRemoteWrite => {
+                        MetricsIngestClient::PrometheusRemoteWrite(
+                            prometheus_remote_write::PrometheusRemoteWriteClient::new(
+                                parsed_url, auth_token,
+                            ),
+                        )
+                    },
+                };
+                (name.clone(), client)
             })
             .collect()
     }
+
+    /// Get auth token for a specific sink based on auth_type
+    fn get_auth_token(&self, sink_name: &str) -> victoria_metrics::AuthToken {
+        match self.auth_type {
+            SinkAuthType::Bearer => {
+                let keys: HashMap<String, String> = self
+                    .keys_env_var
+                    .as_ref()
+                    .and_then(|env_var| std::env::var(env_var).ok())
+                    .and_then(|json_str| serde_json::from_str(&json_str).ok())
+                    .unwrap_or_default();
+                keys.get(sink_name)
+                    .map(|k| victoria_metrics::AuthToken::Bearer(k.clone()))
+                    // Fall back to None to avoid sending malformed auth headers
+                    .unwrap_or(victoria_metrics::AuthToken::None)
+            },
+            SinkAuthType::Basic => {
+                let creds: HashMap<String, String> = self
+                    .basic_auth_env_var
+                    .as_ref()
+                    .and_then(|env_var| std::env::var(env_var).ok())
+                    .and_then(|json_str| serde_json::from_str(&json_str).ok())
+                    .unwrap_or_default();
+                creds
+                    .get(sink_name)
+                    .and_then(|cred| {
+                        let parts: Vec<&str> = cred.splitn(2, ':').collect();
+                        if parts.len() == 2 {
+                            Some(victoria_metrics::AuthToken::Basic(
+                                parts[0].to_string(),
+                                parts[1].to_string(),
+                            ))
+                        } else {
+                            None
+                        }
+                    })
+                    // Fall back to None to avoid sending malformed auth headers
+                    .unwrap_or(victoria_metrics::AuthToken::None)
+            },
+            SinkAuthType::None => victoria_metrics::AuthToken::None,
+        }
+    }
 }
 
-/// Custom contract configuration - consolidates auth and all data sinks
+/// Log sink configuration for custom contracts.
+///
+/// Mirrors `MetricsSinkConfig` for consistency. Supports single endpoint.
+/// Authentication can be configured via bearer tokens OR basic auth.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct LogSinkConfig {
+    /// Endpoint URL for log ingestion
+    #[serde(alias = "endpoint")]
+    pub endpoint_url: String,
+
+    /// Authentication type (bearer, basic, or none). Defaults to bearer.
+    #[serde(default)]
+    pub auth_type: SinkAuthType,
+
+    /// Environment variable containing the bearer token.
+    /// Used when auth_type is "bearer" (default).
+    #[serde(default, alias = "key_env")]
+    pub key_env_var: Option<String>,
+
+    /// Environment variable containing basic auth credentials.
+    /// Format: "username:password"
+    /// Used when auth_type is "basic".
+    #[serde(default)]
+    pub basic_auth_env_var: Option<String>,
+
+    /// Backend type (humio or loki). Defaults to humio.
+    #[serde(default)]
+    pub backend_type: LogBackendType,
+}
+
+impl LogSinkConfig {
+    /// Convert to LogIngestClient
+    pub fn make_client(&self) -> context::LogIngestClient {
+        use crate::clients::{humio, loki};
+
+        let parsed_url = Url::parse(&self.endpoint_url).expect("valid URL in log sink config");
+
+        match self.backend_type {
+            LogBackendType::Humio => {
+                let auth = self.get_humio_auth();
+                context::LogIngestClient::Humio(humio::IngestClient::with_auth(parsed_url, auth))
+            },
+            LogBackendType::Loki => {
+                let auth = self.get_loki_auth();
+                context::LogIngestClient::Loki(loki::LokiIngestClient::with_auth(parsed_url, auth))
+            },
+        }
+    }
+
+    /// Get Humio auth configuration based on auth_type
+    fn get_humio_auth(&self) -> humio::HumioAuth {
+        use crate::clients::humio;
+
+        match self.auth_type {
+            SinkAuthType::Bearer | SinkAuthType::None => {
+                let token = self
+                    .key_env_var
+                    .as_ref()
+                    .and_then(|env_var| env::var(env_var).ok())
+                    .unwrap_or_else(|| {
+                        if matches!(self.auth_type, SinkAuthType::Bearer) {
+                            panic!("key_env_var must be set for Humio with bearer auth")
+                        }
+                        "".to_string()
+                    });
+                humio::HumioAuth::Bearer(token)
+            },
+            SinkAuthType::Basic => {
+                let creds = self
+                    .basic_auth_env_var
+                    .as_ref()
+                    .and_then(|env_var| env::var(env_var).ok())
+                    .expect("basic_auth_env_var must be set for basic auth");
+                humio::HumioAuth::from_basic_auth_string(&creds)
+                    .expect("basic_auth_env_var must be in 'username:password' format")
+            },
+        }
+    }
+
+    /// Get Loki auth configuration based on auth_type
+    fn get_loki_auth(&self) -> loki::LokiAuth {
+        use crate::clients::loki;
+
+        match self.auth_type {
+            SinkAuthType::None => loki::LokiAuth::None,
+            SinkAuthType::Bearer => {
+                let token = self
+                    .key_env_var
+                    .as_ref()
+                    .and_then(|env_var| env::var(env_var).ok());
+                loki::LokiAuth::from_bearer_token(token)
+            },
+            SinkAuthType::Basic => {
+                let creds = self
+                    .basic_auth_env_var
+                    .as_ref()
+                    .and_then(|env_var| env::var(env_var).ok())
+                    .expect("basic_auth_env_var must be set for basic auth");
+                loki::LokiAuth::from_basic_auth_string(&creds)
+                    .expect("basic_auth_env_var must be in 'username:password' format")
+            },
+        }
+    }
+}
+
+/// Custom contract configuration - consolidates auth and all data sinks.
+///
+/// All sink configs follow a consistent pattern:
+/// - `metrics_sink`: Single MetricsSinkConfig (backwards compatible)
+/// - `metrics_sinks`: Array of MetricsSinkConfig (for multiple backend types)
+/// - `logs_sink`: Uses `LogSinkConfig` (single-endpoint, backend_type)
+/// - `events_sink`: Uses `CustomEventConfig` (BigQuery)
+///
+/// For multiple metrics sinks with different backend types (e.g., victoria_metrics AND
+/// prometheus_remote_write), use the `metrics_sinks` array field. Both `metrics_sink`
+/// and `metrics_sinks` can be used together - they will be merged.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct CustomContractConfig {
-    /// Unique identifier for this custom contract configuration
-    /// Used in routing and logging
+    /// Unique identifier for this custom contract configuration.
+    /// Used in routing and logging.
     pub name: String,
 
     /// On-chain authentication configuration
     pub on_chain_auth: OnChainAuthConfig,
 
-    /// Metrics sinks for this custom contract (optional)
+    /// Single metrics sink for this custom contract (optional, backwards compatible).
+    /// Use `metrics_sinks` (array) if you need multiple sinks with different backend types.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub metrics_sinks: Option<MetricsSinkConfig>,
+    pub metrics_sink: Option<MetricsSinkConfig>,
 
-    /// Log sink for this custom contract (optional)
+    /// Multiple metrics sinks for this custom contract (optional).
+    /// Use this when you need different backend types (e.g., victoria_metrics AND prometheus_remote_write).
+    /// Can be used alongside `metrics_sink` - all sinks will be merged.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub logs_sink: Option<LogIngestEndpoint>,
+    pub metrics_sinks: Option<Vec<MetricsSinkConfig>>,
 
-    /// BigQuery events sink for this custom contract (optional)
+    /// Log sink for this custom contract (optional).
+    /// Supports single endpoint with selectable backend (humio or loki).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub logs_sink: Option<LogSinkConfig>,
+
+    /// BigQuery events sink for this custom contract (optional).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub events_sink: Option<CustomEventConfig>,
+}
+
+impl CustomContractConfig {
+    /// Get all metrics clients from both `metrics_sink` and `metrics_sinks` fields.
+    /// This allows backwards compatibility with single sink configs while supporting
+    /// multiple sinks with different backend types.
+    pub fn make_metrics_clients(&self) -> HashMap<String, MetricsIngestClient> {
+        let mut clients = HashMap::new();
+
+        // Add clients from singular metrics_sink (backwards compatible)
+        if let Some(ref sink) = self.metrics_sink {
+            clients.extend(sink.make_clients());
+        }
+
+        // Add clients from plural metrics_sinks array
+        if let Some(ref sinks) = self.metrics_sinks {
+            for sink in sinks {
+                clients.extend(sink.make_clients());
+            }
+        }
+
+        clients
+    }
 }
 
 impl OnChainAuthConfig {
@@ -499,13 +814,31 @@ impl OnChainAuthConfig {
     }
 }
 
-/// A single log ingest endpoint config
+/// Log ingestion endpoint configuration for main telemetry service.
+///
+/// Supports bearer tokens OR basic auth, configurable via `auth_type`.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct LogIngestEndpoint {
+    /// Endpoint URL for log ingestion
     pub endpoint_url: Url,
+
+    /// Authentication type (bearer, basic, or none). Defaults to bearer.
+    #[serde(default)]
+    pub auth_type: SinkAuthType,
+
+    /// Environment variable containing the bearer token.
+    /// Used when auth_type is "bearer" (default).
+    /// Note: Optional for Loki backend (can operate without auth)
     pub key_env_var: String,
-    /// Log backend type (humio or loki). Defaults to humio for compatibility.
+
+    /// Environment variable containing basic auth credentials.
+    /// Format: "username:password"
+    /// Used when auth_type is "basic".
+    #[serde(default)]
+    pub basic_auth_env_var: Option<String>,
+
+    /// Backend type (humio or loki). Defaults to humio for backward compatibility.
     #[serde(default)]
     pub backend_type: LogBackendType,
 }
@@ -515,49 +848,96 @@ impl LogIngestEndpoint {
     fn default_for_test() -> Self {
         Self {
             endpoint_url: Url::parse("test://test").unwrap(),
+            auth_type: SinkAuthType::Bearer,
             key_env_var: "".into(),
+            basic_auth_env_var: None,
             backend_type: LogBackendType::Humio,
         }
     }
 
     fn make_client(&self) -> context::LogIngestClient {
-        use crate::clients::{humio, loki};
-
-        let secret = env::var(&self.key_env_var).ok(); // Make optional for Loki
-
         match self.backend_type {
             LogBackendType::Humio => {
-                let token = secret.unwrap_or_else(|| {
-                    panic!(
-                        "environment variable {} must be set for Humio backend.",
-                        self.key_env_var.clone()
-                    )
-                });
-                context::LogIngestClient::Humio(humio::IngestClient::new(
+                let auth = self.get_humio_auth();
+                context::LogIngestClient::Humio(humio::IngestClient::with_auth(
                     self.endpoint_url.clone(),
-                    token,
+                    auth,
                 ))
             },
             LogBackendType::Loki => {
-                // Loki auth token is optional
-                context::LogIngestClient::Loki(loki::LokiIngestClient::new(
+                let auth = self.get_loki_auth();
+                context::LogIngestClient::Loki(loki::LokiIngestClient::with_auth(
                     self.endpoint_url.clone(),
-                    secret,
+                    auth,
                 ))
+            },
+        }
+    }
+
+    /// Get Humio auth configuration based on auth_type
+    fn get_humio_auth(&self) -> humio::HumioAuth {
+        match self.auth_type {
+            SinkAuthType::Bearer | SinkAuthType::None => {
+                let token = env::var(&self.key_env_var).unwrap_or_else(|_| {
+                    if matches!(self.auth_type, SinkAuthType::Bearer)
+                        && !self.key_env_var.is_empty()
+                    {
+                        panic!(
+                            "environment variable {} must be set for Humio with bearer auth",
+                            self.key_env_var
+                        )
+                    }
+                    "".to_string()
+                });
+                humio::HumioAuth::Bearer(token)
+            },
+            SinkAuthType::Basic => {
+                let creds = self
+                    .basic_auth_env_var
+                    .as_ref()
+                    .and_then(|env_var| env::var(env_var).ok())
+                    .expect("basic_auth_env_var must be set for basic auth");
+                humio::HumioAuth::from_basic_auth_string(&creds)
+                    .expect("basic_auth_env_var must be in 'username:password' format")
+            },
+        }
+    }
+
+    /// Get Loki auth configuration based on auth_type
+    fn get_loki_auth(&self) -> loki::LokiAuth {
+        match self.auth_type {
+            SinkAuthType::None => loki::LokiAuth::None,
+            SinkAuthType::Bearer => {
+                let token = env::var(&self.key_env_var).ok();
+                loki::LokiAuth::from_bearer_token(token)
+            },
+            SinkAuthType::Basic => {
+                let creds = self
+                    .basic_auth_env_var
+                    .as_ref()
+                    .and_then(|env_var| env::var(env_var).ok())
+                    .expect("basic_auth_env_var must be set for basic auth");
+                loki::LokiAuth::from_basic_auth_string(&creds)
+                    .expect("basic_auth_env_var must be in 'username:password' format")
             },
         }
     }
 }
 
-/// Log ingest configuration for different sources
+/// Log ingest configuration for different sources.
+///
+/// Supports multiple backends (humio, loki) via `backend_type` field in each endpoint.
+/// This enables gradual migration between log backends while maintaining backward compatibility.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct LogIngestConfig {
-    // Log endpoint for known nodes (nodes from validator set, whitelist, etc.)
+    /// Log endpoint for known/trusted nodes (validators, whitelisted nodes, etc.)
     pub known_logs_endpoint: LogIngestEndpoint,
-    // Log endpoint for unknown nodes
+
+    /// Log endpoint for unknown/untrusted nodes
     pub unknown_logs_endpoint: LogIngestEndpoint,
-    // Blacklisted peers from log ingestion
+
+    /// Optional set of peer IDs to blacklist from log ingestion
     #[serde(default)]
     pub blacklist_peers: Option<HashSet<PeerId>>,
 }
@@ -572,35 +952,63 @@ impl LogIngestConfig {
     }
 }
 
+/// Main telemetry service configuration.
+///
+/// Configuration fields use consistent naming patterns:
+/// - `*_config` suffix for nested config structs
+/// - `backend_type` field to select between backends (e.g., victoria_metrics/prometheus, humio/loki)
+/// - Aliases are provided for backward compatibility when field names have been improved
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TelemetryServiceConfig {
+    /// Socket address to bind the service to (e.g., "0.0.0.0:8080")
     pub address: SocketAddr,
+
+    /// Optional TLS certificate path for HTTPS
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls_cert_path: Option<String>,
+
+    /// Optional TLS key path for HTTPS (required if tls_cert_path is set)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls_key_path: Option<String>,
 
+    /// Map of chain name to full node REST API URL for fetching validator sets
     pub trusted_full_node_addresses: HashMap<ChainCommonName, String>,
+
+    /// Interval in seconds to update peer/validator caches
     pub update_interval: u64,
+
+    /// Public full node allowlist: chain_id -> peer_id -> public_key
     pub pfn_allowlist: HashMap<ChainId, HashMap<PeerId, x25519::PublicKey>>,
 
+    /// BigQuery configuration for custom events
     pub custom_event_config: CustomEventConfig,
+
+    /// Log ingestion configuration for known/unknown nodes.
+    /// Supports multiple backends (humio, loki) via `backend_type` field in endpoints.
+    /// Note: Field name preserved as `humio_ingest_config` for backward compatibility;
+    /// use alias `log_ingest_config` in new configurations.
+    #[serde(alias = "log_ingest_config")]
     pub humio_ingest_config: LogIngestConfig,
 
+    /// Map of chain_id -> peer_id -> environment name (for log routing)
     pub log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
+
+    /// Map of chain_id -> peer_id -> identity string (for peer identification)
     pub peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
 
+    /// Metrics endpoints configuration for telemetry service, trusted, and untrusted nodes.
+    /// Supports multiple backends (victoria_metrics, prometheus) via `backend_type` field.
     pub metrics_endpoints_config: MetricsEndpointsConfig,
 
-    /// Custom contract configurations (optional)
-    /// Each entry defines authentication and data sinks for a different custom contract client type
+    /// Custom contract configurations (optional).
+    /// Each entry defines authentication and data sinks for a different custom contract client type.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub custom_contract_configs: Vec<CustomContractConfig>,
 
-    /// Allowlist cache TTL in seconds (optional)
-    /// Controls how long on-chain allowlist data is cached before re-fetching
-    /// Default: 300 seconds (5 minutes). Set lower for testing (e.g., 10 seconds)
+    /// Allowlist cache TTL in seconds (optional).
+    /// Controls how long on-chain allowlist data is cached before re-fetching.
+    /// Default: 300 seconds (5 minutes). Set lower for testing (e.g., 10 seconds).
     #[serde(default = "default_allowlist_cache_ttl_secs")]
     pub allowlist_cache_ttl_secs: u64,
 }

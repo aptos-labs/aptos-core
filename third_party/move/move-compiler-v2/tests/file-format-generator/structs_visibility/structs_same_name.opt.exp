@@ -1,0 +1,124 @@
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0xc0ffee::m_friend
+friend 0xc0ffee::n_friend
+struct S<T0: copy>
+  f: T0
+
+// Function definition at index 0
+friend fun pack$S<T0: copy>(l0: T0): S<T0>
+    local l1: T0
+    move_loc l0
+    pack S<T0>
+    ret
+
+// Function definition at index 1
+friend fun unpack$S<T0: copy>(l0: S<T0>): T0
+    local l1: S<T0>
+    move_loc l0
+    unpack S<T0>
+    ret
+
+// Function definition at index 2
+friend fun borrow$S$0<T0: copy>(l0: &S<T0>): &T0
+    local l1: &S<T0>
+    move_loc l0
+    borrow_field S<T0>, f
+    ret
+
+// Function definition at index 3
+friend fun borrow_mut$S$0<T0: copy>(l0: &mut S<T0>): &mut T0
+    local l1: &mut S<T0>
+    move_loc l0
+    mut_borrow_field S<T0>, f
+    ret
+
+// Bytecode version v10
+module 0xc0ffee::m_friend_2
+friend 0xc0ffee::n_friend
+struct S<T0: copy>
+  f: T0
+
+// Function definition at index 0
+friend fun pack$S<T0: copy>(l0: T0): S<T0>
+    local l1: T0
+    move_loc l0
+    pack S<T0>
+    ret
+
+// Function definition at index 1
+friend fun unpack$S<T0: copy>(l0: S<T0>): T0
+    local l1: S<T0>
+    move_loc l0
+    unpack S<T0>
+    ret
+
+// Function definition at index 2
+friend fun borrow$S$0<T0: copy>(l0: &S<T0>): &T0
+    local l1: &S<T0>
+    move_loc l0
+    borrow_field S<T0>, f
+    ret
+
+// Function definition at index 3
+friend fun borrow_mut$S$0<T0: copy>(l0: &mut S<T0>): &mut T0
+    local l1: &mut S<T0>
+    move_loc l0
+    mut_borrow_field S<T0>, f
+    ret
+
+// Bytecode version v10
+module 0xc0ffee::n_friend
+use 0xc0ffee::m_friend
+use 0xc0ffee::m_friend_2
+// Function definition at index 0
+fun test_borrow_friend_struct(l0: &m_friend::S<u64>): &u64
+    move_loc l0
+    call m_friend::borrow$S$0<u64>
+    ret
+
+// Function definition at index 1
+fun test_borrow_friend_struct_2(l0: &m_friend_2::S<u64>): &u64
+    move_loc l0
+    call m_friend_2::borrow$S$0<u64>
+    ret
+
+// Function definition at index 2
+fun test_mut_borrow_friend_struct(l0: &mut m_friend::S<u64>): &mut u64
+    move_loc l0
+    call m_friend::borrow_mut$S$0<u64>
+    ret
+
+// Function definition at index 3
+fun test_mut_borrow_friend_struct_2(l0: &mut m_friend_2::S<u64>): &mut u64
+    move_loc l0
+    call m_friend_2::borrow_mut$S$0<u64>
+    ret
+
+// Function definition at index 4
+fun test_pack_friend_struct(): m_friend::S<u64>
+    ld_u64 22
+    call m_friend::pack$S<u64>
+    ret
+
+// Function definition at index 5
+fun test_pack_friend_struct_2(): m_friend_2::S<u64>
+    ld_u64 22
+    call m_friend_2::pack$S<u64>
+    ret
+
+// Function definition at index 6
+fun test_unpack_friend_struct(l0: m_friend::S<u64>): u64
+    move_loc l0
+    call m_friend::unpack$S<u64>
+    ret
+
+// Function definition at index 7
+fun test_unpack_friend_struct_2(l0: m_friend_2::S<u64>): u64
+    move_loc l0
+    call m_friend_2::unpack$S<u64>
+    ret
+
+
+============ bytecode verification succeeded ========

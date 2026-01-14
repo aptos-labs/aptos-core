@@ -1,0 +1,292 @@
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0xc0ffee::m
+enum E has copy + drop
+  V1
+    o1: u8
+  V2
+    o1: u8
+    o3: u16
+  V3
+    o2: u8
+  V4
+    o2: u8
+
+// Function definition at index 0
+public fun test_variant$E$V1(l0: &E): bool
+    local l1: &E
+    move_loc l0
+    test_variant E, V1
+    ret
+
+// Function definition at index 1
+public fun test_variant$E$V2(l0: &E): bool
+    local l1: &E
+    move_loc l0
+    test_variant E, V2
+    ret
+
+// Function definition at index 2
+public fun test_variant$E$V3(l0: &E): bool
+    local l1: &E
+    move_loc l0
+    test_variant E, V3
+    ret
+
+// Function definition at index 3
+public fun test_variant$E$V4(l0: &E): bool
+    local l1: &E
+    move_loc l0
+    test_variant E, V4
+    ret
+
+// Function definition at index 4
+public fun pack$E$V1(l0: u8): E
+    local l1: u8
+    move_loc l0
+    pack_variant E, V1
+    ret
+
+// Function definition at index 5
+public fun pack$E$V2(l0: u8, l1: u16): E
+    local l2: u8
+    local l3: u16
+    move_loc l0
+    move_loc l1
+    pack_variant E, V2
+    ret
+
+// Function definition at index 6
+public fun pack$E$V3(l0: u8): E
+    local l1: u8
+    move_loc l0
+    pack_variant E, V3
+    ret
+
+// Function definition at index 7
+public fun pack$E$V4(l0: u8): E
+    local l1: u8
+    move_loc l0
+    pack_variant E, V4
+    ret
+
+// Function definition at index 8
+public fun unpack$E$V1(l0: E): u8
+    local l1: E
+    move_loc l0
+    unpack_variant E, V1
+    ret
+
+// Function definition at index 9
+public fun unpack$E$V2(l0: E): (u8, u16)
+    local l1: E
+    move_loc l0
+    unpack_variant E, V2
+    ret
+
+// Function definition at index 10
+public fun unpack$E$V3(l0: E): u8
+    local l1: E
+    move_loc l0
+    unpack_variant E, V3
+    ret
+
+// Function definition at index 11
+public fun unpack$E$V4(l0: E): u8
+    local l1: E
+    move_loc l0
+    unpack_variant E, V4
+    ret
+
+// Function definition at index 12
+public fun borrow$E$0$0(l0: &E): &u8
+    local l1: &E
+    move_loc l0
+    borrow_variant_field E, V1::o1, V2::o1, V3::o2, V4::o2
+    ret
+
+// Function definition at index 13
+public fun borrow$E$1$1(l0: &E): &u16
+    local l1: &E
+    move_loc l0
+    borrow_variant_field E, V2::o3
+    ret
+
+// Function definition at index 14
+public fun borrow_mut$E$0$0(l0: &mut E): &mut u8
+    local l1: &mut E
+    move_loc l0
+    mut_borrow_variant_field E, V1::o1, V2::o1, V3::o2, V4::o2
+    ret
+
+// Function definition at index 15
+public fun borrow_mut$E$1$1(l0: &mut E): &mut u16
+    local l1: &mut E
+    move_loc l0
+    mut_borrow_variant_field E, V2::o3
+    ret
+
+// Bytecode version v10
+module 0xc0ffee::n6
+use 0xc0ffee::m
+// Function definition at index 0
+fun mut_borrow(l0: &mut m::E): (&mut u8, u16)
+    local l1: u16
+    local l2: &m::E
+    copy_loc l0
+    freeze_ref
+    call m::borrow$E$1$1
+    read_ref
+    st_loc l1
+    // @5
+    copy_loc l0
+    freeze_ref
+    st_loc l2
+    copy_loc l2
+    call m::test_variant$E$V1
+    // @10
+    br_true l0
+    copy_loc l2
+    call m::test_variant$E$V2
+    br_true l0
+    move_loc l2
+    // @15
+    pop
+    move_loc l0
+    pop
+    ld_u64 14566554180833181697
+    abort
+    // @20
+l0: move_loc l2
+    pop
+    move_loc l0
+    call m::borrow_mut$E$0$0
+    move_loc l1
+    // @25
+    ret
+
+// Function definition at index 1
+fun test_match(l0: m::E): bool
+    local l1: &m::E
+    local l2: bool
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    call m::test_variant$E$V1
+    br_false l0
+    // @5
+    move_loc l1
+    pop
+    move_loc l0
+    call m::unpack$E$V1
+    ld_true
+    // @10
+    st_loc l2
+    pop
+    branch l1
+l0: copy_loc l1
+    call m::test_variant$E$V2
+    // @15
+    br_false l2
+    move_loc l1
+    pop
+    move_loc l0
+    call m::unpack$E$V2
+    // @20
+    ld_false
+    st_loc l2
+    pop
+    pop
+    branch l1
+    // @25
+l2: copy_loc l1
+    call m::test_variant$E$V3
+    br_false l3
+    move_loc l1
+    pop
+    // @30
+    move_loc l0
+    call m::unpack$E$V3
+    ld_false
+    st_loc l2
+    pop
+    // @35
+    branch l1
+l3: move_loc l1
+    call m::test_variant$E$V4
+    br_false l4
+    move_loc l0
+    // @40
+    call m::unpack$E$V4
+    ld_false
+    st_loc l2
+    pop
+    branch l1
+    // @45
+l4: ld_u64 14566554180833181697
+    abort
+l1: move_loc l2
+    ret
+
+// Function definition at index 2
+fun test_mut_borrow()
+    local l0: m::E
+    local l1: u8
+    local l2: &mut u8
+    local l3: &m::E
+    ld_u8 0
+    ld_u16 0
+    call m::pack$E$V2
+    st_loc l0
+    mut_borrow_loc l0
+    // @5
+    call mut_borrow
+    ld_u8 1
+    st_loc l1
+    pop
+    st_loc l2
+    // @10
+    move_loc l1
+    move_loc l2
+    write_ref
+    borrow_loc l0
+    st_loc l3
+    // @15
+    copy_loc l3
+    call m::test_variant$E$V1
+    br_true l0
+    copy_loc l3
+    call m::test_variant$E$V2
+    // @20
+    br_true l0
+    move_loc l3
+    pop
+    ld_u64 14566554180833181697
+    abort
+    // @25
+l0: move_loc l3
+    call m::borrow$E$0$0
+    read_ref
+    ld_u8 1
+    eq
+    // @30
+    br_false l1
+    branch l2
+l1: ld_u64 1
+    abort
+l2: borrow_loc l0
+    // @35
+    call m::borrow$E$1$1
+    read_ref
+    ld_u16 0
+    eq
+    br_false l3
+    // @40
+    branch l4
+l3: ld_u64 2
+    abort
+l4: ret
+
+
+============ bytecode verification succeeded ========

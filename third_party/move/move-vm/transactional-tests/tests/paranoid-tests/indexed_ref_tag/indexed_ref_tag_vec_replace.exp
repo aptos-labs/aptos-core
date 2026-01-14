@@ -1,0 +1,12 @@
+processed 2 tasks
+task 0 lines 11-51:  publish [module 0xc0ffe3::vec_replace_confusion]
+task 1 lines 53-53:  run 0xc0ffe3::vec_replace_confusion::stale_vec_replace --verbose
+Error: Function execution failed with VMError: {
+    message: invalid enum tag,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(4),
+    location: 0xc0ffe3::vec_replace_confusion,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 18)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

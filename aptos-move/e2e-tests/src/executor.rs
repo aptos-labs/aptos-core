@@ -88,7 +88,11 @@ use move_core_types::{
     move_resource::{MoveResource, MoveStructType},
     value::MoveValue,
 };
-use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
+use move_coverage::{coverage_map, coverage_map::CoverageMap};
+use move_vm_runtime::{
+    module_traversal::{TraversalContext, TraversalStorage},
+    tracing,
+};
 use move_vm_types::gas::UnmeteredGasMeter;
 use serde::Serialize;
 use std::{
@@ -375,6 +379,66 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
     pub fn with_gas_scaling(mut self, gas_scaling_factor: u64) -> Self {
         self.modify_gas_scaling(gas_scaling_factor);
         self
+    }
+
+    /// Enable code coverage collection for this executor. This is thread safe,
+    /// but all threads should use the same `file_base_name` to avoid logical confusion. If
+    /// multiple threads with the same file generate tracing info concurrently, it will be
+    /// accumulated as expected. See `save_code_coverage` how to persist coverage info
+    /// and how to analyze it.
+    pub fn enable_code_coverage(&self, file_base_name: &str) {
+        // Ensure debugging is enabled in the VM
+        aptos_vm_environment::prod_configs::set_debugging_enabled(true);
+        // Enable execution tracing.
+        let trace_name = format!("{}.mvtr", file_base_name);
+        tracing::enable_tracing(Some(&trace_name));
+    }
+
+    /// Saves code coverage information collected so far into a coverage file.
+    /// An existing coverage file is extended, otherwise new is created. The file is located
+    /// at `"{file_base_name}.mvcov"`. The information collected so far is cleared.
+    ///
+    /// This function is idempotent, that is, if called multiple times in sequence,
+    /// it only adds information not yet collected so far to the coverage file.
+    ///
+    /// A typical way how this is used from code is as follows:
+    ///
+    /// ```ignore
+    ///   executor.enable_code_coverage(coverage_file);
+    ///   for test in tests {
+    ///     test.run();
+    ///     executor.save_code_coverage(coverage_file);
+    ///   }
+    /// ```
+    ///
+    /// The output in `{file_base_name}.mvcov` can be fed in to Aptos CLI for analysis of coverage
+    /// for a given package:
+    ///
+    /// ```ignore
+    ///   package_dir> aptos move \
+    ///      coverage summary --extra-coverage {file_base_name}.mvcov
+    ///   package_dir> aptos move \
+    ///      coverage source --extra-coverage {file_base_name}.mvcov --module my_module
+    /// ```
+    ///
+    /// The coverage in the file will be added to any coverage produced by
+    /// `aptos move test --coverage`, such that both unit tests and e2e tests count
+    /// for overall coverage.
+    ///
+    pub fn save_code_coverage(&self, file_base_name: &str) -> anyhow::Result<()> {
+        let trace_path = PathBuf::from(tracing::get_file_path().load().as_str());
+        let coverage_path = PathBuf::from(format!("{}.mvcov", file_base_name));
+        let map = if coverage_path.exists() {
+            CoverageMap::from_binary_file(&coverage_path)?
+        } else {
+            CoverageMap::default()
+        };
+        // TODO: there is a chance of a racing condition: any entries traced after flush
+        // might be lost and not updated in the coverage map.
+        tracing::flush_tracing_buffer();
+        let map = map.update_coverage_from_trace_file(&trace_path)?;
+        tracing::clear_tracing_buffer(); // we covered what has been traced so far
+        coverage_map::output_map_to_file(&coverage_path, &map)
     }
 
     /// Mutably sets the gas unit scaling factor by updating on-chain gas schedule state

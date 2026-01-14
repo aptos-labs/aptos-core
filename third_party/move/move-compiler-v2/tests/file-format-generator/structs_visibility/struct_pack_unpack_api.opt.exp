@@ -1,0 +1,546 @@
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0x42::m1
+struct T<T0: drop + store> has copy + drop + store
+  h: T0
+
+struct Inner<T0: drop + store> has drop
+  t: T0
+
+struct Nested<T0: copy + drop + store> has copy + drop + store
+  inner: T<V<T0>>
+
+struct NoFields has drop
+  dummy_field: bool
+
+struct P<phantom T0> has drop
+  p: u64
+
+struct S<T0: drop + store> has drop
+  f: u64
+  g: T<T0>
+
+struct V<T0: drop + store> has copy + drop + store
+  items: vector<T0>
+
+// Function definition at index 0
+public fun pack$T<T0: drop + store>(l0: T0): T<T0>
+    local l1: T0
+    move_loc l0
+    pack T<T0>
+    ret
+
+// Function definition at index 1
+public fun unpack$T<T0: drop + store>(l0: T<T0>): T0
+    local l1: T<T0>
+    move_loc l0
+    unpack T<T0>
+    ret
+
+// Function definition at index 2
+public fun borrow$T$0<T0: drop + store>(l0: &T<T0>): &T0
+    local l1: &T<T0>
+    move_loc l0
+    borrow_field T<T0>, h
+    ret
+
+// Function definition at index 3
+public fun borrow_mut$T$0<T0: drop + store>(l0: &mut T<T0>): &mut T0
+    local l1: &mut T<T0>
+    move_loc l0
+    mut_borrow_field T<T0>, h
+    ret
+
+// Function definition at index 4
+public fun pack$Nested<T0: copy + drop + store>(l0: T<V<T0>>): Nested<T0>
+    local l1: T<V<T0>>
+    move_loc l0
+    pack Nested<T0>
+    ret
+
+// Function definition at index 5
+public fun unpack$Nested<T0: copy + drop + store>(l0: Nested<T0>): T<V<T0>>
+    local l1: Nested<T0>
+    move_loc l0
+    unpack Nested<T0>
+    ret
+
+// Function definition at index 6
+public fun borrow$Nested$0<T0: copy + drop + store>(l0: &Nested<T0>): &T<V<T0>>
+    local l1: &Nested<T0>
+    move_loc l0
+    borrow_field Nested<T0>, inner
+    ret
+
+// Function definition at index 7
+public fun borrow_mut$Nested$0<T0: copy + drop + store>(l0: &mut Nested<T0>): &mut T<V<T0>>
+    local l1: &mut Nested<T0>
+    move_loc l0
+    mut_borrow_field Nested<T0>, inner
+    ret
+
+// Function definition at index 8
+public fun pack$NoFields(l0: bool): NoFields
+    local l1: bool
+    move_loc l0
+    pack NoFields
+    ret
+
+// Function definition at index 9
+public fun unpack$NoFields(l0: NoFields): bool
+    local l1: NoFields
+    move_loc l0
+    unpack NoFields
+    ret
+
+// Function definition at index 10
+public fun pack$P<T0>(l0: u64): P<T0>
+    local l1: u64
+    move_loc l0
+    pack P<T0>
+    ret
+
+// Function definition at index 11
+public fun unpack$P<T0>(l0: P<T0>): u64
+    local l1: P<T0>
+    move_loc l0
+    unpack P<T0>
+    ret
+
+// Function definition at index 12
+public fun borrow$P$0<T0>(l0: &P<T0>): &u64
+    local l1: &P<T0>
+    move_loc l0
+    borrow_field P<T0>, p
+    ret
+
+// Function definition at index 13
+public fun borrow_mut$P$0<T0>(l0: &mut P<T0>): &mut u64
+    local l1: &mut P<T0>
+    move_loc l0
+    mut_borrow_field P<T0>, p
+    ret
+
+// Function definition at index 14
+public fun pack$S<T0: drop + store>(l0: u64, l1: T<T0>): S<T0>
+    local l2: u64
+    local l3: T<T0>
+    move_loc l0
+    move_loc l1
+    pack S<T0>
+    ret
+
+// Function definition at index 15
+public fun unpack$S<T0: drop + store>(l0: S<T0>): (u64, T<T0>)
+    local l1: S<T0>
+    move_loc l0
+    unpack S<T0>
+    ret
+
+// Function definition at index 16
+public fun borrow$S$0<T0: drop + store>(l0: &S<T0>): &u64
+    local l1: &S<T0>
+    move_loc l0
+    borrow_field S<T0>, f
+    ret
+
+// Function definition at index 17
+public fun borrow$S$1<T0: drop + store>(l0: &S<T0>): &T<T0>
+    local l1: &S<T0>
+    move_loc l0
+    borrow_field S<T0>, g
+    ret
+
+// Function definition at index 18
+public fun borrow_mut$S$0<T0: drop + store>(l0: &mut S<T0>): &mut u64
+    local l1: &mut S<T0>
+    move_loc l0
+    mut_borrow_field S<T0>, f
+    ret
+
+// Function definition at index 19
+public fun borrow_mut$S$1<T0: drop + store>(l0: &mut S<T0>): &mut T<T0>
+    local l1: &mut S<T0>
+    move_loc l0
+    mut_borrow_field S<T0>, g
+    ret
+
+// Function definition at index 20
+public fun pack$V<T0: drop + store>(l0: vector<T0>): V<T0>
+    local l1: vector<T0>
+    move_loc l0
+    pack V<T0>
+    ret
+
+// Function definition at index 21
+public fun unpack$V<T0: drop + store>(l0: V<T0>): vector<T0>
+    local l1: V<T0>
+    move_loc l0
+    unpack V<T0>
+    ret
+
+// Function definition at index 22
+public fun borrow$V$0<T0: drop + store>(l0: &V<T0>): &vector<T0>
+    local l1: &V<T0>
+    move_loc l0
+    borrow_field V<T0>, items
+    ret
+
+// Function definition at index 23
+public fun borrow_mut$V$0<T0: drop + store>(l0: &mut V<T0>): &mut vector<T0>
+    local l1: &mut V<T0>
+    move_loc l0
+    mut_borrow_field V<T0>, items
+    ret
+
+// Bytecode version v10
+module 0x42::m3
+use 0x42::m1
+struct S<T0: drop + store> has drop
+  f: u64
+  g: m1::T<T0>
+
+// Function definition at index 0
+public fun pack$S<T0: drop + store>(l0: u64, l1: m1::T<T0>): S<T0>
+    local l2: u64
+    local l3: m1::T<T0>
+    move_loc l0
+    move_loc l1
+    pack S<T0>
+    ret
+
+// Function definition at index 1
+public fun unpack$S<T0: drop + store>(l0: S<T0>): (u64, m1::T<T0>)
+    local l1: S<T0>
+    move_loc l0
+    unpack S<T0>
+    ret
+
+// Function definition at index 2
+public fun borrow$S$0<T0: drop + store>(l0: &S<T0>): &u64
+    local l1: &S<T0>
+    move_loc l0
+    borrow_field S<T0>, f
+    ret
+
+// Function definition at index 3
+public fun borrow$S$1<T0: drop + store>(l0: &S<T0>): &m1::T<T0>
+    local l1: &S<T0>
+    move_loc l0
+    borrow_field S<T0>, g
+    ret
+
+// Function definition at index 4
+public fun borrow_mut$S$0<T0: drop + store>(l0: &mut S<T0>): &mut u64
+    local l1: &mut S<T0>
+    move_loc l0
+    mut_borrow_field S<T0>, f
+    ret
+
+// Function definition at index 5
+public fun borrow_mut$S$1<T0: drop + store>(l0: &mut S<T0>): &mut m1::T<T0>
+    local l1: &mut S<T0>
+    move_loc l0
+    mut_borrow_field S<T0>, g
+    ret
+
+// Bytecode version v10
+module 0x42::m2
+use 0x42::m1
+use 0x42::m3
+// Function definition at index 0
+#[persistent] public fun return_struct(): m1::S<u64>
+    ld_u64 77
+    ld_u64 88
+    call m1::pack$T<u64>
+    call m1::pack$S<u64>
+    ret
+
+// Function definition at index 1
+#[persistent] public fun take_struct(l0: m1::S<vector<u8>>)
+    borrow_loc l0
+    call m1::borrow$S$1<vector<u8>>
+    call m1::borrow$T$0<vector<u8>>
+    ld_u64 0
+    vec_borrow <u8>
+    // @5
+    read_ref
+    ld_u8 255
+    eq
+    br_false l0
+    ret
+    // @10
+l0: ld_u64 12
+    abort
+
+// Function definition at index 2
+#[persistent] public fun try_nested_pack()
+    local l0: m1::Nested<u64>
+    ld_const<vector<u64>> [1, 2, 3]
+    call m1::pack$V<u64>
+    call m1::pack$T<m1::V<u64>>
+    call m1::pack$Nested<u64>
+    st_loc l0
+    // @5
+    borrow_loc l0
+    call m1::borrow$Nested$0<u64>
+    call m1::borrow$T$0<m1::V<u64>>
+    call m1::borrow$V$0<u64>
+    ld_u64 2
+    // @10
+    vec_borrow <u64>
+    read_ref
+    ld_u64 3
+    eq
+    br_false l0
+    // @15
+    ret
+l0: ld_u64 7
+    abort
+
+// Function definition at index 3
+#[persistent] public fun try_pack()
+    local l0: m1::T<u64>
+    local l1: m1::S<u64>
+    ld_u64 42
+    call m1::pack$T<u64>
+    st_loc l0
+    borrow_loc l0
+    call m1::borrow$T$0<u64>
+    // @5
+    read_ref
+    ld_u64 42
+    eq
+    br_false l0
+    ld_u64 43
+    // @10
+    move_loc l0
+    call m1::pack$S<u64>
+    st_loc l1
+    borrow_loc l1
+    call m1::borrow$S$0<u64>
+    // @15
+    read_ref
+    ld_u64 43
+    eq
+    br_false l1
+    ret
+    // @20
+l1: ld_u64 2
+    abort
+l0: ld_u64 1
+    abort
+
+// Function definition at index 4
+#[persistent] public fun try_pack_S3()
+    local l0: m1::T<u64>
+    local l1: m3::S<u64>
+    ld_u64 42
+    call m1::pack$T<u64>
+    st_loc l0
+    borrow_loc l0
+    call m1::borrow$T$0<u64>
+    // @5
+    read_ref
+    ld_u64 42
+    eq
+    br_false l0
+    ld_u64 43
+    // @10
+    move_loc l0
+    call m3::pack$S<u64>
+    st_loc l1
+    borrow_loc l1
+    call m3::borrow$S$0<u64>
+    // @15
+    read_ref
+    ld_u64 43
+    eq
+    br_false l1
+    borrow_loc l1
+    // @20
+    call m3::borrow$S$1<u64>
+    call m1::borrow$T$0<u64>
+    read_ref
+    ld_u64 42
+    eq
+    // @25
+    br_false l2
+    ret
+l2: ld_u64 14
+    abort
+l1: ld_u64 13
+    // @30
+    abort
+l0: ld_u64 1
+    abort
+
+// Function definition at index 5
+#[persistent] public fun try_pack_unpack_no_fields()
+    ld_false
+    call m1::pack$NoFields
+    call m1::unpack$NoFields
+    pop
+    ret
+
+// Function definition at index 6
+#[persistent] public fun try_pack_unpack_phantom()
+    local l0: m1::P<m1::Inner<u64>>
+    ld_u64 42
+    call m1::pack$P<m1::Inner<u64>>
+    st_loc l0
+    borrow_loc l0
+    call m1::borrow$P$0<m1::Inner<u64>>
+    // @5
+    read_ref
+    ld_u64 42
+    eq
+    br_false l0
+    move_loc l0
+    // @10
+    call m1::unpack$P<m1::Inner<u64>>
+    ld_u64 42
+    eq
+    br_false l1
+    ret
+    // @15
+l1: ld_u64 4
+    abort
+l0: ld_u64 1
+    abort
+
+// Function definition at index 7
+#[persistent] public fun try_pack_vector()
+    local l0: m1::T<vector<u64>>
+    ld_const<vector<u64>> [42]
+    call m1::pack$T<vector<u64>>
+    st_loc l0
+    borrow_loc l0
+    call m1::borrow$T$0<vector<u64>>
+    // @5
+    ld_u64 0
+    vec_borrow <u64>
+    read_ref
+    ld_u64 42
+    eq
+    // @10
+    br_false l0
+    ret
+l0: ld_u64 3
+    abort
+
+// Function definition at index 8
+#[persistent] public fun try_pass_struct_as_arg()
+    ld_u64 1
+    ld_const<vector<u8>> [255]
+    call m1::pack$T<vector<u8>>
+    call m1::pack$S<vector<u8>>
+    call take_struct
+    // @5
+    ret
+
+// Function definition at index 9
+#[persistent] public fun try_return_struct()
+    local l0: u64
+    call return_struct
+    call m1::unpack$S<u64>
+    call m1::unpack$T<u64>
+    st_loc l0
+    ld_u64 77
+    // @5
+    eq
+    br_false l0
+    move_loc l0
+    ld_u64 88
+    eq
+    // @10
+    br_false l1
+    ret
+l1: ld_u64 11
+    abort
+l0: ld_u64 10
+    // @15
+    abort
+
+// Function definition at index 10
+#[persistent] public fun try_unpack()
+    local l0: u64
+    ld_u64 43
+    ld_u64 42
+    call m1::pack$T<u64>
+    call m1::pack$S<u64>
+    call m1::unpack$S<u64>
+    // @5
+    call m1::unpack$T<u64>
+    st_loc l0
+    ld_u64 43
+    eq
+    br_false l0
+    // @10
+    move_loc l0
+    ld_u64 42
+    eq
+    br_false l1
+    ret
+    // @15
+l1: ld_u64 5
+    abort
+l0: ld_u64 4
+    abort
+
+// Function definition at index 11
+#[persistent] public fun try_unpack_nested()
+    local l0: vector<u64>
+    ld_const<vector<u64>> [10, 20]
+    call m1::pack$V<u64>
+    call m1::pack$T<m1::V<u64>>
+    call m1::pack$Nested<u64>
+    call m1::unpack$Nested<u64>
+    // @5
+    call m1::unpack$T<m1::V<u64>>
+    call m1::unpack$V<u64>
+    st_loc l0
+    borrow_loc l0
+    ld_u64 0
+    // @10
+    vec_borrow <u64>
+    read_ref
+    ld_u64 10
+    eq
+    br_false l0
+    // @15
+    borrow_loc l0
+    ld_u64 1
+    vec_borrow <u64>
+    read_ref
+    ld_u64 20
+    // @20
+    eq
+    br_false l1
+    ret
+l1: ld_u64 9
+    abort
+    // @25
+l0: ld_u64 8
+    abort
+
+// Function definition at index 12
+#[persistent] public fun try_unpack_with_let_ignore()
+    ld_u64 100
+    ld_u64 7
+    call m1::pack$T<u64>
+    call m1::pack$S<u64>
+    call m1::unpack$S<u64>
+    // @5
+    pop
+    ld_u64 100
+    eq
+    br_false l0
+    ret
+    // @10
+l0: ld_u64 6
+    abort
+
+
+============ bytecode verification succeeded ========

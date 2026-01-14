@@ -110,7 +110,7 @@ fn script_large_ty() {
     let vm_config = VMConfig {
         verifier_config,
         paranoid_type_checks: true,
-        ..Default::default()
+        ..VMConfig::default_for_test()
     };
     let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
     let mut storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);

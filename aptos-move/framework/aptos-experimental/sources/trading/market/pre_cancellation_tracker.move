@@ -31,12 +31,14 @@ module aptos_experimental::pre_cancellation_tracker {
     const BIG_MAP_INNER_DEGREE: u16 = 64;
     const BIG_MAP_LEAF_DEGREE: u16 = 32;
 
-    struct PreCancellationTracker has store {
-        pre_cancellation_window_secs: u64,
-        // Map of order IDs with expiration time to a boolean indicating if the order is active.
-        expiration_with_order_ids: BigOrderedMap<ExpirationAndOrderId, bool>,
-        // Map of order Ids to their corresponding expiration time.
-        account_order_ids: BigOrderedMap<AccountClientOrderId, u64>
+    enum PreCancellationTracker has store {
+        V1 {
+            pre_cancellation_window_secs: u64,
+            // Map of order IDs with expiration time to a boolean indicating if the order is active.
+            expiration_with_order_ids: BigOrderedMap<ExpirationAndOrderId, bool>,
+            // Map of order Ids to their corresponding expiration time.
+            account_order_ids: BigOrderedMap<AccountClientOrderId, u64>
+        }
     }
 
     struct ExpirationAndOrderId has copy, drop, store {
@@ -53,7 +55,7 @@ module aptos_experimental::pre_cancellation_tracker {
     }
 
     public(friend) fun new_pre_cancellation_tracker(expiration_time_secs: u64): PreCancellationTracker {
-        PreCancellationTracker {
+        PreCancellationTracker::V1 {
             pre_cancellation_window_secs: expiration_time_secs,
             expiration_with_order_ids: new_default_big_ordered_map(),
             account_order_ids: new_default_big_ordered_map(),
@@ -135,7 +137,7 @@ module aptos_experimental::pre_cancellation_tracker {
     public fun destroy_tracker(tracker: PreCancellationTracker) {
         // This function is used to destroy the tracker in tests.
         // In production, the tracker will be garbage collected automatically.
-        let PreCancellationTracker {
+        let PreCancellationTracker::V1 {
             pre_cancellation_window_secs: _,
             expiration_with_order_ids: order_ids_with_expiration,
             account_order_ids

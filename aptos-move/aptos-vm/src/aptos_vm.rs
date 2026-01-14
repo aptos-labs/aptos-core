@@ -6,7 +6,7 @@ use crate::{
     counters::*,
     data_cache::{AsMoveResolver, StorageAdapter},
     errors::{discarded_output, expect_only_successful_execution},
-    gas::{check_gas, make_prod_gas_meter, ProdGasMeter},
+    gas::{check_gas, make_prod_gas_meter, make_prod_gas_meter_impl},
     keyless_validation,
     move_vm_ext::{
         session::{
@@ -40,13 +40,14 @@ use aptos_block_executor::{
 use aptos_crypto::HashValue;
 use aptos_framework::natives::code::PublishRequest;
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
-use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
+use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::{
     gas_feature_versions,
     gas_feature_versions::{RELEASE_V1_10, RELEASE_V1_27, RELEASE_V1_38},
     AptosGasParameters, VMGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
+use aptos_memory_usage_tracker::{MemoryAlgebra, MemoryTrackedGasMeterImpl};
 use aptos_metrics_core::IntCounterVecHelper;
 #[cfg(any(test, feature = "testing"))]
 use aptos_types::state_store::StateViewId;
@@ -77,11 +78,11 @@ use aptos_types::{
         authenticator::{AbstractAuthenticationData, AnySignature, AuthenticationProof},
         block_epilogue::{BlockEpiloguePayload, FeeDistribution},
         signature_verified_transaction::SignatureVerifiedTransaction,
-        AuxiliaryInfo, AuxiliaryInfoTrait, BlockOutput, EntryFunction, ExecutionError,
-        ExecutionStatus, ModuleBundle, MultisigTransactionPayload, ReplayProtector, Script,
-        SignedTransaction, Transaction, TransactionArgument, TransactionExecutableRef,
-        TransactionExtraConfig, TransactionOutput, TransactionPayload, TransactionStatus,
-        VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
+        AuxiliaryInfo, BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle,
+        MultisigTransactionPayload, ReplayProtector, Script, SignedTransaction, Transaction,
+        TransactionArgument, TransactionExecutableRef, TransactionExtraConfig, TransactionOutput,
+        TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
+        WriteSetPayload,
     },
     vm::module_metadata::{
         get_compilation_metadata, get_metadata, get_randomness_annotation_for_entry_function,
@@ -640,7 +641,7 @@ impl AptosVM {
         if let ExecutionStatus::MoveAbort {
             location: AbortLocation::Module(module_id),
             code,
-            ..
+            info: current_info,
         } = status
         {
             // Note: in general, this module should have been charged for (because the location is
@@ -660,12 +661,20 @@ impl AptosVM {
                 );
             }
 
-            let info = module_storage
+            let mut info = module_storage
                 .unmetered_get_deserialized_module(module_id.address(), module_id.name())
                 .ok()
                 .flatten()
                 .and_then(|module| get_metadata(&module.metadata))
                 .and_then(|m| m.extract_abort_info(code));
+
+            // If the abort had a message, override the description with the message.
+            if let Some(mut current_info) = current_info {
+                if let Some(info) = info {
+                    current_info.reason_name = info.reason_name;
+                }
+                info = Some(current_info);
+            }
 
             ExecutionStatus::MoveAbort {
                 location: AbortLocation::Module(module_id),
@@ -2180,7 +2189,7 @@ impl AptosVM {
     ///
     /// This can be useful for off-chain applications that wants to perform additional
     /// measurements or analysis while preserving the production gas behavior.
-    pub fn execute_user_transaction_with_modified_gas_meter<'a, G, F>(
+    pub fn execute_user_transaction_with_modified_gas_meter<'a, G, M, F>(
         &self,
         resolver: &'a impl AptosMoveResolver,
         code_storage: &'a (impl AptosCodeStorage + BlockSynchronizationKillSwitch),
@@ -2190,8 +2199,14 @@ impl AptosVM {
         auxiliary_info: &AuxiliaryInfo,
     ) -> Result<(VMStatus, VMOutput, G), VMStatus>
     where
-        F: FnOnce(ProdGasMeter<'a, NoopBlockSynchronizationKillSwitch>) -> G,
+        F: FnOnce(
+            MemoryTrackedGasMeterImpl<
+                StandardGasMeter<StandardGasAlgebra<'a, NoopBlockSynchronizationKillSwitch>>,
+                M,
+            >,
+        ) -> G,
         G: AptosGasMeter,
+        M: MemoryAlgebra,
     {
         self.execute_user_transaction_with_custom_gas_meter(
             resolver,
@@ -2204,7 +2219,7 @@ impl AptosVM {
              is_approved_gov_script,
              meter_balance,
              _maybe_block_synchronization_kill_switch| {
-                modify_gas_meter(make_prod_gas_meter(
+                modify_gas_meter(make_prod_gas_meter_impl::<_, M>(
                     gas_feature_version,
                     vm_gas_params,
                     storage_gas_params,
@@ -2671,7 +2686,7 @@ impl AptosVM {
             Err(e) => {
                 let vm_status = e.clone().into_vm_status();
                 match vm_status {
-                    VMStatus::MoveAbort(_, _) => {},
+                    VMStatus::MoveAbort { .. } => {},
                     _ => {
                         let message = e
                             .message()
@@ -2948,16 +2963,21 @@ impl AptosVM {
                             },
                         // Paranoid mode failure but with reference safety checks
                         StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
-                        if vm_status.sub_status()
-                            == Some(unknown_invariant_violation::EREFERENCE_SAFETY_FAILURE) =>
-                            {
-                                error!(
-                                *log_context,
-                                "[aptos_vm] Transaction breaking paranoid reference safety check. txn: {:?}, status: {:?}",
-                                bcs::to_bytes::<SignedTransaction>(txn),
-                                vm_status,
+                        if matches!(
+                            vm_status.sub_status(),
+                            Some(
+                                unknown_invariant_violation::EREFERENCE_SAFETY_FAILURE
+                                | unknown_invariant_violation::EINDEXED_REF_TAG_MISMATCH
+                            )
+                        ) =>
+                        {
+                            error!(
+                            *log_context,
+                            "[aptos_vm] Transaction breaking paranoid reference safety check (including enum tag guard). txn: {:?}, status: {:?}",
+                            bcs::to_bytes::<SignedTransaction>(txn),
+                            vm_status,
                             );
-                            },
+                        }
                         // Ignore DelayedFields speculative errors as it can be intentionally triggered by parallel execution.
                         StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR => (),
                         // We will log the rest of invariant violation directly with regular logger as they shouldn't happen.
@@ -3185,14 +3205,13 @@ impl VMValidator for AptosVM {
         if transaction.payload().is_encrypted_variant() {
             return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
         }
-
         let txn = match transaction.check_signature() {
             Ok(t) => t,
             _ => {
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
             },
         };
-        let auxiliary_info = AuxiliaryInfo::new_empty();
+        let auxiliary_info = AuxiliaryInfo::new_timestamp_not_yet_assigned(0);
         let txn_data = TransactionMetadata::new(&txn, &auxiliary_info);
 
         let resolver = self.as_move_resolver(&state_view);
@@ -3326,7 +3345,7 @@ impl AptosSimulationVM {
             &code_storage,
             transaction,
             &log_context,
-            &AuxiliaryInfo::new_empty(),
+            &AuxiliaryInfo::new_timestamp_not_yet_assigned(0),
         );
         let txn_output = vm_output
             .try_materialize_into_transaction_output(&resolver)

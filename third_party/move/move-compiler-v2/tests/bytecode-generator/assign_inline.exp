@@ -70,7 +70,7 @@ public fun assign::main(): (u64, u64) {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0x42::assign
 // Function definition at index 0
 #[persistent] public fun main(): (u64, u64)

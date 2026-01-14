@@ -219,7 +219,9 @@ impl<'db> ProvableStateSummary<'db> {
             let (val_opt, proof) = self
                 .db
                 // check the full proof
-                .get_state_value_with_proof_by_version_ext(key, version, 0)?;
+                .get_state_value_with_proof_by_version_ext(
+                    key, version, /* root_depth = */ 0, /* use_hot_state = */ false,
+                )?;
             proof.verify(
                 self.state_summary.global_state_summary.root_hash(),
                 *key,
@@ -227,9 +229,9 @@ impl<'db> ProvableStateSummary<'db> {
             )?;
             Ok(proof)
         } else {
-            Ok(self
-                .db
-                .get_state_proof_by_version_ext(key, version, root_depth)?)
+            Ok(self.db.get_state_proof_by_version_ext(
+                key, version, root_depth, /* use_hot_state = */ false,
+            )?)
         }
     }
 }

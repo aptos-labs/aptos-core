@@ -3,6 +3,7 @@
 
 use crate::metrics::{COUNTER, GAUGE, OTHER_TIMERS_SECONDS};
 use anyhow::{ensure, Result};
+use aptos_config::config::HotStateConfig;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntCounterVecHelper, IntGaugeVecHelper, TimerHelper};
@@ -10,10 +11,7 @@ use aptos_storage_interface::state_store::{
     state::State, state_view::hot_state_view::HotStateView,
 };
 use aptos_types::state_store::{
-    hot_state::{HotStateConfig, THotStateSlot},
-    state_key::StateKey,
-    state_slot::StateSlot,
-    NUM_STATE_SHARDS,
+    hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot, NUM_STATE_SHARDS,
 };
 #[cfg(test)]
 use aptos_types::transaction::Version;
@@ -269,11 +267,11 @@ impl Committer {
             );
 
             debug_assert!(self.validate_lru(shard_id).is_ok());
-
-            COUNTER.inc_with_by(&["hot_state_insert"], n_insert);
-            COUNTER.inc_with_by(&["hot_state_update"], n_update);
-            COUNTER.inc_with_by(&["hot_state_evict"], n_evict);
         }
+
+        COUNTER.inc_with_by(&["hot_state_insert"], n_insert);
+        COUNTER.inc_with_by(&["hot_state_update"], n_update);
+        COUNTER.inc_with_by(&["hot_state_evict"], n_evict);
     }
 
     /// Traverses the entire map and checks if all the pointers are correctly linked.

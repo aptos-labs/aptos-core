@@ -335,7 +335,9 @@ pub enum Opcodes {
     CAST_I64                    = 0x64,
     CAST_I128                   = 0x65,
     CAST_I256                   = 0x66,
-    NEGATE                      = 0x67
+    NEGATE                      = 0x67,
+    // Since bytecode version 10
+    ABORT_MSG                   = 0x68,
 }
 
 /// Upper limit on the binary size
@@ -552,22 +554,25 @@ pub const VERSION_8: u32 = 8;
 /// + allow `$` in identifiers
 pub const VERSION_9: u32 = 9;
 
+/// Version 10: changes compared to version 9
+/// + abort with message instruction
+pub const VERSION_10: u32 = 10;
+
+/// Mark which oldest version is supported.
+pub const VERSION_MIN: u32 = VERSION_5;
+
 /// Mark which version is the latest version.
-pub const VERSION_MAX: u32 = VERSION_9;
+pub const VERSION_MAX: u32 = VERSION_10;
 
 /// Mark which version is the default version. This is the version used by default by tools like
 /// the compiler. Notice that this version might be different from the one supported on nodes.
 /// The node's max version is determined by the on-chain config for that node.
-pub const VERSION_DEFAULT: u32 = VERSION_8;
+/// !!! For user experience, the default version needs to be already in production.
+pub const VERSION_DEFAULT: u32 = VERSION_9;
 
-/// Mark which version is the default version if compiling Move 2.
-pub const VERSION_DEFAULT_LANG_V2: u32 = VERSION_8;
-
-/// Mark which version is the default version if compiling with language version 2.3
-pub const VERSION_DEFAULT_LANG_V2_3: u32 = VERSION_9;
-
-// Mark which oldest version is supported.
-pub const VERSION_MIN: u32 = VERSION_5;
+/// Mark which bytecode version is the default if compiling with language version 2.4 -
+/// In general, these are used to set up the default bytecode version for language versions higher than the default.
+pub const VERSION_DEFAULT_LANG_V2_4: u32 = VERSION_10;
 
 pub(crate) mod versioned_data {
     use crate::{errors::*, file_format_common::*};
@@ -798,6 +803,7 @@ pub fn instruction_key(instruction: &Bytecode) -> u8 {
         Le => Opcodes::LE,
         Ge => Opcodes::GE,
         Abort => Opcodes::ABORT,
+        AbortMsg => Opcodes::ABORT_MSG,
         Nop => Opcodes::NOP,
         Exists(_) => Opcodes::EXISTS,
         ExistsGeneric(_) => Opcodes::EXISTS_GENERIC,

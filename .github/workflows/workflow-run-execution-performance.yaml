@@ -108,7 +108,7 @@ on:
 jobs:
   # This job determines which tests to run
   test-target-determinator:
-    runs-on: ubuntu-latest
+    runs-on: 2cpu-gh-ubuntu24-x64
     outputs:
       run_execution_performance_test: ${{ steps.determine_test_targets.outputs.run_execution_performance_test }}
     steps:

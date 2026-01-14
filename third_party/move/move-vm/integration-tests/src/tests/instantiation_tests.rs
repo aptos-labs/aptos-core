@@ -116,7 +116,7 @@ fn instantiation_err() {
 
     let vm_config = VMConfig {
         paranoid_type_checks: false,
-        ..VMConfig::default()
+        ..VMConfig::default_for_test()
     };
     let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
     let storage: InMemoryStorage =

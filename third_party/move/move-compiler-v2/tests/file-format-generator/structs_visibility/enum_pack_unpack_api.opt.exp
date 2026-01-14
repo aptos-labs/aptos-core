@@ -1,0 +1,372 @@
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0x42::m1
+enum E has drop
+  A
+    x: u64
+  B
+    x: u64
+
+enum Inner
+  Inner1
+    x: u64
+  Inner2
+    x: u64
+    y: u64
+
+enum Result<T0: copy + drop, T1: copy + drop> has copy + drop
+  Ok
+    _0: T0
+  Err
+    _0: T1
+
+// Function definition at index 0
+public fun test_variant$E$A(l0: &E): bool
+    local l1: &E
+    move_loc l0
+    test_variant E, A
+    ret
+
+// Function definition at index 1
+public fun test_variant$E$B(l0: &E): bool
+    local l1: &E
+    move_loc l0
+    test_variant E, B
+    ret
+
+// Function definition at index 2
+public fun pack$E$A(l0: u64): E
+    local l1: u64
+    move_loc l0
+    pack_variant E, A
+    ret
+
+// Function definition at index 3
+public fun pack$E$B(l0: u64): E
+    local l1: u64
+    move_loc l0
+    pack_variant E, B
+    ret
+
+// Function definition at index 4
+public fun unpack$E$A(l0: E): u64
+    local l1: E
+    move_loc l0
+    unpack_variant E, A
+    ret
+
+// Function definition at index 5
+public fun unpack$E$B(l0: E): u64
+    local l1: E
+    move_loc l0
+    unpack_variant E, B
+    ret
+
+// Function definition at index 6
+public fun borrow$E$0$0(l0: &E): &u64
+    local l1: &E
+    move_loc l0
+    borrow_variant_field E, A::x, B::x
+    ret
+
+// Function definition at index 7
+public fun borrow_mut$E$0$0(l0: &mut E): &mut u64
+    local l1: &mut E
+    move_loc l0
+    mut_borrow_variant_field E, A::x, B::x
+    ret
+
+// Function definition at index 8
+public fun test_variant$Inner$Inner1(l0: &Inner): bool
+    local l1: &Inner
+    move_loc l0
+    test_variant Inner, Inner1
+    ret
+
+// Function definition at index 9
+public fun test_variant$Inner$Inner2(l0: &Inner): bool
+    local l1: &Inner
+    move_loc l0
+    test_variant Inner, Inner2
+    ret
+
+// Function definition at index 10
+public fun pack$Inner$Inner1(l0: u64): Inner
+    local l1: u64
+    move_loc l0
+    pack_variant Inner, Inner1
+    ret
+
+// Function definition at index 11
+public fun pack$Inner$Inner2(l0: u64, l1: u64): Inner
+    local l2: u64
+    local l3: u64
+    move_loc l0
+    move_loc l1
+    pack_variant Inner, Inner2
+    ret
+
+// Function definition at index 12
+public fun unpack$Inner$Inner1(l0: Inner): u64
+    local l1: Inner
+    move_loc l0
+    unpack_variant Inner, Inner1
+    ret
+
+// Function definition at index 13
+public fun unpack$Inner$Inner2(l0: Inner): (u64, u64)
+    local l1: Inner
+    move_loc l0
+    unpack_variant Inner, Inner2
+    ret
+
+// Function definition at index 14
+public fun borrow$Inner$0$0(l0: &Inner): &u64
+    local l1: &Inner
+    move_loc l0
+    borrow_variant_field Inner, Inner1::x, Inner2::x
+    ret
+
+// Function definition at index 15
+public fun borrow$Inner$1$1(l0: &Inner): &u64
+    local l1: &Inner
+    move_loc l0
+    borrow_variant_field Inner, Inner2::y
+    ret
+
+// Function definition at index 16
+public fun borrow_mut$Inner$0$0(l0: &mut Inner): &mut u64
+    local l1: &mut Inner
+    move_loc l0
+    mut_borrow_variant_field Inner, Inner1::x, Inner2::x
+    ret
+
+// Function definition at index 17
+public fun borrow_mut$Inner$1$1(l0: &mut Inner): &mut u64
+    local l1: &mut Inner
+    move_loc l0
+    mut_borrow_variant_field Inner, Inner2::y
+    ret
+
+// Function definition at index 18
+public fun test_variant$Result$Ok<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): bool
+    local l1: &Result<T0, T1>
+    move_loc l0
+    test_variant Result<T0, T1>, Ok
+    ret
+
+// Function definition at index 19
+public fun test_variant$Result$Err<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): bool
+    local l1: &Result<T0, T1>
+    move_loc l0
+    test_variant Result<T0, T1>, Err
+    ret
+
+// Function definition at index 20
+public fun pack$Result$Ok<T0: copy + drop, T1: copy + drop>(l0: T0): Result<T0, T1>
+    local l1: T0
+    move_loc l0
+    pack_variant Result<T0, T1>, Ok
+    ret
+
+// Function definition at index 21
+public fun pack$Result$Err<T0: copy + drop, T1: copy + drop>(l0: T1): Result<T0, T1>
+    local l1: T1
+    move_loc l0
+    pack_variant Result<T0, T1>, Err
+    ret
+
+// Function definition at index 22
+public fun unpack$Result$Ok<T0: copy + drop, T1: copy + drop>(l0: Result<T0, T1>): T0
+    local l1: Result<T0, T1>
+    move_loc l0
+    unpack_variant Result<T0, T1>, Ok
+    ret
+
+// Function definition at index 23
+public fun unpack$Result$Err<T0: copy + drop, T1: copy + drop>(l0: Result<T0, T1>): T1
+    local l1: Result<T0, T1>
+    move_loc l0
+    unpack_variant Result<T0, T1>, Err
+    ret
+
+// Function definition at index 24
+public fun borrow$Result$0$0<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): &T0
+    local l1: &Result<T0, T1>
+    move_loc l0
+    borrow_variant_field Result<T0, T1>, Ok::_0
+    ret
+
+// Function definition at index 25
+public fun borrow$Result$0$1<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): &T1
+    local l1: &Result<T0, T1>
+    move_loc l0
+    borrow_variant_field Result<T0, T1>, Err::_0
+    ret
+
+// Function definition at index 26
+public fun borrow_mut$Result$0$0<T0: copy + drop, T1: copy + drop>(l0: &mut Result<T0, T1>): &mut T0
+    local l1: &mut Result<T0, T1>
+    move_loc l0
+    mut_borrow_variant_field Result<T0, T1>, Ok::_0
+    ret
+
+// Function definition at index 27
+public fun borrow_mut$Result$0$1<T0: copy + drop, T1: copy + drop>(l0: &mut Result<T0, T1>): &mut T1
+    local l1: &mut Result<T0, T1>
+    move_loc l0
+    mut_borrow_variant_field Result<T0, T1>, Err::_0
+    ret
+
+// Bytecode version v10
+module 0x42::m2
+use 0x42::m1
+// Function definition at index 0
+#[persistent] public fun test_pack_unpack_result_err()
+    ld_u8 7
+    call m1::pack$Result$Err<u64, u8>
+    call m1::unpack$Result$Err<u64, u8>
+    ld_u8 7
+    eq
+    // @5
+    br_false l0
+    ret
+l0: ld_u64 3
+    abort
+
+// Function definition at index 1
+#[persistent] public fun test_pack_unpack_result_ok()
+    local l0: m1::Result<u64, u64>
+    ld_u64 42
+    call m1::pack$Result$Ok<u64, u64>
+    st_loc l0
+    copy_loc l0
+    ld_u64 42
+    // @5
+    call m1::pack$Result$Ok<u64, u64>
+    eq
+    br_false l0
+    move_loc l0
+    call m1::unpack$Result$Ok<u64, u64>
+    // @10
+    ld_u64 42
+    eq
+    br_false l1
+    ret
+l1: ld_u64 2
+    // @15
+    abort
+l0: ld_u64 1
+    abort
+
+// Function definition at index 2
+#[persistent] public fun test_unpack_enum_e()
+    local l0: m1::E
+    ld_u64 100
+    call m1::pack$E$A
+    ld_u64 200
+    call m1::pack$E$B
+    st_loc l0
+    // @5
+    call m1::unpack$E$A
+    ld_u64 100
+    eq
+    br_false l0
+    move_loc l0
+    // @10
+    call m1::unpack$E$B
+    ld_u64 200
+    eq
+    br_false l1
+    ret
+    // @15
+l1: ld_u64 5
+    abort
+l0: ld_u64 4
+    abort
+
+// Function definition at index 3
+#[persistent] public fun test_unpack_inner()
+    local l0: m1::Inner
+    local l1: m1::Inner
+    local l2: &m1::Inner
+    local l3: u64
+    local l4: &m1::Inner
+    local l5: u64
+    local l6: u64
+    local l7: u64
+    ld_u64 10
+    call m1::pack$Inner$Inner1
+    st_loc l0
+    ld_u64 20
+    ld_u64 30
+    // @5
+    call m1::pack$Inner$Inner2
+    st_loc l1
+    borrow_loc l0
+    st_loc l2
+    copy_loc l2
+    // @10
+    call m1::test_variant$Inner$Inner1
+    br_false l0
+    move_loc l2
+    pop
+    move_loc l0
+    // @15
+    call m1::unpack$Inner$Inner1
+    st_loc l3
+l7: borrow_loc l1
+    st_loc l4
+    copy_loc l4
+    // @20
+    call m1::test_variant$Inner$Inner1
+    br_false l1
+    move_loc l4
+    pop
+    move_loc l1
+    // @25
+    call m1::unpack$Inner$Inner1
+    st_loc l5
+l5: move_loc l3
+    ld_u64 10
+    eq
+    // @30
+    br_false l2
+    move_loc l5
+    ld_u64 50
+    eq
+    br_false l3
+    // @35
+    ret
+l3: ld_u64 7
+    abort
+l2: ld_u64 6
+    abort
+    // @40
+l1: move_loc l4
+    call m1::test_variant$Inner$Inner2
+    br_false l4
+    move_loc l1
+    call m1::unpack$Inner$Inner2
+    // @45
+    add
+    st_loc l5
+    branch l5
+l4: ld_u64 14566554180833181697
+    abort
+    // @50
+l0: move_loc l2
+    call m1::test_variant$Inner$Inner2
+    br_false l6
+    move_loc l0
+    call m1::unpack$Inner$Inner2
+    // @55
+    add
+    st_loc l3
+    branch l7
+l6: ld_u64 14566554180833181697
+    abort
+
+
+============ bytecode verification succeeded ========
