@@ -4,10 +4,10 @@ module 0x2::Map {
     }
     public native fun empty<K,V>(): T<K, V>;
     public native fun remove<K,V>(m: &T<K, V>,k: &K): V;
+    public native fun insert<K,V>(m: &T<K, V>,k: K,v: V);
     public native fun contains_key<K,V>(m: &T<K, V>,k: &K): bool;
     public native fun get<K,V>(m: &T<K, V>,k: &K): &V;
     public native fun get_mut<K,V>(m: &mut T<K, V>,k: &K): &mut V;
-    public native fun insert<K,V>(m: &T<K, V>,k: K,v: V);
 } // end 0x2::Map
 module 0x2::Token {
     struct Coin<AssetType> {
@@ -287,10 +287,10 @@ module 0x2::Map {
     }
     public native fun empty<K, V>(): T<K, V>;
     public native fun remove<K, V>(m: &T<K, V>, k: &K): V;
+    public native fun insert<K, V>(m: &T<K, V>, k: K, v: V);
     public native fun contains_key<K, V>(m: &T<K, V>, k: &K): bool;
     public native fun get<K, V>(m: &T<K, V>, k: &K): &V;
     public native fun get_mut<K, V>(m: &mut T<K, V>, k: &K): &mut V;
-    public native fun insert<K, V>(m: &T<K, V>, k: K, v: V);
 }
 module 0x2::Token {
     struct Coin<AssetType: copy + drop> has store {

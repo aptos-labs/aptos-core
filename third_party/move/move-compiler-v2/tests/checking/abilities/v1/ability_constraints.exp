@@ -31,6 +31,9 @@ module 0x42::M {
     struct Ssk<T> {
         dummy_field: bool,
     }
+    private fun s<T>() {
+        Tuple()
+    }
     private fun c<T>() {
         Tuple()
     }
@@ -41,9 +44,6 @@ module 0x42::M {
         Tuple()
     }
     private fun k<T>() {
-        Tuple()
-    }
-    private fun s<T>() {
         Tuple()
     }
     private fun sk<T>() {
@@ -271,6 +271,8 @@ module 0x42::M {
     }
     struct Ssk<phantom T: store + key> {
     }
+    fun s<T: store>() {
+    }
     fun c<T: copy>() {
     }
     fun cds<T: copy + drop + store>() {
@@ -278,8 +280,6 @@ module 0x42::M {
     fun d<T: drop>() {
     }
     fun k<T: key>() {
-    }
-    fun s<T: store>() {
     }
     fun sk<T: store + key>() {
     }
