@@ -21,9 +21,12 @@ use aptos_storage_interface::{
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{
-        hot_state::LRUEntry, state_key::StateKey, state_slot::StateSlot,
-        state_storage_usage::StateStorageUsage, state_value::StateValue, StateViewId,
-        StateViewResult, TStateView, NUM_STATE_SHARDS,
+        hot_state::{HotStateValueRef, LRUEntry},
+        state_key::StateKey,
+        state_slot::StateSlot,
+        state_storage_usage::StateStorageUsage,
+        state_value::StateValue,
+        StateViewId, StateViewResult, TStateView, NUM_STATE_SHARDS,
     },
     transaction::Version,
     write_set::{BaseStateOp, HotStateOp, WriteOp},
@@ -52,10 +55,11 @@ const HOT_STATE_MAX_ITEMS_PER_SHARD: usize = NUM_KEYS / NUM_STATE_SHARDS / 2;
 
 // TODO(HotState): these are not used much at the moment.
 const MAX_PROMOTIONS_PER_BLOCK: usize = NUM_KEYS;
-const REFRESH_INTERVAL_VERSIONS: usize = 50;
+const REFRESH_INTERVAL_VERSIONS: Version = 50;
 
 const TEST_CONFIG: HotStateConfig = HotStateConfig {
     max_items_per_shard: HOT_STATE_MAX_ITEMS_PER_SHARD,
+    refresh_interval_versions: REFRESH_INTERVAL_VERSIONS,
     delete_on_restart: false,
     compute_root_hash: true,
 };
@@ -209,10 +213,11 @@ impl VersionState {
                         hot_since_version: version,
                         lru_info: LRUEntry::uninitialized(),
                     };
+                    hot_smt_updates
+                        .push((k.hash(), Some(HotStateValueRef::from_slot(&slot).hash())));
                     hot_state[shard_id].put(k.clone(), slot);
-                    state.remove(k);
-                    hot_smt_updates.push((k.hash(), None));
                     smt_updates.push((k.hash(), None));
+                    state.remove(k);
                 },
                 Some(v) => {
                     let slot = StateSlot::HotOccupied {
@@ -221,10 +226,11 @@ impl VersionState {
                         hot_since_version: version,
                         lru_info: LRUEntry::uninitialized(),
                     };
+                    hot_smt_updates
+                        .push((k.hash(), Some(HotStateValueRef::from_slot(&slot).hash())));
                     hot_state[shard_id].put(k.clone(), slot);
-                    state.insert(k.clone(), (version, v.clone()));
-                    hot_smt_updates.push((k.hash(), Some(v.hash())));
                     smt_updates.push((k.hash(), Some(v.hash())));
+                    state.insert(k.clone(), (version, v.clone()));
                 },
             }
         }
@@ -232,24 +238,35 @@ impl VersionState {
         for k in promotions {
             assert!(is_checkpoint, "No promotions unless in checkpoints");
             let shard_id = k.get_shard_id();
-            if let Some(slot) = hot_state[shard_id].get_mut(k) {
-                slot.refresh(version);
-                continue;
+
+            let hot_value_hash;
+            if let Some(slot) = hot_state[shard_id].peek_mut(k) {
+                if slot.expect_hot_since_version() + REFRESH_INTERVAL_VERSIONS <= version {
+                    slot.refresh(version);
+                    hot_value_hash = Some(HotStateValueRef::from_slot(slot).hash());
+                } else {
+                    hot_value_hash = None;
+                }
+            } else {
+                let slot = match state.get(k) {
+                    Some((value_version, value)) => StateSlot::HotOccupied {
+                        value_version: *value_version,
+                        value: value.clone(),
+                        hot_since_version: version,
+                        lru_info: LRUEntry::uninitialized(),
+                    },
+                    None => StateSlot::HotVacant {
+                        hot_since_version: version,
+                        lru_info: LRUEntry::uninitialized(),
+                    },
+                };
+                hot_value_hash = Some(HotStateValueRef::from_slot(&slot).hash());
+                hot_state[shard_id].put(k.clone(), slot);
             }
-            let slot = match state.get(k) {
-                Some((value_version, value)) => StateSlot::HotOccupied {
-                    value_version: *value_version,
-                    value: value.clone(),
-                    hot_since_version: version,
-                    lru_info: LRUEntry::uninitialized(),
-                },
-                None => StateSlot::HotVacant {
-                    hot_since_version: version,
-                    lru_info: LRUEntry::uninitialized(),
-                },
-            };
-            hot_smt_updates.push((k.hash(), slot.as_state_value_opt().map(|v| v.hash())));
-            hot_state[shard_id].put(k.clone(), slot);
+            if hot_value_hash.is_some() {
+                assert!(hot_state[shard_id].promote(k));
+                hot_smt_updates.push((k.hash(), hot_value_hash));
+            }
         }
 
         if is_checkpoint {
@@ -267,6 +284,11 @@ impl VersionState {
         let items = state.len();
         let bytes = state.iter().map(|(k, v)| k.size() + v.1.size()).sum();
         let usage = StateStorageUsage::new(items, bytes);
+
+        assert_eq!(
+            hot_state.iter().map(|x| x.len()).sum::<usize>(),
+            hot_summary.leaves.len()
+        );
 
         Self {
             usage,
@@ -660,10 +682,8 @@ fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, bool)>) -> (Vec<Txn>, StateByVers
     let mut all_txns = vec![];
     let mut state_by_version = StateByVersion::new_empty();
     for (block_txns, append_epilogue) in blocks {
-        let mut op_accu = BlockHotStateOpAccumulator::<StateKey>::new_with_config(
-            MAX_PROMOTIONS_PER_BLOCK,
-            REFRESH_INTERVAL_VERSIONS,
-        );
+        let mut op_accu =
+            BlockHotStateOpAccumulator::<StateKey>::new_with_config(MAX_PROMOTIONS_PER_BLOCK);
         let num_txns = block_txns.len();
         for (idx, txn) in block_txns.into_iter().enumerate() {
             // No promotions except for block epilogue. Also note that in case of reconfig, there's

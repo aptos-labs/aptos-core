@@ -25,7 +25,7 @@ use aptos_storage_interface::{
     jmt_update_refs, state_store::state_with_summary::StateWithSummary, Result,
 };
 use aptos_types::{
-    state_store::{state_key::StateKey, NUM_STATE_SHARDS},
+    state_store::{hot_state::HotStateValueRef, state_key::StateKey, NUM_STATE_SHARDS},
     transaction::Version,
 };
 use rayon::prelude::*;
@@ -99,6 +99,7 @@ impl StateSnapshotCommitter {
                         .map(|(v, _e)| v);
                     let min_version = self.last_snapshot.next_version();
 
+                    // Element format: (key_hash, Option<(value_hash, key)>)
                     let (hot_updates, all_updates): (Vec<_>, Vec<_>) = snapshot
                         .make_delta(&self.last_snapshot)
                         .shards
@@ -111,8 +112,10 @@ impl StateSnapshotCommitter {
                                 if slot.is_hot() {
                                     hot_updates.push((
                                         CryptoHash::hash(&key),
-                                        slot.as_state_value_opt()
-                                            .map(|value| (CryptoHash::hash(value), key.clone())),
+                                        Some((
+                                            HotStateValueRef::from_slot(&slot).hash(),
+                                            key.clone(),
+                                        )),
                                     ));
                                 } else {
                                     hot_updates.push((CryptoHash::hash(&key), None));
