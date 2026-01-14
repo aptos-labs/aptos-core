@@ -4,6 +4,9 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+## [7.14.1]
+- Transaction simulation: fix bug in `fund_apt_fungible_store`
+
 ## [7.14.0]
 - Add support for code object deployment and upgrade in Transaction Simulation Sessions
 
