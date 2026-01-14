@@ -132,7 +132,7 @@ export function hmac_kdf(otp_source: Uint8Array): Uint8Array {
 
 export function get_random_fr(): bigint {
   const random_bigint = leBytesToBigint(randomBytes(128));
-  return bls12_381.G1.Point.Fp.create(random_bigint);
+  return bls12_381.G1.Point.Fn.create(random_bigint);
 }
 
 export function hash_to_fr(input: Uint8Array): bigint {

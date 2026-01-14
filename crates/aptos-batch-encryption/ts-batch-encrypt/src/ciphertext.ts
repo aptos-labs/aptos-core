@@ -10,7 +10,7 @@ import type { Fp2 } from '@noble/curves/abstract/tower.js';
 import { get_random_fr, hash_g2_element, hash_to_fr, OneTimePad, SymmetricCiphertext, SymmetricKey } from './symmetric.ts';
 import { leBytesToBigint, bigintToLEBytesFr, fp12ToLEBytes } from './fieldSerialization.ts';
 import { bytesToG2, G2_SIZE, g2ToBytes } from './curveSerialization.ts';
-import { bn254 } from "@noble/curves/bn254.js";
+import { bls12_381 } from '@noble/curves/bls12-381.js';
 
 
 /**
@@ -122,8 +122,8 @@ export class BIBEEncryptionKey extends Serializable {
   }
 
   bibe_encrypt(plaintext: Serializable, id: bigint): BIBECiphertext {
-    const G2 = bn254.G2.Point;
-    const Gt = bn254.fields.Fp12;
+    const G2 = bls12_381.G2.Point;
+    const Gt = bls12_381.fields.Fp12;
 
 
     let r = [get_random_fr(), get_random_fr()];
@@ -138,7 +138,7 @@ export class BIBEEncryptionKey extends Serializable {
 
     // Note: in contrast to arkworks, the target group operations are multiplications, not additions.
     // The multiplication by `r[1]` is done inside the pairing because I'm not sure what the interface is for scalar multiplication over the target group.
-    let otp_source_gt = Gt.inv(bn254.pairing(hashed_encryption_key.multiply(r[1]), this.sig_mpk_g2));
+    let otp_source_gt = Gt.inv(bls12_381.pairing(hashed_encryption_key.multiply(r[1]), this.sig_mpk_g2));
 
     let otp_source_bytes = fp12ToLEBytes(otp_source_gt);
     let otp = OneTimePad.from_source_bytes(otp_source_bytes);
