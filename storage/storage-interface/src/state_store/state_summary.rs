@@ -125,8 +125,8 @@ impl StateSummary {
                 shard
                     .insertions
                     .iter()
-                    .map(|(k, value_opt)| (k, value_opt.as_ref().map(|v| v.hash())))
-                    .chain(shard.evictions.keys().map(|k| (k, None)))
+                    .map(|(k, value)| (k, Some(value.hash())))
+                    .chain(shard.evictions.iter().map(|k| (k, None)))
                     .sorted_by_key(|(k, _)| k.crypto_hash_ref())
                     .collect_vec()
             })
@@ -297,23 +297,20 @@ impl<'db> ProvableStateSummary<'db> {
         root_depth: usize,
         use_hot_state: bool,
     ) -> Result<SparseMerkleProofExt> {
-        if rand::random::<usize>() % 10000 == 0 {
+        // TODO(HotState): we cannot verify proof yet. In order to verify the proof, we need to
+        // fetch and construct the corresponding `HotStateValue` for `key` at `version`, including
+        // `hot_since_version`. However, the current in-memory hot state does not support this
+        // query, and we might need persist hot state KV to db first.
+        if !use_hot_state && rand::random::<usize>() % 10000 == 0 {
             // 1 out of 10000 times, verify the proof.
             let (val_opt, proof) = self
                 .db
                 // check the full proof
                 .get_state_value_with_proof_by_version_ext(
-                    key,
-                    version,
-                    /* root_depth = */ 0,
-                    use_hot_state,
+                    key, version, /* root_depth = */ 0, /* use_hot_state = */ false,
                 )?;
             proof.verify(
-                if use_hot_state {
-                    self.state_summary.hot_state_summary.root_hash()
-                } else {
-                    self.state_summary.global_state_summary.root_hash()
-                },
+                self.state_summary.global_state_summary.root_hash(),
                 *key,
                 val_opt.as_ref(),
             )?;
