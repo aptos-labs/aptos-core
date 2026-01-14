@@ -11,7 +11,6 @@ use crate::{
         state_merkle_batch_committer::{StateMerkleBatch, StateMerkleBatchCommitter},
         StateDb,
     },
-    versioned_node_cache::VersionedNodeCache,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::trace;
@@ -21,59 +20,29 @@ use aptos_storage_interface::{
 };
 use itertools::Itertools;
 use rayon::prelude::*;
-use static_assertions::const_assert;
-use std::{
-    sync::{
-        mpsc,
-        mpsc::{Receiver, SyncSender},
-        Arc,
-    },
-    thread::JoinHandle,
-};
+use std::sync::{mpsc::Receiver, Arc};
 
 pub(crate) struct StateSnapshotCommitter {
     state_db: Arc<StateDb>,
-    /// Last snapshot merklized and sent for persistence, not guaranteed to have committed already.
     last_snapshot: StateWithSummary,
     state_snapshot_commit_receiver: Receiver<CommitMessage<StateWithSummary>>,
-    state_merkle_batch_commit_sender: SyncSender<CommitMessage<StateMerkleBatch>>,
-    join_handle: Option<JoinHandle<()>>,
+    state_merkle_batch_committer: StateMerkleBatchCommitter,
 }
 
 impl StateSnapshotCommitter {
-    const CHANNEL_SIZE: usize = 0;
-
     pub fn new(
         state_db: Arc<StateDb>,
         state_snapshot_commit_receiver: Receiver<CommitMessage<StateWithSummary>>,
         last_snapshot: StateWithSummary,
         persisted_state: PersistedState,
     ) -> Self {
-        // Note: This is to ensure we cache nodes in memory from previous batches before they get committed to DB.
-        const_assert!(
-            StateSnapshotCommitter::CHANNEL_SIZE < VersionedNodeCache::NUM_VERSIONS_TO_CACHE
-        );
-        // Rendezvous channel
-        let (state_merkle_batch_commit_sender, state_merkle_batch_commit_receiver) =
-            mpsc::sync_channel(Self::CHANNEL_SIZE);
         let arc_state_db = Arc::clone(&state_db);
-        let join_handle = std::thread::Builder::new()
-            .name("state_batch_committer".to_string())
-            .spawn(move || {
-                let committer = StateMerkleBatchCommitter::new(
-                    arc_state_db,
-                    state_merkle_batch_commit_receiver,
-                    persisted_state.clone(),
-                );
-                committer.run();
-            })
-            .expect("Failed to spawn state merkle batch committer thread.");
+        let committer = StateMerkleBatchCommitter::new(arc_state_db, persisted_state);
         Self {
             state_db,
             last_snapshot,
             state_snapshot_commit_receiver,
-            state_merkle_batch_commit_sender,
-            join_handle: Some(join_handle),
+            state_merkle_batch_committer: committer,
         }
     }
 
@@ -179,39 +148,17 @@ impl StateSnapshotCommitter {
                         );
                     }
 
+                    self.state_merkle_batch_committer.commit(StateMerkleBatch {
+                        top_levels_batch,
+                        batches_for_shards,
+                        snapshot,
+                    });
                     self.last_snapshot = snapshot.clone();
-
-                    self.state_merkle_batch_commit_sender
-                        .send(CommitMessage::Data(StateMerkleBatch {
-                            top_levels_batch,
-                            batches_for_shards,
-                            snapshot,
-                        }))
-                        .unwrap();
                 },
-                CommitMessage::Sync(finish_sender) => {
-                    self.state_merkle_batch_commit_sender
-                        .send(CommitMessage::Sync(finish_sender))
-                        .unwrap();
-                },
-                CommitMessage::Exit => {
-                    self.state_merkle_batch_commit_sender
-                        .send(CommitMessage::Exit)
-                        .unwrap();
-                    break;
-                },
+                CommitMessage::Sync(finish_sender) => finish_sender.send(()).unwrap(),
+                CommitMessage::Exit => break,
             }
             trace!("State snapshot committing thread exit.")
         }
-    }
-}
-
-impl Drop for StateSnapshotCommitter {
-    fn drop(&mut self) {
-        self.join_handle
-            .take()
-            .expect("state merkle batch commit thread must exist.")
-            .join()
-            .expect("state merkle batch thread should join peacefully.");
     }
 }
