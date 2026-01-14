@@ -30,7 +30,7 @@ error: cannot pass `&bool` to a function which expects argument of type `&mut bo
 30 │         g(&1, x)
    │               ^
 
-error: the function takes 2 arguments but 1 were provided
+error: the function takes 2 arguments but 1 was provided
    ┌─ tests/checking/error_context/argument.move:34:9
    │
 34 │         f(1);

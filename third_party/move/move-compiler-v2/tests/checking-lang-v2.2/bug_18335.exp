@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: expected function type has 0 arguments but 2 were provided
+   ┌─ tests/checking-lang-v2.2/bug_18335.move:13:20
+   │
+13 │         s.receiver(func); // type error happens here, as `func` (of type `|u64|(u64, u64)`) does not match function type `|u64|`
+   │                    ^^^^
+
+error: expected function type returns 0 values but 2 were provided
+   ┌─ tests/checking-lang-v2.2/bug_18335.move:29:20
+   │
+29 │         s.receiver(func); // type error happens here, as `func` (of type `|u64|(u64, u64)`) does not match function type `|u64|`
+   │                    ^^^^
