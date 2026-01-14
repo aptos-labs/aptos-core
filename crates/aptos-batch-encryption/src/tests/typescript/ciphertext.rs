@@ -1,34 +1,37 @@
 // Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::runner::run_ts;
 use crate::{
     group::Fr,
-    schemes::fptx::{EncryptionKey, FPTX},
+    schemes::fptx::FPTX,
     shared::{
-        ciphertext::{BIBECTDecrypt as _, BIBECTEncrypt, BIBECiphertext, CTDecrypt, Ciphertext},
-        ids::{FreeRootId, FreeRootIdSet, IdSet as _},
-        key_derivation::BIBEDecryptionKey,
+        ciphertext::{bibe::{BIBECTDecrypt, BIBECTEncrypt, BIBECiphertext, InnerCiphertext as _}, CTDecrypt, StandardCiphertext
+        }, encryption_key::EncryptionKey, ids::{Id, IdSet}, key_derivation::BIBEDecryptionKey
     },
     traits::BatchThresholdEncryption as _,
 };
 use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
+use aptos_dkg::pvss::traits::Reconstructable as _;
 use ark_std::{
-    rand::{thread_rng, Rng as _},
+    rand::{thread_rng, Rng as _, RngCore as _},
     One, Zero,
 };
-use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey, SECRET_KEY_LENGTH};
 use serde::{Deserialize, Serialize};
 
 #[test]
 #[ignore]
 fn test_bibe_ciphertext_serialization() {
-    let ct: BIBECiphertext<FreeRootId> = BIBECiphertext::blank_for_testing();
+    let ct  = BIBECiphertext::blank_for_testing();
     let input = bcs::to_bytes(&ct).unwrap();
 
     let ts_result = run_ts("bibe_ciphertext_serialization", &input).unwrap();
 
-    let ct_deserialized: BIBECiphertext<FreeRootId> = bcs::from_bytes(&ts_result).unwrap();
+    let ct_deserialized: BIBECiphertext = bcs::from_bytes(&ts_result).unwrap();
 
     assert_eq!(ct_deserialized, ct);
 }
@@ -38,7 +41,7 @@ fn test_bibe_ciphertext_serialization() {
 fn test_dummy() {
     let ek = EncryptionKey::new_for_testing();
     let mut rng = thread_rng();
-    let _bibe_ct = ek.bibe_encrypt(&mut rng, &String::from("hi"), FreeRootId::new(Fr::one()));
+    let _bibe_ct = ek.bibe_encrypt(&mut rng, &String::from("hi"), Id::one());
 }
 
 #[ignore]
@@ -49,11 +52,11 @@ fn test_bibe_ct_encrypt_decrypt_ts() {
     let (ek, dk, _, msk_shares, _, _) =
         FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc, &tc).unwrap();
 
-    let mut ids = FreeRootIdSet::with_capacity(dk.capacity()).unwrap();
+    let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
     let mut counter = Fr::zero();
 
     for _ in 0..dk.capacity() {
-        ids.add(&FreeRootId::new(counter));
+        ids.add(&Id::new(counter));
         counter += Fr::one();
     }
 
@@ -63,15 +66,15 @@ fn test_bibe_ct_encrypt_decrypt_ts() {
 
     let plaintext = String::from("hi");
 
-    let _id = FreeRootId::new(Fr::one());
+    let _id = Id::new(Fr::one());
 
     let ek_bytes = bcs::to_bytes(&ek).unwrap();
     let ct_bytes = run_ts("bibe_ciphertext_encrypt", &ek_bytes).unwrap();
-    let ct: BIBECiphertext<FreeRootId> = bcs::from_bytes(&ct_bytes).unwrap();
+    let ct: BIBECiphertext = bcs::from_bytes(&ct_bytes).unwrap();
 
     let dk = BIBEDecryptionKey::reconstruct(
-        &[msk_shares[0].derive_decryption_key_share(&digest).unwrap()],
         &tc,
+        &[msk_shares[0].derive_decryption_key_share(&digest).unwrap()],
     )
     .unwrap();
 
@@ -95,7 +98,10 @@ fn test_ed25519() {
     }
 
     let mut rng = thread_rng();
-    let secretKey: SigningKey = SigningKey::generate(&mut rng);
+    let mut signing_key_bytes: [u8; SECRET_KEY_LENGTH] = [0; SECRET_KEY_LENGTH];
+    rng.fill_bytes(&mut signing_key_bytes);
+
+    let secretKey: SigningKey = SigningKey::from_bytes(&signing_key_bytes);
     let publicKey = secretKey.verifying_key();
 
     let msg = vec![0u8, 1u8, 2u8];
@@ -130,7 +136,7 @@ fn test_ct_verify_ts() {
     let associated_data = String::from("associated data");
     let ek_bytes = bcs::to_bytes(&ek).unwrap();
     let ct_bytes = run_ts("ciphertext_encrypt", &ek_bytes).unwrap();
-    let ct: Ciphertext<FreeRootId> = bcs::from_bytes(&ct_bytes).unwrap();
+    let ct: StandardCiphertext = bcs::from_bytes(&ct_bytes).unwrap();
 
     // Verification with the correct associated data should succeed.
     ct.verify(&associated_data).unwrap();
@@ -148,9 +154,9 @@ fn test_ct_encrypt_decrypt_ts() {
 
     let ek_bytes = bcs::to_bytes(&ek).unwrap();
     let ct_bytes = run_ts("ciphertext_encrypt", &ek_bytes).unwrap();
-    let ct: Ciphertext<FreeRootId> = bcs::from_bytes(&ct_bytes).unwrap();
+    let ct: StandardCiphertext = bcs::from_bytes(&ct_bytes).unwrap();
 
-    let mut ids = FreeRootIdSet::with_capacity(dk.capacity()).unwrap();
+    let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
     ids.add(&ct.id());
 
     ids.compute_poly_coeffs();
@@ -158,8 +164,8 @@ fn test_ct_encrypt_decrypt_ts() {
     let pfs = pfs.compute_all(&dk);
 
     let dk = BIBEDecryptionKey::reconstruct(
-        &[msk_shares[0].derive_decryption_key_share(&digest).unwrap()],
         &tc,
+        &[msk_shares[0].derive_decryption_key_share(&digest).unwrap()],
     )
     .unwrap();
 

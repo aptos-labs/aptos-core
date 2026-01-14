@@ -96,57 +96,8 @@ impl<EK: BIBECTEncrypt> CTEncrypt<EK::CT> for EK {
     }
 }
 
-<<<<<<< HEAD:crates/aptos-batch-encryption/src/shared/ciphertext.rs
-#[cfg(test)]
-use super::ids::FreeRootId;
 
-#[cfg(test)]
-impl BIBECiphertext<FreeRootId> {
-    pub(crate) fn blank_for_testing() -> Self {
-        use ark_std::Zero;
 
-        BIBECiphertext {
-            id: FreeRootId::new(Fr::zero()),
-            ct_g2: [
-                G2Affine::generator(),
-                (G2Affine::generator() * Fr::from(2)).into(),
-                (G2Affine::generator() * Fr::from(3)).into(),
-            ],
-            padded_key: OneTimePaddedKey::blank_for_testing(),
-            symmetric_ciphertext: SymmetricCiphertext::blank_for_testing(),
-        }
-    }
-}
-
-impl<I: Id> BIBECiphertext<I> {
-    pub fn prepare(
-        &self,
-        digest: &Digest,
-        eval_proofs: &EvalProofs<<I as Id>::OssifiedSet>,
-    ) -> Result<PreparedBIBECiphertext> {
-        let pf = eval_proofs
-            .get(&self.id)
-            .ok_or(BatchEncryptionError::UncomputedEvalProofError)?;
-
-        self.prepare_individual(digest, &pf)
-    }
-
-    pub fn prepare_individual(
-        &self,
-        digest: &Digest,
-        eval_proof: &G1Affine,
-    ) -> Result<PreparedBIBECiphertext> {
-        let pairing_output = PairingSetting::pairing(digest.as_g1(), self.ct_g2[0])
-            + PairingSetting::pairing(eval_proof, self.ct_g2[1]);
-
-        Ok(PreparedBIBECiphertext {
-            pairing_output,
-            ct_g2: self.ct_g2[2].into(),
-            padded_key: self.padded_key.clone(),
-            symmetric_ciphertext: self.symmetric_ciphertext.clone(),
-        })
-    }
-}
 
 impl<PCT: InnerCiphertext> Ciphertext<PCT> {
     pub fn random() -> Self {
