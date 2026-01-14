@@ -30,7 +30,7 @@ pub enum BatchEncryptionError {
     UncomputedEvalProofError,
     #[error("Tried to compute eval proofs for an id set whose coefficients weren't computed yet")]
     EvalProofsWithUncomputedCoefficients,
-    #[error("Hash2Curve failed: couldn't find a quadratic residue")]
+    #[error("Hash2Curve failed: couldn't find a quadratic residue, or couldn't map to subgroup")]
     Hash2CurveFailure,
 }
 
