@@ -65,5 +65,9 @@ name = "fptx"
 harness = false
 
 [[bench]]
+name = "fptx_succinct"
+harness = false
+
+[[bench]]
 name = "msm"
 harness = false

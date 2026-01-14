@@ -1,12 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
-    errors::BatchEncryptionError,
     group::{self, *},
     shared::{
-        ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, StandardCiphertext},
+        ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, SuccinctCiphertext},
         digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise},
-        encryption_key::EncryptionKey,
+        encryption_key::AugmentedEncryptionKey,
         ids::{Id, IdSet, UncomputedCoeffs},
         key_derivation::{
             self, BIBEDecryptionKey, BIBEDecryptionKeyShare, BIBEMasterSecretKeyShare,
@@ -16,25 +15,23 @@ use crate::{
     traits::{AssociatedData, BatchThresholdEncryption, Plaintext},
 };
 use anyhow::{anyhow, Result};
-use aptos_crypto::SecretSharingConfig as _;
 use aptos_dkg::pvss::{
     traits::{Reconstructable as _, Subtranscript},
     Player,
 };
-use ark_ec::AffineRepr as _;
 use ark_ff::UniformRand as _;
 use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 use rayon::iter::{IntoParallelIterator, ParallelIterator as _};
 
-pub struct FPTX {}
+pub struct FPTXSuccinct {}
 
-impl BatchThresholdEncryption for FPTX {
-    type Ciphertext = StandardCiphertext;
+impl BatchThresholdEncryption for FPTXSuccinct {
+    type Ciphertext = SuccinctCiphertext;
     type DecryptionKey = BIBEDecryptionKey;
     type DecryptionKeyShare = BIBEDecryptionKeyShare;
     type Digest = Digest;
     type DigestKey = DigestKey;
-    type EncryptionKey = EncryptionKey;
+    type EncryptionKey = AugmentedEncryptionKey;
     type EvalProof = EvalProof;
     type EvalProofs = EvalProofs;
     type EvalProofsPromise = EvalProofsPromise;
@@ -47,14 +44,14 @@ impl BatchThresholdEncryption for FPTX {
     type VerificationKey = BIBEVerificationKey;
 
     fn setup(
-        digest_key: &Self::DigestKey,
-        pvss_public_params: &<Self::SubTranscript as Subtranscript>::PublicParameters,
-        subtranscript_happypath: &Self::SubTranscript,
-        subtranscript_slowpath: &Self::SubTranscript,
-        tc_happypath: &Self::ThresholdConfig,
-        tc_slowpath: &Self::ThresholdConfig,
-        current_player: Player,
-        msk_share_decryption_key: &<Self::SubTranscript as Subtranscript>::DecryptPrivKey,
+        _digest_key: &Self::DigestKey,
+        _pvss_public_params: &<Self::SubTranscript as Subtranscript>::PublicParameters,
+        _subtranscript_happypath: &Self::SubTranscript,
+        _subtranscript_slowpath: &Self::SubTranscript,
+        _tc_happypath: &Self::ThresholdConfig,
+        _tc_slowpath: &Self::ThresholdConfig,
+        _current_player: Player,
+        _msk_share_decryption_key: &<Self::SubTranscript as Subtranscript>::DecryptPrivKey,
     ) -> Result<(
         Self::EncryptionKey,
         Vec<Self::VerificationKey>,
@@ -62,84 +59,8 @@ impl BatchThresholdEncryption for FPTX {
         Vec<Self::VerificationKey>,
         Self::MasterSecretKeyShare,
     )> {
-        (subtranscript_happypath.get_dealt_public_key()
-            == subtranscript_slowpath.get_dealt_public_key())
-        .then_some(())
-        .ok_or(BatchEncryptionError::HappySlowPathMismatchError)?;
-
-        let mpk_g2: G2Affine = subtranscript_happypath.get_dealt_public_key().as_g2();
-
-        let ek = EncryptionKey::new(mpk_g2, digest_key.tau_g2);
-
-        let vks_happypath: Vec<Self::VerificationKey> = tc_happypath
-            .get_players()
-            .into_iter()
-            .map(|p| Self::VerificationKey {
-                player: p,
-                mpk_g2,
-                vk_g2: subtranscript_happypath
-                    .get_public_key_share(tc_happypath, &p)
-                    .as_g2(),
-            })
-            .collect();
-
-        let vks_slowpath: Vec<Self::VerificationKey> = tc_slowpath
-            .get_players()
-            .into_iter()
-            .map(|p| Self::VerificationKey {
-                player: p,
-                mpk_g2,
-                vk_g2: subtranscript_slowpath
-                    .get_public_key_share(tc_slowpath, &p)
-                    .as_g2(),
-            })
-            .collect();
-
-        let msk_share_happypath = Self::MasterSecretKeyShare {
-            mpk_g2,
-            player: current_player,
-            shamir_share_eval: subtranscript_happypath
-                .decrypt_own_share(
-                    tc_happypath,
-                    &current_player,
-                    msk_share_decryption_key,
-                    pvss_public_params,
-                )
-                .0
-                .into_fr(),
-        };
-
-        let msk_share_slowpath = Self::MasterSecretKeyShare {
-            mpk_g2,
-            player: current_player,
-            shamir_share_eval: subtranscript_slowpath
-                .decrypt_own_share(
-                    tc_slowpath,
-                    &current_player,
-                    msk_share_decryption_key,
-                    pvss_public_params,
-                )
-                .0
-                .into_fr(),
-        };
-
-        for (vks, msk_share) in [
-            (&vks_happypath, &msk_share_happypath),
-            (&vks_slowpath, &msk_share_slowpath),
-        ] {
-            (vks[msk_share.player.get_id()].vk_g2
-                == G2Affine::generator() * msk_share.shamir_share_eval)
-                .then_some(())
-                .ok_or(BatchEncryptionError::VKMSKMismatchError)?;
-        }
-
-        Ok((
-            ek,
-            vks_happypath,
-            msk_share_happypath,
-            vks_slowpath,
-            msk_share_slowpath,
-        ))
+        // we don't yet have a PVSS scheme that supports the succinct version of FPTX
+        unimplemented!()
     }
 
     fn setup_for_testing(
@@ -166,9 +87,10 @@ impl BatchThresholdEncryption for FPTX {
         let (_, vks_slowpath, msk_shares_slowpath) =
             key_derivation::gen_msk_shares(msk, &mut rng, tc_slowpath);
 
-        let ek = EncryptionKey {
+        let ek = AugmentedEncryptionKey {
             sig_mpk_g2: mpk.0,
             tau_g2: digest_key.tau_g2,
+            tau_mpk_g2: (digest_key.tau_g2 * msk).into(),
         };
 
         Ok((
