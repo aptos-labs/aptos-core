@@ -1,4 +1,7 @@
 // Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use super::runner::run_ts;
 use crate::{
@@ -15,7 +18,6 @@ use rand::RngCore;
 use sha2::Sha256;
 
 #[test]
-#[ignore]
 fn test_hmac_kdf() {
     for i in [1, 2, 7, 8, 31, 32, 33, 63, 64, 65] {
         let mut input = vec![0u8; i];
@@ -29,7 +31,6 @@ fn test_hmac_kdf() {
 }
 
 #[test]
-#[ignore]
 fn test_hash_to_fr() {
     for i in [1, 2, 7, 8, 31, 32, 33, 63, 64, 65] {
         let mut input = vec![0u8; i];
@@ -45,7 +46,6 @@ fn test_hash_to_fr() {
 }
 
 #[test]
-#[ignore]
 fn test_hash_to_fq() {
     for i in [1, 2, 7, 8, 31, 32, 33, 63, 64, 65] {
         let mut input = vec![0u8; i];
@@ -61,7 +61,6 @@ fn test_hash_to_fq() {
 }
 
 #[test]
-#[ignore]
 fn test_symmetric_key_serialize() {
     let mut input = [0u8; 16];
     rand::thread_rng().fill_bytes(&mut input);
@@ -73,7 +72,6 @@ fn test_symmetric_key_serialize() {
 }
 
 #[test]
-#[ignore]
 fn test_symmetric_encrypt() {
     let mut input = [0u8; 16];
     rand::thread_rng().fill_bytes(&mut input);
@@ -86,7 +84,6 @@ fn test_symmetric_encrypt() {
 }
 
 #[test]
-#[ignore]
 fn test_otp_generation() {
     let mut input = [0u8; 64];
     rand::thread_rng().fill_bytes(&mut input);
@@ -98,7 +95,6 @@ fn test_otp_generation() {
 }
 
 #[test]
-#[ignore]
 fn test_otp_padding() {
     let mut key_bytes = [0u8; 16];
     let mut otp_bytes = [0u8; 64];
@@ -117,7 +113,6 @@ fn test_otp_padding() {
 }
 
 #[test]
-#[ignore]
 fn test_hash_g2_element() {
     let mut rng = thread_rng();
     let g2 = G2Affine::rand(&mut rng);

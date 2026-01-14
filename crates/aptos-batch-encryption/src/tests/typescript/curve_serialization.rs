@@ -1,4 +1,7 @@
 // Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use super::runner::run_ts;
 use crate::group::{Fr, G1Affine, G2Affine};
@@ -8,7 +11,6 @@ use ark_serialize::{CanonicalDeserializeWithFlags, CanonicalSerialize, Compress,
 use ark_std::rand::thread_rng;
 
 #[test]
-#[ignore]
 fn test_g1_serialization() {
     let mut rng = thread_rng();
     let rand_exponent: Fr = Fr::rand(&mut rng);
@@ -24,7 +26,6 @@ fn test_g1_serialization() {
 }
 
 #[test]
-#[ignore]
 fn test_g2_serialization() {
     let mut rng = thread_rng();
     let rand_exponent: Fr = Fr::rand(&mut rng);
@@ -42,7 +43,6 @@ fn test_g2_serialization() {
 type TargetField = <Bn<ark_bn254::Config> as Pairing>::TargetField;
 
 #[test]
-#[ignore]
 fn test_fp12_serialization() {
     let mut rng = thread_rng();
     let x = TargetField::rand(&mut rng);

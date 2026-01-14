@@ -3,7 +3,7 @@
 import type { Fp2 } from '@noble/curves/abstract/tower.js';
 import type { WeierstrassPoint, WeierstrassPointCons } from '@noble/curves/abstract/weierstrass.js';
 import { bn254 } from '@noble/curves/bn254.js';
-import { leBytesToBigint, bigintToLEBytes } from './fieldSerialization.ts';
+import { leBytesToBigint, bigintToLEBytesFq, bigintToLEBytesFr } from './fieldSerialization.ts';
 
 const SWFlag = {
   PointAtInfinity : 1 << 6,
@@ -58,7 +58,7 @@ export function g1ToBytes(p: WeierstrassPoint<bigint>): Uint8Array {
 
     let flag = affine.y <= bn254.G1.Point.Fp.neg(affine.y) ? SWFlag.YIsPositive : SWFlag.YIsNegative;
 
-    let bytes = bigintToLEBytes(affine.x);
+    let bytes = bigintToLEBytesFq(affine.x);
     bytes[31] |= flag;
     return bytes;
   }
@@ -105,8 +105,8 @@ export function g2ToBytes(p: WeierstrassPoint<Fp2>): Uint8Array {
 
     let flag = fp2LessThanEq(affine.y, bn254.G2.Point.Fp.neg(affine.y)) ? SWFlag.YIsPositive : SWFlag.YIsNegative;
 
-    let c0_bytes = bigintToLEBytes(affine.x.c0);
-    let c1_bytes = bigintToLEBytes(affine.x.c1);
+    let c0_bytes = bigintToLEBytesFq(affine.x.c0);
+    let c1_bytes = bigintToLEBytesFq(affine.x.c1);
     c1_bytes[31] |= flag;
 
     let bytes = new Uint8Array(64);

@@ -6,7 +6,7 @@ import { Serializable, Serializer, Deserializer } from "@aptos-labs/ts-sdk";
 import { hmac } from '@noble/hashes/hmac.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { type H2COpts, hash_to_field } from '@noble/curves/abstract/hash-to-curve.js';
-import { bn254 } from '@noble/curves/bn254.js';
+import { bls12_381 } from '@noble/curves/bls12-381.js';
 import { leBytesToBigint } from './fieldSerialization.ts';
 import { type WeierstrassPoint } from '@noble/curves/abstract/weierstrass.js';
 import type { Fp2 } from '@noble/curves/abstract/tower.js';
@@ -132,7 +132,7 @@ export function hmac_kdf(otp_source: Uint8Array): Uint8Array {
 
 export function get_random_fr(): bigint {
   const random_bigint = leBytesToBigint(randomBytes(128));
-  return bn254.G1.Point.Fp.create(random_bigint);
+  return bls12_381.G1.Point.Fp.create(random_bigint);
 }
 
 export function hash_to_fr(input: Uint8Array): bigint {
@@ -140,7 +140,7 @@ export function hash_to_fr(input: Uint8Array): bigint {
     DST: "",
     expand: "xmd",
     hash: sha256,
-    p: bn254.fields.Fr.ORDER,
+    p: bls12_381.fields.Fr.ORDER,
     m: 1,
     k: 128  
   }
@@ -152,7 +152,7 @@ export function hash_to_fq(input: Uint8Array) {
     DST: "",
     expand: "xmd",
     hash: sha256,
-    p: bn254.fields.Fp.ORDER,
+    p: bls12_381.fields.Fp.ORDER,
     m: 1,
     k: 128  
   }
@@ -167,10 +167,10 @@ export function hash_g2_element(g2_element: WeierstrassPoint<Fp2>): WeierstrassP
     hash_source_bytes.set(bytes_without_ctr);
     hash_source_bytes.set([ctr], bytes_without_ctr.length);
     let x = hash_to_fq(hash_source_bytes);
-    let y_squared = weierstrassEquation(x, bn254.G1.Point);
+    let y_squared = weierstrassEquation(x, bls12_381.G1.Point);
     try {
-      let y = bn254.G1.Point.Fp.sqrt(y_squared);
-      return new bn254.G1.Point(x, y, 1n);
+      let y = bls12_381.G1.Point.Fp.sqrt(y_squared);
+      return new bls12_381.G1.Point(x, y, 1n);
     } catch (sqrtError) {
       continue;
     }

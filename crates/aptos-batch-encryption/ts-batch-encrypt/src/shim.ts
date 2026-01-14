@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Deserializer, Serializable, Serializer} from '@aptos-labs/ts-sdk';
 import { hmac_kdf, hash_to_fq, hash_to_fr, SymmetricKey, Test, OneTimePad, hash_g2_element } from './symmetric.ts';
-import { leBytesToBigint, bigintToLEBytes, leBytesToFp12, fp12ToLEBytes } from './fieldSerialization.ts';
+import { leBytesToBigint, bigintToLEBytesFr, bigintToLEBytesFq, leBytesToFp12, fp12ToLEBytes } from './fieldSerialization.ts';
 import { bn254 } from '@noble/curves/bn254.js';
 import { bytesToG2, g1ToBytes, g2ToBytes } from './curveSerialization.ts';
 import { BIBECiphertext, BIBEEncryptionKey } from './ciphertext.ts';
@@ -40,8 +40,8 @@ class TestEd25519 extends Serializable {
 
 const functions = {
   'hmac_kdf': hmac_kdf,
-  'hash_to_fr': function(x: Uint8Array) { return bigintToLEBytes(hash_to_fr(x)) },
-  'hash_to_fq': function(x: Uint8Array) { return bigintToLEBytes(hash_to_fq(x)) },
+  'hash_to_fr': function(x: Uint8Array) { return bigintToLEBytesFr(hash_to_fr(x)) },
+  'hash_to_fq': function(x: Uint8Array) { return bigintToLEBytesFq(hash_to_fq(x)) },
   "symmetric_key_serialize":  function(x: Uint8Array) {
     const key = new SymmetricKey(x);
     var serializer = new Serializer();

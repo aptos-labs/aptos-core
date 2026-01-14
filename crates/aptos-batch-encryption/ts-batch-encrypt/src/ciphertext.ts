@@ -8,7 +8,7 @@ ed.hashes.sha512 = sha512;
 import type { WeierstrassPoint } from '@noble/curves/abstract/weierstrass.js';
 import type { Fp2 } from '@noble/curves/abstract/tower.js';
 import { get_random_fr, hash_g2_element, hash_to_fr, OneTimePad, SymmetricCiphertext, SymmetricKey } from './symmetric.ts';
-import { leBytesToBigint, bigintToLEBytes, fp12ToLEBytes } from './fieldSerialization.ts';
+import { leBytesToBigint, bigintToLEBytesFr, fp12ToLEBytes } from './fieldSerialization.ts';
 import { bytesToG2, G2_SIZE, g2ToBytes } from './curveSerialization.ts';
 import { bn254 } from "@noble/curves/bn254.js";
 
@@ -34,7 +34,7 @@ export class BIBECiphertext extends Serializable {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeBytes(bigintToLEBytes(this.id));
+    serializer.serializeBytes(bigintToLEBytesFr(this.id));
     // The array of G2 elements is serialized "all at once", i.e., in bcs a single length is given for the whole array. 
     // This has to do w/ the way the arkworks-serde serialization wrapper works in rust.
     let ct_g2_bytes = new Uint8Array(G2_SIZE*3);

@@ -2,18 +2,26 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { Fp2, Fp6, Fp12 } from "@noble/curves/abstract/tower.js";
 
-const BIGINT_SIZE = 32;
+const BIGINT_SIZE = 48;
 const FP2_SIZE = 2 * BIGINT_SIZE;
 const FP6_SIZE = 3 * FP2_SIZE;
 const FP12_SIZE = 2 * FP6_SIZE;
 
-export function bigintToLEBytes(val: bigint): Uint8Array {
+export function bigintToLEBytesInternal(val: bigint, numBytes: number): Uint8Array {
   let ret : number[] = [];
-  for (let i = 0; i < 32; i++) {
+  for (let i = 0; i < numBytes; i++) {
     ret.push(Number(BigInt.asUintN(8, val)));
     val = val >> 8n;
   }
   return Uint8Array.from(ret);
+}
+
+export function bigintToLEBytesFr(val: bigint, numBytes: number): Uint8Array {
+  return bigintToLEBytesInternal(val, 32);
+}
+
+export function bigintToLEBytesFq(val: bigint, numBytes: number): Uint8Array {
+  return bigintToLEBytesInternal(val, 48);
 }
 
 export function leBytesToBigint(bytes: Uint8Array): bigint {
@@ -27,8 +35,8 @@ export function leBytesToBigint(bytes: Uint8Array): bigint {
 
 export function fp2ToLEBytes(val: Fp2): Uint8Array {
   let ret = new Uint8Array(FP2_SIZE);
-  ret.set(bigintToLEBytes(val.c0));
-  ret.set(bigintToLEBytes(val.c1), BIGINT_SIZE);
+  ret.set(bigintToLEBytesFq(val.c0));
+  ret.set(bigintToLEBytesFq(val.c1), BIGINT_SIZE);
   return ret;
 }
 
