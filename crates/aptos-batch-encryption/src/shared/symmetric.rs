@@ -173,8 +173,10 @@ pub fn hash_g2_element(g2_element: G2Affine) -> Result<G1Affine> {
             .unwrap();
         let mut ctr_bytes = Vec::from([ctr]);
         hash_source_bytes.append(&mut ctr_bytes);
+        println!("{:?}", hash_source_bytes);
         let field_hasher = <DefaultFieldHasher<Sha256> as HashToField<Fq>>::new(&[]);
         let [x]: [Fq; 1] = field_hasher.hash_to_field::<1>(&hash_source_bytes);
+        println!("{:?}", x);
 
         // Rust does not optimise away addition with zero
         use crate::group::G1Config;
@@ -185,8 +187,10 @@ pub fn hash_g2_element(g2_element: G2Affine) -> Result<G1Affine> {
 
         // TODO vary the sign of y??
         if let Some(x3b_sqrt) = x3b.sqrt() {
-            let p = G1Affine::new_unchecked(x, x3b_sqrt).mul_by_cofactor();
+            println!("{:?}", x3b_sqrt);
+            let p = G1Affine::new_unchecked(x, x3b_sqrt).clear_cofactor();
             assert!(p.is_in_correct_subgroup_assuming_on_curve());
+            println!("{:?}", p);
             return Ok(p);
         }
     }

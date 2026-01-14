@@ -119,7 +119,6 @@ fn test_hash_g2_element() {
     let rust_result = hash_g2_element(g2).unwrap();
     let mut input = vec![];
     g2.serialize_with_mode(&mut input, Compress::Yes).unwrap();
-    println!("{:?}", input);
     let ts_result_bytes = run_ts("hash_g2_element", &input).unwrap();
     let ts_result =
         G1Affine::deserialize_with_mode(ts_result_bytes.as_slice(), Compress::Yes, Validate::Yes)

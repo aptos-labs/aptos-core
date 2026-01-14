@@ -4,8 +4,8 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use super::runner::run_ts;
-use crate::group::{Fr, G1Affine, G2Affine};
-use ark_ec::{bn::Bn, pairing::Pairing, AffineRepr};
+use crate::group::{Fr, G1Affine, G2Affine, Pairing};
+use ark_ec::AffineRepr;
 use ark_ff::{BigInteger, PrimeField, UniformRand};
 use ark_serialize::{CanonicalDeserializeWithFlags, CanonicalSerialize, Compress, EmptyFlags};
 use ark_std::rand::thread_rng;
@@ -40,7 +40,7 @@ fn test_g2_serialization() {
     assert_eq!(rust_result, ts_result);
 }
 
-type TargetField = <Bn<ark_bn254::Config> as Pairing>::TargetField;
+type TargetField = <Pairing as ark_ec::pairing::Pairing>::TargetField;
 
 #[test]
 fn test_fp12_serialization() {

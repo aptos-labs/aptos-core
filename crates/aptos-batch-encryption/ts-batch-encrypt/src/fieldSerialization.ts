@@ -16,11 +16,11 @@ export function bigintToLEBytesInternal(val: bigint, numBytes: number): Uint8Arr
   return Uint8Array.from(ret);
 }
 
-export function bigintToLEBytesFr(val: bigint, numBytes: number): Uint8Array {
+export function bigintToLEBytesFr(val: bigint): Uint8Array {
   return bigintToLEBytesInternal(val, 32);
 }
 
-export function bigintToLEBytesFq(val: bigint, numBytes: number): Uint8Array {
+export function bigintToLEBytesFq(val: bigint): Uint8Array {
   return bigintToLEBytesInternal(val, 48);
 }
 

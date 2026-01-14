@@ -1,4 +1,7 @@
 // Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use anyhow::{anyhow, Context as _};
 use std::{
@@ -59,7 +62,10 @@ pub(super) fn run_ts(fn_name: &str, input: &[u8]) -> anyhow::Result<Vec<u8>> {
         ));
     }
 
-    println!("{:?}", String::from_utf8_lossy(&output.stderr));
+    println!("typescript console:");
+    println!("---");
+    println!("{}", String::from_utf8_lossy(&output.stderr));
+    println!("---");
 
     Ok(output.stdout)
 }

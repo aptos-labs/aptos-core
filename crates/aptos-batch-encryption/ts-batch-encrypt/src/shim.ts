@@ -3,10 +3,11 @@
 import { Deserializer, Serializable, Serializer} from '@aptos-labs/ts-sdk';
 import { hmac_kdf, hash_to_fq, hash_to_fr, SymmetricKey, Test, OneTimePad, hash_g2_element } from './symmetric.ts';
 import { leBytesToBigint, bigintToLEBytesFr, bigintToLEBytesFq, leBytesToFp12, fp12ToLEBytes } from './fieldSerialization.ts';
-import { bn254 } from '@noble/curves/bn254.js';
+import { bls12_381 } from '@noble/curves/bls12-381.js';
 import { bytesToG2, g1ToBytes, g2ToBytes } from './curveSerialization.ts';
 import { BIBECiphertext, BIBEEncryptionKey } from './ciphertext.ts';
 import * as ed from '@noble/ed25519';
+import { bls } from '@noble/curves/abstract/bls.js';
 
 class TestEd25519 extends Serializable {
   secretKey: Uint8Array;
@@ -73,12 +74,12 @@ const functions = {
   },
   "g1_serialization": function(x: Uint8Array) {
     let rand_exponent : bigint = leBytesToBigint(x);
-    let g1 = bn254.G1.Point.BASE.multiply(rand_exponent);
+    let g1 = bls12_381.G1.Point.BASE.multiply(rand_exponent);
     return g1ToBytes(g1);
   },
   "g2_serialization": function(x: Uint8Array) {
     let rand_exponent : bigint = leBytesToBigint(x);
-    let g2 = bn254.G2.Point.BASE.multiply(rand_exponent);
+    let g2 = bls12_381.G2.Point.BASE.multiply(rand_exponent);
     return g2ToBytes(g2);
   },
   "hash_g2_element": function(g2_bytes: Uint8Array) {
@@ -88,15 +89,15 @@ const functions = {
   },
   "leBytesToFp12": function(bytes: Uint8Array) {
     let f = leBytesToFp12(bytes);
-    let result = bn254.fields.Fp12.add(f, f);
+    let result = bls12_381.fields.Fp12.add(f, f);
     return fp12ToLEBytes(result);
   },
   "bibe_ciphertext_serialization": function(bytes: Uint8Array) {
     let ct = BIBECiphertext.deserialize(new Deserializer(bytes));
 
-    if (!ct.ct_g2[0].equals(bn254.G2.Point.BASE)
-    || !ct.ct_g2[1].equals(bn254.G2.Point.BASE.multiply(2n))
-    || !ct.ct_g2[2].equals(bn254.G2.Point.BASE.multiply(3n))
+    if (!ct.ct_g2[0].equals(bls12_381.G2.Point.BASE)
+    || !ct.ct_g2[1].equals(bls12_381.G2.Point.BASE.multiply(2n))
+    || !ct.ct_g2[2].equals(bls12_381.G2.Point.BASE.multiply(3n))
     ) {
       throw new Error("incorrect ct_g2");
     }
