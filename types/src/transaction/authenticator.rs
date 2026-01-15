@@ -1248,7 +1248,7 @@ pub enum AnySignature {
         signature: KeylessSignature,
     },
     SlhDsa_Sha2_128s {
-        signature: slh_dsa_sha2_128s::Signature,
+        signature: Box<slh_dsa_sha2_128s::Signature>,
     },
 }
 
@@ -1262,7 +1262,9 @@ impl AnySignature {
     }
 
     pub fn slh_dsa_sha2_128s(signature: slh_dsa_sha2_128s::Signature) -> Self {
-        Self::SlhDsa_Sha2_128s { signature }
+        Self::SlhDsa_Sha2_128s {
+            signature: Box::new(signature),
+        }
     }
 
     pub fn webauthn(signature: PartialAuthenticatorAssertionResponse) -> Self {
