@@ -158,7 +158,6 @@ impl FileStoreUploader {
                             .get_transactions_from_cache(
                                 next_version,
                                 MAX_SIZE_PER_FILE,
-                                /*update_file_store_version=*/ true,
                             )
                             .await
                     };
@@ -169,6 +168,7 @@ impl FileStoreUploader {
                             .await
                             .unwrap();
                     }
+                    data_manager.refresh_file_store_version().await;
                     if len == 0 {
                         info!("No transaction was returned from cache, requested version: {next_version}.");
                         tokio::time::sleep(Duration::from_millis(200)).await;
