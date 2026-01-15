@@ -69,7 +69,8 @@ type SubmitTransactionResult<T> =
 generate_success_response!(
     SubmitTransactionsBatchResponse,
     (202, Accepted),
-    (206, AcceptedPartial)
+    (206, AcceptedPartial),
+    (400, BadRequest)
 );
 
 type SubmitTransactionsBatchResult<T> =
@@ -848,6 +849,8 @@ impl TransactionsApi {
 }
 
 impl TransactionsApi {
+    const MAX_SIGNED_TRANSACTION_DEPTH: usize = 16;
+
     /// List all transactions paging by ledger version
     fn list(&self, accept_type: &AcceptType, page: Page) -> BasicResultWith404<Vec<Transaction>> {
         let latest_ledger_info = self.context.get_latest_ledger_info()?;
@@ -1216,12 +1219,10 @@ impl TransactionsApi {
         ledger_info: &LedgerInfo,
         data: SubmitTransactionPost,
     ) -> Result<SignedTransaction, SubmitTransactionError> {
-        pub const MAX_SIGNED_TRANSACTION_DEPTH: usize = 16;
-
         match data {
             SubmitTransactionPost::Bcs(data) => {
                 let signed_transaction: SignedTransaction =
-                    bcs::from_bytes_with_limit(&data.0, MAX_SIGNED_TRANSACTION_DEPTH)
+                    bcs::from_bytes_with_limit(&data.0, Self::MAX_SIGNED_TRANSACTION_DEPTH)
                         .context("Failed to deserialize input into SignedTransaction")
                         .map_err(|err| {
                             SubmitTransactionError::bad_request_with_code(
@@ -1231,94 +1232,7 @@ impl TransactionsApi {
                             )
                         })?;
                 // Verify the signed transaction
-                match signed_transaction.payload() {
-                    TransactionPayload::EntryFunction(entry_function) => {
-                        TransactionsApi::validate_entry_function_payload_format(
-                            ledger_info,
-                            entry_function,
-                        )?;
-                    },
-                    TransactionPayload::Script(script) => {
-                        TransactionsApi::validate_script(ledger_info, script)?;
-                    },
-                    TransactionPayload::Multisig(multisig) => {
-                        if let Some(payload) = &multisig.transaction_payload {
-                            match payload {
-                                MultisigTransactionPayload::EntryFunction(entry_function) => {
-                                    TransactionsApi::validate_entry_function_payload_format(
-                                        ledger_info,
-                                        entry_function,
-                                    )?;
-                                },
-                            }
-                        }
-                    },
-
-                    // Deprecated. To avoid panics when malicios users submit this
-                    // payload, return an error.
-                    TransactionPayload::ModuleBundle(_) => {
-                        return Err(SubmitTransactionError::bad_request_with_code(
-                            "Module bundle payload has been removed",
-                            AptosErrorCode::InvalidInput,
-                            ledger_info,
-                        ))
-                    },
-                    TransactionPayload::Payload(TransactionPayloadInner::V1 {
-                        executable,
-                        extra_config,
-                    }) => match executable {
-                        TransactionExecutable::Script(script) => {
-                            TransactionsApi::validate_script(ledger_info, script)?;
-                            if extra_config.is_multisig() {
-                                return Err(SubmitTransactionError::bad_request_with_code(
-                                    "Script transaction payload must not be a multisig transaction",
-                                    AptosErrorCode::InvalidInput,
-                                    ledger_info,
-                                ));
-                            }
-                        },
-                        TransactionExecutable::EntryFunction(entry_function) => {
-                            TransactionsApi::validate_entry_function_payload_format(
-                                ledger_info,
-                                entry_function,
-                            )?;
-                        },
-                        TransactionExecutable::Empty => {
-                            if !extra_config.is_multisig() {
-                                return Err(SubmitTransactionError::bad_request_with_code(
-                                    "Empty transaction payload must be a multisig transaction",
-                                    AptosErrorCode::InvalidInput,
-                                    ledger_info,
-                                ));
-                            }
-                        },
-                    },
-                    TransactionPayload::EncryptedPayload(payload) => {
-                        if !self.context.node_config.api.allow_encrypted_txns_submission {
-                            return Err(SubmitTransactionError::bad_request_with_code(
-                                "Encrypted Transaction submission is not allowed yet",
-                                AptosErrorCode::InvalidInput,
-                                ledger_info,
-                            ));
-                        }
-
-                        if !payload.is_encrypted() {
-                            return Err(SubmitTransactionError::bad_request_with_code(
-                                "Encrypted transaction must be in encrypted state",
-                                AptosErrorCode::InvalidInput,
-                                ledger_info,
-                            ));
-                        }
-
-                        if let Err(e) = payload.verify(signed_transaction.sender()) {
-                            return Err(SubmitTransactionError::bad_request_with_code(
-                                e.context("Encrypted transaction payload could not be verified"),
-                                AptosErrorCode::InvalidInput,
-                                ledger_info,
-                            ));
-                        }
-                    },
-                }
+                self.validate_signed_transaction_payload(ledger_info, &signed_transaction)?;
                 // TODO: Verify script args?
 
                 Ok(signed_transaction)
@@ -1337,6 +1251,103 @@ impl TransactionsApi {
                     )
                 }),
         }
+    }
+
+    /// Validates a signed transaction's payload
+    fn validate_signed_transaction_payload(
+        &self,
+        ledger_info: &LedgerInfo,
+        signed_transaction: &SignedTransaction,
+    ) -> Result<(), SubmitTransactionError> {
+        match signed_transaction.payload() {
+            TransactionPayload::EntryFunction(entry_function) => {
+                TransactionsApi::validate_entry_function_payload_format(
+                    ledger_info,
+                    entry_function,
+                )?;
+            },
+            TransactionPayload::Script(script) => {
+                TransactionsApi::validate_script(ledger_info, script)?;
+            },
+            TransactionPayload::Multisig(multisig) => {
+                if let Some(payload) = &multisig.transaction_payload {
+                    match payload {
+                        MultisigTransactionPayload::EntryFunction(entry_function) => {
+                            TransactionsApi::validate_entry_function_payload_format(
+                                ledger_info,
+                                entry_function,
+                            )?;
+                        },
+                    }
+                }
+            },
+
+            // Deprecated. To avoid panics when malicios users submit this
+            // payload, return an error.
+            TransactionPayload::ModuleBundle(_) => {
+                return Err(SubmitTransactionError::bad_request_with_code(
+                    "Module bundle payload has been removed",
+                    AptosErrorCode::InvalidInput,
+                    ledger_info,
+                ))
+            },
+            TransactionPayload::Payload(TransactionPayloadInner::V1 {
+                executable,
+                extra_config,
+            }) => match executable {
+                TransactionExecutable::Script(script) => {
+                    TransactionsApi::validate_script(ledger_info, script)?;
+                    if extra_config.is_multisig() {
+                        return Err(SubmitTransactionError::bad_request_with_code(
+                            "Script transaction payload must not be a multisig transaction",
+                            AptosErrorCode::InvalidInput,
+                            ledger_info,
+                        ));
+                    }
+                },
+                TransactionExecutable::EntryFunction(entry_function) => {
+                    TransactionsApi::validate_entry_function_payload_format(
+                        ledger_info,
+                        entry_function,
+                    )?;
+                },
+                TransactionExecutable::Empty => {
+                    if !extra_config.is_multisig() {
+                        return Err(SubmitTransactionError::bad_request_with_code(
+                            "Empty transaction payload must be a multisig transaction",
+                            AptosErrorCode::InvalidInput,
+                            ledger_info,
+                        ));
+                    }
+                },
+            },
+            TransactionPayload::EncryptedPayload(payload) => {
+                if !self.context.node_config.api.allow_encrypted_txns_submission {
+                    return Err(SubmitTransactionError::bad_request_with_code(
+                        "Encrypted Transaction submission is not allowed yet",
+                        AptosErrorCode::InvalidInput,
+                        ledger_info,
+                    ));
+                }
+
+                if !payload.is_encrypted() {
+                    return Err(SubmitTransactionError::bad_request_with_code(
+                        "Encrypted transaction must be in encrypted state",
+                        AptosErrorCode::InvalidInput,
+                        ledger_info,
+                    ));
+                }
+
+                if let Err(e) = payload.verify(signed_transaction.sender()) {
+                    return Err(SubmitTransactionError::bad_request_with_code(
+                        e.context("Encrypted transaction payload could not be verified"),
+                        AptosErrorCode::InvalidInput,
+                        ledger_info,
+                    ));
+                }
+            },
+        }
+        Ok(())
     }
 
     // Validates that the module, function, and args in EntryFunction payload are correctly
@@ -1387,15 +1398,20 @@ impl TransactionsApi {
     ) -> Result<Vec<SignedTransaction>, SubmitTransactionError> {
         match data {
             SubmitTransactionsBatchPost::Bcs(data) => {
-                let signed_transactions = bcs::from_bytes(&data.0)
-                    .context("Failed to deserialize input into SignedTransaction")
-                    .map_err(|err| {
-                        SubmitTransactionError::bad_request_with_code(
-                            err,
-                            AptosErrorCode::InvalidInput,
-                            ledger_info,
-                        )
-                    })?;
+                let signed_transactions: Vec<SignedTransaction> =
+                    bcs::from_bytes_with_limit(&data.0, Self::MAX_SIGNED_TRANSACTION_DEPTH)
+                        .context("Failed to deserialize input into SignedTransaction")
+                        .map_err(|err| {
+                            SubmitTransactionError::bad_request_with_code(
+                                err,
+                                AptosErrorCode::InvalidInput,
+                                ledger_info,
+                            )
+                        })?;
+                // Verify each signed transaction
+                for signed_transaction in signed_transactions.iter() {
+                    self.validate_signed_transaction_payload(ledger_info, signed_transaction)?;
+                }
                 Ok(signed_transactions)
             }
             SubmitTransactionsBatchPost::Json(data) => data
@@ -1566,8 +1582,9 @@ impl TransactionsApi {
         // Return the possible failures, and have a different success code for partial success
         let response_status = if txn_failures.is_empty() {
             SubmitTransactionsBatchResponseStatus::Accepted
+        } else if txn_failures.len() == txns.len() {
+            SubmitTransactionsBatchResponseStatus::BadRequest
         } else {
-            // TODO: This should really throw an error if all fail
             SubmitTransactionsBatchResponseStatus::AcceptedPartial
         };
 
