@@ -28,33 +28,44 @@ custom_event_config:
 custom_contract_configs:
   # Test contract configuration
   - name: "e2e_test_contract"
-    
+
     on_chain_auth:
       # Chain ID where the contract is deployed (4 = local testnet)
       chain_id: 4
-      
+
       # Use view function method (recommended)
       method: viewfunction
-      
+
       # Contract function to call - will be substituted with deployed address
       # Format: ${CONTRACT_ADDRESS}::telemetry_registry::get_all_members
       resource_path: "${TEST_CONTRACT_ADDRESS}::telemetry_registry::get_all_members"
-      
+
       # Arguments to pass to the view function
       # get_all_members(registry_address: address) - pass the registry address
       view_function_args:
         - "${TEST_CONTRACT_ADDRESS}"
-      
+
       # Extract address field from returned Member structs
       # The Move contract returns vector<Member> where Member has an 'address' field
       address_list_field: "[0].address"
-      
+
       # REST API URL - points to local test node
       rest_api_url: "http://127.0.0.1:8080"
-      
+
       # Custom node type for JWT claims
       node_type_name: "TelemetryTestNode"
-    
+
+    # ========================================================================
+    # UNKNOWN/UNTRUSTED NODE SUPPORT
+    # ========================================================================
+    # Allow unknown nodes (not in on-chain allowlist) to authenticate and send telemetry.
+    # When enabled:
+    # - Nodes NOT in the allowlist get NodeType::CustomUnknown (instead of rejection)
+    # - Their telemetry is routed to untrusted_metrics_sinks / untrusted_logs_sink
+    # - All telemetry includes a "trust_status" label (trusted/untrusted) for attribution
+    # This enables community nodes to get custom labels without being in the allowlist.
+    allow_unknown_nodes: true
+
     # Multiple metrics sinks - supports different backend types simultaneously
     # Use `metrics_sink` (singular) for backwards compatibility with single sink
     # Use `metrics_sinks` (array) for multiple sinks with different backend types
@@ -73,23 +84,41 @@ custom_contract_configs:
           victoria_metrics: "http://127.0.0.1:8428/api/v1/import/prometheus"
         auth_type: none
         keys_env_var: "TEST_METRICS_KEYS"
-        backend_type: victoria_metrics
-      
+
       # Prometheus Remote Write sink (protobuf + snappy)
       - endpoint_urls:
           prometheus_remote_write: "http://127.0.0.1:9090/api/v1/write"
         auth_type: none
         keys_env_var: "TEST_METRICS_KEYS"
         backend_type: prometheus_remote_write
-    
-    # Logs sink - local Loki
+
+    # Untrusted metrics sinks - used for unknown nodes (not in allowlist) when allow_unknown_nodes: true
+    # If not specified, unknown nodes use the regular metrics_sinks (with trust_status=untrusted label)
+    # In production, you might want separate sinks for capacity planning and cost attribution
+    # Using Prometheus Remote Write for untrusted nodes to test both backend types
+    untrusted_metrics_sinks:
+      - endpoint_urls:
+          prometheus_remote_write: "http://127.0.0.1:9090/api/v1/write"
+        auth_type: none
+        keys_env_var: "TEST_METRICS_KEYS"
+        backend_type: prometheus_remote_write
+
+    # Logs sink - local Loki (for trusted/allowlisted nodes)
     # Authentication options same as metrics: auth_type (bearer/basic/none)
     logs_sink:
       endpoint_url: "http://127.0.0.1:3100/loki/api/v1/push"
-      auth_type: none  # No auth for local testing
-      key_env_var: "TEST_LOKI_TOKEN"  # Used when auth_type: bearer
+      auth_type: none # No auth for local testing
+      key_env_var: "TEST_LOKI_TOKEN" # Used when auth_type: bearer
       # basic_auth_env_var: "LOKI_BASIC_AUTH"  # Used when auth_type: basic
       # Format for basic_auth_env_var: "username:password"
+      backend_type: loki
+
+    # Untrusted logs sink - used for unknown nodes (optional)
+    # If not specified, unknown nodes use the regular logs_sink (with trust_status=untrusted tag)
+    untrusted_logs_sink:
+      endpoint_url: "http://127.0.0.1:3100/loki/api/v1/push"
+      auth_type: none
+      key_env_var: "TEST_LOKI_TOKEN"
       backend_type: loki
 
 # Standard telemetry endpoints (required but not used in custom contract testing)
@@ -101,14 +130,15 @@ metrics_endpoints_config:
   telemetry_service_metrics:
     endpoint_urls:
       local: "http://127.0.0.1:8428/api/v1/import/prometheus"
-    auth_type: none  # No auth for local testing
+    auth_type: none # No auth for local testing
     keys_env_var: "TEST_METRICS_KEYS"
   ingest_metrics:
     endpoint_urls: {}
     auth_type: none
     keys_env_var: "TEST_METRICS_KEYS"
   untrusted_ingest_metrics:
-    endpoint_urls: {}
+    endpoint_urls:
+      victoria_metrics: "http://127.0.0.1:8428/api/v1/import/prometheus"
     auth_type: none
     keys_env_var: "TEST_METRICS_KEYS"
 
@@ -116,7 +146,7 @@ humio_ingest_config:
   # Log endpoints also support auth_type: bearer | basic | none
   known_logs_endpoint:
     endpoint_url: "http://127.0.0.1:3100/loki/api/v1/push"
-    auth_type: none  # No auth for local testing
+    auth_type: none # No auth for local testing
     key_env_var: "TEST_LOKI_TOKEN"
     backend_type: loki
   unknown_logs_endpoint:
@@ -124,4 +154,3 @@ humio_ingest_config:
     auth_type: none
     key_env_var: "TEST_LOKI_TOKEN"
     backend_type: loki
-
