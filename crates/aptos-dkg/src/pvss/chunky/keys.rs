@@ -90,7 +90,6 @@ impl From<&aptos_crypto::bls12381::PrivateKey> for DecryptPrivKey<ark_bls12_381:
     }
 }
 
-
 #[allow(non_snake_case)]
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct DealtPubKey<E: Pairing> {
@@ -129,27 +128,32 @@ pub type DealtSecretKey<F: PrimeField> = Scalar<F>;
 #[allow(type_alias_bounds)]
 pub type DealtSecretKeyShare<F: PrimeField> = Scalar<F>;
 
-
 #[cfg(test)]
 mod tests {
-    use rand::thread_rng;
-    use aptos_crypto::{bls12381::{PrivateKey, PublicKey}, Uniform};
-    use ark_bls12_381::Bls12_381;
+    use super::{DecryptPrivKey, EncryptPubKey};
     use crate::pvss::{chunky::chunked_elgamal::PublicParameters, traits::Convert};
-
-    use super::{EncryptPubKey, DecryptPrivKey};
+    use aptos_crypto::{
+        bls12381::{PrivateKey, PublicKey},
+        Uniform,
+    };
+    use ark_bls12_381::Bls12_381;
+    use rand::thread_rng;
 
     #[test]
     fn test_conversion_from_blst_types() {
         let mut rng = thread_rng();
-        let sk : PrivateKey = PrivateKey::generate(&mut rng);
-        let pk : PublicKey = PublicKey::from(&sk);
+        let sk: PrivateKey = PrivateKey::generate(&mut rng);
+        let pk: PublicKey = PublicKey::from(&sk);
 
-        let decryption_key : DecryptPrivKey<Bls12_381> = DecryptPrivKey::from(&sk);
-        let encryption_key_from_decryption_key : EncryptPubKey<Bls12_381> = decryption_key.to(&PublicParameters::default());
+        let decryption_key: DecryptPrivKey<Bls12_381> = DecryptPrivKey::from(&sk);
+        let encryption_key_from_decryption_key: EncryptPubKey<Bls12_381> =
+            decryption_key.to(&PublicParameters::default());
 
         let encryption_key_from_blst_pk = EncryptPubKey::from(&pk);
 
-        assert_eq!(encryption_key_from_decryption_key, encryption_key_from_blst_pk);
+        assert_eq!(
+            encryption_key_from_decryption_key,
+            encryption_key_from_blst_pk
+        );
     }
 }

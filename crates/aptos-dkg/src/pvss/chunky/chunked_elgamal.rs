@@ -12,7 +12,7 @@ use aptos_crypto::arkworks::{
     random::sample_field_element,
 };
 use aptos_crypto_derive::SigmaProtocolWitness;
-use ark_ec::{pairing::Pairing, VariableBaseMSM, AffineRepr};
+use ark_ec::{pairing::Pairing, AffineRepr, VariableBaseMSM};
 use ark_ff::PrimeField;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
