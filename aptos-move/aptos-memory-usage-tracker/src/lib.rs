@@ -708,5 +708,7 @@ where
         fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()>;
 
         fn charge_keyless(&mut self) -> VMResult<()>;
+
+        fn charge_slh_dsa_sha2_128s(&mut self) -> VMResult<()>;
     }
 }
