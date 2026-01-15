@@ -658,7 +658,7 @@ module aptos_framework::delegation_pool {
         if (pending_active == 0) {
             // zero `pending_active` stake indicates that either there are no `add_stake` fees or
             // previous epoch has ended and should identify shares owning these fees as released
-            total_active_shares = total_active_shares - pool_u64::shares(&pool.active_shares, NULL_SHAREHOLDER);
+            total_active_shares -= pool_u64::shares(&pool.active_shares, NULL_SHAREHOLDER);
             if (delegator_address == NULL_SHAREHOLDER) {
                 delegator_active_shares = 0
             }
@@ -681,12 +681,12 @@ module aptos_framework::delegation_pool {
         // some imprecision (received stake would be slightly less)
         // but adding rewards onto the existing stake is still a good approximation
         if (delegator_address == beneficiary_for_operator(get_operator(pool_address))) {
-            active = active + commission_active;
+            active += commission_active;
             // in-flight pending_inactive commission can coexist with already inactive withdrawal
             if (lockup_cycle_ended) {
-                inactive = inactive + commission_pending_inactive
+                inactive += commission_pending_inactive
             } else {
-                pending_inactive = pending_inactive + commission_pending_inactive
+                pending_inactive += commission_pending_inactive
             }
         };
 
@@ -711,8 +711,8 @@ module aptos_framework::delegation_pool {
             if (rewards_rate_denominator > 0) {
                 assert_delegation_pool_exists(pool_address);
 
-                rewards_rate = rewards_rate * (MAX_FEE - operator_commission_percentage(pool_address));
-                rewards_rate_denominator = rewards_rate_denominator * MAX_FEE;
+                rewards_rate *= (MAX_FEE - operator_commission_percentage(pool_address));
+                rewards_rate_denominator *= MAX_FEE;
                 ((((amount as u128) * (rewards_rate as u128)) / ((rewards_rate as u128) + (rewards_rate_denominator as u128))) as u64)
             } else { 0 }
         } else { 0 }
@@ -989,7 +989,7 @@ module aptos_framework::delegation_pool {
         // Check a edge case during the transient period of enabling partial governance voting.
         assert_and_update_proposal_used_voting_power(governance_records, pool_address, proposal_id, voting_power);
         let used_voting_power = borrow_mut_used_voting_power(governance_records, voter_address, proposal_id);
-        *used_voting_power = *used_voting_power + voting_power;
+        *used_voting_power += voting_power;
 
         let pool_signer = retrieve_stake_pool_owner(borrow_global<DelegationPool>(pool_address));
         aptos_governance::partial_vote(&pool_signer, pool_address, proposal_id, voting_power, should_pass);
@@ -1440,16 +1440,14 @@ module aptos_framework::delegation_pool {
                 governance_records,
                 pending_voter
             );
-            pending_delegated_votes.active_shares_next_lockup =
-                pending_delegated_votes.active_shares_next_lockup - active_shares;
+            pending_delegated_votes.active_shares_next_lockup -= active_shares;
 
             let new_delegated_votes = update_and_borrow_mut_delegated_votes(
                 delegation_pool,
                 governance_records,
                 new_voter
             );
-            new_delegated_votes.active_shares_next_lockup =
-                new_delegated_votes.active_shares_next_lockup + active_shares;
+            new_delegated_votes.active_shares_next_lockup += active_shares;
         };
 
         if (features::module_event_migration_enabled()) {
@@ -1776,7 +1774,7 @@ module aptos_framework::delegation_pool {
             let (_, _, _, pending_inactive) = stake::get_stake(pool_address);
             if (withdrawal_olc.index == pool.observed_lockup_cycle.index) {
                 // `amount` less excess if withdrawing pending_inactive stake
-                pending_inactive = pending_inactive - amount
+                pending_inactive -= amount
             };
             // escape excess stake from inactivation
             stake::reactivate_stake(stake_pool_owner, pending_inactive);
@@ -2009,7 +2007,7 @@ module aptos_framework::delegation_pool {
         let lockup_cycle_ended = inactive > pool.total_coins_inactive;
 
         // actual coins on stake pool belonging to the active shares pool
-        active = active + pending_active;
+        active += pending_active;
         // actual coins on stake pool belonging to the shares pool hosting `pending_inactive` stake
         // at current observed lockup cycle, either pending: `pending_inactive` or already inactivated:
         if (lockup_cycle_ended) {
@@ -2117,7 +2115,7 @@ module aptos_framework::delegation_pool {
             pool.total_coins_inactive = inactive;
 
             // advance lockup cycle on the delegation pool
-            pool.observed_lockup_cycle.index = pool.observed_lockup_cycle.index + 1;
+            pool.observed_lockup_cycle.index += 1;
             // start new lockup cycle with a fresh shares pool for `pending_inactive` stake
             table::add(
                 &mut pool.inactive_shares,
@@ -2154,7 +2152,7 @@ module aptos_framework::delegation_pool {
             stake_pool_used_voting_power == *proposal_used_voting_power,
             error::invalid_argument(EALREADY_VOTED_BEFORE_ENABLE_PARTIAL_VOTING)
         );
-        *proposal_used_voting_power = *proposal_used_voting_power + voting_power;
+        *proposal_used_voting_power += voting_power;
     }
 
     fun update_governance_records_for_buy_in_active_shares(
@@ -2169,15 +2167,13 @@ module aptos_framework::delegation_pool {
         let pending_voter = vote_delegation.pending_voter;
         let current_delegated_votes =
             update_and_borrow_mut_delegated_votes(pool, governance_records, current_voter);
-        current_delegated_votes.active_shares = current_delegated_votes.active_shares + new_shares;
+        current_delegated_votes.active_shares += new_shares;
         if (pending_voter == current_voter) {
-            current_delegated_votes.active_shares_next_lockup =
-                current_delegated_votes.active_shares_next_lockup + new_shares;
+            current_delegated_votes.active_shares_next_lockup += new_shares;
         } else {
             let pending_delegated_votes =
                 update_and_borrow_mut_delegated_votes(pool, governance_records, pending_voter);
-            pending_delegated_votes.active_shares_next_lockup =
-                pending_delegated_votes.active_shares_next_lockup + new_shares;
+            pending_delegated_votes.active_shares_next_lockup += new_shares;
         };
     }
 
@@ -2190,7 +2186,7 @@ module aptos_framework::delegation_pool {
         let governance_records = borrow_global_mut<GovernanceRecords>(pool_address);
         let current_voter = calculate_and_update_delegator_voter_internal(pool, governance_records, shareholder);
         let current_delegated_votes = update_and_borrow_mut_delegated_votes(pool, governance_records, current_voter);
-        current_delegated_votes.pending_inactive_shares = current_delegated_votes.pending_inactive_shares + new_shares;
+        current_delegated_votes.pending_inactive_shares += new_shares;
     }
 
     fun update_governanace_records_for_redeem_active_shares(
@@ -2208,15 +2204,13 @@ module aptos_framework::delegation_pool {
         let current_voter = vote_delegation.voter;
         let pending_voter = vote_delegation.pending_voter;
         let current_delegated_votes = update_and_borrow_mut_delegated_votes(pool, governance_records, current_voter);
-        current_delegated_votes.active_shares = current_delegated_votes.active_shares - shares_to_redeem;
+        current_delegated_votes.active_shares -= shares_to_redeem;
         if (current_voter == pending_voter) {
-            current_delegated_votes.active_shares_next_lockup =
-                current_delegated_votes.active_shares_next_lockup - shares_to_redeem;
+            current_delegated_votes.active_shares_next_lockup -= shares_to_redeem;
         } else {
             let pending_delegated_votes =
                 update_and_borrow_mut_delegated_votes(pool, governance_records, pending_voter);
-            pending_delegated_votes.active_shares_next_lockup =
-                pending_delegated_votes.active_shares_next_lockup - shares_to_redeem;
+            pending_delegated_votes.active_shares_next_lockup -= shares_to_redeem;
         };
     }
 
@@ -2229,7 +2223,7 @@ module aptos_framework::delegation_pool {
         let governance_records = borrow_global_mut<GovernanceRecords>(pool_address);
         let current_voter = calculate_and_update_delegator_voter_internal(pool, governance_records, shareholder);
         let current_delegated_votes = update_and_borrow_mut_delegated_votes(pool, governance_records, current_voter);
-        current_delegated_votes.pending_inactive_shares = current_delegated_votes.pending_inactive_shares - shares_to_redeem;
+        current_delegated_votes.pending_inactive_shares -= shares_to_redeem;
     }
 
     #[deprecated]

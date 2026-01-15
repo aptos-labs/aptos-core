@@ -119,7 +119,7 @@ module aptos_framework::nonce_validation {
                         empty_bucket(true)
                     );
                 };
-                nonce_history.next_key = nonce_history.next_key + 1;
+                nonce_history.next_key += 1;
             }
         }
     }
@@ -189,7 +189,7 @@ module aptos_framework::nonce_validation {
             } else {
                 break;
             };
-            i = i + 1;
+            i += 1;
         };
 
         // Insert the (address, nonce) pair in the bucket.

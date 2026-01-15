@@ -383,7 +383,7 @@ module aptos_framework::multisig_account {
         let next_sequence_number = multisig_account.next_sequence_number;
         while (i < next_sequence_number) {
             vector::push_back(&mut pending_transactions, *table::borrow(&multisig_account.transactions, i));
-            i = i + 1;
+            i += 1;
         };
         pending_transactions
     }
@@ -418,7 +418,7 @@ module aptos_framework::multisig_account {
         assert_valid_sequence_number(multisig_account, sequence_number);
         let (num_approvals, _) = num_approvals_and_rejections(multisig_account, sequence_number);
         if (!has_voted_for_approval(multisig_account, sequence_number, owner)) {
-            num_approvals = num_approvals + 1;
+            num_approvals += 1;
         };
         is_owner(owner, multisig_account) &&
             sequence_number == last_resolved_sequence_number(multisig_account) + 1 &&
@@ -440,7 +440,7 @@ module aptos_framework::multisig_account {
         assert_valid_sequence_number(multisig_account, sequence_number);
         let (_, num_rejections) = num_approvals_and_rejections(multisig_account, sequence_number);
         if (!has_voted_for_rejection(multisig_account, sequence_number, owner)) {
-            num_rejections = num_rejections + 1;
+            num_rejections += 1;
         };
         is_owner(owner, multisig_account) &&
             sequence_number == last_resolved_sequence_number(multisig_account) + 1 &&
@@ -924,7 +924,7 @@ module aptos_framework::multisig_account {
             );
 
             simple_map::add(metadata, key, value);
-            i = i + 1;
+            i += 1;
         };
 
         if (emit_event) {
@@ -1067,7 +1067,7 @@ module aptos_framework::multisig_account {
         let sequence_number = starting_sequence_number;
         while(sequence_number <= final_sequence_number) {
             vote_transanction(owner, multisig_account, sequence_number, approved);
-            sequence_number = sequence_number + 1;
+            sequence_number += 1;
         }
     }
 
@@ -1278,7 +1278,7 @@ module aptos_framework::multisig_account {
                     }
                 );
             };
-            num_approvals = num_approvals + 1;
+            num_approvals += 1;
         };
 
         num_approvals
@@ -1377,9 +1377,9 @@ module aptos_framework::multisig_account {
         vector::for_each_ref(owners, |owner| {
             if (simple_map::contains_key(votes, owner)) {
                 if (*simple_map::borrow(votes, owner)) {
-                    num_approvals = num_approvals + 1;
+                    num_approvals += 1;
                 } else {
-                    num_rejections = num_rejections + 1;
+                    num_rejections += 1;
                 };
             }
         });
@@ -2398,7 +2398,7 @@ module aptos_framework::multisig_account {
         let remaining_iterations = MAX_PENDING_TRANSACTIONS + 1;
         while (remaining_iterations > 0) {
             create_transaction(owner_1, multisig_address, PAYLOAD);
-            remaining_iterations = remaining_iterations - 1;
+            remaining_iterations -= 1;
         }
     }
 
@@ -2446,7 +2446,7 @@ module aptos_framework::multisig_account {
         let remaining_iterations = MAX_PENDING_TRANSACTIONS;
         while (remaining_iterations > 0) {
             create_transaction(owner_3, multisig_address, PAYLOAD);
-            remaining_iterations = remaining_iterations - 1;
+            remaining_iterations -= 1;
         };
 
         // No one can create a transaction anymore because the transaction queue is full.

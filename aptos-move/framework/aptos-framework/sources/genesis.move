@@ -233,7 +233,7 @@ module aptos_framework::genesis {
                 let coins = coin::withdraw<AptosCoin>(&employee, total);
                 simple_map::add(&mut buy_ins, *account, coins);
 
-                j = j + 1;
+                j += 1;
             };
 
             let j = 0;
@@ -245,7 +245,7 @@ module aptos_framework::genesis {
                 let event = fixed_point32::create_from_rational(*numerator, employee_group.vesting_schedule_denominator);
                 vector::push_back(&mut schedule, event);
 
-                j = j + 1;
+                j += 1;
             };
 
             let vesting_schedule = vesting::create_vesting_schedule(

@@ -446,7 +446,7 @@ module aptos_framework::storage_gas {
             let cur = if (i == 0) { &Point { x: 0, y: 0 } } else { vector::borrow(points, i - 1) };
             let next = if (i == len) { &Point { x: BASIS_POINT_DENOMINATION, y: BASIS_POINT_DENOMINATION } } else { vector::borrow(points, i) };
             assert!(cur.x < next.x && cur.y <= next.y, error::invalid_argument(EINVALID_MONOTONICALLY_NON_DECREASING_CURVE));
-            i = i + 1;
+            i += 1;
         }
     }
 
@@ -563,10 +563,10 @@ module aptos_framework::storage_gas {
                 let new_standard_curve_gas = calculate_gas(target, i, &standard_curve);
                 assert!(new_standard_curve_gas >= old_standard_curve_gas, 0);
                 old_standard_curve_gas = new_standard_curve_gas;
-                i = i + 3;
+                i += 3;
             };
             assert!(old_standard_curve_gas == 1000, 0);
-            target = target + BASIS_POINT_DENOMINATION;
+            target += BASIS_POINT_DENOMINATION;
         }
     }
 

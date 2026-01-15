@@ -373,7 +373,7 @@ module aptos_framework::permissioned_signer {
         match (perm) {
             StoredPermission::Capacity(current_capacity) => {
                 if (*current_capacity >= threshold) {
-                    *current_capacity = *current_capacity - threshold;
+                    *current_capacity -= threshold;
                     true
                 } else { false }
             }
@@ -385,7 +385,7 @@ module aptos_framework::permissioned_signer {
     fun increase_capacity(perm: &mut StoredPermission, threshold: u256) {
         match (perm) {
             StoredPermission::Capacity(current_capacity) => {
-                *current_capacity = *current_capacity + threshold;
+                *current_capacity += threshold;
             }
             StoredPermission::Unlimited => (),
         }
@@ -397,7 +397,7 @@ module aptos_framework::permissioned_signer {
             StoredPermission::Capacity(new_capacity) => {
                 match (lhs) {
                     StoredPermission::Capacity(current_capacity) => {
-                        *current_capacity = *current_capacity + new_capacity;
+                        *current_capacity += new_capacity;
                     }
                     StoredPermission::Unlimited => (),
                 }

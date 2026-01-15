@@ -433,7 +433,7 @@ module aptos_framework::transaction_validation {
                 };
             };
 
-            i = i + 1;
+            i += 1;
         }
     }
 

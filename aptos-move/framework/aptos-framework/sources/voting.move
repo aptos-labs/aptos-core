@@ -312,7 +312,7 @@ module aptos_framework::voting {
 
         let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
         let proposal_id = voting_forum.next_proposal_id;
-        voting_forum.next_proposal_id = voting_forum.next_proposal_id + 1;
+        voting_forum.next_proposal_id += 1;
 
         // Add a flag to indicate if this proposal is single-step or multi-step.
         simple_map::add(&mut metadata, utf8(IS_MULTI_STEP_PROPOSAL_KEY), to_bytes(&is_multi_step_proposal));
@@ -403,9 +403,9 @@ module aptos_framework::voting {
             error::invalid_state(EMULTI_STEP_PROPOSAL_IN_EXECUTION));
 
         if (should_pass) {
-            proposal.yes_votes = proposal.yes_votes + (num_votes as u128);
+            proposal.yes_votes += (num_votes as u128);
         } else {
-            proposal.no_votes = proposal.no_votes + (num_votes as u128);
+            proposal.no_votes += (num_votes as u128);
         };
 
         // Record the resolvable time to ensure that resolution has to be done non-atomically.
