@@ -12,7 +12,7 @@ use aptos_crypto::arkworks::{
     random::sample_field_element,
 };
 use aptos_crypto_derive::SigmaProtocolWitness;
-use ark_ec::{pairing::Pairing, VariableBaseMSM};
+use ark_ec::{pairing::Pairing, VariableBaseMSM, AffineRepr};
 use ark_ff::PrimeField;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
@@ -48,7 +48,9 @@ impl<E: Pairing> PublicParameters<E> {
 
     pub fn default() -> Self {
         let G = hashing::unsafe_hash_to_affine(b"G", DST);
-        let H = hashing::unsafe_hash_to_affine(b"H", DST);
+        // Chunky's encryption pubkey base must match up with the blst base, since validators
+        // reuse their consensus keypairs as encryption keypairs
+        let H = E::G1Affine::generator();
         debug_assert_ne!(G, H);
         Self { G, H }
     }
