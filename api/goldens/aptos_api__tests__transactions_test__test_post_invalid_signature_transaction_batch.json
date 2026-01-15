@@ -1,0 +1,5 @@
+{
+  "message": "All transactions submitted were invalid.",
+  "error_code": "invalid_input",
+  "vm_error_code": null
+}
