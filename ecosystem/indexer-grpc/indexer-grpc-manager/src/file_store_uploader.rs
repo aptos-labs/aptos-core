@@ -135,6 +135,7 @@ impl FileStoreUploader {
 
         tokio_scoped::scope(|s| {
             let (tx, mut rx) = channel::<(_, BatchMetadata, _)>(5);
+            let data_manager_clone = data_manager.clone();
             s.spawn(async move {
                 while let Some((transactions, batch_metadata, end_batch)) = rx.recv().await {
                     let bytes_to_upload = batch_metadata.files.last().unwrap().size_bytes as u64;
@@ -142,6 +143,8 @@ impl FileStoreUploader {
                         .await
                         .unwrap();
                     FILE_STORE_UPLOADED_BYTES.inc_by(bytes_to_upload);
+                    // Refresh version from disk after write completes
+                    data_manager_clone.refresh_file_store_version().await;
                 }
             });
             s.spawn(async move {
@@ -168,7 +171,6 @@ impl FileStoreUploader {
                             .await
                             .unwrap();
                     }
-                    data_manager.refresh_file_store_version().await;
                     if len == 0 {
                         info!("No transaction was returned from cache, requested version: {next_version}.");
                         tokio::time::sleep(Duration::from_millis(200)).await;

@@ -362,9 +362,11 @@ impl DataManager {
     /// This ensures GC only evicts data that has been persisted to the file store.
     pub(crate) async fn refresh_file_store_version(&self) {
         let cache = self.cache.read().await;
-        self.update_file_store_version_in_cache(&cache, /*version_can_go_backward=*/ false).await;
+        self.update_file_store_version_in_cache(&cache, /*version_can_go_backward=*/ false)
+            .await;
     }
-    
+
+
     pub(crate) async fn get_transactions_from_cache(
         &self,
         start_version: u64,
