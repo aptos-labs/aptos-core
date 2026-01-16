@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
-    group::{self, *},
+    group::*,
     shared::{
         ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, SuccinctCiphertext},
         digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise},
@@ -39,7 +39,7 @@ impl BatchThresholdEncryption for FPTXSuccinct {
     type MasterSecretKeyShare = BIBEMasterSecretKeyShare;
     type PreparedCiphertext = PreparedCiphertext;
     type Round = u64;
-    type SubTranscript = aptos_dkg::pvss::chunky::UnweightedSubtranscript<group::Pairing>;
+    type SubTranscript = aptos_dkg::pvss::chunky::WeightedSubtranscript<Pairing>;
     type ThresholdConfig = aptos_crypto::arkworks::shamir::ShamirThresholdConfig<Fr>;
     type VerificationKey = BIBEVerificationKey;
 
