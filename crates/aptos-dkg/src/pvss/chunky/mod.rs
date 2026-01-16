@@ -12,7 +12,7 @@ mod hkzg_chunked_elgamal_commit;
 mod input_secret;
 mod keys;
 pub mod public_parameters;
-mod scalar_mul;
+//mod scalar_mul;
 //mod transcript;
 mod weighted_transcript;
 mod weighted_transcriptv2;

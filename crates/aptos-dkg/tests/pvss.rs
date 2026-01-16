@@ -29,6 +29,7 @@ use aptos_dkg::pvss::{
     GenericWeighting, ThresholdConfigBlstrs,
 };
 use ark_bn254::Bn254;
+use ark_ec::pairing::Pairing;
 use rand::{rngs::StdRng, thread_rng};
 use rand_core::SeedableRng;
 
@@ -301,6 +302,7 @@ fn test_pvss_aggregate_subtranscript_and_decrypt<E: Pairing, T>(
 }
 
 #[cfg(test)]
+#[allow(dead_code)] // TODO
 fn nonaggregatable_pvss_deal_verify_and_reconstruct<T: HasAggregatableSubtranscript>(
     sc: &T::SecretSharingConfig,
     seed_bytes: [u8; 32],
@@ -337,7 +339,6 @@ fn nonaggregatable_pvss_deal_verify_and_reconstruct<T: HasAggregatableSubtranscr
     }
 }
 
-use ark_ec::pairing::Pairing;
 // TODO: merge this stuff
 #[cfg(test)]
 fn nonaggregatable_weighted_pvss_deal_verify_and_reconstruct<E: Pairing, T>(
@@ -380,6 +381,7 @@ fn nonaggregatable_weighted_pvss_deal_verify_and_reconstruct<E: Pairing, T>(
 }
 
 #[cfg(test)]
+#[allow(dead_code)] // TODO
 fn pvss_deal_verify_and_reconstruct_from_subtranscript<
     T: Transcript + HasAggregatableSubtranscript,
 >(

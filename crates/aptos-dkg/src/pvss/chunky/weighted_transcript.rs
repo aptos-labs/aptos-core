@@ -668,6 +668,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
                         rng,
                         1 << pp.ell as u64,
                         num_chunks_per_scalar::<E::ScalarField>(pp.ell),
+                        &E::ScalarField::ZERO,
                     )
                 })
                 .collect(),

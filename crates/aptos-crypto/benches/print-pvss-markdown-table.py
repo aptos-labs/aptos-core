@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import sys, csv, re, math
+import sys, csv, re
 from collections import defaultdict
 
 HEADER = [
@@ -221,7 +221,6 @@ def padded_table(rows):
         for c in cols:
             widths[c] = max(widths[c], len(str(r.get(display_map[c], ""))))
 
-    left_cols = {"Scheme", "Setup"}
     right_cols = {
         "Deal (ms)",
         "Serialize (ms)",

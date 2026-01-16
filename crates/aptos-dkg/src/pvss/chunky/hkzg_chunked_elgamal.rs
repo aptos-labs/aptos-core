@@ -16,8 +16,8 @@ use crate::{
 };
 use aptos_crypto::{
     arkworks::random::{
-        sample_field_element, sample_field_elements, unsafe_random_point,
-        unsafe_random_point_group, unsafe_random_points, unsafe_random_points_group, UniformRand,
+        sample_field_element, sample_field_elements, unsafe_random_point_group,
+        unsafe_random_points_group, UniformRand,
     },
     weighted_config::WeightedConfigArkworks,
     SecretSharingConfig,

@@ -63,10 +63,13 @@ fn benchmark_commitment_scheme<CS: PolynomialCommitmentScheme>(c: &mut Criterion
                 || {
                     let poly = random_poly::<CS, _>(&mut rng, len, 32);
                     let challenge = random_point::<CS, _>(&mut rng, num_vars);
-                    (poly, challenge)
+                    let mut rng = rand::thread_rng();
+                    let r = CS::random_witness(&mut rng);
+                    let trs = merlin::Transcript::new(b"pcs-bench");
+                    (poly, challenge, Some(r), rng, trs)
                 },
-                |(poly, challenge)| {
-                    CS::open(&ck, poly, challenge);
+                |(poly, challenge, r, mut rng, mut trs)| {
+                    CS::open(&ck, poly, challenge, r, &mut rng, &mut trs);
                 },
                 BatchSize::LargeInput,
             );
@@ -82,7 +85,17 @@ fn benchmark_commitment_scheme<CS: PolynomialCommitmentScheme>(c: &mut Criterion
                     let challenge = random_point::<CS, _>(&mut rng, num_vars);
                     let val = CS::evaluate_point(&poly, &challenge);
                     let com = CS::commit(&ck, poly.clone(), None);
-                    let proof = CS::open(&ck, poly.clone(), challenge.clone());
+                    let mut rng = rand::thread_rng();
+                    let r = CS::random_witness(&mut rng);
+                    let mut trs = merlin::Transcript::new(b"pcs-bench");
+                    let proof = CS::open(
+                        &ck,
+                        poly.clone(),
+                        challenge.clone(),
+                        Some(r),
+                        &mut rng,
+                        &mut trs,
+                    );
                     (challenge, val, com, proof)
                 },
                 |(challenge, val, com, proof)| {

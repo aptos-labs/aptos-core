@@ -3,6 +3,9 @@
 
 // Some of this is derived from: https://www.ietf.org/archive/id/draft-zkproof-polycommit-00.html
 // TODO: This trait is still very much a work in progress
+
+use rand::{CryptoRng, RngCore};
+
 pub trait PolynomialCommitmentScheme {
     type CommitmentKey: Clone;
     type VerificationKey: Clone;
@@ -23,13 +26,26 @@ pub trait PolynomialCommitmentScheme {
         r: Option<Self::WitnessField>,
     ) -> Self::Commitment;
 
-    fn open(
+    fn open<R: RngCore + CryptoRng>(
         ck: &Self::CommitmentKey,
         poly: Self::Polynomial,
         // com: Self::Commitment,
         //com_state: CommitmentState,
         challenge: Vec<Self::WitnessField>,
-        //r: Option<WitnessField>
+        // Might want to put `eval` here
+        r: Option<Self::WitnessField>,
+        rng: &mut R,
+        trs: &mut merlin::Transcript,
+    ) -> Self::Proof;
+
+    fn batch_open<R: RngCore + CryptoRng>(
+        ck: Self::CommitmentKey,
+        polys: Vec<Self::Polynomial>,
+        //   coms: Vec<Commitment>,
+        challenge: Vec<Self::WitnessField>,
+        rs: Option<Vec<Self::WitnessField>>,
+        rng: &mut R,
+        trs: &mut merlin::Transcript,
     ) -> Self::Proof;
 
     fn verify(

@@ -3,22 +3,20 @@
 
 use crate::{
     pvss::chunky::{
-        chunked_elgamal, chunked_scalar_mul, chunks::le_chunks_to_scalar, hkzg_chunked_elgamal,
+        chunked_elgamal, chunked_scalar_mul, hkzg_chunked_elgamal,
         hkzg_chunked_elgamal::HkzgWeightedElgamalWitness,
     },
     sigma_protocol,
     sigma_protocol::{
         homomorphism::{
             tuple::{PairingTupleHomomorphism, TupleCodomainShape},
-            LiftHomomorphism, VectorShape,
+            LiftHomomorphism,
         },
         traits::FirstProofItem,
     },
-    Scalar,
 };
 use aptos_crypto::{
-    arkworks::random::{unsafe_random_points, unsafe_random_points_group},
-    weighted_config::WeightedConfigArkworks,
+    arkworks::random::unsafe_random_points_group, weighted_config::WeightedConfigArkworks,
     SecretSharingConfig,
 };
 use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup};

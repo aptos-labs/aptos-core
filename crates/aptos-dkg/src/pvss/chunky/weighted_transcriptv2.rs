@@ -43,7 +43,7 @@ use aptos_crypto::{
     CryptoMaterialError, SecretSharingConfig as _, ValidCryptoMaterial,
 };
 use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup};
-use ark_ff::{Fp, FpConfig};
+use ark_ff::{AdditiveGroup, Fp, FpConfig};
 use ark_poly::EvaluationDomain;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid, Validate,
@@ -963,6 +963,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
                         rng,
                         1 << pp.ell as u64,
                         num_chunks_per_scalar::<E::ScalarField>(pp.ell),
+                        &E::ScalarField::ZERO,
                     )
                 })
                 .collect(),

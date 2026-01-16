@@ -140,7 +140,6 @@ mod tests {
     };
     use aptos_crypto::arkworks::random::{sample_field_elements, unsafe_random_point};
     use ark_bls12_381::{G1Affine, G1Projective};
-    use ark_ec::CurveGroup;
     use rand::thread_rng;
 
     #[test]

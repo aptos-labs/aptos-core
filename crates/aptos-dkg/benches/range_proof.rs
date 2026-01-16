@@ -21,6 +21,7 @@ use rand::thread_rng;
 /// `crates/aptos-crypto/README.md` rely on it.
 const BROKEN_DEKART_RS_SCHEME_NAME: &str = "dekart-rs-broken";
 const DEKART_RS_SCHEME_NAME: &str = "dekart-rs";
+//const DEKART_MULTIVARIATE_SCHEME_NAME: &str = "dekart-multivar";
 const BN254: &str = "bn254";
 const BLS12_381: &str = "bls12-381";
 

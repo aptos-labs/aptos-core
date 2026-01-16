@@ -369,28 +369,53 @@ impl<'a, C: CurveGroup> sigma_protocol::Trait<C> for WeightedHomomorphism<'a, C>
     }
 }
 
-pub(crate) fn correlated_randomness<F, R>(rng: &mut R, radix: u64, num_chunks: u32) -> Vec<F>
+// pub(crate) fn correlated_randomness<F, R>(rng: &mut R, radix: u64, num_chunks: u32) -> Vec<F>
+// where
+//     F: PrimeField, // because `sample_field_element()` needs `PrimeField`
+//     R: rand_core::RngCore + rand_core::CryptoRng,
+// {
+//     let mut r_vals = Vec::with_capacity(num_chunks as usize);
+//     r_vals.push(F::zero()); // placeholder for r_0
+//     let mut remainder = F::zero();
+
+//     // Precompute radix as F once
+//     let radix_f = F::from(radix);
+//     let mut cur_base = radix_f;
+
+//     // Fill r_1 .. r_{num_chunks-1} randomly
+//     for _ in 1..num_chunks {
+//         let r = sample_field_element(rng);
+//         r_vals.push(r);
+//         remainder -= r * cur_base;
+//         cur_base *= radix_f;
+//     }
+
+//     r_vals[0] = remainder;
+
+//     r_vals
+// }
+
+pub fn correlated_randomness<F, R>(
+    rng: &mut R,
+    radix: u64,
+    num_chunks: u32,
+    target_sum: &F,
+) -> Vec<F>
 where
-    F: PrimeField, // because `sample_field_element()` needs `PrimeField`
+    F: PrimeField, // PrimeField because of sample_field_element()
     R: rand_core::RngCore + rand_core::CryptoRng,
 {
-    let mut r_vals = Vec::with_capacity(num_chunks as usize);
-    r_vals.push(F::zero()); // placeholder for r_0
-    let mut remainder = F::zero();
-
-    // Precompute radix as F once
+    let mut r_vals = vec![F::zero(); num_chunks as usize];
+    let mut remaining = *target_sum;
     let radix_f = F::from(radix);
     let mut cur_base = radix_f;
 
-    // Fill r_1 .. r_{num_chunks-1} randomly
-    for _ in 1..num_chunks {
-        let r = sample_field_element(rng);
-        r_vals.push(r);
-        remainder -= r * cur_base;
+    for i in 1..(num_chunks as usize) {
+        r_vals[i] = sample_field_element(rng);
+        remaining -= r_vals[i] * cur_base;
         cur_base *= radix_f;
     }
-
-    r_vals[0] = remainder;
+    r_vals[0] = remaining;
 
     r_vals
 }
@@ -472,7 +497,7 @@ mod tests {
 
         // 3. Generate correlated randomness
         let rs: Vec<Vec<F>> = (0..sc.get_max_weight())
-            .map(|_| correlated_randomness(&mut rng, 1 << ell, number_of_chunks))
+            .map(|_| correlated_randomness(&mut rng, 1 << ell, number_of_chunks, &F::ZERO))
             .collect();
 
         // 4. Convert values into little-endian chunks
