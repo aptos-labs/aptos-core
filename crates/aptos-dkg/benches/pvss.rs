@@ -32,18 +32,18 @@ const BN254: &str = "bn254";
 const BLS12_381: &str = "bls12-381";
 
 pub fn all_groups(c: &mut Criterion) {
-    // weighted PVSS with aggregatable subtranscript; only doing 3 because large configs are a bit slow and not relevant anyway
-    for tc in get_weighted_configs_for_benchmarking().into_iter().take(2) {
+    // weighted PVSS with aggregatable subtranscript; only doing one at the moment because large configs are a bit slow and not relevant anyway
+    for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
         subaggregatable_pvss_group::<Chunky_v1<Bn254>>(&tc, c, BN254);
     }
-    for tc in get_weighted_configs_for_benchmarking().into_iter().take(2) {
+    for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
         subaggregatable_pvss_group::<Chunky_v1<Bn254>>(&tc, c, BLS12_381);
     }
 
-    for tc in get_weighted_configs_for_benchmarking().into_iter().take(2) {
+    for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
         subaggregatable_pvss_group::<Chunky_v2<Bls12_381>>(&tc, c, BN254);
     }
-    for tc in get_weighted_configs_for_benchmarking().into_iter().take(2) {
+    for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
         subaggregatable_pvss_group::<Chunky_v2<Bls12_381>>(&tc, c, BLS12_381);
     }
 

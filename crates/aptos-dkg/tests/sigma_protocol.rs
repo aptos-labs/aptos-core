@@ -134,10 +134,6 @@ mod schnorr {
             // but the verification needs a 3-term MSM... so we should really do a custom MSM which dispatches based on length TODO
             C::msm(input.bases(), input.scalars()).expect("MSM failed in Schnorr")
         }
-
-        fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
-            C::normalize_batch(&msm_output)
-        }
     }
 
     impl<C: CurveGroup<ScalarField = Fp<P, N>>, const N: usize, P: FpConfig<N>>

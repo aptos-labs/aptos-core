@@ -95,27 +95,6 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
     {
         msms.map(|msm_input| Self::msm_eval(msm_input))
     }
-
-    fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base>;
-
-    fn normalize_output(
-        projective_output: Self::CodomainShape<Self::MsmOutput>,
-    ) -> Self::CodomainShape<Self::Base>
-    where
-        Self::CodomainShape<Self::MsmOutput>:
-            EntrywiseMap<Self::MsmOutput, Output<Self::Base> = Self::CodomainShape<Self::Base>>,
-    {
-        // 1. Collect all elements into a Vec
-        let msm_vec: Vec<Self::MsmOutput> = projective_output.clone().into_iter().collect();
-
-        // 2. Apply batch_normalize
-        let normalized_vec: Vec<Self::Base> = Self::batch_normalize(msm_vec);
-
-        // 3. Replace elements in projective_output with normalized values
-        let mut iter = normalized_vec.into_iter();
-
-        projective_output.map(|_t| iter.next().expect("Not enough elements, somehow"))
-    }
 }
 
 // Implements FixedBaseMsms for the LiftHomomorphism wrapper.
@@ -142,10 +121,6 @@ where
 
     fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
         H::msm_eval(input)
-    }
-
-    fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
-        H::batch_normalize(msm_output)
     }
 }
 

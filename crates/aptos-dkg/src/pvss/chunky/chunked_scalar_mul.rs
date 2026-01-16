@@ -119,10 +119,6 @@ impl<C: CurveGroup> fixed_base_msms::Trait for Homomorphism<C> {
     fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
         C::msm(input.bases(), input.scalars()).expect("MSM failed in Schnorr") // TODO: custom MSM here, because only length 1 MSM except during verification
     }
-
-    fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
-        C::normalize_batch(&msm_output)
-    }
 }
 
 impl<C: CurveGroup> sigma_protocol::Trait<C> for Homomorphism<C> {

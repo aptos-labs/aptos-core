@@ -6,7 +6,7 @@ use crate::sigma_protocol::{
     homomorphism::{fixed_base_msms, fixed_base_msms::Trait, TrivialShape as CodomainShape},
 };
 use aptos_crypto::arkworks::msm::{IsMsmInput, MsmInput};
-use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};
+use ark_ec::{pairing::Pairing, VariableBaseMSM};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use std::fmt::Debug;
 
@@ -65,9 +65,5 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
 
     fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
         E::G1::msm(input.bases(), input.scalars()).expect("MSM failed in univariate KZG")
-    }
-
-    fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
-        E::G1::normalize_batch(&msm_output)
     }
 }

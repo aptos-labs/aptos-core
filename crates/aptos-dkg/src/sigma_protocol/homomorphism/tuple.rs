@@ -209,10 +209,6 @@ where
     fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
         H1::msm_eval(input)
     }
-
-    fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
-        H1::batch_normalize(msm_output)
-    }
 }
 
 impl<C: CurveGroup, H1, H2> sigma_protocol::Trait<C> for TupleHomomorphism<H1, H2>

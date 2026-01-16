@@ -984,10 +984,6 @@ pub mod two_term_msm {
         fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
             C::msm(input.bases(), input.scalars()).expect("MSM failed in TwoTermMSM")
         }
-
-        fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
-            C::normalize_batch(&msm_output)
-        }
     }
 
     impl<C: CurveGroup> sigma_protocol::Trait<C> for Homomorphism<C> {

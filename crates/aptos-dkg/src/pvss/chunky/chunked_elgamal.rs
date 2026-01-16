@@ -260,10 +260,6 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for WeightedHomomorphism<'a, C> {
     fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
         C::msm(input.bases(), input.scalars()).expect("MSM failed in ChunkedElgamal")
     }
-
-    fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
-        C::normalize_batch(&msm_output)
-    }
 }
 
 impl<'a, C: CurveGroup> sigma_protocol::Trait<C> for WeightedHomomorphism<'a, C> {
