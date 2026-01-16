@@ -37,7 +37,7 @@ use aptos_framework::{
     },
     docgen::DocgenOptions,
     extended_checks,
-    natives::code::UpgradePolicy,
+    natives::code::{PackageRegistry, UpgradePolicy},
     prover::ProverOptions,
     BuildOptions, BuiltPackage,
 };
@@ -48,15 +48,19 @@ use aptos_rest_client::{
     error::RestError,
     AptosBaseUrl, Client,
 };
+use aptos_transaction_simulation::SimulationStateStore;
+use aptos_transaction_simulation_session::Session;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
     object_address::create_object_code_deployment_address,
     on_chain_config::aptos_test_feature_flags_genesis,
+    state_store::state_key::StateKey,
     transaction::{
         ReplayProtector, Transaction, TransactionArgument, TransactionPayload, TransactionStatus,
     },
 };
 use aptos_vm::data_cache::AsMoveResolver;
+use aptos_vm_types::resolver::TResourceView;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand, ValueEnum};
 use colored::Colorize;
@@ -66,7 +70,7 @@ use move_command_line_common::{address::NumericalAddress, env::MOVE_HOME};
 use move_core_types::{
     identifier::Identifier,
     int256::{I256, U256},
-    language_storage::ModuleId,
+    language_storage::{ModuleId, StructTag},
 };
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig};
@@ -159,8 +163,8 @@ impl MoveTool {
                 tool.execute_serialized_success().await
             },
             MoveTool::UpgradeObjectPackage(tool) => tool.execute_serialized_success().await,
-            MoveTool::DeployObject(tool) => tool.execute_serialized_success().await,
-            MoveTool::UpgradeObject(tool) => tool.execute_serialized_success().await,
+            MoveTool::DeployObject(tool) => tool.execute_serialized().await,
+            MoveTool::UpgradeObject(tool) => tool.execute_serialized().await,
             MoveTool::CreateResourceAccountAndPublishPackage(tool) => {
                 tool.execute_serialized_success().await
             },
@@ -861,7 +865,7 @@ impl AsyncTryInto<ChunkedPublishPayloads> for &PublishPackage {
             None,
             self.chunked_publish_option
                 .large_packages_module
-                .large_packages_module_address(&self.txn_options.rest_client()?)
+                .large_packages_module_address(&self.txn_options)
                 .await?,
             self.chunked_publish_option.chunk_size,
         )?;
@@ -1065,7 +1069,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
                 &self.txn_options,
                 self.chunked_publish_option
                     .large_packages_module
-                    .large_packages_module_address(&self.txn_options.rest_client()?)
+                    .large_packages_module_address(&self.txn_options)
                     .await?,
             )
             .await
@@ -1167,7 +1171,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 Some(
                     self.chunked_publish_option
                         .large_packages_module
-                        .large_packages_module_address(&self.txn_options.rest_client()?)
+                        .large_packages_module_address(&self.txn_options)
                         .await?,
                 )
             } else {
@@ -1324,7 +1328,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
             let chunked_publish_large_packages_module_address = self
                 .chunked_publish_option
                 .large_packages_module
-                .large_packages_module_address(&self.txn_options.rest_client()?)
+                .large_packages_module_address(&self.txn_options)
                 .await?;
 
             let payloads = create_chunked_publish_payloads(
@@ -1419,7 +1423,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
                 Some(
                     self.chunked_publish_option
                         .large_packages_module
-                        .large_packages_module_address(&self.txn_options.rest_client()?)
+                        .large_packages_module_address(&self.txn_options)
                         .await?,
                 )
             } else {
@@ -1433,7 +1437,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
             self.move_options
                 .add_named_address(self.address_name.clone(), mock_object_address.to_string());
             let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
-            let mock_payloads = create_chunked_publish_payloads(
+            let mock_payloads: Vec<TransactionPayload> = create_chunked_publish_payloads(
                 package,
                 PublishType::AccountDeploy,
                 None,
@@ -1459,7 +1463,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
         );
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
-        let result = if self.chunked_publish_option.chunked_publish {
+        let mut result = if self.chunked_publish_option.chunked_publish {
             let payloads = create_chunked_publish_payloads(
                 package,
                 PublishType::ObjectDeploy,
@@ -1502,18 +1506,19 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
                     MAX_PUBLISH_PACKAGE_SIZE,
                 ));
             }
-            self.txn_options
-                .submit_transaction(payload)
-                .await
-                .map(TransactionSummary::from)
+            dispatch_transaction(payload, &self.txn_options).await
         };
 
-        if result.is_ok() {
-            println!(
-                "Code was successfully deployed to object address {}",
-                object_address
-            );
+        if let Ok(tx_summary) = &mut result {
+            if let Some(true) = tx_summary.success {
+                println!(
+                    "Code was successfully deployed to object address {}",
+                    object_address
+                );
+                tx_summary.deployed_object_address = Some(object_address);
+            }
         }
+
         result
     }
 }
@@ -1553,19 +1558,53 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
             .add_named_address(self.address_name, self.object_address.to_string());
 
         let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
-        let url = self
-            .txn_options
-            .rest_options
-            .url(&self.txn_options.profile_options)?;
 
         // Get the `PackageRegistry` at the given code object address.
-        let registry = CachedPackageRegistry::create(url, self.object_address, false).await?;
-        let package_info = registry
-            .get_package(package.name())
-            .await
-            .map_err(|s| CliError::CommandArgumentError(s.to_string()))?;
+        let upgrade_policy = match &self.txn_options.session {
+            None => {
+                let url = self
+                    .txn_options
+                    .rest_options
+                    .url(&self.txn_options.profile_options)?;
 
-        if package_info.upgrade_policy() == UpgradePolicy::immutable() {
+                let registry =
+                    CachedPackageRegistry::create(url, self.object_address, false).await?;
+                let package_info = registry
+                    .get_package(package.name())
+                    .await
+                    .map_err(|s| CliError::CommandArgumentError(s.to_string()))?;
+                package_info.upgrade_policy()
+            },
+            Some(session_path) => {
+                let sess = Session::load(session_path)?;
+
+                let package_registry = sess
+                    .state_store()
+                    .get_resource::<PackageRegistry>(self.object_address)?
+                    .ok_or_else(|| {
+                        CliError::CommandArgumentError(format!(
+                            "Package registry not found at object address {}",
+                            self.object_address
+                        ))
+                    })?;
+
+                let metadata = package_registry
+                    .packages
+                    .iter()
+                    .find(|p| p.name == package.name())
+                    .ok_or_else(|| {
+                        CliError::CommandArgumentError(format!(
+                            "Package {} not found at object address {}",
+                            package.name(),
+                            self.object_address
+                        ))
+                    })?;
+
+                metadata.upgrade_policy
+            },
+        };
+
+        if upgrade_policy == UpgradePolicy::immutable() {
             return Err(CliError::CommandArgumentError(
                 "A code package with upgrade policy `immutable` cannot be upgraded".to_owned(),
             ));
@@ -1573,7 +1612,7 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
 
         let message = format!(
             "Do you want to upgrade the code package '{}' at object address {}",
-            package_info.name(),
+            package.name(),
             self.object_address
         );
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
@@ -1582,7 +1621,7 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
             let chunked_publish_large_packages_module_address = self
                 .chunked_publish_option
                 .large_packages_module
-                .large_packages_module_address(&self.txn_options.rest_client()?)
+                .large_packages_module_address(&self.txn_options)
                 .await?;
 
             let payloads = create_chunked_publish_payloads(
@@ -1626,10 +1665,7 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
                     MAX_PUBLISH_PACKAGE_SIZE,
                 ));
             }
-            self.txn_options
-                .submit_transaction(payload)
-                .await
-                .map(TransactionSummary::from)
+            dispatch_transaction(payload, &self.txn_options).await
         };
 
         if result.is_ok() {
@@ -1679,10 +1715,7 @@ async fn submit_chunked_publish_transactions(
 
     for (idx, payload) in payloads.into_iter().enumerate() {
         println!("Transaction {} of {}", idx + 1, payloads_length);
-        let result = txn_options
-            .submit_transaction(payload)
-            .await
-            .map(TransactionSummary::from);
+        let result = dispatch_transaction(payload, txn_options).await;
 
         match result {
             Ok(tx_summary) => {
@@ -1729,30 +1762,55 @@ async fn is_staging_area_empty(
     txn_options: &TransactionOptions,
     large_packages_module_address: AccountAddress,
 ) -> CliTypedResult<bool> {
-    let client = txn_options.rest_client()?;
-
     let (_, account_address) = txn_options.get_public_key_and_address()?;
-    let staging_area_response = client
-        .get_account_resource(
-            account_address,
-            &format!(
-                "{}::large_packages::StagingArea",
-                large_packages_module_address
-            ),
-        )
-        .await;
 
-    match staging_area_response {
-        Ok(response) => match response.into_inner() {
-            Some(_) => Ok(false), // StagingArea is not empty
-            None => Ok(true),     // TODO: determine which case this is
+    let staging_area_type_name = format!(
+        "{}::large_packages::StagingArea",
+        large_packages_module_address
+    );
+
+    match &txn_options.session {
+        None => {
+            let client = txn_options.rest_client()?;
+
+            let staging_area_response = client
+                .get_account_resource(account_address, &staging_area_type_name)
+                .await;
+
+            match staging_area_response {
+                Ok(response) => match response.into_inner() {
+                    Some(_) => Ok(false), // StagingArea is not empty
+                    None => Ok(true),     // TODO: determine which case this is
+                },
+                Err(RestError::Api(aptos_error_response))
+                    if aptos_error_response.error.error_code
+                        == AptosErrorCode::ResourceNotFound =>
+                {
+                    Ok(true) // The resource doesn't exist
+                },
+                Err(rest_err) => Err(CliError::from(rest_err)),
+            }
         },
-        Err(RestError::Api(aptos_error_response))
-            if aptos_error_response.error.error_code == AptosErrorCode::ResourceNotFound =>
-        {
-            Ok(true) // The resource doesn't exist
+        Some(session_path) => {
+            let sess = Session::load(session_path)?;
+
+            let staging_area_bytes = sess
+                .state_store()
+                .get_resource_bytes(
+                    &StateKey::resource(
+                        &account_address,
+                        &StructTag::from_str(&staging_area_type_name)
+                            .expect("Should be able to construct staging area tag"),
+                    )
+                    .expect("Should be able to construct staging area state key"),
+                    None,
+                )
+                .map_err(|e| {
+                    CliError::UnexpectedError(format!("Failed to get staging area: {}", e))
+                })?;
+
+            Ok(staging_area_bytes.is_none())
         },
-        Err(rest_err) => Err(CliError::from(rest_err)),
     }
 }
 
@@ -1777,7 +1835,7 @@ impl CliCommand<TransactionSummary> for ClearStagingArea {
 
         let large_packages_module_address = self
             .large_packages_module
-            .large_packages_module_address(&self.txn_options.rest_client()?)
+            .large_packages_module_address(&self.txn_options)
             .await?;
         println!(
             "Cleaning up resource {}::large_packages::StagingArea under account {}.",
@@ -2429,6 +2487,7 @@ impl CliCommand<TransactionSummary> for Replay {
             timestamp_us: None,
             version: Some(self.txn_id),
             vm_status: Some(vm_status.to_string()),
+            deployed_object_address: None,
         };
 
         Ok(summary)

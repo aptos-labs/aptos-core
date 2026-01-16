@@ -1,6 +1,6 @@
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0x42::m1
 struct NestedPair<T0: drop> has drop
   _0: Pair
@@ -160,7 +160,7 @@ public fun borrow_mut$Wrapper$0<T0: drop>(l0: &mut Wrapper<T0>): &mut T0
     mut_borrow_field Wrapper<T0>, _0
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0x42::m2
 use 0x42::m1
 // Function definition at index 0

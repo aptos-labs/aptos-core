@@ -7,7 +7,7 @@ use crate::{
 };
 use aes_gcm::{aead::Aead as _, aes::Aes128, AeadCore, Aes128Gcm, AesGcm, Key, KeySizeUser, Nonce};
 use anyhow::Result;
-use ark_ec::{bn::BnConfig, short_weierstrass::SWCurveConfig};
+use ark_ec::{short_weierstrass::SWCurveConfig, AffineRepr};
 use ark_ff::{
     field_hashers::{DefaultFieldHasher, HashToField},
     Field,
@@ -45,6 +45,7 @@ pub struct OneTimePaddedKey(GenericArray<u8, KeySize>);
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub struct SymmetricCiphertext {
     nonce: SymmetricNonce,
+    #[serde(with = "serde_bytes")]
     ct_body: Vec<u8>,
 }
 
@@ -158,14 +159,17 @@ pub fn hash_g2_element(g2_element: G2Affine) -> Result<G1Affine> {
         let [x]: [Fq; 1] = field_hasher.hash_to_field::<1>(&hash_source_bytes);
 
         // Rust does not optimise away addition with zero
-        let mut x3b = <ark_bn254::Config as BnConfig>::G1Config::add_b(x.square() * x);
-        if !<ark_bn254::Config as BnConfig>::G1Config::COEFF_A.is_zero() {
-            x3b += <ark_bn254::Config as BnConfig>::G1Config::mul_by_a(x);
+        use crate::group::G1Config;
+        let mut x3b = G1Config::add_b(x.square() * x);
+        if !G1Config::COEFF_A.is_zero() {
+            x3b += G1Config::mul_by_a(x);
         };
 
         // TODO vary the sign of y??
         if let Some(x3b_sqrt) = x3b.sqrt() {
-            return Ok(G1Affine::new(x, x3b_sqrt));
+            let p = G1Affine::new_unchecked(x, x3b_sqrt).mul_by_cofactor();
+            assert!(p.is_in_correct_subgroup_assuming_on_curve());
+            return Ok(p);
         }
     }
 

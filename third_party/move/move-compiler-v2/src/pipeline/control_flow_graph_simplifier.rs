@@ -838,7 +838,7 @@ impl RedundantJumpRemover {
         }
         to_instrs
             .first()
-            .filter(|bc| matches!(bc, Bytecode::Ret(..) | Bytecode::Abort(..)))
+            .filter(|bc| bc.is_return() || bc.is_abort())
     }
 }
 

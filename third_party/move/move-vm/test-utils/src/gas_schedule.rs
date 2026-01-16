@@ -538,6 +538,10 @@ impl GasMeter for GasStatus {
     fn charge_create_ty(&mut self, _num_nodes: NumTypeNodes) -> PartialVMResult<()> {
         Ok(())
     }
+
+    fn charge_abort_message(&mut self, _bytes: &[u8]) -> PartialVMResult<()> {
+        Ok(())
+    }
 }
 
 pub fn new_from_instructions(mut instrs: Vec<(Bytecode, GasCost)>) -> CostTable {
@@ -624,6 +628,7 @@ pub fn zero_cost_instruction_table() -> Vec<(Bytecode, GasCost)> {
         (CastU64, GasCost::new(0, 0)),
         (CastU128, GasCost::new(0, 0)),
         (Abort, GasCost::new(0, 0)),
+        (AbortMsg, GasCost::new(0, 0)),
         (MutBorrowLoc(0), GasCost::new(0, 0)),
         (ImmBorrowLoc(0), GasCost::new(0, 0)),
         (LdConst(ConstantPoolIndex::new(0)), GasCost::new(0, 0)),
@@ -819,6 +824,7 @@ pub fn bytecode_instruction_costs() -> Vec<(Bytecode, GasCost)> {
         (CastU64, GasCost::new(1, 1)),
         (CastU128, GasCost::new(1, 1)),
         (Abort, GasCost::new(1, 1)),
+        (AbortMsg, GasCost::new(1, 1)),
         (MutBorrowLoc(0), GasCost::new(2, 1)),
         (ImmBorrowLoc(0), GasCost::new(1, 1)),
         (LdConst(ConstantPoolIndex::new(0)), GasCost::new(1, 1)),

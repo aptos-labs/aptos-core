@@ -3,6 +3,7 @@
 pub mod algebra;
 pub mod ciphertext;
 pub mod digest;
+pub mod encryption_key;
 pub mod ids;
 pub mod key_derivation;
 pub mod symmetric;

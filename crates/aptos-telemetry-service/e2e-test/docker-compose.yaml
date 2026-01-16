@@ -1,9 +1,15 @@
 # Docker Compose setup for E2E testing of Aptos Telemetry Service
-# Runs VictoriaMetrics and Loki locally for telemetry data ingestion testing
+#
+# Architecture:
+# - VictoriaMetrics: Primary metrics backend (accepts Prometheus text format via /api/v1/import/prometheus)
+# - Prometheus: Secondary metrics store (accepts remote write via /api/v1/write)
+# - Loki: Log aggregation backend
+# - Grafana: Visualization (queries all backends)
 version: '3.8'
 
 services:
-  # VictoriaMetrics - Time-series database for metrics
+  # VictoriaMetrics - Primary metrics backend for telemetry ingestion
+  # Accepts Prometheus text format via /api/v1/import/prometheus (simpler than protobuf)
   victoria-metrics:
     image: victoriametrics/victoria-metrics:latest
     container_name: telemetry-victoria-metrics
@@ -19,6 +25,28 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8428/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Prometheus - Secondary metrics backend for remote write
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: telemetry-prometheus
+    ports:
+      - "9090:9090"  # HTTP API for queries and remote write
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-remote-write-receiver'  # Enable receiving remote writes
+      - '--web.enable-lifecycle'  # Enable /-/reload endpoint
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -56,10 +84,13 @@ services:
     restart: unless-stopped
     depends_on:
       - victoria-metrics
+      - prometheus
       - loki
 
 volumes:
   victoria-data:
+    driver: local
+  prometheus-data:
     driver: local
   loki-data:
     driver: local

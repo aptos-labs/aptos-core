@@ -5,8 +5,8 @@ use anyhow::{bail, Error, Ok, Result};
 use aptos_backup_cli::utils::{ReplayConcurrencyLevelOpt, RocksdbOpt};
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_config::config::{
-    StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-    NO_OP_STORAGE_PRUNER_CONFIG,
+    HotStateConfig, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
+    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_db::{backup::backup_handler::BackupHandler, AptosDB};
 use aptos_logger::prelude::*;
@@ -160,6 +160,7 @@ impl Verifier {
                     BUFFERED_STATE_TARGET_ITEMS,
                     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
                     None,
+                    HotStateConfig::default(),
                 )
             }) {
                 warn!("Unable to open AptosDB in write mode: {:?}", e);
@@ -175,6 +176,10 @@ impl Verifier {
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             None,
+            HotStateConfig {
+                delete_on_restart: false,
+                ..Default::default()
+            },
         )?;
 
         let backup_handler = aptos_db.get_backup_handler();

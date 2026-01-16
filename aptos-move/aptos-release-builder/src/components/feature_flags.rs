@@ -157,6 +157,8 @@ pub enum FeatureFlag {
     EnableFrameworkForOption,
     SessionContinuation,
     EnableFunctionReflection,
+    VMBinaryFormatV10,
+    SlhDsaSha2_128sSignature,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -307,6 +309,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::Bn254Structures => AptosFeatureFlag::BN254_STRUCTURES,
             FeatureFlag::WebAuthnSignature => AptosFeatureFlag::WEBAUTHN_SIGNATURE,
+            FeatureFlag::SlhDsaSha2_128sSignature => AptosFeatureFlag::SLH_DSA_SHA2_128S_SIGNATURE,
             FeatureFlag::ReconfigureWithDkg => AptosFeatureFlag::_DEPRECATED_RECONFIGURE_WITH_DKG,
             FeatureFlag::KeylessAccounts => AptosFeatureFlag::KEYLESS_ACCOUNTS,
             FeatureFlag::KeylessButZklessAccounts => AptosFeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
@@ -413,6 +416,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::EnableFrameworkForOption => AptosFeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION,
             FeatureFlag::SessionContinuation => AptosFeatureFlag::SESSION_CONTINUATION,
             FeatureFlag::EnableFunctionReflection => AptosFeatureFlag::ENABLE_FUNCTION_REFLECTION,
+            FeatureFlag::VMBinaryFormatV10 => AptosFeatureFlag::VM_BINARY_FORMAT_V10,
         }
     }
 }
@@ -490,6 +494,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::BN254_STRUCTURES => FeatureFlag::Bn254Structures,
             AptosFeatureFlag::WEBAUTHN_SIGNATURE => FeatureFlag::WebAuthnSignature,
+            AptosFeatureFlag::SLH_DSA_SHA2_128S_SIGNATURE => FeatureFlag::SlhDsaSha2_128sSignature,
             AptosFeatureFlag::_DEPRECATED_RECONFIGURE_WITH_DKG => FeatureFlag::ReconfigureWithDkg,
             AptosFeatureFlag::KEYLESS_ACCOUNTS => FeatureFlag::KeylessAccounts,
             AptosFeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS => FeatureFlag::KeylessButZklessAccounts,
@@ -596,6 +601,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION => FeatureFlag::EnableFrameworkForOption,
             AptosFeatureFlag::SESSION_CONTINUATION => FeatureFlag::SessionContinuation,
             AptosFeatureFlag::ENABLE_FUNCTION_REFLECTION => FeatureFlag::EnableFunctionReflection,
+            AptosFeatureFlag::VM_BINARY_FORMAT_V10 => FeatureFlag::VMBinaryFormatV10,
         }
     }
 }

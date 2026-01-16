@@ -1,6 +1,6 @@
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0x42::m
 struct Scalar has copy + drop + store
   data: vector<u8>
@@ -33,7 +33,7 @@ public fun borrow_mut$Scalar$0(l0: &mut Scalar): &mut vector<u8>
     mut_borrow_field Scalar, data
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0x42::test_m
 use 0x42::m
 // Function definition at index 0

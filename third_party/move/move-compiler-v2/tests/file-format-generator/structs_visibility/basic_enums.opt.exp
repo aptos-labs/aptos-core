@@ -1,6 +1,6 @@
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::m
 friend 0xc0ffee::n
 friend 0xc0ffee::n2
@@ -77,7 +77,7 @@ friend fun borrow_mut$Wrapper$0$0(l0: &mut Wrapper): &mut u64
     pack_variant Wrapper, V1
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n
 use 0xc0ffee::m
 // Function definition at index 0
@@ -98,7 +98,7 @@ fun test()
 l0: ld_u64 1
     abort
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n2
 use 0xc0ffee::m
 // Function definition at index 0
@@ -108,7 +108,7 @@ fun test_pack()
     pop
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n3
 use 0xc0ffee::m
 // Function definition at index 0
@@ -118,7 +118,7 @@ fun test_unpack(l0: m::Wrapper)
     pop
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n4
 use 0xc0ffee::m
 // Function definition at index 0
@@ -128,7 +128,7 @@ fun test_select_variant(l0: m::Wrapper): u64
     read_ref
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n5
 use 0xc0ffee::m
 // Function definition at index 0
@@ -137,7 +137,7 @@ fun test_test_variant(l0: m::Wrapper): bool
     call m::test_variant$Wrapper$V1
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n6
 use 0xc0ffee::m
 // Function definition at index 0
@@ -153,7 +153,7 @@ fun test_test_variant_mut_borrow(l0: &mut m::Wrapper): bool
     call m::test_variant$Wrapper$V1
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n7
 use 0xc0ffee::m
 // Function definition at index 0

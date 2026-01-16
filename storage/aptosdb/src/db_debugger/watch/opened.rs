@@ -23,6 +23,7 @@ impl Cmd {
         config.set_data_dir(self.db_dir);
         config.rocksdb_configs.enable_storage_sharding =
             self.sharding_config.enable_storage_sharding;
+        config.hot_state_config.delete_on_restart = false;
 
         let _db = AptosDB::open(
             config.get_dir_paths(),
@@ -33,6 +34,7 @@ impl Cmd {
             config.buffered_state_target_items,
             config.max_num_nodes_per_lru_cache_shard,
             None,
+            config.hot_state_config,
         )
         .expect("Failed to open AptosDB");
 

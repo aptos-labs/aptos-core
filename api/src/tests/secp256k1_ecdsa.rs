@@ -48,7 +48,10 @@ async fn test_multi_secp256k1_ecdsa(
     )
     .account_address();
 
-    // Set a dummy key
+    // NOTE: LocalAccount requires a private key, but we use a dummy Ed25519 key here as a
+    // placeholder. This key is never used for actual authentication because:
+    // 1. create_user_account() and mint_user_account() are signed by the root/faucet account
+    // 2. The transfer transaction will be re-signed below with the actual secp256k1 key
     let key_bytes =
         hex::decode("a38ba78b1a0fbfc55e2c5dfdedf48d1172283d0f7c59fd64c02d811130a2f4b2").unwrap();
     let ed25519_private_key: Ed25519PrivateKey = (&key_bytes[..]).try_into().unwrap();
@@ -123,7 +126,10 @@ async fn test_secp256k1_ecdsa(
     let address = AuthenticationKey::any_key(AnyPublicKey::secp256k1_ecdsa(public_key.clone()))
         .account_address();
 
-    // Set a dummy key
+    // NOTE: LocalAccount requires a private key, but we use a dummy Ed25519 key here as a
+    // placeholder. This key is never used for actual authentication because:
+    // 1. create_user_account() and mint_user_account() are signed by the root/faucet account
+    // 2. The transfer transaction will be re-signed below with the actual secp256k1 key
     let key_bytes =
         hex::decode("a38ba78b1a0fbfc55e2c5dfdedf48d1172283d0f7c59fd64c02d811130a2f4b2").unwrap();
     let ed25519_private_key: Ed25519PrivateKey = (&key_bytes[..]).try_into().unwrap();

@@ -161,7 +161,7 @@ impl<'a> ExpBuilder<'a> {
         match last.as_ref() {
             LoopCont(_, nest, false) if *nest == break_nest => Some(self.seq(default_loc, front)),
             LoopCont(.., nest, _) if allow_exit && *nest > break_nest => Some(exp),
-            Return(..) | Call(_, Operation::Abort, _) if allow_exit => Some(exp),
+            Return(..) | Call(_, Operation::Abort(_), _) if allow_exit => Some(exp),
             Block(id, pat, binding, scope) => {
                 let scope = self.extract_terminated_prefix(
                     default_loc,

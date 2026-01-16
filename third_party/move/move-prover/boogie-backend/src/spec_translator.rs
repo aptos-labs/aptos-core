@@ -1139,7 +1139,7 @@ impl SpecTranslator<'_> {
                 self.translate_call(node_id, oper, &[args[args.len() - 1].clone()]);
                 emit!(self.writer, &")".repeat(count));
             },
-            Operation::Abort => {
+            Operation::Abort(_) => {
                 let exp_bv_flag = global_state.get_node_num_oper(node_id) == Bitwise;
                 emit!(
                     self.writer,
@@ -1156,6 +1156,7 @@ impl SpecTranslator<'_> {
             | Operation::MoveTo
             | Operation::MoveFrom
             | Operation::Closure(..)
+            | Operation::Behavior(..)
             | Operation::Old => {
                 self.env.error(
                     &self.env.get_node_loc(node_id),

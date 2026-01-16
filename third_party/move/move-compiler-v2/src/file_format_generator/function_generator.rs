@@ -780,10 +780,15 @@ impl<'a> FunctionGenerator<'a> {
                 self.add_label_reference(*label);
                 self.emit(FF::Bytecode::Branch(0));
             },
-            Bytecode::Abort(_, temp) => {
-                self.balance_stack_end_of_block(ctx, vec![*temp]);
+            Bytecode::Abort(_, temp, None) => {
+                self.balance_stack_end_of_block(ctx, [*temp]);
                 self.emit(FF::Bytecode::Abort);
                 self.abstract_pop(ctx)
+            },
+            Bytecode::Abort(_, temp0, Some(temp1)) => {
+                self.balance_stack_end_of_block(ctx, [*temp0, *temp1]);
+                self.emit(FF::Bytecode::AbortMsg);
+                self.abstract_pop_n(ctx, 2);
             },
             Bytecode::Nop(_) => {
                 // do nothing -- labels are relative

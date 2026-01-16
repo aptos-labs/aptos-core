@@ -16,8 +16,7 @@ use crate::{
             },
         },
         observer::{
-            block_data,
-            block_data::ObserverBlockData,
+            block_data::{self, ObserverBlockData},
             epoch_state::ObserverEpochState,
             execution_pool::ObservedOrderedBlock,
             fallback_manager::ObserverFallbackManager,
@@ -28,7 +27,7 @@ use crate::{
         publisher::consensus_publisher::ConsensusPublisher,
     },
     dag::DagCommitSigner,
-    network::{IncomingCommitRequest, IncomingRandGenRequest},
+    network::{IncomingCommitRequest, IncomingRandGenRequest, IncomingSecretShareRequest},
     network_interface::CommitMessage,
     pipeline::{execution_client::TExecutionClient, pipeline_builder::PipelineBuilder},
 };
@@ -1080,6 +1079,10 @@ impl ConsensusObserver {
         let dummy_signer = Arc::new(DagCommitSigner::new(signer.clone()));
         let (_, rand_msg_rx) =
             aptos_channel::new::<AccountAddress, IncomingRandGenRequest>(QueueStyle::FIFO, 1, None);
+        let (_, secret_share_msg_rx) = aptos_channel::new::<
+            AccountAddress,
+            IncomingSecretShareRequest,
+        >(QueueStyle::FIFO, 1, None);
         self.execution_client
             .start_epoch(
                 sk,
@@ -1092,6 +1095,7 @@ impl ConsensusObserver {
                 None,
                 None,
                 rand_msg_rx,
+                secret_share_msg_rx,
                 0,
             )
             .await;

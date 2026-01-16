@@ -1,194 +1,74 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
-    errors::BatchEncryptionError,
-    group::{self, *},
+    group::*,
     shared::{
-        ark_serialize::*,
-        ciphertext::{BIBEEncryptionKey, CTDecrypt, CTEncrypt, Ciphertext, PreparedCiphertext},
-        digest::{Digest, DigestKey, EvalProofs, EvalProofsPromise},
-        ids::{
-            free_roots::{ComputedCoeffs, UncomputedCoeffs},
-            FreeRootId, FreeRootIdSet, IdSet,
-        },
+        ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, StandardCiphertext},
+        digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise},
+        encryption_key::EncryptionKey,
+        ids::{Id, IdSet, UncomputedCoeffs},
         key_derivation::{
-            self, BIBEDecryptionKey, BIBEDecryptionKeyShare, BIBEMasterPublicKey,
-            BIBEMasterSecretKeyShare, BIBEVerificationKey,
+            self, BIBEDecryptionKey, BIBEDecryptionKeyShare, BIBEMasterSecretKeyShare,
+            BIBEVerificationKey,
         },
     },
     traits::{AssociatedData, BatchThresholdEncryption, Plaintext},
 };
 use anyhow::{anyhow, Result};
-use aptos_crypto::SecretSharingConfig as _;
 use aptos_dkg::pvss::{
     traits::{Reconstructable as _, Subtranscript},
     Player,
 };
-use ark_ec::AffineRepr as _;
 use ark_ff::UniformRand as _;
 use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 use rayon::iter::{IntoParallelIterator, ParallelIterator as _};
-use serde::{Deserialize, Serialize};
 
 pub struct FPTX {}
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct EncryptionKey {
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    sig_mpk_g2: G2Affine,
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    tau_g2: G2Affine,
-}
-
-impl EncryptionKey {
-    pub fn new(sig_mpk_g2: G2Affine, tau_g2: G2Affine) -> Self {
-        Self { sig_mpk_g2, tau_g2 }
-    }
-
-    pub fn verify_decryption_key(
-        &self,
-        digest: &Digest,
-        decryption_key: &BIBEDecryptionKey,
-    ) -> Result<()> {
-        BIBEMasterPublicKey(self.sig_mpk_g2).verify_decryption_key(digest, decryption_key)
-    }
-}
-
-impl BIBEEncryptionKey for EncryptionKey {
-    fn sig_mpk_g2(&self) -> G2Affine {
-        self.sig_mpk_g2
-    }
-
-    fn tau_g2(&self) -> G2Affine {
-        self.tau_g2
-    }
-}
-
 impl BatchThresholdEncryption for FPTX {
-    type Ciphertext = Ciphertext<FreeRootId>;
+    type Ciphertext = StandardCiphertext;
     type DecryptionKey = BIBEDecryptionKey;
     type DecryptionKeyShare = BIBEDecryptionKeyShare;
     type Digest = Digest;
     type DigestKey = DigestKey;
     type EncryptionKey = EncryptionKey;
-    type EvalProof = G1Affine;
-    type EvalProofs = EvalProofs<FreeRootIdSet<ComputedCoeffs>>;
-    type EvalProofsPromise = EvalProofsPromise<FreeRootIdSet<ComputedCoeffs>>;
-    type Id = FreeRootId;
+    type EvalProof = EvalProof;
+    type EvalProofs = EvalProofs;
+    type EvalProofsPromise = EvalProofsPromise;
+    type Id = Id;
     type MasterSecretKeyShare = BIBEMasterSecretKeyShare;
     type PreparedCiphertext = PreparedCiphertext;
     type Round = u64;
-    type SubTranscript = aptos_dkg::pvss::chunky::UnweightedSubtranscript<group::Pairing>;
+    // This is essentially a placeholder, since there is no PVSS scheme right now that works
+    // with the unweighted `SmairThresholdConfig`
+    type SubTranscript = aptos_dkg::pvss::chunky::WeightedSubtranscript<Pairing>;
     type ThresholdConfig = aptos_crypto::arkworks::shamir::ShamirThresholdConfig<Fr>;
     type VerificationKey = BIBEVerificationKey;
 
     fn setup(
-        digest_key: &Self::DigestKey,
-        pvss_public_params: &<Self::SubTranscript as Subtranscript>::PublicParameters,
-        subtranscript_happypath: &Self::SubTranscript,
-        subtranscript_slowpath: &Self::SubTranscript,
-        tc_happypath: &Self::ThresholdConfig,
-        tc_slowpath: &Self::ThresholdConfig,
-        current_player: Player,
-        msk_share_decryption_key: &<Self::SubTranscript as Subtranscript>::DecryptPrivKey,
+        _digest_key: &Self::DigestKey,
+        _pvss_public_params: &<Self::SubTranscript as Subtranscript>::PublicParameters,
+        _subtranscript: &Self::SubTranscript,
+        _threshold_config: &Self::ThresholdConfig,
+        _current_player: Player,
+        _msk_share_decryption_key: &<Self::SubTranscript as Subtranscript>::DecryptPrivKey,
     ) -> Result<(
         Self::EncryptionKey,
         Vec<Self::VerificationKey>,
         Self::MasterSecretKeyShare,
-        Vec<Self::VerificationKey>,
-        Self::MasterSecretKeyShare,
     )> {
-        (subtranscript_happypath.get_dealt_public_key()
-            == subtranscript_slowpath.get_dealt_public_key())
-        .then_some(())
-        .ok_or(BatchEncryptionError::HappySlowPathMismatchError)?;
-
-        let mpk_g2: G2Affine = subtranscript_happypath.get_dealt_public_key().as_g2();
-
-        let ek = EncryptionKey::new(mpk_g2, digest_key.tau_g2);
-
-        let vks_happypath: Vec<Self::VerificationKey> = tc_happypath
-            .get_players()
-            .into_iter()
-            .map(|p| Self::VerificationKey {
-                player: p,
-                mpk_g2,
-                vk_g2: subtranscript_happypath
-                    .get_public_key_share(tc_happypath, &p)
-                    .as_g2(),
-            })
-            .collect();
-
-        let vks_slowpath: Vec<Self::VerificationKey> = tc_slowpath
-            .get_players()
-            .into_iter()
-            .map(|p| Self::VerificationKey {
-                player: p,
-                mpk_g2,
-                vk_g2: subtranscript_slowpath
-                    .get_public_key_share(tc_slowpath, &p)
-                    .as_g2(),
-            })
-            .collect();
-
-        let msk_share_happypath = Self::MasterSecretKeyShare {
-            mpk_g2,
-            player: current_player,
-            shamir_share_eval: subtranscript_happypath
-                .decrypt_own_share(
-                    tc_happypath,
-                    &current_player,
-                    msk_share_decryption_key,
-                    pvss_public_params,
-                )
-                .0
-                .into_fr(),
-        };
-
-        let msk_share_slowpath = Self::MasterSecretKeyShare {
-            mpk_g2,
-            player: current_player,
-            shamir_share_eval: subtranscript_slowpath
-                .decrypt_own_share(
-                    tc_slowpath,
-                    &current_player,
-                    msk_share_decryption_key,
-                    pvss_public_params,
-                )
-                .0
-                .into_fr(),
-        };
-
-        for (vks, msk_share) in [
-            (&vks_happypath, &msk_share_happypath),
-            (&vks_slowpath, &msk_share_slowpath),
-        ] {
-            (vks[msk_share.player.get_id()].vk_g2
-                == G2Affine::generator() * msk_share.shamir_share_eval)
-                .then_some(())
-                .ok_or(BatchEncryptionError::VKMSKMismatchError)?;
-        }
-
-        Ok((
-            ek,
-            vks_happypath,
-            msk_share_happypath,
-            vks_slowpath,
-            msk_share_slowpath,
-        ))
+        // B/c unweighted chunky is being removed
+        unimplemented!()
     }
 
     fn setup_for_testing(
         seed: u64,
         max_batch_size: usize,
         number_of_rounds: usize,
-        tc_happypath: &Self::ThresholdConfig,
-        tc_slowpath: &Self::ThresholdConfig,
+        threshold_config: &Self::ThresholdConfig,
     ) -> Result<(
         Self::EncryptionKey,
         Self::DigestKey,
-        Vec<Self::VerificationKey>,
-        Vec<Self::MasterSecretKeyShare>,
         Vec<Self::VerificationKey>,
         Vec<Self::MasterSecretKeyShare>,
     )> {
@@ -197,24 +77,15 @@ impl BatchThresholdEncryption for FPTX {
         let digest_key = DigestKey::new(&mut rng, max_batch_size, number_of_rounds)
             .ok_or(anyhow!("Failed to create digest key"))?;
         let msk = Fr::rand(&mut rng);
-        let (mpk, vks_happypath, msk_shares_happypath) =
-            key_derivation::gen_msk_shares(msk, &mut rng, tc_happypath);
-        let (_, vks_slowpath, msk_shares_slowpath) =
-            key_derivation::gen_msk_shares(msk, &mut rng, tc_slowpath);
+        let (mpk, vks, msk_shares) =
+            key_derivation::gen_msk_shares(msk, &mut rng, threshold_config);
 
         let ek = EncryptionKey {
             sig_mpk_g2: mpk.0,
             tau_g2: digest_key.tau_g2,
         };
 
-        Ok((
-            ek,
-            digest_key,
-            vks_happypath,
-            msk_shares_happypath,
-            vks_slowpath,
-            msk_shares_slowpath,
-        ))
+        Ok((ek, digest_key, vks, msk_shares))
     }
 
     fn encrypt<R: CryptoRng + RngCore>(
@@ -231,8 +102,8 @@ impl BatchThresholdEncryption for FPTX {
         cts: &[Self::Ciphertext],
         round: Self::Round,
     ) -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise)> {
-        let mut ids: FreeRootIdSet<UncomputedCoeffs> =
-            FreeRootIdSet::from_slice(&cts.iter().map(|ct| ct.id()).collect::<Vec<FreeRootId>>())
+        let mut ids: IdSet<UncomputedCoeffs> =
+            IdSet::from_slice(&cts.iter().map(|ct| ct.id()).collect::<Vec<Id>>())
                 .ok_or(anyhow!(""))?;
 
         digest_key.digest(&mut ids, round)

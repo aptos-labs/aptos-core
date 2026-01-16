@@ -1,6 +1,6 @@
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0x42::m
 friend 0x42::m2
 enum Data has drop
@@ -401,7 +401,7 @@ friend fun borrow_mut$V$0<T0>(l0: &mut V<T0>): &mut vector<T0>
     mut_borrow_field V<T0>, x
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0x42::m2
 use 0x42::m
 // Function definition at index 0

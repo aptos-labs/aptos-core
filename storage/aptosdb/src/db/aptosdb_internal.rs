@@ -14,7 +14,8 @@ use crate::{
     transaction_store::TransactionStore,
 };
 use aptos_config::config::{
-    PrunerConfig, RocksdbConfig, RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG,
+    HotStateConfig, PrunerConfig, RocksdbConfig, RocksdbConfigs, StorageDirPaths,
+    NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_db_indexer::{db_indexer::InternalIndexerDB, Indexer};
 use aptos_logger::prelude::*;
@@ -41,6 +42,7 @@ use std::{
 impl AptosDB {
     fn new_with_dbs(
         ledger_db: LedgerDb,
+        hot_state_merkle_db: Option<StateMerkleDb>,
         state_merkle_db: StateMerkleDb,
         state_kv_db: StateKvDb,
         pruner_config: PrunerConfig,
@@ -49,8 +51,10 @@ impl AptosDB {
         empty_buffered_state_for_restore: bool,
         skip_index_and_usage: bool,
         internal_indexer_db: Option<InternalIndexerDB>,
+        hot_state_config: HotStateConfig,
     ) -> Self {
         let ledger_db = Arc::new(ledger_db);
+        let hot_state_merkle_db = hot_state_merkle_db.map(Arc::new);
         let state_merkle_db = Arc::new(state_merkle_db);
         let state_kv_db = Arc::new(state_kv_db);
         let state_merkle_pruner = StateMerklePrunerManager::new(
@@ -65,6 +69,7 @@ impl AptosDB {
             StateKvPrunerManager::new(Arc::clone(&state_kv_db), pruner_config.ledger_pruner_config);
         let state_store = Arc::new(StateStore::new(
             Arc::clone(&ledger_db),
+            hot_state_merkle_db,
             Arc::clone(&state_merkle_db),
             Arc::clone(&state_kv_db),
             state_merkle_pruner,
@@ -75,6 +80,7 @@ impl AptosDB {
             empty_buffered_state_for_restore,
             skip_index_and_usage,
             internal_indexer_db.clone(),
+            hot_state_config,
         ));
 
         let ledger_pruner = LedgerPrunerManager::new(
@@ -113,6 +119,7 @@ impl AptosDB {
         max_num_nodes_per_lru_cache_shard: usize,
         empty_buffered_state_for_restore: bool,
         internal_indexer_db: Option<InternalIndexerDB>,
+        hot_state_config: HotStateConfig,
     ) -> Result<Self> {
         ensure!(
             pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
@@ -128,17 +135,19 @@ impl AptosDB {
             /* estimated_entry_charge = */ 0,
         );
 
-        let (ledger_db, state_merkle_db, state_kv_db) = Self::open_dbs(
+        let (ledger_db, hot_state_merkle_db, state_merkle_db, state_kv_db) = Self::open_dbs(
             db_paths,
             rocksdb_configs,
             Some(&env),
             Some(&block_cache),
             readonly,
             max_num_nodes_per_lru_cache_shard,
+            hot_state_config.delete_on_restart,
         )?;
 
         let mut myself = Self::new_with_dbs(
             ledger_db,
+            hot_state_merkle_db,
             state_merkle_db,
             state_kv_db,
             pruner_config,
@@ -147,6 +156,7 @@ impl AptosDB {
             empty_buffered_state_for_restore,
             rocksdb_configs.enable_storage_sharding,
             internal_indexer_db,
+            hot_state_config,
         );
 
         if !readonly {
@@ -243,6 +253,7 @@ impl AptosDB {
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
             None,
+            HotStateConfig::default(),
         )
         .expect("Unable to open AptosDB")
     }

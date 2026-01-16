@@ -211,7 +211,10 @@ fn contains_control_flow_redirections(exp: &Exp) -> bool {
     let mut result = false;
     let mut visitor = |e: &ExpData| {
         use ExpData::*;
-        if matches!(e, LoopCont(..) | Return(..) | Call(_, Operation::Abort, _)) {
+        if matches!(
+            e,
+            LoopCont(..) | Return(..) | Call(_, Operation::Abort(_), _)
+        ) {
             result = true;
             false // stop traversal early
         } else {

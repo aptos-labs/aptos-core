@@ -1,6 +1,6 @@
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::m
 enum E has copy + drop
   V1
@@ -127,7 +127,7 @@ public fun borrow_mut$E$1$1(l0: &mut E): &mut u16
     mut_borrow_variant_field E, V2::o3
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n6
 use 0xc0ffee::m
 // Function definition at index 0

@@ -1032,6 +1032,7 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                 | MoveTo(_)
                 | MoveFrom(_)
                 | Abort
+                | AbortMsg
                 | Nop => (),
             }
         }

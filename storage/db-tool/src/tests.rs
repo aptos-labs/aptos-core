@@ -80,6 +80,7 @@ mod dbtool_tests {
         storage::{local_fs::LocalFs, BackupStorage},
         utils::test_utils::start_local_backup_service,
     };
+    use aptos_config::config::HotStateConfig;
     use aptos_db::AptosDB;
     use aptos_executor_test_helpers::integration_test_impl::{
         test_execution_with_storage_impl, test_execution_with_storage_impl_inner,
@@ -468,6 +469,7 @@ mod dbtool_tests {
                 BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
                 1000,
                 Some(internal_indexer_db.clone()),
+                HotStateConfig::default(),
             )
             .unwrap(),
         );

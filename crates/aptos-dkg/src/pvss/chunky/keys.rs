@@ -43,6 +43,16 @@ impl<E: Pairing> TryFrom<&[u8]> for EncryptPubKey<E> {
     }
 }
 
+impl From<&aptos_crypto::bls12381::PublicKey> for EncryptPubKey<ark_bls12_381::Bls12_381> {
+    fn from(value: &aptos_crypto::bls12381::PublicKey) -> Self {
+        Self {
+            // I believe this unwrap is safe, because value should always serialize to a valid
+            // bls12-381 curve point.
+            ek: <ark_bls12_381::Bls12_381 as ark_ec::pairing::Pairing>::G1Affine::deserialize_compressed(&value.to_bytes()[..]).unwrap()
+        }
+    }
+}
+
 /// The *decryption (secret) key* used by each PVSS player to decrypt their share of the dealt secret.
 #[derive(SilentDisplay, SilentDebug)]
 pub struct DecryptPrivKey<E: Pairing> {
@@ -68,6 +78,14 @@ impl<E: Pairing> traits::Convert<EncryptPubKey<E>, chunked_elgamal::PublicParame
     fn to(&self, pp_elgamal: &chunked_elgamal::PublicParameters<E::G1>) -> EncryptPubKey<E> {
         EncryptPubKey::<E> {
             ek: pp_elgamal.pubkey_base().mul(self.dk).into_affine(),
+        }
+    }
+}
+
+impl From<&aptos_crypto::bls12381::PrivateKey> for DecryptPrivKey<ark_bls12_381::Bls12_381> {
+    fn from(value: &aptos_crypto::bls12381::PrivateKey) -> Self {
+        Self {
+            dk: <ark_bls12_381::Bls12_381 as ark_ec::pairing::Pairing>::ScalarField::from_be_bytes_mod_order(&value.to_bytes())
         }
     }
 }
@@ -109,3 +127,33 @@ impl<E: Pairing> DealtPubKeyShare<E> {
 pub type DealtSecretKey<F: PrimeField> = Scalar<F>;
 #[allow(type_alias_bounds)]
 pub type DealtSecretKeyShare<F: PrimeField> = Scalar<F>;
+
+#[cfg(test)]
+mod tests {
+    use super::{DecryptPrivKey, EncryptPubKey};
+    use crate::pvss::{chunky::chunked_elgamal::PublicParameters, traits::Convert};
+    use aptos_crypto::{
+        bls12381::{PrivateKey, PublicKey},
+        Uniform,
+    };
+    use ark_bls12_381::Bls12_381;
+    use rand::thread_rng;
+
+    #[test]
+    fn test_conversion_from_blst_types() {
+        let mut rng = thread_rng();
+        let sk: PrivateKey = PrivateKey::generate(&mut rng);
+        let pk: PublicKey = PublicKey::from(&sk);
+
+        let decryption_key: DecryptPrivKey<Bls12_381> = DecryptPrivKey::from(&sk);
+        let encryption_key_from_decryption_key: EncryptPubKey<Bls12_381> =
+            decryption_key.to(&PublicParameters::default());
+
+        let encryption_key_from_blst_pk = EncryptPubKey::from(&pk);
+
+        assert_eq!(
+            encryption_key_from_decryption_key,
+            encryption_key_from_blst_pk
+        );
+    }
+}

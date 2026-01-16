@@ -7,10 +7,11 @@ use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     transaction::{
-        authenticator::AuthenticationProof, user_transaction_context::UserTransactionContext,
-        AuxiliaryInfo, AuxiliaryInfoTrait, EntryFunction, Multisig, MultisigTransactionPayload,
-        ReplayProtector, SignedTransaction, TransactionExecutable, TransactionExecutableRef,
-        TransactionExtraConfig, TransactionPayload, TransactionPayloadInner,
+        authenticator::AuthenticationProof,
+        user_transaction_context::{TransactionIndexKind, UserTransactionContext},
+        AuxiliaryInfo, EntryFunction, Multisig, MultisigTransactionPayload, ReplayProtector,
+        SignedTransaction, TransactionExecutable, TransactionExecutableRef, TransactionExtraConfig,
+        TransactionPayload, TransactionPayloadInner,
     },
 };
 
@@ -32,10 +33,11 @@ pub struct TransactionMetadata {
     pub script_hash: Vec<u8>,
     pub script_size: NumBytes,
     pub is_keyless: bool,
+    pub is_slh_dsa_sha2_128s: bool,
     pub entry_function_payload: Option<EntryFunction>,
     pub multisig_payload: Option<Multisig>,
-    // Index of the transaction in the block.
-    pub transaction_index: Option<u32>,
+    /// The transaction index context for the monotonically increasing counter.
+    pub transaction_index_kind: TransactionIndexKind,
 }
 
 impl TransactionMetadata {
@@ -78,6 +80,15 @@ impl TransactionMetadata {
             is_keyless: aptos_types::keyless::get_authenticators(txn)
                 .map(|res| !res.is_empty())
                 .unwrap_or(false),
+            is_slh_dsa_sha2_128s: txn
+                .authenticator_ref()
+                .to_single_key_authenticators()
+                .map(|authenticators| {
+                    authenticators
+                        .iter()
+                        .any(|auth| matches!(auth.signature(), aptos_types::transaction::authenticator::AnySignature::SlhDsa_Sha2_128s { .. }))
+                })
+                .unwrap_or(false),
             entry_function_payload: if txn.payload().is_multisig() {
                 None
             } else if let Ok(TransactionExecutableRef::EntryFunction(e)) =
@@ -108,7 +119,7 @@ impl TransactionMetadata {
                 }),
                 _ => None,
             },
-            transaction_index: auxiliary_info.transaction_index(),
+            transaction_index_kind: auxiliary_info.transaction_index_kind(),
         }
     }
 
@@ -183,6 +194,10 @@ impl TransactionMetadata {
         self.is_keyless
     }
 
+    pub fn is_slh_dsa_sha2_128s(&self) -> bool {
+        self.is_slh_dsa_sha2_128s
+    }
+
     pub fn entry_function_payload(&self) -> Option<EntryFunction> {
         self.entry_function_payload.clone()
     }
@@ -203,11 +218,24 @@ impl TransactionMetadata {
                 .map(|entry_func| entry_func.as_entry_function_payload()),
             self.multisig_payload()
                 .map(|multisig| multisig.as_multisig_payload()),
-            self.transaction_index,
+            self.transaction_index_kind,
         )
     }
 
+    pub fn transaction_index_kind(&self) -> TransactionIndexKind {
+        self.transaction_index_kind
+    }
+
+    /// Returns the transaction index if available, regardless of execution mode.
+    /// Returns `Some(index)` for both `BlockExecution` and `ValidationOrSimulation`,
+    /// Returns `None` for `NotAvailable`.
     pub fn transaction_index(&self) -> Option<u32> {
-        self.transaction_index
+        match self.transaction_index_kind {
+            TransactionIndexKind::BlockExecution { transaction_index }
+            | TransactionIndexKind::ValidationOrSimulation { transaction_index } => {
+                Some(transaction_index)
+            },
+            TransactionIndexKind::NotAvailable => None,
+        }
     }
 }

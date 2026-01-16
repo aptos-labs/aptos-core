@@ -26,7 +26,7 @@ use aptos_crypto::{
     ed25519::*,
     hash::CryptoHash,
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
-    secp256k1_ecdsa,
+    secp256k1_ecdsa, slh_dsa_sha2_128s,
     traits::{signing_message, SigningKey},
     CryptoMaterialError, HashValue,
 };
@@ -533,6 +533,21 @@ impl RawTransaction {
         ))
     }
 
+    /// Signs the given `RawTransaction` using SLH-DSA-SHA2-128s. Note that this consumes the `RawTransaction` and turns it
+    /// into a `SignatureCheckedTransaction`.
+    ///
+    /// For a transaction that has just been signed, its signature is expected to be valid.
+    pub fn sign_slh_dsa_sha2_128s(
+        self,
+        private_key: &slh_dsa_sha2_128s::PrivateKey,
+        public_key: slh_dsa_sha2_128s::PublicKey,
+    ) -> Result<SignatureCheckedTransaction> {
+        let signature = private_key.sign(&self)?;
+        Ok(SignatureCheckedTransaction(
+            SignedTransaction::new_slh_dsa_sha2_128s(self, public_key, signature),
+        ))
+    }
+
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn multi_sign_for_testing(
         self,
@@ -944,6 +959,20 @@ impl TransactionPayload {
     pub fn is_encrypted_variant(&self) -> bool {
         matches!(self, Self::EncryptedPayload(_))
     }
+
+    pub fn as_encrypted_payload(&self) -> Option<&EncryptedPayload> {
+        match self {
+            Self::EncryptedPayload(payload) => Some(payload),
+            _ => None,
+        }
+    }
+
+    pub fn as_encrypted_payload_mut(&mut self) -> Option<&mut EncryptedPayload> {
+        match self {
+            Self::EncryptedPayload(payload) => Some(payload),
+            _ => None,
+        }
+    }
 }
 
 impl TransactionExtraConfig {
@@ -1156,6 +1185,18 @@ impl SignedTransaction {
         Self::new_single_sender(raw_txn, authenticator)
     }
 
+    pub fn new_slh_dsa_sha2_128s(
+        raw_txn: RawTransaction,
+        public_key: slh_dsa_sha2_128s::PublicKey,
+        signature: slh_dsa_sha2_128s::Signature,
+    ) -> SignedTransaction {
+        let authenticator = AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
+            AnyPublicKey::slh_dsa_sha2_128s(public_key),
+            AnySignature::slh_dsa_sha2_128s(signature),
+        ));
+        Self::new_single_sender(raw_txn, authenticator)
+    }
+
     pub fn new_keyless(
         raw_txn: RawTransaction,
         public_key: KeylessPublicKey,
@@ -1303,6 +1344,10 @@ impl SignedTransaction {
 
     pub fn is_encrypted_txn(&self) -> bool {
         self.payload().is_encrypted_variant()
+    }
+
+    pub fn payload_mut(&mut self) -> &mut TransactionPayload {
+        &mut self.raw_txn.payload
     }
 }
 
@@ -1582,7 +1627,7 @@ impl TransactionStatus {
         match vm_status.keep_or_discard(
             features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES),
             memory_limit_exceeded_as_miscellaneous_error,
-            false,
+            features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V10),
         ) {
             Ok(recorded) => match recorded {
                 // TODO(bowu):status code should be removed from transaction status
@@ -2782,7 +2827,8 @@ fn verify_auxiliary_infos_against_transaction_infos(
         .zip_eq(transaction_infos.par_iter())
         .map(|(aux_info, txn_info)| {
             match aux_info {
-                PersistedAuxiliaryInfo::None => {
+                PersistedAuxiliaryInfo::None
+                | PersistedAuxiliaryInfo::TimestampNotYetAssignedV1 { .. } => {
                     ensure!(
                         txn_info.auxiliary_info_hash().is_none(),
                         "The transaction info has an auxiliary info hash: {:?}, \
@@ -3182,7 +3228,8 @@ impl AuxiliaryInfo {
     pub fn persisted_info_hash(&self) -> Option<HashValue> {
         match self.persisted_info {
             PersistedAuxiliaryInfo::V1 { .. } => Some(self.persisted_info.hash()),
-            PersistedAuxiliaryInfo::None => None,
+            PersistedAuxiliaryInfo::None
+            | PersistedAuxiliaryInfo::TimestampNotYetAssignedV1 { .. } => None,
         }
     }
 }
@@ -3192,6 +3239,30 @@ impl Default for AuxiliaryInfo {
         Self {
             persisted_info: PersistedAuxiliaryInfo::None, // Use None by default for compatibility
             ephemeral_info: None,
+        }
+    }
+}
+
+impl AuxiliaryInfo {
+    pub fn new_timestamp_not_yet_assigned(transaction_index: u32) -> Self {
+        Self {
+            persisted_info: PersistedAuxiliaryInfo::TimestampNotYetAssignedV1 { transaction_index },
+            ephemeral_info: None,
+        }
+    }
+
+    pub fn transaction_index_kind(
+        &self,
+    ) -> crate::transaction::user_transaction_context::TransactionIndexKind {
+        use crate::transaction::user_transaction_context::TransactionIndexKind;
+        match self.persisted_info {
+            PersistedAuxiliaryInfo::V1 { transaction_index } => {
+                TransactionIndexKind::BlockExecution { transaction_index }
+            },
+            PersistedAuxiliaryInfo::TimestampNotYetAssignedV1 { transaction_index } => {
+                TransactionIndexKind::ValidationOrSimulation { transaction_index }
+            },
+            PersistedAuxiliaryInfo::None => TransactionIndexKind::NotAvailable,
         }
     }
 }
@@ -3206,7 +3277,10 @@ impl AuxiliaryInfoTrait for AuxiliaryInfo {
 
     fn transaction_index(&self) -> Option<u32> {
         match self.persisted_info {
-            PersistedAuxiliaryInfo::V1 { transaction_index } => Some(transaction_index),
+            PersistedAuxiliaryInfo::V1 { transaction_index }
+            | PersistedAuxiliaryInfo::TimestampNotYetAssignedV1 { transaction_index } => {
+                Some(transaction_index)
+            },
             PersistedAuxiliaryInfo::None => None,
         }
     }
@@ -3236,6 +3310,11 @@ pub enum PersistedAuxiliaryInfo {
     // Note that this would be slightly different from the index of transactions that get committed
     // onchain, as this considers transactions that may get discarded.
     V1 { transaction_index: u32 },
+    // When we are doing a simulation or validation of transactions, the transaction is not executed
+    // within the context of a block. The timestamp is not yet assigned, but we still track the
+    // transaction index for multi-transaction simulations. For single transaction simulation or
+    // validation, the transaction index is set to 0.
+    TimestampNotYetAssignedV1 { transaction_index: u32 },
 }
 
 pub trait AuxiliaryInfoTrait: Clone {

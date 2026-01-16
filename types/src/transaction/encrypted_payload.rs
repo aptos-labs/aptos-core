@@ -1,36 +1,60 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::transaction::{TransactionExecutable, TransactionExecutableRef, TransactionExtraConfig};
+use crate::{
+    secret_sharing::{Ciphertext, EvalProof},
+    transaction::{TransactionExecutable, TransactionExecutableRef, TransactionExtraConfig},
+};
 use anyhow::{bail, Result};
+use aptos_batch_encryption::traits::{AssociatedData, Plaintext};
 use aptos_crypto::HashValue;
+use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 
-pub type CipherText = Vec<u8>;
-pub type EvalProof = Vec<u8>;
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct DecryptedPayload {
+    executable: TransactionExecutable,
+    decryption_nonce: u64,
+}
+
+impl DecryptedPayload {
+    pub fn unwrap(self) -> (TransactionExecutable, u64) {
+        (self.executable, self.decryption_nonce)
+    }
+}
+
+impl Plaintext for DecryptedPayload {}
+
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct PayloadAssociatedData {
+    sender: AccountAddress,
+}
+
+impl PayloadAssociatedData {
+    fn new(sender: AccountAddress) -> Self {
+        Self { sender }
+    }
+}
+
+impl AssociatedData for PayloadAssociatedData {}
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum EncryptedPayload {
     Encrypted {
-        #[serde(with = "serde_bytes")]
-        ciphertext: CipherText,
+        ciphertext: Ciphertext,
         extra_config: TransactionExtraConfig,
         payload_hash: HashValue,
     },
     FailedDecryption {
-        #[serde(with = "serde_bytes")]
-        ciphertext: CipherText,
+        ciphertext: Ciphertext,
         extra_config: TransactionExtraConfig,
         payload_hash: HashValue,
-        #[serde(with = "serde_bytes")]
         eval_proof: EvalProof,
     },
     Decrypted {
-        #[serde(with = "serde_bytes")]
-        ciphertext: CipherText,
+        ciphertext: Ciphertext,
         extra_config: TransactionExtraConfig,
         payload_hash: HashValue,
-        #[serde(with = "serde_bytes")]
         eval_proof: EvalProof,
 
         // decrypted things
@@ -40,6 +64,14 @@ pub enum EncryptedPayload {
 }
 
 impl EncryptedPayload {
+    pub fn ciphertext(&self) -> &Ciphertext {
+        match self {
+            Self::Encrypted { ciphertext, .. }
+            | Self::FailedDecryption { ciphertext, .. }
+            | Self::Decrypted { ciphertext, .. } => ciphertext,
+        }
+    }
+
     pub fn executable(&self) -> Result<TransactionExecutable> {
         let Self::Decrypted { executable, .. } = self else {
             bail!("Transaction is encrypted");
@@ -64,5 +96,56 @@ impl EncryptedPayload {
 
     pub fn is_encrypted(&self) -> bool {
         matches!(self, Self::Encrypted { .. })
+    }
+
+    pub fn into_decrypted(
+        &mut self,
+        eval_proof: EvalProof,
+        executable: TransactionExecutable,
+        nonce: u64,
+    ) -> anyhow::Result<()> {
+        let Self::Encrypted {
+            ciphertext,
+            extra_config,
+            payload_hash,
+        } = self
+        else {
+            bail!("Payload is not in Encrypted state");
+        };
+
+        *self = Self::Decrypted {
+            ciphertext: ciphertext.clone(),
+            extra_config: extra_config.clone(),
+            payload_hash: *payload_hash,
+            eval_proof,
+            executable,
+            decryption_nonce: nonce,
+        };
+        Ok(())
+    }
+
+    pub fn into_failed_decryption(&mut self, eval_proof: EvalProof) -> anyhow::Result<()> {
+        let Self::Encrypted {
+            ciphertext,
+            extra_config,
+            payload_hash,
+        } = self
+        else {
+            bail!("Payload is not in Encrypted state");
+        };
+
+        // TODO(ibalajiarun): Avoid the clone
+        *self = Self::FailedDecryption {
+            ciphertext: ciphertext.clone(),
+            extra_config: extra_config.clone(),
+            payload_hash: *payload_hash,
+            eval_proof,
+        };
+        Ok(())
+    }
+
+    pub fn verify(&self, sender: AccountAddress) -> anyhow::Result<()> {
+        let associated_data = PayloadAssociatedData::new(sender);
+        self.ciphertext().verify(&associated_data)
     }
 }

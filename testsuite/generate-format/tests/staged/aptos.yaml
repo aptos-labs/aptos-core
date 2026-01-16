@@ -101,6 +101,11 @@ AnyPublicKey:
         STRUCT:
           - public_key:
               TYPENAME: FederatedKeylessPublicKey
+    5:
+      SlhDsa_Sha2_128s:
+        STRUCT:
+          - public_key:
+              TYPENAME: SlhDsa_Sha2_128s_PublicKey
 AnySignature:
   ENUM:
     0:
@@ -123,6 +128,11 @@ AnySignature:
         STRUCT:
           - signature:
               TYPENAME: KeylessSignature
+    4:
+      SlhDsa_Sha2_128s:
+        STRUCT:
+          - signature:
+              TYPENAME: SlhDsa_Sha2_128s_Signature
 AssertionSignature:
   ENUM:
     0:
@@ -130,6 +140,15 @@ AssertionSignature:
         STRUCT:
           - signature:
               TYPENAME: Secp256r1EcdsaSignature
+BIBECiphertext:
+  STRUCT:
+    - id:
+        TYPENAME: Id
+    - ct_g2: BYTES
+    - padded_key:
+        TYPENAME: OneTimePaddedKey
+    - symmetric_ciphertext:
+        TYPENAME: SymmetricCiphertext
 BitVec:
   STRUCT:
     - inner: BYTES
@@ -206,6 +225,16 @@ ChangeSet:
     - events:
         SEQ:
           TYPENAME: ContractEvent
+Ciphertext:
+  STRUCT:
+    - vk: BYTES
+    - bibe_ct:
+        TYPENAME: BIBECiphertext
+    - associated_data_bytes: BYTES
+    - signature:
+        TUPLEARRAY:
+          CONTENT: U8
+          SIZE: 64
 ContractEvent:
   ENUM:
     0:
@@ -251,7 +280,8 @@ EncryptedPayload:
     0:
       Encrypted:
         STRUCT:
-          - ciphertext: BYTES
+          - ciphertext:
+              TYPENAME: Ciphertext
           - extra_config:
               TYPENAME: TransactionExtraConfig
           - payload_hash:
@@ -259,21 +289,25 @@ EncryptedPayload:
     1:
       FailedDecryption:
         STRUCT:
-          - ciphertext: BYTES
+          - ciphertext:
+              TYPENAME: Ciphertext
           - extra_config:
               TYPENAME: TransactionExtraConfig
           - payload_hash:
               TYPENAME: HashValue
-          - eval_proof: BYTES
+          - eval_proof:
+              TYPENAME: EvalProof
     2:
       Decrypted:
         STRUCT:
-          - ciphertext: BYTES
+          - ciphertext:
+              TYPENAME: Ciphertext
           - extra_config:
               TYPENAME: TransactionExtraConfig
           - payload_hash:
               TYPENAME: HashValue
-          - eval_proof: BYTES
+          - eval_proof:
+              TYPENAME: EvalProof
           - executable:
               TYPENAME: TransactionExecutable
           - decryption_nonce: U64
@@ -305,11 +339,6 @@ EphemeralPublicKey:
         STRUCT:
           - public_key:
               TYPENAME: Ed25519PublicKey
-    1:
-      Secp256r1Ecdsa:
-        STRUCT:
-          - public_key:
-              TYPENAME: Secp256r1EcdsaPublicKey
 EphemeralSignature:
   ENUM:
     0:
@@ -322,6 +351,8 @@ EphemeralSignature:
         STRUCT:
           - signature:
               TYPENAME: PartialAuthenticatorAssertionResponse
+EvalProof:
+  NEWTYPESTRUCT: BYTES
 EventKey:
   STRUCT:
     - creation_number: U64
@@ -396,6 +427,9 @@ HashValue:
         TUPLEARRAY:
           CONTENT: U8
           SIZE: 32
+Id:
+  STRUCT:
+    - root_x: BYTES
 IdCommitment:
   NEWTYPESTRUCT: BYTES
 Identifier:
@@ -457,6 +491,11 @@ MultisigTransactionPayload:
       EntryFunction:
         NEWTYPE:
           TYPENAME: EntryFunction
+OneTimePaddedKey:
+  NEWTYPESTRUCT:
+    TUPLEARRAY:
+      CONTENT: U8
+      SIZE: 16
 OpenIdSig:
   STRUCT:
     - jwt_sig: BYTES
@@ -551,6 +590,12 @@ SingleKeyAuthenticator:
         TYPENAME: AnyPublicKey
     - signature:
         TYPENAME: AnySignature
+SlhDsa_Sha2_128s_PrivateKey:
+  NEWTYPESTRUCT: BYTES
+SlhDsa_Sha2_128s_PublicKey:
+  NEWTYPESTRUCT: BYTES
+SlhDsa_Sha2_128s_Signature:
+  NEWTYPESTRUCT: BYTES
 StateKey:
   ENUM:
     0:
@@ -590,6 +635,13 @@ StructTag:
     - type_args:
         SEQ:
           TYPENAME: TypeTag
+SymmetricCiphertext:
+  STRUCT:
+    - nonce:
+        TUPLEARRAY:
+          CONTENT: U8
+          SIZE: 12
+    - ct_body: BYTES
 TableHandle:
   NEWTYPESTRUCT:
     TYPENAME: AccountAddress
