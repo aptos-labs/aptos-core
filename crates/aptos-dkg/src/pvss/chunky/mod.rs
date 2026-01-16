@@ -12,22 +12,17 @@ mod hkzg_chunked_elgamal_commit;
 mod input_secret;
 mod keys;
 pub mod public_parameters;
-//mod scalar_mul;
-//mod transcript;
+//mod scalar_mul; // TODO: why is this not used?
 mod weighted_transcript;
 mod weighted_transcriptv2;
 
 pub use public_parameters::DEFAULT_ELL_FOR_TESTING;
-// pub use transcript::{
-//     SubTranscript as UnweightedSubtranscript, Transcript as UnsignedUnweightedTranscript,
-// };
 pub use weighted_transcript::{
     Subtranscript as WeightedSubtranscript, Transcript as UnsignedWeightedTranscript,
 };
 pub use weighted_transcriptv2::{
     Subtranscript as WeightedSubtranscriptv2, Transcript as UnsignedWeightedTranscriptv2,
 };
-
 #[allow(type_alias_bounds)]
 pub type SignedWeightedTranscript<E: Pairing> = GenericSigning<UnsignedWeightedTranscript<E>>;
 #[allow(type_alias_bounds)]

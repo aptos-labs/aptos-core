@@ -22,8 +22,8 @@ if [ "$ANS" == "y" ]; then
     echo "Benchmarking DeKART..."
     cd $repo_root/crates/aptos-dkg/
     RAYON_NUM_THREADS=1 cargo bench --bench range_proof -- dekart-rs/bls12-381
-    RAYON_NUM_THREADS=1 cargo bench --bench range_proof -- dekart-multivar/bn254
-    RAYON_NUM_THREADS=1 cargo bench --bench range_proof -- dekart-multivar/bls12-381
+#    RAYON_NUM_THREADS=1 cargo bench --bench range_proof -- dekart-multivar/bn254
+#    RAYON_NUM_THREADS=1 cargo bench --bench range_proof -- dekart-multivar/bls12-381
     cd - &>/dev/null
 fi
 

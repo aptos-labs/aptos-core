@@ -125,18 +125,6 @@ pub struct WeightedWitness<F: PrimeField> {
     pub plaintext_randomness: Vec<Vec<Scalar<F>>>, // For at most max_weight, there needs to be a vector of randomness to encrypt a vector of chunks
 }
 
-// type PlayerPlaintextChunks<C: CurveGroup> = Vec<Vec<Scalar<E>>>;
-// type PlaintextRandomness<C: CurveGroup> = Vec<Scalar<E>>;
-
-// impl<C: CurveGroup> homomorphism::Trait for Homomorphism<'_, C> {
-//     type Codomain = CodomainShape<C>;
-//     type Domain = Witness<C::ScalarField>;
-
-//     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
-//         self.apply_msm(self.msm_terms(input))
-//     }
-// }
-
 impl<C: CurveGroup> homomorphism::Trait for WeightedHomomorphism<'_, C> {
     type Codomain = WeightedCodomainShape<C>;
     type Domain = WeightedWitness<C::ScalarField>;
@@ -145,30 +133,6 @@ impl<C: CurveGroup> homomorphism::Trait for WeightedHomomorphism<'_, C> {
         self.apply_msm(self.msm_terms(input))
     }
 }
-
-// TODO: Can problably do EntrywiseMap with another derive macro
-// impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> EntrywiseMap<T>
-//     for CodomainShape<T>
-// {
-//     type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> =
-//         CodomainShape<U>;
-
-//     fn map<U, F>(self, f: F) -> Self::Output<U>
-//     where
-//         F: Fn(T) -> U,
-//         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
-//     {
-//         let chunks = self
-//             .chunks
-//             .into_iter()
-//             .map(|row| row.into_iter().map(&f).collect())
-//             .collect();
-
-//         let randomness = self.randomness.into_iter().map(f).collect();
-
-//         CodomainShape { chunks, randomness }
-//     }
-// }
 
 impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> EntrywiseMap<T>
     for WeightedCodomainShape<T>
@@ -201,18 +165,6 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> Entrywis
     }
 }
 
-// TODO: Use a derive macro?
-// impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator for CodomainShape<T> {
-//     type IntoIter = std::vec::IntoIter<T>;
-//     type Item = T;
-
-//     fn into_iter(self) -> Self::IntoIter {
-//         let mut combined: Vec<T> = self.chunks.into_iter().flatten().collect(); // Temporary Vec can probably be avoided, but might require unstable Rust or a lot of lines
-//         combined.extend(self.randomness);
-//         combined.into_iter()
-//     }
-// }
-
 impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator
     for WeightedCodomainShape<T>
 {
@@ -225,49 +177,6 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator
         combined.into_iter()
     }
 }
-
-// #[allow(non_snake_case)]
-// impl<'a, C: CurveGroup> fixed_base_msms::Trait for Homomorphism<'a, C> {
-//     type CodomainShape<T>
-//         = CodomainShape<T>
-//     where
-//         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-//     type MsmInput = MsmInput<C::Affine, C::ScalarField>;
-//     type MsmOutput = C;
-//     type Scalar = C::ScalarField;
-
-//     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
-//         // C_{i,j} = z_{i,j} * G_1 + r_j * ek[i]
-//         let Cs = input
-//             .plaintext_chunks
-//             .iter()
-//             .enumerate()
-//             .map(|(i, z_i)| {
-//                 // here i is the player's id
-//                 chunks_msm_terms(self.pp, self.eks[i], z_i, &input.plaintext_randomness)
-//             })
-//             .collect();
-
-//         // R_j = r_j * H_1
-//         let Rs = input
-//             .plaintext_randomness
-//             .iter()
-//             .map(|&r_j| MsmInput {
-//                 bases: vec![self.pp.H],
-//                 scalars: vec![r_j.0],
-//             })
-//             .collect();
-
-//         CodomainShape {
-//             chunks: Cs,
-//             randomness: Rs,
-//         }
-//     }
-
-//     fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
-//         C::msm(input.bases(), input.scalars()).expect("MSM failed in ChunkedElgamal")
-//     }
-// }
 
 // Given a chunked scalar [z_j] and vector of randomness [r_j], returns a vector of MSM terms
 // of the vector C_j = z_j * G_1 + r_j * ek, so a vector with entries [(G_1, ek), (z_j, r_j)]_j
@@ -357,12 +266,6 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for WeightedHomomorphism<'a, C> {
     }
 }
 
-// impl<'a, C: CurveGroup> sigma_protocol::Trait<C> for Homomorphism<'a, C> {
-//     fn dst(&self) -> Vec<u8> {
-//         DST.to_vec()
-//     }
-// }
-
 impl<'a, C: CurveGroup> sigma_protocol::Trait<C> for WeightedHomomorphism<'a, C> {
     fn dst(&self) -> Vec<u8> {
         let mut result = b"WEIGHTED_".to_vec();
@@ -371,32 +274,6 @@ impl<'a, C: CurveGroup> sigma_protocol::Trait<C> for WeightedHomomorphism<'a, C>
     }
 }
 
-// pub(crate) fn correlated_randomness<F, R>(rng: &mut R, radix: u64, num_chunks: u32) -> Vec<F>
-// where
-//     F: PrimeField, // because `sample_field_element()` needs `PrimeField`
-//     R: rand_core::RngCore + rand_core::CryptoRng,
-// {
-//     let mut r_vals = Vec::with_capacity(num_chunks as usize);
-//     r_vals.push(F::zero()); // placeholder for r_0
-//     let mut remainder = F::zero();
-
-//     // Precompute radix as F once
-//     let radix_f = F::from(radix);
-//     let mut cur_base = radix_f;
-
-//     // Fill r_1 .. r_{num_chunks-1} randomly
-//     for _ in 1..num_chunks {
-//         let r = sample_field_element(rng);
-//         r_vals.push(r);
-//         remainder -= r * cur_base;
-//         cur_base *= radix_f;
-//     }
-
-//     r_vals[0] = remainder;
-
-//     r_vals
-// }
-
 pub fn correlated_randomness<F, R>(
     rng: &mut R,
     radix: u64,
@@ -404,7 +281,7 @@ pub fn correlated_randomness<F, R>(
     target_sum: &F,
 ) -> Vec<F>
 where
-    F: PrimeField, // PrimeField because of sample_field_element()
+    F: PrimeField, // need `PrimeField` here because of `sample_field_element()`
     R: rand_core::RngCore + rand_core::CryptoRng,
 {
     let mut r_vals = vec![F::zero(); num_chunks as usize];
@@ -485,7 +362,6 @@ mod tests {
     use ark_ec::CurveGroup;
     use rand::thread_rng;
 
-    #[test]
     fn test_correlated_randomness_generic<F: PrimeField>() {
         let mut rng = thread_rng();
         let target_sum = F::one();
