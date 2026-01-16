@@ -52,10 +52,10 @@ impl<E: Pairing> Proof<E> {
     /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
     pub fn generate<R: rand::Rng + rand::CryptoRng>(ell: u8, rng: &mut R) -> Self {
         Self {
-            hatC: unsafe_random_point::<E::G1Affine, _>(rng).into(),
+            hatC: unsafe_random_point::<E::G1, _>(rng).into(),
             pi_PoK: two_term_msm::Proof::generate(rng),
             Cs: unsafe_random_points_group(ell as usize, rng),
-            D: unsafe_random_point::<E::G1Affine, _>(rng).into(),
+            D: unsafe_random_point::<E::G1, _>(rng).into(),
             a: sample_field_element(rng),
             a_h: sample_field_element(rng),
             a_js: sample_field_elements(ell as usize, rng),
@@ -917,7 +917,7 @@ pub mod two_term_msm {
         pub fn generate<R: rand::Rng + rand::CryptoRng>(rng: &mut R) -> Self {
             Self {
                 first_proof_item: FirstProofItem::Commitment(CodomainShape(
-                    unsafe_random_point::<C::Affine, _>(rng).into(),
+                    unsafe_random_point::<C, _>(rng).into(),
                 )),
                 z: Witness {
                     poly_randomness: Scalar::rand(rng),

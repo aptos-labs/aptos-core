@@ -3,6 +3,8 @@
 
 // A lot of this code is copy-pasted from `jolt-core`. TODO: benchmark them against each other
 
+// THIS CODE HAS NOT YET BEEN VETTED, ONLY USE FOR BENCHMARKING PURPOSES!!!!!
+
 use crate::{
     fiat_shamir::PolynomialCommitmentScheme as _,
     pcs::{
@@ -78,10 +80,7 @@ pub struct ZeromorphProof<P: Pairing> {
 fn compute_multilinear_quotients<P: Pairing>(
     poly: &DenseMultilinearExtension<P::ScalarField>,
     point: &[P::ScalarField],
-) -> (Vec<UniPoly<P::ScalarField>>, P::ScalarField)
-// where
-//     <P as Pairing>::ScalarField: JoltField,
-{
+) -> (Vec<UniPoly<P::ScalarField>>, P::ScalarField) {
     let num_vars = poly.num_vars;
     assert_eq!(num_vars, point.len());
 
@@ -136,10 +135,7 @@ fn compute_multilinear_quotients<P: Pairing>(
 fn compute_batched_lifted_degree_quotient<P: Pairing>(
     quotients: &[UniPoly<P::ScalarField>],
     y_challenge: &P::ScalarField,
-) -> (UniPoly<P::ScalarField>, usize)
-// where
-//     <P as Pairing>::ScalarField: JoltField,
-{
+) -> (UniPoly<P::ScalarField>, usize) {
     let num_vars = quotients.len();
 
     // Compute \hat{q} = \sum_k y^k * X^{N - d_k - 1} * q_k

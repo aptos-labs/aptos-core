@@ -52,9 +52,9 @@ impl<E: Pairing> OpeningProof<E> {
     pub fn generate<R: rand::Rng + rand::CryptoRng>(rng: &mut R) -> Self {
         Self {
             pi_1: sigma_protocol::homomorphism::TrivialShape(
-                unsafe_random_point::<E::G1Affine, _>(rng).into(),
+                unsafe_random_point::<E::G1, _>(rng).into(),
             ),
-            pi_2: unsafe_random_point::<E::G1Affine, _>(rng).into(),
+            pi_2: unsafe_random_point::<E::G1, _>(rng).into(),
         }
     }
 }

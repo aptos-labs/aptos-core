@@ -602,7 +602,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         (
             Scalar::vec_from_inner(sk_shares),
-            pk_shares, // TODO: review this formalism... wh ydo we need this here?
+            pk_shares, // TODO: review this formalism... why do we need this here?
         )
     }
 

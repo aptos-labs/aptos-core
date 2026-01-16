@@ -485,6 +485,29 @@ mod tests {
     use ark_ec::CurveGroup;
     use rand::thread_rng;
 
+    #[test]
+    fn test_correlated_randomness_generic<F: PrimeField>() {
+        let mut rng = thread_rng();
+        let target_sum = F::one();
+        let radix: u64 = 4;
+        let num_chunks: u8 = 8;
+
+        let coefs = correlated_randomness(&mut rng, radix, num_chunks as u32, &target_sum);
+
+        // Compute actual sum: Σ coef[i] * radix^i
+        let actual_sum: F = (0..num_chunks)
+            .map(|i| coefs[i as usize] * F::from(radix.pow(i as u32)))
+            .sum();
+
+        assert_eq!(target_sum, actual_sum);
+    }
+
+    #[test]
+    fn test_correlated_randomness_bn254() {
+        use ark_bn254::Fr;
+        test_correlated_randomness_generic::<Fr>();
+    }
+
     fn prepare_chunked_witness<F: PrimeField>(
         sc: WeightedConfig<ShamirThresholdConfig<F>>,
         ell: u8,

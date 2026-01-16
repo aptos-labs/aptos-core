@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 // Some of this is derived from: https://www.ietf.org/archive/id/draft-zkproof-polycommit-00.html
+
 // TODO: This trait is still very much a work in progress
 
 use rand::{CryptoRng, RngCore};
@@ -11,6 +12,7 @@ pub trait PolynomialCommitmentScheme {
     type VerificationKey: Clone;
     type Polynomial: Clone;
     type WitnessField: Clone + From<u64>; // So the domain of a polynomial is a Vec<WitnessField>
+                                          // For small fields, add ChallengeField here, which should probably have a from-WitnessField-property
     type Commitment: Clone;
     type Proof: Clone;
 

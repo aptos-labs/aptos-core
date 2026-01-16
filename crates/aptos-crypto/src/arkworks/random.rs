@@ -8,7 +8,7 @@
 //! would not be accepted directly.
 
 use crate::arkworks::hashing;
-use ark_ec::{AffineRepr, CurveGroup};
+use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use rand::Rng;
 
@@ -45,7 +45,7 @@ where
 
 /// Faster "unsafe" random point by hashing some random bytes to the curve
 /// But still not very fast
-pub fn unsafe_random_point<C: AffineRepr, R>(rng: &mut R) -> C
+pub fn unsafe_random_point<C: CurveGroup, R>(rng: &mut R) -> C::Affine
 where
     R: rand_core::RngCore + rand_core::CryptoRng,
 {
@@ -62,16 +62,16 @@ pub fn unsafe_random_point_group<C: CurveGroup, R>(rng: &mut R) -> C
 where
     R: rand_core::RngCore + rand_core::CryptoRng,
 {
-    unsafe_random_point::<C::Affine, _>(rng).into()
+    unsafe_random_point::<C, _>(rng).into()
 }
 
 /// Samples `n` uniformly random elements from the group, but is somewhat unsafe
 /// because it involves a hashing function which is sensitive to timing attacks
-pub fn unsafe_random_points<C: AffineRepr, R>(n: usize, rng: &mut R) -> Vec<C>
+pub fn unsafe_random_points<C: CurveGroup, R>(n: usize, rng: &mut R) -> Vec<C::Affine>
 where
     R: rand_core::RngCore + rand_core::CryptoRng,
 {
-    (0..n).map(|_| unsafe_random_point(rng)).collect()
+    (0..n).map(|_| unsafe_random_point::<C, _>(rng)).collect()
 }
 
 /// Very similar, but turns affine elements into group elements for convenience
@@ -80,7 +80,7 @@ where
     R: rand_core::RngCore + rand_core::CryptoRng,
 {
     (0..n)
-        .map(|_| unsafe_random_point::<C::Affine, _>(rng).into())
+        .map(|_| unsafe_random_point::<C, _>(rng).into())
         .collect()
 }
 

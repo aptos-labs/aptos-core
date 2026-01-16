@@ -18,14 +18,14 @@ ark-poly-commit = "0.5.0"
 ark-serialize = { workspace = true }
 ark-std = { workspace = true }
 bcs = { workspace = true }
-blake2.workspace = true
+blake2 = { workspace = true }
 blst = { workspace = true }
 blstrs = { workspace = true }
 criterion = { workspace = true }
 derive_more = { workspace = true }
 ff = { workspace = true }
 group = { workspace = true }
-hashbrown.workspace = true
+hashbrown = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
 merlin = { workspace = true }
@@ -35,7 +35,6 @@ num-integer = { workspace = true }
 num-traits = { workspace = true }
 pairing = { workspace = true }
 rand = { workspace = true }
-rand_chacha = "0.9.0"
 rand_core = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }

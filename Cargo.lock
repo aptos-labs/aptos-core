@@ -1432,7 +1432,6 @@ dependencies = [
  "num_cpus",
  "pairing",
  "rand 0.7.3",
- "rand_chacha 0.9.0",
  "rand_core 0.5.1",
  "rayon",
  "serde",
