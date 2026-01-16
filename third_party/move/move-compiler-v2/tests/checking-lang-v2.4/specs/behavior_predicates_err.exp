@@ -1,0 +1,49 @@
+
+Diagnostics:
+error: behavior predicates for function values (requires_of, aborts_of, ensures_of, modifies_of) are not yet supported in the model
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_err.move:14:17
+   │
+14 │         ensures requires_of<f>(x, y);
+   │                 ^^^^^^^^^^^^^^^^^^^^
+
+error: behavior predicates for function values (requires_of, aborts_of, ensures_of, modifies_of) are not yet supported in the model
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_err.move:17:17
+   │
+17 │         ensures ensures_of<f>(x, y, result);
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: behavior predicates for function values (requires_of, aborts_of, ensures_of, modifies_of) are not yet supported in the model
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_err.move:20:19
+   │
+20 │         aborts_if aborts_of<f>(x, y);
+   │                   ^^^^^^^^^^^^^^^^^^
+
+error: behavior predicates for function values (requires_of, aborts_of, ensures_of, modifies_of) are not yet supported in the model
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_err.move:23:18
+   │
+23 │         modifies modifies_of<f>(x);
+   │                  ^^^^^^^^^^^^^^^^^
+
+error: global resource access expected
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_err.move:23:18
+   │
+23 │         modifies modifies_of<f>(x);
+   │                  ^^^^^^^^^^^^^^^^^
+
+error: behavior predicates for function values (requires_of, aborts_of, ensures_of, modifies_of) are not yet supported in the model
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_err.move:33:17
+   │
+33 │         ensures old@ensures_of<f>(x, result);
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: behavior predicates for function values (requires_of, aborts_of, ensures_of, modifies_of) are not yet supported in the model
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_err.move:36:17
+   │
+36 │         ensures ensures_of<f>(x, result)@post;
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: behavior predicates for function values (requires_of, aborts_of, ensures_of, modifies_of) are not yet supported in the model
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_err.move:39:17
+   │
+39 │         ensures pre@ensures_of<f>(x, result)@post;
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

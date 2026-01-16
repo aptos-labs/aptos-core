@@ -5,9 +5,9 @@
 use crate::{
     expansion::translate::is_valid_struct_constant_or_schema_name,
     parser::ast::{
-        self as P, Ability, Ability_, BinOp, CallKind, ConstantName, Field, FunctionName, Label,
-        LambdaCaptureKind, ModuleName, QuantKind, SpecApplyPattern, StructName, UnaryOp, UseDecl,
-        Var, VariantName, ENTRY_MODIFIER,
+        self as P, Ability, Ability_, BehaviorKind, BinOp, CallKind, ConstantName, Field,
+        FunctionName, Label, LambdaCaptureKind, ModuleName, QuantKind, SpecApplyPattern,
+        StructName, UnaryOp, UseDecl, Var, VariantName, ENTRY_MODIFIER,
     },
     shared::{
         ast_debug::*,
@@ -541,6 +541,19 @@ pub enum Exp_ {
         Vec<Vec<Exp>>,
         Option<Box<Exp>>,
         Box<Exp>,
+    ), // spec only
+    // Behavior predicate for function values in specifications:
+    // [pre_label@]requires_of<f[<T1, ..., Tn>]>(args)[@post_label]
+    // [pre_label@]aborts_of<f[<T1, ..., Tn>]>(args)[@post_label]
+    // [pre_label@]ensures_of<f[<T1, ..., Tn>]>(args)[@post_label]
+    // [pre_label@]modifies_of<f[<T1, ..., Tn>]>(args)[@post_label]
+    Behavior(
+        BehaviorKind,
+        Option<Label>,     // pre-state label
+        ModuleAccess,      // function name
+        Option<Vec<Type>>, // optional type instantiation
+        Spanned<Vec<Exp>>, // arguments
+        Option<Label>,     // post-state label
     ), // spec only
 
     Assign(LValueList, Box<Exp>),
@@ -1861,6 +1874,31 @@ impl AstDebug for Exp_ {
                     w.write(" applies [");
                     w.comma(unbound_func_ptrs, |w, n| w.write(format!("{}", n)));
                     w.write("]");
+                }
+            },
+            E::Behavior(kind, pre_label, fn_name, type_args, sp!(_, args), post_label) => {
+                if let Some(label) = pre_label {
+                    w.write(format!("{}@", label.value().as_str()));
+                }
+                let kind_str = match kind {
+                    BehaviorKind::RequiresOf => "requires_of",
+                    BehaviorKind::AbortsOf => "aborts_of",
+                    BehaviorKind::EnsuresOf => "ensures_of",
+                    BehaviorKind::ModifiesOf => "modifies_of",
+                };
+                w.write(kind_str);
+                w.write("<");
+                fn_name.ast_debug(w);
+                if let Some(tys) = type_args {
+                    w.write("<");
+                    w.comma(tys, |w, ty| ty.ast_debug(w));
+                    w.write(">");
+                }
+                w.write(">(");
+                w.comma(args, |w, e| e.ast_debug(w));
+                w.write(")");
+                if let Some(label) = post_label {
+                    w.write(format!("@{}", label.value().as_str()));
                 }
             },
             E::UnresolvedError => w.write("_|_"),

@@ -22,6 +22,14 @@ pub(crate) fn pluralize(s: &str, n: usize) -> String {
     }
 }
 
+pub(crate) fn pluralize_be(n: usize) -> String {
+    if n != 1 {
+        "were".to_string()
+    } else {
+        "was".to_string()
+    }
+}
+
 pub(crate) fn ith_str(n: usize) -> String {
     match n {
         0 => panic!("cannot be 0"),
