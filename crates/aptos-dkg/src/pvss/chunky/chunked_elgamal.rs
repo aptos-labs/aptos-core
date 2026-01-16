@@ -43,37 +43,39 @@ pub const DST: &[u8; 35] = b"APTOS_CHUNKED_ELGAMAL_GENERATOR_DST"; // This is us
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(non_snake_case)]
 pub struct WeightedHomomorphism<'a, C: CurveGroup> {
-    pub pp: &'a PublicParameters<C::Affine>, // These are small so no harm in copying them here
+    pub pp: &'a PublicParameters<C>, // These are small so no harm in copying them here
     pub eks: &'a [C::Affine],                // TODO: capitalize to EKs ?
 }
 
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, PartialEq, Clone, Eq, Debug)]
-pub struct PublicParameters<A: AffineRepr> {
+pub struct PublicParameters<C: CurveGroup> {
     /// A group element $G$ that is raised to the encrypted message
-    pub G: A,
+    pub G: C::Affine,
     /// A group element $H$ that is used to exponentiate both
     /// (1) the ciphertext randomness and (2) the DSK when computing its EK.
-    pub H: A,
+    pub H: C::Affine,
 }
 
 #[allow(non_snake_case)]
-impl<A: AffineRepr> PublicParameters<A> {
-    pub fn new(G: A, H: A) -> Self {
+impl<C: CurveGroup> PublicParameters<C> {
+    pub fn new(G: C::Affine, H: C::Affine) -> Self {
         Self { G, H }
     }
 
-    pub fn message_base(&self) -> &A {
+    pub fn message_base(&self) -> &C::Affine {
         &self.G
     }
 
-    pub fn pubkey_base(&self) -> &A {
+    pub fn pubkey_base(&self) -> &C::Affine {
         &self.H
     }
 
     pub fn default() -> Self {
         let G = hashing::unsafe_hash_to_affine(b"G", DST);
-        let H = hashing::unsafe_hash_to_affine(b"H", DST);
+        // Chunky's encryption pubkey base must match up with the blst base, since validators
+        // reuse their consensus keypairs as encryption keypairs
+        let H = C::Affine::generator();
         debug_assert_ne!(G, H);
         Self { G, H }
     }
@@ -270,7 +272,7 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator
 // Given a chunked scalar [z_j] and vector of randomness [r_j], returns a vector of MSM terms
 // of the vector C_j = z_j * G_1 + r_j * ek, so a vector with entries [(G_1, ek), (z_j, r_j)]_j
 fn chunks_msm_terms<C: CurveGroup>(
-    pp: &PublicParameters<C::Affine>,
+    pp: &PublicParameters<C>,
     ek: C::Affine,
     chunks: &[Scalar<C::ScalarField>],
     correlated_randomness: &[Scalar<C::ScalarField>],
@@ -288,7 +290,7 @@ fn chunks_msm_terms<C: CurveGroup>(
 // Given a vector of chunked scalar [[z_j]] and vector of randomness [[r_j]], returns a vector of
 // vector of MSM terms. This is used for the weighted PVSS, where each player gets a vector of chunks
 pub fn chunks_vec_msm_terms<C: CurveGroup>(
-    pp: &PublicParameters<C::Affine>,
+    pp: &PublicParameters<C>,
     ek: C::Affine,
     chunks_vec: &[Vec<Scalar<C::ScalarField>>],
     correlated_randomness_vec: &[Vec<Scalar<C::ScalarField>>],
@@ -441,7 +443,7 @@ pub fn decrypt_chunked_scalars<C: CurveGroup>(
     Cs_rows: &[Vec<C>],
     Rs_rows: &[Vec<C>],
     dk: &C::ScalarField,
-    pp: &PublicParameters<C::Affine>,
+    pp: &PublicParameters<C>,
     table: &HashMap<Vec<u8>, u32>,
     radix_exponent: u8,
 ) -> Vec<C::ScalarField> {
@@ -525,7 +527,7 @@ mod tests {
             prepare_chunked_witness::<C::ScalarField>(sc, 16);
 
         // 6. Initialize the homomorphism
-        let pp: PublicParameters<C::Affine> = PublicParameters::default();
+        let pp: PublicParameters<C> = PublicParameters::default();
         let dks: Vec<C::ScalarField> = sample_field_elements(2, &mut thread_rng());
 
         let hom = WeightedHomomorphism::<C> {

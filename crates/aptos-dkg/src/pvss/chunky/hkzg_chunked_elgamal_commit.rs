@@ -76,7 +76,7 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
     pub fn new(
         lagr_g1: &'a [E::G1Affine],
         xi_1: E::G1Affine,
-        pp: &'a chunked_elgamal::PublicParameters<E::G1Affine>,
+        pp: &'a chunked_elgamal::PublicParameters<E::G1>,
         eks: &'a [E::G1Affine],
         base: E::G2Affine,
         ell: u8,

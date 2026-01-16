@@ -61,11 +61,11 @@ impl<E: Pairing> Uniform for DecryptPrivKey<E> {
     }
 }
 
-impl<E: Pairing> traits::Convert<EncryptPubKey<E>, chunked_elgamal::PublicParameters<E::G1Affine>>
+impl<E: Pairing> traits::Convert<EncryptPubKey<E>, chunked_elgamal::PublicParameters<E::G1>>
     for DecryptPrivKey<E>
 {
     /// Given a decryption key $dk$, computes its associated encryption key $H^{dk}$
-    fn to(&self, pp_elgamal: &chunked_elgamal::PublicParameters<E::G1Affine>) -> EncryptPubKey<E> {
+    fn to(&self, pp_elgamal: &chunked_elgamal::PublicParameters<E::G1>) -> EncryptPubKey<E> {
         EncryptPubKey::<E> {
             ek: pp_elgamal.pubkey_base().mul(self.dk).into_affine(),
         }
