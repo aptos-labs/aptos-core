@@ -6,17 +6,17 @@
 
 use crate::{
     boogie_helpers::{
-        boogie_address, boogie_address_blob, boogie_behavioral_spec_fun_name, boogie_bv_type,
-        boogie_byte_blob, boogie_closure_pack_name, boogie_constant_blob,
-        boogie_debug_track_abort, boogie_debug_track_local, boogie_debug_track_return,
-        boogie_equality_for_type, boogie_field_sel, boogie_field_update, boogie_fun_apply_name,
-        boogie_fun_param_name, boogie_function_bv_name, boogie_function_name,
-        boogie_make_vec_from_strings, boogie_modifies_memory_name, boogie_num_literal,
-        boogie_num_type_base, boogie_num_type_string_capital, boogie_reflection_type_info,
-        boogie_reflection_type_name, boogie_resource_memory_name, boogie_struct_name,
-        boogie_struct_variant_name, boogie_temp, boogie_temp_from_suffix, boogie_type,
-        boogie_type_for_struct_field, boogie_type_param, boogie_type_suffix,
-        boogie_type_suffix_bv, boogie_type_suffix_for_struct,
+        behavioral_spec_fun_symbol, boogie_address, boogie_address_blob,
+        boogie_behavioral_spec_fun_name, boogie_bv_type, boogie_byte_blob,
+        boogie_closure_pack_name, boogie_constant_blob, boogie_debug_track_abort,
+        boogie_debug_track_local, boogie_debug_track_return, boogie_equality_for_type,
+        boogie_field_sel, boogie_field_update, boogie_fun_apply_name, boogie_fun_param_name,
+        boogie_function_bv_name, boogie_function_name, boogie_make_vec_from_strings,
+        boogie_modifies_memory_name, boogie_num_literal, boogie_num_type_base,
+        boogie_num_type_string_capital, boogie_reflection_type_info, boogie_reflection_type_name,
+        boogie_resource_memory_name, boogie_struct_name, boogie_struct_variant_name, boogie_temp,
+        boogie_temp_from_suffix, boogie_type, boogie_type_for_struct_field, boogie_type_param,
+        boogie_type_suffix, boogie_type_suffix_bv, boogie_type_suffix_for_struct,
         boogie_type_suffix_for_struct_variant, boogie_variant_field_update,
         boogie_well_formed_check, boogie_well_formed_expr_bv, field_bv_flag_global_state,
         TypeIdentToken,
@@ -31,7 +31,7 @@ use legacy_move_compiler::interface_generator::NATIVE_INTERFACE;
 #[allow(unused_imports)]
 use log::{debug, info, log, warn, Level};
 use move_model::{
-    ast::{Attribute, TempIndex, TraceKind},
+    ast::{Attribute, BehaviorKind, TempIndex, TraceKind},
     code_writer::CodeWriter,
     emit, emitln,
     model::{FieldEnv, FunctionEnv, GlobalEnv, Loc, NodeId, QualifiedInstId, StructEnv, StructId},
@@ -681,22 +681,25 @@ impl<'env> BoogieTranslator<'env> {
             // Look up which behavioral predicate spec functions exist
             let fun_env = self.env.get_function(info.fun.to_qualified_id());
             let module_env = &fun_env.module_env;
-            let fun_name_sym = fun_env.get_name();
-            let fun_name = fun_name_sym.display(self.env.symbol_pool()).to_string();
-            let param_name = info.param_sym.display(self.env.symbol_pool()).to_string();
 
-            let requires_sym = self
-                .env
-                .symbol_pool()
-                .make(&format!("$requires_of${}${}", fun_name, param_name));
-            let aborts_sym = self
-                .env
-                .symbol_pool()
-                .make(&format!("$aborts_of${}${}", fun_name, param_name));
-            let ensures_sym = self
-                .env
-                .symbol_pool()
-                .make(&format!("$ensures_of${}${}", fun_name, param_name));
+            let requires_sym = behavioral_spec_fun_symbol(
+                self.env,
+                &info.fun,
+                info.param_sym,
+                BehaviorKind::RequiresOf,
+            );
+            let aborts_sym = behavioral_spec_fun_symbol(
+                self.env,
+                &info.fun,
+                info.param_sym,
+                BehaviorKind::AbortsOf,
+            );
+            let ensures_sym = behavioral_spec_fun_symbol(
+                self.env,
+                &info.fun,
+                info.param_sym,
+                BehaviorKind::EnsuresOf,
+            );
 
             let has_requires = module_env.get_spec_funs_of_name(requires_sym).next().is_some();
             let has_aborts = module_env.get_spec_funs_of_name(aborts_sym).next().is_some();
@@ -717,7 +720,7 @@ impl<'env> BoogieTranslator<'env> {
                     self.env,
                     &info.fun,
                     info.param_sym,
-                    "requires_of",
+                    BehaviorKind::RequiresOf,
                     &[],
                 );
                 emitln!(self.writer, "assert {}({});", requires_name, bp_args);
@@ -729,7 +732,7 @@ impl<'env> BoogieTranslator<'env> {
                     self.env,
                     &info.fun,
                     info.param_sym,
-                    "aborts_of",
+                    BehaviorKind::AbortsOf,
                     &[],
                 );
                 emitln!(self.writer, "if ({}({})) {{", aborts_name, bp_args);
@@ -753,7 +756,7 @@ impl<'env> BoogieTranslator<'env> {
                         self.env,
                         &info.fun,
                         info.param_sym,
-                        "ensures_of",
+                        BehaviorKind::EnsuresOf,
                         &[],
                     );
                     emitln!(self.writer, "assume {}({});", ensures_name, ensures_args);

@@ -13,7 +13,7 @@ use move_core_types::{
     ability::AbilitySet, account_address::AccountAddress, function::ClosureMask,
 };
 use move_model::{
-    ast::{Address, MemoryLabel, TempIndex, Value},
+    ast::{Address, BehaviorKind, MemoryLabel, TempIndex, Value},
     model::{
         FieldEnv, FieldId, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, QualifiedInstId,
         SpecFunId, StructEnv, StructId, SCRIPT_MODULE_NAME,
@@ -1274,13 +1274,30 @@ pub fn boogie_fun_param_name(
     format!("$param'{}${}'", fun_name, param_name)
 }
 
+/// Return the symbol name for a behavioral predicate spec function in the model.
+/// This is used for looking up whether the spec function exists.
+/// Format: `$${kind}$${fun}$${param}` (e.g., `$requires_of$apply$f`)
+pub fn behavioral_spec_fun_symbol(
+    env: &GlobalEnv,
+    fun: &QualifiedInstId<FunId>,
+    param_sym: Symbol,
+    kind: BehaviorKind,
+) -> Symbol {
+    let fun_env = env.get_function(fun.to_qualified_id());
+    let fun_name_sym = fun_env.get_name();
+    let fun_name = fun_name_sym.display(env.symbol_pool());
+    let param_name = param_sym.display(env.symbol_pool());
+    env.symbol_pool()
+        .make(&format!("${}${}${}", kind, fun_name, param_name))
+}
+
 /// Return name of a behavioral predicate spec function (requires_of, aborts_of, ensures_of)
-/// for a function-typed parameter.
+/// for a function-typed parameter in Boogie.
 pub fn boogie_behavioral_spec_fun_name(
     env: &GlobalEnv,
     fun: &QualifiedInstId<FunId>,
     param_sym: Symbol,
-    kind: &str,
+    kind: BehaviorKind,
     inst: &[Type],
 ) -> String {
     let fun_env = env.get_function(fun.to_qualified_id());

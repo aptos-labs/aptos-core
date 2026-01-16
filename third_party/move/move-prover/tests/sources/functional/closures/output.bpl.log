@@ -1,0 +1,604 @@
+assert_failed(2,806,830): post-condition does not hold
+Execution trace:
+    output.bpl(4298,9): anon0
+    output.bpl(4298,9): anon0$1
+    output.bpl(4182,9): inline$$42_behavioral_apply$0$anon0
+    output.bpl(4647,9): inline$$apply'$fun_u64_u64'$0$anon6_Then
+    output.bpl(4426,9): inline$$42_behavioral___lambda__1__test_apply_lambda_fail$0$anon0
+    output.bpl(459,5): inline$$AddU64$1$anon3_Else
+    output.bpl(4439,5): inline$$42_behavioral___lambda__1__test_apply_lambda_fail$0$anon3_Else
+    output.bpl(4647,9): inline$$apply'$fun_u64_u64'$0$anon6_Then$1
+    output.bpl(4196,5): inline$$42_behavioral_apply$0$anon3_Else
+    output.bpl(4318,5): anon4_Else
+Augmented execution trace:
+$at(2,616,617)
+$track_local(1,1,0):41
+$at(2,672,681)
+$at(2,666,685)
+$at(2,284,285)
+$track_local(1,0,0):(|$closure'$42_behavioral___lambda__1__test_apply_lambda_fail'_0|)
+$track_local(1,0,1):41
+$at(2,331,335)
+$at(2,672,673)
+$track_local(1,3,0):41
+$track_return(1,3,0):44
+$at(2,680,681)
+$track_return(1,0,0):44
+$at(2,340,341)
+$at(2,340,341)
+$track_return(1,1,0):44
+$at(2,690,691)
+$at(2,806,830)
+*** MODEL
+_$t0 -> 41
+$abort_code -> 
+$abort_code@0 -> 6
+$abort_code@1 -> 0
+$abort_code@2 -> 6
+$abort_code@3 -> 6
+$abort_flag -> 
+$abort_flag@0 -> false
+$abort_flag@1 -> false
+$abort_flag@2 -> false
+$abort_flag@3 -> false
+$abort_flag@4 -> false
+$abort_flag@5 -> false
+$abort_flag@6 -> false
+$abort_flag@7 -> false
+$Arbitrary_value_of'bv64' -> 0bv64
+$EXEC_FAILURE_CODE -> (- 1)
+$MAX_I128 -> 170141183460469231731687303715884105727
+$MAX_I16 -> 32767
+$MAX_I256 -> 57896044618658097711785492504343953926634992332820282019728792003956564819967
+$MAX_I32 -> 2147483647
+$MAX_I64 -> 9223372036854775807
+$MAX_I8 -> 127
+$MAX_U128 -> 340282366920938463463374607431768211455
+$MAX_U16 -> 65535
+$MAX_U256 -> 115792089237316195423570985008687907853269984665640564039457584007913129639935
+$MAX_U32 -> 4294967295
+$MAX_U64 -> 18446744073709551615
+$MAX_U8 -> 255
+$MIN_I128 -> (- 170141183460469231731687303715884105728)
+$MIN_I16 -> (- 32768)
+$MIN_I256 -> (- 57896044618658097711785492504343953926634992332820282019728792003956564819968)
+$MIN_I32 -> (- 2147483648)
+$MIN_I64 -> (- 9223372036854775808)
+$MIN_I8 -> (- 128)
+$MIN_U128 -> 0
+$MIN_U16 -> 0
+$MIN_U256 -> 0
+$MIN_U32 -> 0
+$MIN_U64 -> 0
+$MIN_U8 -> 0
+$ret0 -> 
+$t0 -> 
+$t1 -> 
+$t1@0 -> (|$closure'$42_behavioral___lambda__1__test_apply_lambda_fail'_0|)
+$t2 -> 
+$t3 -> 
+$undefined_int -> 0
+DefaultTableKeyExistsArray_990 -> |T@[Int]Bool!val!0|
+inline$$42_behavioral___lambda__1__test_apply_lambda_fail$0$_$t0 -> 
+inline$$42_behavioral___lambda__1__test_apply_lambda_fail$0$$abort_code -> 
+inline$$42_behavioral___lambda__1__test_apply_lambda_fail$0$$abort_flag -> 
+inline$$42_behavioral___lambda__1__test_apply_lambda_fail$0$$ret0 -> 
+inline$$42_behavioral___lambda__1__test_apply_lambda_fail$0$$ret0@0 -> 0
+inline$$42_behavioral___lambda__1__test_apply_lambda_fail$0$$ret0@1 -> 44
+inline$$42_behavioral___lambda__1__test_apply_lambda_fail$0$$t0 -> 
+inline$$42_behavioral___lambda__1__test_apply_lambda_fail$0$$t1 -> 
+inline$$42_behavioral___lambda__1__test_apply_lambda_fail$0$$t2 -> 
+inline$$42_behavioral___lambda__1__test_apply_lambda_fail$0$$t3 -> 
+inline$$42_behavioral___lambda__1__test_apply_lambda_ok$0$_$t0 -> 
+inline$$42_behavioral___lambda__1__test_apply_lambda_ok$0$$abort_code -> 
+inline$$42_behavioral___lambda__1__test_apply_lambda_ok$0$$abort_flag -> 
+inline$$42_behavioral___lambda__1__test_apply_lambda_ok$0$$ret0 -> 
+inline$$42_behavioral___lambda__1__test_apply_lambda_ok$0$$ret0@0 -> 0
+inline$$42_behavioral___lambda__1__test_apply_lambda_ok$0$$ret0@1 -> 0
+inline$$42_behavioral___lambda__1__test_apply_lambda_ok$0$$t0 -> 
+inline$$42_behavioral___lambda__1__test_apply_lambda_ok$0$$t1 -> 
+inline$$42_behavioral___lambda__1__test_apply_lambda_ok$0$$t2 -> 
+inline$$42_behavioral___lambda__1__test_apply_lambda_ok$0$$t3 -> 
+inline$$42_behavioral_apply$0$_$t0 -> 
+inline$$42_behavioral_apply$0$_$t1 -> 
+inline$$42_behavioral_apply$0$$abort_code -> 
+inline$$42_behavioral_apply$0$$abort_flag -> 
+inline$$42_behavioral_apply$0$$ret0 -> 
+inline$$42_behavioral_apply$0$$ret0@0 -> 0
+inline$$42_behavioral_apply$0$$ret0@1 -> 44
+inline$$42_behavioral_apply$0$$t0 -> 
+inline$$42_behavioral_apply$0$$t1 -> 
+inline$$42_behavioral_apply$0$$t2 -> 
+inline$$42_behavioral_apply$0$$t3 -> 
+inline$$AddU64$0$$abort_code -> 
+inline$$AddU64$0$$abort_flag -> 
+inline$$AddU64$0$dst -> 
+inline$$AddU64$0$dst@0 -> 0
+inline$$AddU64$0$dst@1 -> 0
+inline$$AddU64$0$dst@2 -> 0
+inline$$AddU64$0$src1 -> 
+inline$$AddU64$0$src2 -> 
+inline$$AddU64$1$$abort_code -> 
+inline$$AddU64$1$$abort_flag -> 
+inline$$AddU64$1$dst -> 
+inline$$AddU64$1$dst@0 -> 0
+inline$$AddU64$1$dst@1 -> 44
+inline$$AddU64$1$dst@2 -> 44
+inline$$AddU64$1$src1 -> 
+inline$$AddU64$1$src2 -> 
+inline$$apply'$fun_u64_u64'$0$$abort_code -> 
+inline$$apply'$fun_u64_u64'$0$$abort_flag -> 
+inline$$apply'$fun_u64_u64'$0$fun -> 
+inline$$apply'$fun_u64_u64'$0$p0 -> 
+inline$$apply'$fun_u64_u64'$0$r0 -> 
+inline$$apply'$fun_u64_u64'$0$r0@0 -> 0
+inline$$apply'$fun_u64_u64'$0$r0@1 -> 0
+inline$$apply'$fun_u64_u64'$0$r0@2 -> 44
+inline$$ExecFailureAbort$0$$abort_code -> 
+inline$$ExecFailureAbort$0$$abort_flag -> 
+inline$$ExecFailureAbort$1$$abort_code -> 
+inline$$ExecFailureAbort$1$$abort_flag -> 
+inline$$InitVerification$0$$abort_code -> 
+inline$$InitVerification$0$$abort_flag -> 
+$1_hash_sha2 -> {
+  else -> (Vec_18815 |T@[Int]Int!val!0| 0)
+}
+$1_hash_sha3 -> {
+  else -> (Vec_18815 |T@[Int]Int!val!0| 0)
+}
+$1_Signature_$ed25519_validate_pubkey -> {
+  else -> false
+}
+$1_Signature_$ed25519_verify -> {
+  else -> false
+}
+$castBv256to256 -> {
+  else -> 0bv256
+}
+$castBv256to64 -> {
+  else -> 0bv64
+}
+$castBv64to256 -> {
+  else -> 0bv256
+}
+$castBv64to64 -> {
+  else -> 0bv64
+}
+$ConstMemoryDomain -> {
+  false -> |T@[Int]Bool!val!0|
+  true -> |T@[Int]Bool!val!1|
+  else -> |T@[Int]Bool!val!1|
+}
+$IndexOfVec'u8' -> {
+  else -> 0
+}
+$InRange -> {
+  else -> false
+}
+$IsEqual'vec'u8'' -> {
+  else -> false
+}
+$IsPrefix'vec'u8'' -> {
+  else -> false
+}
+$IsSuffix'vec'u8'' -> {
+  else -> false
+}
+$IsValid'$fun_u64_u64' -> {
+  else -> false
+}
+$IsValid'address' -> {
+  else -> false
+}
+$IsValid'bv128' -> {
+  else -> false
+}
+$IsValid'bv16' -> {
+  else -> false
+}
+$IsValid'bv256' -> {
+  else -> false
+}
+$IsValid'bv32' -> {
+  else -> false
+}
+$IsValid'bv64' -> {
+  else -> false
+}
+$IsValid'bv8' -> {
+  else -> false
+}
+$IsValid'i128' -> {
+  else -> false
+}
+$IsValid'i16' -> {
+  else -> false
+}
+$IsValid'i256' -> {
+  else -> false
+}
+$IsValid'i32' -> {
+  else -> false
+}
+$IsValid'i64' -> {
+  else -> false
+}
+$IsValid'i8' -> {
+  else -> false
+}
+$IsValid'num' -> {
+  else -> false
+}
+$IsValid'u128' -> {
+  else -> false
+}
+$IsValid'u16' -> {
+  else -> false
+}
+$IsValid'u256' -> {
+  else -> false
+}
+$IsValid'u32' -> {
+  else -> false
+}
+$IsValid'u64' -> {
+  3 -> true
+  41 -> true
+  else -> true
+}
+$IsValid'u8' -> {
+  else -> false
+}
+$IsValid'vec'u8'' -> {
+  else -> false
+}
+$pow -> {
+  else -> 0
+}
+$shl -> {
+  else -> 0
+}
+$shlBv128From128 -> {
+  else -> 0bv128
+}
+$shlBv128From16 -> {
+  else -> 0bv128
+}
+$shlBv128From256 -> {
+  else -> 0bv128
+}
+$shlBv128From32 -> {
+  else -> 0bv128
+}
+$shlBv128From64 -> {
+  else -> 0bv128
+}
+$shlBv128From8 -> {
+  else -> 0bv128
+}
+$shlBv16From128 -> {
+  else -> 0bv16
+}
+$shlBv16From16 -> {
+  else -> 0bv16
+}
+$shlBv16From256 -> {
+  else -> 0bv16
+}
+$shlBv16From32 -> {
+  else -> 0bv16
+}
+$shlBv16From64 -> {
+  else -> 0bv16
+}
+$shlBv16From8 -> {
+  else -> 0bv16
+}
+$shlBv256From128 -> {
+  else -> 0bv256
+}
+$shlBv256From16 -> {
+  else -> 0bv256
+}
+$shlBv256From256 -> {
+  else -> 0bv256
+}
+$shlBv256From32 -> {
+  else -> 0bv256
+}
+$shlBv256From64 -> {
+  else -> 0bv256
+}
+$shlBv256From8 -> {
+  else -> 0bv256
+}
+$shlBv32From128 -> {
+  else -> 0bv32
+}
+$shlBv32From16 -> {
+  else -> 0bv32
+}
+$shlBv32From256 -> {
+  else -> 0bv32
+}
+$shlBv32From32 -> {
+  else -> 0bv32
+}
+$shlBv32From64 -> {
+  else -> 0bv32
+}
+$shlBv32From8 -> {
+  else -> 0bv32
+}
+$shlBv64From128 -> {
+  else -> 0bv64
+}
+$shlBv64From16 -> {
+  else -> 0bv64
+}
+$shlBv64From256 -> {
+  else -> 0bv64
+}
+$shlBv64From32 -> {
+  else -> 0bv64
+}
+$shlBv64From64 -> {
+  else -> 0bv64
+}
+$shlBv64From8 -> {
+  else -> 0bv64
+}
+$shlBv8From128 -> {
+  else -> 0bv8
+}
+$shlBv8From16 -> {
+  else -> 0bv8
+}
+$shlBv8From256 -> {
+  else -> 0bv8
+}
+$shlBv8From32 -> {
+  else -> 0bv8
+}
+$shlBv8From64 -> {
+  else -> 0bv8
+}
+$shlBv8From8 -> {
+  else -> 0bv8
+}
+$shlU128 -> {
+  else -> 0
+}
+$shlU16 -> {
+  else -> 0
+}
+$shlU256 -> {
+  else -> 0
+}
+$shlU32 -> {
+  else -> 0
+}
+$shlU64 -> {
+  else -> 0
+}
+$shlU8 -> {
+  else -> 0
+}
+$shr -> {
+  else -> 0
+}
+$shrBv128From128 -> {
+  else -> 0bv128
+}
+$shrBv128From16 -> {
+  else -> 0bv128
+}
+$shrBv128From256 -> {
+  else -> 0bv128
+}
+$shrBv128From32 -> {
+  else -> 0bv128
+}
+$shrBv128From64 -> {
+  else -> 0bv128
+}
+$shrBv128From8 -> {
+  else -> 0bv128
+}
+$shrBv16From128 -> {
+  else -> 0bv16
+}
+$shrBv16From16 -> {
+  else -> 0bv16
+}
+$shrBv16From256 -> {
+  else -> 0bv16
+}
+$shrBv16From32 -> {
+  else -> 0bv16
+}
+$shrBv16From64 -> {
+  else -> 0bv16
+}
+$shrBv16From8 -> {
+  else -> 0bv16
+}
+$shrBv256From128 -> {
+  else -> 0bv256
+}
+$shrBv256From16 -> {
+  else -> 0bv256
+}
+$shrBv256From256 -> {
+  else -> 0bv256
+}
+$shrBv256From32 -> {
+  else -> 0bv256
+}
+$shrBv256From64 -> {
+  else -> 0bv256
+}
+$shrBv256From8 -> {
+  else -> 0bv256
+}
+$shrBv32From128 -> {
+  else -> 0bv32
+}
+$shrBv32From16 -> {
+  else -> 0bv32
+}
+$shrBv32From256 -> {
+  else -> 0bv32
+}
+$shrBv32From32 -> {
+  else -> 0bv32
+}
+$shrBv32From64 -> {
+  else -> 0bv32
+}
+$shrBv32From8 -> {
+  else -> 0bv32
+}
+$shrBv64From128 -> {
+  else -> 0bv64
+}
+$shrBv64From16 -> {
+  else -> 0bv64
+}
+$shrBv64From256 -> {
+  else -> 0bv64
+}
+$shrBv64From32 -> {
+  else -> 0bv64
+}
+$shrBv64From64 -> {
+  else -> 0bv64
+}
+$shrBv64From8 -> {
+  else -> 0bv64
+}
+$shrBv8From128 -> {
+  else -> 0bv8
+}
+$shrBv8From16 -> {
+  else -> 0bv8
+}
+$shrBv8From256 -> {
+  else -> 0bv8
+}
+$shrBv8From32 -> {
+  else -> 0bv8
+}
+$shrBv8From64 -> {
+  else -> 0bv8
+}
+$shrBv8From8 -> {
+  else -> 0bv8
+}
+ControlFlow -> {
+  0 0 -> 30
+  0 20 -> 5
+  0 22 -> 20
+  0 23 -> 22
+  0 26 -> 23
+  0 27 -> 26
+  0 28 -> 27
+  0 29 -> 28
+  0 3 -> (- 2)
+  0 30 -> 29
+  0 5 -> 3
+  else -> 26
+}
+IndexOfVec_18815 -> {
+  else -> 0
+}
+InRangeVec_18815 -> {
+  else -> false
+}
+lambda#0 -> {
+  else -> |T@[Int]Int!val!0|
+}
+lambda#1 -> {
+  else -> |T@[Int]Int!val!0|
+}
+lambda#2 -> {
+  else -> |T@[Int]Int!val!0|
+}
+lambda#3 -> {
+  else -> |T@[Int]Int!val!0|
+}
+lambda#4 -> {
+  false -> |T@[Int]Bool!val!0|
+  true -> |T@[Int]Bool!val!1|
+  else -> |T@[Int]Bool!val!0|
+}
+Select__T@[Int]Bool_ -> {
+  else -> false
+}
+Select__T@[Int]Int_ -> {
+  else -> 0
+}
+tickleBool -> {
+  false -> true
+  true -> true
+  else -> true
+}
+*** STATE <initial>
+  _$t0 -> 41
+  $abort_code -> 
+  $abort_flag -> 
+  $ret0 -> 
+  $t0 -> 
+  $t1 -> 
+  $t2 -> 
+  $t3 -> 
+  inline$$42_behavioral___lambda__1__test_apply_lambda_fail$0$_$t0 -> 
+  inline$$42_behavioral___lambda__1__test_apply_lambda_fail$0$$abort_code -> 
+  inline$$42_behavioral___lambda__1__test_apply_lambda_fail$0$$abort_flag -> 
+  inline$$42_behavioral___lambda__1__test_apply_lambda_fail$0$$ret0 -> 
+  inline$$42_behavioral___lambda__1__test_apply_lambda_fail$0$$t0 -> 
+  inline$$42_behavioral___lambda__1__test_apply_lambda_fail$0$$t1 -> 
+  inline$$42_behavioral___lambda__1__test_apply_lambda_fail$0$$t2 -> 
+  inline$$42_behavioral___lambda__1__test_apply_lambda_fail$0$$t3 -> 
+  inline$$42_behavioral___lambda__1__test_apply_lambda_ok$0$_$t0 -> 
+  inline$$42_behavioral___lambda__1__test_apply_lambda_ok$0$$abort_code -> 
+  inline$$42_behavioral___lambda__1__test_apply_lambda_ok$0$$abort_flag -> 
+  inline$$42_behavioral___lambda__1__test_apply_lambda_ok$0$$ret0 -> 
+  inline$$42_behavioral___lambda__1__test_apply_lambda_ok$0$$t0 -> 
+  inline$$42_behavioral___lambda__1__test_apply_lambda_ok$0$$t1 -> 
+  inline$$42_behavioral___lambda__1__test_apply_lambda_ok$0$$t2 -> 
+  inline$$42_behavioral___lambda__1__test_apply_lambda_ok$0$$t3 -> 
+  inline$$42_behavioral_apply$0$_$t0 -> 
+  inline$$42_behavioral_apply$0$_$t1 -> 
+  inline$$42_behavioral_apply$0$$abort_code -> 
+  inline$$42_behavioral_apply$0$$abort_flag -> 
+  inline$$42_behavioral_apply$0$$ret0 -> 
+  inline$$42_behavioral_apply$0$$t0 -> 
+  inline$$42_behavioral_apply$0$$t1 -> 
+  inline$$42_behavioral_apply$0$$t2 -> 
+  inline$$42_behavioral_apply$0$$t3 -> 
+  inline$$AddU64$0$$abort_code -> 
+  inline$$AddU64$0$$abort_flag -> 
+  inline$$AddU64$0$dst -> 
+  inline$$AddU64$0$src1 -> 
+  inline$$AddU64$0$src2 -> 
+  inline$$AddU64$1$$abort_code -> 
+  inline$$AddU64$1$$abort_flag -> 
+  inline$$AddU64$1$dst -> 
+  inline$$AddU64$1$src1 -> 
+  inline$$AddU64$1$src2 -> 
+  inline$$apply'$fun_u64_u64'$0$$abort_code -> 
+  inline$$apply'$fun_u64_u64'$0$$abort_flag -> 
+  inline$$apply'$fun_u64_u64'$0$fun -> 
+  inline$$apply'$fun_u64_u64'$0$p0 -> 
+  inline$$apply'$fun_u64_u64'$0$r0 -> 
+  inline$$ExecFailureAbort$0$$abort_code -> 
+  inline$$ExecFailureAbort$0$$abort_flag -> 
+  inline$$ExecFailureAbort$1$$abort_code -> 
+  inline$$ExecFailureAbort$1$$abort_flag -> 
+  inline$$InitVerification$0$$abort_code -> 
+  inline$$InitVerification$0$$abort_flag -> 
+*** END_STATE
+*** END_MODEL
+
+Boogie program verifier finished with 1 error
