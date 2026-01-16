@@ -1,0 +1,181 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
+use super::new_test_context_with_orderless_flags;
+use aptos_api_test_context::current_function_name;
+use aptos_crypto::{ed25519::Ed25519PrivateKey, slh_dsa_sha2_128s, SigningKey};
+use aptos_sdk::types::{
+    transaction::{
+        authenticator::{
+            AccountAuthenticator, AnyPublicKey, AnySignature, AuthenticationKey, MultiKey,
+            MultiKeyAuthenticator,
+        },
+        SignedTransaction,
+    },
+    LocalAccount,
+};
+use aptos_types::on_chain_config::FeatureFlag;
+use rand::{rngs::StdRng, SeedableRng};
+use rstest::rstest;
+use std::convert::TryInto;
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    case_name,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case("", false, false),
+    case("_payload_v2", true, false),
+    case("_orderless", true, true)
+)]
+async fn test_multi_slh_dsa_sha2_128s(
+    case_name: &str,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!() + case_name,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+
+    // Enable the SLH-DSA feature flag (it's feature-gated)
+    context
+        .enable_feature(FeatureFlag::SLH_DSA_SHA2_128S_SIGNATURE as u64)
+        .await;
+
+    let other = context.create_account().await;
+
+    let mut rng: StdRng = SeedableRng::from_seed([0; 32]);
+    let private_key: slh_dsa_sha2_128s::PrivateKey = aptos_crypto::Uniform::generate(&mut rng);
+    let public_key = aptos_crypto::PrivateKey::public_key(&private_key);
+    let address = AuthenticationKey::multi_key(
+        MultiKey::new(vec![AnyPublicKey::slh_dsa_sha2_128s(public_key.clone())], 1).unwrap(),
+    )
+    .account_address();
+
+    // NOTE: LocalAccount requires a private key, but we use a dummy Ed25519 key here as a
+    // placeholder. This key is never used for actual authentication because:
+    // 1. create_user_account() and mint_user_account() are signed by the root/faucet account
+    // 2. The transfer transaction will be re-signed below with the actual SLH-DSA key
+    let key_bytes =
+        hex::decode("a38ba78b1a0fbfc55e2c5dfdedf48d1172283d0f7c59fd64c02d811130a2f4b2").unwrap();
+    let ed25519_private_key: Ed25519PrivateKey = (&key_bytes[..]).try_into().unwrap();
+    let mut account = LocalAccount::new(address, ed25519_private_key, 0);
+
+    let txn0 = context.create_user_account(&account).await;
+    context.commit_block(&vec![txn0]).await;
+    let txn1 = context.mint_user_account(&account).await;
+    context.commit_block(&vec![txn1]).await;
+    let txn2 = context.create_user_account(&other).await;
+    context.commit_block(&vec![txn2]).await;
+
+    let current_ledger_version = u64::from(context.get_latest_ledger_info().ledger_version);
+    let ed22519_txn = context.account_transfer(&mut account, &other, 5);
+    let raw_txn = ed22519_txn.into_raw_transaction();
+
+    let signature = private_key.sign(&raw_txn).unwrap();
+    let authenticator = AccountAuthenticator::multi_key(
+        MultiKeyAuthenticator::new(
+            MultiKey::new(vec![AnyPublicKey::slh_dsa_sha2_128s(public_key.clone())], 1).unwrap(),
+            vec![(0, AnySignature::slh_dsa_sha2_128s(signature))],
+        )
+        .unwrap(),
+    );
+    let slh_dsa_txn = SignedTransaction::new_single_sender(raw_txn, authenticator);
+    let balance_start = context.get_apt_balance(other.address()).await;
+    let bcs_txn = bcs::to_bytes(&slh_dsa_txn).unwrap();
+    context
+        .expect_status_code(202)
+        .post_bcs_txn("/transactions", bcs_txn)
+        .await;
+    context.commit_mempool_txns(1).await;
+    assert_eq!(
+        balance_start + 5,
+        context.get_apt_balance(other.address()).await
+    );
+
+    let txns = context
+        .get(&format!(
+            "/transactions?start={}&limit=1",
+            current_ledger_version + 2
+        ))
+        .await;
+    context.check_golden_output(txns[0]["signature"].clone());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    case_name,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case("", false, false),
+    case("_payload_v2", true, false),
+    case("_orderless", true, true)
+)]
+async fn test_slh_dsa_sha2_128s(
+    case_name: &str,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!() + case_name,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+
+    // Enable the SLH-DSA feature flag (it's feature-gated)
+    context
+        .enable_feature(FeatureFlag::SLH_DSA_SHA2_128S_SIGNATURE as u64)
+        .await;
+
+    let other = context.create_account().await;
+
+    let mut rng: StdRng = SeedableRng::from_seed([0; 32]);
+    let private_key: slh_dsa_sha2_128s::PrivateKey = aptos_crypto::Uniform::generate(&mut rng);
+    let public_key = aptos_crypto::PrivateKey::public_key(&private_key);
+    let address = AuthenticationKey::any_key(AnyPublicKey::slh_dsa_sha2_128s(public_key.clone()))
+        .account_address();
+
+    // NOTE: LocalAccount requires a private key, but we use a dummy Ed25519 key here as a
+    // placeholder. This key is never used for actual authentication because:
+    // 1. create_user_account() and mint_user_account() are signed by the root/faucet account
+    // 2. The transfer transaction will be re-signed below with the actual SLH-DSA key
+    let key_bytes =
+        hex::decode("a38ba78b1a0fbfc55e2c5dfdedf48d1172283d0f7c59fd64c02d811130a2f4b2").unwrap();
+    let ed25519_private_key: Ed25519PrivateKey = (&key_bytes[..]).try_into().unwrap();
+    let mut account = LocalAccount::new(address, ed25519_private_key, 0);
+
+    let txn0 = context.create_user_account(&account).await;
+    context.commit_block(&vec![txn0]).await;
+    let txn1 = context.mint_user_account(&account).await;
+    context.commit_block(&vec![txn1]).await;
+    let txn2 = context.create_user_account(&other).await;
+    context.commit_block(&vec![txn2]).await;
+
+    let current_ledger_version = u64::from(context.get_latest_ledger_info().ledger_version);
+    let ed22519_txn = context.account_transfer(&mut account, &other, 5);
+    let slh_dsa_txn = ed22519_txn
+        .into_raw_transaction()
+        .sign_slh_dsa_sha2_128s(&private_key, public_key)
+        .unwrap();
+    let balance_start = context.get_apt_balance(other.address()).await;
+    let bcs_txn = bcs::to_bytes(&slh_dsa_txn.into_inner()).unwrap();
+    context
+        .expect_status_code(202)
+        .post_bcs_txn("/transactions", bcs_txn)
+        .await;
+    context.commit_mempool_txns(1).await;
+    assert_eq!(
+        balance_start + 5,
+        context.get_apt_balance(other.address()).await
+    );
+
+    let txns = context
+        .get(&format!(
+            "/transactions?start={}&limit=1",
+            current_ledger_version + 2
+        ))
+        .await;
+    context.check_golden_output(txns[0]["signature"].clone());
+}

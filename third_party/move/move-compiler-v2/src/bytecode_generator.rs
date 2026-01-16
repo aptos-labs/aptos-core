@@ -1047,7 +1047,8 @@ impl Generator<'_> {
             | Operation::EmptyEventStore
             | Operation::ExtendEventStore
             | Operation::EventStoreIncludes
-            | Operation::EventStoreIncludedIn => self.internal_error(
+            | Operation::EventStoreIncludedIn
+            | Operation::Behavior(..) => self.internal_error(
                 id,
                 format!("unsupported specification construct: `{:?}`", op),
             ),

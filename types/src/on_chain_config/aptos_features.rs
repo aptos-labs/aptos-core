@@ -163,6 +163,8 @@ pub enum FeatureFlag {
     ENABLE_FUNCTION_REFLECTION = 105,
     /// Enables bytecode version v10
     VM_BINARY_FORMAT_V10 = 106,
+    /// Whether SLH-DSA-SHA2-128s signature scheme is enabled for transaction authentication.
+    SLH_DSA_SHA2_128S_SIGNATURE = 107,
 }
 
 impl FeatureFlag {
@@ -270,6 +272,7 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION,
             FeatureFlag::ENABLE_FUNCTION_REFLECTION,
             FeatureFlag::VM_BINARY_FORMAT_V10,
+            FeatureFlag::SLH_DSA_SHA2_128S_SIGNATURE,
         ]
     }
 }

@@ -6,8 +6,9 @@ use crate::{
     transaction::{TransactionExecutable, TransactionExecutableRef, TransactionExtraConfig},
 };
 use anyhow::{bail, Result};
-use aptos_batch_encryption::traits::Plaintext;
+use aptos_batch_encryption::traits::{AssociatedData, Plaintext};
 use aptos_crypto::HashValue;
+use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -23,6 +24,19 @@ impl DecryptedPayload {
 }
 
 impl Plaintext for DecryptedPayload {}
+
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct PayloadAssociatedData {
+    sender: AccountAddress,
+}
+
+impl PayloadAssociatedData {
+    fn new(sender: AccountAddress) -> Self {
+        Self { sender }
+    }
+}
+
+impl AssociatedData for PayloadAssociatedData {}
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum EncryptedPayload {
@@ -128,5 +142,10 @@ impl EncryptedPayload {
             eval_proof,
         };
         Ok(())
+    }
+
+    pub fn verify(&self, sender: AccountAddress) -> anyhow::Result<()> {
+        let associated_data = PayloadAssociatedData::new(sender);
+        self.ciphertext().verify(&associated_data)
     }
 }

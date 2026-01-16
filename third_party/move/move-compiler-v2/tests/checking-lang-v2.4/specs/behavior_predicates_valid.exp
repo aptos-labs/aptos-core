@@ -1,0 +1,1906 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::M {
+    struct Box<T> {
+        value: T,
+    }
+    struct Counter {
+        value: u64,
+    }
+    public fun swap<T>(a: T,b: T): (T, T) {
+        Tuple(b, a)
+    }
+    spec {
+      ensures Eq<#0>(result0(), $t1);
+      ensures Eq<#0>(result1(), $t0);
+    }
+
+    public fun add(a: u64,b: u64): u64 {
+        Add<u64>(a, b)
+    }
+    spec {
+      requires Le(Add($t0, $t1), 18446744073709551615);
+      ensures Eq<u64>(result0(), Add($t0, $t1));
+    }
+
+    private fun apply_aborts(f: |u64|u64,x: u64): u64 {
+        (f)(x)
+    }
+    spec {
+      aborts_if aborts_of<f>($t1);
+    }
+
+    private fun apply_binary(f: |u64, u64|u64,a: u64,b: u64): u64 {
+        (f)(a, b)
+    }
+    spec {
+      ensures requires_of<f>($t1, $t2);
+      ensures ensures_of<f>($t1, $t2, result0());
+      aborts_if aborts_of<f>($t1, $t2);
+    }
+
+    private fun apply_ensures(f: |u64|u64,x: u64): u64 {
+        (f)(x)
+    }
+    spec {
+      ensures ensures_of<f>($t1, result0());
+    }
+
+    private fun apply_modifies(f: |address|,addr: address) {
+        (f)(addr)
+    }
+    spec {
+      ensures modifies_of<f>(global<0x42::M::Counter>($t1));
+    }
+
+    private fun apply_requires(f: |u64|u64,x: u64): u64 {
+        (f)(x)
+    }
+    spec {
+      ensures requires_of<f>($t1);
+    }
+
+    private fun do_nothing(_x: u64) {
+        Tuple()
+    }
+    spec {
+      ensures true;
+    }
+
+    private fun generic_noop<T>(_x: T) {
+        Tuple()
+    }
+    public fun identity<T>(x: T): T {
+        x
+    }
+    spec {
+      ensures Eq<#0>(result0(), $t0);
+    }
+
+    public fun increment(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    spec {
+      requires Lt($t0, 18446744073709551615);
+      ensures Eq<u64>(result0(), Add($t0, 1));
+    }
+
+    public fun increment_counter(addr: address)
+        acquires Counter(*)
+     {
+        {
+          let counter: &mut Counter = BorrowGlobal(Mutable)<Counter>(addr);
+          select M::Counter.value<&mut Counter>(counter) = Add<u64>(select M::Counter.value<&mut Counter>(counter), 1);
+          Tuple()
+        }
+    }
+    spec {
+      modifies global<0x42::M::Counter>($t0);
+      ensures Eq<u64>(select M::Counter.value<0x42::M::Counter>(global<0x42::M::Counter>($t0)), Add(select M::Counter.value<0x42::M::Counter>(Old<0x42::M::Counter>(global<0x42::M::Counter>($t0))), 1));
+    }
+
+    private fun mixed_params(x: u64,flag: bool): u64 {
+        if flag {
+          Add<u64>(x, 1)
+        } else {
+          x
+        }
+    }
+    public fun pair<T,U>(x: T,y: U): (T, U) {
+        Tuple(x, y)
+    }
+    spec {
+      ensures Eq<#0>(result0(), $t0);
+      ensures Eq<#1>(result1(), $t1);
+    }
+
+    private fun split(x: u64): (u64, u64) {
+        Tuple(Div<u64>(x, 2), Sub<u64>(x, Div<u64>(x, 2)))
+    }
+    spec {
+      ensures Eq<num>(Add(result0(), result1()), $t0);
+    }
+
+    public fun swap_counters(addr1: address,addr2: address)
+        acquires Counter(*)
+     {
+        {
+          let v1: u64 = select M::Counter.value<&Counter>(BorrowGlobal(Immutable)<Counter>(addr1));
+          {
+            let v2: u64 = select M::Counter.value<&Counter>(BorrowGlobal(Immutable)<Counter>(addr2));
+            select M::Counter.value<&mut Counter>(BorrowGlobal(Mutable)<Counter>(addr1)) = v2;
+            select M::Counter.value<&mut Counter>(BorrowGlobal(Mutable)<Counter>(addr2)) = v1;
+            Tuple()
+          }
+        }
+    }
+    spec {
+      modifies global<0x42::M::Counter>($t0);
+      modifies global<0x42::M::Counter>($t1);
+    }
+
+    private fun test_aborts(x: u64): u64 {
+        M::increment(x)
+    }
+    spec {
+      aborts_if aborts_of<M::increment>($t0);
+    }
+
+    private fun test_aborts_generic_explicit(x: u64): u64 {
+        M::identity<u64>(x)
+    }
+    spec {
+      aborts_if aborts_of<M::identity><u64>($t0);
+    }
+
+    private fun test_aborts_generic_inferred(x: u64): u64 {
+        M::identity<u64>(x)
+    }
+    spec {
+      aborts_if aborts_of<M::identity><u64>($t0);
+    }
+
+    private fun test_ensures_binary(a: u64,b: u64): u64 {
+        M::add(a, b)
+    }
+    spec {
+      ensures ensures_of<M::add>($t0, $t1, result0());
+    }
+
+    private fun test_ensures_generic_explicit(x: u64): u64 {
+        M::identity<u64>(x)
+    }
+    spec {
+      ensures ensures_of<M::identity><u64>($t0, result0());
+    }
+
+    private fun test_ensures_generic_inferred(x: u64): u64 {
+        M::identity<u64>(x)
+    }
+    spec {
+      ensures ensures_of<M::identity><u64>($t0, result0());
+    }
+
+    private fun test_ensures_generic_unit(x: u64) {
+        M::generic_noop<u64>(x)
+    }
+    spec {
+      ensures ensures_of<M::generic_noop><u64>($t0);
+    }
+
+    private fun test_ensures_multi(x: u64): (u64, u64) {
+        M::split(x)
+    }
+    spec {
+      ensures ensures_of<M::split>($t0, result0(), result1());
+    }
+
+    private fun test_ensures_unary(x: u64): u64 {
+        M::increment(x)
+    }
+    spec {
+      ensures ensures_of<M::increment>($t0, result0());
+    }
+
+    private fun test_ensures_unit(x: u64) {
+        M::do_nothing(x)
+    }
+    spec {
+      ensures ensures_of<M::do_nothing>($t0);
+    }
+
+    private fun test_mixed_params(x: u64,b: bool): u64 {
+        M::mixed_params(x, b)
+    }
+    spec {
+      ensures requires_of<M::mixed_params>($t0, $t1);
+      ensures ensures_of<M::mixed_params>($t0, $t1, result0());
+    }
+
+    private fun test_modifies_multi(addr1: address,addr2: address)
+        acquires Counter(*)
+     {
+        M::swap_counters(addr1, addr2)
+    }
+    spec {
+      ensures modifies_of<M::swap_counters>(global<0x42::M::Counter>($t0), global<0x42::M::Counter>($t1));
+    }
+
+    private fun test_modifies_single(addr: address)
+        acquires Counter(*)
+     {
+        M::increment_counter(addr)
+    }
+    spec {
+      ensures modifies_of<M::increment_counter>(global<0x42::M::Counter>($t0));
+    }
+
+    private fun test_pair_generic_explicit(x: u64,y: bool): (u64, bool) {
+        M::pair<u64, bool>(x, y)
+    }
+    spec {
+      ensures requires_of<M::pair><u64, bool>($t0, $t1);
+      ensures ensures_of<M::pair><u64, bool>($t0, $t1, result0(), result1());
+    }
+
+    private fun test_requires_binary(a: u64,b: u64): u64 {
+        M::add(a, b)
+    }
+    spec {
+      ensures requires_of<M::add>($t0, $t1);
+    }
+
+    private fun test_requires_generic_explicit(x: u64): u64 {
+        M::identity<u64>(x)
+    }
+    spec {
+      ensures requires_of<M::identity><u64>($t0);
+    }
+
+    private fun test_requires_generic_inferred(x: u64): u64 {
+        M::identity<u64>(x)
+    }
+    spec {
+      ensures requires_of<M::identity><u64>($t0);
+    }
+
+    private fun test_requires_unary(x: u64): u64 {
+        M::increment(x)
+    }
+    spec {
+      ensures requires_of<M::increment>($t0);
+    }
+
+    private fun test_swap_generic_explicit(a: u64,b: u64): (u64, u64) {
+        M::swap<u64>(a, b)
+    }
+    spec {
+      ensures requires_of<M::swap><u64>($t0, $t1);
+      ensures ensures_of<M::swap><u64>($t0, $t1, result0(), result1());
+    }
+
+    private fun test_swap_generic_inferred(a: u64,b: u64): (u64, u64) {
+        M::swap<u64>(a, b)
+    }
+    spec {
+      ensures requires_of<M::swap><u64>($t0, $t1);
+      ensures ensures_of<M::swap><u64>($t0, $t1, result0(), result1());
+    }
+
+    private fun test_unbox_inferred(b: Box<u64>): u64 {
+        M::unbox<u64>(b)
+    }
+    spec {
+      ensures requires_of<M::unbox><u64>($t0);
+      ensures ensures_of<M::unbox><u64>($t0, result0());
+    }
+
+    public fun unbox<T>(b: Box<T>): T {
+        select M::Box.value<Box<T>>(b)
+    }
+    spec {
+      ensures Eq<#0>(result0(), select M::Box.value<0x42::M::Box<#0>>($t0));
+    }
+
+} // end 0x42::M
+module 0x42::N {
+    use 0x42::M; // resolved as: 0x42::M
+    private fun call_add(a: u64,b: u64): u64 {
+        M::add(a, b)
+    }
+    spec {
+      ensures requires_of<M::add>($t0, $t1);
+      ensures ensures_of<M::add>($t0, $t1, result0());
+    }
+
+    private fun call_increment(x: u64): u64 {
+        M::increment(x)
+    }
+    spec {
+      ensures requires_of<M::increment>($t0);
+      ensures ensures_of<M::increment>($t0, result0());
+    }
+
+} // end 0x42::N
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::M {
+    struct Box<T> has copy, drop {
+        value: T,
+    }
+    struct Counter has key {
+        value: u64,
+    }
+    public fun swap<T>(a: T, b: T): (T, T) {
+        (b, a)
+    }
+    public fun add(a: u64, b: u64): u64 {
+        a + b
+    }
+    fun apply_aborts(f: |u64|u64, x: u64): u64 {
+        f(x)
+    }
+    fun apply_binary(f: |u64, u64|u64, a: u64, b: u64): u64 {
+        f(a, b)
+    }
+    fun apply_ensures(f: |u64|u64, x: u64): u64 {
+        f(x)
+    }
+    fun apply_modifies(f: |address|, addr: address) {
+        f(addr)
+    }
+    fun apply_requires(f: |u64|u64, x: u64): u64 {
+        f(x)
+    }
+    fun do_nothing(_x: u64) {
+    }
+    fun generic_noop<T: drop>(_x: T) {
+    }
+    public fun identity<T>(x: T): T {
+        x
+    }
+    public fun increment(x: u64): u64 {
+        x + 1
+    }
+    public fun increment_counter(addr: address)
+        acquires Counter
+    {
+        let counter = borrow_global_mut<Counter>(addr);
+        counter.value = counter.value + 1;
+    }
+    fun mixed_params(x: u64, flag: bool): u64 {
+        if (flag) x + 1 else x
+    }
+    public fun pair<T, U>(x: T, y: U): (T, U) {
+        (x, y)
+    }
+    fun split(x: u64): (u64, u64) {
+        (x / 2, x - x / 2)
+    }
+    public fun swap_counters(addr1: address, addr2: address)
+        acquires Counter
+    {
+        let v1 = borrow_global<Counter>(addr1).value;
+        let v2 = borrow_global<Counter>(addr2).value;
+        borrow_global_mut<Counter>(addr1).value = v2;
+        borrow_global_mut<Counter>(addr2).value = v1;
+    }
+    fun test_aborts(x: u64): u64 {
+        increment(x)
+    }
+    fun test_aborts_generic_explicit(x: u64): u64 {
+        identity<u64>(x)
+    }
+    fun test_aborts_generic_inferred(x: u64): u64 {
+        identity<u64>(x)
+    }
+    fun test_ensures_binary(a: u64, b: u64): u64 {
+        add(a, b)
+    }
+    fun test_ensures_generic_explicit(x: u64): u64 {
+        identity<u64>(x)
+    }
+    fun test_ensures_generic_inferred(x: u64): u64 {
+        identity<u64>(x)
+    }
+    fun test_ensures_generic_unit(x: u64) {
+        generic_noop<u64>(x)
+    }
+    fun test_ensures_multi(x: u64): (u64, u64) {
+        split(x)
+    }
+    fun test_ensures_unary(x: u64): u64 {
+        increment(x)
+    }
+    fun test_ensures_unit(x: u64) {
+        do_nothing(x)
+    }
+    fun test_mixed_params(x: u64, b: bool): u64 {
+        mixed_params(x, b)
+    }
+    fun test_modifies_multi(addr1: address, addr2: address)
+        acquires Counter
+    {
+        swap_counters(addr1, addr2)
+    }
+    fun test_modifies_single(addr: address)
+        acquires Counter
+    {
+        increment_counter(addr)
+    }
+    fun test_pair_generic_explicit(x: u64, y: bool): (u64, bool) {
+        pair<u64,bool>(x, y)
+    }
+    fun test_requires_binary(a: u64, b: u64): u64 {
+        add(a, b)
+    }
+    fun test_requires_generic_explicit(x: u64): u64 {
+        identity<u64>(x)
+    }
+    fun test_requires_generic_inferred(x: u64): u64 {
+        identity<u64>(x)
+    }
+    fun test_requires_unary(x: u64): u64 {
+        increment(x)
+    }
+    fun test_swap_generic_explicit(a: u64, b: u64): (u64, u64) {
+        swap<u64>(a, b)
+    }
+    fun test_swap_generic_inferred(a: u64, b: u64): (u64, u64) {
+        swap<u64>(a, b)
+    }
+    fun test_unbox_inferred(b: Box<u64>): u64 {
+        unbox<u64>(b)
+    }
+    public fun unbox<T: copy + drop>(b: Box<T>): T {
+        b.value
+    }
+}
+module 0x42::N {
+    use 0x42::M;
+    fun call_add(a: u64, b: u64): u64 {
+        M::add(a, b)
+    }
+    fun call_increment(x: u64): u64 {
+        M::increment(x)
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+public fun M::swap<#0>($t0: #0, $t1: #0): (#0, #0) {
+     var $t2: #0
+     var $t3: #0
+  0: $t2 := infer($t1)
+  1: $t3 := infer($t0)
+  2: return ($t2, $t3)
+}
+
+
+[variant baseline]
+public fun M::add($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+  0: $t3 := infer($t0)
+  1: $t2 := +($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun M::apply_aborts($t0: |u64|u64, $t1: u64): u64 {
+     var $t2: u64
+  0: $t2 := invoke($t1, $t0)
+  1: return $t2
+}
+
+
+[variant baseline]
+fun M::apply_binary($t0: |u64, u64|u64, $t1: u64, $t2: u64): u64 {
+     var $t3: u64
+     var $t4: u64
+  0: $t4 := infer($t1)
+  1: $t3 := invoke($t4, $t2, $t0)
+  2: return $t3
+}
+
+
+[variant baseline]
+fun M::apply_ensures($t0: |u64|u64, $t1: u64): u64 {
+     var $t2: u64
+  0: $t2 := invoke($t1, $t0)
+  1: return $t2
+}
+
+
+[variant baseline]
+fun M::apply_modifies($t0: |address|, $t1: address) {
+  0: invoke($t1, $t0)
+  1: return ()
+}
+
+
+[variant baseline]
+fun M::apply_requires($t0: |u64|u64, $t1: u64): u64 {
+     var $t2: u64
+  0: $t2 := invoke($t1, $t0)
+  1: return $t2
+}
+
+
+[variant baseline]
+fun M::do_nothing($t0: u64) {
+  0: return ()
+}
+
+
+[variant baseline]
+fun M::generic_noop<#0>($t0: #0) {
+  0: return ()
+}
+
+
+[variant baseline]
+public fun M::identity<#0>($t0: #0): #0 {
+     var $t1: #0
+  0: $t1 := infer($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public fun M::increment($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := infer($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+public fun M::increment_counter($t0: address) {
+     var $t1: &mut 0x42::M::Counter
+     var $t2: u64
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &mut u64
+  0: $t1 := borrow_global<0x42::M::Counter>($t0)
+  1: $t4 := borrow_field<0x42::M::Counter>.value($t1)
+  2: $t3 := read_ref($t4)
+  3: $t5 := 1
+  4: $t2 := +($t3, $t5)
+  5: $t6 := borrow_field<0x42::M::Counter>.value($t1)
+  6: write_ref($t6, $t2)
+  7: return ()
+}
+
+
+[variant baseline]
+fun M::mixed_params($t0: u64, $t1: bool): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: if ($t1) goto 1 else goto 6
+  1: label L0
+  2: $t3 := infer($t0)
+  3: $t4 := 1
+  4: $t2 := +($t3, $t4)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t0)
+  8: label L2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun M::pair<#0, #1>($t0: #0, $t1: #1): (#0, #1) {
+     var $t2: #0
+     var $t3: #1
+  0: $t2 := infer($t0)
+  1: $t3 := infer($t1)
+  2: return ($t2, $t3)
+}
+
+
+[variant baseline]
+fun M::split($t0: u64): (u64, u64) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+  0: $t3 := infer($t0)
+  1: $t4 := 2
+  2: $t1 := /($t3, $t4)
+  3: $t5 := infer($t0)
+  4: $t7 := infer($t0)
+  5: $t8 := 2
+  6: $t6 := /($t7, $t8)
+  7: $t2 := -($t5, $t6)
+  8: return ($t1, $t2)
+}
+
+
+[variant baseline]
+public fun M::swap_counters($t0: address, $t1: address) {
+     var $t2: u64
+     var $t3: &0x42::M::Counter
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::M::Counter
+     var $t7: &u64
+     var $t8: &mut u64
+     var $t9: &mut 0x42::M::Counter
+     var $t10: &mut u64
+     var $t11: &mut 0x42::M::Counter
+  0: $t3 := borrow_global<0x42::M::Counter>($t0)
+  1: $t4 := borrow_field<0x42::M::Counter>.value($t3)
+  2: $t2 := read_ref($t4)
+  3: $t6 := borrow_global<0x42::M::Counter>($t1)
+  4: $t7 := borrow_field<0x42::M::Counter>.value($t6)
+  5: $t5 := read_ref($t7)
+  6: $t9 := borrow_global<0x42::M::Counter>($t0)
+  7: $t8 := borrow_field<0x42::M::Counter>.value($t9)
+  8: write_ref($t8, $t5)
+  9: $t11 := borrow_global<0x42::M::Counter>($t1)
+ 10: $t10 := borrow_field<0x42::M::Counter>.value($t11)
+ 11: write_ref($t10, $t2)
+ 12: return ()
+}
+
+
+[variant baseline]
+fun M::test_aborts($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := M::increment($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun M::test_aborts_generic_explicit($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := M::identity<u64>($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun M::test_aborts_generic_inferred($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := M::identity<u64>($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun M::test_ensures_binary($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+  0: $t3 := infer($t0)
+  1: $t2 := M::add($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun M::test_ensures_generic_explicit($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := M::identity<u64>($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun M::test_ensures_generic_inferred($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := M::identity<u64>($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun M::test_ensures_generic_unit($t0: u64) {
+  0: M::generic_noop<u64>($t0)
+  1: return ()
+}
+
+
+[variant baseline]
+fun M::test_ensures_multi($t0: u64): (u64, u64) {
+     var $t1: u64
+     var $t2: u64
+  0: ($t1, $t2) := M::split($t0)
+  1: return ($t1, $t2)
+}
+
+
+[variant baseline]
+fun M::test_ensures_unary($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := M::increment($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun M::test_ensures_unit($t0: u64) {
+  0: M::do_nothing($t0)
+  1: return ()
+}
+
+
+[variant baseline]
+fun M::test_mixed_params($t0: u64, $t1: bool): u64 {
+     var $t2: u64
+     var $t3: u64
+  0: $t3 := infer($t0)
+  1: $t2 := M::mixed_params($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun M::test_modifies_multi($t0: address, $t1: address) {
+     var $t2: address
+  0: $t2 := infer($t0)
+  1: M::swap_counters($t2, $t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun M::test_modifies_single($t0: address) {
+  0: M::increment_counter($t0)
+  1: return ()
+}
+
+
+[variant baseline]
+fun M::test_pair_generic_explicit($t0: u64, $t1: bool): (u64, bool) {
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+  0: $t4 := infer($t0)
+  1: ($t2, $t3) := M::pair<u64, bool>($t4, $t1)
+  2: return ($t2, $t3)
+}
+
+
+[variant baseline]
+fun M::test_requires_binary($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+  0: $t3 := infer($t0)
+  1: $t2 := M::add($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun M::test_requires_generic_explicit($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := M::identity<u64>($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun M::test_requires_generic_inferred($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := M::identity<u64>($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun M::test_requires_unary($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := M::increment($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun M::test_swap_generic_explicit($t0: u64, $t1: u64): (u64, u64) {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: $t4 := infer($t0)
+  1: ($t2, $t3) := M::swap<u64>($t4, $t1)
+  2: return ($t2, $t3)
+}
+
+
+[variant baseline]
+fun M::test_swap_generic_inferred($t0: u64, $t1: u64): (u64, u64) {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: $t4 := infer($t0)
+  1: ($t2, $t3) := M::swap<u64>($t4, $t1)
+  2: return ($t2, $t3)
+}
+
+
+[variant baseline]
+fun M::test_unbox_inferred($t0: 0x42::M::Box<u64>): u64 {
+     var $t1: u64
+  0: $t1 := M::unbox<u64>($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public fun M::unbox<#0>($t0: 0x42::M::Box<#0>): #0 {
+     var $t1: #0
+     var $t2: &0x42::M::Box<#0>
+     var $t3: &#0
+  0: $t2 := borrow_local($t0)
+  1: $t3 := borrow_field<0x42::M::Box<#0>>.value($t2)
+  2: $t1 := read_ref($t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun N::call_add($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+  0: $t3 := infer($t0)
+  1: $t2 := M::add($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun N::call_increment($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := M::increment($t0)
+  1: return $t1
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::M {
+    struct Box<T> {
+        value: T,
+    }
+    struct Counter {
+        value: u64,
+    }
+    public fun swap<T>(a: T,b: T): (T, T) {
+        Tuple(b, a)
+    }
+    spec {
+      ensures Eq<#0>(result0(), $t1);
+      ensures Eq<#0>(result1(), $t0);
+    }
+
+    public fun add(a: u64,b: u64): u64 {
+        Add<u64>(a, b)
+    }
+    spec {
+      requires Le(Add($t0, $t1), 18446744073709551615);
+      ensures Eq<u64>(result0(), Add($t0, $t1));
+    }
+
+    private fun apply_aborts(f: |u64|u64,x: u64): u64 {
+        (f)(x)
+    }
+    spec {
+      aborts_if aborts_of<f>($t1);
+    }
+
+    private fun apply_binary(f: |u64, u64|u64,a: u64,b: u64): u64 {
+        (f)(a, b)
+    }
+    spec {
+      ensures requires_of<f>($t1, $t2);
+      ensures ensures_of<f>($t1, $t2, result0());
+      aborts_if aborts_of<f>($t1, $t2);
+    }
+
+    private fun apply_ensures(f: |u64|u64,x: u64): u64 {
+        (f)(x)
+    }
+    spec {
+      ensures ensures_of<f>($t1, result0());
+    }
+
+    private fun apply_modifies(f: |address|,addr: address) {
+        (f)(addr)
+    }
+    spec {
+      ensures modifies_of<f>(global<0x42::M::Counter>($t1));
+    }
+
+    private fun apply_requires(f: |u64|u64,x: u64): u64 {
+        (f)(x)
+    }
+    spec {
+      ensures requires_of<f>($t1);
+    }
+
+    private fun do_nothing(_x: u64) {
+        Tuple()
+    }
+    spec {
+      ensures true;
+    }
+
+    private fun generic_noop<T>(_x: T) {
+        Tuple()
+    }
+    public fun identity<T>(x: T): T {
+        x
+    }
+    spec {
+      ensures Eq<#0>(result0(), $t0);
+    }
+
+    public fun increment(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    spec {
+      requires Lt($t0, 18446744073709551615);
+      ensures Eq<u64>(result0(), Add($t0, 1));
+    }
+
+    public fun increment_counter(addr: address)
+        acquires Counter(*)
+     {
+        {
+          let counter: &mut Counter = BorrowGlobal(Mutable)<Counter>(addr);
+          select M::Counter.value<&mut Counter>(counter) = Add<u64>(select M::Counter.value<&mut Counter>(counter), 1);
+          Tuple()
+        }
+    }
+    spec {
+      modifies global<0x42::M::Counter>($t0);
+      ensures Eq<u64>(select M::Counter.value<0x42::M::Counter>(global<0x42::M::Counter>($t0)), Add(select M::Counter.value<0x42::M::Counter>(Old<0x42::M::Counter>(global<0x42::M::Counter>($t0))), 1));
+    }
+
+    private fun mixed_params(x: u64,flag: bool): u64 {
+        if flag {
+          Add<u64>(x, 1)
+        } else {
+          x
+        }
+    }
+    public fun pair<T,U>(x: T,y: U): (T, U) {
+        Tuple(x, y)
+    }
+    spec {
+      ensures Eq<#0>(result0(), $t0);
+      ensures Eq<#1>(result1(), $t1);
+    }
+
+    private fun split(x: u64): (u64, u64) {
+        Tuple(Div<u64>(x, 2), Sub<u64>(x, Div<u64>(x, 2)))
+    }
+    spec {
+      ensures Eq<num>(Add(result0(), result1()), $t0);
+    }
+
+    public fun swap_counters(addr1: address,addr2: address)
+        acquires Counter(*)
+     {
+        {
+          let v1: u64 = select M::Counter.value<&Counter>(BorrowGlobal(Immutable)<Counter>(addr1));
+          {
+            let v2: u64 = select M::Counter.value<&Counter>(BorrowGlobal(Immutable)<Counter>(addr2));
+            select M::Counter.value<&mut Counter>(BorrowGlobal(Mutable)<Counter>(addr1)) = v2;
+            select M::Counter.value<&mut Counter>(BorrowGlobal(Mutable)<Counter>(addr2)) = v1;
+            Tuple()
+          }
+        }
+    }
+    spec {
+      modifies global<0x42::M::Counter>($t0);
+      modifies global<0x42::M::Counter>($t1);
+    }
+
+    private fun test_aborts(x: u64): u64 {
+        M::increment(x)
+    }
+    spec {
+      aborts_if aborts_of<M::increment>($t0);
+    }
+
+    private fun test_aborts_generic_explicit(x: u64): u64 {
+        M::identity<u64>(x)
+    }
+    spec {
+      aborts_if aborts_of<M::identity><u64>($t0);
+    }
+
+    private fun test_aborts_generic_inferred(x: u64): u64 {
+        M::identity<u64>(x)
+    }
+    spec {
+      aborts_if aborts_of<M::identity><u64>($t0);
+    }
+
+    private fun test_ensures_binary(a: u64,b: u64): u64 {
+        M::add(a, b)
+    }
+    spec {
+      ensures ensures_of<M::add>($t0, $t1, result0());
+    }
+
+    private fun test_ensures_generic_explicit(x: u64): u64 {
+        M::identity<u64>(x)
+    }
+    spec {
+      ensures ensures_of<M::identity><u64>($t0, result0());
+    }
+
+    private fun test_ensures_generic_inferred(x: u64): u64 {
+        M::identity<u64>(x)
+    }
+    spec {
+      ensures ensures_of<M::identity><u64>($t0, result0());
+    }
+
+    private fun test_ensures_generic_unit(x: u64) {
+        M::generic_noop<u64>(x)
+    }
+    spec {
+      ensures ensures_of<M::generic_noop><u64>($t0);
+    }
+
+    private fun test_ensures_multi(x: u64): (u64, u64) {
+        M::split(x)
+    }
+    spec {
+      ensures ensures_of<M::split>($t0, result0(), result1());
+    }
+
+    private fun test_ensures_unary(x: u64): u64 {
+        M::increment(x)
+    }
+    spec {
+      ensures ensures_of<M::increment>($t0, result0());
+    }
+
+    private fun test_ensures_unit(x: u64) {
+        M::do_nothing(x)
+    }
+    spec {
+      ensures ensures_of<M::do_nothing>($t0);
+    }
+
+    private fun test_mixed_params(x: u64,b: bool): u64 {
+        M::mixed_params(x, b)
+    }
+    spec {
+      ensures requires_of<M::mixed_params>($t0, $t1);
+      ensures ensures_of<M::mixed_params>($t0, $t1, result0());
+    }
+
+    private fun test_modifies_multi(addr1: address,addr2: address)
+        acquires Counter(*)
+     {
+        M::swap_counters(addr1, addr2)
+    }
+    spec {
+      ensures modifies_of<M::swap_counters>(global<0x42::M::Counter>($t0), global<0x42::M::Counter>($t1));
+    }
+
+    private fun test_modifies_single(addr: address)
+        acquires Counter(*)
+     {
+        M::increment_counter(addr)
+    }
+    spec {
+      ensures modifies_of<M::increment_counter>(global<0x42::M::Counter>($t0));
+    }
+
+    private fun test_pair_generic_explicit(x: u64,y: bool): (u64, bool) {
+        M::pair<u64, bool>(x, y)
+    }
+    spec {
+      ensures requires_of<M::pair><u64, bool>($t0, $t1);
+      ensures ensures_of<M::pair><u64, bool>($t0, $t1, result0(), result1());
+    }
+
+    private fun test_requires_binary(a: u64,b: u64): u64 {
+        M::add(a, b)
+    }
+    spec {
+      ensures requires_of<M::add>($t0, $t1);
+    }
+
+    private fun test_requires_generic_explicit(x: u64): u64 {
+        M::identity<u64>(x)
+    }
+    spec {
+      ensures requires_of<M::identity><u64>($t0);
+    }
+
+    private fun test_requires_generic_inferred(x: u64): u64 {
+        M::identity<u64>(x)
+    }
+    spec {
+      ensures requires_of<M::identity><u64>($t0);
+    }
+
+    private fun test_requires_unary(x: u64): u64 {
+        M::increment(x)
+    }
+    spec {
+      ensures requires_of<M::increment>($t0);
+    }
+
+    private fun test_swap_generic_explicit(a: u64,b: u64): (u64, u64) {
+        M::swap<u64>(a, b)
+    }
+    spec {
+      ensures requires_of<M::swap><u64>($t0, $t1);
+      ensures ensures_of<M::swap><u64>($t0, $t1, result0(), result1());
+    }
+
+    private fun test_swap_generic_inferred(a: u64,b: u64): (u64, u64) {
+        M::swap<u64>(a, b)
+    }
+    spec {
+      ensures requires_of<M::swap><u64>($t0, $t1);
+      ensures ensures_of<M::swap><u64>($t0, $t1, result0(), result1());
+    }
+
+    private fun test_unbox_inferred(b: Box<u64>): u64 {
+        M::unbox<u64>(b)
+    }
+    spec {
+      ensures requires_of<M::unbox><u64>($t0);
+      ensures ensures_of<M::unbox><u64>($t0, result0());
+    }
+
+    public fun unbox<T>(b: Box<T>): T {
+        select M::Box.value<Box<T>>(b)
+    }
+    spec {
+      ensures Eq<#0>(result0(), select M::Box.value<0x42::M::Box<#0>>($t0));
+    }
+
+} // end 0x42::M
+module 0x42::N {
+    use 0x42::M; // resolved as: 0x42::M
+    private fun call_add(a: u64,b: u64): u64 {
+        M::add(a, b)
+    }
+    spec {
+      ensures requires_of<M::add>($t0, $t1);
+      ensures ensures_of<M::add>($t0, $t1, result0());
+    }
+
+    private fun call_increment(x: u64): u64 {
+        M::increment(x)
+    }
+    spec {
+      ensures requires_of<M::increment>($t0);
+      ensures ensures_of<M::increment>($t0, result0());
+    }
+
+} // end 0x42::N
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+public fun M::swap<#0>($t0: #0, $t1: #0): (#0, #0) {
+     var $t2: #0
+     var $t3: #0
+  0: $t2 := infer($t1)
+  1: $t3 := infer($t0)
+  2: return ($t2, $t3)
+}
+
+
+[variant baseline]
+public fun M::add($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+  0: $t3 := infer($t0)
+  1: $t2 := +($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun M::apply_aborts($t0: |u64|u64, $t1: u64): u64 {
+     var $t2: u64
+  0: $t2 := invoke($t1, $t0)
+  1: return $t2
+}
+
+
+[variant baseline]
+fun M::apply_binary($t0: |u64, u64|u64, $t1: u64, $t2: u64): u64 {
+     var $t3: u64
+     var $t4: u64
+  0: $t4 := infer($t1)
+  1: $t3 := invoke($t4, $t2, $t0)
+  2: return $t3
+}
+
+
+[variant baseline]
+fun M::apply_ensures($t0: |u64|u64, $t1: u64): u64 {
+     var $t2: u64
+  0: $t2 := invoke($t1, $t0)
+  1: return $t2
+}
+
+
+[variant baseline]
+fun M::apply_modifies($t0: |address|, $t1: address) {
+  0: invoke($t1, $t0)
+  1: return ()
+}
+
+
+[variant baseline]
+fun M::apply_requires($t0: |u64|u64, $t1: u64): u64 {
+     var $t2: u64
+  0: $t2 := invoke($t1, $t0)
+  1: return $t2
+}
+
+
+[variant baseline]
+fun M::do_nothing($t0: u64) {
+  0: return ()
+}
+
+
+[variant baseline]
+fun M::generic_noop<#0>($t0: #0) {
+  0: return ()
+}
+
+
+[variant baseline]
+public fun M::identity<#0>($t0: #0): #0 {
+     var $t1: #0
+  0: $t1 := infer($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public fun M::increment($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := infer($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+public fun M::increment_counter($t0: address) {
+     var $t1: &mut 0x42::M::Counter
+     var $t2: u64
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &mut u64
+  0: $t1 := borrow_global<0x42::M::Counter>($t0)
+  1: $t4 := borrow_field<0x42::M::Counter>.value($t1)
+  2: $t3 := read_ref($t4)
+  3: $t5 := 1
+  4: $t2 := +($t3, $t5)
+  5: $t6 := borrow_field<0x42::M::Counter>.value($t1)
+  6: write_ref($t6, $t2)
+  7: return ()
+}
+
+
+[variant baseline]
+fun M::mixed_params($t0: u64, $t1: bool): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: if ($t1) goto 1 else goto 6
+  1: label L0
+  2: $t3 := infer($t0)
+  3: $t4 := 1
+  4: $t2 := +($t3, $t4)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t0)
+  8: label L2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun M::pair<#0, #1>($t0: #0, $t1: #1): (#0, #1) {
+     var $t2: #0
+     var $t3: #1
+  0: $t2 := infer($t0)
+  1: $t3 := infer($t1)
+  2: return ($t2, $t3)
+}
+
+
+[variant baseline]
+fun M::split($t0: u64): (u64, u64) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+  0: $t3 := infer($t0)
+  1: $t4 := 2
+  2: $t1 := /($t3, $t4)
+  3: $t5 := infer($t0)
+  4: $t7 := infer($t0)
+  5: $t8 := 2
+  6: $t6 := /($t7, $t8)
+  7: $t2 := -($t5, $t6)
+  8: return ($t1, $t2)
+}
+
+
+[variant baseline]
+public fun M::swap_counters($t0: address, $t1: address) {
+     var $t2: u64
+     var $t3: &0x42::M::Counter
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::M::Counter
+     var $t7: &u64
+     var $t8: &mut u64
+     var $t9: &mut 0x42::M::Counter
+     var $t10: &mut u64
+     var $t11: &mut 0x42::M::Counter
+  0: $t3 := borrow_global<0x42::M::Counter>($t0)
+  1: $t4 := borrow_field<0x42::M::Counter>.value($t3)
+  2: $t2 := read_ref($t4)
+  3: $t6 := borrow_global<0x42::M::Counter>($t1)
+  4: $t7 := borrow_field<0x42::M::Counter>.value($t6)
+  5: $t5 := read_ref($t7)
+  6: $t9 := borrow_global<0x42::M::Counter>($t0)
+  7: $t8 := borrow_field<0x42::M::Counter>.value($t9)
+  8: write_ref($t8, $t5)
+  9: $t11 := borrow_global<0x42::M::Counter>($t1)
+ 10: $t10 := borrow_field<0x42::M::Counter>.value($t11)
+ 11: write_ref($t10, $t2)
+ 12: return ()
+}
+
+
+[variant baseline]
+fun M::test_aborts($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := M::increment($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun M::test_aborts_generic_explicit($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := M::identity<u64>($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun M::test_aborts_generic_inferred($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := M::identity<u64>($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun M::test_ensures_binary($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+  0: $t3 := infer($t0)
+  1: $t2 := M::add($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun M::test_ensures_generic_explicit($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := M::identity<u64>($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun M::test_ensures_generic_inferred($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := M::identity<u64>($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun M::test_ensures_generic_unit($t0: u64) {
+  0: M::generic_noop<u64>($t0)
+  1: return ()
+}
+
+
+[variant baseline]
+fun M::test_ensures_multi($t0: u64): (u64, u64) {
+     var $t1: u64
+     var $t2: u64
+  0: ($t1, $t2) := M::split($t0)
+  1: return ($t1, $t2)
+}
+
+
+[variant baseline]
+fun M::test_ensures_unary($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := M::increment($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun M::test_ensures_unit($t0: u64) {
+  0: M::do_nothing($t0)
+  1: return ()
+}
+
+
+[variant baseline]
+fun M::test_mixed_params($t0: u64, $t1: bool): u64 {
+     var $t2: u64
+     var $t3: u64
+  0: $t3 := infer($t0)
+  1: $t2 := M::mixed_params($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun M::test_modifies_multi($t0: address, $t1: address) {
+     var $t2: address
+  0: $t2 := infer($t0)
+  1: M::swap_counters($t2, $t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun M::test_modifies_single($t0: address) {
+  0: M::increment_counter($t0)
+  1: return ()
+}
+
+
+[variant baseline]
+fun M::test_pair_generic_explicit($t0: u64, $t1: bool): (u64, bool) {
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+  0: $t4 := infer($t0)
+  1: ($t2, $t3) := M::pair<u64, bool>($t4, $t1)
+  2: return ($t2, $t3)
+}
+
+
+[variant baseline]
+fun M::test_requires_binary($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+  0: $t3 := infer($t0)
+  1: $t2 := M::add($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun M::test_requires_generic_explicit($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := M::identity<u64>($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun M::test_requires_generic_inferred($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := M::identity<u64>($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun M::test_requires_unary($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := M::increment($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun M::test_swap_generic_explicit($t0: u64, $t1: u64): (u64, u64) {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: $t4 := infer($t0)
+  1: ($t2, $t3) := M::swap<u64>($t4, $t1)
+  2: return ($t2, $t3)
+}
+
+
+[variant baseline]
+fun M::test_swap_generic_inferred($t0: u64, $t1: u64): (u64, u64) {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: $t4 := infer($t0)
+  1: ($t2, $t3) := M::swap<u64>($t4, $t1)
+  2: return ($t2, $t3)
+}
+
+
+[variant baseline]
+fun M::test_unbox_inferred($t0: 0x42::M::Box<u64>): u64 {
+     var $t1: u64
+  0: $t1 := M::unbox<u64>($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public fun M::unbox<#0>($t0: 0x42::M::Box<#0>): #0 {
+     var $t1: #0
+     var $t2: &0x42::M::Box<#0>
+     var $t3: &#0
+  0: $t2 := borrow_local($t0)
+  1: $t3 := borrow_field<0x42::M::Box<#0>>.value($t2)
+  2: $t1 := read_ref($t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun N::call_add($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+  0: $t3 := infer($t0)
+  1: $t2 := M::add($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun N::call_increment($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := M::increment($t0)
+  1: return $t1
+}
+
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0x42::M
+struct Box<T0> has copy + drop
+  value: T0
+
+struct Counter has key
+  value: u64
+
+// Function definition at index 0
+#[persistent] public fun swap<T0>(l0: T0, l1: T0): (T0, T0)
+    move_loc l1
+    move_loc l0
+    ret
+
+// Function definition at index 1
+#[persistent] public fun add(l0: u64, l1: u64): u64
+    move_loc l0
+    move_loc l1
+    add
+    ret
+
+// Function definition at index 2
+fun apply_aborts(l0: |u64|u64, l1: u64): u64
+    move_loc l1
+    move_loc l0
+    call_closure <|u64|u64>
+    ret
+
+// Function definition at index 3
+fun apply_binary(l0: |u64, u64|u64, l1: u64, l2: u64): u64
+    move_loc l1
+    move_loc l2
+    move_loc l0
+    call_closure <|u64, u64|u64>
+    ret
+
+// Function definition at index 4
+fun apply_ensures(l0: |u64|u64, l1: u64): u64
+    move_loc l1
+    move_loc l0
+    call_closure <|u64|u64>
+    ret
+
+// Function definition at index 5
+fun apply_modifies(l0: |address|, l1: address)
+    move_loc l1
+    move_loc l0
+    call_closure <|address|>
+    ret
+
+// Function definition at index 6
+fun apply_requires(l0: |u64|u64, l1: u64): u64
+    move_loc l1
+    move_loc l0
+    call_closure <|u64|u64>
+    ret
+
+// Function definition at index 7
+fun do_nothing(l0: u64)
+    ret
+
+// Function definition at index 8
+fun generic_noop<T0: drop>(l0: T0)
+    ret
+
+// Function definition at index 9
+#[persistent] public fun identity<T0>(l0: T0): T0
+    move_loc l0
+    ret
+
+// Function definition at index 10
+#[persistent] public fun increment(l0: u64): u64
+    move_loc l0
+    ld_u64 1
+    add
+    ret
+
+// Function definition at index 11
+#[persistent] public fun increment_counter(l0: address) acquires Counter
+    local l1: &mut Counter
+    move_loc l0
+    mut_borrow_global Counter
+    st_loc l1
+    copy_loc l1
+    borrow_field Counter, value
+    // @5
+    read_ref
+    ld_u64 1
+    add
+    move_loc l1
+    mut_borrow_field Counter, value
+    // @10
+    write_ref
+    ret
+
+// Function definition at index 12
+fun mixed_params(l0: u64, l1: bool): u64
+    move_loc l1
+    br_false l0
+    move_loc l0
+    ld_u64 1
+    add
+    // @5
+    ret
+l0: move_loc l0
+    ret
+
+// Function definition at index 13
+#[persistent] public fun pair<T0, T1>(l0: T0, l1: T1): (T0, T1)
+    move_loc l0
+    move_loc l1
+    ret
+
+// Function definition at index 14
+fun split(l0: u64): (u64, u64)
+    copy_loc l0
+    ld_u64 2
+    div
+    copy_loc l0
+    move_loc l0
+    // @5
+    ld_u64 2
+    div
+    sub
+    ret
+
+// Function definition at index 15
+#[persistent] public fun swap_counters(l0: address, l1: address) acquires Counter
+    copy_loc l0
+    borrow_global Counter
+    borrow_field Counter, value
+    read_ref
+    copy_loc l1
+    // @5
+    borrow_global Counter
+    borrow_field Counter, value
+    read_ref
+    move_loc l0
+    mut_borrow_global Counter
+    // @10
+    mut_borrow_field Counter, value
+    write_ref
+    move_loc l1
+    mut_borrow_global Counter
+    mut_borrow_field Counter, value
+    // @15
+    write_ref
+    ret
+
+// Function definition at index 16
+fun test_aborts(l0: u64): u64
+    move_loc l0
+    call increment
+    ret
+
+// Function definition at index 17
+fun test_aborts_generic_explicit(l0: u64): u64
+    move_loc l0
+    call identity<u64>
+    ret
+
+// Function definition at index 18
+fun test_aborts_generic_inferred(l0: u64): u64
+    move_loc l0
+    call identity<u64>
+    ret
+
+// Function definition at index 19
+fun test_ensures_binary(l0: u64, l1: u64): u64
+    move_loc l0
+    move_loc l1
+    call add
+    ret
+
+// Function definition at index 20
+fun test_ensures_generic_explicit(l0: u64): u64
+    move_loc l0
+    call identity<u64>
+    ret
+
+// Function definition at index 21
+fun test_ensures_generic_inferred(l0: u64): u64
+    move_loc l0
+    call identity<u64>
+    ret
+
+// Function definition at index 22
+fun test_ensures_generic_unit(l0: u64)
+    move_loc l0
+    call generic_noop<u64>
+    ret
+
+// Function definition at index 23
+fun test_ensures_multi(l0: u64): (u64, u64)
+    move_loc l0
+    call split
+    ret
+
+// Function definition at index 24
+fun test_ensures_unary(l0: u64): u64
+    move_loc l0
+    call increment
+    ret
+
+// Function definition at index 25
+fun test_ensures_unit(l0: u64)
+    move_loc l0
+    call do_nothing
+    ret
+
+// Function definition at index 26
+fun test_mixed_params(l0: u64, l1: bool): u64
+    move_loc l0
+    move_loc l1
+    call mixed_params
+    ret
+
+// Function definition at index 27
+fun test_modifies_multi(l0: address, l1: address) acquires Counter
+    move_loc l0
+    move_loc l1
+    call swap_counters
+    ret
+
+// Function definition at index 28
+fun test_modifies_single(l0: address) acquires Counter
+    move_loc l0
+    call increment_counter
+    ret
+
+// Function definition at index 29
+fun test_pair_generic_explicit(l0: u64, l1: bool): (u64, bool)
+    move_loc l0
+    move_loc l1
+    call pair<u64, bool>
+    ret
+
+// Function definition at index 30
+fun test_requires_binary(l0: u64, l1: u64): u64
+    move_loc l0
+    move_loc l1
+    call add
+    ret
+
+// Function definition at index 31
+fun test_requires_generic_explicit(l0: u64): u64
+    move_loc l0
+    call identity<u64>
+    ret
+
+// Function definition at index 32
+fun test_requires_generic_inferred(l0: u64): u64
+    move_loc l0
+    call identity<u64>
+    ret
+
+// Function definition at index 33
+fun test_requires_unary(l0: u64): u64
+    move_loc l0
+    call increment
+    ret
+
+// Function definition at index 34
+fun test_swap_generic_explicit(l0: u64, l1: u64): (u64, u64)
+    move_loc l0
+    move_loc l1
+    call swap<u64>
+    ret
+
+// Function definition at index 35
+fun test_swap_generic_inferred(l0: u64, l1: u64): (u64, u64)
+    move_loc l0
+    move_loc l1
+    call swap<u64>
+    ret
+
+// Function definition at index 36
+fun test_unbox_inferred(l0: Box<u64>): u64
+    move_loc l0
+    call unbox<u64>
+    ret
+
+// Function definition at index 37
+#[persistent] public fun unbox<T0: copy + drop>(l0: Box<T0>): T0
+    borrow_loc l0
+    borrow_field Box<T0>, value
+    read_ref
+    ret
+
+// Bytecode version v10
+module 0x42::N
+use 0x42::M
+// Function definition at index 0
+fun call_add(l0: u64, l1: u64): u64
+    move_loc l0
+    move_loc l1
+    call M::add
+    ret
+
+// Function definition at index 1
+fun call_increment(l0: u64): u64
+    move_loc l0
+    call M::increment
+    ret
+
+
+============ bytecode verification succeeded ========

@@ -128,6 +128,10 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// expensive computation required.
     fn charge_keyless(&mut self) -> VMResult<()>;
 
+    /// Charges an additional cost for SLH-DSA signature verification to compensate for the
+    /// expensive computation required (5x more expensive than ed25519).
+    fn charge_slh_dsa_sha2_128s(&mut self) -> VMResult<()>;
+
     /// Charges IO gas for the transaction itself.
     fn charge_io_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()>;
 

@@ -23,7 +23,7 @@ use aptos_protos::{
                 Jwk as ProtoJwk,
             },
         },
-        Ed25519, Keyless, Secp256k1Ecdsa, TransactionSizeInfo, WebAuthn,
+        Ed25519, Keyless, Secp256k1Ecdsa, SlhDsaSha2128s, TransactionSizeInfo, WebAuthn,
     },
     util::timestamp,
 };
@@ -662,6 +662,15 @@ fn convert_signature(signature: &Signature) -> transaction::AnySignature {
                 signature: s.value.clone().into(),
             })),
         },
+        Signature::SlhDsa_Sha2_128s(s) => transaction::AnySignature {
+            r#type: transaction::any_signature::Type::SlhDsaSha2128s as i32,
+            signature: s.value.clone().into(),
+            signature_variant: Some(any_signature::SignatureVariant::SlhDsaSha2128s(
+                SlhDsaSha2128s {
+                    signature: s.value.clone().into(),
+                },
+            )),
+        },
     }
 }
 
@@ -685,6 +694,10 @@ fn convert_public_key(public_key: &PublicKey) -> transaction::AnyPublicKey {
         },
         PublicKey::FederatedKeyless(p) => transaction::AnyPublicKey {
             r#type: transaction::any_public_key::Type::FederatedKeyless as i32,
+            public_key: p.value.clone().into(),
+        },
+        PublicKey::SlhDsa_Sha2_128s(p) => transaction::AnyPublicKey {
+            r#type: transaction::any_public_key::Type::SlhDsaSha2128s as i32,
             public_key: p.value.clone().into(),
         },
     }
