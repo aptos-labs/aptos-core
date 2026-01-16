@@ -1260,3 +1260,42 @@ pub fn boogie_closure_pack_name(
     let fun_name = boogie_function_name(&fun_env, &fun.inst);
     format!("$closure'{}'_{}", fun_name, mask)
 }
+
+/// Return name of the datatype constructor for a function parameter variant.
+/// These variants represent function-typed parameters of verification targets.
+pub fn boogie_fun_param_name(
+    env: &GlobalEnv,
+    fun: &QualifiedInstId<FunId>,
+    param_sym: Symbol,
+) -> String {
+    let fun_env = env.get_function(fun.to_qualified_id());
+    let fun_name = boogie_function_name(&fun_env, &fun.inst);
+    let param_name = param_sym.display(env.symbol_pool());
+    format!("$param'{}${}'", fun_name, param_name)
+}
+
+/// Return name of a behavioral predicate spec function (requires_of, aborts_of, ensures_of)
+/// for a function-typed parameter.
+pub fn boogie_behavioral_spec_fun_name(
+    env: &GlobalEnv,
+    fun: &QualifiedInstId<FunId>,
+    param_sym: Symbol,
+    kind: &str,
+    inst: &[Type],
+) -> String {
+    let fun_env = env.get_function(fun.to_qualified_id());
+    let module_name = boogie_module_name(&fun_env.module_env);
+    let fun_name_sym = fun_env.get_name();
+    let fun_name = fun_name_sym.display(env.symbol_pool());
+    let param_name = param_sym.display(env.symbol_pool());
+    // The spec function name format matches what spec_rewriter generates and what
+    // spec_translator expects: ${module}_$${kind}$${fun}$${param}${suffix}
+    format!(
+        "${}_${}${}${}{}",
+        module_name,
+        kind,
+        fun_name,
+        param_name,
+        boogie_inst_suffix(env, inst)
+    )
+}
