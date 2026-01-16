@@ -9,7 +9,7 @@ import { Test } from '../src/symmetric.js';
 describe("BIBE ciphertext", () => {
 
   it("bibe_encrypt", () => {
-    let ek = new BIBEEncryptionKey(bn254.G2.Point.BASE, bn254.G2.Point.BASE);
+    let ek = new EncryptionKey(bn254.G2.Point.BASE, bn254.G2.Point.BASE);
     let bibe_ct = ek.bibe_encrypt(new Test("hi"), 1n);
   });
 });

@@ -1,14 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
-    group::G2Affine,
     schemes::fptx::FPTX,
-    shared::{digest::DigestKey, key_derivation::BIBEDecryptionKeyShare},
+    shared::{key_derivation::BIBEDecryptionKeyShare},
     traits::BatchThresholdEncryption,
 };
 use anyhow::Result;
-use aptos_crypto::{arkworks::shamir::ShamirThresholdConfig, SecretSharingConfig as _};
-use ark_ec::AffineRepr as _;
+use aptos_crypto::{arkworks::shamir::ShamirThresholdConfig};
 use ark_std::rand::{seq::SliceRandom, thread_rng, CryptoRng, Rng as _, RngCore};
 
 fn smoke_with_setup<R: RngCore + CryptoRng>(

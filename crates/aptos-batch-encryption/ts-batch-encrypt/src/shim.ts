@@ -5,9 +5,8 @@ import { hmac_kdf, hash_to_fq, hash_to_fr, SymmetricKey, Test, OneTimePad, hash_
 import { leBytesToBigint, bigintToLEBytesFr, bigintToLEBytesFq, leBytesToFp12, fp12ToLEBytes } from './fieldSerialization.ts';
 import { bls12_381 } from '@noble/curves/bls12-381.js';
 import { bytesToG2, g1ToBytes, g2ToBytes } from './curveSerialization.ts';
-import { BIBECiphertext, BIBEEncryptionKey } from './ciphertext.ts';
+import { BIBECiphertext, EncryptionKey } from './ciphertext.ts';
 import * as ed from '@noble/ed25519';
-import { bls } from '@noble/curves/abstract/bls.js';
 
 class TestEd25519 extends Serializable {
   secretKey: Uint8Array;
@@ -107,7 +106,7 @@ const functions = {
     return serializer.toUint8Array();
   },
   "bibe_ciphertext_encrypt": function(bytes: Uint8Array) {
-    let ek = BIBEEncryptionKey.deserialize(new Deserializer(bytes));
+    let ek = EncryptionKey.deserialize(new Deserializer(bytes));
 
     let bibe_ct = ek.bibe_encrypt(new Test("hi"), 1n);
 
@@ -126,7 +125,7 @@ const functions = {
     return signature;
   },
   "ciphertext_encrypt": function(bytes: Uint8Array) {
-    let ek = BIBEEncryptionKey.deserialize(new Deserializer(bytes));
+    let ek = EncryptionKey.deserialize(new Deserializer(bytes));
 
     let ct = ek.encrypt(new Test("hi"), new Test("associated data"));
 
