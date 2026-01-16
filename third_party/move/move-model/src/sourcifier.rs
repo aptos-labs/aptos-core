@@ -1330,6 +1330,7 @@ impl<'a> ExpSourcifier<'a> {
             | Operation::Implies
             | Operation::Iff
             | Operation::Identical
+            | Operation::Behavior(..)
             | Operation::NoOp => {
                 emitln!(self.wr(), "/* unsupported spec operation {:?} */", oper)
             },

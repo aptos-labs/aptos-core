@@ -1,0 +1,49 @@
+
+Diagnostics:
+error: expected 2 argument(s) for requires_of but 1 were provided
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_type_err.move:22:17
+   │
+22 │         ensures requires_of<binary>(a);
+   │                 ^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected 2 argument(s) for ensures_of but 1 were provided
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_type_err.move:35:17
+   │
+35 │         ensures ensures_of<unary>(x);
+   │                 ^^^^^^^^^^^^^^^^^^^^
+
+error: unknown function `M::nonexistent_function` in behavior predicate
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_type_err.move:48:17
+   │
+48 │         ensures requires_of<nonexistent_function>(x);
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: type arguments cannot be provided for function parameter `f`
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_type_err.move:61:17
+   │
+61 │         ensures requires_of<f<u64>>(x);
+   │                 ^^^^^^^^^^^^^^^^^^^^^^
+
+error: behavior predicate target `x` must have function type, found `u64`
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_type_err.move:74:17
+   │
+74 │         ensures requires_of<x>(x);
+   │                 ^^^^^^^^^^^^^^^^^
+
+error: expected 1 type argument but 2 were provided
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_type_err.move:87:17
+   │
+87 │         ensures requires_of<generic_id<u64, u64>>(x);
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected `u64` but found a value of type `bool`
+    ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_type_err.move:100:40
+    │
+100 │         ensures requires_of<binary>(a, b);
+    │                                        ^
+
+error: expected 2 argument(s) for requires_of but 3 were provided
+    ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_type_err.move:113:17
+    │
+113 │         ensures requires_of<binary>(a, b, c);
+    │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -59,16 +59,12 @@ pub trait BatchThresholdEncryption {
     fn setup(
         digest_key: &Self::DigestKey,
         pvss_public_params: &<Self::SubTranscript as Subtranscript>::PublicParameters,
-        subtranscript_happypath: &Self::SubTranscript,
-        subtranscript_slowpath: &Self::SubTranscript,
-        tc_happypath: &Self::ThresholdConfig,
-        tc_slowpath: &Self::ThresholdConfig,
+        subtranscript: &Self::SubTranscript,
+        threshold_config: &Self::ThresholdConfig,
         current_player: Player,
         sk_share_decryption_key: &<Self::SubTranscript as Subtranscript>::DecryptPrivKey,
     ) -> Result<(
         Self::EncryptionKey,
-        Vec<Self::VerificationKey>,
-        Self::MasterSecretKeyShare,
         Vec<Self::VerificationKey>,
         Self::MasterSecretKeyShare,
     )>;
@@ -82,13 +78,10 @@ pub trait BatchThresholdEncryption {
         seed: u64,
         max_batch_size: usize,
         number_of_rounds: usize,
-        tc_happypath: &Self::ThresholdConfig,
-        tc_slowpath: &Self::ThresholdConfig,
+        threshold_config: &Self::ThresholdConfig,
     ) -> Result<(
         Self::EncryptionKey,
         Self::DigestKey,
-        Vec<Self::VerificationKey>,
-        Vec<Self::MasterSecretKeyShare>,
         Vec<Self::VerificationKey>,
         Vec<Self::MasterSecretKeyShare>,
     )>;

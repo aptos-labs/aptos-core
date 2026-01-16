@@ -1609,13 +1609,18 @@ impl ModuleBuilder<'_, '_> {
         };
         let mut et = self.exp_translator_for_context(loc, context, &kind);
         let (_, def) = et.translate_exp_free(def);
+        // Need to acquire type information to be able to resolve receiver-style functions.
+        et.finalize_types(false);
+        // Post-process to resolve placeholders including receiver-style function calls.
+        let desugared_exp = et.post_process_body(def.into_exp());
+        // Run type inference again with proper error reporting.
         et.finalize_types(true);
 
         // Check whether a let of this name is already defined, and add it to the
         // map which tracks lets in this block.
         if self
             .spec_block_lets
-            .insert(sym, (post_state, def.node_id()))
+            .insert(sym, (post_state, desugared_exp.node_id()))
             .is_some()
         {
             self.parent.error(
@@ -1630,7 +1635,7 @@ impl ModuleBuilder<'_, '_> {
                 loc: loc.clone(),
                 kind,
                 properties: Default::default(),
-                exp: def.into_exp(),
+                exp: desugared_exp,
                 additional_exps: vec![],
             })
         })

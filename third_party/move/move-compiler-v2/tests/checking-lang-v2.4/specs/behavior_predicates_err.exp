@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: global resource access expected
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_err.move:24:33
+   │
+24 │         modifies modifies_of<f>(x);
+   │                                 ^
+
+error: global resource access expected
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_err.move:24:18
+   │
+24 │         modifies modifies_of<f>(x);
+   │                  ^^^^^^^^^^^^^^^^^

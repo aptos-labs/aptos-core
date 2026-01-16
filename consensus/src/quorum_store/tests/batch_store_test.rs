@@ -285,13 +285,17 @@ async fn test_get_local_batch() {
     assert_err!(store.get_batch_from_local(&digest_3));
 }
 
-#[tokio::test]
-async fn test_batch_store_bootstrap_gc_expiry() {
+#[test]
+fn test_batch_store_bootstrap_gc_expiry() {
     let tmp_dir = TempPath::new();
     let digest_1 = HashValue::random();
     let memory_quota = 10;
-    {
-        let db = Arc::new(QuorumStoreDB::new(&tmp_dir));
+    let tmp_dir_path = tmp_dir.path().to_path_buf();
+    let tmp_dir_path_clone = tmp_dir_path.clone();
+
+    let runtime = tokio::runtime::Builder::new_multi_thread().build().unwrap();
+    runtime.block_on(async move {
+        let db = Arc::new(QuorumStoreDB::new(&tmp_dir_path_clone));
         let (signers, _validator_verifier) = random_validator_verifier(4, None, false);
 
         let store = Arc::new(BatchStore::new(
@@ -309,9 +313,11 @@ async fn test_batch_store_bootstrap_gc_expiry() {
         let request_1 = request_for_test(&digest_1, 50, 20, Some(vec![]));
         // Should be stored in memory and DB.
         assert!(!store.persist(vec![request_1]).is_empty());
-    }
+    });
+    drop(runtime);
 
-    {
+    let runtime = tokio::runtime::Builder::new_multi_thread().build().unwrap();
+    runtime.block_on(async move {
         let db = Arc::new(QuorumStoreDB::new(&tmp_dir));
         let (signers, _validator_verifier) = random_validator_verifier(4, None, false);
 
@@ -328,5 +334,5 @@ async fn test_batch_store_bootstrap_gc_expiry() {
         ));
 
         store.get_batch_from_local(&digest_1).unwrap();
-    }
+    });
 }

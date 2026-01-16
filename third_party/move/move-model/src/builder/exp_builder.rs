@@ -4,9 +4,9 @@
 
 use crate::{
     ast::{
-        AbortKind, AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Exp, ExpData,
-        LambdaCaptureKind, MatchArm, ModuleName, Operation, Pattern, QualifiedSymbol, QuantKind,
-        ResourceSpecifier, RewriteResult, Spec, TempIndex, Value,
+        AbortKind, AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, BehaviorKind,
+        BehaviorTarget, Exp, ExpData, LambdaCaptureKind, MatchArm, ModuleName, Operation, Pattern,
+        QualifiedSymbol, QuantKind, ResourceSpecifier, RewriteResult, Spec, TempIndex, Value,
     },
     builder::{
         model_builder::{
@@ -2038,6 +2038,17 @@ impl ExpTranslator<'_, '_, '_> {
                         });
                 }
                 ExpData::Call(id, Operation::NoOp, vec![])
+            },
+            EA::Exp_::Behavior(kind, _pre_label, fn_name, type_args, sp!(_, args), _post_label) => {
+                self.translate_behavior_predicate(
+                    &loc,
+                    *kind,
+                    fn_name,
+                    type_args,
+                    args,
+                    expected_type,
+                    context,
+                )
             },
             EA::Exp_::UnresolvedError => {
                 // Error reported
@@ -5694,6 +5705,229 @@ impl ExpTranslator<'_, '_, '_> {
         self.check_type(loc, &quant_ty, expected_type, context);
         let id = self.new_node_id_with_type_loc(&quant_ty, loc);
         ExpData::Quant(id, rkind, rranges, rtriggers, rcondition, rbody.into_exp())
+    }
+
+    /// Translates a behavior predicate expression (requires_of, aborts_of, ensures_of, modifies_of).
+    fn translate_behavior_predicate(
+        &mut self,
+        loc: &Loc,
+        kind: PA::BehaviorKind,
+        fn_name: &EA::ModuleAccess,
+        type_args: &Option<Vec<EA::Type>>,
+        args: &[EA::Exp],
+        expected_type: &Type,
+        context: &ErrorMessageContext,
+    ) -> ExpData {
+        // Convert parser BehaviorKind to model BehaviorKind
+        let model_kind = match kind {
+            PA::BehaviorKind::RequiresOf => BehaviorKind::RequiresOf,
+            PA::BehaviorKind::AbortsOf => BehaviorKind::AbortsOf,
+            PA::BehaviorKind::EnsuresOf => BehaviorKind::EnsuresOf,
+            PA::BehaviorKind::ModifiesOf => BehaviorKind::ModifiesOf,
+        };
+
+        // Resolve the function name to a behavior target
+        let Some((target, expected_arg_types)) =
+            self.resolve_behavior_target(loc, fn_name, type_args, &model_kind)
+        else {
+            return self.new_error_exp();
+        };
+
+        // Translate arguments and check types
+        let translated_args =
+            self.translate_and_check_behavior_args(loc, args, &expected_arg_types, &model_kind);
+
+        // The result type of behavior predicates is bool
+        let result_ty = self.check_type(loc, &BOOL_TYPE, expected_type, context);
+        let id = self.new_node_id_with_type_loc(&result_ty, loc);
+
+        // Set the type instantiation on the node for proper type resolution during finalize_types
+        if let BehaviorTarget::Function(qid) = &target {
+            self.set_node_instantiation(id, qid.inst.clone());
+        }
+
+        // Labels are ignored for now (None, None)
+        ExpData::Call(
+            id,
+            Operation::Behavior(model_kind, None, target, None),
+            translated_args,
+        )
+    }
+
+    /// Resolves the target of a behavior predicate to either a parameter or a function.
+    /// Returns the BehaviorTarget and the expected argument types.
+    fn resolve_behavior_target(
+        &mut self,
+        loc: &Loc,
+        maccess: &EA::ModuleAccess,
+        type_args: &Option<Vec<EA::Type>>,
+        kind: &BehaviorKind,
+    ) -> Option<(BehaviorTarget, Vec<Type>)> {
+        match &maccess.value {
+            EA::ModuleAccess_::Name(name) => {
+                // First try to resolve as a local parameter
+                let sym = self.symbol_pool().make(name.value.as_str());
+                if let Some(entry) = self.lookup_local(sym, false) {
+                    // Check if it's a function type
+                    let entry_type = entry.type_.clone();
+                    let ty = self.subs.specialize(&entry_type);
+                    if let Type::Fun(arg_ty, result_ty, _abilities) = &ty {
+                        // Check that no type arguments are provided for function parameters
+                        if type_args.as_ref().is_some_and(|args| !args.is_empty()) {
+                            self.error(
+                                loc,
+                                &format!(
+                                    "type arguments cannot be provided for function parameter `{}`",
+                                    sym.display(self.symbol_pool())
+                                ),
+                            );
+                            return None;
+                        }
+                        let expected_types =
+                            self.compute_behavior_arg_types(arg_ty, result_ty, kind);
+                        return Some((BehaviorTarget::Parameter(sym), expected_types));
+                    } else {
+                        self.error(
+                            loc,
+                            &format!(
+                                "behavior predicate target `{}` must have function type, found `{}`",
+                                sym.display(self.symbol_pool()),
+                                ty.display(&self.type_display_context())
+                            ),
+                        );
+                        return None;
+                    }
+                }
+                // Fall through to try resolving as a function
+                let global_sym = self.parent.qualified_by_module(sym);
+                self.resolve_function_target(loc, &global_sym, type_args, kind)
+            },
+            EA::ModuleAccess_::ModuleAccess(..) => {
+                let global_sym = self.parent.module_access_to_qualified(maccess);
+                self.resolve_function_target(loc, &global_sym, type_args, kind)
+            },
+        }
+    }
+
+    /// Resolves a qualified function name for behavior predicates.
+    fn resolve_function_target(
+        &mut self,
+        loc: &Loc,
+        global_sym: &QualifiedSymbol,
+        type_args: &Option<Vec<EA::Type>>,
+        kind: &BehaviorKind,
+    ) -> Option<(BehaviorTarget, Vec<Type>)> {
+        if let Some(entry) = self.parent.parent.fun_table.get(global_sym) {
+            let module_id = entry.module_id;
+            let fun_id = entry.fun_id;
+            let type_params = entry.type_params.clone();
+            let params = entry.params.clone();
+            let result_type = entry.result_type.clone();
+
+            // Make instantiation
+            let instantiation = self.make_instantiation_or_report(
+                loc,
+                false,
+                global_sym.symbol,
+                &type_params,
+                type_args,
+            )?;
+
+            // Compute instantiated parameter types
+            let param_types: Vec<Type> = params
+                .iter()
+                .map(|p| p.get_type().instantiate(&instantiation))
+                .collect();
+            let instantiated_result_type = result_type.instantiate(&instantiation);
+
+            // Compute expected argument types based on behavior kind
+            let arg_ty = Type::tuple(param_types);
+            let expected_types =
+                self.compute_behavior_arg_types(&arg_ty, &instantiated_result_type, kind);
+
+            let qid = QualifiedInstId {
+                module_id,
+                id: fun_id,
+                inst: instantiation,
+            };
+            Some((BehaviorTarget::Function(qid), expected_types))
+        } else {
+            self.error(
+                loc,
+                &format!(
+                    "unknown function `{}` in behavior predicate",
+                    global_sym.display(self.env())
+                ),
+            );
+            None
+        }
+    }
+
+    /// Computes the expected argument types for a behavior predicate based on kind.
+    fn compute_behavior_arg_types(
+        &self,
+        arg_ty: &Type,
+        result_ty: &Type,
+        kind: &BehaviorKind,
+    ) -> Vec<Type> {
+        match kind {
+            BehaviorKind::RequiresOf | BehaviorKind::AbortsOf => {
+                // requires_of and aborts_of take input parameters
+                arg_ty.clone().flatten()
+            },
+            BehaviorKind::EnsuresOf => {
+                // ensures_of takes input parameters + result
+                let mut types = arg_ty.clone().flatten();
+                types.extend(result_ty.clone().flatten());
+                types
+            },
+            BehaviorKind::ModifiesOf => {
+                // modifies_of takes global resource references, not function parameters.
+                // We don't enforce argument count or types here.
+                vec![]
+            },
+        }
+    }
+
+    /// Translates and type-checks behavior predicate arguments.
+    fn translate_and_check_behavior_args(
+        &mut self,
+        loc: &Loc,
+        args: &[EA::Exp],
+        expected_types: &[Type],
+        kind: &BehaviorKind,
+    ) -> Vec<Exp> {
+        // For modifies_of, arguments must be global resource expressions
+        if matches!(kind, BehaviorKind::ModifiesOf) {
+            return args
+                .iter()
+                .map(|arg| self.translate_modify_target(arg).into_exp())
+                .collect();
+        }
+
+        // Check arity for other behavior kinds
+        if args.len() != expected_types.len() {
+            self.error(
+                loc,
+                &format!(
+                    "expected {} argument(s) for {} but {} were provided",
+                    expected_types.len(),
+                    kind,
+                    args.len()
+                ),
+            );
+            // Still translate arguments to provide better error messages
+            return args
+                .iter()
+                .map(|arg| self.translate_exp_free(arg).1.into_exp())
+                .collect();
+        }
+
+        // Translate each argument with expected type
+        args.iter()
+            .zip(expected_types.iter())
+            .map(|(arg, expected_ty)| self.translate_exp(arg, expected_ty).into_exp())
+            .collect()
     }
 
     /// Unify types with order `LeftToRight` and shallow variance
