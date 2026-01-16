@@ -17,6 +17,8 @@ pub enum ValidatorInfoIdlError {
     ConsensusPublicKeyError(String),
     #[error("Network addresses BCS deserialization error: {0}")]
     NetworkAddressesError(String),
+    #[error("Network address parsing error: {0}")]
+    NetworkAddressParseError(String),
     #[error("Base64 decoding error: {0}")]
     Base64Error(String),
     #[error("Hex decoding error: {0}")]

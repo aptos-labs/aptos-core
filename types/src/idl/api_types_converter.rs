@@ -17,7 +17,6 @@ use crate::{
 };
 use anyhow::format_err;
 use aptos_crypto::bls12381;
-use bytes::Bytes;
 use std::{convert::TryFrom, str::FromStr};
 
 // Convert the bytes returned from execution layer
@@ -99,15 +98,27 @@ pub fn convert_validator_info(
     ))
 }
 
-// TODO(Gravity_alex): we should consider multi addresses in one validator config
+/// Parse network addresses from BCS-encoded bytes
+/// The bytes come directly from EVM storage and are BCS-encoded Vec<NetworkAddress>
 fn parse_network_address(
     network_addresses: Vec<u8>,
 ) -> Result<Vec<NetworkAddress>, ValidatorInfoIdlError> {
-    let address_bytes = Bytes::from(network_addresses);
-    let address_string: String = bcs::from_bytes(&address_bytes).unwrap();
-    let validator_network_address: NetworkAddress =
-        NetworkAddress::from_str(&address_string).unwrap();
-    Ok(vec![validator_network_address])
+    if network_addresses.is_empty() {
+        return Ok(vec![]);
+    }
+    // The network addresses are BCS-encoded, first try to decode as BCS string
+    // which is how gravity-cli encodes them
+    if let Ok(address_string) = bcs::from_bytes::<String>(&network_addresses) {
+        if let Ok(addr) = NetworkAddress::from_str(&address_string) {
+            return Ok(vec![addr]);
+        }
+    }
+    // If that fails, try to decode as BCS Vec<NetworkAddress> directly
+    if let Ok(addresses) = bcs::from_bytes::<Vec<NetworkAddress>>(&network_addresses) {
+        return Ok(addresses);
+    }
+    // As a fallback, return empty
+    Ok(vec![])
 }
 
 /// Convert api-types ValidatorConfig to gravity-aptos ValidatorConfig
@@ -115,25 +126,22 @@ pub fn convert_validator_config(
     api_config: &api_types::on_chain_config::validator_config::ValidatorConfig,
 ) -> Result<ValidatorConfig, ValidatorInfoIdlError> {
     // Convert consensus public key from Vec<u8> to bls12381::PublicKey
-    // let consensus_public_key =
-    //     bls12381::PublicKey::try_from(api_config.consensus_public_key.as_slice())
-    //         .map_err(|e| ValidatorInfoIdlError::ConsensusPublicKeyError(e.to_string()))?;
-
+    // The consensus_public_key is already raw bytes (48 bytes for BLS12381),
+    // NOT a hex string, so we should NOT hex::decode it
     let consensus_public_key = bls12381::PublicKey::try_from(
-        hex::decode(&api_config.consensus_public_key)
-            .unwrap()
-            .as_slice(),
+        api_config.consensus_public_key.as_slice(),
     )
     .map_err(|e| ValidatorInfoIdlError::ConsensusPublicKeyError(e.to_string()))?;
 
+    // Parse and re-encode network addresses to ensure proper BCS format
     let validator_network_addresses = bcs::to_bytes(
-        &parse_network_address(api_config.validator_network_addresses.clone()).unwrap(),
+        &parse_network_address(api_config.validator_network_addresses.clone())?,
     )
-    .unwrap();
+    .map_err(|e| ValidatorInfoIdlError::NetworkAddressParseError(e.to_string()))?;
     let fullnode_network_addresses = bcs::to_bytes(
-        &parse_network_address(api_config.fullnode_network_addresses.clone()).unwrap(),
+        &parse_network_address(api_config.fullnode_network_addresses.clone())?,
     )
-    .unwrap();
+    .map_err(|e| ValidatorInfoIdlError::NetworkAddressParseError(e.to_string()))?;
 
     Ok(ValidatorConfig::new(
         consensus_public_key,

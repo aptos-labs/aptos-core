@@ -43,7 +43,8 @@ pub struct ExternalBlockMeta {
     pub epoch: u64,
     pub randomness: Option<Random>,
     pub block_hash: Option<ComputeRes>,
-    pub proposer: Option<ExternalAccountAddress>,
+    /// The proposer's index in the active validator set (None for NIL blocks)
+    pub proposer_index: Option<u64>,
 }
 
 #[derive(Debug, Clone)]
