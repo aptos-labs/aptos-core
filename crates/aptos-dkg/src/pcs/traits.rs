@@ -56,6 +56,7 @@ pub trait PolynomialCommitmentScheme {
         challenge: Vec<Self::WitnessField>,
         eval: Self::WitnessField,
         proof: Self::Proof,
+        trs: &mut merlin::Transcript,
     ) -> anyhow::Result<()>;
 
     fn random_witness<R: rand_core::RngCore + rand_core::CryptoRng>(

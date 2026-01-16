@@ -37,11 +37,11 @@ pub fn all_groups(c: &mut Criterion) {
         subaggregatable_pvss_group::<Chunky_v1<Bn254>>(&tc, c, BN254);
     }
     for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
-        subaggregatable_pvss_group::<Chunky_v1<Bn254>>(&tc, c, BLS12_381);
+        subaggregatable_pvss_group::<Chunky_v1<Bls12_381>>(&tc, c, BLS12_381);
     }
 
     for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
-        subaggregatable_pvss_group::<Chunky_v2<Bls12_381>>(&tc, c, BN254);
+        subaggregatable_pvss_group::<Chunky_v2<Bn254>>(&tc, c, BN254);
     }
     for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
         subaggregatable_pvss_group::<Chunky_v2<Bls12_381>>(&tc, c, BLS12_381);

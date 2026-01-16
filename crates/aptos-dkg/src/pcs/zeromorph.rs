@@ -493,7 +493,7 @@ where
 
         let trapdoor = univariate_hiding_kzg::Trapdoor::<P>::rand(rng);
         let (kzg_vk_pp, kzg_commit_pp) = univariate_hiding_kzg::setup_extra(
-            number_of_coefficients,
+            number_of_coefficients + 1,
             SrsType::PowersOfTau,
             GroupGenerators::default(),
             trapdoor,
@@ -576,9 +576,9 @@ where
         challenge: Vec<Self::WitnessField>,
         eval: Self::WitnessField,
         proof: Self::Proof,
+        trs: &mut merlin::Transcript,
     ) -> anyhow::Result<()> {
-        let mut transcript = merlin::Transcript::new(b"Zeromorph");
-        Zeromorph::verify(&vk, &com, &challenge, &eval, &proof, &mut transcript)
+        Zeromorph::verify(&vk, &com, &challenge, &eval, &proof, trs)
     }
 
     fn random_witness<R: RngCore + CryptoRng>(rng: &mut R) -> Self::WitnessField {

@@ -70,8 +70,11 @@ impl<C: CurveGroup> PublicParameters<C> {
     pub fn pubkey_base(&self) -> &C::Affine {
         &self.H
     }
+}
 
-    pub fn default() -> Self {
+#[allow(non_snake_case)]
+impl<C: CurveGroup> Default for PublicParameters<C> {
+    fn default() -> Self {
         let G = hashing::unsafe_hash_to_affine(b"G", DST);
         // Chunky's encryption pubkey base must match up with the blst base, since validators
         // reuse their consensus keypairs as encryption keypairs
