@@ -56,28 +56,6 @@ fn test_pvss_all_unweighted() {
         // TODO: Remove?
         pvss_deal_verify_and_reconstruct::<insecure_field::Transcript>(&tc, seed.to_bytes_le());
     }
-
-    // Restarting the loop here because now it'll grab **arkworks** `ThresholdConfig`s over BN254 instead
-    // let tcs = test_utils::get_threshold_configs_for_testing_smaller();
-    // for tc in tcs.iter().take(20) {
-    //     // Reduce the number of tcs to make it a bit faster?
-    //     println!("\nTesting {tc} PVSS");
-
-    //     let seed = random_scalar(&mut rng);
-
-    //     type ChunkyTranscriptBn254 = chunky::UnsignedUnweightedTranscript<ark_bn254::Bn254>;
-
-    //     // Chunky
-    //     nonaggregatable_pvss_deal_verify_and_reconstruct::<ChunkyTranscriptBn254>(
-    //         &tc,
-    //         seed.to_bytes_le(),
-    //     );
-
-    //     pvss_deal_verify_and_reconstruct_from_subtranscript::<ChunkyTranscriptBn254>(
-    //         &tc,
-    //         seed.to_bytes_le(),
-    //     );
-    // }
 }
 
 #[test]
@@ -138,17 +116,6 @@ fn test_pvss_all_weighted() {
             Bn254,
             chunky::UnsignedWeightedTranscriptv2<Bn254>,
         >(&wc, seed.to_bytes_le());
-
-        //type SignedChunkyTranscriptBn254 = signed::GenericSigning<chunky::WeightedTranscript<Bn254>>; TODO!!
-        // type UnsignedChunkyTranscriptBn254 = chunky::UnsignedWeightedTranscript<Bn254>;
-
-        // OLD: <ChunkyTranscriptBn254 as Transcript>::SecretSharingConfig
-        // if wc.get_total_num_players() > 8 {
-        //     test_pvss_aggregate_subtranscript_and_decrypt::<Bn254, UnsignedChunkyTranscriptBn254>(
-        //         &wc,
-        //         seed.to_bytes_le(),
-        //     );
-        // }
     }
 }
 

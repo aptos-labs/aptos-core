@@ -36,7 +36,7 @@ where
     a.map_err(serde::de::Error::custom)
 }
 
-/// Blabla
+/// TODO: Not sure this is a good idea, will probably remove it in the next PR?
 pub trait BatchSerializable<E: Pairing> {
     /// Collect *all* curve elements in canonical order
     fn collect_points(&self, g1: &mut Vec<E::G1>, g2: &mut Vec<E::G2>);

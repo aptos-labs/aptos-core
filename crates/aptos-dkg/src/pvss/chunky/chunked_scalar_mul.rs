@@ -179,15 +179,6 @@ mod tests {
                 let reconstructed =
                     le_chunks_to_scalar(ell, &Scalar::slice_as_inner(scalar_chunks));
 
-                // assert_eq!(
-                //     reconstructed, *scalars.iter().find(|s| {
-                //         let expected_chunks: Vec<Scalar<_>> =
-                //             scalar_to_le_chunks(ell, s).into_iter().map(Scalar).collect();
-                //         expected_chunks == *scalar_chunks
-                //     }).unwrap(),
-                //     "Unchunked scalar does not match original"
-                // );
-
                 let expected = base * reconstructed;
                 assert_eq!(
                     *V, expected,
@@ -196,61 +187,4 @@ mod tests {
             }
         }
     }
-
-    // #[test]
-    // fn test_chunked_homomorphism_ell_16() {
-    //     let mut rng = thread_rng();
-
-    //     // Parameters
-    //     let ell: u8 = 16;
-    //     let num_scalars = 8;
-
-    //     // Random base
-    //     let base = unsafe_random_point::<G1Projective, _>(&mut rng).into_affine();
-
-    //     // Create random scalars
-    //     let scalars = sample_field_elements(num_scalars, &mut rng);
-
-    //     // Chunk each scalar into little-endian chunks of size `ell`
-    //     let chunked_values: Vec<Vec<Scalar<_>>> = scalars
-    //         .iter()
-    //         .map(|s| {
-    //             scalar_to_le_chunks(ell, s)
-    //                 .into_iter()
-    //                 .map(|chunk| Scalar(chunk))
-    //                 .collect()
-    //         })
-    //         .collect();
-
-    //     let witness = Witness {
-    //         chunked_values: chunked_values.clone(),
-    //     };
-
-    //     let hom = Homomorphism::<G1Projective> { base, ell };
-
-    //     // Apply the homomorphism
-    //     let VectorShape(outputs) = hom.apply(&witness);
-
-    //     // Check correctness:
-    //     // base * unchunk(chunks) == output
-    //     for ((chunks, original_scalar), output) in chunked_values
-    //         .iter()
-    //         .zip(scalars.iter())
-    //         .zip(outputs.iter())
-    //     {
-    //         let reconstructed =
-    //             le_chunks_to_scalar(ell, &Scalar::slice_as_inner(chunks));
-
-    //         assert_eq!(
-    //             reconstructed, *original_scalar,
-    //             "Unchunked scalar does not match original"
-    //         );
-
-    //         let expected = base * reconstructed;
-    //         assert_eq!(
-    //             *output, expected,
-    //             "Homomorphism output does not match expected base * scalar"
-    //         );
-    //     }
-    // }
 }

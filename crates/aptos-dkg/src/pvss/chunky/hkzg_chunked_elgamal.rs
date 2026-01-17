@@ -41,15 +41,6 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 /// - the HKZG randomness,
 /// - the chunked plaintexts, and
 /// - the ElGamal randomness.
-// #[derive(
-//     SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq,
-// )]
-// pub struct HkzgElgamalWitness<F: PrimeField> {
-//     pub hkzg_randomness: univariate_hiding_kzg::CommitmentRandomness<F>,
-//     pub chunked_plaintexts: Vec<Vec<Scalar<F>>>, // For each plaintext z_i, a chunk z_{i,j}
-//     pub elgamal_randomness: Vec<Scalar<F>>,      // For each chunk, a blinding factor
-// }
-
 #[derive(
     SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq,
 )]
@@ -70,15 +61,6 @@ pub struct HkzgWeightedElgamalWitness<F: PrimeField> {
 /// two components: in each case, the witness omits (or “ignores”) one of its three fields, then applies
 /// a homomorphism. Thus, the overall homomorphism of the Σ-protocol can be viewed as a tuple of two
 /// *lifted* homomorphisms.
-// type LiftedHkzg<'a, E> = LiftHomomorphism<
-//     univariate_hiding_kzg::CommitmentHomomorphism<'a, E>,
-//     HkzgElgamalWitness<<E as Pairing>::ScalarField>,
-// >;
-// type LiftedChunkedElgamal<'a, C> = LiftHomomorphism<
-//     chunked_elgamal::Homomorphism<'a, C>,
-//     HkzgElgamalWitness<<<C as CurveGroup>::Affine as AffineRepr>::ScalarField>,
-// >;
-
 type LiftedHkzgWeighted<'a, E> = LiftHomomorphism<
     univariate_hiding_kzg::CommitmentHomomorphism<'a, E>,
     HkzgWeightedElgamalWitness<<E as Pairing>::ScalarField>,

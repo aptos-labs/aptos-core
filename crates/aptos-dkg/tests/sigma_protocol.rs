@@ -65,7 +65,7 @@ fn test_imhomog_chaum_pedersen<
 use aptos_dkg::pvss::chunky::chunked_scalar_mul::Witness;
 
 fn test_imhomog_scalar_mul<E>(
-    hom: scalar_mul::InhomogScalarMul<E>,
+    hom: chunked_scalar_mul::InhomogChunkedScalarMul<E>,
     witness: Witness<E::ScalarField>,
 ) where
     E: Pairing,
@@ -191,18 +191,18 @@ mod chaum_pedersen {
     }
 }
 
-mod scalar_mul {
+mod chunked_scalar_mul {
     use super::*;
     use aptos_dkg::pvss::chunky::chunked_scalar_mul;
 
-    pub type InhomogScalarMul<E> = PairingTupleHomomorphism<
+    pub type InhomogChunkedScalarMul<E> = PairingTupleHomomorphism<
         E,
         chunked_scalar_mul::Homomorphism<<E as Pairing>::G1>,
         chunked_scalar_mul::Homomorphism<<E as Pairing>::G2>,
     >;
 
     #[allow(non_snake_case)]
-    pub fn make_inhomogeneous_scalar_mul<E: Pairing>() -> InhomogScalarMul<E> {
+    pub fn make_inhomogeneous_scalar_mul<E: Pairing>() -> InhomogChunkedScalarMul<E> {
         let G_1 = E::G1::generator().into_affine();
         let G_2 = E::G2::generator().into_affine();
 
@@ -257,7 +257,7 @@ fn test_chaum_pedersen() {
         witness_bls,
     );
 
-    use crate::scalar_mul::make_inhomogeneous_scalar_mul;
+    use crate::chunked_scalar_mul::make_inhomogeneous_scalar_mul;
     use aptos_dkg::pvss::chunky::{chunked_scalar_mul::Witness, chunks};
 
     let ell = 16u8;

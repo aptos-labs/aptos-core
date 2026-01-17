@@ -26,10 +26,7 @@ use std::fmt::Debug;
 /// - A uniform “shape” abstraction for collecting and flattening MSM outputs
 ///   for batch verification in Σ-protocols.
 pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOutput>> {
-    // Briefly considered changing that to `Codomain = Self::CodomainShape<Self::MsmOutput>`,
-    // but this will lead to too many uncoordinated batch normalisations happening
-
-    // Type representing the scalar used in the `MsmInput`s. Convenient to repeat here
+    // Type representing the scalar used in the `MsmInput`s. Convenient to repeat here, and currently used in `prove_homomorphism()` where it could be replaced by e.g. `C::ScalarField`... (or maybe by going inside of MsmInput)
     type Scalar: ark_ff::PrimeField; // Probably need less here but this what it'll be in practice
 
     /// Type representing a single MSM input (a set of bases and scalars). Normally, this would default
@@ -69,7 +66,6 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
         + Eq
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-    // for<'a> &'a mut Self::CodomainShape<T>: IntoIterator<Item = &'a mut T>;
 
     /// Returns the MSM terms corresponding to a given homomorphism input.
     ///
