@@ -271,7 +271,7 @@ fn test_chaum_pedersen() {
         .map(|s| {
             vec![chunks::scalar_to_le_chunks(ell, s)
                 .into_iter()
-                .map(|chunk| Scalar(chunk))
+                .map(Scalar)
                 .collect::<Vec<_>>()]
         })
         .collect();

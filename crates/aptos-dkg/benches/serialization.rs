@@ -246,7 +246,9 @@ struct DasSizes {
 fn das_sizes() -> DasSizes {
     let (_, n) = BENCHMARK_CONFIGS[0];
 
+    #[allow(clippy::identity_op)]
     let g1 = (n + n + 1 + n) * 1; // The `* 1` is for experimenting
+    #[allow(clippy::identity_op)]
     let g2 = (n + n + 1) * 1;
 
     DasSizes { g1, g2, scalars: 0 }
