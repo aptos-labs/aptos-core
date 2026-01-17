@@ -1410,18 +1410,15 @@ dependencies = [
  "ark-ec 0.5.0",
  "ark-ff 0.5.0",
  "ark-poly 0.5.0",
- "ark-poly-commit",
  "ark-serialize 0.5.0",
  "ark-std 0.5.0",
  "bcs 0.1.4",
- "blake2",
  "blst",
  "blstrs",
  "criterion",
  "derive_more 0.99.17",
  "ff",
  "group",
- "hashbrown 0.14.3",
  "hex",
  "itertools 0.13.0",
  "merlin",
@@ -1438,7 +1435,6 @@ dependencies = [
  "serde_bytes",
  "sha3 0.9.1",
  "static_assertions",
- "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -5241,7 +5237,6 @@ dependencies = [
  "derivative",
  "digest 0.10.7",
  "fnv",
- "hashbrown 0.14.3",
  "merlin",
  "rayon",
  "sha2 0.10.8",
@@ -5421,30 +5416,6 @@ dependencies = [
  "educe",
  "fnv",
  "hashbrown 0.15.3",
- "rayon",
-]
-
-[[package]]
-name = "ark-poly-commit"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d68a105d915bcde6c0687363591c97e72d2d3758f3532d48fd0bf21a3261ce7"
-dependencies = [
- "ahash 0.8.11",
- "ark-crypto-primitives",
- "ark-ec 0.5.0",
- "ark-ff 0.5.0",
- "ark-poly 0.5.0",
- "ark-relations",
- "ark-serialize 0.5.0",
- "ark-std 0.5.0",
- "blake2",
- "derivative",
- "digest 0.10.7",
- "fnv",
- "merlin",
- "num-traits",
- "rand 0.8.5",
  "rayon",
 ]
 
