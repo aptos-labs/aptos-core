@@ -2,7 +2,8 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    algebra::polynomials, fiat_shamir, pcs::univariate_kzg, range_proofs::traits,
+    algebra::polynomials, fiat_shamir, pcs::univariate_kzg,
+    pvss::chunky::chunked_elgamal::correlated_randomness, range_proofs::traits,
     sigma_protocol::homomorphism::Trait, utils, Scalar,
 };
 use anyhow::ensure;
@@ -11,7 +12,7 @@ use ark_ec::{
     pairing::{Pairing, PairingOutput},
     CurveGroup, PrimeGroup, VariableBaseMSM,
 };
-use ark_ff::{AdditiveGroup, Field, PrimeField};
+use ark_ff::{AdditiveGroup, Field};
 use ark_poly::{self, EvaluationDomain, Radix2EvaluationDomain};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError};
 #[cfg(feature = "range_proof_timing")]
@@ -290,7 +291,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         #[cfg(feature = "range_proof_timing")]
         let start = Instant::now();
 
-        let r = correlated_randomness(rng, 2, ell, &r.0);
+        let r = correlated_randomness(rng, 2, ell.try_into().unwrap(), &r.0);
 
         #[cfg(feature = "range_proof_timing")]
         {
@@ -670,63 +671,4 @@ fn fiat_shamir_challenges<E: Pairing>(
         );
 
     (alpha_vals, beta_vals)
-}
-
-/// Generate correlated random values whose weighted sum equals `target_sum`.
-///
-/// Returns `num_chunks` field elements `[r_0, ..., r_{num_chunks-1}]` such that:
-/// `r_0 + r_1 * radix + r_2 * radix^2 + ... + r_{num_chunks-1} * radix^{num_chunks-1} = target_sum`.
-pub fn correlated_randomness<F, R>(
-    rng: &mut R,
-    radix: u64,
-    num_chunks: usize,
-    target_sum: &F,
-) -> Vec<F>
-where
-    F: PrimeField, // PrimeField because of sample_field_element()
-    R: rand_core::RngCore + rand_core::CryptoRng,
-{
-    let mut r_vals = vec![F::zero(); num_chunks];
-    let mut remaining = *target_sum;
-    let radix_f = F::from(radix);
-    let mut cur_base = radix_f;
-
-    for i in 1..num_chunks {
-        r_vals[i] = sample_field_element(rng);
-        remaining -= r_vals[i] * cur_base;
-        cur_base *= radix_f;
-    }
-    r_vals[0] = remaining;
-
-    r_vals
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::range_proofs::dekart_univariate::correlated_randomness;
-    use ark_ff::PrimeField;
-    use rand::thread_rng;
-
-    #[cfg(test)]
-    fn test_correlated_randomness_generic<F: PrimeField>() {
-        let mut rng = thread_rng();
-        let target_sum = F::one();
-        let radix: u64 = 4;
-        let num_chunks: usize = 8;
-
-        let coefs = correlated_randomness(&mut rng, radix, num_chunks, &target_sum);
-
-        // Compute actual sum: Σ coef[i] * radix^i
-        let actual_sum: F = (0..num_chunks)
-            .map(|i| coefs[i] * F::from(radix.pow(i as u32)))
-            .sum();
-
-        assert_eq!(target_sum, actual_sum);
-    }
-
-    #[test]
-    fn test_correlated_randomness_bn254() {
-        use ark_bn254::Fr;
-        test_correlated_randomness_generic::<Fr>();
-    }
 }

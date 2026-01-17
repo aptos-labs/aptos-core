@@ -4,7 +4,6 @@ use crate::{
     errors::BatchEncryptionError,
     group::*,
     shared::{
-        ark_serialize::*,
         ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, StandardCiphertext},
         digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise},
         encryption_key::EncryptionKey,
@@ -19,7 +18,11 @@ use crate::{
     },
 };
 use anyhow::{anyhow, Result};
-use aptos_crypto::{weighted_config::WeightedConfigArkworks, SecretSharingConfig as _};
+use aptos_crypto::{
+    arkworks::serialization::{ark_de, ark_se},
+    weighted_config::WeightedConfigArkworks,
+    SecretSharingConfig as _,
+};
 use aptos_dkg::pvss::{
     traits::{Reconstructable as _, Subtranscript},
     Player,

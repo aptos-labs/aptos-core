@@ -6,9 +6,10 @@ use super::ids::{ComputedCoeffs, Id, IdSet};
 use crate::{
     errors::BatchEncryptionError,
     group::{Fr, G1Affine, G1Projective, G2Affine, G2Projective, PairingSetting},
-    shared::{algebra::fk_algorithm::FKDomain, ark_serialize::*, ids::UncomputedCoeffs},
+    shared::{algebra::fk_algorithm::FKDomain, ids::UncomputedCoeffs},
 };
 use anyhow::{anyhow, Result};
+use aptos_crypto::arkworks::serialization::{ark_de, ark_se};
 use ark_ec::{pairing::Pairing, AffineRepr, ScalarMul, VariableBaseMSM};
 use ark_std::{
     rand::{CryptoRng, RngCore},

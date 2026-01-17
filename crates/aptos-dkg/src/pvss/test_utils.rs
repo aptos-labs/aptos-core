@@ -6,7 +6,7 @@ use crate::pvss::{
         transcript::{Transcript, WithMaxNumShares},
         Convert, HasEncryptionPublicParams, Subtranscript,
     },
-    Player, ThresholdConfigBlstrs, WeightedConfigBlstrs,
+    Player, ThresholdConfigBlstrs,
 };
 use aptos_crypto::{
     arkworks::shamir::Reconstructable,
@@ -52,12 +52,12 @@ pub fn setup_dealing<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng
     mut rng: &mut R,
 ) -> DealingArgs<T> {
     println!(
-        "Setting up dealing for {} PVSS, with {}",
+        "Setting up dealing for {} PVSS, with {} (and some elliptic curve)",
         T::scheme_name(),
         sc
     );
 
-    let pp = T::PublicParameters::with_max_num_shares(sc.get_total_num_players());
+    let pp = T::PublicParameters::with_max_num_shares(sc.get_total_num_shares());
 
     let (ssks, spks, dks, eks, iss, s, dsk, dpk) =
         generate_keys_and_secrets::<T, R>(sc, &pp, &mut rng);
@@ -75,7 +75,7 @@ pub fn setup_dealing<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng
     }
 }
 
-// TODO: Possible way to merge this would be to make `SecretSharingConfig`s implement `WeightedConfig` with all weights set to 1
+// TODO: I think this can be deleted
 pub fn setup_dealing_weighted<
     F: FftField,
     T: Transcript<SecretSharingConfig = WeightedConfigArkworks<F>>,
@@ -218,6 +218,8 @@ pub fn get_weighted_configs_for_testing<T: traits::ThresholdConfig>() -> Vec<Wei
     wcs.push(WeightedConfig::<T>::new(1, vec![1, 1]).unwrap());
     // 2-out-of-2, weights 1 1
     wcs.push(WeightedConfig::<T>::new(2, vec![1, 1]).unwrap());
+    // 2-out-of-3, weights 2 1
+    wcs.push(WeightedConfig::<T>::new(2, vec![2, 1]).unwrap());
 
     // 1-out-of-3, weights 1 1 1
     wcs.push(WeightedConfig::<T>::new(1, vec![1, 1, 1]).unwrap());
@@ -248,6 +250,8 @@ pub fn get_weighted_configs_for_testing<T: traits::ThresholdConfig>() -> Vec<Wei
 }
 
 pub const BENCHMARK_CONFIGS: &[(usize, usize)] = &[
+    // (t, n)
+    (129, 219), // See the mid-Nov 2025 weighted config below
     (143, 254),
     (184, 254),
     (548, 821),
@@ -264,7 +268,8 @@ pub fn get_threshold_configs_for_benchmarking<T: traits::ThresholdConfig>() -> V
         .collect()
 }
 
-pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfigBlstrs> {
+pub fn get_weighted_configs_for_benchmarking<T: traits::ThresholdConfig>() -> Vec<WeightedConfig<T>>
+{
     let mut wcs = vec![];
 
     // This one was produced mid-Nov 2025
@@ -276,9 +281,10 @@ pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfigBlstrs> {
         3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 7,
     ];
     let threshold = 129; // slow path
-    wcs.push(WeightedConfigBlstrs::new(threshold, weights.clone()).unwrap());
-    let threshold = 166; // fast path
-    wcs.push(WeightedConfigBlstrs::new(threshold, weights).unwrap());
+    wcs.push(WeightedConfig::<T>::new(threshold, weights.clone()).unwrap());
+    // let threshold = 166; // fast path; not including this at the moment because
+    //                         threshold size barely influences benchmarks
+    // wcs.push(WeightedConfig::<T>::new(threshold, weights).unwrap());
 
     let weights = vec![
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -289,7 +295,7 @@ pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfigBlstrs> {
     ];
     let total_weight: usize = weights.iter().sum();
     let threshold = total_weight * 2 / 3 + 1;
-    wcs.push(WeightedConfigBlstrs::new(threshold, weights).unwrap());
+    wcs.push(WeightedConfig::<T>::new(threshold, weights).unwrap());
 
     let weights = vec![
         3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
@@ -300,7 +306,7 @@ pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfigBlstrs> {
     ];
     let total_weight: usize = weights.iter().sum();
     let threshold = total_weight * 2 / 3 + 1;
-    wcs.push(WeightedConfigBlstrs::new(threshold, weights).unwrap());
+    wcs.push(WeightedConfig::<T>::new(threshold, weights).unwrap());
 
     let weights = vec![
         5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
@@ -311,7 +317,7 @@ pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfigBlstrs> {
     ];
     let total_weight: usize = weights.iter().sum();
     let threshold = total_weight * 2 / 3 + 1;
-    wcs.push(WeightedConfigBlstrs::new(threshold, weights).unwrap());
+    wcs.push(WeightedConfig::<T>::new(threshold, weights).unwrap());
 
     wcs
 }

@@ -37,6 +37,7 @@ where
     pub hom2: H2,
 }
 
+// We need to add `E: Pairing` because of the sigma protocol implementation below, Rust wouldn't allow that otherwise
 #[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
 pub struct PairingTupleHomomorphism<E, H1, H2>
 where
@@ -162,12 +163,12 @@ where
     type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> =
         TupleCodomainShape<A::Output<U>, B::Output<U>>;
 
-    fn map<U, F>(self, f: F) -> Self::Output<U>
+    fn map<U, F>(self, mut f: F) -> Self::Output<U>
     where
-        F: Fn(T) -> U,
+        F: FnMut(T) -> U,
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
     {
-        TupleCodomainShape(self.0.map(&f), self.1.map(f))
+        TupleCodomainShape(self.0.map(&mut f), self.1.map(f))
     }
 }
 
@@ -245,7 +246,9 @@ use aptos_crypto::utils;
 use ark_ff::{UniformRand, Zero};
 use serde::Serialize;
 
-// Slightly hacky implementation of a sigma protocol for `PairingTupleHomomorphism`
+/// Slightly hacky implementation of a sigma protocol for `PairingTupleHomomorphism`
+///
+/// We need `E: Pairing` here because the sigma_protocol needs to know which curves `H1` and `H2` are working over
 impl<E: Pairing, H1, H2> PairingTupleHomomorphism<E, H1, H2>
 where
     H1: sigma_protocol::Trait<E::G1>,
@@ -294,11 +297,11 @@ where
     }
 
     #[allow(non_snake_case)]
-    pub fn verify<C: Serialize, H>(
+    pub fn verify<Ct: Serialize, H>(
         &self,
         public_statement: &<Self as homomorphism::Trait>::Codomain,
         proof: &Proof<H1::Scalar, H>, // Would like to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
-        cntxt: &C,
+        cntxt: &Ct,
     ) -> anyhow::Result<()>
     where
         H: homomorphism::Trait<
@@ -346,7 +349,7 @@ where
         );
 
         let mut rng = ark_std::rand::thread_rng(); // TODO: make this part of the function input?
-        let beta = H1::Scalar::rand(&mut rng);
+        let beta = H1::Scalar::rand(&mut rng); // verifier-specific challenge
         let len1 = public_statement.0.clone().into_iter().count(); // hmm maybe pass the into_iter version in merge_msm_terms?
         let len2 = public_statement.1.clone().into_iter().count();
         let powers_of_beta = utils::powers(beta, len1 + len2);

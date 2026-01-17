@@ -7,15 +7,21 @@ use crate::{
     algebra::polynomials,
     pcs::univariate_hiding_kzg,
     range_proofs::traits,
-    sigma_protocol::{self, homomorphism, homomorphism::Trait as _, Trait as _},
+    sigma_protocol::{
+        self,
+        homomorphism::{self, Trait as _},
+        Trait as _,
+    },
     utils, Scalar,
 };
 use aptos_crypto::arkworks::{
     self,
     msm::MsmInput,
     random::{
-        sample_field_element, sample_field_elements, unsafe_random_point, unsafe_random_points,
+        sample_field_element, sample_field_elements, unsafe_random_point,
+        unsafe_random_points_group,
     },
+    srs::{SrsBasis, SrsType},
     GroupGenerators,
 };
 use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup, VariableBaseMSM};
@@ -46,10 +52,10 @@ impl<E: Pairing> Proof<E> {
     /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
     pub fn generate<R: rand::Rng + rand::CryptoRng>(ell: u8, rng: &mut R) -> Self {
         Self {
-            hatC: unsafe_random_point(rng),
+            hatC: unsafe_random_point::<E::G1, _>(rng).into(),
             pi_PoK: two_term_msm::Proof::generate(rng),
-            Cs: unsafe_random_points(ell as usize, rng),
-            D: unsafe_random_point(rng),
+            Cs: unsafe_random_points_group(ell as usize, rng),
+            D: unsafe_random_point::<E::G1, _>(rng).into(),
             a: sample_field_element(rng),
             a_h: sample_field_element(rng),
             a_js: sample_field_elements(ell as usize, rng),
@@ -259,8 +265,12 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let trapdoor = univariate_hiding_kzg::Trapdoor::<E>::rand(rng);
         let xi_1_proj: E::G1 = group_generators.g1 * trapdoor.xi;
 
-        let (vk_hkzg, ck_S) =
-            univariate_hiding_kzg::setup(max_n + 1, group_generators.clone(), trapdoor, rng);
+        let (vk_hkzg, ck_S) = univariate_hiding_kzg::setup(
+            max_n + 1,
+            SrsType::Lagrange,
+            group_generators.clone(),
+            trapdoor,
+        );
 
         let h_denom_eval = compute_h_denom_eval::<E>(&ck_S.roots_of_unity_in_eval_dom);
 
@@ -276,9 +286,14 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             roots_of_unity: ck_S.roots_of_unity_in_eval_dom.clone(),
         };
 
+        let lagr_0: E::G1Affine = match &ck_S.msm_basis {
+            SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1[0],
+            SrsBasis::PowersOfTau { .. } => panic!("Wrong basis, this should not happen"),
+        };
+
         let vk = VerificationKey {
             xi_1: xi_1_proj.into_affine(),
-            lagr_0: ck_S.lagr_g1[0],
+            lagr_0,
             vk_hkzg,
             verifier_precomputed,
         };
@@ -347,11 +362,18 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         let univariate_hiding_kzg::CommitmentKey {
             xi_1,
-            lagr_g1,
+            msm_basis,
             eval_dom,
             m_inv: num_omegas_inv,
             ..
         } = ck_S;
+
+        let lagr_g1: &[E::G1Affine] = match msm_basis {
+            SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,
+            SrsBasis::PowersOfTau { .. } => {
+                panic!("Expected Lagrange basis, somehow got PowersOfTau basis instead")
+            },
+        };
 
         debug_assert_eq!(
             *num_omegas_inv,
@@ -420,7 +442,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             .collect();
 
         let hkzg_commitment_hom = univariate_hiding_kzg::CommitmentHomomorphism::<E> {
-            lagr_g1,
+            msm_basis: lagr_g1,
             xi_1: *xi_1,
         };
         let Cs: Vec<_> = f_js_evals
@@ -730,7 +752,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         use sigma_protocol::homomorphism::TrivialShape as HkzgCommitment;
         univariate_hiding_kzg::CommitmentHomomorphism::verify(
-            vk_hkzg.clone(),
+            *vk_hkzg,
             HkzgCommitment(U), // TODO: Ugh univariate_hiding_kzg::Commitment(U) does not work because it's a tuple struct, see https://github.com/rust-lang/rust/issues/17422; So make it a struct with one named field?
             gamma,
             a_u,
@@ -874,6 +896,8 @@ mod fiat_shamir {
 /// Conceptually, this behaves similarly to a Pedersen commitment:
 ///
 /// `output = base_1 * scalar_1 + base_2 * scalar_2`
+///
+/// The resulting sigma protocol is also known as Okamoto's protocol (see 19.5.1 in the book of Boneh-Shoup)
 pub mod two_term_msm {
     // TODO: maybe fixed_base_msms should become a folder and put its code inside mod.rs? Then put this mod inside of that folder?
     use super::*;
@@ -892,9 +916,9 @@ pub mod two_term_msm {
         /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
         pub fn generate<R: rand::Rng + rand::CryptoRng>(rng: &mut R) -> Self {
             Self {
-                first_proof_item: FirstProofItem::Commitment(CodomainShape(unsafe_random_point(
-                    rng,
-                ))),
+                first_proof_item: FirstProofItem::Commitment(CodomainShape(
+                    unsafe_random_point::<C, _>(rng).into(),
+                )),
                 z: Witness {
                     poly_randomness: Scalar::rand(rng),
                     hiding_kzg_randomness: Scalar::rand(rng),

@@ -5,43 +5,56 @@
 #![allow(clippy::needless_borrow)]
 
 use aptos_crypto::{SecretSharingConfig, Uniform};
-use aptos_dkg::{
-    algebra::evaluation_domain::BatchEvaluationDomain,
-    pvss::{
-        chunky::UnsignedUnweightedTranscript as ChunkyTranscript,
-        das,
-        test_utils::{
-            self, get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
-            DealingArgs, NoAux, BENCHMARK_CONFIGS,
-        },
-        traits::transcript::{
-            Aggregatable, AggregatableTranscript, HasAggregatableSubtranscript,
-            MalleableTranscript, Transcript, WithMaxNumShares,
-        },
-        LowDegreeTest, WeightedConfigBlstrs,
+use aptos_dkg::pvss::{
+    chunky::{UnsignedWeightedTranscript as Chunky_v1, UnsignedWeightedTranscriptv2 as Chunky_v2},
+    das,
+    test_utils::{
+        self, get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
+        DealingArgs, NoAux,
     },
+    traits::transcript::{
+        Aggregatable, AggregatableTranscript, HasAggregatableSubtranscript, MalleableTranscript,
+        Transcript, WithMaxNumShares,
+    },
+    WeightedConfigBlstrs,
 };
+use ark_bls12_381::Bls12_381;
 use ark_bn254::Bn254;
 use criterion::{
-    criterion_group, criterion_main,
+    black_box, criterion_group, criterion_main,
     measurement::{Measurement, WallTime},
     BenchmarkGroup, Criterion, Throughput,
 };
 use more_asserts::assert_le;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
 
+const BN254: &str = "bn254";
+const BLS12_381: &str = "bls12-381";
+
 pub fn all_groups(c: &mut Criterion) {
-    // unweighted BN254 PVSS with aggregatable subtranscript; only doing 2 because large configs are a bit slow and not relevant anyway
-    for tc in get_threshold_configs_for_benchmarking().into_iter().take(2) {
-        subaggregatable_pvss_group::<ChunkyTranscript<Bn254>>(&tc, c);
+    println!("Rayon num threads: {}", rayon::current_num_threads());
+
+    // weighted PVSS with aggregatable subtranscript; only doing one at the moment because large configs are a bit slow and not relevant anyway
+    for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
+        subaggregatable_pvss_group::<Chunky_v1<Bn254>>(&tc, c, BN254);
+    }
+    for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
+        subaggregatable_pvss_group::<Chunky_v1<Bls12_381>>(&tc, c, BLS12_381);
     }
 
-    // unweighted aggregatable PVSS
+    for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
+        subaggregatable_pvss_group::<Chunky_v2<Bn254>>(&tc, c, BN254);
+    }
+    for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
+        subaggregatable_pvss_group::<Chunky_v2<Bls12_381>>(&tc, c, BLS12_381);
+    }
+
+    // unweighted aggregatable PVSS, `blstrs` only so this is BLS12-381
     for tc in get_threshold_configs_for_benchmarking() {
         aggregatable_pvss_group::<das::Transcript>(&tc, c);
     }
 
-    // weighted PVSS
+    // weighted aggregatable PVSS, `blstrs` only so this is BLS12-381
     for wc in get_weighted_configs_for_benchmarking() {
         let d = aggregatable_pvss_group::<das::WeightedTranscript>(&wc, c);
         weighted_pvss_group(&wc, d, c);
@@ -49,30 +62,6 @@ pub fn all_groups(c: &mut Criterion) {
         // Note: Insecure, so not interested in benchmarks.
         // let d = pvss_group::<GenericWeighting<pvss::das::Transcript>>(&wc, c);
         // weighted_pvss_group(&wc, d, c);
-    }
-
-    // LDT
-    ldt_group(c);
-}
-
-// TODO: benchmark both blstrs and arkworks LDT?
-pub fn ldt_group(c: &mut Criterion) {
-    let mut rng = thread_rng();
-    let mut group = c.benchmark_group("ldt");
-
-    for &(t, n) in BENCHMARK_CONFIGS {
-        group.bench_function(format!("dual_code_word/t{}/n{}", t, n), |b| {
-            b.iter_with_setup(
-                || {
-                    let batch_dom = BatchEvaluationDomain::new(n);
-                    (n, t, batch_dom)
-                },
-                |(n, t, batch_dom)| {
-                    let ldt = LowDegreeTest::random(&mut rng, t, n, true, &batch_dom);
-                    ldt.dual_code_word();
-                },
-            )
-        });
     }
 }
 
@@ -104,6 +93,7 @@ pub fn aggregatable_pvss_group<T: AggregatableTranscript + MalleableTranscript>(
 pub fn subaggregatable_pvss_group<T>(
     sc: &T::SecretSharingConfig,
     c: &mut Criterion,
+    curve_name: &str,
 ) -> DealingArgs<T>
 where
     T: MalleableTranscript
@@ -114,7 +104,7 @@ where
         >,
 {
     let name = T::scheme_name();
-    let mut group = c.benchmark_group(format!("pvss/{}", name));
+    let mut group = c.benchmark_group(format!("pvss/{}/{}", name, curve_name));
     let mut rng = thread_rng();
 
     // TODO: use a lazy pattern to avoid this expensive step when no benchmarks are run
@@ -122,6 +112,7 @@ where
 
     // pvss_transcript_random::<T, WallTime>(sc, &mut group);
     pvss_deal::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
+    pvss_nonaggregate_serialize::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
     pvss_subaggregate::<T, WallTime>(sc, &mut group);
     pvss_nonaggregate_verify::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
     pvss_decrypt_own_share::<T, WallTime>(
@@ -283,6 +274,42 @@ fn pvss_verify<T: AggregatableTranscript, M: Measurement>(
     });
 }
 
+fn pvss_nonaggregate_serialize<T: HasAggregatableSubtranscript, M: Measurement>(
+    sc: &T::SecretSharingConfig,
+    pp: &T::PublicParameters,
+    ssks: &[T::SigningSecretKey],
+    spks: &[T::SigningPubKey],
+    eks: &[T::EncryptPubKey],
+    g: &mut BenchmarkGroup<M>,
+) {
+    g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
+
+    let mut rng = thread_rng();
+
+    g.bench_function(format!("serialize/{}", sc), move |b| {
+        b.iter_with_setup(
+            || {
+                let s = T::InputSecret::generate(&mut rng);
+                T::deal(
+                    &sc,
+                    &pp,
+                    &ssks[0],
+                    &spks[0],
+                    &eks,
+                    &s,
+                    &NoAux,
+                    &sc.get_player(0),
+                    &mut rng,
+                )
+            },
+            |trs| {
+                let bytes = trs.to_bytes();
+                black_box(&bytes);
+            },
+        )
+    });
+}
+
 fn pvss_nonaggregate_verify<T: HasAggregatableSubtranscript, M: Measurement>(
     sc: &T::SecretSharingConfig,
     pp: &T::PublicParameters,
@@ -299,7 +326,7 @@ fn pvss_nonaggregate_verify<T: HasAggregatableSubtranscript, M: Measurement>(
         b.iter_with_setup(
             || {
                 let s = T::InputSecret::generate(&mut rng);
-                T::deal(
+                let trs = T::deal(
                     &sc,
                     &pp,
                     &ssks[0],
@@ -309,7 +336,10 @@ fn pvss_nonaggregate_verify<T: HasAggregatableSubtranscript, M: Measurement>(
                     &NoAux,
                     &sc.get_player(0),
                     &mut rng,
-                )
+                );
+                T::try_from(trs.to_bytes().as_slice())
+                    .expect("serialized transcript should deserialize correctly")
+                // we have to serialize and deserialize because otherwise verify gets a transcript with "non-normalised" projective group elements
             },
             |trx| {
                 trx.verify(&sc, &pp, &[spks[0].clone()], &eks, &NoAux)

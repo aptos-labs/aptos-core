@@ -4,14 +4,14 @@
 #![allow(clippy::ptr_arg)]
 #![allow(clippy::needless_borrow)]
 
-use aptos_crypto::traits::SecretSharingConfig as _;
+use aptos_crypto::{arkworks::shamir::ShamirThresholdConfig, traits::SecretSharingConfig as _};
 use aptos_dkg::pvss::test_utils::get_weighted_configs_for_benchmarking;
 use rand::thread_rng;
 
 #[ignore]
 #[test]
 fn print_best_worst_avg_case_subsets() {
-    let wcs = get_weighted_configs_for_benchmarking();
+    let wcs = get_weighted_configs_for_benchmarking::<ShamirThresholdConfig<ark_bn254::Fr>>();
 
     let mut rng = thread_rng();
 

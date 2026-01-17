@@ -8,10 +8,11 @@ use super::super::{
 use crate::{
     errors::BatchEncryptionError,
     group::{Fr, G1Affine, G2Affine, G2Prepared, PairingOutput, PairingSetting},
-    shared::{ark_serialize::*, digest::EvalProof, encryption_key::EncryptionKey, ids::Id},
+    shared::{digest::EvalProof, encryption_key::EncryptionKey, ids::Id},
     traits::Plaintext,
 };
 use anyhow::Result;
+use aptos_crypto::arkworks::serialization::{ark_de, ark_se};
 use ark_ec::{pairing::Pairing, AffineRepr};
 use ark_serialize::CanonicalSerialize;
 use ark_std::{
