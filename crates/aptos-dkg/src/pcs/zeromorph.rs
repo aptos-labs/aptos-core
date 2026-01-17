@@ -32,7 +32,6 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{One, Zero};
 use core::fmt::Debug;
 use itertools::izip;
-use rand::thread_rng;
 use rand_core::{CryptoRng, RngCore};
 use rayon::prelude::*;
 use std::{iter, marker::PhantomData};
@@ -241,14 +240,11 @@ where
     }
 
     // Commits to the evaluations on the hypercube
-    pub fn commit<R: RngCore + CryptoRng>(
+    pub fn commit(
         pp: &ZeromorphProverKey<P>,
         poly: &DenseMultilinearExtension<P::ScalarField>,
-        rng: &mut R,
-    ) -> (
-        ZeromorphCommitment<P>,
-        univariate_hiding_kzg::CommitmentRandomness<P::ScalarField>,
-    ) {
+        r: P::ScalarField,
+    ) -> ZeromorphCommitment<P> {
         // TODO: PUT THIS BACK IN
         // if pp.commit_pp.g1_powers().len() < poly.len() {
         //     return Err(ProofVerifyError::KeyLengthError(
@@ -256,17 +252,13 @@ where
         //         poly.len(),
         //     ));
         // }
-        let r = Scalar(sample_field_element(rng));
-        (
-            ZeromorphCommitment(
-                univariate_hiding_kzg::commit_with_randomness(
-                    &pp.commit_pp,
-                    &poly.to_evaluations(),
-                    &r,
-                )
-                .0,
-            ),
-            r,
+        ZeromorphCommitment(
+            univariate_hiding_kzg::commit_with_randomness(
+                &pp.commit_pp,
+                &poly.to_evaluations(),
+                &Scalar(r),
+            )
+            .0,
         )
     }
 
@@ -517,10 +509,10 @@ where
     fn commit(
         ck: &Self::CommitmentKey,
         poly: Self::Polynomial,
-        _r: Option<Self::WitnessField>,
+        r: Option<Self::WitnessField>,
     ) -> Self::Commitment {
-        let mut rng = thread_rng();
-        Zeromorph::commit(&ck, &poly, &mut rng).0
+        let r = r.expect("Should not be empty");
+        Zeromorph::commit(&ck, &poly, r)
     }
 
     fn open<R: RngCore + CryptoRng>(
