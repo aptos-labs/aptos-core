@@ -8,6 +8,11 @@ module 0x42::behavioral {
     fun apply(f: |u64| u64, x: u64): u64 {
         f(x)
     }
+    spec apply {
+        requires requires_of<f>(x);
+        aborts_if aborts_of<f>(x);
+        ensures ensures_of<f>(x, result);
+    }
 
     // Test with a lambda - verification works because lambda is inlined
     fun test_apply_lambda_ok(x: u64): u64 {

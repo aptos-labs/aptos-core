@@ -1,23 +1,26 @@
 Move prover returns: exiting with verification errors
 error: post-condition does not hold
-   ┌─ tests/sources/functional/closures/closure_behavioral.move:26:9
+   ┌─ tests/sources/functional/closures/closure_behavioral.move:31:9
    │
-26 │         ensures result == x + 5; // error: post-condition does not hold
+31 │         ensures result == x + 5; // error: post-condition does not hold
    │         ^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/functional/closures/closure_behavioral.move:21: test_apply_lambda_fail
+   =     at tests/sources/functional/closures/closure_behavioral.move:26: test_apply_lambda_fail
    =         x = <redacted>
-   =     at tests/sources/functional/closures/closure_behavioral.move:22: test_apply_lambda_fail
+   =     at tests/sources/functional/closures/closure_behavioral.move:27: test_apply_lambda_fail
+   =     at tests/sources/functional/closures/closure_behavioral.move:12: apply (spec)
+   =     at tests/sources/functional/closures/closure_behavioral.move:27: test_apply_lambda_fail
+   =     at tests/sources/functional/closures/closure_behavioral.move:12: apply (spec)
    =     at tests/sources/functional/closures/closure_behavioral.move:8: apply
    =         f = <redacted>
    =         x = <redacted>
    =     at tests/sources/functional/closures/closure_behavioral.move:9: apply
-   =     at tests/sources/functional/closures/closure_behavioral.move:22: test_apply_lambda_fail
+   =     at tests/sources/functional/closures/closure_behavioral.move:27: test_apply_lambda_fail
    =         y = <redacted>
    =         result = <redacted>
-   =     at tests/sources/functional/closures/closure_behavioral.move:22: test_apply_lambda_fail
+   =     at tests/sources/functional/closures/closure_behavioral.move:27: test_apply_lambda_fail
    =         result = <redacted>
    =     at tests/sources/functional/closures/closure_behavioral.move:10: apply
    =         result = <redacted>
-   =     at tests/sources/functional/closures/closure_behavioral.move:23: test_apply_lambda_fail
-   =     at tests/sources/functional/closures/closure_behavioral.move:26: test_apply_lambda_fail (spec)
+   =     at tests/sources/functional/closures/closure_behavioral.move:28: test_apply_lambda_fail
+   =     at tests/sources/functional/closures/closure_behavioral.move:31: test_apply_lambda_fail (spec)

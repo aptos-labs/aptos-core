@@ -30,8 +30,9 @@ use itertools::Itertools;
 use legacy_move_compiler::interface_generator::NATIVE_INTERFACE;
 #[allow(unused_imports)]
 use log::{debug, info, log, warn, Level};
+use move_core_types::ability::AbilitySet;
 use move_model::{
-    ast::{Attribute, BehaviorKind, TempIndex, TraceKind},
+    ast::{Attribute, BehaviorKind, ConditionKind, TempIndex, TraceKind},
     code_writer::CodeWriter,
     emit, emitln,
     model::{FieldEnv, FunctionEnv, GlobalEnv, Loc, NodeId, QualifiedInstId, StructEnv, StructId},
@@ -85,6 +86,9 @@ pub struct BoogieTranslator<'env> {
     writer: &'env CodeWriter,
     spec_translator: SpecTranslator<'env>,
     targets: &'env FunctionTargetsHolder,
+    /// Map from function type to the set of function parameter infos for that type.
+    /// Used to emit behavioral predicate assumptions at closure construction sites.
+    fun_param_infos: BTreeMap<Type, BTreeSet<FunParamInfo>>,
 }
 
 pub struct FunctionTranslator<'env> {
@@ -114,6 +118,7 @@ impl<'env> BoogieTranslator<'env> {
             targets,
             writer,
             spec_translator: SpecTranslator::new(writer, env, options),
+            fun_param_infos: BTreeMap::new(),
         }
     }
 
@@ -219,6 +224,10 @@ impl<'env> BoogieTranslator<'env> {
 
         let mono_info = mono_analysis::get_info(self.env);
         let empty = &BTreeSet::new();
+
+        // Populate fun_param_infos for use during closure construction.
+        // This enables emitting behavioral predicate assumptions at the call site.
+        self.fun_param_infos = mono_info.fun_param_infos.clone();
 
         emitln!(
             writer,
@@ -2156,7 +2165,150 @@ impl FunctionTranslator<'_> {
                                 dest_str,
                                 closure_ctor_name,
                                 args_str
-                            )
+                            );
+
+                            // Emit behavioral predicate assumptions at the closure construction site.
+                            // This ensures the assumptions are available BEFORE any precondition checks.
+                            let closure_fun_type = self.get_local_type(dests[0]);
+                            // Normalize the function type to match the key used in fun_param_infos.
+                            // This removes abilities and flattens singleton tuples.
+                            let normalized_type = if let Type::Fun(params, results, _) =
+                                &closure_fun_type
+                            {
+                                Type::Fun(
+                                    Box::new(Type::tuple(params.clone().flatten())),
+                                    Box::new(Type::tuple(results.clone().flatten())),
+                                    AbilitySet::EMPTY,
+                                )
+                            } else {
+                                closure_fun_type.clone()
+                            };
+                            if let Some(param_infos) =
+                                self.parent.fun_param_infos.get(&normalized_type)
+                            {
+                                // Get the closure's spec to determine if it has preconditions/aborts
+                                let closure_spec = callee_env.get_spec();
+                                let closure_has_requires = closure_spec
+                                    .conditions
+                                    .iter()
+                                    .any(|c| matches!(c.kind, ConditionKind::Requires));
+                                let closure_has_aborts = closure_spec
+                                    .conditions
+                                    .iter()
+                                    .any(|c| matches!(c.kind, ConditionKind::AbortsIf));
+
+                                // Get the function type parameters for building argument list
+                                let Type::Fun(param_types, result_types, _) = &closure_fun_type
+                                else {
+                                    panic!("expected function type for closure")
+                                };
+                                let params = param_types.clone().flatten();
+                                let results = result_types.clone().flatten();
+
+                                for info in param_infos {
+                                    let param_fun_env =
+                                        env.get_function(info.fun.to_qualified_id());
+                                    let info_module_env = &param_fun_env.module_env;
+
+                                    let requires_sym = behavioral_spec_fun_symbol(
+                                        env,
+                                        &info.fun,
+                                        info.param_sym,
+                                        BehaviorKind::RequiresOf,
+                                    );
+                                    let aborts_sym = behavioral_spec_fun_symbol(
+                                        env,
+                                        &info.fun,
+                                        info.param_sym,
+                                        BehaviorKind::AbortsOf,
+                                    );
+
+                                    let has_requires = info_module_env
+                                        .get_spec_funs_of_name(requires_sym)
+                                        .next()
+                                        .is_some();
+                                    let has_aborts = info_module_env
+                                        .get_spec_funs_of_name(aborts_sym)
+                                        .next()
+                                        .is_some();
+
+                                    // Build quantifier variables for all inputs
+                                    let param_vars: Vec<_> = params
+                                        .iter()
+                                        .enumerate()
+                                        .map(|(i, ty)| {
+                                            format!("$bp{}: {}", i, boogie_type(env, ty))
+                                        })
+                                        .collect();
+                                    let param_args: Vec<_> = params
+                                        .iter()
+                                        .enumerate()
+                                        .map(|(i, _)| format!("$bp{}", i))
+                                        .collect();
+                                    let result_vars: Vec<_> = results
+                                        .iter()
+                                        .enumerate()
+                                        .map(|(i, ty)| {
+                                            format!("$br{}: {}", i, boogie_type(env, ty))
+                                        })
+                                        .collect();
+
+                                    // If the closure has no preconditions, assume requires_of is always true
+                                    if has_requires && !closure_has_requires {
+                                        let requires_name = boogie_behavioral_spec_fun_name(
+                                            env,
+                                            &info.fun,
+                                            info.param_sym,
+                                            BehaviorKind::RequiresOf,
+                                            &[],
+                                        );
+                                        if param_vars.is_empty() {
+                                            emitln!(
+                                                writer,
+                                                "assume {};  // closure has no precondition",
+                                                requires_name
+                                            );
+                                        } else {
+                                            emitln!(
+                                                writer,
+                                                "assume (forall {} :: {}({}));  // closure has no precondition",
+                                                param_vars.join(", "),
+                                                requires_name,
+                                                param_args.join(", ")
+                                            );
+                                        }
+                                    }
+
+                                    // If the closure has no abort conditions, assume aborts_of is always false
+                                    if has_aborts && !closure_has_aborts {
+                                        let aborts_name = boogie_behavioral_spec_fun_name(
+                                            env,
+                                            &info.fun,
+                                            info.param_sym,
+                                            BehaviorKind::AbortsOf,
+                                            &[],
+                                        );
+                                        if param_vars.is_empty() {
+                                            emitln!(
+                                                writer,
+                                                "assume !{};  // closure has no abort conditions",
+                                                aborts_name
+                                            );
+                                        } else {
+                                            emitln!(
+                                                writer,
+                                                "assume (forall {} :: !{}({}));  // closure has no abort conditions",
+                                                param_vars.join(", "),
+                                                aborts_name,
+                                                param_args.join(", ")
+                                            );
+                                        }
+                                    }
+
+                                    // Suppress unused variable warning
+                                    let _ = result_vars;
+                                }
+                            }
                         } else {
                             // regular path
                             let targeted = self.fun_target.module_env().is_target();
