@@ -203,13 +203,13 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
         y: E::ScalarField,
         s: &CommitmentRandomness<E::ScalarField>,
     ) -> OpeningProof<E> {
-        if ck.roots_of_unity_in_eval_dom.contains(&x) {
-            panic!("x is not allowed to be a root of unity");
-        }
-
         let q_vals = match &ck.msm_basis {
             SrsBasis::Lagrange { .. } => {
                 // Lagrange basis expects f_vals to be evaluations, and we return q_vals with evaluations
+                // The `quotient_evaluations_batch()` function divides over `(theta_i - x)` for `theta_i` an m-th root of unity, hence:
+                if ck.roots_of_unity_in_eval_dom.contains(&x) {
+                    panic!("x is not allowed to be a root of unity");
+                }
                 polynomials::quotient_evaluations_batch(
                     &f_vals,
                     &ck.roots_of_unity_in_eval_dom,

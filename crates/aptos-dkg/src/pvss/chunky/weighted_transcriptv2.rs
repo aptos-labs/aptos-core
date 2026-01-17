@@ -621,7 +621,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let Cs = &self.Cs[player.id];
         debug_assert_eq!(Cs.len(), sc.get_player_weight(player));
 
-        if Cs.len() > 0 {
+        if !Cs.is_empty() {
             if let Some(first_key) = self.Rs.first() {
                 debug_assert_eq!(
                     first_key.len(),

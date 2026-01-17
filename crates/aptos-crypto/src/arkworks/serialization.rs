@@ -58,45 +58,50 @@ pub trait BatchSerializable<E: Pairing> {
 pub mod tests {
     use super::*;
     use ark_bn254::{G1Affine, G1Projective, G2Affine, G2Projective};
-    use ark_ec::AffineRepr as _;
-    use ark_ff::{BigInteger, PrimeField};
+    use ark_ec::{AffineRepr as _, PrimeGroup};
     use serde::{Deserialize, Serialize};
 
+    const MAX_DOUBLINGS: usize = 5; // Test 1G, 2G, 4G, 8G, 16G
+
     #[test]
-    fn test_g1_serialization() {
-        #[derive(Serialize, Deserialize)]
+    fn test_g1_serialization_multiple_points() {
+        #[derive(Serialize, Deserialize, PartialEq, Debug)]
         struct A(#[serde(serialize_with = "ark_se", deserialize_with = "ark_de")] G1Affine);
 
-        let g1 = G1Affine::zero();
-        println!("{:?}", bcs::to_bytes(&A(g1)));
-        let mut g1 = G1Affine::generator();
-        println!("{:?}", bcs::to_bytes(&A(g1)));
-        g1 = (g1 + G1Projective::from(g1)).into();
-        println!("{:?}", bcs::to_bytes(&A(g1)));
-        g1 = (g1 + G1Projective::from(g1)).into();
-        println!("{:?}", bcs::to_bytes(&A(g1)));
-        g1 = (g1 + G1Projective::from(g1)).into();
-        println!("{:?}", bcs::to_bytes(&A(g1)));
+        let mut points = vec![G1Affine::zero()]; // Include zero
+        let mut g = G1Projective::generator();
+
+        for _ in 0..MAX_DOUBLINGS {
+            points.push(g.into());
+            g += g; // double for next
+        }
+
+        for p in points {
+            let serialized = bcs::to_bytes(&A(p)).expect("Serialization failed");
+            let deserialized: A = bcs::from_bytes(&serialized).expect("Deserialization failed");
+
+            assert_eq!(deserialized.0, p, "G1 point round-trip failed for {:?}", p);
+        }
     }
 
     #[test]
-    fn test_g2_serialization() {
-        #[derive(Serialize, Deserialize)]
+    fn test_g2_serialization_multiple_points() {
+        #[derive(Serialize, Deserialize, PartialEq, Debug)]
         struct A(#[serde(serialize_with = "ark_se", deserialize_with = "ark_de")] G2Affine);
 
-        let g2 = G2Affine::zero();
-        println!("{:?}", bcs::to_bytes(&A(g2)));
-        let mut g2 = G2Affine::generator();
-        println!("{:?}", bcs::to_bytes(&A(g2)));
-        println!("{:?}", g2.x.c1.into_bigint().to_bytes_le());
-        g2 = (g2 + G2Projective::from(g2)).into();
-        println!("{:?}", bcs::to_bytes(&A(g2)));
-        println!("{:?}", g2.x.c1.into_bigint().to_bytes_le());
-        g2 = (g2 + G2Projective::from(g2)).into();
-        println!("{:?}", bcs::to_bytes(&A(g2)));
-        println!("{:?}", g2.x.c1.into_bigint().to_bytes_le());
-        g2 = (g2 + G2Projective::from(g2)).into();
-        println!("{:?}", bcs::to_bytes(&A(g2)));
-        println!("{:?}", g2.x.c1.into_bigint().to_bytes_le());
+        let mut points = vec![G2Affine::zero()]; // Include zero
+        let mut g = G2Projective::generator();
+
+        for _ in 0..MAX_DOUBLINGS {
+            points.push(g.into());
+            g += g; // double for next
+        }
+
+        for p in points {
+            let serialized = bcs::to_bytes(&A(p)).expect("Serialization failed");
+            let deserialized: A = bcs::from_bytes(&serialized).expect("Deserialization failed");
+
+            assert_eq!(deserialized.0, p, "G2 point round-trip failed for {:?}", p);
+        }
     }
 }
