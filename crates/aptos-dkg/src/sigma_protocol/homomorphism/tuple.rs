@@ -190,7 +190,6 @@ where
         MsmOutput = H1::MsmOutput,
     >,
 {
-    type Base = H1::Base;
     type CodomainShape<T>
         = TupleCodomainShape<H1::CodomainShape<T>, H2::CodomainShape<T>>
     where

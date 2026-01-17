@@ -340,7 +340,6 @@ impl<E: Pairing> homomorphism::Trait for CommitmentHomomorphism<'_, E> {
 }
 
 impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
-    type Base = E::G1Affine;
     type CodomainShape<T>
         = CodomainShape<T>
     where

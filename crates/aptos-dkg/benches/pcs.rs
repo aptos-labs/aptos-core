@@ -96,10 +96,10 @@ fn benchmark_commitment_scheme<CS: PolynomialCommitmentScheme>(c: &mut Criterion
                         &mut rng,
                         &mut trs,
                     );
-                    (challenge, val, com, proof)
+                    (challenge, val, com, proof, trs)
                 },
-                |(challenge, val, com, proof)| {
-                    let _ = CS::verify(black_box(&vk), com, challenge, val, proof);
+                |(challenge, val, com, proof, mut trs)| {
+                    let _ = CS::verify(black_box(&vk), com, challenge, val, proof, &mut trs);
                 },
                 BatchSize::LargeInput,
             );

@@ -218,7 +218,6 @@ pub fn chunks_vec_msm_terms<C: CurveGroup>(
 
 #[allow(non_snake_case)]
 impl<'a, C: CurveGroup> fixed_base_msms::Trait for WeightedHomomorphism<'a, C> {
-    type Base = C::Affine;
     type CodomainShape<T>
         = WeightedCodomainShape<T>
     where

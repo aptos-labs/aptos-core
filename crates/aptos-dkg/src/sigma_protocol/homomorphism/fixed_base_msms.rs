@@ -31,7 +31,6 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
 
     // Type representing the scalar used in the `MsmInput`s. Convenient to repeat here
     type Scalar: ark_ff::PrimeField; // Probably need less here but this what it'll be in practice
-    type Base: Clone + CanonicalSerialize + CanonicalDeserialize + Debug + Eq;
 
     /// Type representing a single MSM input (a set of bases and scalars). Normally, this would default
     /// to `MsmInput<..., ...>`, but stable Rust does not yet support associated type defaults,
@@ -39,7 +38,7 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
     type MsmInput: CanonicalSerialize
         + CanonicalDeserialize
         + Clone
-        + IsMsmInput<Scalar = Self::Scalar, Base = Self::Base>
+        + IsMsmInput<Scalar = Self::Scalar>
         + Debug
         + Eq;
 
@@ -104,7 +103,6 @@ impl<H, LargerDomain> Trait for homomorphism::LiftHomomorphism<H, LargerDomain>
 where
     H: Trait,
 {
-    type Base = H::Base;
     type CodomainShape<T>
         = H::CodomainShape<T>
     where

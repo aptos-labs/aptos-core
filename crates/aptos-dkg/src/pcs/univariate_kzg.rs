@@ -36,7 +36,6 @@ impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<'a, E> {
 }
 
 impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
-    type Base = E::G1Affine;
     type CodomainShape<T>
         = CodomainShape<T>
     where

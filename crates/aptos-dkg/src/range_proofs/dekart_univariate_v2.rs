@@ -960,7 +960,6 @@ pub mod two_term_msm {
     }
 
     impl<C: CurveGroup> fixed_base_msms::Trait for Homomorphism<C> {
-        type Base = C::Affine;
         type CodomainShape<T>
             = CodomainShape<T>
         where

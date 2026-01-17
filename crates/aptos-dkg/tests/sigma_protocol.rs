@@ -113,7 +113,6 @@ mod schnorr {
     impl<C: CurveGroup<ScalarField = Fp<P, N>>, const N: usize, P: FpConfig<N>>
         fixed_base_msms::Trait for Schnorr<C>
     {
-        type Base = C::Affine;
         type CodomainShape<T>
             = CodomainShape<T>
         where
