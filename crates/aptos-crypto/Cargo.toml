@@ -58,7 +58,7 @@ proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 rand = { workspace = true }
 rand_core = { workspace = true }
-rayon.workspace = true
+rayon = { workspace = true }
 ring = { workspace = true }
 serde = { workspace = true }
 serde-name = { workspace = true }

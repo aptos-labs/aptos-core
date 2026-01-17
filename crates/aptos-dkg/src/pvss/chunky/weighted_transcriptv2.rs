@@ -760,8 +760,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             "Number of encryption keys must equal total weight"
         );
 
-        println!("Rayon num threads: {}", rayon::current_num_threads());
-
         // Initialize the PVSS SoK context
         let sok_cntxt = (spk.clone(), session_id, dealer.id, DST.to_vec()); // This is a bit hacky; also get rid of DST here and use self.dst? Would require making `self` input of `deal()`
 
