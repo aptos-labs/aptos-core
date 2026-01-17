@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    chunk_size_manager::ChunkSizeManager,
     data_stream::{DataStream, DataStreamId, DataStreamListener},
     error::Error,
     logging::{LogEntry, LogEvent, LogSchema},
@@ -84,6 +85,9 @@ pub struct DataStreamingService<T> {
 
     // The time service used to track elapsed time (e.g., for stream progress checks)
     time_service: TimeService,
+
+    // The chunk size manager for dynamic chunk sizing (if enabled)
+    chunk_size_manager: Option<Arc<ChunkSizeManager>>,
 }
 
 impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<T> {
@@ -98,6 +102,33 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
         let (stream_update_notifier, stream_update_listener) =
             aptos_channel::new(QueueStyle::LIFO, STREAM_PROGRESS_UPDATE_CHANNEL_SIZE, None);
 
+        // Create chunk size manager if dynamic sizing is enabled
+        let chunk_size_manager = if streaming_service_config
+            .dynamic_chunk_sizing
+            .enable_dynamic_chunk_sizing
+        {
+            Some(Arc::new(ChunkSizeManager::new(
+                data_client_config.max_epoch_chunk_size,
+                data_client_config.max_state_chunk_size,
+                data_client_config.max_transaction_chunk_size,
+                data_client_config.max_transaction_output_chunk_size,
+                streaming_service_config
+                    .dynamic_chunk_sizing
+                    .truncation_percentage_threshold,
+                streaming_service_config
+                    .dynamic_chunk_sizing
+                    .chunk_size_reduction_percentage,
+                streaming_service_config
+                    .dynamic_chunk_sizing
+                    .chunk_size_increase_percentage,
+                streaming_service_config
+                    .dynamic_chunk_sizing
+                    .chunk_history_size,
+            )))
+        } else {
+            None
+        };
+
         // Create the streaming service
         Self {
             data_client_config,
@@ -111,6 +142,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
             stream_id_generator: U64IdGenerator::new(),
             notification_id_generator: Arc::new(U64IdGenerator::new()),
             time_service,
+            chunk_size_manager,
         }
     }
 
@@ -281,6 +313,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
             self.notification_id_generator.clone(),
             &advertised_data,
             self.time_service.clone(),
+            self.chunk_size_manager.clone(),
         )?;
 
         // Verify the data stream can be fulfilled using the currently advertised data

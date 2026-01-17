@@ -34,6 +34,7 @@ fn test_create_epoch_ending_requests() {
             5,
             0,
             &create_epoch_ending_chunk_sizes(10000),
+            None,
             create_notification_id_generator(),
         )
         .unwrap();
@@ -54,6 +55,7 @@ fn test_create_epoch_ending_requests() {
             3,
             0,
             &create_epoch_ending_chunk_sizes(chunk_size),
+            None,
             create_notification_id_generator(),
         )
         .unwrap();
@@ -76,6 +78,7 @@ fn test_create_epoch_ending_requests() {
             100,
             0,
             &create_epoch_ending_chunk_sizes(chunk_size),
+            None,
             create_notification_id_generator(),
         )
         .unwrap();
@@ -106,6 +109,7 @@ fn test_create_epoch_ending_requests_dynamic() {
             5,
             0,
             &create_epoch_ending_chunk_sizes(700),
+            None,
             create_notification_id_generator(),
         )
         .unwrap();
@@ -132,6 +136,7 @@ fn test_create_epoch_ending_requests_dynamic() {
             10,
             0,
             &create_epoch_ending_chunk_sizes(chunk_size),
+            None,
             create_notification_id_generator(),
         )
         .unwrap();
@@ -155,6 +160,7 @@ fn test_create_epoch_ending_requests_dynamic() {
             5,
             0,
             &create_epoch_ending_chunk_sizes(700),
+            None,
             create_notification_id_generator(),
         )
         .unwrap();
@@ -175,6 +181,7 @@ fn test_create_epoch_ending_requests_dynamic() {
         10,
         0,
         &create_epoch_ending_chunk_sizes(50),
+        None,
         create_notification_id_generator(),
     );
     assert_ok!(client_requests);

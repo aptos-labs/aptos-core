@@ -238,6 +238,7 @@ fn create_client_requests_continuous_output_stream_optimistic_fetch() {
                 1_000_000, // Allow a large number of in-flight requests
                 0,
                 &global_data_summary,
+                None,
                 create_notification_id_generator(),
             )
             .unwrap();
@@ -373,6 +374,7 @@ fn create_client_requests_continuous_output_stream_prefetching() {
                 1_000_000, // Allow a large number of in-flight requests
                 0,
                 &global_data_summary,
+                None,
                 create_notification_id_generator(),
             )
             .unwrap();
@@ -389,6 +391,7 @@ fn create_client_requests_continuous_output_stream_prefetching() {
                     max_in_flight_requests,
                     num_in_flight_requests,
                     &global_data_summary,
+                    None,
                     create_notification_id_generator(),
                 )
                 .unwrap();
@@ -423,6 +426,7 @@ fn verify_data_client_requests<T: DataStreamEngine>(
                 1_000_000, // Allow a large number of in-flight requests
                 0,
                 global_data_summary,
+                None,
                 create_notification_id_generator(),
             )
             .unwrap();
@@ -438,6 +442,7 @@ fn verify_data_client_requests<T: DataStreamEngine>(
                     max_in_flight_requests,
                     num_in_flight_requests,
                     global_data_summary,
+                    None,
                     create_notification_id_generator(),
                 )
                 .unwrap();

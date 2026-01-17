@@ -3,8 +3,8 @@
 
 use aptos_metrics_core::{
     exponential_buckets, histogram_opts, register_histogram_vec, register_int_counter,
-    register_int_counter_vec, register_int_gauge, HistogramTimer, HistogramVec, IntCounter,
-    IntCounterVec, IntGauge,
+    register_int_counter_vec, register_int_gauge, register_int_gauge_vec, HistogramTimer,
+    HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 use std::time::Instant;
@@ -220,6 +220,36 @@ pub static DATA_NOTIFICATION_SEND_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Gauge for tracking adjusted chunk sizes
+pub static ADJUSTED_CHUNK_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_data_streaming_service_adjusted_chunk_size",
+        "The dynamically adjusted chunk size for each chunk type",
+        &["chunk_type"]
+    )
+    .unwrap()
+});
+
+/// Counter for chunk size adjustments
+pub static CHUNK_SIZE_ADJUSTMENTS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_data_streaming_service_chunk_size_adjustments",
+        "Counter for chunk size adjustments",
+        &["chunk_type", "adjustment_type"]
+    )
+    .unwrap()
+});
+
+/// Gauge for truncation rate (as percentage 0-100)
+pub static TRUNCATION_RATE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_data_streaming_service_truncation_rate",
+        "The truncation rate for each chunk type (percentage 0-100)",
+        &["chunk_type"]
+    )
+    .unwrap()
+});
+
 /// Increments the given counter with the single label value.
 pub fn increment_counter(counter: &Lazy<IntCounterVec>, label: &str) {
     counter.with_label_values(&[label]).inc();
@@ -278,6 +308,11 @@ pub fn set_pending_data_responses(value: u64) {
 /// Sets the subscription stream lag
 pub fn set_subscription_stream_lag(value: u64) {
     SUBSCRIPTION_STREAM_LAG.set(value as i64);
+}
+
+/// Sets a gauge value for a given label
+pub fn set_gauge(gauge: &Lazy<IntGaugeVec>, label: &str, value: u64) {
+    gauge.with_label_values(&[label]).set(value as i64);
 }
 
 /// Starts the timer for the provided histogram and label values.

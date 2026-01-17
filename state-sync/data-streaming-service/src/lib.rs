@@ -3,6 +3,7 @@
 
 #![forbid(unsafe_code)]
 
+mod chunk_size_manager;
 pub mod data_notification;
 pub mod data_stream;
 mod dynamic_prefetching;

@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    chunk_size_manager::ChunkSizeManager,
     data_notification,
     data_notification::{
         DataClientRequest, DataNotification, DataPayload, EpochEndingLedgerInfosRequest,
@@ -122,6 +123,9 @@ pub struct DataStream<T> {
 
     // The dynamic prefetching state (if enabled)
     dynamic_prefetching_state: DynamicPrefetchingState,
+
+    // The chunk size manager for dynamic chunk sizing (if enabled)
+    chunk_size_manager: Option<Arc<ChunkSizeManager>>,
 }
 
 impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
@@ -135,6 +139,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         notification_id_generator: Arc<U64IdGenerator>,
         advertised_data: &AdvertisedData,
         time_service: TimeService,
+        chunk_size_manager: Option<Arc<ChunkSizeManager>>,
     ) -> Result<(Self, DataStreamListener), Error> {
         // Create a new data stream listener
         let (notification_sender, notification_receiver) =
@@ -167,6 +172,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
             subscription_stream_lag: None,
             time_service,
             dynamic_prefetching_state,
+            chunk_size_manager,
         };
 
         Ok((data_stream, data_stream_listener))
@@ -284,12 +290,18 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                 .dynamic_prefetching_state
                 .get_max_concurrent_requests(&self.stream_engine);
 
+            // Get the adjusted chunk sizes if dynamic sizing is enabled
+            let adjusted_chunk_sizes = self
+                .get_chunk_size_manager()
+                .map(|manager| manager.get_adjusted_chunk_sizes());
+
             // Create the client requests
             let client_requests = self.stream_engine.create_data_client_requests(
                 max_num_requests_to_send,
                 max_in_flight_requests,
                 num_in_flight_requests,
                 global_data_summary,
+                adjusted_chunk_sizes,
                 self.notification_id_generator.clone(),
             )?;
 
@@ -655,6 +667,11 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         if let Some(missing_data_request) =
             create_missing_data_request(data_client_request, response_payload)?
         {
+            // Record truncation event if dynamic chunk sizing is enabled
+            if let Some(chunk_size_manager) = self.get_chunk_size_manager() {
+                self.record_truncation_event(data_client_request, true, &chunk_size_manager);
+            }
+
             // Increment the missing client request counter
             increment_counter(
                 &metrics::SENT_DATA_REQUESTS_FOR_MISSING_DATA,
@@ -670,6 +687,11 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                 .push_front(pending_client_response);
 
             return Ok(true); // Missing data was requested
+        }
+
+        // Record non-truncation event if dynamic chunk sizing is enabled
+        if let Some(chunk_size_manager) = self.get_chunk_size_manager() {
+            self.record_truncation_event(data_client_request, false, &chunk_size_manager);
         }
 
         Ok(false) // No missing data was requested
@@ -924,6 +946,40 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
     /// Returns the subscription stream lag (for testing)
     pub fn get_subscription_stream_lag(&self) -> Option<SubscriptionStreamLag> {
         self.subscription_stream_lag.clone()
+    }
+
+    /// Records a truncation event for the appropriate chunk type
+    fn record_truncation_event(
+        &self,
+        request: &DataClientRequest,
+        was_truncated: bool,
+        chunk_size_manager: &Arc<ChunkSizeManager>,
+    ) {
+        match request {
+            DataClientRequest::EpochEndingLedgerInfos(_) => {
+                chunk_size_manager.record_epoch_chunk(was_truncated);
+            },
+            DataClientRequest::StateValuesWithProof(_) => {
+                chunk_size_manager.record_state_chunk(was_truncated);
+            },
+            DataClientRequest::TransactionsWithProof(_) => {
+                chunk_size_manager.record_transaction_chunk(was_truncated);
+            },
+            DataClientRequest::TransactionOutputsWithProof(_) => {
+                chunk_size_manager.record_transaction_output_chunk(was_truncated);
+            },
+            DataClientRequest::TransactionsOrOutputsWithProof(_) => {
+                // Record for both transaction and output trackers
+                chunk_size_manager.record_transaction_chunk(was_truncated);
+                chunk_size_manager.record_transaction_output_chunk(was_truncated);
+            },
+            _ => {}, // Other request types don't have chunk size tracking
+        }
+    }
+
+    /// Gets the chunk size manager for dynamic sizing
+    fn get_chunk_size_manager(&self) -> Option<Arc<ChunkSizeManager>> {
+        self.chunk_size_manager.clone()
     }
 }
 

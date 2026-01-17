@@ -217,11 +217,106 @@ impl Default for StorageServiceConfig {
     }
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct DynamicChunkSizingConfig {
+    /// Whether or not to enable dynamic chunk sizing based on truncation rates
+    pub enable_dynamic_chunk_sizing: bool,
+
+    /// The truncation percentage threshold (0.0-1.0) that triggers chunk size reduction.
+    /// For example, 0.10 means if >10% of chunks are truncated, reduce size.
+    pub truncation_percentage_threshold: f64,
+
+    /// The percentage at which to reduce chunk sizes (0.0-1.0) when truncation threshold is exceeded.
+    /// For example, 0.5 means halve the chunk size.
+    pub chunk_size_reduction_percentage: f64,
+
+    /// The percentage at which to increase chunk sizes (0.0-1.0) when no truncation occurs.
+    /// For example, 0.25 means increase by 25%.
+    pub chunk_size_increase_percentage: f64,
+
+    /// The number of recent chunk requests to track for truncation rate calculation.
+    pub chunk_history_size: usize,
+}
+
+impl PartialEq for DynamicChunkSizingConfig {
+    fn eq(&self, other: &Self) -> bool {
+        self.enable_dynamic_chunk_sizing == other.enable_dynamic_chunk_sizing
+            && self.truncation_percentage_threshold.to_bits()
+                == other.truncation_percentage_threshold.to_bits()
+            && self.chunk_size_reduction_percentage.to_bits()
+                == other.chunk_size_reduction_percentage.to_bits()
+            && self.chunk_size_increase_percentage.to_bits()
+                == other.chunk_size_increase_percentage.to_bits()
+            && self.chunk_history_size == other.chunk_history_size
+    }
+}
+
+impl Eq for DynamicChunkSizingConfig {}
+
+impl Default for DynamicChunkSizingConfig {
+    fn default() -> Self {
+        Self {
+            enable_dynamic_chunk_sizing: false,
+            truncation_percentage_threshold: 0.10, // 10%
+            chunk_size_reduction_percentage: 0.5,  // Halve the size
+            chunk_size_increase_percentage: 0.25,  // Increase by 25%
+            chunk_history_size: 100,               // Track last 100 chunks
+        }
+    }
+}
+
+impl DynamicChunkSizingConfig {
+    /// Sanitizes the dynamic chunk sizing config. Returns an error if the
+    /// config is invalid.
+    pub fn sanitize(&self) -> Result<(), Error> {
+        let sanitizer_name = "DynamicChunkSizingConfig";
+
+        // Verify that truncation_percentage_threshold is between 0.0 and 1.0
+        if !(0.0..=1.0).contains(&self.truncation_percentage_threshold) {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name.to_string(),
+                format!(
+                    "truncation_percentage_threshold must be between 0.0 and 1.0, got: {}",
+                    self.truncation_percentage_threshold
+                ),
+            ));
+        }
+
+        // Verify that chunk_size_reduction_percentage is between 0.0 and 1.0
+        if !(0.0..=1.0).contains(&self.chunk_size_reduction_percentage) {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name.to_string(),
+                format!(
+                    "chunk_size_reduction_percentage must be between 0.0 and 1.0, got: {}",
+                    self.chunk_size_reduction_percentage
+                ),
+            ));
+        }
+
+        // Verify that chunk_size_increase_percentage is between 0.0 and 1.0
+        if !(0.0..=1.0).contains(&self.chunk_size_increase_percentage) {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name.to_string(),
+                format!(
+                    "chunk_size_increase_percentage must be between 0.0 and 1.0, got: {}",
+                    self.chunk_size_increase_percentage
+                ),
+            ));
+        }
+
+        Ok(())
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct DataStreamingServiceConfig {
     /// The dynamic prefetching config for the data streaming service
     pub dynamic_prefetching: DynamicPrefetchingConfig,
+
+    /// The dynamic chunk sizing config for the data streaming service
+    pub dynamic_chunk_sizing: DynamicChunkSizingConfig,
 
     /// Whether or not to enable data subscription streaming.
     pub enable_subscription_streaming: bool,
@@ -266,6 +361,7 @@ impl Default for DataStreamingServiceConfig {
     fn default() -> Self {
         Self {
             dynamic_prefetching: DynamicPrefetchingConfig::default(),
+            dynamic_chunk_sizing: DynamicChunkSizingConfig::default(),
             enable_subscription_streaming: false,
             global_summary_refresh_interval_ms: 50,
             max_concurrent_requests: MAX_CONCURRENT_REQUESTS,
@@ -514,6 +610,13 @@ impl ConfigSanitizer for StateSyncDriverConfig {
                     .to_string(),
             ));
         }
+
+        // Sanitize the dynamic chunk sizing config
+        node_config
+            .state_sync
+            .data_streaming_service
+            .dynamic_chunk_sizing
+            .sanitize()?;
 
         Ok(())
     }

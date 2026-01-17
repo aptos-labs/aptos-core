@@ -69,13 +69,16 @@ macro_rules! invalid_stream_request {
 pub trait DataStreamEngine {
     /// Creates a batch of data client requests that can be sent to the
     /// Aptos data client to progress the stream. The number of requests
-    /// created is bound by the `max_number_of_requests`.
+    /// created is bound by the `max_number_of_requests`. If `adjusted_chunk_sizes`
+    /// is provided, those sizes will be used instead of the optimal chunk sizes
+    /// from the global data summary (for dynamic chunk sizing).
     fn create_data_client_requests(
         &mut self,
         max_number_of_requests: u64,
         max_in_flight_requests: u64,
         num_in_flight_requests: u64,
         global_data_summary: &GlobalDataSummary,
+        adjusted_chunk_sizes: Option<(u64, u64, u64, u64)>, // (epoch, state, txn, txn_output)
         unique_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Vec<DataClientRequest>, Error>;
 
@@ -230,6 +233,7 @@ impl DataStreamEngine for StateStreamEngine {
         max_in_flight_requests: u64,
         num_in_flight_requests: u64,
         global_data_summary: &GlobalDataSummary,
+        adjusted_chunk_sizes: Option<(u64, u64, u64, u64)>,
         _unique_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Vec<DataClientRequest>, Error> {
         // Check if we should wait for the number of states to be returned
@@ -251,12 +255,17 @@ impl DataStreamEngine for StateStreamEngine {
                 .checked_sub(1)
                 .ok_or_else(|| Error::IntegerOverflow("End state index has overflown!".into()))?;
 
+            // Determine the chunk size to use (adjusted or optimal)
+            let state_chunk_size = adjusted_chunk_sizes
+                .map(|(_, state, _, _)| state)
+                .unwrap_or(global_data_summary.optimal_chunk_sizes.state_chunk_size);
+
             // Create the client requests
             let client_requests = create_data_client_request_batch(
                 self.next_request_index,
                 end_state_index,
                 num_requests_to_send,
-                global_data_summary.optimal_chunk_sizes.state_chunk_size,
+                state_chunk_size,
                 self.clone().into(),
             )?;
 
@@ -1167,6 +1176,7 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
         max_in_flight_requests: u64,
         num_in_flight_requests: u64,
         global_data_summary: &GlobalDataSummary,
+        adjusted_chunk_sizes: Option<(u64, u64, u64, u64)>,
         unique_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Vec<DataClientRequest>, Error> {
         // Check if we're waiting for a blocking response type
@@ -1256,11 +1266,24 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
                 },
                 request => invalid_stream_request!(request),
             };
+
+            // Determine the chunk size to use (adjusted or optimal)
+            let chunk_size = if let Some((_, _, txn, txn_output)) = adjusted_chunk_sizes {
+                match &self.request {
+                    StreamRequest::ContinuouslyStreamTransactions(_) => txn,
+                    StreamRequest::ContinuouslyStreamTransactionOutputs(_) => txn_output,
+                    StreamRequest::ContinuouslyStreamTransactionsOrOutputs(_) => txn_output,
+                    request => invalid_stream_request!(request),
+                }
+            } else {
+                optimal_chunk_sizes
+            };
+
             let client_requests = create_data_client_request_batch(
                 next_request_version,
                 target_ledger_info.ledger_info().version(),
                 num_requests_to_send,
-                optimal_chunk_sizes,
+                chunk_size,
                 self.clone().into(),
             )?;
             self.update_request_tracking(&client_requests, &target_ledger_info)?;
@@ -1544,6 +1567,7 @@ impl DataStreamEngine for EpochEndingStreamEngine {
         max_in_flight_requests: u64,
         num_in_flight_requests: u64,
         global_data_summary: &GlobalDataSummary,
+        adjusted_chunk_sizes: Option<(u64, u64, u64, u64)>,
         _unique_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Vec<DataClientRequest>, Error> {
         // Calculate the number of requests to send
@@ -1553,12 +1577,17 @@ impl DataStreamEngine for EpochEndingStreamEngine {
             num_in_flight_requests,
         );
 
+        // Determine the chunk size to use (adjusted or optimal)
+        let epoch_chunk_size = adjusted_chunk_sizes
+            .map(|(epoch, _, _, _)| epoch)
+            .unwrap_or(global_data_summary.optimal_chunk_sizes.epoch_chunk_size);
+
         // Create the client requests
         let client_requests = create_data_client_request_batch(
             self.next_request_epoch,
             self.end_epoch,
             num_requests_to_send,
-            global_data_summary.optimal_chunk_sizes.epoch_chunk_size,
+            epoch_chunk_size,
             self.clone().into(),
         )?;
 
@@ -1800,6 +1829,7 @@ impl DataStreamEngine for TransactionStreamEngine {
         max_in_flight_requests: u64,
         num_in_flight_requests: u64,
         global_data_summary: &GlobalDataSummary,
+        adjusted_chunk_sizes: Option<(u64, u64, u64, u64)>,
         _unique_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Vec<DataClientRequest>, Error> {
         // Calculate the request end version and optimal chunk sizes
@@ -1825,6 +1855,18 @@ impl DataStreamEngine for TransactionStreamEngine {
             request => invalid_stream_request!(request),
         };
 
+        // Determine the chunk size to use (adjusted or optimal)
+        let chunk_size = if let Some((_, _, txn, txn_output)) = adjusted_chunk_sizes {
+            match &self.request {
+                StreamRequest::GetAllTransactions(_) => txn,
+                StreamRequest::GetAllTransactionOutputs(_) => txn_output,
+                StreamRequest::GetAllTransactionsOrOutputs(_) => txn_output,
+                request => invalid_stream_request!(request),
+            }
+        } else {
+            optimal_chunk_sizes
+        };
+
         // Calculate the number of requests to send
         let num_requests_to_send = calculate_num_requests_to_send(
             max_number_of_requests,
@@ -1837,7 +1879,7 @@ impl DataStreamEngine for TransactionStreamEngine {
             self.next_request_version,
             request_end_version,
             num_requests_to_send,
-            optimal_chunk_sizes,
+            chunk_size,
             self.clone().into(),
         )?;
 

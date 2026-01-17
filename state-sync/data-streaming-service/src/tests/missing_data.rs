@@ -438,6 +438,7 @@ fn transform_epoch_ending_stream_notifications() {
             1,
             0,
             &global_data_summary,
+            None,
             notification_id_generator.clone(),
         )
         .unwrap();
@@ -552,6 +553,7 @@ fn transform_state_values_stream_notifications() {
             1,
             0,
             &global_data_summary,
+            None,
             notification_id_generator.clone(),
         )
         .unwrap();
@@ -671,6 +673,7 @@ fn transform_transactions_stream_notifications() {
             1,
             0,
             &global_data_summary,
+            None,
             notification_id_generator.clone(),
         )
         .unwrap();
@@ -778,6 +781,7 @@ fn transform_continuous_outputs_stream_notifications() {
             1,
             0,
             &global_data_summary,
+            None,
             notification_id_generator.clone(),
         )
         .unwrap();

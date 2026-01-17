@@ -3500,6 +3500,7 @@ fn create_data_stream(
         notification_generator,
         &advertised_data,
         time_service.clone(),
+        None, // chunk_size_manager
     )
     .unwrap();
 
