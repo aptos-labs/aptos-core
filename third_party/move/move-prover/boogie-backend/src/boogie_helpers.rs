@@ -401,7 +401,7 @@ pub fn boogie_type(env: &GlobalEnv, ty: &Type, bv_flag: bool) -> String {
                     n, MAX_TUPLE_SIZE
                 )
             } else {
-                let args = elems.iter().map(|t| boogie_type(env, t)).join(" ");
+                let args = elems.iter().map(|t| boogie_type(env, t, bv_flag)).join(" ");
                 format!("$Tuple{} {}", n, args)
             }
         },
@@ -547,7 +547,7 @@ pub fn boogie_type_suffix(env: &GlobalEnv, ty: &Type, bv_flag: bool) -> String {
             } else {
                 let suffixes = elems
                     .iter()
-                    .map(|t| boogie_type_suffix_bv(env, t, bv_flag))
+                    .map(|t| boogie_type_suffix(env, t, bv_flag))
                     .join("_");
                 format!("$tup{}'{}'", n, suffixes)
             }

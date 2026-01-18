@@ -31,10 +31,7 @@ use move_model::{
     ast::{Attribute, TempIndex, TraceKind},
     code_writer::CodeWriter,
     emit, emitln,
-    model::{
-        FieldEnv, FunctionEnv, GlobalEnv, Loc, ModuleEnv, NodeId, QualifiedInstId, StructEnv,
-        StructId,
-    },
+    model::{FieldEnv, FunctionEnv, GlobalEnv, Loc, NodeId, QualifiedInstId, StructEnv, StructId},
     pragmas::{
         ADDITION_OVERFLOW_UNCHECKED_PRAGMA, SEED_PRAGMA, TIMEOUT_PRAGMA,
         VERIFY_DURATION_ESTIMATE_PRAGMA,
@@ -1340,14 +1337,14 @@ impl FunctionTranslator<'_> {
     ///
     /// # Returns
     /// Type string like "U64", "Bv128", "I32_unchecked", etc.
+    ///
+    /// # Note
+    /// U8 never gets the unchecked suffix - it always preserves overflow checking.
     fn boogie_arith_type_name(&self, ty: &Type, bv_flag: bool, unchecked_suffix: &str) -> String {
         match ty {
             Type::Primitive(PrimitiveType::U8) => {
-                format!(
-                    "{}{}",
-                    boogie_num_type_string_capital("U", "8", bv_flag),
-                    unchecked_suffix
-                )
+                // U8 never gets unchecked suffix - always preserve overflow checking
+                boogie_num_type_string_capital("U", "8", bv_flag)
             },
             Type::Primitive(PrimitiveType::U16) => {
                 format!(
@@ -1443,7 +1440,6 @@ impl FunctionTranslator<'_> {
     fn handle_vector_table_bytecode_call<F1, F2, F3>(
         &self,
         writer: &CodeWriter,
-        module_env: &ModuleEnv,
         callee_env: &FunctionEnv,
         inst: &[Type],
         srcs: &[TempIndex],
@@ -1460,114 +1456,109 @@ impl FunctionTranslator<'_> {
         F2: Fn(TempIndex, &mut Vec<String>),
         F3: Fn(TempIndex) -> bool,
     {
+        let module_env = &callee_env.module_env;
+
         if !module_env.is_std_vector() && !module_env.is_table() {
             return (false, None, None);
         }
 
-        // Compute derived values
         let callee_name = callee_env.get_name_str();
         let bv_flag = !srcs.is_empty() && compute_flag(srcs[0]);
         let dest_bv_flag = !dests.is_empty() && compute_flag(dests[0]);
+        let is_vector = module_env.is_std_vector();
+        let has_return = !dest_str.is_empty();
 
-        let mut new_fun_name = None;
-        let mut new_args_str = None;
-        let mut fully_handled = false;
+        // Helper to emit int2bv conversion for length functions
+        let emit_length_bv_conversion = |fun_name: String| {
+            let local_ty = self.get_local_type(dests[0]);
+            emitln!(
+                writer,
+                "call {} := $int2bv{}({}({}));",
+                dest_str,
+                boogie_num_type_base(
+                    self.parent.env,
+                    Some(self.fun_target.get_bytecode_loc(attr_id)),
+                    &local_ty,
+                    false,
+                ),
+                fun_name,
+                args_str
+            );
+        };
 
-        if dest_str.is_empty() {
-            // Handle case with no return value
-            if module_env.is_std_vector() {
-                // Check the target vector contains bv values
-                if callee_name.contains("insert") {
-                    let mut args_str_vec = vec![str_local(srcs[0]), str_local(srcs[1])];
-                    assert!(srcs.len() > 2);
-                    instrument_bv2int(srcs[2], &mut args_str_vec);
-                    new_args_str = Some(args_str_vec.iter().cloned().join(", "));
-                }
-                new_fun_name = Some(boogie_function_name(callee_env, inst, &[bv_flag]));
-            } else if module_env.is_table() {
-                new_fun_name = Some(boogie_function_name(callee_env, inst, &[false, bv_flag]));
+        // Helper to build args with bv2int instrumentation
+        let build_instrumented_args = |start_idx: usize, end_idx: usize| -> String {
+            let mut args_vec = vec![str_local(srcs[0])];
+            let range_end = end_idx.min(srcs.len());
+            for &src_idx in &srcs[start_idx..range_end] {
+                instrument_bv2int(src_idx, &mut args_vec);
             }
-        } else {
-            // Handle case with return value
-            if module_env.is_std_vector() {
-                new_fun_name = Some(boogie_function_name(callee_env, inst, &[
-                    bv_flag || dest_bv_flag
-                ]));
+            args_vec.iter().cloned().join(", ")
+        };
 
-                // Handle the case where the return value of length is assigned to a bv int because
-                // length always returns a non-bv result
+        match (is_vector, has_return) {
+            // Vector without return value
+            (true, false) => {
+                let new_args = if callee_name.contains("insert") {
+                    // insert<T>(v: &mut vector<T>, i: u64, e: T)
+                    // Only the element (srcs[2]) needs bv2int instrumentation, not the index (srcs[1])
+                    assert!(srcs.len() > 2);
+                    let mut args_vec = vec![str_local(srcs[0]), str_local(srcs[1])];
+                    instrument_bv2int(srcs[2], &mut args_vec);
+                    Some(args_vec.iter().cloned().join(", "))
+                } else {
+                    None
+                };
+                (
+                    false,
+                    Some(boogie_function_name(callee_env, inst, &[bv_flag])),
+                    new_args,
+                )
+            },
+            // Table without return value
+            (false, false) => (
+                false,
+                Some(boogie_function_name(callee_env, inst, &[false, bv_flag])),
+                None,
+            ),
+            // Vector with return value
+            (true, true) => {
+                let combined_bv = bv_flag || dest_bv_flag;
+                let new_fun_name = boogie_function_name(callee_env, inst, &[combined_bv]);
+
                 if callee_name.contains("length") && dest_bv_flag {
-                    let local_ty = self.get_local_type(dests[0]);
-                    let mut fun_name = new_fun_name.clone().unwrap();
-                    // Insert '$' for calling function instead of procedure
-                    // TODO(tengzhang): a hacky way to convert int to bv for return value
-                    fun_name.insert(10, '$');
-                    // first call len fun then convert its return value to a bv type
-                    emitln!(
-                        writer,
-                        "call {} := $int2bv{}({}({}));",
-                        dest_str,
-                        boogie_num_type_base(
-                            self.parent.env,
-                            Some(self.fun_target.get_bytecode_loc(attr_id)),
-                            &local_ty,
-                            false,
-                        ),
-                        fun_name,
-                        args_str
-                    );
-                    fully_handled = true;
+                    let mut fun_name = new_fun_name.clone();
+                    fun_name.insert(10, '$'); // Convert procedure to function call
+                    emit_length_bv_conversion(fun_name);
+                    (true, Some(new_fun_name), None)
                 } else if callee_name.contains("borrow")
                     || callee_name.contains("remove")
                     || callee_name.contains("swap")
                 {
-                    let mut args_str_vec = vec![str_local(srcs[0])];
-                    instrument_bv2int(srcs[1], &mut args_str_vec);
-                    // Handle swap with three parameters
-                    if srcs.len() > 2 {
-                        instrument_bv2int(srcs[2], &mut args_str_vec);
-                    }
-                    new_args_str = Some(args_str_vec.iter().cloned().join(", "));
+                    let end_idx = if srcs.len() > 2 { 3 } else { 2 };
+                    (
+                        false,
+                        Some(new_fun_name),
+                        Some(build_instrumented_args(1, end_idx)),
+                    )
+                } else {
+                    (false, Some(new_fun_name), None)
                 }
-            } else if module_env.is_table() {
-                new_fun_name = Some(boogie_function_name(callee_env, inst, &[
-                    false,
-                    bv_flag || dest_bv_flag,
-                ]));
+            },
+            // Table with return value
+            (false, true) => {
+                let combined_bv = bv_flag || dest_bv_flag;
+                let new_fun_name = boogie_function_name(callee_env, inst, &[false, combined_bv]);
 
                 if dest_bv_flag && callee_name.contains("length") {
-                    // Handle the case where the return value of length is assigned to a bv int because
-                    // length always returns a non-bv result
-                    let local_ty = self.get_local_type(dests[0]);
-                    // Replace with "spec_len"
-                    let length_idx_start = callee_name.find("length").unwrap();
-                    let length_idx_end = length_idx_start + "length".len();
-                    let fun_name = [
-                        callee_name[0..length_idx_start].to_string(),
-                        "spec_len".to_string(),
-                        callee_name[length_idx_end..].to_string(),
-                    ]
-                    .join("");
-                    // first call len fun then convert its return value to a bv type
-                    emitln!(
-                        writer,
-                        "call {} := $int2bv{}({}({}));",
-                        dest_str,
-                        boogie_num_type_base(
-                            self.parent.env,
-                            Some(self.fun_target.get_bytecode_loc(attr_id)),
-                            &local_ty,
-                            false,
-                        ),
-                        fun_name,
-                        args_str
-                    );
-                    fully_handled = true;
+                    let fun_name = callee_name.replace("length", "spec_len");
+                    emit_length_bv_conversion(fun_name);
+                    (true, Some(new_fun_name), None)
+                } else {
+                    (false, Some(new_fun_name), None)
                 }
-            }
+            },
         }
-
-        (fully_handled, new_fun_name, new_args_str)
     }
 
     /// Return boogie type for a local with given signature token.
@@ -2332,7 +2323,6 @@ impl FunctionTranslator<'_> {
                             let (fully_handled, new_fun_name, new_args_str) = self
                                 .handle_vector_table_bytecode_call(
                                     writer,
-                                    &module_env,
                                     &callee_env,
                                     inst,
                                     srcs,

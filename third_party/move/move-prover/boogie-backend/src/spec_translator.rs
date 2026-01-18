@@ -1767,12 +1767,13 @@ impl SpecTranslator<'_> {
             let bv_flag = self.node_bv_flag(range.node_id());
             match quant_ty.skip_reference() {
                 Type::TypeDomain(ty) => {
+                    // TypeDomain uses standard integer types, not bitvector types
                     emit!(
                         self.writer,
                         "{}{}: {}",
                         comma,
                         var_name_str,
-                        boogie_type(self.env, ty, bv_flag)
+                        boogie_type(self.env, ty, false)
                     );
                 },
                 Type::Struct(mid, sid, targs) => {
@@ -1851,8 +1852,9 @@ impl SpecTranslator<'_> {
             let bv_flag = self.node_bv_flag(range.node_id());
             match quant_ty.skip_reference() {
                 Type::TypeDomain(domain_ty) => {
+                    // TypeDomain uses standard integer type suffixes, not bitvector suffixes
                     let mut type_check =
-                        boogie_well_formed_expr(self.env, &var_name_str, domain_ty, bv_flag);
+                        boogie_well_formed_expr(self.env, &var_name_str, domain_ty, false);
                     if type_check.is_empty() {
                         type_check = "true".to_string();
                     }
