@@ -22,8 +22,8 @@ use itertools::Itertools;
 use log::{debug, info, warn};
 use move_model::{
     ast::{
-        Condition, ConditionKind, Exp, ExpData, MemoryLabel, Operation, Pattern, QuantKind,
-        SpecFunDecl, SpecVarDecl, TempIndex, Value,
+        BehaviorKind, Condition, ConditionKind, Exp, ExpData, MemoryLabel, Operation, Pattern,
+        QuantKind, SpecFunDecl, SpecVarDecl, TempIndex, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -348,6 +348,183 @@ impl SpecTranslator<'_> {
         }
     }
 
+    /// Emit a functionality axiom for ensures_of behavioral predicates.
+    ///
+    /// For an `ensures_of` predicate on a function `|T1, T2| R`, the parameters are
+    /// `(arg0: T1, arg1: T2, result0: R)`. This axiom asserts that for fixed inputs,
+    /// the result is unique:
+    ///
+    /// ```boogie
+    /// axiom (forall arg0: T1, arg1: T2, result0_1: R, result0_2: R ::
+    ///     ensures_of(arg0, arg1, result0_1) && ensures_of(arg0, arg1, result0_2)
+    ///     ==> result0_1 == result0_2);
+    /// ```
+    ///
+    /// This allows the prover to derive equality between choice expression results
+    /// and actual function call results when both satisfy the ensures_of predicate.
+    fn emit_ensures_of_functionality_axiom(
+        &self,
+        fun: &SpecFunDecl,
+        module_env: &ModuleEnv,
+        boogie_name: &str,
+    ) {
+        // Check if this is an ensures_of behavioral predicate by name pattern
+        let fun_name = fun.name.display(module_env.symbol_pool()).to_string();
+        let ensures_of_marker = format!("${}$", BehaviorKind::EnsuresOf);
+        if !fun_name.contains(&ensures_of_marker) {
+            return;
+        }
+
+        // Partition parameters into input args (argN) and result params (resultN)
+        let pool = module_env.symbol_pool();
+        let mut arg_params = vec![];
+        let mut result_params = vec![];
+
+        for param in &fun.params {
+            let name = param.0.display(pool).to_string();
+            if name.starts_with("result") {
+                result_params.push(param);
+            } else {
+                arg_params.push(param);
+            }
+        }
+
+        // Only emit axiom if there are result parameters
+        if result_params.is_empty() {
+            return;
+        }
+
+        // Build forall parameter list:
+        // - Input args: as-is
+        // - Result params: duplicated with _1 and _2 suffixes
+        let arg_param_strs: Vec<String> = arg_params
+            .iter()
+            .map(|Parameter(name, ty, _)| {
+                format!(
+                    "{}: {}",
+                    name.display(pool),
+                    boogie_type(self.env, &self.inst(ty))
+                )
+            })
+            .collect();
+
+        let result_param_strs_1: Vec<String> = result_params
+            .iter()
+            .map(|Parameter(name, ty, _)| {
+                format!(
+                    "{}_1: {}",
+                    name.display(pool),
+                    boogie_type(self.env, &self.inst(ty))
+                )
+            })
+            .collect();
+
+        let result_param_strs_2: Vec<String> = result_params
+            .iter()
+            .map(|Parameter(name, ty, _)| {
+                format!(
+                    "{}_2: {}",
+                    name.display(pool),
+                    boogie_type(self.env, &self.inst(ty))
+                )
+            })
+            .collect();
+
+        let forall_params = arg_param_strs
+            .iter()
+            .chain(result_param_strs_1.iter())
+            .chain(result_param_strs_2.iter())
+            .join(", ");
+
+        // Build call arguments for two instances of the predicate
+        let arg_names: Vec<String> = arg_params
+            .iter()
+            .map(|Parameter(name, _, _)| name.display(pool).to_string())
+            .collect();
+
+        let result_names_1: Vec<String> = result_params
+            .iter()
+            .map(|Parameter(name, _, _)| format!("{}_1", name.display(pool)))
+            .collect();
+
+        let result_names_2: Vec<String> = result_params
+            .iter()
+            .map(|Parameter(name, _, _)| format!("{}_2", name.display(pool)))
+            .collect();
+
+        let call_args_1 = arg_names.iter().chain(result_names_1.iter()).join(", ");
+        let call_args_2 = arg_names.iter().chain(result_names_2.iter()).join(", ");
+
+        // Build equality conditions for results
+        let equalities: Vec<String> = result_params
+            .iter()
+            .map(|Parameter(name, _, _)| {
+                let name_str = name.display(pool).to_string();
+                format!("{}_1 == {}_2", name_str, name_str)
+            })
+            .collect();
+        let equality_cond = equalities.join(" && ");
+
+        // Emit the functionality axiom with explicit multi-trigger to help SMT solver
+        // The trigger includes both predicate calls to ensure proper instantiation
+        emitln!(
+            self.writer,
+            "axiom (forall {} :: {{{}({}), {}({})}} {}({}) && {}({}) ==> {});",
+            forall_params,
+            boogie_name,
+            call_args_1,
+            boogie_name,
+            call_args_2,
+            boogie_name,
+            call_args_1,
+            boogie_name,
+            call_args_2,
+            equality_cond
+        );
+
+        // Also emit a validity axiom: if ensures_of(x, y) holds, then y is well-formed
+        // This is needed because the choice predicate requires both ensures_of AND validity
+        let orig_param_list = arg_params
+            .iter()
+            .chain(result_params.iter())
+            .map(|Parameter(name, ty, _)| {
+                format!(
+                    "{}: {}",
+                    name.display(pool),
+                    boogie_type(self.env, &self.inst(ty))
+                )
+            })
+            .join(", ");
+
+        let orig_call_args = arg_params
+            .iter()
+            .chain(result_params.iter())
+            .map(|Parameter(name, _, _)| name.display(pool).to_string())
+            .join(", ");
+
+        // Generate validity conditions for result parameters
+        let result_validity: Vec<String> = result_params
+            .iter()
+            .map(|Parameter(name, ty, _)| {
+                boogie_well_formed_expr(self.env, &name.display(pool).to_string(), &self.inst(ty))
+            })
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        if !result_validity.is_empty() {
+            emitln!(
+                self.writer,
+                "axiom (forall {} :: {{{}({})}} {}({}) ==> {});",
+                orig_param_list,
+                boogie_name,
+                orig_call_args,
+                boogie_name,
+                orig_call_args,
+                result_validity.join(" && ")
+            );
+        }
+    }
+
     #[allow(clippy::literal_string_with_formatting_args)]
     fn translate_spec_fun(&self, module_env: &ModuleEnv, id: SpecFunId, fun: &SpecFunDecl) {
         if fun.body.is_none() && !fun.uninterpreted {
@@ -541,7 +718,9 @@ impl SpecTranslator<'_> {
             }
             // Generate axioms from the spec block attached to the spec function
             // TODO(#16256): support general condition kinds, exploration use of `spec_translator` in `move_model`
-            self.generate_spec_function_axioms(fun, module_env, boogie_name, param_list);
+            self.generate_spec_function_axioms(fun, module_env, boogie_name.clone(), param_list);
+            // For ensures_of behavioral predicates, emit functionality axiom
+            self.emit_ensures_of_functionality_axiom(fun, module_env, &boogie_name);
         } else {
             emitln!(self.writer, " {");
             self.writer.indent();
@@ -561,6 +740,69 @@ impl SpecTranslator<'_> {
 impl SpecTranslator<'_> {
     pub(crate) fn finalize(&self) {
         self.translate_choice_functions();
+    }
+
+    /// Check if an expression contains an ensures_of behavioral predicate call.
+    fn contains_ensures_of_predicate(&self, exp: &Exp) -> bool {
+        use ExpData::*;
+        let pool = self.env.symbol_pool();
+        let ensures_of_marker = format!("${}$", BehaviorKind::EnsuresOf);
+
+        match exp.as_ref() {
+            Call(_, Operation::SpecFunction(mid, fid, _), args) => {
+                let module_env = self.env.get_module(*mid);
+                let fun = module_env.get_spec_fun(*fid);
+                let fun_name = fun.name.display(pool).to_string();
+                if fun_name.contains(&ensures_of_marker) {
+                    return true;
+                }
+                args.iter().any(|e| self.contains_ensures_of_predicate(e))
+            },
+            Call(_, _, args) => args.iter().any(|e| self.contains_ensures_of_predicate(e)),
+            Invoke(_, target, args) => {
+                self.contains_ensures_of_predicate(target)
+                    || args.iter().any(|e| self.contains_ensures_of_predicate(e))
+            },
+            Lambda(_, _, body, _, _) => self.contains_ensures_of_predicate(body),
+            Quant(_, _, ranges, _, cond, body) => {
+                ranges
+                    .iter()
+                    .any(|(_, e)| self.contains_ensures_of_predicate(e))
+                    || cond
+                        .as_ref()
+                        .is_some_and(|e| self.contains_ensures_of_predicate(e))
+                    || self.contains_ensures_of_predicate(body)
+            },
+            Block(_, _, binding, body) => {
+                binding
+                    .as_ref()
+                    .is_some_and(|e| self.contains_ensures_of_predicate(e))
+                    || self.contains_ensures_of_predicate(body)
+            },
+            IfElse(_, c, t, e) => {
+                self.contains_ensures_of_predicate(c)
+                    || self.contains_ensures_of_predicate(t)
+                    || self.contains_ensures_of_predicate(e)
+            },
+            Match(_, scrut, arms) => {
+                self.contains_ensures_of_predicate(scrut)
+                    || arms.iter().any(|arm| {
+                        arm.condition
+                            .as_ref()
+                            .is_some_and(|e| self.contains_ensures_of_predicate(e))
+                            || self.contains_ensures_of_predicate(&arm.body)
+                    })
+            },
+            Sequence(_, items) => items.iter().any(|e| self.contains_ensures_of_predicate(e)),
+            Loop(_, body) => self.contains_ensures_of_predicate(body),
+            LoopCont(_, _, _) => false,
+            Mutate(_, lhs, rhs) => {
+                self.contains_ensures_of_predicate(lhs) || self.contains_ensures_of_predicate(rhs)
+            },
+            Assign(_, _, rhs) => self.contains_ensures_of_predicate(rhs),
+            Return(_, e) => self.contains_ensures_of_predicate(e),
+            _ => false,
+        }
     }
 
     /// Translate lifted functions for choice expressions.
@@ -767,7 +1009,29 @@ impl SpecTranslator<'_> {
             if !param_decls.is_empty() {
                 emit!(new_spec_trans.writer, ")");
             }
-            emitln!(new_spec_trans.writer, ");\n");
+            emitln!(new_spec_trans.writer, ");");
+
+            // For choice expressions with ensures_of predicates, add functionality axiom.
+            // Since ensures_of is functional (one output per input), if any y satisfies the
+            // predicate, then choice must return that y.
+            // This axiom: pred(y) ==> choice() == y
+            if self.contains_ensures_of_predicate(&info.condition) {
+                let all_decls = vec![&var_decl]
+                    .into_iter()
+                    .chain(param_decls.iter())
+                    .map(mk_decl)
+                    .join(", ");
+                emitln!(
+                    new_spec_trans.writer,
+                    "axiom (forall {} :: {{{}}} {} ==> {} == {});",
+                    all_decls,
+                    predicate,
+                    predicate,
+                    choice,
+                    &var_decl.0
+                );
+            }
+            emitln!(new_spec_trans.writer);
         }
     }
 }

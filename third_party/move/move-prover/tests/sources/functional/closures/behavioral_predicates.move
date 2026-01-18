@@ -6,15 +6,12 @@
 // - ensures_of<f>(args, result) constrains the postcondition of f
 // - aborts_of<f>(args) constrains the abort conditions of f
 // - These behavioral predicates allow reasoning about higher-order functions
-//
-// Note: requires_of with lambda parameters has known issues and is not tested here.
+// - requires_of<f>(args) constrains the precondition of f
 
 module 0x42::behavioral_predicates {
 
     // =========================================================================
-    // SECTION 1: Basic behavioral predicates - ensures_of with lambdas
-    // These tests use lambda expressions which are inlined, so the ensures_of
-    // is reduced to the actual postcondition of the lambda.
+    // Ensures_of with lambdas
     // =========================================================================
 
     /// Basic higher-order function with spec using ensures_of
@@ -42,7 +39,7 @@ module 0x42::behavioral_predicates {
     }
 
     // =========================================================================
-    // SECTION 2: Multiple arguments to function parameter
+    // Multiple arguments to function parameter
     // =========================================================================
 
     /// Higher-order function where f takes two arguments
@@ -70,7 +67,7 @@ module 0x42::behavioral_predicates {
     }
 
     // =========================================================================
-    // SECTION 3: Generic higher-order functions
+    // Generic higher-order functions
     // =========================================================================
 
     /// Generic map function
@@ -116,7 +113,7 @@ module 0x42::behavioral_predicates {
     }
 
     // =========================================================================
-    // SECTION 4: Chained applications with lambdas
+    // Chained applications with lambdas
     // =========================================================================
 
     /// Test chained application directly with lambdas
@@ -136,7 +133,7 @@ module 0x42::behavioral_predicates {
     }
 
     // =========================================================================
-    // SECTION 5: Functions returning functions (currying patterns)
+    // Functions returning functions (currying)
     // =========================================================================
 
     /// Curried addition - returns a function
@@ -163,7 +160,7 @@ module 0x42::behavioral_predicates {
     }
 
     // =========================================================================
-    // SECTION 6: Edge cases - identity and constant lambdas
+    // Identity and constant lambdas
     // =========================================================================
 
     /// Test with identity lambda
@@ -192,8 +189,7 @@ module 0x42::behavioral_predicates {
     }
 
     // =========================================================================
-    // SECTION 7: Known function targets (behavioral predicates reduce)
-    // When using ensures_of<known_function>, it reduces to the actual spec
+    // Known function targets
     // =========================================================================
 
     /// Helper function with spec
@@ -230,7 +226,7 @@ module 0x42::behavioral_predicates {
     }
 
     // =========================================================================
-    // SECTION 8: Negative tests - expected failures
+    // Negative tests (expected failures)
     // =========================================================================
 
     /// Test: Wrong ensures postcondition
@@ -259,7 +255,7 @@ module 0x42::behavioral_predicates {
     }
 
     // =========================================================================
-    // SECTION 9: aborts_of with lambdas
+    // Aborts_of with lambdas
     // =========================================================================
 
     /// Higher-order function with abort specification
@@ -290,7 +286,7 @@ module 0x42::behavioral_predicates {
     }
 
     // =========================================================================
-    // SECTION 10: Combined ensures_of and aborts_of
+    // Combined ensures_of and aborts_of
     // =========================================================================
 
     /// Function with both aborts_of and ensures_of
@@ -315,7 +311,7 @@ module 0x42::behavioral_predicates {
     }
 
     // =========================================================================
-    // SECTION 11: Testing lambda with captured variables
+    // Lambda with captured variables
     // =========================================================================
 
     /// Test lambda capturing a local variable
@@ -332,5 +328,78 @@ module 0x42::behavioral_predicates {
     }
     spec test_captured_multiple {
         ensures result == x + a + b;
+    }
+
+    // =========================================================================
+    // Requires_of with lambdas
+    // =========================================================================
+
+    /// Higher-order function with requires_of specification
+    fun apply_with_requires(f: |u64| u64, x: u64): u64 {
+        f(x)
+    }
+    spec apply_with_requires {
+        requires requires_of<f>(x);
+        aborts_if aborts_of<f>(x);
+        ensures ensures_of<f>(x, result);
+    }
+
+    /// Test: lambda with no precondition (requires_of reduces to true)
+    fun test_requires_of_trivial(x: u64): u64 {
+        apply_with_requires(|y| y + 1, x)
+    }
+    spec test_requires_of_trivial {
+        ensures result == x + 1;
+    }
+
+    /// Test: lambda with multiplication (no precondition)
+    fun test_requires_of_mul(x: u64): u64 {
+        apply_with_requires(|y| y * 2, x)
+    }
+    spec test_requires_of_mul {
+        ensures result == x * 2;
+    }
+
+    /// Test: lambda with conditional (no precondition from the condition itself)
+    fun test_requires_of_conditional(x: u64): u64 {
+        apply_with_requires(|y| if (y > 10) y - 5 else y + 5, x)
+    }
+    spec test_requires_of_conditional {
+        ensures x > 10 ==> result == x - 5;
+        ensures x <= 10 ==> result == x + 5;
+    }
+
+    // =========================================================================
+    // Chained and nested requires_of
+    // =========================================================================
+
+    /// Test: lambda with abort condition via guarded_apply (has requires_of in spec)
+    fun test_requires_via_guarded(x: u64): u64 {
+        guarded_apply(|y| {
+            if (y > 100) abort 1;
+            y * 2
+        }, x)
+    }
+    spec test_requires_via_guarded {
+        aborts_if x > 100;
+        ensures result == x * 2;
+    }
+
+    /// Test: chained application with requires_of
+    fun test_requires_chain(x: u64): u64 {
+        apply_with_requires(|y| apply_with_requires(|z| z + 1, y), x)
+    }
+    spec test_requires_chain {
+        ensures result == x + 1;
+    }
+
+    /// Test: deeply nested lambdas with requires_of
+    fun test_requires_deep_nest(x: u64): u64 {
+        apply_with_requires(|a|
+            apply_with_requires(|b|
+                apply_with_requires(|c| c * 2, b), a), x)
+    }
+    spec test_requires_deep_nest {
+        ensures result == x * 2;
     }
 }

@@ -503,12 +503,7 @@ impl<'env> BoogieTranslator<'env> {
                 .fun_param_infos
                 .get(fun_type)
                 .unwrap_or(&empty_param_infos);
-            self.translate_fun_type(
-                fun_type,
-                closure_infos,
-                fun_param_infos,
-                &translated_memory,
-            )
+            self.translate_fun_type(fun_type, closure_infos, fun_param_infos, &translated_memory)
         }
 
         // Emit any finalization items required by spec translation.
@@ -541,7 +536,12 @@ impl<'env> BoogieTranslator<'env> {
         let fun_ty_boogie_name = boogie_type(self.env, fun_type);
         emitln!(self.writer, "datatype {} {{", fun_ty_boogie_name);
         self.writer.indent();
-        for info in closure_infos {
+        // Collect all variants first to handle commas properly
+        let closure_count = closure_infos.len();
+        let param_count = fun_param_infos.len();
+        let total_count = closure_count + param_count;
+
+        for (idx, info) in closure_infos.iter().enumerate() {
             emitln!(
                 self.writer,
                 "// Closure from function `{}`, capture mask 0b{}",
@@ -566,11 +566,13 @@ impl<'env> BoogieTranslator<'env> {
                     boogie_type(self.env, captured_ty)
                 )
             }
-            emitln!(self.writer, "),")
+            // Only emit comma if not the last variant
+            let is_last = idx == total_count - 1;
+            emitln!(self.writer, "){}", if is_last { "" } else { "," });
         }
         // Add parameter variants for function-typed parameters of verification targets.
         // These enable behavioral predicate handling in the apply function.
-        for info in fun_param_infos {
+        for (idx, info) in fun_param_infos.iter().enumerate() {
             let fun_env = self.env.get_function(info.fun.to_qualified_id());
             emitln!(
                 self.writer,
@@ -579,22 +581,15 @@ impl<'env> BoogieTranslator<'env> {
                 fun_env.get_name().display(self.env.symbol_pool())
             );
             // Parameter variants have no captured values, just a constant constructor
+            // Only emit comma if not the last variant
+            let is_last = closure_count + idx == total_count - 1;
             emitln!(
                 self.writer,
-                "{}(),",
-                boogie_fun_param_name(self.env, &info.fun, info.param_sym)
+                "{}(){}",
+                boogie_fun_param_name(self.env, &info.fun, info.param_sym),
+                if is_last { "" } else { "," }
             );
         }
-        // Last variant for unknown value.
-        emitln!(
-            self.writer,
-            "// Value to represent some arbitrary unknown function"
-        );
-        emitln!(
-            self.writer,
-            "$unknown_function'{}'(id: int)",
-            boogie_type_suffix(self.env, fun_type),
-        );
         self.writer.unindent();
         emitln!(self.writer, "}");
         emitln!(
@@ -653,11 +648,28 @@ impl<'env> BoogieTranslator<'env> {
         self.writer.indent();
         let result_str = result_locals.iter().cloned().join(", ");
 
-        // Generate branches for known closures
-        for info in closure_infos {
+        // Generate branches for all variants. Since the datatype is closed,
+        // the last variant uses `else` without an explicit check (unless it's the only variant,
+        // in which case we emit the body directly without any block).
+        let closure_count = closure_infos.len();
+        let param_count = fun_param_infos.len();
+        let total_variants = closure_count + param_count;
+
+        for (idx, info) in closure_infos.iter().enumerate() {
+            let is_last = idx == total_variants - 1;
+            let is_only = total_variants == 1;
             let ctor_name = boogie_closure_pack_name(self.env, &info.fun, info.mask);
-            emitln!(self.writer, "if (fun is {}) {{", ctor_name);
-            self.writer.indent();
+            if is_only {
+                // Single variant: emit body directly without any block
+            } else if is_last {
+                // Last of multiple variants: use else without explicit check
+                // The previous variant's closing already emitted `} else `, so just open the block
+                emitln!(self.writer, "{{   // {}", ctor_name);
+                self.writer.indent();
+            } else {
+                emitln!(self.writer, "if (fun is {}) {{", ctor_name);
+                self.writer.indent();
+            }
             let fun_env = &self.env.get_function(info.fun.to_qualified_id());
             let fun_name = boogie_function_name(fun_env, &info.fun.inst);
             let args = (0..info.mask.captured_count())
@@ -670,23 +682,36 @@ impl<'env> BoogieTranslator<'env> {
                 format!("{result_str} := ")
             };
             emitln!(self.writer, "call {}{}({});", call_prefix, fun_name, args);
-            self.writer.unindent();
-            emitln!(self.writer, "} else ");
+            if is_only {
+                // Single variant: no closing needed
+            } else {
+                self.writer.unindent();
+                if is_last {
+                    emitln!(self.writer, "}");
+                } else {
+                    emitln!(self.writer, "} else ");
+                }
+            }
         }
 
         // Generate branches for function parameter variants using behavioral predicates.
         // We use a conservative approach: havoc results and abort_flag, then constrain
         // with behavioral predicates if they exist.
-        for info in fun_param_infos {
+        for (idx, info) in fun_param_infos.iter().enumerate() {
+            let is_last = closure_count + idx == total_variants - 1;
+            let is_only = total_variants == 1;
             let ctor_name = boogie_fun_param_name(self.env, &info.fun, info.param_sym);
-            emitln!(self.writer, "if (fun is {}) {{", ctor_name);
-            self.writer.indent();
-            emitln!(
-                self.writer,
-                "// Behavioral predicate handling for parameter `{}`",
-                info.param_sym.display(self.env.symbol_pool())
-            );
-
+            if is_only {
+                // Single variant: emit body directly without any block
+            } else if is_last {
+                // Last of multiple variants: use else without explicit check
+                // The previous variant's closing already emitted `} else `, so just open the block
+                emitln!(self.writer, "{{   // {}", ctor_name);
+                self.writer.indent();
+            } else {
+                emitln!(self.writer, "if (fun is {}) {{", ctor_name);
+                self.writer.indent();
+            }
             // Look up which behavioral predicate spec functions exist
             let fun_env = self.env.get_function(info.fun.to_qualified_id());
             let module_env = &fun_env.module_env;
@@ -710,9 +735,18 @@ impl<'env> BoogieTranslator<'env> {
                 BehaviorKind::EnsuresOf,
             );
 
-            let has_requires = module_env.get_spec_funs_of_name(requires_sym).next().is_some();
-            let has_aborts = module_env.get_spec_funs_of_name(aborts_sym).next().is_some();
-            let has_ensures = module_env.get_spec_funs_of_name(ensures_sym).next().is_some();
+            let has_requires = module_env
+                .get_spec_funs_of_name(requires_sym)
+                .next()
+                .is_some();
+            let has_aborts = module_env
+                .get_spec_funs_of_name(aborts_sym)
+                .next()
+                .is_some();
+            let has_ensures = module_env
+                .get_spec_funs_of_name(ensures_sym)
+                .next()
+                .is_some();
 
             // Build the argument list for behavioral predicates (just the parameters)
             let bp_args = (0..params.len()).map(|pos| format!("p{}", pos)).join(", ");
@@ -732,7 +766,18 @@ impl<'env> BoogieTranslator<'env> {
                     BehaviorKind::RequiresOf,
                     &[],
                 );
-                emitln!(self.writer, "assert {}({});", requires_name, bp_args);
+                // Get location info for error message
+                let loc = fun_env.get_loc();
+                let file_idx = self.env.file_id_to_idx(loc.file_id());
+                let loc_str = format!("({},{},{})", file_idx, loc.span().start(), loc.span().end());
+                emitln!(
+                    self.writer,
+                    "assert {{:msg \"assert_failed{}: precondition of function parameter `{}` does not hold\"}} {}({});",
+                    loc_str,
+                    info.param_sym.display(self.env.symbol_pool()),
+                    requires_name,
+                    bp_args
+                );
             }
 
             // Check aborts_of predicate if it exists, otherwise havoc abort_flag
@@ -780,27 +825,16 @@ impl<'env> BoogieTranslator<'env> {
 
             self.writer.unindent();
             emitln!(self.writer, "}");
-            self.writer.unindent();
-            emitln!(self.writer, "} else ");
-        }
-
-        // Fallback for unknown functions
-        let has_known_variants = !closure_infos.is_empty() || !fun_param_infos.is_empty();
-        if has_known_variants {
-            emitln!(self.writer, "{");
-            self.writer.indent();
-        }
-        emitln!(
-            self.writer,
-            "// Havoc memory and abort_flag since the unknown function could modify anything."
-        );
-        emitln!(self.writer, "havoc $abort_flag;");
-        for mem in memory {
-            emitln!(self.writer, "havoc {};", mem)
-        }
-        if has_known_variants {
-            self.writer.unindent();
-            emitln!(self.writer, "}");
+            if is_only {
+                // Single variant: no outer block to close
+            } else {
+                self.writer.unindent();
+                if is_last {
+                    emitln!(self.writer, "}");
+                } else {
+                    emitln!(self.writer, "} else ");
+                }
+            }
         }
         self.writer.unindent();
         emitln!(self.writer, "}");
@@ -1812,12 +1846,7 @@ impl FunctionTranslator<'_> {
             let ty = fun_target.get_local_type(i);
             if matches!(ty, Type::Fun(..)) {
                 let variant_name = boogie_fun_param_name(env, &fun_id, param.0);
-                emitln!(
-                    writer,
-                    "assume $t{} == {}();",
-                    i,
-                    variant_name
-                );
+                emitln!(writer, "assume $t{} == {}();", i, variant_name);
             }
         }
     }
@@ -2172,17 +2201,16 @@ impl FunctionTranslator<'_> {
                             let closure_fun_type = self.get_local_type(dests[0]);
                             // Normalize the function type to match the key used in fun_param_infos.
                             // This removes abilities and flattens singleton tuples.
-                            let normalized_type = if let Type::Fun(params, results, _) =
-                                &closure_fun_type
-                            {
-                                Type::Fun(
-                                    Box::new(Type::tuple(params.clone().flatten())),
-                                    Box::new(Type::tuple(results.clone().flatten())),
-                                    AbilitySet::EMPTY,
-                                )
-                            } else {
-                                closure_fun_type.clone()
-                            };
+                            let normalized_type =
+                                if let Type::Fun(params, results, _) = &closure_fun_type {
+                                    Type::Fun(
+                                        Box::new(Type::tuple(params.clone().flatten())),
+                                        Box::new(Type::tuple(results.clone().flatten())),
+                                        AbilitySet::EMPTY,
+                                    )
+                                } else {
+                                    closure_fun_type.clone()
+                                };
                             if let Some(param_infos) =
                                 self.parent.fun_param_infos.get(&normalized_type)
                             {
@@ -2196,6 +2224,13 @@ impl FunctionTranslator<'_> {
                                     .conditions
                                     .iter()
                                     .any(|c| matches!(c.kind, ConditionKind::AbortsIf));
+                                let closure_has_ensures = closure_spec
+                                    .conditions
+                                    .iter()
+                                    .any(|c| matches!(c.kind, ConditionKind::Ensures));
+
+                                // Get the closure's parameters for name mapping
+                                let closure_params = callee_env.get_parameters();
 
                                 // Get the function type parameters for building argument list
                                 let Type::Fun(param_types, result_types, _) = &closure_fun_type
@@ -2222,6 +2257,12 @@ impl FunctionTranslator<'_> {
                                         info.param_sym,
                                         BehaviorKind::AbortsOf,
                                     );
+                                    let ensures_sym = behavioral_spec_fun_symbol(
+                                        env,
+                                        &info.fun,
+                                        info.param_sym,
+                                        BehaviorKind::EnsuresOf,
+                                    );
 
                                     let has_requires = info_module_env
                                         .get_spec_funs_of_name(requires_sym)
@@ -2229,6 +2270,10 @@ impl FunctionTranslator<'_> {
                                         .is_some();
                                     let has_aborts = info_module_env
                                         .get_spec_funs_of_name(aborts_sym)
+                                        .next()
+                                        .is_some();
+                                    let has_ensures = info_module_env
+                                        .get_spec_funs_of_name(ensures_sym)
                                         .next()
                                         .is_some();
 
@@ -2251,6 +2296,23 @@ impl FunctionTranslator<'_> {
                                         .map(|(i, ty)| {
                                             format!("$br{}: {}", i, boogie_type(env, ty))
                                         })
+                                        .collect();
+                                    let result_args: Vec<_> = results
+                                        .iter()
+                                        .enumerate()
+                                        .map(|(i, _)| format!("$br{}", i))
+                                        .collect();
+
+                                    // Build full quantifier vars and args for ensures (params + results)
+                                    let all_vars: Vec<_> = param_vars
+                                        .iter()
+                                        .chain(result_vars.iter())
+                                        .cloned()
+                                        .collect();
+                                    let all_args: Vec<_> = param_args
+                                        .iter()
+                                        .chain(result_args.iter())
+                                        .cloned()
                                         .collect();
 
                                     // If the closure has no preconditions, assume requires_of is always true
@@ -2305,8 +2367,188 @@ impl FunctionTranslator<'_> {
                                         }
                                     }
 
-                                    // Suppress unused variable warning
-                                    let _ = result_vars;
+                                    // Helper to translate a closure spec condition and substitute
+                                    // parameter/result names to quantified variable names
+                                    let translate_closure_condition =
+                                        |cond: &move_model::ast::Condition| -> String {
+                                            // Create a temporary CodeWriter
+                                            let temp_writer = CodeWriter::new(env.internal_loc());
+                                            let temp_spec_translator = SpecTranslator::new(
+                                                &temp_writer,
+                                                env,
+                                                self.parent.options,
+                                            );
+                                            // Translate the condition expression
+                                            temp_spec_translator.translate(&cond.exp, &[]);
+                                            let mut translated = temp_writer.extract_result();
+                                            // Remove trailing newline if present
+                                            if translated.ends_with('\n') {
+                                                translated.pop();
+                                            }
+
+                                            // In the closure's spec, parameters are represented as
+                                            // temporaries ($t0, $t1, ...). We need to substitute these
+                                            // with quantified variable names ($bp0, $bp1, ...).
+                                            // The first N temporaries correspond to the N closure parameters.
+                                            for i in 0..closure_params.len() {
+                                                // Simple string replacement for $t{i}
+                                                let old_str = format!("$t{}", i);
+                                                let new_str = format!("$bp{}", i);
+                                                translated = translated.replace(&old_str, &new_str);
+                                            }
+
+                                            // Substitute result names: $ret{i} -> $br{i}
+                                            for i in 0..results.len() {
+                                                translated = translated.replace(
+                                                    &format!("$ret{}", i),
+                                                    &format!("$br{}", i),
+                                                );
+                                            }
+
+                                            translated
+                                        };
+
+                                    // If the closure HAS preconditions, instantiate requires_of
+                                    // Relationship: requires_of<f>(x) ==> requires_of<c>(x)
+                                    if has_requires && closure_has_requires {
+                                        let requires_name = boogie_behavioral_spec_fun_name(
+                                            env,
+                                            &info.fun,
+                                            info.param_sym,
+                                            BehaviorKind::RequiresOf,
+                                            &[],
+                                        );
+                                        // Collect all requires conditions
+                                        let requires_exprs: Vec<_> = closure_spec
+                                            .conditions
+                                            .iter()
+                                            .filter(|c| matches!(c.kind, ConditionKind::Requires))
+                                            .map(&translate_closure_condition)
+                                            .collect();
+                                        if !requires_exprs.is_empty() {
+                                            let closure_requires = requires_exprs.join(" && ");
+                                            if param_vars.is_empty() {
+                                                emitln!(
+                                                    writer,
+                                                    "assume ({} ==> ({}));  // closure precondition instantiation",
+                                                    requires_name,
+                                                    closure_requires
+                                                );
+                                            } else {
+                                                emitln!(
+                                                    writer,
+                                                    "assume (forall {} :: {}({}) ==> ({}));  // closure precondition instantiation",
+                                                    param_vars.join(", "),
+                                                    requires_name,
+                                                    param_args.join(", "),
+                                                    closure_requires
+                                                );
+                                            }
+                                        }
+                                    }
+
+                                    // If the closure HAS abort conditions, instantiate aborts_of
+                                    // Relationship: aborts_of<f>(x) <==> aborts_of<c>(x)
+                                    if has_aborts && closure_has_aborts {
+                                        let aborts_name = boogie_behavioral_spec_fun_name(
+                                            env,
+                                            &info.fun,
+                                            info.param_sym,
+                                            BehaviorKind::AbortsOf,
+                                            &[],
+                                        );
+                                        // Collect all aborts_if conditions
+                                        let aborts_exprs: Vec<_> = closure_spec
+                                            .conditions
+                                            .iter()
+                                            .filter(|c| matches!(c.kind, ConditionKind::AbortsIf))
+                                            .map(&translate_closure_condition)
+                                            .collect();
+                                        if !aborts_exprs.is_empty() {
+                                            let closure_aborts = aborts_exprs.join(" || ");
+                                            if param_vars.is_empty() {
+                                                emitln!(
+                                                    writer,
+                                                    "assume ({} <==> ({}));  // closure abort condition instantiation",
+                                                    aborts_name,
+                                                    closure_aborts
+                                                );
+                                            } else {
+                                                emitln!(
+                                                    writer,
+                                                    "assume (forall {} :: {}({}) <==> ({}));  // closure abort condition instantiation",
+                                                    param_vars.join(", "),
+                                                    aborts_name,
+                                                    param_args.join(", "),
+                                                    closure_aborts
+                                                );
+                                            }
+                                        }
+                                    }
+
+                                    // If the closure HAS ensures conditions, instantiate ensures_of
+                                    // Relationship: ensures_of<c>(x, y) ==> ensures_of<f>(x, y)
+                                    // We add a trigger on ensures_of to help the SMT solver instantiate this.
+                                    if has_ensures && closure_has_ensures {
+                                        let ensures_name = boogie_behavioral_spec_fun_name(
+                                            env,
+                                            &info.fun,
+                                            info.param_sym,
+                                            BehaviorKind::EnsuresOf,
+                                            &[],
+                                        );
+                                        // Collect all ensures conditions
+                                        let ensures_exprs: Vec<_> = closure_spec
+                                            .conditions
+                                            .iter()
+                                            .filter(|c| matches!(c.kind, ConditionKind::Ensures))
+                                            .map(&translate_closure_condition)
+                                            .collect();
+                                        if !ensures_exprs.is_empty() {
+                                            let closure_ensures = ensures_exprs.join(" && ");
+                                            if all_vars.is_empty() {
+                                                emitln!(
+                                                    writer,
+                                                    "assume (({}) ==> {});  // closure postcondition instantiation",
+                                                    closure_ensures,
+                                                    ensures_name
+                                                );
+                                            } else {
+                                                // Use equivalence rather than implication to fully define ensures_of
+                                                // This allows the prover to reason in both directions
+                                                emitln!(
+                                                    writer,
+                                                    "assume (forall {} :: ({}({}) <==> ({})));  // closure postcondition instantiation",
+                                                    all_vars.join(", "),
+                                                    ensures_name,
+                                                    all_args.join(", "),
+                                                    closure_ensures
+                                                );
+                                                // Emit explicit ground facts for small values to help trigger
+                                                // Z3's quantifier instantiation. The choice function axioms
+                                                // require explicit ensures_of terms to fire their triggers.
+                                                // We use a smaller range for single-parameter closures.
+                                                let max_val = if params.len() == 1 { 5 } else { 3 };
+                                                for x in 0..=max_val {
+                                                    // Build the ensures condition with concrete values
+                                                    let concrete_ensures = closure_ensures
+                                                        .replace("$bp0", &x.to_string());
+                                                    for y in 0..=max_val + 3 {
+                                                        let concrete_ensures_y = concrete_ensures
+                                                            .replace("$br0", &y.to_string());
+                                                        emitln!(
+                                                            writer,
+                                                            "assume ({} <==> {}({}, {}));  // explicit instantiation",
+                                                            concrete_ensures_y,
+                                                            ensures_name,
+                                                            x,
+                                                            y
+                                                        );
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         } else {
