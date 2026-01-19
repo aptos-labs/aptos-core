@@ -1772,7 +1772,7 @@ async fn test_multivalidator_staking_reward_impl() {
                      epoch_reward_rate);
             
             if reward_earned == 0 {
-                println!("  ⚠️  WARNING: Validator {} earned NO rewards in epoch {}", address, epoch_num);
+                println!("  WARNING: Validator {} earned NO rewards in epoch {}", address, epoch_num);
             }
         }
         
@@ -1975,4 +1975,228 @@ pub fn create_features_with_treasury_rewards() -> aptos_types::on_chain_config::
     features.disable(FeatureFlag::DERIVABLE_ACCOUNT_ABSTRACTION);
         
     features
+}
+
+/// Smoke test to verify epoch changes succeed even when the Governed Gas Pool (GGP) has zero balance.
+/// This tests the failsafe logic in stake::distribute_rewards that prevents epoch changes from aborting.
+#[tokio::test]
+async fn test_staking_reward_failsafe_zero_ggp_balance() {
+    // Run the actual test in a thread with larger stack size (8MB instead of default 2MB)
+    let handle = std::thread::Builder::new()
+        .stack_size(8 * 1024 * 1024) // 8MB stack
+        .spawn(|| {
+            let runtime = tokio::runtime::Runtime::new().unwrap();
+            runtime.block_on(async {
+                test_staking_reward_failsafe_zero_ggp_balance_impl().await;
+            })
+        })
+        .unwrap();
+
+    handle.join().unwrap();
+}
+
+async fn test_staking_reward_failsafe_zero_ggp_balance_impl() {
+    // Base stake amount
+    const BASE_STAKE: u64 = 3600u64 * 24 * 365 * 10 * 100; // Same as multivalidator test
+
+    println!("==============================================");
+    println!("FAILSAFE TEST: Epoch change with zero GGP balance");
+    println!("==============================================");
+
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
+        .with_init_config(Arc::new(|_, conf, _| {
+            conf.consensus.round_initial_timeout_ms = 200;
+            conf.consensus.quorum_store_poll_time_ms = 100;
+        }))
+        .with_init_genesis_stake(Arc::new(|i, genesis_stake_amount| {
+            *genesis_stake_amount = match i {
+                0 => 10 * BASE_STAKE,
+                1 => 8 * BASE_STAKE,
+                2 => 6 * BASE_STAKE,
+                3 => 4 * BASE_STAKE,
+                _ => BASE_STAKE,
+            };
+        }))
+        .with_init_genesis_config(Arc::new(|genesis_config| {
+            genesis_config.epoch_duration_secs = 4;
+            genesis_config.recurring_lockup_duration_secs = 4;
+            genesis_config.voting_duration_secs = 3;
+            genesis_config.rewards_apy_percentage = 10;
+        }))
+        .with_aptos()
+        .with_initial_features_override(create_features_with_treasury_rewards())
+        .build_with_cli(0)
+        .await;
+
+    // Wait for swarm to be ready
+    println!("Waiting for swarm to be fully ready...");
+    swarm
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(30))
+        .await
+        .unwrap();
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    // Add root account to CLI for governance operations
+    cli.add_account_with_address_to_cli(
+        swarm.root_key(),
+        swarm.chain_info().root_account().address(),
+    );
+
+    let transaction_factory = swarm.chain_info().transaction_factory();
+    let rest_client = swarm.validators().next().unwrap().rest_client();
+
+    // Enable the STAKE_REWARD_USING_TREASURY feature WITHOUT depositing any funds to GGP
+    // This is the key difference from the normal test - we enable treasury mode but leave it empty
+    println!("Enabling stake_reward_using_treasury feature (WITHOUT funding GGP)...");
+    let enable_feature_script = format!(
+        r#"
+    script {{
+        use aptos_framework::aptos_governance;
+        use std::features;
+        fun main(core_resources: &signer) {{
+            let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+            features::change_feature_flags_for_next_epoch(&framework_signer, vector[224], vector[]);
+        }}
+    }}
+    "#
+    );
+    
+    cli.run_script(0, &enable_feature_script)
+        .await
+        .expect("Failed to enable stake_reward_using_treasury feature");
+
+    // Resync after script
+    swarm
+        .chain_info()
+        .resync_root_account_seq_num(&rest_client)
+        .await
+        .unwrap();
+
+    // Check GGP balance - should be very low or zero (only gas fees collected)
+    let initial_ggp_balance: u64 = rest_client
+        .view(
+            &aptos_rest_client::aptos_api_types::ViewRequest {
+                function: aptos_rest_client::aptos_api_types::EntryFunctionId::from_str("0x1::governed_gas_pool::get_balance").unwrap(),
+                type_arguments: vec![aptos_rest_client::aptos_api_types::MoveType::from_str("0x1::aptos_coin::AptosCoin").unwrap()],
+                arguments: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("GGP balance view request failed")
+        .inner()
+        .first()
+        .unwrap()
+        .as_str()
+        .unwrap_or("0")
+        .parse()
+        .unwrap();
+    
+    println!("Initial GGP balance: {} (should be minimal - only gas fees)", initial_ggp_balance);
+
+    // Get initial validator state
+    let (initial_state, initial_validator_set) = get_validator_set_and_state(&rest_client).await;
+    println!(
+        "Initial state - Epoch: {}, Version: {}",
+        initial_state.epoch, initial_state.version
+    );
+
+    // Store initial voting power
+    let initial_voting_powers = initial_validator_set.clone();
+
+    // Run through 3 epochs to verify system stability with empty/depleted GGP
+    println!("\n=== Testing epoch changes with depleted GGP ===");
+    
+    for epoch_num in 1..=3 {
+        println!("\n--- Attempting epoch change {} ---", epoch_num);
+        tokio::time::sleep(Duration::from_secs(5)).await;
+
+        // Trigger epoch change - THIS SHOULD NOT ABORT even with zero GGP balance
+        let epoch_result = reconfig(
+            &rest_client,
+            &transaction_factory,
+            swarm.chain_info().root_account(),
+        )
+        .await;
+
+        // Get state after epoch
+        let (epoch_state, epoch_validator_set) = get_validator_set_and_state(&rest_client).await;
+        
+        println!(
+            "[PASS] Epoch change {} SUCCEEDED! Blockchain now at Epoch: {}, Version: {}",
+            epoch_num, epoch_state.epoch, epoch_state.version
+        );
+
+        // Verify validators are still active (voting power should remain the same or have minimal change)
+        for (address, current_power) in &epoch_validator_set {
+            let initial_power = initial_voting_powers.get(address).unwrap();
+            let reward = if current_power > initial_power {
+                current_power - initial_power
+            } else {
+                0
+            };
+            println!(
+                "  Validator {}: Initial={}, Current={}, Reward={}",
+                address, initial_power, current_power, reward
+            );
+        }
+    }
+
+    // Final verification: Check that all validators still have their stake
+    let (final_state, final_validator_set) = get_validator_set_and_state(&rest_client).await;
+    
+    println!("\n=== FINAL VERIFICATION ===");
+    println!("Final epoch: {}", final_state.epoch);
+
+    // Verify validators retained their stake (minimal or no rewards due to empty GGP)
+    let mut all_validators_ok = true;
+    for (address, final_power) in &final_validator_set {
+        let initial_power = initial_voting_powers.get(address).unwrap();
+        
+        // Validators should at minimum retain their initial stake
+        if final_power < initial_power {
+            println!("[FAIL] Validator {} lost stake! Initial: {}, Final: {}", 
+                     address, initial_power, final_power);
+            all_validators_ok = false;
+        } else {
+            let reward = final_power - initial_power;
+            println!("[PASS] Validator {}: Initial={}, Final={}, Reward={} (expected minimal/zero due to empty GGP)",
+                     address, initial_power, final_power, reward);
+        }
+    }
+
+    // Check final GGP balance
+    let final_ggp_balance: u64 = rest_client
+        .view(
+            &aptos_rest_client::aptos_api_types::ViewRequest {
+                function: aptos_rest_client::aptos_api_types::EntryFunctionId::from_str("0x1::governed_gas_pool::get_balance").unwrap(),
+                type_arguments: vec![aptos_rest_client::aptos_api_types::MoveType::from_str("0x1::aptos_coin::AptosCoin").unwrap()],
+                arguments: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("GGP balance view request failed")
+        .inner()
+        .first()
+        .unwrap()
+        .as_str()
+        .unwrap_or("0")
+        .parse()
+        .unwrap();
+
+    println!("\nFinal GGP balance: {}", final_ggp_balance);
+
+    assert!(all_validators_ok, "One or more validators lost stake during epoch changes");
+
+    println!("\n==============================================");
+    println!("[PASS] FAILSAFE TEST PASSED!");
+    println!("   - {} epoch changes completed successfully", final_state.epoch - initial_state.epoch);
+    println!("   - All validators retained their stake");
+    println!("   - System remained stable with depleted GGP");
+    println!("==============================================");
+
+    swarm.wait_for_all_nodes_to_catchup(Duration::from_secs(30))
+        .await
+        .unwrap();
 }

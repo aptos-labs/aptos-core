@@ -4261,6 +4261,7 @@ Calculate the rewards amount.
 ## Function `distribute_rewards`
 
 Get rewards from the Governed Gas Pool corresponding to current epoch's <code><a href="stake.md#0x1_stake">stake</a></code> and <code>num_successful_votes</code>.
+This function includes failsafe logic to allow epoch changes even when the governed gas pool has insufficient funds.
 
 
 <pre><code><b>fun</b> <a href="stake.md#0x1_stake_distribute_rewards">distribute_rewards</a>(<a href="stake.md#0x1_stake">stake</a>: &<b>mut</b> <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;, num_successful_proposals: u64, num_total_proposals: u64, rewards_rate: u64, rewards_rate_denominator: u64): u64
@@ -4291,16 +4292,29 @@ Get rewards from the Governed Gas Pool corresponding to current epoch's <code><a
     } <b>else</b> {
         0
     };
-    <b>if</b> (rewards_amount &gt; 0) {
-        <b>let</b> rewards = <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_stake_reward_using_treasury_enabled">features::stake_reward_using_treasury_enabled</a>()) {
-            <a href="governed_gas_pool.md#0x1_governed_gas_pool_withdraw_staking_reward">governed_gas_pool::withdraw_staking_reward</a>&lt;AptosCoin&gt;(rewards_amount)
+    <b>let</b> actual_rewards_amount = <b>if</b> (rewards_amount &gt; 0) {
+        <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_stake_reward_using_treasury_enabled">features::stake_reward_using_treasury_enabled</a>()) {
+            // Failsafe: Check balance before attempting withdrawal <b>to</b> prevent epoch change from aborting
+            <b>let</b> available_balance = <a href="governed_gas_pool.md#0x1_governed_gas_pool_get_balance">governed_gas_pool::get_balance</a>&lt;AptosCoin&gt;();
+            <b>let</b> withdraw_amount = <b>min</b>(rewards_amount, available_balance);
+            <b>if</b> (withdraw_amount &gt; 0) {
+                <b>let</b> rewards = <a href="governed_gas_pool.md#0x1_governed_gas_pool_withdraw_staking_reward">governed_gas_pool::withdraw_staking_reward</a>&lt;AptosCoin&gt;(withdraw_amount);
+                <a href="coin.md#0x1_coin_merge">coin::merge</a>(<a href="stake.md#0x1_stake">stake</a>, rewards);
+                withdraw_amount
+            } <b>else</b> {
+                // Insufficient funds in governed gas pool - epoch change proceeds <b>with</b> zero rewards
+                0
+            }
         } <b>else</b> {
             <b>let</b> mint_cap = &<b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework).mint_cap;
-            <a href="coin.md#0x1_coin_mint">coin::mint</a>(rewards_amount, mint_cap)
-        };
-        <a href="coin.md#0x1_coin_merge">coin::merge</a>(<a href="stake.md#0x1_stake">stake</a>, rewards);
+            <b>let</b> rewards = <a href="coin.md#0x1_coin_mint">coin::mint</a>(rewards_amount, mint_cap);
+            <a href="coin.md#0x1_coin_merge">coin::merge</a>(<a href="stake.md#0x1_stake">stake</a>, rewards);
+            rewards_amount
+        }
+    } <b>else</b> {
+        0
     };
-    rewards_amount
+    actual_rewards_amount
 }
 </code></pre>
 

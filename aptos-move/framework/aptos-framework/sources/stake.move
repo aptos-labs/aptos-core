@@ -1647,6 +1647,7 @@ module aptos_framework::stake {
     }
 
     /// Get rewards from the Governed Gas Pool corresponding to current epoch's `stake` and `num_successful_votes`.
+    /// This function includes failsafe logic to allow epoch changes even when the governed gas pool has insufficient funds.
     fun distribute_rewards(
         stake: &mut Coin<AptosCoin>,
         num_successful_proposals: u64,
@@ -1666,16 +1667,29 @@ module aptos_framework::stake {
         } else {
             0
         };
-        if (rewards_amount > 0) {
-            let rewards = if (features::stake_reward_using_treasury_enabled()) {
-                governed_gas_pool::withdraw_staking_reward<AptosCoin>(rewards_amount)
+        let actual_rewards_amount = if (rewards_amount > 0) {
+            if (features::stake_reward_using_treasury_enabled()) {
+                // Failsafe: Check balance before attempting withdrawal to prevent epoch change from aborting
+                let available_balance = governed_gas_pool::get_balance<AptosCoin>();
+                let withdraw_amount = min(rewards_amount, available_balance);
+                if (withdraw_amount > 0) {
+                    let rewards = governed_gas_pool::withdraw_staking_reward<AptosCoin>(withdraw_amount);
+                    coin::merge(stake, rewards);
+                    withdraw_amount
+                } else {
+                    // Insufficient funds in governed gas pool - epoch change proceeds with zero rewards
+                    0
+                }
             } else {
                 let mint_cap = &borrow_global<AptosCoinCapabilities>(@aptos_framework).mint_cap;
-                coin::mint(rewards_amount, mint_cap)
-            };
-            coin::merge(stake, rewards);
+                let rewards = coin::mint(rewards_amount, mint_cap);
+                coin::merge(stake, rewards);
+                rewards_amount
+            }
+        } else {
+            0
         };
-        rewards_amount
+        actual_rewards_amount
     }
 
     fun append<T>(v1: &mut vector<T>, v2: &mut vector<T>) {
@@ -1810,6 +1824,78 @@ module aptos_framework::stake {
             governed_gas_pool::register_coin<AptosCoin>();
         };
         coin::deposit<AptosCoin>(pool_addr, coins);
+    }
+
+    #[test_only]
+    /// Set the governed gas pool balance to a specific amount for testing.
+    /// This can both add or remove funds from the pool.
+    public fun set_governed_gas_pool_balance(
+        aptos_framework: &signer, target_amount: u64
+    ) acquires AptosCoinCapabilities {
+        let current_balance = governed_gas_pool::get_balance<AptosCoin>();
+        if (target_amount > current_balance) {
+            // Need to add more
+            let amount_to_add = target_amount - current_balance;
+            seed_governed_gas_pool(aptos_framework, amount_to_add);
+        } else if (target_amount < current_balance) {
+            // Need to reduce - withdraw excess to a burn address
+            let excess = current_balance - target_amount;
+            // Use fund() to withdraw excess coins to the aptos_framework account
+            governed_gas_pool::fund<AptosCoin>(aptos_framework, @aptos_framework, excess);
+        };
+        // If equal, do nothing
+    }
+
+    #[test_only]
+    /// Initialize for testing WITHOUT seeding the governed gas pool.
+    /// This allows testing scenarios where the pool has insufficient funds.
+    public fun initialize_for_test_no_pool_seed(
+        aptos_framework: &signer,
+        minimum_stake: u64,
+        maximum_stake: u64,
+        recurring_lockup_secs: u64,
+        allow_validator_set_change: bool,
+        rewards_rate_numerator: u64,
+        rewards_rate_denominator: u64,
+        voting_power_increase_limit: u64,
+    ) {
+        // Create framework account
+        aptos_framework::account::create_account_for_test(@aptos_framework);
+
+        // Enable treasury feature
+        features::change_feature_flags_for_testing(aptos_framework, vector[features::get_stake_reward_using_treasury_feature()], vector[]);
+
+        timestamp::set_time_has_started_for_testing(aptos_framework);
+        reconfiguration_state::initialize(aptos_framework);
+        if (!exists<ValidatorSet>(@aptos_framework)) {
+            initialize(aptos_framework);
+        };
+        staking_config::initialize_for_test(
+            aptos_framework,
+            minimum_stake,
+            maximum_stake,
+            recurring_lockup_secs,
+            allow_validator_set_change,
+            rewards_rate_numerator,
+            rewards_rate_denominator,
+            voting_power_increase_limit,
+        );
+
+        if (!exists<AptosCoinCapabilities>(@aptos_framework)) {
+            let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(aptos_framework);
+            store_aptos_coin_mint_cap(aptos_framework, mint_cap);
+            coin::destroy_burn_cap<AptosCoin>(burn_cap);
+        };
+
+        // Initialize governed gas pool with ZERO balance (for testing insufficient funds)
+        let seed: vector<u8> = b"test";
+        governed_gas_pool::initialize(aptos_framework, seed);
+        governed_gas_pool::initialize_governed_gas_pool_extension(aptos_framework);
+        let pool_addr = governed_gas_pool::governed_gas_pool_address();
+        if (!coin::is_account_registered<AptosCoin>(pool_addr)) {
+            governed_gas_pool::register_coin<AptosCoin>();
+        };
+        // DO NOT seed any coins - pool starts with 0 balance
     }
 
     #[test_only]
@@ -3248,6 +3334,104 @@ module aptos_framework::stake {
     public fun with_rewards(amount: u64): u64 {
         let (numerator, denominator) = staking_config::get_reward_rate(&staking_config::get());
         amount + amount * numerator / denominator
+    }
+
+    // Test the failsafe logic when governed gas pool has insufficient funds.
+    // This test verifies that epoch changes can proceed even when rewards cannot be fully distributed.
+    #[test(aptos_framework = @aptos_framework, validator = @0x123)]
+    public entry fun test_stake_reward_failsafe_insufficient_funds(
+        aptos_framework: &signer,
+        validator: &signer,
+    ) acquires AllowedValidators, AptosCoinCapabilities, OwnerCapability, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        // Initialize WITHOUT seeding the governed gas pool (starts with 0 balance)
+        initialize_for_test_no_pool_seed(
+            aptos_framework,
+            100,      // minimum_stake
+            10000,    // maximum_stake
+            LOCKUP_CYCLE_SECONDS,
+            true,     // allow_validator_set_change
+            1,        // rewards_rate_numerator
+            100,      // rewards_rate_denominator (1% rewards)
+            1000000,  // voting_power_increase_limit
+        );
+
+        let validator_address = signer::address_of(validator);
+
+        // Initialize validator with stake
+        let (_sk, pk, pop) = generate_identity();
+        initialize_test_validator(&pk, &pop, validator, 1000, true, true);
+
+        // Verify pool starts with 0 balance
+        assert!(governed_gas_pool::get_balance<AptosCoin>() == 0, 1);
+
+        // Get initial stake
+        let initial_stake = coin::value(&borrow_global<StakePool>(validator_address).active);
+        assert!(initial_stake == 1000, 2);
+
+        // Test Case 1: Epoch change with ZERO balance in pool
+        // Expected reward would be 10 (1% of 1000), but pool has 0
+        // This should NOT abort - epoch change must succeed
+        end_epoch();
+
+        // Verify epoch changed successfully (validator still has same stake, no rewards)
+        let stake_after_zero_balance = coin::value(&borrow_global<StakePool>(validator_address).active);
+        assert!(stake_after_zero_balance == 1000, 3); // No rewards distributed
+
+        // Test Case 2: Partial funds - add less than needed
+        // Expected reward is 10 (1% of 1000), add only 5
+        seed_governed_gas_pool(aptos_framework, 5);
+        assert!(governed_gas_pool::get_balance<AptosCoin>() == 5, 4);
+
+        end_epoch();
+
+        // Verify partial rewards distributed
+        let stake_after_partial = coin::value(&borrow_global<StakePool>(validator_address).active);
+        assert!(stake_after_partial == 1005, 5); // Only 5 distributed (what was available)
+        assert!(governed_gas_pool::get_balance<AptosCoin>() == 0, 6); // Pool depleted
+
+        // Test Case 3: Multiple epochs with depleted pool
+        // Pool is now empty, run several epochs
+        end_epoch();
+        end_epoch();
+        end_epoch();
+
+        // Verify epochs completed without abort, stake unchanged (no rewards)
+        let stake_after_multiple = coin::value(&borrow_global<StakePool>(validator_address).active);
+        assert!(stake_after_multiple == 1005, 7); // Same as before, no new rewards
+
+        // Test Case 4: Full rewards when pool has enough
+        // Expected reward is ~10 (1% of 1005), add 100 to be safe
+        seed_governed_gas_pool(aptos_framework, 100);
+        
+        end_epoch();
+
+        // Verify full rewards distributed
+        let stake_after_full = coin::value(&borrow_global<StakePool>(validator_address).active);
+        // Should be ~1015 (1005 + 1% = 1005 + 10.05 = 1015)
+        assert!(stake_after_full >= 1015, 8); // Got full rewards
+    }
+
+    // Test that the old minting path still works when treasury feature is disabled
+    #[test(aptos_framework = @aptos_framework, validator = @0x123)]
+    public entry fun test_stake_reward_minting_path_still_works(
+        aptos_framework: &signer,
+        validator: &signer,
+    ) acquires AllowedValidators, AptosCoinCapabilities, OwnerCapability, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        // Initialize WITHOUT treasury feature (uses minting)
+        initialize_for_test(aptos_framework);
+        
+        // Disable treasury feature to use minting path
+        features::change_feature_flags_for_testing(aptos_framework, vector[], vector[features::get_stake_reward_using_treasury_feature()]);
+        
+        let validator_address = signer::address_of(validator);
+        let (_sk, pk, pop) = generate_identity();
+        initialize_test_validator(&pk, &pop, validator, 1000, true, true);
+        
+        // Trigger epoch change - should use minting path
+        end_epoch();
+        
+        // Validator should receive full rewards via minting (not from pool)
+        assert_validator_state(validator_address, 1010, 0, 0, 0, 0);
     }
 
 }
