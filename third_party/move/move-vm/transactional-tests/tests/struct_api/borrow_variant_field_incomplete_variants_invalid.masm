@@ -1,0 +1,17 @@
+//# publish --print-bytecode
+module 0x66::test_borrow_variant_field_incomplete
+
+enum Color has drop
+  Red
+    r: u8
+  Green
+    g: u16
+  Blue
+    b: u8
+
+// Invalid: borrow$Color$0$0 should list ALL variants with u8 at offset 0 (Red, Blue)
+// But this only lists Red, missing Blue
+#[borrow=0] public fun borrow$Color$0$0(l0: &Color): &u8
+    move_loc l0
+    borrow_variant_field Color, Red::r
+    ret

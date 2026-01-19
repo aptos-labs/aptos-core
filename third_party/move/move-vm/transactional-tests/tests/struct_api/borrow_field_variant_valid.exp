@@ -1,0 +1,40 @@
+processed 1 task
+task 0 lines 1-39:  publish --print-bytecode [module 0x66::test_borrow_field_variant_valid]
+
+== BEGIN Bytecode ==
+// Bytecode version v9
+module 0x66::test_borrow_field_variant_valid
+enum Color has drop
+  Red
+    r: u8
+  Green
+    g: u16
+  Blue
+    b: u8
+
+// Function definition at index 0
+#[borrow=0] public fun borrow$Color$0$0(l0: &Color): &u8
+    move_loc l0
+    borrow_variant_field Color, Red::r, Blue::b
+    ret
+
+// Function definition at index 1
+#[borrow=0] public fun borrow$Color$0$1(l0: &Color): &u16
+    move_loc l0
+    borrow_variant_field Color, Green::g
+    ret
+
+// Function definition at index 2
+#[borrow_mut=0] public fun borrow_mut$Color$0$0(l0: &mut Color): &mut u8
+    move_loc l0
+    mut_borrow_variant_field Color, Red::r, Blue::b
+    ret
+
+// Function definition at index 3
+#[borrow_mut=0] public fun borrow_mut$Color$0$1(l0: &mut Color): &mut u16
+    move_loc l0
+    mut_borrow_variant_field Color, Green::g
+    ret
+
+
+== END Bytecode ==

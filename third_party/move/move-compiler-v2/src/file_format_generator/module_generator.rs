@@ -19,7 +19,13 @@ use move_binary_format::{
 };
 use move_bytecode_source_map::source_map::{SourceMap, SourceName};
 use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, metadata::Metadata,
+    account_address::AccountAddress,
+    identifier::Identifier,
+    language_storage::{
+        BORROW, BORROW_MUT, PACK, PACK_VARIANT, PUBLIC_STRUCT_DELIMITER, TEST_VARIANT, UNPACK,
+        UNPACK_VARIANT,
+    },
+    metadata::Metadata,
 };
 use move_ir_types::ast as IR_AST;
 use move_model::{
@@ -630,19 +636,14 @@ impl ModuleGenerator {
         ctx: &ModuleContext,
         loc: &Loc,
         struct_env: &StructEnv,
-        op_prefix: &str, // e.g., well_known::PACK / UNPACK / TEST_VARIANT
+        op_prefix: &str, // e.g., PACK / UNPACK / TEST_VARIANT
         param_sig_index: Option<FF::SignatureIndex>, // When None, the parameters are the fields of the struct
         return_sig_index: Option<FF::SignatureIndex>, // When None, the return type is the list of fields of the struct
         key_conv: fn(Option<Symbol>) -> K,
     ) -> BTreeMap<K, FF::FunctionHandleIndex> {
         let module = self.module_index(ctx, loc, &struct_env.module_env);
         let struct_name = struct_env.get_name_str();
-        let fun_name_prefix = format!(
-            "{}{}{}",
-            op_prefix,
-            well_known::PUBLIC_STRUCT_DELIMITER,
-            struct_name
-        );
+        let fun_name_prefix = format!("{}{}{}", op_prefix, PUBLIC_STRUCT_DELIMITER, struct_name);
 
         let type_parameters = struct_env
             .get_type_parameters()
@@ -658,7 +659,7 @@ impl ModuleGenerator {
                     let name = format!(
                         "{}{}{}",
                         fun_name_prefix,
-                        well_known::PUBLIC_STRUCT_DELIMITER,
+                        PUBLIC_STRUCT_DELIMITER,
                         variant.display(pool)
                     );
                     let field_types = struct_env
@@ -695,7 +696,7 @@ impl ModuleGenerator {
 
             // Attach attributes according to the operation
             let attributes = match op_prefix {
-                well_known::PACK => match variant_opt {
+                PACK => match variant_opt {
                     Some(variant) => {
                         let idx = struct_env
                             .get_variants()
@@ -706,7 +707,7 @@ impl ModuleGenerator {
                     None => vec![FF::FunctionAttribute::Pack],
                 },
 
-                well_known::UNPACK => match variant_opt {
+                UNPACK => match variant_opt {
                     Some(variant) => {
                         let idx = struct_env
                             .get_variants()
@@ -717,7 +718,7 @@ impl ModuleGenerator {
                     None => vec![FF::FunctionAttribute::Unpack],
                 },
 
-                well_known::TEST_VARIANT => {
+                TEST_VARIANT => {
                     let variant = variant_opt.expect("test_variant must be a concrete variant");
                     let idx = struct_env
                         .get_variants()
@@ -775,11 +776,7 @@ impl ModuleGenerator {
             (None, Some(struct_sig))
         };
 
-        let op_prefix = if IS_PACK {
-            well_known::PACK
-        } else {
-            well_known::UNPACK
-        };
+        let op_prefix = if IS_PACK { PACK } else { UNPACK };
 
         let built = self.build_struct_api_index_common(
             ctx,
@@ -880,7 +877,7 @@ impl ModuleGenerator {
             ctx,
             loc,
             struct_env,
-            well_known::TEST_VARIANT,
+            TEST_VARIANT,
             Some(ref_struct_sig),
             Some(bool_sig),
             must_some,
@@ -975,12 +972,8 @@ impl ModuleGenerator {
         let struct_name = struct_env.get_name_str();
         let fun_name_prefix = format!(
             "{}{}{}",
-            if is_imm {
-                well_known::BORROW_NAME
-            } else {
-                well_known::BORROW_MUT_NAME
-            },
-            well_known::PUBLIC_STRUCT_DELIMITER,
+            if is_imm { BORROW } else { BORROW_MUT },
+            PUBLIC_STRUCT_DELIMITER,
             struct_name
         );
         let struct_ty = Type::Struct(
@@ -1014,9 +1007,9 @@ impl ModuleGenerator {
                 let name = format!(
                     "{}{}{}{}{}",
                     fun_name_prefix,
-                    well_known::PUBLIC_STRUCT_DELIMITER,
+                    PUBLIC_STRUCT_DELIMITER,
                     offset,
-                    well_known::PUBLIC_STRUCT_DELIMITER,
+                    PUBLIC_STRUCT_DELIMITER,
                     ty_order
                 );
                 handle_elements.push((name, ty.clone(), variant_vec.clone(), offset));
@@ -1049,12 +1042,7 @@ impl ModuleGenerator {
                 let offset = field.get_offset();
                 let ref_type = field.get_type().wrap_in_reference(!is_imm);
                 let return_: FF::SignatureIndex = self.signature(ctx, loc, vec![ref_type.clone()]);
-                let name = format!(
-                    "{}{}{}",
-                    fun_name_prefix,
-                    well_known::PUBLIC_STRUCT_DELIMITER,
-                    offset
-                );
+                let name = format!("{}{}{}", fun_name_prefix, PUBLIC_STRUCT_DELIMITER, offset);
                 let idx = FF::FunctionHandleIndex(ctx.checked_bound(
                     loc,
                     self.module.function_handles.len(),
@@ -1787,21 +1775,13 @@ impl ModuleContext<'_> {
             match attr {
                 Attribute::Apply(_, name, args) => {
                     let name = fun_env.symbol_pool().string(*name);
-                    // These attributes must be applied to.
-                    if matches!(
-                        name.as_str(),
-                        well_known::PACK_VARIANT
-                            | well_known::UNPACK_VARIANT
-                            | well_known::TEST_VARIANT
-                            | well_known::BORROW_NAME
-                            | well_known::BORROW_MUT_NAME
-                    ) {
-                        self.error(
-                            fun_env.get_id_loc(),
-                            format!("attribute `{}` cannot be applied", name),
-                        );
-                    }
                     match name.as_str() {
+                        PACK_VARIANT | UNPACK_VARIANT | TEST_VARIANT | BORROW | BORROW_MUT => {
+                            self.error(
+                                fun_env.get_id_loc(),
+                                format!("attribute `{}` cannot be applied", name),
+                            );
+                        },
                         well_known::PERSISTENT_ATTRIBUTE => {
                             validate_no_args_and_not_script(name.as_str(), args, self);
                             has_persistent = true;
@@ -1811,11 +1791,11 @@ impl ModuleContext<'_> {
                             validate_no_args_and_not_script(name.as_str(), args, self);
                             result.push(FF::FunctionAttribute::ModuleLock);
                         },
-                        well_known::PACK => {
+                        PACK => {
                             validate_no_args_and_not_script(name.as_str(), args, self);
                             result.push(FF::FunctionAttribute::Pack);
                         },
-                        well_known::UNPACK => {
+                        UNPACK => {
                             validate_no_args_and_not_script(name.as_str(), args, self);
                             result.push(FF::FunctionAttribute::Unpack);
                         },
@@ -1826,38 +1806,34 @@ impl ModuleContext<'_> {
                 Attribute::Assign(_, name, attribute_value) => {
                     let name = fun_env.symbol_pool().string(*name);
 
-                    // These attributes must not be assigned-to (keep existing behavior).
-                    if matches!(
-                        name.as_str(),
-                        well_known::PERSISTENT_ATTRIBUTE
-                            | well_known::MODULE_LOCK_ATTRIBUTE
-                            | well_known::PACK
-                            | well_known::UNPACK
-                    ) {
-                        self.error(
-                            fun_env.get_id_loc(),
-                            format!("attribute `{}` cannot be assigned to", name),
-                        );
-                    }
-
                     let ctor: Option<fn(u16) -> FF::FunctionAttribute> = match name.as_str() {
-                        well_known::PACK_VARIANT => {
+                        well_known::PERSISTENT_ATTRIBUTE
+                        | well_known::MODULE_LOCK_ATTRIBUTE
+                        | PACK
+                        | UNPACK => {
+                            self.error(
+                                fun_env.get_id_loc(),
+                                format!("attribute `{}` cannot be assigned to", name),
+                            );
+                            None
+                        },
+                        PACK_VARIANT => {
                             validate_not_script(name.as_str(), self);
                             Some(FF::FunctionAttribute::PackVariant)
                         },
-                        well_known::UNPACK_VARIANT => {
+                        UNPACK_VARIANT => {
                             validate_not_script(name.as_str(), self);
                             Some(FF::FunctionAttribute::UnpackVariant)
                         },
-                        well_known::TEST_VARIANT => {
+                        TEST_VARIANT => {
                             validate_not_script(name.as_str(), self);
                             Some(FF::FunctionAttribute::TestVariant)
                         },
-                        well_known::BORROW_NAME => {
+                        BORROW => {
                             validate_not_script(name.as_str(), self);
                             Some(FF::FunctionAttribute::BorrowFieldImmutable)
                         },
-                        well_known::BORROW_MUT_NAME => {
+                        BORROW_MUT => {
                             validate_not_script(name.as_str(), self);
                             Some(FF::FunctionAttribute::BorrowFieldMutable)
                         },
@@ -1872,12 +1848,10 @@ impl ModuleContext<'_> {
                 },
             }
         }
-
         if !has_persistent && fun_env.visibility() == Visibility::Public {
             // For a public function, derive the persistent attribute
-            result.push(FF::FunctionAttribute::Persistent);
+            result.push(FF::FunctionAttribute::Persistent)
         }
-
         result
     }
 }

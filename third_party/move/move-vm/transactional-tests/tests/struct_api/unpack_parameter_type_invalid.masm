@@ -1,0 +1,15 @@
+//# publish --print-bytecode
+module 0x66::test_unpack_parameter_invalid
+
+struct S
+    x: u64
+    y: u64
+
+struct T
+    a: u64
+
+// Invalid: unpack$S should take S, not T
+#[unpack] public fun unpack$S(l0: T): u64
+    move_loc l0
+    unpack T
+    ret

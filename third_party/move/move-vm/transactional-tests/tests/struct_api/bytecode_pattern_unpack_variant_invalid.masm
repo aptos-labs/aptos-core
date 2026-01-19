@@ -1,0 +1,16 @@
+//# publish --print-bytecode
+module 0x66::test_bytecode_pattern_unpack_variant
+
+enum Color has drop
+  Red
+    value: u64
+  Green
+    value: u64
+
+// Invalid: unpack_variant function has extra instructions (not exactly 3 instructions)
+#[unpack_variant=0] public fun unpack$Color$Red(l0: Color): u64
+    move_loc l0
+    ld_false
+    pop
+    unpack_variant Color, Red
+    ret

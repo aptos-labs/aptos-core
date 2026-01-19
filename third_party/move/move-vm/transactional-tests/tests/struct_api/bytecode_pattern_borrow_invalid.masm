@@ -1,0 +1,14 @@
+//# publish --print-bytecode
+module 0x66::test_bytecode_pattern_borrow
+
+struct S
+    x: u64
+    y: u64
+
+// Invalid: borrow function has extra instruction (not exactly 3 instructions)
+#[borrow=0] public fun borrow$S$0(l0: &S): &u64
+    move_loc l0
+    ld_u64 1
+    pop
+    borrow_field S, x
+    ret

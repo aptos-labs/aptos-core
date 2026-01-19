@@ -37,6 +37,17 @@ pub const LEGACY_OPTION_VEC: &str = "vec";
 pub const OPTION_MODULE_NAME_STR: &str = "option";
 pub const OPTION_STRUCT_NAME_STR: &str = "Option";
 
+// Struct API constants for public struct/enum APIs
+pub const PUBLIC_STRUCT_DELIMITER: &str = "$";
+pub const PACK: &str = "pack";
+pub const UNPACK: &str = "unpack";
+pub const PACK_VARIANT: &str = "pack_variant";
+pub const UNPACK_VARIANT: &str = "unpack_variant";
+pub const TEST_VARIANT: &str = "test_variant";
+pub const PARAM_NAME_FOR_STRUCT_API: &str = "_s";
+pub const BORROW: &str = "borrow";
+pub const BORROW_MUT: &str = "borrow_mut";
+
 pub static OPTION_MODULE_ID: Lazy<ModuleId> = Lazy::new(|| {
     ModuleId::new(
         AccountAddress::ONE,

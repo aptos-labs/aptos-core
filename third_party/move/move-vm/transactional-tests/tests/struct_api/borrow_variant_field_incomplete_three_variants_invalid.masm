@@ -1,0 +1,21 @@
+//# publish --print-bytecode
+module 0x66::test_borrow_variant_field_incomplete_three
+
+enum Shape has drop
+  Circle
+    radius: u64
+  Square
+    side: u64
+  Triangle
+    base: u64
+  Rectangle
+    width: u64
+    height: u64
+
+// All of Circle, Square, and Triangle have u64 at offset 0
+// Rectangle also has u64 at offset 0 (width)
+// Invalid: This only lists Circle and Square, missing Triangle and Rectangle
+#[borrow=0] public fun borrow$Shape$0$0(l0: &Shape): &u64
+    move_loc l0
+    borrow_variant_field Shape, Circle::radius, Square::side
+    ret

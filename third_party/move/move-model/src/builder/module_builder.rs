@@ -3622,7 +3622,7 @@ impl ModuleBuilder<'_, '_> {
                 is_native: entry.is_native,
                 visibility: entry.visibility,
                 has_package_visibility: self.package_structs.contains(&entry.struct_id),
-                is_empty_struct: entry.is_empty_struct.into(),
+                is_empty_struct: entry.is_empty_struct,
             };
             struct_data.insert(StructId::new(name.symbol), data);
             if entry.visibility != Visibility::Private

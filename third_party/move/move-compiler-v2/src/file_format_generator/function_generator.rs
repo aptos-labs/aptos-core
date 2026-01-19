@@ -16,7 +16,9 @@ use move_binary_format::{
     file_format as FF,
     file_format::{CodeOffset, FunctionDefinitionIndex},
 };
-use move_core_types::{ability, function::ClosureMask};
+use move_core_types::{
+    ability, function::ClosureMask, language_storage::PARAM_NAME_FOR_STRUCT_API,
+};
 use move_model::{
     ast::{ExpData, Spec, SpecBlockTarget, TempIndex},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
@@ -311,7 +313,7 @@ impl<'a> FunctionGenerator<'a> {
                 let input_param_name = struct_env
                     .env()
                     .symbol_pool()
-                    .make(well_known::PARAM_NAME_FOR_STRUCT_API);
+                    .make(PARAM_NAME_FOR_STRUCT_API);
                 genr.source_map
                     .add_parameter_mapping(
                         def_idx,
@@ -462,7 +464,7 @@ impl<'a> FunctionGenerator<'a> {
                 let input_param_name = struct_env
                     .env()
                     .symbol_pool()
-                    .make(well_known::PARAM_NAME_FOR_STRUCT_API);
+                    .make(PARAM_NAME_FOR_STRUCT_API);
 
                 genr.source_map
                     .add_parameter_mapping(def_idx, ctx.source_name(input_param_name, loc.clone()))
@@ -522,7 +524,8 @@ impl<'a> FunctionGenerator<'a> {
     ) {
         let visibility = struct_env.get_visibility();
         assert!(visibility.is_public_or_friend());
-        if struct_env.is_empty_struct().is_yes() {
+        // Early return if struct is empty (has no fields)
+        if struct_env.is_empty_struct() {
             return;
         }
         let type_parameters = TypeParameter::vec_to_formals(struct_env.get_type_parameters());
@@ -562,7 +565,7 @@ impl<'a> FunctionGenerator<'a> {
             let input_param_name = struct_env
                 .env()
                 .symbol_pool()
-                .make(well_known::PARAM_NAME_FOR_STRUCT_API);
+                .make(PARAM_NAME_FOR_STRUCT_API);
             genr.source_map
                 .add_parameter_mapping(def_idx, ctx.source_name(input_param_name, loc.clone()))
                 .expect(SOURCE_MAP_OK);

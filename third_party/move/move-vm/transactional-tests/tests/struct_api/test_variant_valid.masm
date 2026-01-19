@@ -1,0 +1,28 @@
+//# publish --print-bytecode
+module 0x66::test_variant_valid
+
+enum Color has drop
+  Red
+    value: u64
+  Green
+    value: u64
+  Blue
+    value: u64
+
+// Valid: test_variant$Color$Red with variant index 0 takes &Color and tests if it's Red
+#[test_variant=0] public fun test_variant$Color$Red(l0: &Color): bool
+    move_loc l0
+    test_variant Color, Red
+    ret
+
+// Valid: test_variant$Color$Green with variant index 1
+#[test_variant=1] public fun test_variant$Color$Green(l0: &Color): bool
+    move_loc l0
+    test_variant Color, Green
+    ret
+
+// Valid: test_variant$Color$Blue with variant index 2
+#[test_variant=2] public fun test_variant$Color$Blue(l0: &Color): bool
+    move_loc l0
+    test_variant Color, Blue
+    ret

@@ -12,9 +12,9 @@ use crate::{
         ResourceSpecifier as ASTResourceSpecifier, Value,
     },
     model::{
-        FieldData, FieldId, FunId, FunctionData, FunctionKind, GlobalEnv, IsEmptyStruct, Loc,
-        ModuleData, ModuleId, MoveIrLoc, Parameter, StructData, StructId, StructVariant,
-        TypeParameter, TypeParameterKind,
+        FieldData, FieldId, FunId, FunctionData, FunctionKind, GlobalEnv, Loc, ModuleData,
+        ModuleId, MoveIrLoc, Parameter, StructData, StructId, StructVariant, TypeParameter,
+        TypeParameterKind,
     },
     symbol::{Symbol, SymbolPool},
     ty::{PrimitiveType, ReferenceKind, Type},
@@ -37,7 +37,13 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_bytecode_source_map::source_map::{SourceMap, SourceName};
-use move_core_types::{ability::AbilitySet, account_address::AccountAddress, language_storage};
+use move_core_types::{
+    ability::AbilitySet,
+    account_address::AccountAddress,
+    language_storage::{
+        self, BORROW, BORROW_MUT, PACK, PACK_VARIANT, TEST_VARIANT, UNPACK, UNPACK_VARIANT,
+    },
+};
 use num::BigInt;
 use std::collections::BTreeMap;
 
@@ -319,7 +325,7 @@ impl<'a> BinaryModuleLoader<'a> {
                 new = true;
                 StructData {
                     abilities: handle_view.abilities(),
-                    is_empty_struct: IsEmptyStruct::unknown(),
+                    is_empty_struct: false, // Default to false when created from a compiled module
                     ..StructData::new(struct_id.symbol(), loc.clone())
                 }
             });
@@ -484,25 +490,25 @@ impl<'a> BinaryModuleLoader<'a> {
                     add_attribute(well_known::MODULE_LOCK_ATTRIBUTE, None);
                 },
                 FunctionAttribute::Pack => {
-                    add_attribute(well_known::PACK, None);
+                    add_attribute(PACK, None);
                 },
                 FunctionAttribute::PackVariant(variant_index) => {
-                    add_attribute(well_known::PACK_VARIANT, Some(*variant_index));
+                    add_attribute(PACK_VARIANT, Some(*variant_index));
                 },
                 FunctionAttribute::Unpack => {
-                    add_attribute(well_known::UNPACK, None);
+                    add_attribute(UNPACK, None);
                 },
                 FunctionAttribute::UnpackVariant(variant_index) => {
-                    add_attribute(well_known::UNPACK_VARIANT, Some(*variant_index));
+                    add_attribute(UNPACK_VARIANT, Some(*variant_index));
                 },
                 FunctionAttribute::TestVariant(variant_index) => {
-                    add_attribute(well_known::TEST_VARIANT, Some(*variant_index));
+                    add_attribute(TEST_VARIANT, Some(*variant_index));
                 },
                 FunctionAttribute::BorrowFieldImmutable(offset) => {
-                    add_attribute(well_known::BORROW_NAME, Some(*offset));
+                    add_attribute(BORROW, Some(*offset));
                 },
                 FunctionAttribute::BorrowFieldMutable(offset) => {
-                    add_attribute(well_known::BORROW_MUT_NAME, Some(*offset));
+                    add_attribute(BORROW_MUT, Some(*offset));
                 },
             }
         }

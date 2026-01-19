@@ -1,0 +1,27 @@
+processed 1 task
+task 0 lines 1-21:  publish --print-bytecode [module 0x66::test_unpack_valid]
+
+== BEGIN Bytecode ==
+// Bytecode version v9
+module 0x66::test_unpack_valid
+struct S
+  x: u64
+  y: u64
+
+struct T
+  a: bool
+
+// Function definition at index 0
+#[unpack] public fun unpack$S(l0: S): (u64, u64)
+    move_loc l0
+    unpack S
+    ret
+
+// Function definition at index 1
+#[unpack] public fun unpack$T(l0: T): bool
+    move_loc l0
+    unpack T
+    ret
+
+
+== END Bytecode ==

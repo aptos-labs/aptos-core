@@ -1,0 +1,13 @@
+//# publish --print-bytecode
+module 0x66::test_borrow_field_variant_no_type_order
+
+enum Color has drop
+  Red
+    r: u8
+
+// Invalid: borrow field on variant requires type_order in function name
+// Should be borrow$Color$0$0, not borrow$Color$0
+#[borrow=0] public fun borrow$Color$0(l0: &Color): &u8
+    move_loc l0
+    borrow_variant_field Color, Red::r
+    ret
