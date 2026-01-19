@@ -402,4 +402,410 @@ module 0x42::behavioral_predicates {
     spec test_requires_deep_nest {
         ensures result == x * 2;
     }
+
+    // =========================================================================
+    // Reference-typed closure parameters
+    // =========================================================================
+
+    /// Applies a function to a reference and returns u64.
+    /// Tests that behavioral predicates work with reference-typed closure parameters.
+    fun apply_ref(x: &u64, f: |&u64| u64): u64 {
+        f(x)
+    }
+    spec apply_ref {
+        pragma opaque = true;
+        requires !aborts_of<f>(x);
+        aborts_if false;
+        ensures ensures_of<f>(x, result);
+    }
+
+    fun test_apply_ref(): u64 {
+        let x = 42;
+        apply_ref(
+            &x,
+            |r| *r + 1 spec { aborts_if r == MAX_U64; ensures result == r + 1; }
+        )
+    }
+    spec test_apply_ref {
+        ensures result == 43;
+    }
+
+    // =========================================================================
+    // Tests for propagation of behavioral predicates (multiple closures, conditional selection)
+    // =========================================================================
+
+    /// Test: Two different closures passed to the same higher-order function
+    /// This tests that behavioral predicates correctly dispatch on closure variants.
+    fun test_multiple_closures(x: u64, y: u64): u64 {
+        let r1 = apply(|z| z + 1 spec { ensures result == z + 1; }, x);
+        let r2 = apply(|z| z * 2 spec { ensures result == z * 2; }, y);
+        r1 + r2
+    }
+    spec test_multiple_closures {
+        ensures result == (x + 1) + (y * 2);
+    }
+
+    /// Higher-order function that takes a closure and applies it
+    fun apply_closure_param(f: |u64| u64, x: u64): u64 {
+        apply(f, x)
+    }
+    spec apply_closure_param {
+        ensures ensures_of<f>(x, result);
+    }
+
+    /// Test: Closure passed to higher-order higher-order function
+    fun test_closure_param(x: u64): u64 {
+        apply_closure_param(|y| y + 5 spec { ensures result == y + 5; }, x)
+    }
+    spec test_closure_param {
+        ensures result == x + 5;
+    }
+
+    // =========================================================================
+    // Opaque versions of apply functions
+    // =========================================================================
+    // These are opaque versions of the apply functions above.
+    // The prover relies solely on the specifications, not the implementations.
+
+    /// Opaque version of apply
+    fun apply_opaque(f: |u64| u64, x: u64): u64 {
+        f(x)
+    }
+    spec apply_opaque {
+        pragma opaque = true;
+        ensures ensures_of<f>(x, result);
+    }
+
+    /// Opaque version of apply2
+    fun apply2_opaque(f: |u64, u64| u64, x: u64, y: u64): u64 {
+        f(x, y)
+    }
+    spec apply2_opaque {
+        pragma opaque = true;
+        ensures ensures_of<f>(x, y, result);
+    }
+
+    /// Opaque higher-order function with abort specification
+    fun apply_may_abort_opaque(f: |u64| u64, x: u64): u64 {
+        f(x)
+    }
+    spec apply_may_abort_opaque {
+        pragma opaque = true;
+        aborts_if aborts_of<f>(x);
+        ensures ensures_of<f>(x, result);
+    }
+
+    /// Opaque function with both aborts_of and ensures_of
+    fun guarded_apply_opaque(f: |u64| u64, x: u64): u64 {
+        f(x)
+    }
+    spec guarded_apply_opaque {
+        pragma opaque = true;
+        aborts_if aborts_of<f>(x);
+        ensures ensures_of<f>(x, result);
+    }
+
+    /// Opaque higher-order function with requires_of specification
+    fun apply_with_requires_opaque(f: |u64| u64, x: u64): u64 {
+        f(x)
+    }
+    spec apply_with_requires_opaque {
+        pragma opaque = true;
+        requires requires_of<f>(x);
+        aborts_if aborts_of<f>(x);
+        ensures ensures_of<f>(x, result);
+    }
+
+    // =========================================================================
+    // Tests using opaque apply functions
+    // =========================================================================
+    // For opaque functions, lambdas MUST have explicit specs since the prover
+    // only uses specifications, not implementations.
+
+    // --- Ensures_of with lambdas (opaque) ---
+
+    /// Test: ensures_of propagates postcondition from lambda (opaque)
+    fun test_ensures_of_basic_opaque(x: u64): u64 {
+        apply_opaque(|y| y + 5 spec { ensures result == y + 5; }, x)
+    }
+    spec test_ensures_of_basic_opaque {
+        ensures result == x + 5;
+    }
+
+    /// Test: ensures_of fails with wrong postcondition (opaque)
+    fun test_ensures_of_fail_opaque(x: u64): u64 {
+        apply_opaque(|y| y + 5 spec { ensures result == y + 5; }, x)
+    }
+    spec test_ensures_of_fail_opaque {
+        ensures result == x + 10; // error: post-condition does not hold
+    }
+
+    // --- Multiple arguments (opaque) ---
+
+    /// Test with binary operation - addition (opaque)
+    fun test_apply2_add_opaque(x: u64, y: u64): u64 {
+        apply2_opaque(|a, b| a + b spec { ensures result == a + b; }, x, y)
+    }
+    spec test_apply2_add_opaque {
+        ensures result == x + y;
+    }
+
+    /// Test with binary operation - multiplication (opaque)
+    fun test_apply2_mul_opaque(x: u64, y: u64): u64 {
+        apply2_opaque(|a, b| a * b spec { ensures result == a * b; }, x, y)
+    }
+    spec test_apply2_mul_opaque {
+        ensures result == x * y;
+    }
+
+    // --- Chained applications (opaque) ---
+
+    /// Test chained application directly with lambdas (opaque)
+    fun test_chained_application_ok_opaque(x: u64): u64 {
+        apply_opaque(
+            |y| y + 1 spec { ensures result == y + 1; },
+            apply_opaque(|z| z + 2 spec { ensures result == z + 2; }, x)
+        )
+    }
+    spec test_chained_application_ok_opaque {
+        ensures result == x + 3;
+    }
+
+    /// Test nested apply calls (opaque)
+    fun test_nested_apply_ok_opaque(x: u64): u64 {
+        apply_opaque(
+            |y| y * 2 spec { ensures result == y * 2; },
+            apply_opaque(|z| z + 5 spec { ensures result == z + 5; }, x)
+        )
+    }
+    spec test_nested_apply_ok_opaque {
+        ensures result == (x + 5) * 2;
+    }
+
+    // --- Identity and constant lambdas (opaque) ---
+
+    /// Test with identity lambda (opaque)
+    fun test_identity_opaque(x: u64): u64 {
+        apply_opaque(|y| y spec { ensures result == y; }, x)
+    }
+    spec test_identity_opaque {
+        ensures result == x;
+    }
+
+    /// Test with constant lambda (opaque)
+    fun test_constant_opaque(x: u64): u64 {
+        apply_opaque(|_y| 42 spec { ensures result == 42; }, x)
+    }
+    spec test_constant_opaque {
+        ensures result == 42;
+    }
+
+    /// Test with a more complex lambda expression (opaque)
+    fun test_complex_lambda_opaque(x: u64, y: u64): u64 {
+        apply_opaque(|z| if (z > y) z - y else y - z spec {
+            ensures z > y ==> result == z - y;
+            ensures z <= y ==> result == y - z;
+        }, x)
+    }
+    spec test_complex_lambda_opaque {
+        ensures x > y ==> result == x - y;
+        ensures x <= y ==> result == y - x;
+    }
+
+    // --- Negative tests (opaque, expected failures) ---
+
+    /// Test: Wrong ensures postcondition (opaque)
+    fun test_wrong_ensures_opaque(x: u64): u64 {
+        apply_opaque(|y| y + 1 spec { ensures result == y + 1; }, x)
+    }
+    spec test_wrong_ensures_opaque {
+        ensures result == x + 2; // error: post-condition does not hold
+    }
+
+    /// Test: Postcondition too strong (opaque)
+    fun test_postcondition_too_strong_opaque(x: u64): u64 {
+        apply_opaque(|y| y + 1 spec { ensures result == y + 1; }, x)
+    }
+    spec test_postcondition_too_strong_opaque {
+        ensures result == x + 1;
+        ensures result > 100; // error: post-condition does not hold
+    }
+
+    /// Test: Wrong binary result (opaque)
+    fun test_wrong_binary_opaque(x: u64, y: u64): u64 {
+        apply2_opaque(|a, b| a + b spec { ensures result == a + b; }, x, y)
+    }
+    spec test_wrong_binary_opaque {
+        ensures result == x * y; // error: should be x + y
+    }
+
+    // --- Aborts_of with lambdas (opaque) ---
+
+    /// Test: lambda that may abort (opaque)
+    fun test_may_abort_opaque(x: u64): u64 {
+        apply_may_abort_opaque(|y| if (y == 0) abort 1 else y spec {
+            aborts_if y == 0;
+            ensures result == y;
+        }, x)
+    }
+    spec test_may_abort_opaque {
+        aborts_if x == 0;
+        ensures result == x;
+    }
+
+    /// Test: lambda that aborts on condition (opaque)
+    fun test_may_abort_on_large_opaque(x: u64): u64 {
+        apply_may_abort_opaque(|y| if (y > 1000) abort 1 else y + 10 spec {
+            aborts_if y > 1000;
+            ensures result == y + 10;
+        }, x)
+    }
+    spec test_may_abort_on_large_opaque {
+        aborts_if x > 1000;
+        ensures result == x + 10;
+    }
+
+    // --- Combined ensures_of and aborts_of (opaque) ---
+
+    /// Test: lambda with both abort and post condition (opaque)
+    fun test_guarded_apply_opaque(x: u64): u64 {
+        guarded_apply_opaque(|y| {
+            if (y > 500) abort 1;
+            y * 2
+        } spec {
+            aborts_if y > 500;
+            ensures result == y * 2;
+        }, x)
+    }
+    spec test_guarded_apply_opaque {
+        aborts_if x > 500;
+        ensures result == x * 2;
+    }
+
+    // --- Lambda with captured variables (opaque) ---
+
+    /// Test lambda capturing a local variable (opaque)
+    fun test_captured_var_opaque(x: u64, offset: u64): u64 {
+        apply_opaque(|y| y + offset spec { ensures result == y + offset; }, x)
+    }
+    spec test_captured_var_opaque {
+        ensures result == x + offset;
+    }
+
+    /// Test lambda capturing multiple variables (opaque)
+    fun test_captured_multiple_opaque(x: u64, a: u64, b: u64): u64 {
+        apply_opaque(|y| y + a + b spec { ensures result == y + a + b; }, x)
+    }
+    spec test_captured_multiple_opaque {
+        ensures result == x + a + b;
+    }
+
+    // --- Requires_of with lambdas (opaque) ---
+
+    /// Test: lambda with no precondition (requires_of reduces to true) (opaque)
+    fun test_requires_of_trivial_opaque(x: u64): u64 {
+        apply_with_requires_opaque(|y| y + 1 spec { ensures result == y + 1; }, x)
+    }
+    spec test_requires_of_trivial_opaque {
+        ensures result == x + 1;
+    }
+
+    /// Test: lambda with multiplication (no precondition) (opaque)
+    fun test_requires_of_mul_opaque(x: u64): u64 {
+        apply_with_requires_opaque(|y| y * 2 spec { ensures result == y * 2; }, x)
+    }
+    spec test_requires_of_mul_opaque {
+        ensures result == x * 2;
+    }
+
+    /// Test: lambda with conditional (opaque)
+    fun test_requires_of_conditional_opaque(x: u64): u64 {
+        apply_with_requires_opaque(|y| if (y > 10) y - 5 else y + 5 spec {
+            ensures y > 10 ==> result == y - 5;
+            ensures y <= 10 ==> result == y + 5;
+        }, x)
+    }
+    spec test_requires_of_conditional_opaque {
+        ensures x > 10 ==> result == x - 5;
+        ensures x <= 10 ==> result == x + 5;
+    }
+
+    // --- Chained and nested requires_of (opaque) ---
+
+    /// Test: lambda with abort condition via guarded_apply_opaque
+    fun test_requires_via_guarded_opaque(x: u64): u64 {
+        guarded_apply_opaque(|y| {
+            if (y > 100) abort 1;
+            y * 2
+        } spec {
+            aborts_if y > 100;
+            ensures result == y * 2;
+        }, x)
+    }
+    spec test_requires_via_guarded_opaque {
+        aborts_if x > 100;
+        ensures result == x * 2;
+    }
+
+    /// Test: chained application with requires_of (opaque)
+    fun test_requires_chain_opaque(x: u64): u64 {
+        apply_with_requires_opaque(
+            |y| apply_with_requires_opaque(
+                |z| z + 1 spec { ensures result == z + 1; },
+                y
+            ) spec { ensures result == y + 1; },
+            x
+        )
+    }
+    spec test_requires_chain_opaque {
+        ensures result == x + 1;
+    }
+
+    /// Test: deeply nested lambdas with requires_of (opaque)
+    fun test_requires_deep_nest_opaque(x: u64): u64 {
+        apply_with_requires_opaque(|a|
+            apply_with_requires_opaque(|b|
+                apply_with_requires_opaque(
+                    |c| c * 2 spec { ensures result == c * 2; },
+                    b
+                ) spec { ensures result == b * 2; },
+                a
+            ) spec { ensures result == a * 2; },
+            x
+        )
+    }
+    spec test_requires_deep_nest_opaque {
+        ensures result == x * 2;
+    }
+
+    // --- Multiple closures (opaque) ---
+
+    /// Test: Two different closures passed to the same higher-order function (opaque)
+    fun test_multiple_closures_opaque(x: u64, y: u64): u64 {
+        let r1 = apply_opaque(|z| z + 1 spec { ensures result == z + 1; }, x);
+        let r2 = apply_opaque(|z| z * 2 spec { ensures result == z * 2; }, y);
+        r1 + r2
+    }
+    spec test_multiple_closures_opaque {
+        ensures result == (x + 1) + (y * 2);
+    }
+
+    /// Higher-order function that takes a closure and applies it (opaque)
+    /// Note: Implementation uses f(x) directly, not apply_opaque, since we're
+    /// passing through a function parameter and need its behavioral predicates.
+    fun apply_closure_param_opaque(f: |u64| u64, x: u64): u64 {
+        f(x)
+    }
+    spec apply_closure_param_opaque {
+        pragma opaque = true;
+        ensures ensures_of<f>(x, result);
+    }
+
+    /// Test: Closure passed to higher-order higher-order function (opaque)
+    fun test_closure_param_opaque(x: u64): u64 {
+        apply_closure_param_opaque(|y| y + 5 spec { ensures result == y + 5; }, x)
+    }
+    spec test_closure_param_opaque {
+        ensures result == x + 5;
+    }
 }

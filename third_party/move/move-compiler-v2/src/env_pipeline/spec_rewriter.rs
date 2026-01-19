@@ -127,8 +127,9 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
         let get_param_names =
             |params: &[Parameter]| params.iter().map(|Parameter(name, ..)| *name).collect_vec();
         match (&target, target.get_env_state(env)) {
-            (MoveFun(_), Def(exp)) => {
-                let mut converter = SpecConverter::new(env, &function_mapping, false);
+            (MoveFun(fun_id), Def(exp)) => {
+                let mut converter =
+                    SpecConverter::new(env, &function_mapping, false).with_enclosing_fun(*fun_id);
                 let new_exp = converter.rewrite_exp(exp.clone());
                 if !ExpData::ptr_eq(&new_exp, &exp) {
                     *targets.state_mut(&target) = Def(new_exp)
@@ -512,6 +513,17 @@ impl<'a> SpecConverter<'a> {
             param_sym.display(self.env.symbol_pool())
         ));
 
+        // Check if a spec function with this name already exists in the module.
+        // This handles the case where different SpecConverter instances process
+        // the same behavioral predicate in different spec contexts (e.g., inline
+        // spec in function body vs external spec block).
+        let module_env = self.env.get_module(enclosing_fun.module_id);
+        if let Some((existing_id, _)) = module_env.get_spec_funs_of_name(name).next() {
+            let spec_fun_id = enclosing_fun.module_id.qualified(*existing_id);
+            self.behavior_spec_funs.insert(cache_key, spec_fun_id);
+            return spec_fun_id;
+        }
+
         // Extract argument types and result types from the function type
         let (fn_arg_types, fn_result_types) = match param_type {
             Type::Fun(arg, result, _) => {
@@ -539,12 +551,14 @@ impl<'a> SpecConverter<'a> {
         };
 
         // Build parameters for the spec function (function's input arguments only)
+        // Strip reference types because spec language uses value semantics
         let mut params: Vec<Parameter> = fn_arg_types
             .iter()
             .enumerate()
             .map(|(i, ty)| {
                 let arg_name = self.env.symbol_pool().make(&format!("arg{}", i));
-                Parameter(arg_name, ty.clone(), loc.clone())
+                // Use skip_reference() to strip &T -> T for spec semantics
+                Parameter(arg_name, ty.skip_reference().clone(), loc.clone())
             })
             .collect();
 

@@ -1316,3 +1316,15 @@ pub fn boogie_behavioral_spec_fun_name(
         boogie_inst_suffix(env, inst)
     )
 }
+
+/// Return name of the behavioral predicate evaluation function for a function type.
+/// These inline functions dispatch on closure variants to evaluate behavioral predicates.
+/// Format: `${kind}'${type_suffix}'`
+/// For example: `$ensures_of'$fun_u64_u64'`
+pub fn boogie_behavioral_eval_fun_name(
+    env: &GlobalEnv,
+    fun_type: &Type,
+    kind: BehaviorKind,
+) -> String {
+    format!("${}'{}'", kind, boogie_type_suffix(env, fun_type))
+}

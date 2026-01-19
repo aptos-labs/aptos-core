@@ -455,32 +455,67 @@ impl SpecTranslator<'_> {
         let call_args_1 = arg_names.iter().chain(result_names_1.iter()).join(", ");
         let call_args_2 = arg_names.iter().chain(result_names_2.iter()).join(", ");
 
-        // Build equality conditions for results
-        let equalities: Vec<String> = result_params
-            .iter()
-            .map(|Parameter(name, _, _)| {
-                let name_str = name.display(pool).to_string();
-                format!("{}_1 == {}_2", name_str, name_str)
-            })
-            .collect();
-        let equality_cond = equalities.join(" && ");
+        // Check if we have exactly one boolean result parameter
+        // If so, we can emit a simpler single-trigger axiom that fires more reliably
+        let single_bool_result = result_params.len() == 1
+            && matches!(
+                self.inst(&result_params[0].1),
+                Type::Primitive(PrimitiveType::Bool)
+            );
 
-        // Emit the functionality axiom with explicit multi-trigger to help SMT solver
-        // The trigger includes both predicate calls to ensure proper instantiation
-        emitln!(
-            self.writer,
-            "axiom (forall {} :: {{{}({}), {}({})}} {}({}) && {}({}) ==> {});",
-            forall_params,
-            boogie_name,
-            call_args_1,
-            boogie_name,
-            call_args_2,
-            boogie_name,
-            call_args_1,
-            boogie_name,
-            call_args_2,
-            equality_cond
-        );
+        if single_bool_result {
+            // For boolean results, emit: forall args, r :: {pred(args, r)} pred(args, r) ==> !pred(args, !r)
+            // This uses a single trigger and directly expresses functionality for booleans
+            let result_name = result_params[0].0.display(pool).to_string();
+            let single_forall_params = arg_param_strs
+                .iter()
+                .chain(std::iter::once(&format!("{}: bool", result_name)))
+                .join(", ");
+            let single_call_args = arg_names
+                .iter()
+                .chain(std::iter::once(&result_name))
+                .join(", ");
+            let negated_call_args = arg_names
+                .iter()
+                .map(|s| s.as_str())
+                .chain(std::iter::once(format!("!{}", result_name).as_str()))
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            emitln!(
+                self.writer,
+                "axiom (forall {} :: {{{}({})}} {}({}) ==> !{}({}));",
+                single_forall_params,
+                boogie_name,
+                single_call_args,
+                boogie_name,
+                single_call_args,
+                boogie_name,
+                negated_call_args
+            );
+        } else {
+            // For non-boolean results, emit the standard functionality axiom
+            // Standard form: forall x, y1, y2 :: R(x,y1) && R(x,y2) ==> y1 == y2
+            let equalities: Vec<String> = result_params
+                .iter()
+                .map(|Parameter(name, _, _)| {
+                    let name_str = name.display(pool).to_string();
+                    format!("{}_1 == {}_2", name_str, name_str)
+                })
+                .collect();
+            let equality_cond = equalities.join(" && ");
+
+            emitln!(
+                self.writer,
+                "axiom (forall {} :: {}({}) && {}({}) ==> {});",
+                forall_params,
+                boogie_name,
+                call_args_1,
+                boogie_name,
+                call_args_2,
+                equality_cond
+            );
+        }
 
         // Also emit a validity axiom: if ensures_of(x, y) holds, then y is well-formed
         // This is needed because the choice predicate requires both ensures_of AND validity
@@ -882,6 +917,8 @@ impl SpecTranslator<'_> {
             );
 
             // Emit predicate function characterizing the choice.
+            // Note: This function is marked {:inline} so Boogie expands it at use sites,
+            // allowing Z3 to reason directly about the expanded constraints.
             emitln!(
                 new_spec_trans.writer,
                 "function {{:inline}} {}_pred({}): bool {{",
@@ -946,86 +983,189 @@ impl SpecTranslator<'_> {
                 param_decls.iter().map(mk_arg).join(", ")
             );
 
-            // Emit choice axiom
-            if !param_decls.is_empty() {
-                emit!(
-                    new_spec_trans.writer,
-                    "axiom (forall {}:: ",
-                    param_decls.iter().map(mk_decl).join(", ")
-                );
-                if !info.free_vars.is_empty() || !info.used_temps.is_empty() {
-                    // TODO: IsValid for memory?
-                    let mut sep = "";
-                    for (s, ty) in &info.free_vars {
-                        emit!(new_spec_trans.writer, sep);
-                        emit_valid(env.symbol_pool().string(*s).as_ref(), ty);
-                        sep = " && ";
-                    }
-                    for (t, ty) in &info.used_temps {
-                        emit!(new_spec_trans.writer, sep);
-                        emit_valid(&mk_temp(*t), ty);
-                        sep = " && ";
-                    }
-                    emitln!(new_spec_trans.writer, " ==>");
-                }
-            } else {
-                emitln!(new_spec_trans.writer, "axiom");
-            }
-            new_spec_trans.writer.indent();
+            // Emit has-witness function for witness pattern
             emitln!(
                 new_spec_trans.writer,
-                "(exists {}:: {}) ==> ",
-                mk_decl(&var_decl),
-                predicate
+                "function {}_has_witness({}): bool;",
+                fun_name,
+                param_decls.iter().map(mk_decl).join(", ")
             );
-            emitln!(
-                new_spec_trans.writer,
-                "(var {} := {}; {}",
-                &var_decl.0,
-                choice,
-                predicate
+            // Create call to has-witness function
+            let has_witness = format!(
+                "{}_has_witness({})",
+                fun_name,
+                param_decls.iter().map(mk_arg).join(", ")
             );
 
-            // Emit min constraint
+            // Build validity constraints string for use in axioms
+            let validity_constraints = {
+                let mut constraints = Vec::new();
+                for (s, ty) in &info.free_vars {
+                    let suffix = boogie_type_suffix(env, ty.skip_reference());
+                    let n = env.symbol_pool().string(*s).to_string();
+                    let n = if ty.is_mutable_reference() {
+                        format!("$Dereference({})", n)
+                    } else {
+                        n
+                    };
+                    constraints.push(format!("$IsValid'{}'({})", suffix, n));
+                }
+                for (t, ty) in &info.used_temps {
+                    let suffix = boogie_type_suffix(env, ty.skip_reference());
+                    let n = mk_temp(*t);
+                    let n = if ty.is_mutable_reference() {
+                        format!("$Dereference({})", n)
+                    } else {
+                        n
+                    };
+                    constraints.push(format!("$IsValid'{}'({})", suffix, n));
+                }
+                constraints.join(" && ")
+            };
+
+            // Emit witness detection axiom
+            // axiom (forall params, var :: validity ==> (predicate ==> has_witness(params)));
+            // Note: No explicit trigger - Boogie infers triggers, and the inline predicate
+            // expands to allow Z3's native existential reasoning.
+            {
+                let all_decls = vec![&var_decl]
+                    .into_iter()
+                    .chain(param_decls.iter())
+                    .map(mk_decl)
+                    .join(", ");
+                emit!(new_spec_trans.writer, "axiom (forall {} :: ", all_decls);
+                if !validity_constraints.is_empty() {
+                    emitln!(
+                        new_spec_trans.writer,
+                        "{} ==> ({} ==> {}));",
+                        validity_constraints,
+                        predicate,
+                        has_witness
+                    );
+                } else {
+                    emitln!(new_spec_trans.writer, "{} ==> {});", predicate, has_witness);
+                }
+            }
+
+            // Emit existential bridge axiom: (exists var :: predicate) ==> has_witness
+            // This allows Z3's native existential reasoning to work alongside the witness pattern.
+            // Without this, Z3 cannot establish has_witness for parameterized choice operators.
+            // NOTE: For parameterized choices, we add {choice} as a trigger so Z3 can instantiate
+            // the axiom when the choice function appears in verification conditions.
+            {
+                if !param_decls.is_empty() {
+                    emit!(
+                        new_spec_trans.writer,
+                        "axiom (forall {} :: ",
+                        param_decls.iter().map(mk_decl).join(", ")
+                    );
+                    // Add trigger {choice} for parameterized choices
+                    emit!(new_spec_trans.writer, "{{{}}} ", choice);
+                    if !validity_constraints.is_empty() {
+                        emit!(new_spec_trans.writer, "{} ==> ", validity_constraints);
+                    }
+                    emitln!(
+                        new_spec_trans.writer,
+                        "((exists {} :: {}) ==> {}));",
+                        mk_decl(&var_decl),
+                        predicate,
+                        has_witness
+                    );
+                } else {
+                    // Non-parameterized: no forall, no trigger needed
+                    emitln!(
+                        new_spec_trans.writer,
+                        "axiom (exists {} :: {}) ==> {};",
+                        mk_decl(&var_decl),
+                        predicate,
+                        has_witness
+                    );
+                }
+            }
+
+            // Check for ChooseMin error before emitting choice validity axiom
             if info.kind == QuantKind::ChooseMin {
-                // Check whether we support min on the range type.
                 if !result_ty.is_number() && !result_ty.is_signer_or_address() {
                     env.error(
                         &env.get_node_loc(info.node_id),
                         "The min choice can only be applied to numbers, addresses, or signers",
                     )
                 }
-                // Add the condition that there does not exist a smaller satisfying value.
-                emit!(new_spec_trans.writer, " && (var $$c := {}; ", &var_decl.0);
+            }
+
+            // Emit choice validity axiom (triggered by choice function)
+            // axiom (forall params :: {choice} has_witness(params) ==> (var v := choice; predicate && min_constraint));
+            {
+                if !param_decls.is_empty() {
+                    emit!(
+                        new_spec_trans.writer,
+                        "axiom (forall {} :: {{{}}} ",
+                        param_decls.iter().map(mk_decl).join(", "),
+                        choice
+                    );
+                } else {
+                    // No parameters, so no forall quantifier (and no trigger possible)
+                    emit!(new_spec_trans.writer, "axiom ");
+                }
                 emit!(
                     new_spec_trans.writer,
-                    "(forall {}:: {} < $$c ==> !{}))",
-                    mk_decl(&var_decl),
+                    "{} ==> (var {} := {}; {}",
+                    has_witness,
                     &var_decl.0,
+                    choice,
                     predicate
                 );
-            }
-            new_spec_trans.writer.unindent();
-            if !param_decls.is_empty() {
-                emit!(new_spec_trans.writer, ")");
-            }
-            emitln!(new_spec_trans.writer, ");");
 
-            // For choice expressions with ensures_of predicates, add functionality axiom.
-            // Since ensures_of is functional (one output per input), if any y satisfies the
-            // predicate, then choice must return that y.
-            // This axiom: pred(y) ==> choice() == y
+                // Add min constraint if needed
+                if info.kind == QuantKind::ChooseMin {
+                    emit!(new_spec_trans.writer, " && (var $$c := {}; ", &var_decl.0);
+                    emit!(
+                        new_spec_trans.writer,
+                        "(forall {}:: {} < $$c ==> !{}))",
+                        mk_decl(&var_decl),
+                        &var_decl.0,
+                        predicate
+                    );
+                }
+
+                if !param_decls.is_empty() {
+                    emitln!(new_spec_trans.writer, "));");
+                } else {
+                    emitln!(new_spec_trans.writer, ");");
+                }
+            }
+
+            // For choice expressions with ensures_of predicates, add axioms to help Z3
+            // with trigger matching. Since ensures_of is functional (one output per input),
+            // if any y satisfies the predicate, then choice must return that y.
             if self.contains_ensures_of_predicate(&info.condition) {
                 let all_decls = vec![&var_decl]
                     .into_iter()
                     .chain(param_decls.iter())
                     .map(mk_decl)
                     .join(", ");
+
+                // Translate the condition to a string for use as a trigger.
+                // This allows the axiom to fire when ensures_of terms appear.
+                let temp_writer = CodeWriter::new(env.internal_loc());
+                let temp_spec_trans =
+                    SpecTranslator::new(&temp_writer, env, new_spec_trans.options);
+                temp_spec_trans.translate(&info.condition, &[]);
+                let mut condition_str = temp_writer.extract_result();
+                if condition_str.ends_with('\n') {
+                    condition_str.pop();
+                }
+
+                // Functionality axiom with BOTH predicate and condition as triggers.
+                // The {condition} trigger allows Z3 to fire this axiom when ensures_of
+                // terms appear (e.g., from closure instantiation assumptions), which then
+                // constrains the choice function to return the unique y satisfying ensures_of.
                 emitln!(
                     new_spec_trans.writer,
-                    "axiom (forall {} :: {{{}}} {} ==> {} == {});",
+                    "axiom (forall {} :: {{{}}} {{{}}} {} ==> {} == {});",
                     all_decls,
                     predicate,
+                    condition_str,
                     predicate,
                     choice,
                     &var_decl.0
