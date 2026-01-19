@@ -52,7 +52,7 @@ module aptos_experimental::bulk_order_book {
     use aptos_trading::order_match_types::{ActiveMatchedOrder, OrderMatch, OrderMatchDetails};
     use aptos_trading::bulk_order_types::{
         BulkOrder, BulkOrderPlaceResponse, BulkOrderRequest,
-        new_bulk_order_match, new_bulk_order, new_bulk_order_place_response_success,
+        new_bulk_order_match, new_bulk_order_place_response_success,
         new_bulk_order_place_response_rejection,
     };
     use aptos_experimental::order_book_utils;
@@ -418,7 +418,7 @@ module aptos_experimental::bulk_order_book {
             self.order_id_to_address.add(order_id, account);
             (order_id, std::option::none())
         };
-        let (bulk_order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes) = new_bulk_order(
+        let (bulk_order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes) = bulk_order_utils::new_bulk_order_with_sanitization(
             order_id,
             next_increasing_idx_type(),
             order_req,

@@ -19,8 +19,8 @@
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
-<b>use</b> <a href="bulk_order_types.md#0x7_bulk_order_types">0x7::bulk_order_types</a>;
-<b>use</b> <a href="order_match_types.md#0x7_order_match_types">0x7::order_match_types</a>;
+<b>use</b> <a href="">0x5::bulk_order_types</a>;
+<b>use</b> <a href="">0x5::order_match_types</a>;
 </code></pre>
 
 
@@ -58,7 +58,7 @@ the size; otherwise, it inserts the new price level at the front.
 - <code>other</code>: Reference to the order result to reinsert
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_reinsert_order_into_bulk_order">reinsert_order_into_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(order: &<b>mut</b> <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;, other: &<a href="order_match_types.md#0x7_order_match_types_OrderMatchDetails">order_match_types::OrderMatchDetails</a>&lt;M&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_reinsert_order_into_bulk_order">reinsert_order_into_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(order: &<b>mut</b> <a href="_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;, other: &<a href="_OrderMatchDetails">order_match_types::OrderMatchDetails</a>&lt;M&gt;)
 </code></pre>
 
 
@@ -122,7 +122,7 @@ A tuple containing the next active price and size as options.
 - If the matched size exceeds the available size at the first level
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_match_order_and_get_next_from_bulk_order">match_order_and_get_next_from_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(order: &<b>mut</b> <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;, is_bid: bool, matched_size: u64): (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_match_order_and_get_next_from_bulk_order">match_order_and_get_next_from_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(order: &<b>mut</b> <a href="_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;, is_bid: bool, matched_size: u64): (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
 </code></pre>
 
 
@@ -180,7 +180,7 @@ the order, keeping other price levels intact.
 The size that was cancelled at that price level, or 0 if the price wasn't found
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_cancel_at_price_level">cancel_at_price_level</a>&lt;M: <b>copy</b>, drop, store&gt;(order: &<b>mut</b> <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;, price: u64, is_bid: bool): u64
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_cancel_at_price_level">cancel_at_price_level</a>&lt;M: <b>copy</b>, drop, store&gt;(order: &<b>mut</b> <a href="_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;, price: u64, is_bid: bool): u64
 </code></pre>
 
 
