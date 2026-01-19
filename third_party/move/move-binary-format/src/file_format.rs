@@ -425,22 +425,22 @@ impl fmt::Display for FunctionAttribute {
                 write!(f, "pack")
             },
             FunctionAttribute::PackVariant(variant_index) => {
-                write!(f, "pack_variant={}", variant_index)
+                write!(f, "pack_variant({})", variant_index)
             },
             FunctionAttribute::Unpack => {
                 write!(f, "unpack")
             },
             FunctionAttribute::UnpackVariant(variant_index) => {
-                write!(f, "unpack_variant={}", variant_index)
+                write!(f, "unpack_variant({})", variant_index)
             },
             FunctionAttribute::TestVariant(variant_index) => {
-                write!(f, "test_variant={}", variant_index)
+                write!(f, "test_variant({})", variant_index)
             },
             FunctionAttribute::BorrowFieldImmutable(offset) => {
-                write!(f, "borrow={}", offset)
+                write!(f, "borrow({})", offset)
             },
             FunctionAttribute::BorrowFieldMutable(offset) => {
-                write!(f, "borrow_mut={}", offset)
+                write!(f, "borrow_mut({})", offset)
             },
         }
     }

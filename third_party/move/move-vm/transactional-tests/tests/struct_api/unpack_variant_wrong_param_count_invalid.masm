@@ -1,0 +1,11 @@
+//# publish --print-bytecode
+module 0x66::test_unpack_variant_wrong_param_count
+
+enum Color has drop
+  Red
+    value: u64
+
+// Invalid: unpack_variant must have exactly one parameter (the enum to unpack)
+#[unpack_variant(0)] public fun unpack$Color$Red(): u64
+    ld_u64 0
+    ret

@@ -117,32 +117,38 @@ fn clos_pack(
     Ok(())
 }
 
-fn check_borrow_field_mut(
+fn call_or_specialize_borrow_field_mut(
     verifier: &mut ReferenceSafetyAnalysis,
     function_handle: &FunctionHandle,
     state: &mut AbstractState,
-    offset: u16,
+    code_offset: u16,
     meter: &mut impl Meter,
 ) -> Result<(), PartialVMError> {
     let mut is_borrow_field_mutable = false;
     for attr in function_handle.attributes.iter() {
-        // When calling a borrow field mut api, we assume
-        // 1) there is only one struct-API related attribute, which is `borrow_mut`,
-        // 2) the implementation of the function matches the attribute, which
-        // only borrows the field at field_offset thus call borrow_field
-        // we need this special case because of reference semantics of mutable references
-        // passing to a function, which is not necessary for immutable references.
-        // same for call generic below.
+        // Special handling for mutable borrow field functions:
+        // When we see a BorrowFieldMutable attribute, we skip the normal function call and
+        // directly perform borrow_field here instead. This is necessary because mutable
+        // references have move semantics when passed as function arguments, which would
+        // invalidate the original reference. By handling the borrow inline, we preserve
+        // correct reference tracking.
+        //
+        // This approach relies on assumptions enforced by struct_api_checker:
+        // 1. The function has only one struct-API attribute (BorrowFieldMutable)
+        // 2. The function implementation matches: it only borrows the specified field
+        //
+        // Note: Immutable references don't need this special case since they can be copied.
+        // The same special handling is done in call_generic below.
         if let FunctionAttribute::BorrowFieldMutable(field_offset) = attr {
             let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
-            let value = state.borrow_field(offset, true, id, *field_offset)?;
+            let value = state.borrow_field(code_offset, true, id, *field_offset)?;
             verifier.stack.push(value);
             is_borrow_field_mutable = true;
             break;
         }
     }
     if !is_borrow_field_mutable {
-        call(verifier, state, offset, function_handle, meter)?;
+        call(verifier, state, code_offset, function_handle, meter)?;
     }
     Ok(())
 }
@@ -263,29 +269,6 @@ fn fun_type(
             StatusCode::VERIFIER_INVARIANT_VIOLATION,
         )),
     }
-}
-
-/// Handles BorrowFieldMutable attribute if present on function.
-/// Returns true if attribute was handled, false otherwise.
-fn handle_borrow_field_mutable(
-    verifier: &mut ReferenceSafetyAnalysis,
-    state: &mut AbstractState,
-    offset: CodeOffset,
-    function_handle: &FunctionHandle,
-) -> PartialVMResult<bool> {
-    for attr in function_handle.attributes.iter() {
-        // When calling a borrow field mut api, we assume the body only
-        // borrows the field at field_offset thus call borrow_field
-        // we need this special case because of reference semantics of mutable references
-        // passing to a function, which is not necessary for immutable references.
-        if let FunctionAttribute::BorrowFieldMutable(field_offset) = attr {
-            let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
-            let value = state.borrow_field(offset, true, id, *field_offset)?;
-            verifier.stack.push(value);
-            return Ok(true);
-        }
-    }
-    Ok(false)
 }
 
 fn execute_inner(
@@ -495,12 +478,12 @@ fn execute_inner(
 
         Bytecode::Call(idx) => {
             let function_handle = verifier.resolver.function_handle_at(*idx);
-            check_borrow_field_mut(verifier, function_handle, state, offset, meter)?;
+            call_or_specialize_borrow_field_mut(verifier, function_handle, state, offset, meter)?;
         },
         Bytecode::CallGeneric(idx) => {
             let func_inst = verifier.resolver.function_instantiation_at(*idx);
             let function_handle = verifier.resolver.function_handle_at(func_inst.handle);
-            check_borrow_field_mut(verifier, function_handle, state, offset, meter)?;
+            call_or_specialize_borrow_field_mut(verifier, function_handle, state, offset, meter)?;
         },
 
         Bytecode::Ret => {

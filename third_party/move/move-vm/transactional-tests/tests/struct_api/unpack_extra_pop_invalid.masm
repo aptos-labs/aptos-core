@@ -1,0 +1,16 @@
+//# publish --print-bytecode
+module 0x66::test_unpack_extra_pop
+
+struct S
+    x: u64
+    y: u64
+
+struct T<T0>
+    a: T0
+
+// Invalid: unpack returns only one field value, but struct S has two fields
+#[unpack] public fun unpack$S(l0: S): u64
+    move_loc l0
+    unpack S
+    pop
+    ret

@@ -1,0 +1,10 @@
+//# publish --print-bytecode
+module 0x66::test_pack_primitive_return
+
+struct S
+    x: u64
+
+// Invalid: pack$S must return the struct type S, not a primitive like u64
+#[pack] public fun pack$S(l0: u64): u64
+    move_loc l0
+    ret

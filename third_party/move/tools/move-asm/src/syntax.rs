@@ -585,15 +585,18 @@ impl AsmParser {
             self.advance()?;
             let attrs = self.list(
                 |parser| {
-                    // Helper to parse a u16 parameter after the attribute name
+                    // Helper to parse a u16 parameter after the attribute name (expects "(<num>)")
                     let parse_u16_param = |parser: &mut AsmParser| -> AsmResult<u16> {
-                        if let Token::Number(num) = &parser.next {
-                            let result = num.repr().as_u16();
+                        parser.expect_special("(")?;
+                        let result = if let Token::Number(num) = &parser.next {
+                            let r = num.repr().as_u16();
                             parser.advance()?;
-                            Ok(result)
+                            r
                         } else {
-                            Err(error(parser.next_loc, "expected number"))
-                        }
+                            return Err(error(parser.next_loc, "expected number"));
+                        };
+                        parser.expect_special(")")?;
+                        Ok(result)
                     };
 
                     let attr_name = parser.ident()?;

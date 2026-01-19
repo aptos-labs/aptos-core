@@ -25,20 +25,9 @@ pub fn is_verify_only_attribute_name(s: &str) -> bool {
     s == "verify_only"
 }
 
-// For public struct/enum APIs
-pub const PUBLIC_STRUCT_DELIMITER: &str = "$";
-pub const PACK: &str = "pack";
-pub const UNPACK: &str = "unpack";
-pub const PACK_VARIANT: &str = "pack_variant";
-pub const UNPACK_VARIANT: &str = "unpack_variant";
-pub const TEST_VARIANT: &str = "test_variant";
-pub const PARAM_NAME_FOR_STRUCT_API: &str = "_s";
-
 pub const VECTOR_MODULE: &str = "vector";
 pub const VECTOR_BORROW_MUT: &str = "vector::borrow_mut";
 pub const EVENT_EMIT_EVENT: &str = "event::emit_event";
-pub const BORROW_NAME: &str = "borrow";
-pub const BORROW_MUT_NAME: &str = "borrow_mut";
 /// Functions in the std::vector module that are implemented as bytecode instructions.
 pub const VECTOR_FUNCS_WITH_BYTECODE_INSTRS: &[&str] = &[
     "empty",
@@ -97,8 +86,3 @@ pub const INCOMPLETE_MATCH_ABORT_CODE: u64 = make_abort_code(1);
 // Well known attributes
 pub const PERSISTENT_ATTRIBUTE: &str = "persistent";
 pub const MODULE_LOCK_ATTRIBUTE: &str = "module_lock";
-pub const PACK_ATTRIBUTE: &str = "pack";
-pub const UNPACK_ATTRIBUTE: &str = "unpack";
-pub const TEST_VARIANT_ATTRIBUTE: &str = "test_variant";
-pub const BORROW_FIELD_IMMUTABLE_ATTRIBUTE: &str = "borrow";
-pub const BORROW_FIELD_MUTABLE_ATTRIBUTE: &str = "borrow_mut";

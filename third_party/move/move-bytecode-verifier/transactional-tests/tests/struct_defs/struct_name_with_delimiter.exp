@@ -1,0 +1,5 @@
+processed 4 tasks
+task 0 lines 1-11:  publish [// Test that struct names containing '$' are accepted; the parser handles them]
+task 1 lines 13-22:  publish [// Test multiple '$' characters in struct name are also accepted.]
+task 2 lines 24-34:  publish [// Test that variant names containing '$' are also accepted.]
+task 3 lines 36-45:  publish [// Test that valid struct names (without '$') are still accepted]
