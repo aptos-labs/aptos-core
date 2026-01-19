@@ -25,7 +25,7 @@ This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="../../aptos-framework/doc/timestamp.md#0x1_timestamp">0x1::timestamp</a>;
-<b>use</b> <a href="order_book_types.md#0x7_order_book_types">0x7::order_book_types</a>;
+<b>use</b> <a href="">0x5::order_book_types</a>;
 </code></pre>
 
 
@@ -67,7 +67,7 @@ This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 
 </dd>
 <dt>
-<code>account_order_ids: <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;<a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">order_book_types::AccountClientOrderId</a>, u64&gt;</code>
+<code>account_order_ids: <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;<a href="_AccountClientOrderId">order_book_types::AccountClientOrderId</a>, u64&gt;</code>
 </dt>
 <dd>
 
@@ -104,7 +104,7 @@ This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 
 </dd>
 <dt>
-<code>account_order_id: <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">order_book_types::AccountClientOrderId</a></code>
+<code>account_order_id: <a href="_AccountClientOrderId">order_book_types::AccountClientOrderId</a></code>
 </dt>
 <dd>
 
