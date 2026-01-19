@@ -66,7 +66,7 @@ This is internal module, which cannot be used directly, use OrderBook instead.
 
 </dd>
 <dt>
-<code>tie_breaker: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a></code>
+<code>tie_breaker: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdx</a></code>
 </dt>
 <dd>
 
@@ -93,7 +93,7 @@ This is internal module, which cannot be used directly, use OrderBook instead.
 
 <dl>
 <dt>
-<code>order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a></code>
+<code>order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderId</a></code>
 </dt>
 <dd>
 
@@ -455,7 +455,7 @@ aborts if there are no sells
 
 
 
-<pre><code><b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, is_bid: bool): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>
+<pre><code><b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdx</a>, is_bid: bool): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdx</a>
 </code></pre>
 
 
@@ -465,8 +465,8 @@ aborts if there are no sells
 
 
 <pre><code>inline <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_tie_breaker">get_tie_breaker</a>(
-    unique_priority_idx: UniqueIdxType, is_bid: bool
-): UniqueIdxType {
+    unique_priority_idx: IncreasingIdx, is_bid: bool
+): IncreasingIdx {
     <b>if</b> (is_bid) {
         unique_priority_idx
     } <b>else</b> {
@@ -485,7 +485,7 @@ aborts if there are no sells
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_cancel_active_order">cancel_active_order</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, is_bid: bool): u64
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_cancel_active_order">cancel_active_order</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdx</a>, is_bid: bool): u64
 </code></pre>
 
 
@@ -497,7 +497,7 @@ aborts if there are no sells
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_cancel_active_order">cancel_active_order</a>(
     self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>,
     price: u64,
-    unique_priority_idx: UniqueIdxType,
+    unique_priority_idx: IncreasingIdx,
     is_bid: bool
 ): u64 {
     <b>let</b> tie_breaker = <a href="active_order_book.md#0x7_active_order_book_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_bid);
@@ -522,7 +522,7 @@ aborts if there are no sells
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_cancel_if_active_order">cancel_if_active_order</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, is_bid: bool)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_cancel_if_active_order">cancel_if_active_order</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdx</a>, is_bid: bool)
 </code></pre>
 
 
@@ -534,7 +534,7 @@ aborts if there are no sells
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_cancel_if_active_order">cancel_if_active_order</a>(
     self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>,
     price: u64,
-    unique_priority_idx: UniqueIdxType,
+    unique_priority_idx: IncreasingIdx,
     is_bid: bool
 ){
     <b>let</b> tie_breaker = <a href="active_order_book.md#0x7_active_order_book_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_bid);
@@ -561,7 +561,7 @@ aborts if there are no sells
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_is_active_order">is_active_order</a>(self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, is_bid: bool): bool
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_is_active_order">is_active_order</a>(self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdx</a>, is_bid: bool): bool
 </code></pre>
 
 
@@ -573,7 +573,7 @@ aborts if there are no sells
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_is_active_order">is_active_order</a>(
     self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>,
     price: u64,
-    unique_priority_idx: UniqueIdxType,
+    unique_priority_idx: IncreasingIdx,
     is_bid: bool
 ): bool {
     <b>let</b> tie_breaker = <a href="active_order_book.md#0x7_active_order_book_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_bid);
@@ -780,7 +780,7 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 Increase the size of the order in the orderbook without altering its position in the price-time priority.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_increase_order_size">increase_order_size</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, size_delta: u64, is_bid: bool)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_increase_order_size">increase_order_size</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdx</a>, size_delta: u64, is_bid: bool)
 </code></pre>
 
 
@@ -792,7 +792,7 @@ Increase the size of the order in the orderbook without altering its position in
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_increase_order_size">increase_order_size</a>(
     self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>,
     price: u64,
-    unique_priority_idx: UniqueIdxType,
+    unique_priority_idx: IncreasingIdx,
     size_delta: u64,
     is_bid: bool
 ) {
@@ -817,7 +817,7 @@ Increase the size of the order in the orderbook without altering its position in
 Decrease the size of the order in the order book without altering its position in the price-time priority.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_decrease_order_size">decrease_order_size</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, size_delta: u64, is_bid: bool)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_decrease_order_size">decrease_order_size</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdx</a>, size_delta: u64, is_bid: bool)
 </code></pre>
 
 
@@ -829,7 +829,7 @@ Decrease the size of the order in the order book without altering its position i
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_decrease_order_size">decrease_order_size</a>(
     self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>,
     price: u64,
-    unique_priority_idx: UniqueIdxType,
+    unique_priority_idx: IncreasingIdx,
     size_delta: u64,
     is_bid: bool
 ) {
@@ -853,7 +853,7 @@ Decrease the size of the order in the order book without altering its position i
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_place_maker_order">place_maker_order</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, size: u64, is_bid: bool)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_place_maker_order">place_maker_order</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderId</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::IncreasingIdx</a>, size: u64, is_bid: bool)
 </code></pre>
 
 
@@ -864,9 +864,9 @@ Decrease the size of the order in the order book without altering its position i
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_place_maker_order">place_maker_order</a>(
     self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>,
-    order_id: OrderIdType,
+    order_id: OrderId,
     price: u64,
-    unique_priority_idx: UniqueIdxType,
+    unique_priority_idx: IncreasingIdx,
     size: u64,
     is_bid: bool
 ) {

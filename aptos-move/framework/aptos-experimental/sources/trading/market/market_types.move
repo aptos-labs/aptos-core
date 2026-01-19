@@ -11,20 +11,18 @@ module aptos_experimental::market_types {
     use aptos_std::table;
     use aptos_std::table::Table;
     use aptos_framework::event;
+    use aptos_trading::single_order_types::SingleOrder;
+    use aptos_trading::order_book_types::{OrderId, TimeInForce, TriggerCondition};
     use aptos_experimental::dead_mans_switch_tracker;
     use aptos_experimental::dead_mans_switch_tracker::{DeadMansSwitchTracker, new_dead_mans_switch_tracker};
     use aptos_experimental::market_clearinghouse_order_info::MarketClearinghouseOrderInfo;
-    use aptos_experimental::single_order_types::SingleOrder;
-    use aptos_experimental::order_book_types::OrderIdType;
-    use aptos_experimental::order_book_types::TimeInForce;
-    use aptos_experimental::order_book_types::TriggerCondition;
     use aptos_experimental::order_book::{OrderBook, new_order_book};
     use aptos_experimental::pre_cancellation_tracker::{PreCancellationTracker, new_pre_cancellation_tracker};
 
     #[test_only]
     use aptos_experimental::pre_cancellation_tracker::destroy_tracker;
     #[test_only]
-    use aptos_experimental::order_book_types::new_order_id_type;
+    use aptos_trading::order_book_types::new_order_id_type;
 
     const EINVALID_ADDRESS: u64 = 1;
     const EINVALID_SETTLE_RESULT: u64 = 2;
@@ -184,7 +182,7 @@ module aptos_experimental::market_types {
             /// cleanup_order_f arguments: order_info, cleanup_size, is_taker
             cleanup_order_f: |MarketClearinghouseOrderInfo<M>, u64, bool| has drop + copy,
             /// cleanup_bulk_orders_f arguments: account, is_bid, remaining_sizes
-            cleanup_bulk_order_at_price_f: |address, OrderIdType, bool, u64, u64| has drop + copy,
+            cleanup_bulk_order_at_price_f: |address, OrderId, bool, u64, u64| has drop + copy,
             /// decrease_order_size_f arguments: order_info, size
             decrease_order_size_f: |MarketClearinghouseOrderInfo<M>, u64| has drop + copy,
             /// get a string representation of order metadata to be used in events
@@ -230,7 +228,7 @@ module aptos_experimental::market_types {
         validate_bulk_order_placement_f: |address, &vector<u64>, &vector<u64>, &vector<u64>, &vector<u64>, &M| ValidationResult has drop + copy,
         place_maker_order_f: |MarketClearinghouseOrderInfo<M>, u64| PlaceMakerOrderResult<R> has drop + copy,
         cleanup_order_f: |MarketClearinghouseOrderInfo<M>, u64, bool| has drop + copy,
-        cleanup_bulk_order_at_price_f: |address, OrderIdType, bool, u64, u64| has drop + copy,
+        cleanup_bulk_order_at_price_f: |address, OrderId, bool, u64, u64| has drop + copy,
         decrease_order_size_f: |MarketClearinghouseOrderInfo<M>, u64| has drop + copy,
         get_order_metadata_bytes: |&M| vector<u8> has drop + copy
     ): MarketClearinghouseCallbacks<M, R> {
@@ -352,7 +350,7 @@ module aptos_experimental::market_types {
     public fun cleanup_bulk_order_at_price<M: store + copy + drop, R: store + copy + drop>(
         self: &MarketClearinghouseCallbacks<M, R>,
         account: address,
-        order_id: OrderIdType,
+        order_id: OrderId,
         is_bid: bool,
         price: u64,
         cleanup_size: u64,
@@ -602,7 +600,7 @@ module aptos_experimental::market_types {
 
     /// Remaining size of the order in the order book.
     public fun get_remaining_size<M: store + copy + drop>(
-        self: &Market<M>, order_id: OrderIdType
+        self: &Market<M>, order_id: OrderId
     ): u64 {
         self.order_book.get_single_remaining_size(order_id)
     }
@@ -614,7 +612,7 @@ module aptos_experimental::market_types {
     }
 
     public fun get_order_metadata<M: store + copy + drop>(
-        self: &Market<M>, order_id: OrderIdType
+        self: &Market<M>, order_id: OrderId
     ): Option<M> {
         self.order_book.get_single_order_metadata(order_id)
     }
@@ -622,7 +620,7 @@ module aptos_experimental::market_types {
     /// Returns the order metadata for an order by order id.
     /// It is up to the caller to perform necessary permissions checks
     public fun set_order_metadata<M: store + copy + drop>(
-        self: &mut Market<M>, order_id: OrderIdType, metadata: M
+        self: &mut Market<M>, order_id: OrderId, metadata: M
     ) {
         self.order_book.set_single_order_metadata(order_id, metadata);
     }
@@ -665,7 +663,7 @@ module aptos_experimental::market_types {
 
     public fun emit_event_for_order<M: store + copy + drop, R: store + copy + drop>(
         self: &Market<M>,
-        order_id: OrderIdType,
+        order_id: OrderId,
         client_order_id: Option<String>,
         user: address,
         orig_size: u64,
@@ -712,7 +710,7 @@ module aptos_experimental::market_types {
 
     public fun emit_event_for_bulk_order_placed<M: store + copy + drop>(
         self: &Market<M>,
-        order_id: OrderIdType,
+        order_id: OrderId,
         sequence_number: u64,
         user: address,
         bid_prices: vector<u64>,
@@ -750,7 +748,7 @@ module aptos_experimental::market_types {
 
     public fun emit_event_for_bulk_order_cancelled<M: store + copy + drop>(
         self: &Market<M>,
-        order_id: OrderIdType,
+        order_id: OrderId,
         sequence_number: u64,
         user: address,
         cancelled_bid_prices: vector<u64>,
@@ -785,7 +783,7 @@ module aptos_experimental::market_types {
 
     public fun emit_event_for_bulk_order_filled<M: store + copy + drop>(
         self: &Market<M>,
-        order_id: OrderIdType,
+        order_id: OrderId,
         sequence_number: u64,
         user: address,
         filled_size: u64,
@@ -815,7 +813,7 @@ module aptos_experimental::market_types {
 
     public fun emit_event_for_bulk_order_modified<M: store + copy + drop>(
         self: &Market<M>,
-        order_id: OrderIdType,
+        order_id: OrderId,
         sequence_number: u64,
         user: address,
         bid_prices: vector<u64>,
@@ -902,7 +900,7 @@ module aptos_experimental::market_types {
     }
 
     #[test_only]
-    public fun get_order_id_from_event(self: OrderEvent): OrderIdType {
+    public fun get_order_id_from_event(self: OrderEvent): OrderId {
         new_order_id_type(self.order_id)
     }
 
@@ -914,7 +912,7 @@ module aptos_experimental::market_types {
     #[test_only]
     public fun verify_order_event(
         self: OrderEvent,
-        order_id: OrderIdType,
+        order_id: OrderId,
         client_order_id: Option<String>,
         market: address,
         user: address,
@@ -942,7 +940,7 @@ module aptos_experimental::market_types {
     #[test_only]
     public fun verify_bulk_order_placed_event(
         self: BulkOrderPlacedEvent,
-        order_id: OrderIdType,
+        order_id: OrderId,
         market: address,
         user: address,
         bid_prices: vector<u64>,
@@ -962,7 +960,7 @@ module aptos_experimental::market_types {
     #[test_only]
     public fun verify_bulk_order_filled_event(
         self: BulkOrderFilledEvent,
-        order_id: OrderIdType,
+        order_id: OrderId,
         sequence_number: u64,
         market: address,
         user: address,
@@ -982,7 +980,7 @@ module aptos_experimental::market_types {
     #[test_only]
     public fun verify_bulk_order_modified_event(
         self: BulkOrderModifiedEvent,
-        order_id: OrderIdType,
+        order_id: OrderId,
         sequence_number: u64,
         market: address,
         user: address,

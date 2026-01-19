@@ -4,6 +4,7 @@ module aptos_experimental::market_test_utils {
     use std::option::Option;
     use std::signer;
     use std::string::String;
+    use aptos_trading::order_book_types::{OrderId, TimeInForce};
     use aptos_experimental::clearinghouse_test;
     use aptos_experimental::event_utils::{latest_emitted_events, EventStore, new_event_store};
     use aptos_experimental::market_types::{
@@ -13,9 +14,6 @@ module aptos_experimental::market_test_utils {
         MarketClearinghouseCallbacks, Market, get_order_id_from_event, BulkOrderFilledEvent,
         BulkOrderModifiedEvent
     };
-    use aptos_experimental::order_book_types::OrderIdType;
-    use aptos_experimental::order_book_types::TimeInForce;
-
     use aptos_experimental::order_placement::{OrderMatchResult, place_limit_order, place_market_order};
     use aptos_experimental::market_types::{OrderEvent};
 
@@ -34,7 +32,7 @@ module aptos_experimental::market_test_utils {
         metadata: M,
         client_order_id: Option<String>,
         callbacks: &MarketClearinghouseCallbacks<M, R>
-    ): OrderIdType {
+    ): OrderId {
         let user_addr = signer::address_of(user);
         let (limit_price, is_taker) = if (price.is_some()) {
             place_limit_order(
@@ -130,7 +128,7 @@ module aptos_experimental::market_test_utils {
         max_matches: Option<u32>,
         metadata: M,
         callbacks: &MarketClearinghouseCallbacks<M, R>
-    ): (OrderIdType, OrderMatchResult<R>) {
+    ): (OrderId, OrderMatchResult<R>) {
         let taker_addr = signer::address_of(taker);
         let max_matches =
             if (max_matches.is_none()) { 1000 }
@@ -203,7 +201,7 @@ module aptos_experimental::market_test_utils {
         fill_sizes: vector<u64>,
         fill_prices: vector<u64>,
         maker_addr: address,
-        maker_order_ids: vector<OrderIdType>,
+        maker_order_ids: vector<OrderId>,
         maker_client_order_ids: vector<Option<String>>,
         maker_orig_sizes: vector<u64>,
         maker_remaining_sizes: vector<u64>,
@@ -213,7 +211,7 @@ module aptos_experimental::market_test_utils {
         metadata: M,
         is_maker_order_bulk: bool,
         callbacks: &MarketClearinghouseCallbacks<M, R>
-    ): (OrderIdType, OrderMatchResult<R>) {
+    ): (OrderId, OrderMatchResult<R>) {
         let (order_id, result) =
             place_taker_order(
                 market,
@@ -273,7 +271,7 @@ module aptos_experimental::market_test_utils {
         market: &mut Market<M>,
         user: &signer,
         is_taker: bool,
-        order_id: OrderIdType,
+        order_id: OrderId,
         client_order_id: Option<String>,
         price: u64,
         orig_size: u64,
@@ -315,7 +313,7 @@ module aptos_experimental::market_test_utils {
     public fun verify_fills<M: store + copy + drop>(
         market: &mut Market<M>,
         taker: &signer,
-        taker_order_id: OrderIdType,
+        taker_order_id: OrderId,
         taker_client_order_id: Option<String>,
         taker_price: u64,
         size: u64,
@@ -323,7 +321,7 @@ module aptos_experimental::market_test_utils {
         fill_sizes: vector<u64>,
         fill_prices: vector<u64>,
         maker_addr: address,
-        maker_order_ids: vector<OrderIdType>,
+        maker_order_ids: vector<OrderId>,
         maker_client_order_ids: vector<Option<String>>,
         maker_orig_sizes: vector<u64>,
         maker_remaining_sizes: vector<u64>,
@@ -426,7 +424,7 @@ module aptos_experimental::market_test_utils {
     public fun verify_fills_with_bulk<M: store + copy + drop>(
         market: &mut Market<M>,
         taker: &signer,
-        taker_order_id: OrderIdType,
+        taker_order_id: OrderId,
         taker_client_order_id: Option<String>,
         taker_price: u64,
         size: u64,
@@ -434,7 +432,7 @@ module aptos_experimental::market_test_utils {
         fill_sizes: vector<u64>,
         fill_prices: vector<u64>,
         maker_addr: address,
-        maker_order_ids: vector<OrderIdType>,
+        maker_order_ids: vector<OrderId>,
         event_store: &mut EventStore,
         is_cancelled: bool,
     ) {

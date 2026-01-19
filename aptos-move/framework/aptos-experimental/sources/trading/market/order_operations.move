@@ -6,12 +6,12 @@ module aptos_experimental::order_operations {
 
     use std::option;
     use std::string::String;
-    use aptos_experimental::market_types::{Self, MarketClearinghouseCallbacks, Market};
-    use aptos_experimental::order_book_types::{
-        OrderIdType,
+    use aptos_trading::order_book_types::{
+        OrderId,
         single_order_type
     };
-    use aptos_experimental::single_order_types::SingleOrder;
+    use aptos_trading::single_order_types::SingleOrder;
+    use aptos_experimental::market_types::{Self, MarketClearinghouseCallbacks, Market};
     use aptos_experimental::pre_cancellation_tracker::{
         pre_cancel_order_for_tracker
     };
@@ -73,7 +73,7 @@ module aptos_experimental::order_operations {
     public fun cancel_order<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         account: address,
-        order_id: OrderIdType,
+        order_id: OrderId,
         emit_event: bool,
         cancellation_reason: market_types::OrderCancellationReason,
         cancel_details: String,
@@ -90,7 +90,7 @@ module aptos_experimental::order_operations {
     public fun try_cancel_order<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         account: address,
-        order_id: OrderIdType,
+        order_id: OrderId,
         emit_event: bool,
         cancellation_reason: market_types::OrderCancellationReason,
         cancel_reason: String,
@@ -120,27 +120,15 @@ module aptos_experimental::order_operations {
     public fun decrease_order_size<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         account: address,
-        order_id: OrderIdType,
+        order_id: OrderId,
         size_delta: u64,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
         let order_book = market.get_order_book_mut();
         order_book.decrease_single_order_size(account, order_id, size_delta);
         let (order, _) = order_book.get_single_order(order_id).destroy_some().destroy_order_from_state();
-        let (
-            user,
-            order_id,
-            client_order_id,
-            _,
-            price,
-            orig_size,
-            remaining_size,
-            is_bid,
-            trigger_condition,
-            time_in_force,
-            metadata,
-            _creation_time_secs
-        ) = order.destroy_single_order();
+        let (order_request, _unique_priority_idx) = order.destroy_single_order();
+        let (user, order_id, client_order_id, price, orig_size, remaining_size, is_bid, trigger_condition, time_in_force, _creation_time_micros, metadata) = order_request.destroy_single_order_request();
         callbacks.decrease_order_size(
             new_clearinghouse_order_info(
                 user,
@@ -150,7 +138,7 @@ module aptos_experimental::order_operations {
                 price,
                 time_in_force,
                 single_order_type(),
-                    trigger_condition,
+                trigger_condition,
                 metadata
             ),
             remaining_size
@@ -194,20 +182,8 @@ module aptos_experimental::order_operations {
         cancel_reason: String,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
-        let (
-            account,
-            order_id,
-            client_order_id,
-            _,
-            price,
-            orig_size,
-            remaining_size,
-            is_bid,
-            trigger_condition,
-            time_in_force,
-            metadata,
-            _creation_time_secs
-        ) = order.destroy_single_order();
+        let (order_request, _unique_priority_idx) = order.destroy_single_order();
+        let (account, order_id, client_order_id, price, orig_size, remaining_size, is_bid, trigger_condition, time_in_force, _creation_time_micros, metadata) = order_request.destroy_single_order_request();
         cleanup_order_internal(
             account, order_id, client_order_id, single_order_type(), is_bid, time_in_force, remaining_size, price, trigger_condition, metadata, callbacks, false
         );
