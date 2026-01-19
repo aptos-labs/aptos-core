@@ -5,6 +5,7 @@ module aptos_experimental::market_tests_common {
     use std::signer;
     use std::vector;
     use aptos_framework::timestamp;
+    use aptos_trading::order_book_types::{OrderId, good_till_cancelled, post_only, immediate_or_cancel};
     use aptos_experimental::market_bulk_order;
     use aptos_experimental::clearinghouse_test;
     use aptos_experimental::clearinghouse_test::{
@@ -23,8 +24,6 @@ module aptos_experimental::market_tests_common {
     use aptos_experimental::event_utils;
     use aptos_experimental::order_placement::{OrderMatchResult};
     use aptos_experimental::market_types::{new_market, new_market_config, Market};
-    use aptos_experimental::order_book_types::OrderIdType;
-    use aptos_experimental::order_book_types::{good_till_cancelled, post_only, immediate_or_cancel};
 
     const PRE_CANCEL_WINDOW_SECS: u64 = 1; // 1 second
     const U64_MAX: u64 = 0xFFFFFFFFFFFFFFFF;
@@ -62,7 +61,7 @@ module aptos_experimental::market_tests_common {
         is_bid: bool,
         event_store: &mut event_utils::EventStore,
         is_bulk: bool,
-    ): OrderIdType {
+    ): OrderId {
         if (is_bulk) {
             // Use bulk order placement for single order
             let bid_prices = if (is_bid) { vector[price] } else { vector::empty<u64>() };
@@ -97,7 +96,7 @@ module aptos_experimental::market_tests_common {
         bid_sizes: vector<u64>,
         ask_prices: vector<u64>,
         ask_sizes: vector<u64>,
-    ): Option<OrderIdType> {
+    ): Option<OrderId> {
         let order_id = market_bulk_order::place_bulk_order(
             market,
             signer::address_of(maker),
@@ -120,10 +119,10 @@ module aptos_experimental::market_tests_common {
         size: u64,
         is_bid: bool,
         maker_addr: address,
-        maker_order_id: OrderIdType,
+        maker_order_id: OrderId,
         maker_orig_size: u64,
         event_store: &mut event_utils::EventStore
-    ): (OrderIdType, OrderMatchResult<u64>) {
+    ): (OrderId, OrderMatchResult<u64>) {
         place_taker_order_and_verify_fill<clearinghouse_test::TestOrderMetadata, u64>(
             market,
             taker,
@@ -161,8 +160,8 @@ module aptos_experimental::market_tests_common {
     // Helper function to verify order cleanup
     public fun verify_orders_cleanup(
         market: &Market<clearinghouse_test::TestOrderMetadata>,
-        maker_order_id: OrderIdType,
-        taker_order_id: OrderIdType,
+        maker_order_id: OrderId,
+        taker_order_id: OrderId,
         expect_maker_cleaned: bool,
         expect_taker_cleaned: bool
     ) {
@@ -178,7 +177,7 @@ module aptos_experimental::market_tests_common {
 
     public fun verify_order_cleanup(
         market: &Market<clearinghouse_test::TestOrderMetadata>,
-        order_id: OrderIdType,
+        order_id: OrderId,
     ) {
             assert!(!clearinghouse_test::order_exists(order_id));
             assert!(market.get_remaining_size(order_id) == 0);
