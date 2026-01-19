@@ -1,0 +1,18 @@
+//# publish --print-bytecode
+module 0x66::test_borrow_field_variant_wrong_type
+
+enum Color has drop
+  Red
+    r: u8
+  Blue
+    b: u16
+
+// In this enum:
+// - offset 0 with type u8 should get type_order 0
+// - offset 0 with type u16 should get type_order 1
+
+// Invalid: borrow$Color$0$0 should return &u8 (Red.r is u8), not &u16
+#[borrow=0] public fun borrow$Color$0$0(l0: &Color): &u16
+    move_loc l0
+    borrow_variant_field Color, Red::r
+    ret

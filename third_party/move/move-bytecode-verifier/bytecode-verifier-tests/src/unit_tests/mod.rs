@@ -19,6 +19,7 @@ pub mod many_back_edges;
 pub mod multi_pass_tests;
 pub mod negative_stack_size_tests;
 pub mod reference_safety_tests;
+pub mod script_tests;
 pub mod signature_tests;
 pub mod struct_defs_tests;
 pub mod variant_name_test;

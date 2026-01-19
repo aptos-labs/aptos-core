@@ -1,0 +1,12 @@
+//# publish --print-bytecode
+module 0x66::test_type_order_unnecessary
+
+struct S
+    x: u64
+    y: u64
+
+// Invalid: borrow on regular struct should not have type_order (should be borrow$S$0, not borrow$S$0$0)
+#[borrow=0] public fun borrow$S$0$0(l0: &S): &u64
+    move_loc l0
+    borrow_field S, x
+    ret

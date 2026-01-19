@@ -1,0 +1,16 @@
+//# publish --print-bytecode
+module 0x66::test_unpack_variant_name_invalid
+
+enum Color has drop
+  Red
+    value: u64
+  Green
+    value: u64
+  Blue
+    value: u64
+
+// Invalid: variant Yellow doesn't exist in Color enum
+#[unpack_variant=0] public fun unpack$Color$Yellow(l0: Color): u64
+    move_loc l0
+    unpack_variant Color, Red
+    ret

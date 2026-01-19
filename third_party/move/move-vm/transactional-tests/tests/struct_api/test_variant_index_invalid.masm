@@ -1,0 +1,18 @@
+//# publish --print-bytecode
+module 0x66::test_variant_index_invalid
+
+enum Color has drop
+  Red
+    value: u64
+  Green
+    value: u64
+  Blue
+    value: u64
+
+// Invalid: test_variant$Color$Red with variant index 1 (should be 0)
+#[test_variant=1] public fun test_variant$Color$Red(l0: Color): u8
+    move_loc l0
+    unpack_variant Color, Red
+    pop
+    ld_u8 1
+    ret
