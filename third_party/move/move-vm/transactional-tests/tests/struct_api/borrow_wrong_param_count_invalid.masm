@@ -1,0 +1,10 @@
+//# publish --print-bytecode
+module 0x66::test_borrow_wrong_param_count
+
+struct S
+    x: u64
+
+// Invalid: borrow$S$0 must have exactly one parameter (&S); 0 params is rejected
+#[borrow(0)] public fun borrow$S$0(): &u64
+    ld_u64 0
+    ret
