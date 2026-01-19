@@ -106,6 +106,17 @@ impl StructApiContext {
             let handle = module.struct_handle_at(def.struct_handle);
             let name = module.identifier_at(handle.name).as_str().to_string();
 
+<<<<<<< HEAD
+=======
+            // SECURITY: Reject struct names containing '$' to prevent parsing ambiguity.
+            // '$' is reserved for compiler/runtime intrinsics and struct API delimiters.
+            // Without this check, a malicious module could create struct "A$B" and function
+            // "pack$A$B$C", causing ambiguous parsing (is struct "A" or "A$B"?).
+            if name.contains(PUBLIC_STRUCT_DELIMITER) {
+                return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE));
+            }
+
+>>>>>>> ff2287ddd9 (Add struct API bytecode verification and update attribute syntax)
             // Store both the struct handle index and definition index for this struct.
             // Using def.struct_handle ensures the handle and def always refer to the same struct.
             struct_name_to_handle.insert(name.clone(), def.struct_handle);
@@ -114,7 +125,11 @@ impl StructApiContext {
             // If this is an enum, pre-compute its type order map and variant indices map
             if let StructFieldInformation::DeclaredVariants(variants) = &def.field_information {
                 let (type_order_map, variant_indices_map) =
+<<<<<<< HEAD
                     build_variant_type_order_and_indices_map(variants)?;
+=======
+                    build_variant_type_order_and_indices_map(module, variants)?;
+>>>>>>> ff2287ddd9 (Add struct API bytecode verification and update attribute syntax)
                 enum_type_order_maps.insert(name.clone(), type_order_map);
                 enum_variant_indices_maps.insert(name, variant_indices_map);
             }
@@ -252,6 +267,7 @@ impl StructApiNameInfo {
 
 /// Parse and validate a struct API function name.
 ///
+<<<<<<< HEAD
 /// Struct/enum names and variant names may contain '$' (for example, in hand-crafted
 /// bytecode or in modules published before the struct API checker existed). This creates
 /// an inherent ambiguity: `pack$A$B` could mean Pack for struct `A$B`, or PackVariant for
@@ -276,6 +292,18 @@ impl StructApiNameInfo {
 /// - Ok(Some(info)) if the name unambiguously matches a struct API pattern
 /// - Ok(None) if the name doesn't match any struct API pattern
 /// - Err only if a structural invariant is violated (e.g., overflow in index conversion)
+=======
+/// This function performs comprehensive validation:
+/// 1. Parses the function name pattern
+/// 2. Validates that the struct exists in the module
+/// 3. Validates variant index/name (for variant-based APIs)
+/// 4. Validates offset and type_order (for borrow field APIs)
+///
+/// Returns:
+/// - Ok(Some(info)) if the name is a valid struct API function name
+/// - Ok(None) if the name doesn't match any struct API pattern
+/// - Err if the name looks like a struct API but validation fails
+>>>>>>> ff2287ddd9 (Add struct API bytecode verification and update attribute syntax)
 fn parse_and_validate_struct_api_name(
     function_name: &str,
     ctx: &StructApiContext,
@@ -289,6 +317,7 @@ fn parse_and_validate_struct_api_name(
     }
 
     let prefix = parts[0];
+<<<<<<< HEAD
 
     // Check if this looks like a struct API prefix
     if !matches!(prefix, PACK | UNPACK | TEST_VARIANT | BORROW | BORROW_MUT) {
@@ -334,11 +363,107 @@ fn parse_and_validate_struct_api_name(
     match prefix {
         PACK => {
             if remaining.is_empty() {
+=======
+    let struct_name = parts[1];
+
+    // Check if this looks like a struct API prefix
+    let is_struct_api_prefix = matches!(prefix, PACK | UNPACK | TEST_VARIANT | BORROW | BORROW_MUT);
+
+    if !is_struct_api_prefix {
+        return Ok(None);
+    }
+
+    // Check if the number of parts makes sense for this prefix
+    // This validates the STRUCTURE before we validate struct existence
+    let valid_parts_count = match prefix {
+        PACK | UNPACK => parts.len() == 2 || parts.len() == 3,
+        TEST_VARIANT => parts.len() == 3,
+        BORROW | BORROW_MUT => parts.len() == 3 || parts.len() == 4,
+        _ => false,
+    };
+
+    if !valid_parts_count {
+        // Pattern doesn't match - this is just a regular function, not a struct API
+        return Ok(None);
+    }
+
+    // Pattern matches - now validate that struct exists
+    let Some(struct_handle_idx) = ctx.get_struct_handle(struct_name) else {
+        // Looks like struct API but struct doesn't exist - this is an error
+        return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE));
+    };
+
+    let struct_def_idx = ctx
+        .get_struct_def_index(struct_name)
+        .ok_or_else(|| PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE))?;
+
+    // Helper to parse offset and type_order for borrow field APIs
+    // Only does syntactic validation (parsing), not semantic validation
+    let parse_borrow_field_components =
+        |offset_str: &str, type_order_str: Option<&str>| -> PartialVMResult<(u16, Option<u16>)> {
+            let offset: u16 = offset_str
+                .parse()
+                .map_err(|_| PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE))?;
+
+            let type_order = if let Some(to_str) = type_order_str {
+                Some(
+                    to_str
+                        .parse()
+                        .map_err(|_| PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE))?,
+                )
+            } else {
+                None
+            };
+
+            // Note: We do NOT validate semantic correctness here (e.g., whether type_order
+            // is appropriate for the struct type). That will be done in Phase 2.
+            // This allows us to parse the name and detect that it's a struct API pattern,
+            // even if the specific values are semantically incorrect.
+
+            Ok((offset, type_order))
+        };
+
+    // Helper to parse borrow field API (both mutable and immutable)
+    let parse_borrow_field_api = |is_mutable: bool| -> PartialVMResult<Option<StructApiNameInfo>> {
+        if parts.len() == 3 {
+            // borrow[_mut]$S$offset
+            let (offset, type_order) = parse_borrow_field_components(parts[2], None)?;
+            Ok(Some(StructApiNameInfo::BorrowField {
+                struct_name: struct_name.to_string(),
+                struct_handle_idx,
+                struct_def_idx,
+                offset,
+                type_order,
+                is_mutable,
+            }))
+        } else if parts.len() == 4 {
+            // borrow[$mut]$S$offset$type_order
+            let (offset, type_order) = parse_borrow_field_components(parts[2], Some(parts[3]))?;
+            Ok(Some(StructApiNameInfo::BorrowField {
+                struct_name: struct_name.to_string(),
+                struct_handle_idx,
+                struct_def_idx,
+                offset,
+                type_order,
+                is_mutable,
+            }))
+        } else {
+            // due to valid_parts_count, unreachable
+            Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE))
+        }
+    };
+
+    // Parse and validate based on prefix
+    match prefix {
+        PACK => {
+            if parts.len() == 2 {
+>>>>>>> ff2287ddd9 (Add struct API bytecode verification and update attribute syntax)
                 // pack$S
                 Ok(Some(StructApiNameInfo::Pack {
                     struct_handle_idx,
                     struct_def_idx,
                 }))
+<<<<<<< HEAD
             } else {
                 // pack$S$Variant  (variant name may itself contain '$')
                 Ok(Some(StructApiNameInfo::PackVariant {
@@ -350,11 +475,29 @@ fn parse_and_validate_struct_api_name(
         },
         UNPACK => {
             if remaining.is_empty() {
+=======
+            } else if parts.len() == 3 {
+                // pack$S$Variant
+                let variant_name = parts[2];
+                Ok(Some(StructApiNameInfo::PackVariant {
+                    struct_handle_idx,
+                    struct_def_idx,
+                    variant_name: variant_name.to_string(),
+                }))
+            } else {
+                // due to valid_parts_count, unreachable
+                Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE))
+            }
+        },
+        UNPACK => {
+            if parts.len() == 2 {
+>>>>>>> ff2287ddd9 (Add struct API bytecode verification and update attribute syntax)
                 // unpack$S
                 Ok(Some(StructApiNameInfo::Unpack {
                     struct_handle_idx,
                     struct_def_idx,
                 }))
+<<<<<<< HEAD
             } else {
                 // unpack$S$Variant
                 Ok(Some(StructApiNameInfo::UnpackVariant {
@@ -415,6 +558,37 @@ fn parse_and_validate_struct_api_name(
                 _ => Ok(None), // wrong number of remaining parts
             }
         },
+=======
+            } else if parts.len() == 3 {
+                // unpack$S$Variant
+                let variant_name = parts[2];
+                Ok(Some(StructApiNameInfo::UnpackVariant {
+                    struct_handle_idx,
+                    struct_def_idx,
+                    variant_name: variant_name.to_string(),
+                }))
+            } else {
+                // due to valid_parts_count, unreachable
+                Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE))
+            }
+        },
+        TEST_VARIANT => {
+            if parts.len() == 3 {
+                // test_variant$S$Variant
+                let variant_name = parts[2];
+                Ok(Some(StructApiNameInfo::TestVariant {
+                    struct_handle_idx,
+                    struct_def_idx,
+                    variant_name: variant_name.to_string(),
+                }))
+            } else {
+                // due to valid_parts_count, unreachable
+                Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE))
+            }
+        },
+        BORROW => parse_borrow_field_api(false),
+        BORROW_MUT => parse_borrow_field_api(true),
+>>>>>>> ff2287ddd9 (Add struct API bytecode verification and update attribute syntax)
         _ => Ok(None),
     }
 }
@@ -567,6 +741,10 @@ fn validate_variant_index(
 /// ```
 /// Note: variants [0, 2] are in ascending order
 fn build_variant_type_order_and_indices_map(
+<<<<<<< HEAD
+=======
+    module: &CompiledModule,
+>>>>>>> ff2287ddd9 (Add struct API bytecode verification and update attribute syntax)
     variants: &[VariantDefinition],
 ) -> PartialVMResult<(
     BTreeMap<(u16, SignatureToken), u16>,
@@ -577,6 +755,16 @@ fn build_variant_type_order_and_indices_map(
     let mut next_order = 0u16;
 
     for (variant_idx, variant) in variants.iter().enumerate() {
+<<<<<<< HEAD
+=======
+        // SECURITY: Reject variant names containing '$' to prevent parsing ambiguity.
+        // Similar to struct names, variant names must not contain the delimiter.
+        let variant_name = module.identifier_at(variant.name).as_str();
+        if variant_name.contains(PUBLIC_STRUCT_DELIMITER) {
+            return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE));
+        }
+
+>>>>>>> ff2287ddd9 (Add struct API bytecode verification and update attribute syntax)
         // Convert variant index to u16 with checked conversion
         let variant_idx_u16 = u16::try_from(variant_idx).map_err(|_| {
             PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)

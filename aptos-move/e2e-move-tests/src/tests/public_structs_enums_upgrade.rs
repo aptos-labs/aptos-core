@@ -787,6 +787,7 @@ fn execute_cross_module_vector_of_structs() {
 fn execute_cross_module_enum_new_variant_handling() {
     let mut h = MoveHarness::new();
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap());
+<<<<<<< HEAD
     let acc2 = h.new_account_at(AccountAddress::from_hex_literal("0x816").unwrap());
 
     // Publish types package (0x815::types): enum with Red and Green variants
@@ -804,10 +805,18 @@ fn execute_cross_module_enum_new_variant_handling() {
     let status = h.publish_package_with_options(
         &acc,
         types_path.path(),
+=======
+
+    // Enum with 2 variants, ops module uses exhaustive match
+    let status = h.publish_package_with_options(
+        &acc,
+        &common::test_dir_path("public_enum.data/test_package"),
+>>>>>>> ff2287ddd9 (Add struct API bytecode verification and update attribute syntax)
         BuildOptions::move_2().set_latest_language(),
     );
     assert_success!(status);
 
+<<<<<<< HEAD
     // Publish ops package (0x816::ops): exhaustive match over Red and Green only
     let mut ops_builder = PackageBuilder::new("ops");
     ops_builder.add_source(
@@ -828,11 +837,22 @@ fn execute_cross_module_enum_new_variant_handling() {
     let status = h.publish_package_with_options(
         &acc2,
         ops_path.path(),
+=======
+    // Publish ops, which uses the enum from the test_package
+    let acc2 = h.new_account_at(AccountAddress::from_hex_literal("0x816").unwrap());
+    let status = h.publish_package_with_options(
+        &acc2,
+        &common::test_dir_path("public_enum.data/ops"),
+>>>>>>> ff2287ddd9 (Add struct API bytecode verification and update attribute syntax)
         BuildOptions::move_2().set_latest_language(),
     );
     assert_success!(status);
 
+<<<<<<< HEAD
     // Expect success: make_color returns Red { r: 2 }, match returns 2 == 2
+=======
+    // Expect success when running the entry function `check`
+>>>>>>> ff2287ddd9 (Add struct API bytecode verification and update attribute syntax)
     let result = h.run_entry_function(
         &acc2,
         str::parse("0x816::ops::check").unwrap(),
@@ -841,6 +861,7 @@ fn execute_cross_module_enum_new_variant_handling() {
     );
     assert_success!(result);
 
+<<<<<<< HEAD
     // Upgrade types: add Blue variant; make_color now returns Blue instead of Red
     let mut upgraded_builder = PackageBuilder::new("types");
     upgraded_builder.add_source(
@@ -856,11 +877,21 @@ fn execute_cross_module_enum_new_variant_handling() {
     let status = h.publish_package_with_options(
         &acc,
         upgraded_path.path(),
+=======
+    // Upgrade enum with new Blue variant
+    let status = h.publish_package_with_options(
+        &acc,
+        &common::test_dir_path("public_enum.data/upgraded_test_package"),
+>>>>>>> ff2287ddd9 (Add struct API bytecode verification and update attribute syntax)
         BuildOptions::move_2().set_latest_language(),
     );
     assert_success!(status);
 
+<<<<<<< HEAD
     // ops module will abort: make_color now returns Blue, which its match doesn't handle
+=======
+    // ops module will abort because it doesn't know about the new Blue variant
+>>>>>>> ff2287ddd9 (Add struct API bytecode verification and update attribute syntax)
     let result = h.run_entry_function(
         &acc2,
         str::parse("0x816::ops::check").unwrap(),
