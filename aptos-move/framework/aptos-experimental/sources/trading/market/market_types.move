@@ -831,10 +831,10 @@ module aptos_experimental::market_types {
         bid_sizes: vector<u64>,
         ask_prices: vector<u64>,
         ask_sizes: vector<u64>,
-        cancelled_bid_sizes: vector<u64>,
         cancelled_bid_prices: vector<u64>,
-        cancelled_ask_sizes: vector<u64>,
+        cancelled_bid_sizes: vector<u64>,
         cancelled_ask_prices: vector<u64>,
+        cancelled_ask_sizes: vector<u64>,
         cancellation_reason: Option<OrderCancellationReason>,
     ) {
         // Final check whether event sending is enabled
