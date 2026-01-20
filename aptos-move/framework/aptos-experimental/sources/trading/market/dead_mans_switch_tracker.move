@@ -44,6 +44,7 @@
 ///
 /// - `KeepAliveUpdateEvent`: Emitted when a trader updates their keep-alive state
 /// - `KeepAliveDisabledEvent`: Emitted when a trader disables their keep-alive
+/// - `MinKeepAliveTimeUpdatedEvent`: Emitted when the minimum keep-alive time is updated
 ///
 module aptos_experimental::dead_mans_switch_tracker {
     friend aptos_experimental::order_placement;
@@ -92,6 +93,22 @@ module aptos_experimental::dead_mans_switch_tracker {
         }
     }
 
+    // Event emitted when the minimum keep-alive time is updated
+    // Fields:
+    // - parent: The parent address (DEX identifier)
+    // - market: The market address
+    // - old_min_keep_alive_time_secs: The previous minimum keep-alive time in seconds
+    // - new_min_keep_alive_time_secs: The new minimum keep-alive time in seconds
+    #[event]
+    enum MinKeepAliveTimeUpdatedEvent has drop, copy, store {
+        V1 {
+            parent: address,
+            market: address,
+            old_min_keep_alive_time_secs: u64,
+            new_min_keep_alive_time_secs: u64,
+        }
+    }
+
     // Stores the keep-alive state for a single trader
     // Fields:
     // - session_start_time_secs: Timestamp when the current session started.
@@ -136,9 +153,20 @@ module aptos_experimental::dead_mans_switch_tracker {
 
     public(friend) fun set_min_keep_alive_time_secs(
         tracker: &mut DeadMansSwitchTracker,
+        parent: address,
+        market: address,
         min_keep_alive_time_secs: u64,
     ) {
+        let old_min_keep_alive_time_secs = tracker.min_keep_alive_time_secs;
         tracker.min_keep_alive_time_secs = min_keep_alive_time_secs;
+        event::emit(
+            MinKeepAliveTimeUpdatedEvent::V1 {
+                parent,
+                market,
+                old_min_keep_alive_time_secs,
+                new_min_keep_alive_time_secs: min_keep_alive_time_secs,
+            },
+        );
     }
 
     /// Checks if an order is valid based on the dead man's switch state

@@ -573,8 +573,12 @@ module aptos_experimental::market_types {
         self: &mut Market<M>, min_keep_alive_time_secs: u64
     ) {
         self.config.min_keep_alive_time_secs = min_keep_alive_time_secs;
+        let parent = self.parent;
+        let market = self.market;
         dead_mans_switch_tracker::set_min_keep_alive_time_secs(
             self.get_dead_mans_switch_tracker_mut(),
+            parent,
+            market,
             min_keep_alive_time_secs
         );
     }
