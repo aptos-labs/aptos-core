@@ -128,6 +128,9 @@ module aptos_experimental::dead_mans_switch_operations {
     /// Updates the keep-alive state for a trader in the dead man's switch.
     /// This function should be called periodically by traders to keep their orders active.
     ///
+    /// This function does not validate the account parameter. It is the caller's responsibility
+    /// to ensure proper signer validation is performed before calling this function if needed.
+    ///
     /// Behavior:
     /// - First update: Creates a new session starting at time 0 (all existing orders remain valid)
     /// - Subsequent updates before expiration: Extends the current session
