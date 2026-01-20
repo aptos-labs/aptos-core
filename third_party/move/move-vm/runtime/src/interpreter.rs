@@ -408,7 +408,7 @@ where
                         + current_frame.caller_value_stack_size as usize;
                     if actual_stack_size != expected_stack_size {
                         let err = current_frame
-                            .stack_size_mismatch_error(expected_stack_size, actual_stack_size);
+                            .stack_size_mismatch_error(actual_stack_size, expected_stack_size);
                         return Err(set_err_info!(current_frame, err));
                     }
 
@@ -808,7 +808,7 @@ impl CallStack {
                 num_return_tys + current_frame.caller_type_stack_size as usize;
             if actual_type_stack_size != expected_type_stack_size {
                 return Err(current_frame
-                    .stack_size_mismatch_error(expected_type_stack_size, actual_type_stack_size));
+                    .stack_size_mismatch_error(actual_type_stack_size, expected_type_stack_size));
             }
             self.check_return_tys::<RTTCheck>(operand_stack, current_frame)?;
             if !caller_has_rt_checks {
@@ -825,7 +825,7 @@ impl CallStack {
             let expected_type_stack_size = current_frame.caller_type_stack_size as usize;
             if actual_type_stack_size != expected_type_stack_size {
                 return Err(current_frame
-                    .stack_size_mismatch_error(expected_type_stack_size, actual_type_stack_size));
+                    .stack_size_mismatch_error(actual_type_stack_size, expected_type_stack_size));
             }
 
             let ty_args = current_frame.function.ty_args();
@@ -1139,8 +1139,8 @@ where
                 if actual_value_stack_size != expected_value_stack_size {
                     return Err(stack_size_mismatch_error_for_function(
                         function,
-                        expected_value_stack_size,
                         actual_value_stack_size,
+                        expected_value_stack_size,
                     ));
                 }
 
@@ -1165,8 +1165,8 @@ where
                     if actual_type_stack_size != expected_type_stack_size {
                         return Err(stack_size_mismatch_error_for_function(
                             function,
-                            expected_type_stack_size,
                             actual_type_stack_size,
+                            expected_type_stack_size,
                         ));
                     }
                 }
@@ -3087,16 +3087,16 @@ impl Frame {
     }
 
     #[cold]
-    fn stack_size_mismatch_error(&self, expected: usize, actual: usize) -> PartialVMError {
-        stack_size_mismatch_error_for_function(&self.function, expected, actual)
+    fn stack_size_mismatch_error(&self, actual: usize, expected: usize) -> PartialVMError {
+        stack_size_mismatch_error_for_function(&self.function, actual, expected)
     }
 }
 
 #[cold]
 fn stack_size_mismatch_error_for_function(
     function: &LoadedFunction,
-    expected: usize,
     actual: usize,
+    expected: usize,
 ) -> PartialVMError {
     let err = PartialVMError::new_invariant_violation(format!(
         "Stack size mismatch when returning from {}: expected: {}, got: {}",
