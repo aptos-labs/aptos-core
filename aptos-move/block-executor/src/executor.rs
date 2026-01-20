@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    captured_reads::CapturedReads,
+    captured_reads::{CapturedReads, SnapshotModuleView},
     code_cache_global::{add_module_write_to_module_cache, GlobalModuleCache},
     code_cache_global_manager::AptosModuleCacheManagerGuard,
     counters::{
@@ -1235,10 +1235,25 @@ where
             // Note that the trace may be empty (if block was small and executor decides not to
             // collect the trace and replay, or if the VM decides it is not profitable to do this
             // check for this particular transaction), so we check it in advance.
+
+            // Retrieve the read-set that was captured during execution. This contains the snapshot
+            // of all modules accessed at execution time. It is important to use this view so that
+            // replay does not see potentially different newer state.
+            let (read_set, _) = last_input_output.read_set(txn_idx).ok_or_else(|| {
+                code_invariant_error("Read set must be recorded for trace replay")
+            })?;
+
+            // Create a module view that resolves modules from the read-set snapshot, ensuring that
+            // the replay sees the same module versions as execution. This prevents race conditions
+            // where modules are published between execution and post-commit processing.
+            let snapshot_view =
+                SnapshotModuleView::new(&read_set, environment.runtime_environment());
+
             let result = {
                 counters::update_txn_trace_counters(&trace);
                 let _timer = TRACE_REPLAY_SECONDS.start_timer();
-                TypeChecker::new(&latest_view).replay(&trace)
+                // Use snapshot_view instead of latest_view to avoid module cache race.
+                TypeChecker::new(&snapshot_view).replay(&trace)
             };
 
             // In case of runtime type check errors, fallback to sequential execution. There errors
