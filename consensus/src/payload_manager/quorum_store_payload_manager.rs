@@ -539,6 +539,40 @@ impl TPayloadManager for QuorumStorePayloadManager {
                     .concat(),
                 )
             },
+            Payload::OptQuorumStore(OptQuorumStorePayload::V2(opt_qs_payload)) => {
+                let opt_batch_txns = process_optqs_payload(
+                    opt_qs_payload.opt_batches(),
+                    self.batch_reader.clone(),
+                    block,
+                    &self.ordered_authors,
+                    block_signers.as_ref(),
+                )
+                .await?;
+                let proof_batch_txns = process_optqs_payload(
+                    opt_qs_payload.proof_with_data(),
+                    self.batch_reader.clone(),
+                    block,
+                    &self.ordered_authors,
+                    None,
+                )
+                .await?;
+                let inline_batch_txns = opt_qs_payload.inline_batches().transactions();
+                let all_txns = [proof_batch_txns, opt_batch_txns, inline_batch_txns].concat();
+                // Use V2 payload type that preserves BatchInfoExt
+                let batch_infos: Vec<_> = opt_qs_payload
+                    .opt_batches()
+                    .iter()
+                    .cloned()
+                    .chain(opt_qs_payload.inline_batches().batch_infos())
+                    .collect();
+                BlockTransactionPayload::new_opt_quorum_store_v2(
+                    all_txns,
+                    opt_qs_payload.proof_with_data().deref().clone(),
+                    opt_qs_payload.max_txns_to_execute(),
+                    opt_qs_payload.block_gas_limit(),
+                    batch_infos,
+                )
+            },
             _ => unreachable!(
                 "Wrong payload {} epoch {}, round {}, id {}",
                 payload,
@@ -588,10 +622,7 @@ fn get_inline_transactions(block: &Block) -> Vec<SignedTransaction> {
                 .collect()
         },
         Payload::OptQuorumStore(OptQuorumStorePayload::V1(p)) => p.inline_batches().transactions(),
-        Payload::OptQuorumStore(OptQuorumStorePayload::V2(_p)) => {
-            error!("OptQSPayload V2 is not expected");
-            Vec::new()
-        },
+        Payload::OptQuorumStore(OptQuorumStorePayload::V2(p)) => p.inline_batches().transactions(),
         _ => {
             vec![] // Other payload types do not have inline transactions
         },
