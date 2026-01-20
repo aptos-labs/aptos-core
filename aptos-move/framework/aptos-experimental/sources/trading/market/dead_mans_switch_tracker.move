@@ -98,7 +98,7 @@ module aptos_experimental::dead_mans_switch_tracker {
     //   Orders created before this time are considered invalid.
     //   Set to 0 on first keep-alive to allow all existing orders.
     // - expiration_time_secs: Timestamp when the current session expires.
-    //   If current time exceeds this, the session is expired.
+    //   If current time is after this (strictly greater), the session is expired.
     struct KeepAliveState has store {
         session_start_time_secs: u64,
         expiration_time_secs: u64,
@@ -161,8 +161,8 @@ module aptos_experimental::dead_mans_switch_tracker {
     ///     return true  // No dead man's switch, all orders valid
     /// if order_creation_time < session_start_time:
     ///     return false  // Order from expired session
-    /// if current_time >= expiration_time:
-    ///     return false  // Session expired (inclusive of expiration time)
+    /// if current_time > expiration_time:
+    ///     return false  // Session expired (exclusive of expiration time)
     /// return true  // Order valid
     /// ```
     ///
