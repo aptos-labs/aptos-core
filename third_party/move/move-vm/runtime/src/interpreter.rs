@@ -1103,6 +1103,11 @@ where
             gas_meter,
             traversal_context,
         );
+
+        // Capture stack sizes before the call for later validation.
+        let saved_value_stack_size = self.operand_stack.value.len();
+        let saved_type_stack_size = self.operand_stack.types.len();
+
         let result = native_function(&mut native_context, ty_args, args)?;
 
         // Note(Gas): The order by which gas is charged / error gets returned MUST NOT be modified
@@ -1127,6 +1132,18 @@ where
                     self.operand_stack.push(value)?;
                 }
 
+                // Stack balance check after pushing return values.
+                let actual_value_stack_size = self.operand_stack.value.len();
+                let expected_value_stack_size =
+                    saved_value_stack_size + function.return_tys().len();
+                if actual_value_stack_size != expected_value_stack_size {
+                    return Err(stack_size_mismatch_error_for_function(
+                        function,
+                        expected_value_stack_size,
+                        actual_value_stack_size,
+                    ));
+                }
+
                 // If the caller requires checks, push return types of native function to
                 // satisfy runtime check protocol.
                 if RTTCheck::should_perform_checks(&current_frame.function.function) {
@@ -1139,6 +1156,18 @@ where
                             let ty = ty_builder.create_ty_with_subst(ty, ty_args)?;
                             self.operand_stack.push_ty(ty)?;
                         }
+                    }
+
+                    // Stack balance check after pushing return types.
+                    let actual_type_stack_size = self.operand_stack.types.len();
+                    let expected_type_stack_size =
+                        saved_type_stack_size + function.return_tys().len();
+                    if actual_type_stack_size != expected_type_stack_size {
+                        return Err(stack_size_mismatch_error_for_function(
+                            function,
+                            expected_type_stack_size,
+                            actual_type_stack_size,
+                        ));
                     }
                 }
                 // Perform reference transition for native call-return.
@@ -3059,12 +3088,21 @@ impl Frame {
 
     #[cold]
     fn stack_size_mismatch_error(&self, expected: usize, actual: usize) -> PartialVMError {
-        let err = PartialVMError::new_invariant_violation(format!(
-            "Stack size mismatch when returning from {}: expected: {}, got: {}",
-            self.function.name_as_pretty_string(),
-            expected,
-            actual
-        ));
-        err.with_sub_status(EPARANOID_FAILURE)
+        stack_size_mismatch_error_for_function(&self.function, expected, actual)
     }
+}
+
+#[cold]
+fn stack_size_mismatch_error_for_function(
+    function: &LoadedFunction,
+    expected: usize,
+    actual: usize,
+) -> PartialVMError {
+    let err = PartialVMError::new_invariant_violation(format!(
+        "Stack size mismatch when returning from {}: expected: {}, got: {}",
+        function.name_as_pretty_string(),
+        expected,
+        actual
+    ));
+    err.with_sub_status(EPARANOID_FAILURE)
 }
