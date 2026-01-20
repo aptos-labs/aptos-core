@@ -3,7 +3,7 @@
 
 use crate::{
     pvss::chunky::{
-        hkzg_chunked_elgamal,
+        chunked_elgamal_pp, chunked_scalar_mul, hkzg_chunked_elgamal,
         hkzg_chunked_elgamal::HkzgWeightedElgamalWitness,
     },
     sigma_protocol,
@@ -15,8 +15,6 @@ use crate::{
         traits::FirstProofItem,
     },
 };
-use crate::pvss::chunky::chunked_scalar_mul;
-use crate::pvss::chunky::chunked_elgamal_pp;
 use aptos_crypto::{
     arkworks::random::unsafe_random_points_group, weighted_config::WeightedConfigArkworks,
     SecretSharingConfig,

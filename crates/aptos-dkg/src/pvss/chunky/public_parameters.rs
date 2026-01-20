@@ -7,7 +7,7 @@ use crate::{
     dlog,
     pvss::{
         chunky::{
-            chunked_elgamal_pp, chunked_elgamal::num_chunks_per_scalar, input_secret::InputSecret,
+            chunked_elgamal::num_chunks_per_scalar, chunked_elgamal_pp, input_secret::InputSecret,
             keys,
         },
         traits,
@@ -43,7 +43,6 @@ fn compute_powers_of_radix<E: Pairing>(ell: u8) -> Vec<E::ScalarField> {
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 #[allow(non_snake_case)]
 pub struct PublicParameters<E: Pairing> {
-    #[serde(serialize_with = "ark_se")]
     pub pp_elgamal: chunked_elgamal_pp::PublicParameters<E::G1>,
 
     #[serde(serialize_with = "ark_se")]
@@ -73,7 +72,6 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
         // Deserialize the serializable fields directly
         #[derive(Deserialize)]
         struct SerializedFields<E: Pairing> {
-            #[serde(deserialize_with = "ark_de")]
             pp_elgamal: chunked_elgamal_pp::PublicParameters<E::G1>,
             #[serde(deserialize_with = "ark_de")]
             pk_range_proof: dekart_univariate_v2::ProverKey<E>,
@@ -159,23 +157,22 @@ impl<E: Pairing> TryFrom<&[u8]> for PublicParameters<E> {
 impl<E: Pairing> PublicParameters<E> {
     /// Verifiably creates Aptos-specific public parameters.
     pub fn new<R: RngCore + CryptoRng>(
-        max_num_shares: usize,
+        max_num_shares: u32,
         ell: u8,
         max_aggregation: usize,
         rng: &mut R,
     ) -> Self {
         let max_num_chunks_padded =
-            ((max_num_shares * num_chunks_per_scalar::<E::ScalarField>(ell) as usize) + 1)
-                .next_power_of_two()
+            (max_num_shares * num_chunks_per_scalar::<E::ScalarField>(ell) + 1).next_power_of_two()
                 - 1;
 
         let group_generators = GroupGenerators::default(); // TODO: At least one of these should come from a powers of tau ceremony?
-        let pp_elgamal = chunked_elgamal_pp::PublicParameters::default();
+        let pp_elgamal = chunked_elgamal_pp::PublicParameters::new(max_num_shares);
         let G = *pp_elgamal.message_base();
         let pp = Self {
             pp_elgamal,
             pk_range_proof: dekart_univariate_v2::Proof::setup(
-                max_num_chunks_padded,
+                max_num_chunks_padded.try_into().unwrap(),
                 ell as usize,
                 group_generators,
                 rng,
@@ -199,7 +196,7 @@ impl<E: Pairing> PublicParameters<E> {
         commitment_base: E::G2Affine,
         rng: &mut R,
     ) -> Self {
-        let mut pp = Self::new(n, ell, max_aggregation, rng);
+        let mut pp = Self::new(n.try_into().unwrap(), ell, max_aggregation, rng);
         pp.G_2 = commitment_base;
         pp
     }
@@ -224,13 +221,13 @@ impl<E: Pairing> Default for PublicParameters<E> {
 }
 
 impl<E: Pairing> WithMaxNumShares for PublicParameters<E> {
-    fn with_max_num_shares(n: usize) -> Self {
+    fn with_max_num_shares(n: u32) -> Self {
         let mut rng = thread_rng();
         Self::new(n, DEFAULT_ELL_FOR_TESTING, 1, &mut rng)
     }
 
     // The only thing from `pp` that `generate()` uses is `pp.ell`, so make the rest as small as possible.
-    fn with_max_num_shares_for_generate(_n: usize) -> Self {
+    fn with_max_num_shares_for_generate(_n: u32) -> Self {
         let mut rng = thread_rng();
         Self::new(1, DEFAULT_ELL_FOR_TESTING, 1, &mut rng)
     }

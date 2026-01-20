@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use super::chunked_elgamal_pp::PublicParameters;
 use crate::{
     dlog::bsgs,
     pvss::chunky::chunks,
@@ -20,7 +21,6 @@ use ark_serialize::{
 };
 use ark_std::fmt::Debug;
 use std::collections::HashMap;
-use super::chunked_elgamal_pp::PublicParameters;
 
 pub const DST: &[u8; 31] = b"APTOS_CHUNKED_ELGAMAL_SIGMA_DST"; // This is used for the sigma protocol Fiat-Shamir challenges
 
@@ -96,7 +96,7 @@ impl<C: CurveGroup> homomorphism::Trait for WeightedHomomorphism<'_, C> {
     type Domain = WeightedWitness<C::ScalarField>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
-        self.apply_msm(self.msm_terms(input))
+        self.apply_msm(self.msm_terms(input)) // WRONG!! use the batch mul stuff here...
     }
 }
 
@@ -387,7 +387,7 @@ mod tests {
             prepare_chunked_witness::<C::ScalarField>(sc, 16);
 
         // 6. Initialize the homomorphism
-        let pp: PublicParameters<C> = PublicParameters::default();
+        let pp: PublicParameters<C> = PublicParameters::new(3);
         let dks: Vec<C::ScalarField> = sample_field_elements(2, &mut thread_rng());
 
         let hom = WeightedHomomorphism::<C> {

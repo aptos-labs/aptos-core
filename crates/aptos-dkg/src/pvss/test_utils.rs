@@ -57,7 +57,8 @@ pub fn setup_dealing<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng
         sc
     );
 
-    let pp = T::PublicParameters::with_max_num_shares(sc.get_total_num_shares());
+    let pp =
+        T::PublicParameters::with_max_num_shares(sc.get_total_num_shares().try_into().unwrap());
 
     let (ssks, spks, dks, eks, iss, s, dsk, dpk) =
         generate_keys_and_secrets::<T, R>(sc, &pp, &mut rng);
@@ -90,7 +91,7 @@ pub fn setup_dealing_weighted<
         sc
     );
 
-    let pp = T::PublicParameters::with_max_num_shares(sc.get_total_weight());
+    let pp = T::PublicParameters::with_max_num_shares(sc.get_total_weight().try_into().unwrap());
 
     let (ssks, spks, dks, eks, iss, s, dsk, dpk) =
         generate_keys_and_secrets::<T, R>(sc, &pp, &mut rng);

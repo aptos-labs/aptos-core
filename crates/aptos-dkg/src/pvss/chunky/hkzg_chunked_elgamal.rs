@@ -3,7 +3,7 @@
 
 use crate::{
     pcs::univariate_hiding_kzg,
-    pvss::chunky::chunked_elgamal,
+    pvss::chunky::{chunked_elgamal, chunked_elgamal_pp},
     sigma_protocol::{
         self,
         homomorphism::{
@@ -14,7 +14,6 @@ use crate::{
     },
     Scalar,
 };
-use crate::pvss::chunky::chunked_elgamal_pp;
 use aptos_crypto::{
     arkworks::random::{
         sample_field_element, sample_field_elements, unsafe_random_point_group,

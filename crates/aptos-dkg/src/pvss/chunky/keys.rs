@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{traits, Scalar};
+use crate::{pvss::chunky::chunked_elgamal_pp, traits, Scalar};
 use aptos_crypto::{
     arkworks,
     arkworks::serialization::{ark_de, ark_se},
@@ -13,7 +13,6 @@ use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use serde::{Deserialize, Serialize};
 use std::ops::Mul;
-use crate::pvss::chunky::chunked_elgamal_pp;
 
 /// The *encryption (public)* key used to encrypt shares of the dealt secret for each PVSS player.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -148,7 +147,7 @@ mod tests {
 
         let decryption_key: DecryptPrivKey<Bls12_381> = DecryptPrivKey::from(&sk);
         let encryption_key_from_decryption_key: EncryptPubKey<Bls12_381> =
-            decryption_key.to(&PublicParameters::default());
+            decryption_key.to(&PublicParameters::new(3));
 
         let encryption_key_from_blst_pk = EncryptPubKey::from(&pk);
 

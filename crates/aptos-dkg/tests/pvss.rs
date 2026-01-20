@@ -393,7 +393,9 @@ fn actual_transcript_size<T: Transcript>(sc: &T::SecretSharingConfig) -> usize {
 
     let trx = T::generate(
         &sc,
-        &T::PublicParameters::with_max_num_shares_for_generate(sc.get_total_num_shares()),
+        &T::PublicParameters::with_max_num_shares_for_generate(
+            sc.get_total_num_shares().try_into().unwrap(),
+        ),
         &mut rng,
     );
     let actual_size = trx.to_bytes().len();

@@ -94,12 +94,12 @@ impl ValidCryptoMaterial for PublicParameters {
 }
 
 impl WithMaxNumShares for PublicParameters {
-    fn with_max_num_shares(_n: usize) -> Self {
+    fn with_max_num_shares(_n: u32) -> Self {
         Self::default()
     }
 
     // Setup is fast enough
-    fn with_max_num_shares_for_generate(_n: usize) -> Self {
+    fn with_max_num_shares_for_generate(_n: u32) -> Self {
         Self::default()
     }
 }

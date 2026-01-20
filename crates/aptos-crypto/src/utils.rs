@@ -4,11 +4,9 @@
 //! Utility functions for general-purpose operations.
 //! Currently contains only a `powers()` function for computing sequential powers of a base element.
 
-use num_traits::One;
-use std::ops::Mul;
-use std::ops::MulAssign;
-use std::ops::Add;
 use num::traits::Zero;
+use num_traits::One;
+use std::ops::{Add, Mul, MulAssign};
 
 /// Returns the first `count` powers of a given `base` element, so
 /// [1, base, base^2, base^3, ..., base^{count - 1}]
@@ -43,7 +41,7 @@ pub fn assert_power_of_two(n: usize) {
 /// ```text
 /// v₁ + c·v₂ + c²·v₃ + … + c⁽ᵐ⁻¹⁾·vₘ
 /// ```
-/// 
+///
 /// Useful for Schwartz-Zippel type operations
 pub fn polynomial_evaluation<T>(c: T, v: &[T]) -> T
 where
