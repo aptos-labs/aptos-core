@@ -1335,7 +1335,7 @@ impl<'a> SnapshotModuleView<'a> {
                 // Module has to be in the read-set during execution.
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message(format!(
-                        "Module {}::{} does not in exist in read-set snapshot",
+                        "Module {}::{} does not exist in read-set snapshot",
                         address.to_hex_literal(),
                         module_name,
                     ))
@@ -1423,7 +1423,7 @@ impl ModuleStorage for SnapshotModuleView<'_> {
         _module_name: &IdentStr,
     ) -> VMResult<Option<Arc<Module>>> {
         // Snapshot module view does not need to support eagerly verified loading of modules
-        // because
+        // because it is only used lazily.
         Err(
             PartialVMError::new_invariant_violation("Eager verification is not supported")
                 .finish(Location::Undefined),
