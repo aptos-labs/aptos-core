@@ -153,7 +153,6 @@ module aptos_experimental::pending_order_book_index {
         self.take_ready_price_move_down_orders(current_price, &mut orders, order_limit);
         // Try to fill the rest of the space if available.
         self.take_ready_price_move_up_orders(current_price, &mut orders, order_limit);
-        self.take_ready_price_move_down_orders(current_price, &mut orders, order_limit);
         orders
     }
 
