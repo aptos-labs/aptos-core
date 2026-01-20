@@ -3,7 +3,7 @@
 
 use crate::{
     pvss::chunky::{
-        chunked_elgamal, chunked_scalar_mul, hkzg_chunked_elgamal,
+        hkzg_chunked_elgamal,
         hkzg_chunked_elgamal::HkzgWeightedElgamalWitness,
     },
     sigma_protocol,
@@ -15,6 +15,8 @@ use crate::{
         traits::FirstProofItem,
     },
 };
+use crate::pvss::chunky::chunked_scalar_mul;
+use crate::pvss::chunky::chunked_elgamal_pp;
 use aptos_crypto::{
     arkworks::random::unsafe_random_points_group, weighted_config::WeightedConfigArkworks,
     SecretSharingConfig,
@@ -76,7 +78,7 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
     pub fn new(
         lagr_g1: &'a [E::G1Affine],
         xi_1: E::G1Affine,
-        pp: &'a chunked_elgamal::PublicParameters<E::G1>,
+        pp: &'a chunked_elgamal_pp::PublicParameters<E::G1>,
         eks: &'a [E::G1Affine],
         base: E::G2Affine,
         ell: u8,

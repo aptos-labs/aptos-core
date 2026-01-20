@@ -9,7 +9,6 @@ use crate::{
     Scalar,
 };
 use aptos_crypto::arkworks::{
-    hashing,
     msm::{IsMsmInput, MsmInput},
     random::sample_field_element,
 };
@@ -21,8 +20,9 @@ use ark_serialize::{
 };
 use ark_std::fmt::Debug;
 use std::collections::HashMap;
+use super::chunked_elgamal_pp::PublicParameters;
 
-pub const DST: &[u8; 35] = b"APTOS_CHUNKED_ELGAMAL_GENERATOR_DST"; // This is used to create public parameters, see `default()` below
+pub const DST: &[u8; 31] = b"APTOS_CHUNKED_ELGAMAL_SIGMA_DST"; // This is used for the sigma protocol Fiat-Shamir challenges
 
 /// Formally, given:
 /// - `G_1, H_1` ∈ G₁ (group generators)
@@ -45,43 +45,6 @@ pub const DST: &[u8; 35] = b"APTOS_CHUNKED_ELGAMAL_GENERATOR_DST"; // This is us
 pub struct WeightedHomomorphism<'a, C: CurveGroup> {
     pub pp: &'a PublicParameters<C>, // These are small so no harm in copying them here
     pub eks: &'a [C::Affine],        // TODO: capitalize to EKs ?
-}
-
-#[allow(non_snake_case)]
-#[derive(CanonicalSerialize, CanonicalDeserialize, PartialEq, Clone, Eq, Debug)]
-pub struct PublicParameters<C: CurveGroup> {
-    /// A group element $G$ that is raised to the encrypted message
-    pub G: C::Affine,
-    /// A group element $H$ that is used to exponentiate both
-    /// (1) the ciphertext randomness and (2) the DSK when computing its EK.
-    pub H: C::Affine,
-}
-
-#[allow(non_snake_case)]
-impl<C: CurveGroup> PublicParameters<C> {
-    pub fn new(G: C::Affine, H: C::Affine) -> Self {
-        Self { G, H }
-    }
-
-    pub fn message_base(&self) -> &C::Affine {
-        &self.G
-    }
-
-    pub fn pubkey_base(&self) -> &C::Affine {
-        &self.H
-    }
-}
-
-#[allow(non_snake_case)]
-impl<C: CurveGroup> Default for PublicParameters<C> {
-    fn default() -> Self {
-        let G = hashing::unsafe_hash_to_affine(b"G", DST);
-        // Chunky's encryption pubkey base must match up with the blst base, since validators
-        // reuse their consensus keypairs as encryption keypairs
-        let H = C::Affine::generator();
-        debug_assert_ne!(G, H);
-        Self { G, H }
-    }
 }
 
 // Need to manually implement `CanonicalSerialize` because `Homomorphism` has references instead of owned values

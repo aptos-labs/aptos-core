@@ -14,6 +14,7 @@ use crate::{
     },
     Scalar,
 };
+use crate::pvss::chunky::chunked_elgamal_pp;
 use aptos_crypto::{
     arkworks::random::{
         sample_field_element, sample_field_elements, unsafe_random_point_group,
@@ -191,7 +192,7 @@ impl<'a, E: Pairing> WeightedHomomorphism<'a, E> {
     pub fn new(
         lagr_g1: &'a [E::G1Affine],
         xi_1: E::G1Affine,
-        pp: &'a chunked_elgamal::PublicParameters<E::G1>,
+        pp: &'a chunked_elgamal_pp::PublicParameters<E::G1>,
         eks: &'a [E::G1Affine],
     ) -> Self {
         // Set up the HKZG homomorphism, and use a projection map to lift it to HkzgElgamalWitness
