@@ -12629,6 +12629,7 @@ dependencies = [
  "move-ir-types",
  "petgraph 0.6.5",
  "serde",
+ "tempfile",
 ]
 
 [[package]]
