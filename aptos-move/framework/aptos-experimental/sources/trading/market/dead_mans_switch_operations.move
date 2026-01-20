@@ -153,7 +153,9 @@ module aptos_experimental::dead_mans_switch_operations {
         // Check if dead man's switch is enabled
         assert!(market.is_dead_mans_switch_enabled(), E_DEAD_MANS_SWITCH_NOT_ENABLED);
 
+        let parent = market_types::get_parent(market);
+        let market_addr = market_types::get_market(market);
         let tracker = market_types::get_dead_mans_switch_tracker_mut(market);
-        dead_mans_switch_tracker::keep_alive(tracker, account, timeout_seconds);
+        dead_mans_switch_tracker::keep_alive(tracker, parent, market_addr, account, timeout_seconds);
     }
 }

@@ -911,6 +911,18 @@ module aptos_experimental::market_types {
         self.config.enable_dead_mans_switch
     }
 
+    public(friend) fun get_parent<M: store + copy + drop>(
+        self: &Market<M>
+    ): address {
+        self.parent
+    }
+
+    public(friend) fun get_market<M: store + copy + drop>(
+        self: &Market<M>
+    ): address {
+        self.market
+    }
+
     // ============================= test_only APIs ====================================
     #[test_only]
     public fun destroy_market<M: store + copy + drop>(self: Market<M>) {
