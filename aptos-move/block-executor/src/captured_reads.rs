@@ -1423,7 +1423,7 @@ impl ModuleStorage for SnapshotModuleView<'_> {
         _module_name: &IdentStr,
     ) -> VMResult<Option<Arc<Module>>> {
         // Snapshot module view does not need to support eagerly verified loading of modules
-        // because
+        // because it is only used lazily.
         Err(
             PartialVMError::new_invariant_violation("Eager verification is not supported")
                 .finish(Location::Undefined),
