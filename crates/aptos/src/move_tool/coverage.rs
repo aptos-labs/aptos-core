@@ -269,3 +269,279 @@ impl CoveragePackage {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::CommandFactory;
+    use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+    use move_coverage::{
+        coverage_map::{CoverageMap, ModuleCoverageMap},
+        summary::{FunctionSummary, ModuleSummary},
+    };
+    use std::collections::BTreeMap;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    /// Verify CLI argument structure for SummaryCoverage
+    #[test]
+    fn verify_summary_coverage_cli() {
+        SummaryCoverage::command().debug_assert();
+    }
+
+    /// Verify CLI argument structure for SourceCoverage
+    #[test]
+    fn verify_source_coverage_cli() {
+        SourceCoverage::command().debug_assert();
+    }
+
+    /// Verify CLI argument structure for BytecodeCoverage
+    #[test]
+    fn verify_bytecode_coverage_cli() {
+        BytecodeCoverage::command().debug_assert();
+    }
+
+    /// Test that format_human_summary produces expected output
+    #[test]
+    fn test_format_human_summary_output() {
+        use legacy_move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
+        use move_binary_format::file_format;
+
+        // Create a simple test module
+        let mut module = file_format::empty_module();
+        module.identifiers[0] = Identifier::new("TestModule").unwrap();
+
+        // Add a function to the module
+        module.function_handles.push(file_format::FunctionHandle {
+            module: file_format::ModuleHandleIndex(0),
+            name: file_format::IdentifierIndex(module.identifiers.len() as u16),
+            parameters: file_format::SignatureIndex(0),
+            return_: file_format::SignatureIndex(0),
+            type_parameters: vec![],
+            access_specifiers: None,
+            attributes: vec![],
+        });
+        module
+            .identifiers
+            .push(Identifier::new("test_func").unwrap());
+
+        module.function_defs.push(file_format::FunctionDefinition {
+            function: file_format::FunctionHandleIndex(0),
+            visibility: file_format::Visibility::Private,
+            is_entry: false,
+            acquires_global_resources: vec![],
+            code: Some(file_format::CodeUnit {
+                locals: file_format::SignatureIndex(0),
+                code: vec![
+                    file_format::Bytecode::LdU64(0),
+                    file_format::Bytecode::Pop,
+                    file_format::Bytecode::Ret,
+                ],
+            }),
+        });
+
+        let modules = vec![module.clone()];
+
+        // Create a coverage map with partial coverage
+        let mut coverage_map = CoverageMap::default();
+        let addr = AccountAddress::ZERO;
+        let module_name = Identifier::new("TestModule").unwrap();
+        let func_name = Identifier::new("test_func").unwrap();
+
+        // Cover 2 of 3 instructions
+        coverage_map.insert("exec", addr, module_name.clone(), func_name.clone(), 0);
+        coverage_map.insert("exec", addr, module_name.clone(), func_name.clone(), 1);
+
+        let unified_map = coverage_map.to_unified_exec_map();
+
+        // Format the summary
+        let mut output = Vec::new();
+        format_human_summary(
+            modules.as_slice(),
+            &unified_map,
+            summarize_inst_cov,
+            &mut output,
+            true, // summarize_functions
+        );
+
+        let output_str = String::from_utf8(output).unwrap();
+
+        // Verify output contains expected elements
+        assert!(
+            output_str.contains("Move Coverage Summary"),
+            "Output should contain header"
+        );
+        assert!(
+            output_str.contains("TestModule"),
+            "Output should contain module name"
+        );
+        assert!(
+            output_str.contains("test_func"),
+            "Output should contain function name"
+        );
+        assert!(
+            output_str.contains("total: 3"),
+            "Output should show 3 total instructions"
+        );
+        assert!(
+            output_str.contains("covered: 2"),
+            "Output should show 2 covered instructions"
+        );
+    }
+
+    /// Test that format_csv_summary produces valid CSV
+    #[test]
+    fn test_format_csv_summary_output() {
+        use move_binary_format::file_format;
+
+        // Create a simple test module
+        let mut module = file_format::empty_module();
+        module.identifiers[0] = Identifier::new("TestModule").unwrap();
+
+        module.function_handles.push(file_format::FunctionHandle {
+            module: file_format::ModuleHandleIndex(0),
+            name: file_format::IdentifierIndex(module.identifiers.len() as u16),
+            parameters: file_format::SignatureIndex(0),
+            return_: file_format::SignatureIndex(0),
+            type_parameters: vec![],
+            access_specifiers: None,
+            attributes: vec![],
+        });
+        module.identifiers.push(Identifier::new("my_func").unwrap());
+
+        module.function_defs.push(file_format::FunctionDefinition {
+            function: file_format::FunctionHandleIndex(0),
+            visibility: file_format::Visibility::Private,
+            is_entry: false,
+            acquires_global_resources: vec![],
+            code: Some(file_format::CodeUnit {
+                locals: file_format::SignatureIndex(0),
+                code: vec![file_format::Bytecode::Ret],
+            }),
+        });
+
+        let modules = vec![module.clone()];
+
+        // Create empty coverage map
+        let coverage_map = CoverageMap::default();
+        let unified_map = coverage_map.to_unified_exec_map();
+
+        // Format as CSV
+        let mut output = Vec::new();
+        format_csv_summary(
+            modules.as_slice(),
+            &unified_map,
+            summarize_inst_cov,
+            &mut output,
+        );
+
+        let output_str = String::from_utf8(output).unwrap();
+
+        // Verify CSV header
+        assert!(
+            output_str.starts_with("ModuleName,FunctionName,Covered,Uncovered"),
+            "CSV should have proper header"
+        );
+
+        // Verify CSV contains data row
+        let lines: Vec<&str> = output_str.lines().collect();
+        assert!(
+            lines.len() >= 2,
+            "Should have header and at least one data row"
+        );
+
+        // Verify the data row has correct format (4 comma-separated values)
+        if lines.len() > 1 {
+            let data_row = lines[1];
+            let columns: Vec<&str> = data_row.split(',').collect();
+            assert_eq!(columns.len(), 4, "Each CSV row should have 4 columns");
+        }
+    }
+
+    /// Test CoverageMap loading from binary file
+    #[test]
+    fn test_coverage_map_binary_roundtrip() {
+        let mut coverage_map = CoverageMap::default();
+        let addr = AccountAddress::from_hex_literal("0x1").unwrap();
+        let module_name = Identifier::new("TestModule").unwrap();
+        let func_name = Identifier::new("test_func").unwrap();
+
+        coverage_map.insert("exec1", addr, module_name.clone(), func_name.clone(), 0);
+        coverage_map.insert("exec1", addr, module_name.clone(), func_name.clone(), 1);
+        coverage_map.insert("exec1", addr, module_name.clone(), func_name.clone(), 0);
+
+        // Serialize to temp file
+        let temp_file = NamedTempFile::new().unwrap();
+        let bytes = bcs::to_bytes(&coverage_map).unwrap();
+        std::fs::write(temp_file.path(), &bytes).unwrap();
+
+        // Load back
+        let loaded = CoverageMap::from_binary_file(&temp_file.path()).unwrap();
+
+        // Verify contents
+        let unified = loaded.to_unified_exec_map();
+        let module_map = unified.module_maps.get(&(addr, module_name)).unwrap();
+        let func_cov = module_map.function_maps.get(&func_name).unwrap();
+
+        assert_eq!(func_cov.get(&0), Some(&2), "PC 0 should be hit twice");
+        assert_eq!(func_cov.get(&1), Some(&1), "PC 1 should be hit once");
+    }
+
+    /// Test merging multiple coverage maps
+    #[test]
+    fn test_coverage_map_merge() {
+        let addr = AccountAddress::from_hex_literal("0x1").unwrap();
+        let module_name = Identifier::new("TestModule").unwrap();
+        let func_name = Identifier::new("test_func").unwrap();
+
+        let mut map1 = CoverageMap::default();
+        map1.insert("exec1", addr, module_name.clone(), func_name.clone(), 0);
+        map1.insert("exec1", addr, module_name.clone(), func_name.clone(), 1);
+
+        let mut map2 = CoverageMap::default();
+        map2.insert("exec1", addr, module_name.clone(), func_name.clone(), 0);
+        map2.insert("exec1", addr, module_name.clone(), func_name.clone(), 2);
+
+        map1.merge(map2);
+
+        let unified = map1.to_unified_exec_map();
+        let module_map = unified.module_maps.get(&(addr, module_name)).unwrap();
+        let func_cov = module_map.function_maps.get(&func_name).unwrap();
+
+        assert_eq!(func_cov.get(&0), Some(&2), "PC 0 should be merged");
+        assert_eq!(func_cov.get(&1), Some(&1), "PC 1 from map1");
+        assert_eq!(func_cov.get(&2), Some(&1), "PC 2 from map2");
+    }
+
+    /// Test ColorChoice enum parsing
+    #[test]
+    fn test_color_choice_values() {
+        use std::str::FromStr;
+
+        assert!(ColorChoice::from_str("none").is_ok());
+        assert!(ColorChoice::from_str("default").is_ok());
+        assert!(ColorChoice::from_str("always").is_ok());
+        assert!(ColorChoice::from_str("invalid").is_err());
+    }
+
+    /// Test TextIndicator enum parsing
+    #[test]
+    fn test_text_indicator_values() {
+        use std::str::FromStr;
+
+        assert!(TextIndicator::from_str("none").is_ok());
+        assert!(TextIndicator::from_str("explicit").is_ok());
+        assert!(TextIndicator::from_str("on").is_ok());
+        assert!(TextIndicator::from_str("invalid").is_err());
+    }
+
+    /// Test that CoverageCommon default has empty extra_coverage
+    #[test]
+    fn test_coverage_common_default() {
+        let common = CoverageCommon::default();
+        assert!(
+            common.extra_coverage.is_empty(),
+            "Default should have no extra coverage files"
+        );
+    }
+}
