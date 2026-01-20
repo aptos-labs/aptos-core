@@ -496,6 +496,17 @@ module aptos_experimental::market_types {
         }
     }
 
+    #[event]
+    enum BulkOrderRejectionEvent has drop, copy, store {
+        V1 {
+            parent: address,
+            market: address,
+            user: address,
+            sequence_number: u64,
+            existing_sequence_number: u64,
+        }
+    }
+
 
     // ============================= Public APIs ====================================
     public fun new_market_config(
@@ -845,6 +856,26 @@ module aptos_experimental::market_types {
                     cancelled_ask_sizes,
                     previous_seq_num: sequence_number,
                     cancellation_reason,
+                }
+            );
+        };
+    }
+
+    public fun emit_event_for_bulk_order_rejection<M: store + copy + drop>(
+        self: &Market<M>,
+        user: address,
+        sequence_number: u64,
+        existing_sequence_number: u64,
+    ) {
+        // Final check whether event sending is enabled
+        if (self.config.allow_events_emission) {
+            event::emit(
+                BulkOrderRejectionEvent::V1 {
+                    parent: self.parent,
+                    market: self.market,
+                    user,
+                    sequence_number,
+                    existing_sequence_number,
                 }
             );
         };
