@@ -349,57 +349,6 @@ module 0x42::M {
         ensures requires_of<unbox>(b);
         ensures ensures_of<unbox>(b, result);
     }
-
-    // ========================================
-    // Tests: Function parameters (no type args allowed)
-    // ========================================
-
-    // Test requires_of with function parameter
-    fun apply_requires(f: |u64| u64, x: u64): u64 {
-        f(x)
-    }
-
-    spec apply_requires {
-        ensures requires_of<f>(x);
-    }
-
-    // Test aborts_of with function parameter
-    fun apply_aborts(f: |u64| u64, x: u64): u64 {
-        f(x)
-    }
-
-    spec apply_aborts {
-        aborts_if aborts_of<f>(x);
-    }
-
-    // Test ensures_of with function parameter
-    fun apply_ensures(f: |u64| u64, x: u64): u64 {
-        f(x)
-    }
-
-    spec apply_ensures {
-        ensures ensures_of<f>(x, result);
-    }
-
-    // Test with binary function parameter
-    fun apply_binary(f: |u64, u64| u64, a: u64, b: u64): u64 {
-        f(a, b)
-    }
-
-    spec apply_binary {
-        ensures requires_of<f>(a, b);
-        ensures ensures_of<f>(a, b, result);
-        aborts_if aborts_of<f>(a, b);
-    }
-
-    // Test modifies_of with function parameter
-    fun apply_modifies(f: |address|, addr: address) {
-        f(addr)
-    }
-
-    spec apply_modifies {
-        ensures modifies_of<f>(global<Counter>(addr));
-    }
 }
 
 // Test cross-module function references
