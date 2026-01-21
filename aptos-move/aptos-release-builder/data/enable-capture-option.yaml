@@ -1,5 +1,5 @@
 remote_endpoint: ~
-name: "v1.39-enable-capture-option"
+name: "v1.40-enable-capture-option"
 proposals:
   - name: enable_capture_option
     metadata:
