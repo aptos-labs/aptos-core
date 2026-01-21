@@ -851,7 +851,7 @@ async fn test_encrypted_transactions_separated_with_batch_v2() {
     let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
 
     let config = QuorumStoreConfig {
-        enable_batch_v2: true,
+        enable_batch_v2_tx: true,
         ..Default::default()
     };
     let max_batch_bytes = config.sender_max_batch_bytes;
@@ -925,7 +925,7 @@ async fn test_encrypted_transactions_filtered_without_batch_v2() {
     let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
 
     let config = QuorumStoreConfig {
-        enable_batch_v2: false, // V2 disabled
+        enable_batch_v2_tx: false, // V2 disabled
         ..Default::default()
     };
     let max_batch_bytes = config.sender_max_batch_bytes;
@@ -989,7 +989,7 @@ async fn test_encrypted_transactions_with_gas_buckets() {
     let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
 
     let config = QuorumStoreConfig {
-        enable_batch_v2: true,
+        enable_batch_v2_tx: true,
         ..Default::default()
     };
     let max_batch_bytes = config.sender_max_batch_bytes;
@@ -1085,7 +1085,7 @@ async fn test_only_encrypted_transactions() {
     let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
 
     let config = QuorumStoreConfig {
-        enable_batch_v2: true,
+        enable_batch_v2_tx: true,
         ..Default::default()
     };
     let max_batch_bytes = config.sender_max_batch_bytes;

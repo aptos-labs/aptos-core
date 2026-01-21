@@ -11,7 +11,7 @@ use std::{collections::HashSet, time::Duration};
 pub struct OptQSPayloadPullParams {
     pub exclude_authors: HashSet<Author>,
     pub minimum_batch_age_usecs: u64,
-    pub use_batch_v2: bool,
+    pub enable_opt_qs_v2_payload: bool,
 }
 
 pub struct PayloadPullParameters {
@@ -33,7 +33,7 @@ impl std::fmt::Debug for OptQSPayloadPullParams {
         f.debug_struct("OptQSPayloadPullParams")
             .field("exclude_authors", &self.exclude_authors)
             .field("minimum_batch_age_useds", &self.minimum_batch_age_usecs)
-            .field("use_batch_v2", &self.use_batch_v2)
+            .field("enable_opt_qs_v2_payload", &self.enable_opt_qs_v2_payload)
             .finish()
     }
 }
