@@ -1105,8 +1105,8 @@ where
         );
 
         // Capture stack sizes before the call for later validation.
-        let saved_value_stack_size = self.operand_stack.value.len();
-        let saved_type_stack_size = self.operand_stack.types.len();
+        let pre_native_call_value_stack_size = self.operand_stack.value.len();
+        let pre_native_call_type_stack_size = self.operand_stack.types.len();
 
         let result = native_function(&mut native_context, ty_args, args)?;
 
@@ -1135,7 +1135,7 @@ where
                 // Stack balance check after pushing return values.
                 let actual_value_stack_size = self.operand_stack.value.len();
                 let expected_value_stack_size =
-                    saved_value_stack_size + function.return_tys().len();
+                    pre_native_call_value_stack_size + function.return_tys().len();
                 if actual_value_stack_size != expected_value_stack_size {
                     return Err(stack_size_mismatch_error_for_function(
                         function,
@@ -1161,7 +1161,7 @@ where
                     // Stack balance check after pushing return types.
                     let actual_type_stack_size = self.operand_stack.types.len();
                     let expected_type_stack_size =
-                        saved_type_stack_size + function.return_tys().len();
+                        pre_native_call_type_stack_size + function.return_tys().len();
                     if actual_type_stack_size != expected_type_stack_size {
                         return Err(stack_size_mismatch_error_for_function(
                             function,
