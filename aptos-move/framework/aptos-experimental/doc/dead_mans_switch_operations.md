@@ -206,6 +206,9 @@ Aborts:
 Updates the keep-alive state for a trader in the dead man's switch.
 This function should be called periodically by traders to keep their orders active.
 
+This function does not validate the account parameter. It is the caller's responsibility
+to ensure proper signer validation is performed before calling this function if needed.
+
 Behavior:
 - First update: Creates a new session starting at time 0 (all existing orders remain valid)
 - Subsequent updates before expiration: Extends the current session
@@ -242,8 +245,10 @@ Aborts:
     // Check <b>if</b> dead man's switch is enabled
     <b>assert</b>!(market.is_dead_mans_switch_enabled(), <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_E_DEAD_MANS_SWITCH_NOT_ENABLED">E_DEAD_MANS_SWITCH_NOT_ENABLED</a>);
 
+    <b>let</b> parent = <a href="market_types.md#0x7_market_types_get_parent">market_types::get_parent</a>(market);
+    <b>let</b> market_addr = <a href="market_types.md#0x7_market_types_get_market">market_types::get_market</a>(market);
     <b>let</b> tracker = <a href="market_types.md#0x7_market_types_get_dead_mans_switch_tracker_mut">market_types::get_dead_mans_switch_tracker_mut</a>(market);
-    <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_keep_alive">dead_mans_switch_tracker::keep_alive</a>(tracker, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, timeout_seconds);
+    <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_keep_alive">dead_mans_switch_tracker::keep_alive</a>(tracker, parent, market_addr, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, timeout_seconds);
 }
 </code></pre>
 

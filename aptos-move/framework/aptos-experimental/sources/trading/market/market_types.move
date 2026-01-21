@@ -496,6 +496,17 @@ module aptos_experimental::market_types {
         }
     }
 
+    #[event]
+    enum BulkOrderRejectionEvent has drop, copy, store {
+        V1 {
+            parent: address,
+            market: address,
+            user: address,
+            sequence_number: u64,
+            existing_sequence_number: u64,
+        }
+    }
+
 
     // ============================= Public APIs ====================================
     public fun new_market_config(
@@ -562,8 +573,12 @@ module aptos_experimental::market_types {
         self: &mut Market<M>, min_keep_alive_time_secs: u64
     ) {
         self.config.min_keep_alive_time_secs = min_keep_alive_time_secs;
+        let parent = self.parent;
+        let market = self.market;
         dead_mans_switch_tracker::set_min_keep_alive_time_secs(
             self.get_dead_mans_switch_tracker_mut(),
+            parent,
+            market,
             min_keep_alive_time_secs
         );
     }
@@ -820,10 +835,10 @@ module aptos_experimental::market_types {
         bid_sizes: vector<u64>,
         ask_prices: vector<u64>,
         ask_sizes: vector<u64>,
-        cancelled_bid_sizes: vector<u64>,
         cancelled_bid_prices: vector<u64>,
-        cancelled_ask_sizes: vector<u64>,
+        cancelled_bid_sizes: vector<u64>,
         cancelled_ask_prices: vector<u64>,
+        cancelled_ask_sizes: vector<u64>,
         cancellation_reason: Option<OrderCancellationReason>,
     ) {
         // Final check whether event sending is enabled
@@ -845,6 +860,26 @@ module aptos_experimental::market_types {
                     cancelled_ask_sizes,
                     previous_seq_num: sequence_number,
                     cancellation_reason,
+                }
+            );
+        };
+    }
+
+    public fun emit_event_for_bulk_order_rejection<M: store + copy + drop>(
+        self: &Market<M>,
+        user: address,
+        sequence_number: u64,
+        existing_sequence_number: u64,
+    ) {
+        // Final check whether event sending is enabled
+        if (self.config.allow_events_emission) {
+            event::emit(
+                BulkOrderRejectionEvent::V1 {
+                    parent: self.parent,
+                    market: self.market,
+                    user,
+                    sequence_number,
+                    existing_sequence_number,
                 }
             );
         };
@@ -878,6 +913,18 @@ module aptos_experimental::market_types {
         self: &Market<M>
     ): bool {
         self.config.enable_dead_mans_switch
+    }
+
+    public(friend) fun get_parent<M: store + copy + drop>(
+        self: &Market<M>
+    ): address {
+        self.parent
+    }
+
+    public(friend) fun get_market<M: store + copy + drop>(
+        self: &Market<M>
+    ): address {
+        self.market
     }
 
     // ============================= test_only APIs ====================================

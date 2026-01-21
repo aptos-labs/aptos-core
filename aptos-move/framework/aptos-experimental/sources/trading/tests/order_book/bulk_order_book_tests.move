@@ -1062,8 +1062,9 @@ module aptos_experimental::bulk_order_book_tests {
             ask_sizes_2
         );
         let response2 = order_book.place_bulk_order(&mut price_time_index, order_request_2);
+        assert!(response2.is_success_response());
 
-        let (_order2, cancelled_bid_prices2, cancelled_bid_sizes2, cancelled_ask_prices2, cancelled_ask_sizes2, _previous_seq_num_option2) = response2.destroy_bulk_order_place_response();
+        let (_order2, cancelled_bid_prices2, cancelled_bid_sizes2, cancelled_ask_prices2, cancelled_ask_sizes2, _previous_seq_num_option2) = response2.destroy_bulk_order_place_response_success();
 
         // Validate cancelled bid levels (106 and 105 should be cancelled as they cross 105)
         assert!(cancelled_bid_prices2.length() == 2);
@@ -1371,7 +1372,6 @@ module aptos_experimental::bulk_order_book_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book::E_INVALID_SEQUENCE_NUMBER)]
     fun test_sequence_number_validation() {
         let (order_book, price_time_index) = setup_test();
 
@@ -1380,7 +1380,8 @@ module aptos_experimental::bulk_order_book_tests {
             TEST_ACCOUNT_1, 10, vector[100], vector[10], vector[200], vector[10]
         );
         let response1 = order_book.place_bulk_order(&mut price_time_index, order_req1);
-        let (_order1, _cancelled_bid_prices1, _cancelled_bid_sizes1, _cancelled_ask_prices1, _cancelled_ask_sizes1, previous_seq_num_option1) = response1.destroy_bulk_order_place_response();
+        assert!(response1.is_success_response());
+        let (_order1, _cancelled_bid_prices1, _cancelled_bid_sizes1, _cancelled_ask_prices1, _cancelled_ask_sizes1, previous_seq_num_option1) = response1.destroy_bulk_order_place_response_success();
         // First order should have previous sequence number of 1 (from setup_test order)
         assert!(previous_seq_num_option1.is_some());
         let previous_seq_num1 = previous_seq_num_option1.destroy_some();
@@ -1394,7 +1395,8 @@ module aptos_experimental::bulk_order_book_tests {
             TEST_ACCOUNT_1, 15, vector[100], vector[10], vector[200], vector[10]
         );
         let response2 = order_book.place_bulk_order(&mut price_time_index, order_req2);
-        let (_order2, _cancelled_bid_prices2, _cancelled_bid_sizes2, _cancelled_ask_prices2, _cancelled_ask_sizes2, previous_seq_num_option2) = response2.destroy_bulk_order_place_response();
+        assert!(response2.is_success_response());
+        let (_order2, _cancelled_bid_prices2, _cancelled_bid_sizes2, _cancelled_ask_prices2, _cancelled_ask_sizes2, previous_seq_num_option2) = response2.destroy_bulk_order_place_response_success();
         // Second order should have previous sequence number of 10 (from first order)
         assert!(previous_seq_num_option2.is_some());
         let previous_seq_num2 = previous_seq_num_option2.destroy_some();
@@ -1403,11 +1405,21 @@ module aptos_experimental::bulk_order_book_tests {
         let bulk_order2 = order_book.get_bulk_order(TEST_ACCOUNT_1);
         assert!(bulk_order2.get_order_request().get_sequence_number() == 15);
 
-        // Test that we cannot place an order with lower sequence number (should return rejection)
+        // Test that we get a rejection when placing an order with lower sequence number
         let order_req3 = create_test_order_request_with_sequence(
             TEST_ACCOUNT_1, 12, vector[100], vector[10], vector[200], vector[10]
         );
-        let _response3 = order_book.place_bulk_order(&mut price_time_index, order_req3);
+        let response3 = order_book.place_bulk_order(&mut price_time_index, order_req3);
+        // Should return rejection
+        assert!(response3.is_rejection_response());
+        let (rejected_account, rejected_seq_num, existing_seq_num) = response3.destroy_bulk_order_place_response_rejection();
+        assert!(rejected_account == TEST_ACCOUNT_1);
+        assert!(rejected_seq_num == 12);
+        assert!(existing_seq_num == 15);
+
+        // Verify the order wasn't updated (still has sequence number 15)
+        let bulk_order3 = order_book.get_bulk_order(TEST_ACCOUNT_1);
+        assert!(bulk_order3.get_order_request().get_sequence_number() == 15);
 
         price_time_index.destroy_price_time_idx();
         order_book.destroy_bulk_order_book();

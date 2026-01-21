@@ -110,13 +110,18 @@ module aptos_trading::bulk_order_types {
     }
 
     enum BulkOrderPlaceResponse<M: store + copy + drop> has copy, drop {
-        V1 {
+        Success_V1 {
             order: BulkOrder<M>,
             cancelled_bid_prices: vector<u64>,
             cancelled_bid_sizes: vector<u64>,
             cancelled_ask_prices: vector<u64>,
             cancelled_ask_sizes: vector<u64>,
             previous_seq_num: option::Option<u64>
+        },
+        Rejection_V1 {
+            account: address,
+            sequence_number: u64,
+            existing_sequence_number: u64
         }
     }
 
@@ -252,7 +257,7 @@ module aptos_trading::bulk_order_types {
         req
     }
 
-    public fun new_bulk_order_place_response<M: store + copy + drop>(
+    public fun new_bulk_order_place_response_success<M: store + copy + drop>(
         order: BulkOrder<M>,
         cancelled_bid_prices: vector<u64>,
         cancelled_bid_sizes: vector<u64>,
@@ -260,13 +265,25 @@ module aptos_trading::bulk_order_types {
         cancelled_ask_sizes: vector<u64>,
         previous_seq_num: option::Option<u64>
     ): BulkOrderPlaceResponse<M> {
-        BulkOrderPlaceResponse::V1 {
+        BulkOrderPlaceResponse::Success_V1 {
             order,
             cancelled_bid_prices,
             cancelled_bid_sizes,
             cancelled_ask_prices,
             cancelled_ask_sizes,
             previous_seq_num
+        }
+    }
+
+    public fun new_bulk_order_place_response_rejection<M: store + copy + drop>(
+        account: address,
+        sequence_number: u64,
+        existing_sequence_number: u64
+    ): BulkOrderPlaceResponse<M> {
+        BulkOrderPlaceResponse::Rejection_V1 {
+            account,
+            sequence_number,
+            existing_sequence_number
         }
     }
 
@@ -410,7 +427,19 @@ module aptos_trading::bulk_order_types {
         }
     }
 
-    public fun destroy_bulk_order_place_response<M: store + copy + drop>(
+    public fun is_success_response<M: store + copy + drop>(
+        self: &BulkOrderPlaceResponse<M>
+    ): bool {
+        self is BulkOrderPlaceResponse::Success_V1
+    }
+
+    public fun is_rejection_response<M: store + copy + drop>(
+        self: &BulkOrderPlaceResponse<M>
+    ): bool {
+        self is BulkOrderPlaceResponse::Rejection_V1
+    }
+
+    public fun destroy_bulk_order_place_response_success<M: store + copy + drop>(
         self: BulkOrderPlaceResponse<M>
     ): (
         BulkOrder<M>,
@@ -420,7 +449,7 @@ module aptos_trading::bulk_order_types {
         vector<u64>,
         option::Option<u64>
     ) {
-        let BulkOrderPlaceResponse::V1 {
+        let BulkOrderPlaceResponse::Success_V1 {
             order,
             cancelled_bid_prices,
             cancelled_bid_sizes,
@@ -436,6 +465,17 @@ module aptos_trading::bulk_order_types {
             cancelled_ask_sizes,
             previous_seq_num
         )
+    }
+
+    public fun destroy_bulk_order_place_response_rejection<M: store + copy + drop>(
+        self: BulkOrderPlaceResponse<M>
+    ): (address, u64, u64) {
+        let BulkOrderPlaceResponse::Rejection_V1 {
+            account,
+            sequence_number,
+            existing_sequence_number
+        } = self;
+        (account, sequence_number, existing_sequence_number)
     }
 
     /// Validates that all sizes in the vector are greater than 0.
