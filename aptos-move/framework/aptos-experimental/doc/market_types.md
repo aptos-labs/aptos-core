@@ -18,6 +18,7 @@
 -  [Enum `BulkOrderPlacedEvent`](#0x7_market_types_BulkOrderPlacedEvent)
 -  [Enum `BulkOrderModifiedEvent`](#0x7_market_types_BulkOrderModifiedEvent)
 -  [Enum `BulkOrderFilledEvent`](#0x7_market_types_BulkOrderFilledEvent)
+-  [Enum `BulkOrderRejectionEvent`](#0x7_market_types_BulkOrderRejectionEvent)
 -  [Constants](#@Constants_0)
 -  [Function `order_cancellation_reason_post_only_violation`](#0x7_market_types_order_cancellation_reason_post_only_violation)
 -  [Function `order_cancellation_reason_ioc_violation`](#0x7_market_types_order_cancellation_reason_ioc_violation)
@@ -86,11 +87,14 @@
 -  [Function `emit_event_for_bulk_order_cancelled`](#0x7_market_types_emit_event_for_bulk_order_cancelled)
 -  [Function `emit_event_for_bulk_order_filled`](#0x7_market_types_emit_event_for_bulk_order_filled)
 -  [Function `emit_event_for_bulk_order_modified`](#0x7_market_types_emit_event_for_bulk_order_modified)
+-  [Function `emit_event_for_bulk_order_rejection`](#0x7_market_types_emit_event_for_bulk_order_rejection)
 -  [Function `get_order_book_mut`](#0x7_market_types_get_order_book_mut)
 -  [Function `get_pre_cancellation_tracker_mut`](#0x7_market_types_get_pre_cancellation_tracker_mut)
 -  [Function `get_dead_mans_switch_tracker`](#0x7_market_types_get_dead_mans_switch_tracker)
 -  [Function `get_dead_mans_switch_tracker_mut`](#0x7_market_types_get_dead_mans_switch_tracker_mut)
 -  [Function `is_dead_mans_switch_enabled`](#0x7_market_types_is_dead_mans_switch_enabled)
+-  [Function `get_parent`](#0x7_market_types_get_parent)
+-  [Function `get_market`](#0x7_market_types_get_market)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/doc/event.md#0x1_event">0x1::event</a>;
@@ -1359,6 +1363,70 @@ enum <a href="market_types.md#0x7_market_types_BulkOrderFilledEvent">BulkOrderFi
 </dd>
 <dt>
 <code>fill_id: u128</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+</details>
+
+</details>
+
+<a id="0x7_market_types_BulkOrderRejectionEvent"></a>
+
+## Enum `BulkOrderRejectionEvent`
+
+
+
+<pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
+enum <a href="market_types.md#0x7_market_types_BulkOrderRejectionEvent">BulkOrderRejectionEvent</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>V1</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>parent: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>market: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>user: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>sequence_number: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>existing_sequence_number: u64</code>
 </dt>
 <dd>
 
@@ -2700,8 +2768,12 @@ enum <a href="market_types.md#0x7_market_types_BulkOrderFilledEvent">BulkOrderFi
     self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;, min_keep_alive_time_secs: u64
 ) {
     self.config.min_keep_alive_time_secs = min_keep_alive_time_secs;
+    <b>let</b> parent = self.parent;
+    <b>let</b> market = self.market;
     <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_set_min_keep_alive_time_secs">dead_mans_switch_tracker::set_min_keep_alive_time_secs</a>(
         self.<a href="market_types.md#0x7_market_types_get_dead_mans_switch_tracker_mut">get_dead_mans_switch_tracker_mut</a>(),
+        parent,
+        market,
         min_keep_alive_time_secs
     );
 }
@@ -3319,7 +3391,7 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_emit_event_for_bulk_order_modified">emit_event_for_bulk_order_modified</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>, sequence_number: u64, user: <b>address</b>, bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancellation_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="market_types.md#0x7_market_types_OrderCancellationReason">market_types::OrderCancellationReason</a>&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_emit_event_for_bulk_order_modified">emit_event_for_bulk_order_modified</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>, sequence_number: u64, user: <b>address</b>, bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancellation_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="market_types.md#0x7_market_types_OrderCancellationReason">market_types::OrderCancellationReason</a>&gt;)
 </code></pre>
 
 
@@ -3337,10 +3409,10 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
     bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
-    cancelled_bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     cancelled_bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
-    cancelled_ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    cancelled_bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     cancelled_ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    cancelled_ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     cancellation_reason: Option&lt;<a href="market_types.md#0x7_market_types_OrderCancellationReason">OrderCancellationReason</a>&gt;,
 ) {
     // Final check whether <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> sending is enabled
@@ -3362,6 +3434,46 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
                 cancelled_ask_sizes,
                 previous_seq_num: sequence_number,
                 cancellation_reason,
+            }
+        );
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_market_types_emit_event_for_bulk_order_rejection"></a>
+
+## Function `emit_event_for_bulk_order_rejection`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_emit_event_for_bulk_order_rejection">emit_event_for_bulk_order_rejection</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user: <b>address</b>, sequence_number: u64, existing_sequence_number: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_emit_event_for_bulk_order_rejection">emit_event_for_bulk_order_rejection</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;,
+    user: <b>address</b>,
+    sequence_number: u64,
+    existing_sequence_number: u64,
+) {
+    // Final check whether <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> sending is enabled
+    <b>if</b> (self.config.allow_events_emission) {
+        <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
+            BulkOrderRejectionEvent::V1 {
+                parent: self.parent,
+                market: self.market,
+                user,
+                sequence_number,
+                existing_sequence_number,
             }
         );
     };
@@ -3493,6 +3605,58 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
     self: &<a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;
 ): bool {
     self.config.enable_dead_mans_switch
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_market_types_get_parent"></a>
+
+## Function `get_parent`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_get_parent">get_parent</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_get_parent">get_parent</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;
+): <b>address</b> {
+    self.parent
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_market_types_get_market"></a>
+
+## Function `get_market`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_get_market">get_market</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_get_market">get_market</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;
+): <b>address</b> {
+    self.market
 }
 </code></pre>
 

@@ -410,7 +410,6 @@
     self.<a href="pending_order_book_index.md#0x7_pending_order_book_index_take_ready_price_move_down_orders">take_ready_price_move_down_orders</a>(current_price, &<b>mut</b> orders, order_limit);
     // Try <b>to</b> fill the rest of the space <b>if</b> available.
     self.<a href="pending_order_book_index.md#0x7_pending_order_book_index_take_ready_price_move_up_orders">take_ready_price_move_up_orders</a>(current_price, &<b>mut</b> orders, order_limit);
-    self.<a href="pending_order_book_index.md#0x7_pending_order_book_index_take_ready_price_move_down_orders">take_ready_price_move_down_orders</a>(current_price, &<b>mut</b> orders, order_limit);
     orders
 }
 </code></pre>

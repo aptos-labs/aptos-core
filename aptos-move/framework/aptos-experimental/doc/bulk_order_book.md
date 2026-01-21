@@ -865,7 +865,16 @@ The first price levels of both bid and ask sides will be activated in the active
     <b>let</b> (order_id, previous_seq_num) = <b>if</b> (order_option.is_some()) {
         <b>let</b> old_order = order_option.destroy_some();
         <b>let</b> existing_sequence_number = old_order.get_order_request().get_sequence_number();
-        <b>assert</b>!(new_sequence_number &gt; existing_sequence_number, <a href="bulk_order_book.md#0x7_bulk_order_book_E_INVALID_SEQUENCE_NUMBER">E_INVALID_SEQUENCE_NUMBER</a>);
+        // Return rejection response instead of aborting
+        <b>if</b> (new_sequence_number &lt;= existing_sequence_number) {
+            // Put the <b>old</b> order back
+            self.orders.add(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, old_order);
+            <b>return</b> new_bulk_order_place_response_rejection(
+                <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+                new_sequence_number,
+                existing_sequence_number
+            )
+        };
         <a href="bulk_order_book.md#0x7_bulk_order_book_cancel_active_orders">cancel_active_orders</a>(price_time_idx, &old_order);
         (old_order.get_order_id(), std::option::some(existing_sequence_number))
     } <b>else</b> {
@@ -883,7 +892,7 @@ The first price levels of both bid and ask sides will be activated in the active
     self.orders.add(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, bulk_order);
     // Activate the first price levels in the active order book
     <a href="bulk_order_book.md#0x7_bulk_order_book_activate_first_price_levels">activate_first_price_levels</a>(price_time_idx, &bulk_order, order_id);
-    new_bulk_order_place_response(
+    new_bulk_order_place_response_success(
         bulk_order,
         cancelled_bid_prices,
         cancelled_bid_sizes,

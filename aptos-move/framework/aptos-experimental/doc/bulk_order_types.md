@@ -88,7 +88,8 @@ ask_sizes
     -  [Arguments:](#@Arguments:_12)
     -  [Returns:](#@Returns:_13)
     -  [Aborts:](#@Aborts:_14)
--  [Function `new_bulk_order_place_response`](#0x7_bulk_order_types_new_bulk_order_place_response)
+-  [Function `new_bulk_order_place_response_success`](#0x7_bulk_order_types_new_bulk_order_place_response_success)
+-  [Function `new_bulk_order_place_response_rejection`](#0x7_bulk_order_types_new_bulk_order_place_response_rejection)
 -  [Function `get_unique_priority_idx`](#0x7_bulk_order_types_get_unique_priority_idx)
     -  [Arguments:](#@Arguments:_15)
     -  [Returns:](#@Returns:_16)
@@ -110,7 +111,10 @@ ask_sizes
     -  [Arguments:](#@Arguments:_21)
     -  [Returns:](#@Returns:_22)
 -  [Function `get_prices_and_sizes_mut`](#0x7_bulk_order_types_get_prices_and_sizes_mut)
--  [Function `destroy_bulk_order_place_response`](#0x7_bulk_order_types_destroy_bulk_order_place_response)
+-  [Function `is_success_response`](#0x7_bulk_order_types_is_success_response)
+-  [Function `is_rejection_response`](#0x7_bulk_order_types_is_rejection_response)
+-  [Function `destroy_bulk_order_place_response_success`](#0x7_bulk_order_types_destroy_bulk_order_place_response_success)
+-  [Function `destroy_bulk_order_place_response_rejection`](#0x7_bulk_order_types_destroy_bulk_order_place_response_rejection)
 -  [Function `validate_not_zero_sizes`](#0x7_bulk_order_types_validate_not_zero_sizes)
     -  [Arguments:](#@Arguments:_23)
 -  [Function `validate_price_ordering`](#0x7_bulk_order_types_validate_price_ordering)
@@ -316,7 +320,7 @@ both original and remaining sizes for tracking purposes.
 
 
 <details>
-<summary>V1</summary>
+<summary>Success_V1</summary>
 
 
 <details>
@@ -356,6 +360,40 @@ both original and remaining sizes for tracking purposes.
 </dd>
 <dt>
 <code>previous_seq_num: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+</details>
+
+<details>
+<summary>Rejection_V1</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>sequence_number: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>existing_sequence_number: u64</code>
 </dt>
 <dd>
 
@@ -718,13 +756,13 @@ A <code><a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrderRequest">Bulk
 
 </details>
 
-<a id="0x7_bulk_order_types_new_bulk_order_place_response"></a>
+<a id="0x7_bulk_order_types_new_bulk_order_place_response_success"></a>
 
-## Function `new_bulk_order_place_response`
+## Function `new_bulk_order_place_response_success`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_types_new_bulk_order_place_response">new_bulk_order_place_response</a>&lt;M: <b>copy</b>, drop, store&gt;(order: <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;, cancelled_bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, previous_seq_num: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;): <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrderPlaceResponse">bulk_order_types::BulkOrderPlaceResponse</a>&lt;M&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_types_new_bulk_order_place_response_success">new_bulk_order_place_response_success</a>&lt;M: <b>copy</b>, drop, store&gt;(order: <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;, cancelled_bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, previous_seq_num: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;): <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrderPlaceResponse">bulk_order_types::BulkOrderPlaceResponse</a>&lt;M&gt;
 </code></pre>
 
 
@@ -733,7 +771,7 @@ A <code><a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrderRequest">Bulk
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_types_new_bulk_order_place_response">new_bulk_order_place_response</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_types_new_bulk_order_place_response_success">new_bulk_order_place_response_success</a>&lt;M: store + <b>copy</b> + drop&gt;(
     order: <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
     cancelled_bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     cancelled_bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
@@ -741,13 +779,45 @@ A <code><a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrderRequest">Bulk
     cancelled_ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     previous_seq_num: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
 ): <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M&gt; {
-    BulkOrderPlaceResponse::V1 {
+    BulkOrderPlaceResponse::Success_V1 {
         order,
         cancelled_bid_prices,
         cancelled_bid_sizes,
         cancelled_ask_prices,
         cancelled_ask_sizes,
         previous_seq_num
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_bulk_order_types_new_bulk_order_place_response_rejection"></a>
+
+## Function `new_bulk_order_place_response_rejection`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_types_new_bulk_order_place_response_rejection">new_bulk_order_place_response_rejection</a>&lt;M: <b>copy</b>, drop, store&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, sequence_number: u64, existing_sequence_number: u64): <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrderPlaceResponse">bulk_order_types::BulkOrderPlaceResponse</a>&lt;M&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_types_new_bulk_order_place_response_rejection">new_bulk_order_place_response_rejection</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
+    sequence_number: u64,
+    existing_sequence_number: u64
+): <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M&gt; {
+    BulkOrderPlaceResponse::Rejection_V1 {
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        sequence_number,
+        existing_sequence_number
     }
 }
 </code></pre>
@@ -1188,13 +1258,13 @@ An option containing the active size if available, none otherwise.
 
 </details>
 
-<a id="0x7_bulk_order_types_destroy_bulk_order_place_response"></a>
+<a id="0x7_bulk_order_types_is_success_response"></a>
 
-## Function `destroy_bulk_order_place_response`
+## Function `is_success_response`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_types_destroy_bulk_order_place_response">destroy_bulk_order_place_response</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrderPlaceResponse">bulk_order_types::BulkOrderPlaceResponse</a>&lt;M&gt;): (<a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_types_is_success_response">is_success_response</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrderPlaceResponse">bulk_order_types::BulkOrderPlaceResponse</a>&lt;M&gt;): bool
 </code></pre>
 
 
@@ -1203,7 +1273,59 @@ An option containing the active size if available, none otherwise.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_types_destroy_bulk_order_place_response">destroy_bulk_order_place_response</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_types_is_success_response">is_success_response</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M&gt;
+): bool {
+    self is BulkOrderPlaceResponse::Success_V1
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_bulk_order_types_is_rejection_response"></a>
+
+## Function `is_rejection_response`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_types_is_rejection_response">is_rejection_response</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrderPlaceResponse">bulk_order_types::BulkOrderPlaceResponse</a>&lt;M&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_types_is_rejection_response">is_rejection_response</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M&gt;
+): bool {
+    self is BulkOrderPlaceResponse::Rejection_V1
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_bulk_order_types_destroy_bulk_order_place_response_success"></a>
+
+## Function `destroy_bulk_order_place_response_success`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_types_destroy_bulk_order_place_response_success">destroy_bulk_order_place_response_success</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrderPlaceResponse">bulk_order_types::BulkOrderPlaceResponse</a>&lt;M&gt;): (<a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_types_destroy_bulk_order_place_response_success">destroy_bulk_order_place_response_success</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M&gt;
 ): (
     <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
@@ -1213,7 +1335,7 @@ An option containing the active size if available, none otherwise.
     <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
 ) {
-    <b>let</b> BulkOrderPlaceResponse::V1 {
+    <b>let</b> BulkOrderPlaceResponse::Success_V1 {
         order,
         cancelled_bid_prices,
         cancelled_bid_sizes,
@@ -1229,6 +1351,37 @@ An option containing the active size if available, none otherwise.
         cancelled_ask_sizes,
         previous_seq_num
     )
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_bulk_order_types_destroy_bulk_order_place_response_rejection"></a>
+
+## Function `destroy_bulk_order_place_response_rejection`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_types_destroy_bulk_order_place_response_rejection">destroy_bulk_order_place_response_rejection</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrderPlaceResponse">bulk_order_types::BulkOrderPlaceResponse</a>&lt;M&gt;): (<b>address</b>, u64, u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_types_destroy_bulk_order_place_response_rejection">destroy_bulk_order_place_response_rejection</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M&gt;
+): (<b>address</b>, u64, u64) {
+    <b>let</b> BulkOrderPlaceResponse::Rejection_V1 {
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        sequence_number,
+        existing_sequence_number
+    } = self;
+    (<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, sequence_number, existing_sequence_number)
 }
 </code></pre>
 
