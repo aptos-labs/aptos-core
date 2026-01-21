@@ -34,34 +34,38 @@ fn native_compute_position_contribution_internal(
     _ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    debug_assert_eq!(args.len(), 12);
+    debug_assert_eq!(args.len(), 14);
     context.charge(FAST_NATIVE_COMPUTATIONS_COMPUTE_POSITION_CONTRIBUTION_BASE)?;
 
     // Pop arguments in reverse order (last argument first)
-    let for_free_collateral = safely_pop_arg!(args, bool);
-    let margin_leverage = safely_pop_arg!(args, u8);
+    let market_max_leverage = safely_pop_arg!(args, u8);
+    let withdrawable_margin_leverage = safely_pop_arg!(args, u8);
     let haircut_bps = safely_pop_arg!(args, u64);
     let rate_size_multiplier = safely_pop_arg!(args, u64);
     let size_multiplier = safely_pop_arg!(args, u64);
     let current_funding_index = safely_pop_arg!(args, i128);
     let mark_px = safely_pop_arg!(args, u64);
+    let position_user_leverage = safely_pop_arg!(args, u8);
     let unrealized_funding_before_last_update = safely_pop_arg!(args, i64);
     let position_funding_index = safely_pop_arg!(args, i128);
     let position_entry_px_times_size_sum = safely_pop_arg!(args, u128);
+    let position_is_isolated = safely_pop_arg!(args, bool);
     let position_is_long = safely_pop_arg!(args, bool);
     let position_size = safely_pop_arg!(args, u64);
 
-    // If position size is 0, return zeros
-    if position_size == 0 {
+    // If position is isolated or size is 0, return zeros
+    if position_is_isolated || position_size == 0 {
         return Ok(smallvec![
-            Value::i64(0),  // pnl
-            Value::u64(0),  // margin
+            Value::i64(0),  // positions_pnl
+            Value::i64(0),  // pnl_haircutted
+            Value::u64(0),  // margin_for_max_leverage
+            Value::u64(0),  // margin_for_free_collateral
             Value::u64(0)   // notional
         ]);
     }
 
     // Compute PnL with funding
-    let positons_pnl = compute_pnl_with_funding(
+    let positions_pnl = compute_pnl_with_funding(
         position_size,
         position_is_long,
         position_entry_px_times_size_sum,
@@ -73,23 +77,34 @@ fn native_compute_position_contribution_internal(
         rate_size_multiplier,
     );
 
-    // Apply haircut if for_free_collateral is true
-    let pnl = if for_free_collateral {
-        apply_pnl_haircut(positons_pnl, haircut_bps)
-    } else {
-        positons_pnl
-    };
+    // Apply haircut to get haircutted PnL
+    let pnl_haircutted = apply_upnl_haircut(positions_pnl, haircut_bps);
 
-    // Calculate margin required
-    let margin = margin_required_formula(position_size, mark_px, size_multiplier, margin_leverage);
+    // Calculate free_collateral_max_leverage = min(user_leverage, withdrawable_margin_leverage)
+    let free_collateral_max_leverage =
+        std::cmp::min(position_user_leverage, withdrawable_margin_leverage);
+
+    // Calculate margin required for max leverage
+    let margin_for_max_leverage =
+        margin_required_formula(position_size, mark_px, size_multiplier, market_max_leverage);
+
+    // Calculate margin required for free collateral
+    let margin_for_free_collateral = margin_required_formula(
+        position_size,
+        mark_px,
+        size_multiplier,
+        free_collateral_max_leverage,
+    );
 
     // Calculate notional value: (position_size * mark_px) / size_multiplier
     let notional = mul_div(position_size, mark_px, size_multiplier);
 
     // Return the results as a tuple
     Ok(smallvec![
-        Value::i64(pnl),
-        Value::u64(margin),
+        Value::i64(positions_pnl),
+        Value::i64(pnl_haircutted),
+        Value::u64(margin_for_max_leverage),
+        Value::u64(margin_for_free_collateral),
         Value::u64(notional)
     ])
 }
@@ -138,11 +153,13 @@ fn compute_pnl_with_funding(
     pnl - total_funding_cost
 }
 
-fn apply_pnl_haircut(pnl: i64, haircut_bps: u64) -> i64 {
+/// Apply unrealized PnL haircut.
+/// Returns pnl * haircut_bps / 10000 if pnl > 0, otherwise 0.
+fn apply_upnl_haircut(pnl: i64, haircut_bps: u64) -> i64 {
     if pnl > 0 {
-        pnl * ((10000 - haircut_bps) as i64) / 10000
+        ((pnl as i128) * (haircut_bps as i128) / 10000) as i64
     } else {
-        pnl
+        0
     }
 }
 
@@ -263,13 +280,16 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_pnl_haircut() {
-        // Positive PnL with 10% haircut
-        assert_eq!(apply_pnl_haircut(10000, 1000), 9000);
-        // Negative PnL - no haircut applied
-        assert_eq!(apply_pnl_haircut(-10000, 1000), -10000);
-        // Zero PnL
-        assert_eq!(apply_pnl_haircut(0, 1000), 0);
+    fn test_apply_upnl_haircut() {
+        // Positive PnL with 90% haircut (9000 bps = 90% kept)
+        // Returns pnl * haircut_bps / 10000 = 10000 * 9000 / 10000 = 9000
+        assert_eq!(apply_upnl_haircut(10000, 9000), 9000);
+        // Positive PnL with 10% haircut (1000 bps = 10% kept)
+        assert_eq!(apply_upnl_haircut(10000, 1000), 1000);
+        // Negative PnL - returns 0
+        assert_eq!(apply_upnl_haircut(-10000, 9000), 0);
+        // Zero PnL - returns 0
+        assert_eq!(apply_upnl_haircut(0, 9000), 0);
     }
 
     #[test]
