@@ -14,6 +14,14 @@ use ark_serialize::{
 };
 use ark_std::io::Write;
 use std::fmt::Debug;
+use crate::sigma_protocol::{
+    traits::{fiat_shamir_challenge_for_sigma_protocol, prove_homomorphism, FirstProofItem},
+    Proof,
+};
+use anyhow::ensure;
+use aptos_crypto::utils;
+use ark_ff::{UniformRand, Zero};
+use serde::Serialize;
 
 /// `TupleHomomorphism` combines two homomorphisms with the same domain
 /// into a single homomorphism that outputs a tuple of codomains.
@@ -236,15 +244,6 @@ where
         dst
     }
 }
-
-use crate::sigma_protocol::{
-    traits::{fiat_shamir_challenge_for_sigma_protocol, prove_homomorphism, FirstProofItem},
-    Proof,
-};
-use anyhow::ensure;
-use aptos_crypto::utils;
-use ark_ff::{UniformRand, Zero};
-use serde::Serialize;
 
 /// Slightly hacky implementation of a sigma protocol for `PairingTupleHomomorphism`
 ///

@@ -49,16 +49,25 @@ pub struct DealingArgs<T: Transcript> {
 /// Useful in tests and benchmarks when wanting to quickly deal & verify a transcript.
 pub fn setup_dealing<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng>(
     sc: &T::SecretSharingConfig,
+    ell: Option<u8>,
     mut rng: &mut R,
 ) -> DealingArgs<T> {
     println!(
-        "Setting up dealing for {} PVSS, with {} (and some elliptic curve)",
+        "Setting up dealing for {} PVSS, with {} and bit-size {:?} (and some elliptic curve)",
         T::scheme_name(),
-        sc
+        sc,
+        ell
     );
 
-    let pp =
-        T::PublicParameters::with_max_num_shares(sc.get_total_num_shares().try_into().unwrap());
+    let pp = match ell {
+        None => T::PublicParameters::with_max_num_shares(
+            sc.get_total_num_shares().try_into().unwrap(),
+        ),
+        Some(bit_size) => T::PublicParameters::with_max_num_shares_and_bit_size(
+            sc.get_total_num_shares().try_into().unwrap(),
+            bit_size,
+        ),
+    };
 
     let (ssks, spks, dks, eks, iss, s, dsk, dpk) =
         generate_keys_and_secrets::<T, R>(sc, &pp, &mut rng);

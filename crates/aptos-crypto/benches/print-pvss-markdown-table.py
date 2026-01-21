@@ -4,6 +4,7 @@ from collections import defaultdict
 
 HEADER = [
     "Scheme",
+    "Ell",  # <-- need capital E here to be consistent with code later
     "Setup",
     "Deal (ms)",
     "Serialize (ms)",
@@ -73,6 +74,16 @@ def decorate_v2(value_ms, ratio):
 
     return display, render
 
+def parse_ell(group):
+    """
+    Extract ell from Group.
+    Examples:
+      pvss_chunky_v1_bls12-381_16  -> 16
+      pvss/chunky_v1/bls12-381/16  -> 16
+      pvss_chunky_v1_bls12-381     -> None
+    """
+    m = re.search(r"(?:/|_)(\d+)$", group)
+    return m.group(1) if m else None
 
 def parse_group(group):
     """Parse the Group column to determine if it's v1 or v2."""
@@ -113,9 +124,9 @@ def parse_setup(ident, parameter):
 
 def accumulate(rows):
     """
-    Build nested dict: setup -> version -> operation -> time_ns
+    Build nested dict: (setup, ell) -> version -> operation -> time_ns
     """
-    data = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+    data = defaultdict(lambda: dict())  # top level defaultdict
 
     for r in rows:
         group = r.get("Group", "")
@@ -138,13 +149,18 @@ def accumulate(rows):
         if operation is None:
             continue
 
+        ell = parse_ell(group)
         setup = parse_setup(ident, param)
-        data[setup][version][operation] = mean_ns
+
+        if (setup, ell) not in data:
+            data[(setup, ell)] = {"v1": {}, "v2": {}}
+
+        data[(setup, ell)][version][operation] = mean_ns
 
     return data
 
 
-def make_rows_for_setup(setup, v1_data, v2_data):
+def make_rows_for_setup(setup, ell, v1_data, v2_data):
     """
     Create rows comparing v1 and v2 for a single setup.
     """
@@ -161,6 +177,7 @@ def make_rows_for_setup(setup, v1_data, v2_data):
     if v1_complete:
         v1_row = {
             "Scheme": V1_NAME,
+            "Ell": ell or "—",
             "Setup": setup,
         }
         for op in OPERATIONS:
@@ -170,9 +187,9 @@ def make_rows_for_setup(setup, v1_data, v2_data):
         rows.append(v1_row)
 
     # Build row for v2
-    if v2_complete:
         v2_row = {
             "Scheme": V2_NAME,
+            "Ell": ell or "—",
             "Setup": setup,
         }
         for op in OPERATIONS:
@@ -199,6 +216,7 @@ def padded_table(rows):
     cols = HEADER
     display_map = {
         "Scheme": "Scheme",
+        "Ell": "Ell",
         "Setup": "Setup",
         "Deal (ms)": "deal_display",
         "Serialize (ms)": "serialize_display",
@@ -208,6 +226,7 @@ def padded_table(rows):
     }
     render_map = {
         "Scheme": "Scheme",
+        "Ell": "Ell",
         "Setup": "Setup",
         "Deal (ms)": "deal_render",
         "Serialize (ms)": "serialize_render",
@@ -266,13 +285,13 @@ def main():
         sys.exit(1)
 
     # Generate a separate table for each setup
-    setups = sorted(data.keys())
+    keys = sorted(data.keys(), key=lambda x: (x[0], x[1] or ""))
     tables = []
     
-    for setup in setups:
-        v1_data = data[setup].get("v1", {})
-        v2_data = data[setup].get("v2", {})
-        tbl_rows = make_rows_for_setup(setup, v1_data, v2_data)
+    for setup, ell in keys:
+        v1_data = data[(setup, ell)].get("v1", {})
+        v2_data = data[(setup, ell)].get("v2", {})
+        tbl_rows = make_rows_for_setup(setup, ell, v1_data, v2_data)
         
         if tbl_rows:
             tables.append(padded_table(tbl_rows))

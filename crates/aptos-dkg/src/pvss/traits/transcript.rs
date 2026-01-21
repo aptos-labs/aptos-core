@@ -335,6 +335,8 @@ pub trait MalleableTranscript: Transcript {
 pub trait WithMaxNumShares {
     fn with_max_num_shares(n: u32) -> Self;
 
+    fn with_max_num_shares_and_bit_size(n: u32, ell: u8) -> Self;
+
     /// This is a modified function which might create public parameters that are fairly nonsensical, but which are sufficient for `generate()`
     fn with_max_num_shares_for_generate(n: u32) -> Self;
 }

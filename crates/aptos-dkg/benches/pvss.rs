@@ -19,7 +19,6 @@ use aptos_dkg::pvss::{
     WeightedConfigBlstrs,
 };
 use ark_bls12_381::Bls12_381;
-use ark_bn254::Bn254;
 use criterion::{
     black_box, criterion_group, criterion_main,
     measurement::{Measurement, WallTime},
@@ -28,25 +27,27 @@ use criterion::{
 use more_asserts::assert_le;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
 
-const BN254: &str = "bn254";
+// const BN254: &str = "bn254";
 const BLS12_381: &str = "bls12-381";
 
 pub fn all_groups(c: &mut Criterion) {
     println!("Rayon num threads: {}", rayon::current_num_threads());
 
     // weighted PVSS with aggregatable subtranscript; only doing one at the moment because large configs are a bit slow and not relevant anyway
+    // Chunky_v1
     for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
-        subaggregatable_pvss_group::<Chunky_v1<Bn254>>(&tc, c, BN254);
+        subaggregatable_pvss_group::<Chunky_v1<Bls12_381>>(&tc, c, Some(16u8), BLS12_381);
     }
     for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
-        subaggregatable_pvss_group::<Chunky_v1<Bls12_381>>(&tc, c, BLS12_381);
+        subaggregatable_pvss_group::<Chunky_v1<Bls12_381>>(&tc, c, Some(32u8),BLS12_381);
     }
 
+    // Chunky_v2
     for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
-        subaggregatable_pvss_group::<Chunky_v2<Bn254>>(&tc, c, BN254);
+        subaggregatable_pvss_group::<Chunky_v2<Bls12_381>>(&tc, c, Some(16u8), BLS12_381);
     }
     for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
-        subaggregatable_pvss_group::<Chunky_v2<Bls12_381>>(&tc, c, BLS12_381);
+        subaggregatable_pvss_group::<Chunky_v2<Bls12_381>>(&tc, c, Some(32u8), BLS12_381);
     }
 
     // unweighted aggregatable PVSS, `blstrs` only so this is BLS12-381
@@ -74,7 +75,7 @@ pub fn aggregatable_pvss_group<T: AggregatableTranscript + MalleableTranscript>(
     let mut rng = thread_rng();
 
     // TODO: use a lazy pattern to avoid this expensive step when no benchmarks are run
-    let d = test_utils::setup_dealing::<T, ThreadRng>(sc, &mut rng);
+    let d = test_utils::setup_dealing::<T, ThreadRng>(sc, None, &mut rng);
 
     // pvss_transcript_random::<T, WallTime>(sc, &mut group);
     pvss_deal::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
@@ -93,6 +94,7 @@ pub fn aggregatable_pvss_group<T: AggregatableTranscript + MalleableTranscript>(
 pub fn subaggregatable_pvss_group<T>(
     sc: &T::SecretSharingConfig,
     c: &mut Criterion,
+    ell: Option<u8>,
     curve_name: &str,
 ) -> DealingArgs<T>
 where
@@ -104,11 +106,15 @@ where
         >,
 {
     let name = T::scheme_name();
-    let mut group = c.benchmark_group(format!("pvss/{}/{}", name, curve_name));
+    let group_name = match ell {
+        Some(ell) => format!("pvss/{}/{}/{}", name, curve_name, ell),
+        None => format!("pvss/{}/{}", name, curve_name),
+    };
+    let mut group = c.benchmark_group(group_name);
     let mut rng = thread_rng();
 
     // TODO: use a lazy pattern to avoid this expensive step when no benchmarks are run
-    let d = test_utils::setup_dealing::<T, ThreadRng>(sc, &mut rng);
+    let d = test_utils::setup_dealing::<T, ThreadRng>(sc, ell, &mut rng);
 
     // pvss_transcript_random::<T, WallTime>(sc, &mut group);
     pvss_deal::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);

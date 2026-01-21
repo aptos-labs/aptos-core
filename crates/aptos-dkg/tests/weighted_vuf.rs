@@ -58,7 +58,7 @@ where
 {
     let wc = WeightedConfigBlstrs::new(10, vec![3, 5, 3, 4, 2, 1, 1, 7]).unwrap();
 
-    let d = test_utils::setup_dealing::<T, StdRng>(&wc, rng);
+    let d = test_utils::setup_dealing::<T, StdRng>(&wc, None, rng);
 
     let trx = T::deal(
         &wc,

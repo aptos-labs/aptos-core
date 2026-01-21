@@ -12,6 +12,7 @@ use ark_ec::{
     pairing::{Pairing, PairingOutput},
     CurveGroup, PrimeGroup, VariableBaseMSM,
 };
+use aptos_crypto::arkworks::powers_of_two;
 use ark_ff::{AdditiveGroup, Field};
 use ark_poly::{self, EvaluationDomain, Radix2EvaluationDomain};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError};
@@ -65,7 +66,7 @@ pub struct Commitment<E: Pairing>(E::G1);
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProverKey<E: Pairing> {
     max_n: usize,
-    max_ell: usize,
+    max_ell: u8,
     taus: PowersOfTau<E>,      // g_1, g_1^{tau}, g_1^{tau^2}, ..., g_1^{tau^n},
     lagr_g1: Vec<E::G1Affine>, // of size n + 1
     lagr_g2: Vec<E::G2Affine>, // of size n + 1
@@ -78,13 +79,13 @@ pub struct ProverKey<E: Pairing> {
 #[derive(CanonicalSerialize)]
 pub struct PublicStatement<E: Pairing> {
     n: usize,
-    ell: usize,
+    ell: u8,
     comm: Commitment<E>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VerificationKey<E: Pairing> {
-    max_ell: usize,
+    max_ell: u8,
     tau_1: E::G1,
     tau_2: E::G2,
     vanishing_com: E::G2, // commitment to deg-n vanishing polynomial (X^{n+1} - 1) / (X - 1) used to test h(X)
@@ -134,7 +135,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     // The main bottlenecks are `powers_of_tau` and the IFFT steps.
     fn setup<R: RngCore + CryptoRng>(
         max_n: usize,
-        max_ell: usize,
+        max_ell: u8,
         group_generators: GroupGenerators<E>,
         rng: &mut R,
     ) -> (ProverKey<E>, VerificationKey<E>) {
@@ -172,10 +173,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         // Notice that $\prod_{i > 0} (1 - \omega^i)$ is the evaluation of (X^{n+1} - 1) / (X - 1) = 1 + X + ... + X^n at X = 1, which is just n + 1.
         let vanishing_com = { lagr_g2_proj[0] * E::ScalarField::from((max_n + 1) as u64) };
 
-        let powers_of_two: Vec<E::ScalarField> =
-            std::iter::successors(Some(E::ScalarField::ONE), |x| Some(x.double()))
-                .take(max_ell)
-                .collect();
+        let powers_of_two = powers_of_two(max_ell as usize);
 
         let vk = VerificationKey {
             max_ell,
@@ -218,7 +216,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     fn prove<R>(
         pk: &ProverKey<E>,
         values: &[Self::Input],
-        ell: usize,
+        ell: u8,
         comm: &Self::Commitment,
         r: &Self::CommitmentRandomness,
         rng: &mut R,
@@ -268,7 +266,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             .map(|z_val| {
                 utils::scalar_to_bits_le::<E>(z_val)
                     .into_iter()
-                    .take(ell)
+                    .take(ell as usize)
                     .collect::<Vec<_>>()
             })
             .collect();
@@ -285,7 +283,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         }
 
         assert_eq!(pk.max_n, bits.len());
-        assert_eq!(ell, bits[0].len());
+        assert_eq!(ell as usize, bits[0].len());
 
         // Step 2: Sample correlated randomness r_j for each f_j polynomial commitment.
         #[cfg(feature = "range_proof_timing")]
@@ -304,7 +302,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             print_cumulative(duration);
         }
 
-        assert_eq!(ell, r.len());
+        assert_eq!(ell as usize, r.len());
 
         // Step 3: Compute f_j(X) = \sum_{i=0}^{n-1} z_i[j] \ell_i(X) + r[j] \ell_n(X),
         // where \ell_i(X) is the ith Lagrange polynomial for the (n+1)th roots-of-unity evaluation domain.
@@ -312,7 +310,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let start = Instant::now();
         // f_evals[j] = the evaluations of f_j(x) at all the (n+1)-th roots of unity.
         //            = (r[j], z_0[j], ..., z_{n-1}[j]), where z_i[j] is the j-th bit of z_i.
-        let f_evals_without_r: Vec<Vec<bool>> = (0..ell)
+        let f_evals_without_r: Vec<Vec<bool>> = (0..ell as usize)
             .map(|j| bits.iter().map(|row| row[j]).collect())
             .collect(); // This is just transposing the bits matrix
                         // Assert f_evals is either 0 or 1s or r_j
@@ -335,7 +333,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         #[cfg(feature = "range_proof_timing")]
         let start = Instant::now();
         // c[j] = c_j = g_1^{f_j(\tau)}
-        let c: Vec<E::G1> = (0..ell)
+        let c: Vec<E::G1> = (0..ell as usize)
             // Note on blstrs: Using a multiexp will be 10-20% slower than manually multiplying.
             // .map(|j|
             //     g1_multi_exp(&pp.lagrange_basis, &f_evals[j]))
@@ -374,7 +372,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         // Step 5: Compute c_hat[j] = \hat{c}_j = g_2^{f_j(\tau)}
         #[cfg(feature = "range_proof_timing")]
         let start = Instant::now();
-        let c_hat: Vec<E::G2> = (0..ell)
+        let c_hat: Vec<E::G2> = (0..ell as usize)
             // Note: Using a multiexp will be 10-20% slower than manually multiplying.
             // .map(|j| g2_multi_exp(&pp.lagrange_basis_g2, &f_evals[j]))
             .map(|j| {
@@ -428,7 +426,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             })
             .collect();
 
-        let h: Vec<Vec<E::ScalarField>> = (0..ell)
+        let h: Vec<Vec<E::ScalarField>> = (0..ell as usize)
             .map(|j| {
                 // Interpolate f_j coeffs
                 let mut f_j = f_evals[j].clone();
@@ -506,7 +504,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             c.as_slice().len(),
             &mut fs_transcript,
         );
-        assert_eq!(ell, betas.len());
+        assert_eq!(ell as usize, betas.len());
         #[cfg(feature = "range_proof_timing")]
         {
             let duration = start.elapsed();
@@ -565,7 +563,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         &self,
         vk: &Self::VerificationKey,
         n: usize,
-        ell: usize,
+        ell: u8,
         comm: &Self::Commitment,
     ) -> anyhow::Result<()> {
         let mut fs_t = merlin::Transcript::new(Self::DST);
@@ -578,7 +576,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         );
 
         let commitment_recomputed: E::G1 =
-            VariableBaseMSM::msm(&self.c, &vk.powers_of_two[..ell]).expect("Failed to compute msm");
+            VariableBaseMSM::msm(&self.c, &vk.powers_of_two[..ell as usize]).expect("Failed to compute msm");
         ensure!(comm.0 == commitment_recomputed);
 
         let public_statement = PublicStatement {
@@ -597,11 +595,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         // Verify h(\tau)
         let h_check = E::multi_pairing(
-            (0..ell)
+            (0..ell as usize)
                 .map(|j| self.c[j] * betas[j]) // E::G1
                 .chain(once(-self.d)) // add -d
                 .collect::<Vec<_>>(), // collect into Vec<E::G1>
-            (0..ell)
+            (0..ell as usize)
                 .map(|j| self.c_hat[j] - vk.tau_2) // E::G2
                 .chain(once(vk.vanishing_com)) // add vanishing commitment
                 .collect::<Vec<_>>(), // collect into Vec<E::G2>

@@ -54,10 +54,11 @@ pub struct PublicParameters<E: Pairing> {
 
     pub ell: u8,
 
+    // Meaning here it seems, the max number of times `n` that transcripts can be aggregated (which means the number of contained transcripts can be `n + 1`)
     pub max_aggregation: usize,
 
     #[serde(skip)]
-    pub table: HashMap<Vec<u8>, u32>,
+    pub table: HashMap<Vec<u8>, u64>,
 
     #[serde(skip)]
     pub powers_of_radix: Vec<E::ScalarField>,
@@ -106,12 +107,12 @@ impl<E: Pairing> PublicParameters<E> {
         G: E::G1,
         ell: u8,
         max_aggregation: usize,
-    ) -> HashMap<Vec<u8>, u32> {
-        dlog::table::build::<E::G1>(G, 1u32 << ((ell as u32 + log2(max_aggregation)) / 2))
+    ) -> HashMap<Vec<u8>, u64> {
+        dlog::table::build::<E::G1>(G, 1u64 << ((ell as u64 + log2(max_aggregation) as u64) / 2))
     }
 
-    pub(crate) fn get_dlog_range_bound(&self) -> u32 {
-        1u32 << (self.ell as u32 + log2(self.max_aggregation))
+    pub(crate) fn get_dlog_range_bound(&self) -> u64 {
+        1u64 << (self.ell as u64 + log2(self.max_aggregation) as u64)
     }
 }
 
@@ -173,7 +174,7 @@ impl<E: Pairing> PublicParameters<E> {
             pp_elgamal,
             pk_range_proof: dekart_univariate_v2::Proof::setup(
                 max_num_chunks_padded.try_into().unwrap(),
-                ell as usize,
+                ell,
                 group_generators,
                 rng,
             )
@@ -224,6 +225,11 @@ impl<E: Pairing> WithMaxNumShares for PublicParameters<E> {
     fn with_max_num_shares(n: u32) -> Self {
         let mut rng = thread_rng();
         Self::new(n, DEFAULT_ELL_FOR_TESTING, 1, &mut rng)
+    }
+
+    fn with_max_num_shares_and_bit_size(n: u32, ell: u8) -> Self {
+        let mut rng = thread_rng();
+        Self::new(n, ell, 1, &mut rng)
     }
 
     // The only thing from `pp` that `generate()` uses is `pp.ell`, so make the rest as small as possible.

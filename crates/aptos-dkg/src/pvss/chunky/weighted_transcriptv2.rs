@@ -532,7 +532,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             if let Err(err) = self.sharing_proof.range_proof.verify(
                 &pp.pk_range_proof.vk,
                 sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize,
-                pp.ell as usize,
+                pp.ell,
                 &self.sharing_proof.range_proof_commitment,
             ) {
                 bail!("Range proof batch verification failed: {:?}", err);
@@ -1030,7 +1030,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         let range_proof = dekart_univariate_v2::Proof::prove(
             &pp.pk_range_proof,
             &f_evals_chunked_flat,
-            pp.ell as usize,
+            pp.ell,
             &range_proof_commitment,
             &hkzg_randomness,
             rng,
