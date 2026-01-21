@@ -1,5 +1,5 @@
 <a href="https://aptos.dev">
-	<img width="100%" src="./.assets/aptos_banner.png" alt="Movement Banner" />
+	<img width="100%" src="./.assets/aptos_banner.png" alt="Aptos Banner" />
 </a>
 
 ---
@@ -14,7 +14,6 @@ Movement is a layer 1 blockchain bringing a paradigm shift to Web3 through bette
 * [Move Industries](https://www.moveindustries.xyz/)
 * [Movement Explorer](https://explorer.movementnetwork.xyz/?network=mainnet)
 * [Movement Documentation](https://docs.movementnetwork.xyz/general)
-* [Movement Developer Network](https://aptos.dev)
 * [Guide (Aptos)](https://aptos.dev/guides/system-integrators-guide)
 * [Tutorials (Aptos)](https://aptos.dev/tutorials)
 * Follow us on [Twitter](https://x.com/MoveIndFDN).
