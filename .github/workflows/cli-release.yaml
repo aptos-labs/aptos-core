@@ -148,12 +148,32 @@ jobs:
           name: cli-builds-windows
           path: aptos-cli-*.zip
 
+  build-windows-arm-binary:
+    name: "Build Windows ARM binary"
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.source_git_ref_override }}
+      # Ensure that long paths work
+      - name: Ensure long paths work
+        run: git config --global core.longpaths true
+        shell: bash
+      - name: Build CLI
+        run: scripts\cli\build_cli_release.ps1
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-builds-windows-arm
+          path: aptos-cli-*.zip
+
   release-binaries:
     name: "Release binaries"
     needs:
       - build-ubuntu22-binary
       - build-ubuntu24-binary
       - build-windows-binary
+      - build-windows-arm-binary
       - build-linux-binary
       - build-linux-arm-binary
       - build-macos-arm-binary
