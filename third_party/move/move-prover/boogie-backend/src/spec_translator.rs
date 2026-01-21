@@ -13,7 +13,7 @@ use crate::{
         boogie_resource_memory_name, boogie_spec_fun_name, boogie_spec_var_name,
         boogie_struct_name, boogie_struct_variant_name, boogie_type, boogie_type_suffix,
         boogie_type_suffix_bv, boogie_value_blob, boogie_well_formed_expr,
-        boogie_well_formed_expr_bv,
+        boogie_well_formed_expr_bv, MAX_TUPLE_SIZE,
     },
     options::BoogieOptions,
 };
@@ -364,9 +364,18 @@ impl SpecTranslator<'_> {
             // so we don't need to translate it.
             return;
         }
-        if let Type::Tuple(..) = fun.result_type {
-            self.error(&fun.loc, "tuple result type not yet supported");
-            return;
+        if let Type::Tuple(elems) = &fun.result_type {
+            if elems.len() > MAX_TUPLE_SIZE {
+                self.error(
+                    &fun.loc,
+                    &format!(
+                        "tuple has {} elements, maximum supported is {}",
+                        elems.len(),
+                        MAX_TUPLE_SIZE
+                    ),
+                );
+                return;
+            }
         }
         if let Type::Fun(..) = fun.result_type {
             self.error(&fun.loc, "function result type not yet supported"); // TODO(LAMBDA)
@@ -822,7 +831,7 @@ impl SpecTranslator<'_> {
             },
             ExpData::Lambda(node_id, ..) => self.error(
                 &self.env.get_node_loc(*node_id),
-                "`|x|e` (lambda) currently only supported as argument for `all` or `any`",
+                "lambda not supported in spec expressions",
             ),
             ExpData::Quant(node_id, kind, ranges, _, _, exp) if kind.is_choice() => {
                 // The parser ensures that len(ranges) = 1 and triggers and condition are
@@ -931,37 +940,99 @@ impl SpecTranslator<'_> {
     fn translate_block(&self, pat: &Pattern, binding: &Option<Exp>, scope: &Exp) {
         let binding = binding.as_ref().expect("valid specification binding");
         let pats = pat.clone().flatten();
-        let bindings = if let ExpData::Call(_, Operation::Tuple, args) = binding.as_ref() {
-            args.clone()
+
+        // Check if binding is an explicit tuple expression
+        if let ExpData::Call(_, Operation::Tuple, args) = binding.as_ref() {
+            // Direct tuple expression - bind each element directly
+            assert_eq!(pats.len(), args.len(), "valid specification binding");
+            let mut vars = vec![];
+            for pat in pats {
+                if let Pattern::Var(_, sym) = pat {
+                    vars.push(sym.display(self.env.symbol_pool()).to_string())
+                } else {
+                    self.error(
+                        &self.env.get_node_loc(pat.node_id()),
+                        "patterns not supported in specification language",
+                    );
+                    return;
+                }
+            }
+            emit!(self.writer, "(var {} := ", vars.into_iter().join(","));
+            let mut first = true;
+            for arg in args {
+                if first {
+                    first = false
+                } else {
+                    emit!(self.writer, ", ")
+                }
+                self.translate_exp(arg);
+            }
+            emit!(self.writer, "; ");
+            self.translate_exp(scope);
+            emit!(self.writer, ")");
         } else {
-            vec![binding.clone()]
-        };
-        assert_eq!(pats.len(), bindings.len(), "valid specification binding");
-        let mut vars = vec![];
-        for pat in pats {
-            if let Pattern::Var(_, sym) = pat {
-                vars.push(sym.display(self.env.symbol_pool()).to_string())
+            // Check if binding has a tuple type (e.g., function call returning tuple)
+            let binding_type = self.get_node_type(binding.node_id());
+            if let Type::Tuple(elem_types) = &binding_type {
+                if pats.len() != elem_types.len() {
+                    self.error(
+                        &self.env.get_node_loc(binding.node_id()),
+                        &format!(
+                            "tuple pattern has {} elements but expression has {} elements",
+                            pats.len(),
+                            elem_types.len()
+                        ),
+                    );
+                    return;
+                }
+                // Function call or other expression returning tuple
+                // Generate: (var $t := call(); (var a := $t->$0; (var b := $t->$1; scope)))
+                let mut vars = vec![];
+                for pat in &pats {
+                    if let Pattern::Var(_, sym) = pat {
+                        vars.push(sym.display(self.env.symbol_pool()).to_string())
+                    } else {
+                        self.error(
+                            &self.env.get_node_loc(pat.node_id()),
+                            "patterns not supported in specification language",
+                        );
+                        return;
+                    }
+                }
+
+                let temp_var = self.fresh_var_name("t");
+                emit!(self.writer, "(var {} := ", temp_var);
+                self.translate_exp(binding);
+                emit!(self.writer, "; ");
+
+                // Generate nested let bindings for each tuple element
+                for (i, var) in vars.iter().enumerate() {
+                    emit!(self.writer, "(var {} := {}->${}; ", var, temp_var, i);
+                }
+                self.translate_exp(scope);
+                // Close all the nested parentheses
+                for _ in 0..vars.len() {
+                    emit!(self.writer, ")");
+                }
+                emit!(self.writer, ")"); // Close outer var
             } else {
-                self.error(
-                    &self.env.get_node_loc(pat.node_id()),
-                    "patterns not supported in specification language",
-                );
-                return;
+                // Non-tuple single binding
+                assert_eq!(pats.len(), 1, "valid specification binding");
+                if let Pattern::Var(_, sym) = &pats[0] {
+                    let var = sym.display(self.env.symbol_pool()).to_string();
+                    emit!(self.writer, "(var {} := ", var);
+                    self.translate_exp(binding);
+                    emit!(self.writer, "; ");
+                    self.translate_exp(scope);
+                    emit!(self.writer, ")");
+                } else {
+                    self.error(
+                        &self.env.get_node_loc(pats[0].node_id()),
+                        "patterns not supported in specification language",
+                    );
+                }
             }
         }
-        emit!(self.writer, "(var {} := ", vars.into_iter().join(","));
-        let mut first = true;
-        for binding in bindings {
-            if first {
-                first = false
-            } else {
-                emit!(self.writer, ", ")
-            }
-            self.translate_exp(&binding);
-        }
-        emit!(self.writer, "; ");
-        self.translate_exp(scope);
-        emit!(self.writer, ")");
     }
 
     fn translate_call(&self, node_id: NodeId, oper: &Operation, args: &[Exp]) {
@@ -989,8 +1060,32 @@ impl SpecTranslator<'_> {
                 self.translate_pack_variant(node_id, *mid, *sid, variant, args)
             },
             Operation::Pack(mid, sid, None) => self.translate_pack(node_id, *mid, *sid, args),
-            Operation::Tuple if args.len() == 1 => self.translate_exp(&args[0]),
-            Operation::Tuple => self.error(&loc, "Tuple not yet supported"),
+            Operation::Tuple if args.is_empty() => {
+                self.error(&loc, "unit type (empty tuple) not supported");
+            },
+            Operation::Tuple if args.len() == 1 => {
+                self.error(&loc, "single-element tuple not supported");
+            },
+            Operation::Tuple if args.len() > MAX_TUPLE_SIZE => {
+                self.error(
+                    &loc,
+                    &format!(
+                        "tuple has {} elements, maximum supported is {}",
+                        args.len(),
+                        MAX_TUPLE_SIZE
+                    ),
+                );
+            },
+            Operation::Tuple => {
+                emit!(self.writer, "$Tuple{}(", args.len());
+                let mut sep = "";
+                for arg in args {
+                    emit!(self.writer, "{}", sep);
+                    self.translate_exp(arg);
+                    sep = ", ";
+                }
+                emit!(self.writer, ")");
+            },
             Operation::Select(module_id, struct_id, field_id) => {
                 self.translate_select(node_id, *module_id, *struct_id, *field_id, args)
             },
@@ -1921,16 +2016,31 @@ impl SpecTranslator<'_> {
     }
 
     fn translate_eq_neq(&self, boogie_val_fun: &str, args: &[Exp]) {
+        let ty_binding = self.get_node_type(args[0].node_id());
+        let ty = ty_binding.skip_reference();
+
+        // For tuple types, use native Boogie equality since datatypes support structural equality
+        if let Type::Tuple(elems) = ty {
+            if elems.len() >= 2 {
+                emit!(self.writer, "(");
+                self.translate_exp(&args[0]);
+                if boogie_val_fun.starts_with('!') {
+                    emit!(self.writer, " != ");
+                } else {
+                    emit!(self.writer, " == ");
+                }
+                self.translate_exp(&args[1]);
+                emit!(self.writer, ")");
+                return;
+            }
+        }
+
         let global_state = &self
             .env
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
         let num_oper = global_state.get_node_num_oper(args[0].node_id());
-        let suffix = boogie_type_suffix_bv(
-            self.env,
-            self.get_node_type(args[0].node_id()).skip_reference(),
-            num_oper == Bitwise,
-        );
+        let suffix = boogie_type_suffix_bv(self.env, ty, num_oper == Bitwise);
         emit!(self.writer, "{}'{}'(", boogie_val_fun, suffix);
         self.translate_exp(&args[0]);
         emit!(self.writer, ", ");

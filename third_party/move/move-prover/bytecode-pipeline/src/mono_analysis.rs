@@ -43,6 +43,7 @@ pub struct MonoInfo {
     pub spec_vars: BTreeMap<QualifiedId<SpecVarId>, BTreeSet<Vec<Type>>>,
     pub type_params: BTreeSet<u16>,
     pub vec_inst: BTreeSet<Type>,
+    pub tuple_inst: BTreeSet<Vec<Type>>,
     pub table_inst: BTreeMap<QualifiedId<StructId>, BTreeSet<(Type, Type)>>,
     pub native_inst: BTreeMap<ModuleId, BTreeSet<Vec<Type>>>,
     pub all_types: BTreeSet<Type>,
@@ -592,6 +593,10 @@ impl Analyzer<'_> {
             },
             Type::Vector(et) => {
                 self.info.vec_inst.insert(et.as_ref().clone());
+            },
+            Type::Tuple(elems) if elems.len() >= 2 && elems.len() <= 8 => {
+                // Only collect tuples with valid size (2-8 elements, matching MAX_TUPLE_SIZE)
+                self.info.tuple_inst.insert(elems.clone());
             },
             Type::Struct(mid, sid, targs) => {
                 self.add_struct(self.env.get_module(*mid).into_struct(*sid), targs)
