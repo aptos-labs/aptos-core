@@ -1,6 +1,7 @@
-<a href="https://aptos.dev">
-	<img width="100%" src="./.assets/aptos_banner.png" alt="Aptos Banner" />
-</a>
+<div align="center" style="display: flex; justify-content: center; align-items: center; gap: 20px;">
+	<img src="./.assets/movement.png" alt="Movement" style="width: 300px;" />
+	<img src="./.assets/movement_logo.png" alt="Movement Logo" style="width: 50px;" />
+</div>
 
 ---
 
