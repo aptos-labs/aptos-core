@@ -33,7 +33,7 @@ full_node_networks:
         role: "Upstream"
 api:
     enabled: true
-    address: 127.0.0.1:8080
+    address: 0.0.0.0:8080
 
 state_sync:
   state_sync_driver:
