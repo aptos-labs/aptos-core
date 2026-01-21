@@ -5,10 +5,10 @@
 //! A helper for building expressions
 
 use crate::{
-    ast::{Exp, ExpData, Operation, Pattern, RewriteResult},
+    ast::{Exp, ExpData, Operation, Pattern, RewriteResult, Value},
     model::{GlobalEnv, Loc, NodeId},
     symbol::Symbol,
-    ty::Type,
+    ty::{PrimitiveType, Type},
 };
 use itertools::Itertools;
 use std::{collections::BTreeMap, vec};
@@ -61,6 +61,32 @@ impl<'a> ExpBuilder<'a> {
             self.not(Call(id, Operation::Or, vec![arg1, arg2]).into_exp())
         } else {
             Call(id, Operation::And, vec![exp1, exp2]).into_exp()
+        }
+    }
+
+    /// Creates a boolean constant expression.
+    pub fn bool_const(&self, loc: &Loc, val: bool) -> Exp {
+        let id = self.new_node_id(loc.clone(), Type::Primitive(PrimitiveType::Bool));
+        ExpData::Value(id, Value::Bool(val)).into_exp()
+    }
+
+    /// Creates an n-ary conjunction (AND) of the given expressions.
+    /// Returns true if the list is empty.
+    pub fn and_n(&self, loc: &Loc, exprs: Vec<Exp>) -> Exp {
+        if exprs.is_empty() {
+            self.bool_const(loc, true)
+        } else {
+            exprs.into_iter().reduce(|a, b| self.and(a, b)).unwrap()
+        }
+    }
+
+    /// Creates an n-ary disjunction (OR) of the given expressions.
+    /// Returns false if the list is empty.
+    pub fn or_n(&self, loc: &Loc, exprs: Vec<Exp>) -> Exp {
+        if exprs.is_empty() {
+            self.bool_const(loc, false)
+        } else {
+            exprs.into_iter().reduce(|a, b| self.or(a, b)).unwrap()
         }
     }
 

@@ -1,0 +1,247 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::M {
+    private fun apply_aborts(f: |u64|u64,x: u64): u64 {
+        (f)(x)
+    }
+    spec {
+      aborts_if M::$aborts_of$apply_aborts$f($t1);
+    }
+
+    private fun apply_binary(f: |u64, u64|u64,a: u64,b: u64): u64 {
+        (f)(a, b)
+    }
+    spec {
+      ensures M::$requires_of$apply_binary$f($t1, $t2);
+      ensures M::$ensures_of$apply_binary$f($t1, $t2, result0());
+      aborts_if M::$aborts_of$apply_binary$f($t1, $t2);
+    }
+
+    private fun apply_ensures(f: |u64|u64,x: u64): u64 {
+        (f)(x)
+    }
+    spec {
+      ensures M::$ensures_of$apply_ensures$f($t1, result0());
+    }
+
+    private fun apply_generic<T>(f: |T|T,x: T): T {
+        (f)(x)
+    }
+    spec {
+      ensures M::$requires_of$apply_generic$f($t1);
+      ensures M::$ensures_of$apply_generic$f($t1, result0());
+    }
+
+    private fun apply_requires(f: |u64|u64,x: u64): u64 {
+        (f)(x)
+    }
+    spec {
+      ensures M::$requires_of$apply_requires$f($t1);
+    }
+
+    spec fun $aborts_of$apply_aborts$f(arg0: u64): bool;
+    spec fun $requires_of$apply_binary$f(arg0: u64,arg1: u64): bool;
+    spec fun $ensures_of$apply_binary$f(arg0: u64,arg1: u64,result0: u64): bool;
+    spec fun $aborts_of$apply_binary$f(arg0: u64,arg1: u64): bool;
+    spec fun $ensures_of$apply_ensures$f(arg0: u64,result0: u64): bool;
+    spec fun $requires_of$apply_generic$f<T>(arg0: #0): bool;
+    spec fun $ensures_of$apply_generic$f<T>(arg0: #0,result0: #0): bool;
+    spec fun $requires_of$apply_requires$f(arg0: u64): bool;
+} // end 0x42::M
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::M {
+    fun apply_aborts(f: |u64|u64, x: u64): u64 {
+        f(x)
+    }
+    fun apply_binary(f: |u64, u64|u64, a: u64, b: u64): u64 {
+        f(a, b)
+    }
+    fun apply_ensures(f: |u64|u64, x: u64): u64 {
+        f(x)
+    }
+    fun apply_generic<T>(f: |T|T, x: T): T {
+        f(x)
+    }
+    fun apply_requires(f: |u64|u64, x: u64): u64 {
+        f(x)
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun M::apply_aborts($t0: |u64|u64, $t1: u64): u64 {
+     var $t2: u64
+  0: $t2 := invoke($t1, $t0)
+  1: return $t2
+}
+
+
+[variant baseline]
+fun M::apply_binary($t0: |u64, u64|u64, $t1: u64, $t2: u64): u64 {
+     var $t3: u64
+     var $t4: u64
+  0: $t4 := infer($t1)
+  1: $t3 := invoke($t4, $t2, $t0)
+  2: return $t3
+}
+
+
+[variant baseline]
+fun M::apply_ensures($t0: |u64|u64, $t1: u64): u64 {
+     var $t2: u64
+  0: $t2 := invoke($t1, $t0)
+  1: return $t2
+}
+
+
+[variant baseline]
+fun M::apply_generic<#0>($t0: |#0|#0, $t1: #0): #0 {
+     var $t2: #0
+  0: $t2 := invoke($t1, $t0)
+  1: return $t2
+}
+
+
+[variant baseline]
+fun M::apply_requires($t0: |u64|u64, $t1: u64): u64 {
+     var $t2: u64
+  0: $t2 := invoke($t1, $t0)
+  1: return $t2
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::M {
+    private fun apply_aborts(f: |u64|u64,x: u64): u64 {
+        (f)(x)
+    }
+    spec {
+      aborts_if M::$aborts_of$apply_aborts$f($t1);
+    }
+
+    private fun apply_binary(f: |u64, u64|u64,a: u64,b: u64): u64 {
+        (f)(a, b)
+    }
+    spec {
+      ensures M::$requires_of$apply_binary$f($t1, $t2);
+      ensures M::$ensures_of$apply_binary$f($t1, $t2, result0());
+      aborts_if M::$aborts_of$apply_binary$f($t1, $t2);
+    }
+
+    private fun apply_ensures(f: |u64|u64,x: u64): u64 {
+        (f)(x)
+    }
+    spec {
+      ensures M::$ensures_of$apply_ensures$f($t1, result0());
+    }
+
+    private fun apply_generic<T>(f: |T|T,x: T): T {
+        (f)(x)
+    }
+    spec {
+      ensures M::$requires_of$apply_generic$f($t1);
+      ensures M::$ensures_of$apply_generic$f($t1, result0());
+    }
+
+    private fun apply_requires(f: |u64|u64,x: u64): u64 {
+        (f)(x)
+    }
+    spec {
+      ensures M::$requires_of$apply_requires$f($t1);
+    }
+
+    spec fun $aborts_of$apply_aborts$f(arg0: u64): bool;
+    spec fun $requires_of$apply_binary$f(arg0: u64,arg1: u64): bool;
+    spec fun $ensures_of$apply_binary$f(arg0: u64,arg1: u64,result0: u64): bool;
+    spec fun $aborts_of$apply_binary$f(arg0: u64,arg1: u64): bool;
+    spec fun $ensures_of$apply_ensures$f(arg0: u64,result0: u64): bool;
+    spec fun $requires_of$apply_generic$f<T>(arg0: #0): bool;
+    spec fun $ensures_of$apply_generic$f<T>(arg0: #0,result0: #0): bool;
+    spec fun $requires_of$apply_requires$f(arg0: u64): bool;
+} // end 0x42::M
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun M::apply_aborts($t0: |u64|u64, $t1: u64): u64 {
+     var $t2: u64
+  0: $t2 := invoke($t1, $t0)
+  1: return $t2
+}
+
+
+[variant baseline]
+fun M::apply_binary($t0: |u64, u64|u64, $t1: u64, $t2: u64): u64 {
+     var $t3: u64
+     var $t4: u64
+  0: $t4 := infer($t1)
+  1: $t3 := invoke($t4, $t2, $t0)
+  2: return $t3
+}
+
+
+[variant baseline]
+fun M::apply_ensures($t0: |u64|u64, $t1: u64): u64 {
+     var $t2: u64
+  0: $t2 := invoke($t1, $t0)
+  1: return $t2
+}
+
+
+[variant baseline]
+fun M::apply_generic<#0>($t0: |#0|#0, $t1: #0): #0 {
+     var $t2: #0
+  0: $t2 := invoke($t1, $t0)
+  1: return $t2
+}
+
+
+[variant baseline]
+fun M::apply_requires($t0: |u64|u64, $t1: u64): u64 {
+     var $t2: u64
+  0: $t2 := invoke($t1, $t0)
+  1: return $t2
+}
+
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0x42::M
+// Function definition at index 0
+fun apply_aborts(l0: |u64|u64, l1: u64): u64
+    move_loc l1
+    move_loc l0
+    call_closure <|u64|u64>
+    ret
+
+// Function definition at index 1
+fun apply_binary(l0: |u64, u64|u64, l1: u64, l2: u64): u64
+    move_loc l1
+    move_loc l2
+    move_loc l0
+    call_closure <|u64, u64|u64>
+    ret
+
+// Function definition at index 2
+fun apply_ensures(l0: |u64|u64, l1: u64): u64
+    move_loc l1
+    move_loc l0
+    call_closure <|u64|u64>
+    ret
+
+// Function definition at index 3
+fun apply_generic<T0>(l0: |T0|T0, l1: T0): T0
+    move_loc l1
+    move_loc l0
+    call_closure <|T0|T0>
+    ret
+
+// Function definition at index 4
+fun apply_requires(l0: |u64|u64, l1: u64): u64
+    move_loc l1
+    move_loc l0
+    call_closure <|u64|u64>
+    ret
+
+
+============ bytecode verification succeeded ========
