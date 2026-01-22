@@ -140,6 +140,7 @@ impl Script {
             borrow_field_mut_api_at_offset: None,
             has_module_reentrancy_lock: false,
             is_trusted: false,
+            is_pack_or_pack_variant: false,
         });
 
         let single_signature_token_map = load_single_signatures_for_script(&script, &struct_names)?;

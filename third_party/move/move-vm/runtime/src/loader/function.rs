@@ -91,6 +91,7 @@ pub struct Function {
     pub(crate) is_persistent: bool,
     pub(crate) has_module_reentrancy_lock: bool,
     pub(crate) is_trusted: bool,
+    pub(crate) is_pack_or_pack_variant: bool,
     // This field is set when the function is a non-private struct/enum API for mutably borrowing a field.
     // which will be used to bypass the runtime ref checks
     pub(crate) borrow_field_mut_api_at_offset: Option<MemberCount>,
@@ -720,6 +721,11 @@ impl Function {
             borrow_field_mut_api_at_offset,
             has_module_reentrancy_lock: handle.attributes.contains(&FunctionAttribute::ModuleLock),
             is_trusted,
+            is_pack_or_pack_variant: handle.attributes.contains(&FunctionAttribute::Pack)
+                || handle
+                    .attributes
+                    .iter()
+                    .any(|a| matches!(a, FunctionAttribute::PackVariant(_))),
         })
     }
 
@@ -780,6 +786,10 @@ impl Function {
 
     pub fn is_public(&self) -> bool {
         matches!(self.visibility, Visibility::Public)
+    }
+
+    pub fn is_pack_or_pack_variant(&self) -> bool {
+        self.is_pack_or_pack_variant
     }
 
     pub fn is_friend(&self) -> bool {
