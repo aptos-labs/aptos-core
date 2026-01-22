@@ -160,6 +160,7 @@ pub enum FeatureFlag {
     VMBinaryFormatV10,
     SlhDsaSha2_128sSignature,
     EncryptedTransactions,
+    PublicStructEnumArgs,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -419,6 +420,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::EnableFunctionReflection => AptosFeatureFlag::ENABLE_FUNCTION_REFLECTION,
             FeatureFlag::VMBinaryFormatV10 => AptosFeatureFlag::VM_BINARY_FORMAT_V10,
             FeatureFlag::EncryptedTransactions => AptosFeatureFlag::ENCRYPTED_TRANSACTIONS,
+            FeatureFlag::PublicStructEnumArgs => AptosFeatureFlag::PUBLIC_STRUCT_ENUM_ARGS,
         }
     }
 }
@@ -605,6 +607,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::ENABLE_FUNCTION_REFLECTION => FeatureFlag::EnableFunctionReflection,
             AptosFeatureFlag::VM_BINARY_FORMAT_V10 => FeatureFlag::VMBinaryFormatV10,
             AptosFeatureFlag::ENCRYPTED_TRANSACTIONS => FeatureFlag::EncryptedTransactions,
+            AptosFeatureFlag::PUBLIC_STRUCT_ENUM_ARGS => FeatureFlag::PublicStructEnumArgs,
         }
     }
 }
