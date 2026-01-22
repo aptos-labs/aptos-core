@@ -3719,6 +3719,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-prefix-consensus"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-logger",
+ "aptos-types",
+ "bcs 0.1.4",
+ "futures",
+ "proptest",
+ "serde",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-profiler"
 version = "0.1.0"
 dependencies = [

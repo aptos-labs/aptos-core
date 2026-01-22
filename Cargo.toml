@@ -52,6 +52,7 @@ members = [
     "config/global-constants",
     "consensus",
     "consensus/consensus-types",
+    "consensus/prefix-consensus",
     "consensus/safety-rules",
     "crates/aptos",
     "crates/aptos-admin-service",
