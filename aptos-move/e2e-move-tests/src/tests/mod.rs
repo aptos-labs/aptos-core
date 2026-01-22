@@ -54,6 +54,7 @@ mod object_code_deployment;
 mod offer_rotation_capability;
 mod offer_signer_capability;
 mod per_category_gas_limits;
+mod public_struct_args;
 mod public_structs_enums_upgrade;
 mod randomness_test_and_abort;
 mod remote_state;

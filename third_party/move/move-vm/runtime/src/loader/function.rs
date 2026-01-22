@@ -553,6 +553,12 @@ impl LoadedFunction {
         self.function.is_private()
     }
 
+    /// Returns the function definition index.
+    /// This is used for validation purposes such as accessing function attributes.
+    pub fn function_definition_index(&self) -> FunctionDefinitionIndex {
+        self.function.index
+    }
+
     /// Returns an error if the loaded function is **NOT** an entry function.
     pub fn is_entry_or_err(&self) -> VMResult<()> {
         if !self.function.is_entry() {
@@ -726,6 +732,12 @@ impl Function {
     #[allow(unused)]
     pub(crate) fn file_format_version(&self) -> u32 {
         self.file_format_version
+    }
+
+    /// Returns the function definition index.
+    /// This is used for validation purposes such as accessing function attributes.
+    pub fn function_definition_index(&self) -> FunctionDefinitionIndex {
+        self.index
     }
 
     pub fn param_count(&self) -> usize {
