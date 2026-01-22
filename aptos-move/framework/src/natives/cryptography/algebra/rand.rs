@@ -43,7 +43,7 @@ macro_rules! ark_rand_internal {
         let element = <$typ>::rand(&mut test_rng());
         match store_element!($context, element) {
             Ok(new_handle) => Ok(smallvec![Value::u64(new_handle as u64)]),
-            Err(abort_code) => Err(SafeNativeError::Abort { abort_code }),
+            Err(abort_code) => Err(SafeNativeError::abort(abort_code)),
         }
     }};
 }
@@ -75,7 +75,7 @@ pub fn rand_insecure_internal(
             let element = BLS12381_GT_GENERATOR.pow(k_bigint);
             match store_element!(context, element) {
                 Ok(handle) => Ok(smallvec![Value::u64(handle as u64)]),
-                Err(abort_code) => Err(SafeNativeError::Abort { abort_code }),
+                Err(abort_code) => Err(SafeNativeError::abort(abort_code)),
             }
         },
         Some(Structure::BN254Fr) => {
@@ -99,7 +99,7 @@ pub fn rand_insecure_internal(
             let element = BN254_GT_GENERATOR.pow(k_bigint);
             match store_element!(context, element) {
                 Ok(handle) => Ok(smallvec![Value::u64(handle as u64)]),
-                Err(abort_code) => Err(SafeNativeError::Abort { abort_code }),
+                Err(abort_code) => Err(SafeNativeError::abort(abort_code)),
             }
         },
         _ => unreachable!(),

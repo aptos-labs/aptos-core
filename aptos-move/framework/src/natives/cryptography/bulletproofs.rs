@@ -88,9 +88,7 @@ fn native_verify_range_proof(
     let comm_point = CompressedRistretto::from_slice(comm_bytes.as_slice());
 
     if !is_supported_number_of_bits(num_bits) {
-        return Err(SafeNativeError::Abort {
-            abort_code: abort_codes::NFE_RANGE_NOT_SUPPORTED,
-        });
+        return Err(SafeNativeError::abort(abort_codes::NFE_RANGE_NOT_SUPPORTED));
     }
 
     let pg = {
@@ -131,14 +129,12 @@ fn native_verify_batch_range_proof(
         .collect::<Vec<_>>();
 
     if !is_supported_number_of_bits(num_bits) {
-        return Err(SafeNativeError::Abort {
-            abort_code: abort_codes::NFE_RANGE_NOT_SUPPORTED,
-        });
+        return Err(SafeNativeError::abort(abort_codes::NFE_RANGE_NOT_SUPPORTED));
     }
     if !is_supported_batch_size(comm_points.len()) {
-        return Err(SafeNativeError::Abort {
-            abort_code: abort_codes::NFE_BATCH_SIZE_NOT_SUPPORTED,
-        });
+        return Err(SafeNativeError::abort(
+            abort_codes::NFE_BATCH_SIZE_NOT_SUPPORTED,
+        ));
     }
 
     let pg = {
@@ -176,16 +172,12 @@ fn native_test_only_prove_range(
     let v = pop_scalar_from_bytes(&mut args)?;
 
     if !is_supported_number_of_bits(num_bits) {
-        return Err(SafeNativeError::Abort {
-            abort_code: abort_codes::NFE_RANGE_NOT_SUPPORTED,
-        });
+        return Err(SafeNativeError::abort(abort_codes::NFE_RANGE_NOT_SUPPORTED));
     }
 
     // Make sure only the first 64 bits are set.
     if !v.as_bytes()[8..].iter().all(|&byte| byte == 0u8) {
-        return Err(SafeNativeError::Abort {
-            abort_code: abort_codes::NFE_VALUE_OUTSIDE_RANGE,
-        });
+        return Err(SafeNativeError::abort(abort_codes::NFE_VALUE_OUTSIDE_RANGE));
     }
 
     // Convert Scalar to u64.
@@ -242,19 +234,17 @@ fn native_test_only_batch_prove_range(
     let vs = pop_scalars_from_bytes(&mut args)?;
 
     if !is_supported_number_of_bits(num_bits) {
-        return Err(SafeNativeError::Abort {
-            abort_code: abort_codes::NFE_RANGE_NOT_SUPPORTED,
-        });
+        return Err(SafeNativeError::abort(abort_codes::NFE_RANGE_NOT_SUPPORTED));
     }
     if !is_supported_batch_size(vs.len()) {
-        return Err(SafeNativeError::Abort {
-            abort_code: abort_codes::NFE_BATCH_SIZE_NOT_SUPPORTED,
-        });
+        return Err(SafeNativeError::abort(
+            abort_codes::NFE_BATCH_SIZE_NOT_SUPPORTED,
+        ));
     }
     if vs.len() != v_blindings.len() {
-        return Err(SafeNativeError::Abort {
-            abort_code: abort_codes::NFE_VECTOR_LENGTHS_MISMATCH,
-        });
+        return Err(SafeNativeError::abort(
+            abort_codes::NFE_VECTOR_LENGTHS_MISMATCH,
+        ));
     }
 
     // Make sure only the first 64 bits are set for each Scalar.
@@ -262,9 +252,7 @@ fn native_test_only_batch_prove_range(
         .iter()
         .all(|v| v.as_bytes()[8..].iter().all(|&byte| byte == 0u8))
     {
-        return Err(SafeNativeError::Abort {
-            abort_code: abort_codes::NFE_VALUE_OUTSIDE_RANGE,
-        });
+        return Err(SafeNativeError::abort(abort_codes::NFE_VALUE_OUTSIDE_RANGE));
     }
 
     // Convert each Scalar to u64.
@@ -334,9 +322,9 @@ fn verify_range_proof(
     let range_proof = match bulletproofs::RangeProof::from_bytes(proof_bytes) {
         Ok(proof) => proof,
         Err(_) => {
-            return Err(SafeNativeError::Abort {
-                abort_code: abort_codes::NFE_DESERIALIZE_RANGE_PROOF,
-            })
+            return Err(SafeNativeError::abort(
+                abort_codes::NFE_DESERIALIZE_RANGE_PROOF,
+            ))
         },
     };
 
@@ -373,9 +361,9 @@ fn verify_batch_range_proof(
     let range_proof = match bulletproofs::RangeProof::from_bytes(proof_bytes) {
         Ok(proof) => proof,
         Err(_) => {
-            return Err(SafeNativeError::Abort {
-                abort_code: abort_codes::NFE_DESERIALIZE_RANGE_PROOF,
-            })
+            return Err(SafeNativeError::abort(
+                abort_codes::NFE_DESERIALIZE_RANGE_PROOF,
+            ))
         },
     };
 

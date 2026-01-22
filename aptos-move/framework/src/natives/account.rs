@@ -39,9 +39,9 @@ fn native_create_address(
     if let Ok(address) = address {
         Ok(smallvec![Value::address(address)])
     } else {
-        Err(SafeNativeError::Abort {
-            abort_code: super::status::NFE_UNABLE_TO_PARSE_ADDRESS,
-        })
+        Err(SafeNativeError::abort(
+            super::status::NFE_UNABLE_TO_PARSE_ADDRESS,
+        ))
     }
 }
 
