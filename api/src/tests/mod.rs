@@ -14,6 +14,8 @@ mod modules;
 mod multisig_transactions_test;
 mod objects;
 mod option_test;
+mod public_struct_enum_negative_test;
+mod public_struct_enum_test;
 mod resource_groups;
 mod secp256k1_ecdsa;
 mod signed_int_test;
