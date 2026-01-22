@@ -218,6 +218,20 @@ module aptos_experimental::order_book {
         self.bulk_order_book.cancel_bulk_order(&mut self.price_time_idx, order_creator)
     }
 
+    public(friend) fun cancel_bulk_order_at_price<M: store + copy + drop>(
+        self: &mut OrderBook<M>,
+        order_creator: address,
+        price: u64,
+        is_bid: bool
+    ): (u64, BulkOrder<M>) {
+        self.bulk_order_book.cancel_bulk_order_at_price(
+            &mut self.price_time_idx,
+            order_creator,
+            price,
+            is_bid
+        )
+    }
+
     // ============================= test_only APIs ====================================
     #[test_only]
     public fun destroy_order_book<M: store + copy + drop>(

@@ -66,4 +66,36 @@ module aptos_experimental::bulk_order_utils {
             (option::some(prices[0]), option::some(sizes[0])) // Return the next active price and size
         }
     }
+
+    /// Cancels a specific price level in a bulk order by setting its size to 0 and removing it.
+    ///
+    /// This function finds the price level matching the specified price and removes it from
+    /// the order, keeping other price levels intact.
+    ///
+    /// # Arguments:
+    /// - `order`: Mutable reference to the bulk order
+    /// - `price`: The price level to cancel
+    /// - `is_bid`: True to cancel from bid side, false for ask side
+    ///
+    /// # Returns:
+    /// The size that was cancelled at that price level, or 0 if the price wasn't found
+    public(friend) fun cancel_at_price_level<M: store + copy + drop>(
+        order: &mut BulkOrder<M>,
+        price: u64,
+        is_bid: bool
+    ): u64 {
+        let (prices, sizes) = order.get_order_request_mut().get_prices_and_sizes_mut(is_bid);
+        let i = 0;
+        while (i < prices.length()) {
+            if (prices[i] == price) {
+                // Found the price level, remove it
+                let cancelled_size = sizes[i];
+                prices.remove(i);
+                sizes.remove(i);
+                return cancelled_size
+            };
+            i = i + 1;
+        };
+        0 // Price not found
+    }
 }
