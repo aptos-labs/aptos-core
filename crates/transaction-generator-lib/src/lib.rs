@@ -56,7 +56,10 @@ use crate::{
 };
 pub use publishing::{
     entry_point_trait,
-    prebuild_packages::{create_prebuilt_packages_bundle, PrebuiltPackageConfig},
+    prebuild_packages::{
+        cargo_build_prebuilt_packages, create_prebuilt_packages_bundle,
+        PrebuiltPackageConfig, PrebuiltPackagesArgs,
+    },
 };
 
 pub const SEND_AMOUNT: u64 = 1;

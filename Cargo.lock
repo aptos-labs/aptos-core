@@ -14058,15 +14058,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "package-generator"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-transaction-generator-lib",
- "clap 4.5.21",
-]
-
-[[package]]
 name = "pad"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
