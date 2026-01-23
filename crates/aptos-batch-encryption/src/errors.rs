@@ -4,6 +4,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum BatchEncryptionError {
+    #[error("Error during digest key initialization: {0}")]
+    DigestInitError(DigestKeyInitError),
     #[error("Tried to setup w/ happy path MPK that doesn't match slow path MPK")]
     HappySlowPathMismatchError,
     #[error("Tried to setup w/ VK that does not match MSK share")]
@@ -52,4 +54,12 @@ pub enum ReconstructError {
     ReconstructImproperNumShares,
     #[error("Tried to reconstruct decryption key shares with mismatching digests")]
     ReconstructDigestsDontMatch,
+}
+
+#[derive(Debug, Error)]
+pub enum DigestKeyInitError {
+    #[error("Tried to compute a digest key w/ a batch size not a power of 2, which is unsupported.")]
+    BatchSizeMustBePowerOfTwo,
+    #[error("Failed to initialize FK domain")]
+    FKDomainInitFailure,
 }
