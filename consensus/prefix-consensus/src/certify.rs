@@ -182,6 +182,13 @@ pub fn qc2_certify(qc2: &QC2) -> PrefixVector {
 /// # Returns
 ///
 /// A tuple (v_low, v_high)
+///
+/// # Panics
+///
+/// Panics if the prefixes in QC3 are not mutually consistent. By the Consistency Lemma,
+/// all certified prefixes from Round 2 are guaranteed to be consistent (even with Byzantine
+/// parties). If this invariant is violated, it indicates an implementation bug in the
+/// certification logic, verification, or QC formation.
 pub fn qc3_certify(qc3: &QC3) -> (PrefixVector, PrefixVector) {
     // Extract all mcp prefixes from votes
     let prefixes: Vec<PrefixVector> = qc3.votes.iter().map(|v| v.mcp_prefix.clone()).collect();
@@ -194,7 +201,13 @@ pub fn qc3_certify(qc3: &QC3) -> (PrefixVector, PrefixVector) {
     let v_low = max_common_prefix(&prefixes);
 
     // Compute v_high (minimum common extension)
-    let v_high = min_common_extension(&prefixes);
+    // By the Consistency Lemma, all Round 2 certified prefixes must be consistent,
+    // so min_common_extension should always return Some(_). If it returns None,
+    // there is a bug in our implementation.
+    let v_high = min_common_extension(&prefixes).expect(
+        "IMPLEMENTATION BUG: QC3 prefixes are inconsistent, violating the Consistency Lemma. \
+         This indicates a bug in qc2_certify, verification logic, or QC formation."
+    );
 
     (v_low, v_high)
 }

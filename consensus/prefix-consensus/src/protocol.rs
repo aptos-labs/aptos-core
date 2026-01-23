@@ -184,9 +184,10 @@ impl PrefixConsensusProtocol {
         if pending.has_quorum(quorum_size) {
             info!("Quorum reached for Round 1, forming QC1");
 
-            // Form QC1
-            let votes = pending.votes().values().cloned().collect();
-            let qc1 = QC1::new(votes);
+            // Form QC1 by consuming pending votes
+            // Replace with new empty PendingVotes1 for potential future use
+            let consumed_pending = std::mem::replace(&mut *pending, PendingVotes1::new());
+            let qc1 = consumed_pending.into_qc1();
 
             // Verify QC1
             verify_qc1(&qc1, self.input.f, self.input.n)?;
@@ -290,9 +291,10 @@ impl PrefixConsensusProtocol {
         if pending.has_quorum(quorum_size) {
             info!("Quorum reached for Round 2, forming QC2");
 
-            // Form QC2
-            let votes = pending.votes().values().cloned().collect();
-            let qc2 = QC2::new(votes);
+            // Form QC2 by consuming pending votes
+            // Replace with new empty PendingVotes2 for potential future use
+            let consumed_pending = std::mem::replace(&mut *pending, PendingVotes2::new());
+            let qc2 = consumed_pending.into_qc2();
 
             // Verify QC2
             verify_qc2(&qc2, self.input.f, self.input.n)?;
@@ -396,9 +398,10 @@ impl PrefixConsensusProtocol {
         if pending.has_quorum(quorum_size) {
             info!("Quorum reached for Round 3, forming QC3 and computing output");
 
-            // Form QC3
-            let votes = pending.votes().values().cloned().collect();
-            let qc3 = QC3::new(votes);
+            // Form QC3 by consuming pending votes
+            // Replace with new empty PendingVotes3 for potential future use
+            let consumed_pending = std::mem::replace(&mut *pending, PendingVotes3::new());
+            let qc3 = consumed_pending.into_qc3();
 
             // Verify QC3
             verify_qc3(&qc3, self.input.f, self.input.n)?;
@@ -485,7 +488,8 @@ fn create_dummy_signature(_private_key: &Ed25519PrivateKey) -> Ed25519Signature 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey};
+    use crate::types::PartyId;
+    use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, Uniform};
 
     fn hash(i: u64) -> HashValue {
         HashValue::sha3_256_of(&i.to_le_bytes())

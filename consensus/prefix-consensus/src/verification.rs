@@ -66,24 +66,20 @@ pub fn verify_vote3(vote: &Vote3, f: usize, n: usize) -> Result<()> {
 /// 2. No duplicate authors
 /// 3. All votes are valid
 pub fn verify_qc1(qc1: &QC1, f: usize, n: usize) -> Result<()> {
-    let quorum_size = n - f;
-
     // Check quorum size
     ensure!(
-        qc1.vote_count() >= quorum_size,
+        is_valid_quorum(qc1.vote_count(), n, f),
         "QC1 has {} votes, but quorum size is {}",
         qc1.vote_count(),
-        quorum_size
+        n - f
     );
 
     // Check for duplicate authors
-    let mut seen_authors = HashSet::new();
-    for vote in &qc1.votes {
-        if !seen_authors.insert(vote.author) {
-            bail!("QC1 contains duplicate vote from author: {}", vote.author);
-        }
+    let authors: Vec<PartyId> = qc1.votes.iter().map(|v| v.author).collect();
+    verify_no_duplicate_authors(&authors)?;
 
-        // Verify each vote
+    // Verify each vote
+    for vote in &qc1.votes {
         verify_vote1(vote)?;
     }
 
@@ -98,24 +94,20 @@ pub fn verify_qc1(qc1: &QC1, f: usize, n: usize) -> Result<()> {
 /// 3. All votes are valid
 /// 4. All embedded QC1s are valid
 pub fn verify_qc2(qc2: &QC2, f: usize, n: usize) -> Result<()> {
-    let quorum_size = n - f;
-
     // Check quorum size
     ensure!(
-        qc2.vote_count() >= quorum_size,
+        is_valid_quorum(qc2.vote_count(), n, f),
         "QC2 has {} votes, but quorum size is {}",
         qc2.vote_count(),
-        quorum_size
+        n - f
     );
 
     // Check for duplicate authors
-    let mut seen_authors = HashSet::new();
-    for vote in &qc2.votes {
-        if !seen_authors.insert(vote.author) {
-            bail!("QC2 contains duplicate vote from author: {}", vote.author);
-        }
+    let authors: Vec<PartyId> = qc2.votes.iter().map(|v| v.author).collect();
+    verify_no_duplicate_authors(&authors)?;
 
-        // Verify each vote (which includes verifying embedded QC1)
+    // Verify each vote (which includes verifying embedded QC1)
+    for vote in &qc2.votes {
         verify_vote2(vote, f, n)?;
     }
 
@@ -130,24 +122,20 @@ pub fn verify_qc2(qc2: &QC2, f: usize, n: usize) -> Result<()> {
 /// 3. All votes are valid
 /// 4. All embedded QC2s are valid
 pub fn verify_qc3(qc3: &QC3, f: usize, n: usize) -> Result<()> {
-    let quorum_size = n - f;
-
     // Check quorum size
     ensure!(
-        qc3.vote_count() >= quorum_size,
+        is_valid_quorum(qc3.vote_count(), n, f),
         "QC3 has {} votes, but quorum size is {}",
         qc3.vote_count(),
-        quorum_size
+        n - f
     );
 
     // Check for duplicate authors
-    let mut seen_authors = HashSet::new();
-    for vote in &qc3.votes {
-        if !seen_authors.insert(vote.author) {
-            bail!("QC3 contains duplicate vote from author: {}", vote.author);
-        }
+    let authors: Vec<PartyId> = qc3.votes.iter().map(|v| v.author).collect();
+    verify_no_duplicate_authors(&authors)?;
 
-        // Verify each vote (which includes verifying embedded QC2)
+    // Verify each vote (which includes verifying embedded QC2)
+    for vote in &qc3.votes {
         verify_vote3(vote, f, n)?;
     }
 

@@ -356,11 +356,6 @@ impl PendingVotes1 {
         let votes: Vec<Vote1> = self.votes.into_values().collect();
         QC1::new(votes)
     }
-
-    /// Get a reference to all votes
-    pub fn votes(&self) -> &HashMap<PartyId, Vote1> {
-        &self.votes
-    }
 }
 
 /// Collection of pending Vote2 messages
@@ -396,10 +391,6 @@ impl PendingVotes2 {
         let votes: Vec<Vote2> = self.votes.into_values().collect();
         QC2::new(votes)
     }
-
-    pub fn votes(&self) -> &HashMap<PartyId, Vote2> {
-        &self.votes
-    }
 }
 
 /// Collection of pending Vote3 messages
@@ -434,9 +425,5 @@ impl PendingVotes3 {
     pub fn into_qc3(self) -> QC3 {
         let votes: Vec<Vote3> = self.votes.into_values().collect();
         QC3::new(votes)
-    }
-
-    pub fn votes(&self) -> &HashMap<PartyId, Vote3> {
-        &self.votes
     }
 }

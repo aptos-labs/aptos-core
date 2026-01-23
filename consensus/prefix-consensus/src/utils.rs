@@ -58,6 +58,9 @@ pub fn max_common_prefix(vectors: &[PrefixVector]) -> PrefixVector {
 /// 1. Has all input vectors as prefixes
 /// 2. Is minimal in length among such vectors
 ///
+/// Returns `None` if the vectors are not mutually consistent (i.e., they diverge
+/// and no single vector can extend all of them as prefixes).
+///
 /// # Implementation Note
 ///
 /// The mce is computed by finding the longest vector among the inputs,
@@ -70,17 +73,17 @@ pub fn max_common_prefix(vectors: &[PrefixVector]) -> PrefixVector {
 /// let v2 = vec![1, 2, 3, 4];
 /// let v3 = vec![1, 2, 3, 4, 5];
 /// let mce = min_common_extension(&[v1, v2, v3]);
-/// assert_eq!(mce, vec![1, 2, 3, 4, 5]);
+/// assert_eq!(mce, Some(vec![1, 2, 3, 4, 5]));
 /// ```
-pub fn min_common_extension(vectors: &[PrefixVector]) -> PrefixVector {
+pub fn min_common_extension(vectors: &[PrefixVector]) -> Option<PrefixVector> {
     if vectors.is_empty() {
-        return Vec::new();
+        return Some(Vec::new());
     }
 
     // First verify that all vectors are consistent (one must be prefix of all others)
     if !all_consistent(vectors) {
-        // If not consistent, fall back to mcp
-        return max_common_prefix(vectors);
+        // If not consistent, return None
+        return None;
     }
 
     // The mce is the longest vector among the inputs
@@ -88,7 +91,8 @@ pub fn min_common_extension(vectors: &[PrefixVector]) -> PrefixVector {
         .iter()
         .max_by_key(|v| v.len())
         .cloned()
-        .unwrap_or_default()
+        .map(Some)
+        .unwrap_or(Some(Vec::new()))
 }
 
 /// Check if a vector is a prefix of another vector
@@ -121,11 +125,10 @@ pub fn all_consistent(vectors: &[PrefixVector]) -> bool {
         return true;
     }
 
-    // Find the mcp
-    let mcp = max_common_prefix(vectors);
-
-    // All vectors should extend the mcp
-    vectors.iter().all(|v| is_prefix_of(&mcp, v))
+    // Check pairwise consistency using iterator combinators
+    vectors.iter().enumerate().all(|(i, v1)| {
+        vectors.iter().skip(i + 1).all(|v2| are_consistent(v1, v2))
+    })
 }
 
 /// Perform a consistency check on a collection of vectors
@@ -217,7 +220,7 @@ mod tests {
     #[test]
     fn test_min_common_extension_empty() {
         let vectors: Vec<PrefixVector> = vec![];
-        assert_eq!(min_common_extension(&vectors), vec![]);
+        assert_eq!(min_common_extension(&vectors), Some(vec![]));
     }
 
     #[test]
@@ -226,16 +229,16 @@ mod tests {
         let v2 = vec![hash(1), hash(2), hash(3)];
         let v3 = vec![hash(1), hash(2), hash(3), hash(4)];
         let vectors = vec![v1, v2.clone(), v3.clone()];
-        assert_eq!(min_common_extension(&vectors), v3);
+        assert_eq!(min_common_extension(&vectors), Some(v3));
     }
 
     #[test]
     fn test_min_common_extension_inconsistent() {
-        // When vectors are inconsistent, should fall back to mcp
+        // When vectors are inconsistent, should return None
         let v1 = vec![hash(1), hash(2), hash(3)];
         let v2 = vec![hash(1), hash(2), hash(4)];
         let vectors = vec![v1, v2];
-        assert_eq!(min_common_extension(&vectors), vec![hash(1), hash(2)]);
+        assert_eq!(min_common_extension(&vectors), None);
     }
 
     #[test]
