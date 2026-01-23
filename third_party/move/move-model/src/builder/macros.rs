@@ -2,9 +2,30 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-//! Module for expanding macros, as `assert!(cond, code)`. This are expanded to
-//! the input AST before type checking.  We also allow `assert!(cond)`, for Move 2,
-//! which generates the "well-known" abort code `UNSPECIFIED_ABORT_CODE`.
+//! Module for expanding macros. Supported macros:
+//! - `assert!`
+//! - `assert_eq!`
+//! - `assert_ne!`
+//!
+//! These macros are expanded to the input AST before type checking.
+//!
+//! ## `assert!` macro
+//! Supported forms:
+//! - `assert!(cond)` - aborts with well-known code `UNSPECIFIED_ABORT_CODE`
+//! - `assert!(cond, exp)` - aborts with provided expression (either u64 or vector<u8>)
+//! - `assert!(cond, fmt, arg1, ..., argN)` - aborts with formatted message (1 ≤ N ≤ 4)
+//!
+//! ## `assert_eq!` and `assert_ne!` macros
+//! Supported forms:
+//! - `assert_eq!(left, right)` - aborts with default message
+//! - `assert_eq!(left, right, message)` - aborts with custom message
+//! - `assert_eq!(left, right, fmt, arg1, ..., argN)` - aborts with formatted message (1 ≤ N ≤ 4)
+//! - `assert_ne!` supports the same forms as `assert_eq!`
+//!
+//! ## Version requirements
+//! - `assert!(cond)` requires Move 2
+//! - `assert!(cond, fmt, arg1, ..., argN)` requires Move 2.4
+//! - `assert_eq!` and `assert_ne!` require Move 2.4
 
 use crate::{
     builder::exp_builder::ExpTranslator,
@@ -23,22 +44,15 @@ use move_core_types::account_address::AccountAddress;
 use move_ir_types::location::{sp, Loc, Spanned};
 use std::fmt::Display;
 
-/// Maximum number of arguments we can format using `std::string_utils::format<N>`.
-const MAX_ARGS: usize = 5;
+/// Maximum total number of arguments for string formatting, including the format string itself.
+/// Note that `string_utils::format<N>` takes N + 1 arguments: the format string + N format arguments.
+/// Currently, the last supported function is `format4`, which takes 5 total arguments, hence this is 5.
+const MAX_FORMAT_ARGS: usize = 5;
 
 #[derive(Copy, Clone)]
 enum AssertKind {
     Eq,
     Ne,
-}
-
-impl AssertKind {
-    fn op(&self) -> &str {
-        match self {
-            AssertKind::Eq => "==",
-            AssertKind::Ne => "!=",
-        }
-    }
 }
 
 impl Display for AssertKind {
@@ -100,7 +114,11 @@ impl ExpTranslator<'_, '_, '_> {
     /// } else {
     ///     abort exp
     /// }
+    /// Note that, while the macro does not explicitly enforce this constraint, this will only
+    /// compile when `exp` is a `u64` (an abort code) or a `vector<u8>` (an abort message).
     /// ```
+    /// Note that, while the macro does not explicitly enforce this constraint, this will only
+    /// compile when `exp` is a `u64` (an abort code) or a `vector<u8>` (an abort message).
     ///
     /// More than two arguments:
     /// ```move
@@ -126,7 +144,7 @@ impl ExpTranslator<'_, '_, '_> {
         let cond = &args.value[0];
         let rest = &args.value[1..];
 
-        let e = match rest.len() {
+        let abort_arg = match rest.len() {
             0 => {
                 // assert!(cond)
                 self.check_language_version(
@@ -143,7 +161,7 @@ impl ExpTranslator<'_, '_, '_> {
                 // assert!(cond, exp)
                 rest[0].clone()
             },
-            n if n <= MAX_ARGS => {
+            n if n <= MAX_FORMAT_ARGS => {
                 // assert!(cond, fmt, arg1, ..., argN)
                 self.check_language_version(
                     &self.to_loc(&loc),
@@ -161,7 +179,7 @@ impl ExpTranslator<'_, '_, '_> {
                     &self.to_loc(&args.loc),
                     &format!(
                         "Macro `assert!` cannot take more than {} arguments",
-                        MAX_ARGS + 1
+                        MAX_FORMAT_ARGS + 1
                     ),
                 );
                 return Exp_::UnresolvedError;
@@ -171,7 +189,7 @@ impl ExpTranslator<'_, '_, '_> {
         Exp_::IfElse(
             Box::new(cond.clone()),
             Box::new(sp(loc, Exp_::Unit { trailing: false })),
-            Box::new(sp(loc, Exp_::Abort(Box::new(e)))),
+            Box::new(sp(loc, Exp_::Abort(Box::new(abort_arg)))),
         )
     }
 
@@ -288,7 +306,7 @@ impl ExpTranslator<'_, '_, '_> {
                     self.call_format(loc, assertion_failed_message, vec![message, left, right]),
                 )
             },
-            n if n <= MAX_ARGS => {
+            n if n <= MAX_FORMAT_ARGS => {
                 // assert_eq!(left, right, fmt, arg1, ..., argN)
                 let assertion_failed_message = Self::assertion_failed_message(loc, kind, true);
                 self.check_string_literal(&rest[0]);
@@ -304,7 +322,7 @@ impl ExpTranslator<'_, '_, '_> {
                     &format!(
                         "Macro `{}` cannot take more than {} arguments",
                         kind,
-                        MAX_ARGS + 2,
+                        MAX_FORMAT_ARGS + 2,
                     ),
                 );
                 return Exp_::UnresolvedError;
@@ -333,7 +351,7 @@ impl ExpTranslator<'_, '_, '_> {
     /// Calls `std::string_utils::format<N>(&fmt, arg1, ..., argN)` for 1 ≤ N ≤ 4.
     fn call_format(&self, loc: Loc, fmt: Exp, args: Vec<Exp>) -> Exp {
         let n = args.len();
-        debug_assert!((1..MAX_ARGS).contains(&n));
+        debug_assert!((1..MAX_FORMAT_ARGS).contains(&n));
         let borrow_fmt = sp(loc, Exp_::Borrow(false, Box::new(fmt)));
         self.call_stdlib_function(
             loc,
@@ -420,7 +438,10 @@ impl ExpTranslator<'_, '_, '_> {
     }
 
     fn assertion_failed_message(loc: Loc, kind: AssertKind, args: bool) -> Exp {
-        let op = kind.op();
+        let op = match kind {
+            AssertKind::Eq => "==",
+            AssertKind::Ne => "!=",
+        };
         let str = if args {
             format!("assertion `left {op} right` failed: {{}}\n  left: {{}}\n right: {{}}")
         } else {
