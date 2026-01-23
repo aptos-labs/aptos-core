@@ -59,7 +59,6 @@ harness = false
 [[bench]]
 name = "multi_point_eval"
 harness = false
-
 # [[bench]]
 # name = "fptx"
 # harness = false
