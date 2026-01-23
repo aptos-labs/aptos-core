@@ -797,30 +797,34 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     cancellation_reason: OrderCancellationReason,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ) {
-    // Get the order state before cancellation <b>to</b> track what's being cancelled
-    <b>let</b> order_before_cancel = market.get_order_book().get_bulk_order(maker_address);
-    <b>let</b> (
-        order_before_cancel_request,
-        _order_id,
-        _unique_priority_idx,
-        _creation_time_micros,
-    ) = order_before_cancel.destroy_bulk_order();
-    <b>let</b> (_account, order_sequence_number, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, _metadata) = order_before_cancel_request.destroy_bulk_order_request();
-
     <b>let</b> remaining_size = maker_order.get_remaining_size_from_match_details();
-    <b>if</b> (remaining_size != 0) {
-        // For bulk orders, we cancel all orders for the user
-        market.get_order_book_mut().cancel_bulk_order(maker_address);
+    <b>let</b> price = maker_order.get_price_from_match_details();
+    <b>let</b> is_bid = maker_order.is_bid_from_match_details();
+    <b>let</b> cancelled_size = unsettled_size + remaining_size;
+
+    // Cancel only at the specific price level instead of cancelling the entire bulk order
+    <b>let</b> (_actual_cancelled_size, modified_order) = <b>if</b> (remaining_size != 0) {
+        market.get_order_book_mut().cancel_bulk_order_at_price(maker_address, price, is_bid)
+    } <b>else</b> {
+        // If remaining size is 0, just get the current order state for <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> emission
+        (0, market.get_order_book().get_bulk_order(maker_address))
     };
 
-    <b>let</b> cancelled_size = unsettled_size + remaining_size;
     callbacks.cleanup_bulk_order_at_price(
-        maker_address, order_id, maker_order.is_bid_from_match_details(), maker_order.get_price_from_match_details(), cancelled_size
+        maker_address, order_id, is_bid, price, cancelled_size
     );
 
-    <b>let</b> modified_order = market.get_order_book().get_bulk_order(maker_address);
+    // Emit <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> <b>with</b> the cancelled price level
     <b>let</b> (modified_order_request, _order_id, _unique_priority_idx, _creation_time_micros) = modified_order.destroy_bulk_order();
-    <b>let</b> (_account, _order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, _metadata) = modified_order_request.destroy_bulk_order_request();
+    <b>let</b> (_account, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, _metadata) = modified_order_request.destroy_bulk_order_request();
+
+    // Build cancelled price/size vectors for the specific level that was cancelled
+    <b>let</b> (cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes) = <b>if</b> (is_bid) {
+        (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[price], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[cancelled_size], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[])
+    } <b>else</b> {
+        (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[price], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[cancelled_size])
+    };
+
     market.emit_event_for_bulk_order_modified(
         order_id,
         order_sequence_number,
