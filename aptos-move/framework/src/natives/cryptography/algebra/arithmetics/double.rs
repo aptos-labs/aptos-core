@@ -33,6 +33,9 @@ pub fn double_internal(
             double,
             ALGEBRA_ARK_BLS12_381_G1_PROJ_DOUBLE
         ),
+        Some(Structure::BLS12377G1) => {
+            ark_unary_op_internal!(context, args, ark_bls12_377::G1Projective, double, ALGEBRA_ARK_BLS12_381_G1_PROJ_DOUBLE)
+        },
         Some(Structure::BLS12381G2) => ark_unary_op_internal!(
             context,
             args,
@@ -40,6 +43,9 @@ pub fn double_internal(
             double,
             ALGEBRA_ARK_BLS12_381_G2_PROJ_DOUBLE
         ),
+        Some(Structure::BLS12377G2) => {
+            ark_unary_op_internal!(context, args, ark_bls12_377::G2Projective, double, ALGEBRA_ARK_BLS12_381_G2_PROJ_DOUBLE)
+        },
         Some(Structure::BLS12381Gt) => ark_unary_op_internal!(
             context,
             args,
@@ -47,6 +53,9 @@ pub fn double_internal(
             square,
             ALGEBRA_ARK_BLS12_381_FQ12_SQUARE
         ),
+        Some(Structure::BLS12377Gt) => {
+            ark_unary_op_internal!(context, args, ark_bls12_377::Fq12, square, ALGEBRA_ARK_BLS12_381_FQ12_SQUARE)
+        },
         Some(Structure::BN254G1) => ark_unary_op_internal!(
             context,
             args,

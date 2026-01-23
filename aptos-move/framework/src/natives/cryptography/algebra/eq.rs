@@ -44,30 +44,45 @@ pub fn eq_internal(
             ark_bls12_381::Fr,
             ALGEBRA_ARK_BLS12_381_FR_EQ
         ),
+        Some(Structure::BLS12377Fr) => {
+            ark_eq_internal!(context, args, ark_bls12_377::Fr, ALGEBRA_ARK_BLS12_381_FR_EQ)
+        },
         Some(Structure::BLS12381Fq12) => ark_eq_internal!(
             context,
             args,
             ark_bls12_381::Fq12,
             ALGEBRA_ARK_BLS12_381_FQ12_EQ
         ),
+        Some(Structure::BLS12377Fq12) => {
+            ark_eq_internal!(context, args, ark_bls12_377::Fq12, ALGEBRA_ARK_BLS12_381_FQ12_EQ)
+        },
         Some(Structure::BLS12381G1) => ark_eq_internal!(
             context,
             args,
             ark_bls12_381::G1Projective,
             ALGEBRA_ARK_BLS12_381_G1_PROJ_EQ
         ),
+        Some(Structure::BLS12377G1) => {
+            ark_eq_internal!(context, args, ark_bls12_377::G1Projective, ALGEBRA_ARK_BLS12_381_G1_PROJ_EQ)
+        },
         Some(Structure::BLS12381G2) => ark_eq_internal!(
             context,
             args,
             ark_bls12_381::G2Projective,
             ALGEBRA_ARK_BLS12_381_G2_PROJ_EQ
         ),
+        Some(Structure::BLS12377G2) => {
+            ark_eq_internal!(context, args, ark_bls12_377::G2Projective, ALGEBRA_ARK_BLS12_381_G2_PROJ_EQ)
+        },
         Some(Structure::BLS12381Gt) => ark_eq_internal!(
             context,
             args,
             ark_bls12_381::Fq12,
             ALGEBRA_ARK_BLS12_381_FQ12_EQ
         ),
+        Some(Structure::BLS12377Gt) => {
+            ark_eq_internal!(context, args, ark_bls12_377::Fq12, ALGEBRA_ARK_BLS12_381_FQ12_EQ)
+        },
         Some(Structure::BN254Fr) => {
             ark_eq_internal!(context, args, ark_bn254::Fr, ALGEBRA_ARK_BN254_FR_EQ)
         },

@@ -48,6 +48,15 @@ pub fn from_u64_internal(
             ark_bls12_381::Fq12,
             ALGEBRA_ARK_BLS12_381_FQ12_FROM_U64
         ),
+        Some(Structure::BLS12377Fr) => {
+            from_u64_internal!(context, args, ark_bls12_377::Fr, ALGEBRA_ARK_BLS12_381_FR_FROM_U64)
+        },
+        Some(Structure::BLS12377Fq12) => from_u64_internal!(
+            context,
+            args,
+            ark_bls12_377::Fq12,
+            ALGEBRA_ARK_BLS12_381_FQ12_FROM_U64
+        ),
         Some(Structure::BN254Fr) => {
             from_u64_internal!(context, args, ark_bn254::Fr, ALGEBRA_ARK_BN254_FR_FROM_U64)
         },

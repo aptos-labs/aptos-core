@@ -52,10 +52,26 @@ pub fn div_internal(
             ALGEBRA_ARK_BLS12_381_FR_EQ,
             ALGEBRA_ARK_BLS12_381_FR_DIV
         ),
+        Some(Structure::BLS12377Fr) => ark_div_internal!(
+            context,
+            args,
+            ark_bls12_377::Fr,
+            div,
+            ALGEBRA_ARK_BLS12_381_FR_EQ,
+            ALGEBRA_ARK_BLS12_381_FR_DIV
+        ),
         Some(Structure::BLS12381Fq12) => ark_div_internal!(
             context,
             args,
             ark_bls12_381::Fq12,
+            div,
+            ALGEBRA_ARK_BLS12_381_FQ12_EQ,
+            ALGEBRA_ARK_BLS12_381_FQ12_DIV
+        ),
+        Some(Structure::BLS12377Fq12) => ark_div_internal!(
+            context,
+            args,
+            ark_bls12_377::Fq12,
             div,
             ALGEBRA_ARK_BLS12_381_FQ12_EQ,
             ALGEBRA_ARK_BLS12_381_FQ12_DIV

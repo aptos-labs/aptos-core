@@ -36,6 +36,11 @@ fn feature_flag_of_group_scalar_mul(
         | (Some(Structure::BLS12381Gt), Some(Structure::BLS12381Fr)) => {
             Some(FeatureFlag::BLS12_381_STRUCTURES)
         },
+        (Some(Structure::BLS12377G1), Some(Structure::BLS12377Fr))
+        | (Some(Structure::BLS12377G2), Some(Structure::BLS12377Fr))
+        | (Some(Structure::BLS12377Gt), Some(Structure::BLS12377Fr)) => {
+            Some(FeatureFlag::BLS12_381_STRUCTURES)
+        },
         (Some(Structure::BN254G1), Some(Structure::BN254Fr))
         | (Some(Structure::BN254G2), Some(Structure::BN254Fr))
         | (Some(Structure::BN254Gt), Some(Structure::BN254Fr)) => {
@@ -135,6 +140,43 @@ pub fn scalar_mul_internal(
                 scalar_ptr,
                 scalar
             );
+            let scalar_bigint: ark_ff::BigInteger256 = (*scalar).into();
+            context.charge(ALGEBRA_ARK_BLS12_381_FQ12_POW_U256)?;
+            let new_element = element.pow(scalar_bigint);
+            let new_handle = store_element!(context, new_element)?;
+            Ok(smallvec![Value::u64(new_handle as u64)])
+        },
+        (Some(Structure::BLS12377G1), Some(Structure::BLS12377Fr)) => {
+            ark_scalar_mul_internal!(
+                context,
+                args,
+                ark_bls12_377::G1Projective,
+                ark_bls12_377::Fr,
+                mul_bigint,
+                ALGEBRA_ARK_BLS12_381_G1_PROJ_SCALAR_MUL
+            )
+        },
+        (Some(Structure::BLS12377G2), Some(Structure::BLS12377Fr)) => {
+            ark_scalar_mul_internal!(
+                context,
+                args,
+                ark_bls12_377::G2Projective,
+                ark_bls12_377::Fr,
+                mul_bigint,
+                ALGEBRA_ARK_BLS12_381_G2_PROJ_SCALAR_MUL
+            )
+        },
+        (Some(Structure::BLS12377Gt), Some(Structure::BLS12377Fr)) => {
+            let scalar_handle = safely_pop_arg!(args, u64) as usize;
+            let element_handle = safely_pop_arg!(args, u64) as usize;
+            safe_borrow_element!(
+                context,
+                element_handle,
+                ark_bls12_377::Fq12,
+                element_ptr,
+                element
+            );
+            safe_borrow_element!(context, scalar_handle, ark_bls12_377::Fr, scalar_ptr, scalar);
             let scalar_bigint: ark_ff::BigInteger256 = (*scalar).into();
             context.charge(ALGEBRA_ARK_BLS12_381_FQ12_POW_U256)?;
             let new_element = element.pow(scalar_bigint);
@@ -262,6 +304,28 @@ pub fn multi_scalar_mul_internal(
                 ALGEBRA_ARK_BLS12_381_G2_PROJ_DOUBLE.per::<Arg>(),
                 ark_bls12_381::G2Projective,
                 ark_bls12_381::Fr
+            )
+        },
+        (Some(Structure::BLS12377G1), Some(Structure::BLS12377Fr)) => {
+            ark_msm_internal!(
+                context,
+                args,
+                ALGEBRA_ARK_BLS12_381_G1_PROJ_TO_AFFINE.per::<Arg>(),
+                ALGEBRA_ARK_BLS12_381_G1_PROJ_ADD.per::<Arg>(),
+                ALGEBRA_ARK_BLS12_381_G1_PROJ_DOUBLE.per::<Arg>(),
+                ark_bls12_377::G1Projective,
+                ark_bls12_377::Fr
+            )
+        },
+        (Some(Structure::BLS12377G2), Some(Structure::BLS12377Fr)) => {
+            ark_msm_internal!(
+                context,
+                args,
+                ALGEBRA_ARK_BLS12_381_G2_PROJ_TO_AFFINE.per::<Arg>(),
+                ALGEBRA_ARK_BLS12_381_G2_PROJ_ADD.per::<Arg>(),
+                ALGEBRA_ARK_BLS12_381_G2_PROJ_DOUBLE.per::<Arg>(),
+                ark_bls12_377::G2Projective,
+                ark_bls12_377::Fr
             )
         },
         (Some(Structure::BN254G1), Some(Structure::BN254Fr)) => {

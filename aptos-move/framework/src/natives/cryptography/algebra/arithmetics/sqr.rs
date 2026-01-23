@@ -32,6 +32,9 @@ pub fn sqr_internal(
             square,
             ALGEBRA_ARK_BLS12_381_FR_SQUARE
         ),
+        Some(Structure::BLS12377Fr) => {
+            ark_unary_op_internal!(context, args, ark_bls12_377::Fr, square, ALGEBRA_ARK_BLS12_381_FR_SQUARE)
+        },
         Some(Structure::BLS12381Fq12) => ark_unary_op_internal!(
             context,
             args,
@@ -39,6 +42,9 @@ pub fn sqr_internal(
             square,
             ALGEBRA_ARK_BLS12_381_FQ12_SQUARE
         ),
+        Some(Structure::BLS12377Fq12) => {
+            ark_unary_op_internal!(context, args, ark_bls12_377::Fq12, square, ALGEBRA_ARK_BLS12_381_FQ12_SQUARE)
+        },
         Some(Structure::BN254Fr) => {
             ark_unary_op_internal!(
                 context,

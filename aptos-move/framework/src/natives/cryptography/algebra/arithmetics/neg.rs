@@ -35,6 +35,9 @@ pub fn neg_internal(
             neg,
             ALGEBRA_ARK_BLS12_381_FR_NEG
         ),
+        Some(Structure::BLS12377Fr) => {
+            ark_unary_op_internal!(context, args, ark_bls12_377::Fr, neg, ALGEBRA_ARK_BLS12_381_FR_NEG)
+        },
         Some(Structure::BLS12381Fq12) => ark_unary_op_internal!(
             context,
             args,
@@ -42,6 +45,9 @@ pub fn neg_internal(
             neg,
             ALGEBRA_ARK_BLS12_381_FQ12_NEG
         ),
+        Some(Structure::BLS12377Fq12) => {
+            ark_unary_op_internal!(context, args, ark_bls12_377::Fq12, neg, ALGEBRA_ARK_BLS12_381_FQ12_NEG)
+        },
         Some(Structure::BLS12381G1) => ark_unary_op_internal!(
             context,
             args,
@@ -49,6 +55,9 @@ pub fn neg_internal(
             neg,
             ALGEBRA_ARK_BLS12_381_G1_PROJ_NEG
         ),
+        Some(Structure::BLS12377G1) => {
+            ark_unary_op_internal!(context, args, ark_bls12_377::G1Projective, neg, ALGEBRA_ARK_BLS12_381_G1_PROJ_NEG)
+        },
         Some(Structure::BLS12381G2) => ark_unary_op_internal!(
             context,
             args,
@@ -56,9 +65,20 @@ pub fn neg_internal(
             neg,
             ALGEBRA_ARK_BLS12_381_G2_PROJ_NEG
         ),
+        Some(Structure::BLS12377G2) => {
+            ark_unary_op_internal!(context, args, ark_bls12_377::G2Projective, neg, ALGEBRA_ARK_BLS12_381_G2_PROJ_NEG)
+        },
         Some(Structure::BLS12381Gt) => {
             let handle = safely_pop_arg!(args, u64) as usize;
             safe_borrow_element!(context, handle, ark_bls12_381::Fq12, element_ptr, element);
+            context.charge(ALGEBRA_ARK_BLS12_381_FQ12_INV)?;
+            let new_element = element.inverse().ok_or_else(abort_invariant_violated)?;
+            let new_handle = store_element!(context, new_element)?;
+            Ok(smallvec![Value::u64(new_handle as u64)])
+        },
+        Some(Structure::BLS12377Gt) => {
+            let handle = safely_pop_arg!(args, u64) as usize;
+            safe_borrow_element!(context, handle, ark_bls12_377::Fq12, element_ptr, element);
             context.charge(ALGEBRA_ARK_BLS12_381_FQ12_INV)?;
             let new_element = element.inverse().ok_or_else(abort_invariant_violated)?;
             let new_handle = store_element!(context, new_element)?;

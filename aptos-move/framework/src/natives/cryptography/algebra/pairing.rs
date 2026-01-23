@@ -31,6 +31,9 @@ fn feature_flag_of_pairing(
         (Some(Structure::BLS12381G1), Some(Structure::BLS12381G2), Some(Structure::BLS12381Gt)) => {
             Some(FeatureFlag::BLS12_381_STRUCTURES)
         },
+        (Some(Structure::BLS12377G1), Some(Structure::BLS12377G2), Some(Structure::BLS12377Gt)) => {
+            Some(FeatureFlag::BLS12_381_STRUCTURES)
+        },
         (Some(Structure::BN254G1), Some(Structure::BN254G2), Some(Structure::BN254Gt)) => {
             Some(FeatureFlag::BN254_STRUCTURES)
         },
@@ -149,6 +152,19 @@ pub fn multi_pairing_internal(
                 ALGEBRA_ARK_BLS12_381_G2_PROJ_TO_AFFINE
             )
         },
+        (Some(Structure::BLS12377G1), Some(Structure::BLS12377G2), Some(Structure::BLS12377Gt)) => {
+            multi_pairing_internal!(
+                context,
+                args,
+                ark_bls12_377::Bls12_377,
+                ark_bls12_377::G1Projective,
+                ark_bls12_377::G2Projective,
+                ALGEBRA_ARK_BLS12_381_MULTI_PAIRING_BASE,
+                ALGEBRA_ARK_BLS12_381_MULTI_PAIRING_PER_PAIR,
+                ALGEBRA_ARK_BLS12_381_G1_PROJ_TO_AFFINE,
+                ALGEBRA_ARK_BLS12_381_G2_PROJ_TO_AFFINE
+            )
+        },
         (Some(Structure::BN254G1), Some(Structure::BN254G2), Some(Structure::BN254Gt)) => {
             multi_pairing_internal!(
                 context,
@@ -186,6 +202,18 @@ pub fn pairing_internal(
                 ark_bls12_381::Bls12_381,
                 ark_bls12_381::G1Projective,
                 ark_bls12_381::G2Projective,
+                ALGEBRA_ARK_BLS12_381_PAIRING,
+                ALGEBRA_ARK_BLS12_381_G1_PROJ_TO_AFFINE,
+                ALGEBRA_ARK_BLS12_381_G2_PROJ_TO_AFFINE
+            )
+        },
+        (Some(Structure::BLS12377G1), Some(Structure::BLS12377G2), Some(Structure::BLS12377Gt)) => {
+            pairing_internal!(
+                context,
+                args,
+                ark_bls12_377::Bls12_377,
+                ark_bls12_377::G1Projective,
+                ark_bls12_377::G2Projective,
                 ALGEBRA_ARK_BLS12_381_PAIRING,
                 ALGEBRA_ARK_BLS12_381_G1_PROJ_TO_AFFINE,
                 ALGEBRA_ARK_BLS12_381_G2_PROJ_TO_AFFINE
