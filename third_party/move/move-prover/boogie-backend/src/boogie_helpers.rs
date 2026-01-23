@@ -31,6 +31,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 
 pub const MAX_MAKE_VEC_ARGS: usize = 4;
+pub const MAX_TUPLE_SIZE: usize = 8;
 pub const TABLE_NATIVE_SPEC_ERROR: &str =
     "Native functions defined in Table cannot be used as specification functions";
 const NUM_TYPE_BASE_ERROR: &str = "cannot infer concrete integer type from `num`, consider using a concrete integer type or explicit type cast";
@@ -350,7 +351,21 @@ pub fn boogie_type(env: &GlobalEnv, ty: &Type) -> String {
         Reference(_, bt) => format!("$Mutation ({})", boogie_type(env, bt)),
         TypeParameter(idx) => boogie_type_param(env, *idx),
         Fun(param, result, abilities) => fun_type(env, param, result, *abilities),
-        Tuple(..) | TypeDomain(..) | ResourceDomain(..) | Error | Var(..) => {
+        Tuple(elems) => {
+            let n = elems.len();
+            if n == 0 || n == 1 {
+                format!("<<unsupported: {:?}>>", ty)
+            } else if n > MAX_TUPLE_SIZE {
+                format!(
+                    "<<tuple too large: {} elements, max is {}>>",
+                    n, MAX_TUPLE_SIZE
+                )
+            } else {
+                let args = elems.iter().map(|t| boogie_type(env, t)).join(" ");
+                format!("$Tuple{} {}", n, args)
+            }
+        },
+        TypeDomain(..) | ResourceDomain(..) | Error | Var(..) => {
             format!("<<unsupported: {:?}>>", ty)
         },
     }
@@ -406,7 +421,21 @@ pub fn boogie_bv_type(env: &GlobalEnv, ty: &Type) -> String {
         Reference(_, bt) => format!("$Mutation ({})", boogie_bv_type(env, bt)),
         TypeParameter(idx) => boogie_type_param(env, *idx),
         Fun(param, result, abilities) => fun_type(env, param, result, *abilities),
-        Tuple(..) | TypeDomain(..) | ResourceDomain(..) | Error | Var(..) => {
+        Tuple(elems) => {
+            let n = elems.len();
+            if n == 0 || n == 1 {
+                format!("<<unsupported: {:?}>>", ty)
+            } else if n > MAX_TUPLE_SIZE {
+                format!(
+                    "<<tuple too large: {} elements, max is {}>>",
+                    n, MAX_TUPLE_SIZE
+                )
+            } else {
+                let args = elems.iter().map(|t| boogie_bv_type(env, t)).join(" ");
+                format!("$Tuple{} {}", n, args)
+            }
+        },
+        TypeDomain(..) | ResourceDomain(..) | Error | Var(..) => {
             format!("<<unsupported: {:?}>>", ty)
         },
     }
@@ -543,7 +572,19 @@ pub fn boogie_type_suffix_bv(env: &GlobalEnv, ty: &Type, bv_flag: bool) -> Strin
         Reference(ReferenceKind::Mutable, ty) => {
             format!("$mut'{}'", boogie_type_suffix_bv(env, ty, bv_flag))
         },
-        Tuple(..) | TypeDomain(..) | ResourceDomain(..) | Error | Var(..) => {
+        Tuple(elems) => {
+            let n = elems.len();
+            if n == 0 || n == 1 {
+                format!("<<unsupported {:?}>>", ty)
+            } else {
+                let suffixes = elems
+                    .iter()
+                    .map(|t| boogie_type_suffix_bv(env, t, bv_flag))
+                    .join("_");
+                format!("$tup{}'{}'", n, suffixes)
+            }
+        },
+        TypeDomain(..) | ResourceDomain(..) | Error | Var(..) => {
             format!("<<unsupported {:?}>>", ty)
         },
     }

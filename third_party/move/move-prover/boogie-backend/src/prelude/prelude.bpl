@@ -460,6 +460,43 @@ datatype $Memory<T> {
     $Memory(domain: [int]bool, contents: [int]T)
 }
 
+// Tuple Types (2-8 elements) for spec functions returning multiple values
+datatype $Tuple2<T1, T2> {
+    $Tuple2($0: T1, $1: T2)
+}
+
+datatype $Tuple3<T1, T2, T3> {
+    $Tuple3($0: T1, $1: T2, $2: T3)
+}
+
+datatype $Tuple4<T1, T2, T3, T4> {
+    $Tuple4($0: T1, $1: T2, $2: T3, $3: T4)
+}
+
+datatype $Tuple5<T1, T2, T3, T4, T5> {
+    $Tuple5($0: T1, $1: T2, $2: T3, $3: T4, $4: T5)
+}
+
+datatype $Tuple6<T1, T2, T3, T4, T5, T6> {
+    $Tuple6($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6)
+}
+
+datatype $Tuple7<T1, T2, T3, T4, T5, T6, T7> {
+    $Tuple7($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6, $6: T7)
+}
+
+datatype $Tuple8<T1, T2, T3, T4, T5, T6, T7, T8> {
+    $Tuple8($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6, $6: T7, $7: T8)
+}
+
+{%- for tuple in tuple_instances %}
+
+function {:inline} $IsValid'$tup{{tuple.arity}}'{{tuple.suffix}}''(t: $Tuple{{tuple.arity}}{% for e in tuple.elements %} {{e.name}}{% endfor %}): bool {
+    {% for e in tuple.elements %}$IsValid'{{e.suffix}}'(t->${{loop.index0}}){% if not loop.last %} && {% endif %}{% endfor %}
+
+}
+{%- endfor %}
+
 function {:builtin "MapConst"} $ConstMemoryDomain(v: bool): [int]bool;
 function {:builtin "MapConst"} $ConstMemoryContent<T>(v: T): [int]T;
 axiom $ConstMemoryDomain(false) == (lambda i: int :: false);
