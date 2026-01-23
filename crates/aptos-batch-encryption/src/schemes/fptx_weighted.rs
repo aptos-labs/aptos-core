@@ -9,7 +9,7 @@ use crate::{
         encryption_key::EncryptionKey,
         ids::{Id, IdSet, UncomputedCoeffs},
         key_derivation::{
-            self, BIBEDecryptionKey, BIBEDecryptionKeyShareValue, BIBEMasterPublicKey,
+            self, BIBEDecryptionKey, BIBEDecryptionKeyShareValue,
             BIBEMasterSecretKeyShare, BIBEVerificationKey,
         },
     },
@@ -180,7 +180,7 @@ fn gen_weighted_msk_shares<R: RngCore + CryptoRng>(
     rng: &mut R,
     tc: &WeightedConfigArkworks<Fr>,
 ) -> (
-    BIBEMasterPublicKey,
+    G2Affine,
     Vec<WeightedBIBEVerificationKey>,
     Vec<WeightedBIBEMasterSecretKeyShare>,
 ) {
@@ -303,7 +303,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
         let msk = Fr::rand(&mut rng);
         let (mpk, vks, msk_shares) = gen_weighted_msk_shares(msk, &mut rng, threshold_config);
 
-        let ek = EncryptionKey::new(mpk.0, digest_key.tau_g2);
+        let ek = EncryptionKey::new(mpk, digest_key.tau_g2);
 
         Ok((ek, digest_key, vks, msk_shares))
     }
@@ -403,6 +403,14 @@ impl BatchThresholdEncryption for FPTXWeighted {
         decryption_key_share: &Self::DecryptionKeyShare,
     ) -> anyhow::Result<()> {
         verification_key.verify_decryption_key_share(digest, decryption_key_share)
+    }
+
+    fn verify_decryption_key(
+        encryption_key: &Self::EncryptionKey,
+        digest: &Self::Digest,
+        decryption_key: &Self::DecryptionKey,
+    ) -> Result<()> {
+        encryption_key.verify_decryption_key(digest, decryption_key)
     }
 
     fn decrypt_individual<P: Plaintext>(
