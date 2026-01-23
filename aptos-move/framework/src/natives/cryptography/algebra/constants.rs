@@ -4,10 +4,10 @@
 use crate::{
     abort_unless_arithmetics_enabled_for_structure, abort_unless_feature_flag_enabled,
     natives::cryptography::algebra::{
-        feature_flag_from_structure, AlgebraContext, Structure, BLS12381_GT_GENERATOR,
-        BLS12381_Q12_LENDIAN, BLS12381_R_LENDIAN, BN254_GT_GENERATOR, BN254_Q12_LENDIAN,
-        BN254_Q_LENDIAN, BN254_R_LENDIAN, E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES,
-        MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        feature_flag_from_structure, AlgebraContext, Structure, BLS12377_GT_GENERATOR,
+        BLS12377_R_LENDIAN, BLS12381_GT_GENERATOR, BLS12381_Q12_LENDIAN, BLS12381_R_LENDIAN,
+        BN254_GT_GENERATOR, BN254_Q12_LENDIAN, BN254_Q_LENDIAN, BN254_R_LENDIAN,
+        E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
     },
     store_element, structure_from_ty_arg,
 };
@@ -44,7 +44,12 @@ pub fn zero_internal(
             ALGEBRA_ARK_BLS12_381_FR_ZERO
         ),
         Some(Structure::BLS12377Fr) => {
-            ark_constant_op_internal!(context, ark_bls12_377::Fr, zero, ALGEBRA_ARK_BLS12_381_FR_ZERO)
+            ark_constant_op_internal!(
+                context,
+                ark_bls12_377::Fr,
+                zero,
+                ALGEBRA_ARK_BLS12_381_FR_ZERO
+            )
         },
         Some(Structure::BLS12381Fq12) => ark_constant_op_internal!(
             context,
@@ -53,7 +58,12 @@ pub fn zero_internal(
             ALGEBRA_ARK_BLS12_381_FQ12_ZERO
         ),
         Some(Structure::BLS12377Fq12) => {
-            ark_constant_op_internal!(context, ark_bls12_377::Fq12, zero, ALGEBRA_ARK_BLS12_381_FQ12_ZERO)
+            ark_constant_op_internal!(
+                context,
+                ark_bls12_377::Fq12,
+                zero,
+                ALGEBRA_ARK_BLS12_381_FQ12_ZERO
+            )
         },
         Some(Structure::BLS12381G1) => ark_constant_op_internal!(
             context,
@@ -86,7 +96,12 @@ pub fn zero_internal(
             ALGEBRA_ARK_BLS12_381_FQ12_ONE
         ),
         Some(Structure::BLS12377Gt) => {
-            ark_constant_op_internal!(context, ark_bls12_377::Fq12, one, ALGEBRA_ARK_BLS12_381_FQ12_ONE)
+            ark_constant_op_internal!(
+                context,
+                ark_bls12_377::Fq12,
+                one,
+                ALGEBRA_ARK_BLS12_381_FQ12_ONE
+            )
         },
         Some(Structure::BN254Fr) => {
             ark_constant_op_internal!(context, ark_bn254::Fr, zero, ALGEBRA_ARK_BN254_FR_ZERO)
@@ -133,7 +148,12 @@ pub fn one_internal(
             ALGEBRA_ARK_BLS12_381_FR_ONE
         ),
         Some(Structure::BLS12377Fr) => {
-            ark_constant_op_internal!(context, ark_bls12_377::Fr, one, ALGEBRA_ARK_BLS12_381_FR_ONE)
+            ark_constant_op_internal!(
+                context,
+                ark_bls12_377::Fr,
+                one,
+                ALGEBRA_ARK_BLS12_381_FR_ONE
+            )
         },
         Some(Structure::BLS12381Fq12) => ark_constant_op_internal!(
             context,
@@ -142,7 +162,12 @@ pub fn one_internal(
             ALGEBRA_ARK_BLS12_381_FQ12_ONE
         ),
         Some(Structure::BLS12377Fq12) => {
-            ark_constant_op_internal!(context, ark_bls12_377::Fq12, one, ALGEBRA_ARK_BLS12_381_FQ12_ONE)
+            ark_constant_op_internal!(
+                context,
+                ark_bls12_377::Fq12,
+                one,
+                ALGEBRA_ARK_BLS12_381_FQ12_ONE
+            )
         },
         Some(Structure::BLS12381G1) => ark_constant_op_internal!(
             context,
@@ -234,9 +259,8 @@ pub fn order_internal(
         Some(Structure::BLS12377Fr)
         | Some(Structure::BLS12377G1)
         | Some(Structure::BLS12377G2)
-        | Some(Structure::BLS12377Gt) => Ok(smallvec![Value::vector_u8(BLS12377_R_LENDIAN.clone())]),
-        Some(Structure::BLS12377Fq12) => {
-            Ok(smallvec![Value::vector_u8(BLS12377_Q12_LENDIAN.clone())])
+        | Some(Structure::BLS12377Gt) => {
+            Ok(smallvec![Value::vector_u8(BLS12377_R_LENDIAN.clone())])
         },
         Some(Structure::BN254Fr)
         | Some(Structure::BN254Gt)

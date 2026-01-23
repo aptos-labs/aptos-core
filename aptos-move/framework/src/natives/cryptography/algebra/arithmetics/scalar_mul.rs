@@ -176,7 +176,13 @@ pub fn scalar_mul_internal(
                 element_ptr,
                 element
             );
-            safe_borrow_element!(context, scalar_handle, ark_bls12_377::Fr, scalar_ptr, scalar);
+            safe_borrow_element!(
+                context,
+                scalar_handle,
+                ark_bls12_377::Fr,
+                scalar_ptr,
+                scalar
+            );
             let scalar_bigint: ark_ff::BigInteger256 = (*scalar).into();
             context.charge(ALGEBRA_ARK_BLS12_381_FQ12_POW_U256)?;
             let new_element = element.pow(scalar_bigint);

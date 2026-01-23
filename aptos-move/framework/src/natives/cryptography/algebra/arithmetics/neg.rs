@@ -36,7 +36,13 @@ pub fn neg_internal(
             ALGEBRA_ARK_BLS12_381_FR_NEG
         ),
         Some(Structure::BLS12377Fr) => {
-            ark_unary_op_internal!(context, args, ark_bls12_377::Fr, neg, ALGEBRA_ARK_BLS12_381_FR_NEG)
+            ark_unary_op_internal!(
+                context,
+                args,
+                ark_bls12_377::Fr,
+                neg,
+                ALGEBRA_ARK_BLS12_381_FR_NEG
+            )
         },
         Some(Structure::BLS12381Fq12) => ark_unary_op_internal!(
             context,
@@ -46,7 +52,13 @@ pub fn neg_internal(
             ALGEBRA_ARK_BLS12_381_FQ12_NEG
         ),
         Some(Structure::BLS12377Fq12) => {
-            ark_unary_op_internal!(context, args, ark_bls12_377::Fq12, neg, ALGEBRA_ARK_BLS12_381_FQ12_NEG)
+            ark_unary_op_internal!(
+                context,
+                args,
+                ark_bls12_377::Fq12,
+                neg,
+                ALGEBRA_ARK_BLS12_381_FQ12_NEG
+            )
         },
         Some(Structure::BLS12381G1) => ark_unary_op_internal!(
             context,
@@ -56,7 +68,13 @@ pub fn neg_internal(
             ALGEBRA_ARK_BLS12_381_G1_PROJ_NEG
         ),
         Some(Structure::BLS12377G1) => {
-            ark_unary_op_internal!(context, args, ark_bls12_377::G1Projective, neg, ALGEBRA_ARK_BLS12_381_G1_PROJ_NEG)
+            ark_unary_op_internal!(
+                context,
+                args,
+                ark_bls12_377::G1Projective,
+                neg,
+                ALGEBRA_ARK_BLS12_381_G1_PROJ_NEG
+            )
         },
         Some(Structure::BLS12381G2) => ark_unary_op_internal!(
             context,
@@ -66,7 +84,13 @@ pub fn neg_internal(
             ALGEBRA_ARK_BLS12_381_G2_PROJ_NEG
         ),
         Some(Structure::BLS12377G2) => {
-            ark_unary_op_internal!(context, args, ark_bls12_377::G2Projective, neg, ALGEBRA_ARK_BLS12_381_G2_PROJ_NEG)
+            ark_unary_op_internal!(
+                context,
+                args,
+                ark_bls12_377::G2Projective,
+                neg,
+                ALGEBRA_ARK_BLS12_381_G2_PROJ_NEG
+            )
         },
         Some(Structure::BLS12381Gt) => {
             let handle = safely_pop_arg!(args, u64) as usize;

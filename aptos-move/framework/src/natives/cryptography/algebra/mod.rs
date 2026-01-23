@@ -23,6 +23,7 @@ use arithmetics::{
     inv::inv_internal,
     scalar_mul::{multi_scalar_mul_internal, scalar_mul_internal},
 };
+use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_ff::{BigInteger, PrimeField};
 use ark_serialize::CanonicalDeserialize;
 use better_any::{Tid, TidAble};
@@ -375,8 +376,6 @@ static BLS12377_GT_GENERATOR: Lazy<ark_bls12_377::Fq12> = Lazy::new(|| {
 static BLS12377_R_LENDIAN: Lazy<Vec<u8>> =
     Lazy::new(|| <ark_bls12_377::Fr as ark_ff::PrimeField>::MODULUS.to_bytes_le());
 static BLS12377_R_SCALAR: ark_ff::BigInteger256 = ark_bls12_377::Fr::MODULUS;
-static BLS12377_Q12_LENDIAN: Lazy<Vec<u8>> =
-    Lazy::new(|| <ark_bls12_377::Fq as ark_ff::PrimeField>::MODULUS.pow(12).to_bytes_le());
 
 static BN254_GT_GENERATOR: Lazy<ark_bn254::Fq12> = Lazy::new(|| {
     // Gt generator is defined as the `e(g1_generator, g2_generator)`.

@@ -629,7 +629,9 @@ pub fn deserialize_internal(
             context.charge(ALGEBRA_ARK_BLS12_381_FQ12_DESER)?;
             match <ark_bls12_377::Fq12>::deserialize_uncompressed(bytes) {
                 Ok(element) => {
-                    context.charge(ALGEBRA_ARK_BLS12_381_FQ12_POW_U256 + ALGEBRA_ARK_BLS12_381_FQ12_EQ)?;
+                    context.charge(
+                        ALGEBRA_ARK_BLS12_381_FQ12_POW_U256 + ALGEBRA_ARK_BLS12_381_FQ12_EQ,
+                    )?;
                     if element.pow(super::BLS12377_R_SCALAR.0) == ark_bls12_377::Fq12::one() {
                         let handle = store_element!(context, element)?;
                         Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])

@@ -33,7 +33,13 @@ pub fn mul_internal(
             ALGEBRA_ARK_BLS12_381_FR_MUL
         ),
         Some(Structure::BLS12377Fr) => {
-            ark_binary_op_internal!(context, args, ark_bls12_377::Fr, mul, ALGEBRA_ARK_BLS12_381_FR_MUL)
+            ark_binary_op_internal!(
+                context,
+                args,
+                ark_bls12_377::Fr,
+                mul,
+                ALGEBRA_ARK_BLS12_381_FR_MUL
+            )
         },
         Some(Structure::BLS12381Fq12) => ark_binary_op_internal!(
             context,
@@ -43,7 +49,13 @@ pub fn mul_internal(
             ALGEBRA_ARK_BLS12_381_FQ12_MUL
         ),
         Some(Structure::BLS12377Fq12) => {
-            ark_binary_op_internal!(context, args, ark_bls12_377::Fq12, mul, ALGEBRA_ARK_BLS12_381_FQ12_MUL)
+            ark_binary_op_internal!(
+                context,
+                args,
+                ark_bls12_377::Fq12,
+                mul,
+                ALGEBRA_ARK_BLS12_381_FQ12_MUL
+            )
         },
         Some(Structure::BN254Fr) => {
             ark_binary_op_internal!(context, args, ark_bn254::Fr, mul, ALGEBRA_ARK_BN254_FR_MUL)
