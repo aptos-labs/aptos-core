@@ -421,8 +421,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
 
     pub async fn process_dkg_start_event(&mut self, event: DKGStartEvent) -> Result<()> {
         info!(
-            epoch = self.epoch_state.epoch,
-            my_addr = self.my_addr,
+            event = event,
             "[DKG] Processing DKGStart event."
         );
         fail_point!("dkg::process_dkg_start_event");

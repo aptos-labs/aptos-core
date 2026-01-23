@@ -9,7 +9,10 @@ use crate::{
     },
     dkg::DKGStartEvent,
     event::EventKey,
-    jwks::{jwk::JWKMoveStruct, rsa::RSA_JWK, unsupported::UnsupportedJWK, AllProvidersJWKs, ObservedJWKsUpdated, ProviderJWKs},
+    jwks::{
+        jwk::JWKMoveStruct, rsa::RSA_JWK, unsupported::UnsupportedJWK, AllProvidersJWKs,
+        ObservedJWKsUpdated, ProviderJWKs,
+    },
     move_any::{Any, AsMoveAny},
     transaction::Version,
     validator_verifier::ValidatorConsensusInfo,
@@ -33,40 +36,31 @@ use std::{convert::TryFrom, ops::Deref, str::FromStr};
 fn convert_validator_consensus_info(
     v: &api_types::on_chain_config::dkg::ValidatorConsensusInfo,
 ) -> Result<ValidatorConsensusInfo, Error> {
-    let addr = crate::account_address::AccountAddress::from_bytes(&v.addr.bytes())
-        .map_err(|e| {
+    let addr =
+        crate::account_address::AccountAddress::from_bytes(&v.addr.bytes()).map_err(|e| {
             eprintln!("Failed to parse address: {:?}, error: {}", v.addr, e);
             e
         })?;
-    
-    // Convert 96-character hex string to 48 bytes
-    let pk_bytes = match hex::decode(&v.pk_bytes) {
-        Ok(bytes) => {
-            if bytes.len() != 48 {
-                return Err(anyhow::anyhow!(
-                    "Invalid BLS12381 public key length after hex decode: expected 48 bytes, got {} bytes. Original hex: {:?}", 
-                    bytes.len(), 
-                    v.pk_bytes
-                ));
-            }
-            bytes
-        },
-        Err(e) => {
-            return Err(anyhow::anyhow!(
-                "Failed to decode hex string: {:?}, error: {}", 
-                v.pk_bytes, 
+
+    // pk_bytes is already raw bytes (Vec<u8>), just validate length
+    if v.pk_bytes.len() != 48 {
+        return Err(anyhow::anyhow!(
+            "Invalid BLS12381 public key length: expected 48 bytes, got {} bytes",
+            v.pk_bytes.len()
+        ));
+    }
+
+    let public_key =
+        aptos_crypto::bls12381::PublicKey::try_from(v.pk_bytes.as_slice()).map_err(|e| {
+            eprintln!(
+                "Failed to parse BLS12381 public key: pk_bytes length: {}, bytes: {:?}, error: {}",
+                v.pk_bytes.len(),
+                v.pk_bytes,
                 e
-            ));
-        }
-    };
-    
-    let public_key = aptos_crypto::bls12381::PublicKey::try_from(pk_bytes.as_slice())
-        .map_err(|e| {
-            eprintln!("Failed to parse BLS12381 public key: pk_bytes length: {}, bytes: {:?}, error: {}", 
-                pk_bytes.len(), pk_bytes, e);
+            );
             e
         })?;
-    
+
     Ok(ValidatorConsensusInfo {
         address: addr,
         public_key,
@@ -503,17 +497,17 @@ impl TryFrom<&GravityEvent> for ContractEvent {
                                     .map(|jwk| {
                                         match jwk.type_name.as_str() {
                                             // TODO(Gravity_byteyue): Support RSA later
-                                            RSA_JWK::MOVE_TYPE_NAME => {
-                                                JWKMoveStruct {
-                                                    variant: Any {
-                                                        type_name: RSA_JWK::MOVE_TYPE_NAME.to_string(),
-                                                        data: jwk.data.clone(),
-                                                    },
-                                                }
+                                            RSA_JWK::MOVE_TYPE_NAME => JWKMoveStruct {
+                                                variant: Any {
+                                                    type_name: RSA_JWK::MOVE_TYPE_NAME.to_string(),
+                                                    data: jwk.data.clone(),
+                                                },
                                             },
                                             UnsupportedJWK::MOVE_TYPE_NAME => {
                                                 let unsupported_jwk = UnsupportedJWK {
-                                                    id: UnsupportedJWK::MOVE_TYPE_NAME.as_bytes().to_vec(),
+                                                    id: UnsupportedJWK::MOVE_TYPE_NAME
+                                                        .as_bytes()
+                                                        .to_vec(),
                                                     payload: jwk.data.clone(),
                                                 };
                                                 JWKMoveStruct {
@@ -537,11 +531,21 @@ impl TryFrom<&GravityEvent> for ContractEvent {
                 let data = DKGStartEvent {
                     session_metadata: crate::dkg::DKGSessionMetadata {
                         dealer_epoch: dkg.session_metadata.dealer_epoch,
-                        randomness_config: crate::on_chain_config::OnChainRandomnessConfig::default_enabled().into(),
-                        dealer_validator_set: dkg.session_metadata.dealer_validator_set.clone().into_iter()
+                        randomness_config:
+                            crate::on_chain_config::OnChainRandomnessConfig::default_enabled()
+                                .into(),
+                        dealer_validator_set: dkg
+                            .session_metadata
+                            .dealer_validator_set
+                            .clone()
+                            .into_iter()
                             .map(|v| convert_validator_consensus_info(&v).map(|info| info.into()))
                             .collect::<Result<Vec<_>, _>>()?,
-                        target_validator_set: dkg.session_metadata.target_validator_set.clone().into_iter()
+                        target_validator_set: dkg
+                            .session_metadata
+                            .target_validator_set
+                            .clone()
+                            .into_iter()
                             .map(|v| convert_validator_consensus_info(&v).map(|info| info.into()))
                             .collect::<Result<Vec<_>, _>>()?,
                     },
