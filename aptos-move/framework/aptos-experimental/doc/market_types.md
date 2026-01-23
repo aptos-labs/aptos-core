@@ -45,6 +45,7 @@
 -  [Function `get_maker_cancellation_reason`](#0x7_market_types_get_maker_cancellation_reason)
 -  [Function `get_taker_cancellation_reason`](#0x7_market_types_get_taker_cancellation_reason)
 -  [Function `get_callback_result`](#0x7_market_types_get_callback_result)
+-  [Function `get_maker_fee`](#0x7_market_types_get_maker_fee)
 -  [Function `is_validation_result_valid`](#0x7_market_types_is_validation_result_valid)
 -  [Function `get_validation_failure_reason`](#0x7_market_types_get_validation_failure_reason)
 -  [Function `get_place_maker_order_actions`](#0x7_market_types_get_place_maker_order_actions)
@@ -591,6 +592,12 @@ Reasons why an order was cancelled
 </dt>
 <dd>
 
+</dd>
+<dt>
+<code>maker_fee: i64</code>
+</dt>
+<dd>
+ Fee charged to the maker for the fill. Negative means rebate.
 </dd>
 </dl>
 
@@ -1367,6 +1374,12 @@ enum <a href="market_types.md#0x7_market_types_BulkOrderFilledEvent">BulkOrderFi
 <dd>
 
 </dd>
+<dt>
+<code>fee: i64</code>
+</dt>
+<dd>
+ Fee charged for the fill. Negative means rebate.
+</dd>
 </dl>
 
 
@@ -1913,7 +1926,7 @@ enum <a href="market_types.md#0x7_market_types_BulkOrderRejectionEvent">BulkOrde
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_settle_trade_result">new_settle_trade_result</a>&lt;R: <b>copy</b>, drop, store&gt;(settled_size: u64, maker_cancellation_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, taker_cancellation_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, callback_result: <a href="market_types.md#0x7_market_types_CallbackResult">market_types::CallbackResult</a>&lt;R&gt;): <a href="market_types.md#0x7_market_types_SettleTradeResult">market_types::SettleTradeResult</a>&lt;R&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_settle_trade_result">new_settle_trade_result</a>&lt;R: <b>copy</b>, drop, store&gt;(settled_size: u64, maker_cancellation_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, taker_cancellation_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, callback_result: <a href="market_types.md#0x7_market_types_CallbackResult">market_types::CallbackResult</a>&lt;R&gt;, maker_fee: i64): <a href="market_types.md#0x7_market_types_SettleTradeResult">market_types::SettleTradeResult</a>&lt;R&gt;
 </code></pre>
 
 
@@ -1926,13 +1939,15 @@ enum <a href="market_types.md#0x7_market_types_BulkOrderRejectionEvent">BulkOrde
     settled_size: u64,
     maker_cancellation_reason: Option&lt;String&gt;,
     taker_cancellation_reason: Option&lt;String&gt;,
-    callback_result: <a href="market_types.md#0x7_market_types_CallbackResult">CallbackResult</a>&lt;R&gt;
+    callback_result: <a href="market_types.md#0x7_market_types_CallbackResult">CallbackResult</a>&lt;R&gt;,
+    maker_fee: i64,
 ): <a href="market_types.md#0x7_market_types_SettleTradeResult">SettleTradeResult</a>&lt;R&gt; {
     SettleTradeResult::V1 {
         settled_size,
         maker_cancellation_reason,
         taker_cancellation_reason,
-        callback_result
+        callback_result,
+        maker_fee,
     }
 }
 </code></pre>
@@ -2130,6 +2145,30 @@ enum <a href="market_types.md#0x7_market_types_BulkOrderRejectionEvent">BulkOrde
 
 <pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_get_callback_result">get_callback_result</a>&lt;R: store + <b>copy</b> + drop&gt;(self: &<a href="market_types.md#0x7_market_types_SettleTradeResult">SettleTradeResult</a>&lt;R&gt;): &<a href="market_types.md#0x7_market_types_CallbackResult">CallbackResult</a>&lt;R&gt; {
     &self.callback_result
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_market_types_get_maker_fee"></a>
+
+## Function `get_maker_fee`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_get_maker_fee">get_maker_fee</a>&lt;R: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_SettleTradeResult">market_types::SettleTradeResult</a>&lt;R&gt;): i64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_get_maker_fee">get_maker_fee</a>&lt;R: store + <b>copy</b> + drop&gt;(self: &<a href="market_types.md#0x7_market_types_SettleTradeResult">SettleTradeResult</a>&lt;R&gt;): i64 {
+    self.maker_fee
 }
 </code></pre>
 
@@ -3341,7 +3380,7 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_emit_event_for_bulk_order_filled">emit_event_for_bulk_order_filled</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>, sequence_number: u64, user: <b>address</b>, filled_size: u64, price: u64, orig_price: u64, is_bid: bool, fill_id: u128)
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_emit_event_for_bulk_order_filled">emit_event_for_bulk_order_filled</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>, sequence_number: u64, user: <b>address</b>, filled_size: u64, price: u64, orig_price: u64, is_bid: bool, fill_id: u128, fee: i64)
 </code></pre>
 
 
@@ -3360,6 +3399,7 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
     orig_price: u64,
     is_bid: bool,
     fill_id: u128,
+    fee: i64,
 ) {
     // Final check whether <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> sending is enabled
     <b>if</b> (self.config.allow_events_emission) {
@@ -3375,6 +3415,7 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
                 orig_price,
                 is_bid,
                 fill_id,
+                fee,
             }
         );
     };

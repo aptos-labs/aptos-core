@@ -1243,7 +1243,8 @@ Places a market order - The order is guaranteed to be a taker order and will be 
                 maker_order.get_price_from_match_details(),
                 maker_order.get_price_from_match_details(),
                 !is_bid,
-                fill_id
+                fill_id,
+                settle_result.get_maker_fee(),
             );
         } <b>else</b> {
             market.emit_event_for_order(
