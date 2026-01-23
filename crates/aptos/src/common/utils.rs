@@ -119,6 +119,8 @@ pub async fn to_common_result<T: Serialize>(
     let is_err = result.is_err();
     let result = ResultWrapper::<T>::from(result);
     let string = serde_json::to_string_pretty(&result).unwrap();
+    // Unescape newlines so they render properly in terminal output
+    let string = string.replace("\\n", "\n");
     if is_err {
         Err(string)
     } else {
