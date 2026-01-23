@@ -58,9 +58,12 @@ impl Digest {
 impl DigestKey {
     pub fn new(rng: &mut impl RngCore, batch_size: usize, num_rounds: usize) -> Result<Self> {
         let mut i = batch_size;
-        while i > 1  {
-            (i % 2 == 0).then_some(())
-                .ok_or(BatchEncryptionError::DigestInitError(DigestKeyInitError::BatchSizeMustBePowerOfTwo))?;
+        while i > 1 {
+            (i % 2 == 0)
+                .then_some(())
+                .ok_or(BatchEncryptionError::DigestInitError(
+                    DigestKeyInitError::BatchSizeMustBePowerOfTwo,
+                ))?;
             i >>= 1;
         }
 
@@ -98,7 +101,8 @@ impl DigestKey {
         let tau_g2: G2Affine = (G2Affine::generator() * tau).into();
 
         let fk_domain = FKDomain::new(batch_size, batch_size, tau_powers_g1_projective).ok_or(
-            BatchEncryptionError::DigestInitError(DigestKeyInitError::FKDomainInitFailure))?;
+            BatchEncryptionError::DigestInitError(DigestKeyInitError::FKDomainInitFailure),
+        )?;
 
         Ok(DigestKey {
             tau_g2,

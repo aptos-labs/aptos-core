@@ -58,7 +58,9 @@ pub enum ReconstructError {
 
 #[derive(Debug, Error)]
 pub enum DigestKeyInitError {
-    #[error("Tried to compute a digest key w/ a batch size not a power of 2, which is unsupported.")]
+    #[error(
+        "Tried to compute a digest key w/ a batch size not a power of 2, which is unsupported."
+    )]
     BatchSizeMustBePowerOfTwo,
     #[error("Failed to initialize FK domain")]
     FKDomainInitFailure,
