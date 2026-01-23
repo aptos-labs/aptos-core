@@ -120,10 +120,10 @@ pub async fn to_common_result<T: Serialize>(
     let is_err = result.is_err();
     let result = ResultWrapper::<T>::from(result);
     let string = serde_json::to_string_pretty(&result).unwrap();
-    // Unescape newlines so they render properly in terminal output
+    // Unescape newlines and quotes so they render properly in terminal output
     // Both Ok and Err are printed to stdout in main.rs
     let string = if std::io::stdout().is_terminal() {
-        string.replace("\\n", "\n")
+        string.replace("\\n", "\n").replace("\\\"", "\"")
     } else {
         string
     };
