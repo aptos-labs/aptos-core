@@ -9,8 +9,8 @@ use crate::{
         encryption_key::EncryptionKey,
         ids::{Id, IdSet, UncomputedCoeffs},
         key_derivation::{
-            self, BIBEDecryptionKey, BIBEDecryptionKeyShareValue,
-            BIBEMasterSecretKeyShare, BIBEVerificationKey,
+            self, BIBEDecryptionKey, BIBEDecryptionKeyShareValue, BIBEMasterSecretKeyShare,
+            BIBEVerificationKey,
         },
     },
     traits::{

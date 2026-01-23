@@ -1,10 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
-    errors::BatchEncryptionError, group::G2Affine, shared::{
+    errors::BatchEncryptionError,
+    group::G2Affine,
+    shared::{
         digest::Digest,
         key_derivation::{self, BIBEDecryptionKey},
-    }
+    },
 };
 use anyhow::Result;
 use aptos_crypto::arkworks::serialization::{ark_de, ark_se};
@@ -28,8 +30,13 @@ impl EncryptionKey {
         digest: &Digest,
         decryption_key: &BIBEDecryptionKey,
     ) -> Result<()> {
-        key_derivation::verify_shifted_bls(self.sig_mpk_g2, digest, self.sig_mpk_g2, decryption_key.signature_g1)
-            .map_err(|_| BatchEncryptionError::DecryptionKeyVerifyError)?;
+        key_derivation::verify_shifted_bls(
+            self.sig_mpk_g2,
+            digest,
+            self.sig_mpk_g2,
+            decryption_key.signature_g1,
+        )
+        .map_err(|_| BatchEncryptionError::DecryptionKeyVerifyError)?;
         Ok(())
     }
 }
@@ -58,8 +65,13 @@ impl AugmentedEncryptionKey {
         digest: &Digest,
         decryption_key: &BIBEDecryptionKey,
     ) -> Result<()> {
-        key_derivation::verify_shifted_bls(self.sig_mpk_g2, digest, self.sig_mpk_g2, decryption_key.signature_g1)
-            .map_err(|_| BatchEncryptionError::DecryptionKeyVerifyError)?;
+        key_derivation::verify_shifted_bls(
+            self.sig_mpk_g2,
+            digest,
+            self.sig_mpk_g2,
+            decryption_key.signature_g1,
+        )
+        .map_err(|_| BatchEncryptionError::DecryptionKeyVerifyError)?;
         Ok(())
     }
 }

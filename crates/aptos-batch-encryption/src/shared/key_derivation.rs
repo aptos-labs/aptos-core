@@ -49,7 +49,6 @@ impl DecryptionKeyShare for BIBEDecryptionKeyShare {
     }
 }
 
-
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BIBEVerificationKey {
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
@@ -74,7 +73,7 @@ pub fn gen_msk_shares<R: RngCore + CryptoRng>(
     Vec<BIBEVerificationKey>,
     Vec<BIBEMasterSecretKeyShare>,
 ) {
-    let mpk : G2Affine = (G2Affine::generator() * msk).into();
+    let mpk: G2Affine = (G2Affine::generator() * msk).into();
 
     let mut coeffs = vec![msk];
     coeffs.extend((0..(threshold_config.t - 1)).map(|_| Fr::rand(rng)));
@@ -150,7 +149,6 @@ impl BIBEVerificationKey {
     }
 }
 
-
 impl Reconstructable<ShamirThresholdConfig<Fr>> for BIBEDecryptionKey {
     type ShareValue = BIBEDecryptionKeyShareValue;
 
@@ -174,13 +172,15 @@ impl Reconstructable<ShamirThresholdConfig<Fr>> for BIBEDecryptionKey {
 #[cfg(test)]
 mod tests {
     use super::{gen_msk_shares, BIBEDecryptionKey, BIBEDecryptionKeyShare};
-    use crate::{group::{Fr, G2Affine}, shared::{digest::Digest, encryption_key::EncryptionKey}};
+    use crate::{
+        group::{Fr, G2Affine},
+        shared::{digest::Digest, encryption_key::EncryptionKey},
+    };
     use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
     use aptos_dkg::pvss::traits::Reconstructable as _;
+    use ark_ec::AffineRepr;
     use ark_ff::UniformRand as _;
     use ark_std::rand::{seq::SliceRandom, thread_rng};
-    use ark_ec::AffineRepr;
-
 
     #[test]
     fn test_reconstruct_verify() {
@@ -205,7 +205,8 @@ mod tests {
             dk_shares.choose_multiple(&mut rng, 6).cloned().collect();
         let dk = BIBEDecryptionKey::reconstruct(&tc, &shares_threshold).unwrap();
 
-        EncryptionKey::new(mpk, G2Affine::generator()).verify_decryption_key(&digest, &dk)
+        EncryptionKey::new(mpk, G2Affine::generator())
+            .verify_decryption_key(&digest, &dk)
             .expect("Decryption key should verify");
     }
 }
