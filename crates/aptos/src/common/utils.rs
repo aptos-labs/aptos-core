@@ -28,6 +28,7 @@ use aptos_types::{
     transaction::{authenticator::AuthenticationKey, TransactionPayload},
 };
 use itertools::Itertools;
+use std::io::IsTerminal;
 use move_core_types::{account_address::AccountAddress, language_storage::CORE_CODE_ADDRESS};
 use reqwest::Url;
 use serde::{ser::Error, Deserialize, Deserializer, Serialize, Serializer};
@@ -120,7 +121,12 @@ pub async fn to_common_result<T: Serialize>(
     let result = ResultWrapper::<T>::from(result);
     let string = serde_json::to_string_pretty(&result).unwrap();
     // Unescape newlines so they render properly in terminal output
-    let string = string.replace("\\n", "\n");
+    // Both Ok and Err are printed to stdout in main.rs
+    let string = if std::io::stdout().is_terminal() {
+        string.replace("\\n", "\n")
+    } else {
+        string
+    };
     if is_err {
         Err(string)
     } else {
