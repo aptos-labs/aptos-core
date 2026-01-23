@@ -298,8 +298,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
     )> {
         let mut rng = <StdRng as SeedableRng>::seed_from_u64(seed);
 
-        let digest_key = DigestKey::new(&mut rng, max_batch_size, number_of_rounds)
-            .ok_or(anyhow!("Failed to create digest key"))?;
+        let digest_key = DigestKey::new(&mut rng, max_batch_size, number_of_rounds)?;
         let msk = Fr::rand(&mut rng);
         let (mpk, vks, msk_shares) = gen_weighted_msk_shares(msk, &mut rng, threshold_config);
 
