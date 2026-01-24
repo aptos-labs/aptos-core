@@ -1890,7 +1890,7 @@ Add more stake to an existing staking contract.
     <b>let</b> staked_coins = <a href="coin.md#0x1_coin_withdraw">coin::withdraw</a>&lt;AptosCoin&gt;(staker, amount);
     <a href="stake.md#0x1_stake_add_stake_with_cap">stake::add_stake_with_cap</a>(&<a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.owner_cap, staked_coins);
 
-    <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.principal = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.principal + amount;
+    <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.principal += amount;
     <b>let</b> pool_address = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.pool_address;
     <b>if</b> (std::features::module_event_migration_enabled()) {
         emit(<a href="staking_contract.md#0x1_staking_contract_AddStake">AddStake</a> { operator, pool_address, amount });
@@ -2264,7 +2264,7 @@ This also triggers paying commission to the operator for accounting simplicity.
     <b>if</b> (active &lt; amount) {
         amount = active;
     };
-    <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.principal = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.principal - amount;
+    <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.principal -= amount;
 
     // Record a distribution for the staker.
     <a href="staking_contract.md#0x1_staking_contract_add_distribution">add_distribution</a>(

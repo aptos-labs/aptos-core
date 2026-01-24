@@ -287,7 +287,7 @@ module aptos_framework::code {
             while (j < vector::length(new_modules)) {
                 let name = vector::borrow(new_modules, j);
                 assert!(&old_mod.name != name, error::already_exists(EMODULE_NAME_CLASH));
-                j = j + 1;
+                j += 1;
             };
         });
     }
@@ -330,7 +330,7 @@ module aptos_framework::code {
                         while (k < r) {
                             let module_name = vector::borrow(&dep_pack.modules, k).name;
                             vector::push_back(&mut allowed_module_deps, AllowedDep { account, module_name });
-                            k = k + 1;
+                            k += 1;
                         };
                         true
                     } else {

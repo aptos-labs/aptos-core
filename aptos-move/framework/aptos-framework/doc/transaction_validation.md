@@ -972,7 +972,7 @@ Only called during genesis to initialize system resources for this module.
             };
         };
 
-        i = i + 1;
+        i += 1;
     }
 }
 </code></pre>

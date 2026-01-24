@@ -41,13 +41,13 @@ module aptos_framework::optional_aggregator {
             value <= (integer.limit - integer.value),
             error::out_of_range(EAGGREGATOR_OVERFLOW)
         );
-        integer.value = integer.value + value;
+        integer.value += value;
     }
 
     /// Subtracts `value` from integer. Aborts on going below zero.
     fun sub_integer(integer: &mut Integer, value: u128) {
         assert!(value <= integer.value, error::out_of_range(EAGGREGATOR_UNDERFLOW));
-        integer.value = integer.value - value;
+        integer.value -= value;
     }
 
     /// Returns an overflow limit of integer.

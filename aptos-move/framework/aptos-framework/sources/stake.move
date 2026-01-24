@@ -508,7 +508,7 @@ module aptos_framework::stake {
         let i = 0;
         while (i < num_validators) {
             result.push_back(fee_table.borrow(&i).read());
-            i = i + 1;
+            i += 1;
         };
 
         result
@@ -577,7 +577,7 @@ module aptos_framework::stake {
                     update ghost_pending_inactive_num = ghost_pending_inactive_num + 1;
                 };
             };
-            i = i + 1;
+            i += 1;
         };
     }
 
@@ -630,7 +630,7 @@ module aptos_framework::stake {
             let validator_index = fee_distribution_validator_indices[i];
             let fee_octa = fee_amounts_octa[i];
             pending_fee.pending_fee_by_validator.borrow_mut(&validator_index).add(fee_octa);
-            i = i + 1;
+            i += 1;
         }
     }
 
@@ -1242,7 +1242,7 @@ module aptos_framework::stake {
             // rounding error somewhere that can lead to an underflow, we still want to allow this transaction to
             // succeed.
             if (validator_set.total_joining_power > validator_stake) {
-                validator_set.total_joining_power = validator_set.total_joining_power - validator_stake;
+                validator_set.total_joining_power -= validator_stake;
             } else {
                 validator_set.total_joining_power = 0;
             };
@@ -1302,7 +1302,7 @@ module aptos_framework::stake {
                 spec {
                     assume validator.successful_proposals + 1 <= MAX_U64;
                 };
-                validator.successful_proposals = validator.successful_proposals + 1;
+                validator.successful_proposals += 1;
             };
         };
 
@@ -1325,9 +1325,9 @@ module aptos_framework::stake {
                 spec {
                     assume validator.failed_proposals + 1 <= MAX_U64;
                 };
-                validator.failed_proposals = validator.failed_proposals + 1;
+                validator.failed_proposals += 1;
             };
-            f = f + 1;
+            f += 1;
         };
     }
 
@@ -1392,10 +1392,10 @@ module aptos_framework::stake {
                 spec {
                     assume total_voting_power + new_validator_info.voting_power <= MAX_U128;
                 };
-                total_voting_power = total_voting_power + (new_validator_info.voting_power as u128);
+                total_voting_power += (new_validator_info.voting_power as u128);
                 vector::push_back(&mut next_epoch_validators, new_validator_info);
             };
-            i = i + 1;
+            i += 1;
         };
 
         validator_set.active_validators = next_epoch_validators;
@@ -1448,7 +1448,7 @@ module aptos_framework::stake {
                 stake_pool.locked_until_secs = now_secs + recurring_lockup_duration_secs;
             };
 
-            validator_index = validator_index + 1;
+            validator_index += 1;
         };
 
         if (exists<PendingTransactionFee>(@aptos_framework)) {
@@ -1549,12 +1549,12 @@ module aptos_framework::stake {
                 spec {
                     assume new_total_power + new_voting_power <= MAX_U128;
                 };
-                new_total_power = new_total_power + (new_voting_power as u128);
+                new_total_power += (new_voting_power as u128);
                 vector::push_back(&mut new_active_validators, new_validator_info);
-                num_new_actives = num_new_actives + 1;
+                num_new_actives += 1;
 
             };
-            candidate_idx = candidate_idx + 1;
+            candidate_idx += 1;
         };
 
         let new_validator_set = ValidatorSet {
@@ -1590,7 +1590,7 @@ module aptos_framework::stake {
             idx < total
         }) {
             vector::push_back(&mut validator_consensus_infos, validator_consensus_info::default());
-            idx = idx + 1;
+            idx += 1;
         };
         spec {
             assert len(validator_consensus_infos) == len(validator_set.active_validators) + len(validator_set.pending_inactive);
@@ -1829,7 +1829,7 @@ module aptos_framework::stake {
             if (vector::borrow(v, i).addr == addr) {
                 return option::some(i)
             };
-            i = i + 1;
+            i += 1;
         };
         option::none()
     }
@@ -1858,7 +1858,7 @@ module aptos_framework::stake {
         let validator_set = borrow_global_mut<ValidatorSet>(@aptos_framework);
         let voting_power_increase_limit =
             (staking_config::get_voting_power_increase_limit(&staking_config::get()) as u128);
-        validator_set.total_joining_power = validator_set.total_joining_power + (increase_amount as u128);
+        validator_set.total_joining_power += (increase_amount as u128);
 
         // Only validator voting power increase if the current validator set's voting power > 0.
         if (validator_set.total_voting_power > 0) {
@@ -2066,7 +2066,7 @@ module aptos_framework::stake {
                     validator_index: 0,
                 }
             });
-            i = i + 1;
+            i += 1;
         };
 
         move_to(aptos_framework, ValidatorSet {

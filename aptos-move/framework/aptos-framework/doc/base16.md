@@ -70,7 +70,7 @@
         <b>let</b> c2 = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&str, i + 1);
         <b>let</b> byte = <a href="base16.md#0x1_base16_hex_char_to_u8">hex_char_to_u8</a>(*c1) &lt;&lt; 4 | <a href="base16.md#0x1_base16_hex_char_to_u8">hex_char_to_u8</a>(*c2);
         <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> result, byte);
-        i = i + 2;
+        i += 2;
     };
     result
 }

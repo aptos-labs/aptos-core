@@ -914,7 +914,7 @@ WARNING: Precision is lost here (see "Veiled coin amounts as truncated <code>u32
     amount &gt;&gt; <a href="veiled_coin.md#0x7_veiled_coin_NUM_MOST_SIGNIFICANT_BITS_REMOVED">NUM_MOST_SIGNIFICANT_BITS_REMOVED</a>;
 
     // Removes the other `32 - <a href="veiled_coin.md#0x7_veiled_coin_NUM_MOST_SIGNIFICANT_BITS_REMOVED">NUM_MOST_SIGNIFICANT_BITS_REMOVED</a>` least significant bits.
-    amount = amount &gt;&gt; <a href="veiled_coin.md#0x7_veiled_coin_NUM_LEAST_SIGNIFICANT_BITS_REMOVED">NUM_LEAST_SIGNIFICANT_BITS_REMOVED</a>;
+    amount &gt;&gt;= <a href="veiled_coin.md#0x7_veiled_coin_NUM_LEAST_SIGNIFICANT_BITS_REMOVED">NUM_LEAST_SIGNIFICANT_BITS_REMOVED</a>;
 
     // We are now left <b>with</b> a 32-bit value
     (amount <b>as</b> u32)

@@ -144,7 +144,7 @@ module aptos_framework::aptos_coin {
                 index = option::some(i);
                 break
             };
-            i = i + 1;
+            i += 1;
         };
         index
     }

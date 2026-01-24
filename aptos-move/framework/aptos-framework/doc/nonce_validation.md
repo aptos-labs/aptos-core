@@ -335,7 +335,7 @@
                     <a href="nonce_validation.md#0x1_nonce_validation_empty_bucket">empty_bucket</a>(<b>true</b>)
                 );
             };
-            nonce_history.next_key = nonce_history.next_key + 1;
+            nonce_history.next_key += 1;
         }
     }
 }
@@ -423,7 +423,7 @@
         } <b>else</b> {
             <b>break</b>;
         };
-        i = i + 1;
+        i += 1;
     };
 
     // Insert the (<b>address</b>, nonce) pair in the bucket.

@@ -490,7 +490,7 @@ module aptos_framework::jwks {
                         upsert_jwk(&mut cur_issuer_jwks, jwk);
                     }
                 });
-                cur_issuer_jwks.version = cur_issuer_jwks.version + 1;
+                cur_issuer_jwks.version += 1;
                 upsert_provider_jwks(&mut observed_jwks.jwks, cur_issuer_jwks);
             });
         } else {
@@ -583,7 +583,7 @@ module aptos_framework::jwks {
             let cur_entry = vector::borrow(&jwks.entries, index);
             let comparison = compare_u8_vector(provider_jwks.issuer, cur_entry.issuer);
             if (is_greater_than(&comparison)) {
-                index = index + 1;
+                index += 1;
             } else {
                 found = is_equal(&comparison);
                 break
@@ -631,7 +631,7 @@ module aptos_framework::jwks {
             let cur_entry = vector::borrow(&set.jwks, index);
             let comparison = compare_u8_vector(get_jwk_id(&jwk), get_jwk_id(cur_entry));
             if (is_greater_than(&comparison)) {
-                index = index + 1;
+                index += 1;
             } else {
                 found = is_equal(&comparison);
                 break

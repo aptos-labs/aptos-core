@@ -455,7 +455,7 @@ Claim the delegated mint capability and destroy the delegated token.
             index = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(i);
             <b>break</b>
         };
-        i = i + 1;
+        i += 1;
     };
     index
 }

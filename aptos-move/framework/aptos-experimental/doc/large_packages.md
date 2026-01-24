@@ -358,7 +358,7 @@ Object reference should be provided when upgrading object code.
                 staging_area.last_module_idx = idx;
             }
         };
-        i = i + 1;
+        i += 1;
     };
 
     staging_area
@@ -483,7 +483,7 @@ Object reference should be provided when upgrading object code.
             &<b>mut</b> <a href="../../aptos-framework/doc/code.md#0x1_code">code</a>,
             *<a href="../../aptos-framework/../aptos-stdlib/doc/smart_table.md#0x1_smart_table_borrow">smart_table::borrow</a>(&staging_area.<a href="../../aptos-framework/doc/code.md#0x1_code">code</a>, i)
         );
-        i = i + 1;
+        i += 1;
     };
     <a href="../../aptos-framework/doc/code.md#0x1_code">code</a>
 }

@@ -843,7 +843,7 @@ module aptos_framework::coin {
                 fungible_asset::supply(option::extract(&mut metadata));
             if (option::is_some(&coin_supply)) {
                 let supply = option::borrow_mut(&mut coin_supply);
-                *supply = *supply + option::destroy_some(fungible_asset_supply);
+                *supply += option::destroy_some(fungible_asset_supply);
             };
         };
         coin_supply
@@ -963,7 +963,7 @@ module aptos_framework::coin {
         spec {
             update supply<CoinType> = supply<CoinType> - amount;
         };
-        coin.value = coin.value - amount;
+        coin.value -= amount;
         spec {
             update supply<CoinType> = supply<CoinType> + amount;
         };
@@ -1113,7 +1113,7 @@ module aptos_framework::coin {
         spec {
             update supply<CoinType> = supply<CoinType> + value;
         };
-        dst_coin.value = dst_coin.value + value;
+        dst_coin.value += value;
     }
 
     /// Mint new `Coin` with capability.

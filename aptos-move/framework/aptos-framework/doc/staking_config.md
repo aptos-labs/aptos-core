@@ -716,9 +716,7 @@ Calculate and return the up-to-date StakingRewardsConfig.
     new_rate = <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_max">fixed_point64::max</a>(new_rate, staking_rewards_config.min_rewards_rate);
 
     staking_rewards_config.rewards_rate = new_rate;
-    staking_rewards_config.last_rewards_rate_period_start_in_secs =
-        staking_rewards_config.last_rewards_rate_period_start_in_secs +
-        staking_rewards_config.rewards_rate_period_in_secs;
+    staking_rewards_config.last_rewards_rate_period_start_in_secs += staking_rewards_config.rewards_rate_period_in_secs;
     <b>return</b> *staking_rewards_config
 }
 </code></pre>

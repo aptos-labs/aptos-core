@@ -2478,7 +2478,7 @@ Returns the pending transaction fee that is accumulated in current epoch.
     <b>let</b> i = 0;
     <b>while</b> (i &lt; num_validators) {
         result.push_back(fee_table.borrow(&i).read());
-        i = i + 1;
+        i += 1;
     };
 
     result
@@ -2607,7 +2607,7 @@ Allow on chain governance to remove validators from the validator set.
                 <b>update</b> <a href="stake.md#0x1_stake_ghost_pending_inactive_num">ghost_pending_inactive_num</a> = <a href="stake.md#0x1_stake_ghost_pending_inactive_num">ghost_pending_inactive_num</a> + 1;
             };
         };
-        i = i + 1;
+        i += 1;
     };
 }
 </code></pre>
@@ -2740,7 +2740,7 @@ Allow on chain governance to remove validators from the validator set.
         <b>let</b> validator_index = fee_distribution_validator_indices[i];
         <b>let</b> fee_octa = fee_amounts_octa[i];
         pending_fee.pending_fee_by_validator.borrow_mut(&validator_index).add(fee_octa);
-        i = i + 1;
+        i += 1;
     }
 }
 </code></pre>
@@ -3852,7 +3852,7 @@ Can only be called by the operator of the validator/staking pool.
         // rounding <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a> somewhere that can lead <b>to</b> an underflow, we still want <b>to</b> allow this transaction <b>to</b>
         // succeed.
         <b>if</b> (validator_set.total_joining_power &gt; validator_stake) {
-            validator_set.total_joining_power = validator_set.total_joining_power - validator_stake;
+            validator_set.total_joining_power -= validator_stake;
         } <b>else</b> {
             validator_set.total_joining_power = 0;
         };
@@ -3952,7 +3952,7 @@ This function cannot abort.
             <b>spec</b> {
                 <b>assume</b> validator.successful_proposals + 1 &lt;= <a href="stake.md#0x1_stake_MAX_U64">MAX_U64</a>;
             };
-            validator.successful_proposals = validator.successful_proposals + 1;
+            validator.successful_proposals += 1;
         };
     };
 
@@ -3975,9 +3975,9 @@ This function cannot abort.
             <b>spec</b> {
                 <b>assume</b> validator.failed_proposals + 1 &lt;= <a href="stake.md#0x1_stake_MAX_U64">MAX_U64</a>;
             };
-            validator.failed_proposals = validator.failed_proposals + 1;
+            validator.failed_proposals += 1;
         };
-        f = f + 1;
+        f += 1;
     };
 }
 </code></pre>
@@ -4062,10 +4062,10 @@ power.
             <b>spec</b> {
                 <b>assume</b> total_voting_power + new_validator_info.voting_power &lt;= MAX_U128;
             };
-            total_voting_power = total_voting_power + (new_validator_info.voting_power <b>as</b> u128);
+            total_voting_power += (new_validator_info.voting_power <b>as</b> u128);
             <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> next_epoch_validators, new_validator_info);
         };
-        i = i + 1;
+        i += 1;
     };
 
     validator_set.active_validators = next_epoch_validators;
@@ -4118,7 +4118,7 @@ power.
             stake_pool.locked_until_secs = now_secs + recurring_lockup_duration_secs;
         };
 
-        validator_index = validator_index + 1;
+        validator_index += 1;
     };
 
     <b>if</b> (<b>exists</b>&lt;<a href="stake.md#0x1_stake_PendingTransactionFee">PendingTransactionFee</a>&gt;(@aptos_framework)) {
@@ -4258,12 +4258,12 @@ Return the <code>ValidatorConsensusInfo</code> of each current validator, sorted
             <b>spec</b> {
                 <b>assume</b> new_total_power + new_voting_power &lt;= MAX_U128;
             };
-            new_total_power = new_total_power + (new_voting_power <b>as</b> u128);
+            new_total_power += (new_voting_power <b>as</b> u128);
             <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> new_active_validators, new_validator_info);
-            num_new_actives = num_new_actives + 1;
+            num_new_actives += 1;
 
         };
-        candidate_idx = candidate_idx + 1;
+        candidate_idx += 1;
     };
 
     <b>let</b> new_validator_set = <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a> {
@@ -4319,7 +4319,7 @@ Return the <code>ValidatorConsensusInfo</code> of each current validator, sorted
         idx &lt; total
     }) {
         <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> validator_consensus_infos, <a href="validator_consensus_info.md#0x1_validator_consensus_info_default">validator_consensus_info::default</a>());
-        idx = idx + 1;
+        idx += 1;
     };
     <b>spec</b> {
         <b>assert</b> len(validator_consensus_infos) == len(validator_set.active_validators) + len(validator_set.pending_inactive);
@@ -4698,7 +4698,7 @@ Mint rewards corresponding to current epoch's <code><a href="stake.md#0x1_stake"
         <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(v, i).addr == addr) {
             <b>return</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(i)
         };
-        i = i + 1;
+        i += 1;
     };
     <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
 }
@@ -4787,7 +4787,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
     <b>let</b> validator_set = <b>borrow_global_mut</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(@aptos_framework);
     <b>let</b> voting_power_increase_limit =
         (<a href="staking_config.md#0x1_staking_config_get_voting_power_increase_limit">staking_config::get_voting_power_increase_limit</a>(&<a href="staking_config.md#0x1_staking_config_get">staking_config::get</a>()) <b>as</b> u128);
-    validator_set.total_joining_power = validator_set.total_joining_power + (increase_amount <b>as</b> u128);
+    validator_set.total_joining_power += (increase_amount <b>as</b> u128);
 
     // Only validator <a href="voting.md#0x1_voting">voting</a> power increase <b>if</b> the current validator set's <a href="voting.md#0x1_voting">voting</a> power &gt; 0.
     <b>if</b> (validator_set.total_voting_power &gt; 0) {
@@ -6072,6 +6072,75 @@ Returns validator's next epoch voting power, including pending_active, active, a
    !<a href="stake.md#0x1_stake_spec_contains">spec_contains</a>(validator_set.pending_active, pool_address)
        && (<a href="stake.md#0x1_stake_spec_contains">spec_contains</a>(validator_set.active_validators, pool_address)
        || <a href="stake.md#0x1_stake_spec_contains">spec_contains</a>(validator_set.pending_inactive, pool_address))
+}
+</code></pre>
+
+
+
+
+<a id="0x1_stake_ResourceRequirement"></a>
+
+
+<pre><code><b>schema</b> <a href="stake.md#0x1_stake_ResourceRequirement">ResourceRequirement</a> {
+    <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework);
+    <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>&gt;(@aptos_framework);
+    <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(@aptos_framework);
+    <b>requires</b> <b>exists</b>&lt;StakingConfig&gt;(@aptos_framework);
+    <b>requires</b> <b>exists</b>&lt;StakingRewardsConfig&gt;(@aptos_framework) || !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>();
+    <b>requires</b> <b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
+}
+</code></pre>
+
+
+
+
+<a id="0x1_stake_spec_get_reward_rate_1"></a>
+
+
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_get_reward_rate_1">spec_get_reward_rate_1</a>(config: StakingConfig): num {
+   <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>()) {
+       <b>let</b> epoch_rewards_rate = <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">staking_config::StakingRewardsConfig</a>&gt;(@aptos_framework).rewards_rate;
+       <b>if</b> (epoch_rewards_rate.value == 0) {
+           0
+       } <b>else</b> {
+           <b>let</b> denominator_0 = aptos_std::fixed_point64::spec_divide_u128(<a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">staking_config::MAX_REWARDS_RATE</a>, epoch_rewards_rate);
+           <b>let</b> denominator = <b>if</b> (denominator_0 &gt; <a href="stake.md#0x1_stake_MAX_U64">MAX_U64</a>) {
+               <a href="stake.md#0x1_stake_MAX_U64">MAX_U64</a>
+           } <b>else</b> {
+               denominator_0
+           };
+           <b>let</b> nominator = aptos_std::fixed_point64::spec_multiply_u128(denominator, epoch_rewards_rate);
+           nominator
+       }
+   } <b>else</b> {
+           config.rewards_rate
+   }
+}
+</code></pre>
+
+
+
+
+<a id="0x1_stake_spec_get_reward_rate_2"></a>
+
+
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_get_reward_rate_2">spec_get_reward_rate_2</a>(config: StakingConfig): num {
+   <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>()) {
+       <b>let</b> epoch_rewards_rate = <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">staking_config::StakingRewardsConfig</a>&gt;(@aptos_framework).rewards_rate;
+       <b>if</b> (epoch_rewards_rate.value == 0) {
+           1
+       } <b>else</b> {
+           <b>let</b> denominator_0 = aptos_std::fixed_point64::spec_divide_u128(<a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">staking_config::MAX_REWARDS_RATE</a>, epoch_rewards_rate);
+           <b>let</b> denominator = <b>if</b> (denominator_0 &gt; <a href="stake.md#0x1_stake_MAX_U64">MAX_U64</a>) {
+               <a href="stake.md#0x1_stake_MAX_U64">MAX_U64</a>
+           } <b>else</b> {
+               denominator_0
+           };
+           denominator
+       }
+   } <b>else</b> {
+           config.rewards_rate_denominator
+   }
 }
 </code></pre>
 

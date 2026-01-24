@@ -1031,7 +1031,7 @@ consume <code>threshold</code> capacity from StoredPermission
     match (perm) {
         StoredPermission::Capacity(current_capacity) =&gt; {
             <b>if</b> (*current_capacity &gt;= threshold) {
-                *current_capacity = *current_capacity - threshold;
+                *current_capacity -= threshold;
                 <b>true</b>
             } <b>else</b> { <b>false</b> }
         }
@@ -1063,7 +1063,7 @@ increase <code>threshold</code> capacity from StoredPermission
 <pre><code><b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_increase_capacity">increase_capacity</a>(perm: &<b>mut</b> <a href="permissioned_signer.md#0x1_permissioned_signer_StoredPermission">StoredPermission</a>, threshold: u256) {
     match (perm) {
         StoredPermission::Capacity(current_capacity) =&gt; {
-            *current_capacity = *current_capacity + threshold;
+            *current_capacity += threshold;
         }
         StoredPermission::Unlimited =&gt; (),
     }
@@ -1095,7 +1095,7 @@ merge the two stored permission
         StoredPermission::Capacity(new_capacity) =&gt; {
             match (lhs) {
                 StoredPermission::Capacity(current_capacity) =&gt; {
-                    *current_capacity = *current_capacity + new_capacity;
+                    *current_capacity += new_capacity;
                 }
                 StoredPermission::Unlimited =&gt; (),
             }

@@ -321,7 +321,7 @@ Generates a sequence of bytes uniformly at random
         <b>let</b> blob = <a href="randomness.md#0x1_randomness_next_32_bytes">next_32_bytes</a>();
         <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_reverse_append">vector::reverse_append</a>(&<b>mut</b> v, blob);
 
-        c = c + 32;
+        c += 32;
     };
 
     <b>if</b> (c &gt; n) {
@@ -390,7 +390,7 @@ Generates an u16 uniformly at random.
     <b>let</b> ret: u16 = 0;
     <b>while</b> (i &lt; 2) {
         ret = ret * 256 + (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> raw) <b>as</b> u16);
-        i = i + 1;
+        i += 1;
     };
 
     <a href="event.md#0x1_event_emit">event::emit</a>(<a href="randomness.md#0x1_randomness_RandomnessGeneratedEvent">RandomnessGeneratedEvent</a> {});
@@ -425,7 +425,7 @@ Generates an u32 uniformly at random.
     <b>let</b> ret: u32 = 0;
     <b>while</b> (i &lt; 4) {
         ret = ret * 256 + (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> raw) <b>as</b> u32);
-        i = i + 1;
+        i += 1;
     };
 
     <a href="event.md#0x1_event_emit">event::emit</a>(<a href="randomness.md#0x1_randomness_RandomnessGeneratedEvent">RandomnessGeneratedEvent</a> {});
@@ -460,7 +460,7 @@ Generates an u64 uniformly at random.
     <b>let</b> ret: u64 = 0;
     <b>while</b> (i &lt; 8) {
         ret = ret * 256 + (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> raw) <b>as</b> u64);
-        i = i + 1;
+        i += 1;
     };
 
     <a href="event.md#0x1_event_emit">event::emit</a>(<a href="randomness.md#0x1_randomness_RandomnessGeneratedEvent">RandomnessGeneratedEvent</a> {});
@@ -495,7 +495,7 @@ Generates an u128 uniformly at random.
     <b>let</b> ret: u128 = 0;
     <b>while</b> (i &lt; 16) {
         ret = ret * 256 + (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> raw) <b>as</b> u128);
-        i = i + 1;
+        i += 1;
     };
 
     <a href="event.md#0x1_event_emit">event::emit</a>(<a href="randomness.md#0x1_randomness_RandomnessGeneratedEvent">RandomnessGeneratedEvent</a> {});
@@ -556,7 +556,7 @@ Generates a u256 uniformly at random.
     <b>let</b> ret: u256 = 0;
     <b>while</b> (i &lt; 32) {
         ret = ret * 256 + (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> raw) <b>as</b> u256);
-        i = i + 1;
+        i += 1;
     };
     ret
 }
@@ -790,7 +790,7 @@ If you need perfect uniformity, consider implement your own with <code><a href="
         i &lt; 256
     }) {
         sample = <a href="randomness.md#0x1_randomness_safe_add_mod">safe_add_mod</a>(sample, sample, range);
-        i = i + 1;
+        i += 1;
     };
 
     <b>let</b> sample = <a href="randomness.md#0x1_randomness_safe_add_mod">safe_add_mod</a>(sample, r0 % range, range);
@@ -844,7 +844,7 @@ If n is 0, returns the empty vector.
         i &lt; n
     }) {
         std::vector::push_back(&<b>mut</b> values, i);
-        i = i + 1;
+        i += 1;
     };
     <b>spec</b> {
         <b>assert</b> len(values) == n;
@@ -863,7 +863,7 @@ If n is 0, returns the empty vector.
             <b>assert</b> pop_position &lt; len(values);
         };
         std::vector::swap(&<b>mut</b> values, pop_position, tail);
-        tail = tail - 1;
+        tail -= 1;
     };
 
     values

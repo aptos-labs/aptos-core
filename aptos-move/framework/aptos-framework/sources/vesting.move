@@ -580,7 +580,7 @@ module aptos_framework::vesting {
                 shareholder,
                 buy_in_amount,
             );
-            grant_amount = grant_amount + buy_in_amount;
+            grant_amount += buy_in_amount;
         });
         assert!(grant_amount > 0, error::invalid_argument(EZERO_GRANT));
 
@@ -712,7 +712,7 @@ module aptos_framework::vesting {
         let vested_amount = fixed_point32::multiply_u64(total_grant, vesting_fraction);
         // Cap vested amount by the remaining grant amount so we don't try to distribute more than what's remaining.
         vested_amount = min(vested_amount, vesting_contract.remaining_grant);
-        vesting_contract.remaining_grant = vesting_contract.remaining_grant - vested_amount;
+        vesting_contract.remaining_grant -= vested_amount;
         vesting_schedule.last_vested_period = next_period_to_vest;
         unlock_stake(vesting_contract, vested_amount);
 
@@ -1157,7 +1157,7 @@ module aptos_framework::vesting {
         let admin_store = borrow_global_mut<AdminStore>(signer::address_of(admin));
         let seed = bcs::to_bytes(&signer::address_of(admin));
         vector::append(&mut seed, bcs::to_bytes(&admin_store.nonce));
-        admin_store.nonce = admin_store.nonce + 1;
+        admin_store.nonce += 1;
 
         // Include a salt to avoid conflicts with any other modules out there that might also generate
         // deterministic resource accounts for the same admin address + nonce.
@@ -1369,7 +1369,7 @@ module aptos_framework::vesting {
         // Stake pool earns more rewards. vest should unlock the rewards but no vested tokens as vesting hasn't started.
         stake::end_epoch();
         rewards = with_rewards(rewards); // Pending inactive stake still earns rewards.
-        rewards = rewards + get_accumulated_rewards(contract_address);
+        rewards += get_accumulated_rewards(contract_address);
         vest(contract_address);
         stake::assert_stake_pool(stake_pool_address, GRANT_AMOUNT, 0, 0, rewards);
         assert!(remaining_grant(contract_address) == GRANT_AMOUNT, 0);
@@ -1407,18 +1407,18 @@ module aptos_framework::vesting {
         timestamp::fast_forward_seconds(VESTING_PERIOD * 3);
         vest(contract_address);
         vested_amount = fraction(GRANT_AMOUNT, 2, 48);
-        remaining_grant = remaining_grant - vested_amount;
-        pending_distribution = pending_distribution + vested_amount;
+        remaining_grant -= vested_amount;
+        pending_distribution += vested_amount;
         stake::assert_stake_pool(stake_pool_address, remaining_grant, 0, 0, pending_distribution);
         vest(contract_address);
         vested_amount = fraction(GRANT_AMOUNT, 1, 48);
-        remaining_grant = remaining_grant - vested_amount;
-        pending_distribution = pending_distribution + vested_amount;
+        remaining_grant -= vested_amount;
+        pending_distribution += vested_amount;
         stake::assert_stake_pool(stake_pool_address, remaining_grant, 0, 0, pending_distribution);
         // The last vesting fraction (1/48) is repeated beyond the first 3 periods.
         vest(contract_address);
-        remaining_grant = remaining_grant - vested_amount;
-        pending_distribution = pending_distribution + vested_amount;
+        remaining_grant -= vested_amount;
+        pending_distribution += vested_amount;
         stake::assert_stake_pool(stake_pool_address, remaining_grant, 0, 0, pending_distribution);
         assert!(remaining_grant(contract_address) == remaining_grant, 0);
 
@@ -1901,7 +1901,7 @@ module aptos_framework::vesting {
         timestamp::fast_forward_seconds(VESTING_PERIOD);
         vest(contract_address);
         let vested_amount = fraction(GRANT_AMOUNT, 2, 48);
-        remaining_grant = remaining_grant - vested_amount;
+        remaining_grant -= vested_amount;
         stake::assert_stake_pool(stake_pool_address, remaining_grant, 0, 0, vested_amount);
         assert!(remaining_grant(contract_address) == remaining_grant, 0);
     }

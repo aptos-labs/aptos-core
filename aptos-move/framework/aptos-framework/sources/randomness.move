@@ -94,7 +94,7 @@ module aptos_framework::randomness {
             let blob = next_32_bytes();
             vector::reverse_append(&mut v, blob);
 
-            c = c + 32;
+            c += 32;
         };
 
         if (c > n) {
@@ -123,7 +123,7 @@ module aptos_framework::randomness {
         let ret: u16 = 0;
         while (i < 2) {
             ret = ret * 256 + (vector::pop_back(&mut raw) as u16);
-            i = i + 1;
+            i += 1;
         };
 
         event::emit(RandomnessGeneratedEvent {});
@@ -138,7 +138,7 @@ module aptos_framework::randomness {
         let ret: u32 = 0;
         while (i < 4) {
             ret = ret * 256 + (vector::pop_back(&mut raw) as u32);
-            i = i + 1;
+            i += 1;
         };
 
         event::emit(RandomnessGeneratedEvent {});
@@ -153,7 +153,7 @@ module aptos_framework::randomness {
         let ret: u64 = 0;
         while (i < 8) {
             ret = ret * 256 + (vector::pop_back(&mut raw) as u64);
-            i = i + 1;
+            i += 1;
         };
 
         event::emit(RandomnessGeneratedEvent {});
@@ -168,7 +168,7 @@ module aptos_framework::randomness {
         let ret: u128 = 0;
         while (i < 16) {
             ret = ret * 256 + (vector::pop_back(&mut raw) as u128);
-            i = i + 1;
+            i += 1;
         };
 
         event::emit(RandomnessGeneratedEvent {});
@@ -189,7 +189,7 @@ module aptos_framework::randomness {
         let ret: u256 = 0;
         while (i < 32) {
             ret = ret * 256 + (vector::pop_back(&mut raw) as u256);
-            i = i + 1;
+            i += 1;
         };
         ret
     }
@@ -283,7 +283,7 @@ module aptos_framework::randomness {
             i < 256
         }) {
             sample = safe_add_mod(sample, sample, range);
-            i = i + 1;
+            i += 1;
         };
 
         let sample = safe_add_mod(sample, r0 % range, range);
@@ -317,7 +317,7 @@ module aptos_framework::randomness {
             i < n
         }) {
             std::vector::push_back(&mut values, i);
-            i = i + 1;
+            i += 1;
         };
         spec {
             assert len(values) == n;
@@ -336,7 +336,7 @@ module aptos_framework::randomness {
                 assert pop_position < len(values);
             };
             std::vector::swap(&mut values, pop_position, tail);
-            tail = tail - 1;
+            tail -= 1;
         };
 
         values
@@ -418,59 +418,59 @@ module aptos_framework::randomness {
         assert_event_count_equals(c);
 
         let _ = bytes(1);
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = u8_integer();
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = u16_integer();
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = u32_integer();
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = u64_integer();
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = u128_integer();
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = u256_integer();
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = u8_range(0, 255);
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = u16_range(0, 255);
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = u32_range(0, 255);
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = u64_range(0, 255);
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = u128_range(0, 255);
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = u256_range(0, 255);
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = permutation(6);
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
     }
 
@@ -552,8 +552,8 @@ module aptos_framework::randomness {
         let num_permutations = 1;
         let c = 1;
         for (i in 0..size) {
-            num_permutations = num_permutations * c;
-            c = c + 1;
+            num_permutations *= c;
+            c += 1;
         };
 
         let permutations = table_with_length::new<vector<u64>, bool>();

@@ -447,7 +447,7 @@ module aptos_experimental::veiled_coin {
         amount >> NUM_MOST_SIGNIFICANT_BITS_REMOVED;
 
         // Removes the other `32 - NUM_MOST_SIGNIFICANT_BITS_REMOVED` least significant bits.
-        amount = amount >> NUM_LEAST_SIGNIFICANT_BITS_REMOVED;
+        amount >>= NUM_LEAST_SIGNIFICANT_BITS_REMOVED;
 
         // We are now left with a 32-bit value
         (amount as u32)

@@ -26,7 +26,7 @@ module aptos_framework::base16 {
             let c2 = vector::borrow(&str, i + 1);
             let byte = hex_char_to_u8(*c1) << 4 | hex_char_to_u8(*c2);
             vector::push_back(&mut result, byte);
-            i = i + 2;
+            i += 2;
         };
         result
     }

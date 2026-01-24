@@ -263,9 +263,7 @@ module aptos_framework::staking_config {
         new_rate = fixed_point64::max(new_rate, staking_rewards_config.min_rewards_rate);
 
         staking_rewards_config.rewards_rate = new_rate;
-        staking_rewards_config.last_rewards_rate_period_start_in_secs =
-            staking_rewards_config.last_rewards_rate_period_start_in_secs +
-            staking_rewards_config.rewards_rate_period_in_secs;
+        staking_rewards_config.last_rewards_rate_period_start_in_secs += staking_rewards_config.rewards_rate_period_in_secs;
         return *staking_rewards_config
     }
 

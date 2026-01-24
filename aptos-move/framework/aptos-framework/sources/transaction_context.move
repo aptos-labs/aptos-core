@@ -237,7 +237,7 @@ module aptos_framework::transaction_context {
         let i: u64 = 0;
         let count: u64 = 50;
         while (i < count) {
-            i = i + 1;
+            i += 1;
             vector::push_back(&mut auids, generate_auid_address());
         };
         i = 0;
@@ -245,9 +245,9 @@ module aptos_framework::transaction_context {
             let j: u64 = i + 1;
             while (j < count) {
                 assert!(*vector::borrow(&auids, i) != *vector::borrow(&auids, j), 0);
-                j = j + 1;
+                j += 1;
             };
-            i = i + 1;
+            i += 1;
         };
     }
 

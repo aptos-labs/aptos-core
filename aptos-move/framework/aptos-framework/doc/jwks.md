@@ -1491,7 +1491,7 @@ and its <code><a href="version.md#0x1_version">version</a></code> equals to the 
                     <a href="jwks.md#0x1_jwks_upsert_jwk">upsert_jwk</a>(&<b>mut</b> cur_issuer_jwks, jwk);
                 }
             });
-            cur_issuer_jwks.<a href="version.md#0x1_version">version</a> = cur_issuer_jwks.<a href="version.md#0x1_version">version</a> + 1;
+            cur_issuer_jwks.<a href="version.md#0x1_version">version</a> += 1;
             <a href="jwks.md#0x1_jwks_upsert_provider_jwks">upsert_provider_jwks</a>(&<b>mut</b> observed_jwks.<a href="jwks.md#0x1_jwks">jwks</a>, cur_issuer_jwks);
         });
     } <b>else</b> {
@@ -1704,7 +1704,7 @@ Maintains the sorted-by-issuer invariant in <code><a href="jwks.md#0x1_jwks_AllP
         <b>let</b> cur_entry = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&<a href="jwks.md#0x1_jwks">jwks</a>.entries, index);
         <b>let</b> comparison = compare_u8_vector(provider_jwks.issuer, cur_entry.issuer);
         <b>if</b> (is_greater_than(&comparison)) {
-            index = index + 1;
+            index += 1;
         } <b>else</b> {
             found = is_equal(&comparison);
             <b>break</b>
@@ -1792,7 +1792,7 @@ Upsert a <code><a href="jwks.md#0x1_jwks_JWK">JWK</a></code> into a <code><a hre
         <b>let</b> cur_entry = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&set.<a href="jwks.md#0x1_jwks">jwks</a>, index);
         <b>let</b> comparison = compare_u8_vector(<a href="jwks.md#0x1_jwks_get_jwk_id">get_jwk_id</a>(&jwk), <a href="jwks.md#0x1_jwks_get_jwk_id">get_jwk_id</a>(cur_entry));
         <b>if</b> (is_greater_than(&comparison)) {
-            index = index + 1;
+            index += 1;
         } <b>else</b> {
             found = is_equal(&comparison);
             <b>break</b>
