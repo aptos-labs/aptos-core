@@ -1034,7 +1034,7 @@ resolve this proposal.
 
     <b>let</b> voting_forum = <b>borrow_global_mut</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
     <b>let</b> proposal_id = voting_forum.next_proposal_id;
-    voting_forum.next_proposal_id = voting_forum.next_proposal_id + 1;
+    voting_forum.next_proposal_id += 1;
 
     // Add a flag <b>to</b> indicate <b>if</b> this proposal is single-step or multi-step.
     <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_add">simple_map::add</a>(&<b>mut</b> metadata, utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_KEY">IS_MULTI_STEP_PROPOSAL_KEY</a>), to_bytes(&is_multi_step_proposal));
@@ -1145,9 +1145,9 @@ This guarantees that voting eligibility and voting power are controlled by the r
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="voting.md#0x1_voting_EMULTI_STEP_PROPOSAL_IN_EXECUTION">EMULTI_STEP_PROPOSAL_IN_EXECUTION</a>));
 
     <b>if</b> (should_pass) {
-        proposal.yes_votes = proposal.yes_votes + (num_votes <b>as</b> u128);
+        proposal.yes_votes += (num_votes <b>as</b> u128);
     } <b>else</b> {
-        proposal.no_votes = proposal.no_votes + (num_votes <b>as</b> u128);
+        proposal.no_votes += (num_votes <b>as</b> u128);
     };
 
     // Record the resolvable time <b>to</b> ensure that resolution <b>has</b> <b>to</b> be done non-atomically.

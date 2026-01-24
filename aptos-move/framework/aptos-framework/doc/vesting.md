@@ -2282,7 +2282,7 @@ Create a vesting contract with a given configurations.
             shareholder,
             buy_in_amount,
         );
-        grant_amount = grant_amount + buy_in_amount;
+        grant_amount += buy_in_amount;
     });
     <b>assert</b>!(grant_amount &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting.md#0x1_vesting_EZERO_GRANT">EZERO_GRANT</a>));
 
@@ -2474,7 +2474,7 @@ Unlock any vested portion of the grant.
     <b>let</b> vested_amount = <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_multiply_u64">fixed_point32::multiply_u64</a>(total_grant, vesting_fraction);
     // Cap vested amount by the remaining grant amount so we don't try <b>to</b> distribute more than what's remaining.
     vested_amount = <b>min</b>(vested_amount, vesting_contract.remaining_grant);
-    vesting_contract.remaining_grant = vesting_contract.remaining_grant - vested_amount;
+    vesting_contract.remaining_grant -= vested_amount;
     vesting_schedule.last_vested_period = next_period_to_vest;
     <a href="vesting.md#0x1_vesting_unlock_stake">unlock_stake</a>(vesting_contract, vested_amount);
 
@@ -3299,7 +3299,7 @@ This address should be deterministic for the same admin and vesting contract cre
     <b>let</b> admin_store = <b>borrow_global_mut</b>&lt;<a href="vesting.md#0x1_vesting_AdminStore">AdminStore</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(admin));
     <b>let</b> seed = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(admin));
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> seed, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&admin_store.nonce));
-    admin_store.nonce = admin_store.nonce + 1;
+    admin_store.nonce += 1;
 
     // Include a salt <b>to</b> avoid conflicts <b>with</b> <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> other modules out there that might also generate
     // deterministic resource accounts for the same admin <b>address</b> + nonce.

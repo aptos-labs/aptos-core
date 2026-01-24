@@ -1599,7 +1599,7 @@ When the feature flag is disabled:
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="account.md#0x1_account_ESEQUENCE_NUMBER_TOO_BIG">ESEQUENCE_NUMBER_TOO_BIG</a>)
     );
 
-    *sequence_number = *sequence_number + 1;
+    *sequence_number += 1;
 }
 </code></pre>
 

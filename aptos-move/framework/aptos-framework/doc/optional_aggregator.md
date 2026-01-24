@@ -213,7 +213,7 @@ Adds <code>value</code> to integer. Aborts on overflowing the limit.
         value &lt;= (integer.limit - integer.value),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="optional_aggregator.md#0x1_optional_aggregator_EAGGREGATOR_OVERFLOW">EAGGREGATOR_OVERFLOW</a>)
     );
-    integer.value = integer.value + value;
+    integer.value += value;
 }
 </code></pre>
 
@@ -239,7 +239,7 @@ Subtracts <code>value</code> from integer. Aborts on going below zero.
 
 <pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_sub_integer">sub_integer</a>(integer: &<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">Integer</a>, value: u128) {
     <b>assert</b>!(value &lt;= integer.value, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="optional_aggregator.md#0x1_optional_aggregator_EAGGREGATOR_UNDERFLOW">EAGGREGATOR_UNDERFLOW</a>));
-    integer.value = integer.value - value;
+    integer.value -= value;
 }
 </code></pre>
 

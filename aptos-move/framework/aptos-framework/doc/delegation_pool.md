@@ -2425,7 +2425,7 @@ in each of its individual states: (<code>active</code>,<code>inactive</code>,<co
     <b>if</b> (pending_active == 0) {
         // zero `pending_active` <a href="stake.md#0x1_stake">stake</a> indicates that either there are no `add_stake` fees or
         // previous epoch <b>has</b> ended and should identify shares owning these fees <b>as</b> released
-        total_active_shares = total_active_shares - <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shares">pool_u64::shares</a>(&pool.active_shares, <a href="delegation_pool.md#0x1_delegation_pool_NULL_SHAREHOLDER">NULL_SHAREHOLDER</a>);
+        total_active_shares -= <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shares">pool_u64::shares</a>(&pool.active_shares, <a href="delegation_pool.md#0x1_delegation_pool_NULL_SHAREHOLDER">NULL_SHAREHOLDER</a>);
         <b>if</b> (delegator_address == <a href="delegation_pool.md#0x1_delegation_pool_NULL_SHAREHOLDER">NULL_SHAREHOLDER</a>) {
             delegator_active_shares = 0
         }
@@ -2448,12 +2448,12 @@ in each of its individual states: (<code>active</code>,<code>inactive</code>,<co
     // some imprecision (received <a href="stake.md#0x1_stake">stake</a> would be slightly less)
     // but adding rewards onto the existing <a href="stake.md#0x1_stake">stake</a> is still a good approximation
     <b>if</b> (delegator_address == <a href="delegation_pool.md#0x1_delegation_pool_beneficiary_for_operator">beneficiary_for_operator</a>(get_operator(pool_address))) {
-        active = active + commission_active;
+        active += commission_active;
         // in-flight pending_inactive commission can coexist <b>with</b> already inactive withdrawal
         <b>if</b> (lockup_cycle_ended) {
-            inactive = inactive + commission_pending_inactive
+            inactive += commission_pending_inactive
         } <b>else</b> {
-            pending_inactive = pending_inactive + commission_pending_inactive
+            pending_inactive += commission_pending_inactive
         }
     };
 
@@ -2498,8 +2498,8 @@ extracted-fee = (amount - extracted-fee) * reward-rate% * (100% - operator-commi
         <b>if</b> (rewards_rate_denominator &gt; 0) {
             <a href="delegation_pool.md#0x1_delegation_pool_assert_delegation_pool_exists">assert_delegation_pool_exists</a>(pool_address);
 
-            rewards_rate = rewards_rate * (<a href="delegation_pool.md#0x1_delegation_pool_MAX_FEE">MAX_FEE</a> - <a href="delegation_pool.md#0x1_delegation_pool_operator_commission_percentage">operator_commission_percentage</a>(pool_address));
-            rewards_rate_denominator = rewards_rate_denominator * <a href="delegation_pool.md#0x1_delegation_pool_MAX_FEE">MAX_FEE</a>;
+            rewards_rate *= (<a href="delegation_pool.md#0x1_delegation_pool_MAX_FEE">MAX_FEE</a> - <a href="delegation_pool.md#0x1_delegation_pool_operator_commission_percentage">operator_commission_percentage</a>(pool_address));
+            rewards_rate_denominator *= <a href="delegation_pool.md#0x1_delegation_pool_MAX_FEE">MAX_FEE</a>;
             ((((amount <b>as</b> u128) * (rewards_rate <b>as</b> u128)) / ((rewards_rate <b>as</b> u128) + (rewards_rate_denominator <b>as</b> u128))) <b>as</b> u64)
         } <b>else</b> { 0 }
     } <b>else</b> { 0 }
@@ -3136,7 +3136,7 @@ Vote on a proposal with a voter's voting power. To successfully vote, the follow
     // Check a edge case during the transient period of enabling partial governance <a href="voting.md#0x1_voting">voting</a>.
     <a href="delegation_pool.md#0x1_delegation_pool_assert_and_update_proposal_used_voting_power">assert_and_update_proposal_used_voting_power</a>(governance_records, pool_address, proposal_id, voting_power);
     <b>let</b> used_voting_power = <a href="delegation_pool.md#0x1_delegation_pool_borrow_mut_used_voting_power">borrow_mut_used_voting_power</a>(governance_records, voter_address, proposal_id);
-    *used_voting_power = *used_voting_power + voting_power;
+    *used_voting_power += voting_power;
 
     <b>let</b> pool_signer = <a href="delegation_pool.md#0x1_delegation_pool_retrieve_stake_pool_owner">retrieve_stake_pool_owner</a>(<b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address));
     <a href="aptos_governance.md#0x1_aptos_governance_partial_vote">aptos_governance::partial_vote</a>(&pool_signer, pool_address, proposal_id, voting_power, should_pass);
@@ -4167,16 +4167,14 @@ this change won't take effects until the next lockup period.
             governance_records,
             pending_voter
         );
-        pending_delegated_votes.active_shares_next_lockup =
-            pending_delegated_votes.active_shares_next_lockup - active_shares;
+        pending_delegated_votes.active_shares_next_lockup -= active_shares;
 
         <b>let</b> new_delegated_votes = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegated_votes">update_and_borrow_mut_delegated_votes</a>(
             <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>,
             governance_records,
             new_voter
         );
-        new_delegated_votes.active_shares_next_lockup =
-            new_delegated_votes.active_shares_next_lockup + active_shares;
+        new_delegated_votes.active_shares_next_lockup += active_shares;
     };
 
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_module_event_migration_enabled">features::module_event_migration_enabled</a>()) {
@@ -4723,7 +4721,7 @@ Withdraw <code>amount</code> of owned inactive stake from the delegation pool at
         <b>let</b> (_, _, _, pending_inactive) = <a href="stake.md#0x1_stake_get_stake">stake::get_stake</a>(pool_address);
         <b>if</b> (withdrawal_olc.index == pool.observed_lockup_cycle.index) {
             // `amount` less excess <b>if</b> withdrawing pending_inactive <a href="stake.md#0x1_stake">stake</a>
-            pending_inactive = pending_inactive - amount
+            pending_inactive -= amount
         };
         // escape excess <a href="stake.md#0x1_stake">stake</a> from inactivation
         <a href="stake.md#0x1_stake_reactivate_stake">stake::reactivate_stake</a>(stake_pool_owner, pending_inactive);
@@ -5156,7 +5154,7 @@ whether the lockup expired on the stake pool.
     <b>let</b> lockup_cycle_ended = inactive &gt; pool.total_coins_inactive;
 
     // actual coins on <a href="stake.md#0x1_stake">stake</a> pool belonging <b>to</b> the active shares pool
-    active = active + pending_active;
+    active += pending_active;
     // actual coins on <a href="stake.md#0x1_stake">stake</a> pool belonging <b>to</b> the shares pool hosting `pending_inactive` <a href="stake.md#0x1_stake">stake</a>
     // at current observed lockup cycle, either pending: `pending_inactive` or already inactivated:
     <b>if</b> (lockup_cycle_ended) {
@@ -5284,7 +5282,7 @@ shares pools, assign commission to operator and eventually prepare delegation po
         pool.total_coins_inactive = inactive;
 
         // advance lockup cycle on the delegation pool
-        pool.observed_lockup_cycle.index = pool.observed_lockup_cycle.index + 1;
+        pool.observed_lockup_cycle.index += 1;
         // start new lockup cycle <b>with</b> a fresh shares pool for `pending_inactive` <a href="stake.md#0x1_stake">stake</a>
         <a href="../../aptos-stdlib/doc/table.md#0x1_table_add">table::add</a>(
             &<b>mut</b> pool.inactive_shares,
@@ -5341,7 +5339,7 @@ shares pools, assign commission to operator and eventually prepare delegation po
         stake_pool_used_voting_power == *proposal_used_voting_power,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="delegation_pool.md#0x1_delegation_pool_EALREADY_VOTED_BEFORE_ENABLE_PARTIAL_VOTING">EALREADY_VOTED_BEFORE_ENABLE_PARTIAL_VOTING</a>)
     );
-    *proposal_used_voting_power = *proposal_used_voting_power + voting_power;
+    *proposal_used_voting_power += voting_power;
 }
 </code></pre>
 
@@ -5376,15 +5374,13 @@ shares pools, assign commission to operator and eventually prepare delegation po
     <b>let</b> pending_voter = vote_delegation.pending_voter;
     <b>let</b> current_delegated_votes =
         <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegated_votes">update_and_borrow_mut_delegated_votes</a>(pool, governance_records, current_voter);
-    current_delegated_votes.active_shares = current_delegated_votes.active_shares + new_shares;
+    current_delegated_votes.active_shares += new_shares;
     <b>if</b> (pending_voter == current_voter) {
-        current_delegated_votes.active_shares_next_lockup =
-            current_delegated_votes.active_shares_next_lockup + new_shares;
+        current_delegated_votes.active_shares_next_lockup += new_shares;
     } <b>else</b> {
         <b>let</b> pending_delegated_votes =
             <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegated_votes">update_and_borrow_mut_delegated_votes</a>(pool, governance_records, pending_voter);
-        pending_delegated_votes.active_shares_next_lockup =
-            pending_delegated_votes.active_shares_next_lockup + new_shares;
+        pending_delegated_votes.active_shares_next_lockup += new_shares;
     };
 }
 </code></pre>
@@ -5417,7 +5413,7 @@ shares pools, assign commission to operator and eventually prepare delegation po
     <b>let</b> governance_records = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address);
     <b>let</b> current_voter = <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_delegator_voter_internal">calculate_and_update_delegator_voter_internal</a>(pool, governance_records, shareholder);
     <b>let</b> current_delegated_votes = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegated_votes">update_and_borrow_mut_delegated_votes</a>(pool, governance_records, current_voter);
-    current_delegated_votes.pending_inactive_shares = current_delegated_votes.pending_inactive_shares + new_shares;
+    current_delegated_votes.pending_inactive_shares += new_shares;
 }
 </code></pre>
 
@@ -5455,15 +5451,13 @@ shares pools, assign commission to operator and eventually prepare delegation po
     <b>let</b> current_voter = vote_delegation.voter;
     <b>let</b> pending_voter = vote_delegation.pending_voter;
     <b>let</b> current_delegated_votes = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegated_votes">update_and_borrow_mut_delegated_votes</a>(pool, governance_records, current_voter);
-    current_delegated_votes.active_shares = current_delegated_votes.active_shares - shares_to_redeem;
+    current_delegated_votes.active_shares -= shares_to_redeem;
     <b>if</b> (current_voter == pending_voter) {
-        current_delegated_votes.active_shares_next_lockup =
-            current_delegated_votes.active_shares_next_lockup - shares_to_redeem;
+        current_delegated_votes.active_shares_next_lockup -= shares_to_redeem;
     } <b>else</b> {
         <b>let</b> pending_delegated_votes =
             <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegated_votes">update_and_borrow_mut_delegated_votes</a>(pool, governance_records, pending_voter);
-        pending_delegated_votes.active_shares_next_lockup =
-            pending_delegated_votes.active_shares_next_lockup - shares_to_redeem;
+        pending_delegated_votes.active_shares_next_lockup -= shares_to_redeem;
     };
 }
 </code></pre>
@@ -5496,7 +5490,7 @@ shares pools, assign commission to operator and eventually prepare delegation po
     <b>let</b> governance_records = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address);
     <b>let</b> current_voter = <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_delegator_voter_internal">calculate_and_update_delegator_voter_internal</a>(pool, governance_records, shareholder);
     <b>let</b> current_delegated_votes = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegated_votes">update_and_borrow_mut_delegated_votes</a>(pool, governance_records, current_voter);
-    current_delegated_votes.pending_inactive_shares = current_delegated_votes.pending_inactive_shares - shares_to_redeem;
+    current_delegated_votes.pending_inactive_shares -= shares_to_redeem;
 }
 </code></pre>
 

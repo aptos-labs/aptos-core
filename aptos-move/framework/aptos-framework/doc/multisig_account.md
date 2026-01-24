@@ -1619,7 +1619,7 @@ Return all pending transactions.
     <b>let</b> next_sequence_number = <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>.next_sequence_number;
     <b>while</b> (i &lt; next_sequence_number) {
         <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> pending_transactions, *<a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>.transactions, i));
-        i = i + 1;
+        i += 1;
     };
     pending_transactions
 }
@@ -1714,7 +1714,7 @@ Return true if the owner can execute the transaction with given transaction id n
     <a href="multisig_account.md#0x1_multisig_account_assert_valid_sequence_number">assert_valid_sequence_number</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number);
     <b>let</b> (num_approvals, _) = <a href="multisig_account.md#0x1_multisig_account_num_approvals_and_rejections">num_approvals_and_rejections</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number);
     <b>if</b> (!<a href="multisig_account.md#0x1_multisig_account_has_voted_for_approval">has_voted_for_approval</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number, owner)) {
-        num_approvals = num_approvals + 1;
+        num_approvals += 1;
     };
     <a href="multisig_account.md#0x1_multisig_account_is_owner">is_owner</a>(owner, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) &&
         sequence_number == <a href="multisig_account.md#0x1_multisig_account_last_resolved_sequence_number">last_resolved_sequence_number</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) + 1 &&
@@ -1776,7 +1776,7 @@ Return true if the owner can execute the "rejected" transaction with given trans
     <a href="multisig_account.md#0x1_multisig_account_assert_valid_sequence_number">assert_valid_sequence_number</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number);
     <b>let</b> (_, num_rejections) = <a href="multisig_account.md#0x1_multisig_account_num_approvals_and_rejections">num_approvals_and_rejections</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number);
     <b>if</b> (!<a href="multisig_account.md#0x1_multisig_account_has_voted_for_rejection">has_voted_for_rejection</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number, owner)) {
-        num_rejections = num_rejections + 1;
+        num_rejections += 1;
     };
     <a href="multisig_account.md#0x1_multisig_account_is_owner">is_owner</a>(owner, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) &&
         sequence_number == <a href="multisig_account.md#0x1_multisig_account_last_resolved_sequence_number">last_resolved_sequence_number</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) + 1 &&
@@ -2736,7 +2736,7 @@ maliciously alter the number of signatures required.
         );
 
         <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_add">simple_map::add</a>(metadata, key, value);
-        i = i + 1;
+        i += 1;
     };
 
     <b>if</b> (emit_event) {
@@ -3017,7 +3017,7 @@ Generic function that can be used to either approve or reject a batch of transac
     <b>let</b> sequence_number = starting_sequence_number;
     <b>while</b>(sequence_number &lt;= final_sequence_number) {
         <a href="multisig_account.md#0x1_multisig_account_vote_transanction">vote_transanction</a>(owner, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number, approved);
-        sequence_number = sequence_number + 1;
+        sequence_number += 1;
     }
 }
 </code></pre>
@@ -3344,7 +3344,7 @@ This function is private so no other code can call this beside the VM itself as 
                 }
             );
         };
-        num_approvals = num_approvals + 1;
+        num_approvals += 1;
     };
 
     num_approvals
@@ -3602,9 +3602,9 @@ This function is private so no other code can call this beside the VM itself as 
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(owners, |owner| {
         <b>if</b> (<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_contains_key">simple_map::contains_key</a>(votes, owner)) {
             <b>if</b> (*<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_borrow">simple_map::borrow</a>(votes, owner)) {
-                num_approvals = num_approvals + 1;
+                num_approvals += 1;
             } <b>else</b> {
-                num_rejections = num_rejections + 1;
+                num_rejections += 1;
             };
         }
     });

@@ -2665,7 +2665,7 @@ Returns the amount of coin in existence.
             <a href="fungible_asset.md#0x1_fungible_asset_supply">fungible_asset::supply</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> metadata));
         <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&coin_supply)) {
             <b>let</b> <a href="coin.md#0x1_coin_supply">supply</a> = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow_mut">option::borrow_mut</a>(&<b>mut</b> coin_supply);
-            *<a href="coin.md#0x1_coin_supply">supply</a> = *<a href="coin.md#0x1_coin_supply">supply</a> + <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_some">option::destroy_some</a>(fungible_asset_supply);
+            *<a href="coin.md#0x1_coin_supply">supply</a> += <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_some">option::destroy_some</a>(fungible_asset_supply);
         };
     };
     coin_supply
@@ -2961,7 +2961,7 @@ Extracts <code>amount</code> from the passed-in <code><a href="coin.md#0x1_coin"
     <b>spec</b> {
         <b>update</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; = <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; - amount;
     };
-    <a href="coin.md#0x1_coin">coin</a>.value = <a href="coin.md#0x1_coin">coin</a>.value - amount;
+    <a href="coin.md#0x1_coin">coin</a>.value -= amount;
     <b>spec</b> {
         <b>update</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; = <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; + amount;
     };
@@ -3271,7 +3271,7 @@ to the sum of the two tokens (<code>dst_coin</code> and <code>source_coin</code>
     <b>spec</b> {
         <b>update</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; = <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; + value;
     };
-    dst_coin.value = dst_coin.value + value;
+    dst_coin.value += value;
 }
 </code></pre>
 
