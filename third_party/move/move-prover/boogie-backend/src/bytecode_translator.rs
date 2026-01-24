@@ -6,16 +6,17 @@
 
 use crate::{
     boogie_helpers::{
-        boogie_address, boogie_address_blob, boogie_bv_type, boogie_byte_blob,
-        boogie_closure_pack_name, boogie_constant_blob, boogie_debug_track_abort,
+        behavioral_spec_fun_symbol, boogie_address, boogie_address_blob,
+        boogie_behavioral_eval_fun_name, boogie_behavioral_spec_fun_name, boogie_bv_type,
+        boogie_byte_blob, boogie_closure_pack_name, boogie_constant_blob, boogie_debug_track_abort,
         boogie_debug_track_local, boogie_debug_track_return, boogie_equality_for_type,
-        boogie_field_sel, boogie_field_update, boogie_fun_apply_name, boogie_function_bv_name,
-        boogie_function_name, boogie_make_vec_from_strings, boogie_modifies_memory_name,
-        boogie_num_literal, boogie_num_type_base, boogie_num_type_string_capital,
-        boogie_reflection_type_info, boogie_reflection_type_name, boogie_resource_memory_name,
-        boogie_struct_name, boogie_struct_variant_name, boogie_temp, boogie_temp_from_suffix,
-        boogie_type, boogie_type_for_struct_field, boogie_type_param, boogie_type_suffix,
-        boogie_type_suffix_bv, boogie_type_suffix_for_struct,
+        boogie_field_sel, boogie_field_update, boogie_fun_apply_name, boogie_fun_param_name,
+        boogie_function_bv_name, boogie_function_name, boogie_make_vec_from_strings,
+        boogie_modifies_memory_name, boogie_num_literal, boogie_num_type_base,
+        boogie_num_type_string_capital, boogie_reflection_type_info, boogie_reflection_type_name,
+        boogie_resource_memory_name, boogie_struct_name, boogie_struct_variant_name, boogie_temp,
+        boogie_temp_from_suffix, boogie_type, boogie_type_for_struct_field, boogie_type_param,
+        boogie_type_suffix, boogie_type_suffix_bv, boogie_type_suffix_for_struct,
         boogie_type_suffix_for_struct_variant, boogie_variant_field_update,
         boogie_well_formed_check, boogie_well_formed_expr_bv, field_bv_flag_global_state,
         TypeIdentToken,
@@ -30,7 +31,7 @@ use legacy_move_compiler::interface_generator::NATIVE_INTERFACE;
 #[allow(unused_imports)]
 use log::{debug, info, log, warn, Level};
 use move_model::{
-    ast::{Attribute, TempIndex, TraceKind},
+    ast::{Attribute, BehaviorKind, ConditionKind, TempIndex, TraceKind},
     code_writer::CodeWriter,
     emit, emitln,
     model::{FieldEnv, FunctionEnv, GlobalEnv, Loc, NodeId, QualifiedInstId, StructEnv, StructId},
@@ -44,7 +45,7 @@ use move_model::{
 };
 use move_prover_bytecode_pipeline::{
     mono_analysis,
-    mono_analysis::ClosureInfo,
+    mono_analysis::{ClosureInfo, FunParamInfo},
     number_operation::{
         FuncOperationMap, GlobalNumberOperationState, NumOperation,
         NumOperation::{Bitwise, Bottom},
@@ -84,6 +85,9 @@ pub struct BoogieTranslator<'env> {
     writer: &'env CodeWriter,
     spec_translator: SpecTranslator<'env>,
     targets: &'env FunctionTargetsHolder,
+    /// Map from function type to the set of function parameter infos for that type.
+    /// Used to emit behavioral predicate assumptions at closure construction sites.
+    fun_param_infos: BTreeMap<Type, BTreeSet<FunParamInfo>>,
 }
 
 pub struct FunctionTranslator<'env> {
@@ -113,6 +117,7 @@ impl<'env> BoogieTranslator<'env> {
             targets,
             writer,
             spec_translator: SpecTranslator::new(writer, env, options),
+            fun_param_infos: BTreeMap::new(),
         }
     }
 
@@ -218,6 +223,10 @@ impl<'env> BoogieTranslator<'env> {
 
         let mono_info = mono_analysis::get_info(self.env);
         let empty = &BTreeSet::new();
+
+        // Populate fun_param_infos for use during closure construction.
+        // This enables emitting behavioral predicate assumptions at the call site.
+        self.fun_param_infos = mono_info.fun_param_infos.clone();
 
         emitln!(
             writer,
@@ -487,8 +496,13 @@ impl<'env> BoogieTranslator<'env> {
         }
 
         // Emit function types and closures
+        let empty_param_infos = BTreeSet::new();
         for (fun_type, closure_infos) in &mono_info.fun_infos {
-            self.translate_fun_type(fun_type, closure_infos, &translated_memory)
+            let fun_param_infos = mono_info
+                .fun_param_infos
+                .get(fun_type)
+                .unwrap_or(&empty_param_infos);
+            self.translate_fun_type(fun_type, closure_infos, fun_param_infos, &translated_memory)
         }
 
         // Emit any finalization items required by spec translation.
@@ -508,6 +522,7 @@ impl<'env> BoogieTranslator<'env> {
         &self,
         fun_type: &Type,
         closure_infos: &BTreeSet<ClosureInfo>,
+        fun_param_infos: &BTreeSet<FunParamInfo>,
         memory: &[String],
     ) {
         emitln!(
@@ -520,7 +535,12 @@ impl<'env> BoogieTranslator<'env> {
         let fun_ty_boogie_name = boogie_type(self.env, fun_type);
         emitln!(self.writer, "datatype {} {{", fun_ty_boogie_name);
         self.writer.indent();
-        for info in closure_infos {
+        // Collect all variants first to handle commas properly
+        let closure_count = closure_infos.len();
+        let param_count = fun_param_infos.len();
+        let total_count = closure_count + param_count;
+
+        for (idx, info) in closure_infos.iter().enumerate() {
             emitln!(
                 self.writer,
                 "// Closure from function `{}`, capture mask 0b{}",
@@ -545,18 +565,30 @@ impl<'env> BoogieTranslator<'env> {
                     boogie_type(self.env, captured_ty)
                 )
             }
-            emitln!(self.writer, "),")
+            // Only emit comma if not the last variant
+            let is_last = idx == total_count - 1;
+            emitln!(self.writer, "){}", if is_last { "" } else { "," });
         }
-        // Last variant for unknown value.
-        emitln!(
-            self.writer,
-            "// Value to represent some arbitrary unknown function"
-        );
-        emitln!(
-            self.writer,
-            "$unknown_function'{}'(id: int)",
-            boogie_type_suffix(self.env, fun_type),
-        );
+        // Add parameter variants for function-typed parameters of verification targets.
+        // These enable behavioral predicate handling in the apply function.
+        for (idx, info) in fun_param_infos.iter().enumerate() {
+            let fun_env = self.env.get_function(info.fun.to_qualified_id());
+            emitln!(
+                self.writer,
+                "// Parameter `{}` of function `{}`",
+                info.param_sym.display(self.env.symbol_pool()),
+                fun_env.get_name().display(self.env.symbol_pool())
+            );
+            // Parameter variants have no captured values, just a constant constructor
+            // Only emit comma if not the last variant
+            let is_last = closure_count + idx == total_count - 1;
+            emitln!(
+                self.writer,
+                "{}(){}",
+                boogie_fun_param_name(self.env, &info.fun, info.param_sym),
+                if is_last { "" } else { "," }
+            );
+        }
         self.writer.unindent();
         emitln!(self.writer, "}");
         emitln!(
@@ -566,7 +598,36 @@ impl<'env> BoogieTranslator<'env> {
             fun_ty_boogie_name
         );
 
-        // Create an apply procedure.
+        // Generate behavioral predicate evaluation functions.
+        // These inline functions dispatch on closure variants to evaluate behavioral predicates.
+        self.generate_behavioral_predicate_evaluator(
+            self.env,
+            fun_type,
+            closure_infos,
+            fun_param_infos,
+            BehaviorKind::RequiresOf,
+        );
+        self.generate_behavioral_predicate_evaluator(
+            self.env,
+            fun_type,
+            closure_infos,
+            fun_param_infos,
+            BehaviorKind::AbortsOf,
+        );
+        self.generate_behavioral_predicate_evaluator(
+            self.env,
+            fun_type,
+            closure_infos,
+            fun_param_infos,
+            BehaviorKind::EnsuresOf,
+        );
+
+        // Create an apply procedure which dispatches to the appropriate closure implementation.
+        emitln!(
+            self.writer,
+            "// Apply procedure for `{}`",
+            fun_type.display(&self.env.get_type_display_ctx())
+        );
         emit!(
             self.writer,
             "procedure {{:inline 1}} {}(",
@@ -614,10 +675,29 @@ impl<'env> BoogieTranslator<'env> {
         emitln!(self.writer, ") {");
         self.writer.indent();
         let result_str = result_locals.iter().cloned().join(", ");
-        for info in closure_infos {
+
+        // Generate branches for all variants. Since the datatype is closed,
+        // the last variant uses `else` without an explicit check (unless it's the only variant,
+        // in which case we emit the body directly without any block).
+        let closure_count = closure_infos.len();
+        let param_count = fun_param_infos.len();
+        let total_variants = closure_count + param_count;
+
+        for (idx, info) in closure_infos.iter().enumerate() {
+            let is_last = idx == total_variants - 1;
+            let is_only = total_variants == 1;
             let ctor_name = boogie_closure_pack_name(self.env, &info.fun, info.mask);
-            emitln!(self.writer, "if (fun is {}) {{", ctor_name);
-            self.writer.indent();
+            if is_only {
+                // Single variant: emit body directly without any block
+            } else if is_last {
+                // Last of multiple variants: use else without explicit check
+                // The previous variant's closing already emitted `} else `, so just open the block
+                emitln!(self.writer, "{{   // {}", ctor_name);
+                self.writer.indent();
+            } else {
+                emitln!(self.writer, "if (fun is {}) {{", ctor_name);
+                self.writer.indent();
+            }
             let fun_env = &self.env.get_function(info.fun.to_qualified_id());
             let fun_name = boogie_function_name(fun_env, &info.fun.inst);
             let args = (0..info.mask.captured_count())
@@ -630,27 +710,405 @@ impl<'env> BoogieTranslator<'env> {
                 format!("{result_str} := ")
             };
             emitln!(self.writer, "call {}{}({});", call_prefix, fun_name, args);
-            self.writer.unindent();
-            emitln!(self.writer, "} else ");
+            if is_only {
+                // Single variant: no closing needed
+            } else {
+                self.writer.unindent();
+                if is_last {
+                    emitln!(self.writer, "}");
+                } else {
+                    emitln!(self.writer, "} else ");
+                }
+            }
         }
-        if !closure_infos.is_empty() {
-            emitln!(self.writer, "{");
-            self.writer.indent();
-        }
-        emitln!(
-            self.writer,
-            "// Havoc memory and abort_flag since the unknown function could modify anything."
-        );
-        emitln!(self.writer, "havoc $abort_flag;");
-        for mem in memory {
-            emitln!(self.writer, "havoc {};", mem)
-        }
-        if !closure_infos.is_empty() {
+
+        // Generate branches for function parameter variants using behavioral predicates.
+        // We use a conservative approach: havoc results and abort_flag, then constrain
+        // with behavioral predicates if they exist.
+        for (idx, info) in fun_param_infos.iter().enumerate() {
+            let is_last = closure_count + idx == total_variants - 1;
+            let is_only = total_variants == 1;
+            let ctor_name = boogie_fun_param_name(self.env, &info.fun, info.param_sym);
+            if is_only {
+                // Single variant: emit body directly without any block
+            } else if is_last {
+                // Last of multiple variants: use else without explicit check
+                // The previous variant's closing already emitted `} else `, so just open the block
+                emitln!(self.writer, "{{   // {}", ctor_name);
+                self.writer.indent();
+            } else {
+                emitln!(self.writer, "if (fun is {}) {{", ctor_name);
+                self.writer.indent();
+            }
+            // Look up which behavioral predicate spec functions exist
+            let fun_env = self.env.get_function(info.fun.to_qualified_id());
+            let module_env = &fun_env.module_env;
+
+            let requires_sym = behavioral_spec_fun_symbol(
+                self.env,
+                &info.fun,
+                info.param_sym,
+                BehaviorKind::RequiresOf,
+            );
+            let aborts_sym = behavioral_spec_fun_symbol(
+                self.env,
+                &info.fun,
+                info.param_sym,
+                BehaviorKind::AbortsOf,
+            );
+            let ensures_sym = behavioral_spec_fun_symbol(
+                self.env,
+                &info.fun,
+                info.param_sym,
+                BehaviorKind::EnsuresOf,
+            );
+
+            let has_requires = module_env
+                .get_spec_funs_of_name(requires_sym)
+                .next()
+                .is_some();
+            let has_aborts = module_env
+                .get_spec_funs_of_name(aborts_sym)
+                .next()
+                .is_some();
+            let has_ensures = module_env
+                .get_spec_funs_of_name(ensures_sym)
+                .next()
+                .is_some();
+
+            // Build the argument list for behavioral predicates (just the parameters)
+            let bp_args = (0..params.len()).map(|pos| format!("p{}", pos)).join(", ");
+
+            // Build the argument list for ensures (parameters + results)
+            let ensures_args = (0..params.len())
+                .map(|pos| format!("p{}", pos))
+                .chain(result_locals.iter().cloned())
+                .join(", ");
+
+            // Assert requires_of predicate if it exists
+            if has_requires {
+                let requires_name = boogie_behavioral_spec_fun_name(
+                    self.env,
+                    &info.fun,
+                    info.param_sym,
+                    BehaviorKind::RequiresOf,
+                    &[],
+                );
+                // Get location info for error message
+                let loc = fun_env.get_loc();
+                let file_idx = self.env.file_id_to_idx(loc.file_id());
+                let loc_str = format!("({},{},{})", file_idx, loc.span().start(), loc.span().end());
+                emitln!(
+                    self.writer,
+                    "assert {{:msg \"assert_failed{}: precondition of function parameter `{}` does not hold\"}} {}({});",
+                    loc_str,
+                    info.param_sym.display(self.env.symbol_pool()),
+                    requires_name,
+                    bp_args
+                );
+            }
+
+            // Check aborts_of predicate if it exists, otherwise havoc abort_flag
+            if has_aborts {
+                let aborts_name = boogie_behavioral_spec_fun_name(
+                    self.env,
+                    &info.fun,
+                    info.param_sym,
+                    BehaviorKind::AbortsOf,
+                    &[],
+                );
+                emitln!(self.writer, "if ({}({})) {{", aborts_name, bp_args);
+                self.writer.indent();
+                emitln!(self.writer, "$abort_flag := true;");
+                self.writer.unindent();
+                emitln!(self.writer, "} else {");
+                self.writer.indent();
+            } else {
+                // Without aborts_of, conservatively assume the function might abort
+                emitln!(self.writer, "havoc $abort_flag;");
+                emitln!(self.writer, "if (!$abort_flag) {");
+                self.writer.indent();
+            }
+
+            // Havoc results and assume ensures_of predicate if it exists
+            if !result_locals.is_empty() {
+                emitln!(self.writer, "havoc {};", result_str);
+                if has_ensures {
+                    let ensures_name = boogie_behavioral_spec_fun_name(
+                        self.env,
+                        &info.fun,
+                        info.param_sym,
+                        BehaviorKind::EnsuresOf,
+                        &[],
+                    );
+                    emitln!(self.writer, "assume {}({});", ensures_name, ensures_args);
+                }
+            }
+
+            // Havoc memory since the function could modify anything.
+            // TODO: When modifies_of is supported, only havoc if no modifies_of is specified.
+            for mem in memory {
+                emitln!(self.writer, "havoc {};", mem)
+            }
+
             self.writer.unindent();
             emitln!(self.writer, "}");
+            if is_only {
+                // Single variant: no outer block to close
+            } else {
+                self.writer.unindent();
+                if is_last {
+                    emitln!(self.writer, "}");
+                } else {
+                    emitln!(self.writer, "} else ");
+                }
+            }
         }
         self.writer.unindent();
         emitln!(self.writer, "}");
+    }
+
+    /// Generate a behavioral predicate evaluation function for a function type.
+    /// This function pattern-matches on closure variants to evaluate the predicate
+    /// using the concrete closure's spec condition.
+    #[allow(clippy::too_many_arguments)]
+    fn generate_behavioral_predicate_evaluator(
+        &self,
+        env: &GlobalEnv,
+        fun_type: &Type,
+        closure_infos: &BTreeSet<ClosureInfo>,
+        fun_param_infos: &BTreeSet<FunParamInfo>,
+        kind: BehaviorKind,
+    ) {
+        let Type::Fun(params, results, _abilities) = fun_type else {
+            panic!("expected function type")
+        };
+        let params = params.clone().flatten();
+        let results = results.clone().flatten();
+
+        // Build parameter list for the evaluation function
+        let fun_ty_boogie_name = boogie_type(env, fun_type);
+        let eval_fun_name = boogie_behavioral_eval_fun_name(env, fun_type, kind);
+
+        // Parameters depend on the kind:
+        // - requires_of and aborts_of: (fun, params...)
+        // - ensures_of: (fun, params..., results...)
+        let mut param_decls = vec![format!("f: {}", fun_ty_boogie_name)];
+        let mut param_args = vec![];
+        for (pos, ty) in params.iter().enumerate() {
+            param_decls.push(format!(
+                "p{}: {}",
+                pos,
+                boogie_type(env, ty.skip_reference())
+            ));
+            param_args.push(format!("p{}", pos));
+        }
+        if kind == BehaviorKind::EnsuresOf {
+            for (pos, ty) in results.iter().enumerate() {
+                param_decls.push(format!("r{}: {}", pos, boogie_type(env, ty)));
+                param_args.push(format!("r{}", pos));
+            }
+        }
+        let all_args = param_args.join(", ");
+
+        emitln!(
+            self.writer,
+            "// Behavioral predicate evaluator for {} on `{}`",
+            kind,
+            fun_type.display(&env.get_type_display_ctx())
+        );
+        emit!(
+            self.writer,
+            "function {{:inline}} {}({}): bool {{",
+            eval_fun_name,
+            param_decls.join(", ")
+        );
+        self.writer.indent();
+        emitln!(self.writer);
+
+        let total_variants = closure_infos.len() + fun_param_infos.len();
+        let mut variant_idx = 0;
+
+        // Generate branches for concrete closure variants
+        for info in closure_infos {
+            let ctor_name = boogie_closure_pack_name(env, &info.fun, info.mask);
+            let is_last = variant_idx == total_variants - 1;
+
+            if variant_idx == 0 && total_variants == 1 {
+                // Single variant: emit directly
+            } else if variant_idx == 0 {
+                emit!(self.writer, "if (f is {}) then ", ctor_name);
+            } else if is_last {
+                emit!(self.writer, "else /* {} */ ", ctor_name);
+            } else {
+                emit!(self.writer, "else if (f is {}) then ", ctor_name);
+            }
+
+            // Get the closure's spec conditions
+            let fun_env = env.get_function(info.fun.to_qualified_id());
+            let closure_spec = fun_env.get_spec();
+
+            // Determine what condition to emit based on kind
+            let condition = self.translate_closure_condition_for_kind(
+                env,
+                &fun_env,
+                &closure_spec,
+                kind,
+                info,
+                &params,
+                &results,
+            );
+            emitln!(self.writer, "{}", condition);
+            variant_idx += 1;
+        }
+
+        // Generate branches for function parameter variants
+        for info in fun_param_infos {
+            let ctor_name = boogie_fun_param_name(env, &info.fun, info.param_sym);
+            let is_last = variant_idx == total_variants - 1;
+
+            if variant_idx == 0 && total_variants == 1 {
+                // Single variant: emit directly
+            } else if variant_idx == 0 {
+                emit!(self.writer, "if (f is {}) then ", ctor_name);
+            } else if is_last {
+                emit!(self.writer, "else /* {} */ ", ctor_name);
+            } else {
+                emit!(self.writer, "else if (f is {}) then ", ctor_name);
+            }
+
+            // Check if the behavioral predicate function exists
+            let param_fun_env = env.get_function(info.fun.to_qualified_id());
+            let module_env = &param_fun_env.module_env;
+            let bp_sym = behavioral_spec_fun_symbol(env, &info.fun, info.param_sym, kind);
+            let has_bp = module_env.get_spec_funs_of_name(bp_sym).next().is_some();
+
+            if has_bp {
+                // Call the abstract behavioral predicate function
+                let bp_name =
+                    boogie_behavioral_spec_fun_name(env, &info.fun, info.param_sym, kind, &[]);
+                emitln!(self.writer, "{}({})", bp_name, all_args);
+            } else {
+                // Default value when no behavioral predicate is defined
+                let default_val = match kind {
+                    BehaviorKind::RequiresOf => "true",
+                    BehaviorKind::AbortsOf => "false",
+                    BehaviorKind::EnsuresOf => "true",
+                    BehaviorKind::ModifiesOf => "true", // modifies_of not yet supported
+                };
+                emitln!(self.writer, "{}", default_val);
+            }
+            variant_idx += 1;
+        }
+
+        self.writer.unindent();
+        emitln!(self.writer, "}");
+    }
+
+    /// Translate a closure's spec condition for a specific behavioral predicate kind.
+    /// Returns a Boogie expression representing the condition.
+    #[allow(clippy::too_many_arguments)]
+    fn translate_closure_condition_for_kind(
+        &self,
+        env: &GlobalEnv,
+        fun_env: &FunctionEnv<'_>,
+        closure_spec: &move_model::ast::Spec,
+        kind: BehaviorKind,
+        closure_info: &ClosureInfo,
+        _params: &[Type],
+        results: &[Type],
+    ) -> String {
+        // Get relevant conditions based on kind
+        let conditions: Vec<_> = closure_spec
+            .conditions
+            .iter()
+            .filter(|c| match kind {
+                BehaviorKind::RequiresOf => matches!(c.kind, ConditionKind::Requires),
+                BehaviorKind::AbortsOf => matches!(c.kind, ConditionKind::AbortsIf),
+                BehaviorKind::EnsuresOf => matches!(c.kind, ConditionKind::Ensures),
+                BehaviorKind::ModifiesOf => matches!(c.kind, ConditionKind::Modifies),
+            })
+            .collect();
+
+        if conditions.is_empty() {
+            // Default values for each kind
+            return match kind {
+                BehaviorKind::RequiresOf => "true".to_string(),
+                BehaviorKind::AbortsOf => "false".to_string(),
+                BehaviorKind::EnsuresOf => "true".to_string(),
+                BehaviorKind::ModifiesOf => "true".to_string(), // modifies_of not yet supported
+            };
+        }
+
+        // Compute captured and non-captured indices from the closure's parameter list
+        let param_tys = fun_env.get_parameter_types();
+        let num_params = param_tys.len();
+        let mut captured_indices = vec![];
+        let mut non_captured_indices = vec![];
+        for i in 0..num_params {
+            if closure_info.mask.is_captured(i) {
+                captured_indices.push(i);
+            } else {
+                non_captured_indices.push(i);
+            }
+        }
+
+        // Translate each condition
+        let translated: Vec<_> = conditions
+            .iter()
+            .map(|cond| {
+                // Translate the condition expression
+                let temp_writer = CodeWriter::new(env.internal_loc());
+                let temp_spec_translator = SpecTranslator::new(&temp_writer, env, self.options);
+                temp_spec_translator.translate(&cond.exp, &[]);
+                let mut translated = temp_writer.extract_result();
+                if translated.ends_with('\n') {
+                    translated.pop();
+                }
+
+                // Substitute captured variables: f->p{pos} for captured args
+                // The closure captures certain parameters. We need to substitute
+                // the captured params ($t{captured_idx}) with f->p{pos}
+                for (pos, &captured_idx) in captured_indices.iter().enumerate() {
+                    let old_str = format!("$t{}", captured_idx);
+                    let new_str = format!("f->p{}", pos);
+                    translated = translated.replace(&old_str, &new_str);
+                }
+
+                // Substitute remaining parameter variables: $t{i} -> p{pos}
+                // These are the non-captured parameters that become the function arguments
+                for (pos, &non_captured_idx) in non_captured_indices.iter().enumerate() {
+                    let old_str = format!("$t{}", non_captured_idx);
+                    let new_str = format!("p{}", pos);
+                    translated = translated.replace(&old_str, &new_str);
+                }
+
+                // Substitute result names: $ret{i} -> r{i}
+                for i in 0..results.len() {
+                    translated = translated.replace(&format!("$ret{}", i), &format!("r{}", i));
+                }
+
+                translated
+            })
+            .collect();
+
+        // Combine conditions based on kind
+        match kind {
+            BehaviorKind::RequiresOf | BehaviorKind::EnsuresOf | BehaviorKind::ModifiesOf => {
+                if translated.len() == 1 {
+                    format!("({})", translated[0])
+                } else {
+                    format!("({})", translated.join(" && "))
+                }
+            },
+            BehaviorKind::AbortsOf => {
+                if translated.len() == 1 {
+                    format!("({})", translated[0])
+                } else {
+                    format!("({})", translated.join(" || "))
+                }
+            },
+        }
     }
 }
 
@@ -1633,6 +2091,7 @@ impl FunctionTranslator<'_> {
 
     fn translate_verify_entry_assumptions(&self, fun_target: &FunctionTarget<'_>) {
         let writer = self.parent.writer;
+        let env = fun_target.global_env();
         emitln!(writer, "\n// verification entrypoint assumptions");
 
         // Prelude initialization
@@ -1647,6 +2106,18 @@ impl FunctionTranslator<'_> {
             let ty = fun_target.get_local_type(i);
             if ty.is_reference() {
                 emitln!(writer, "assume $t{}->l == $Param({});", i, i);
+            }
+        }
+
+        // Assume function-typed parameters equal their parameter variant.
+        // This enables behavioral predicate handling in the apply function.
+        let params = fun_target.func_env.get_parameters();
+        let fun_id = fun_target.func_env.get_qualified_id().instantiate(vec![]);
+        for (i, param) in params.iter().enumerate() {
+            let ty = fun_target.get_local_type(i);
+            if matches!(ty, Type::Fun(..)) {
+                let variant_name = boogie_fun_param_name(env, &fun_id, param.0);
+                emitln!(writer, "assume $t{} == {}();", i, variant_name);
             }
         }
     }
@@ -1994,7 +2465,10 @@ impl FunctionTranslator<'_> {
                                 dest_str,
                                 closure_ctor_name,
                                 args_str
-                            )
+                            );
+                            // Emit behavioral predicate assumptions that connect the abstract
+                            // spec functions to the eval functions for this specific closure.
+                            self.emit_closure_behavioral_assumptions(writer, env, dests[0]);
                         } else {
                             // regular path
                             let targeted = self.fun_target.module_env().is_target();
@@ -3746,6 +4220,260 @@ impl FunctionTranslator<'_> {
             }
         }
         res
+    }
+
+    /// Emit behavioral predicate assumptions at a closure construction site.
+    /// This connects the abstract behavioral predicate spec functions to the
+    /// eval functions for the specific closure value.
+    fn emit_closure_behavioral_assumptions(
+        &self,
+        writer: &CodeWriter,
+        env: &GlobalEnv,
+        closure_dest: TempIndex,
+    ) {
+        use move_core_types::ability::AbilitySet;
+
+        // Get the closure's function type
+        let closure_fun_type = self.get_local_type(closure_dest);
+        // Normalize the function type to match the key used in fun_param_infos
+        let normalized_type = if let Type::Fun(params, results, _) = &closure_fun_type {
+            Type::Fun(
+                Box::new(Type::tuple(params.clone().flatten())),
+                Box::new(Type::tuple(results.clone().flatten())),
+                AbilitySet::EMPTY,
+            )
+        } else {
+            return; // Not a function type, nothing to do
+        };
+
+        // Check if any functions use this type for behavioral predicates
+        if let Some(param_infos) = self.parent.fun_param_infos.get(&normalized_type) {
+            // Get the closure variable name
+            let closure_var = format!("$t{}", closure_dest);
+
+            // Get function type parameters for building quantifier variables
+            let Type::Fun(param_types, result_types, _) = &closure_fun_type else {
+                return;
+            };
+            let params = param_types.clone().flatten();
+            let results = result_types.clone().flatten();
+
+            // Build quantifier variables
+            let param_vars: Vec<_> = params
+                .iter()
+                .enumerate()
+                .map(|(i, ty)| format!("$bp{}: {}", i, boogie_type(env, ty.skip_reference())))
+                .collect();
+            let param_args: Vec<_> = params
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!("$bp{}", i))
+                .collect();
+            let result_vars: Vec<_> = results
+                .iter()
+                .enumerate()
+                .map(|(i, ty)| format!("$br{}: {}", i, boogie_type(env, ty)))
+                .collect();
+            let result_args: Vec<_> = results
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!("$br{}", i))
+                .collect();
+
+            // Collect functions actually called in this function to filter assumptions
+            let called_funs: BTreeSet<_> = self
+                .fun_target
+                .get_bytecode()
+                .iter()
+                .filter_map(|bc| {
+                    use move_stackless_bytecode::stackless_bytecode::{Bytecode, Operation};
+                    if let Bytecode::Call(_, _, op, _, _) = bc {
+                        match op {
+                            Operation::Function(mid, fid, _)
+                            | Operation::OpaqueCallBegin(mid, fid, _) => Some(mid.qualified(*fid)),
+                            _ => None,
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            for info in param_infos {
+                // Only emit assumptions for functions actually called
+                if !called_funs.contains(&info.fun.to_qualified_id()) {
+                    continue;
+                }
+
+                let param_fun_env = env.get_function(info.fun.to_qualified_id());
+                let module_env = &param_fun_env.module_env;
+
+                // Check which behavioral predicates exist
+                let requires_sym = behavioral_spec_fun_symbol(
+                    env,
+                    &info.fun,
+                    info.param_sym,
+                    BehaviorKind::RequiresOf,
+                );
+                let aborts_sym = behavioral_spec_fun_symbol(
+                    env,
+                    &info.fun,
+                    info.param_sym,
+                    BehaviorKind::AbortsOf,
+                );
+                let ensures_sym = behavioral_spec_fun_symbol(
+                    env,
+                    &info.fun,
+                    info.param_sym,
+                    BehaviorKind::EnsuresOf,
+                );
+
+                let has_requires = module_env
+                    .get_spec_funs_of_name(requires_sym)
+                    .next()
+                    .is_some();
+                let has_aborts = module_env
+                    .get_spec_funs_of_name(aborts_sym)
+                    .next()
+                    .is_some();
+                let has_ensures = module_env
+                    .get_spec_funs_of_name(ensures_sym)
+                    .next()
+                    .is_some();
+
+                if !has_requires && !has_aborts && !has_ensures {
+                    continue;
+                }
+
+                // Emit comment
+                let param_name = env.symbol_pool().string(info.param_sym);
+                let func_name = param_fun_env.get_name_str();
+                emitln!(
+                    writer,
+                    "// Connecting behavioral predicates for parameter `{}` of `{}`",
+                    param_name,
+                    func_name
+                );
+
+                // Emit requires_of assumption
+                if has_requires {
+                    let spec_fun_name = boogie_behavioral_spec_fun_name(
+                        env,
+                        &info.fun,
+                        info.param_sym,
+                        BehaviorKind::RequiresOf,
+                        &[],
+                    );
+                    let eval_fun_name = boogie_behavioral_eval_fun_name(
+                        env,
+                        &closure_fun_type,
+                        BehaviorKind::RequiresOf,
+                    );
+                    if param_vars.is_empty() {
+                        emitln!(
+                            writer,
+                            "assume {} == {}({});",
+                            spec_fun_name,
+                            eval_fun_name,
+                            closure_var
+                        );
+                    } else {
+                        emitln!(
+                            writer,
+                            "assume (forall {} :: {}({}) == {}({}, {}));",
+                            param_vars.join(", "),
+                            spec_fun_name,
+                            param_args.join(", "),
+                            eval_fun_name,
+                            closure_var,
+                            param_args.join(", ")
+                        );
+                    }
+                }
+
+                // Emit aborts_of assumption
+                if has_aborts {
+                    let spec_fun_name = boogie_behavioral_spec_fun_name(
+                        env,
+                        &info.fun,
+                        info.param_sym,
+                        BehaviorKind::AbortsOf,
+                        &[],
+                    );
+                    let eval_fun_name = boogie_behavioral_eval_fun_name(
+                        env,
+                        &closure_fun_type,
+                        BehaviorKind::AbortsOf,
+                    );
+                    if param_vars.is_empty() {
+                        emitln!(
+                            writer,
+                            "assume {} == {}({});",
+                            spec_fun_name,
+                            eval_fun_name,
+                            closure_var
+                        );
+                    } else {
+                        emitln!(
+                            writer,
+                            "assume (forall {} :: {}({}) == {}({}, {}));",
+                            param_vars.join(", "),
+                            spec_fun_name,
+                            param_args.join(", "),
+                            eval_fun_name,
+                            closure_var,
+                            param_args.join(", ")
+                        );
+                    }
+                }
+
+                // Emit ensures_of assumption
+                if has_ensures {
+                    let spec_fun_name = boogie_behavioral_spec_fun_name(
+                        env,
+                        &info.fun,
+                        info.param_sym,
+                        BehaviorKind::EnsuresOf,
+                        &[],
+                    );
+                    let eval_fun_name = boogie_behavioral_eval_fun_name(
+                        env,
+                        &closure_fun_type,
+                        BehaviorKind::EnsuresOf,
+                    );
+                    let all_vars: Vec<_> = param_vars
+                        .iter()
+                        .chain(result_vars.iter())
+                        .cloned()
+                        .collect();
+                    let all_args: Vec<_> = param_args
+                        .iter()
+                        .chain(result_args.iter())
+                        .cloned()
+                        .collect();
+                    if all_vars.is_empty() {
+                        emitln!(
+                            writer,
+                            "assume {} == {}({});",
+                            spec_fun_name,
+                            eval_fun_name,
+                            closure_var
+                        );
+                    } else {
+                        emitln!(
+                            writer,
+                            "assume (forall {} :: {}({}) == {}({}, {}));",
+                            all_vars.join(", "),
+                            spec_fun_name,
+                            all_args.join(", "),
+                            eval_fun_name,
+                            closure_var,
+                            all_args.join(", ")
+                        );
+                    }
+                }
+            }
+        }
     }
 }
 

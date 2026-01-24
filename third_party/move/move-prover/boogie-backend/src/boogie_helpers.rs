@@ -13,7 +13,7 @@ use move_core_types::{
     ability::AbilitySet, account_address::AccountAddress, function::ClosureMask,
 };
 use move_model::{
-    ast::{Address, MemoryLabel, TempIndex, Value},
+    ast::{Address, BehaviorKind, MemoryLabel, TempIndex, Value},
     model::{
         FieldEnv, FieldId, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, QualifiedInstId,
         SpecFunId, StructEnv, StructId, SCRIPT_MODULE_NAME,
@@ -1259,4 +1259,72 @@ pub fn boogie_closure_pack_name(
     let fun_env = env.get_function(fun.to_qualified_id());
     let fun_name = boogie_function_name(&fun_env, &fun.inst);
     format!("$closure'{}'_{}", fun_name, mask)
+}
+
+/// Return name of the datatype constructor for a function parameter variant.
+/// These variants represent function-typed parameters of verification targets.
+pub fn boogie_fun_param_name(
+    env: &GlobalEnv,
+    fun: &QualifiedInstId<FunId>,
+    param_sym: Symbol,
+) -> String {
+    let fun_env = env.get_function(fun.to_qualified_id());
+    let fun_name = boogie_function_name(&fun_env, &fun.inst);
+    let param_name = param_sym.display(env.symbol_pool());
+    format!("$param'{}${}'", fun_name, param_name)
+}
+
+/// Return the symbol name for a behavioral predicate spec function in the model.
+/// This is used for looking up whether the spec function exists.
+/// Format: `$${kind}$${fun}$${param}` (e.g., `$requires_of$apply$f`)
+pub fn behavioral_spec_fun_symbol(
+    env: &GlobalEnv,
+    fun: &QualifiedInstId<FunId>,
+    param_sym: Symbol,
+    kind: BehaviorKind,
+) -> Symbol {
+    let fun_env = env.get_function(fun.to_qualified_id());
+    let fun_name_sym = fun_env.get_name();
+    let fun_name = fun_name_sym.display(env.symbol_pool());
+    let param_name = param_sym.display(env.symbol_pool());
+    env.symbol_pool()
+        .make(&format!("${}${}${}", kind, fun_name, param_name))
+}
+
+/// Return name of a behavioral predicate spec function (requires_of, aborts_of, ensures_of)
+/// for a function-typed parameter in Boogie.
+pub fn boogie_behavioral_spec_fun_name(
+    env: &GlobalEnv,
+    fun: &QualifiedInstId<FunId>,
+    param_sym: Symbol,
+    kind: BehaviorKind,
+    inst: &[Type],
+) -> String {
+    let fun_env = env.get_function(fun.to_qualified_id());
+    let module_name = boogie_module_name(&fun_env.module_env);
+    let fun_name_sym = fun_env.get_name();
+    let fun_name = fun_name_sym.display(env.symbol_pool());
+    let param_name = param_sym.display(env.symbol_pool());
+    // The spec function name format matches what spec_rewriter generates and what
+    // spec_translator expects: ${module}_$${kind}$${fun}$${param}${suffix}
+    format!(
+        "${}_${}${}${}{}",
+        module_name,
+        kind,
+        fun_name,
+        param_name,
+        boogie_inst_suffix(env, inst)
+    )
+}
+
+/// Return name of the behavioral predicate evaluation function for a function type.
+/// These inline functions dispatch on closure variants to evaluate behavioral predicates.
+/// Format: `${kind}'${type_suffix}'`
+/// For example: `$ensures_of'$fun_u64_u64'`
+pub fn boogie_behavioral_eval_fun_name(
+    env: &GlobalEnv,
+    fun_type: &Type,
+    kind: BehaviorKind,
+) -> String {
+    format!("${}'{}'", kind, boogie_type_suffix(env, fun_type))
 }

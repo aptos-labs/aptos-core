@@ -1,0 +1,40 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_predicates_examples.move:31:9
+   │
+31 │         ensures result == 3;
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_predicates_examples.move:27: add_opaque
+   =     at tests/sources/functional/closures/behavioral_predicates_examples.move:28: add_opaque
+   =     at tests/sources/functional/closures/behavioral_predicates_examples.move:19: apply_twice_opaque (spec)
+   =     at tests/sources/functional/closures/behavioral_predicates_examples.move:20: apply_twice_opaque (spec)
+   =     at tests/sources/functional/closures/behavioral_predicates_examples.move:26: add_opaque
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/behavioral_predicates_examples.move:29: add_opaque
+   =     at tests/sources/functional/closures/behavioral_predicates_examples.move:31: add_opaque (spec)
+
+error: precondition does not hold at this call
+   ┌─ tests/sources/functional/closures/behavioral_predicates_examples.move:70:9
+   │
+70 │         requires !aborts_of<f>(x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_predicates_examples.move:90: test_no_abort_fail
+   =     at tests/sources/functional/closures/behavioral_predicates_examples.move:91: test_no_abort_fail
+   =     at tests/sources/functional/closures/behavioral_predicates_examples.move:70: apply_with_no_abort (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates_examples.move:141:9
+    │
+141 │         ensures result == true;  // 4 > 2
+    │         ^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:136: test_contains_found
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:137: test_contains_found
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:126: contains (spec)
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:135: test_contains_found
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:139: test_contains_found
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:141: test_contains_found (spec)
