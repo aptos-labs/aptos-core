@@ -132,7 +132,7 @@ spec aptos_framework::code {
         let code_object_addr = code_object.inner;
         aborts_if !exists<object::ObjectCore>(code_object_addr);
         aborts_if !exists<PackageRegistry>(code_object_addr);
-        aborts_if !object::is_owner(code_object, signer::address_of(publisher));
+        aborts_if !code_object.is_owner(signer::address_of(publisher));
         // include AbortsIfPermissionedSigner { s: publisher };
 
         modifies global<PackageRegistry>(code_object_addr);

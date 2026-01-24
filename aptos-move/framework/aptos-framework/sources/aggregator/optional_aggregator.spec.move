@@ -75,10 +75,10 @@ spec aptos_framework::optional_aggregator {
     spec schema SubAbortsIf {
         optional_aggregator: OptionalAggregator;
         value: u128;
-        aborts_if is_parallelizable(optional_aggregator) && (aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator))
+        aborts_if is_parallelizable(optional_aggregator) && (aggregator::spec_aggregator_get_val(optional_aggregator.aggregator.borrow())
             < value);
         aborts_if !is_parallelizable(optional_aggregator) &&
-            (option::borrow(optional_aggregator.integer).value < value);
+            (optional_aggregator.integer.borrow().value < value);
     }
 
     spec read(optional_aggregator: &OptionalAggregator): u128 {
@@ -95,14 +95,14 @@ spec aptos_framework::optional_aggregator {
     spec schema AddAbortsIf {
         optional_aggregator: OptionalAggregator;
         value: u128;
-        aborts_if is_parallelizable(optional_aggregator) && (aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator))
-            + value > aggregator::spec_get_limit(option::borrow(optional_aggregator.aggregator)));
-        aborts_if is_parallelizable(optional_aggregator) && (aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator))
+        aborts_if is_parallelizable(optional_aggregator) && (aggregator::spec_aggregator_get_val(optional_aggregator.aggregator.borrow())
+            + value > aggregator::spec_get_limit(optional_aggregator.aggregator.borrow()));
+        aborts_if is_parallelizable(optional_aggregator) && (aggregator::spec_aggregator_get_val(optional_aggregator.aggregator.borrow())
             + value > MAX_U128);
         aborts_if !is_parallelizable(optional_aggregator) &&
-            (option::borrow(optional_aggregator.integer).value + value > MAX_U128);
+            (optional_aggregator.integer.borrow().value + value > MAX_U128);
         aborts_if !is_parallelizable(optional_aggregator) &&
-            (value > (option::borrow(optional_aggregator.integer).limit - option::borrow(optional_aggregator.integer).value));
+            (value > (optional_aggregator.integer.borrow().limit - optional_aggregator.integer.borrow().value));
     }
 
     spec switch(_optional_aggregator: &mut OptionalAggregator) {
@@ -123,37 +123,37 @@ spec aptos_framework::optional_aggregator {
     }
 
     spec destroy(optional_aggregator: OptionalAggregator) {
-        aborts_if is_parallelizable(optional_aggregator) && option::is_some(optional_aggregator.integer);
-        aborts_if !is_parallelizable(optional_aggregator) && option::is_none(optional_aggregator.integer);
+        aborts_if is_parallelizable(optional_aggregator) && optional_aggregator.integer.is_some();
+        aborts_if !is_parallelizable(optional_aggregator) && optional_aggregator.integer.is_none();
     }
 
     /// The aggregator exists and the integer does not exist when destroy the aggregator.
     spec destroy_optional_aggregator(optional_aggregator: OptionalAggregator): u128 {
-        aborts_if option::is_none(optional_aggregator.aggregator);
-        aborts_if option::is_some(optional_aggregator.integer);
-        ensures result == aggregator::spec_get_limit(option::borrow(optional_aggregator.aggregator));
+        aborts_if optional_aggregator.aggregator.is_none();
+        aborts_if optional_aggregator.integer.is_some();
+        ensures result == aggregator::spec_get_limit(optional_aggregator.aggregator.borrow());
     }
 
     /// The integer exists and the aggregator does not exist when destroy the integer.
     spec destroy_optional_integer(optional_aggregator: OptionalAggregator): u128 {
-        aborts_if option::is_none(optional_aggregator.integer);
-        aborts_if option::is_some(optional_aggregator.aggregator);
-        ensures result == option::borrow(optional_aggregator.integer).limit;
+        aborts_if optional_aggregator.integer.is_none();
+        aborts_if optional_aggregator.aggregator.is_some();
+        ensures result == optional_aggregator.integer.borrow().limit;
     }
 
     spec fun optional_aggregator_value(optional_aggregator: OptionalAggregator): u128 {
         if (is_parallelizable(optional_aggregator)) {
-            aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator))
+            aggregator::spec_aggregator_get_val(optional_aggregator.aggregator.borrow())
         } else {
-            option::borrow(optional_aggregator.integer).value
+            optional_aggregator.integer.borrow().value
         }
     }
 
     spec fun optional_aggregator_limit(optional_aggregator: OptionalAggregator): u128 {
         if (is_parallelizable(optional_aggregator)) {
-            aggregator::spec_get_limit(option::borrow(optional_aggregator.aggregator))
+            aggregator::spec_get_limit(optional_aggregator.aggregator.borrow())
         } else {
-            option::borrow(optional_aggregator.integer).limit
+            optional_aggregator.integer.borrow().limit
         }
     }
 

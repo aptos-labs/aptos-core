@@ -17,7 +17,7 @@
 module aptos_framework::dispatchable_fungible_asset {
     use aptos_framework::fungible_asset::{Self, FungibleAsset, TransferRef};
     use aptos_framework::function_info::{Self, FunctionInfo};
-    use aptos_framework::object::{Self, ConstructorRef, Object};
+    use aptos_framework::object::{ConstructorRef, Object};
 
     use std::error;
     use std::option::Option;
