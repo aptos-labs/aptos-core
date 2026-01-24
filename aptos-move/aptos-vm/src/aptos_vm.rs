@@ -1041,6 +1041,9 @@ impl AptosVM {
         if txn_data.is_keyless() {
             gas_meter.charge_keyless()?;
         }
+        if txn_data.is_slh_dsa_sha2_128s() {
+            gas_meter.charge_slh_dsa_sha2_128s()?;
+        }
 
         match executable {
             TransactionExecutableRef::Script(script) => {
@@ -1195,6 +1198,9 @@ impl AptosVM {
         gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
         if txn_data.is_keyless() {
             gas_meter.charge_keyless()?;
+        }
+        if txn_data.is_slh_dsa_sha2_128s() {
+            gas_meter.charge_slh_dsa_sha2_128s()?;
         }
 
         // Step 1: Obtain the payload. If any errors happen here, the entire transaction should fail
@@ -3179,6 +3185,24 @@ impl VMValidator for AptosVM {
             {
                 for authenticator in sk_authenticators {
                     if let AnySignature::WebAuthn { .. } = authenticator.signature() {
+                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+                    }
+                }
+            } else {
+                return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
+            }
+        }
+
+        if !self
+            .features()
+            .is_enabled(FeatureFlag::SLH_DSA_SHA2_128S_SIGNATURE)
+        {
+            if let Ok(sk_authenticators) = transaction
+                .authenticator_ref()
+                .to_single_key_authenticators()
+            {
+                for authenticator in sk_authenticators {
+                    if let AnySignature::SlhDsa_Sha2_128s { .. } = authenticator.signature() {
                         return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
                     }
                 }

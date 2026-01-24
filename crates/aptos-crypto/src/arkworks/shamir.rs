@@ -180,18 +180,24 @@ pub fn all_lagrange_denominators<F: FftField>(
 ) -> Vec<F> {
     // A(X) = \prod_{i \in [0, n-1]} (X - \omega^i)
     let omegas: Vec<F> = dom.elements().take(n).collect();
-    debug_assert_eq!(F::ONE, omegas[0]);
-    for i in 1..n {
-        debug_assert_eq!(
-            omegas[i - 1] * omegas[1],
-            omegas[i],
-            "omegas are not in sequence at index {}",
-            i
-        );
+    #[cfg(debug_assertions)]
+    {
+        assert_eq!(F::ONE, omegas[0]);
+        for i in 1..n {
+            assert_eq!(
+                omegas[i - 1] * omegas[1],
+                omegas[i],
+                "omegas are not in sequence at index {}",
+                i
+            );
+        }
     }
 
+    //    use std::time::Instant;
+    //    let start = Instant::now();
     // This is **not** X^n - 1, because the \omega^i are not n-th roots of unity, they are N-th roots of unity where N is some power of 2
     let mut A = vanishing_poly::from_roots(&omegas);
+    //    println!("vanishing_poly::from_roots took {:?}", start.elapsed());
 
     // A'(X) = \sum_{i \in [0, n-1]} \prod_{j \ne i, j \in [0, n-1]} (X - \omega^j)
     A.differentiate_in_place();

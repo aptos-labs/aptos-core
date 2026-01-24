@@ -6,6 +6,7 @@ module aptos_experimental::market_single_order_tests {
     use std::string::String;
     use std::vector;
     use aptos_framework::timestamp;
+    use aptos_trading::order_book_types::{OrderId, price_move_up_condition, good_till_cancelled};
     use aptos_experimental::order_placement::{place_market_order, place_limit_order};
     use aptos_experimental::event_utils::latest_emitted_events;
     use aptos_experimental::clearinghouse_test;
@@ -23,8 +24,6 @@ module aptos_experimental::market_single_order_tests {
     use aptos_experimental::event_utils;
     use aptos_experimental::market_types::{order_status_open};
     use aptos_experimental::market_types::{OrderEvent};
-    use aptos_experimental::order_book_types::{OrderIdType, price_move_up_condition};
-    use aptos_experimental::order_book_types::{good_till_cancelled};
 
     // Import common functions from market_tests
     use aptos_experimental::market_tests_common::{
@@ -312,7 +311,7 @@ module aptos_experimental::market_single_order_tests {
 
         // Place several maker order with small sizes.
         let i = 1;
-        let maker_order_ids = vector::empty<OrderIdType>();
+        let maker_order_ids = vector::empty<OrderId>();
         let expected_fill_sizes = vector::empty<u64>();
         let fill_prices = vector::empty<u64>();
         let maker_orig_sizes = vector::empty<u64>();

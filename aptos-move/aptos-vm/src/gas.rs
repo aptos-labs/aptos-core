@@ -5,8 +5,9 @@ use crate::{move_vm_ext::AptosMoveResolver, transaction_metadata::TransactionMet
 use aptos_gas_algebra::{Gas, GasExpression, InternalGas};
 use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::{
-    gas_feature_versions::RELEASE_V1_13, gas_params::txn::KEYLESS_BASE_COST, AptosGasParameters,
-    VMGasParameters,
+    gas_feature_versions::RELEASE_V1_13,
+    gas_params::txn::{KEYLESS_BASE_COST, SLH_DSA_SHA2_128S_BASE_COST},
+    AptosGasParameters, VMGasParameters,
 };
 use aptos_logger::{enabled, Level};
 use aptos_memory_usage_tracker::{
@@ -145,10 +146,16 @@ pub(crate) fn check_gas(
     } else {
         InternalGas::zero()
     };
+    let slh_dsa_sha2_128s = if txn_metadata.is_slh_dsa_sha2_128s() {
+        SLH_DSA_SHA2_128S_BASE_COST.evaluate(gas_feature_version, &gas_params.vm)
+    } else {
+        InternalGas::zero()
+    };
     let intrinsic_gas = txn_gas_params
         .calculate_intrinsic_gas(raw_bytes_len)
         .evaluate(gas_feature_version, &gas_params.vm);
-    let total_rounded: Gas = (intrinsic_gas + keyless).to_unit_round_up_with_params(txn_gas_params);
+    let total_rounded: Gas =
+        (intrinsic_gas + keyless + slh_dsa_sha2_128s).to_unit_round_up_with_params(txn_gas_params);
     if txn_metadata.max_gas_amount() < total_rounded {
         speculative_warn!(
             log_context,

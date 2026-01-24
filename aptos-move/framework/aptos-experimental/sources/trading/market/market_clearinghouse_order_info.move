@@ -1,17 +1,17 @@
 
 module aptos_experimental::market_clearinghouse_order_info {
-    use std::option::Option;
-    use std::string::String;
-    use aptos_experimental::order_book_types::{OrderIdType, TimeInForce, OrderType, TriggerCondition};
-
     friend aptos_experimental::market_types;
     friend aptos_experimental::order_operations;
     friend aptos_experimental::order_placement;
 
+    use std::option::Option;
+    use std::string::String;
+    use aptos_trading::order_book_types::{OrderId, TimeInForce, OrderType, TriggerCondition};
+
     enum MarketClearinghouseOrderInfo<M: copy + drop> has copy, drop {
         V1 {
             account: address,
-            order_id: OrderIdType,
+            order_id: OrderId,
             client_order_id: Option<String>,
             is_bid: bool,
             limit_price: u64,
@@ -24,7 +24,7 @@ module aptos_experimental::market_clearinghouse_order_info {
 
     public fun new_clearinghouse_order_info<M: copy + drop>(
         account: address,
-        order_id: OrderIdType,
+        order_id: OrderId,
         client_order_id: Option<String>,
         is_bid: bool,
         limit_price: u64,
@@ -42,7 +42,7 @@ module aptos_experimental::market_clearinghouse_order_info {
         self.account
     }
 
-    public fun get_order_id<M: copy + drop>(self: &MarketClearinghouseOrderInfo<M>): OrderIdType {
+    public fun get_order_id<M: copy + drop>(self: &MarketClearinghouseOrderInfo<M>): OrderId {
         self.order_id
     }
 
@@ -58,7 +58,7 @@ module aptos_experimental::market_clearinghouse_order_info {
         &self.metadata
     }
 
-    public fun into_inner<M: copy + drop>(self: MarketClearinghouseOrderInfo<M>): (address, OrderIdType, Option<String>, bool, u64, TimeInForce, OrderType, Option<TriggerCondition>, M) {
+    public fun into_inner<M: copy + drop>(self: MarketClearinghouseOrderInfo<M>): (address, OrderId, Option<String>, bool, u64, TimeInForce, OrderType, Option<TriggerCondition>, M) {
         let MarketClearinghouseOrderInfo::V1 {
             account,
             order_id,

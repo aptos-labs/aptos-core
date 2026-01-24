@@ -23,3 +23,12 @@ where
 
     powers
 }
+
+/// Asserts that the given value is a power of two.
+pub fn assert_power_of_two(n: usize) {
+    assert!(
+        n.is_power_of_two(),
+        "Parameter must be a power of 2, but got {}",
+        n
+    );
+}

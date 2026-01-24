@@ -4,12 +4,15 @@ use super::symmetric;
 use crate::{
     errors::BatchEncryptionError,
     group::{Fr, G1Affine, G2Affine, PairingSetting},
-    shared::{ark_serialize::*, digest::Digest},
+    shared::digest::Digest,
     traits::{DecryptionKeyShare, VerificationKey},
 };
 use anyhow::Result;
 use aptos_crypto::{
-    arkworks::shamir::{Reconstructable, ShamirGroupShare, ShamirThresholdConfig},
+    arkworks::{
+        serialization::{ark_de, ark_se},
+        shamir::{Reconstructable, ShamirGroupShare, ShamirThresholdConfig},
+    },
     player::Player,
 };
 use ark_ec::{pairing::Pairing as _, AffineRepr};

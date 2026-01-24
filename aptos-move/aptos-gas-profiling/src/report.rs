@@ -135,6 +135,23 @@ impl TransactionGasLog {
             data.insert("keyless-percentage".to_string(), json!(percentage));
         }
 
+        // SLH-DSA-SHA2-128s cost
+        if !self.exec_io.slh_dsa_sha2_128s_cost.is_zero() {
+            let cost_scaled = format!(
+                "{:.8}",
+                (u64::from(self.exec_io.slh_dsa_sha2_128s_cost) as f64 / scaling_factor)
+            );
+            let percentage = format!(
+                "{:.2}%",
+                u64::from(self.exec_io.slh_dsa_sha2_128s_cost) as f64 / total_exec_io * 100.0
+            );
+            data.insert("slh_dsa_sha2_128s".to_string(), json!(cost_scaled));
+            data.insert(
+                "slh_dsa_sha2_128s-percentage".to_string(),
+                json!(percentage),
+            );
+        }
+
         let mut deps = self.exec_io.dependencies.clone();
         deps.sort_by(|lhs, rhs| rhs.cost.cmp(&lhs.cost));
         data.insert(

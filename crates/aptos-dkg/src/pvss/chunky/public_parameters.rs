@@ -44,7 +44,7 @@ fn compute_powers_of_radix<E: Pairing>(ell: u8) -> Vec<E::ScalarField> {
 #[allow(non_snake_case)]
 pub struct PublicParameters<E: Pairing> {
     #[serde(serialize_with = "ark_se")]
-    pub pp_elgamal: chunked_elgamal::PublicParameters<E>, // TODO: make this <E::G1> or <E::G1Affine> instead of <E>?
+    pub pp_elgamal: chunked_elgamal::PublicParameters<E::G1>,
 
     #[serde(serialize_with = "ark_se")]
     pub pk_range_proof: dekart_univariate_v2::ProverKey<E>,
@@ -74,7 +74,7 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
         #[derive(Deserialize)]
         struct SerializedFields<E: Pairing> {
             #[serde(deserialize_with = "ark_de")]
-            pp_elgamal: chunked_elgamal::PublicParameters<E>,
+            pp_elgamal: chunked_elgamal::PublicParameters<E::G1>,
             #[serde(deserialize_with = "ark_de")]
             pk_range_proof: dekart_univariate_v2::ProverKey<E>,
             #[serde(deserialize_with = "ark_de")]
@@ -124,7 +124,7 @@ impl<E: Pairing> Valid for PublicParameters<E> {
 }
 
 impl<E: Pairing> traits::HasEncryptionPublicParams for PublicParameters<E> {
-    type EncryptionPublicParameters = chunked_elgamal::PublicParameters<E>;
+    type EncryptionPublicParameters = chunked_elgamal::PublicParameters<E::G1>;
 
     fn get_encryption_public_params(&self) -> &Self::EncryptionPublicParameters {
         &self.pp_elgamal

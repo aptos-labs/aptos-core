@@ -107,6 +107,11 @@ AnyPublicKey:
         STRUCT:
           - public_key:
               TYPENAME: FederatedKeylessPublicKey
+    5:
+      SlhDsa_Sha2_128s:
+        STRUCT:
+          - public_key:
+              TYPENAME: SlhDsa_Sha2_128s_PublicKey
 AnySignature:
   ENUM:
     0:
@@ -129,6 +134,11 @@ AnySignature:
         STRUCT:
           - signature:
               TYPENAME: KeylessSignature
+    4:
+      SlhDsa_Sha2_128s:
+        STRUCT:
+          - signature:
+              TYPENAME: SlhDsa_Sha2_128s_Signature
 AssertionSignature:
   ENUM:
     0:
@@ -1160,6 +1170,12 @@ SingleKeyAuthenticator:
         TYPENAME: AnyPublicKey
     - signature:
         TYPENAME: AnySignature
+SlhDsa_Sha2_128s_PrivateKey:
+  NEWTYPESTRUCT: BYTES
+SlhDsa_Sha2_128s_PublicKey:
+  NEWTYPESTRUCT: BYTES
+SlhDsa_Sha2_128s_Signature:
+  NEWTYPESTRUCT: BYTES
 StateKey:
   ENUM:
     0:

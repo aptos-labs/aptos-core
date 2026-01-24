@@ -61,16 +61,15 @@ module aptos_experimental::order_placement {
     use std::signer;
     use std::string::String;
     use std::vector;
+    use aptos_trading::order_book_types::{
+        OrderId, TriggerCondition, TimeInForce, immediate_or_cancel, post_only, single_order_type, next_order_id, OrderType
+    };
+    use aptos_trading::order_match_types::OrderMatchDetails;
+    use aptos_trading::single_order_types::new_single_order_request;
     use aptos_experimental::market_clearinghouse_order_info::new_clearinghouse_order_info;
-    use aptos_experimental::order_book::{new_single_order_request};
     use aptos_experimental::pre_cancellation_tracker::{
         is_pre_cancelled
     };
-    use aptos_experimental::order_book_types::{
-        OrderIdType, OrderMatchDetails, single_order_type, next_order_id, OrderType
-    };
-    use aptos_experimental::order_book_types::TriggerCondition;
-    use aptos_experimental::order_book_types::{TimeInForce, immediate_or_cancel, post_only};
     use aptos_experimental::market_types::{
         Self,
         MarketClearinghouseCallbacks,
@@ -90,7 +89,7 @@ module aptos_experimental::order_placement {
 
     enum OrderMatchResult<R: store + copy + drop> has drop {
         V1 {
-            order_id: OrderIdType,
+            order_id: OrderId,
             remaining_size: u64,
             cancel_reason: Option<OrderCancellationReason>,
             callback_results: vector<R>,
@@ -101,7 +100,7 @@ module aptos_experimental::order_placement {
 
     public fun destroy_order_match_result<R: store + copy + drop>(
         self: OrderMatchResult<R>
-    ): (OrderIdType, u64, Option<OrderCancellationReason>, vector<R>, vector<u64>, u32) {
+    ): (OrderId, u64, Option<OrderCancellationReason>, vector<R>, vector<u64>, u32) {
         let OrderMatchResult::V1 { order_id, remaining_size, cancel_reason, callback_results,  fill_sizes, match_count } =
             self;
         (order_id, remaining_size, cancel_reason, callback_results, fill_sizes, match_count)
@@ -129,22 +128,22 @@ module aptos_experimental::order_placement {
     }
 
     public fun is_ioc_violation(reason: OrderCancellationReason): bool {
-        return reason == market_types::order_cancellation_reason_ioc_violation()
+        reason == market_types::order_cancellation_reason_ioc_violation()
     }
 
     public fun is_fill_limit_violation(
         cancel_reason: OrderCancellationReason
     ): bool {
-        return cancel_reason == market_types::order_cancellation_reason_max_fill_limit_violation()
+        cancel_reason == market_types::order_cancellation_reason_max_fill_limit_violation()
     }
 
     public fun is_dead_mans_switch_expired(
         cancel_reason: OrderCancellationReason
     ): bool {
-        return cancel_reason == market_types::order_cancellation_reason_dead_mans_switch_expired()
+        cancel_reason == market_types::order_cancellation_reason_dead_mans_switch_expired()
     }
 
-    public fun get_order_id<R: store + copy + drop>(self: OrderMatchResult<R>): OrderIdType {
+    public fun get_order_id<R: store + copy + drop>(self: OrderMatchResult<R>): OrderId {
         self.order_id
     }
 
@@ -251,7 +250,7 @@ module aptos_experimental::order_placement {
         time_in_force: TimeInForce,
         trigger_condition: Option<TriggerCondition>,
         metadata: M,
-        order_id: OrderIdType,
+        order_id: OrderId,
         client_order_id: Option<String>,
         emit_open_for_cancellation: bool,
         callbacks: &MarketClearinghouseCallbacks<M, R>,
@@ -397,14 +396,20 @@ module aptos_experimental::order_placement {
         market: &mut Market<M>,
         maker_order: &OrderMatchDetails<M>,
         maker_address: address,
-        order_id: OrderIdType,
+        order_id: OrderId,
         unsettled_size: u64,
         cancellation_reason: OrderCancellationReason,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
         // Get the order state before cancellation to track what's being cancelled
         let order_before_cancel = market.get_order_book().get_bulk_order(maker_address);
-        let (_, _, _, sequence_number, _, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, _ ) = order_before_cancel.destroy_bulk_order();
+        let (
+            order_before_cancel_request,
+            _order_id,
+            _unique_priority_idx,
+            _creation_time_micros,
+        ) = order_before_cancel.destroy_bulk_order();
+        let (_account, order_sequence_number, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, _metadata) = order_before_cancel_request.destroy_bulk_order_request();
 
         let remaining_size = maker_order.get_remaining_size_from_match_details();
         if (remaining_size != 0) {
@@ -418,10 +423,11 @@ module aptos_experimental::order_placement {
         );
 
         let modified_order = market.get_order_book().get_bulk_order(maker_address);
-        let (_, _, _, _, _, bid_prices, bid_sizes, ask_prices, ask_sizes, _ ) = modified_order.destroy_bulk_order();
+        let (modified_order_request, _order_id, _unique_priority_idx, _creation_time_micros) = modified_order.destroy_bulk_order();
+        let (_account, _order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, _metadata) = modified_order_request.destroy_bulk_order_request();
         market.emit_event_for_bulk_order_modified(
             order_id,
-            sequence_number,
+            order_sequence_number,
             maker_address,
             bid_prices,
             bid_sizes,
@@ -440,7 +446,7 @@ module aptos_experimental::order_placement {
         maker_order: &OrderMatchDetails<M>,
         client_order_id: Option<String>,
         maker_address: address,
-        order_id: OrderIdType,
+        order_id: OrderId,
         cancellation_reason: OrderCancellationReason,
         maker_cancellation_reason: String,
         unsettled_size: u64,
@@ -503,7 +509,7 @@ module aptos_experimental::order_placement {
         market: &mut Market<M>,
         user_addr: address,
         limit_price: u64,
-        order_id: OrderIdType,
+        order_id: OrderId,
         client_order_id: Option<String>,
         orig_size: u64,
         size_delta: u64,
@@ -573,7 +579,7 @@ module aptos_experimental::order_placement {
             size_delta,
             is_taker,
         );
-        return OrderMatchResult::V1 {
+        OrderMatchResult::V1 {
             order_id,
             remaining_size: 0,
             cancel_reason: option::some(cancel_reason),
@@ -585,7 +591,7 @@ module aptos_experimental::order_placement {
 
     public(friend) fun cleanup_order_internal<M: store + copy + drop, R: store + copy + drop>(
         user_addr: address,
-        order_id: OrderIdType,
+        order_id: OrderId,
         client_order_id: Option<String>,
         order_type: OrderType,
         is_bid: bool,
@@ -628,39 +634,37 @@ module aptos_experimental::order_placement {
         remaining_size: &mut u64,
         is_bid: bool,
         metadata: M,
-        order_id: OrderIdType,
+        order_id: OrderId,
         client_order_id: Option<String>,
         callbacks: &MarketClearinghouseCallbacks<M, R>,
         time_in_force: TimeInForce,
         fill_sizes: &mut vector<u64>,
     ): (Option<OrderCancellationReason>, CallbackResult<R>) {
         let dead_mans_switch_enabled = market.is_dead_mans_switch_enabled();
-        if (dead_mans_switch_enabled) {
-            if (!is_order_valid(market.get_dead_mans_switch_tracker(), user_addr, option::none())) {
-                let taker_cancellation_reason = std::string::utf8(b"Order invalidated due to dead man's switch expiry");
-                cancel_single_order_internal(
-                    market,
-                    user_addr,
-                    price,
-                    order_id,
-                    client_order_id,
-                    orig_size,
-                    *remaining_size,
-                    *fill_sizes,
-                    0, // match_count - doesn't matter as we don't use the result.
-                    is_bid,
-                    true, // is_taker
-                    market_types::order_cancellation_reason_dead_mans_switch_expired(),
-                    taker_cancellation_reason,
-                    option::none(), // trigger_condition
-                    metadata,
-                    time_in_force,
-                    false, // emit_order_open is false as the order was already open
-                    callbacks,
-                    vector[]
-                );
-                return (option::some(market_types::order_cancellation_reason_dead_mans_switch_expired()), new_callback_result_not_available());
-            }
+        if (dead_mans_switch_enabled && !is_order_valid(market.get_dead_mans_switch_tracker(), user_addr, option::none())) {
+            let taker_cancellation_reason = std::string::utf8(b"Order invalidated due to dead man's switch expiry");
+            cancel_single_order_internal(
+                market,
+                user_addr,
+                price,
+                order_id,
+                client_order_id,
+                orig_size,
+                *remaining_size,
+                *fill_sizes,
+                0, // match_count - doesn't matter as we don't use the result.
+                is_bid,
+                true, // is_taker
+                market_types::order_cancellation_reason_dead_mans_switch_expired(),
+                taker_cancellation_reason,
+                option::none(), // trigger_condition
+                metadata,
+                time_in_force,
+                false, // emit_order_open is false as the order was already open
+                callbacks,
+                vector[]
+            );
+            return (option::some(market_types::order_cancellation_reason_dead_mans_switch_expired()), new_callback_result_not_available());
         };
         let result =
             market.get_order_book_mut()
@@ -682,23 +686,21 @@ module aptos_experimental::order_placement {
             );
             return (option::none(), new_callback_result_not_available());
         };
-        if (dead_mans_switch_enabled) {
-            if (!is_order_valid(market.get_dead_mans_switch_tracker(), maker_order.get_account_from_match_details(),  option::some(maker_order.get_creation_time_micros_from_match_details() / 1000000))) {
-                cancel_maker_order_internal(
-                    market,
-                    &maker_order,
-                    maker_order.get_client_order_id_from_match_details(),
-                    maker_order.get_account_from_match_details(),
-                    maker_order.get_order_id_from_match_details(),
-                    market_types::order_cancellation_reason_dead_mans_switch_expired(),
-                    std::string::utf8(b"Order invalidated due to dead man's switch expiry"),
-                    maker_matched_size,
-                    maker_order.get_metadata_from_match_details(),
-                    maker_order.get_time_in_force_from_match_details(),
-                    callbacks
-                );
-                return (option::none(), new_callback_result_not_available());
-            }
+        if (dead_mans_switch_enabled && !is_order_valid(market.get_dead_mans_switch_tracker(), maker_order.get_account_from_match_details(),  option::some(maker_order.get_creation_time_micros_from_match_details() / 1000000))) {
+            cancel_maker_order_internal(
+                market,
+                &maker_order,
+                maker_order.get_client_order_id_from_match_details(),
+                maker_order.get_account_from_match_details(),
+                maker_order.get_order_id_from_match_details(),
+                market_types::order_cancellation_reason_dead_mans_switch_expired(),
+                std::string::utf8(b"Order invalidated due to dead man's switch expiry"),
+                maker_matched_size,
+                maker_order.get_metadata_from_match_details(),
+                maker_order.get_time_in_force_from_match_details(),
+                callbacks
+            );
+            return (option::none(), new_callback_result_not_available());
         };
         let fill_id = transaction_context::monotonically_increasing_counter();
         let settle_result = callbacks.settle_trade(
@@ -879,7 +881,7 @@ module aptos_experimental::order_placement {
         time_in_force: TimeInForce,
         trigger_condition: Option<TriggerCondition>,
         metadata: M,
-        order_id: Option<OrderIdType>,
+        order_id: Option<OrderId>,
         client_order_id: Option<String>,
         max_match_limit: u32,
         cancel_on_match_limit: bool,

@@ -11,17 +11,19 @@ read -p "Delete past benchmark results and re-run? (Otherwise, will use extant d
 
 if [ "$ANS" == "y" ]; then
     echo "Cleaning previous Bulletproof criterion benchmark results..."
-    rm -r $repo_root/target/criterion/bulletproofs
+    rm -rf $repo_root/target/criterion/bulletproofs
 
     echo "Benchmarking Bulletproofs..."
-    RAYON_NUM_THREADS=1 cargo bench -- bulletproofs
+    RAYON_NUM_THREADS=1 cargo bench --bench bulletproofs
 
     echo "Cleaning previous DeKART criterion benchmark results..."
-    rm -r $repo_root/target/criterion/dekart*
+    rm -rf $repo_root/target/criterion/dekart*
 
     echo "Benchmarking DeKART..."
     cd $repo_root/crates/aptos-dkg/
-    RAYON_NUM_THREADS=1 cargo bench -- dekart-rs/bls12-381
+    RAYON_NUM_THREADS=1 cargo bench --bench range_proof -- dekart-rs/bls12-381
+#    RAYON_NUM_THREADS=1 cargo bench --bench range_proof -- dekart-multivar/bn254
+#    RAYON_NUM_THREADS=1 cargo bench --bench range_proof -- dekart-multivar/bls12-381
     cd - &>/dev/null
 fi
 
@@ -29,10 +31,10 @@ cd $repo_root
 csv_data=`cargo criterion-means | grep -E '^(bulletproofs|dekart-rs|Group)'`
 
 csv_file=`mktemp`
-echo "Wrote CSV file to $csv_file..."
 echo "$csv_data" >$csv_file
+echo "Wrote CSV file to $csv_file..."
 
-md_tables=`$scriptdir/print-markdown-table.py $csv_file`
+md_tables=`$scriptdir/print-range-proof-markdown-table.py $csv_file`
 
 echo "$md_tables"
 
