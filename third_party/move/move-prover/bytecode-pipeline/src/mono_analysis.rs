@@ -594,8 +594,8 @@ impl Analyzer<'_> {
             Type::Vector(et) => {
                 self.info.vec_inst.insert(et.as_ref().clone());
             },
-            Type::Tuple(elems) if elems.len() >= 2 && elems.len() <= 8 => {
-                // Only collect tuples with valid size (2-8 elements, matching MAX_TUPLE_SIZE)
+            Type::Tuple(elems) if elems.len() >= 2 => {
+                // Only collect proper tuples, tuples of size 0 and 1 do not exist.
                 self.info.tuple_inst.insert(elems.clone());
             },
             Type::Struct(mid, sid, targs) => {
