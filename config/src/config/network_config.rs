@@ -50,6 +50,28 @@ pub const MAX_FRAME_SIZE: usize = 4 * 1024 * 1024; /* 4 MiB large messages will 
 pub const MAX_MESSAGE_SIZE: usize = 64 * 1024 * 1024; /* 64 MiB */
 pub const CONNECTION_BACKOFF_BASE: u64 = 2;
 
+/// Access control policy for peer connections.
+/// Determines which peers are allowed or blocked from connecting.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AccessControlPolicy {
+    /// Only allow connections from peers in this list. All others are blocked.
+    AllowList(HashSet<PeerId>),
+    /// Block connections from peers in this list. All others are allowed.
+    BlockList(HashSet<PeerId>),
+}
+
+impl AccessControlPolicy {
+    /// Check if a peer is allowed based on this access control policy.
+    /// Returns true if the peer should be allowed, false if blocked.
+    pub fn is_peer_allowed(&self, peer_id: &PeerId) -> bool {
+        match self {
+            AccessControlPolicy::AllowList(allowed_peers) => allowed_peers.contains(peer_id),
+            AccessControlPolicy::BlockList(blocked_peers) => !blocked_peers.contains(peer_id),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct NetworkConfig {
@@ -117,6 +139,9 @@ pub struct NetworkConfig {
     pub max_parallel_deserialization_tasks: Option<usize>,
     /// Whether or not to enable latency aware peer dialing
     pub enable_latency_aware_dialing: bool,
+    /// Access control policy for peer connections. If not specified, all
+    /// peers are allowed. Otherwise, the specified policy is enforced.
+    pub access_control_policy: Option<AccessControlPolicy>,
 }
 
 impl Default for NetworkConfig {
@@ -156,6 +181,7 @@ impl NetworkConfig {
             outbound_tx_buffer_size_bytes: None,
             max_parallel_deserialization_tasks: None,
             enable_latency_aware_dialing: true,
+            access_control_policy: None,
         };
 
         // Configure the number of parallel deserialization tasks
@@ -475,6 +501,7 @@ impl Peer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use maplit::hashset;
 
     #[test]
     fn test_num_parallel_deserialization_tasks() {
@@ -494,5 +521,107 @@ mod tests {
         // Configure the number of deserialization tasks and verify that it is not overridden
         network_config.configure_num_deserialization_tasks();
         assert_eq!(network_config.max_parallel_deserialization_tasks, Some(1));
+    }
+
+    #[test]
+    fn test_access_control_policy_default() {
+        // Default config should have no access control policy
+        let network_config = NetworkConfig::default();
+        assert!(network_config.access_control_policy.is_none());
+    }
+
+    #[test]
+    fn test_access_control_policy_allow_list_serialization() {
+        // Create peer IDs for testing
+        let peer_1 = PeerId::random();
+        let peer_2 = PeerId::random();
+
+        // Create an access control policy with an allow list
+        let access_control_policy_yaml = format!(
+            r#"
+            allow_list:
+              - "{}"
+              - "{}"
+            "#,
+            peer_1, peer_2
+        );
+        let access_control_policy: AccessControlPolicy =
+            serde_yaml::from_str(&access_control_policy_yaml).unwrap();
+
+        // Verify the access control policy is correctly parsed
+        match access_control_policy {
+            AccessControlPolicy::AllowList(peers) => {
+                assert_eq!(peers.len(), 2);
+                assert!(peers.contains(&peer_1));
+                assert!(peers.contains(&peer_2));
+            },
+            _ => panic!("Expected allow list policy!"),
+        }
+    }
+
+    #[test]
+    fn test_access_control_policy_block_list_serialization() {
+        // Create peer IDs for testing
+        let peer_1 = PeerId::random();
+        let peer_2 = PeerId::random();
+        let peer_3 = PeerId::random();
+
+        // Create an access control policy with a block list
+        let access_control_policy_yaml = format!(
+            r#"
+            block_list:
+              - "{}"
+              - "{}"
+              - "{}"
+            "#,
+            peer_1, peer_2, peer_3
+        );
+        let access_control_policy: AccessControlPolicy =
+            serde_yaml::from_str(&access_control_policy_yaml).unwrap();
+
+        // Verify the access control policy is correctly parsed
+        match access_control_policy {
+            AccessControlPolicy::BlockList(peers) => {
+                assert_eq!(peers.len(), 3);
+                assert!(peers.contains(&peer_1));
+                assert!(peers.contains(&peer_2));
+                assert!(peers.contains(&peer_3));
+            },
+            _ => panic!("Expected block list policy!"),
+        }
+    }
+
+    #[test]
+    fn test_access_control_policy_allow_list() {
+        // Create an access control policy with an allow list
+        let peer_1 = PeerId::random();
+        let peer_2 = PeerId::random();
+        let peer_3 = PeerId::random();
+        let allow_list = hashset! {peer_1, peer_2};
+        let access_control_policy = AccessControlPolicy::AllowList(allow_list);
+
+        // Peers in the allow list should be allowed
+        assert!(access_control_policy.is_peer_allowed(&peer_1));
+        assert!(access_control_policy.is_peer_allowed(&peer_2));
+
+        // Peer not in the allow list should be blocked
+        assert!(!access_control_policy.is_peer_allowed(&peer_3));
+    }
+
+    #[test]
+    fn test_access_control_policy_block_list() {
+        // Create an access control policy with a block list
+        let peer_1 = PeerId::random();
+        let peer_2 = PeerId::random();
+        let peer_3 = PeerId::random();
+        let block_list = hashset! {peer_3};
+        let access_control_policy = AccessControlPolicy::BlockList(block_list);
+
+        // Peers not in the block list should be allowed
+        assert!(access_control_policy.is_peer_allowed(&peer_1));
+        assert!(access_control_policy.is_peer_allowed(&peer_2));
+
+        // Peer in the block list should be blocked
+        assert!(!access_control_policy.is_peer_allowed(&peer_3));
     }
 }
