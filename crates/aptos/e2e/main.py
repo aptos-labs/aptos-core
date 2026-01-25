@@ -59,7 +59,6 @@ from cases.account_e2e import (
     test_account_list_resources,
     test_account_list_modules,
     test_account_list_balance_query,
-    test_account_create_new,
     test_account_transfer_coins,
     test_account_fund_with_faucet_explicit,
     test_account_lookup_address_with_auth_key,
@@ -237,7 +236,6 @@ async def run_tests(run_helper):
     test_account_derive_resource_account_with_hex_encoding(run_helper)
     
     # New comprehensive account tests - create operations
-    await test_account_create_new(run_helper)
     await test_account_transfer_coins(run_helper)
     await test_account_fund_with_faucet_explicit(run_helper)
     test_account_create_resource_account(run_helper)

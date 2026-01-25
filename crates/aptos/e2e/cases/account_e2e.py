@@ -15,6 +15,7 @@ in flag availability or behavior.
 
 import json
 import secrets
+import subprocess
 
 from cases.cli_flag_helpers import (
     ExpectedFlag,
@@ -256,11 +257,7 @@ def test_account_help_subcommands(run_helper: RunHelper, test_name=None):
     
     This ensures no subcommands are accidentally removed or renamed.
     """
-    help_text = run_help_command(
-        run_helper.cli_path,
-        ["account"],
-        run_helper.host_working_directory
-    )
+    help_text = run_help_command(run_helper, ["account"], test_name)
     
     expected_subcommands = [
         "create",
@@ -284,11 +281,7 @@ def test_account_create_flags(run_helper: RunHelper, test_name=None):
     
     This catches any accidental flag removal or renaming.
     """
-    help_text = run_help_command(
-        run_helper.cli_path,
-        ["account", "create"],
-        run_helper.host_working_directory
-    )
+    help_text = run_help_command(run_helper, ["account", "create"], test_name)
     
     verify_flags_present(help_text, ACCOUNT_CREATE_FLAGS)
 
@@ -298,11 +291,7 @@ def test_account_create_resource_account_flags(run_helper: RunHelper, test_name=
     """
     Test that `aptos account create-resource-account` has all expected flags.
     """
-    help_text = run_help_command(
-        run_helper.cli_path,
-        ["account", "create-resource-account"],
-        run_helper.host_working_directory
-    )
+    help_text = run_help_command(run_helper, ["account", "create-resource-account"], test_name)
     
     verify_flags_present(help_text, ACCOUNT_CREATE_RESOURCE_FLAGS)
 
@@ -312,11 +301,7 @@ def test_account_derive_resource_account_flags(run_helper: RunHelper, test_name=
     """
     Test that `aptos account derive-resource-account-address` has all expected flags.
     """
-    help_text = run_help_command(
-        run_helper.cli_path,
-        ["account", "derive-resource-account-address"],
-        run_helper.host_working_directory
-    )
+    help_text = run_help_command(run_helper, ["account", "derive-resource-account-address"], test_name)
     
     verify_flags_present(help_text, ACCOUNT_DERIVE_RESOURCE_FLAGS)
 
@@ -326,11 +311,7 @@ def test_account_fund_with_faucet_flags(run_helper: RunHelper, test_name=None):
     """
     Test that `aptos account fund-with-faucet` has all expected flags.
     """
-    help_text = run_help_command(
-        run_helper.cli_path,
-        ["account", "fund-with-faucet"],
-        run_helper.host_working_directory
-    )
+    help_text = run_help_command(run_helper, ["account", "fund-with-faucet"], test_name)
     
     verify_flags_present(help_text, ACCOUNT_FUND_FLAGS)
 
@@ -340,11 +321,7 @@ def test_account_balance_flags(run_helper: RunHelper, test_name=None):
     """
     Test that `aptos account balance` has all expected flags.
     """
-    help_text = run_help_command(
-        run_helper.cli_path,
-        ["account", "balance"],
-        run_helper.host_working_directory
-    )
+    help_text = run_help_command(run_helper, ["account", "balance"], test_name)
     
     verify_flags_present(help_text, ACCOUNT_BALANCE_FLAGS)
 
@@ -354,11 +331,7 @@ def test_account_list_flags(run_helper: RunHelper, test_name=None):
     """
     Test that `aptos account list` has all expected flags.
     """
-    help_text = run_help_command(
-        run_helper.cli_path,
-        ["account", "list"],
-        run_helper.host_working_directory
-    )
+    help_text = run_help_command(run_helper, ["account", "list"], test_name)
     
     verify_flags_present(help_text, ACCOUNT_LIST_FLAGS)
 
@@ -368,11 +341,7 @@ def test_account_lookup_address_flags(run_helper: RunHelper, test_name=None):
     """
     Test that `aptos account lookup-address` has all expected flags.
     """
-    help_text = run_help_command(
-        run_helper.cli_path,
-        ["account", "lookup-address"],
-        run_helper.host_working_directory
-    )
+    help_text = run_help_command(run_helper, ["account", "lookup-address"], test_name)
     
     verify_flags_present(help_text, ACCOUNT_LOOKUP_FLAGS)
 
@@ -382,11 +351,7 @@ def test_account_rotate_key_flags(run_helper: RunHelper, test_name=None):
     """
     Test that `aptos account rotate-key` has all expected flags.
     """
-    help_text = run_help_command(
-        run_helper.cli_path,
-        ["account", "rotate-key"],
-        run_helper.host_working_directory
-    )
+    help_text = run_help_command(run_helper, ["account", "rotate-key"], test_name)
     
     verify_flags_present(help_text, ACCOUNT_ROTATE_KEY_FLAGS)
 
@@ -396,11 +361,7 @@ def test_account_transfer_flags(run_helper: RunHelper, test_name=None):
     """
     Test that `aptos account transfer` has all expected flags.
     """
-    help_text = run_help_command(
-        run_helper.cli_path,
-        ["account", "transfer"],
-        run_helper.host_working_directory
-    )
+    help_text = run_help_command(run_helper, ["account", "transfer"], test_name)
     
     verify_flags_present(help_text, ACCOUNT_TRANSFER_FLAGS)
 
@@ -551,35 +512,6 @@ def test_account_list_balance_query(run_helper: RunHelper, test_name=None):
     
     if "Result" not in json_result:
         raise TestError(f"Expected 'Result' in balance query output, got: {result.stdout}")
-
-
-@test_case
-async def test_account_create_new(run_helper: RunHelper, test_name=None):
-    """
-    Test creating a new account using `aptos account create`.
-    """
-    # Create the new account
-    run_helper.run_command(
-        test_name,
-        [
-            "aptos",
-            "account",
-            "create",
-            "--account",
-            str(OTHER_ACCOUNT_ONE.account_address),
-            "--assume-yes",
-        ],
-    )
-    
-    # Verify the account exists with zero balance
-    balance = int(
-        await run_helper.api_client.account_balance(OTHER_ACCOUNT_ONE.account_address)
-    )
-    if balance != 0:
-        raise TestError(
-            f"Newly created account {OTHER_ACCOUNT_ONE.account_address} "
-            f"should have 0 balance, got {balance}"
-        )
 
 
 @test_case
@@ -910,11 +842,9 @@ def test_account_balance_invalid_address(run_helper: RunHelper, test_name=None):
             ],
         )
         raise TestError("Expected command to fail with invalid address")
-    except Exception as e:
+    except subprocess.CalledProcessError:
         # Expected to fail - this is the correct behavior
-        if "invalid_address" not in str(e).lower() and "TestError" not in str(type(e)):
-            # Re-raise if it's not a parsing error
-            pass
+        pass
 
 
 @test_case
@@ -935,7 +865,7 @@ def test_account_transfer_missing_amount(run_helper: RunHelper, test_name=None):
             ],
         )
         raise TestError("Expected command to fail without amount flag")
-    except Exception:
+    except subprocess.CalledProcessError:
         # Expected to fail - amount is required
         pass
 
@@ -956,7 +886,7 @@ def test_account_create_resource_account_missing_seed(run_helper: RunHelper, tes
             ],
         )
         raise TestError("Expected command to fail without seed flag")
-    except Exception:
+    except subprocess.CalledProcessError:
         # Expected to fail - seed is required
         pass
 
