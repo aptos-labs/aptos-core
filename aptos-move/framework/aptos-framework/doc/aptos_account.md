@@ -272,7 +272,7 @@ Batch version of APT transfer.
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_enumerate_ref">vector::enumerate_ref</a>(
         &recipients,
         |i, <b>to</b>| {
-            <b>let</b> amount = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&amounts, i);
+            <b>let</b> amount = amounts[i];
             <a href="aptos_account.md#0x1_aptos_account_transfer">transfer</a>(source, *<b>to</b>, amount);
         }
     );
@@ -350,7 +350,7 @@ Batch version of transfer_coins.
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_enumerate_ref">vector::enumerate_ref</a>(
         &recipients,
         |i, <b>to</b>| {
-            <b>let</b> amount = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&amounts, i);
+            <b>let</b> amount = amounts[i];
             <a href="aptos_account.md#0x1_aptos_account_transfer_coins">transfer_coins</a>&lt;CoinType&gt;(from, *<b>to</b>, amount);
         }
     );
@@ -464,7 +464,7 @@ Batch version of transfer_fungible_assets.
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_enumerate_ref">vector::enumerate_ref</a>(
         &recipients,
         |i, <b>to</b>| {
-            <b>let</b> amount = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&amounts, i);
+            <b>let</b> amount = amounts[i];
             <a href="aptos_account.md#0x1_aptos_account_transfer_fungible_assets">transfer_fungible_assets</a>(from, metadata, *<b>to</b>, amount);
         }
     );
