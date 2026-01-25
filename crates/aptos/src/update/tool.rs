@@ -2,12 +2,12 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::{aptos::AptosUpdateTool, revela::RevelaUpdateTool};
+#[cfg(feature = "prover-deps")]
+use crate::update::prover_dependencies::ProverDependencyInstaller;
 use crate::{
     common::types::{CliCommand, CliResult},
     update::{move_mutation_test::MutationTestUpdaterTool, movefmt::FormatterUpdateTool},
 };
-#[cfg(feature = "prover-deps")]
-use crate::update::prover_dependencies::ProverDependencyInstaller;
 use clap::Subcommand;
 
 /// Update the CLI or other tools it depends on.
