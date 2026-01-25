@@ -15,12 +15,14 @@ pub mod stake;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test;
 pub mod update;
+#[cfg(feature = "workspace")]
 pub mod workspace;
 
 use crate::common::{
     types::{CliCommand, CliResult, CliTypedResult},
     utils::cli_build_information,
 };
+#[cfg(feature = "workspace")]
 use aptos_workspace_server::WorkspaceCommand;
 use async_trait::async_trait;
 use clap::Parser;
@@ -52,6 +54,7 @@ pub enum Tool {
     Stake(stake::StakeTool),
     #[clap(subcommand)]
     Update(update::UpdateTool),
+    #[cfg(feature = "workspace")]
     #[clap(subcommand, hide(true))]
     Workspace(WorkspaceCommand),
 }
@@ -73,6 +76,7 @@ impl Tool {
             Node(tool) => tool.execute().await,
             Stake(tool) => tool.execute().await,
             Update(tool) => tool.execute().await,
+            #[cfg(feature = "workspace")]
             Workspace(workspace) => workspace.execute_serialized_without_logger().await,
         }
     }
