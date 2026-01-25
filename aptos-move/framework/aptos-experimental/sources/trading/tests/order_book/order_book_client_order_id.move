@@ -44,7 +44,7 @@ module aptos_experimental::order_book_client_order_id {
         let cancel_result_again =
             order_book.try_cancel_single_order_with_client_order_id(user1_addr, client_order_id);
         assert!(cancel_result_again.is_none());
-        destroy_order_book(order_book);
+        order_book.destroy_order_book();
     }
 
     #[test(user1 = @0x456)]
@@ -96,7 +96,7 @@ module aptos_experimental::order_book_client_order_id {
         assert!(
             order_book.try_cancel_single_order_with_client_order_id(user2_addr, client_order_id).is_none()
         );
-        destroy_order_book(order_book);
+        order_book.destroy_order_book();
     }
 
     #[test(user1 = @0x456)]
@@ -189,7 +189,7 @@ module aptos_experimental::order_book_client_order_id {
         let cancel_result_3_again =
             order_book.try_cancel_single_order_with_client_order_id(user1_addr, client_order_id_3);
         assert!(cancel_result_3_again.is_none());
-        destroy_order_book(order_book);
+        order_book.destroy_order_book();
     }
 
     #[test(user1 = @0x456)]
@@ -223,7 +223,7 @@ module aptos_experimental::order_book_client_order_id {
         let cancel_result =
             order_book.try_cancel_single_order_with_client_order_id(user1_addr, std::string::utf8(b"12345"));
         assert!(cancel_result.is_none());
-        destroy_order_book(order_book);
+        order_book.destroy_order_book();
     }
 
     #[test(user1 = @0x456)]
@@ -292,7 +292,7 @@ module aptos_experimental::order_book_client_order_id {
         let cancel_result_after_full_match =
             order_book.try_cancel_single_order_with_client_order_id(user1_addr, client_order_id);
         assert!(cancel_result_after_full_match.is_none());
-        destroy_order_book(order_book);
+        order_book.destroy_order_book();
     }
 
     #[test(user1 = @0x456)]
@@ -351,7 +351,7 @@ module aptos_experimental::order_book_client_order_id {
         let cancel_result_after_cancel =
             order_book.try_cancel_single_order_with_client_order_id(user1_addr, client_order_id);
         assert!(cancel_result_after_cancel.is_none());
-        destroy_order_book(order_book);
+        order_book.destroy_order_book();
     }
 
     #[test(user1 = @0x456)]
@@ -397,7 +397,7 @@ module aptos_experimental::order_book_client_order_id {
 
         // Verify order is now removed after cancellation
         assert!(order_book.get_single_remaining_size(maker_order_id) == 0);
-        destroy_order_book(order_book);
+        order_book.destroy_order_book();
     }
 
     #[test(user1 = @0x456)]
@@ -453,7 +453,7 @@ module aptos_experimental::order_book_client_order_id {
         let cancel_result_2 =
             order_book.try_cancel_single_order_with_client_order_id(user1_addr, std::string::utf8(b"1002"));
         assert!(cancel_result_2.is_some());
-        destroy_order_book(order_book);
+        order_book.destroy_order_book();
     }
 
     #[test(user1 = @0x456)]

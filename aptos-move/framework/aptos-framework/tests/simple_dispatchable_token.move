@@ -37,7 +37,7 @@ module 0xcafe::simple_token {
         amount: u64,
         transfer_ref: &TransferRef,
     ): FungibleAsset {
-        fungible_asset::withdraw_with_ref(transfer_ref, store, amount)
+        transfer_ref.withdraw_with_ref(store, amount)
     }
 
     public fun deposit<T: key>(
@@ -45,6 +45,6 @@ module 0xcafe::simple_token {
         fa: FungibleAsset,
         transfer_ref: &TransferRef,
     ) {
-        fungible_asset::deposit_with_ref(transfer_ref, store, fa)
+        transfer_ref.deposit_with_ref(store, fa)
     }
 }

@@ -64,7 +64,7 @@ module aptos_std::keyless {
 
     /// Creates a new keyless public key from an issuer string and an identifier bytes.
     public fun new(iss: String, idc: vector<u8>): PublicKey {
-        assert!(string::bytes(&iss).length() <= MAX_ISSUER_UTF8_BYTES_LENGTH, error::invalid_argument(E_INVALID_ISSUER_UTF8_BYTES_LENGTH));
+        assert!(iss.bytes().length() <= MAX_ISSUER_UTF8_BYTES_LENGTH, error::invalid_argument(E_INVALID_ISSUER_UTF8_BYTES_LENGTH));
         assert!(idc.length() == ID_COMMITMENT_BYTES_LENGTH, error::invalid_argument(E_INVALID_ID_COMMITMENT_BYTES_LENGTH));
         PublicKey { iss, idc }
     }

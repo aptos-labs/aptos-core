@@ -204,7 +204,7 @@ module aptos_framework::aptos_governance {
         };
 
         let signer_caps = &mut borrow_global_mut<GovernanceResponsbility>(@aptos_framework).signer_caps;
-        simple_map::add(signer_caps, signer_address, signer_cap);
+        signer_caps.add(signer_address, signer_cap);
     }
 
     /// Initializes the state for Aptos Governance. Can only be called during Genesis with a signer
@@ -311,7 +311,7 @@ module aptos_framework::aptos_governance {
         // If a stake pool has already voted on a proposal before partial governance voting is enabled,
         // there is a record in VotingRecords.
         let voting_records = borrow_global<VotingRecords>(@aptos_framework);
-        table::contains(&voting_records.votes, record_key)
+        voting_records.votes.contains(record_key)
     }
 
     #[view]
@@ -442,8 +442,8 @@ module aptos_framework::aptos_governance {
         // supply during the voting period.
         let total_voting_token_supply = coin::supply<AptosCoin>();
         let early_resolution_vote_threshold = option::none<u128>();
-        if (option::is_some(&total_voting_token_supply)) {
-            let total_supply = *option::borrow(&total_voting_token_supply);
+        if (total_voting_token_supply.is_some()) {
+            let total_supply = *total_voting_token_supply.borrow();
             // 50% + 1 to avoid rounding errors.
             early_resolution_vote_threshold = option::some(total_supply / 2 + 1);
         };
@@ -493,7 +493,7 @@ module aptos_framework::aptos_governance {
         proposal_id: u64,
         should_pass: bool,
     ) acquires ApprovedExecutionHashes, VotingRecords, VotingRecordsV2, GovernanceEvents {
-        vector::for_each(stake_pools, |stake_pool| {
+        stake_pools.for_each(|stake_pool| {
             vote_internal(voter, stake_pool, proposal_id, MAX_U64, should_pass);
         });
     }
@@ -506,7 +506,7 @@ module aptos_framework::aptos_governance {
         voting_power: u64,
         should_pass: bool,
     ) acquires ApprovedExecutionHashes, VotingRecords, VotingRecordsV2, GovernanceEvents {
-        vector::for_each(stake_pools, |stake_pool| {
+        stake_pools.for_each(|stake_pool| {
             vote_internal(voter, stake_pool, proposal_id, voting_power, should_pass);
         });
     }
@@ -621,11 +621,11 @@ module aptos_framework::aptos_governance {
 
         // If this is a multi-step proposal, the proposal id will already exist in the ApprovedExecutionHashes map.
         // We will update execution hash in ApprovedExecutionHashes to be the next_execution_hash.
-        if (simple_map::contains_key(&approved_hashes.hashes, &proposal_id)) {
-            let current_execution_hash = simple_map::borrow_mut(&mut approved_hashes.hashes, &proposal_id);
+        if (approved_hashes.hashes.contains_key(&proposal_id)) {
+            let current_execution_hash = approved_hashes.hashes.borrow_mut(&proposal_id);
             *current_execution_hash = execution_hash;
         } else {
-            simple_map::add(&mut approved_hashes.hashes, proposal_id, execution_hash);
+            approved_hashes.hashes.add(proposal_id, execution_hash);
         }
     }
 
@@ -649,7 +649,7 @@ module aptos_framework::aptos_governance {
         voting::resolve_proposal_v2<GovernanceProposal>(@aptos_framework, proposal_id, next_execution_hash);
         // If the current step is the last step of this multi-step proposal,
         // we will remove the execution hash from the ApprovedExecutionHashes map.
-        if (vector::length(&next_execution_hash) == 0) {
+        if (next_execution_hash.length() == 0) {
             remove_approved_hash(proposal_id);
         } else {
             // If the current step is not the last step of this proposal,
@@ -668,8 +668,8 @@ module aptos_framework::aptos_governance {
         );
 
         let approved_hashes = &mut borrow_global_mut<ApprovedExecutionHashes>(@aptos_framework).hashes;
-        if (simple_map::contains_key(approved_hashes, &proposal_id)) {
-            simple_map::remove(approved_hashes, &proposal_id);
+        if (approved_hashes.contains_key(&proposal_id)) {
+            approved_hashes.remove(&proposal_id);
         };
     }
 
@@ -744,7 +744,7 @@ module aptos_framework::aptos_governance {
     /// Return a signer for making changes to 0x1 as part of on-chain governance proposal process.
     fun get_signer(signer_address: address): signer acquires GovernanceResponsbility {
         let governance_responsibility = borrow_global<GovernanceResponsbility>(@aptos_framework);
-        let signer_cap = simple_map::borrow(&governance_responsibility.signer_caps, &signer_address);
+        let signer_cap = governance_responsibility.signer_caps.borrow(&signer_address);
         create_signer_with_capability(signer_cap)
     }
 
@@ -752,12 +752,12 @@ module aptos_framework::aptos_governance {
         metadata_location: vector<u8>,
         metadata_hash: vector<u8>
     ): SimpleMap<String, vector<u8>> {
-        assert!(string::length(&utf8(metadata_location)) <= 256, error::invalid_argument(EMETADATA_LOCATION_TOO_LONG));
-        assert!(string::length(&utf8(metadata_hash)) <= 256, error::invalid_argument(EMETADATA_HASH_TOO_LONG));
+        assert!(utf8(metadata_location).length() <= 256, error::invalid_argument(EMETADATA_LOCATION_TOO_LONG));
+        assert!(utf8(metadata_hash).length() <= 256, error::invalid_argument(EMETADATA_HASH_TOO_LONG));
 
         let metadata = simple_map::create<String, vector<u8>>();
-        simple_map::add(&mut metadata, utf8(METADATA_LOCATION_KEY), metadata_location);
-        simple_map::add(&mut metadata, utf8(METADATA_HASH_KEY), metadata_hash);
+        metadata.add(utf8(METADATA_LOCATION_KEY), metadata_location);
+        metadata.add(utf8(METADATA_HASH_KEY), metadata_hash);
         metadata
     }
 
@@ -800,7 +800,7 @@ module aptos_framework::aptos_governance {
     ): signer acquires ApprovedExecutionHashes, GovernanceResponsbility {
         if (multi_step) {
             let execution_hash = vector::empty<u8>();
-            vector::push_back(&mut execution_hash, 1);
+            execution_hash.push_back(1);
 
             if (finish_multi_step_execution) {
                 resolve_multi_step_proposal(proposal_id, signer_address, vector::empty<u8>())
@@ -854,14 +854,14 @@ module aptos_framework::aptos_governance {
         // Add approved script hash.
         add_approved_script_hash(0);
         let approved_hashes = borrow_global<ApprovedExecutionHashes>(@aptos_framework).hashes;
-        assert!(*simple_map::borrow(&approved_hashes, &0) == execution_hash, 0);
+        assert!(*approved_hashes.borrow(&0) == execution_hash, 0);
 
         // Resolve the proposal.
         let account = resolve_proposal_for_test(0, @aptos_framework, use_generic_resolve_function, true);
         assert!(signer::address_of(&account) == @aptos_framework, 1);
         assert!(voting::is_resolved<GovernanceProposal>(@aptos_framework, 0), 2);
         let approved_hashes = borrow_global<ApprovedExecutionHashes>(@aptos_framework).hashes;
-        assert!(!simple_map::contains_key(&approved_hashes, &0), 3);
+        assert!(!approved_hashes.contains_key(&0), 3);
     }
 
     #[test(aptos_framework = @aptos_framework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]
@@ -927,10 +927,10 @@ module aptos_framework::aptos_governance {
         if (multi_step) {
             let execution_hash = vector::empty<u8>();
             let next_execution_hash = vector::empty<u8>();
-            vector::push_back(&mut execution_hash, 1);
+            execution_hash.push_back(1);
             voting::resolve_proposal_v2<GovernanceProposal>(@aptos_framework, 0, next_execution_hash);
             assert!(voting::is_resolved<GovernanceProposal>(@aptos_framework, 0), 0);
-            if (vector::length(&next_execution_hash) == 0) {
+            if (next_execution_hash.length() == 0) {
                 remove_approved_hash(0);
             } else {
                 add_approved_script_hash(0)
@@ -941,7 +941,7 @@ module aptos_framework::aptos_governance {
             remove_approved_hash(0);
         };
         let approved_hashes = borrow_global<ApprovedExecutionHashes>(@aptos_framework).hashes;
-        assert!(!simple_map::contains_key(&approved_hashes, &0), 1);
+        assert!(!approved_hashes.contains_key(&0), 1);
     }
 
     #[test(aptos_framework = @aptos_framework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]
@@ -1245,9 +1245,9 @@ module aptos_framework::aptos_governance {
 
         // Initialize the stake pools for proposer and voters.
         let active_validators = vector::empty<address>();
-        vector::push_back(&mut active_validators, signer::address_of(proposer));
-        vector::push_back(&mut active_validators, signer::address_of(yes_voter));
-        vector::push_back(&mut active_validators, signer::address_of(no_voter));
+        active_validators.push_back(signer::address_of(proposer));
+        active_validators.push_back(signer::address_of(yes_voter));
+        active_validators.push_back(signer::address_of(no_voter));
         let (_sk_1, pk_1, _pop_1) = stake::generate_identity();
         let (_sk_2, pk_2, _pop_2) = stake::generate_identity();
         let (_sk_3, pk_3, _pop_3) = stake::generate_identity();
@@ -1379,19 +1379,19 @@ module aptos_framework::aptos_governance {
         // Resolve the proposal.
         let execution_hash = vector::empty<u8>();
         let next_execution_hash = vector::empty<u8>();
-        vector::push_back(&mut execution_hash, 1);
-        vector::push_back(&mut next_execution_hash, 10);
+        execution_hash.push_back(1);
+        next_execution_hash.push_back(10);
 
         voting::resolve_proposal_v2<GovernanceProposal>(@aptos_framework, 0, next_execution_hash);
 
-        if (vector::length(&next_execution_hash) == 0) {
+        if (next_execution_hash.length() == 0) {
             remove_approved_hash(0);
         } else {
             add_approved_script_hash(0)
         };
 
         let approved_hashes = borrow_global<ApprovedExecutionHashes>(@aptos_framework).hashes;
-        assert!(*simple_map::borrow(&approved_hashes, &0) == vector[10u8, ], 1);
+        assert!(*approved_hashes.borrow(&0) == vector[10u8, ], 1);
     }
 
     #[test_only]

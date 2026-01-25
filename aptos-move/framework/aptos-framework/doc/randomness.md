@@ -1038,7 +1038,7 @@ function as its payload.
 <pre><code><b>include</b> <a href="randomness.md#0x1_randomness_NextBlobAbortsIf">NextBlobAbortsIf</a>;
 <b>let</b> input = b"APTOS_RANDOMNESS";
 <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
-<b>let</b> seed = <a href="randomness.md#0x1_randomness">randomness</a>.seed.borrow();
+<b>let</b> seed = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="randomness.md#0x1_randomness">randomness</a>.seed);
 <b>let</b> txn_hash = <a href="transaction_context.md#0x1_transaction_context_spec_get_txn_hash">transaction_context::spec_get_txn_hash</a>();
 <b>let</b> txn_counter = <a href="randomness.md#0x1_randomness_spec_fetch_and_increment_txn_counter">spec_fetch_and_increment_txn_counter</a>();
 <b>ensures</b> len(result) == 32;
@@ -1053,7 +1053,7 @@ function as its payload.
 
 <pre><code><b>schema</b> <a href="randomness.md#0x1_randomness_NextBlobAbortsIf">NextBlobAbortsIf</a> {
     <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
-    <b>aborts_if</b> <a href="randomness.md#0x1_randomness">randomness</a>.seed.is_none();
+    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(<a href="randomness.md#0x1_randomness">randomness</a>.seed);
     <b>aborts_if</b> !<a href="randomness.md#0x1_randomness_spec_is_unbiasable">spec_is_unbiasable</a>();
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
 }

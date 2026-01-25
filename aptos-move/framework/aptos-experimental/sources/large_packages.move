@@ -136,7 +136,7 @@ module aptos_experimental::large_packages {
         code_chunks: vector<vector<u8>>
     ): &mut StagingArea {
         assert!(
-            vector::length(&code_indices) == vector::length(&code_chunks),
+            code_indices.length() == code_chunks.length(),
             error::invalid_argument(ECODE_MISMATCH)
         );
 
@@ -155,21 +155,19 @@ module aptos_experimental::large_packages {
 
         let staging_area = borrow_global_mut<StagingArea>(owner_address);
 
-        if (!vector::is_empty(&metadata_chunk)) {
-            vector::append(&mut staging_area.metadata_serialized, metadata_chunk);
+        if (!metadata_chunk.is_empty()) {
+            staging_area.metadata_serialized.append(metadata_chunk);
         };
 
         let i = 0;
-        while (i < vector::length(&code_chunks)) {
+        while (i < code_chunks.length()) {
             let inner_code = code_chunks[i];
             let idx = (code_indices[i] as u64);
 
-            if (smart_table::contains(&staging_area.code, idx)) {
-                vector::append(
-                    smart_table::borrow_mut(&mut staging_area.code, idx), inner_code
-                );
+            if (staging_area.code.contains(idx)) {
+                staging_area.code.borrow_mut(idx).append(inner_code);
             } else {
-                smart_table::add(&mut staging_area.code, idx, inner_code);
+                staging_area.code.add(idx, inner_code);
                 if (idx > staging_area.last_module_idx) {
                     staging_area.last_module_idx = idx;
                 }
@@ -215,10 +213,7 @@ module aptos_experimental::large_packages {
         let code = vector[];
         let i = 0;
         while (i <= last_module_idx) {
-            vector::push_back(
-                &mut code,
-                *smart_table::borrow(&staging_area.code, i)
-            );
+            code.push_back(*staging_area.code.borrow(i));
             i += 1;
         };
         code
@@ -227,6 +222,6 @@ module aptos_experimental::large_packages {
     public entry fun cleanup_staging_area(owner: &signer) acquires StagingArea {
         let StagingArea { metadata_serialized: _, code, last_module_idx: _ } =
             move_from<StagingArea>(signer::address_of(owner));
-        smart_table::destroy(code);
+        code.destroy();
     }
 }

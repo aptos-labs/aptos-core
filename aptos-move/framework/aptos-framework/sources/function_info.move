@@ -38,11 +38,11 @@ module aptos_framework::function_info {
         function_name: String,
     ): FunctionInfo {
         assert!(
-            is_identifier(string::bytes(&module_name)),
+            is_identifier(module_name.bytes()),
             EINVALID_IDENTIFIER
         );
         assert!(
-            is_identifier(string::bytes(&function_name)),
+            is_identifier(function_name.bytes()),
             EINVALID_IDENTIFIER
         );
         FunctionInfo {

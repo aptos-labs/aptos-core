@@ -56,7 +56,7 @@ module aptos_framework::reconfiguration_state {
         };
 
         let state = borrow_global<State>(@aptos_framework);
-        let variant_type_name = *string::bytes(copyable_any::type_name(&state.variant));
+        let variant_type_name = *state.variant.type_name().bytes();
         variant_type_name == b"0x1::reconfiguration_state::StateActive"
     }
 
@@ -67,7 +67,7 @@ module aptos_framework::reconfiguration_state {
     public(friend) fun on_reconfig_start() acquires State {
         if (exists<State>(@aptos_framework)) {
             let state = borrow_global_mut<State>(@aptos_framework);
-            let variant_type_name = *string::bytes(copyable_any::type_name(&state.variant));
+            let variant_type_name = *state.variant.type_name().bytes();
             if (variant_type_name == b"0x1::reconfiguration_state::StateInactive") {
                 state.variant = copyable_any::pack(StateActive {
                     start_time_secs: timestamp::now_seconds()
@@ -80,9 +80,9 @@ module aptos_framework::reconfiguration_state {
     /// Abort if the reconfiguration state is not "in progress".
     public(friend) fun start_time_secs(): u64 acquires State {
         let state = borrow_global<State>(@aptos_framework);
-        let variant_type_name = *string::bytes(copyable_any::type_name(&state.variant));
+        let variant_type_name = *state.variant.type_name().bytes();
         if (variant_type_name == b"0x1::reconfiguration_state::StateActive") {
-            let active = copyable_any::unpack<StateActive>(state.variant);
+            let active = state.variant.unpack::<StateActive>();
             active.start_time_secs
         } else {
             abort(error::invalid_state(ERECONFIG_NOT_IN_PROGRESS))
@@ -94,7 +94,7 @@ module aptos_framework::reconfiguration_state {
     public(friend) fun on_reconfig_finish() acquires State {
         if (exists<State>(@aptos_framework)) {
             let state = borrow_global_mut<State>(@aptos_framework);
-            let variant_type_name = *string::bytes(copyable_any::type_name(&state.variant));
+            let variant_type_name = *state.variant.type_name().bytes();
             if (variant_type_name == b"0x1::reconfiguration_state::StateActive") {
                 state.variant = copyable_any::pack(StateInactive {});
             } else {

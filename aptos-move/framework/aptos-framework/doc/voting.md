@@ -2087,7 +2087,7 @@ Return true if the voting period of the given proposal has already ended.
     <b>let</b> proposal_id = voting_forum.next_proposal_id;
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
     <b>aborts_if</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(voting_forum.proposals,proposal_id);
-    <b>aborts_if</b> early_resolution_vote_threshold.is_some() && min_vote_threshold &gt; early_resolution_vote_threshold.borrow();
+    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(early_resolution_vote_threshold) && min_vote_threshold &gt; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(early_resolution_vote_threshold);
     <b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_KEY">IS_MULTI_STEP_PROPOSAL_KEY</a>);
     <b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
     <b>aborts_if</b> len(execution_hash) == 0;
@@ -2217,9 +2217,9 @@ Return true if the voting period of the given proposal has already ended.
 // This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
 <b>ensures</b> post_proposal.is_resolved == <b>true</b>;
 <b>ensures</b> post_proposal.resolution_time_secs == <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>();
-<b>aborts_if</b> proposal.execution_content.is_none();
-<b>ensures</b> result == proposal.execution_content.borrow();
-<b>ensures</b> post_proposal.execution_content.is_none();
+<b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(proposal.execution_content);
+<b>ensures</b> result == <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(proposal.execution_content);
+<b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(post_proposal.execution_content);
 </code></pre>
 
 
@@ -2360,8 +2360,8 @@ Return true if the voting period of the given proposal has already ended.
 
 
 <pre><code><b>fun</b> <a href="voting.md#0x1_voting_spec_can_be_resolved_early">spec_can_be_resolved_early</a>&lt;ProposalType: store&gt;(proposal: <a href="voting.md#0x1_voting_Proposal">Proposal</a>&lt;ProposalType&gt;): bool {
-   <b>if</b> (proposal.early_resolution_vote_threshold.is_some()) {
-       <b>let</b> early_resolution_threshold = proposal.early_resolution_vote_threshold.borrow();
+   <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(proposal.early_resolution_vote_threshold)) {
+       <b>let</b> early_resolution_threshold = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(proposal.early_resolution_vote_threshold);
        <b>if</b> (proposal.yes_votes &gt;= early_resolution_threshold || proposal.no_votes &gt;= early_resolution_threshold) {
            <b>true</b>
        } <b>else</b>{

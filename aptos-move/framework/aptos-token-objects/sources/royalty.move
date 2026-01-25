@@ -35,18 +35,18 @@ module aptos_token_objects::royalty {
 
     /// Add a royalty, given a ConstructorRef.
     public fun init(ref: &ConstructorRef, royalty: Royalty) {
-        let signer = object::generate_signer(ref);
+        let signer = ref.generate_signer();
         move_to(&signer, royalty);
     }
 
     /// Set the royalty if it does not exist, replace it otherwise.
     public fun update(mutator_ref: &MutatorRef, royalty: Royalty) acquires Royalty {
-        let addr = object::address_from_extend_ref(&mutator_ref.inner);
+        let addr = mutator_ref.inner.address_from_extend_ref();
         if (exists<Royalty>(addr)) {
             move_from<Royalty>(addr);
         };
 
-        let signer = object::generate_signer_for_extending(&mutator_ref.inner);
+        let signer = mutator_ref.inner.generate_signer_for_extending();
         move_to(&signer, royalty);
     }
 
@@ -73,7 +73,7 @@ module aptos_token_objects::royalty {
 
     // Accessors
     public fun get<T: key>(maybe_royalty: Object<T>): Option<Royalty> acquires Royalty {
-        let obj_addr = object::object_address(&maybe_royalty);
+        let obj_addr = maybe_royalty.object_address();
         if (exists<Royalty>(obj_addr)) {
             option::some(Royalty[obj_addr])
         } else {
@@ -96,14 +96,14 @@ module aptos_token_objects::royalty {
     #[test(creator = @0x123)]
     fun test_none(creator: &signer) acquires Royalty {
         let constructor_ref = object::create_named_object(creator, b"");
-        let object = object::object_from_constructor_ref<object::ObjectCore>(&constructor_ref);
+        let object = constructor_ref.object_from_constructor_ref::<object::ObjectCore>();
         assert!(option::none() == get(object), 0);
     }
 
     #[test(creator = @0x123)]
     fun test_init_and_update(creator: &signer) acquires Royalty {
         let constructor_ref = object::create_named_object(creator, b"");
-        let object = object::object_from_constructor_ref<object::ObjectCore>(&constructor_ref);
+        let object = constructor_ref.object_from_constructor_ref::<object::ObjectCore>();
         let init_royalty = create(1, 2, @0x123);
         init(&constructor_ref, init_royalty);
         assert!(option::some(init_royalty) == get(object), 0);
@@ -111,7 +111,7 @@ module aptos_token_objects::royalty {
         assert!(denominator(&init_royalty) == 2, 2);
         assert!(payee_address(&init_royalty) == @0x123, 3);
 
-        let mutator_ref = generate_mutator_ref(object::generate_extend_ref(&constructor_ref));
+        let mutator_ref = generate_mutator_ref(constructor_ref.generate_extend_ref());
         let update_royalty = create(2, 5, @0x456);
         update(&mutator_ref, update_royalty);
         assert!(option::some(update_royalty) == get(object), 4);
@@ -123,10 +123,10 @@ module aptos_token_objects::royalty {
     #[test(creator = @0x123)]
     fun test_update_only(creator: &signer) acquires Royalty {
         let constructor_ref = object::create_named_object(creator, b"");
-        let object = object::object_from_constructor_ref<object::ObjectCore>(&constructor_ref);
+        let object = constructor_ref.object_from_constructor_ref::<object::ObjectCore>();
         assert!(option::none() == get(object), 0);
 
-        let mutator_ref = generate_mutator_ref(object::generate_extend_ref(&constructor_ref));
+        let mutator_ref = generate_mutator_ref(constructor_ref.generate_extend_ref());
         let update_royalty = create(1, 5, @0x123);
         update(&mutator_ref, update_royalty);
         assert!(option::some(update_royalty) == get(object), 1);

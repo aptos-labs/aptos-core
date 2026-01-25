@@ -23,8 +23,8 @@ module aptos_framework::reconfiguration_with_dkg {
     /// Do nothing if one is already in progress.
     public(friend) fun try_start() {
         let incomplete_dkg_session = dkg::incomplete_session();
-        if (option::is_some(&incomplete_dkg_session)) {
-            let session = option::borrow(&incomplete_dkg_session);
+        if (incomplete_dkg_session.is_some()) {
+            let session = incomplete_dkg_session.borrow();
             if (dkg::session_dealer_epoch(session) == reconfiguration::current_epoch()) {
                 return
             }

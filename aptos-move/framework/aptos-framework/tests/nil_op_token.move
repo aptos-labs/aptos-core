@@ -31,6 +31,6 @@ module 0xcafe::nil_op_token {
         transfer_ref: &TransferRef,
     ): FungibleAsset {
         // Always return a one FA.
-        fungible_asset::withdraw_with_ref(transfer_ref, store, 1)
+        transfer_ref.withdraw_with_ref(store, 1)
     }
 }

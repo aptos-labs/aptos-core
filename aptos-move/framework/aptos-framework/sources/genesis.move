@@ -99,8 +99,8 @@ module aptos_framework::genesis {
 
         // put reserved framework reserved accounts under aptos governance
         let framework_reserved_addresses = vector<address>[@0x2, @0x3, @0x4, @0x5, @0x6, @0x7, @0x8, @0x9, @0xa];
-        while (!vector::is_empty(&framework_reserved_addresses)) {
-            let address = vector::pop_back<address>(&mut framework_reserved_addresses);
+        while (!framework_reserved_addresses.is_empty()) {
+            let address = framework_reserved_addresses.pop_back::<address>();
             let (_, framework_signer_cap) = account::create_framework_reserved_account(address);
             aptos_governance::store_signer_cap(&aptos_framework_account, address, framework_signer_cap);
         };
@@ -174,7 +174,7 @@ module aptos_framework::genesis {
 
     fun create_accounts(aptos_framework: &signer, accounts: vector<AccountMap>) {
         let unique_accounts = vector::empty();
-        vector::for_each_ref(&accounts, |account_map| {
+        accounts.for_each_ref(|account_map| {
             let account_map: &AccountMap = account_map;
             assert!(
                 !vector::contains(&unique_accounts, &account_map.account_address),
@@ -213,7 +213,7 @@ module aptos_framework::genesis {
     ) {
         let unique_accounts = vector::empty();
 
-        vector::for_each_ref(&employees, |employee_group| {
+        employees.for_each_ref(|employee_group| {
             let j = 0;
             let employee_group: &EmployeeAccountMap = employee_group;
             let num_employees_in_group = vector::length(&employee_group.accounts);
@@ -299,7 +299,7 @@ module aptos_framework::genesis {
         use_staking_contract: bool,
         validators: vector<ValidatorConfigurationWithCommission>,
     ) {
-        vector::for_each_ref(&validators, |validator| {
+        validators.for_each_ref(|validator| {
             let validator: &ValidatorConfigurationWithCommission = validator;
             create_initialize_validator(aptos_framework, validator, use_staking_contract);
         });
@@ -323,7 +323,7 @@ module aptos_framework::genesis {
     /// encoded in a single BCS byte array.
     fun create_initialize_validators(aptos_framework: &signer, validators: vector<ValidatorConfiguration>) {
         let validators_with_commission = vector::empty();
-        vector::for_each_reverse(validators, |validator| {
+        validators.for_each_reverse(|validator| {
             let validator_with_commission = ValidatorConfigurationWithCommission {
                 validator_config: validator,
                 commission_percentage: 0,

@@ -14,7 +14,7 @@ module aptos_framework::ten_x_token_tests {
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
-        let metadata = object::convert<TestToken, Metadata>(token_object);
+        let metadata = token_object.convert::<TestToken, Metadata>();
 
         let creator_store = fungible_asset::create_test_store(creator, metadata);
 
@@ -22,7 +22,7 @@ module aptos_framework::ten_x_token_tests {
 
         assert!(dispatchable_fungible_asset::derived_supply(metadata) == option::some(0), 2);
         // Mint
-        let fa = fungible_asset::mint(&mint, 100);
+        let fa = mint.mint(100);
         dispatchable_fungible_asset::deposit(creator_store, fa);
 
         // The derived value is 10x
@@ -38,12 +38,12 @@ module aptos_framework::ten_x_token_tests {
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _) = primary_fungible_store::init_test_metadata_with_primary_store_enabled(&creator_ref);
-        let metadata = object::convert<TestToken, Metadata>(token_object);
+        let metadata = token_object.convert::<TestToken, Metadata>();
 
         ten_x_token::initialize(creator, &creator_ref);
         let creator_address = signer::address_of(creator);
 
-        let fa = fungible_asset::mint(&mint, 100);
+        let fa = mint.mint(100);
         primary_fungible_store::deposit(creator_address, fa);
 
         // The derived value is 10x
@@ -58,7 +58,7 @@ module aptos_framework::ten_x_token_tests {
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         fungible_asset::init_test_metadata(&creator_ref);
-        let metadata = object::convert<TestToken, Metadata>(token_object);
+        let metadata = token_object.convert::<TestToken, Metadata>();
 
         let creator_store = fungible_asset::create_test_store(creator, metadata);
 
@@ -73,7 +73,7 @@ module aptos_framework::ten_x_token_tests {
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         fungible_asset::init_test_metadata(&creator_ref);
-        let metadata = object::convert<TestToken, Metadata>(token_object);
+        let metadata = token_object.convert::<TestToken, Metadata>();
 
         ten_x_token::initialize(creator, &creator_ref);
 

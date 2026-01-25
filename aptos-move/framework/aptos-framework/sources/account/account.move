@@ -666,8 +666,8 @@ module aptos_framework::account {
             verified_public_key_bit_map = vector[0x80, 0x00, 0x00, 0x00];
         } else {
             // The new key is a multi-ed25519 key, so set the verified_public_key_bit_map to the signature bitmap.
-            let len = vector::length(&cap_update_table);
-            verified_public_key_bit_map = vector::slice(&cap_update_table, len - 4, len);
+            let len = cap_update_table.length();
+            verified_public_key_bit_map = cap_update_table.slice(len - 4, len);
         };
 
         event::emit(KeyRotationToPublicKey {
@@ -729,8 +729,8 @@ module aptos_framework::account {
             verified_public_key_bit_map = vector[0x80, 0x00, 0x00, 0x00];
         } else {
             // The new key is a multi-ed25519 key, so set the verified_public_key_bit_map to the signature bitmap.
-            let len = vector::length(&cap_update_table);
-            verified_public_key_bit_map = vector::slice(&cap_update_table, len - 4, len);
+            let len = cap_update_table.length();
+            verified_public_key_bit_map = cap_update_table.slice(len - 4, len);
         };
 
         event::emit(KeyRotationToPublicKey {

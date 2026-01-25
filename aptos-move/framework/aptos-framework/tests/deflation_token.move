@@ -41,10 +41,10 @@ module 0xcafe::deflation_token {
         // For every withdraw, we burn 10% from the store.
         let burn_amount = amount / 10;
         if (burn_amount > 0) {
-            fungible_asset::burn_from(&borrow_global<BurnStore>(@0xcafe).burn_ref, store, burn_amount);
+            borrow_global<BurnStore>(@0xcafe).burn_ref.burn_from(store, burn_amount);
         };
 
-        fungible_asset::withdraw_with_ref(transfer_ref, store, amount)
+        transfer_ref.withdraw_with_ref(store, amount)
     }
 
     #[test_only]
@@ -59,7 +59,7 @@ module 0xcafe::deflation_token {
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
-        let metadata = object::convert<TestToken, Metadata>(token_object);
+        let metadata = token_object.convert::<TestToken, Metadata>();
 
         let creator_store = fungible_asset::create_test_store(creator, metadata);
 
@@ -67,7 +67,7 @@ module 0xcafe::deflation_token {
 
         assert!(fungible_asset::supply(metadata) == option::some(0), 1);
         // Mint
-        let fa = fungible_asset::mint(&mint, 100);
+        let fa = mint.mint(100);
         assert!(fungible_asset::supply(metadata) == option::some(100), 2);
         dispatchable_fungible_asset::deposit(creator_store, fa);
 

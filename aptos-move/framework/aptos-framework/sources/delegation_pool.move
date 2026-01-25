@@ -583,7 +583,7 @@ module aptos_framework::delegation_pool {
     /// Return the number of delegators owning active stake within `pool_address`.
     public fun shareholders_count_active_pool(pool_address: address): u64 acquires DelegationPool {
         assert_delegation_pool_exists(pool_address);
-        pool_u64::shareholders_count(&borrow_global<DelegationPool>(pool_address).active_shares)
+        borrow_global<DelegationPool>(pool_address).active_shares.shareholders_count()
     }
 
     #[view]
@@ -617,17 +617,12 @@ module aptos_framework::delegation_pool {
             (false, 0)
         } else {
             // delegator has either inactive or pending_inactive stake due to automatic withdrawals
-            let inactive_shares = table::borrow(&pool.inactive_shares, withdrawal_olc);
+            let inactive_shares = pool.inactive_shares.borrow(withdrawal_olc);
             if (withdrawal_olc.index < pool.observed_lockup_cycle.index) {
                 // if withdrawal's lockup cycle ended on delegation pool then it is inactive
-                (true, pool_u64::balance(inactive_shares, delegator_address))
+                (true, inactive_shares.balance(delegator_address))
             } else {
-                pending_inactive = pool_u64::shares_to_amount_with_total_coins(
-                    inactive_shares,
-                    pool_u64::shares(inactive_shares, delegator_address),
-                    // exclude operator pending_inactive rewards not converted to shares yet
-                    pending_inactive - commission_pending_inactive
-                );
+                pending_inactive = inactive_shares.shares_to_amount_with_total_coins(inactive_shares.shares(delegator_address), pending_inactive - commission_pending_inactive);
                 // if withdrawal's lockup cycle ended ONLY on stake pool then it is also inactive
                 (lockup_cycle_ended, pending_inactive)
             }
@@ -651,25 +646,19 @@ module aptos_framework::delegation_pool {
             commission_pending_inactive
         ) = calculate_stake_pool_drift(pool);
 
-        let total_active_shares = pool_u64::total_shares(&pool.active_shares);
-        let delegator_active_shares = pool_u64::shares(&pool.active_shares, delegator_address);
+        let total_active_shares = pool.active_shares.total_shares();
+        let delegator_active_shares = pool.active_shares.shares(delegator_address);
 
         let (_, _, pending_active, _) = stake::get_stake(pool_address);
         if (pending_active == 0) {
             // zero `pending_active` stake indicates that either there are no `add_stake` fees or
             // previous epoch has ended and should identify shares owning these fees as released
-            total_active_shares -= pool_u64::shares(&pool.active_shares, NULL_SHAREHOLDER);
+            total_active_shares -= pool.active_shares.shares(NULL_SHAREHOLDER);
             if (delegator_address == NULL_SHAREHOLDER) {
                 delegator_active_shares = 0
             }
         };
-        active = pool_u64::shares_to_amount_with_total_stats(
-            &pool.active_shares,
-            delegator_active_shares,
-            // exclude operator active rewards not converted to shares yet
-            active - commission_active,
-            total_active_shares
-        );
+        active = pool.active_shares.shares_to_amount_with_total_stats(delegator_active_shares, active - commission_active, total_active_shares);
 
         // get state and stake (0 if there is none) of the pending withdrawal
         let (withdrawal_inactive, withdrawal_stake) = get_pending_withdrawal(pool_address, delegator_address);
@@ -827,7 +816,7 @@ module aptos_framework::delegation_pool {
         delegator_address: address,
     ): bool acquires DelegationPoolAllowlisting {
         if (!allowlisting_enabled(pool_address)) { return true };
-        smart_table::contains(freeze(borrow_mut_delegators_allowlist(pool_address)), delegator_address)
+        freeze(borrow_mut_delegators_allowlist(pool_address)).contains(delegator_address)
     }
 
     #[view]
@@ -838,7 +827,7 @@ module aptos_framework::delegation_pool {
         assert_allowlisting_enabled(pool_address);
 
         let allowlist = vector[];
-        smart_table::for_each_ref(freeze(borrow_mut_delegators_allowlist(pool_address)), |delegator, _v| {
+        freeze(borrow_mut_delegators_allowlist(pool_address)).for_each_ref(|delegator, _v| {
             vector::push_back(&mut allowlist, *delegator);
         });
         allowlist
@@ -892,11 +881,7 @@ module aptos_framework::delegation_pool {
         stake::initialize_stake_owner(&stake_pool_signer, 0, owner_address, owner_address);
 
         let inactive_shares = table::new<ObservedLockupCycle, pool_u64::Pool>();
-        table::add(
-            &mut inactive_shares,
-            olc_with_index(0),
-            pool_u64::create_with_scaling_factor(SHARES_SCALING_FACTOR)
-        );
+        inactive_shares.add(olc_with_index(0), pool_u64::create_with_scaling_factor(SHARES_SCALING_FACTOR));
 
         move_to(&stake_pool_signer, DelegationPool {
             active_shares: pool_u64::create_with_scaling_factor(SHARES_SCALING_FACTOR),
@@ -1083,12 +1068,12 @@ module aptos_framework::delegation_pool {
     }
 
     fun assert_min_active_balance(pool: &DelegationPool, delegator_address: address) {
-        let balance = pool_u64::balance(&pool.active_shares, delegator_address);
+        let balance = pool.active_shares.balance(delegator_address);
         assert!(balance >= MIN_COINS_ON_SHARES_POOL, error::invalid_argument(EDELEGATOR_ACTIVE_BALANCE_TOO_LOW));
     }
 
     fun assert_min_pending_inactive_balance(pool: &DelegationPool, delegator_address: address) {
-        let balance = pool_u64::balance(pending_inactive_shares_pool(pool), delegator_address);
+        let balance = pending_inactive_shares_pool(pool).balance(delegator_address);
         assert!(
             balance >= MIN_COINS_ON_SHARES_POOL,
             error::invalid_argument(EDELEGATOR_PENDING_INACTIVE_BALANCE_TOO_LOW)
@@ -1123,12 +1108,9 @@ module aptos_framework::delegation_pool {
         amount: u64,
     ): u64 {
         // find how many coins would be redeemed if supplying `amount`
-        let redeemed_coins = pool_u64::shares_to_amount(
-            src_shares_pool,
-            amount_to_shares_to_redeem(src_shares_pool, shareholder, amount)
-        );
+        let redeemed_coins = src_shares_pool.shares_to_amount(amount_to_shares_to_redeem(src_shares_pool, shareholder, amount));
         // if balance drops under threshold then redeem it entirely
-        let src_balance = pool_u64::balance(src_shares_pool, shareholder);
+        let src_balance = src_shares_pool.balance(shareholder);
         if (src_balance - redeemed_coins < MIN_COINS_ON_SHARES_POOL) {
             amount = src_balance;
         };
@@ -1142,12 +1124,9 @@ module aptos_framework::delegation_pool {
         amount: u64,
     ): u64 {
         // find how many coins would be redeemed from source if supplying `amount`
-        let redeemed_coins = pool_u64::shares_to_amount(
-            src_shares_pool,
-            amount_to_shares_to_redeem(src_shares_pool, shareholder, amount)
-        );
+        let redeemed_coins = src_shares_pool.shares_to_amount(amount_to_shares_to_redeem(src_shares_pool, shareholder, amount));
         // if balance on destination would be less than threshold then redeem difference to threshold
-        let dst_balance = pool_u64::balance(dst_shares_pool, shareholder);
+        let dst_balance = dst_shares_pool.balance(shareholder);
         if (dst_balance + redeemed_coins < MIN_COINS_ON_SHARES_POOL) {
             // `redeemed_coins` >= `amount` - 1 as redeem can lose at most 1 coin
             amount = MIN_COINS_ON_SHARES_POOL - dst_balance + 1;
@@ -1169,12 +1148,12 @@ module aptos_framework::delegation_pool {
 
     /// Get the active share amount of the delegator.
     fun get_delegator_active_shares(pool: &DelegationPool, delegator: address): u128 {
-        pool_u64::shares(&pool.active_shares, delegator)
+        pool.active_shares.shares(delegator)
     }
 
     /// Get the pending inactive share amount of the delegator.
     fun get_delegator_pending_inactive_shares(pool: &DelegationPool, delegator: address): u128 {
-        pool_u64::shares(pending_inactive_shares_pool(pool), delegator)
+        pending_inactive_shares_pool(pool).shares(delegator)
     }
 
     /// Get the used voting power of a voter on a proposal.
@@ -1184,7 +1163,7 @@ module aptos_framework::delegation_pool {
             voter,
             proposal_id,
         };
-        *smart_table::borrow_with_default(votes, key, &0)
+        *votes.borrow_with_default(key, &0)
     }
 
     /// Create the seed to derive the resource account address.
@@ -1193,9 +1172,9 @@ module aptos_framework::delegation_pool {
     ): vector<u8> {
         let seed = vector::empty<u8>();
         // include module salt (before any subseeds) to avoid conflicts with other modules creating resource accounts
-        vector::append(&mut seed, MODULE_SALT);
+        seed.append(MODULE_SALT);
         // include an additional salt in case the same resource account has already been created
-        vector::append(&mut seed, delegation_pool_creation_seed);
+        seed.append(delegation_pool_creation_seed);
         seed
     }
 
@@ -1210,7 +1189,7 @@ module aptos_framework::delegation_pool {
             proposal_id,
             voter,
         };
-        smart_table::borrow_mut_with_default(votes, key, 0)
+        votes.borrow_mut_with_default(key, 0)
     }
 
     /// Update VoteDelegation of a delegator to up-to-date then borrow_mut it.
@@ -1225,15 +1204,15 @@ module aptos_framework::delegation_pool {
         let vote_delegation_table = &mut governance_records.vote_delegation;
         // By default, a delegator's delegated voter is itself.
         // TODO: recycle storage when VoteDelegation equals to default value.
-        if (!smart_table::contains(vote_delegation_table, delegator)) {
-            return smart_table::borrow_mut_with_default(vote_delegation_table, delegator, VoteDelegation {
+        if (!vote_delegation_table.contains(delegator)) {
+            return vote_delegation_table.borrow_mut_with_default(delegator, VoteDelegation {
                 voter: delegator,
                 last_locked_until_secs: locked_until_secs,
                 pending_voter: delegator,
             })
         };
 
-        let vote_delegation = smart_table::borrow_mut(vote_delegation_table, delegator);
+        let vote_delegation = vote_delegation_table.borrow_mut(delegator);
         // A lockup period has passed since last time `vote_delegation` was updated. Pending voter takes effect.
         if (vote_delegation.last_locked_until_secs < locked_until_secs) {
             vote_delegation.voter = vote_delegation.pending_voter;
@@ -1254,10 +1233,10 @@ module aptos_framework::delegation_pool {
         let delegated_votes_per_voter = &mut governance_records.delegated_votes;
         // By default, a delegator's voter is itself.
         // TODO: recycle storage when DelegatedVotes equals to default value.
-        if (!smart_table::contains(delegated_votes_per_voter, voter)) {
+        if (!delegated_votes_per_voter.contains(voter)) {
             let active_shares = get_delegator_active_shares(pool, voter);
             let inactive_shares = get_delegator_pending_inactive_shares(pool, voter);
-            return smart_table::borrow_mut_with_default(delegated_votes_per_voter, voter, DelegatedVotes {
+            return delegated_votes_per_voter.borrow_mut_with_default(voter, DelegatedVotes {
                 active_shares,
                 pending_inactive_shares: inactive_shares,
                 active_shares_next_lockup: active_shares,
@@ -1265,7 +1244,7 @@ module aptos_framework::delegation_pool {
             })
         };
 
-        let delegated_votes = smart_table::borrow_mut(delegated_votes_per_voter, voter);
+        let delegated_votes = delegated_votes_per_voter.borrow_mut(voter);
         // A lockup period has passed since last time `delegated_votes` was updated. Pending voter takes effect.
         if (delegated_votes.last_locked_until_secs < locked_until_secs) {
             delegated_votes.active_shares = delegated_votes.active_shares_next_lockup;
@@ -1282,12 +1261,8 @@ module aptos_framework::delegation_pool {
     /// Given the amounts of shares in `active_shares` pool and `inactive_shares` pool, calculate the total voting
     /// power, which equals to the sum of the coin amounts.
     fun calculate_total_voting_power(delegation_pool: &DelegationPool, latest_delegated_votes: &DelegatedVotes): u64 {
-        let active_amount = pool_u64::shares_to_amount(
-            &delegation_pool.active_shares,
-            latest_delegated_votes.active_shares);
-        let pending_inactive_amount = pool_u64::shares_to_amount(
-            pending_inactive_shares_pool(delegation_pool),
-            latest_delegated_votes.pending_inactive_shares);
+        let active_amount = delegation_pool.active_shares.shares_to_amount(latest_delegated_votes.active_shares);
+        let pending_inactive_amount = pending_inactive_shares_pool(delegation_pool).shares_to_amount(latest_delegated_votes.pending_inactive_shares);
         active_amount + pending_inactive_amount
     }
 
@@ -1494,7 +1469,7 @@ module aptos_framework::delegation_pool {
 
         let DelegationPoolAllowlisting { allowlist } = move_from<DelegationPoolAllowlisting>(pool_address);
         // if the allowlist becomes too large, the owner can always remove some delegators
-        smart_table::destroy(allowlist);
+        allowlist.destroy();
 
         event::emit(DisableDelegatorsAllowlisting { pool_address });
     }
@@ -1510,7 +1485,7 @@ module aptos_framework::delegation_pool {
 
         if (delegator_allowlisted(pool_address, delegator_address)) { return };
 
-        smart_table::add(borrow_mut_delegators_allowlist(pool_address), delegator_address, true);
+        borrow_mut_delegators_allowlist(pool_address).add(delegator_address, true);
 
         event::emit(AllowlistDelegator { pool_address, delegator_address });
     }
@@ -1526,7 +1501,7 @@ module aptos_framework::delegation_pool {
 
         if (!delegator_allowlisted(pool_address, delegator_address)) { return };
 
-        smart_table::remove(borrow_mut_delegators_allowlist(pool_address), delegator_address);
+        borrow_mut_delegators_allowlist(pool_address).remove(delegator_address);
 
         event::emit(RemoveDelegatorFromAllowlist { pool_address, delegator_address });
     }
@@ -1550,7 +1525,7 @@ module aptos_framework::delegation_pool {
         let pool = borrow_global<DelegationPool>(pool_address);
         if (get_delegator_active_shares(pool, delegator_address) == 0) { return };
 
-        unlock_internal(delegator_address, pool_address, pool_u64::balance(&pool.active_shares, delegator_address));
+        unlock_internal(delegator_address, pool_address, pool.active_shares.balance(delegator_address));
 
         event::emit(EvictDelegator { pool_address, delegator_address });
     }
@@ -1816,8 +1791,8 @@ module aptos_framework::delegation_pool {
     /// unlocking (or already unlocked) stake to be withdrawn from delegation pool `pool`.
     /// A bool is returned to signal if a pending withdrawal exists at all.
     fun pending_withdrawal_exists(pool: &DelegationPool, delegator_address: address): (bool, ObservedLockupCycle) {
-        if (table::contains(&pool.pending_withdrawals, delegator_address)) {
-            (true, *table::borrow(&pool.pending_withdrawals, delegator_address))
+        if (pool.pending_withdrawals.contains(delegator_address)) {
+            (true, *pool.pending_withdrawals.borrow(delegator_address))
         } else {
             (false, olc_with_index(0))
         }
@@ -1827,11 +1802,11 @@ module aptos_framework::delegation_pool {
     /// delegation pool, always the last item in `inactive_shares`.
     fun pending_inactive_shares_pool_mut(pool: &mut DelegationPool): &mut pool_u64::Pool {
         let observed_lockup_cycle = pool.observed_lockup_cycle;
-        table::borrow_mut(&mut pool.inactive_shares, observed_lockup_cycle)
+        pool.inactive_shares.borrow_mut(observed_lockup_cycle)
     }
 
     fun pending_inactive_shares_pool(pool: &DelegationPool): &pool_u64::Pool {
-        table::borrow(&pool.inactive_shares, pool.observed_lockup_cycle)
+        pool.inactive_shares.borrow(pool.observed_lockup_cycle)
     }
 
     /// Execute the pending withdrawal of `delegator_address` on delegation pool `pool`
@@ -1852,7 +1827,7 @@ module aptos_framework::delegation_pool {
         shareholder: address,
         coins_amount: u64,
     ): u128 acquires GovernanceRecords {
-        let new_shares = pool_u64::amount_to_shares(&pool.active_shares, coins_amount);
+        let new_shares = pool.active_shares.amount_to_shares(coins_amount);
         // No need to buy 0 shares.
         if (new_shares == 0) { return 0 };
 
@@ -1862,7 +1837,7 @@ module aptos_framework::delegation_pool {
             update_governance_records_for_buy_in_active_shares(pool, pool_address, new_shares, shareholder);
         };
 
-        pool_u64::buy_in(&mut pool.active_shares, shareholder, coins_amount);
+        pool.active_shares.buy_in(shareholder, coins_amount);
         new_shares
     }
 
@@ -1875,7 +1850,7 @@ module aptos_framework::delegation_pool {
         shareholder: address,
         coins_amount: u64,
     ): u128 acquires GovernanceRecords {
-        let new_shares = pool_u64::amount_to_shares(pending_inactive_shares_pool(pool), coins_amount);
+        let new_shares = pending_inactive_shares_pool(pool).amount_to_shares(coins_amount);
         // never create a new pending withdrawal unless delegator owns some pending_inactive shares
         if (new_shares == 0) { return 0 };
 
@@ -1886,18 +1861,14 @@ module aptos_framework::delegation_pool {
         };
 
         // cannot buy inactive shares, only pending_inactive at current lockup cycle
-        pool_u64::buy_in(pending_inactive_shares_pool_mut(pool), shareholder, coins_amount);
+        pending_inactive_shares_pool_mut(pool).buy_in(shareholder, coins_amount);
 
         // execute the pending withdrawal if exists and is inactive before creating a new one
         execute_pending_withdrawal(pool, shareholder);
 
         // save observed lockup cycle for the new pending withdrawal
         let observed_lockup_cycle = pool.observed_lockup_cycle;
-        assert!(*table::borrow_mut_with_default(
-            &mut pool.pending_withdrawals,
-            shareholder,
-            observed_lockup_cycle
-        ) == observed_lockup_cycle,
+        assert!(*pool.pending_withdrawals.borrow_mut_with_default(shareholder, observed_lockup_cycle) == observed_lockup_cycle,
             error::invalid_state(EPENDING_WITHDRAWAL_EXISTS)
         );
 
@@ -1911,11 +1882,11 @@ module aptos_framework::delegation_pool {
         shareholder: address,
         coins_amount: u64,
     ): u128 {
-        if (coins_amount >= pool_u64::balance(shares_pool, shareholder)) {
+        if (coins_amount >= shares_pool.balance(shareholder)) {
             // cap result at total shares of shareholder to pass `EINSUFFICIENT_SHARES` on subsequent redeem
-            pool_u64::shares(shares_pool, shareholder)
+            shares_pool.shares(shareholder)
         } else {
-            pool_u64::amount_to_shares(shares_pool, coins_amount)
+            shares_pool.amount_to_shares(coins_amount)
         }
     }
 
@@ -1938,7 +1909,7 @@ module aptos_framework::delegation_pool {
             update_governanace_records_for_redeem_active_shares(pool, pool_address, shares_to_redeem, shareholder);
         };
 
-        pool_u64::redeem_shares(&mut pool.active_shares, shareholder, shares_to_redeem)
+        pool.active_shares.redeem_shares(shareholder, shares_to_redeem)
     }
 
     /// Redeem shares from the inactive pool at `lockup_cycle` < current OLC on behalf of
@@ -1954,7 +1925,7 @@ module aptos_framework::delegation_pool {
         lockup_cycle: ObservedLockupCycle,
     ): u64 acquires GovernanceRecords {
         let shares_to_redeem = amount_to_shares_to_redeem(
-            table::borrow(&pool.inactive_shares, lockup_cycle),
+            pool.inactive_shares.borrow(lockup_cycle),
             shareholder,
             coins_amount);
         // silently exit if not a shareholder otherwise redeem would fail with `ESHAREHOLDER_NOT_FOUND`
@@ -1972,20 +1943,20 @@ module aptos_framework::delegation_pool {
             );
         };
 
-        let inactive_shares = table::borrow_mut(&mut pool.inactive_shares, lockup_cycle);
+        let inactive_shares = pool.inactive_shares.borrow_mut(lockup_cycle);
         // 1. reaching here means delegator owns inactive/pending_inactive shares at OLC `lockup_cycle`
-        let redeemed_coins = pool_u64::redeem_shares(inactive_shares, shareholder, shares_to_redeem);
+        let redeemed_coins = inactive_shares.redeem_shares(shareholder, shares_to_redeem);
 
         // if entirely reactivated pending_inactive stake or withdrawn inactive one,
         // re-enable unlocking for delegator by deleting this pending withdrawal
-        if (pool_u64::shares(inactive_shares, shareholder) == 0) {
+        if (inactive_shares.shares(shareholder) == 0) {
             // 2. a delegator owns inactive/pending_inactive shares only at the OLC of its pending withdrawal
             // 1 & 2: the pending withdrawal itself has been emptied of shares and can be safely deleted
-            table::remove(&mut pool.pending_withdrawals, shareholder);
+            pool.pending_withdrawals.remove(shareholder);
         };
         // destroy inactive shares pool of past OLC if all its stake has been withdrawn
-        if (lockup_cycle.index < pool.observed_lockup_cycle.index && total_coins(inactive_shares) == 0) {
-            pool_u64::destroy_empty(table::remove(&mut pool.inactive_shares, lockup_cycle));
+        if (lockup_cycle.index < pool.observed_lockup_cycle.index && inactive_shares.total_coins() == 0) {
+            pool.inactive_shares.remove(lockup_cycle).destroy_empty();
         };
 
         redeemed_coins
@@ -2021,7 +1992,7 @@ module aptos_framework::delegation_pool {
         // unsynced are rewards and slashes routed exclusively to/out the stake pool
 
         // operator `active` rewards not persisted yet to the active shares pool
-        let pool_active = total_coins(&pool.active_shares);
+        let pool_active = pool.active_shares.total_coins();
         let commission_active = if (active > pool_active) {
             math64::mul_div(active - pool_active, pool.operator_commission_percentage, MAX_FEE)
         } else {
@@ -2029,7 +2000,7 @@ module aptos_framework::delegation_pool {
             0
         };
         // operator `pending_inactive` rewards not persisted yet to the pending_inactive shares pool
-        let pool_pending_inactive = total_coins(pending_inactive_shares_pool(pool));
+        let pool_pending_inactive = pending_inactive_shares_pool(pool).total_coins();
         let commission_pending_inactive = if (pending_inactive > pool_pending_inactive) {
             math64::mul_div(
                 pending_inactive - pool_pending_inactive,
@@ -2074,12 +2045,9 @@ module aptos_framework::delegation_pool {
 
         // update total coins accumulated by `active` + `pending_active` shares
         // redeemed `add_stake` fees are restored and distributed to the rest of the pool as rewards
-        pool_u64::update_total_coins(&mut pool.active_shares, active - commission_active);
+        pool.active_shares.update_total_coins(active - commission_active);
         // update total coins accumulated by `pending_inactive` shares at current observed lockup cycle
-        pool_u64::update_total_coins(
-            pending_inactive_shares_pool_mut(pool),
-            pending_inactive - commission_pending_inactive
-        );
+        pending_inactive_shares_pool_mut(pool).update_total_coins(pending_inactive - commission_pending_inactive);
 
         // reward operator its commission out of uncommitted active rewards (`add_stake` fees already excluded)
         buy_in_active_shares(pool, beneficiary_for_operator(stake::get_operator(pool_address)), commission_active);
@@ -2117,11 +2085,7 @@ module aptos_framework::delegation_pool {
             // advance lockup cycle on the delegation pool
             pool.observed_lockup_cycle.index += 1;
             // start new lockup cycle with a fresh shares pool for `pending_inactive` stake
-            table::add(
-                &mut pool.inactive_shares,
-                pool.observed_lockup_cycle,
-                pool_u64::create_with_scaling_factor(SHARES_SCALING_FACTOR)
-            );
+            pool.inactive_shares.add(pool.observed_lockup_cycle, pool_u64::create_with_scaling_factor(SHARES_SCALING_FACTOR));
         };
 
         if (is_next_commission_percentage_effective(pool_address)) {
@@ -2138,11 +2102,7 @@ module aptos_framework::delegation_pool {
         let stake_pool_used_voting_power = aptos_governance::get_voting_power(
             pool_address
         ) - stake_pool_remaining_voting_power;
-        let proposal_used_voting_power = smart_table::borrow_mut_with_default(
-            &mut governance_records.votes_per_proposal,
-            proposal_id,
-            0
-        );
+        let proposal_used_voting_power = governance_records.votes_per_proposal.borrow_mut_with_default(proposal_id, 0);
         // A edge case: Before enabling partial governance voting on a delegation pool, the delegation pool has
         // a voter which can vote with all voting power of this delegation pool. If the voter votes on a proposal after
         // partial governance voting flag is enabled, the delegation pool doesn't have enough voting power on this
@@ -2769,7 +2729,7 @@ module aptos_framework::delegation_pool {
         // check that shares of null shareholder have been released
         assert_delegation(NULL_SHAREHOLDER, pool_address, 0, 0, 0);
         synchronize_delegation_pool(pool_address);
-        assert!(pool_u64::shares(&borrow_global<DelegationPool>(pool_address).active_shares, NULL_SHAREHOLDER) == 0, 0);
+        assert!(borrow_global<DelegationPool>(pool_address).active_shares.shares(NULL_SHAREHOLDER) == 0, 0);
         assert_delegation(NULL_SHAREHOLDER, pool_address, 0, 0, 0);
 
         // add 200 coins being pending_active until next epoch
@@ -2790,7 +2750,7 @@ module aptos_framework::delegation_pool {
         // check that shares of null shareholder have been released
         assert_delegation(NULL_SHAREHOLDER, pool_address, 0, 0, 0);
         synchronize_delegation_pool(pool_address);
-        assert!(pool_u64::shares(&borrow_global<DelegationPool>(pool_address).active_shares, NULL_SHAREHOLDER) == 0, 0);
+        assert!(borrow_global<DelegationPool>(pool_address).active_shares.shares(NULL_SHAREHOLDER) == 0, 0);
         assert_delegation(NULL_SHAREHOLDER, pool_address, 0, 0, 0);
     }
 
@@ -4183,7 +4143,7 @@ module aptos_framework::delegation_pool {
         end_aptos_epoch();
 
         let execution_hash = vector::empty<u8>();
-        vector::push_back(&mut execution_hash, 1);
+        execution_hash.push_back(1);
         create_proposal(
             delegator1,
             pool_address,
@@ -4223,7 +4183,7 @@ module aptos_framework::delegation_pool {
         end_aptos_epoch();
 
         let execution_hash = vector::empty<u8>();
-        vector::push_back(&mut execution_hash, 1);
+        execution_hash.push_back(1);
         create_proposal(
             delegator1,
             pool_address,
@@ -4836,21 +4796,21 @@ module aptos_framework::delegation_pool {
         assert!(!delegator_allowlisted(pool_address, delegator_1_address), 0);
         assert!(!delegator_allowlisted(pool_address, delegator_2_address), 0);
         let allowlist = &get_delegators_allowlist(pool_address);
-        assert!(vector::length(allowlist) == 0, 0);
+        assert!(allowlist.length() == 0, 0);
 
         allowlist_delegator(validator, delegator_1_address);
         assert!(delegator_allowlisted(pool_address, delegator_1_address), 0);
         assert!(!delegator_allowlisted(pool_address, delegator_2_address), 0);
         allowlist = &get_delegators_allowlist(pool_address);
-        assert!(vector::length(allowlist) == 1 && vector::contains(allowlist, &delegator_1_address), 0);
+        assert!(allowlist.length() == 1 && allowlist.contains(&delegator_1_address), 0);
 
         allowlist_delegator(validator, delegator_2_address);
         assert!(delegator_allowlisted(pool_address, delegator_1_address), 0);
         assert!(delegator_allowlisted(pool_address, delegator_2_address), 0);
         allowlist = &get_delegators_allowlist(pool_address);
-        assert!(vector::length(allowlist) == 2 &&
-            vector::contains(allowlist, &delegator_1_address) &&
-            vector::contains(allowlist, &delegator_2_address),
+        assert!(allowlist.length() == 2 &&
+            allowlist.contains(&delegator_1_address) &&
+            allowlist.contains(&delegator_2_address),
             0
         );
 
@@ -4858,7 +4818,7 @@ module aptos_framework::delegation_pool {
         assert!(delegator_allowlisted(pool_address, delegator_1_address), 0);
         assert!(!delegator_allowlisted(pool_address, delegator_2_address), 0);
         allowlist = &get_delegators_allowlist(pool_address);
-        assert!(vector::length(allowlist) == 1 && vector::contains(allowlist, &delegator_1_address), 0);
+        assert!(allowlist.length() == 1 && allowlist.contains(&delegator_1_address), 0);
 
         // destroy the allowlist constructed so far
         disable_delegators_allowlisting(validator);
@@ -4874,22 +4834,22 @@ module aptos_framework::delegation_pool {
         assert!(!delegator_allowlisted(pool_address, delegator_1_address), 0);
         assert!(delegator_allowlisted(pool_address, delegator_2_address), 0);
         allowlist = &get_delegators_allowlist(pool_address);
-        assert!(vector::length(allowlist) == 1 && vector::contains(allowlist, &delegator_2_address), 0);
+        assert!(allowlist.length() == 1 && allowlist.contains(&delegator_2_address), 0);
 
         // allowlist does not ever have duplicates
         allowlist_delegator(validator, delegator_2_address);
         allowlist = &get_delegators_allowlist(pool_address);
-        assert!(vector::length(allowlist) == 1 && vector::contains(allowlist, &delegator_2_address), 0);
+        assert!(allowlist.length() == 1 && allowlist.contains(&delegator_2_address), 0);
 
         // no override of existing allowlist when enabling allowlisting again
         enable_delegators_allowlisting(validator);
         allowlist = &get_delegators_allowlist(pool_address);
-        assert!(vector::length(allowlist) == 1 && vector::contains(allowlist, &delegator_2_address), 0);
+        assert!(allowlist.length() == 1 && allowlist.contains(&delegator_2_address), 0);
 
         // nothing changes when trying to remove an inexistent delegator
         remove_delegator_from_allowlist(validator, delegator_1_address);
         allowlist = &get_delegators_allowlist(pool_address);
-        assert!(vector::length(allowlist) == 1 && vector::contains(allowlist, &delegator_2_address), 0);
+        assert!(allowlist.length() == 1 && allowlist.contains(&delegator_2_address), 0);
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123, delegator_1 = @0x010)]
@@ -5093,19 +5053,13 @@ module aptos_framework::delegation_pool {
         assert!(!delegator_allowlisted(pool_address, delegator_1_address), 0);
 
         // check that in-flight active rewards are evicted too, which validates that `synchronize_delegation_pool` was called
-        let active = pool_u64::balance(
-            &borrow_global<DelegationPool>(pool_address).active_shares,
-            delegator_1_address
-        ) + get_add_stake_fee(pool_address, 10 * ONE_APT);
+        let active = borrow_global<DelegationPool>(pool_address).active_shares.balance(delegator_1_address) + get_add_stake_fee(pool_address, 10 * ONE_APT);
         // 5050000000 + 1000000000 active at last `synchronize_delegation_pool`
         assert!(active == 6050000000, active);
 
         evict_delegator(validator, delegator_1_address);
         assert_delegation(delegator_1_address, pool_address, 0, 0, 6161504999);
-        let pending_inactive = pool_u64::balance(
-            pending_inactive_shares_pool(borrow_global<DelegationPool>(pool_address)),
-            delegator_1_address
-        );
+        let pending_inactive = pending_inactive_shares_pool(borrow_global<DelegationPool>(pool_address)).balance(delegator_1_address);
         assert!(pending_inactive == 6161504999, pending_inactive);
 
         // allowlist delegator 1 back and check that they can add stake
@@ -5172,9 +5126,9 @@ module aptos_framework::delegation_pool {
     ) acquires DelegationPool {
         assert_delegation_pool_exists(pool_address);
         let pool = borrow_global<DelegationPool>(pool_address);
-        assert!(table::contains(&pool.inactive_shares, olc_with_index(olc)) == exists, 0);
+        assert!(pool.inactive_shares.contains(olc_with_index(olc)) == exists, 0);
         if (exists) {
-            let actual_stake = total_coins(table::borrow(&pool.inactive_shares, olc_with_index(olc)));
+            let actual_stake = pool.inactive_shares.borrow(olc_with_index(olc)).total_coins();
             assert!(actual_stake == stake, actual_stake);
         } else {
             assert!(0 == stake, 0);
