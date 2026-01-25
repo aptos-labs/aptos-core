@@ -285,11 +285,11 @@ of the hash function).
 
     <b>let</b> input = <a href="randomness.md#0x1_randomness_DST">DST</a>;
     <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>borrow_global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
-    <b>let</b> seed = *<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&<a href="randomness.md#0x1_randomness">randomness</a>.seed);
+    <b>let</b> seed = *<a href="randomness.md#0x1_randomness">randomness</a>.seed.borrow();
 
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> input, seed);
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> input, <a href="transaction_context.md#0x1_transaction_context_get_transaction_hash">transaction_context::get_transaction_hash</a>());
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> input, <a href="randomness.md#0x1_randomness_fetch_and_increment_txn_counter">fetch_and_increment_txn_counter</a>());
+    input.append(seed);
+    input.append(<a href="transaction_context.md#0x1_transaction_context_get_transaction_hash">transaction_context::get_transaction_hash</a>());
+    input.append(<a href="randomness.md#0x1_randomness_fetch_and_increment_txn_counter">fetch_and_increment_txn_counter</a>());
     <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash_sha3_256">hash::sha3_256</a>(input)
 }
 </code></pre>
@@ -319,13 +319,13 @@ Generates a sequence of bytes uniformly at random
     <b>let</b> c = 0;
     <b>while</b> (c &lt; n) {
         <b>let</b> blob = <a href="randomness.md#0x1_randomness_next_32_bytes">next_32_bytes</a>();
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_reverse_append">vector::reverse_append</a>(&<b>mut</b> v, blob);
+        v.reverse_append(blob);
 
         c += 32;
     };
 
     <b>if</b> (c &gt; n) {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_trim">vector::trim</a>(&<b>mut</b> v, n);
+        v.trim(n);
     };
 
     <a href="event.md#0x1_event_emit">event::emit</a>(<a href="randomness.md#0x1_randomness_RandomnessGeneratedEvent">RandomnessGeneratedEvent</a> {});
@@ -356,7 +356,7 @@ Generates an u8 uniformly at random.
 
 <pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u8_integer">u8_integer</a>(): u8 <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
     <b>let</b> raw = <a href="randomness.md#0x1_randomness_next_32_bytes">next_32_bytes</a>();
-    <b>let</b> ret: u8 = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> raw);
+    <b>let</b> ret: u8 = raw.pop_back();
 
     <a href="event.md#0x1_event_emit">event::emit</a>(<a href="randomness.md#0x1_randomness_RandomnessGeneratedEvent">RandomnessGeneratedEvent</a> {});
 
@@ -389,7 +389,7 @@ Generates an u16 uniformly at random.
     <b>let</b> i = 0;
     <b>let</b> ret: u16 = 0;
     <b>while</b> (i &lt; 2) {
-        ret = ret * 256 + (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> raw) <b>as</b> u16);
+        ret = ret * 256 + (raw.pop_back() <b>as</b> u16);
         i += 1;
     };
 
@@ -424,7 +424,7 @@ Generates an u32 uniformly at random.
     <b>let</b> i = 0;
     <b>let</b> ret: u32 = 0;
     <b>while</b> (i &lt; 4) {
-        ret = ret * 256 + (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> raw) <b>as</b> u32);
+        ret = ret * 256 + (raw.pop_back() <b>as</b> u32);
         i += 1;
     };
 
@@ -459,7 +459,7 @@ Generates an u64 uniformly at random.
     <b>let</b> i = 0;
     <b>let</b> ret: u64 = 0;
     <b>while</b> (i &lt; 8) {
-        ret = ret * 256 + (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> raw) <b>as</b> u64);
+        ret = ret * 256 + (raw.pop_back() <b>as</b> u64);
         i += 1;
     };
 
@@ -494,7 +494,7 @@ Generates an u128 uniformly at random.
     <b>let</b> i = 0;
     <b>let</b> ret: u128 = 0;
     <b>while</b> (i &lt; 16) {
-        ret = ret * 256 + (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> raw) <b>as</b> u128);
+        ret = ret * 256 + (raw.pop_back() <b>as</b> u128);
         i += 1;
     };
 
@@ -555,7 +555,7 @@ Generates a u256 uniformly at random.
     <b>let</b> i = 0;
     <b>let</b> ret: u256 = 0;
     <b>while</b> (i &lt; 32) {
-        ret = ret * 256 + (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> raw) <b>as</b> u256);
+        ret = ret * 256 + (raw.pop_back() <b>as</b> u256);
         i += 1;
     };
     ret
@@ -843,7 +843,7 @@ If n is 0, returns the empty vector.
         };
         i &lt; n
     }) {
-        std::vector::push_back(&<b>mut</b> values, i);
+        values.push_back(i);
         i += 1;
     };
     <b>spec</b> {
@@ -862,7 +862,7 @@ If n is 0, returns the empty vector.
         <b>spec</b> {
             <b>assert</b> pop_position &lt; len(values);
         };
-        std::vector::swap(&<b>mut</b> values, pop_position, tail);
+        values.swap(pop_position, tail);
         tail -= 1;
     };
 
@@ -1038,7 +1038,7 @@ function as its payload.
 <pre><code><b>include</b> <a href="randomness.md#0x1_randomness_NextBlobAbortsIf">NextBlobAbortsIf</a>;
 <b>let</b> input = b"APTOS_RANDOMNESS";
 <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
-<b>let</b> seed = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="randomness.md#0x1_randomness">randomness</a>.seed);
+<b>let</b> seed = <a href="randomness.md#0x1_randomness">randomness</a>.seed.borrow();
 <b>let</b> txn_hash = <a href="transaction_context.md#0x1_transaction_context_spec_get_txn_hash">transaction_context::spec_get_txn_hash</a>();
 <b>let</b> txn_counter = <a href="randomness.md#0x1_randomness_spec_fetch_and_increment_txn_counter">spec_fetch_and_increment_txn_counter</a>();
 <b>ensures</b> len(result) == 32;
@@ -1053,7 +1053,7 @@ function as its payload.
 
 <pre><code><b>schema</b> <a href="randomness.md#0x1_randomness_NextBlobAbortsIf">NextBlobAbortsIf</a> {
     <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
-    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(<a href="randomness.md#0x1_randomness">randomness</a>.seed);
+    <b>aborts_if</b> <a href="randomness.md#0x1_randomness">randomness</a>.seed.is_none();
     <b>aborts_if</b> !<a href="randomness.md#0x1_randomness_spec_is_unbiasable">spec_is_unbiasable</a>();
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
 }

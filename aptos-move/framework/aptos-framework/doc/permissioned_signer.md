@@ -702,15 +702,10 @@ Revoke all storable permission handle of the signer immediately.
 
     <b>let</b> granted_permissions =
         <b>borrow_global_mut</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a>&gt;(master_account_addr);
-    <b>let</b> delete_list = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_trim_reverse">vector::trim_reverse</a>(
-        &<b>mut</b> granted_permissions.active_handles, 0
-    );
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_destroy">vector::destroy</a>(
-        delete_list,
-        |<b>address</b>| {
+    <b>let</b> delete_list = granted_permissions.active_handles.trim_reverse(0);
+    delete_list.destroy(|<b>address</b>| {
             <a href="permissioned_signer.md#0x1_permissioned_signer_destroy_permissions_storage_address">destroy_permissions_storage_address</a>(<b>address</b>);
-        }
-    )
+        })
 }
 </code></pre>
 
@@ -873,10 +868,7 @@ Destroys a storable permission handle. Clean up the permission stored in that ha
     <b>if</b> (<b>exists</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermissionStorage">PermissionStorage</a>&gt;(permissions_storage_addr)) {
         <b>let</b> PermissionStorage::V1 { perms } =
             <b>move_from</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermissionStorage">PermissionStorage</a>&gt;(permissions_storage_addr);
-        <a href="big_ordered_map.md#0x1_big_ordered_map_destroy">big_ordered_map::destroy</a>(
-            perms,
-            |_dv| {},
-        );
+        perms.destroy(|_dv| {});
     }
 }
 </code></pre>
@@ -1143,7 +1135,7 @@ signer.
     <b>let</b> perms =
         &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermissionStorage">PermissionStorage</a>&gt;(permission_signer_addr).perms;
     <b>let</b> key = <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>(perm);
-    <b>if</b> (<a href="big_ordered_map.md#0x1_big_ordered_map_contains">big_ordered_map::contains</a>(perms, &key)) {
+    <b>if</b> (perms.contains(&key)) {
         <b>let</b> value = perms.remove(&key);
         <b>let</b> return_ = mutate(&<b>mut</b> value);
         perms.add(key, value);
