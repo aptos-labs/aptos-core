@@ -32,7 +32,7 @@ fn feature_flag_of_pairing(
             Some(FeatureFlag::BLS12_381_STRUCTURES)
         },
         (Some(Structure::BLS12377G1), Some(Structure::BLS12377G2), Some(Structure::BLS12377Gt)) => {
-            Some(FeatureFlag::BLS12_381_STRUCTURES)
+            Some(FeatureFlag::BLS12_377_STRUCTURES)
         },
         (Some(Structure::BN254G1), Some(Structure::BN254G2), Some(Structure::BN254Gt)) => {
             Some(FeatureFlag::BN254_STRUCTURES)

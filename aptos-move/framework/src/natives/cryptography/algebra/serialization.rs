@@ -47,7 +47,7 @@ pub fn feature_flag_of_serialization_format(
         | Some(SerializationFormat::BLS12377G1Compressed)
         | Some(SerializationFormat::BLS12377G2Uncompressed)
         | Some(SerializationFormat::BLS12377G2Compressed)
-        | Some(SerializationFormat::BLS12377Gt) => Some(FeatureFlag::BLS12_381_STRUCTURES),
+        | Some(SerializationFormat::BLS12377Gt) => Some(FeatureFlag::BLS12_377_STRUCTURES),
         Some(SerializationFormat::BN254FrLsb)
         | Some(SerializationFormat::BN254FrMsb)
         | Some(SerializationFormat::BN254FqLsb)

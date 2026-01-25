@@ -309,7 +309,7 @@ fn feature_flag_from_structure(structure_opt: Option<Structure>) -> Option<Featu
         | Some(Structure::BLS12377Fq12)
         | Some(Structure::BLS12377G1)
         | Some(Structure::BLS12377G2)
-        | Some(Structure::BLS12377Gt) => Some(FeatureFlag::BLS12_381_STRUCTURES),
+        | Some(Structure::BLS12377Gt) => Some(FeatureFlag::BLS12_377_STRUCTURES),
         Some(Structure::BN254Fr)
         | Some(Structure::BN254Fq)
         | Some(Structure::BN254Fq12)

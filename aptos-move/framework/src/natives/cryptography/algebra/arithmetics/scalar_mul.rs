@@ -39,7 +39,7 @@ fn feature_flag_of_group_scalar_mul(
         (Some(Structure::BLS12377G1), Some(Structure::BLS12377Fr))
         | (Some(Structure::BLS12377G2), Some(Structure::BLS12377Fr))
         | (Some(Structure::BLS12377Gt), Some(Structure::BLS12377Fr)) => {
-            Some(FeatureFlag::BLS12_381_STRUCTURES)
+            Some(FeatureFlag::BLS12_377_STRUCTURES)
         },
         (Some(Structure::BN254G1), Some(Structure::BN254Fr))
         | (Some(Structure::BN254G2), Some(Structure::BN254Fr))

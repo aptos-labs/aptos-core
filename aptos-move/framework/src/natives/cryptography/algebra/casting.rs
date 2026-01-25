@@ -29,7 +29,7 @@ fn feature_flag_of_casting(
             Some(FeatureFlag::BLS12_381_STRUCTURES)
         },
         (Some(Structure::BLS12377Fq12), Some(Structure::BLS12377Gt)) => {
-            Some(FeatureFlag::BLS12_381_STRUCTURES)
+            Some(FeatureFlag::BLS12_377_STRUCTURES)
         },
         (Some(Structure::BN254Fq12), Some(Structure::BN254Gt)) => {
             Some(FeatureFlag::BN254_STRUCTURES)
