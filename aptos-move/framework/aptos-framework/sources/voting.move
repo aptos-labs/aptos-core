@@ -25,6 +25,7 @@ module aptos_framework::voting {
     use std::option::{Self, Option};
     use std::signer;
     use std::string::{String, utf8};
+    #[test_only]
     use std::vector;
 
     use aptos_std::from_bcs::to_u64;

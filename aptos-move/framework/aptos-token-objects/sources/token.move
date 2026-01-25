@@ -595,7 +595,7 @@ module aptos_token_objects::token {
 
     /// Creates a MutatorRef, which gates the ability to mutate any fields that support mutation.
     public fun generate_mutator_ref(ref: &ConstructorRef): MutatorRef {
-        let object = ref.object_from_constructor_ref::<Token>();
+        let object = ref.object_from_constructor_ref<Token>();
         MutatorRef { self: object.object_address() }
     }
 
@@ -1043,7 +1043,7 @@ module aptos_token_objects::token {
             string::utf8(b"collection uri"),
         );
 
-        let collection = constructor_ref.object_from_constructor_ref::<Collection>();
+        let collection = constructor_ref.object_from_constructor_ref<Collection>();
         create_named_token_object(
             creator,
             collection,
@@ -1265,11 +1265,11 @@ module aptos_token_objects::token {
         let extend_ref = create_collection_helper(creator, collection_name, 2);
         let collection = get_collection_from_ref(&extend_ref);
         let token_1_ref = create_numbered_token_helper(creator, collection, token_name);
-        let token_1_name = name(token_1_ref.object_from_constructor_ref::<Token>());
+        let token_1_name = name(token_1_ref.object_from_constructor_ref<Token>());
         assert!(token_1_name == std::string::utf8(b"token name1"), 1);
 
         let token_2_ref = create_numbered_token_helper(creator, collection, token_name);
-        assert!(name(token_2_ref.object_from_constructor_ref::<Token>()) == std::string::utf8(b"token name2"), 1);
+        assert!(name(token_2_ref.object_from_constructor_ref<Token>()) == std::string::utf8(b"token name2"), 1);
         assert!(event::emitted_events<collection::Mint>().length() == 2, 0);
 
         let burn_ref = generate_burn_ref(&token_2_ref);

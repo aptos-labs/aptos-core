@@ -4,7 +4,6 @@ module aptos_experimental::dead_mans_switch_operations {
     use std::option;
     use std::string;
     use aptos_trading::order_book_types::OrderId;
-    use aptos_trading::bulk_order_types;
     use aptos_experimental::market_types::{Self, MarketClearinghouseCallbacks, Market};
     use aptos_experimental::dead_mans_switch_tracker::{Self, is_order_valid};
     use aptos_experimental::order_operations;

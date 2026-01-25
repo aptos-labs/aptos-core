@@ -3,7 +3,6 @@ module 0xcafe::permissioned_token_tests {
     use aptos_framework::fungible_asset::{Self, Metadata, TestToken};
     use aptos_framework::dispatchable_fungible_asset;
     use 0xcafe::permissioned_token;
-    use aptos_framework::object;
     use std::option;
 
     #[test(creator = @0xcafe, aaron = @0xface)]
@@ -13,7 +12,7 @@ module 0xcafe::permissioned_token_tests {
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
-        let metadata = token_object.convert::<TestToken, Metadata>();
+        let metadata = token_object.convert<TestToken, Metadata>();
 
         let creator_store = fungible_asset::create_test_store(creator, metadata);
         let aaron_store = fungible_asset::create_test_store(aaron, metadata);
@@ -48,7 +47,7 @@ module 0xcafe::permissioned_token_tests {
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
-        let metadata = token_object.convert::<TestToken, Metadata>();
+        let metadata = token_object.convert<TestToken, Metadata>();
 
         let creator_store = fungible_asset::create_test_store(creator, metadata);
         let aaron_store = fungible_asset::create_test_store(aaron, metadata);
@@ -82,7 +81,7 @@ module 0xcafe::permissioned_token_tests {
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
-        let metadata = token_object.convert::<TestToken, Metadata>();
+        let metadata = token_object.convert<TestToken, Metadata>();
 
         let creator_store = fungible_asset::create_test_store(creator, metadata);
         let aaron_store = fungible_asset::create_test_store(aaron, metadata);

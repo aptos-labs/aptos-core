@@ -29,6 +29,7 @@ module aptos_framework::staking_contract {
     use std::error;
     use std::features;
     use std::signer;
+    #[test_only]
     use std::vector;
 
     use aptos_std::pool_u64::{Self, Pool};

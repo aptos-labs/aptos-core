@@ -114,7 +114,7 @@ module aptos_framework::delegation_pool {
     use std::vector;
 
     use aptos_std::math64;
-    use aptos_std::pool_u64_unbound::{Self as pool_u64, total_coins};
+    use aptos_std::pool_u64_unbound as pool_u64;
     use aptos_std::table::{Self, Table};
     use aptos_std::smart_table::{Self, SmartTable};
 

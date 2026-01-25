@@ -3,7 +3,6 @@
 module aptos_framework::execution_config {
     use aptos_framework::config_buffer;
     use std::error;
-    use std::vector;
     use aptos_framework::chain_status;
 
     use aptos_framework::reconfiguration;

@@ -18,7 +18,7 @@ module 0xcafe::deflation_token_tests {
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
-        let metadata = token_object.convert::<TestToken, Metadata>();
+        let metadata = token_object.convert<TestToken, Metadata>();
 
         let creator_store = fungible_asset::create_test_store(creator, metadata);
         let aaron_store = fungible_asset::create_test_store(aaron, metadata);
@@ -65,7 +65,7 @@ module 0xcafe::deflation_token_tests {
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
-        let metadata = token_object.convert::<TestToken, Metadata>();
+        let metadata = token_object.convert<TestToken, Metadata>();
 
         let creator_store = fungible_asset::create_test_store(creator, metadata);
         let aaron_store = fungible_asset::create_test_store(aaron, metadata);
@@ -88,7 +88,7 @@ module 0xcafe::deflation_token_tests {
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
-        let metadata = token_object.convert::<TestToken, Metadata>();
+        let metadata = token_object.convert<TestToken, Metadata>();
 
         let creator_store = fungible_asset::create_test_store(creator, metadata);
 
@@ -113,7 +113,7 @@ module 0xcafe::deflation_token_tests {
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
-        let metadata = token_object.convert::<TestToken, Metadata>();
+        let metadata = token_object.convert<TestToken, Metadata>();
 
         let creator_store = fungible_asset::create_test_store(creator, metadata);
         let aaron_store = fungible_asset::create_test_store(aaron, metadata);
@@ -273,7 +273,7 @@ module 0xcafe::deflation_token_tests {
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
-        let metadata = token_object.convert::<TestToken, Metadata>();
+        let metadata = token_object.convert<TestToken, Metadata>();
 
         let creator_store = fungible_asset::create_test_store(creator, metadata);
 
@@ -314,7 +314,7 @@ module 0xcafe::deflation_token_tests {
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint_ref, transfer_ref, burn_ref) = primary_fungible_store::init_test_metadata_with_primary_store_enabled(&creator_ref);
-        let metadata = token_object.convert::<TestToken, Metadata>();
+        let metadata = token_object.convert<TestToken, Metadata>();
 
         deflation_token::initialize(creator, &creator_ref);
         let creator_address = signer::address_of(creator);
@@ -361,7 +361,7 @@ module 0xcafe::deflation_token_tests {
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, transfer_ref, _, _) = fungible_asset::init_test_metadata(&creator_ref);
-        let metadata = token_object.convert::<TestToken, Metadata>();
+        let metadata = token_object.convert<TestToken, Metadata>();
 
         let creator_store = fungible_asset::create_test_store(creator, metadata);
         let aaron_store = fungible_asset::create_test_store(aaron, metadata);
@@ -396,7 +396,7 @@ module 0xcafe::deflation_token_tests {
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         fungible_asset::init_test_metadata(&creator_ref);
-        let metadata = token_object.convert::<TestToken, Metadata>();
+        let metadata = token_object.convert<TestToken, Metadata>();
 
         let creator_store = fungible_asset::create_test_store(creator, metadata);
         let aaron_store = fungible_asset::create_test_store(aaron, metadata);

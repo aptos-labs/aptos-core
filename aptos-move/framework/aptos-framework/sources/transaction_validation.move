@@ -4,8 +4,6 @@ module aptos_framework::transaction_validation {
     use std::option;
     use std::option::Option;
     use std::signer;
-    use std::vector;
-
     use aptos_framework::account;
     use aptos_framework::aptos_account;
     use aptos_framework::account_abstraction;

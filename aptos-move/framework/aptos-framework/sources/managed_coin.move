@@ -130,9 +130,6 @@ module aptos_framework::managed_coin {
     //
 
     #[test_only]
-    use std::option;
-
-    #[test_only]
     use aptos_framework::aggregator_factory;
 
     #[test_only]

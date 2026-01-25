@@ -1,7 +1,6 @@
 /// Reconfiguration with DKG helper functions.
 module aptos_framework::reconfiguration_with_dkg {
     use std::features;
-    use std::option;
     use aptos_framework::consensus_config;
     use aptos_framework::dkg;
     use aptos_framework::execution_config;

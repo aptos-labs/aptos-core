@@ -9,7 +9,7 @@ module aptos_framework::permissioned_delegation {
         UnvalidatedPublicKey
     };
     use aptos_std::big_ordered_map::{Self, BigOrderedMap};
-    use aptos_framework::auth_data::{Self, AbstractionAuthData};
+    use aptos_framework::auth_data::AbstractionAuthData;
     use aptos_framework::bcs_stream::{Self, deserialize_u8};
     use aptos_framework::permissioned_signer::{Self, is_permissioned_signer, StorablePermissionedHandle};
     use aptos_framework::rate_limiter;
@@ -18,6 +18,8 @@ module aptos_framework::permissioned_delegation {
     use std::bcs;
     #[test_only]
     use std::option;
+    #[test_only]
+    use aptos_framework::auth_data;
 
     const ENOT_MASTER_SIGNER: u64 = 1;
     const EINVALID_PUBLIC_KEY: u64 = 2;

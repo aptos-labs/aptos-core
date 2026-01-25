@@ -14,7 +14,6 @@ module aptos_framework::aptos_governance {
     use std::option;
     use std::signer;
     use std::string::{Self, String, utf8};
-    use std::vector;
     use std::features;
 
     use aptos_std::math64::min;
@@ -36,6 +35,9 @@ module aptos_framework::aptos_governance {
     use aptos_framework::reconfiguration_with_dkg;
     use aptos_framework::timestamp;
     use aptos_framework::voting;
+
+    #[test_only]
+    use std::vector;
 
     /// The specified stake pool does not have sufficient stake to create a proposal
     const EINSUFFICIENT_PROPOSER_STAKE: u64 = 1;

@@ -11,7 +11,6 @@ module aptos_framework::aptos_account {
     use std::error;
     use std::features;
     use std::signer;
-    use std::vector;
     use aptos_framework::object::Object;
 
     friend aptos_framework::genesis;

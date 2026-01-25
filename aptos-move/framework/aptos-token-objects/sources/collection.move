@@ -530,7 +530,7 @@ module aptos_token_objects::collection {
 
     /// Creates a MutatorRef, which gates the ability to mutate any fields that support mutation.
     public fun generate_mutator_ref(ref: &ConstructorRef): MutatorRef {
-        let object = ref.object_from_constructor_ref::<Collection>();
+        let object = ref.object_from_constructor_ref<Collection>();
         MutatorRef { self: object.object_address() }
     }
 
@@ -948,7 +948,7 @@ module aptos_token_objects::collection {
         let collection_name = string::utf8(b"collection name");
         let max_supply = 10;
         let constructor_ref = create_fixed_collection_helper(creator, collection_name, max_supply);
-        let collection = constructor_ref.object_from_constructor_ref::<Collection>();
+        let collection = constructor_ref.object_from_constructor_ref<Collection>();
         let token_signer = create_token(creator);
 
         let current_supply = 5;
@@ -987,7 +987,7 @@ module aptos_token_objects::collection {
         let constructor_ref = create_fixed_collection_helper(creator, collection_name, max_supply);
         downgrade_from_concurrent_for_test(&constructor_ref.generate_extend_ref());
 
-        let collection = constructor_ref.object_from_constructor_ref::<Collection>();
+        let collection = constructor_ref.object_from_constructor_ref<Collection>();
         let token_signer = create_token(creator);
 
         for (i in 0..max_supply) {
@@ -1005,7 +1005,7 @@ module aptos_token_objects::collection {
         let collection_name = string::utf8(b"Low Supply Collection");
         let max_supply = 3;
         let constructor_ref = create_fixed_collection_helper(creator, collection_name, max_supply);
-        let collection = constructor_ref.object_from_constructor_ref::<Collection>();
+        let collection = constructor_ref.object_from_constructor_ref<Collection>();
         let token_signer = create_token(creator);
 
         for (i in 0..max_supply) {

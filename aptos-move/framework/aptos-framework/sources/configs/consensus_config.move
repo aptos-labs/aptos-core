@@ -2,7 +2,6 @@
 /// Reconfiguration, and may be updated by root.
 module aptos_framework::consensus_config {
     use std::error;
-    use std::vector;
     use aptos_framework::chain_status;
     use aptos_framework::config_buffer;
 

@@ -3,7 +3,7 @@
 module aptos_std::keyless {
     use aptos_std::bcs_stream::{Self, deserialize_u8};
     use std::error;
-    use std::string::{Self, String};
+    use std::string::String;
     friend aptos_std::federated_keyless;
 
     #[test_only]

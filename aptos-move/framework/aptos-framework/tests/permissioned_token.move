@@ -1,15 +1,13 @@
 #[test_only]
 module 0xcafe::permissioned_token {
-    use aptos_framework::fungible_asset::{Self, FungibleAsset, TransferRef};
+    use aptos_framework::fungible_asset::{FungibleAsset, TransferRef};
     use aptos_framework::dispatchable_fungible_asset;
-    use aptos_framework::object::{Self, ConstructorRef, Object};
+    use aptos_framework::object::{ConstructorRef, Object};
     use aptos_framework::function_info;
 
     use std::option;
     use std::signer;
     use std::string;
-    use std::vector;
-
     /// Provided withdraw function type doesn't meet the signature requirement.
     const EWITHDRAW_NOT_ALLOWED: u64 = 1;
 

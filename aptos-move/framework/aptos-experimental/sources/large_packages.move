@@ -45,7 +45,6 @@
 module aptos_experimental::large_packages {
     use std::error;
     use std::signer;
-    use std::vector;
     use aptos_std::smart_table::{Self, SmartTable};
 
     use aptos_framework::code::{Self, PackageRegistry};

@@ -9,7 +9,6 @@ module aptos_framework::randomness {
     use std::hash;
     use std::option;
     use std::option::Option;
-    use std::vector;
     use aptos_framework::event;
     use aptos_framework::system_addresses;
     use aptos_framework::transaction_context;

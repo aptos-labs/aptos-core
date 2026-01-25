@@ -273,7 +273,7 @@ module aptos_experimental::market_bulk_order_tests {
         market_signer: &signer,
         maker: &signer,
     ) {
-        use aptos_experimental::market_types::{BulkOrderModifiedEvent, verify_bulk_order_modified_event};
+        use aptos_experimental::market_types::BulkOrderModifiedEvent;
         use aptos_experimental::market_bulk_order::cancel_bulk_order;
         use aptos_experimental::event_utils::{new_event_store, latest_emitted_events};
 

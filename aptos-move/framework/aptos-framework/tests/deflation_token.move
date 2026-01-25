@@ -48,8 +48,6 @@ module 0xcafe::deflation_token {
     }
 
     #[test_only]
-    use aptos_framework::object;
-    #[test_only]
     use aptos_framework::fungible_asset::{Metadata, TestToken};
 
     #[test(creator = @0xcafe)]
@@ -59,7 +57,7 @@ module 0xcafe::deflation_token {
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
-        let metadata = token_object.convert::<TestToken, Metadata>();
+        let metadata = token_object.convert<TestToken, Metadata>();
 
         let creator_store = fungible_asset::create_test_store(creator, metadata);
 

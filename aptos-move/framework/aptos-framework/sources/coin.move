@@ -24,7 +24,7 @@ module aptos_framework::coin {
         TransferRef,
         BurnRef
     };
-    use aptos_framework::object::{Self, Object, object_address};
+    use aptos_framework::object::{Self, Object};
     use aptos_framework::primary_fungible_store;
     use aptos_std::type_info::{Self, TypeInfo};
     use aptos_framework::create_signer;

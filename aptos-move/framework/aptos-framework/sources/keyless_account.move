@@ -3,11 +3,9 @@
 module aptos_framework::keyless_account {
     use std::bn254_algebra;
     use std::config_buffer;
-    use std::option;
     use std::option::Option;
     use std::signer;
     use std::string::String;
-    use std::vector;
     use aptos_std::crypto_algebra;
     use aptos_std::ed25519;
     use aptos_framework::chain_status;

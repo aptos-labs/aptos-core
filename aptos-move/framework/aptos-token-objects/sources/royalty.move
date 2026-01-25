@@ -4,7 +4,9 @@
 module aptos_token_objects::royalty {
     use std::error;
     use std::option::{Self, Option};
-    use aptos_framework::object::{Self, ConstructorRef, ExtendRef, Object};
+    use aptos_framework::object::{ConstructorRef, ExtendRef, Object};
+    #[test_only]
+    use aptos_framework::object::Self;
 
     friend aptos_token_objects::token;
 
@@ -96,14 +98,14 @@ module aptos_token_objects::royalty {
     #[test(creator = @0x123)]
     fun test_none(creator: &signer) acquires Royalty {
         let constructor_ref = object::create_named_object(creator, b"");
-        let object = constructor_ref.object_from_constructor_ref::<object::ObjectCore>();
+        let object = constructor_ref.object_from_constructor_ref<object::ObjectCore>();
         assert!(option::none() == get(object), 0);
     }
 
     #[test(creator = @0x123)]
     fun test_init_and_update(creator: &signer) acquires Royalty {
         let constructor_ref = object::create_named_object(creator, b"");
-        let object = constructor_ref.object_from_constructor_ref::<object::ObjectCore>();
+        let object = constructor_ref.object_from_constructor_ref<object::ObjectCore>();
         let init_royalty = create(1, 2, @0x123);
         init(&constructor_ref, init_royalty);
         assert!(option::some(init_royalty) == get(object), 0);
@@ -123,7 +125,7 @@ module aptos_token_objects::royalty {
     #[test(creator = @0x123)]
     fun test_update_only(creator: &signer) acquires Royalty {
         let constructor_ref = object::create_named_object(creator, b"");
-        let object = constructor_ref.object_from_constructor_ref::<object::ObjectCore>();
+        let object = constructor_ref.object_from_constructor_ref<object::ObjectCore>();
         assert!(option::none() == get(object), 0);
 
         let mutator_ref = generate_mutator_ref(constructor_ref.generate_extend_ref());

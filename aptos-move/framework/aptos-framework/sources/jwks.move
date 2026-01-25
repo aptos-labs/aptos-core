@@ -14,7 +14,7 @@ module aptos_framework::jwks {
     use std::string;
     use std::string::{String, utf8};
     use std::vector;
-    use aptos_std::comparator::{compare_u8_vector, is_greater_than, is_equal};
+    use aptos_std::comparator::compare_u8_vector;
     use aptos_std::copyable_any;
     use aptos_std::copyable_any::Any;
     use aptos_framework::chain_status;
@@ -257,7 +257,7 @@ module aptos_framework::jwks {
     /// NOTE: Currently only RSA keys are supported.
     public entry fun update_federated_jwk_set(jwk_owner: &signer, iss: vector<u8>, kid_vec: vector<String>, alg_vec: vector<String>, e_vec: vector<String>, n_vec: vector<String>) acquires FederatedJWKs {
         assert!(!kid_vec.is_empty(), error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
-        let num_jwk = kid_vec.length::<String>();
+        let num_jwk = kid_vec.length<String>();
         assert!(alg_vec.length() == num_jwk , error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
         assert!(e_vec.length() == num_jwk, error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
         assert!(n_vec.length() == num_jwk, error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
@@ -562,10 +562,10 @@ module aptos_framework::jwks {
     fun get_jwk_id(jwk: &JWK): vector<u8> {
         let variant_type_name = *jwk.variant.type_name().bytes();
         if (variant_type_name == b"0x1::jwks::RSA_JWK") {
-            let rsa = jwk.variant.unpack::<RSA_JWK>();
+            let rsa = jwk.variant.unpack<RSA_JWK>();
             *rsa.kid.bytes()
         } else if (variant_type_name == b"0x1::jwks::UnsupportedJWK") {
-            let unsupported = jwk.variant.unpack::<UnsupportedJWK>();
+            let unsupported = jwk.variant.unpack<UnsupportedJWK>();
             unsupported.id
         } else {
             abort(error::invalid_argument(EUNKNOWN_JWK_VARIANT))
@@ -676,10 +676,10 @@ module aptos_framework::jwks {
         if (variant_type_name == b"0x1::jwks::PatchRemoveAll") {
             jwks.entries = vector[];
         } else if (variant_type_name == b"0x1::jwks::PatchRemoveIssuer") {
-            let cmd = patch.variant.unpack::<PatchRemoveIssuer>();
+            let cmd = patch.variant.unpack<PatchRemoveIssuer>();
             remove_issuer(jwks, cmd.issuer);
         } else if (variant_type_name == b"0x1::jwks::PatchRemoveJWK") {
-            let cmd = patch.variant.unpack::<PatchRemoveJWK>();
+            let cmd = patch.variant.unpack<PatchRemoveJWK>();
             // TODO: This is inefficient: we remove the issuer, modify its JWKs & and reinsert the updated issuer. Why
             // not just update it in place?
             let existing_jwk_set = remove_issuer(jwks, cmd.issuer);
@@ -689,7 +689,7 @@ module aptos_framework::jwks {
                 upsert_provider_jwks(jwks, jwk_set);
             };
         } else if (variant_type_name == b"0x1::jwks::PatchUpsertJWK") {
-            let cmd = patch.variant.unpack::<PatchUpsertJWK>();
+            let cmd = patch.variant.unpack<PatchUpsertJWK>();
             // TODO: This is inefficient: we remove the issuer, modify its JWKs & and reinsert the updated issuer. Why
             // not just update it in place?
             let existing_jwk_set = remove_issuer(jwks, cmd.issuer);

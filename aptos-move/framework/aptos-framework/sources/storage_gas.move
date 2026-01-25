@@ -151,6 +151,7 @@ module aptos_framework::storage_gas {
     use aptos_framework::system_addresses;
     use std::error;
     use aptos_framework::state_storage;
+    #[test_only]
     use std::vector;
 
     friend aptos_framework::gas_schedule;

@@ -3,7 +3,6 @@
 /// WARNING: `reconfiguration_state::initialize()` is required before `RECONFIGURE_WITH_DKG` can be enabled.
 module aptos_framework::reconfiguration_state {
     use std::error;
-    use std::string;
     use aptos_std::copyable_any;
     use aptos_std::copyable_any::Any;
     use aptos_framework::system_addresses;
@@ -82,7 +81,7 @@ module aptos_framework::reconfiguration_state {
         let state = borrow_global<State>(@aptos_framework);
         let variant_type_name = *state.variant.type_name().bytes();
         if (variant_type_name == b"0x1::reconfiguration_state::StateActive") {
-            let active = state.variant.unpack::<StateActive>();
+            let active = state.variant.unpack<StateActive>();
             active.start_time_secs
         } else {
             abort(error::invalid_state(ERECONFIG_NOT_IN_PROGRESS))

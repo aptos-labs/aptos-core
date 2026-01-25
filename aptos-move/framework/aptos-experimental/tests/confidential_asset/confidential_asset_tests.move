@@ -272,7 +272,7 @@ module aptos_experimental::confidential_asset_tests {
             vector[]
         );
 
-        let token = ctor_ref.object_from_constructor_ref::<Metadata>();
+        let token = ctor_ref.object_from_constructor_ref<Metadata>();
 
         let sender_store =
             primary_fungible_store::ensure_primary_store_exists(

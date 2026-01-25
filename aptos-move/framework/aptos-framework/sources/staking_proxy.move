@@ -1,8 +1,6 @@
 module aptos_framework::staking_proxy {
     use std::error;
     use std::signer;
-    use std::vector;
-
     use aptos_framework::permissioned_signer;
     use aptos_framework::stake;
     use aptos_framework::staking_contract;

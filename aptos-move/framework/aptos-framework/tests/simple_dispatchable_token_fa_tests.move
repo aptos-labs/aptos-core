@@ -1,9 +1,8 @@
 #[test_only]
 module aptos_framework::simple_token_fa_tests {
     use aptos_framework::fungible_asset::{
-        amount, balance, burn, destroy_zero, extract, create_test_token, init_test_metadata,
-        supply, create_store, create_test_store, remove_store, deposit_with_ref, mint, mint_to, merge,
-        set_frozen_flag, is_frozen, transfer_with_ref, upgrade_to_concurrent, Metadata, TestToken
+        amount, balance, create_test_token, init_test_metadata,
+        supply, create_store, create_test_store, remove_store, is_frozen, upgrade_to_concurrent, Metadata, TestToken
     };
     use aptos_framework::object;
     use 0xcafe::simple_token;
@@ -29,7 +28,7 @@ module aptos_framework::simple_token_fa_tests {
     ) {
         let (creator_ref, test_token) = create_test_token(creator);
         let (mint_ref, transfer_ref, _burn_ref, _mutate_metadata_ref) = init_test_metadata(&creator_ref);
-        let metadata = test_token.convert::<TestToken, Metadata>();
+        let metadata = test_token.convert<TestToken, Metadata>();
         simple_token::initialize(creator, &creator_ref);
 
         let creator_store = create_test_store(creator, metadata);
@@ -73,7 +72,7 @@ module aptos_framework::simple_token_fa_tests {
 
         let (creator_ref, token_object) = create_test_token(creator);
         let (mint_ref, transfer_ref, _burn_ref, _mutate_metadata_ref) = init_test_metadata(&creator_ref);
-        let test_token = token_object.convert::<TestToken, Metadata>();
+        let test_token = token_object.convert<TestToken, Metadata>();
         simple_token::initialize(creator, &creator_ref);
 
         let creator_store = create_test_store(creator, test_token);
@@ -101,7 +100,7 @@ module aptos_framework::simple_token_fa_tests {
     ) {
         let (creator_ref, test_token) = create_test_token(creator);
         let (mint_ref, transfer_ref, _burn_ref, _mutate_metadata_ref) = init_test_metadata(&creator_ref);
-        let metadata = test_token.convert::<TestToken, Metadata>();
+        let metadata = test_token.convert<TestToken, Metadata>();
         simple_token::initialize(creator, &creator_ref);
 
         let creator_store = create_test_store(creator, metadata);

@@ -6,12 +6,7 @@ module aptos_experimental::market_bulk_order {
 
     use std::signer;
     use std::option::{Self, Option};
-    use aptos_trading::bulk_order_types::{
-        new_bulk_order_request,
-        is_success_response,
-        destroy_bulk_order_place_response_success,
-        destroy_bulk_order_place_response_rejection,
-    };
+    use aptos_trading::bulk_order_types::new_bulk_order_request;
     use aptos_trading::order_book_types::OrderId;
     use aptos_experimental::market_types::{Self, MarketClearinghouseCallbacks, Market};
 

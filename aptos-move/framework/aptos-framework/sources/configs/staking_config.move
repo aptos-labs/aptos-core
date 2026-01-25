@@ -6,7 +6,7 @@ module aptos_framework::staking_config {
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
 
-    use aptos_std::fixed_point64::{Self, FixedPoint64, less_or_equal};
+    use aptos_std::fixed_point64::{Self, FixedPoint64};
     use aptos_std::math_fixed64;
 
     friend aptos_framework::genesis;
@@ -397,7 +397,7 @@ module aptos_framework::staking_config {
     }
 
     #[test_only]
-    use aptos_std::fixed_point64::{equal, create_from_rational};
+    use aptos_std::fixed_point64::create_from_rational;
 
     #[test(aptos_framework = @aptos_framework)]
     public entry fun test_change_staking_configs(aptos_framework: signer) acquires StakingConfig {

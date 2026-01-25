@@ -100,7 +100,7 @@ module aptos_framework::genesis {
         // put reserved framework reserved accounts under aptos governance
         let framework_reserved_addresses = vector<address>[@0x2, @0x3, @0x4, @0x5, @0x6, @0x7, @0x8, @0x9, @0xa];
         while (!framework_reserved_addresses.is_empty()) {
-            let address = framework_reserved_addresses.pop_back::<address>();
+            let address = framework_reserved_addresses.pop_back<address>();
             let (_, framework_signer_cap) = account::create_framework_reserved_account(address);
             aptos_governance::store_signer_cap(&aptos_framework_account, address, framework_signer_cap);
         };

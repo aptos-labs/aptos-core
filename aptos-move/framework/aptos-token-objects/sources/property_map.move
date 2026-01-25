@@ -8,7 +8,9 @@ module aptos_token_objects::property_map {
     use aptos_std::from_bcs;
     use aptos_std::simple_map::{Self, SimpleMap};
     use aptos_std::type_info;
-    use aptos_framework::object::{Self, ConstructorRef, Object, ExtendRef, ObjectCore};
+    use aptos_framework::object::{ConstructorRef, Object, ExtendRef, ObjectCore};
+    #[test_only]
+    use aptos_framework::object::Self;
 
     // Errors
     /// The property map does not exist
@@ -345,7 +347,7 @@ module aptos_token_objects::property_map {
     #[test(creator = @0x123)]
     fun test_end_to_end(creator: &signer) acquires PropertyMap {
         let constructor_ref = object::create_named_object(creator, b"");
-        let object = constructor_ref.object_from_constructor_ref::<object::ObjectCore>();
+        let object = constructor_ref.object_from_constructor_ref<object::ObjectCore>();
 
         let input = end_to_end_input();
         init(&constructor_ref, input);
@@ -516,7 +518,7 @@ module aptos_token_objects::property_map {
         let extend_ref = constructor_ref.generate_extend_ref();
         extend(&extend_ref, end_to_end_input());
 
-        let object = constructor_ref.object_from_constructor_ref::<ObjectCore>();
+        let object = constructor_ref.object_from_constructor_ref<ObjectCore>();
         assert_end_to_end_input(object);
     }
 
@@ -634,7 +636,7 @@ module aptos_token_objects::property_map {
     #[expected_failure(abort_code = 0x10006, location = Self)]
     fun test_invalid_read(creator: &signer) acquires PropertyMap {
         let constructor_ref = object::create_named_object(creator, b"");
-        let object = constructor_ref.object_from_constructor_ref::<object::ObjectCore>();
+        let object = constructor_ref.object_from_constructor_ref<object::ObjectCore>();
 
         let input = prepare_input(
             vector[string::utf8(b"bool")],
