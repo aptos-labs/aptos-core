@@ -345,8 +345,8 @@ Object reference should be provided when upgrading object code.
 
     <b>let</b> i = 0;
     <b>while</b> (i &lt; <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&code_chunks)) {
-        <b>let</b> inner_code = *<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&code_chunks, i);
-        <b>let</b> idx = (*<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&code_indices, i) <b>as</b> u64);
+        <b>let</b> inner_code = code_chunks[i];
+        <b>let</b> idx = (code_indices[i] <b>as</b> u64);
 
         <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/doc/smart_table.md#0x1_smart_table_contains">smart_table::contains</a>(&staging_area.<a href="../../aptos-framework/doc/code.md#0x1_code">code</a>, idx)) {
             <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(

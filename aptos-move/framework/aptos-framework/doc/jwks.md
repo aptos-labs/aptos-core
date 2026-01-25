@@ -1633,7 +1633,7 @@ Get a JWK by key ID from a <code><a href="jwks.md#0x1_jwks_ProviderJWKs">Provide
     });
 
     <b>if</b> (jwk_id_found) {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&provider_jwks.<a href="jwks.md#0x1_jwks">jwks</a>, index))
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(provider_jwks.<a href="jwks.md#0x1_jwks">jwks</a>[index])
     } <b>else</b> {
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
     }

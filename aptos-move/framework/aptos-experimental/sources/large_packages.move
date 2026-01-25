@@ -161,8 +161,8 @@ module aptos_experimental::large_packages {
 
         let i = 0;
         while (i < vector::length(&code_chunks)) {
-            let inner_code = *vector::borrow(&code_chunks, i);
-            let idx = (*vector::borrow(&code_indices, i) as u64);
+            let inner_code = code_chunks[i];
+            let idx = (code_indices[i] as u64);
 
             if (smart_table::contains(&staging_area.code, idx)) {
                 vector::append(

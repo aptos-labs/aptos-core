@@ -2465,10 +2465,10 @@ Unlock any vested portion of the grant.
     <b>let</b> schedule = &vesting_schedule.schedule;
     <b>let</b> schedule_index = next_period_to_vest - 1;
     <b>let</b> vesting_fraction = <b>if</b> (schedule_index &lt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(schedule)) {
-        *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(schedule, schedule_index)
+        schedule[schedule_index]
     } <b>else</b> {
         // Last <a href="vesting.md#0x1_vesting">vesting</a> schedule fraction will repeat until the grant runs out.
-        *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(schedule, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(schedule) - 1)
+        schedule[<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(schedule) - 1]
     };
     <b>let</b> total_grant = <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_total_coins">pool_u64::total_coins</a>(&vesting_contract.grant_pool);
     <b>let</b> vested_amount = <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_multiply_u64">fixed_point32::multiply_u64</a>(total_grant, vesting_fraction);

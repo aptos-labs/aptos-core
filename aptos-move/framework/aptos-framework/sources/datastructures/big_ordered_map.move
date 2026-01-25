@@ -1507,7 +1507,7 @@ module aptos_std::big_ordered_map {
 
         // index of the node we will rebalance with.
         let sibling_index = {
-            let parent_children = &self.borrow_node(*path_to_node.borrow(path_to_node.length() - 1)).children;
+            let parent_children = &self.borrow_node(path_to_node[path_to_node.length() - 1]).children;
             assert!(parent_children.length() >= 2, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
             // If we are the largest node from the parent, we merge with the `prev`
             // (which is then guaranteed to have the same parent, as any node has >1 children),
@@ -2014,7 +2014,7 @@ module aptos_std::big_ordered_map {
 
         let i = 0;
         while (i < data.length()) {
-            let element = *data.borrow(i);
+            let element = data[i];
             let it = map.internal_lower_bound(&element);
             assert!(!it.iter_is_end(&map), i);
             assert!(it.key == element, i);

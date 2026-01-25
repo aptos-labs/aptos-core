@@ -552,7 +552,7 @@ module aptos_framework::jwks {
         });
 
         if (jwk_id_found) {
-            option::some(*vector::borrow(&provider_jwks.jwks, index))
+            option::some(provider_jwks.jwks[index])
         } else {
             option::none()
         }

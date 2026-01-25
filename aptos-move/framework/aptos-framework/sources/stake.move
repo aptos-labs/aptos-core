@@ -567,7 +567,7 @@ module aptos_framework::stake {
             };
             i < len_validators
         }) {
-            let validator = *vector::borrow(validators, i);
+            let validator = validators[i];
             let validator_index = find_validator(active_validators, validator);
             if (option::is_some(&validator_index)) {
                 let validator_info = vector::swap_remove(active_validators, *option::borrow(&validator_index));
@@ -1319,7 +1319,7 @@ module aptos_framework::stake {
             };
             f < f_len
         }) {
-            let validator_index = *vector::borrow(&failed_proposer_indices, f);
+            let validator_index = failed_proposer_indices[f];
             if (validator_index < validator_len) {
                 let validator = vector::borrow_mut(&mut validator_perf.validators, validator_index);
                 spec {

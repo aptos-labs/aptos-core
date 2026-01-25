@@ -2728,8 +2728,8 @@ maliciously alter the number of signatures required.
     <b>let</b> metadata = &<b>mut</b> multisig_account_resource.metadata;
     <b>let</b> i = 0;
     <b>while</b> (i &lt; num_attributes) {
-        <b>let</b> key = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&keys, i);
-        <b>let</b> value = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&values, i);
+        <b>let</b> key = keys[i];
+        <b>let</b> value = values[i];
         <b>assert</b>!(
             !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_contains_key">simple_map::contains_key</a>(metadata, &key),
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="multisig_account.md#0x1_multisig_account_EDUPLICATE_METADATA_KEY">EDUPLICATE_METADATA_KEY</a>),

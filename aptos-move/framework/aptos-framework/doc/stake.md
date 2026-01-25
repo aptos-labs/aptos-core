@@ -2597,7 +2597,7 @@ Allow on chain governance to remove validators from the validator set.
         };
         i &lt; len_validators
     }) {
-        <b>let</b> validator = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(validators, i);
+        <b>let</b> validator = validators[i];
         <b>let</b> validator_index = <a href="stake.md#0x1_stake_find_validator">find_validator</a>(active_validators, validator);
         <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&validator_index)) {
             <b>let</b> validator_info = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_swap_remove">vector::swap_remove</a>(active_validators, *<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&validator_index));
@@ -3969,7 +3969,7 @@ This function cannot abort.
         };
         f &lt; f_len
     }) {
-        <b>let</b> validator_index = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&failed_proposer_indices, f);
+        <b>let</b> validator_index = failed_proposer_indices[f];
         <b>if</b> (validator_index &lt; validator_len) {
             <b>let</b> validator = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(&<b>mut</b> validator_perf.validators, validator_index);
             <b>spec</b> {

@@ -71,7 +71,7 @@ module aptos_framework::aptos_account {
         vector::enumerate_ref(
             &recipients,
             |i, to| {
-                let amount = *vector::borrow(&amounts, i);
+                let amount = amounts[i];
                 transfer(source, *to, amount);
             }
         );
@@ -109,7 +109,7 @@ module aptos_framework::aptos_account {
         vector::enumerate_ref(
             &recipients,
             |i, to| {
-                let amount = *vector::borrow(&amounts, i);
+                let amount = amounts[i];
                 transfer_coins<CoinType>(from, *to, amount);
             }
         );
@@ -163,7 +163,7 @@ module aptos_framework::aptos_account {
         vector::enumerate_ref(
             &recipients,
             |i, to| {
-                let amount = *vector::borrow(&amounts, i);
+                let amount = amounts[i];
                 transfer_fungible_assets(from, metadata, *to, amount);
             }
         );

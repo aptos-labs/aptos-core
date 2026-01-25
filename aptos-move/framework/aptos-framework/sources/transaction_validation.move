@@ -416,9 +416,9 @@ module aptos_framework::transaction_validation {
             // };
             (i < num_secondary_signers)
         }) {
-            let secondary_address = *vector::borrow(&secondary_signer_addresses, i);
+            let secondary_address = secondary_signer_addresses[i];
             assert!(account::exists_at(secondary_address), error::invalid_argument(PROLOGUE_EACCOUNT_DOES_NOT_EXIST));
-            let signer_public_key_hash = *vector::borrow(&secondary_signer_public_key_hashes, i);
+            let signer_public_key_hash = secondary_signer_public_key_hashes[i];
             if (!skip_auth_key_check(is_simulation, &signer_public_key_hash)) {
                 if (option::is_some(&signer_public_key_hash)) {
                     assert!(
