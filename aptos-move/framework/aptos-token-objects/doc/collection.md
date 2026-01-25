@@ -1368,7 +1368,7 @@ Creates a MutatorRef, which gates the ability to mutate any fields that support 
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_generate_mutator_ref">generate_mutator_ref</a>(ref: &ConstructorRef): <a href="collection.md#0x4_collection_MutatorRef">MutatorRef</a> {
-    <b>let</b> <a href="../../aptos-framework/doc/object.md#0x1_object">object</a> = ref.object_from_constructor_ref::&lt;<a href="collection.md#0x4_collection_Collection">Collection</a>&gt;();
+    <b>let</b> <a href="../../aptos-framework/doc/object.md#0x1_object">object</a> = ref.object_from_constructor_ref&lt;<a href="collection.md#0x4_collection_Collection">Collection</a>&gt;();
     <a href="collection.md#0x4_collection_MutatorRef">MutatorRef</a> { self: <a href="../../aptos-framework/doc/object.md#0x1_object">object</a>.object_address() }
 }
 </code></pre>

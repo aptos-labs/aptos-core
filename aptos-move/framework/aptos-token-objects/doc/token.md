@@ -1388,7 +1388,7 @@ Creates a MutatorRef, which gates the ability to mutate any fields that support 
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_generate_mutator_ref">generate_mutator_ref</a>(ref: &ConstructorRef): <a href="token.md#0x4_token_MutatorRef">MutatorRef</a> {
-    <b>let</b> <a href="../../aptos-framework/doc/object.md#0x1_object">object</a> = ref.object_from_constructor_ref::&lt;<a href="token.md#0x4_token_Token">Token</a>&gt;();
+    <b>let</b> <a href="../../aptos-framework/doc/object.md#0x1_object">object</a> = ref.object_from_constructor_ref&lt;<a href="token.md#0x4_token_Token">Token</a>&gt;();
     <a href="token.md#0x4_token_MutatorRef">MutatorRef</a> { self: <a href="../../aptos-framework/doc/object.md#0x1_object">object</a>.object_address() }
 }
 </code></pre>
