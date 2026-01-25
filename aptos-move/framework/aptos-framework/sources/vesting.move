@@ -703,10 +703,10 @@ module aptos_framework::vesting {
         let schedule = &vesting_schedule.schedule;
         let schedule_index = next_period_to_vest - 1;
         let vesting_fraction = if (schedule_index < vector::length(schedule)) {
-            *vector::borrow(schedule, schedule_index)
+            schedule[schedule_index]
         } else {
             // Last vesting schedule fraction will repeat until the grant runs out.
-            *vector::borrow(schedule, vector::length(schedule) - 1)
+            schedule[vector::length(schedule) - 1]
         };
         let total_grant = pool_u64::total_coins(&vesting_contract.grant_pool);
         let vested_amount = fixed_point32::multiply_u64(total_grant, vesting_fraction);
@@ -1301,7 +1301,7 @@ module aptos_framework::vesting {
         let admin_address = signer::address_of(admin);
         let buy_ins = simple_map::create<address, Coin<AptosCoin>>();
         vector::enumerate_ref(shares, |i, share| {
-            let shareholder = *vector::borrow(shareholders, i);
+            let shareholder = shareholders[i];
             simple_map::add(&mut buy_ins, shareholder, stake::mint_coins(*share));
         });
 

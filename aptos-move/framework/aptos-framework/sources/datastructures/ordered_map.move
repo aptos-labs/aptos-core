@@ -1324,7 +1324,7 @@ module aptos_std::ordered_map {
 
         let len = data.length();
         for (i in 0..len) {
-            let element = *data.borrow(i);
+            let element = data[i];
             map.upsert(element, element);
             map.validate_map();
         };

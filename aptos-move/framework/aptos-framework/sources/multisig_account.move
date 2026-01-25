@@ -916,8 +916,8 @@ module aptos_framework::multisig_account {
         let metadata = &mut multisig_account_resource.metadata;
         let i = 0;
         while (i < num_attributes) {
-            let key = *vector::borrow(&keys, i);
-            let value = *vector::borrow(&values, i);
+            let key = keys[i];
+            let value = values[i];
             assert!(
                 !simple_map::contains_key(metadata, &key),
                 error::invalid_argument(EDUPLICATE_METADATA_KEY),

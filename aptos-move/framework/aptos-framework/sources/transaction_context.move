@@ -244,7 +244,7 @@ module aptos_framework::transaction_context {
         while (i < count - 1) {
             let j: u64 = i + 1;
             while (j < count) {
-                assert!(*vector::borrow(&auids, i) != *vector::borrow(&auids, j), 0);
+                assert!(auids[i] != auids[j], 0);
                 j += 1;
             };
             i += 1;

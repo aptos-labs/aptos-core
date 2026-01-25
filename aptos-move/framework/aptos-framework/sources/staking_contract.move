@@ -965,7 +965,7 @@ module aptos_framework::staking_contract {
         // Buy all recipients out of the distribution pool.
         while (pool_u64::shareholders_count(distribution_pool) > 0) {
             let recipients = pool_u64::shareholders(distribution_pool);
-            let recipient = *vector::borrow(&recipients, 0);
+            let recipient = recipients[0];
             let current_shares = pool_u64::shares(distribution_pool, recipient);
             let amount_to_distribute =
                 pool_u64::redeem_shares(distribution_pool, recipient, current_shares);
