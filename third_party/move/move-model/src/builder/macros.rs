@@ -36,13 +36,15 @@ use crate::{
     LanguageVersion,
 };
 use legacy_move_compiler::{
-    expansion::ast::{Address, Exp, Exp_, LValue, LValue_, ModuleAccess_, ModuleIdent_, Value_},
+    expansion::ast::{
+        Address, Exp, Exp_, LValue, LValue_, ModuleAccess_, ModuleIdent_, SequenceItem_, Value_,
+    },
     parser::ast::{BinOp_, CallKind, ModuleName},
     shared::NumericalAddress,
 };
 use move_core_types::account_address::AccountAddress;
 use move_ir_types::location::{sp, Loc, Spanned};
-use std::fmt::Display;
+use std::{collections::VecDeque, fmt::Display};
 
 /// Maximum total number of arguments for string formatting, including the format string itself.
 /// Note that `string_utils::format<N>` takes N + 1 arguments: the format string + N format arguments.
@@ -201,14 +203,11 @@ impl ExpTranslator<'_, '_, '_> {
     /// ```
     /// expands to:
     /// ```move
-    /// match ((left, right)) {
-    ///     (_left, _right) => {
-    ///         if (_left == _right) {
-    ///             ()
-    ///         } else {
-    ///             abort string::into_bytes(string_utils::format2(<assertion_failed_message>, _left, _right))
-    ///         }
-    ///     }
+    /// let ($left, $right) = (left, right);
+    /// if ($left == $right) {
+    ///     ()
+    /// } else {
+    ///     abort string::into_bytes(string_utils::format2(<assertion_failed_message>, $left, $right))
     /// }
     /// ```
     ///
@@ -218,14 +217,11 @@ impl ExpTranslator<'_, '_, '_> {
     /// ```
     /// expands to:
     /// ```move
-    /// match ((left, right)) {
-    ///     (_left, _right) => {
-    ///         if (_left == _right) {
-    ///             ()
-    ///         } else {
-    ///             abort string::into_bytes(string_utils::format3(<assertion_failed_message>, string::utf8(message), _left, _right))
-    ///         }
-    ///     }
+    /// let ($left, $right) = (left, right);
+    /// if ($left == $right) {
+    ///     ()
+    /// } else {
+    ///     abort string::into_bytes(string_utils::format3(<assertion_failed_message>, string::utf8(message), $left, $right))
     /// }
     /// ```
     ///
@@ -235,14 +231,11 @@ impl ExpTranslator<'_, '_, '_> {
     /// ```
     /// expands to:
     /// ```move
-    /// match ((left, right)) {
-    ///     (_left, _right) => {
-    ///         if (_left == _right) {
-    ///             ()
-    ///         } else {
-    ///             abort string::into_bytes(string_utils::format3(<assertion_failed_message>, string_utils::format<N>(&fmt, arg1, ..., argN), _left, _right))
-    ///         }
-    ///     }
+    /// let ($left, $right) = (left, right);
+    /// if ($left == $right) {
+    ///     ()
+    /// } else {
+    ///     abort string::into_bytes(string_utils::format3(<assertion_failed_message>, string_utils::format<N>(&fmt, arg1, ..., argN), $left, $right))
     /// }
     /// ```
     fn expand_assert_eq(&self, loc: Loc, args: &Spanned<Vec<Exp>>) -> Exp_ {
@@ -272,10 +265,8 @@ impl ExpTranslator<'_, '_, '_> {
         let operands = &args.value[0..2];
         let rest = &args.value[2..];
 
-        let discriminator = sp(loc, Exp_::ExpList(operands.to_vec()));
-
-        let (left_lvalue, left) = Self::make_binding(loc, "_left");
-        let (right_lvalue, right) = Self::make_binding(loc, "_right");
+        let (left_lvalue, left) = Self::make_binding(loc, "$left");
+        let (right_lvalue, right) = Self::make_binding(loc, "$right");
 
         let lvalues = sp(loc, vec![left_lvalue, right_lvalue]);
 
@@ -338,14 +329,15 @@ impl ExpTranslator<'_, '_, '_> {
             ),
         );
 
-        // We use a `match` expression for two reasons:
-        // 1. To ensure the `left` and `right` expressions are evaluated only once, instead of twice (once for the condition and once for the error message).
-        // 2. To introduce a new scope for the temporary bindings `_left` and `_right`, avoiding name clashes with variables in the surrounding scope.
-        // This mirrors how Rust expands similar macros.
-        Exp_::Match(Box::new(discriminator), vec![sp(
+        let binding = sp(
             loc,
-            (lvalues, None, assert),
-        )])
+            SequenceItem_::Bind(lvalues, sp(loc, Exp_::ExpList(operands.to_vec()))),
+        );
+
+        Exp_::Block(VecDeque::from_iter([
+            binding,
+            sp(loc, SequenceItem_::Seq(assert)),
+        ]))
     }
 
     /// Calls `std::string_utils::format<N>(&fmt, arg1, ..., argN)` for 1 ≤ N ≤ 4.
