@@ -282,6 +282,13 @@ pub fn get_weighted_configs_for_benchmarking<T: traits::ThresholdConfig>() -> Ve
 {
     let mut wcs = vec![];
 
+    // THIS IS TEMP REMOVE IT
+    let weights = vec![
+        1, 1, 1
+    ];
+    let threshold = 1; // slow path
+    wcs.push(WeightedConfig::<T>::new(threshold, weights.clone()).unwrap());
+
     // This one was produced mid-Nov 2025
     let weights = vec![
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1,
