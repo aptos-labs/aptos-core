@@ -22,7 +22,6 @@ spec aptos_framework::dkg {
     }
 
     spec finish(transcript: vector<u8>) {
-        use std::option;
         requires exists<DKGState>(@aptos_framework);
         requires global<DKGState>(@aptos_framework).in_progress.is_some();
         aborts_if false;

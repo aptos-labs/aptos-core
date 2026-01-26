@@ -54,7 +54,6 @@ spec aptos_framework::jwks {
     }
 
     spec remove_issuer(jwks: &mut AllProvidersJWKs, issuer: vector<u8>): Option<ProviderJWKs> {
-        use std::option;
         use std::vector;
         pragma opaque;
         ensures result.is_none() <==> (forall jwk: ProviderJWKs where vector::spec_contains(old(jwks).entries, jwk): jwk.issuer != issuer);

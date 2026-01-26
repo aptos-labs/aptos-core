@@ -440,7 +440,6 @@ spec aptos_framework::transaction_validation {
 
 
     spec schema EpilogueGasPayerAbortsIf {
-        use std::option;
         use aptos_std::type_info;
         use aptos_framework::account::{Account};
         use aptos_framework::aptos_coin::{AptosCoin};
