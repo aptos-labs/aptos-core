@@ -116,8 +116,6 @@ impl ExpTranslator<'_, '_, '_> {
     /// } else {
     ///     abort exp
     /// }
-    /// Note that, while the macro does not explicitly enforce this constraint, this will only
-    /// compile when `exp` is a `u64` (an abort code) or a `vector<u8>` (an abort message).
     /// ```
     /// Note that, while the macro does not explicitly enforce this constraint, this will only
     /// compile when `exp` is a `u64` (an abort code) or a `vector<u8>` (an abort message).
