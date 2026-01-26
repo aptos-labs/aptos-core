@@ -30,7 +30,7 @@ use crate::{
         ShardedStateKvSchemaBatch,
     },
 };
-use aptos_config::config::HotStateConfig;
+use aptos_config::config::{HotStateConfig, PrunerConfig};
 use aptos_crypto::{
     hash::{CryptoHash, CORRUPTION_SENTINEL, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
@@ -106,14 +106,53 @@ const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT
 
 pub const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 1_000_000;
 
+pub(crate) struct StatePruner {
+    pub hot_state_merkle_pruner: Option<StateMerklePrunerManager<StaleNodeIndexSchema>>,
+    pub hot_epoch_snapshot_pruner: Option<StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>>,
+    pub state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
+    pub epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
+    pub state_kv_pruner: StateKvPrunerManager,
+}
+
+impl StatePruner {
+    pub fn new(
+        hot_state_merkle_db: Option<Arc<StateMerkleDb>>,
+        state_merkle_db: Arc<StateMerkleDb>,
+        state_kv_db: Arc<StateKvDb>,
+        config: PrunerConfig,
+    ) -> Self {
+        let hot_state_merkle_pruner = hot_state_merkle_db.as_ref().map(|db| {
+            StateMerklePrunerManager::new(Arc::clone(db), config.state_merkle_pruner_config)
+        });
+        let hot_epoch_snapshot_pruner = hot_state_merkle_db.map(|db| {
+            StateMerklePrunerManager::new(db, config.epoch_snapshot_pruner_config.into())
+        });
+        let state_merkle_pruner = StateMerklePrunerManager::new(
+            Arc::clone(&state_merkle_db),
+            config.state_merkle_pruner_config,
+        );
+        let epoch_snapshot_pruner = StateMerklePrunerManager::new(
+            state_merkle_db,
+            config.epoch_snapshot_pruner_config.into(),
+        );
+        let state_kv_pruner = StateKvPrunerManager::new(state_kv_db, config.ledger_pruner_config);
+
+        Self {
+            hot_state_merkle_pruner,
+            hot_epoch_snapshot_pruner,
+            state_merkle_pruner,
+            epoch_snapshot_pruner,
+            state_kv_pruner,
+        }
+    }
+}
+
 pub(crate) struct StateDb {
     pub ledger_db: Arc<LedgerDb>,
     pub hot_state_merkle_db: Option<Arc<StateMerkleDb>>,
     pub state_merkle_db: Arc<StateMerkleDb>,
     pub state_kv_db: Arc<StateKvDb>,
-    pub state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
-    pub epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
-    pub state_kv_pruner: StateKvPrunerManager,
+    pub state_pruner: StatePruner,
     pub skip_usage: bool,
 }
 
@@ -340,9 +379,7 @@ impl StateStore {
         hot_state_merkle_db: Option<Arc<StateMerkleDb>>,
         state_merkle_db: Arc<StateMerkleDb>,
         state_kv_db: Arc<StateKvDb>,
-        state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
-        epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
-        state_kv_pruner: StateKvPrunerManager,
+        state_pruner: StatePruner,
         buffered_state_target_items: usize,
         hack_for_tests: bool,
         empty_buffered_state_for_restore: bool,
@@ -363,9 +400,7 @@ impl StateStore {
             hot_state_merkle_db,
             state_merkle_db,
             state_kv_db,
-            state_merkle_pruner,
-            epoch_snapshot_pruner,
-            state_kv_pruner,
+            state_pruner,
             skip_usage,
         });
         // TODO(HotState): probably fetch onchain config from storage.
@@ -508,28 +543,18 @@ impl StateStore {
         state_merkle_db: Arc<StateMerkleDb>,
         state_kv_db: Arc<StateKvDb>,
     ) -> Result<Option<Version>> {
-        use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
-
-        let state_merkle_pruner = StateMerklePrunerManager::new(
+        let state_pruner = StatePruner::new(
+            hot_state_merkle_db.clone(),
             Arc::clone(&state_merkle_db),
-            NO_OP_STORAGE_PRUNER_CONFIG.state_merkle_pruner_config,
-        );
-        let epoch_snapshot_pruner = StateMerklePrunerManager::new(
-            Arc::clone(&state_merkle_db),
-            NO_OP_STORAGE_PRUNER_CONFIG.state_merkle_pruner_config,
-        );
-        let state_kv_pruner = StateKvPrunerManager::new(
             Arc::clone(&state_kv_db),
-            NO_OP_STORAGE_PRUNER_CONFIG.ledger_pruner_config,
+            aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG,
         );
         let state_db = Arc::new(StateDb {
             ledger_db,
             hot_state_merkle_db,
             state_merkle_db,
             state_kv_db,
-            state_merkle_pruner,
-            epoch_snapshot_pruner,
-            state_kv_pruner,
+            state_pruner,
             skip_usage: false,
         });
         let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty(
