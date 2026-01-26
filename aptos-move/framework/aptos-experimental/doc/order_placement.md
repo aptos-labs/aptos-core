@@ -76,7 +76,7 @@ TimeBased(time): The order is triggered when the current time is greater than or
 -  [Function `place_maker_order_internal`](#0x7_order_placement_place_maker_order_internal)
 -  [Function `cancel_bulk_maker_order_internal`](#0x7_order_placement_cancel_bulk_maker_order_internal)
 -  [Function `cancel_maker_order_internal`](#0x7_order_placement_cancel_maker_order_internal)
--  [Function `cancel_single_order_internal`](#0x7_order_placement_cancel_single_order_internal)
+-  [Function `cancel_taker_order_internal`](#0x7_order_placement_cancel_taker_order_internal)
 -  [Function `cleanup_order_internal`](#0x7_order_placement_cleanup_order_internal)
 -  [Function `settle_single_trade`](#0x7_order_placement_settle_single_trade)
 -  [Function `place_order_with_order_id`](#0x7_order_placement_place_order_with_order_id)
@@ -633,7 +633,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     callback_results: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;R&gt;,
 ): <a href="order_placement.md#0x7_order_placement_OrderMatchResult">OrderMatchResult</a>&lt;R&gt; {
     <b>if</b> (time_in_force == immediate_or_cancel() && trigger_condition.is_none()) {
-        <b>return</b> <a href="order_placement.md#0x7_order_placement_cancel_single_order_internal">cancel_single_order_internal</a>(
+        <b>return</b> <a href="order_placement.md#0x7_order_placement_cancel_taker_order_internal">cancel_taker_order_internal</a>(
             market,
             user_addr,
             limit_price,
@@ -697,7 +697,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         remaining_size,
     );
     <b>if</b> (result.get_place_maker_order_cancellation_reason().is_some()) {
-        <b>return</b> <a href="order_placement.md#0x7_order_placement_cancel_single_order_internal">cancel_single_order_internal</a>(
+        <b>return</b> <a href="order_placement.md#0x7_order_placement_cancel_taker_order_internal">cancel_taker_order_internal</a>(
             market,
             user_addr,
             limit_price,
@@ -797,34 +797,30 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     cancellation_reason: OrderCancellationReason,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ) {
-    <b>let</b> remaining_size = maker_order.get_remaining_size_from_match_details();
-    <b>let</b> price = maker_order.get_price_from_match_details();
-    <b>let</b> is_bid = maker_order.is_bid_from_match_details();
-    <b>let</b> cancelled_size = unsettled_size + remaining_size;
+    // Get the order state before cancellation <b>to</b> track what's being cancelled
+    <b>let</b> order_before_cancel = market.get_order_book().get_bulk_order(maker_address);
+    <b>let</b> (
+        order_before_cancel_request,
+        _order_id,
+        _unique_priority_idx,
+        _creation_time_micros,
+    ) = order_before_cancel.destroy_bulk_order();
+    <b>let</b> (_account, order_sequence_number, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, _metadata) = order_before_cancel_request.destroy_bulk_order_request();
 
-    // Cancel only at the specific price level instead of cancelling the entire bulk order
-    <b>let</b> (_actual_cancelled_size, modified_order) = <b>if</b> (remaining_size != 0) {
-        market.get_order_book_mut().cancel_bulk_order_at_price(maker_address, price, is_bid)
-    } <b>else</b> {
-        // If remaining size is 0, just get the current order state for <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> emission
-        (0, market.get_order_book().get_bulk_order(maker_address))
+    <b>let</b> remaining_size = maker_order.get_remaining_size_from_match_details();
+    <b>if</b> (remaining_size != 0) {
+        // For bulk orders, we cancel all orders for the user
+        market.get_order_book_mut().cancel_bulk_order(maker_address);
     };
 
+    <b>let</b> cancelled_size = unsettled_size + remaining_size;
     callbacks.cleanup_bulk_order_at_price(
-        maker_address, order_id, is_bid, price, cancelled_size
+        maker_address, order_id, maker_order.is_bid_from_match_details(), maker_order.get_price_from_match_details(), cancelled_size
     );
 
-    // Emit <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> <b>with</b> the cancelled price level
+    <b>let</b> modified_order = market.get_order_book().get_bulk_order(maker_address);
     <b>let</b> (modified_order_request, _order_id, _unique_priority_idx, _creation_time_micros) = modified_order.destroy_bulk_order();
-    <b>let</b> (_account, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, _metadata) = modified_order_request.destroy_bulk_order_request();
-
-    // Build cancelled price/size vectors for the specific level that was cancelled
-    <b>let</b> (cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes) = <b>if</b> (is_bid) {
-        (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[price], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[cancelled_size], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[])
-    } <b>else</b> {
-        (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[price], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[cancelled_size])
-    };
-
+    <b>let</b> (_account, _order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, _metadata) = modified_order_request.destroy_bulk_order_request();
     market.emit_event_for_bulk_order_modified(
         order_id,
         order_sequence_number,
@@ -929,14 +925,14 @@ Places a market order - The order is guaranteed to be a taker order and will be 
 
 </details>
 
-<a id="0x7_order_placement_cancel_single_order_internal"></a>
+<a id="0x7_order_placement_cancel_taker_order_internal"></a>
 
-## Function `cancel_single_order_internal`
+## Function `cancel_taker_order_internal`
 
 
 
 <pre><code>#[lint::skip(#[needless_mutable_reference])]
-<b>fun</b> <a href="order_placement.md#0x7_order_placement_cancel_single_order_internal">cancel_single_order_internal</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user_addr: <b>address</b>, limit_price: u64, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, orig_size: u64, size_delta: u64, fill_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, match_count: u32, is_bid: bool, is_taker: bool, cancel_reason: <a href="market_types.md#0x7_market_types_OrderCancellationReason">market_types::OrderCancellationReason</a>, cancel_details: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, emit_order_open: bool, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;, callback_results: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;R&gt;): <a href="order_placement.md#0x7_order_placement_OrderMatchResult">order_placement::OrderMatchResult</a>&lt;R&gt;
+<b>fun</b> <a href="order_placement.md#0x7_order_placement_cancel_taker_order_internal">cancel_taker_order_internal</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user_addr: <b>address</b>, limit_price: u64, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, orig_size: u64, size_delta: u64, fill_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, match_count: u32, is_bid: bool, is_taker: bool, cancel_reason: <a href="market_types.md#0x7_market_types_OrderCancellationReason">market_types::OrderCancellationReason</a>, cancel_details: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, emit_order_open: bool, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;, callback_results: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;R&gt;): <a href="order_placement.md#0x7_order_placement_OrderMatchResult">order_placement::OrderMatchResult</a>&lt;R&gt;
 </code></pre>
 
 
@@ -945,7 +941,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="order_placement.md#0x7_order_placement_cancel_single_order_internal">cancel_single_order_internal</a>&lt;M: store + <b>copy</b> + drop, R: store + <b>copy</b> + drop&gt;(
+<pre><code><b>fun</b> <a href="order_placement.md#0x7_order_placement_cancel_taker_order_internal">cancel_taker_order_internal</a>&lt;M: store + <b>copy</b> + drop, R: store + <b>copy</b> + drop&gt;(
     market: &<b>mut</b> Market&lt;M&gt;,
     user_addr: <b>address</b>,
     limit_price: u64,
@@ -1123,7 +1119,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     <b>let</b> dead_mans_switch_enabled = market.is_dead_mans_switch_enabled();
     <b>if</b> (dead_mans_switch_enabled && !is_order_valid(market.get_dead_mans_switch_tracker(), user_addr, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>())) {
         <b>let</b> taker_cancellation_reason = std::string::utf8(b"Order invalidated due <b>to</b> dead man's switch expiry");
-        <a href="order_placement.md#0x7_order_placement_cancel_single_order_internal">cancel_single_order_internal</a>(
+        <a href="order_placement.md#0x7_order_placement_cancel_taker_order_internal">cancel_taker_order_internal</a>(
             market,
             user_addr,
             price,
@@ -1281,7 +1277,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         );
     };
     <b>let</b> taker_cancellation_reason = <b>if</b> (taker_cancellation_reason_str.is_some()) {
-        <a href="order_placement.md#0x7_order_placement_cancel_single_order_internal">cancel_single_order_internal</a>(
+        <a href="order_placement.md#0x7_order_placement_cancel_taker_order_internal">cancel_taker_order_internal</a>(
             market,
             user_addr,
             price,
@@ -1418,7 +1414,7 @@ is done before calling this function if needed.
         remaining_size,
     );
     <b>if</b> (!validation_result.is_validation_result_valid()) {
-        <b>return</b> <a href="order_placement.md#0x7_order_placement_cancel_single_order_internal">cancel_single_order_internal</a>(
+        <b>return</b> <a href="order_placement.md#0x7_order_placement_cancel_taker_order_internal">cancel_taker_order_internal</a>(
             market,
             user_addr,
             limit_price,
@@ -1444,7 +1440,7 @@ is done before calling this function if needed.
     <b>if</b> (client_order_id.is_some()) {
         <b>if</b> (market.get_order_book().client_order_id_exists(user_addr, client_order_id.destroy_some())) {
             // Client provided a client order id that already <b>exists</b> in the order book
-            <b>return</b> <a href="order_placement.md#0x7_order_placement_cancel_single_order_internal">cancel_single_order_internal</a>(
+            <b>return</b> <a href="order_placement.md#0x7_order_placement_cancel_taker_order_internal">cancel_taker_order_internal</a>(
                 market,
                 user_addr,
                 limit_price,
@@ -1472,7 +1468,7 @@ is done before calling this function if needed.
             user_addr,
             client_order_id.destroy_some()
         )) {
-            <b>return</b> <a href="order_placement.md#0x7_order_placement_cancel_single_order_internal">cancel_single_order_internal</a>(
+            <b>return</b> <a href="order_placement.md#0x7_order_placement_cancel_taker_order_internal">cancel_taker_order_internal</a>(
                 market,
                 user_addr,
                 limit_price,
@@ -1522,7 +1518,7 @@ is done before calling this function if needed.
     // NOTE: We should always <b>use</b> is_taker: <b>true</b> for this order past this
     // point so that indexer can consistently track the order's status
     <b>if</b> (time_in_force == post_only()) {
-        <b>return</b> <a href="order_placement.md#0x7_order_placement_cancel_single_order_internal">cancel_single_order_internal</a>(
+        <b>return</b> <a href="order_placement.md#0x7_order_placement_cancel_taker_order_internal">cancel_taker_order_internal</a>(
             market,
             user_addr,
             limit_price,
@@ -1624,7 +1620,7 @@ is done before calling this function if needed.
             market.is_taker_order(limit_price, is_bid, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>());
         <b>if</b> (!is_taker_order) {
             <b>if</b> (time_in_force == immediate_or_cancel()) {
-                <b>return</b> <a href="order_placement.md#0x7_order_placement_cancel_single_order_internal">cancel_single_order_internal</a>(
+                <b>return</b> <a href="order_placement.md#0x7_order_placement_cancel_taker_order_internal">cancel_taker_order_internal</a>(
                     market,
                     user_addr,
                     limit_price,
@@ -1670,7 +1666,7 @@ is done before calling this function if needed.
 
         <b>if</b> (match_count &gt;= max_match_limit) {
             <b>if</b> (cancel_on_match_limit) {
-                <b>return</b> <a href="order_placement.md#0x7_order_placement_cancel_single_order_internal">cancel_single_order_internal</a>(
+                <b>return</b> <a href="order_placement.md#0x7_order_placement_cancel_taker_order_internal">cancel_taker_order_internal</a>(
                     market,
                     user_addr,
                     limit_price,

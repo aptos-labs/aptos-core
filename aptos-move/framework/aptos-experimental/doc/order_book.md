@@ -11,7 +11,6 @@
 -  [Function `client_order_id_exists`](#0x7_order_book_client_order_id_exists)
 -  [Function `get_single_order_metadata`](#0x7_order_book_get_single_order_metadata)
 -  [Function `get_order_id_by_client_id`](#0x7_order_book_get_order_id_by_client_id)
--  [Function `is_single_order_active`](#0x7_order_book_is_single_order_active)
 -  [Function `get_single_order`](#0x7_order_book_get_single_order)
 -  [Function `get_single_remaining_size`](#0x7_order_book_get_single_remaining_size)
 -  [Function `cancel_single_order`](#0x7_order_book_cancel_single_order)
@@ -24,16 +23,13 @@
 -  [Function `take_ready_time_based_orders`](#0x7_order_book_take_ready_time_based_orders)
 -  [Function `best_bid_price`](#0x7_order_book_best_bid_price)
 -  [Function `best_ask_price`](#0x7_order_book_best_ask_price)
--  [Function `get_mid_price`](#0x7_order_book_get_mid_price)
--  [Function `get_slippage_price`](#0x7_order_book_get_slippage_price)
--  [Function `get_bulk_order_remaining_size`](#0x7_order_book_get_bulk_order_remaining_size)
 -  [Function `is_taker_order`](#0x7_order_book_is_taker_order)
 -  [Function `get_single_match_for_taker`](#0x7_order_book_get_single_match_for_taker)
 -  [Function `reinsert_order`](#0x7_order_book_reinsert_order)
+-  [Function `get_bulk_order_remaining_size`](#0x7_order_book_get_bulk_order_remaining_size)
 -  [Function `place_bulk_order`](#0x7_order_book_place_bulk_order)
 -  [Function `get_bulk_order`](#0x7_order_book_get_bulk_order)
 -  [Function `cancel_bulk_order`](#0x7_order_book_cancel_bulk_order)
--  [Function `cancel_bulk_order_at_price`](#0x7_order_book_cancel_bulk_order_at_price)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
@@ -148,7 +144,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_client_order_id_exists">client_order_id_exists</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): bool
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_client_order_id_exists">client_order_id_exists</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): bool
 </code></pre>
 
 
@@ -157,7 +153,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_client_order_id_exists">client_order_id_exists</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_client_order_id_exists">client_order_id_exists</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, client_order_id: String
 ): bool {
     self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.<a href="order_book.md#0x7_order_book_client_order_id_exists">client_order_id_exists</a>(order_creator, client_order_id)
@@ -174,7 +170,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_single_order_metadata">get_single_order_metadata</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_get_single_order_metadata">get_single_order_metadata</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;M&gt;
 </code></pre>
 
 
@@ -183,7 +179,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_single_order_metadata">get_single_order_metadata</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_get_single_order_metadata">get_single_order_metadata</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_id: OrderId
 ): Option&lt;M&gt; {
     self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.get_order_metadata(order_id)
@@ -200,7 +196,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_order_id_by_client_id">get_order_id_by_client_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_get_order_id_by_client_id">get_order_id_by_client_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>&gt;
 </code></pre>
 
 
@@ -209,36 +205,10 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_order_id_by_client_id">get_order_id_by_client_id</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_get_order_id_by_client_id">get_order_id_by_client_id</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, client_order_id: String
 ): Option&lt;OrderId&gt; {
     self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.<a href="order_book.md#0x7_order_book_get_order_id_by_client_id">get_order_id_by_client_id</a>(order_creator, client_order_id)
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_order_book_is_single_order_active"></a>
-
-## Function `is_single_order_active`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_is_single_order_active">is_single_order_active</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_is_single_order_active">is_single_order_active</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_id: OrderId
-): bool {
-    self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.is_active_order(order_id)
 }
 </code></pre>
 
@@ -252,7 +222,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_single_order">get_single_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_get_single_order">get_single_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;&gt;
 </code></pre>
 
 
@@ -261,7 +231,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_single_order">get_single_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_get_single_order">get_single_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_id: OrderId
 ): Option&lt;aptos_trading::single_order_types::OrderWithState&lt;M&gt;&gt; {
     self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.get_order(order_id)
@@ -278,7 +248,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_single_remaining_size">get_single_remaining_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>): u64
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_get_single_remaining_size">get_single_remaining_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>): u64
 </code></pre>
 
 
@@ -287,7 +257,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_single_remaining_size">get_single_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_get_single_remaining_size">get_single_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_id: OrderId
 ): u64 {
     self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.get_remaining_size(order_id)
@@ -515,7 +485,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_best_bid_price">best_bid_price</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_best_bid_price">best_bid_price</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
 </code></pre>
 
 
@@ -524,7 +494,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_best_bid_price">best_bid_price</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;): Option&lt;u64&gt; {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_best_bid_price">best_bid_price</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;): Option&lt;u64&gt; {
     self.price_time_idx.<a href="order_book.md#0x7_order_book_best_bid_price">best_bid_price</a>()
 }
 </code></pre>
@@ -539,7 +509,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_best_ask_price">best_ask_price</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_best_ask_price">best_ask_price</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
 </code></pre>
 
 
@@ -548,86 +518,8 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_best_ask_price">best_ask_price</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;): Option&lt;u64&gt; {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_best_ask_price">best_ask_price</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;): Option&lt;u64&gt; {
     self.price_time_idx.<a href="order_book.md#0x7_order_book_best_ask_price">best_ask_price</a>()
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_order_book_get_mid_price"></a>
-
-## Function `get_mid_price`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_mid_price">get_mid_price</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_mid_price">get_mid_price</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;): Option&lt;u64&gt; {
-    self.price_time_idx.<a href="order_book.md#0x7_order_book_get_mid_price">get_mid_price</a>()
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_order_book_get_slippage_price"></a>
-
-## Function `get_slippage_price`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_slippage_price">get_slippage_price</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, is_bid: bool, slippage_bps: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_slippage_price">get_slippage_price</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, is_bid: bool, slippage_bps: u64
-): Option&lt;u64&gt; {
-    self.price_time_idx.<a href="order_book.md#0x7_order_book_get_slippage_price">get_slippage_price</a>(is_bid, slippage_bps)
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_order_book_get_bulk_order_remaining_size"></a>
-
-## Function `get_bulk_order_remaining_size`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_bulk_order_remaining_size">get_bulk_order_remaining_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, is_bid: bool): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_bulk_order_remaining_size">get_bulk_order_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;,
-    order_creator: <b>address</b>,
-    is_bid: bool
-): u64 {
-    self.<a href="bulk_order_book.md#0x7_bulk_order_book">bulk_order_book</a>.get_remaining_size(order_creator, is_bid)
 }
 </code></pre>
 
@@ -738,6 +630,34 @@ Checks if the order is a taker order i.e., matched immediately with the active o
 
 </details>
 
+<a id="0x7_order_book_get_bulk_order_remaining_size"></a>
+
+## Function `get_bulk_order_remaining_size`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_get_bulk_order_remaining_size">get_bulk_order_remaining_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, is_bid: bool): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_get_bulk_order_remaining_size">get_bulk_order_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;,
+    order_creator: <b>address</b>,
+    is_bid: bool
+): u64 {
+    self.<a href="bulk_order_book.md#0x7_bulk_order_book">bulk_order_book</a>.get_remaining_size(order_creator, is_bid)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x7_order_book_place_bulk_order"></a>
 
 ## Function `place_bulk_order`
@@ -812,40 +732,6 @@ Checks if the order is a taker order i.e., matched immediately with the active o
     self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>
 ): BulkOrder&lt;M&gt; {
     self.<a href="bulk_order_book.md#0x7_bulk_order_book">bulk_order_book</a>.<a href="order_book.md#0x7_order_book_cancel_bulk_order">cancel_bulk_order</a>(&<b>mut</b> self.price_time_idx, order_creator)
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_order_book_cancel_bulk_order_at_price"></a>
-
-## Function `cancel_bulk_order_at_price`
-
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_cancel_bulk_order_at_price">cancel_bulk_order_at_price</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, price: u64, is_bid: bool): (u64, <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_cancel_bulk_order_at_price">cancel_bulk_order_at_price</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;,
-    order_creator: <b>address</b>,
-    price: u64,
-    is_bid: bool
-): (u64, BulkOrder&lt;M&gt;) {
-    self.<a href="bulk_order_book.md#0x7_bulk_order_book">bulk_order_book</a>.<a href="order_book.md#0x7_order_book_cancel_bulk_order_at_price">cancel_bulk_order_at_price</a>(
-        &<b>mut</b> self.price_time_idx,
-        order_creator,
-        price,
-        is_bid
-    )
 }
 </code></pre>
 

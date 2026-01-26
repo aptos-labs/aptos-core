@@ -113,11 +113,11 @@ It it the caller's responsibility to ensure that the account is authorized to ca
 - user: The signer of the user whose order should be cancelled
 - order_id: The order ID of the order to cancel
 - cancellation_reason: The reason for cancellation
-- cancel_details: String description of the cancellation
+- cancel_reason: String description of the cancellation
 - callbacks: The market clearinghouse callbacks for cleanup operations
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_operations.md#0x7_order_operations_cancel_order">cancel_order</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>, emit_event: bool, cancellation_reason: <a href="market_types.md#0x7_market_types_OrderCancellationReason">market_types::OrderCancellationReason</a>, cancel_details: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;): <a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="order_operations.md#0x7_order_operations_cancel_order">cancel_order</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>, emit_event: bool, cancellation_reason: <a href="market_types.md#0x7_market_types_OrderCancellationReason">market_types::OrderCancellationReason</a>, cancel_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;): <a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;
 </code></pre>
 
 
@@ -132,11 +132,11 @@ It it the caller's responsibility to ensure that the account is authorized to ca
     order_id: OrderId,
     emit_event: bool,
     cancellation_reason: <a href="market_types.md#0x7_market_types_OrderCancellationReason">market_types::OrderCancellationReason</a>,
-    cancel_details: String,
+    cancel_reason: String,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ): SingleOrder&lt;M&gt; {
     <b>let</b> order = market.get_order_book_mut().cancel_single_order(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id);
-    <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>(market, order, emit_event, cancellation_reason, cancel_details, callbacks);
+    <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>(market, order, emit_event, cancellation_reason, cancel_reason, callbacks);
     order
 }
 </code></pre>

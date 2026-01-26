@@ -2541,7 +2541,7 @@ enum <a href="market_types.md#0x7_market_types_BulkOrderRejectionEvent">BulkOrde
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_decrease_order_size">decrease_order_size</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;, order_info: <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">market_clearinghouse_order_info::MarketClearinghouseOrderInfo</a>&lt;M&gt;, size: u64)
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_decrease_order_size">decrease_order_size</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;, order_info: <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">market_clearinghouse_order_info::MarketClearinghouseOrderInfo</a>&lt;M&gt;, new_size: u64)
 </code></pre>
 
 
@@ -2553,8 +2553,8 @@ enum <a href="market_types.md#0x7_market_types_BulkOrderRejectionEvent">BulkOrde
 <pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_decrease_order_size">decrease_order_size</a>&lt;M: store + <b>copy</b> + drop, R: store + <b>copy</b> + drop&gt;(
     self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">MarketClearinghouseCallbacks</a>&lt;M, R&gt;,
     order_info: MarketClearinghouseOrderInfo&lt;M&gt;,
-    size: u64) {
-    (self.decrease_order_size_f)(order_info, size)
+    new_size: u64) {
+    (self.decrease_order_size_f)(order_info, new_size)
 }
 </code></pre>
 

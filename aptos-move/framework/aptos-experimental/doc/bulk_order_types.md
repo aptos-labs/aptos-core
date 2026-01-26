@@ -78,7 +78,6 @@ ask_sizes
 -  [Enum `BulkOrder`](#0x7_bulk_order_types_BulkOrder)
     -  [Fields:](#@Fields:_8)
 -  [Enum `BulkOrderPlaceResponse`](#0x7_bulk_order_types_BulkOrderPlaceResponse)
--  [Enum `BulkOrderRequestResponse`](#0x7_bulk_order_types_BulkOrderRequestResponse)
 -  [Constants](#@Constants_9)
 -  [Function `trim_start`](#0x7_bulk_order_types_trim_start)
 -  [Function `new_bulk_order`](#0x7_bulk_order_types_new_bulk_order)
@@ -407,45 +406,6 @@ both original and remaining sizes for tracking purposes.
 
 </details>
 
-<a id="0x7_bulk_order_types_BulkOrderRequestResponse"></a>
-
-## Enum `BulkOrderRequestResponse`
-
-
-
-<pre><code>enum <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrderRequestResponse">BulkOrderRequestResponse</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> <b>copy</b>, drop
-</code></pre>
-
-
-
-<details>
-<summary>Variants</summary>
-
-
-<details>
-<summary>V1</summary>
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>request: <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrderRequest">bulk_order_types::BulkOrderRequest</a>&lt;M&gt;</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-</details>
-
-</details>
-
 <a id="@Constants_9"></a>
 
 ## Constants
@@ -541,11 +501,40 @@ both original and remaining sizes for tracking purposes.
 
 
 
+<a id="0x7_bulk_order_types_E_BULK_ORDER_DEPTH_EXCEEDED"></a>
+
+
+
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x7_bulk_order_types_E_BULK_ORDER_DEPTH_EXCEEDED">E_BULK_ORDER_DEPTH_EXCEEDED</a>: u64 = 14;
+</code></pre>
+
+
+
 <a id="0x7_bulk_order_types_E_EMPTY_ORDER"></a>
 
 
 
 <pre><code><b>const</b> <a href="bulk_order_types.md#0x7_bulk_order_types_E_EMPTY_ORDER">E_EMPTY_ORDER</a>: u64 = 9;
+</code></pre>
+
+
+
+<a id="0x7_bulk_order_types_E_INVALID_SEQUENCE_NUMBER"></a>
+
+
+
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x7_bulk_order_types_E_INVALID_SEQUENCE_NUMBER">E_INVALID_SEQUENCE_NUMBER</a>: u64 = 15;
+</code></pre>
+
+
+
+<a id="0x7_bulk_order_types_MAX_BULK_ORDER_DEPTH_PER_SIDE"></a>
+
+Maximum number of price levels per side (bid or ask) in a bulk order.
+This limit prevents gas DoS scenarios when cancelling bulk orders.
+
+
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x7_bulk_order_types_MAX_BULK_ORDER_DEPTH_PER_SIDE">MAX_BULK_ORDER_DEPTH_PER_SIDE</a>: u64 = 30;
 </code></pre>
 
 
@@ -699,8 +688,10 @@ A <code><a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrderRequest">Bulk
 
 ### Aborts:
 
+- If sequence_number is 0 (reserved to avoid ambiguity in events)
 - If bid_prices and bid_sizes have different lengths
 - If ask_prices and ask_sizes have different lengths
+- If bid_prices or ask_prices exceeds MAX_BULK_ORDER_DEPTH_PER_SIDE (30) levels
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_types_new_bulk_order_request">new_bulk_order_request</a>&lt;M: <b>copy</b>, drop, store&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, sequence_number: u64, bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, metadata: M): <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrderRequest">bulk_order_types::BulkOrderRequest</a>&lt;M&gt;
@@ -721,6 +712,9 @@ A <code><a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrderRequest">Bulk
     ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     metadata: M
 ): <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrderRequest">BulkOrderRequest</a>&lt;M&gt; {
+    // Sequence number 0 is reserved <b>to</b> avoid ambiguity in events
+    <b>assert</b>!(sequence_number &gt; 0, <a href="bulk_order_types.md#0x7_bulk_order_types_E_INVALID_SEQUENCE_NUMBER">E_INVALID_SEQUENCE_NUMBER</a>);
+
     <b>let</b> num_bids = bid_prices.length();
     <b>let</b> num_asks = ask_prices.length();
 
@@ -728,6 +722,9 @@ A <code><a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrderRequest">Bulk
     <b>assert</b>!(num_bids == bid_sizes.length(), <a href="bulk_order_types.md#0x7_bulk_order_types_E_BID_LENGTH_MISMATCH">E_BID_LENGTH_MISMATCH</a>);
     <b>assert</b>!(num_asks == ask_sizes.length(), <a href="bulk_order_types.md#0x7_bulk_order_types_E_ASK_LENGTH_MISMATCH">E_ASK_LENGTH_MISMATCH</a>);
     <b>assert</b>!(num_bids &gt; 0 || num_asks &gt; 0, <a href="bulk_order_types.md#0x7_bulk_order_types_E_EMPTY_ORDER">E_EMPTY_ORDER</a>);
+    // Depth validation <b>to</b> prevent gas DoS when cancelling
+    <b>assert</b>!(num_bids &lt;= <a href="bulk_order_types.md#0x7_bulk_order_types_MAX_BULK_ORDER_DEPTH_PER_SIDE">MAX_BULK_ORDER_DEPTH_PER_SIDE</a>, <a href="bulk_order_types.md#0x7_bulk_order_types_E_BULK_ORDER_DEPTH_EXCEEDED">E_BULK_ORDER_DEPTH_EXCEEDED</a>);
+    <b>assert</b>!(num_asks &lt;= <a href="bulk_order_types.md#0x7_bulk_order_types_MAX_BULK_ORDER_DEPTH_PER_SIDE">MAX_BULK_ORDER_DEPTH_PER_SIDE</a>, <a href="bulk_order_types.md#0x7_bulk_order_types_E_BULK_ORDER_DEPTH_EXCEEDED">E_BULK_ORDER_DEPTH_EXCEEDED</a>);
     <b>assert</b>!(<a href="bulk_order_types.md#0x7_bulk_order_types_validate_not_zero_sizes">validate_not_zero_sizes</a>(&bid_sizes), <a href="bulk_order_types.md#0x7_bulk_order_types_E_BID_SIZE_ZERO">E_BID_SIZE_ZERO</a>);
     <b>assert</b>!(<a href="bulk_order_types.md#0x7_bulk_order_types_validate_not_zero_sizes">validate_not_zero_sizes</a>(&ask_sizes), <a href="bulk_order_types.md#0x7_bulk_order_types_E_ASK_SIZE_ZERO">E_ASK_SIZE_ZERO</a>);
     <b>assert</b>!(<a href="bulk_order_types.md#0x7_bulk_order_types_validate_price_ordering">validate_price_ordering</a>(&bid_prices, <b>true</b>), <a href="bulk_order_types.md#0x7_bulk_order_types_E_BID_ORDER_INVALID">E_BID_ORDER_INVALID</a>);

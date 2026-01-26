@@ -66,7 +66,7 @@ module aptos_experimental::order_book {
         self.single_order_book.get_remaining_size(order_id)
     }
 
-    public(friend) fun cancel_single_order<M: store + copy + drop>(
+    public fun cancel_single_order<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_creator: address, order_id: OrderId
     ): SingleOrder<M> {
         self.single_order_book.cancel_order(&mut self.price_time_idx, order_creator, order_id)
@@ -84,7 +84,7 @@ module aptos_experimental::order_book {
         self.single_order_book.try_cancel_order_with_client_order_id(&mut self.price_time_idx, order_creator, client_order_id)
     }
 
-    public(friend) fun place_maker_order<M: store + copy + drop>(
+    public fun place_maker_order<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_req: SingleOrderRequest<M>
     ) {
         self.single_order_book.place_maker_or_pending_order(
@@ -128,7 +128,7 @@ module aptos_experimental::order_book {
     }
 
     /// Checks if the order is a taker order i.e., matched immediately with the active order book.
-    public(friend) fun is_taker_order<M: store + copy + drop>(
+    public fun is_taker_order<M: store + copy + drop>(
         self: &OrderBook<M>,
         price: u64,
         is_bid: bool,
@@ -140,7 +140,7 @@ module aptos_experimental::order_book {
         self.price_time_idx.is_taker_order(price, is_bid)
     }
 
-    public(friend) fun get_single_match_for_taker<M: store + copy + drop>(
+    public fun get_single_match_for_taker<M: store + copy + drop>(
         self: &mut OrderBook<M>,
         price: u64,
         size: u64,
