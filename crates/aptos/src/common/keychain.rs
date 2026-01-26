@@ -6,15 +6,18 @@
 //! This module provides platform-native secure storage for private keys:
 //! - macOS: Keychain Access
 //! - Windows: Credential Manager
-//! - Linux: Secret Service (via D-Bus)
 //!
 //! Using the system keychain provides better security than file-based encryption
 //! because the credentials are protected by the OS security mechanisms and can
 //! integrate with biometrics, secure enclaves, etc.
+//!
+//! Note: Linux Secret Service support is not currently available due to build
+//! dependency requirements. Use passphrase encryption instead on Linux.
 
 use crate::common::types::CliError;
 
 /// The service name used to store credentials in the system keychain
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 const KEYCHAIN_SERVICE: &str = "aptos-cli";
 
 /// Check if the system keychain is available on this platform
@@ -22,11 +25,7 @@ const KEYCHAIN_SERVICE: &str = "aptos-cli";
 /// Currently supports:
 /// - macOS: Keychain Access
 /// - Windows: Credential Manager
-/// - Linux: Not currently supported (Secret Service requires additional setup)
 pub fn is_keychain_available() -> bool {
-    // On Linux, the keyring crate requires Secret Service (D-Bus) which may not be available
-    // in all environments. For now, we only support macOS and Windows where the system
-    // keychain is reliably available.
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     {
         // Try to create an entry to check if the keychain is available
@@ -40,8 +39,7 @@ pub fn is_keychain_available() -> bool {
 
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
-        // On Linux and other platforms, return false for now
-        // Linux Secret Service support could be added in the future if there's demand
+        // On Linux and other platforms, keychain is not supported
         false
     }
 }
@@ -49,6 +47,7 @@ pub fn is_keychain_available() -> bool {
 /// Store a private key in the system keychain
 ///
 /// The key is stored as a hex-encoded string under the given profile name.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 pub fn store_private_key(profile_name: &str, private_key_bytes: &[u8]) -> Result<(), CliError> {
     let entry = keyring::Entry::new(KEYCHAIN_SERVICE, profile_name).map_err(|e| {
         CliError::UnexpectedError(format!("Failed to create keychain entry: {}", e))
@@ -62,9 +61,19 @@ pub fn store_private_key(profile_name: &str, private_key_bytes: &[u8]) -> Result
         .map_err(|e| CliError::UnexpectedError(format!("Failed to store key in keychain: {}", e)))
 }
 
+/// Store a private key in the system keychain (stub for unsupported platforms)
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+pub fn store_private_key(_profile_name: &str, _private_key_bytes: &[u8]) -> Result<(), CliError> {
+    Err(CliError::UnexpectedError(
+        "System keychain is not supported on this platform. Use passphrase encryption instead."
+            .to_string(),
+    ))
+}
+
 /// Retrieve a private key from the system keychain
 ///
 /// Returns the private key bytes for the given profile name.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 pub fn retrieve_private_key(profile_name: &str) -> Result<Vec<u8>, CliError> {
     let entry = keyring::Entry::new(KEYCHAIN_SERVICE, profile_name).map_err(|e| {
         CliError::UnexpectedError(format!("Failed to access keychain entry: {}", e))
@@ -87,7 +96,17 @@ pub fn retrieve_private_key(profile_name: &str) -> Result<Vec<u8>, CliError> {
     })
 }
 
+/// Retrieve a private key from the system keychain (stub for unsupported platforms)
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+pub fn retrieve_private_key(_profile_name: &str) -> Result<Vec<u8>, CliError> {
+    Err(CliError::UnexpectedError(
+        "System keychain is not supported on this platform. Use passphrase encryption instead."
+            .to_string(),
+    ))
+}
+
 /// Delete a private key from the system keychain
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 pub fn delete_private_key(profile_name: &str) -> Result<(), CliError> {
     let entry = keyring::Entry::new(KEYCHAIN_SERVICE, profile_name).map_err(|e| {
         CliError::UnexpectedError(format!("Failed to access keychain entry: {}", e))
@@ -102,7 +121,17 @@ pub fn delete_private_key(profile_name: &str) -> Result<(), CliError> {
     })
 }
 
+/// Delete a private key from the system keychain (stub for unsupported platforms)
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+pub fn delete_private_key(_profile_name: &str) -> Result<(), CliError> {
+    Err(CliError::UnexpectedError(
+        "System keychain is not supported on this platform. Use passphrase encryption instead."
+            .to_string(),
+    ))
+}
+
 /// Check if a private key exists in the system keychain for the given profile
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 pub fn has_private_key(profile_name: &str) -> bool {
     let entry = match keyring::Entry::new(KEYCHAIN_SERVICE, profile_name) {
         Ok(e) => e,
@@ -112,7 +141,14 @@ pub fn has_private_key(profile_name: &str) -> bool {
     entry.get_password().is_ok()
 }
 
+/// Check if a private key exists in the system keychain (stub for unsupported platforms)
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+pub fn has_private_key(_profile_name: &str) -> bool {
+    false
+}
+
 #[cfg(test)]
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 mod tests {
     use super::*;
 
