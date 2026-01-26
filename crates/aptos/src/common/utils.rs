@@ -434,6 +434,117 @@ pub fn read_line(input_name: &'static str) -> CliTypedResult<String> {
     Ok(input_buf)
 }
 
+/// Reads a passphrase from the user without echoing it to the terminal.
+/// Falls back to regular input if terminal is not interactive.
+pub fn read_passphrase(prompt: &str) -> CliTypedResult<String> {
+    use std::io::{self, Write};
+
+    eprint!("{}", prompt);
+    io::stderr().flush().map_err(|e| CliError::IO("stderr".to_string(), e))?;
+
+    // Try to read without echo first (Unix only for now)
+    #[cfg(unix)]
+    {
+        if atty::is(atty::Stream::Stdin) {
+            // Use rpassword-like behavior
+            return read_passphrase_no_echo();
+        }
+    }
+
+    // Fall back to regular read for non-interactive or non-Unix
+    let mut passphrase = String::new();
+    io::stdin()
+        .read_line(&mut passphrase)
+        .map_err(|e| CliError::IO("passphrase".to_string(), e))?;
+
+    // Remove trailing newline
+    if passphrase.ends_with('\n') {
+        passphrase.pop();
+        if passphrase.ends_with('\r') {
+            passphrase.pop();
+        }
+    }
+
+    Ok(passphrase)
+}
+
+#[cfg(unix)]
+fn read_passphrase_no_echo() -> CliTypedResult<String> {
+    use std::io::{self, BufRead, Write};
+    use std::os::unix::io::AsRawFd;
+
+    let stdin = io::stdin();
+    let fd = stdin.as_raw_fd();
+
+    // Get current terminal settings
+    let mut termios = unsafe {
+        let mut termios = std::mem::zeroed();
+        if libc::tcgetattr(fd, &mut termios) != 0 {
+            return Err(CliError::UnexpectedError(
+                "Failed to get terminal attributes".to_string(),
+            ));
+        }
+        termios
+    };
+
+    // Disable echo
+    let old_termios = termios;
+    termios.c_lflag &= !libc::ECHO;
+
+    unsafe {
+        if libc::tcsetattr(fd, libc::TCSANOW, &termios) != 0 {
+            return Err(CliError::UnexpectedError(
+                "Failed to set terminal attributes".to_string(),
+            ));
+        }
+    }
+
+    // Read the passphrase
+    let mut passphrase = String::new();
+    let result = stdin.lock().read_line(&mut passphrase);
+
+    // Restore terminal settings
+    unsafe {
+        libc::tcsetattr(fd, libc::TCSANOW, &old_termios);
+    }
+
+    // Print newline since echo was disabled
+    eprintln!();
+
+    result.map_err(|e| CliError::IO("passphrase".to_string(), e))?;
+
+    // Remove trailing newline
+    if passphrase.ends_with('\n') {
+        passphrase.pop();
+        if passphrase.ends_with('\r') {
+            passphrase.pop();
+        }
+    }
+
+    Ok(passphrase)
+}
+
+/// Prompts the user for a passphrase with confirmation for new passphrases.
+pub fn prompt_passphrase_with_confirmation(prompt: &str) -> CliTypedResult<String> {
+    let passphrase = read_passphrase(prompt)?;
+
+    if passphrase.is_empty() {
+        return Err(CliError::CommandArgumentError(
+            "Passphrase cannot be empty".to_string(),
+        ));
+    }
+
+    let confirm = read_passphrase("Confirm passphrase: ")?;
+
+    if passphrase != confirm {
+        return Err(CliError::CommandArgumentError(
+            "Passphrases do not match".to_string(),
+        ));
+    }
+
+    Ok(passphrase)
+}
+
 /// Lists the content of a directory
 pub fn read_dir_files(
     path: &Path,

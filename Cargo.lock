@@ -306,6 +306,7 @@ dependencies = [
 name = "aptos"
 version = "7.14.1"
 dependencies = [
+ "aes-gcm",
  "anyhow",
  "aptos-api-types",
  "aptos-backup-cli",
@@ -346,6 +347,7 @@ dependencies = [
  "aptos-vm-types",
  "aptos-workspace-server",
  "async-trait",
+ "atty",
  "backoff",
  "base64 0.13.1",
  "bcs 0.1.4",
@@ -363,6 +365,7 @@ dependencies = [
  "indoc",
  "itertools 0.13.0",
  "legacy-move-compiler",
+ "libc",
  "maplit",
  "move-asm",
  "move-binary-format",
@@ -384,6 +387,7 @@ dependencies = [
  "move-vm-runtime",
  "open",
  "pathsearch",
+ "pbkdf2 0.12.2",
  "poem",
  "processor",
  "rand 0.7.3",
@@ -394,6 +398,7 @@ dependencies = [
  "serde_json",
  "serde_yaml 0.8.26",
  "set_env",
+ "sha2 0.10.8",
  "shadow-rs",
  "tempfile",
  "thiserror 1.0.69",
@@ -14270,6 +14275,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "password-hash"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "346f04948ba92c43e8469c1ee6736c7563d71012b17d40745260fe106aac2166"
+dependencies = [
+ "base64ct",
+ "rand_core 0.6.4",
+ "subtle",
+]
+
+[[package]]
 name = "pasta_curves"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14344,7 +14360,7 @@ checksum = "83a0692ec44e4cf1ef28ca317f14f8f07da2d95ec3fa01f86e4467b725e60917"
 dependencies = [
  "digest 0.10.7",
  "hmac 0.12.1",
- "password-hash",
+ "password-hash 0.4.2",
  "sha2 0.10.8",
 ]
 
@@ -14356,6 +14372,8 @@ checksum = "f8ed6a7761f76e3b9f92dfb0a60a6a6477c61024b775147ff0973a02653abaf2"
 dependencies = [
  "digest 0.10.7",
  "hmac 0.12.1",
+ "password-hash 0.5.0",
+ "sha2 0.10.8",
 ]
 
 [[package]]

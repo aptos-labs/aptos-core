@@ -33,6 +33,9 @@ pub enum ConfigTool {
     ShowPrivateKey(ShowPrivateKey),
     RenameProfile(RenameProfile),
     DeleteProfile(DeleteProfile),
+    EncryptCredentials(EncryptCredentials),
+    DecryptCredentials(DecryptCredentials),
+    RotatePassphrase(RotatePassphrase),
 }
 
 impl ConfigTool {
@@ -45,6 +48,9 @@ impl ConfigTool {
             ConfigTool::ShowGlobalConfig(tool) => tool.execute_serialized().await,
             ConfigTool::ShowPrivateKey(tool) => tool.execute_serialized().await,
             ConfigTool::ShowProfiles(tool) => tool.execute_serialized().await,
+            ConfigTool::EncryptCredentials(tool) => tool.execute_serialized().await,
+            ConfigTool::DecryptCredentials(tool) => tool.execute_serialized().await,
+            ConfigTool::RotatePassphrase(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -93,6 +99,14 @@ pub struct SetGlobalConfig {
     /// "no" runs cli with "--assume-no", default: "prompt"
     #[clap(long)]
     default_prompt_response: Option<PromptResponseType>,
+    /// A configuration for credential encryption at rest
+    ///
+    /// Option can be one of ["disabled", "enabled", "prompt"]
+    /// - "disabled": Do not encrypt credentials (default)
+    /// - "enabled": Always encrypt credentials when creating profiles
+    /// - "prompt": Ask whether to encrypt when creating profiles
+    #[clap(long)]
+    credential_encryption: Option<CredentialEncryptionType>,
 }
 
 #[async_trait]
@@ -114,12 +128,19 @@ impl CliCommand<GlobalConfig> for SetGlobalConfig {
             config.default_prompt_response = default_prompt_response;
         }
 
+        if let Some(credential_encryption) = self.credential_encryption {
+            config.credential_encryption = credential_encryption;
+        }
+
         config.save()?;
         config.display()
     }
 }
 
 /// Show the private key for the given profile
+///
+/// If the private key is encrypted, you will be prompted for the passphrase
+/// or it will use the APTOS_CLI_PASSPHRASE environment variable.
 #[derive(Parser, Debug)]
 pub struct ShowPrivateKey {
     /// Which profile's private key to show
@@ -138,7 +159,8 @@ impl CliCommand<String> for ShowPrivateKey {
 
         if let Some(profiles) = &config.profiles {
             if let Some(profile) = profiles.get(&self.profile.clone()) {
-                if let Some(private_key) = &profile.private_key {
+                // Use get_private_key() which handles both encrypted and plaintext keys
+                if let Some(private_key) = profile.get_private_key()? {
                     Ok(private_key.to_aip_80_string()?)
                 } else {
                     Err(CliError::CommandArgumentError(format!(
@@ -309,6 +331,208 @@ impl CliCommand<GlobalConfig> for ShowGlobalConfig {
     }
 }
 
+/// Encrypt the private key for a profile
+///
+/// This encrypts the private key stored in a profile using a passphrase.
+/// Once encrypted, the passphrase will be required to use the private key.
+/// You can set the APTOS_CLI_PASSPHRASE environment variable to avoid
+/// being prompted for the passphrase on each operation.
+#[derive(Parser, Debug)]
+pub struct EncryptCredentials {
+    /// Which profile's credentials to encrypt
+    #[clap(long, default_value = "default")]
+    profile: String,
+}
+
+#[async_trait]
+impl CliCommand<String> for EncryptCredentials {
+    fn command_name(&self) -> &'static str {
+        "EncryptCredentials"
+    }
+
+    async fn execute(self) -> CliTypedResult<String> {
+        use crate::common::utils::prompt_passphrase_with_confirmation;
+
+        let mut config = CliConfig::load(ConfigSearchMode::CurrentDir)?;
+
+        if let Some(profiles) = &mut config.profiles {
+            if let Some(profile) = profiles.get_mut(&self.profile) {
+                if profile.encrypted_private_key.is_some() {
+                    return Err(CliError::CommandArgumentError(format!(
+                        "Profile {} already has encrypted credentials",
+                        self.profile
+                    )));
+                }
+
+                if profile.private_key.is_none() {
+                    return Err(CliError::CommandArgumentError(format!(
+                        "Profile {} does not have a private key to encrypt",
+                        self.profile
+                    )));
+                }
+
+                let passphrase = prompt_passphrase_with_confirmation(
+                    "Enter passphrase to encrypt credentials: ",
+                )?;
+
+                profile.encrypt_private_key(&passphrase)?;
+
+                config.save().map_err(|err| {
+                    CliError::UnexpectedError(format!(
+                        "Unable to save config after encrypting credentials: {}",
+                        err,
+                    ))
+                })?;
+
+                Ok(format!(
+                    "Successfully encrypted credentials for profile {}",
+                    self.profile
+                ))
+            } else {
+                Err(CliError::CommandArgumentError(format!(
+                    "Profile {} does not exist",
+                    self.profile
+                )))
+            }
+        } else {
+            Err(CliError::CommandArgumentError(
+                "Config has no profiles".to_string(),
+            ))
+        }
+    }
+}
+
+/// Decrypt the private key for a profile
+///
+/// This decrypts an encrypted private key and stores it in plaintext.
+/// Note: Storing private keys in plaintext is less secure. Consider
+/// keeping credentials encrypted and using the APTOS_CLI_PASSPHRASE
+/// environment variable for automation use cases.
+#[derive(Parser, Debug)]
+pub struct DecryptCredentials {
+    /// Which profile's credentials to decrypt
+    #[clap(long, default_value = "default")]
+    profile: String,
+}
+
+#[async_trait]
+impl CliCommand<String> for DecryptCredentials {
+    fn command_name(&self) -> &'static str {
+        "DecryptCredentials"
+    }
+
+    async fn execute(self) -> CliTypedResult<String> {
+        use crate::common::utils::read_passphrase;
+
+        let mut config = CliConfig::load(ConfigSearchMode::CurrentDir)?;
+
+        if let Some(profiles) = &mut config.profiles {
+            if let Some(profile) = profiles.get_mut(&self.profile) {
+                if profile.encrypted_private_key.is_none() {
+                    return Err(CliError::CommandArgumentError(format!(
+                        "Profile {} does not have encrypted credentials",
+                        self.profile
+                    )));
+                }
+
+                let passphrase = read_passphrase("Enter passphrase to decrypt credentials: ")?;
+
+                profile.decrypt_private_key(&passphrase)?;
+
+                config.save().map_err(|err| {
+                    CliError::UnexpectedError(format!(
+                        "Unable to save config after decrypting credentials: {}",
+                        err,
+                    ))
+                })?;
+
+                Ok(format!(
+                    "Successfully decrypted credentials for profile {}",
+                    self.profile
+                ))
+            } else {
+                Err(CliError::CommandArgumentError(format!(
+                    "Profile {} does not exist",
+                    self.profile
+                )))
+            }
+        } else {
+            Err(CliError::CommandArgumentError(
+                "Config has no profiles".to_string(),
+            ))
+        }
+    }
+}
+
+/// Change the passphrase for encrypted credentials
+///
+/// This re-encrypts the private key with a new passphrase.
+#[derive(Parser, Debug)]
+pub struct RotatePassphrase {
+    /// Which profile's passphrase to rotate
+    #[clap(long, default_value = "default")]
+    profile: String,
+}
+
+#[async_trait]
+impl CliCommand<String> for RotatePassphrase {
+    fn command_name(&self) -> &'static str {
+        "RotatePassphrase"
+    }
+
+    async fn execute(self) -> CliTypedResult<String> {
+        use crate::common::utils::{prompt_passphrase_with_confirmation, read_passphrase};
+
+        let mut config = CliConfig::load(ConfigSearchMode::CurrentDir)?;
+
+        if let Some(profiles) = &mut config.profiles {
+            if let Some(profile) = profiles.get_mut(&self.profile) {
+                if profile.encrypted_private_key.is_none() {
+                    return Err(CliError::CommandArgumentError(format!(
+                        "Profile {} does not have encrypted credentials",
+                        self.profile
+                    )));
+                }
+
+                // Get the current passphrase
+                let current_passphrase =
+                    read_passphrase("Enter current passphrase: ")?;
+
+                // Decrypt with the current passphrase
+                profile.decrypt_private_key(&current_passphrase)?;
+
+                // Get the new passphrase
+                let new_passphrase =
+                    prompt_passphrase_with_confirmation("Enter new passphrase: ")?;
+
+                // Re-encrypt with the new passphrase
+                profile.encrypt_private_key(&new_passphrase)?;
+
+                config.save().map_err(|err| {
+                    CliError::UnexpectedError(format!(
+                        "Unable to save config after rotating passphrase: {}",
+                        err,
+                    ))
+                })?;
+
+                Ok(format!(
+                    "Successfully rotated passphrase for profile {}",
+                    self.profile
+                ))
+            } else {
+                Err(CliError::CommandArgumentError(format!(
+                    "Profile {} does not exist",
+                    self.profile
+                )))
+            }
+        } else {
+            Err(CliError::CommandArgumentError(
+                "Config has no profiles".to_string(),
+            ))
+        }
+    }
+}
+
 const GLOBAL_CONFIG_FILE: &str = "global_config.yaml";
 
 /// A global configuration for global settings related to a user
@@ -320,6 +544,46 @@ pub struct GlobalConfig {
     /// Prompt response type
     #[serde(default)]
     pub default_prompt_response: PromptResponseType,
+    /// Whether to encrypt credentials by default when creating new profiles
+    #[serde(default)]
+    pub credential_encryption: CredentialEncryptionType,
+}
+
+/// Configuration for credential encryption behavior
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, ValueEnum, Default, PartialEq, Eq)]
+pub enum CredentialEncryptionType {
+    /// Do not encrypt credentials (default for backward compatibility)
+    #[default]
+    Disabled,
+    /// Always encrypt credentials when creating or updating profiles
+    Enabled,
+    /// Prompt the user to choose whether to encrypt credentials
+    Prompt,
+}
+
+impl std::fmt::Display for CredentialEncryptionType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            CredentialEncryptionType::Disabled => "disabled",
+            CredentialEncryptionType::Enabled => "enabled",
+            CredentialEncryptionType::Prompt => "prompt",
+        })
+    }
+}
+
+impl FromStr for CredentialEncryptionType {
+    type Err = CliError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().trim() {
+            "disabled" | "off" | "no" | "false" => Ok(Self::Disabled),
+            "enabled" | "on" | "yes" | "true" => Ok(Self::Enabled),
+            "prompt" | "ask" => Ok(Self::Prompt),
+            _ => Err(CliError::CommandArgumentError(
+                "Invalid credential encryption type, must be one of [disabled, enabled, prompt]".to_string(),
+            )),
+        }
+    }
 }
 
 impl GlobalConfig {

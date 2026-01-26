@@ -710,6 +710,7 @@ primitive-types = { version = "0.12.2" }
 signature = "2.1.0"
 slh-dsa = "0.2.0-rc.1"
 pairing = "0.23"
+pbkdf2 = { version = "0.12.2", features = ["simple"] }
 parking_lot = "0.12.0"
 paste = "1.0.7"
 pathsearch = "0.2.0"

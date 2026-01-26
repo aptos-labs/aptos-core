@@ -53,6 +53,8 @@ aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
 aptos-workspace-server = { workspace = true }
 async-trait = { workspace = true }
+atty = { workspace = true }
+libc = { workspace = true }
 backoff = { workspace = true }
 base64 = { workspace = true }
 bcs = { workspace = true }
@@ -65,6 +67,9 @@ dashmap = { workspace = true }
 diesel = { workspace = true, features = ["postgres_backend"] }
 diesel-async = { workspace = true }
 dirs = { workspace = true }
+aes-gcm = { workspace = true }
+pbkdf2 = { workspace = true }
+sha2_0_10_6 = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 indoc = { workspace = true }

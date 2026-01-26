@@ -12,10 +12,11 @@ use crate::{
             DEFAULT_PROFILE,
         },
         utils::{
-            explorer_account_link, fund_account, prompt_yes_with_override, read_line,
-            strip_private_key_prefix,
+            explorer_account_link, fund_account, prompt_passphrase_with_confirmation,
+            prompt_yes_with_override, read_line, strip_private_key_prefix,
         },
     },
+    config::{CredentialEncryptionType, GlobalConfig},
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
 use aptos_ledger;
@@ -74,6 +75,15 @@ pub struct InitTool {
     pub(crate) prompt_options: PromptOptions,
     #[clap(flatten)]
     pub(crate) encoding_options: EncodingOptions,
+
+    /// Encrypt the private key with a passphrase for secure storage at rest.
+    ///
+    /// When enabled, you will be prompted for a passphrase that will be used
+    /// to encrypt the private key. The passphrase will be required whenever
+    /// the private key is needed. You can set the APTOS_CLI_PASSPHRASE
+    /// environment variable to avoid being prompted each time.
+    #[clap(long)]
+    pub encrypt_credentials: Option<bool>,
 }
 
 #[async_trait]
@@ -281,6 +291,23 @@ impl CliCommand<()> for InitTool {
         profile_config.public_key = Some(public_key);
         profile_config.account = Some(address);
 
+        // Handle credential encryption if a private key is present
+        if profile_config.private_key.is_some() {
+            let should_encrypt = self.should_encrypt_credentials()?;
+
+            if should_encrypt {
+                let passphrase = prompt_passphrase_with_confirmation(
+                    "Enter passphrase to encrypt credentials: ",
+                )?;
+                profile_config.encrypt_private_key(&passphrase)?;
+                eprintln!("Private key encrypted successfully.");
+                eprintln!(
+                    "Tip: Set the {} environment variable to avoid passphrase prompts.",
+                    crate::common::encryption::APTOS_CLI_PASSPHRASE_ENV
+                );
+            }
+        }
+
         // Create account if it doesn't exist (and there's a faucet)
         // Check if account exists
         let funded = matches!(client
@@ -377,6 +404,45 @@ impl CliCommand<()> for InitTool {
 }
 
 impl InitTool {
+    /// Determine whether credentials should be encrypted based on CLI args and global config
+    fn should_encrypt_credentials(&self) -> CliTypedResult<bool> {
+        // If explicitly specified on command line, use that
+        if let Some(encrypt) = self.encrypt_credentials {
+            return Ok(encrypt);
+        }
+
+        // Otherwise, check the global config
+        let global_config = GlobalConfig::load()?;
+
+        match global_config.credential_encryption {
+            CredentialEncryptionType::Disabled => Ok(false),
+            CredentialEncryptionType::Enabled => Ok(true),
+            CredentialEncryptionType::Prompt => {
+                if self.prompt_options.assume_yes {
+                    // Default to yes if --assume-yes is set
+                    Ok(true)
+                } else if self.prompt_options.assume_no {
+                    // Default to no if --assume-no is set
+                    Ok(false)
+                } else {
+                    // Prompt the user
+                    eprintln!(
+                        "\nWould you like to encrypt your private key with a passphrase?"
+                    );
+                    eprintln!(
+                        "Encryption adds security by protecting your key at rest."
+                    );
+                    eprintln!(
+                        "You can also set this globally with: aptos config set-global-config --credential-encryption enabled"
+                    );
+                    Ok(crate::common::utils::prompt_yes(
+                        "Encrypt credentials?",
+                    ))
+                }
+            },
+        }
+    }
+
     /// Custom network created, which requires a REST URL
     fn custom_network(&self, profile_config: &mut ProfileConfig) -> CliTypedResult<()> {
         // Rest Endpoint
