@@ -90,6 +90,7 @@ use move_core_types::{
 use move_coverage::{coverage_map, coverage_map::CoverageMap};
 use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
+    move_vm::SerializedReturnValues,
     tracing,
 };
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -1659,6 +1660,58 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
             &module_storage,
             &ChangeSetConfigs::unlimited_at_gas_feature_version(env.gas_feature_version()),
         ))
+    }
+
+    /// Execute a Move function bypassing visibility checks and return the serialized return values.
+    /// This allows calling private functions from tests.
+    ///
+    /// # Arguments
+    /// * `module_address` - The address where the module is deployed (e.g., AccountAddress::from_hex_literal("0x7"))
+    /// * `module_name` - The module name (e.g., "confidential_asset")
+    /// * `function_name` - Function name to call
+    /// * `type_params` - Type parameters for the function
+    /// * `args` - BCS-serialized arguments
+    pub fn exec_with_return_values(
+        &mut self,
+        module_address: AccountAddress,
+        module_name: &str,
+        function_name: &str,
+        type_params: Vec<TypeTag>,
+        args: Vec<Vec<u8>>,
+    ) -> Result<SerializedReturnValues, VMStatus> {
+        let env = AptosEnvironment::new(&self.state_store);
+        let resolver = self.state_store.as_move_resolver();
+        let vm = MoveVmExt::new(&env);
+
+        let module_storage = self.state_store.as_aptos_code_storage(&env);
+
+        let mut session = vm.new_session(&resolver, SessionId::void(), None);
+        let traversal_storage = TraversalStorage::new();
+        let mut traversal_context = TraversalContext::new(&traversal_storage);
+
+        let module_id = ModuleId::new(module_address, Identifier::new(module_name).unwrap());
+
+        let return_values = session
+            .execute_function_bypass_visibility(
+                &module_id,
+                &Self::name(function_name),
+                type_params,
+                args,
+                &mut UnmeteredGasMeter,
+                &mut traversal_context,
+                &module_storage,
+            )
+            .map_err(|e| e.into_vm_status())?;
+
+        let (write_set, events) = finish_session_assert_no_modules(
+            session,
+            &module_storage,
+            &ChangeSetConfigs::unlimited_at_gas_feature_version(env.gas_feature_version()),
+        );
+        self.state_store.apply_write_set(&write_set).unwrap();
+        self.event_store.extend(events);
+
+        Ok(return_values)
     }
 
     pub fn execute_view_function(
