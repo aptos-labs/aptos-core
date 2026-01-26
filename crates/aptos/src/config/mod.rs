@@ -682,18 +682,23 @@ impl CliCommand<String> for RemoveFromKeychain {
                     }
                 }
 
+                // Determine storage method before dropping the profile reference
+                let storage_method = if profile.encrypted_private_key.is_some() {
+                    "encrypted"
+                } else {
+                    "plaintext"
+                };
+
+                // Drop the mutable borrow before saving
+                drop(profile);
+                drop(profiles);
+
                 config.save().map_err(|err| {
                     CliError::UnexpectedError(format!(
                         "Unable to save config after removing credentials from keychain: {}",
                         err,
                     ))
                 })?;
-
-                let storage_method = if profile.encrypted_private_key.is_some() {
-                    "encrypted"
-                } else {
-                    "plaintext"
-                };
 
                 Ok(format!(
                     "Successfully removed credentials for profile {} from keychain and stored as {}",
