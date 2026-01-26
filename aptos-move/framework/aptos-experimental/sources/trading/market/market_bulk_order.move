@@ -6,12 +6,7 @@ module aptos_experimental::market_bulk_order {
 
     use std::signer;
     use std::option::{Self, Option};
-    use aptos_trading::bulk_order_types::{
-        new_bulk_order_request,
-        is_success_response,
-        destroy_bulk_order_place_response_success,
-        destroy_bulk_order_place_response_rejection,
-    };
+    use aptos_trading::bulk_order_types::new_bulk_order_request;
     use aptos_trading::order_book_types::OrderId;
     use aptos_experimental::market_types::{Self, MarketClearinghouseCallbacks, Market};
 
@@ -65,9 +60,9 @@ module aptos_experimental::market_bulk_order {
         let response = market.get_order_book_mut().place_bulk_order(request);
 
         // Check if the response is a rejection
-        if (!is_success_response(&response)) {
+        if (!response.is_success_response()) {
             let (rejected_account, rejected_seq_num, existing_seq_num) =
-                destroy_bulk_order_place_response_rejection(response);
+                response.destroy_bulk_order_place_response_rejection();
             // Emit rejection event
             market.emit_event_for_bulk_order_rejection(
                 rejected_account,
@@ -79,7 +74,7 @@ module aptos_experimental::market_bulk_order {
         };
 
         // Handle success response
-        let (bulk_order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num_option) = destroy_bulk_order_place_response_success(response);
+        let (bulk_order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num_option) = response.destroy_bulk_order_place_response_success();
         let (
             order_request,
             order_id,

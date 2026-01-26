@@ -2626,14 +2626,14 @@ module aptos_std::big_ordered_map {
         spec {
             assert spec_contains_key(map, 4);
             assert spec_get(map, 4) == 5;
-            assert option::is_none(result_1);
+            assert result_1.is_none();
         };
         let result_2 = map.upsert(4, 6);
         spec {
             assert spec_contains_key(map, 4);
             assert spec_get(map, 4) == 6;
-            assert option::is_some(result_2);
-            assert option::borrow(result_2) == 5;
+            assert result_2.is_some();
+            assert result_2.borrow() == 5;
             assert !spec_contains_key(map, 10);
         };
         spec {
@@ -2669,7 +2669,7 @@ module aptos_std::big_ordered_map {
         let map = new_from(keys, values);
         let result_1 = map.next_key(&3);
         spec {
-            assert option::is_none(result_1);
+            assert result_1.is_none();
         };
         let result_2 = map.next_key(&1);
         spec {
@@ -2677,8 +2677,8 @@ module aptos_std::big_ordered_map {
             assert spec_contains_key(map, 1);
             assert keys[1] == 2;
             assert spec_contains_key(map, 2);
-            assert option::is_some(result_2);
-            assert option::borrow(result_2) == 2;
+            assert result_2.is_some();
+            assert result_2.borrow() == 2;
         };
         map.remove(&1);
         map.remove(&2);
@@ -2697,7 +2697,7 @@ module aptos_std::big_ordered_map {
         let map = new_from(keys, values);
         let result_1 = map.prev_key(&1);
         spec {
-            assert option::is_none(result_1);
+            assert result_1.is_none();
         };
         let result_2 = map.prev_key(&3);
         spec {
@@ -2705,7 +2705,7 @@ module aptos_std::big_ordered_map {
             assert spec_contains_key(map, 1);
             assert keys[1] == 2;
             assert spec_contains_key(map, 2);
-            assert option::is_some(result_2);
+            assert result_2.is_some();
         };
         map.remove(&1);
         map.remove(&2);

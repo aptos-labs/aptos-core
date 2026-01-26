@@ -1979,8 +1979,8 @@ to rotate his address to Alice's address in the first place.
         verified_public_key_bit_map = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[0x80, 0x00, 0x00, 0x00];
     } <b>else</b> {
         // The new key is a multi-<a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519">ed25519</a> key, so set the verified_public_key_bit_map <b>to</b> the signature bitmap.
-        <b>let</b> len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&cap_update_table);
-        verified_public_key_bit_map = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_slice">vector::slice</a>(&cap_update_table, len - 4, len);
+        <b>let</b> len = cap_update_table.length();
+        verified_public_key_bit_map = cap_update_table.slice(len - 4, len);
     };
 
     <a href="event.md#0x1_event_emit">event::emit</a>(<a href="account.md#0x1_account_KeyRotationToPublicKey">KeyRotationToPublicKey</a> {
@@ -2062,8 +2062,8 @@ to rotate his address to Alice's address in the first place.
         verified_public_key_bit_map = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[0x80, 0x00, 0x00, 0x00];
     } <b>else</b> {
         // The new key is a multi-<a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519">ed25519</a> key, so set the verified_public_key_bit_map <b>to</b> the signature bitmap.
-        <b>let</b> len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&cap_update_table);
-        verified_public_key_bit_map = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_slice">vector::slice</a>(&cap_update_table, len - 4, len);
+        <b>let</b> len = cap_update_table.length();
+        verified_public_key_bit_map = cap_update_table.slice(len - 4, len);
     };
 
     <a href="event.md#0x1_event_emit">event::emit</a>(<a href="account.md#0x1_account_KeyRotationToPublicKey">KeyRotationToPublicKey</a> {

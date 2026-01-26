@@ -21,11 +21,11 @@ module aptos_framework::base16 {
     public(friend) fun base16_utf8_to_vec_u8(str: vector<u8>): vector<u8> {
         let result = vector::empty<u8>();
         let i = 0;
-        while (i < vector::length(&str)) {
-            let c1 = vector::borrow(&str, i);
-            let c2 = vector::borrow(&str, i + 1);
+        while (i < str.length()) {
+            let c1 = str.borrow(i);
+            let c2 = str.borrow(i + 1);
             let byte = hex_char_to_u8(*c1) << 4 | hex_char_to_u8(*c2);
-            vector::push_back(&mut result, byte);
+            result.push_back(byte);
             i += 2;
         };
         result

@@ -11,7 +11,6 @@ module aptos_framework::aptos_account {
     use std::error;
     use std::features;
     use std::signer;
-    use std::vector;
     use aptos_framework::object::Object;
 
     friend aptos_framework::genesis;
@@ -62,19 +61,16 @@ module aptos_framework::aptos_account {
     public entry fun batch_transfer(
         source: &signer, recipients: vector<address>, amounts: vector<u64>
     ) {
-        let recipients_len = vector::length(&recipients);
+        let recipients_len = recipients.length();
         assert!(
-            recipients_len == vector::length(&amounts),
+            recipients_len == amounts.length(),
             error::invalid_argument(EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH)
         );
 
-        vector::enumerate_ref(
-            &recipients,
-            |i, to| {
+        recipients.enumerate_ref(|i, to| {
                 let amount = amounts[i];
                 transfer(source, *to, amount);
-            }
-        );
+            });
     }
 
     /// Convenient function to transfer APT to a recipient account that might not exist.
@@ -100,19 +96,16 @@ module aptos_framework::aptos_account {
     public entry fun batch_transfer_coins<CoinType>(
         from: &signer, recipients: vector<address>, amounts: vector<u64>
     ) acquires DirectTransferConfig {
-        let recipients_len = vector::length(&recipients);
+        let recipients_len = recipients.length();
         assert!(
-            recipients_len == vector::length(&amounts),
+            recipients_len == amounts.length(),
             error::invalid_argument(EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH)
         );
 
-        vector::enumerate_ref(
-            &recipients,
-            |i, to| {
+        recipients.enumerate_ref(|i, to| {
                 let amount = amounts[i];
                 transfer_coins<CoinType>(from, *to, amount);
-            }
-        );
+            });
     }
 
     /// Convenient function to transfer a custom CoinType to a recipient account that might not exist.
@@ -154,19 +147,16 @@ module aptos_framework::aptos_account {
         recipients: vector<address>,
         amounts: vector<u64>
     ) {
-        let recipients_len = vector::length(&recipients);
+        let recipients_len = recipients.length();
         assert!(
-            recipients_len == vector::length(&amounts),
+            recipients_len == amounts.length(),
             error::invalid_argument(EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH)
         );
 
-        vector::enumerate_ref(
-            &recipients,
-            |i, to| {
+        recipients.enumerate_ref(|i, to| {
                 let amount = amounts[i];
                 transfer_fungible_assets(from, metadata, *to, amount);
-            }
-        );
+            });
     }
 
     /// Convenient function to deposit fungible asset into a recipient account that might not exist.
@@ -318,7 +308,7 @@ module aptos_framework::aptos_account {
         // Skip burning if amount is zero. This shouldn't error out as it's called as part of transaction fee burning.
         if (amount != 0) {
             let store_addr = primary_fungible_store_address(account);
-            fungible_asset::address_burn_from_for_gas(ref, store_addr, amount);
+            ref.address_burn_from_for_gas(store_addr, amount);
         };
     }
 
@@ -328,11 +318,9 @@ module aptos_framework::aptos_account {
         if (fungible_asset::store_exists(store_addr)) {
             store_addr
         } else {
-            object::object_address(
-                &primary_fungible_store::create_primary_store(
+            primary_fungible_store::create_primary_store(
                     owner, object::address_to_object<Metadata>(@aptos_fungible_asset)
-                )
-            )
+                ).object_address()
         }
     }
 

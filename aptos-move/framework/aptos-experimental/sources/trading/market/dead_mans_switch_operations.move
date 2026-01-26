@@ -4,7 +4,6 @@ module aptos_experimental::dead_mans_switch_operations {
     use std::option;
     use std::string;
     use aptos_trading::order_book_types::OrderId;
-    use aptos_trading::bulk_order_types;
     use aptos_experimental::market_types::{Self, MarketClearinghouseCallbacks, Market};
     use aptos_experimental::dead_mans_switch_tracker::{Self, is_order_valid};
     use aptos_experimental::order_operations;
@@ -107,7 +106,7 @@ module aptos_experimental::dead_mans_switch_operations {
         let bulk_order = market.get_order_book().get_bulk_order(account);
 
         // Get creation timestamp in microseconds and convert to seconds
-        let creation_time_micros = bulk_order_types::get_creation_time_micros(&bulk_order);
+        let creation_time_micros = bulk_order.get_creation_time_micros();
         let creation_time_secs = creation_time_micros / MICROS_PER_SECOND;
 
         // Check if order is valid according to dead man's switch
@@ -156,9 +155,9 @@ module aptos_experimental::dead_mans_switch_operations {
         // Check if dead man's switch is enabled
         assert!(market.is_dead_mans_switch_enabled(), E_DEAD_MANS_SWITCH_NOT_ENABLED);
 
-        let parent = market_types::get_parent(market);
-        let market_addr = market_types::get_market(market);
-        let tracker = market_types::get_dead_mans_switch_tracker_mut(market);
+        let parent = market.get_parent();
+        let market_addr = market.get_market();
+        let tracker = market.get_dead_mans_switch_tracker_mut();
         dead_mans_switch_tracker::keep_alive(tracker, parent, market_addr, account, timeout_seconds);
     }
 }

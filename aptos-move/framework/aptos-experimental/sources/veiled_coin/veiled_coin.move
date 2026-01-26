@@ -319,7 +319,7 @@ module aptos_experimental::veiled_coin {
         let sigma_proof =
             sigma_protos::deserialize_withdrawal_subproof(withdraw_subproof);
         assert!(
-            std::option::is_some(&sigma_proof),
+            sigma_proof.is_some(),
             error::invalid_argument(EDESERIALIZATION_FAILED)
         );
 
@@ -327,7 +327,7 @@ module aptos_experimental::veiled_coin {
         let zkrp_new_balance = bulletproofs::range_proof_from_bytes(zkrp_new_balance);
 
         let withdrawal_proof = WithdrawalProof {
-            sigma_proof: std::option::extract(&mut sigma_proof),
+            sigma_proof: sigma_proof.extract(),
             zkrp_new_balance
         };
 
@@ -412,14 +412,14 @@ module aptos_experimental::veiled_coin {
         let transfer_subproof =
             sigma_protos::deserialize_transfer_subproof(transfer_subproof);
         assert!(
-            std::option::is_some(&transfer_subproof),
+            transfer_subproof.is_some(),
             error::invalid_argument(EDESERIALIZATION_FAILED)
         );
 
         let transfer_proof = TransferProof {
             zkrp_new_balance: bulletproofs::range_proof_from_bytes(zkrp_new_balance),
             zkrp_amount: bulletproofs::range_proof_from_bytes(zkrp_amount),
-            sigma_proof: std::option::extract(&mut transfer_subproof)
+            sigma_proof: transfer_subproof.extract()
         };
 
         // Do the actual work

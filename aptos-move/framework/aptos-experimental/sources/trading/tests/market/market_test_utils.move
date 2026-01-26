@@ -11,7 +11,7 @@ module aptos_experimental::market_test_utils {
         order_status_cancelled,
         order_status_filled,
         order_status_open,
-        MarketClearinghouseCallbacks, Market, get_order_id_from_event, BulkOrderFilledEvent,
+        MarketClearinghouseCallbacks, Market, BulkOrderFilledEvent,
         BulkOrderModifiedEvent
     };
     use aptos_experimental::order_placement::{OrderMatchResult, place_limit_order, place_market_order};
@@ -168,7 +168,7 @@ module aptos_experimental::market_test_utils {
 
         let events = latest_emitted_events<OrderEvent>(event_store, option::some(1));
         let order_place_event = events[0];
-        let order_id = get_order_id_from_event(order_place_event);
+        let order_id = order_place_event.get_order_id_from_event();
         let limit_price = if (taker_price.is_some()) {
             taker_price.destroy_some()
         } else {

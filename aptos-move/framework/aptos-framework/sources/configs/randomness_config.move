@@ -1,6 +1,5 @@
 /// Structs and functions for on-chain randomness configurations.
 module aptos_framework::randomness_config {
-    use std::string;
     use aptos_std::copyable_any;
     use aptos_std::copyable_any::Any;
     use aptos_std::fixed_point64::FixedPoint64;
@@ -75,7 +74,7 @@ module aptos_framework::randomness_config {
     public fun enabled(): bool acquires RandomnessConfig {
         if (exists<RandomnessConfig>(@aptos_framework)) {
             let config = borrow_global<RandomnessConfig>(@aptos_framework);
-            let variant_type_name = *string::bytes(copyable_any::type_name(&config.variant));
+            let variant_type_name = *config.variant.type_name().bytes();
             variant_type_name != b"0x1::randomness_config::ConfigOff"
         } else {
             false

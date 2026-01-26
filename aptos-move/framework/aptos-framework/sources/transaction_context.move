@@ -231,14 +231,12 @@ module aptos_framework::transaction_context {
 
     #[test()]
     fun test_auid_uniquess() {
-        use std::vector;
-
         let auids: vector<address> = vector<address>[];
         let i: u64 = 0;
         let count: u64 = 50;
         while (i < count) {
             i += 1;
-            vector::push_back(&mut auids, generate_auid_address());
+            auids.push_back(generate_auid_address());
         };
         i = 0;
         while (i < count - 1) {

@@ -176,7 +176,7 @@ Aborts:
     <b>let</b> bulk_order = market.get_order_book().get_bulk_order(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
 
     // Get creation <a href="../../aptos-framework/doc/timestamp.md#0x1_timestamp">timestamp</a> in microseconds and convert <b>to</b> seconds
-    <b>let</b> creation_time_micros = <a href="bulk_order_types.md#0x7_bulk_order_types_get_creation_time_micros">bulk_order_types::get_creation_time_micros</a>(&bulk_order);
+    <b>let</b> creation_time_micros = bulk_order.get_creation_time_micros();
     <b>let</b> creation_time_secs = creation_time_micros / <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_MICROS_PER_SECOND">MICROS_PER_SECOND</a>;
 
     // Check <b>if</b> order is valid according <b>to</b> dead man's switch
@@ -245,9 +245,9 @@ Aborts:
     // Check <b>if</b> dead man's switch is enabled
     <b>assert</b>!(market.is_dead_mans_switch_enabled(), <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_E_DEAD_MANS_SWITCH_NOT_ENABLED">E_DEAD_MANS_SWITCH_NOT_ENABLED</a>);
 
-    <b>let</b> parent = <a href="market_types.md#0x7_market_types_get_parent">market_types::get_parent</a>(market);
-    <b>let</b> market_addr = <a href="market_types.md#0x7_market_types_get_market">market_types::get_market</a>(market);
-    <b>let</b> tracker = <a href="market_types.md#0x7_market_types_get_dead_mans_switch_tracker_mut">market_types::get_dead_mans_switch_tracker_mut</a>(market);
+    <b>let</b> parent = market.get_parent();
+    <b>let</b> market_addr = market.get_market();
+    <b>let</b> tracker = market.get_dead_mans_switch_tracker_mut();
     <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_keep_alive">dead_mans_switch_tracker::keep_alive</a>(tracker, parent, market_addr, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, timeout_seconds);
 }
 </code></pre>
