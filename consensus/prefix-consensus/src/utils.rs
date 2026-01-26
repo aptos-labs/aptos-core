@@ -281,4 +281,154 @@ mod tests {
         assert!(consistency_check(&[v1.clone(), v2.clone()]).is_ok());
         assert!(consistency_check(&[v1, v2, v3]).is_err());
     }
+
+    // ============================================================================
+    // Edge Case Tests
+    // ============================================================================
+
+    #[test]
+    fn test_all_consistent_edge_case_diverge_at_different_positions() {
+        // Vectors that share prefix but diverge at different lengths
+        let v1 = vec![hash(1), hash(2), hash(3)]; // diverges at position 3
+        let v2 = vec![hash(1), hash(2), hash(4)]; // diverges at position 3
+        let v3 = vec![hash(1), hash(5)]; // diverges at position 2
+
+        // v1 and v2 share prefix [1,2] but diverge
+        // v3 shares prefix [1] with both but diverges earlier
+        // These are NOT mutually consistent
+        assert!(!all_consistent(&[v1, v2, v3]));
+    }
+
+    #[test]
+    fn test_all_consistent_edge_case_all_identical() {
+        let v = vec![hash(1), hash(2), hash(3)];
+        let vectors = vec![v.clone(), v.clone(), v.clone(), v.clone()];
+        assert!(all_consistent(&vectors));
+    }
+
+    #[test]
+    fn test_all_consistent_edge_case_reverse_order() {
+        // Consistency should work regardless of order
+        let v1 = vec![hash(1)];
+        let v2 = vec![hash(1), hash(2)];
+        let v3 = vec![hash(1), hash(2), hash(3)];
+
+        // Forward order
+        assert!(all_consistent(&[v1.clone(), v2.clone(), v3.clone()]));
+        // Reverse order
+        assert!(all_consistent(&[v3, v2, v1]));
+    }
+
+    #[test]
+    fn test_all_consistent_edge_case_empty_in_prefix_chain() {
+        let v0 = vec![];
+        let v1 = vec![hash(1)];
+        let v2 = vec![hash(1), hash(2)];
+
+        // Empty vector is prefix of everything
+        assert!(all_consistent(&[v0, v1, v2]));
+    }
+
+    #[test]
+    fn test_min_common_extension_edge_case_single_vector() {
+        let v = vec![hash(1), hash(2), hash(3)];
+        assert_eq!(min_common_extension(&[v.clone()]), Some(v));
+    }
+
+    #[test]
+    fn test_min_common_extension_edge_case_all_identical() {
+        let v = vec![hash(1), hash(2)];
+        let vectors = vec![v.clone(), v.clone(), v.clone()];
+        assert_eq!(min_common_extension(&vectors), Some(v));
+    }
+
+    #[test]
+    fn test_min_common_extension_edge_case_diverge_at_end() {
+        // Vectors share long prefix but diverge at the end
+        let v1 = vec![hash(1), hash(2), hash(3), hash(4), hash(5), hash(100)];
+        let v2 = vec![hash(1), hash(2), hash(3), hash(4), hash(5), hash(200)];
+        // Should return None because they diverge
+        assert_eq!(min_common_extension(&[v1, v2]), None);
+    }
+
+    #[test]
+    fn test_min_common_extension_edge_case_with_empty() {
+        let v0 = vec![];
+        let v1 = vec![hash(1)];
+        let v2 = vec![hash(1), hash(2)];
+
+        assert_eq!(
+            min_common_extension(&[v0, v1, v2.clone()]),
+            Some(v2)
+        );
+    }
+
+    #[test]
+    fn test_max_common_prefix_edge_case_one_empty() {
+        let v1 = vec![];
+        let v2 = vec![hash(1), hash(2)];
+        let v3 = vec![hash(1), hash(2), hash(3)];
+
+        // If any vector is empty, mcp is empty
+        assert_eq!(max_common_prefix(&[v1, v2, v3]), vec![]);
+    }
+
+    #[test]
+    fn test_max_common_prefix_edge_case_long_divergence() {
+        // Long shared prefix before divergence
+        let v1 = vec![hash(1), hash(2), hash(3), hash(4), hash(5), hash(100)];
+        let v2 = vec![hash(1), hash(2), hash(3), hash(4), hash(5), hash(200)];
+        let v3 = vec![hash(1), hash(2), hash(3), hash(4), hash(5), hash(300)];
+
+        assert_eq!(
+            max_common_prefix(&[v1, v2, v3]),
+            vec![hash(1), hash(2), hash(3), hash(4), hash(5)]
+        );
+    }
+
+    #[test]
+    fn test_is_prefix_of_edge_case_exact_match() {
+        let v = vec![hash(1), hash(2)];
+        assert!(is_prefix_of(&v, &v));
+    }
+
+    #[test]
+    fn test_is_prefix_of_edge_case_empty_prefix() {
+        let empty = vec![];
+        let v = vec![hash(1), hash(2)];
+        assert!(is_prefix_of(&empty, &v));
+    }
+
+    #[test]
+    fn test_is_prefix_of_edge_case_longer_prefix() {
+        let v1 = vec![hash(1), hash(2), hash(3)];
+        let v2 = vec![hash(1), hash(2)];
+        // v1 is longer, so it's NOT a prefix of v2
+        assert!(!is_prefix_of(&v1, &v2));
+    }
+
+    #[test]
+    fn test_consistency_check_edge_case_many_vectors() {
+        // Many vectors forming a prefix chain
+        let v1 = vec![hash(1)];
+        let v2 = vec![hash(1), hash(2)];
+        let v3 = vec![hash(1), hash(2), hash(3)];
+        let v4 = vec![hash(1), hash(2), hash(3), hash(4)];
+        let v5 = vec![hash(1), hash(2), hash(3), hash(4), hash(5)];
+
+        assert!(consistency_check(&[v1, v2, v3, v4, v5]).is_ok());
+    }
+
+    #[test]
+    fn test_consistency_check_edge_case_diverge_in_middle() {
+        // First few are consistent, then one diverges
+        let v1 = vec![hash(1)];
+        let v2 = vec![hash(1), hash(2)];
+        let v3 = vec![hash(1), hash(2), hash(3)];
+        let v4 = vec![hash(1), hash(99)]; // Diverges from v2, v3
+
+        let result = consistency_check(&[v1, v2, v3, v4]);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("indices"));
+    }
 }

@@ -461,4 +461,57 @@ mod tests {
         assert!(combos.contains(&vec![2, 4]));
         assert!(combos.contains(&vec![3, 4]));
     }
+
+    // ============================================================================
+    // Edge Case Tests
+    // ============================================================================
+
+    #[test]
+    fn test_qc1_certify_edge_case_all_empty_vectors() {
+        let votes = vec![
+            Vote1::new(dummy_party_id(1), vec![], dummy_signature()),
+            Vote1::new(dummy_party_id(2), vec![], dummy_signature()),
+            Vote1::new(dummy_party_id(3), vec![], dummy_signature()),
+        ];
+        let qc1 = QC1::new(votes);
+        let result = qc1_certify(&qc1, 1);
+        assert_eq!(result, vec![]);
+    }
+
+    #[test]
+    fn test_qc1_certify_edge_case_all_different_prefixes() {
+        let votes = vec![
+            Vote1::new(dummy_party_id(1), vec![hash(1), hash(2)], dummy_signature()),
+            Vote1::new(dummy_party_id(2), vec![hash(10), hash(20)], dummy_signature()),
+            Vote1::new(dummy_party_id(3), vec![hash(100), hash(200)], dummy_signature()),
+            Vote1::new(dummy_party_id(4), vec![hash(1000), hash(2000)], dummy_signature()),
+        ];
+        let qc1 = QC1::new(votes);
+        let result = qc1_certify(&qc1, 1);
+        assert_eq!(result, vec![]);
+    }
+
+    #[test]
+    fn test_qc3_certify_edge_case_long_prefix_chain() {
+        let votes = vec![
+            Vote3::new(dummy_party_id(1), vec![hash(1)], QC2::new(vec![]), dummy_signature()),
+            Vote3::new(dummy_party_id(2), vec![hash(1), hash(2)], QC2::new(vec![]), dummy_signature()),
+            Vote3::new(dummy_party_id(3), vec![hash(1), hash(2), hash(3)], QC2::new(vec![]), dummy_signature()),
+        ];
+        let qc3 = QC3::new(votes);
+        let (v_low, v_high) = qc3_certify(&qc3);
+        assert_eq!(v_low, vec![hash(1)]);
+        assert_eq!(v_high, vec![hash(1), hash(2), hash(3)]);
+    }
+
+    #[test]
+    #[should_panic(expected = "IMPLEMENTATION BUG")]
+    fn test_qc3_certify_edge_case_inconsistent_prefixes_panics() {
+        let votes = vec![
+            Vote3::new(dummy_party_id(1), vec![hash(1), hash(2), hash(3)], QC2::new(vec![]), dummy_signature()),
+            Vote3::new(dummy_party_id(2), vec![hash(1), hash(2), hash(99)], QC2::new(vec![]), dummy_signature()),
+        ];
+        let qc3 = QC3::new(votes);
+        qc3_certify(&qc3);
+    }
 }
