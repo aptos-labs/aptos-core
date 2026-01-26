@@ -1,33 +1,45 @@
 # MonoMove: Design Document
 
 MonoMove is a Move Virtual Machine (VM) designed for performance and safety.
-At its core, it relies on monomorphization in order to handle Move generics and maximize efficiency.
+At its core, it relies on monomorphization in order to handle Move generics and
+maximize efficiency.
 MonoMove design follows the following principles:
 
-1. **Stateless Optimized VM**:
-   VM does not store any context. For execution, VM needs an external local (per-transaction) and global contexts.
-   Execution operates on monomorphized basic blocks or fully-monomorphized functions.
-   Gas is charged per basic block.
-   Value system uses a flat memory representation.
+1. **Stateless VM**:
+   VM does not store any long-living context.
+   For execution, VM requires an external local (per-transaction) and global
+   contexts.
 
-2. **Minimum Indirection on Hot Path**:
-   Hot execution paths have minimal pointer chasing.
-   Flattened data structures are preferred.
-   Hot data is tightly packed, cold data separated.
-   
+2. **Performance Built-in by Design**:
+   Value system uses a flat memory representation.
+   Hot execution paths have minimal pointer chasing: hot data is tightly
+   packed, cold data separated.
+   Execution operates on monomorphized basic blocks or
+   fully-monomorphized functions.
+   Gas charges are aggregated when possible, for better efficiency.
+
 3. **Long-Living Caches**:
-   Code-derived data (types, instantiations) cached globally and shared between threads.
-   Data allocation are managed by per-transaction or global context.
-   Flat data representation is cached globally to avoid BCS-to-flat conversions.
+   Code-derived data (types, instantiated types, monomorphized functions, etc.)
+   are cached globally and are shared between threads.
+   Allocations of the values used by the VM are managed by per-transaction
+   (e.g., if VM created a value) or global context (e.g., if VM borrowed a
+   resource from storage).
+   Values use flat-memory representation.
+   Flat value representation is cached globally to avoid BCS-to-flat conversions.
+
+4. **Safety Built-in by Design**:
+   Additional runtime reference or type checks are built-in.
+   Metering is a first-class citizen.
 
 
 ## Execution Model
 
-Throughput the document, the following execution model is used.
+Throughout the document, the following execution model is used.
 
 1. There is a single executor instance that runs blocks (validator nodes) or
    chunks (state syncing nodes) of transactions.
-   In between blocks, there is no parallelism.
+   There is only parallelism within each block, but any two distinct blocks
+   are sequential.
 2. For each transaction block, a Block-STM instance is created to run
    transactions in the block in parallel.
    Block-STM is using a fixed number of workers that execute different tasks
@@ -49,6 +61,7 @@ Memory allocations for these caches are managed in epoch-based reclamation
 style, so that garbage collection (GC) only runs between transaction blocks.
 With this design, only concurrent allocations to the cache need to be
 supported, but not deallocations.
+**This imposes an invariant that our various limits need to imply caches cannot get full within a block.***
 
 #### Rationale
 
@@ -116,7 +129,7 @@ impl Drop for MaintenanceGuard<'_> {
 
 impl GlobalExecutionContext {
    fn execution_guard(&self) -> Option<ExecutionGuard<'_>> {
-      // If in maintence mode, return None. Otherwise, increase the execution
+      // If in maintenance mode, return None. Otherwise, increase the execution
       // count and return the guard.
       ...
    }
@@ -133,7 +146,7 @@ impl GlobalExecutionContext {
 ### 2. Global Identifiers
 
 Module address-name pairs, function/struct identifiers, and fully-instantiated
-types (and type slices) are interned as compact integer IDs.
+types (and type lists) are interned as compact integer IDs.
 Interning is managed by the global context which owns the interner tables and
 the corresponding caches (e.g., for reverse lookups).
 These IDs (and the data interned behind them: addresses, strings, and type
@@ -152,7 +165,7 @@ representations) are executor-only implementation details:
   A reset invalidates **all** dependent interned tables and caches (IDs,
   reverse lookups, and type-derived caches such as abilities).
 - **Per-table counters**:
-  Each interner table maintains its own counter (e.g., types, type slices,
+  Each interner table maintains its own counter (e.g., types, type lists,
   module IDs, name strings).
   Counters are checked at transaction block boundaries so overflow (and hence
   the deallocation) never happens at runtime.
@@ -165,6 +178,8 @@ representations) are executor-only implementation details:
   of types).
   Using an ID after a reset is a code-invariant violation and may lead
   to non-determinism (and chain halt), but must never cause UB.
+  It could also lead to type confusion, but because of ID non-determinsim, type
+  confusion is likely non-deterministic across nodes (leading to chain halt).
 
 #### 2.1 Module Identifiers
 
@@ -213,9 +228,9 @@ A reverse lookup also needs to be supported for the following scenarios:
 
 #### 2.2 Fully-Instantiated Types
 
-Fully-instantiated types and type slices are interned as well.
+Fully-instantiated types and type lists are interned as well.
 Every type is a 32-bit identifier.
-Two most signficant bits are reserved to indicate if the type is a reference
+Two most significant bits are reserved to indicate if the type is a reference
 (immutable or mutable).
 This design is chosen because:
 
@@ -230,11 +245,11 @@ not stored in the interning table.
 This allows to avoid any lookups to the context for primitive types and ensures
 that the invariant is that tables only store compound types.
 
-Every slice of types (e.g., type argument list) is also interned as a 32-bit
+Every list of types (e.g., type argument list) is also interned as a 32-bit
 identifier.
-A most significant bit is reserved to indicate if this is a small slice with a
+A most significant bit is reserved to indicate if this is a small list with a
 single type as a payload.
-As a result, there is no need to "decode" `TypeSliceId` for single-type slice
+As a result, there is no need to "decode" `TypeListId` for single-type list
 via context.
 Empty `TypeSliceId` is always 0.
 
@@ -244,17 +259,17 @@ Empty `TypeSliceId` is always 0.
 /// Two MSBs are reserved for references:
 ///   00 - not a reference
 ///   01 - immutable reference
-///   10 - mutable reference
-///   11 - reserved.
+///   11 - mutable reference
+///   10 - reserved.
 pub struct TypeId(u32);
 
-/// Represents a slice of a type.
-/// For empty slices, 0 is reserved.
+/// Represents a list of types.
+/// For empty list, 0 is reserved.
 /// Two MSBs are reserved for small-vec optimization:
 ///   00 - not a small-vec
-///   01 - this slice has a single element directly encoded
+///   01 - this list has a single element directly encoded
 ///   10 / 11 -- reserved.
-pub struct TypeSliceId(u32);
+pub struct TypeListId(u32);
 ```
 
 For type interning, fully-instantiated `SignatureToken`s are converted to
@@ -268,7 +283,7 @@ enum TypeRepr {
       elem_id: TypeId,
    },
    Struct {
-      // Uniqely identifies struct instantiation, see below.
+      // Uniquely identifies struct instantiation, see below.
       struct_id: StructId,
    },
    Function {
@@ -280,16 +295,18 @@ enum TypeRepr {
 }
 ```
 
-For every compund type, an additional metadats is tracked:
+For every compound type, an additional metadata is tracked:
 
 1. Ability sets - used for paranoid type checks.
 2. Element type for vector types - used for paranoid type checks.
 3. Argument and result types for function types - used for paranoid type checks.
-4. Number of argument and result types for function types - used for paranoid stack
-   balance checks.
+4. Number of argument and result types for function types - used for paranoid
+   stack balance checks.
 
-The reverse lookups for this data are predominatly part of runtime type checks.
-This checks can be moved out of the hot path via tracing (see later sections).
+The reverse lookups for this data are predominantly part of runtime type
+checks.
+This checks can be moved out of the hot path via tracing (see later
+sections).
 
 #### 2.3 Struct and Function Identifiers
 
@@ -299,7 +316,7 @@ These IDs include:
  
 - `ModuleId` indicating the module owning this struct or function.
 - 32-bit integer encoding struct or function name.
-- `TypeSliceId` for type arguments (set to 0 if non-generic).
+- `TypeListId` for type arguments (set to 0 if non-generic).
 
 ```rust
 /// Represents struct / function ID without type argument list. Can
@@ -307,13 +324,13 @@ These IDs include:
 pub struct TemplateId(ModuleId, u32);
 
 /// Represents a struct identifier: module ID, struct name ID and
-/// type argument slice ID (0 for non-generic structs).
+/// type argument list ID (0 for non-generic structs).
 /// TODO: consider using a bit to indicate this is a resource group tag.
-pub struct StructId(TemplateId, TypeSliceId);
+pub struct StructId(TemplateId, TypeListId);
 
 /// Represents a function identifier: module ID, function name ID
-/// and type argument slice ID (0 if non-generic).
-pub struct FunctionId(TemplateId, TypeSliceId);
+/// and type argument list ID (0 if non-generic).
+pub struct FunctionId(TemplateId, TypeListId);
 ```
 
 Like `ModuleId`s, function and struct IDs are obtained:
@@ -327,7 +344,7 @@ Like `ModuleId`s, function and struct IDs are obtained:
 
 In the file format, generics are represented as `TypeParam(u16)` variant in
 `SignatureToken`.
-MonoMove still needs to manage generics for templates.
+MonoMove still needs to manage generics.
 It uses a flattened format to avoid pointer chasing and ensure memory is
 managed more efficiently (a compressed tree where instantiated leaves are
 `TypeId`s and only truly generic leaves are kept as type parameters).
@@ -336,23 +353,24 @@ at runtime and are not cached.
 
 1. Primitives: 1 byte header.
 2. Vectors or references: 1 byte header, followed by element encoding.
-3. Structs: 1 byte header, followed by struct ID (8 bytes), number of type arguments, encoded type arguments.
-4. Functions: 1 byte header, followed by number of arguments (1 byte), number of returns (1 byte), abilities (1 byte)
-   then encoded arguments and returns.
+3. Structs: 1 byte header, followed by struct ID (8 bytes), number of type
+   arguments, encoded type arguments.
+4. Functions: 1 byte header, followed by number of arguments (1 byte), number
+   of returns (1 byte), abilities (1 byte) then encoded arguments and returns.
 5. Resolved type (`TypeId`): 1 byte header, 4-byte payload.
-6. Type paramter: 1 byte header, followed by u16 index.
+6. Type parameter: 1 byte header, followed by u16 index.
 
 ```rust
-pub struct TypeTemplate {
+pub struct GenericType {
    // TODO: consider this being allocated in executable's arena.
    bytes: Box<[u8]>,
 }
 
 impl GlobalExecutionContextGuard<'_> {
-   fn instantiate_type_template(&self, template: &TypeTemplate, ty_args: &[TypeId]) -> TypeId {
-      // Walks the template, interning what is needed.
-      // We can also use a cache, because each ty_args slice has a unique ID
-      // so we can have a cache for each template.
+   fn instantiate_generic_type(&self, template: &GenericType, ty_args: &[TypeId]) -> TypeId {
+      // Walks the type tokens, interning what is needed.
+      // We can also use a cache, because each ty_args list has a unique ID
+      // so we can have a cache for each generic type.
       ...
    }
 }
