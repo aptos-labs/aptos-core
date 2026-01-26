@@ -42,12 +42,13 @@ use move_package::{
 };
 pub use online_execution::*;
 
-const APTOS_PACKAGES_DIR_NAMES: [&str; 6] = [
+const APTOS_PACKAGES_DIR_NAMES: [&str; 7] = [
     "aptos-framework",
     "move-stdlib",
     "aptos-stdlib",
     "aptos-token",
     "aptos-token-objects",
+    "aptos-trading",
     "aptos-experimental",
 ];
 
