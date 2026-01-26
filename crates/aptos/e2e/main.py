@@ -104,6 +104,21 @@ from cases.info_e2e import (
     test_info_json_format,
 )
 from cases.init import test_aptos_header_included, test_init, test_metrics_accessible
+from cases.init_e2e import (
+    # Flag regression tests
+    test_init_help,
+    test_init_flags,
+    test_init_network_options_in_help,
+    # Functional tests
+    test_init_creates_config,
+    test_init_config_has_profile,
+    test_init_config_has_network,
+    test_init_with_named_profile,
+    test_init_with_skip_faucet,
+    test_init_with_private_key,
+    # JSON format tests
+    test_init_profiles_json_format,
+)
 from cases.key_e2e import (
     # Flag regression tests
     test_key_help_subcommands,
@@ -260,6 +275,11 @@ async def run_tests(run_helper):
     # Info command flag tests
     test_info_help(run_helper)
 
+    # Init command flag tests
+    test_init_help(run_helper)
+    test_init_flags(run_helper)
+    test_init_network_options_in_help(run_helper)
+
     # Key subcommand flag tests
     test_key_help_subcommands(run_helper)
     test_key_generate_flags(run_helper)
@@ -283,6 +303,18 @@ async def run_tests(run_helper):
 
     # Run config tests.
     test_config_show_profiles(run_helper)
+
+    # =========================================================================
+    # Init Functional E2E Tests
+    # =========================================================================
+    
+    test_init_creates_config(run_helper)
+    test_init_config_has_profile(run_helper)
+    test_init_config_has_network(run_helper)
+    test_init_with_named_profile(run_helper)
+    test_init_with_skip_faucet(run_helper)
+    test_init_with_private_key(run_helper)
+    test_init_profiles_json_format(run_helper)
 
     # =========================================================================
     # Config Functional E2E Tests
