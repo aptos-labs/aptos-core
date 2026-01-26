@@ -160,3 +160,43 @@ fn bench_gas_register() {
 fn bench_gas_register_detailed() {
     profile_confidential_asset_register(true);
 }
+
+/// Test that we can call a private Move function using exec_function_bypass_visibility.
+///
+/// Run with:
+/// ```bash
+/// cargo test -p e2e-move-tests test_call_private_function --release -- --nocapture
+/// ```
+#[test]
+fn test_call_private_function() {
+    let mut h = MoveHarness::new();
+
+    // Call the private function using the new bypass visibility method
+    let return_values = h
+        .exec_function_bypass_visibility(
+            EXPERIMENTAL_ADDRESS,
+            "confidential_asset",
+            "get_fa_store_address",
+            vec![],
+            vec![],
+        )
+        .unwrap();
+
+    println!("\n=== Test Call Private Function ===");
+
+    // The function returns a u64, so we expect one return value
+    assert_eq!(return_values.return_values.len(), 1);
+    let (bytes, _) = &return_values.return_values[0];
+    let expected = AccountAddress::from_hex_literal(
+        "0x5d35f41578f4cebfdc2c4ae38761b890950dfc3c24315e8b5bafd003e8165db9",
+    )
+    .unwrap();
+    let value: AccountAddress = bcs::from_bytes(bytes).expect("Failed to deserialize u64");
+    println!(
+        "Successfully called private function! Returned value: {}",
+        value
+    );
+    assert_eq!(value, expected, "Wrong address returned!");
+
+    println!("=== End Test ===\n");
+}

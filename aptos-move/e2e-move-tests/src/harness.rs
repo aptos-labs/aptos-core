@@ -6,6 +6,7 @@ use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::{natives::code::PackageMetadata, BuildOptions, BuiltPackage};
 use aptos_gas_profiling::TransactionGasLog;
 use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule, ToOnChainGasSchedule};
+pub use aptos_language_e2e_tests::SerializedReturnValues;
 use aptos_language_e2e_tests::{
     account::{Account, TransactionBuilder},
     executor::FakeExecutorImpl,
@@ -1076,6 +1077,35 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
     ) -> ViewFunctionOutput {
         self.executor
             .execute_view_function(fun, type_args, arguments)
+    }
+
+    /// Execute a Move function bypassing visibility checks and return the serialized return values.
+    /// This allows calling private functions from tests.
+    ///
+    /// # Arguments
+    /// * `module_address` - The address where the module is deployed
+    /// * `module_name` - The module name (e.g., "confidential_asset")
+    /// * `function_name` - Function name to call
+    /// * `type_params` - Type parameters for the function
+    /// * `args` - BCS-serialized arguments
+    ///
+    /// # Returns
+    /// The serialized return values from the function, or an error if execution failed.
+    pub fn exec_function_bypass_visibility(
+        &mut self,
+        module_address: AccountAddress,
+        module_name: &str,
+        function_name: &str,
+        type_params: Vec<TypeTag>,
+        args: Vec<Vec<u8>>,
+    ) -> Result<SerializedReturnValues, aptos_types::vm_status::VMStatus> {
+        self.executor.exec_with_return_values(
+            module_address,
+            module_name,
+            function_name,
+            type_params,
+            args,
+        )
     }
 
     /// Splits transactions into blocks based on passed `block_split``, and
