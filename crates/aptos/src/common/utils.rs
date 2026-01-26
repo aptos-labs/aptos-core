@@ -434,84 +434,22 @@ pub fn read_line(input_name: &'static str) -> CliTypedResult<String> {
     Ok(input_buf)
 }
 
-/// Reads a passphrase from the user without echoing it to the terminal.
-/// Falls back to regular input if terminal is not interactive.
+/// Reads a passphrase from the user.
+/// Note: The passphrase will be visible as you type it.
+/// For automated use, set the APTOS_CLI_PASSPHRASE environment variable.
 pub fn read_passphrase(prompt: &str) -> CliTypedResult<String> {
     use std::io::{self, Write};
 
-    eprint!("{}", prompt);
-    io::stderr().flush().map_err(|e| CliError::IO("stderr".to_string(), e))?;
-
-    // Try to read without echo first (Unix only for now)
-    #[cfg(unix)]
-    {
-        if atty::is(atty::Stream::Stdin) {
-            // Use rpassword-like behavior
-            return read_passphrase_no_echo();
-        }
+    // Check if we're in an interactive terminal
+    if atty::is(atty::Stream::Stdin) {
+        eprint!("{}", prompt);
+        io::stderr().flush().map_err(|e| CliError::IO("stderr".to_string(), e))?;
     }
 
-    // Fall back to regular read for non-interactive or non-Unix
     let mut passphrase = String::new();
     io::stdin()
         .read_line(&mut passphrase)
         .map_err(|e| CliError::IO("passphrase".to_string(), e))?;
-
-    // Remove trailing newline
-    if passphrase.ends_with('\n') {
-        passphrase.pop();
-        if passphrase.ends_with('\r') {
-            passphrase.pop();
-        }
-    }
-
-    Ok(passphrase)
-}
-
-#[cfg(unix)]
-fn read_passphrase_no_echo() -> CliTypedResult<String> {
-    use std::io::{self, BufRead, Write};
-    use std::os::unix::io::AsRawFd;
-
-    let stdin = io::stdin();
-    let fd = stdin.as_raw_fd();
-
-    // Get current terminal settings
-    let mut termios = unsafe {
-        let mut termios = std::mem::zeroed();
-        if libc::tcgetattr(fd, &mut termios) != 0 {
-            return Err(CliError::UnexpectedError(
-                "Failed to get terminal attributes".to_string(),
-            ));
-        }
-        termios
-    };
-
-    // Disable echo
-    let old_termios = termios;
-    termios.c_lflag &= !libc::ECHO;
-
-    unsafe {
-        if libc::tcsetattr(fd, libc::TCSANOW, &termios) != 0 {
-            return Err(CliError::UnexpectedError(
-                "Failed to set terminal attributes".to_string(),
-            ));
-        }
-    }
-
-    // Read the passphrase
-    let mut passphrase = String::new();
-    let result = stdin.lock().read_line(&mut passphrase);
-
-    // Restore terminal settings
-    unsafe {
-        libc::tcsetattr(fd, libc::TCSANOW, &old_termios);
-    }
-
-    // Print newline since echo was disabled
-    eprintln!();
-
-    result.map_err(|e| CliError::IO("passphrase".to_string(), e))?;
 
     // Remove trailing newline
     if passphrase.ends_with('\n') {

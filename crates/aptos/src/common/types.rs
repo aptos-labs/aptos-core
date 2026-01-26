@@ -313,10 +313,7 @@ impl ProfileConfig {
     /// If the profile has an encrypted private key, this will prompt for a passphrase
     /// or use the APTOS_CLI_PASSPHRASE environment variable.
     pub fn get_private_key(&self) -> CliTypedResult<Option<Ed25519PrivateKey>> {
-        use crate::common::{
-            encryption::{get_passphrase_from_env, APTOS_CLI_PASSPHRASE_ENV},
-            utils::read_passphrase,
-        };
+        use crate::common::{encryption::get_passphrase_from_env, utils::read_passphrase};
         use aptos_crypto::ValidCryptoMaterialStringExt;
 
         // If we have a plaintext private key, return it directly
@@ -354,7 +351,6 @@ impl ProfileConfig {
     /// Returns an error if no plaintext private key is present.
     pub fn encrypt_private_key(&mut self, passphrase: &str) -> CliTypedResult<()> {
         use crate::common::encryption::EncryptedPrivateKey;
-        use aptos_crypto::ValidCryptoMaterial;
 
         if let Some(ref private_key) = self.private_key {
             let private_key_bytes = private_key.to_bytes();
