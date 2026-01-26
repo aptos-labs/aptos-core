@@ -217,6 +217,15 @@ Main bulk order book container that manages all orders and their matching.
 
 
 
+<a id="0x7_bulk_order_book_E_INVALID_SEQUENCE_NUMBER"></a>
+
+
+
+<pre><code><b>const</b> <a href="bulk_order_book.md#0x7_bulk_order_book_E_INVALID_SEQUENCE_NUMBER">E_INVALID_SEQUENCE_NUMBER</a>: u64 = 13;
+</code></pre>
+
+
+
 <a id="0x7_bulk_order_book_EINVALID_ADD_SIZE_TO_ORDER"></a>
 
 
@@ -276,15 +285,6 @@ Main bulk order book container that manages all orders and their matching.
 
 
 <pre><code><b>const</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EPOST_ONLY_FILLED">EPOST_ONLY_FILLED</a>: u64 = 2;
-</code></pre>
-
-
-
-<a id="0x7_bulk_order_book_E_INVALID_SEQUENCE_NUMBER"></a>
-
-
-
-<pre><code><b>const</b> <a href="bulk_order_book.md#0x7_bulk_order_book_E_INVALID_SEQUENCE_NUMBER">E_INVALID_SEQUENCE_NUMBER</a>: u64 = 13;
 </code></pre>
 
 

@@ -11,8 +11,10 @@ module aptos_experimental::dead_mans_switch_operations {
 
     // Error codes
     const E_DEAD_MANS_SWITCH_NOT_ENABLED: u64 = 0;
+    const E_TOO_MANY_ORDERS: u64 = 1;
 
     const MICROS_PER_SECOND: u64 = 1000000;
+    const MAX_ORDERS_CLEANED_PER_CALL: u64 = 100;
 
     /// Cleans up expired orders based on dead man's switch rules.
     ///
@@ -27,6 +29,7 @@ module aptos_experimental::dead_mans_switch_operations {
     ///
     /// Aborts:
     /// - E_DEAD_MANS_SWITCH_NOT_ENABLED: If dead man's switch is not enabled for this market
+    /// - E_TOO_MANY_ORDERS: If more than MAX_ORDERS_CLEANED_PER_CALL order IDs are provided
     public fun cleanup_expired_orders<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         order_ids: vector<OrderId>,
@@ -34,6 +37,8 @@ module aptos_experimental::dead_mans_switch_operations {
     ) {
         // Check if dead man's switch is enabled
         assert!(market.is_dead_mans_switch_enabled(), E_DEAD_MANS_SWITCH_NOT_ENABLED);
+        // Cap the number of orders that can be cleaned in a single call
+        assert!(order_ids.length() <= MAX_ORDERS_CLEANED_PER_CALL, E_TOO_MANY_ORDERS);
 
         // Loop through each order ID
         let i = 0;

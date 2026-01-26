@@ -257,7 +257,7 @@ module aptos_experimental::order_placement {
         callback_results: vector<R>,
     ): OrderMatchResult<R> {
         if (time_in_force == immediate_or_cancel() && trigger_condition.is_none()) {
-            return cancel_single_order_internal(
+            return cancel_taker_order_internal(
                 market,
                 user_addr,
                 limit_price,
@@ -321,7 +321,7 @@ module aptos_experimental::order_placement {
             remaining_size,
         );
         if (result.get_place_maker_order_cancellation_reason().is_some()) {
-            return cancel_single_order_internal(
+            return cancel_taker_order_internal(
                 market,
                 user_addr,
                 limit_price,
@@ -509,7 +509,7 @@ module aptos_experimental::order_placement {
     }
 
     #[lint::skip(needless_mutable_reference)]
-    fun cancel_single_order_internal<M: store + copy + drop, R: store + copy + drop>(
+    fun cancel_taker_order_internal<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         user_addr: address,
         limit_price: u64,
@@ -647,7 +647,7 @@ module aptos_experimental::order_placement {
         let dead_mans_switch_enabled = market.is_dead_mans_switch_enabled();
         if (dead_mans_switch_enabled && !is_order_valid(market.get_dead_mans_switch_tracker(), user_addr, option::none())) {
             let taker_cancellation_reason = std::string::utf8(b"Order invalidated due to dead man's switch expiry");
-            cancel_single_order_internal(
+            cancel_taker_order_internal(
                 market,
                 user_addr,
                 price,
@@ -805,7 +805,7 @@ module aptos_experimental::order_placement {
             );
         };
         let taker_cancellation_reason = if (taker_cancellation_reason_str.is_some()) {
-            cancel_single_order_internal(
+            cancel_taker_order_internal(
                 market,
                 user_addr,
                 price,
@@ -922,7 +922,7 @@ module aptos_experimental::order_placement {
             remaining_size,
         );
         if (!validation_result.is_validation_result_valid()) {
-            return cancel_single_order_internal(
+            return cancel_taker_order_internal(
                 market,
                 user_addr,
                 limit_price,
@@ -948,7 +948,7 @@ module aptos_experimental::order_placement {
         if (client_order_id.is_some()) {
             if (market.get_order_book().client_order_id_exists(user_addr, client_order_id.destroy_some())) {
                 // Client provided a client order id that already exists in the order book
-                return cancel_single_order_internal(
+                return cancel_taker_order_internal(
                     market,
                     user_addr,
                     limit_price,
@@ -976,7 +976,7 @@ module aptos_experimental::order_placement {
                 user_addr,
                 client_order_id.destroy_some()
             )) {
-                return cancel_single_order_internal(
+                return cancel_taker_order_internal(
                     market,
                     user_addr,
                     limit_price,
@@ -1026,7 +1026,7 @@ module aptos_experimental::order_placement {
         // NOTE: We should always use is_taker: true for this order past this
         // point so that indexer can consistently track the order's status
         if (time_in_force == post_only()) {
-            return cancel_single_order_internal(
+            return cancel_taker_order_internal(
                 market,
                 user_addr,
                 limit_price,
@@ -1128,7 +1128,7 @@ module aptos_experimental::order_placement {
                 market.is_taker_order(limit_price, is_bid, option::none());
             if (!is_taker_order) {
                 if (time_in_force == immediate_or_cancel()) {
-                    return cancel_single_order_internal(
+                    return cancel_taker_order_internal(
                         market,
                         user_addr,
                         limit_price,
@@ -1174,7 +1174,7 @@ module aptos_experimental::order_placement {
 
             if (match_count >= max_match_limit) {
                 if (cancel_on_match_limit) {
-                    return cancel_single_order_internal(
+                    return cancel_taker_order_internal(
                         market,
                         user_addr,
                         limit_price,

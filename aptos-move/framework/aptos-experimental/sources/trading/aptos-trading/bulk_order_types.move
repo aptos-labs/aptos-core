@@ -63,6 +63,12 @@ module aptos_trading::bulk_order_types {
     const E_ASK_SIZE_ZERO: u64 = 11;
     const E_BID_ORDER_INVALID: u64 = 12;
     const E_ASK_ORDER_INVALID: u64 = 13;
+    const E_BULK_ORDER_DEPTH_EXCEEDED: u64 = 14;
+    const E_INVALID_SEQUENCE_NUMBER: u64 = 15;
+
+    /// Maximum number of price levels per side (bid or ask) in a bulk order.
+    /// This limit prevents gas DoS scenarios when cancelling bulk orders.
+    const MAX_BULK_ORDER_DEPTH_PER_SIDE: u64 = 30;
 
     /// Request structure for placing a new bulk order with multiple price levels.
     ///
@@ -122,12 +128,6 @@ module aptos_trading::bulk_order_types {
             account: address,
             sequence_number: u64,
             existing_sequence_number: u64
-        }
-    }
-
-    enum BulkOrderRequestResponse<M: store + copy + drop> has copy, drop {
-        V1 {
-            request: BulkOrderRequest<M>
         }
     }
 
@@ -216,8 +216,10 @@ module aptos_trading::bulk_order_types {
     /// A `BulkOrderRequest` instance.
     ///
     /// # Aborts:
+    /// - If sequence_number is 0 (reserved to avoid ambiguity in events)
     /// - If bid_prices and bid_sizes have different lengths
     /// - If ask_prices and ask_sizes have different lengths
+    /// - If bid_prices or ask_prices exceeds MAX_BULK_ORDER_DEPTH_PER_SIDE (30) levels
     public fun new_bulk_order_request<M: store + copy + drop>(
         account: address,
         sequence_number: u64,
@@ -227,6 +229,9 @@ module aptos_trading::bulk_order_types {
         ask_sizes: vector<u64>,
         metadata: M
     ): BulkOrderRequest<M> {
+        // Sequence number 0 is reserved to avoid ambiguity in events
+        assert!(sequence_number > 0, E_INVALID_SEQUENCE_NUMBER);
+
         let num_bids = bid_prices.length();
         let num_asks = ask_prices.length();
 
@@ -234,6 +239,9 @@ module aptos_trading::bulk_order_types {
         assert!(num_bids == bid_sizes.length(), E_BID_LENGTH_MISMATCH);
         assert!(num_asks == ask_sizes.length(), E_ASK_LENGTH_MISMATCH);
         assert!(num_bids > 0 || num_asks > 0, E_EMPTY_ORDER);
+        // Depth validation to prevent gas DoS when cancelling
+        assert!(num_bids <= MAX_BULK_ORDER_DEPTH_PER_SIDE, E_BULK_ORDER_DEPTH_EXCEEDED);
+        assert!(num_asks <= MAX_BULK_ORDER_DEPTH_PER_SIDE, E_BULK_ORDER_DEPTH_EXCEEDED);
         assert!(validate_not_zero_sizes(&bid_sizes), E_BID_SIZE_ZERO);
         assert!(validate_not_zero_sizes(&ask_sizes), E_ASK_SIZE_ZERO);
         assert!(validate_price_ordering(&bid_prices, true), E_BID_ORDER_INVALID);

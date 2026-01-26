@@ -361,8 +361,8 @@ module aptos_experimental::market_types {
     public fun decrease_order_size<M: store + copy + drop, R: store + copy + drop>(
         self: &MarketClearinghouseCallbacks<M, R>,
         order_info: MarketClearinghouseOrderInfo<M>,
-        size: u64) {
-        (self.decrease_order_size_f)(order_info, size)
+        new_size: u64) {
+        (self.decrease_order_size_f)(order_info, new_size)
     }
 
     public fun get_order_metadata_bytes<M: store + copy + drop, R: store + copy + drop>(

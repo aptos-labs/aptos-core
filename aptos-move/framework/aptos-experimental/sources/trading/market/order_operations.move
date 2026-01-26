@@ -68,7 +68,7 @@ module aptos_experimental::order_operations {
     /// - user: The signer of the user whose order should be cancelled
     /// - order_id: The order ID of the order to cancel
     /// - cancellation_reason: The reason for cancellation
-    /// - cancel_details: String description of the cancellation
+    /// - cancel_reason: String description of the cancellation
     /// - callbacks: The market clearinghouse callbacks for cleanup operations
     public fun cancel_order<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
@@ -76,11 +76,11 @@ module aptos_experimental::order_operations {
         order_id: OrderId,
         emit_event: bool,
         cancellation_reason: market_types::OrderCancellationReason,
-        cancel_details: String,
+        cancel_reason: String,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ): SingleOrder<M> {
         let order = market.get_order_book_mut().cancel_single_order(account, order_id);
-        cancel_single_order_helper(market, order, emit_event, cancellation_reason, cancel_details, callbacks);
+        cancel_single_order_helper(market, order, emit_event, cancellation_reason, cancel_reason, callbacks);
         order
     }
 
