@@ -33,6 +33,7 @@
 -  [Function `place_bulk_order`](#0x7_order_book_place_bulk_order)
 -  [Function `get_bulk_order`](#0x7_order_book_get_bulk_order)
 -  [Function `cancel_bulk_order`](#0x7_order_book_cancel_bulk_order)
+-  [Function `cancel_bulk_order_at_price`](#0x7_order_book_cancel_bulk_order_at_price)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
@@ -811,6 +812,40 @@ Checks if the order is a taker order i.e., matched immediately with the active o
     self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>
 ): BulkOrder&lt;M&gt; {
     self.<a href="bulk_order_book.md#0x7_bulk_order_book">bulk_order_book</a>.<a href="order_book.md#0x7_order_book_cancel_bulk_order">cancel_bulk_order</a>(&<b>mut</b> self.price_time_idx, order_creator)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_cancel_bulk_order_at_price"></a>
+
+## Function `cancel_bulk_order_at_price`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_cancel_bulk_order_at_price">cancel_bulk_order_at_price</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, price: u64, is_bid: bool): (u64, <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_cancel_bulk_order_at_price">cancel_bulk_order_at_price</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;,
+    order_creator: <b>address</b>,
+    price: u64,
+    is_bid: bool
+): (u64, BulkOrder&lt;M&gt;) {
+    self.<a href="bulk_order_book.md#0x7_bulk_order_book">bulk_order_book</a>.<a href="order_book.md#0x7_order_book_cancel_bulk_order_at_price">cancel_bulk_order_at_price</a>(
+        &<b>mut</b> self.price_time_idx,
+        order_creator,
+        price,
+        is_bid
+    )
 }
 </code></pre>
 
