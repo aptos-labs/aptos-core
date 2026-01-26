@@ -123,7 +123,7 @@ spec aptos_framework::voting {
 
         aborts_if !exists<VotingForum<ProposalType>>(voting_forum_address);
         aborts_if table::spec_contains(voting_forum.proposals,proposal_id);
-        aborts_if option::is_some(early_resolution_vote_threshold) && min_vote_threshold > option::borrow(early_resolution_vote_threshold);
+        aborts_if early_resolution_vote_threshold.is_some() && min_vote_threshold > early_resolution_vote_threshold.borrow();
         aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_KEY);
         aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
         aborts_if len(execution_hash) == 0;
@@ -245,9 +245,9 @@ spec aptos_framework::voting {
         ensures post_proposal.is_resolved == true;
         ensures post_proposal.resolution_time_secs == timestamp::spec_now_seconds();
 
-        aborts_if option::is_none(proposal.execution_content);
-        ensures result == option::borrow(proposal.execution_content);
-        ensures option::is_none(post_proposal.execution_content);
+        aborts_if proposal.execution_content.is_none();
+        ensures result == proposal.execution_content.borrow();
+        ensures post_proposal.execution_content.is_none();
     }
 
     spec resolve_proposal_v2<ProposalType: store>(
@@ -318,8 +318,8 @@ spec aptos_framework::voting {
     }
 
     spec fun spec_can_be_resolved_early<ProposalType: store>(proposal: Proposal<ProposalType>): bool {
-        if (option::is_some(proposal.early_resolution_vote_threshold)) {
-            let early_resolution_threshold = option::borrow(proposal.early_resolution_vote_threshold);
+        if (proposal.early_resolution_vote_threshold.is_some()) {
+            let early_resolution_threshold = proposal.early_resolution_vote_threshold.borrow();
             if (proposal.yes_votes >= early_resolution_threshold || proposal.no_votes >= early_resolution_threshold) {
                 true
             } else{

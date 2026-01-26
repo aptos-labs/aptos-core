@@ -269,12 +269,12 @@ spec aptos_framework::aptos_governance {
         let addr = aptos_std::type_info::type_of<AptosCoin>().account_address;
         aborts_if !exists<coin::CoinInfo<AptosCoin>>(addr);
         let maybe_supply = global<coin::CoinInfo<AptosCoin>>(addr).supply;
-        let supply = option::borrow(maybe_supply);
+        let supply = maybe_supply.borrow();
         let total_supply = aptos_framework::optional_aggregator::optional_aggregator_value(supply);
         let early_resolution_vote_threshold_value = total_supply / 2 + 1;
 
         // verify voting::create_proposal_v2
-        aborts_if option::is_some(maybe_supply) && governance_config.min_voting_threshold > early_resolution_vote_threshold_value;
+        aborts_if maybe_supply.is_some() && governance_config.min_voting_threshold > early_resolution_vote_threshold_value;
         aborts_if len(execution_hash) == 0;
         aborts_if !exists<voting::VotingForum<GovernanceProposal>>(@aptos_framework);
         let voting_forum = global<voting::VotingForum<GovernanceProposal>>(@aptos_framework);
@@ -433,39 +433,39 @@ spec aptos_framework::aptos_governance {
         aborts_if !exists<GovernanceEvents>(@aptos_framework);
 
         // verify voting::get_proposal_state
-        let early_resolution_threshold = option::borrow(proposal.early_resolution_vote_threshold);
+        let early_resolution_threshold = proposal.early_resolution_vote_threshold.borrow();
         let is_voting_period_over = timestamp::spec_now_seconds() > proposal_expiration;
 
         let new_proposal_yes_votes_0 = proposal.yes_votes + real_voting_power;
-        let can_be_resolved_early_0 = option::is_some(proposal.early_resolution_vote_threshold) &&
+        let can_be_resolved_early_0 = proposal.early_resolution_vote_threshold.is_some() &&
                                     (new_proposal_yes_votes_0 >= early_resolution_threshold ||
                                      proposal.no_votes >= early_resolution_threshold);
         let is_voting_closed_0 = is_voting_period_over || can_be_resolved_early_0;
         let proposal_state_successed_0 = is_voting_closed_0 && new_proposal_yes_votes_0 > proposal.no_votes &&
                                          new_proposal_yes_votes_0 + proposal.no_votes >= proposal.min_vote_threshold;
         let new_proposal_no_votes_0 = proposal.no_votes + real_voting_power;
-        let can_be_resolved_early_1 = option::is_some(proposal.early_resolution_vote_threshold) &&
+        let can_be_resolved_early_1 = proposal.early_resolution_vote_threshold.is_some() &&
                                     (proposal.yes_votes >= early_resolution_threshold ||
                                      new_proposal_no_votes_0 >= early_resolution_threshold);
         let is_voting_closed_1 = is_voting_period_over || can_be_resolved_early_1;
         let proposal_state_successed_1 = is_voting_closed_1 && proposal.yes_votes > new_proposal_no_votes_0 &&
                                          proposal.yes_votes + new_proposal_no_votes_0 >= proposal.min_vote_threshold;
         let new_proposal_yes_votes_1 = proposal.yes_votes + real_voting_power;
-        let can_be_resolved_early_2 = option::is_some(proposal.early_resolution_vote_threshold) &&
+        let can_be_resolved_early_2 = proposal.early_resolution_vote_threshold.is_some() &&
                                     (new_proposal_yes_votes_1 >= early_resolution_threshold ||
                                      proposal.no_votes >= early_resolution_threshold);
         let is_voting_closed_2 = is_voting_period_over || can_be_resolved_early_2;
         let proposal_state_successed_2 = is_voting_closed_2 && new_proposal_yes_votes_1 > proposal.no_votes &&
                                          new_proposal_yes_votes_1 + proposal.no_votes >= proposal.min_vote_threshold;
         let new_proposal_no_votes_1 = proposal.no_votes + real_voting_power;
-        let can_be_resolved_early_3 = option::is_some(proposal.early_resolution_vote_threshold) &&
+        let can_be_resolved_early_3 = proposal.early_resolution_vote_threshold.is_some() &&
                                     (proposal.yes_votes >= early_resolution_threshold ||
                                      new_proposal_no_votes_1 >= early_resolution_threshold);
         let is_voting_closed_3 = is_voting_period_over || can_be_resolved_early_3;
         let proposal_state_successed_3 = is_voting_closed_3 && proposal.yes_votes > new_proposal_no_votes_1 &&
                                          proposal.yes_votes + new_proposal_no_votes_1 >= proposal.min_vote_threshold;
         // post state
-        let post can_be_resolved_early = option::is_some(proposal.early_resolution_vote_threshold) &&
+        let post can_be_resolved_early = proposal.early_resolution_vote_threshold.is_some() &&
                                     (post_proposal.yes_votes >= early_resolution_threshold ||
                                      post_proposal.no_votes >= early_resolution_threshold);
         let post is_voting_closed = is_voting_period_over || can_be_resolved_early;
@@ -517,12 +517,12 @@ spec aptos_framework::aptos_governance {
         let voting_forum = global<voting::VotingForum<GovernanceProposal>>(@aptos_framework);
         let proposal = table::spec_get(voting_forum.proposals, proposal_id);
         aborts_if !table::spec_contains(voting_forum.proposals, proposal_id);
-        let early_resolution_threshold = option::borrow(proposal.early_resolution_vote_threshold);
+        let early_resolution_threshold = proposal.early_resolution_vote_threshold.borrow();
         aborts_if timestamp::now_seconds() <= proposal.expiration_secs &&
-            (option::is_none(proposal.early_resolution_vote_threshold) ||
+            (proposal.early_resolution_vote_threshold.is_none() ||
             proposal.yes_votes < early_resolution_threshold && proposal.no_votes < early_resolution_threshold);
         aborts_if (timestamp::now_seconds() > proposal.expiration_secs ||
-            option::is_some(proposal.early_resolution_vote_threshold) && (proposal.yes_votes >= early_resolution_threshold ||
+            proposal.early_resolution_vote_threshold.is_some() && (proposal.yes_votes >= early_resolution_threshold ||
                                                                                proposal.no_votes >= early_resolution_threshold)) &&
             (proposal.yes_votes <= proposal.no_votes || proposal.yes_votes + proposal.no_votes < proposal.min_vote_threshold);
 
@@ -554,7 +554,7 @@ spec aptos_framework::aptos_governance {
         let post post_voting_forum = global<voting::VotingForum<GovernanceProposal>>(@aptos_framework);
         let post post_proposal = table::spec_get(post_voting_forum.proposals, proposal_id);
         ensures post_proposal.is_resolved == true && post_proposal.resolution_time_secs == timestamp::now_seconds();
-        aborts_if option::is_none(proposal.execution_content);
+        aborts_if proposal.execution_content.is_none();
 
         // verify remove_approved_hash
         aborts_if !exists<ApprovedExecutionHashes>(@aptos_framework);
@@ -736,8 +736,8 @@ spec aptos_framework::aptos_governance {
         metadata_location: vector<u8>;
         metadata_hash: vector<u8>;
 
-        aborts_if string::length(utf8(metadata_location)) > 256;
-        aborts_if string::length(utf8(metadata_hash)) > 256;
+        aborts_if utf8(metadata_location).length() > 256;
+        aborts_if utf8(metadata_hash).length() > 256;
         aborts_if !string::spec_internal_check_utf8(metadata_location);
         aborts_if !string::spec_internal_check_utf8(metadata_hash);
         aborts_if !string::spec_internal_check_utf8(METADATA_LOCATION_KEY);
@@ -812,9 +812,9 @@ spec aptos_framework::aptos_governance {
         let voting_forum = global<voting::VotingForum<GovernanceProposal>>(@aptos_framework);
         let proposal = table::spec_get(voting_forum.proposals, proposal_id);
         aborts_if !table::spec_contains(voting_forum.proposals, proposal_id);
-        let early_resolution_threshold = option::borrow(proposal.early_resolution_vote_threshold);
+        let early_resolution_threshold = proposal.early_resolution_vote_threshold.borrow();
         let voting_period_over = timestamp::now_seconds() > proposal.expiration_secs;
-        let be_resolved_early = option::is_some(proposal.early_resolution_vote_threshold) &&
+        let be_resolved_early = proposal.early_resolution_vote_threshold.is_some() &&
                                     (proposal.yes_votes >= early_resolution_threshold ||
                                      proposal.no_votes >= early_resolution_threshold);
         let voting_closed = voting_period_over || be_resolved_early;

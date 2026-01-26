@@ -57,9 +57,9 @@ spec aptos_framework::jwks {
         use std::option;
         use std::vector;
         pragma opaque;
-        ensures option::is_none(result) <==> (forall jwk: ProviderJWKs where vector::spec_contains(old(jwks).entries, jwk): jwk.issuer != issuer);
-        ensures option::is_none(result) ==> old(jwks) == jwks;
-        ensures option::is_some(result) ==> vector::spec_contains(old(jwks).entries, option::borrow(result));
+        ensures result.is_none() <==> (forall jwk: ProviderJWKs where vector::spec_contains(old(jwks).entries, jwk): jwk.issuer != issuer);
+        ensures result.is_none() ==> old(jwks) == jwks;
+        ensures result.is_some() ==> vector::spec_contains(old(jwks).entries, result.borrow());
     }
 
 }
