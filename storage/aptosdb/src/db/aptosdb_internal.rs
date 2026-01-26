@@ -175,6 +175,18 @@ impl AptosDB {
                     .state_pruner
                     .epoch_snapshot_pruner
                     .maybe_set_pruner_target_db_version(version);
+                myself
+                    .state_store
+                    .state_pruner
+                    .hot_state_merkle_pruner
+                    .as_ref()
+                    .map(|pruner| pruner.maybe_set_pruner_target_db_version(version));
+                myself
+                    .state_store
+                    .state_pruner
+                    .hot_epoch_snapshot_pruner
+                    .as_ref()
+                    .map(|pruner| pruner.maybe_set_pruner_target_db_version(version));
             }
         }
 
