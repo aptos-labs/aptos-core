@@ -18,13 +18,31 @@ use crate::common::types::CliError;
 const KEYCHAIN_SERVICE: &str = "aptos-cli";
 
 /// Check if the system keychain is available on this platform
+///
+/// Currently supports:
+/// - macOS: Keychain Access
+/// - Windows: Credential Manager
+/// - Linux: Not currently supported (Secret Service requires additional setup)
 pub fn is_keychain_available() -> bool {
-    // Try to create an entry to check if the keychain is available
-    // We use a test key that we immediately discard
-    let entry = keyring::Entry::new(KEYCHAIN_SERVICE, "__aptos_keychain_test__");
-    match entry {
-        Ok(_) => true,
-        Err(_) => false,
+    // On Linux, the keyring crate requires Secret Service (D-Bus) which may not be available
+    // in all environments. For now, we only support macOS and Windows where the system
+    // keychain is reliably available.
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    {
+        // Try to create an entry to check if the keychain is available
+        // We use a test key that we immediately discard
+        let entry = keyring::Entry::new(KEYCHAIN_SERVICE, "__aptos_keychain_test__");
+        match entry {
+            Ok(_) => true,
+            Err(_) => false,
+        }
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        // On Linux and other platforms, return false for now
+        // Linux Secret Service support could be added in the future if there's demand
+        false
     }
 }
 
