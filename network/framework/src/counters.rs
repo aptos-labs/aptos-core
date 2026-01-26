@@ -44,6 +44,10 @@ const PRE_DIAL_LABEL: &str = "pre_dial";
 pub const SERIALIZATION_LABEL: &str = "serialization";
 pub const DESERIALIZATION_LABEL: &str = "deserialization";
 
+// Rate limit token state labels
+pub const TOKENS_GRANTED_LABEL: &str = "tokens_granted";
+pub const TOKENS_DENIED_LABEL: &str = "tokens_denied";
+
 pub static APTOS_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "aptos_connections",
@@ -679,4 +683,54 @@ pub fn inbound_queue_delay_observe(protocol_id: ProtocolId, seconds: f64) {
     INBOUND_QUEUE_DELAY
         .with_label_values(&[protocol_id.as_str()])
         .observe(seconds)
+}
+
+/// Counter for inbound byte rate limit tokens
+static INBOUND_BYTE_RATE_LIMIT_TOKENS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_network_inbound_byte_rate_limit_tokens",
+        "Inbound byte rate limit token usage",
+        &["role_type", "network_id", "state"]
+    )
+    .unwrap()
+});
+
+/// Increments the inbound byte rate limit counter
+pub fn update_inbound_byte_rate_limit_tokens(
+    network_context: &NetworkContext,
+    state_label: &str,
+    count: u64,
+) {
+    INBOUND_BYTE_RATE_LIMIT_TOKENS
+        .with_label_values(&[
+            network_context.role().as_str(),
+            network_context.network_id().as_str(),
+            state_label,
+        ])
+        .inc_by(count);
+}
+
+/// Counter for inbound message rate limit tokens
+static INBOUND_MESSAGE_RATE_LIMIT_TOKENS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_network_inbound_message_rate_limit_tokens",
+        "Inbound message rate limit token usage",
+        &["role_type", "network_id", "state"]
+    )
+    .unwrap()
+});
+
+/// Increments the inbound message rate limit counter
+pub fn update_inbound_message_rate_limit_tokens(
+    network_context: &NetworkContext,
+    state_label: &str,
+    count: u64,
+) {
+    INBOUND_MESSAGE_RATE_LIMIT_TOKENS
+        .with_label_values(&[
+            network_context.role().as_str(),
+            network_context.network_id().as_str(),
+            state_label,
+        ])
+        .inc_by(count);
 }

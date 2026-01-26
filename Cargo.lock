@@ -3326,6 +3326,7 @@ dependencies = [
  "aptos-proptest-helpers",
  "aptos-short-hex-str",
  "aptos-time-service",
+ "aptos-token-bucket",
  "aptos-types",
  "arc-swap",
  "async-trait",
@@ -3787,19 +3788,6 @@ dependencies = [
  "rand 0.7.3",
  "ureq",
  "url",
-]
-
-[[package]]
-name = "aptos-rate-limiter"
-version = "0.1.0"
-dependencies = [
- "aptos-infallible",
- "aptos-logger",
- "aptos-metrics-core",
- "futures",
- "pin-project 1.1.3",
- "tokio",
- "tokio-util 0.7.10",
 ]
 
 [[package]]
@@ -4542,6 +4530,17 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tokio-test",
+]
+
+[[package]]
+name = "aptos-token-bucket"
+version = "0.1.0"
+dependencies = [
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-time-service",
+ "tokio",
 ]
 
 [[package]]

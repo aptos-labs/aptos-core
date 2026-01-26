@@ -27,18 +27,24 @@ use crate::{
         rpc::{error::RpcError, InboundRpcs, OutboundRpcRequest, OutboundRpcs},
         stream::{InboundStreamBuffer, OutboundStream, StreamMessage},
         wire::messaging::v1::{
-            DirectSendMsg, ErrorCode, MultiplexMessage, MultiplexMessageSink,
-            MultiplexMessageStream, NetworkMessage, Priority, ReadError, WriteError,
+            rate_limited_stream::RateLimitedMultiplexMessageStream, DirectSendMsg, ErrorCode,
+            MultiplexMessage, MultiplexMessageSink, MultiplexMessageStream, NetworkMessage,
+            Priority, ReadError, WriteError,
         },
     },
     transport::{self, Connection, ConnectionMetadata},
     ProtocolId,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::{NetworkContext, PeerNetworkId};
+use aptos_config::{
+    config::InboundRateLimitConfig,
+    network_id::{NetworkContext, PeerNetworkId},
+};
+use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
+use aptos_token_bucket::{SharedTokenBucket, TokenBucket};
 use aptos_types::PeerId;
 use futures::{
     self,
@@ -137,6 +143,14 @@ pub struct Peer<TSocket> {
     max_message_size: usize,
     /// Inbound stream buffer
     inbound_stream: InboundStreamBuffer,
+    /// Inbound rate limiters
+    inbound_rate_limiters: Option<InboundRateLimiters>,
+}
+
+/// Per-connection inbound rate limiters
+struct InboundRateLimiters {
+    byte_limiter: Option<SharedTokenBucket>,
+    message_limiter: Option<SharedTokenBucket>,
 }
 
 impl<TSocket> Peer<TSocket>
@@ -159,6 +173,7 @@ where
         max_concurrent_outbound_rpcs: u32,
         max_frame_size: usize,
         max_message_size: usize,
+        inbound_rate_limit_config: Option<InboundRateLimitConfig>,
     ) -> Self {
         let Connection {
             metadata: connection_metadata,
@@ -166,6 +181,32 @@ where
         } = connection;
         let remote_peer_id = connection_metadata.remote_peer_id;
         let max_fragments = max_message_size / max_frame_size;
+
+        // Create the inbound rate limiters
+        let inbound_rate_limiters =
+            inbound_rate_limit_config.map(|inbound_rate_limit_config| InboundRateLimiters {
+                byte_limiter: inbound_rate_limit_config.max_bytes_per_sec.map(|limit| {
+                    let initial_tokens =
+                        limit * (inbound_rate_limit_config.initial_bucket_percentage / 100);
+                    Arc::new(Mutex::new(TokenBucket::new_with_initial_tokens(
+                        limit,
+                        limit,
+                        initial_tokens,
+                        time_service.clone(),
+                    )))
+                }),
+                message_limiter: inbound_rate_limit_config.max_messages_per_sec.map(|limit| {
+                    let initial_tokens =
+                        limit * (inbound_rate_limit_config.initial_bucket_percentage / 100);
+                    Arc::new(Mutex::new(TokenBucket::new_with_initial_tokens(
+                        limit,
+                        limit,
+                        initial_tokens,
+                        time_service.clone(),
+                    )))
+                }),
+            });
+
         Self {
             network_context,
             executor,
@@ -192,6 +233,7 @@ where
             max_frame_size,
             max_message_size,
             inbound_stream: InboundStreamBuffer::new(max_fragments),
+            inbound_rate_limiters,
         }
     }
 
@@ -213,8 +255,25 @@ where
         let (read_socket, write_socket) =
             tokio::io::split(self.connection.take().unwrap().compat());
 
-        let mut reader =
-            MultiplexMessageStream::new(read_socket.compat(), self.max_frame_size).fuse();
+        // Create the message stream for reading inbound messages
+        let message_stream = MultiplexMessageStream::new(read_socket.compat(), self.max_frame_size);
+        let inbound_byte_limiter = self
+            .inbound_rate_limiters
+            .as_ref()
+            .and_then(|limiters| limiters.byte_limiter.clone());
+        let inbound_message_limiter = self
+            .inbound_rate_limiters
+            .as_ref()
+            .and_then(|limiters| limiters.message_limiter.clone());
+        let rate_limited_message_stream = RateLimitedMultiplexMessageStream::new(
+            self.network_context,
+            message_stream,
+            inbound_byte_limiter,
+            inbound_message_limiter,
+        );
+        let mut reader = rate_limited_message_stream.fuse();
+
+        // Create the message sink for writing outbound messages
         let writer = MultiplexMessageSink::new(write_socket.compat_write(), self.max_frame_size);
 
         // Start writer "process" as a separate task. We receive two handles to
