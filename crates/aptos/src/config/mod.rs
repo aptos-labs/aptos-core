@@ -657,10 +657,7 @@ impl CliCommand<String> for RemoveFromKeychain {
             })?;
 
             let profile = profiles.get_mut(&self.profile).ok_or_else(|| {
-                CliError::CommandArgumentError(format!(
-                    "Profile {} does not exist",
-                    self.profile
-                ))
+                CliError::CommandArgumentError(format!("Profile {} does not exist", self.profile))
             })?;
 
             if profile.keychain_entry.is_none() {
@@ -675,8 +672,9 @@ impl CliCommand<String> for RemoveFromKeychain {
 
             // Now handle encryption if requested
             if self.encrypt {
-                let passphrase =
-                    prompt_passphrase_with_confirmation("Enter passphrase to encrypt credentials: ")?;
+                let passphrase = prompt_passphrase_with_confirmation(
+                    "Enter passphrase to encrypt credentials: ",
+                )?;
                 profile.encrypt_private_key(&passphrase)?;
             } else if !self.plaintext {
                 // Default behavior: ask user what to do
