@@ -2484,9 +2484,9 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
-<b>ensures</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_canonical_internal">spec_scalar_is_canonical_internal</a>(bytes) ==&gt; (std::option::is_some(result)
-    && std::option::borrow(result).data == bytes);
-<b>ensures</b> !<a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_canonical_internal">spec_scalar_is_canonical_internal</a>(bytes) ==&gt; std::option::is_none(result);
+<b>ensures</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_canonical_internal">spec_scalar_is_canonical_internal</a>(bytes) ==&gt; (result.is_some()
+    && result.borrow().data == bytes);
+<b>ensures</b> !<a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_canonical_internal">spec_scalar_is_canonical_internal</a>(bytes) ==&gt; result.is_none();
 </code></pre>
 
 
@@ -2588,8 +2588,8 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 
 
-<pre><code><b>ensures</b> len(bytes) != 32 ==&gt; std::option::is_none(result);
-<b>ensures</b> len(bytes) == 32 ==&gt; std::option::borrow(result).data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_reduced_from_32_bytes_internal">spec_scalar_reduced_from_32_bytes_internal</a>(bytes);
+<pre><code><b>ensures</b> len(bytes) != 32 ==&gt; result.is_none();
+<b>ensures</b> len(bytes) == 32 ==&gt; result.borrow().data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_reduced_from_32_bytes_internal">spec_scalar_reduced_from_32_bytes_internal</a>(bytes);
 </code></pre>
 
 
@@ -2605,8 +2605,8 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 
 
-<pre><code><b>ensures</b> len(bytes) != 64 ==&gt; std::option::is_none(result);
-<b>ensures</b> len(bytes) == 64 ==&gt; std::option::borrow(result).data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_uniform_from_64_bytes_internal">spec_scalar_uniform_from_64_bytes_internal</a>(bytes);
+<pre><code><b>ensures</b> len(bytes) != 64 ==&gt; result.is_none();
+<b>ensures</b> len(bytes) == 64 ==&gt; result.borrow().data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_uniform_from_64_bytes_internal">spec_scalar_uniform_from_64_bytes_internal</a>(bytes);
 </code></pre>
 
 
@@ -2704,8 +2704,8 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
-<b>ensures</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_zero">spec_scalar_is_zero</a>(s) ==&gt; std::option::is_none(result);
-<b>ensures</b> !<a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_zero">spec_scalar_is_zero</a>(s) ==&gt; (std::option::is_some(result) && std::option::borrow(result).data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_invert_internal">spec_scalar_invert_internal</a>(s.data));
+<b>ensures</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_zero">spec_scalar_is_zero</a>(s) ==&gt; result.is_none();
+<b>ensures</b> !<a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_zero">spec_scalar_is_zero</a>(s) ==&gt; (result.is_some() && result.borrow().data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_invert_internal">spec_scalar_invert_internal</a>(s.data));
 </code></pre>
 
 

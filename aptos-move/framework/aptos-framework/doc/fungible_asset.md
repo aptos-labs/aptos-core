@@ -4791,8 +4791,8 @@ Removing permissions from permissioned signer.
 
 
 
-<pre><code><b>modifies</b> <b>global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(<a href="object.md#0x1_object_object_address">object::object_address</a>(store));
-<b>modifies</b> <b>global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a>&gt;(<a href="object.md#0x1_object_object_address">object::object_address</a>(store));
+<pre><code><b>modifies</b> <b>global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store.object_address());
+<b>modifies</b> <b>global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a>&gt;(store.object_address());
 </code></pre>
 
 
