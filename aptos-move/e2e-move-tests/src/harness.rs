@@ -434,6 +434,37 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         txn: SignedTransaction,
         auxiliary_info: &AuxiliaryInfo,
     ) -> (TransactionGasLog, u64, Option<FeeStatement>) {
+        let (_, gas_log, gas_used, fee_statement) =
+            self.evaluate_gas_with_profiler_and_status_signed(txn, auxiliary_info);
+        (gas_log, gas_used, fee_statement)
+    }
+
+    /// Runs a transaction with the gas profiler and returns the transaction status.
+    pub fn evaluate_gas_with_profiler_and_status(
+        &mut self,
+        account: &Account,
+        payload: TransactionPayload,
+    ) -> (
+        TransactionStatus,
+        TransactionGasLog,
+        u64,
+        Option<FeeStatement>,
+    ) {
+        let txn = self.create_transaction_payload(account, payload);
+        self.evaluate_gas_with_profiler_and_status_signed(txn, &AuxiliaryInfo::default())
+    }
+
+    /// Runs a transaction with the gas profiler and returns the transaction status.
+    pub fn evaluate_gas_with_profiler_and_status_signed(
+        &mut self,
+        txn: SignedTransaction,
+        auxiliary_info: &AuxiliaryInfo,
+    ) -> (
+        TransactionStatus,
+        TransactionGasLog,
+        u64,
+        Option<FeeStatement>,
+    ) {
         let (output, gas_log) = self
             .executor
             .execute_transaction_with_gas_profiler(txn, auxiliary_info)
@@ -442,6 +473,7 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
             self.executor.apply_write_set(output.write_set());
         }
         (
+            output.status().clone(),
             gas_log,
             output.gas_used(),
             output.try_extract_fee_statement().unwrap(),
