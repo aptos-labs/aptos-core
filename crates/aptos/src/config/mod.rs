@@ -650,71 +650,67 @@ impl CliCommand<String> for RemoveFromKeychain {
 
         let mut config = CliConfig::load(ConfigSearchMode::CurrentDir)?;
 
-        if let Some(profiles) = &mut config.profiles {
-            if let Some(profile) = profiles.get_mut(&self.profile) {
-                if profile.keychain_entry.is_none() {
-                    return Err(CliError::CommandArgumentError(format!(
-                        "Profile {} does not have credentials stored in keychain",
-                        self.profile
-                    )));
-                }
+        // Use a block to limit the scope of the mutable borrow
+        let storage_method = {
+            let profiles = config.profiles.as_mut().ok_or_else(|| {
+                CliError::CommandArgumentError("Config has no profiles".to_string())
+            })?;
 
-                // Remove from keychain and keep plaintext temporarily
-                profile.remove_from_keychain(true)?;
+            let profile = profiles.get_mut(&self.profile).ok_or_else(|| {
+                CliError::CommandArgumentError(format!(
+                    "Profile {} does not exist",
+                    self.profile
+                ))
+            })?;
 
-                // Now handle encryption if requested
-                if self.encrypt {
+            if profile.keychain_entry.is_none() {
+                return Err(CliError::CommandArgumentError(format!(
+                    "Profile {} does not have credentials stored in keychain",
+                    self.profile
+                )));
+            }
+
+            // Remove from keychain and keep plaintext temporarily
+            profile.remove_from_keychain(true)?;
+
+            // Now handle encryption if requested
+            if self.encrypt {
+                let passphrase =
+                    prompt_passphrase_with_confirmation("Enter passphrase to encrypt credentials: ")?;
+                profile.encrypt_private_key(&passphrase)?;
+            } else if !self.plaintext {
+                // Default behavior: ask user what to do
+                eprintln!("The private key has been removed from the keychain.");
+                eprintln!("Would you like to encrypt it with a passphrase? (recommended)");
+                if crate::common::utils::prompt_yes("Encrypt credentials?") {
                     let passphrase = prompt_passphrase_with_confirmation(
                         "Enter passphrase to encrypt credentials: ",
                     )?;
                     profile.encrypt_private_key(&passphrase)?;
-                } else if !self.plaintext {
-                    // Default behavior: ask user what to do
-                    eprintln!("The private key has been removed from the keychain.");
-                    eprintln!("Would you like to encrypt it with a passphrase? (recommended)");
-                    if crate::common::utils::prompt_yes("Encrypt credentials?") {
-                        let passphrase = prompt_passphrase_with_confirmation(
-                            "Enter passphrase to encrypt credentials: ",
-                        )?;
-                        profile.encrypt_private_key(&passphrase)?;
-                    } else {
-                        eprintln!("Warning: Storing private key in plaintext is less secure.");
-                    }
-                }
-
-                // Determine storage method before dropping the profile reference
-                let storage_method = if profile.encrypted_private_key.is_some() {
-                    "encrypted"
                 } else {
-                    "plaintext"
-                };
-
-                // Drop the mutable borrow before saving
-                drop(profile);
-                drop(profiles);
-
-                config.save().map_err(|err| {
-                    CliError::UnexpectedError(format!(
-                        "Unable to save config after removing credentials from keychain: {}",
-                        err,
-                    ))
-                })?;
-
-                Ok(format!(
-                    "Successfully removed credentials for profile {} from keychain and stored as {}",
-                    self.profile, storage_method
-                ))
-            } else {
-                Err(CliError::CommandArgumentError(format!(
-                    "Profile {} does not exist",
-                    self.profile
-                )))
+                    eprintln!("Warning: Storing private key in plaintext is less secure.");
+                }
             }
-        } else {
-            Err(CliError::CommandArgumentError(
-                "Config has no profiles".to_string(),
+
+            // Determine storage method - this value will be returned from the block
+            if profile.encrypted_private_key.is_some() {
+                "encrypted"
+            } else {
+                "plaintext"
+            }
+        }; // Mutable borrow ends here
+
+        config.save().map_err(|err| {
+            CliError::UnexpectedError(format!(
+                "Unable to save config after removing credentials from keychain: {}",
+                err,
             ))
-        }
+        })?;
+
+        Ok(format!(
+            "Successfully removed credentials for profile {} from keychain and stored as {}",
+            self.profile, storage_method
+        ))
     }
 }
 
