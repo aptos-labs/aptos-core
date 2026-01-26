@@ -15,7 +15,6 @@ This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 -  [Enum `PreCancellationTracker`](#0x7_pre_cancellation_tracker_PreCancellationTracker)
 -  [Struct `ExpirationAndOrderId`](#0x7_pre_cancellation_tracker_ExpirationAndOrderId)
 -  [Constants](#@Constants_0)
--  [Function `new_default_big_ordered_map`](#0x7_pre_cancellation_tracker_new_default_big_ordered_map)
 -  [Function `new_pre_cancellation_tracker`](#0x7_pre_cancellation_tracker_new_pre_cancellation_tracker)
 -  [Function `pre_cancel_order_for_tracker`](#0x7_pre_cancellation_tracker_pre_cancel_order_for_tracker)
 -  [Function `is_pre_cancelled`](#0x7_pre_cancellation_tracker_is_pre_cancelled)
@@ -120,24 +119,6 @@ This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 ## Constants
 
 
-<a id="0x7_pre_cancellation_tracker_BIG_MAP_INNER_DEGREE"></a>
-
-
-
-<pre><code><b>const</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_BIG_MAP_INNER_DEGREE">BIG_MAP_INNER_DEGREE</a>: u16 = 64;
-</code></pre>
-
-
-
-<a id="0x7_pre_cancellation_tracker_BIG_MAP_LEAF_DEGREE"></a>
-
-
-
-<pre><code><b>const</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_BIG_MAP_LEAF_DEGREE">BIG_MAP_LEAF_DEGREE</a>: u16 = 32;
-</code></pre>
-
-
-
 <a id="0x7_pre_cancellation_tracker_DUPLICATE_ORDER_PLACEMENT"></a>
 
 
@@ -155,34 +136,6 @@ This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 </code></pre>
 
 
-
-<a id="0x7_pre_cancellation_tracker_new_default_big_ordered_map"></a>
-
-## Function `new_default_big_ordered_map`
-
-
-
-<pre><code><b>fun</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_new_default_big_ordered_map">new_default_big_ordered_map</a>&lt;K: store, V: store&gt;(): <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_new_default_big_ordered_map">new_default_big_ordered_map</a>&lt;K: store, V: store&gt;(): BigOrderedMap&lt;K, V&gt; {
-    <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map_new_with_config">big_ordered_map::new_with_config</a>(
-        <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_BIG_MAP_INNER_DEGREE">BIG_MAP_INNER_DEGREE</a>,
-        <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_BIG_MAP_LEAF_DEGREE">BIG_MAP_LEAF_DEGREE</a>,
-        <b>true</b>
-    )
-}
-</code></pre>
-
-
-
-</details>
 
 <a id="0x7_pre_cancellation_tracker_new_pre_cancellation_tracker"></a>
 
@@ -202,8 +155,8 @@ This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_new_pre_cancellation_tracker">new_pre_cancellation_tracker</a>(expiration_time_secs: u64): <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_PreCancellationTracker">PreCancellationTracker</a> {
     PreCancellationTracker::V1 {
         pre_cancellation_window_secs: expiration_time_secs,
-        expiration_with_order_ids: <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_new_default_big_ordered_map">new_default_big_ordered_map</a>(),
-        account_order_ids: <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_new_default_big_ordered_map">new_default_big_ordered_map</a>(),
+        expiration_with_order_ids: <a href="order_book_utils.md#0x7_order_book_utils_new_default_big_ordered_map">order_book_utils::new_default_big_ordered_map</a>(),
+        account_order_ids: <a href="order_book_utils.md#0x7_order_book_utils_new_default_big_ordered_map">order_book_utils::new_default_big_ordered_map</a>(),
     }
 }
 </code></pre>

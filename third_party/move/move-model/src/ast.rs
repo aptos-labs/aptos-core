@@ -271,6 +271,49 @@ impl fmt::Display for QuantKind {
     }
 }
 
+/// The kind of behavior predicate for function values in specifications.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BehaviorKind {
+    /// `requires_of<f>(args)` - the precondition of function `f`
+    RequiresOf,
+    /// `aborts_of<f>(args)` - the aborts condition of function `f`
+    AbortsOf,
+    /// `ensures_of<f>(args)` - the postcondition of function `f`
+    EnsuresOf,
+    /// `modifies_of<f>(args)` - the modify clauses of function `f`
+    ModifiesOf,
+}
+
+impl fmt::Display for BehaviorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        use BehaviorKind::*;
+        match self {
+            RequiresOf => write!(f, "requires_of"),
+            AbortsOf => write!(f, "aborts_of"),
+            EnsuresOf => write!(f, "ensures_of"),
+            ModifiesOf => write!(f, "modifies_of"),
+        }
+    }
+}
+
+/// The target of a behavior predicate - either a function parameter or a known function.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum BehaviorTarget {
+    /// A parameter of function type, identified by its symbol.
+    Parameter(Symbol),
+    /// A known Move function.
+    Function(QualifiedInstId<FunId>),
+}
+
+impl fmt::Display for BehaviorTarget {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BehaviorTarget::Parameter(sym) => write!(f, "param#{:?}", sym),
+            BehaviorTarget::Function(qid) => write!(f, "{:?}", qid),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Condition {
     pub loc: Loc,
@@ -1995,6 +2038,15 @@ pub enum Operation {
     // Specification specific
     SpecFunction(ModuleId, SpecFunId, Option<Vec<MemoryLabel>>),
     UpdateField(ModuleId, StructId, FieldId),
+    /// Behavior predicate for function values (requires_of, aborts_of, ensures_of, modifies_of).
+    /// Arguments: kind of predicate, pre-state label, target function/parameter, post-state label.
+    /// Labels are currently ignored but reserved for future state-binding functionality.
+    Behavior(
+        BehaviorKind,
+        Option<MemoryLabel>,
+        BehaviorTarget,
+        Option<MemoryLabel>,
+    ),
     Result(usize),
     Index,
     Slice,
@@ -2817,13 +2869,14 @@ impl Operation {
             UpdateField(..) => false,    // Move-related
 
             // Specification specific
-            Result(..) => false, // Spec
-            Index => false,      // Spec
-            Slice => false,      // Spec
-            Range => false,      // Spec
-            Implies => false,    // Spec
-            Iff => false,        // Spec
-            Identical => false,  // Spec
+            Result(..) => false,   // Spec
+            Index => false,        // Spec
+            Slice => false,        // Spec
+            Range => false,        // Spec
+            Implies => false,      // Spec
+            Iff => false,          // Spec
+            Identical => false,    // Spec
+            Behavior(..) => false, // Spec
 
             // Binary operators
             Add => false, // can overflow
@@ -3770,6 +3823,30 @@ impl fmt::Display for OperationDisplay<'_> {
                 write!(f, "update {}", self.field_str(mid, sid, fid))
             },
             Result(t) => write!(f, "result{}", t),
+            Behavior(kind, pre_label, target, post_label) => {
+                if let Some(label) = pre_label {
+                    write!(f, "@{}", label)?;
+                }
+                write!(f, "{}", kind)?;
+                write!(f, "<")?;
+                match target {
+                    BehaviorTarget::Parameter(sym) => {
+                        write!(f, "{}", sym.display(self.env.symbol_pool()))?
+                    },
+                    BehaviorTarget::Function(qid) => write!(
+                        f,
+                        "{}",
+                        self.env
+                            .get_function(qid.to_qualified_id())
+                            .get_full_name_str()
+                    )?,
+                }
+                write!(f, ">")?;
+                if let Some(label) = post_label {
+                    write!(f, "@{}", label)?;
+                }
+                Ok(())
+            },
             Abort(_) => write!(f, "Abort"),
             _ => write!(f, "{:?}", self.oper),
         }?;

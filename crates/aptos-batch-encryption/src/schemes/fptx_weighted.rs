@@ -4,7 +4,6 @@ use crate::{
     errors::BatchEncryptionError,
     group::*,
     shared::{
-        ark_serialize::*,
         ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, StandardCiphertext},
         digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise},
         encryption_key::EncryptionKey,
@@ -19,7 +18,11 @@ use crate::{
     },
 };
 use anyhow::{anyhow, Result};
-use aptos_crypto::{weighted_config::WeightedConfigArkworks, SecretSharingConfig as _};
+use aptos_crypto::{
+    arkworks::serialization::{ark_de, ark_se},
+    weighted_config::WeightedConfigArkworks,
+    SecretSharingConfig as _,
+};
 use aptos_dkg::pvss::{
     traits::{Reconstructable as _, Subtranscript},
     Player,
@@ -295,8 +298,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
     )> {
         let mut rng = <StdRng as SeedableRng>::seed_from_u64(seed);
 
-        let digest_key = DigestKey::new(&mut rng, max_batch_size, number_of_rounds)
-            .ok_or(anyhow!("Failed to create digest key"))?;
+        let digest_key = DigestKey::new(&mut rng, max_batch_size, number_of_rounds)?;
         let msk = Fr::rand(&mut rng);
         let (mpk, vks, msk_shares) = gen_weighted_msk_shares(msk, &mut rng, threshold_config);
 

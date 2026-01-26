@@ -214,30 +214,30 @@ module aptos_framework::aggregator_v2 {
             assert spec_get_max_value(agg) == 10;
             assert spec_get_value(agg) == 0;
         };
-        let x = try_add(&mut agg, 5);
+        let x = agg.try_add(5);
         spec {
             assert x;
-            assert is_at_least(agg, 5);
+            assert agg.is_at_least(5);
         };
-        let y = try_sub(&mut agg, 6);
+        let y = agg.try_sub(6);
         spec {
             assert !y;
             assert spec_get_value(agg) == 5;
             assert spec_get_max_value(agg) == 10;
         };
-        let y = try_sub(&mut agg, 4);
+        let y = agg.try_sub(4);
         spec {
             assert y;
             assert spec_get_value(agg) == 1;
             assert spec_get_max_value(agg) == 10;
         };
-        let x = try_add(&mut agg, 11);
+        let x = agg.try_add(11);
         spec {
             assert !x;
             assert spec_get_value(agg) == 1;
             assert spec_get_max_value(agg) == 10;
         };
-        let x = try_add(&mut agg, 9);
+        let x = agg.try_add(9);
         spec {
             assert x;
             assert spec_get_value(agg) == 10;
@@ -249,17 +249,17 @@ module aptos_framework::aggregator_v2 {
     spec verify_aggregator_try_add_sub{
         ensures spec_get_max_value(result) == 10;
         ensures spec_get_value(result) == 10;
-        ensures read(result) == 10;
+        ensures result.read() == 10;
     }
 
     #[verify_only]
     fun verify_aggregator_add_sub(sub_value: u64, add_value: u64) {
         let agg = create_aggregator(10);
-        add(&mut agg, add_value);
+        agg.add(add_value);
         spec {
             assert spec_get_value(agg) == add_value;
         };
-        sub(&mut agg, sub_value);
+        agg.sub(sub_value);
         spec {
             assert spec_get_value(agg) == add_value - sub_value;
         };
@@ -285,7 +285,7 @@ module aptos_framework::aggregator_v2 {
 
     #[verify_only]
     fun verify_invalid_read(aggregator: &Aggregator<u8>): u8 {
-        read(aggregator)
+        aggregator.read()
     }
     spec verify_invalid_read {
         aborts_if true;
@@ -293,7 +293,7 @@ module aptos_framework::aggregator_v2 {
 
     #[verify_only]
     fun verify_invalid_is_least(aggregator: &Aggregator<u8>): bool {
-        is_at_least(aggregator, 0)
+        aggregator.is_at_least(0)
     }
     spec verify_invalid_is_least {
         aborts_if true;
@@ -333,11 +333,11 @@ module aptos_framework::aggregator_v2 {
 
     #[verify_only]
     fun verify_aggregator_generic_add<IntElement: copy + drop>(aggregator: &mut Aggregator<IntElement>, value: IntElement) {
-        try_add(aggregator, value);
-        is_at_least_impl(aggregator, value);
+        aggregator.try_add(value);
+        aggregator.is_at_least_impl(value);
         // cannot specify aborts_if condition for generic `add`
         // because comparison is not supported by IntElement
-        add(aggregator, value);
+        aggregator.add(value);
     }
     spec verify_aggregator_generic_add<IntElement: copy + drop>(aggregator: &mut Aggregator<IntElement>, value: IntElement) {
         use aptos_std::type_info;
@@ -346,10 +346,10 @@ module aptos_framework::aggregator_v2 {
 
     #[verify_only]
     fun verify_aggregator_generic_sub<IntElement: copy + drop>(aggregator: &mut Aggregator<IntElement>, value: IntElement) {
-        try_sub(aggregator, value);
+        aggregator.try_sub(value);
         // cannot specify aborts_if condition for generic `sub`
         // because comparison is not supported by IntElement
-        sub(aggregator, value);
+        aggregator.sub(value);
     }
     spec verify_aggregator_generic_sub<IntElement: copy + drop>(aggregator: &mut Aggregator<IntElement>, value: IntElement) {
         use aptos_std::type_info;
@@ -405,27 +405,27 @@ module aptos_framework::aggregator_v2 {
     #[test]
     fun test_aggregator() {
         let agg = create_aggregator(10);
-        assert!(try_add(&mut agg, 5), 1);
-        assert!(try_add(&mut agg, 5), 2);
-        assert!(read(&agg) == 10, 3);
-        assert!(!try_add(&mut agg, 5), 4);
-        assert!(read(&agg) == 10, 5);
-        assert!(try_sub(&mut agg, 5), 6);
-        assert!(read(&agg) == 5, 7);
+        assert!(agg.try_add(5), 1);
+        assert!(agg.try_add(5), 2);
+        assert!(agg.read() == 10, 3);
+        assert!(!agg.try_add(5), 4);
+        assert!(agg.read() == 10, 5);
+        assert!(agg.try_sub(5), 6);
+        assert!(agg.read() == 5, 7);
 
-        let snap = snapshot(&agg);
-        assert!(try_add(&mut agg, 2), 8);
-        assert!(read(&agg) == 7, 9);
-        assert!(read_snapshot(&snap) == 5, 10);
+        let snap = agg.snapshot();
+        assert!(agg.try_add(2), 8);
+        assert!(agg.read() == 7, 9);
+        assert!(snap.read_snapshot() == 5, 10);
     }
 
     #[test]
     fun test_correct_read() {
         let snapshot = create_snapshot(42);
-        assert!(read_snapshot(&snapshot) == 42, 0);
+        assert!(snapshot.read_snapshot() == 42, 0);
 
         let derived = create_derived_string(std::string::utf8(b"42"));
-        assert!(read_derived_string(&derived) == std::string::utf8(b"42"), 0);
+        assert!(derived.read_derived_string() == std::string::utf8(b"42"), 0);
     }
 
     #[test]
@@ -439,7 +439,7 @@ module aptos_framework::aggregator_v2 {
     fun test_string_concat1() {
         let snapshot = create_snapshot(42);
         let derived = derive_string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
-        assert!(read_derived_string(&derived) == std::string::utf8(b"before42after"), 0);
+        assert!(derived.read_derived_string() == std::string::utf8(b"before42after"), 0);
     }
 
     #[test]

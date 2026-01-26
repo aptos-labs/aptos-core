@@ -102,7 +102,7 @@ pub trait EntrywiseMap<T> {
 
     fn map<U, F>(self, f: F) -> Self::Output<U>
     where
-        F: Fn(T) -> U,
+        F: FnMut(T) -> U,
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
 }
 
@@ -121,9 +121,9 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> Entrywis
     type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> =
         TrivialShape<U>;
 
-    fn map<U, F>(self, f: F) -> Self::Output<U>
+    fn map<U, F>(self, mut f: F) -> Self::Output<U>
     where
-        F: Fn(T) -> U,
+        F: FnMut(T) -> U,
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
     {
         TrivialShape(f(self.0))
@@ -164,7 +164,7 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> Entrywis
 
     fn map<U, F>(self, f: F) -> Self::Output<U>
     where
-        F: Fn(T) -> U,
+        F: FnMut(T) -> U,
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
     {
         VectorShape(self.0.into_iter().map(f).collect())

@@ -100,7 +100,7 @@ fn native_sub_string(
 
     if j < i {
         // TODO: The abort code should follow the error convention.
-        return Err(aptos_native_interface::SafeNativeError::Abort { abort_code: 1 });
+        return Err(aptos_native_interface::SafeNativeError::abort(1));
     }
 
     context.charge(STRING_SUB_STRING_PER_BYTE * NumBytes::new((j - i) as u64))?;

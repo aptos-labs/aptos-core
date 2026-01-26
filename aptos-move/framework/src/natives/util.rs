@@ -51,11 +51,7 @@ fn native_from_bytes(
         .deserialize(&bytes, &layout)
     {
         Some(val) => val,
-        None => {
-            return Err(SafeNativeError::Abort {
-                abort_code: EFROM_BYTES,
-            })
-        },
+        None => return Err(SafeNativeError::abort(EFROM_BYTES)),
     };
 
     Ok(smallvec![val])

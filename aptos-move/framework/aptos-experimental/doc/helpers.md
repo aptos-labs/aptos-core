@@ -51,11 +51,11 @@ exists because we did not like the interface of <code>std::vector::trim</code>.)
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="helpers.md#0x7_helpers_cut_vector">cut_vector</a>&lt;T&gt;(vec: &<b>mut</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;T&gt;, cut_len: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;T&gt; {
-    <b>let</b> len = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(vec);
+    <b>let</b> len = vec.length();
     <b>let</b> res = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
     <b>assert</b>!(len &gt;= cut_len, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="helpers.md#0x7_helpers_EVECTOR_CUT_TOO_LARGE">EVECTOR_CUT_TOO_LARGE</a>));
     <b>while</b> (cut_len &gt; 0) {
-        res.push_back(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(vec));
+        res.push_back(vec.pop_back());
         cut_len -= 1;
     };
     res.reverse();

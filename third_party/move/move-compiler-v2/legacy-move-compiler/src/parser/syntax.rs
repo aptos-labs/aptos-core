@@ -1096,6 +1096,59 @@ fn parse_sequence_item(context: &mut Context) -> Result<SequenceItem, Box<Diagno
     ))
 }
 
+/// Check if an expression ends with a `}`.
+fn exp_ends_with_rbrace(exp: &Exp) -> bool {
+    match &exp.value {
+        // Block expressions always end with `}`
+        Exp_::Block(_) => true,
+        // Match expressions always end with `}`
+        Exp_::Match(_, _) => true,
+        // For IfElse, check the last branch
+        Exp_::IfElse(_, then_exp, else_opt) => {
+            if let Some(else_exp) = else_opt {
+                // If there's an else, check the else branch
+                exp_ends_with_rbrace(else_exp)
+            } else {
+                // If there's no else, check if the then branch ends with a `}`
+                exp_ends_with_rbrace(then_exp)
+            }
+        },
+        // For While and Loop, check the body
+        Exp_::While(_, _, body) | Exp_::Loop(_, body) => exp_ends_with_rbrace(body),
+        // All other expression types don't end with a `}`.
+        // We keep this list exhaustive to catch future additions.
+        Exp_::Value(_)
+        | Exp_::Move(_)
+        | Exp_::Copy(_)
+        | Exp_::Name(_, _)
+        | Exp_::Call(_, _, _, _)
+        | Exp_::ExpCall(_, _)
+        | Exp_::Pack(_, _, _)
+        | Exp_::Vector(_, _, _)
+        | Exp_::Lambda(_, _, _, _)
+        | Exp_::Quant(_, _, _, _, _)
+        | Exp_::Behavior(_, _, _, _, _, _)
+        | Exp_::ExpList(_)
+        | Exp_::Unit
+        | Exp_::Assign(_, _, _)
+        | Exp_::Return(_)
+        | Exp_::Abort(_)
+        | Exp_::Break(_)
+        | Exp_::Continue(_)
+        | Exp_::Dereference(_)
+        | Exp_::UnaryExp(_, _)
+        | Exp_::BinopExp(_, _, _)
+        | Exp_::Borrow(_, _)
+        | Exp_::Dot(_, _)
+        | Exp_::Index(_, _)
+        | Exp_::Cast(_, _)
+        | Exp_::Annotate(_, _)
+        | Exp_::Test(_, _)
+        | Exp_::Spec(_)
+        | Exp_::UnresolvedError => false,
+    }
+}
+
 // Parse a sequence:
 //      Sequence = <UseDecl>* (<SequenceItem> ";")* <Exp>? "}"
 //
@@ -1128,8 +1181,27 @@ fn parse_sequence(context: &mut Context) -> Result<Sequence, Box<Diagnostic>> {
             break;
         }
         seq.push(item);
-        last_semicolon_loc = Some(current_token_loc(context.tokens));
-        consume_token(context.tokens, Tok::Semicolon)?;
+
+        // Check if semicolon can be optional for expressions that end with `}`.
+        let semicolon_optional = match &seq.last() {
+            Some(last_item) => match &last_item.value {
+                SequenceItem_::Seq(e) => exp_ends_with_rbrace(e),
+                _ => false,
+            },
+            None => false,
+        };
+
+        if semicolon_optional {
+            // Semicolon is optional after expressions that end with `}`.
+            if context.tokens.peek() == Tok::Semicolon {
+                last_semicolon_loc = Some(current_token_loc(context.tokens));
+                context.tokens.advance()?;
+            }
+        } else {
+            // Semicolon is required
+            last_semicolon_loc = Some(current_token_loc(context.tokens));
+            consume_token(context.tokens, Tok::Semicolon)?;
+        }
     }
     context.tokens.advance()?; // consume the RBrace
     Ok((uses, seq, last_semicolon_loc, Box::new(eopt)))

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
-    group::{self, *},
+    group::*,
     shared::{
         ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, SuccinctCiphertext},
         digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise},
@@ -39,7 +39,7 @@ impl BatchThresholdEncryption for FPTXSuccinct {
     type MasterSecretKeyShare = BIBEMasterSecretKeyShare;
     type PreparedCiphertext = PreparedCiphertext;
     type Round = u64;
-    type SubTranscript = aptos_dkg::pvss::chunky::UnweightedSubtranscript<group::Pairing>;
+    type SubTranscript = aptos_dkg::pvss::chunky::WeightedSubtranscript<Pairing>;
     type ThresholdConfig = aptos_crypto::arkworks::shamir::ShamirThresholdConfig<Fr>;
     type VerificationKey = BIBEVerificationKey;
 
@@ -72,8 +72,7 @@ impl BatchThresholdEncryption for FPTXSuccinct {
     )> {
         let mut rng = <StdRng as SeedableRng>::seed_from_u64(seed);
 
-        let digest_key = DigestKey::new(&mut rng, max_batch_size, number_of_rounds)
-            .ok_or(anyhow!("Failed to create digest key"))?;
+        let digest_key = DigestKey::new(&mut rng, max_batch_size, number_of_rounds)?;
         let msk = Fr::rand(&mut rng);
         let (mpk, vks, msk_shares) = key_derivation::gen_msk_shares(msk, &mut rng, tc);
 

@@ -359,7 +359,7 @@ Maximum number of characters in a property name
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_init">init</a>(ref: &ConstructorRef, container: <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a>) {
-    <b>let</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> = <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer">object::generate_signer</a>(ref);
+    <b>let</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> = ref.generate_signer();
     <b>move_to</b>(&<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, container);
 }
 </code></pre>
@@ -384,7 +384,7 @@ Maximum number of characters in a property name
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_extend">extend</a>(ref: &ExtendRef, container: <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a>) {
-    <b>let</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> = <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer_for_extending">object::generate_signer_for_extending</a>(ref);
+    <b>let</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> = ref.generate_signer_for_extending();
     <b>move_to</b>(&<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, container);
 }
 </code></pre>
@@ -652,7 +652,7 @@ Validates property value type against its expected type
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_generate_mutator_ref">generate_mutator_ref</a>(ref: &ConstructorRef): <a href="property_map.md#0x4_property_map_MutatorRef">MutatorRef</a> {
-    <a href="property_map.md#0x4_property_map_MutatorRef">MutatorRef</a> { self: <a href="../../aptos-framework/doc/object.md#0x1_object_address_from_constructor_ref">object::address_from_constructor_ref</a>(ref) }
+    <a href="property_map.md#0x4_property_map_MutatorRef">MutatorRef</a> { self: ref.address_from_constructor_ref() }
 }
 </code></pre>
 
@@ -676,8 +676,8 @@ Validates property value type against its expected type
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_contains_key">contains_key</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): bool <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
-    <a href="property_map.md#0x4_property_map_assert_exists">assert_exists</a>(<a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>));
-    <b>let</b> <a href="property_map.md#0x4_property_map">property_map</a> = &<a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a>[<a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>)];
+    <a href="property_map.md#0x4_property_map_assert_exists">assert_exists</a>(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>.object_address());
+    <b>let</b> <a href="property_map.md#0x4_property_map">property_map</a> = &<a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a>[<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>.object_address()];
     <a href="property_map.md#0x4_property_map">property_map</a>.inner.<a href="property_map.md#0x4_property_map_contains_key">contains_key</a>(key)
 }
 </code></pre>
@@ -702,8 +702,8 @@ Validates property value type against its expected type
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_length">length</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;): u64 <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
-    <a href="property_map.md#0x4_property_map_assert_exists">assert_exists</a>(<a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>));
-    <b>let</b> <a href="property_map.md#0x4_property_map">property_map</a> = &<a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a>[<a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>)];
+    <a href="property_map.md#0x4_property_map_assert_exists">assert_exists</a>(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>.object_address());
+    <b>let</b> <a href="property_map.md#0x4_property_map">property_map</a> = &<a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a>[<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>.object_address()];
     <a href="property_map.md#0x4_property_map">property_map</a>.inner.<a href="property_map.md#0x4_property_map_length">length</a>()
 }
 </code></pre>
@@ -731,8 +731,8 @@ The preferred method is to use <code>read_&lt;type&gt;</code> where the type is 
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_read">read</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): (String, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
-    <a href="property_map.md#0x4_property_map_assert_exists">assert_exists</a>(<a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>));
-    <b>let</b> <a href="property_map.md#0x4_property_map">property_map</a> = &<a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a>[<a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>)];
+    <a href="property_map.md#0x4_property_map_assert_exists">assert_exists</a>(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>.object_address());
+    <b>let</b> <a href="property_map.md#0x4_property_map">property_map</a> = &<a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a>[<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>.object_address()];
     <b>let</b> property_value = <a href="property_map.md#0x4_property_map">property_map</a>.inner.borrow(key);
     <b>let</b> new_type = <a href="property_map.md#0x4_property_map_to_external_type">to_external_type</a>(property_value.type);
     (new_type, property_value.value)

@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: `modifies_of` is not supported for function-typed parameters
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_param_err.move:15:17
+   │
+15 │         ensures modifies_of<f>(global<Counter>(addr));
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

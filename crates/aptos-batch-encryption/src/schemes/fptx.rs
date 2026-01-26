@@ -1,8 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
-    errors::BatchEncryptionError,
-    group::{self, *},
+    group::*,
     shared::{
         ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, StandardCiphertext},
         digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise},
@@ -16,12 +15,10 @@ use crate::{
     traits::{AssociatedData, BatchThresholdEncryption, Plaintext},
 };
 use anyhow::{anyhow, Result};
-use aptos_crypto::SecretSharingConfig as _;
 use aptos_dkg::pvss::{
     traits::{Reconstructable as _, Subtranscript},
     Player,
 };
-use ark_ec::AffineRepr as _;
 use ark_ff::UniformRand as _;
 use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 use rayon::iter::{IntoParallelIterator, ParallelIterator as _};
@@ -42,58 +39,26 @@ impl BatchThresholdEncryption for FPTX {
     type MasterSecretKeyShare = BIBEMasterSecretKeyShare;
     type PreparedCiphertext = PreparedCiphertext;
     type Round = u64;
-    type SubTranscript = aptos_dkg::pvss::chunky::UnweightedSubtranscript<group::Pairing>;
+    // This is essentially a placeholder, since there is no PVSS scheme right now that works
+    // with the unweighted `SmairThresholdConfig`
+    type SubTranscript = aptos_dkg::pvss::chunky::WeightedSubtranscript<Pairing>;
     type ThresholdConfig = aptos_crypto::arkworks::shamir::ShamirThresholdConfig<Fr>;
     type VerificationKey = BIBEVerificationKey;
 
     fn setup(
-        digest_key: &Self::DigestKey,
-        pvss_public_params: &<Self::SubTranscript as Subtranscript>::PublicParameters,
-        subtranscript: &Self::SubTranscript,
-        threshold_config: &Self::ThresholdConfig,
-        current_player: Player,
-        msk_share_decryption_key: &<Self::SubTranscript as Subtranscript>::DecryptPrivKey,
+        _digest_key: &Self::DigestKey,
+        _pvss_public_params: &<Self::SubTranscript as Subtranscript>::PublicParameters,
+        _subtranscript: &Self::SubTranscript,
+        _threshold_config: &Self::ThresholdConfig,
+        _current_player: Player,
+        _msk_share_decryption_key: &<Self::SubTranscript as Subtranscript>::DecryptPrivKey,
     ) -> Result<(
         Self::EncryptionKey,
         Vec<Self::VerificationKey>,
         Self::MasterSecretKeyShare,
     )> {
-        let mpk_g2: G2Affine = subtranscript.get_dealt_public_key().as_g2();
-
-        let ek = EncryptionKey::new(mpk_g2, digest_key.tau_g2);
-
-        let vks: Vec<Self::VerificationKey> = threshold_config
-            .get_players()
-            .into_iter()
-            .map(|p| Self::VerificationKey {
-                player: p,
-                mpk_g2,
-                vk_g2: subtranscript
-                    .get_public_key_share(threshold_config, &p)
-                    .as_g2(),
-            })
-            .collect();
-
-        let msk_share = Self::MasterSecretKeyShare {
-            mpk_g2,
-            player: current_player,
-            shamir_share_eval: subtranscript
-                .decrypt_own_share(
-                    threshold_config,
-                    &current_player,
-                    msk_share_decryption_key,
-                    pvss_public_params,
-                )
-                .0
-                .into_fr(),
-        };
-
-        (vks[msk_share.player.get_id()].vk_g2
-            == G2Affine::generator() * msk_share.shamir_share_eval)
-            .then_some(())
-            .ok_or(BatchEncryptionError::VKMSKMismatchError)?;
-
-        Ok((ek, vks, msk_share))
+        // B/c unweighted chunky is being removed
+        unimplemented!()
     }
 
     fn setup_for_testing(
@@ -109,8 +74,7 @@ impl BatchThresholdEncryption for FPTX {
     )> {
         let mut rng = <StdRng as SeedableRng>::seed_from_u64(seed);
 
-        let digest_key = DigestKey::new(&mut rng, max_batch_size, number_of_rounds)
-            .ok_or(anyhow!("Failed to create digest key"))?;
+        let digest_key = DigestKey::new(&mut rng, max_batch_size, number_of_rounds)?;
         let msk = Fr::rand(&mut rng);
         let (mpk, vks, msk_shares) =
             key_derivation::gen_msk_shares(msk, &mut rng, threshold_config);

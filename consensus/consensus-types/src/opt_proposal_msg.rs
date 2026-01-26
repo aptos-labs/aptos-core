@@ -99,6 +99,7 @@ impl OptProposalMsg {
         validator: &ValidatorVerifier,
         proof_cache: &ProofCache,
         quorum_store_enabled: bool,
+        opt_qs_v2_enabled: bool,
     ) -> Result<()> {
         ensure!(
             self.proposer() == sender,
@@ -109,9 +110,12 @@ impl OptProposalMsg {
 
         let (payload_verify_result, qc_verify_result) = rayon::join(
             || {
-                self.block_data()
-                    .payload()
-                    .verify(validator, proof_cache, quorum_store_enabled)
+                self.block_data().payload().verify(
+                    validator,
+                    proof_cache,
+                    quorum_store_enabled,
+                    opt_qs_v2_enabled,
+                )
             },
             || self.block_data().grandparent_qc().verify(validator),
         );
@@ -212,7 +216,7 @@ mod tests {
         let msg = create_opt_proposal_msg(3, 1, signer);
         let proof_cache = ProofCache::new(1024);
         assert!(msg
-            .verify(signer.author(), &validators, &proof_cache, false)
+            .verify(signer.author(), &validators, &proof_cache, false, false)
             .is_ok());
     }
 
@@ -225,7 +229,7 @@ mod tests {
         // Test round too low
         let msg_round_1 = create_opt_proposal_msg(1, 1, signer);
         assert!(msg_round_1
-            .verify(signer.author(), &validators, &proof_cache, false)
+            .verify(signer.author(), &validators, &proof_cache, false, false)
             .is_err());
 
         // Test epoch mismatch
@@ -249,7 +253,7 @@ mod tests {
         );
         let msg_epoch_mismatch = OptProposalMsg::new(epoch_2_block_data, sync_info);
         assert!(msg_epoch_mismatch
-            .verify(signer.author(), &validators, &proof_cache, false)
+            .verify(signer.author(), &validators, &proof_cache, false, false)
             .is_err());
 
         // Test with timeout cert
@@ -266,7 +270,7 @@ mod tests {
         );
         let msg_with_tc = OptProposalMsg::new(block_data, sync_info);
         assert!(msg_with_tc
-            .verify(signer.author(), &validators, &proof_cache, false)
+            .verify(signer.author(), &validators, &proof_cache, false, false)
             .is_err());
     }
 
@@ -280,7 +284,7 @@ mod tests {
         let proof_cache = ProofCache::new(1024);
 
         assert!(msg
-            .verify(signer2.author(), &validators, &proof_cache, false)
+            .verify(signer2.author(), &validators, &proof_cache, false, false)
             .is_err());
     }
 }

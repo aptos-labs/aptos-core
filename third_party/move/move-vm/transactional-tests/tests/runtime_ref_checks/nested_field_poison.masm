@@ -1,0 +1,46 @@
+//# publish
+module 0xc0ffee::nested_field_test
+
+struct Inner has drop
+    value: u64
+
+struct Outer has drop
+    inner: Inner
+    other: u64
+
+// Test: Nested field reference poisoned when parent field is mutably written
+public fun test_nested_field_poison(): u64
+    local outer: Outer
+    local inner_value_ref: &u64
+    local inner_ref: &mut Inner
+
+    // Create nested structure
+    ld_u64 42
+    pack Inner
+    ld_u64 100
+    pack Outer
+    st_loc outer
+
+    // Get reference to nested field (outer.inner.value)
+    borrow_loc outer
+    borrow_field Outer, inner
+    borrow_field Inner, value
+    st_loc inner_value_ref
+
+    // Get mutable reference to inner field
+    mut_borrow_loc outer
+    mut_borrow_field Outer, inner
+    st_loc inner_ref
+
+    // Write to inner (should poison inner_value_ref)
+    ld_u64 999
+    pack Inner
+    move_loc inner_ref
+    write_ref
+
+    // Try to read from poisoned nested field reference (should fail)
+    move_loc inner_value_ref
+    read_ref
+    ret
+
+//# run 0xc0ffee::nested_field_test::test_nested_field_poison --verbose

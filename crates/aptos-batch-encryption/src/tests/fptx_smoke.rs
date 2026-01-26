@@ -1,14 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
-    group::G2Affine,
-    schemes::fptx::FPTX,
-    shared::{digest::DigestKey, key_derivation::BIBEDecryptionKeyShare},
+    schemes::fptx::FPTX, shared::key_derivation::BIBEDecryptionKeyShare,
     traits::BatchThresholdEncryption,
 };
 use anyhow::Result;
-use aptos_crypto::{arkworks::shamir::ShamirThresholdConfig, SecretSharingConfig as _};
-use ark_ec::AffineRepr as _;
+use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
 use ark_std::rand::{seq::SliceRandom, thread_rng, CryptoRng, Rng as _, RngCore};
 
 fn smoke_with_setup<R: RngCore + CryptoRng>(
@@ -69,79 +66,6 @@ fn smoke_with_setup_for_testing() {
     let tc = ShamirThresholdConfig::new(3, 8);
 
     let (ek, dk, vks, msk_shares) = FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc).unwrap();
-
-    smoke_with_setup(&mut rng, tc, ek, dk, vks, msk_shares);
-}
-
-type T = aptos_dkg::pvss::chunky::UnsignedUnweightedTranscript<crate::group::Pairing>;
-use aptos_crypto::{SigningKey, Uniform};
-use aptos_dkg::pvss::{
-    test_utils::NoAux,
-    traits::{
-        transcript::HasAggregatableSubtranscript, Convert, HasEncryptionPublicParams, Transcript,
-    },
-};
-
-#[test]
-fn smoke_with_pvss() {
-    let mut rng = thread_rng();
-    let mut rng_aptos = rand::thread_rng();
-
-    let tc = ShamirThresholdConfig::new(3, 8);
-    let pp = <T as Transcript>::PublicParameters::new_with_commitment_base(
-        tc.get_total_num_players(),
-        aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_TESTING,
-        1,
-        G2Affine::generator(),
-        &mut rng_aptos,
-    );
-
-    let ssks = (0..tc.get_total_num_players())
-        .map(|_| <T as Transcript>::SigningSecretKey::generate(&mut rng_aptos))
-        .collect::<Vec<<T as Transcript>::SigningSecretKey>>();
-    let spks = ssks
-        .iter()
-        .map(|ssk| ssk.verifying_key())
-        .collect::<Vec<<T as Transcript>::SigningPubKey>>();
-
-    let dks: Vec<<T as Transcript>::DecryptPrivKey> = (0..tc.get_total_num_players())
-        .map(|_| <T as Transcript>::DecryptPrivKey::generate(&mut rng_aptos))
-        .collect();
-    let eks: Vec<<T as Transcript>::EncryptPubKey> = dks
-        .iter()
-        .map(|dk| dk.to(pp.get_encryption_public_params()))
-        .collect();
-
-    let s = <T as Transcript>::InputSecret::generate(&mut rng_aptos);
-
-    // Test dealing
-    let subtranscript = T::deal(
-        &tc,
-        &pp,
-        &ssks[0],
-        &spks[0],
-        &eks,
-        &s,
-        &NoAux,
-        &tc.get_player(0),
-        &mut rng_aptos,
-    )
-    .get_subtranscript();
-
-    let dk = DigestKey::new(&mut rng, 8, 1).unwrap();
-
-    let (ek, vks, _) =
-        FPTX::setup(&dk, &pp, &subtranscript, &tc, tc.get_player(0), &dks[0]).unwrap();
-
-    let msk_shares: Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare> = tc
-        .get_players()
-        .into_iter()
-        .map(|p| {
-            let (_, _, msk_share) =
-                FPTX::setup(&dk, &pp, &subtranscript, &tc, p, &dks[p.get_id()]).unwrap();
-            msk_share
-        })
-        .collect();
 
     smoke_with_setup(&mut rng, tc, ek, dk, vks, msk_shares);
 }

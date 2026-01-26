@@ -77,6 +77,7 @@ An order is considered valid if:
 
 - <code><a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_KeepAliveUpdateEvent">KeepAliveUpdateEvent</a></code>: Emitted when a trader updates their keep-alive state
 - <code><a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_KeepAliveDisabledEvent">KeepAliveDisabledEvent</a></code>: Emitted when a trader disables their keep-alive
+- <code><a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_MinKeepAliveTimeUpdatedEvent">MinKeepAliveTimeUpdatedEvent</a></code>: Emitted when the minimum keep-alive time is updated
 
 
 -  [Dead Man's Switch Tracker Module](#@Dead_Man's_Switch_Tracker_Module_0)
@@ -88,10 +89,10 @@ An order is considered valid if:
     -  [Events](#@Events_6)
 -  [Enum `KeepAliveUpdateEvent`](#0x7_dead_mans_switch_tracker_KeepAliveUpdateEvent)
 -  [Enum `KeepAliveDisabledEvent`](#0x7_dead_mans_switch_tracker_KeepAliveDisabledEvent)
+-  [Enum `MinKeepAliveTimeUpdatedEvent`](#0x7_dead_mans_switch_tracker_MinKeepAliveTimeUpdatedEvent)
 -  [Struct `KeepAliveState`](#0x7_dead_mans_switch_tracker_KeepAliveState)
 -  [Struct `DeadMansSwitchTracker`](#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker)
 -  [Constants](#@Constants_7)
--  [Function `new_default_big_ordered_map`](#0x7_dead_mans_switch_tracker_new_default_big_ordered_map)
 -  [Function `new_dead_mans_switch_tracker`](#0x7_dead_mans_switch_tracker_new_dead_mans_switch_tracker)
     -  [Parameters](#@Parameters_8)
     -  [Returns](#@Returns_9)
@@ -145,6 +146,18 @@ enum <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_KeepAlive
 
 <dl>
 <dt>
+<code>parent: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>market: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
 <code><a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b></code>
 </dt>
 <dd>
@@ -197,7 +210,83 @@ enum <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_KeepAlive
 
 <dl>
 <dt>
+<code>parent: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>market: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
 <code><a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>was_registered: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+</details>
+
+</details>
+
+<a id="0x7_dead_mans_switch_tracker_MinKeepAliveTimeUpdatedEvent"></a>
+
+## Enum `MinKeepAliveTimeUpdatedEvent`
+
+
+
+<pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
+enum <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_MinKeepAliveTimeUpdatedEvent">MinKeepAliveTimeUpdatedEvent</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>V1</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>parent: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>market: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>old_min_keep_alive_time_secs: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>new_min_keep_alive_time_secs: u64</code>
 </dt>
 <dd>
 
@@ -282,24 +371,6 @@ enum <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_KeepAlive
 ## Constants
 
 
-<a id="0x7_dead_mans_switch_tracker_BIG_MAP_INNER_DEGREE"></a>
-
-
-
-<pre><code><b>const</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_BIG_MAP_INNER_DEGREE">BIG_MAP_INNER_DEGREE</a>: u16 = 64;
-</code></pre>
-
-
-
-<a id="0x7_dead_mans_switch_tracker_BIG_MAP_LEAF_DEGREE"></a>
-
-
-
-<pre><code><b>const</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_BIG_MAP_LEAF_DEGREE">BIG_MAP_LEAF_DEGREE</a>: u16 = 32;
-</code></pre>
-
-
-
 <a id="0x7_dead_mans_switch_tracker_E_KEEP_ALIVE_TIMEOUT_TOO_SHORT"></a>
 
 Error code when the provided keep-alive timeout is shorter than the minimum allowed
@@ -309,35 +380,6 @@ Error code when the provided keep-alive timeout is shorter than the minimum allo
 </code></pre>
 
 
-
-<a id="0x7_dead_mans_switch_tracker_new_default_big_ordered_map"></a>
-
-## Function `new_default_big_ordered_map`
-
-Creates a new BigOrderedMap with default configuration
-
-
-<pre><code><b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_new_default_big_ordered_map">new_default_big_ordered_map</a>&lt;K: store, V: store&gt;(): <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_new_default_big_ordered_map">new_default_big_ordered_map</a>&lt;K: store, V: store&gt;(): BigOrderedMap&lt;K, V&gt; {
-    <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map_new_with_config">big_ordered_map::new_with_config</a>(
-        <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_BIG_MAP_INNER_DEGREE">BIG_MAP_INNER_DEGREE</a>,
-        <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_BIG_MAP_LEAF_DEGREE">BIG_MAP_LEAF_DEGREE</a>,
-        <b>true</b>
-    )
-}
-</code></pre>
-
-
-
-</details>
 
 <a id="0x7_dead_mans_switch_tracker_new_dead_mans_switch_tracker"></a>
 
@@ -382,7 +424,7 @@ let tracker = new_dead_mans_switch_tracker(60); // 60 second minimum
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_new_dead_mans_switch_tracker">new_dead_mans_switch_tracker</a>(min_keep_alive_time_secs: u64): <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">DeadMansSwitchTracker</a> {
     <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">DeadMansSwitchTracker</a> {
         min_keep_alive_time_secs,
-        state: <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_new_default_big_ordered_map">new_default_big_ordered_map</a>(),
+        state: <a href="order_book_utils.md#0x7_order_book_utils_new_default_big_ordered_map">order_book_utils::new_default_big_ordered_map</a>(),
     }
 }
 </code></pre>
@@ -397,7 +439,7 @@ let tracker = new_dead_mans_switch_tracker(60); // 60 second minimum
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_set_min_keep_alive_time_secs">set_min_keep_alive_time_secs</a>(tracker: &<b>mut</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">dead_mans_switch_tracker::DeadMansSwitchTracker</a>, min_keep_alive_time_secs: u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_set_min_keep_alive_time_secs">set_min_keep_alive_time_secs</a>(tracker: &<b>mut</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">dead_mans_switch_tracker::DeadMansSwitchTracker</a>, parent: <b>address</b>, market: <b>address</b>, min_keep_alive_time_secs: u64)
 </code></pre>
 
 
@@ -408,9 +450,20 @@ let tracker = new_dead_mans_switch_tracker(60); // 60 second minimum
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_set_min_keep_alive_time_secs">set_min_keep_alive_time_secs</a>(
     tracker: &<b>mut</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">DeadMansSwitchTracker</a>,
+    parent: <b>address</b>,
+    market: <b>address</b>,
     min_keep_alive_time_secs: u64,
 ) {
+    <b>let</b> old_min_keep_alive_time_secs = tracker.min_keep_alive_time_secs;
     tracker.min_keep_alive_time_secs = min_keep_alive_time_secs;
+    <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
+        MinKeepAliveTimeUpdatedEvent::V1 {
+            parent,
+            market,
+            old_min_keep_alive_time_secs,
+            new_min_keep_alive_time_secs: min_keep_alive_time_secs,
+        },
+    );
 }
 </code></pre>
 
@@ -454,8 +507,8 @@ if no keep-alive state:
 return true  // No dead man's switch, all orders valid
 if order_creation_time < session_start_time:
 return false  // Order from expired session
-if current_time >= expiration_time:
-return false  // Session expired (inclusive of expiration time)
+if current_time > expiration_time:
+return false  // Session expired (exclusive of expiration time)
 return true  // Order valid
 ```
 
@@ -517,7 +570,7 @@ if (!is_valid) {
 
 
 
-<pre><code><b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_disable_keep_alive">disable_keep_alive</a>(tracker: &<b>mut</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">dead_mans_switch_tracker::DeadMansSwitchTracker</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>)
+<pre><code><b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_disable_keep_alive">disable_keep_alive</a>(tracker: &<b>mut</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">dead_mans_switch_tracker::DeadMansSwitchTracker</a>, parent: <b>address</b>, market: <b>address</b>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>)
 </code></pre>
 
 
@@ -528,17 +581,23 @@ if (!is_valid) {
 
 <pre><code><b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_disable_keep_alive">disable_keep_alive</a>(
     tracker: &<b>mut</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">DeadMansSwitchTracker</a>,
+    parent: <b>address</b>,
+    market: <b>address</b>,
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
 ) {
     <b>let</b> removed = tracker.state.remove_or_none(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
-    <b>if</b> (removed.is_some()) {
+    <b>let</b> was_registered = removed.is_some();
+    <b>if</b> (was_registered) {
         <b>let</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_KeepAliveState">KeepAliveState</a> { session_start_time_secs: _, expiration_time_secs: _ } = removed.destroy_some();
     } <b>else</b> {
         removed.destroy_none();
     };
     <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
         KeepAliveDisabledEvent::V1 {
+            parent,
+            market,
             <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+            was_registered,
         },
     );
 }
@@ -618,7 +677,7 @@ update_keep_alive_state(&mut tracker, trader_addr, 0);
 ```
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_keep_alive">keep_alive</a>(tracker: &<b>mut</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">dead_mans_switch_tracker::DeadMansSwitchTracker</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, timeout_seconds: u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_keep_alive">keep_alive</a>(tracker: &<b>mut</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">dead_mans_switch_tracker::DeadMansSwitchTracker</a>, parent: <b>address</b>, market: <b>address</b>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, timeout_seconds: u64)
 </code></pre>
 
 
@@ -629,11 +688,13 @@ update_keep_alive_state(&mut tracker, trader_addr, 0);
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_keep_alive">keep_alive</a>(
     tracker: &<b>mut</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">DeadMansSwitchTracker</a>,
+    parent: <b>address</b>,
+    market: <b>address</b>,
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
     timeout_seconds: u64,
 ) {
     <b>if</b> (timeout_seconds == 0) {
-        <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_disable_keep_alive">disable_keep_alive</a>(tracker, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
+        <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_disable_keep_alive">disable_keep_alive</a>(tracker, parent, market, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
         <b>return</b>;
     };
     <b>assert</b>!(
@@ -653,6 +714,8 @@ update_keep_alive_state(&mut tracker, trader_addr, 0);
         state.expiration_time_secs = expiration_time;
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
             KeepAliveUpdateEvent::V1 {
+                parent,
+                market,
                 <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
                 session_start_time_secs: state.session_start_time_secs,
                 expiration_time_secs: state.expiration_time_secs,
@@ -666,6 +729,8 @@ update_keep_alive_state(&mut tracker, trader_addr, 0);
         tracker.state.add(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, new_state);
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
             KeepAliveUpdateEvent::V1 {
+                parent,
+                market,
                 <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
                 session_start_time_secs: 0,
                 expiration_time_secs: expiration_time,
