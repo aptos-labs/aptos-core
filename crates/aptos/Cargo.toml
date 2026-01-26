@@ -13,6 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+aes-gcm = { workspace = true }
 anyhow = { workspace = true }
 aptos-api-types = { workspace = true }
 aptos-backup-cli = { workspace = true }
@@ -52,7 +53,6 @@ aptos-vm-genesis = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
 aptos-workspace-server = { workspace = true }
-aes-gcm = { workspace = true }
 async-trait = { workspace = true }
 atty = { workspace = true }
 backoff = { workspace = true }
