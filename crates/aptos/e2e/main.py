@@ -77,7 +77,61 @@ from cases.account_e2e import (
     test_account_list_json_format,
 )
 from cases.config import test_config_show_profiles
+from cases.config_e2e import (
+    # Flag regression tests
+    test_config_help_subcommands,
+    test_config_generate_shell_completions_flags,
+    test_config_set_global_config_flags,
+    test_config_show_profiles_flags,
+    test_config_show_private_key_flags,
+    test_config_delete_profile_flags,
+    test_config_rename_profile_flags,
+    # Functional tests
+    test_config_show_global_config,
+    test_config_show_profiles_default,
+    test_config_show_profiles_specific,
+    test_config_show_private_key_default,
+    # Error handling tests
+    test_config_show_private_key_nonexistent_profile,
+    test_config_delete_profile_nonexistent,
+    test_config_rename_profile_nonexistent,
+)
+from cases.info_e2e import (
+    # Flag regression tests
+    test_info_help,
+    # Functional tests
+    test_info_command,
+    test_info_json_format,
+)
 from cases.init import test_aptos_header_included, test_init, test_metrics_accessible
+from cases.key_e2e import (
+    # Flag regression tests
+    test_key_help_subcommands,
+    test_key_generate_flags,
+    test_key_extract_public_key_flags,
+    test_key_extract_peer_flags,
+    # Functional tests
+    test_key_generate_ed25519,
+    test_key_generate_x25519,
+    test_key_generate_bls12381,
+    test_key_extract_public_key,
+    # Error handling tests
+    test_key_generate_missing_output_file,
+    test_key_extract_public_key_missing_input,
+)
+from cases.update_e2e import (
+    # Flag regression tests
+    test_update_help_subcommands,
+    test_update_aptos_flags,
+    test_update_revela_flags,
+    test_update_movefmt_flags,
+    test_update_move_mutation_test_flags,
+    test_update_prover_dependencies_flags,
+    # Functional tests (check only)
+    test_update_aptos_check,
+    test_update_revela_check,
+    test_update_movefmt_check,
+)
 from cases.move import (
     test_move_compile,
     test_move_compile_script,
@@ -194,6 +248,32 @@ async def run_tests(run_helper):
     test_account_rotate_key_flags(run_helper)
     test_account_transfer_flags(run_helper)
 
+    # Config subcommand flag tests
+    test_config_help_subcommands(run_helper)
+    test_config_generate_shell_completions_flags(run_helper)
+    test_config_set_global_config_flags(run_helper)
+    test_config_show_profiles_flags(run_helper)
+    test_config_show_private_key_flags(run_helper)
+    test_config_delete_profile_flags(run_helper)
+    test_config_rename_profile_flags(run_helper)
+
+    # Info command flag tests
+    test_info_help(run_helper)
+
+    # Key subcommand flag tests
+    test_key_help_subcommands(run_helper)
+    test_key_generate_flags(run_helper)
+    test_key_extract_public_key_flags(run_helper)
+    test_key_extract_peer_flags(run_helper)
+
+    # Update subcommand flag tests
+    test_update_help_subcommands(run_helper)
+    test_update_aptos_flags(run_helper)
+    test_update_revela_flags(run_helper)
+    test_update_movefmt_flags(run_helper)
+    test_update_move_mutation_test_flags(run_helper)
+    test_update_prover_dependencies_flags(run_helper)
+
     # =========================================================================
     # Initialize CLI - must run before functional tests
     # =========================================================================
@@ -203,6 +283,48 @@ async def run_tests(run_helper):
 
     # Run config tests.
     test_config_show_profiles(run_helper)
+
+    # =========================================================================
+    # Config Functional E2E Tests
+    # =========================================================================
+    
+    test_config_show_global_config(run_helper)
+    test_config_show_profiles_default(run_helper)
+    test_config_show_profiles_specific(run_helper)
+    test_config_show_private_key_default(run_helper)
+    
+    # Config error handling tests
+    test_config_show_private_key_nonexistent_profile(run_helper)
+    test_config_delete_profile_nonexistent(run_helper)
+    test_config_rename_profile_nonexistent(run_helper)
+
+    # =========================================================================
+    # Info Functional E2E Tests
+    # =========================================================================
+    
+    test_info_command(run_helper)
+    test_info_json_format(run_helper)
+
+    # =========================================================================
+    # Key Functional E2E Tests
+    # =========================================================================
+    
+    test_key_generate_ed25519(run_helper)
+    test_key_generate_x25519(run_helper)
+    test_key_generate_bls12381(run_helper)
+    test_key_extract_public_key(run_helper)
+    
+    # Key error handling tests
+    test_key_generate_missing_output_file(run_helper)
+    test_key_extract_public_key_missing_input(run_helper)
+
+    # =========================================================================
+    # Update Functional E2E Tests (check only, no actual updates)
+    # =========================================================================
+    
+    test_update_aptos_check(run_helper)
+    test_update_revela_check(run_helper)
+    test_update_movefmt_check(run_helper)
 
     # =========================================================================
     # Account Functional E2E Tests
