@@ -332,8 +332,13 @@ impl ProfileConfig {
             let decrypted_bytes = encrypted.decrypt(&passphrase)?;
             let decrypted_hex = hex::encode(&decrypted_bytes);
 
-            let private_key = Ed25519PrivateKey::from_encoded_string(&decrypted_hex)
-                .map_err(|e| CliError::UnexpectedError(format!("Failed to parse decrypted private key: {}", e)))?;
+            let private_key =
+                Ed25519PrivateKey::from_encoded_string(&decrypted_hex).map_err(|e| {
+                    CliError::UnexpectedError(format!(
+                        "Failed to parse decrypted private key: {}",
+                        e
+                    ))
+                })?;
 
             return Ok(Some(private_key));
         }
@@ -380,8 +385,13 @@ impl ProfileConfig {
             let decrypted_bytes = encrypted.decrypt(passphrase)?;
             let decrypted_hex = hex::encode(&decrypted_bytes);
 
-            let private_key = Ed25519PrivateKey::from_encoded_string(&decrypted_hex)
-                .map_err(|e| CliError::UnexpectedError(format!("Failed to parse decrypted private key: {}", e)))?;
+            let private_key =
+                Ed25519PrivateKey::from_encoded_string(&decrypted_hex).map_err(|e| {
+                    CliError::UnexpectedError(format!(
+                        "Failed to parse decrypted private key: {}",
+                        e
+                    ))
+                })?;
 
             self.private_key = Some(private_key);
             self.encrypted_private_key = None;

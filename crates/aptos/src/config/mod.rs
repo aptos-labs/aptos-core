@@ -495,15 +495,13 @@ impl CliCommand<String> for RotatePassphrase {
                 }
 
                 // Get the current passphrase
-                let current_passphrase =
-                    read_passphrase("Enter current passphrase: ")?;
+                let current_passphrase = read_passphrase("Enter current passphrase: ")?;
 
                 // Decrypt with the current passphrase
                 profile.decrypt_private_key(&current_passphrase)?;
 
                 // Get the new passphrase
-                let new_passphrase =
-                    prompt_passphrase_with_confirmation("Enter new passphrase: ")?;
+                let new_passphrase = prompt_passphrase_with_confirmation("Enter new passphrase: ")?;
 
                 // Re-encrypt with the new passphrase
                 profile.encrypt_private_key(&new_passphrase)?;
@@ -580,7 +578,8 @@ impl FromStr for CredentialEncryptionType {
             "enabled" | "on" | "yes" | "true" => Ok(Self::Enabled),
             "prompt" | "ask" => Ok(Self::Prompt),
             _ => Err(CliError::CommandArgumentError(
-                "Invalid credential encryption type, must be one of [disabled, enabled, prompt]".to_string(),
+                "Invalid credential encryption type, must be one of [disabled, enabled, prompt]"
+                    .to_string(),
             )),
         }
     }

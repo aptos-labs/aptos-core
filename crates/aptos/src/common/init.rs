@@ -426,18 +426,12 @@ impl InitTool {
                     Ok(false)
                 } else {
                     // Prompt the user
-                    eprintln!(
-                        "\nWould you like to encrypt your private key with a passphrase?"
-                    );
-                    eprintln!(
-                        "Encryption adds security by protecting your key at rest."
-                    );
+                    eprintln!("\nWould you like to encrypt your private key with a passphrase?");
+                    eprintln!("Encryption adds security by protecting your key at rest.");
                     eprintln!(
                         "You can also set this globally with: aptos config set-global-config --credential-encryption enabled"
                     );
-                    Ok(crate::common::utils::prompt_yes(
-                        "Encrypt credentials?",
-                    ))
+                    Ok(crate::common::utils::prompt_yes("Encrypt credentials?"))
                 }
             },
         }

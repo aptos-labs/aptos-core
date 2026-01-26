@@ -443,7 +443,9 @@ pub fn read_passphrase(prompt: &str) -> CliTypedResult<String> {
     // Check if we're in an interactive terminal
     if atty::is(atty::Stream::Stdin) {
         eprint!("{}", prompt);
-        io::stderr().flush().map_err(|e| CliError::IO("stderr".to_string(), e))?;
+        io::stderr()
+            .flush()
+            .map_err(|e| CliError::IO("stderr".to_string(), e))?;
     }
 
     let mut passphrase = String::new();
