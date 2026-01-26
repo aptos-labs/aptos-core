@@ -296,7 +296,23 @@ fn pvss_nonaggregate_serialize<T: HasAggregatableSubtranscript, M: Measurement>(
 
     let mut rng = thread_rng();
 
-    g.bench_function(format!("serialize/{}", sc), move |b| {
+    let transcript_size = {
+        let s = T::InputSecret::generate(&mut rng);
+        let trs = T::deal(
+            &sc,
+            &pp,
+            &ssks[0],
+            &spks[0],
+            &eks,
+            &s,
+            &NoAux,
+            &sc.get_player(0),
+            &mut rng,
+        );
+        trs.to_bytes().len()
+    };
+
+    g.bench_function(format!("serialize/{}/transcript_bytes={}", sc, transcript_size), move |b| {
         b.iter_with_setup(
             || {
                 let s = T::InputSecret::generate(&mut rng);
