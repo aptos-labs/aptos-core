@@ -20,27 +20,27 @@ module aptos_std::string_utils {
 }
 
 module 0x42::M {
-    fun foo1<T: drop>(left: T, right: T) {
+    fun foo1<T: copy + drop>(left: T, right: T) {
         assert_ne!(left, right)
     }
 
-    fun foo2<T: drop>(left: T, right: T, message: vector<u8>) {
+    fun foo2<T: copy + drop>(left: T, right: T, message: vector<u8>) {
         assert_ne!(left, right, message)
     }
 
-    fun foo3<T: drop, T0: drop>(left: T, right: T, a: T0) {
+    fun foo3<T: copy + drop, T0: drop>(left: T, right: T, a: T0) {
         assert_ne!(left, right, b"a = {}", a)
     }
 
-    fun foo4<T: drop, T0: drop, T1: drop>(left: T, right: T, a: T0, b: T1) {
+    fun foo4<T: copy + drop, T0: drop, T1: drop>(left: T, right: T, a: T0, b: T1) {
         assert_ne!(left, right, b"a = {}, b = {}", a, b)
     }
 
-    fun foo5<T: drop, T0: drop, T1: drop, T2: drop>(left: T, right: T, a: T0, b: T1, c: T2) {
+    fun foo5<T: copy + drop, T0: drop, T1: drop, T2: drop>(left: T, right: T, a: T0, b: T1, c: T2) {
         assert_ne!(left, right, b"a = {}, b = {}, c = {}", a, b, c)
     }
 
-    fun foo6<T: drop, T0: drop, T1: drop, T2: drop, T3: drop>(left: T, right: T, a: T0, b: T1, c: T2, d: T3) {
+    fun foo6<T: copy + drop, T0: drop, T1: drop, T2: drop, T3: drop>(left: T, right: T, a: T0, b: T1, c: T2, d: T3) {
         assert_ne!(left, right, b"a = {}, b = {}, c = {}, d = {}", a, b, c, d)
     }
 }
