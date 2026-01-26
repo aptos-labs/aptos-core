@@ -251,6 +251,7 @@ pub fn get_weighted_configs_for_testing<T: traits::ThresholdConfig>() -> Vec<Wei
 
 pub const BENCHMARK_CONFIGS: &[(usize, usize)] = &[
     // (t, n)
+    (2,3),
     (129, 219), // See the mid-Nov 2025 weighted config below
     (143, 254),
     (184, 254),
@@ -271,6 +272,10 @@ pub fn get_threshold_configs_for_benchmarking<T: traits::ThresholdConfig>() -> V
 pub fn get_weighted_configs_for_benchmarking<T: traits::ThresholdConfig>() -> Vec<WeightedConfig<T>>
 {
     let mut wcs = vec![];
+
+    let weights = vec![1, 1, 1];
+    let threshold = 2;
+    wcs.push(WeightedConfig::<T>::new(threshold, weights.clone()).unwrap());
 
     // This one was produced mid-Nov 2025
     let weights = vec![
