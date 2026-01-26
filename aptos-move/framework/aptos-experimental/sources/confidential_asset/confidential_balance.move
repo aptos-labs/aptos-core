@@ -31,11 +31,13 @@ module aptos_experimental::confidential_balance {
     // Contants
     //
 
-    /// The number of chunks in a pending balance.
+    /// The number of chunks $n$ in a pending balance.
     const PENDING_BALANCE_CHUNKS: u64 = 4;
-    /// The number of chunks in an actual balance.
+
+    /// The number of chunks $\ell$ in an actual balance.
     const ACTUAL_BALANCE_CHUNKS: u64 = 8;
-    /// The number of bits in a single chunk.
+
+    /// The number of bits $b$ in a single chunk.
     const CHUNK_SIZE_BITS: u64 = 16;
 
     //

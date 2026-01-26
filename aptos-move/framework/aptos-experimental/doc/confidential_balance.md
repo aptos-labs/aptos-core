@@ -117,7 +117,7 @@ Represents a confidential balance, where each chunk is a Twisted ElGamal ciphert
 
 <a id="0x7_confidential_balance_ACTUAL_BALANCE_CHUNKS"></a>
 
-The number of chunks in an actual balance.
+The number of chunks $\ell$ in an actual balance.
 
 
 <pre><code><b>const</b> <a href="confidential_balance.md#0x7_confidential_balance_ACTUAL_BALANCE_CHUNKS">ACTUAL_BALANCE_CHUNKS</a>: u64 = 8;
@@ -127,7 +127,7 @@ The number of chunks in an actual balance.
 
 <a id="0x7_confidential_balance_CHUNK_SIZE_BITS"></a>
 
-The number of bits in a single chunk.
+The number of bits $b$ in a single chunk.
 
 
 <pre><code><b>const</b> <a href="confidential_balance.md#0x7_confidential_balance_CHUNK_SIZE_BITS">CHUNK_SIZE_BITS</a>: u64 = 16;
@@ -147,7 +147,7 @@ An internal error occurred, indicating unexpected behavior.
 
 <a id="0x7_confidential_balance_PENDING_BALANCE_CHUNKS"></a>
 
-The number of chunks in a pending balance.
+The number of chunks $n$ in a pending balance.
 
 
 <pre><code><b>const</b> <a href="confidential_balance.md#0x7_confidential_balance_PENDING_BALANCE_CHUNKS">PENDING_BALANCE_CHUNKS</a>: u64 = 4;

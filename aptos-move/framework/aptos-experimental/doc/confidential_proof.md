@@ -1144,7 +1144,14 @@ If all conditions are satisfied, the proof validates the transfer; otherwise, th
         auditor_amounts,
         &proof.sigma_proof
     );
+
+    // TODO(feature): enforce <b>min</b> balance
+    // TODO(perf): can we batch the batches?
+
+    // Verifies a `CHUNK_SIZE_BITS`-bit range proof on a batch of size ACTUAL_BALANCE_CHUNKS
     <a href="confidential_proof.md#0x7_confidential_proof_verify_new_balance_range_proof">verify_new_balance_range_proof</a>(new_balance, &proof.zkrp_new_balance);
+
+    // Verifies a `CHUNK_SIZE_BITS`-bit range proof on a batch of size PENDING_BALANCE_CHUNKS
     <a href="confidential_proof.md#0x7_confidential_proof_verify_transfer_amount_range_proof">verify_transfer_amount_range_proof</a>(
         recipient_amount, &proof.zkrp_transfer_amount
     );

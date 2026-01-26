@@ -102,6 +102,7 @@ It enables private transfers by obfuscating token amounts while keeping sender a
 ## Resource `ConfidentialAssetStore`
 
 The <code><a href="confidential_asset.md#0x7_confidential_asset">confidential_asset</a></code> module stores a <code><a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a></code> object for each user-token pair.
+TODO: rename this, since there are too many stores flying around: FA stores and CFA pools
 
 
 <pre><code><b>struct</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a> <b>has</b> key
@@ -210,7 +211,9 @@ Represents the controller for the primary FA stores and <code><a href="confident
 
 ## Resource `FAConfig`
 
-Represents the configuration of a token.
+Represents the configuration of a token type.
+
+TODO(upgradeability): Should we make this into an enum to make it easier to upgrade it?
 
 
 <pre><code><b>struct</b> <a href="confidential_asset.md#0x7_confidential_asset_FAConfig">FAConfig</a> <b>has</b> key
@@ -227,17 +230,19 @@ Represents the configuration of a token.
 <code>allowed: bool</code>
 </dt>
 <dd>
- Indicates whether the token is allowed for confidential transfers.
+ Indicates whether the token type is allowed for confidential transfers.
  If allow list is disabled, all tokens are allowed.
- Can be toggled by the governance module. The withdrawals are always allowed.
+ Can be toggled by the governance module. Withdrawals are always allowed.
 </dd>
 <dt>
 <code>auditor_ek: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_CompressedPubkey">ristretto255_twisted_elgamal::CompressedPubkey</a>&gt;</code>
 </dt>
 <dd>
- The auditor's public key for the token. If the auditor is not set, this field is <code>None</code>.
+ The auditor's public key for the token type. If the auditor is not set, this field is <code>None</code>.
  Otherwise, each confidential transfer must include the auditor as an additional party,
  alongside the recipient, who has access to the decrypted transferred amount.
+
+ TODO(feature): token-type-specific auditor EKs or global auditor EKs? (Or both?)
 </dd>
 </dl>
 
@@ -882,7 +887,7 @@ The function hides the transferred amount while keeping the sender and recipient
 The sender encrypts the transferred amount with the recipient's encryption key and the function updates the
 recipient's confidential balance homomorphically.
 Additionally, the sender encrypts the transferred amount with the auditors' EKs, allowing auditors to decrypt
-the it on their side.
+it on their side.
 The sender provides their new normalized confidential balance, encrypted with fresh randomness to preserve privacy.
 Warning: If the auditor feature is enabled, the sender must include the auditor as the first element in the
 <code>auditor_eks</code> vector.
@@ -1181,7 +1186,7 @@ This function facilitates making both calls in a single transaction.
 
 ## Function `enable_allow_list`
 
-Enables the allow list, restricting confidential transfers to tokens on the allow list.
+Enables the allow list, restricting confidential transfers to token types on the allow list.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_enable_allow_list">enable_allow_list</a>(aptos_framework: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
@@ -1215,7 +1220,7 @@ Enables the allow list, restricting confidential transfers to tokens on the allo
 
 ## Function `disable_allow_list`
 
-Disables the allow list, allowing confidential transfers for all tokens.
+Disables the allow list, allowing confidential transfers for all token types.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_disable_allow_list">disable_allow_list</a>(aptos_framework: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
@@ -1686,6 +1691,7 @@ If the auditing feature is disabled for the token, the encryption key is set to 
 ## Function `confidential_asset_balance`
 
 Returns the circulating supply of the confidential asset.
+TODO: rename; this is not a "balance"; it's more of a "supply"
 
 
 <pre><code>#[view]
@@ -1796,6 +1802,7 @@ Implementation of the <code>register</code> entry function.
 ## Function `deposit_to_internal`
 
 Implementation of the <code>deposit_to</code> entry function.
+For convenience, we often refer to this operation as "veiling."
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_deposit_to_internal">deposit_to_internal</a>(sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, token: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;<a href="../../aptos-framework/doc/fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;, <b>to</b>: <b>address</b>, amount: u64)
@@ -1818,15 +1825,19 @@ Implementation of the <code>deposit_to</code> entry function.
 
     <b>let</b> from = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
 
+    // TODO(odd): <b>if</b> the sender <b>has</b> no FA store for `token`, then he <b>has</b> no money; so why create an empty store here just <b>to</b> fail over in `transfer` later?
     <b>let</b> sender_fa_store =
         <a href="../../aptos-framework/doc/primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">primary_fungible_store::ensure_primary_store_exists</a>(from, token);
-    <b>let</b> ca_fa_store =
+
+    // Note: This call sets up confidential FA (CFA) store for this type-of-token, <b>if</b> one is not already set up:
+    // e.g., such <b>as</b> when someone first veils APT for the first time.
+    <b>let</b> cfa_store =
         <a href="../../aptos-framework/doc/primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">primary_fungible_store::ensure_primary_store_exists</a>(
             <a href="confidential_asset.md#0x7_confidential_asset_get_fa_store_address">get_fa_store_address</a>(), token
         );
 
     <a href="../../aptos-framework/doc/dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_transfer">dispatchable_fungible_asset::transfer</a>(
-        sender, sender_fa_store, ca_fa_store, amount
+        sender, sender_fa_store, cfa_store, amount
     );
 
     <b>let</b> ca_store =
@@ -2258,6 +2269,8 @@ Ensures that the <code><a href="confidential_asset.md#0x7_confidential_asset_FAC
 If the object does not exist, creates it.
 Used only for internal purposes.
 
+TODO: rename to fa_config_address_or_create() or something like this
+
 
 <pre><code><b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_ensure_fa_config_exists">ensure_fa_config_exists</a>(token: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;<a href="../../aptos-framework/doc/fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;): <b>address</b>
 </code></pre>
@@ -2272,10 +2285,11 @@ Used only for internal purposes.
     <b>let</b> fa_config_address = <a href="confidential_asset.md#0x7_confidential_asset_get_fa_config_address">get_fa_config_address</a>(token);
 
     <b>if</b> (!<b>exists</b>&lt;<a href="confidential_asset.md#0x7_confidential_asset_FAConfig">FAConfig</a>&gt;(fa_config_address)) {
-        <b>let</b> fa_config_singer = <a href="confidential_asset.md#0x7_confidential_asset_get_fa_config_signer">get_fa_config_signer</a>(token);
+        <b>let</b> fa_config_signer = <a href="confidential_asset.md#0x7_confidential_asset_get_fa_config_signer">get_fa_config_signer</a>(token);
 
         <b>move_to</b>(
-            &fa_config_singer,
+            &fa_config_signer,
+            // TODO: why default <b>to</b> <b>false</b>?
             <a href="confidential_asset.md#0x7_confidential_asset_FAConfig">FAConfig</a> { allowed: <b>false</b>, auditor_ek: std::option::none() }
         );
     };

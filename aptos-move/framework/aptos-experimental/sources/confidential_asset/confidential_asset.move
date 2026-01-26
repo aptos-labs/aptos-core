@@ -110,6 +110,7 @@ module aptos_experimental::confidential_asset {
     //
 
     /// The `confidential_asset` module stores a `ConfidentialAssetStore` object for each user-token pair.
+    /// TODO: rename this, since there are too many stores flying around: FA stores and CFA pools
     struct ConfidentialAssetStore has key {
         /// Indicates if the account is frozen. If `true`, transactions are temporarily disabled
         /// for this account. This is particularly useful during key rotations, which require
@@ -156,16 +157,20 @@ module aptos_experimental::confidential_asset {
         extend_ref: ExtendRef
     }
 
-    /// Represents the configuration of a token.
+    /// Represents the configuration of a token type.
+    ///
+    /// TODO(upgradeability): Should we make this into an enum to make it easier to upgrade it?
     struct FAConfig has key {
-        /// Indicates whether the token is allowed for confidential transfers.
+        /// Indicates whether the token type is allowed for confidential transfers.
         /// If allow list is disabled, all tokens are allowed.
-        /// Can be toggled by the governance module. The withdrawals are always allowed.
+        /// Can be toggled by the governance module. Withdrawals are always allowed.
         allowed: bool,
 
-        /// The auditor's public key for the token. If the auditor is not set, this field is `None`.
+        /// The auditor's public key for the token type. If the auditor is not set, this field is `None`.
         /// Otherwise, each confidential transfer must include the auditor as an additional party,
         /// alongside the recipient, who has access to the decrypted transferred amount.
+        ///
+        /// TODO(feature): token-type-specific auditor EKs or global auditor EKs? (Or both?)
         auditor_ek: Option<twisted_elgamal::CompressedPubkey>
     }
 
@@ -336,7 +341,7 @@ module aptos_experimental::confidential_asset {
     /// The sender encrypts the transferred amount with the recipient's encryption key and the function updates the
     /// recipient's confidential balance homomorphically.
     /// Additionally, the sender encrypts the transferred amount with the auditors' EKs, allowing auditors to decrypt
-    /// the it on their side.
+    /// it on their side.
     /// The sender provides their new normalized confidential balance, encrypted with fresh randomness to preserve privacy.
     /// Warning: If the auditor feature is enabled, the sender must include the auditor as the first element in the
     /// `auditor_eks` vector.
@@ -479,7 +484,7 @@ module aptos_experimental::confidential_asset {
     // Public governance functions
     //
 
-    /// Enables the allow list, restricting confidential transfers to tokens on the allow list.
+    /// Enables the allow list, restricting confidential transfers to token types on the allow list.
     public fun enable_allow_list(aptos_framework: &signer) acquires FAController {
         system_addresses::assert_aptos_framework(aptos_framework);
 
@@ -493,7 +498,7 @@ module aptos_experimental::confidential_asset {
         fa_controller.allow_list_enabled = true;
     }
 
-    /// Disables the allow list, allowing confidential transfers for all tokens.
+    /// Disables the allow list, allowing confidential transfers for all token types.
     public fun disable_allow_list(aptos_framework: &signer) acquires FAController {
         system_addresses::assert_aptos_framework(aptos_framework);
 
@@ -689,6 +694,7 @@ module aptos_experimental::confidential_asset {
 
     #[view]
     /// Returns the circulating supply of the confidential asset.
+    /// TODO: rename; this is not a "balance"; it's more of a "supply"
     public fun confidential_asset_balance(token: Object<Metadata>): u64 acquires FAController {
         let fa_store_address = get_fa_store_address();
         assert!(
@@ -743,6 +749,7 @@ module aptos_experimental::confidential_asset {
     }
 
     /// Implementation of the `deposit_to` entry function.
+    /// For convenience, we often refer to this operation as "veiling."
     public fun deposit_to_internal(
         sender: &signer,
         token: Object<Metadata>,
@@ -754,15 +761,19 @@ module aptos_experimental::confidential_asset {
 
         let from = signer::address_of(sender);
 
+        // TODO(odd): if the sender has no FA store for `token`, then he has no money; so why create an empty store here just to fail over in `transfer` later?
         let sender_fa_store =
             primary_fungible_store::ensure_primary_store_exists(from, token);
-        let ca_fa_store =
+
+        // Note: This call sets up confidential FA (CFA) store for this type-of-token, if one is not already set up:
+        // e.g., such as when someone first veils APT for the first time.
+        let cfa_store =
             primary_fungible_store::ensure_primary_store_exists(
                 get_fa_store_address(), token
             );
 
         dispatchable_fungible_asset::transfer(
-            sender, sender_fa_store, ca_fa_store, amount
+            sender, sender_fa_store, cfa_store, amount
         );
 
         let ca_store =
@@ -1048,14 +1059,17 @@ module aptos_experimental::confidential_asset {
     /// Ensures that the `FAConfig` object exists for the specified token.
     /// If the object does not exist, creates it.
     /// Used only for internal purposes.
+    ///
+    /// TODO: rename to fa_config_address_or_create() or something like this
     fun ensure_fa_config_exists(token: Object<Metadata>): address acquires FAController {
         let fa_config_address = get_fa_config_address(token);
 
         if (!exists<FAConfig>(fa_config_address)) {
-            let fa_config_singer = get_fa_config_signer(token);
+            let fa_config_signer = get_fa_config_signer(token);
 
             move_to(
-                &fa_config_singer,
+                &fa_config_signer,
+                // TODO: why default to false?
                 FAConfig { allowed: false, auditor_ek: std::option::none() }
             );
         };
@@ -1245,6 +1259,7 @@ module aptos_experimental::confidential_asset {
         fa
     }
 
+    // Used to initialize the module for devnet and for tests in aptos-move/e2e-move-tests/
     entry fun init_module_for_genesis(deployer: &signer) {
         assert!(
             signer::address_of(deployer) == @aptos_experimental,

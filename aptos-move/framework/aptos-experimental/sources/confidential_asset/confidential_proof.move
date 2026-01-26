@@ -256,7 +256,14 @@ module aptos_experimental::confidential_proof {
             auditor_amounts,
             &proof.sigma_proof
         );
+
+        // TODO(feature): enforce min balance
+        // TODO(perf): can we batch the batches?
+
+        // Verifies a `CHUNK_SIZE_BITS`-bit range proof on a batch of size ACTUAL_BALANCE_CHUNKS
         verify_new_balance_range_proof(new_balance, &proof.zkrp_new_balance);
+
+        // Verifies a `CHUNK_SIZE_BITS`-bit range proof on a batch of size PENDING_BALANCE_CHUNKS
         verify_transfer_amount_range_proof(
             recipient_amount, &proof.zkrp_transfer_amount
         );
