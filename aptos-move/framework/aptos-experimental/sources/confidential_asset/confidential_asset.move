@@ -10,7 +10,6 @@ module aptos_experimental::confidential_asset {
     use aptos_std::ristretto255_bulletproofs::Self as bulletproofs;
     use aptos_std::string_utils;
     use aptos_framework::chain_id;
-    use aptos_framework::coin;
     use aptos_framework::event;
     use aptos_framework::dispatchable_fungible_asset;
     use aptos_framework::fungible_asset::{Metadata};
@@ -261,29 +260,6 @@ module aptos_experimental::confidential_asset {
     public entry fun deposit(
         sender: &signer, token: Object<Metadata>, amount: u64
     ) acquires ConfidentialAssetStore, FAController, FAConfig {
-        deposit_to_internal(
-            sender,
-            token,
-            signer::address_of(sender),
-            amount
-        )
-    }
-
-    /// The same as `deposit_to`, but converts coins to missing FA first.
-    public entry fun deposit_coins_to<CoinType>(
-        sender: &signer, to: address, amount: u64
-    ) acquires ConfidentialAssetStore, FAController, FAConfig {
-        let token = ensure_sufficient_fa<CoinType>(sender, amount).extract();
-
-        deposit_to_internal(sender, token, to, amount)
-    }
-
-    /// The same as `deposit`, but converts coins to missing FA first.
-    public entry fun deposit_coins<CoinType>(
-        sender: &signer, amount: u64
-    ) acquires ConfidentialAssetStore, FAController, FAConfig {
-        let token = ensure_sufficient_fa<CoinType>(sender, amount).extract();
-
         deposit_to_internal(
             sender,
             token,
@@ -1229,34 +1205,6 @@ module aptos_experimental::confidential_asset {
         std::option::some(
             auditor_amounts.map(|balance| balance.extract())
         )
-    }
-
-    /// Converts coins to missing FA.
-    /// Returns `Some(Object<Metadata>)` if user has a suffucient amount of FA to proceed, otherwise `None`.
-    fun ensure_sufficient_fa<CoinType>(sender: &signer, amount: u64): Option<Object<Metadata>> {
-        let user = signer::address_of(sender);
-        let fa = coin::paired_metadata<CoinType>();
-
-        if (fa.is_none()) {
-            return fa;
-        };
-
-        let fa_balance = primary_fungible_store::balance(user, *fa.borrow());
-
-        if (fa_balance >= amount) {
-            return fa;
-        };
-
-        if (coin::balance<CoinType>(user) < amount) {
-            return std::option::none();
-        };
-
-        let coin_amount = coin::withdraw<CoinType>(sender, amount - fa_balance);
-        let fa_amount = coin::coin_to_fungible_asset(coin_amount);
-
-        primary_fungible_store::deposit(user, fa_amount);
-
-        fa
     }
 
     // Used to initialize the module for devnet and for tests in aptos-move/e2e-move-tests/

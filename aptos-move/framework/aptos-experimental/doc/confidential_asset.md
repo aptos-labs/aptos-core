@@ -18,8 +18,6 @@ It enables private transfers by obfuscating token amounts while keeping sender a
 -  [Function `register`](#0x7_confidential_asset_register)
 -  [Function `deposit_to`](#0x7_confidential_asset_deposit_to)
 -  [Function `deposit`](#0x7_confidential_asset_deposit)
--  [Function `deposit_coins_to`](#0x7_confidential_asset_deposit_coins_to)
--  [Function `deposit_coins`](#0x7_confidential_asset_deposit_coins)
 -  [Function `withdraw_to`](#0x7_confidential_asset_withdraw_to)
 -  [Function `withdraw`](#0x7_confidential_asset_withdraw)
 -  [Function `confidential_transfer`](#0x7_confidential_asset_confidential_transfer)
@@ -68,13 +66,11 @@ It enables private transfers by obfuscating token amounts while keeping sender a
 -  [Function `validate_auditors`](#0x7_confidential_asset_validate_auditors)
 -  [Function `deserialize_auditor_eks`](#0x7_confidential_asset_deserialize_auditor_eks)
 -  [Function `deserialize_auditor_amounts`](#0x7_confidential_asset_deserialize_auditor_amounts)
--  [Function `ensure_sufficient_fa`](#0x7_confidential_asset_ensure_sufficient_fa)
 -  [Function `init_module_for_genesis`](#0x7_confidential_asset_init_module_for_genesis)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
 <b>use</b> <a href="../../aptos-framework/doc/chain_id.md#0x1_chain_id">0x1::chain_id</a>;
-<b>use</b> <a href="../../aptos-framework/doc/coin.md#0x1_coin">0x1::coin</a>;
 <b>use</b> <a href="../../aptos-framework/doc/dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset">0x1::dispatchable_fungible_asset</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-framework/doc/event.md#0x1_event">0x1::event</a>;
@@ -718,69 +714,6 @@ The same as <code>deposit_to</code>, but the recipient is the sender.
 <pre><code><b>public</b> entry <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_deposit">deposit</a>(
     sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, token: Object&lt;Metadata&gt;, amount: u64
 ) <b>acquires</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>, <a href="confidential_asset.md#0x7_confidential_asset_FAController">FAController</a>, <a href="confidential_asset.md#0x7_confidential_asset_FAConfig">FAConfig</a> {
-    <a href="confidential_asset.md#0x7_confidential_asset_deposit_to_internal">deposit_to_internal</a>(
-        sender,
-        token,
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender),
-        amount
-    )
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_confidential_asset_deposit_coins_to"></a>
-
-## Function `deposit_coins_to`
-
-The same as <code>deposit_to</code>, but converts coins to missing FA first.
-
-
-<pre><code><b>public</b> entry <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_deposit_coins_to">deposit_coins_to</a>&lt;CoinType&gt;(sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> entry <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_deposit_coins_to">deposit_coins_to</a>&lt;CoinType&gt;(
-    sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64
-) <b>acquires</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>, <a href="confidential_asset.md#0x7_confidential_asset_FAController">FAController</a>, <a href="confidential_asset.md#0x7_confidential_asset_FAConfig">FAConfig</a> {
-    <b>let</b> token = <a href="confidential_asset.md#0x7_confidential_asset_ensure_sufficient_fa">ensure_sufficient_fa</a>&lt;CoinType&gt;(sender, amount).extract();
-
-    <a href="confidential_asset.md#0x7_confidential_asset_deposit_to_internal">deposit_to_internal</a>(sender, token, <b>to</b>, amount)
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_confidential_asset_deposit_coins"></a>
-
-## Function `deposit_coins`
-
-The same as <code>deposit</code>, but converts coins to missing FA first.
-
-
-<pre><code><b>public</b> entry <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_deposit_coins">deposit_coins</a>&lt;CoinType&gt;(sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, amount: u64)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> entry <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_deposit_coins">deposit_coins</a>&lt;CoinType&gt;(
-    sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, amount: u64
-) <b>acquires</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>, <a href="confidential_asset.md#0x7_confidential_asset_FAController">FAController</a>, <a href="confidential_asset.md#0x7_confidential_asset_FAConfig">FAConfig</a> {
-    <b>let</b> token = <a href="confidential_asset.md#0x7_confidential_asset_ensure_sufficient_fa">ensure_sufficient_fa</a>&lt;CoinType&gt;(sender, amount).extract();
-
     <a href="confidential_asset.md#0x7_confidential_asset_deposit_to_internal">deposit_to_internal</a>(
         sender,
         token,
@@ -2669,54 +2602,6 @@ Returns <code>Some(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib
     std::option::some(
         auditor_amounts.map(|balance| balance.extract())
     )
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_confidential_asset_ensure_sufficient_fa"></a>
-
-## Function `ensure_sufficient_fa`
-
-Converts coins to missing FA.
-Returns <code>Some(Object&lt;Metadata&gt;)</code> if user has a suffucient amount of FA to proceed, otherwise <code>None</code>.
-
-
-<pre><code><b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_ensure_sufficient_fa">ensure_sufficient_fa</a>&lt;CoinType&gt;(sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, amount: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;<a href="../../aptos-framework/doc/fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_ensure_sufficient_fa">ensure_sufficient_fa</a>&lt;CoinType&gt;(sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, amount: u64): Option&lt;Object&lt;Metadata&gt;&gt; {
-    <b>let</b> user = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
-    <b>let</b> fa = <a href="../../aptos-framework/doc/coin.md#0x1_coin_paired_metadata">coin::paired_metadata</a>&lt;CoinType&gt;();
-
-    <b>if</b> (fa.is_none()) {
-        <b>return</b> fa;
-    };
-
-    <b>let</b> fa_balance = <a href="../../aptos-framework/doc/primary_fungible_store.md#0x1_primary_fungible_store_balance">primary_fungible_store::balance</a>(user, *fa.borrow());
-
-    <b>if</b> (fa_balance &gt;= amount) {
-        <b>return</b> fa;
-    };
-
-    <b>if</b> (<a href="../../aptos-framework/doc/coin.md#0x1_coin_balance">coin::balance</a>&lt;CoinType&gt;(user) &lt; amount) {
-        <b>return</b> std::option::none();
-    };
-
-    <b>let</b> coin_amount = <a href="../../aptos-framework/doc/coin.md#0x1_coin_withdraw">coin::withdraw</a>&lt;CoinType&gt;(sender, amount - fa_balance);
-    <b>let</b> fa_amount = <a href="../../aptos-framework/doc/coin.md#0x1_coin_coin_to_fungible_asset">coin::coin_to_fungible_asset</a>(coin_amount);
-
-    <a href="../../aptos-framework/doc/primary_fungible_store.md#0x1_primary_fungible_store_deposit">primary_fungible_store::deposit</a>(user, fa_amount);
-
-    fa
 }
 </code></pre>
 
