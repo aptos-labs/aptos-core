@@ -2067,16 +2067,36 @@ impl Generator<'_> {
         match_mode: &MatchMode,
         next_scope: Option<&Scope>,
     ) {
-        if !matches!(pat, Pattern::Tuple(..)) && values.len() != 1 {
+        if !matches!(pat, Pattern::Wildcard(..) | Pattern::Tuple(..)) && values.len() != 1 {
             self.internal_error(id, "inconsistent tuple value in match");
             return;
         }
         match pat {
             Pattern::Wildcard(id) => {
+                if match_mode.is_probing() {
+                    return;
+                }
                 let pat_ty = self.env().get_node_type(*id);
-                if !match_mode.is_probing() {
+                if values.len() == 1 {
                     let temp = self.new_temp(pat_ty);
                     self.emit_assign_with_convert(*id, temp, values[0], AssignKind::Inferred)
+                } else {
+                    match pat_ty {
+                        Type::Tuple(tys) if values.len() == tys.len() => {
+                            for (value, ty) in std::iter::zip(values, tys) {
+                                let temp = self.new_temp(ty);
+                                self.emit_assign_with_convert(
+                                    *id,
+                                    temp,
+                                    *value,
+                                    AssignKind::Inferred,
+                                )
+                            }
+                        },
+                        _ => {
+                            self.internal_error(*id, "inconsistent pattern wildcard");
+                        },
+                    }
                 }
             },
             Pattern::Var(var_id, sym) => {

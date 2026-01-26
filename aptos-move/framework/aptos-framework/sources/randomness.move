@@ -9,7 +9,6 @@ module aptos_framework::randomness {
     use std::hash;
     use std::option;
     use std::option::Option;
-    use std::vector;
     use aptos_framework::event;
     use aptos_framework::system_addresses;
     use aptos_framework::transaction_context;
@@ -78,11 +77,11 @@ module aptos_framework::randomness {
 
         let input = DST;
         let randomness = borrow_global<PerBlockRandomness>(@aptos_framework);
-        let seed = *option::borrow(&randomness.seed);
+        let seed = *randomness.seed.borrow();
 
-        vector::append(&mut input, seed);
-        vector::append(&mut input, transaction_context::get_transaction_hash());
-        vector::append(&mut input, fetch_and_increment_txn_counter());
+        input.append(seed);
+        input.append(transaction_context::get_transaction_hash());
+        input.append(fetch_and_increment_txn_counter());
         hash::sha3_256(input)
     }
 
@@ -92,13 +91,13 @@ module aptos_framework::randomness {
         let c = 0;
         while (c < n) {
             let blob = next_32_bytes();
-            vector::reverse_append(&mut v, blob);
+            v.reverse_append(blob);
 
-            c = c + 32;
+            c += 32;
         };
 
         if (c > n) {
-            vector::trim(&mut v, n);
+            v.trim(n);
         };
 
         event::emit(RandomnessGeneratedEvent {});
@@ -109,7 +108,7 @@ module aptos_framework::randomness {
     /// Generates an u8 uniformly at random.
     public fun u8_integer(): u8 acquires PerBlockRandomness {
         let raw = next_32_bytes();
-        let ret: u8 = vector::pop_back(&mut raw);
+        let ret: u8 = raw.pop_back();
 
         event::emit(RandomnessGeneratedEvent {});
 
@@ -122,8 +121,8 @@ module aptos_framework::randomness {
         let i = 0;
         let ret: u16 = 0;
         while (i < 2) {
-            ret = ret * 256 + (vector::pop_back(&mut raw) as u16);
-            i = i + 1;
+            ret = ret * 256 + (raw.pop_back() as u16);
+            i += 1;
         };
 
         event::emit(RandomnessGeneratedEvent {});
@@ -137,8 +136,8 @@ module aptos_framework::randomness {
         let i = 0;
         let ret: u32 = 0;
         while (i < 4) {
-            ret = ret * 256 + (vector::pop_back(&mut raw) as u32);
-            i = i + 1;
+            ret = ret * 256 + (raw.pop_back() as u32);
+            i += 1;
         };
 
         event::emit(RandomnessGeneratedEvent {});
@@ -152,8 +151,8 @@ module aptos_framework::randomness {
         let i = 0;
         let ret: u64 = 0;
         while (i < 8) {
-            ret = ret * 256 + (vector::pop_back(&mut raw) as u64);
-            i = i + 1;
+            ret = ret * 256 + (raw.pop_back() as u64);
+            i += 1;
         };
 
         event::emit(RandomnessGeneratedEvent {});
@@ -167,8 +166,8 @@ module aptos_framework::randomness {
         let i = 0;
         let ret: u128 = 0;
         while (i < 16) {
-            ret = ret * 256 + (vector::pop_back(&mut raw) as u128);
-            i = i + 1;
+            ret = ret * 256 + (raw.pop_back() as u128);
+            i += 1;
         };
 
         event::emit(RandomnessGeneratedEvent {});
@@ -188,8 +187,8 @@ module aptos_framework::randomness {
         let i = 0;
         let ret: u256 = 0;
         while (i < 32) {
-            ret = ret * 256 + (vector::pop_back(&mut raw) as u256);
-            i = i + 1;
+            ret = ret * 256 + (raw.pop_back() as u256);
+            i += 1;
         };
         ret
     }
@@ -283,7 +282,7 @@ module aptos_framework::randomness {
             i < 256
         }) {
             sample = safe_add_mod(sample, sample, range);
-            i = i + 1;
+            i += 1;
         };
 
         let sample = safe_add_mod(sample, r0 % range, range);
@@ -316,8 +315,8 @@ module aptos_framework::randomness {
             };
             i < n
         }) {
-            std::vector::push_back(&mut values, i);
-            i = i + 1;
+            values.push_back(i);
+            i += 1;
         };
         spec {
             assert len(values) == n;
@@ -335,8 +334,8 @@ module aptos_framework::randomness {
             spec {
                 assert pop_position < len(values);
             };
-            std::vector::swap(&mut values, pop_position, tail);
-            tail = tail - 1;
+            values.swap(pop_position, tail);
+            tail -= 1;
         };
 
         values
@@ -344,7 +343,7 @@ module aptos_framework::randomness {
 
     #[test_only]
     public fun set_seed(seed: vector<u8>) acquires PerBlockRandomness {
-        assert!(vector::length(&seed) == 32, 0);
+        assert!(seed.length() == 32, 0);
         let randomness = borrow_global_mut<PerBlockRandomness>(@aptos_framework);
         randomness.seed = option::some(seed);
     }
@@ -407,7 +406,7 @@ module aptos_framework::randomness {
     #[test_only]
     fun assert_event_count_equals(count: u64) {
         let events = event::emitted_events<RandomnessGeneratedEvent>();
-        assert!(vector::length(&events) == count, 0);
+        assert!(events.length() == count, 0);
     }
 
     #[test(fx = @aptos_framework)]
@@ -418,59 +417,59 @@ module aptos_framework::randomness {
         assert_event_count_equals(c);
 
         let _ = bytes(1);
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = u8_integer();
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = u16_integer();
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = u32_integer();
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = u64_integer();
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = u128_integer();
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = u256_integer();
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = u8_range(0, 255);
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = u16_range(0, 255);
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = u32_range(0, 255);
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = u64_range(0, 255);
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = u128_range(0, 255);
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = u256_range(0, 255);
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
 
         let _ = permutation(6);
-        c = c + 1;
+        c += 1;
         assert_event_count_equals(c);
     }
 
@@ -479,31 +478,31 @@ module aptos_framework::randomness {
         initialize_for_testing(&fx);
 
         let v = bytes(0);
-        assert!(vector::length(&v) == 0, 0);
+        assert!(v.length() == 0, 0);
 
         let v = bytes(1);
-        assert!(vector::length(&v) == 1, 0);
+        assert!(v.length() == 1, 0);
         let v = bytes(2);
-        assert!(vector::length(&v) == 2, 0);
+        assert!(v.length() == 2, 0);
         let v = bytes(3);
-        assert!(vector::length(&v) == 3, 0);
+        assert!(v.length() == 3, 0);
         let v = bytes(4);
-        assert!(vector::length(&v) == 4, 0);
+        assert!(v.length() == 4, 0);
         let v = bytes(30);
-        assert!(vector::length(&v) == 30, 0);
+        assert!(v.length() == 30, 0);
         let v = bytes(31);
-        assert!(vector::length(&v) == 31, 0);
+        assert!(v.length() == 31, 0);
         let v = bytes(32);
-        assert!(vector::length(&v) == 32, 0);
+        assert!(v.length() == 32, 0);
 
         let v = bytes(33);
-        assert!(vector::length(&v) == 33, 0);
+        assert!(v.length() == 33, 0);
         let v = bytes(50);
-        assert!(vector::length(&v) == 50, 0);
+        assert!(v.length() == 50, 0);
         let v = bytes(63);
-        assert!(vector::length(&v) == 63, 0);
+        assert!(v.length() == 63, 0);
         let v = bytes(64);
-        assert!(vector::length(&v) == 64, 0);
+        assert!(v.length() == 64, 0);
     }
 
     #[test_only]
@@ -511,19 +510,19 @@ module aptos_framework::randomness {
         let present = vector[];
 
         // Mark all elements from 0 to n-1 as not present
-        let n = vector::length(v);
+        let n = v.length();
         for (i in 0..n) {
-            vector::push_back(&mut present, false);
+            present.push_back(false);
         };
 
         for (i in 0..n) {
-            let e = vector::borrow(v, i);
-            let bit = vector::borrow_mut(&mut present, *e);
+            let e = v.borrow(i);
+            let bit = present.borrow_mut(*e);
             *bit = true;
         };
 
         for (i in 0..n) {
-            let bit = vector::borrow(&present, i);
+            let bit = present.borrow(i);
             if(*bit == false) {
                 return false
             };
@@ -537,7 +536,7 @@ module aptos_framework::randomness {
         initialize_for_testing(&fx);
 
         let v = permutation(0);
-        assert!(vector::length(&v) == 0, 0);
+        assert!(v.length() == 0, 0);
 
         test_permutation_internal(1);
         test_permutation_internal(2);
@@ -552,23 +551,23 @@ module aptos_framework::randomness {
         let num_permutations = 1;
         let c = 1;
         for (i in 0..size) {
-            num_permutations = num_permutations * c;
-            c = c + 1;
+            num_permutations *= c;
+            c += 1;
         };
 
         let permutations = table_with_length::new<vector<u64>, bool>();
 
         // This loop will not exit until all permutations are created
-        while(table_with_length::length(&permutations) < num_permutations) {
+        while(permutations.length() < num_permutations) {
             let v = permutation(size);
-            assert!(vector::length(&v) == size, 0);
+            assert!(v.length() == size, 0);
             assert!(is_permutation(&v), 0);
 
-            if(table_with_length::contains(&permutations, v) == false) {
-                table_with_length::add(&mut permutations, v, true);
+            if(permutations.contains(v) == false) {
+                permutations.add(v, true);
             }
         };
 
-        table_with_length::drop_unchecked(permutations);
+        permutations.drop_unchecked();
     }
 }

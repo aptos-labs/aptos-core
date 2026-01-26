@@ -1,0 +1,3 @@
+processed 2 tasks
+task 0 lines 1-26:  publish [module 0xc0ffee::move_to_test]
+task 1 lines 28-28:  run 0xc0ffee::move_to_test::test_move_to --signers 0x1 --verbose

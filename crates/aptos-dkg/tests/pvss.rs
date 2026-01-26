@@ -29,6 +29,7 @@ use aptos_dkg::pvss::{
     GenericWeighting, ThresholdConfigBlstrs,
 };
 use ark_bn254::Bn254;
+use ark_ec::pairing::Pairing;
 use rand::{rngs::StdRng, thread_rng};
 use rand_core::SeedableRng;
 
@@ -54,28 +55,6 @@ fn test_pvss_all_unweighted() {
         // Insecure testing-only field-element PVSS.
         // TODO: Remove?
         pvss_deal_verify_and_reconstruct::<insecure_field::Transcript>(&tc, seed.to_bytes_le());
-    }
-
-    // Restarting the loop here because now it'll grab **arkworks** `ThresholdConfig`s over BN254 instead
-    let tcs = test_utils::get_threshold_configs_for_testing_smaller();
-    for tc in tcs.iter().take(20) {
-        // Reduce the number of tcs to make it a bit faster?
-        println!("\nTesting {tc} PVSS");
-
-        let seed = random_scalar(&mut rng);
-
-        type ChunkyTranscriptBn254 = chunky::UnsignedUnweightedTranscript<ark_bn254::Bn254>;
-
-        // Chunky
-        nonaggregatable_pvss_deal_verify_and_reconstruct::<ChunkyTranscriptBn254>(
-            &tc,
-            seed.to_bytes_le(),
-        );
-
-        pvss_deal_verify_and_reconstruct_from_subtranscript::<ChunkyTranscriptBn254>(
-            &tc,
-            seed.to_bytes_le(),
-        );
     }
 }
 
@@ -123,23 +102,20 @@ fn test_pvss_all_weighted() {
             Bn254,
             chunky::SignedWeightedTranscript<Bn254>,
         >(&wc, seed.to_bytes_le());
+        nonaggregatable_weighted_pvss_deal_verify_and_reconstruct::<
+            Bn254,
+            chunky::SignedWeightedTranscriptv2<Bn254>,
+        >(&wc, seed.to_bytes_le());
 
         // Unsigned weighted Chunky
         nonaggregatable_weighted_pvss_deal_verify_and_reconstruct::<
             Bn254,
             chunky::UnsignedWeightedTranscript<Bn254>,
         >(&wc, seed.to_bytes_le());
-
-        //type SignedChunkyTranscriptBn254 = signed::GenericSigning<chunky::WeightedTranscript<Bn254>>; TODO!!
-        // type UnsignedChunkyTranscriptBn254 = chunky::UnsignedWeightedTranscript<Bn254>;
-
-        // OLD: <ChunkyTranscriptBn254 as Transcript>::SecretSharingConfig
-        // if wc.get_total_num_players() > 8 {
-        //     test_pvss_aggregate_subtranscript_and_decrypt::<Bn254, UnsignedChunkyTranscriptBn254>(
-        //         &wc,
-        //         seed.to_bytes_le(),
-        //     );
-        // }
+        nonaggregatable_weighted_pvss_deal_verify_and_reconstruct::<
+            Bn254,
+            chunky::UnsignedWeightedTranscriptv2<Bn254>,
+        >(&wc, seed.to_bytes_le());
     }
 }
 
@@ -157,27 +133,27 @@ fn test_pvss_transcript_size() {
     // Restarting the loop here because now it'll grab **arkworks** `ThresholdConfig`s with BN254
     // uses default chunk sizes, so probably want to modify this at some point to allow a wider range
     // Ideally should iterate over a vec of (t, n), not the actual threshold configs... but won't be a bottleneck
-    for sc in get_threshold_configs_for_benchmarking().iter().take(1) {
+    for sc in get_weighted_configs_for_benchmarking().iter().take(1) {
         // Only trying 1 for now to keep tests fast (also the second one has the same n, which means it would yield the same size...)
         println!();
         let actual_size =
-            actual_transcript_size::<chunky::UnsignedUnweightedTranscript<ark_bn254::Bn254>>(&sc);
-        print_transcript_size::<chunky::UnsignedUnweightedTranscript<ark_bn254::Bn254>>(
+            actual_transcript_size::<chunky::UnsignedWeightedTranscript<ark_bn254::Bn254>>(&sc);
+        print_transcript_size::<chunky::UnsignedWeightedTranscript<ark_bn254::Bn254>>(
             "Actual for BN254",
             &sc,
             actual_size,
-        );
+        ); // TODO: also do signed here? or only do signed?
     }
 
     // Restarting so it grabs BLS12-381 instead of BN254... TODO: could get rid of this with some work
-    for sc in get_threshold_configs_for_benchmarking().iter().take(1) {
+    for sc in get_weighted_configs_for_benchmarking().iter().take(1) {
         // Only trying 1 for now to keep tests fast (also the second one has the same n, which means it would yield the same size...)
 
         println!();
         let actual_size = actual_transcript_size::<
-            chunky::UnsignedUnweightedTranscript<ark_bls12_381::Bls12_381>,
+            chunky::UnsignedWeightedTranscript<ark_bls12_381::Bls12_381>,
         >(&sc);
-        print_transcript_size::<chunky::UnsignedUnweightedTranscript<ark_bls12_381::Bls12_381>>(
+        print_transcript_size::<chunky::UnsignedWeightedTranscript<ark_bls12_381::Bls12_381>>(
             "Actual for BLS12_381",
             &sc,
             actual_size,
@@ -293,6 +269,7 @@ fn test_pvss_aggregate_subtranscript_and_decrypt<E: Pairing, T>(
 }
 
 #[cfg(test)]
+#[allow(dead_code)] // TODO
 fn nonaggregatable_pvss_deal_verify_and_reconstruct<T: HasAggregatableSubtranscript>(
     sc: &T::SecretSharingConfig,
     seed_bytes: [u8; 32],
@@ -329,7 +306,6 @@ fn nonaggregatable_pvss_deal_verify_and_reconstruct<T: HasAggregatableSubtranscr
     }
 }
 
-use ark_ec::pairing::Pairing;
 // TODO: merge this stuff
 #[cfg(test)]
 fn nonaggregatable_weighted_pvss_deal_verify_and_reconstruct<E: Pairing, T>(
@@ -372,6 +348,7 @@ fn nonaggregatable_weighted_pvss_deal_verify_and_reconstruct<E: Pairing, T>(
 }
 
 #[cfg(test)]
+#[allow(dead_code)] // TODO
 fn pvss_deal_verify_and_reconstruct_from_subtranscript<
     T: Transcript + HasAggregatableSubtranscript,
 >(

@@ -87,9 +87,9 @@ pub fn fetch_and_increment_txn_counter(
 
     let ctx = context.extensions_mut().get_mut::<RandomnessContext>();
     if !ctx.is_unbiasable() {
-        return Err(SafeNativeError::Abort {
-            abort_code: E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT,
-        });
+        return Err(SafeNativeError::abort(
+            E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT,
+        ));
     }
 
     let ret = ctx.txn_local_state.to_vec();

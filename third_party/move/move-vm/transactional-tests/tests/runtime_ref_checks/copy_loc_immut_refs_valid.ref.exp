@@ -1,0 +1,4 @@
+processed 2 tasks
+task 0 lines 1-23:  publish [module 0xc0ffee::copy_immut_test]
+task 1 lines 25-25:  run 0xc0ffee::copy_immut_test::test_copy_loc_immut_refs_ok --verbose
+return values: 42

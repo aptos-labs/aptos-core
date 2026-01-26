@@ -1,0 +1,58 @@
+//# publish
+module 0xc0ffee::closure_overlap_test
+
+// Test: Closure that captures a value and takes TWO mutable reference parameters
+// This tests exclusive lock violation when calling closure with two refs to same location
+public fun make_closure_with_two_mut_refs(captured_val: u64): |&mut u64, &mut u64|u64 has drop
+    // Pack closure that captures the value (not a reference)
+    move_loc captured_val
+    pack_closure action_with_two_refs, 1
+    ret
+
+#[persistent] fun action_with_two_refs(captured: u64, ref1: &mut u64, ref2: &mut u64): u64
+    // Try to read from both mutable references
+    // If they point to same location, violates exclusivity
+    copy_loc ref1
+    read_ref
+    copy_loc ref2
+    read_ref
+    add
+    move_loc captured
+    add
+    ret
+
+// Test: Create closure with two &mut u64 parameters,
+// then call it with two mutable references to the SAME location
+// This should fail with exclusive lock conflict
+public fun test_closure_with_overlapping_mut_refs(): u64
+    local x: u64
+    local ref1: &mut u64
+    local ref2: &mut u64
+    local closure: |&mut u64, &mut u64|u64 has drop
+
+    // Create value
+    ld_u64 10
+    st_loc x
+
+    // Create first mutable reference to x
+    mut_borrow_loc x
+    st_loc ref1
+
+    // Create closure that takes two &mut u64 params and captures a value
+    ld_u64 5
+    call make_closure_with_two_mut_refs
+    st_loc closure
+
+    // Create second mutable reference to x (violates exclusivity with ref1)
+    mut_borrow_loc x
+    st_loc ref2
+
+    // Try to call closure with both refs to same location
+    // This should fail: can't have two mutable references to same location
+    move_loc ref1
+    move_loc ref2
+    move_loc closure
+    call_closure<|&mut u64, &mut u64|u64>
+    ret
+
+//# run 0xc0ffee::closure_overlap_test::test_closure_with_overlapping_mut_refs --verbose

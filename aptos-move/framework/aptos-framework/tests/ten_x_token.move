@@ -58,18 +58,12 @@ module 0xcafe::ten_x_token {
 
     public fun derived_balance<T: key>(store: Object<T>): u64 acquires BalanceStore {
         // Derived value is always 10x!
-        fungible_asset::balance_with_ref(
-            &borrow_global<BalanceStore>(@0xcafe).balance_ref,
-            store
-        ) * 10
+        borrow_global<BalanceStore>(@0xcafe).balance_ref.balance_with_ref(store) * 10
     }
 
     public fun derived_supply<T: key>(metadata: Object<T>): Option<u128> acquires BalanceStore {
         // Derived supply is 10x.
-        option::some(option::extract(&mut fungible_asset::supply_with_ref(
-            &borrow_global<BalanceStore>(@0xcafe).supply_ref,
-            metadata
-        )) * 10)
+        option::some(borrow_global<BalanceStore>(@0xcafe).supply_ref.supply_with_ref(metadata).extract() * 10)
     }
 
     public fun withdraw<T: key>(
@@ -77,7 +71,7 @@ module 0xcafe::ten_x_token {
         amount: u64,
         transfer_ref: &TransferRef,
     ): FungibleAsset {
-        fungible_asset::withdraw_with_ref(transfer_ref, store, amount)
+        transfer_ref.withdraw_with_ref(store, amount)
     }
 
     public fun deposit<T: key>(
@@ -85,6 +79,6 @@ module 0xcafe::ten_x_token {
         fa: FungibleAsset,
         transfer_ref: &TransferRef,
     ) {
-        fungible_asset::deposit_with_ref(transfer_ref, store, fa)
+        transfer_ref.deposit_with_ref(store, fa)
     }
 }

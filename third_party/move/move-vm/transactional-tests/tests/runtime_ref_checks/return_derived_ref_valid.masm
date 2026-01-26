@@ -1,0 +1,31 @@
+//# publish
+module 0xc0ffee::valid_return_test
+
+struct Pair has drop
+    first: u64
+    second: u64
+
+// Test: Returning a reference derived from parameter should work
+public fun get_first(pair_ref: &Pair): &u64
+    move_loc pair_ref
+    borrow_field Pair, first
+    ret
+
+public fun test_call_get_first(): u64
+    local pair: Pair
+    local result_ref: &u64
+
+    ld_u64 100
+    ld_u64 200
+    pack Pair
+    st_loc pair
+
+    borrow_loc pair
+    call get_first
+    st_loc result_ref
+
+    move_loc result_ref
+    read_ref
+    ret
+
+//# run 0xc0ffee::valid_return_test::test_call_get_first --verbose

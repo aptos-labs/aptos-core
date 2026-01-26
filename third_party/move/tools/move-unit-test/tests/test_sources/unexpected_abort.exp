@@ -3,6 +3,7 @@ Running Move unit tests
 [ PASS    ] 0x1::M::just_test_failure
 [ FAIL    ] 0x1::M::unexpected_abort
 [ FAIL    ] 0x1::M::unexpected_abort_in_other_function
+[ FAIL    ] 0x1::M::unexpected_abort_with_canonical_error_code
 [ FAIL    ] 0x1::M::wrong_abort_code
 0x1::M::correct_abort_code
 Output: Ok(Changes { accounts: {} })
@@ -11,6 +12,8 @@ Output: Ok(Changes { accounts: {} })
 0x1::M::unexpected_abort
 Output: Ok(Changes { accounts: {} })
 0x1::M::unexpected_abort_in_other_function
+Output: Ok(Changes { accounts: {} })
+0x1::M::unexpected_abort_with_canonical_error_code
 Output: Ok(Changes { accounts: {} })
 0x1::M::wrong_abort_code
 Output: Ok(Changes { accounts: {} })
@@ -48,6 +51,19 @@ Failures in 0x1::M:
 └──────────────────
 
 
+┌── unexpected_abort_with_canonical_error_code ──────
+│ error[E11001]: test failure
+│    ┌─ unexpected_abort.move:38:9
+│    │
+│ 37 │     public fun unexpected_abort_with_canonical_error_code() {
+│    │                ------------------------------------------ In this function in 0x1::M
+│ 38 │         abort std::error::invalid_state(42)
+│    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Test was not expected to error, but it aborted with code 196650 (category: INVALID_STATE, reason: 42) originating in the module 0000000000000000000000000000000000000000000000000000000000000001::M rooted here
+│ 
+│ 
+└──────────────────
+
+
 ┌── wrong_abort_code ──────
 │ error[E11001]: test failure
 │    ┌─ unexpected_abort.move:11:9
@@ -60,4 +76,4 @@ Failures in 0x1::M:
 │ 
 └──────────────────
 
-Test result: FAILED. Total tests: 5; passed: 2; failed: 3
+Test result: FAILED. Total tests: 6; passed: 2; failed: 4

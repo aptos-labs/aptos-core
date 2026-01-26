@@ -14,7 +14,6 @@ pub mod constant_time;
 pub mod ed25519;
 pub mod elgamal;
 pub mod encoding_type;
-pub mod error;
 pub mod hash;
 pub mod hkdf;
 pub mod input_secret;

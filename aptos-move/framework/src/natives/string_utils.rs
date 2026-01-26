@@ -317,9 +317,7 @@ fn native_format_impl(
                     .unpack()?
                     // The second field of a signer is always the master address regardless of which variants.
                     .nth(MASTER_ADDRESS_FIELD_OFFSET)
-                    .ok_or_else(|| SafeNativeError::Abort {
-                        abort_code: EINVALID_FORMAT,
-                    })?
+                    .ok_or_else(|| SafeNativeError::abort(EINVALID_FORMAT))?
                     .value_as::<AccountAddress>()?
             } else {
                 val.value_as::<AccountAddress>()?
@@ -452,9 +450,7 @@ fn native_format_impl(
             let struct_value = val.value_as::<Struct>()?;
             let (tag, elems) = struct_value.unpack_with_tag()?;
             if (tag as usize) >= variants.len() {
-                return Err(SafeNativeError::Abort {
-                    abort_code: EINVALID_FORMAT,
-                });
+                return Err(SafeNativeError::abort(EINVALID_FORMAT));
             }
             out.push_str(&format!("#{}{{", tag));
             format_vector(
@@ -471,9 +467,7 @@ fn native_format_impl(
             let struct_value = val.value_as::<Struct>()?;
             let (tag, elems) = struct_value.unpack_with_tag()?;
             if (tag as usize) >= variants.len() {
-                return Err(SafeNativeError::Abort {
-                    abort_code: EINVALID_FORMAT,
-                });
+                return Err(SafeNativeError::abort(EINVALID_FORMAT));
             }
             let variant = &variants[tag as usize];
             out.push_str(&format!("{}{{", variant.name));
@@ -496,9 +490,7 @@ fn native_format_impl(
                 .context
                 .loader_context()
                 .get_captured_layouts_for_string_utils(fun.as_ref())?
-                .ok_or_else(|| SafeNativeError::Abort {
-                    abort_code: EUNABLE_TO_FORMAT_DELAYED_FIELD,
-                })?;
+                .ok_or_else(|| SafeNativeError::abort(EUNABLE_TO_FORMAT_DELAYED_FIELD))?;
             out.push_str(&fun.to_canonical_string());
             out.push('(');
             if !captured_layouts.is_empty() {
@@ -517,9 +509,7 @@ fn native_format_impl(
 
         // Return error for native types
         MoveTypeLayout::Native(..) => {
-            return Err(SafeNativeError::Abort {
-                abort_code: EUNABLE_TO_FORMAT_DELAYED_FIELD,
-            })
+            return Err(SafeNativeError::abort(EUNABLE_TO_FORMAT_DELAYED_FIELD))
         },
     };
     if context.include_int_type {
@@ -535,12 +525,9 @@ pub(crate) fn native_format_debug(
     ty: &Type,
     v: Value,
 ) -> SafeNativeResult<String> {
-    let layout =
-        context
-            .type_to_fully_annotated_layout(ty)?
-            .ok_or_else(|| SafeNativeError::Abort {
-                abort_code: EUNABLE_TO_FORMAT_DELAYED_FIELD,
-            })?;
+    let layout = context
+        .type_to_fully_annotated_layout(ty)?
+        .ok_or_else(|| SafeNativeError::abort(EUNABLE_TO_FORMAT_DELAYED_FIELD))?;
     let mut format_context = FormatContext {
         context,
         should_charge_gas: false,
@@ -565,9 +552,7 @@ fn native_format(
 
     let ty = context
         .type_to_fully_annotated_layout(&ty_args[0])?
-        .ok_or_else(|| SafeNativeError::Abort {
-            abort_code: EUNABLE_TO_FORMAT_DELAYED_FIELD,
-        })?;
+        .ok_or_else(|| SafeNativeError::abort(EUNABLE_TO_FORMAT_DELAYED_FIELD))?;
     let include_int_type = safely_pop_arg!(arguments, bool);
     let single_line = safely_pop_arg!(arguments, bool);
     let canonicalize = safely_pop_arg!(arguments, bool);
@@ -606,9 +591,8 @@ fn native_format_list(
     let fmt_ref = safely_pop_arg!(arguments, VectorRef);
     let fmt_ref2 = fmt_ref.as_bytes_ref();
     // Could use unsafe here, but it's forbidden in this crate.
-    let fmt = std::str::from_utf8(fmt_ref2.as_slice()).map_err(|_| SafeNativeError::Abort {
-        abort_code: EINVALID_FORMAT,
-    })?;
+    let fmt = std::str::from_utf8(fmt_ref2.as_slice())
+        .map_err(|_| SafeNativeError::abort(EINVALID_FORMAT))?;
 
     context.charge(STRING_UTILS_PER_BYTE * NumBytes::new(fmt.len() as u64))?;
 
@@ -621,15 +605,11 @@ fn native_format_list(
                 && struct_tag.module.as_str() == "string_utils"
                 && struct_tag.name.as_str() == name)
             {
-                return Err(SafeNativeError::Abort {
-                    abort_code: EARGS_MISMATCH,
-                });
+                return Err(SafeNativeError::abort(EARGS_MISMATCH));
             }
             Ok(())
         } else {
-            Err(SafeNativeError::Abort {
-                abort_code: EARGS_MISMATCH,
-            })
+            Err(SafeNativeError::abort(EARGS_MISMATCH))
         }
     };
 
@@ -655,9 +635,7 @@ fn native_format_list(
 
                 let ty = context
                     .type_to_fully_annotated_layout(&ty_args[0])?
-                    .ok_or_else(|| SafeNativeError::Abort {
-                        abort_code: EUNABLE_TO_FORMAT_DELAYED_FIELD,
-                    })?;
+                    .ok_or_else(|| SafeNativeError::abort(EUNABLE_TO_FORMAT_DELAYED_FIELD))?;
 
                 let mut format_context = FormatContext {
                     context,
@@ -672,16 +650,12 @@ fn native_format_list(
                 native_format_impl(&mut format_context, &ty, car, 0, &mut out)?;
                 continue;
             } else if c != '{' {
-                return Err(SafeNativeError::Abort {
-                    abort_code: EINVALID_FORMAT,
-                });
+                return Err(SafeNativeError::abort(EINVALID_FORMAT));
             }
         } else if in_braces == -1 {
             in_braces = 0;
             if c != '}' {
-                return Err(SafeNativeError::Abort {
-                    abort_code: EINVALID_FORMAT,
-                });
+                return Err(SafeNativeError::abort(EINVALID_FORMAT));
             }
         } else if c == '{' {
             in_braces = 1;
@@ -693,9 +667,7 @@ fn native_format_list(
         out.push(c);
     }
     if in_braces != 0 {
-        return Err(SafeNativeError::Abort {
-            abort_code: EINVALID_FORMAT,
-        });
+        return Err(SafeNativeError::abort(EINVALID_FORMAT));
     }
     match_list_ty(context, list_ty, "NIL")?;
 

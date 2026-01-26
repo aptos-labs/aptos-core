@@ -11,7 +11,6 @@ use crate::{
     errors::BatchEncryptionError,
     group::{Fr, G1Affine, G2Affine, PairingOutput, PairingSetting},
     shared::{
-        ark_serialize::*,
         ciphertext::bibe::{BIBECTEncrypt, InnerCiphertext},
         digest::{Digest, EvalProof},
         encryption_key::AugmentedEncryptionKey,
@@ -20,6 +19,7 @@ use crate::{
     traits::Plaintext,
 };
 use anyhow::Result;
+use aptos_crypto::arkworks::serialization::{ark_de, ark_se};
 use ark_ec::{pairing::Pairing, AffineRepr};
 use ark_serialize::CanonicalSerialize;
 use ark_std::{

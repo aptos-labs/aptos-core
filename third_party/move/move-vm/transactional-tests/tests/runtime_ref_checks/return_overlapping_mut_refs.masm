@@ -1,0 +1,59 @@
+//# publish
+module 0xc0ffee::return_overlap_test
+
+struct Pair has drop
+    first: u64
+    second: u64
+
+// Test: Cannot return overlapping mutable references (exclusivity violation)
+public fun get_both_mut(pair_ref: &mut Pair): (&mut u64, &mut u64)
+    local ref1: &mut u64
+    local ref2: &mut u64
+
+    // Get first mutable ref to first field
+    copy_loc pair_ref
+    mut_borrow_field Pair, first
+    st_loc ref1
+
+    // Get second mutable ref to SAME field (violates exclusivity)
+    move_loc pair_ref
+    mut_borrow_field Pair, first
+    st_loc ref2
+
+    // Try to return both
+    move_loc ref1
+    move_loc ref2
+    ret
+
+// Test wrapper function
+public fun test_overlapping_mut_refs()
+    local pair: Pair
+    local pair_ref: &mut Pair
+    local ref1: &mut u64
+    local ref2: &mut u64
+
+    // Create a pair
+    ld_u64 10
+    ld_u64 20
+    pack Pair
+    st_loc pair
+
+    // Get mutable reference to pair
+    mut_borrow_loc pair
+    st_loc pair_ref
+
+    // Call get_both_mut (should fail when returning overlapping refs)
+    move_loc pair_ref
+    call get_both_mut
+    st_loc ref2
+    st_loc ref1
+
+    // Cleanup
+    move_loc ref1
+    pop
+    move_loc ref2
+    pop
+
+    ret
+
+//# run 0xc0ffee::return_overlap_test::test_overlapping_mut_refs --verbose

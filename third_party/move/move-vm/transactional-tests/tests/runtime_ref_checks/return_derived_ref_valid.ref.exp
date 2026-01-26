@@ -1,0 +1,4 @@
+processed 2 tasks
+task 0 lines 1-29:  publish [module 0xc0ffee::valid_return_test]
+task 1 lines 31-31:  run 0xc0ffee::valid_return_test::test_call_get_first --verbose
+return values: 100

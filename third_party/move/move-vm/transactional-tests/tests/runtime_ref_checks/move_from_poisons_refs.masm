@@ -1,0 +1,48 @@
+//# publish
+module 0xc0ffee::move_from_test
+
+struct Resource has key+drop
+    value: u64
+
+// Test: MoveFrom poisons all references to the global resource
+public fun test_move_from_poisons(s: &signer): u64 acquires Resource
+    local res: Resource
+    local global_ref: &Resource
+    local field_ref: &u64
+
+    // Setup: publish a resource
+    ld_u64 42
+    pack Resource
+    st_loc res
+    copy_loc s
+    move_loc res
+    move_to Resource
+
+    // Create reference to global resource
+    ld_const<address> 0x1
+    borrow_global Resource
+    st_loc global_ref
+
+    // Create reference to field
+    ld_const<address> 0x1
+    borrow_global Resource
+    borrow_field Resource, value
+    st_loc field_ref
+
+    // MoveFrom the resource (should poison both refs)
+    ld_const<address> 0x1
+    move_from Resource
+    pop
+
+    // Try to read from poisoned reference (should fail)
+    move_loc global_ref
+    borrow_field Resource, value
+    read_ref
+
+    // Clean up
+    move_loc field_ref
+    pop
+
+    ret
+
+//# run 0xc0ffee::move_from_test::test_move_from_poisons --signers 0x1 --verbose

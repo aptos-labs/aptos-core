@@ -15,7 +15,7 @@ Failures in 0x1::UnitTest:
 │    │         ------- In this function in 0x1::UnitTest
 │ 18 │         let ret = bar(17);
 │ 19 │         assert!(ret == 19, ONE);
-│    │         ^^^^^^ Test was not expected to error, but it aborted with code 131073 originating in the module 0000000000000000000000000000000000000000000000000000000000000001::UnitTest rooted here
+│    │         ^^^^^^ Test was not expected to error, but it aborted with code 131073 (category: OUT_OF_RANGE, reason: 1) originating in the module 0000000000000000000000000000000000000000000000000000000000000001::UnitTest rooted here
 │ 
 │ 
 └──────────────────
