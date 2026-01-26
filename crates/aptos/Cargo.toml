@@ -12,6 +12,13 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+fuzzing = []
+no-upload-proposal = []
+indexer = ["aptos-node/indexer"]
+cli-framework-test-move = []
+
 [dependencies]
 aes-gcm = { workspace = true }
 anyhow = { workspace = true }
@@ -106,8 +113,8 @@ self_update = { git = "https://github.com/banool/self_update.git", rev = "830615
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
-sha2_0_10_6 = { workspace = true }
 set_env = { workspace = true }
+sha2_0_10_6 = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
@@ -116,19 +123,12 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 url = { workspace = true }
 
-[target.'cfg(unix)'.dependencies]
-jemallocator = { workspace = true }
-
 # System keychain support for macOS and Windows only
 [target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
 keyring = { workspace = true }
 
-[features]
-default = []
-fuzzing = []
-no-upload-proposal = []
-indexer = ["aptos-node/indexer"]
-cli-framework-test-move = []
+[target.'cfg(unix)'.dependencies]
+jemallocator = { workspace = true }
 
 [build-dependencies]
 shadow-rs = { workspace = true }
