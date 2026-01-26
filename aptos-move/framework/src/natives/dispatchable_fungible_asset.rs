@@ -42,7 +42,7 @@ pub(crate) fn native_dispatch(
         }
     };
     check_visited(module_name.address(), module_name.name())
-        .map_err(|_| SafeNativeError::Abort { abort_code: 4 })?;
+        .map_err(|_| SafeNativeError::abort(4))?;
 
     context.charge(DISPATCHABLE_FUNGIBLE_ASSET_DISPATCH_BASE)?;
 

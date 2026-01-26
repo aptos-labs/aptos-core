@@ -44,9 +44,7 @@ fn native_ecdsa_recover(
     let msg = match libsecp256k1::Message::parse_slice(&msg) {
         Ok(msg) => msg,
         Err(_) => {
-            return Err(SafeNativeError::Abort {
-                abort_code: abort_codes::NFE_DESERIALIZE,
-            });
+            return Err(SafeNativeError::abort(abort_codes::NFE_DESERIALIZE));
         },
     };
 
@@ -54,9 +52,7 @@ fn native_ecdsa_recover(
     let rid = match libsecp256k1::RecoveryId::parse(recovery_id) {
         Ok(rid) => rid,
         Err(_) => {
-            return Err(SafeNativeError::Abort {
-                abort_code: abort_codes::NFE_DESERIALIZE,
-            });
+            return Err(SafeNativeError::abort(abort_codes::NFE_DESERIALIZE));
         },
     };
 
@@ -65,9 +61,7 @@ fn native_ecdsa_recover(
     let sig = match libsecp256k1::Signature::parse_standard_slice(&signature) {
         Ok(sig) => sig,
         Err(_) => {
-            return Err(SafeNativeError::Abort {
-                abort_code: abort_codes::NFE_DESERIALIZE,
-            });
+            return Err(SafeNativeError::abort(abort_codes::NFE_DESERIALIZE));
         },
     };
 

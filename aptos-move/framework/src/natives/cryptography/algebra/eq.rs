@@ -96,8 +96,6 @@ pub fn eq_internal(
         Some(Structure::BN254Gt) => {
             ark_eq_internal!(context, args, ark_bn254::Fq12, ALGEBRA_ARK_BN254_FQ12_EQ)
         },
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
+        _ => Err(SafeNativeError::abort(MOVE_ABORT_CODE_NOT_IMPLEMENTED)),
     }
 }
