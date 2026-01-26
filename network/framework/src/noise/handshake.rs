@@ -390,37 +390,22 @@ impl NoiseUpgrader {
                         Self::authenticate_inbound(remote_peer_short, &peer, &remote_public_key)
                     },
                     None => {
-                        // The peer is not in the trusted peer set. Verify that the Peer ID is
-                        // constructed correctly from the public key.
-                        let derived_remote_peer_id =
-                            aptos_types::account_address::from_identity_public_key(
-                                remote_public_key,
-                            );
-                        if derived_remote_peer_id != remote_peer_id {
-                            // The peer ID is not constructed correctly from the public key
-                            Err(NoiseHandshakeError::ClientPeerIdMismatch(
-                                remote_peer_short,
-                                remote_peer_id,
-                                derived_remote_peer_id,
-                            ))
-                        } else {
-                            // Try to infer the role from the network context
-                            if self.network_context.role().is_validator() {
-                                if network_id.is_vfn_network() {
-                                    // Inbound connections to validators on the VFN network must be VFNs
-                                    Ok(PeerRole::ValidatorFullNode)
-                                } else {
-                                    // Otherwise, they're unknown. Validators will connect through
-                                    // authenticated channels (on the validator network) so shouldn't hit
-                                    // this, and PFNs will connect on public networks (which aren't common).
-                                    Ok(PeerRole::Unknown)
-                                }
+                        // Try to infer the role from the network context
+                        if self.network_context.role().is_validator() {
+                            if network_id.is_vfn_network() {
+                                // Inbound connections to validators on the VFN network must be VFNs
+                                Ok(PeerRole::ValidatorFullNode)
                             } else {
-                                // We're a VFN or PFN. VFNs get no inbound connections on the vfn network
-                                // (so the peer won't be a validator). Thus, we're on the public network
-                                // so mark the peer as unknown.
+                                // Otherwise, they're unknown. Validators will connect through
+                                // authenticated channels (on the validator network) so shouldn't hit
+                                // this, and PFNs will connect on public networks (which aren't common).
                                 Ok(PeerRole::Unknown)
                             }
+                        } else {
+                            // We're a VFN or PFN. VFNs get no inbound connections on the vfn network
+                            // (so the peer won't be a validator). Thus, we're on the public network
+                            // so mark the peer as unknown.
+                            Ok(PeerRole::Unknown)
                         }
                     },
                 }
