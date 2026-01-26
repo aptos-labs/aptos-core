@@ -32,4 +32,8 @@ module 0x42::M {
         let fmt = b"a = {}";
         assert!(cond, fmt, a)
     }
+
+    fun wrong_type_argument<T>(cond: bool, x: T) {
+        assert!(cond, x)
+    }
 }

@@ -17,3 +17,9 @@ error: Expected a string literal
    │
 33 │         assert!(cond, fmt, a)
    │                       ^^^
+
+error: invalid argument to `abort`: unsupported type `T`
+   ┌─ tests/macros/assert_invalid.move:37:23
+   │
+37 │         assert!(cond, x)
+   │                       ^
