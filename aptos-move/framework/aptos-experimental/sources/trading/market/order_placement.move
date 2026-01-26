@@ -401,30 +401,34 @@ module aptos_experimental::order_placement {
         cancellation_reason: OrderCancellationReason,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
-        // Get the order state before cancellation to track what's being cancelled
-        let order_before_cancel = market.get_order_book().get_bulk_order(maker_address);
-        let (
-            order_before_cancel_request,
-            _order_id,
-            _unique_priority_idx,
-            _creation_time_micros,
-        ) = order_before_cancel.destroy_bulk_order();
-        let (_account, order_sequence_number, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, _metadata) = order_before_cancel_request.destroy_bulk_order_request();
-
         let remaining_size = maker_order.get_remaining_size_from_match_details();
-        if (remaining_size != 0) {
-            // For bulk orders, we cancel all orders for the user
-            market.get_order_book_mut().cancel_bulk_order(maker_address);
+        let price = maker_order.get_price_from_match_details();
+        let is_bid = maker_order.is_bid_from_match_details();
+        let cancelled_size = unsettled_size + remaining_size;
+
+        // Cancel only at the specific price level instead of cancelling the entire bulk order
+        let (_actual_cancelled_size, modified_order) = if (remaining_size != 0) {
+            market.get_order_book_mut().cancel_bulk_order_at_price(maker_address, price, is_bid)
+        } else {
+            // If remaining size is 0, just get the current order state for event emission
+            (0, market.get_order_book().get_bulk_order(maker_address))
         };
 
-        let cancelled_size = unsettled_size + remaining_size;
         callbacks.cleanup_bulk_order_at_price(
-            maker_address, order_id, maker_order.is_bid_from_match_details(), maker_order.get_price_from_match_details(), cancelled_size
+            maker_address, order_id, is_bid, price, cancelled_size
         );
 
-        let modified_order = market.get_order_book().get_bulk_order(maker_address);
+        // Emit event with the cancelled price level
         let (modified_order_request, _order_id, _unique_priority_idx, _creation_time_micros) = modified_order.destroy_bulk_order();
-        let (_account, _order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, _metadata) = modified_order_request.destroy_bulk_order_request();
+        let (_account, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, _metadata) = modified_order_request.destroy_bulk_order_request();
+
+        // Build cancelled price/size vectors for the specific level that was cancelled
+        let (cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes) = if (is_bid) {
+            (vector[price], vector[cancelled_size], vector[], vector[])
+        } else {
+            (vector[], vector[], vector[price], vector[cancelled_size])
+        };
+
         market.emit_event_for_bulk_order_modified(
             order_id,
             order_sequence_number,
