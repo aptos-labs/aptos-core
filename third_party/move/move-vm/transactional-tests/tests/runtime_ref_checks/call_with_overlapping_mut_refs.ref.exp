@@ -1,0 +1,12 @@
+processed 2 tasks
+task 0 lines 1-36:  publish [module 0xc0ffee::lock_conflict_test]
+task 1 lines 38-38:  run 0xc0ffee::lock_conflict_test::test_call_overlapping_mut_refs --verbose
+Error: Function execution failed with VMError: {
+    message: Exclusive lock conflict,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(3),
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}

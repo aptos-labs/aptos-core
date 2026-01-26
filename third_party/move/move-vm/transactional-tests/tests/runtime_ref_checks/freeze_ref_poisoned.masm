@@ -1,0 +1,45 @@
+//# publish
+module 0xc0ffee::freeze_poison_test
+
+struct Container has copy+drop
+    value: u64
+
+// Test: Cannot freeze a poisoned mutable reference
+// A child reference becomes poisoned when the parent is overwritten
+public fun test_freeze_poisoned_ref(): u64
+    local container: Container
+    local mut_field_ref: &mut u64
+    local parent_ref: &mut Container
+    local immut_ref: &u64
+
+    // Create container
+    ld_u64 42
+    pack Container
+    st_loc container
+
+    // Borrow field mutably (child reference)
+    mut_borrow_loc container
+    mut_borrow_field Container, value
+    st_loc mut_field_ref
+
+    // Get parent reference
+    mut_borrow_loc container
+    st_loc parent_ref
+
+    // Write to parent via dereferencing and overwriting
+    // This poisons the child reference (mut_field_ref)
+    ld_u64 100
+    pack Container
+    move_loc parent_ref
+    write_ref
+
+    // Try to freeze the now-poisoned mut_field_ref (should fail)
+    move_loc mut_field_ref
+    freeze_ref
+    st_loc immut_ref
+
+    move_loc immut_ref
+    read_ref
+    ret
+
+//# run 0xc0ffee::freeze_poison_test::test_freeze_poisoned_ref --verbose

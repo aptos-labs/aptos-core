@@ -1,0 +1,33 @@
+//# publish
+module 0xc0ffee::field_poison_test
+
+struct Pair has drop
+    first: u64
+    second: u64
+
+// Test: Field reference should be poisoned after parent is moved
+public fun test_field_ref_after_parent_move(): u64
+    local pair: Pair
+    local field_ref: &u64
+
+    // Create a pair
+    ld_u64 10
+    ld_u64 20
+    pack Pair
+    st_loc pair
+
+    // Borrow reference to first field
+    borrow_loc pair
+    borrow_field Pair, first
+    st_loc field_ref
+
+    // Move the parent (should poison field_ref)
+    move_loc pair
+    pop
+
+    // Try to read from poisoned field reference (should fail)
+    move_loc field_ref
+    read_ref
+    ret
+
+//# run 0xc0ffee::field_poison_test::test_field_ref_after_parent_move --verbose
