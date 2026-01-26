@@ -41,7 +41,7 @@ pub fn metrics_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
 async fn handle_metrics_ingest(
     contract_name: String,
     context: Context,
-    (jwt_contract_name, peer_id, chain_id): (String, PeerId, ChainId),
+    (jwt_contract_name, peer_id, chain_id, is_trusted): (String, PeerId, ChainId, bool),
     content_encoding: Option<String>,
     body: Bytes,
 ) -> Result<impl Reply, Rejection> {
@@ -68,10 +68,11 @@ async fn handle_metrics_ingest(
     }
 
     debug!(
-        "received custom contract '{}' metrics from peer_id: {}, chain_id: {}, body length: {}",
+        "received custom contract '{}' metrics from peer_id: {}, chain_id: {}, is_trusted: {}, body length: {}",
         contract_name,
         peer_id,
         chain_id,
+        is_trusted,
         body.len()
     );
 
@@ -88,26 +89,30 @@ async fn handle_metrics_ingest(
         ))
     })?;
 
-    // Get the metrics clients for this contract
-    let metrics_client = &instance.metrics_clients;
+    // Get the appropriate metrics clients based on whether node is trusted (allowlisted)
+    // Unknown/untrusted nodes go to untrusted_metrics_sinks if configured, else regular sinks
+    let metrics_clients = instance.get_metrics_clients(is_trusted);
 
-    // Prepare extra labels for metrics - include contract name and node_type_name from config
+    // Prepare extra labels for metrics - include contract name, node_type_name, and trust status
     // Format: name=value (no quotes - Victoria Metrics extra_label format)
     let node_type = &instance.config.node_type_name;
+    let trust_label = if is_trusted { "trusted" } else { "untrusted" };
     let extra_labels = vec![
         format!("peer_id={}", peer_id),
         format!("node_type={}", node_type),
         format!("contract_name={}", contract_name),
+        format!("trust_status={}", trust_label),
     ];
 
     // Determine encoding
     let encoding = content_encoding.unwrap_or_else(|| "identity".to_string());
 
     // Send metrics to all configured sinks for this custom contract
-    for (name, client) in metrics_client {
+    for (name, client) in metrics_clients {
         debug!(
-            "forwarding custom contract '{}' metrics to sink '{}' (url: {})",
+            "forwarding custom contract '{}' metrics to {} sink '{}' (url: {})",
             contract_name,
+            trust_label,
             name,
             client.base_url()
         );
@@ -155,7 +160,7 @@ pub fn log_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
 async fn handle_log_ingest(
     contract_name: String,
     context: Context,
-    (jwt_contract_name, peer_id, chain_id): (String, PeerId, ChainId),
+    (jwt_contract_name, peer_id, chain_id, is_trusted): (String, PeerId, ChainId, bool),
     content_encoding: Option<String>,
     body: Bytes,
 ) -> Result<impl Reply, Rejection> {
@@ -182,10 +187,11 @@ async fn handle_log_ingest(
     }
 
     debug!(
-        "received custom contract '{}' logs from peer_id: {}, chain_id: {}, body length: {}",
+        "received custom contract '{}' logs from peer_id: {}, chain_id: {}, is_trusted: {}, body length: {}",
         contract_name,
         peer_id,
         chain_id,
+        is_trusted,
         body.len()
     );
 
@@ -221,10 +227,11 @@ async fn handle_log_ingest(
     })?;
 
     debug!(
-        "custom contract '{}' log batch size: {} from peer_id: {}",
+        "custom contract '{}' log batch size: {} from peer_id: {}, is_trusted: {}",
         contract_name,
         log_batch.len(),
-        peer_id
+        peer_id,
+        is_trusted
     );
 
     // Get the custom contract instance
@@ -240,8 +247,9 @@ async fn handle_log_ingest(
         ))
     })?;
 
-    // Get the log client for this contract
-    let log_client = instance.logs_client.as_ref().ok_or_else(|| {
+    // Get the appropriate log client based on whether node is trusted (allowlisted)
+    // Unknown/untrusted nodes go to untrusted_logs_sink if configured, else regular sink
+    let log_client = instance.get_logs_client(is_trusted).ok_or_else(|| {
         debug!(
             "custom contract '{}' log client not configured",
             contract_name
@@ -260,12 +268,19 @@ async fn handle_log_ingest(
     let mut fields = HashMap::new();
     fields.insert(PEER_ID_FIELD_NAME.into(), peer_id.to_string());
 
-    // Get the node type from the contract instance config
-    let node_type = NodeType::Custom(instance.config.node_type_name.clone());
+    // Get the node type from the contract instance config, marked as unknown if not trusted
+    let node_type = if is_trusted {
+        NodeType::Custom(instance.config.node_type_name.clone())
+    } else {
+        NodeType::CustomUnknown(instance.config.node_type_name.clone())
+    };
+
+    let trust_label = if is_trusted { "trusted" } else { "untrusted" };
 
     let mut tags = HashMap::new();
     tags.insert(PEER_ROLE_TAG_NAME.into(), node_type.as_str());
     tags.insert("contract_name".into(), contract_name.clone());
+    tags.insert("trust_status".into(), trust_label.into());
 
     let unstructured_log = UnstructuredLog {
         fields,
@@ -273,7 +288,7 @@ async fn handle_log_ingest(
         messages: log_batch,
     };
 
-    // Forward logs to the custom contract-specific sink
+    // Forward logs to the appropriate custom contract sink
     log_client
         .ingest_unstructured_log(unstructured_log)
         .await
@@ -310,7 +325,7 @@ pub fn custom_event_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
 async fn handle_custom_event_ingest(
     contract_name: String,
     context: Context,
-    (jwt_contract_name, peer_id, chain_id): (String, PeerId, ChainId),
+    (jwt_contract_name, peer_id, chain_id, is_trusted): (String, PeerId, ChainId, bool),
     body: TelemetryDump,
 ) -> Result<impl Reply, Rejection> {
     // Verify the JWT was issued for this specific contract (prevents cross-contract token reuse)
@@ -336,10 +351,11 @@ async fn handle_custom_event_ingest(
     }
 
     debug!(
-        "received custom contract '{}' custom event from peer_id: {}, chain_id: {}, events: {}",
+        "received custom contract '{}' custom event from peer_id: {}, chain_id: {}, is_trusted: {}, events: {}",
         contract_name,
         peer_id,
         chain_id,
+        is_trusted,
         body.events.len()
     );
 
@@ -393,11 +409,19 @@ async fn handle_custom_event_ingest(
     })?;
 
     // Get the BigQuery client for this custom contract
+    // Note: BigQuery events don't have separate trusted/untrusted sinks yet
+    // but we include trust_status as an event parameter for filtering
     if let Some(bq_client) = &instance.bigquery_client {
         use crate::types::telemetry::BigQueryRow;
 
-        // Get the node type from the contract instance config
-        let node_type = NodeType::Custom(instance.config.node_type_name.clone());
+        // Get the node type from the contract instance config, marked as unknown if not trusted
+        let node_type = if is_trusted {
+            NodeType::Custom(instance.config.node_type_name.clone())
+        } else {
+            NodeType::CustomUnknown(instance.config.node_type_name.clone())
+        };
+
+        let trust_label = if is_trusted { "trusted" } else { "untrusted" };
 
         // Create event identity for custom contract client using chain_id from JWT claims
         let event_identity = EventIdentity {
@@ -412,7 +436,7 @@ async fn handle_custom_event_ingest(
         let mut insert_request = TableDataInsertAllRequest::new();
 
         for event in body.events {
-            // Add contract_name to event params
+            // Add contract_name and trust_status to event params
             let mut event_params: Vec<serde_json::Value> = event
                 .params
                 .into_iter()
@@ -423,10 +447,14 @@ async fn handle_custom_event_ingest(
                     })
                 })
                 .collect();
-            // Append contract_name as an additional parameter
+            // Append contract_name and trust_status as additional parameters
             event_params.push(serde_json::json!({
                 "key": "contract_name",
                 "value": {"string_value": contract_name.clone()}
+            }));
+            event_params.push(serde_json::json!({
+                "key": "trust_status",
+                "value": {"string_value": trust_label}
             }));
 
             let row = BigQueryRow {
