@@ -401,6 +401,9 @@ impl Parser {
                 .then(|| Self::ensure_next_epoch_state(&to_commit))
                 .transpose()?
         };
+        if let Some(state) = &next_epoch_state {
+            info!("New epoch: {}", state.epoch);
+        }
 
         base_state_view.prime_cache(
             to_commit.state_update_refs(),
@@ -422,6 +425,7 @@ impl Parser {
             base_state_view.persisted_state(),
             to_commit.state_update_refs(),
             base_state_view.memorized_reads(),
+            next_epoch_state.is_some(),
         );
         let state_reads = base_state_view.into_memorized_reads();
 

@@ -97,6 +97,7 @@ impl BufferedState {
     /// If a commit is needed, it sends a CommitMessage::Data message to the StateSnapshotCommitter thread to commit the data.
     /// If sync_commit is true, it also sends a CommitMessage::Sync message to ensure that the commit is completed before returning.
     fn maybe_commit(&mut self, checkpoint: Option<StateWithSummary>, sync_commit: bool) {
+        let sync_commit = true;
         if let Some(checkpoint) = checkpoint {
             if !checkpoint.is_the_same(&self.last_snapshot)
                 && (sync_commit
