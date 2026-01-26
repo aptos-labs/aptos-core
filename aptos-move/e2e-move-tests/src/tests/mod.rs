@@ -15,6 +15,7 @@ mod bcs;
 mod chain_id;
 mod code_publishing;
 mod common;
+mod confidential_asset;
 mod constructor_args;
 mod cryptoalgebra;
 mod dependencies;
