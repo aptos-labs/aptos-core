@@ -73,6 +73,7 @@ futures = { workspace = true }
 hex = { workspace = true }
 indoc = { workspace = true }
 itertools = { workspace = true }
+keyring = { workspace = true }
 legacy-move-compiler = { workspace = true }
 maplit = { workspace = true }
 move-asm = { workspace = true }

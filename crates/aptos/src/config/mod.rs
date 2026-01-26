@@ -36,6 +36,8 @@ pub enum ConfigTool {
     EncryptCredentials(EncryptCredentials),
     DecryptCredentials(DecryptCredentials),
     RotatePassphrase(RotatePassphrase),
+    StoreInKeychain(StoreInKeychain),
+    RemoveFromKeychain(RemoveFromKeychain),
 }
 
 impl ConfigTool {
@@ -51,6 +53,8 @@ impl ConfigTool {
             ConfigTool::EncryptCredentials(tool) => tool.execute_serialized().await,
             ConfigTool::DecryptCredentials(tool) => tool.execute_serialized().await,
             ConfigTool::RotatePassphrase(tool) => tool.execute_serialized().await,
+            ConfigTool::StoreInKeychain(tool) => tool.execute_serialized().await,
+            ConfigTool::RemoveFromKeychain(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -101,9 +105,10 @@ pub struct SetGlobalConfig {
     default_prompt_response: Option<PromptResponseType>,
     /// A configuration for credential encryption at rest
     ///
-    /// Option can be one of ["disabled", "enabled", "prompt"]
+    /// Option can be one of ["disabled", "enabled", "keychain", "prompt"]
     /// - "disabled": Do not encrypt credentials (default)
     /// - "enabled": Always encrypt credentials when creating profiles
+    /// - "keychain": Store credentials in system keychain (macOS Keychain, Windows Credential Manager, Linux Secret Service)
     /// - "prompt": Ask whether to encrypt when creating profiles
     #[clap(long)]
     credential_encryption: Option<CredentialEncryptionType>,
@@ -531,6 +536,183 @@ impl CliCommand<String> for RotatePassphrase {
     }
 }
 
+/// Store the private key in the system keychain
+///
+/// This moves the private key from file-based storage to the system keychain
+/// (macOS Keychain, Windows Credential Manager, or Linux Secret Service).
+/// The keychain provides better security as the credentials are protected
+/// by the OS security mechanisms and can integrate with biometrics.
+#[derive(Parser, Debug)]
+pub struct StoreInKeychain {
+    /// Which profile's credentials to store in keychain
+    #[clap(long, default_value = "default")]
+    profile: String,
+}
+
+#[async_trait]
+impl CliCommand<String> for StoreInKeychain {
+    fn command_name(&self) -> &'static str {
+        "StoreInKeychain"
+    }
+
+    async fn execute(self) -> CliTypedResult<String> {
+        use crate::common::keychain::is_keychain_available;
+
+        // Check if keychain is available
+        if !is_keychain_available() {
+            return Err(CliError::UnexpectedError(
+                "System keychain is not available on this platform. \
+                 On Linux, ensure the Secret Service (e.g., gnome-keyring) is running."
+                    .to_string(),
+            ));
+        }
+
+        let mut config = CliConfig::load(ConfigSearchMode::CurrentDir)?;
+
+        if let Some(profiles) = &mut config.profiles {
+            if let Some(profile) = profiles.get_mut(&self.profile) {
+                if profile.keychain_entry.is_some() {
+                    return Err(CliError::CommandArgumentError(format!(
+                        "Profile {} already has credentials stored in keychain",
+                        self.profile
+                    )));
+                }
+
+                if !profile.has_private_key() {
+                    return Err(CliError::CommandArgumentError(format!(
+                        "Profile {} does not have a private key to store",
+                        self.profile
+                    )));
+                }
+
+                profile.store_in_keychain(&self.profile)?;
+
+                config.save().map_err(|err| {
+                    CliError::UnexpectedError(format!(
+                        "Unable to save config after storing credentials in keychain: {}",
+                        err,
+                    ))
+                })?;
+
+                Ok(format!(
+                    "Successfully stored credentials for profile {} in system keychain",
+                    self.profile
+                ))
+            } else {
+                Err(CliError::CommandArgumentError(format!(
+                    "Profile {} does not exist",
+                    self.profile
+                )))
+            }
+        } else {
+            Err(CliError::CommandArgumentError(
+                "Config has no profiles".to_string(),
+            ))
+        }
+    }
+}
+
+/// Remove the private key from the system keychain
+///
+/// This retrieves the private key from the system keychain and optionally
+/// stores it back in the config file. You can choose to encrypt it with
+/// a passphrase or store it in plaintext.
+#[derive(Parser, Debug)]
+pub struct RemoveFromKeychain {
+    /// Which profile's credentials to remove from keychain
+    #[clap(long, default_value = "default")]
+    profile: String,
+
+    /// Store the key as encrypted (with passphrase) after removing from keychain
+    #[clap(long)]
+    encrypt: bool,
+
+    /// Store the key as plaintext after removing from keychain (less secure)
+    #[clap(long)]
+    plaintext: bool,
+}
+
+#[async_trait]
+impl CliCommand<String> for RemoveFromKeychain {
+    fn command_name(&self) -> &'static str {
+        "RemoveFromKeychain"
+    }
+
+    async fn execute(self) -> CliTypedResult<String> {
+        use crate::common::utils::prompt_passphrase_with_confirmation;
+
+        // Validate mutually exclusive options
+        if self.encrypt && self.plaintext {
+            return Err(CliError::CommandArgumentError(
+                "Cannot specify both --encrypt and --plaintext".to_string(),
+            ));
+        }
+
+        let mut config = CliConfig::load(ConfigSearchMode::CurrentDir)?;
+
+        if let Some(profiles) = &mut config.profiles {
+            if let Some(profile) = profiles.get_mut(&self.profile) {
+                if profile.keychain_entry.is_none() {
+                    return Err(CliError::CommandArgumentError(format!(
+                        "Profile {} does not have credentials stored in keychain",
+                        self.profile
+                    )));
+                }
+
+                // Remove from keychain and keep plaintext temporarily
+                profile.remove_from_keychain(true)?;
+
+                // Now handle encryption if requested
+                if self.encrypt {
+                    let passphrase = prompt_passphrase_with_confirmation(
+                        "Enter passphrase to encrypt credentials: ",
+                    )?;
+                    profile.encrypt_private_key(&passphrase)?;
+                } else if !self.plaintext {
+                    // Default behavior: ask user what to do
+                    eprintln!("The private key has been removed from the keychain.");
+                    eprintln!("Would you like to encrypt it with a passphrase? (recommended)");
+                    if crate::common::utils::prompt_yes("Encrypt credentials?") {
+                        let passphrase = prompt_passphrase_with_confirmation(
+                            "Enter passphrase to encrypt credentials: ",
+                        )?;
+                        profile.encrypt_private_key(&passphrase)?;
+                    } else {
+                        eprintln!("Warning: Storing private key in plaintext is less secure.");
+                    }
+                }
+
+                config.save().map_err(|err| {
+                    CliError::UnexpectedError(format!(
+                        "Unable to save config after removing credentials from keychain: {}",
+                        err,
+                    ))
+                })?;
+
+                let storage_method = if profile.encrypted_private_key.is_some() {
+                    "encrypted"
+                } else {
+                    "plaintext"
+                };
+
+                Ok(format!(
+                    "Successfully removed credentials for profile {} from keychain and stored as {}",
+                    self.profile, storage_method
+                ))
+            } else {
+                Err(CliError::CommandArgumentError(format!(
+                    "Profile {} does not exist",
+                    self.profile
+                )))
+            }
+        } else {
+            Err(CliError::CommandArgumentError(
+                "Config has no profiles".to_string(),
+            ))
+        }
+    }
+}
+
 const GLOBAL_CONFIG_FILE: &str = "global_config.yaml";
 
 /// A global configuration for global settings related to a user
@@ -555,6 +737,8 @@ pub enum CredentialEncryptionType {
     Disabled,
     /// Always encrypt credentials when creating or updating profiles
     Enabled,
+    /// Store credentials in the system keychain (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+    Keychain,
     /// Prompt the user to choose whether to encrypt credentials
     Prompt,
 }
@@ -564,6 +748,7 @@ impl std::fmt::Display for CredentialEncryptionType {
         f.write_str(match self {
             CredentialEncryptionType::Disabled => "disabled",
             CredentialEncryptionType::Enabled => "enabled",
+            CredentialEncryptionType::Keychain => "keychain",
             CredentialEncryptionType::Prompt => "prompt",
         })
     }
@@ -576,9 +761,10 @@ impl FromStr for CredentialEncryptionType {
         match s.to_lowercase().trim() {
             "disabled" | "off" | "no" | "false" => Ok(Self::Disabled),
             "enabled" | "on" | "yes" | "true" => Ok(Self::Enabled),
+            "keychain" | "keyring" | "system" => Ok(Self::Keychain),
             "prompt" | "ask" => Ok(Self::Prompt),
             _ => Err(CliError::CommandArgumentError(
-                "Invalid credential encryption type, must be one of [disabled, enabled, prompt]"
+                "Invalid credential encryption type, must be one of [disabled, enabled, keychain, prompt]"
                     .to_string(),
             )),
         }

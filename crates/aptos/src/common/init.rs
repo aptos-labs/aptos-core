@@ -84,6 +84,15 @@ pub struct InitTool {
     /// environment variable to avoid being prompted each time.
     #[clap(long)]
     pub encrypt_credentials: Option<bool>,
+
+    /// Store the private key in the system keychain (macOS Keychain, Windows Credential Manager,
+    /// or Linux Secret Service).
+    ///
+    /// This provides better security than file-based storage as the credentials are protected
+    /// by OS security mechanisms and can integrate with biometrics. This option takes precedence
+    /// over --encrypt-credentials.
+    #[clap(long)]
+    pub use_keychain: Option<bool>,
 }
 
 #[async_trait]
@@ -291,20 +300,29 @@ impl CliCommand<()> for InitTool {
         profile_config.public_key = Some(public_key);
         profile_config.account = Some(address);
 
-        // Handle credential encryption if a private key is present
+        // Handle credential storage based on user preference
         if profile_config.private_key.is_some() {
-            let should_encrypt = self.should_encrypt_credentials()?;
+            let storage_type = self.determine_credential_storage()?;
 
-            if should_encrypt {
-                let passphrase = prompt_passphrase_with_confirmation(
-                    "Enter passphrase to encrypt credentials: ",
-                )?;
-                profile_config.encrypt_private_key(&passphrase)?;
-                eprintln!("Private key encrypted successfully.");
-                eprintln!(
-                    "Tip: Set the {} environment variable to avoid passphrase prompts.",
-                    crate::common::encryption::APTOS_CLI_PASSPHRASE_ENV
-                );
+            match storage_type {
+                CredentialEncryptionType::Keychain => {
+                    profile_config.store_in_keychain(profile_name)?;
+                    eprintln!("Private key stored in system keychain successfully.");
+                },
+                CredentialEncryptionType::Enabled => {
+                    let passphrase = prompt_passphrase_with_confirmation(
+                        "Enter passphrase to encrypt credentials: ",
+                    )?;
+                    profile_config.encrypt_private_key(&passphrase)?;
+                    eprintln!("Private key encrypted successfully.");
+                    eprintln!(
+                        "Tip: Set the {} environment variable to avoid passphrase prompts.",
+                        crate::common::encryption::APTOS_CLI_PASSPHRASE_ENV
+                    );
+                },
+                CredentialEncryptionType::Disabled | CredentialEncryptionType::Prompt => {
+                    // Store in plaintext (Prompt case shouldn't reach here, but handle it)
+                },
             }
         }
 
@@ -404,36 +422,106 @@ impl CliCommand<()> for InitTool {
 }
 
 impl InitTool {
-    /// Determine whether credentials should be encrypted based on CLI args and global config
-    fn should_encrypt_credentials(&self) -> CliTypedResult<bool> {
-        // If explicitly specified on command line, use that
+    /// Determine the credential storage method based on CLI args and global config
+    fn determine_credential_storage(&self) -> CliTypedResult<CredentialEncryptionType> {
+        // If keychain is explicitly requested on command line
+        if let Some(true) = self.use_keychain {
+            // Check if keychain is available
+            if crate::common::keychain::is_keychain_available() {
+                return Ok(CredentialEncryptionType::Keychain);
+            } else {
+                eprintln!(
+                    "Warning: System keychain is not available. Falling back to file-based storage."
+                );
+            }
+        }
+
+        // If encryption is explicitly specified on command line
         if let Some(encrypt) = self.encrypt_credentials {
-            return Ok(encrypt);
+            return Ok(if encrypt {
+                CredentialEncryptionType::Enabled
+            } else {
+                CredentialEncryptionType::Disabled
+            });
         }
 
         // Otherwise, check the global config
         let global_config = GlobalConfig::load()?;
 
         match global_config.credential_encryption {
-            CredentialEncryptionType::Disabled => Ok(false),
-            CredentialEncryptionType::Enabled => Ok(true),
-            CredentialEncryptionType::Prompt => {
-                if self.prompt_options.assume_yes {
-                    // Default to yes if --assume-yes is set
-                    Ok(true)
-                } else if self.prompt_options.assume_no {
-                    // Default to no if --assume-no is set
-                    Ok(false)
+            CredentialEncryptionType::Disabled => Ok(CredentialEncryptionType::Disabled),
+            CredentialEncryptionType::Enabled => Ok(CredentialEncryptionType::Enabled),
+            CredentialEncryptionType::Keychain => {
+                // Check if keychain is available
+                if crate::common::keychain::is_keychain_available() {
+                    Ok(CredentialEncryptionType::Keychain)
                 } else {
-                    // Prompt the user
-                    eprintln!("\nWould you like to encrypt your private key with a passphrase?");
-                    eprintln!("Encryption adds security by protecting your key at rest.");
                     eprintln!(
-                        "You can also set this globally with: aptos config set-global-config --credential-encryption enabled"
+                        "Warning: System keychain is not available. Falling back to file-based storage."
                     );
-                    Ok(crate::common::utils::prompt_yes("Encrypt credentials?"))
+                    eprintln!("Consider using passphrase encryption instead.");
+                    Ok(CredentialEncryptionType::Disabled)
                 }
             },
+            CredentialEncryptionType::Prompt => {
+                if self.prompt_options.assume_yes {
+                    // Check if keychain is available, prefer it
+                    if crate::common::keychain::is_keychain_available() {
+                        Ok(CredentialEncryptionType::Keychain)
+                    } else {
+                        Ok(CredentialEncryptionType::Enabled)
+                    }
+                } else if self.prompt_options.assume_no {
+                    Ok(CredentialEncryptionType::Disabled)
+                } else {
+                    // Prompt the user with options
+                    self.prompt_credential_storage()
+                }
+            },
+        }
+    }
+
+    /// Prompt the user to choose a credential storage method
+    fn prompt_credential_storage(&self) -> CliTypedResult<CredentialEncryptionType> {
+        eprintln!("\nHow would you like to secure your private key?");
+
+        let keychain_available = crate::common::keychain::is_keychain_available();
+
+        if keychain_available {
+            eprintln!("  1. System keychain (recommended - uses macOS Keychain/Windows Credential Manager/Linux Secret Service)");
+            eprintln!("  2. Passphrase encryption (encrypts key with a password)");
+            eprintln!("  3. No encryption (stored in plaintext - not recommended)");
+
+            loop {
+                let input = crate::common::utils::read_line("Choose option (1/2/3)")?;
+                match input.trim() {
+                    "1" | "keychain" => return Ok(CredentialEncryptionType::Keychain),
+                    "2" | "encrypt" | "passphrase" => return Ok(CredentialEncryptionType::Enabled),
+                    "3" | "none" | "plaintext" => return Ok(CredentialEncryptionType::Disabled),
+                    "" => {
+                        // Default to keychain
+                        return Ok(CredentialEncryptionType::Keychain);
+                    },
+                    _ => eprintln!("Please enter 1, 2, or 3"),
+                }
+            }
+        } else {
+            eprintln!("  1. Passphrase encryption (encrypts key with a password)");
+            eprintln!("  2. No encryption (stored in plaintext - not recommended)");
+            eprintln!("  (System keychain is not available on this platform)");
+
+            loop {
+                let input = crate::common::utils::read_line("Choose option (1/2)")?;
+                match input.trim() {
+                    "1" | "encrypt" | "passphrase" => return Ok(CredentialEncryptionType::Enabled),
+                    "2" | "none" | "plaintext" => return Ok(CredentialEncryptionType::Disabled),
+                    "" => {
+                        // Default to encryption
+                        return Ok(CredentialEncryptionType::Enabled);
+                    },
+                    _ => eprintln!("Please enter 1 or 2"),
+                }
+            }
         }
     }
 

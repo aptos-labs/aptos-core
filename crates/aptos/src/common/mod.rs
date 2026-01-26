@@ -3,6 +3,7 @@
 
 pub mod encryption;
 pub mod init;
+pub mod keychain;
 pub mod local_simulation;
 pub mod transactions;
 pub mod types;
