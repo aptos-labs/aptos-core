@@ -96,7 +96,7 @@ impl<C: CurveGroup> homomorphism::Trait for WeightedHomomorphism<'_, C> {
     type Domain = WeightedWitness<C::ScalarField>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
-        self.apply_msm(self.msm_terms(input)) // WRONG!! use the batch mul stuff here...
+        self.apply_msm(self.msm_terms(input)) // TODO: use the batch mul stuff here...
     }
 }
 

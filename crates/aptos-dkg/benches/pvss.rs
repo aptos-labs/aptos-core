@@ -25,7 +25,7 @@ use criterion::{
     BenchmarkGroup, Criterion, Throughput,
 };
 use more_asserts::assert_le;
-use rand::{rngs::ThreadRng, thread_rng, Rng};
+use rand::{rngs::StdRng, thread_rng, Rng, SeedableRng};
 
 // const BN254: &str = "bn254";
 const BLS12_381: &str = "bls12-381";
@@ -72,10 +72,10 @@ pub fn aggregatable_pvss_group<T: AggregatableTranscript + MalleableTranscript>(
 ) -> DealingArgs<T> {
     let name = T::scheme_name();
     let mut group = c.benchmark_group(format!("pvss/{}", name));
-    let mut rng = thread_rng();
+    let mut rng = StdRng::seed_from_u64(42);
 
     // TODO: use a lazy pattern to avoid this expensive step when no benchmarks are run
-    let d = test_utils::setup_dealing::<T, ThreadRng>(sc, None, &mut rng);
+    let d = test_utils::setup_dealing::<T, _>(sc, None, &mut rng);
 
     // pvss_transcript_random::<T, WallTime>(sc, &mut group);
     pvss_deal::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
@@ -111,10 +111,10 @@ where
         None => format!("pvss/{}/{}", name, curve_name),
     };
     let mut group = c.benchmark_group(group_name);
-    let mut rng = thread_rng();
+    let mut rng = StdRng::seed_from_u64(42);
 
     // TODO: use a lazy pattern to avoid this expensive step when no benchmarks are run
-    let d = test_utils::setup_dealing::<T, ThreadRng>(sc, ell, &mut rng);
+    let d = test_utils::setup_dealing::<T, _>(sc, ell, &mut rng);
 
     // pvss_transcript_random::<T, WallTime>(sc, &mut group);
     pvss_deal::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
@@ -139,7 +139,7 @@ pub fn weighted_pvss_group<
 ) {
     let name = T::scheme_name();
     let mut group = c.benchmark_group(format!("wpvss/{}", name));
-    let mut rng = thread_rng();
+    let mut rng = StdRng::seed_from_u64(42);
 
     let average_aggregation_size = sc.get_average_size_of_eligible_subset(250, &mut rng);
     pvss_aggregate_verify::<T, WallTime>(
@@ -172,7 +172,7 @@ fn pvss_deal<T: Transcript, M: Measurement>(
         b.iter_with_setup(
             || {
                 let s = T::InputSecret::generate(&mut rng);
-                (s, rng)
+                (s, rng.clone())
             },
             |(s, mut rng)| {
                 T::deal(
@@ -196,7 +196,7 @@ fn pvss_aggregate<T: AggregatableTranscript, M: Measurement>(
     g: &mut BenchmarkGroup<M>,
 ) {
     g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
-    let mut rng = thread_rng();
+    let mut rng = StdRng::seed_from_u64(42);
 
     g.bench_function(format!("aggregate/{}", sc), move |b| {
         b.iter_with_setup(
@@ -224,7 +224,7 @@ where
     >,
 {
     g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
-    let mut rng = thread_rng();
+    let mut rng = StdRng::seed_from_u64(42);
 
     g.bench_function(format!("aggregate/{}", sc), move |b| {
         b.iter_with_setup(
@@ -258,7 +258,7 @@ fn pvss_verify<T: AggregatableTranscript, M: Measurement>(
 ) {
     g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
 
-    let mut rng = thread_rng();
+    let mut rng = StdRng::seed_from_u64(42);
 
     g.bench_function(format!("verify/{}", sc), move |b| {
         b.iter_with_setup(
@@ -294,7 +294,7 @@ fn pvss_nonaggregate_serialize<T: HasAggregatableSubtranscript, M: Measurement>(
 ) {
     g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
 
-    let mut rng = thread_rng();
+    let mut rng = StdRng::seed_from_u64(42);
 
     let transcript_size = {
         let s = T::InputSecret::generate(&mut rng);
@@ -349,7 +349,7 @@ fn pvss_nonaggregate_verify<T: HasAggregatableSubtranscript, M: Measurement>(
 ) {
     g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
 
-    let mut rng = thread_rng();
+    let mut rng = StdRng::seed_from_u64(42);
 
     g.bench_function(format!("verify/{}", sc), move |b| {
         b.iter_with_setup(
@@ -396,7 +396,7 @@ fn pvss_aggregate_verify<T: AggregatableTranscript + MalleableTranscript, M: Mea
 
     g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
 
-    let mut rng = thread_rng();
+    let mut rng = StdRng::seed_from_u64(42);
 
     // Aggregated transcript will have SoKs from `num_aggr` players.
     let mut spks = spks.clone();
@@ -449,7 +449,7 @@ fn pvss_decrypt_own_share<T: Transcript, M: Measurement>(
 ) {
     g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
 
-    let mut rng = thread_rng();
+    let mut rng = StdRng::seed_from_u64(42);
 
     let trx = T::deal(
         &sc,
@@ -480,7 +480,7 @@ fn pvss_transcript_random<T: Transcript, M: Measurement>(
 ) {
     g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
 
-    let mut rng = thread_rng();
+    let mut rng = StdRng::seed_from_u64(42);
 
     g.bench_function(format!("transcript-random/{}", sc), move |b| {
         b.iter(|| {
