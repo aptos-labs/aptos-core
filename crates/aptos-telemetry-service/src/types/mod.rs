@@ -48,7 +48,12 @@ pub mod common {
         UnknownValidator,
         UnknownFullNode,
         /// Custom node type with a user-defined name (e.g., "ShelbyStorageProvider")
+        /// These are nodes that are registered in the on-chain allowlist.
         Custom(String),
+        /// Unknown/untrusted custom node type - nodes that authenticated via custom contract
+        /// endpoint but are NOT in the on-chain allowlist. Requires `allow_unknown_nodes: true`
+        /// in the custom contract config. Routed to untrusted sinks for separate attribution.
+        CustomUnknown(String),
     }
 
     impl NodeType {
@@ -63,6 +68,31 @@ pub mod common {
                 NodeType::UnknownValidator => "unknown_validator".to_string(),
                 NodeType::UnknownFullNode => "unknown_fullnode".to_string(),
                 NodeType::Custom(name) => format!("custom({})", name),
+                NodeType::CustomUnknown(name) => format!("custom_unknown({})", name),
+            }
+        }
+
+        /// Check if this is an unknown/untrusted node type
+        pub fn is_unknown(&self) -> bool {
+            matches!(
+                self,
+                NodeType::Unknown
+                    | NodeType::UnknownValidator
+                    | NodeType::UnknownFullNode
+                    | NodeType::CustomUnknown(_)
+            )
+        }
+
+        /// Check if this is a custom contract node type (trusted or unknown)
+        pub fn is_custom(&self) -> bool {
+            matches!(self, NodeType::Custom(_) | NodeType::CustomUnknown(_))
+        }
+
+        /// Get the contract name if this is a custom node type
+        pub fn custom_contract_name(&self) -> Option<&str> {
+            match self {
+                NodeType::Custom(name) | NodeType::CustomUnknown(name) => Some(name),
+                _ => None,
             }
         }
     }

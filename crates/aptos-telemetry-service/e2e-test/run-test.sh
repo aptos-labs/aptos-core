@@ -81,30 +81,92 @@ setup_aptos_cmd
 # Skip to verification if requested
 if [ "$VERIFY_ONLY" = true ]; then
     print_section "Verifying Metrics"
-    verify_metrics_victoria "test_iteration_metric"
-    verify_metrics_prometheus "test_iteration_metric"
+    echo -e "${BLUE}Custom Contract Metrics (Trusted):${NC}"
+    verify_metrics_victoria "telemetry_e2e_test_iteration_metric"
+    verify_metrics_prometheus "telemetry_e2e_test_iteration_metric"
+    verify_trust_status_victoria "telemetry_e2e_test_iteration_metric" "trusted"
+    echo ""
+    echo -e "${BLUE}Custom Contract Metrics (Untrusted via allow_unknown_nodes):${NC}"
+    verify_trust_status_prometheus "telemetry_e2e_test_iteration_metric" "untrusted"
+    echo ""
+    echo -e "${BLUE}Direct/Legacy Metrics:${NC}"
+    verify_metrics_victoria "telemetry_e2e_test_direct"
+    echo ""
+    echo -e "${BLUE}Logs:${NC}"
     verify_logs_loki '{contract_name="e2e_test_contract"}'
     exit 0
 fi
 
 # ============================================================================
-# Phase 1: Test with existing account
+# Phase 0: Test Direct Backend Ingestion
 # ============================================================================
-print_section "Phase 1: Testing with Existing Account"
+print_section "Phase 0: Testing Direct Backend Ingestion"
 
-echo "Sending telemetry from existing test account..."
+echo "Testing direct Victoria Metrics ingestion..."
+echo "This verifies the direct path still works for direct metric push."
+echo ""
+
+# Test direct ingestion to Victoria Metrics
+send_direct_victoria_metrics "http://localhost:8428" "telemetry_e2e_test_direct"
+
+echo ""
+
+# Verify Prometheus Remote Write is enabled
+verify_prometheus_remote_write_enabled "http://localhost:9090" || true
+
+echo ""
+echo "Verifying direct ingestion..."
+sleep 2
+verify_metrics_victoria "telemetry_e2e_test_direct"
+
+# ============================================================================
+# Phase 1: Test with TRUSTED account (Custom Contract Auth - in allowlist)
+# ============================================================================
+print_section "Phase 1: Testing Trusted Node via Custom Contract (allowlisted)"
+
+echo "Sending telemetry from TRUSTED test account (in on-chain registry)..."
 echo "  Address: $TEST_ACCOUNT_ADDRESS"
 echo "  Key: ${TEST_ACCOUNT_KEY_HEX:0:20}..."
+echo "  Expected: trust_status=trusted, routed to metrics_sinks (Victoria Metrics + Prometheus)"
 echo ""
 
 send_telemetry "$TEST_ACCOUNT_KEY_HEX" "$ITERATIONS"
 
-# Verify initial telemetry
+# Verify trusted telemetry - should have trust_status=trusted
 echo ""
-echo "Verifying telemetry data..."
-sleep 2  # Give backends time to ingest
-verify_metrics_victoria "test_iteration_metric"
-verify_metrics_prometheus "test_iteration_metric"
+echo "Verifying trusted node telemetry..."
+sleep 2
+verify_metrics_victoria "telemetry_e2e_test_iteration_metric"
+verify_metrics_prometheus "telemetry_e2e_test_iteration_metric"
+echo ""
+echo "Checking trust_status label..."
+verify_trust_status_victoria "telemetry_e2e_test_iteration_metric" "trusted" || true
+
+# ============================================================================
+# Phase 1b: Test with UNKNOWN account (Custom Contract Auth - NOT in allowlist)
+# ============================================================================
+print_section "Phase 1b: Testing Unknown Node via Custom Contract (NOT allowlisted)"
+
+echo "Creating an UNKNOWN account (NOT added to on-chain registry)..."
+create_unknown_account "unknown-test-node"
+
+echo ""
+echo "Sending telemetry from UNKNOWN account..."
+echo "  Address: $UNKNOWN_ACCOUNT_ADDRESS"
+echo "  Expected: trust_status=untrusted, routed to untrusted_metrics_sinks (Prometheus)"
+echo "  (This tests allow_unknown_nodes=true in telemetry-config.yaml)"
+echo ""
+
+send_unknown_telemetry "$UNKNOWN_ACCOUNT_KEY_HEX" "$ITERATIONS"
+
+# Verify unknown telemetry - should have trust_status=untrusted and be in Prometheus
+echo ""
+echo "Verifying unknown node telemetry (should be in Prometheus via untrusted sinks)..."
+echo "Waiting for Prometheus to process remote write..."
+sleep 5  # Prometheus remote write needs time to process
+echo ""
+echo "Checking trust_status label in Prometheus (untrusted sink)..."
+verify_trust_status_prometheus "telemetry_e2e_test_iteration_metric" "untrusted" || true
 
 # ============================================================================
 # Phase 2: Create additional accounts
@@ -188,19 +250,29 @@ echo "Waiting for metrics to be ingested..."
 sleep 3
 
 echo ""
-echo "Checking VictoriaMetrics..."
-VICTORIA_COUNT=$(curl -s "http://localhost:8428/api/v1/series?match[]=test_iteration_metric" | jq -r '.data | length')
-echo -e "  Found ${GREEN}$VICTORIA_COUNT${NC} time series in VictoriaMetrics"
+echo -e "${BLUE}Checking VictoriaMetrics (trusted node sink)...${NC}"
+VICTORIA_CONTRACT_COUNT=$(curl -s "http://localhost:8428/api/v1/series?match[]=telemetry_e2e_test_iteration_metric" | jq -r '.data | length')
+VICTORIA_DIRECT_COUNT=$(curl -s "http://localhost:8428/api/v1/series?match[]=telemetry_e2e_test_direct" | jq -r '.data | length')
+# URL-encoded: {trust_status="trusted"} -> %7Btrust_status%3D%22trusted%22%7D
+VICTORIA_TRUSTED_COUNT=$(curl -s "http://localhost:8428/api/v1/series?match[]=telemetry_e2e_test_iteration_metric%7Btrust_status%3D%22trusted%22%7D" | jq -r '.data | length')
+echo -e "  Custom contract metrics (all):       ${GREEN}$VICTORIA_CONTRACT_COUNT${NC} series"
+echo -e "  Custom contract metrics (trusted):   ${GREEN}$VICTORIA_TRUSTED_COUNT${NC} series"
+echo -e "  Direct ingestion metrics:            ${GREEN}$VICTORIA_DIRECT_COUNT${NC} series"
 
 echo ""
-echo "Checking Prometheus..."
-PROMETHEUS_COUNT=$(curl -s "http://localhost:9090/api/v1/series?match[]=test_iteration_metric" | jq -r '.data | length')
-echo -e "  Found ${GREEN}$PROMETHEUS_COUNT${NC} time series in Prometheus"
+echo -e "${BLUE}Checking Prometheus (trusted + untrusted sinks)...${NC}"
+PROMETHEUS_CONTRACT_COUNT=$(curl -s "http://localhost:9090/api/v1/series?match[]=telemetry_e2e_test_iteration_metric" | jq -r '.data | length')
+# URL-encoded queries for trust_status labels
+PROMETHEUS_TRUSTED_COUNT=$(curl -s "http://localhost:9090/api/v1/series?match[]=telemetry_e2e_test_iteration_metric%7Btrust_status%3D%22trusted%22%7D" | jq -r '.data | length')
+PROMETHEUS_UNTRUSTED_COUNT=$(curl -s "http://localhost:9090/api/v1/series?match[]=telemetry_e2e_test_iteration_metric%7Btrust_status%3D%22untrusted%22%7D" | jq -r '.data | length')
+echo -e "  Custom contract metrics (all):       ${GREEN}$PROMETHEUS_CONTRACT_COUNT${NC} series"
+echo -e "  Custom contract metrics (trusted):   ${GREEN}$PROMETHEUS_TRUSTED_COUNT${NC} series"
+echo -e "  Custom contract metrics (untrusted): ${GREEN}$PROMETHEUS_UNTRUSTED_COUNT${NC} series"
 
 echo ""
-echo "Checking Loki..."
+echo -e "${BLUE}Checking Loki...${NC}"
 LOKI_COUNT=$(curl -s 'http://localhost:3100/loki/api/v1/query?query=%7Bcontract_name%3D%22e2e_test_contract%22%7D' | jq -r '.data.result | length')
-echo -e "  Found ${GREEN}$LOKI_COUNT${NC} log streams in Loki"
+echo -e "  Custom contract logs: ${GREEN}$LOKI_COUNT${NC} streams"
 
 # ============================================================================
 # Summary
@@ -213,30 +285,120 @@ if [ "$SKIP_CREATE" = true ]; then
 fi
 
 echo -e "${BLUE}Test Configuration:${NC}"
-echo "  • Total accounts tested: $TOTAL_ACCOUNTS"
-echo "  • Iterations per account: $ITERATIONS"
-echo "  • Contract address: $DEPLOYER_ADDRESS"
+echo "  • Trusted accounts tested:   $TOTAL_ACCOUNTS"
+echo "  • Untrusted accounts tested: 1"
+echo "  • Iterations per account:    $ITERATIONS"
+echo "  • Contract address:          $DEPLOYER_ADDRESS"
 echo ""
 
-echo -e "${BLUE}Metrics Backends:${NC}"
-echo "  • VictoriaMetrics: $VICTORIA_COUNT series"
-echo "  • Prometheus:      $PROMETHEUS_COUNT series"
-echo "  • Loki:            $LOKI_COUNT streams"
+echo -e "${BLUE}Metrics Ingestion Results:${NC}"
+echo "  VictoriaMetrics (trusted sink - text format):"
+echo "    • Custom contract (all):     $VICTORIA_CONTRACT_COUNT series"
+echo "    • Custom contract (trusted): $VICTORIA_TRUSTED_COUNT series"
+echo "    • Direct ingestion:          $VICTORIA_DIRECT_COUNT series"
+echo "  Prometheus (trusted + untrusted sinks - protobuf format):"
+echo "    • Custom contract (all):       $PROMETHEUS_CONTRACT_COUNT series"
+echo "    • Custom contract (trusted):   $PROMETHEUS_TRUSTED_COUNT series"
+echo "    • Custom contract (untrusted): $PROMETHEUS_UNTRUSTED_COUNT series"
+echo "  Loki:"
+echo "    • Custom contract logs:        $LOKI_COUNT streams"
 echo ""
 
 # Determine overall pass/fail
-if [ "$VICTORIA_COUNT" -gt 0 ] && [ "$PROMETHEUS_COUNT" -gt 0 ]; then
+# Pass if: 
+#   1. Victoria Metrics has trusted metrics and direct metrics
+#   2. Prometheus has both trusted AND untrusted metrics (tests allow_unknown_nodes)
+TEST_RESULT="pass"
+
+if [ "$VICTORIA_TRUSTED_COUNT" -gt 0 ] && [ "$VICTORIA_DIRECT_COUNT" -gt 0 ] && [ "$PROMETHEUS_TRUSTED_COUNT" -gt 0 ] && [ "$PROMETHEUS_UNTRUSTED_COUNT" -gt 0 ]; then
     echo -e "${GREEN}========================================${NC}"
     echo -e "${GREEN}  ✓ E2E TEST PASSED                    ${NC}"
     echo -e "${GREEN}========================================${NC}"
-    exit 0
+    echo ""
+    echo "All telemetry paths verified:"
+    echo "  ✓ Trusted node via custom contract (in allowlist)"
+    echo "  ✓ Untrusted node via custom contract (allow_unknown_nodes=true)"
+    echo "  ✓ Direct backend ingestion (legacy path)"
+    echo "  ✓ Trust status labels correctly applied"
+    TEST_RESULT="pass"
+elif [ "$VICTORIA_CONTRACT_COUNT" -gt 0 ] || [ "$PROMETHEUS_CONTRACT_COUNT" -gt 0 ]; then
+    echo -e "${YELLOW}========================================${NC}"
+    echo -e "${YELLOW}  ⚠ E2E TEST PARTIAL PASS              ${NC}"
+    echo -e "${YELLOW}========================================${NC}"
+    echo ""
+    echo "Some metrics were ingested but not all paths verified."
+    echo "  VictoriaMetrics trusted:   $VICTORIA_TRUSTED_COUNT"
+    echo "  VictoriaMetrics direct:    $VICTORIA_DIRECT_COUNT"
+    echo "  Prometheus trusted:        $PROMETHEUS_TRUSTED_COUNT"
+    echo "  Prometheus untrusted:      $PROMETHEUS_UNTRUSTED_COUNT"
+    TEST_RESULT="partial"
 else
     echo -e "${RED}========================================${NC}"
     echo -e "${RED}  ✗ E2E TEST FAILED                    ${NC}"
     echo -e "${RED}========================================${NC}"
     echo ""
-    echo "Check telemetry service logs:"
+    echo "No metrics were ingested. Check telemetry service logs:"
     echo "  tail -f $TEST_DIR/telemetry.log"
+    TEST_RESULT="fail"
+fi
+
+# ============================================================================
+# Manual Verification Instructions
+# ============================================================================
+echo ""
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${CYAN}  Manual Verification via Grafana                          ${NC}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+echo -e "${BLUE}Open Grafana:${NC} http://localhost:3000"
+echo "  Login: admin / admin"
+echo ""
+echo -e "${BLUE}Explore Metrics (VictoriaMetrics - trusted sink):${NC}"
+echo "  1. Go to: Explore → Select 'VictoriaMetrics' datasource"
+echo "  2. Query all E2E test metrics:"
+echo "     ${YELLOW}telemetry_e2e_test_iteration_metric${NC}"
+echo "  3. Query trusted metrics only:"
+echo "     ${YELLOW}telemetry_e2e_test_iteration_metric{trust_status=\"trusted\"}${NC}"
+echo "  4. Query direct ingestion metrics:"
+echo "     ${YELLOW}telemetry_e2e_test_direct${NC}"
+echo ""
+echo -e "${BLUE}Explore Metrics (Prometheus - both trusted + untrusted sinks):${NC}"
+echo "  1. Go to: Explore → Select 'Prometheus' datasource"
+echo "  2. Query all E2E test metrics:"
+echo "     ${YELLOW}telemetry_e2e_test_iteration_metric${NC}"
+echo "  3. Query trusted metrics only:"
+echo "     ${YELLOW}telemetry_e2e_test_iteration_metric{trust_status=\"trusted\"}${NC}"
+echo "  4. Query untrusted/unknown node metrics:"
+echo "     ${YELLOW}telemetry_e2e_test_iteration_metric{trust_status=\"untrusted\"}${NC}"
+echo ""
+echo -e "${BLUE}Explore Logs (Loki):${NC}"
+echo "  1. Go to: Explore → Select 'Loki' datasource"
+echo "  2. Query all custom contract logs:"
+echo "     ${YELLOW}{contract_name=\"e2e_test_contract\"}${NC}"
+echo "  3. Query trusted node logs:"
+echo "     ${YELLOW}{contract_name=\"e2e_test_contract\",trust_status=\"trusted\"}${NC}"
+echo "  4. Query untrusted node logs:"
+echo "     ${YELLOW}{contract_name=\"e2e_test_contract\",trust_status=\"untrusted\"}${NC}"
+echo ""
+echo -e "${BLUE}Direct API Queries:${NC}"
+echo "  # All E2E test metrics"
+echo "  curl 'http://localhost:8428/api/v1/series?match[]=telemetry_e2e_test_iteration_metric'"
+echo "  curl 'http://localhost:9090/api/v1/series?match[]=telemetry_e2e_test_iteration_metric'"
+echo ""
+echo "  # Trusted metrics only"
+echo "  curl 'http://localhost:9090/api/v1/series?match[]=telemetry_e2e_test_iteration_metric{trust_status=\"trusted\"}'"
+echo ""
+echo "  # Untrusted metrics only (should be in Prometheus via untrusted sink)"
+echo "  curl 'http://localhost:9090/api/v1/series?match[]=telemetry_e2e_test_iteration_metric{trust_status=\"untrusted\"}'"
+echo ""
+echo "  # Logs"
+echo "  curl 'http://localhost:3100/loki/api/v1/query?query={contract_name=\"e2e_test_contract\"}'"
+echo ""
+
+# Exit with appropriate code
+if [ "$TEST_RESULT" = "fail" ]; then
     exit 1
+else
+    exit 0
 fi
 

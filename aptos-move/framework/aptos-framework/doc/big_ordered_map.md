@@ -3605,7 +3605,7 @@ Given a path to node (excluding the node itself), which is currently stored unde
 
     // index of the node we will rebalance <b>with</b>.
     <b>let</b> sibling_index = {
-        <b>let</b> parent_children = &self.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node">borrow_node</a>(*path_to_node.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow">borrow</a>(path_to_node.length() - 1)).children;
+        <b>let</b> parent_children = &self.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node">borrow_node</a>(path_to_node[path_to_node.length() - 1]).children;
         <b>assert</b>!(parent_children.length() &gt;= 2, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>));
         // If we are the largest node from the parent, we merge <b>with</b> the `prev`
         // (which is then guaranteed <b>to</b> have the same parent, <b>as</b> <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> node <b>has</b> &gt;1 children),

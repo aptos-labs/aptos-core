@@ -320,7 +320,7 @@ Object reference should be provided when upgrading object code.
     code_chunks: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;
 ): &<b>mut</b> <a href="large_packages.md#0x7_large_packages_StagingArea">StagingArea</a> {
     <b>assert</b>!(
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&code_indices) == <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&code_chunks),
+        code_indices.length() == code_chunks.length(),
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="large_packages.md#0x7_large_packages_ECODE_MISMATCH">ECODE_MISMATCH</a>)
     );
 
@@ -339,26 +339,24 @@ Object reference should be provided when upgrading object code.
 
     <b>let</b> staging_area = <b>borrow_global_mut</b>&lt;<a href="large_packages.md#0x7_large_packages_StagingArea">StagingArea</a>&gt;(owner_address);
 
-    <b>if</b> (!<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_is_empty">vector::is_empty</a>(&metadata_chunk)) {
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> staging_area.metadata_serialized, metadata_chunk);
+    <b>if</b> (!metadata_chunk.is_empty()) {
+        staging_area.metadata_serialized.append(metadata_chunk);
     };
 
     <b>let</b> i = 0;
-    <b>while</b> (i &lt; <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&code_chunks)) {
-        <b>let</b> inner_code = *<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&code_chunks, i);
-        <b>let</b> idx = (*<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&code_indices, i) <b>as</b> u64);
+    <b>while</b> (i &lt; code_chunks.length()) {
+        <b>let</b> inner_code = code_chunks[i];
+        <b>let</b> idx = (code_indices[i] <b>as</b> u64);
 
-        <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/doc/smart_table.md#0x1_smart_table_contains">smart_table::contains</a>(&staging_area.<a href="../../aptos-framework/doc/code.md#0x1_code">code</a>, idx)) {
-            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(
-                <a href="../../aptos-framework/../aptos-stdlib/doc/smart_table.md#0x1_smart_table_borrow_mut">smart_table::borrow_mut</a>(&<b>mut</b> staging_area.<a href="../../aptos-framework/doc/code.md#0x1_code">code</a>, idx), inner_code
-            );
+        <b>if</b> (staging_area.<a href="../../aptos-framework/doc/code.md#0x1_code">code</a>.contains(idx)) {
+            staging_area.<a href="../../aptos-framework/doc/code.md#0x1_code">code</a>.borrow_mut(idx).append(inner_code);
         } <b>else</b> {
-            <a href="../../aptos-framework/../aptos-stdlib/doc/smart_table.md#0x1_smart_table_add">smart_table::add</a>(&<b>mut</b> staging_area.<a href="../../aptos-framework/doc/code.md#0x1_code">code</a>, idx, inner_code);
+            staging_area.<a href="../../aptos-framework/doc/code.md#0x1_code">code</a>.add(idx, inner_code);
             <b>if</b> (idx &gt; staging_area.last_module_idx) {
                 staging_area.last_module_idx = idx;
             }
         };
-        i = i + 1;
+        i += 1;
     };
 
     staging_area
@@ -479,11 +477,8 @@ Object reference should be provided when upgrading object code.
     <b>let</b> <a href="../../aptos-framework/doc/code.md#0x1_code">code</a> = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
     <b>let</b> i = 0;
     <b>while</b> (i &lt;= last_module_idx) {
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(
-            &<b>mut</b> <a href="../../aptos-framework/doc/code.md#0x1_code">code</a>,
-            *<a href="../../aptos-framework/../aptos-stdlib/doc/smart_table.md#0x1_smart_table_borrow">smart_table::borrow</a>(&staging_area.<a href="../../aptos-framework/doc/code.md#0x1_code">code</a>, i)
-        );
-        i = i + 1;
+        <a href="../../aptos-framework/doc/code.md#0x1_code">code</a>.push_back(*staging_area.<a href="../../aptos-framework/doc/code.md#0x1_code">code</a>.borrow(i));
+        i += 1;
     };
     <a href="../../aptos-framework/doc/code.md#0x1_code">code</a>
 }
@@ -511,7 +506,7 @@ Object reference should be provided when upgrading object code.
 <pre><code><b>public</b> entry <b>fun</b> <a href="large_packages.md#0x7_large_packages_cleanup_staging_area">cleanup_staging_area</a>(owner: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="large_packages.md#0x7_large_packages_StagingArea">StagingArea</a> {
     <b>let</b> <a href="large_packages.md#0x7_large_packages_StagingArea">StagingArea</a> { metadata_serialized: _, <a href="../../aptos-framework/doc/code.md#0x1_code">code</a>, last_module_idx: _ } =
         <b>move_from</b>&lt;<a href="large_packages.md#0x7_large_packages_StagingArea">StagingArea</a>&gt;(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner));
-    <a href="../../aptos-framework/../aptos-stdlib/doc/smart_table.md#0x1_smart_table_destroy">smart_table::destroy</a>(<a href="../../aptos-framework/doc/code.md#0x1_code">code</a>);
+    <a href="../../aptos-framework/doc/code.md#0x1_code">code</a>.destroy();
 }
 </code></pre>
 

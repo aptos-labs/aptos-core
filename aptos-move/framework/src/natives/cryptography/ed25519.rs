@@ -57,9 +57,7 @@ fn native_public_key_validate(
             {
                 return Ok(smallvec![Value::bool(false)]);
             } else {
-                return Err(SafeNativeError::Abort {
-                    abort_code: abort_codes::E_WRONG_PUBKEY_SIZE,
-                });
+                return Err(SafeNativeError::abort(abort_codes::E_WRONG_PUBKEY_SIZE));
             }
         },
     };

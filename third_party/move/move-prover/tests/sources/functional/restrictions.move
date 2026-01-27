@@ -5,9 +5,6 @@ module 0x42::M {
         f: u64
     }
     spec module {
-        // Tuples as result type.
-        fun f1(): (u64, u64) { (1u64, 2u64) }
-
         // Functions as result type.
         fun f2(): | |num { | | 1 }
 
@@ -42,10 +39,9 @@ module 0x42::M {
         //}
     }
 
-    /// Need to use the specctions, otherwise the monomorphizer will eliminate them.
+    /// Need to use the spec functions, otherwise the monomorphizer will eliminate them.
     fun use_them(): bool { true }
     spec use_them {
-        ensures f1() == f1();
         ensures f2() == f2();
         ensures f3(|x|x) == f3(|x|x);
         ensures f4() == f4();

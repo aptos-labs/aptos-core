@@ -335,7 +335,7 @@
                     <a href="nonce_validation.md#0x1_nonce_validation_empty_bucket">empty_bucket</a>(<b>true</b>)
                 );
             };
-            nonce_history.next_key = nonce_history.next_key + 1;
+            nonce_history.next_key += 1;
         }
     }
 }
@@ -381,7 +381,7 @@
             <a href="nonce_validation.md#0x1_nonce_validation_empty_bucket">empty_bucket</a>(<b>false</b>)
         );
     };
-    <b>let</b> bucket = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> nonce_history.nonce_table, bucket_index);
+    <b>let</b> bucket = nonce_history.nonce_table.borrow_mut(bucket_index);
 
     <b>let</b> existing_exp_time = bucket.nonce_to_exp_time_map.get(&nonce_key);
     <b>if</b> (existing_exp_time.is_some()) {
@@ -423,7 +423,7 @@
         } <b>else</b> {
             <b>break</b>;
         };
-        i = i + 1;
+        i += 1;
     };
 
     // Insert the (<b>address</b>, nonce) pair in the bucket.

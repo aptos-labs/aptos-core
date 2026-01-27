@@ -191,26 +191,58 @@ async fn handle_auth(
         ))
     })?;
 
-    // Verify the address is in the AllowList list on-chain (with caching)
-    verify_custom_contract(
-        &context,
-        &contract_name,
-        &instance.config,
-        &body.address,
-        &body.chain_id,
-    )
-    .await
-    .map_err(|e| {
-        warn!("custom contract verification failed: {}", e);
-        record_custom_contract_error(
-            &contract_name,
-            CustomContractEndpoint::Auth,
-            CustomContractErrorType::NotInAllowlist,
-        );
-        reject::custom(ServiceError::forbidden(
-            ServiceErrorCode::CustomContractAuthError(e.to_string(), body.chain_id),
-        ))
-    })?;
+    // Check allowlist status and determine node type
+    let allowlist_status =
+        check_allowlist_status(&context, &contract_name, &body.address, &body.chain_id);
+
+    let node_type = match allowlist_status {
+        AllowlistStatus::InAllowlist => NodeType::Custom(contract_name.clone()),
+
+        AllowlistStatus::NotInAllowlist if instance.allow_unknown_nodes => {
+            // Issue token for unknown nodes - routed to untrusted sinks
+            NodeType::CustomUnknown(contract_name.clone())
+        },
+
+        AllowlistStatus::NotInAllowlist => {
+            // Unknown nodes not allowed - reject
+            warn!(
+                "address {} NOT in allowlist for contract '{}' and unknown nodes not allowed",
+                body.address, contract_name
+            );
+            record_custom_contract_error(
+                &contract_name,
+                CustomContractEndpoint::Auth,
+                CustomContractErrorType::NotInAllowlist,
+            );
+            return Err(reject::custom(ServiceError::forbidden(
+                ServiceErrorCode::CustomContractAuthError(
+                    format!(
+                        "address {} not in allowlist for contract '{}'",
+                        body.address, contract_name
+                    ),
+                    body.chain_id,
+                ),
+            )));
+        },
+
+        AllowlistStatus::CacheMiss => {
+            // Can't verify - allowlist data not available yet
+            record_custom_contract_error(
+                &contract_name,
+                CustomContractEndpoint::Auth,
+                CustomContractErrorType::NotInAllowlist,
+            );
+            return Err(reject::custom(ServiceError::forbidden(
+                ServiceErrorCode::CustomContractAuthError(
+                    format!(
+                        "allowlist not available for contract '{}' (cache miss)",
+                        contract_name
+                    ),
+                    body.chain_id,
+                ),
+            )));
+        },
+    };
 
     // Create JWT token for the custom contract client
     // IMPORTANT: Store the contract_name in JWT (not node_type_name) for auth verification
@@ -220,9 +252,9 @@ async fn handle_auth(
     let token = create_jwt_token(
         context.jwt_service(),
         body.chain_id,
-        body.address,                            // Use address as PeerId
-        NodeType::Custom(contract_name.clone()), // contract_name for auth, not display label
-        0,                                       // epoch not relevant for custom contract clients
+        body.address, // Use address as PeerId
+        node_type,    // Custom for allowlisted, CustomUnknown for unknown
+        0,            // epoch not relevant for custom contract clients
         run_uuid,
     )
     .map_err(|e| {
@@ -271,19 +303,27 @@ pub(crate) fn verify_signature(request: &CustomAuthRequest) -> Result<()> {
     Ok(())
 }
 
+/// Result of checking an address against the on-chain allowlist cache.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum AllowlistStatus {
+    /// Address is confirmed to be in the allowlist
+    InAllowlist,
+    /// Address is confirmed to NOT be in the allowlist
+    NotInAllowlist,
+    /// Cache miss - allowlist data not available (service just started, etc.)
+    CacheMiss,
+}
+
 /// Verify that the address is registered in an on-chain allowlist.
 ///
 /// Uses a simple cache lookup - the cache is kept fresh by AllowlistCacheUpdater
 /// running in the background (similar to PeerSetCacheUpdater for validators).
-///
-/// Returns Ok if address is in allowlist, Err otherwise.
-async fn verify_custom_contract(
+fn check_allowlist_status(
     context: &Context,
     contract_name: &str,
-    _config: &crate::OnChainAuthConfig,
     address: &AccountAddress,
     chain_id: &ChainId,
-) -> Result<()> {
+) -> AllowlistStatus {
     let cache = context.allowlist_cache();
 
     match cache.check_address(contract_name, chain_id, address) {
@@ -292,34 +332,21 @@ async fn verify_custom_contract(
                 "address {} is in allowlist for contract '{}' chain {}",
                 address, contract_name, chain_id
             );
-            Ok(())
+            AllowlistStatus::InAllowlist
         },
         Some(false) => {
             debug!(
                 "address {} is NOT in allowlist for contract '{}' chain {}",
                 address, contract_name, chain_id
             );
-            Err(anyhow!(
-                "address {} is not in the allowlist for contract '{}'",
-                address,
-                contract_name
-            ))
+            AllowlistStatus::NotInAllowlist
         },
         None => {
             // Cache miss - this shouldn't happen in normal operation since
             // AllowlistCacheUpdater populates the cache before requests arrive.
             // This could occur if:
             // 1. Service just started and updater hasn't run yet
-            // 2. Contract was just added to config
-            // 3. Cache was cleared
-            warn!(
-                "allowlist cache miss for contract '{}' chain {} - updater may not have run yet",
-                contract_name, chain_id
-            );
-            Err(anyhow!(
-                "allowlist not available for contract '{}' (cache miss)",
-                contract_name
-            ))
+            AllowlistStatus::CacheMiss
         },
     }
 }
@@ -618,12 +645,13 @@ fn get_rest_url_for_chain(chain_id: &ChainId) -> Result<reqwest::Url> {
 }
 
 /// Authorization filter for custom contract authenticated requests.
-/// Returns (contract_name, peer_id, chain_id) from JWT claims.
-/// The contract_name is extracted from NodeType::Custom(contract_name) and should be
-/// verified against the URL path to prevent cross-contract token reuse.
+/// Returns (contract_name, peer_id, chain_id, is_trusted) from JWT claims.
+/// The contract_name is extracted from NodeType::Custom or NodeType::CustomUnknown.
+/// is_trusted is true for Custom (allowlisted), false for CustomUnknown.
 pub fn with_custom_contract_auth(
     context: Context,
-) -> impl Filter<Extract = ((String, aptos_types::PeerId, ChainId),), Error = Rejection> + Clone {
+) -> impl Filter<Extract = ((String, aptos_types::PeerId, ChainId, bool),), Error = Rejection> + Clone
+{
     warp::header::optional(AUTHORIZATION.as_str())
         .and_then(crate::jwt_auth::jwt_from_header)
         .and(warp::any().map(move || context.clone()))
@@ -631,13 +659,14 @@ pub fn with_custom_contract_auth(
 }
 
 /// Authorize a custom contract JWT token.
-/// Returns (contract_name, peer_id, chain_id) from claims for use in data ingestion.
-/// The contract_name is stored in NodeType::Custom(contract_name) to prevent
+/// Returns (contract_name, peer_id, chain_id, is_trusted) from claims for use in data ingestion.
+/// The contract_name is stored in NodeType::Custom or NodeType::CustomUnknown to prevent
 /// cross-contract token reuse attacks.
+/// is_trusted indicates whether the node is in the on-chain allowlist (Custom) or not (CustomUnknown).
 async fn authorize_custom_contract_jwt(
     token: String,
     context: Context,
-) -> Result<(String, aptos_types::PeerId, ChainId), Rejection> {
+) -> Result<(String, aptos_types::PeerId, ChainId, bool), Rejection> {
     use crate::types::auth::Claims;
 
     let claims = context
@@ -654,10 +683,12 @@ async fn authorize_custom_contract_jwt(
         })?
         .claims;
 
-    // Extract and verify the contract_name from NodeType::Custom
+    // Extract and verify the contract_name from NodeType::Custom or NodeType::CustomUnknown
     // This prevents cross-contract token reuse attacks
-    let jwt_contract_name = match &claims.node_type {
-        NodeType::Custom(name) => name.clone(),
+    // CustomUnknown nodes are allowed but will be routed to untrusted sinks
+    let (jwt_contract_name, is_trusted) = match &claims.node_type {
+        NodeType::Custom(name) => (name.clone(), true),
+        NodeType::CustomUnknown(name) => (name.clone(), false),
         _ => {
             return Err(reject::custom(ServiceError::forbidden(
                 ServiceErrorCode::CustomContractAuthError(
@@ -668,5 +699,10 @@ async fn authorize_custom_contract_jwt(
         },
     };
 
-    Ok((jwt_contract_name, claims.peer_id, claims.chain_id))
+    Ok((
+        jwt_contract_name,
+        claims.peer_id,
+        claims.chain_id,
+        is_trusted,
+    ))
 }

@@ -68,8 +68,6 @@ pub fn double_internal(
             square,
             ALGEBRA_ARK_BN254_FQ12_SQUARE
         ),
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
+        _ => Err(SafeNativeError::abort(MOVE_ABORT_CODE_NOT_IMPLEMENTED)),
     }
 }

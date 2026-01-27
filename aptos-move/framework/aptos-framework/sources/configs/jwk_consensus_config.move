@@ -3,14 +3,11 @@ module aptos_framework::jwk_consensus_config {
     use std::error;
     use std::option;
     use std::string::String;
-    use std::vector;
     use aptos_std::copyable_any;
     use aptos_std::copyable_any::Any;
     use aptos_std::simple_map;
     use aptos_framework::config_buffer;
     use aptos_framework::system_addresses;
-    #[test_only]
-    use std::string;
     #[test_only]
     use std::string::utf8;
 
@@ -89,7 +86,7 @@ module aptos_framework::jwk_consensus_config {
     /// Abort if the given provider list contains duplicated provider names.
     public fun new_v1(oidc_providers: vector<OIDCProvider>): JWKConsensusConfig {
         let name_set = simple_map::new<String, u64>();
-        vector::for_each_ref(&oidc_providers, |provider| {
+        oidc_providers.for_each_ref(|provider| {
             let provider: &OIDCProvider = provider;
             let (_, old_value) = simple_map::upsert(&mut name_set, provider.name, 0);
             if (option::is_some(&old_value)) {
@@ -109,7 +106,7 @@ module aptos_framework::jwk_consensus_config {
     #[test_only]
     fun enabled(): bool acquires JWKConsensusConfig {
         let variant= borrow_global<JWKConsensusConfig>(@aptos_framework).variant;
-        let variant_type_name = *string::bytes(copyable_any::type_name(&variant));
+        let variant_type_name = *variant.type_name().bytes();
         variant_type_name != b"0x1::jwk_consensus_config::ConfigOff"
     }
 

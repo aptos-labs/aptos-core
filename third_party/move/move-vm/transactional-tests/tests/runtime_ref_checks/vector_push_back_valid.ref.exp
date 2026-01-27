@@ -1,0 +1,4 @@
+processed 2 tasks
+task 0 lines 1-34:  publish [module 0xc0ffee::vec_push_test]
+task 1 lines 36-36:  run 0xc0ffee::vec_push_test::test_vec_push_back_no_poison --verbose
+return values: 100

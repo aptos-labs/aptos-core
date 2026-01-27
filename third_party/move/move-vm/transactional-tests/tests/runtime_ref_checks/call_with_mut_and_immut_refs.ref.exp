@@ -1,0 +1,12 @@
+processed 2 tasks
+task 0 lines 1-37:  publish [module 0xc0ffee::lock_mix_test]
+task 1 lines 39-39:  run 0xc0ffee::lock_mix_test::test_call_mut_and_immut_refs --verbose
+Error: Function execution failed with VMError: {
+    message: Exclusive lock conflict,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(3),
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
