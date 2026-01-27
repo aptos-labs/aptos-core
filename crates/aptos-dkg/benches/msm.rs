@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
 use ark_bls12_381::Bls12_381;
 use ark_bn254::Bn254;
 use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};

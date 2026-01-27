@@ -107,6 +107,8 @@ def parse_transcript_bytes_from_folder(folder_path):
                     if m:
                         return int(m.group(1))
         except (json.JSONDecodeError, IOError, ValueError):
+            # If the benchmark.json file is missing, unreadable, or malformed,
+            # treat it as "no transcript_bytes" and fall back to returning None.
             pass
     
     return None
@@ -181,7 +183,7 @@ def accumulate(rows, folder_map=None):
     Build nested dict: (setup, ell) -> version -> operation -> time_ns.
     Also stores transcript_bytes per version.
     """
-    data = defaultdict(lambda: dict())
+    data = defaultdict(dict)
 
     for r in rows:
         group = r.get("Group", "")
