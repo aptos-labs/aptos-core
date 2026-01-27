@@ -225,14 +225,16 @@ where
     T::Aggregated: Aggregated<T>,
 {
     type SecretSharingConfig = WeightedConfig<ThresholdConfigBlstrs>;
-    type Aggregated = Self;
+    type Aggregated = GenericWeighting<T::Aggregated>;
 
     fn to_aggregated(&self) -> Self::Aggregated {
-        self.clone()
+        GenericWeighting {
+            trx: self.trx.to_aggregated(),
+        }
     }
 }
 
-impl<T> Aggregated<GenericWeighting<T>> for GenericWeighting<T>
+impl<T> Aggregated<GenericWeighting<T>> for GenericWeighting<T::Aggregated>
 where
     T: AggregatableTranscript
         + Aggregatable<SecretSharingConfig = ThresholdConfigBlstrs>
@@ -244,14 +246,17 @@ where
         sc: &WeightedConfig<ThresholdConfigBlstrs>,
         other: &GenericWeighting<T>,
     ) -> anyhow::Result<()> {
-        let mut agg = self.trx.to_aggregated();
-        agg.aggregate_with(sc.get_threshold_config(), &other.trx)?;
-        self.trx = agg.normalize();
+        // self.trx is T::Aggregated, other.trx is T
+        // Aggregate other.trx into self.trx
+        self.trx.aggregate_with(sc.get_threshold_config(), &other.trx)?;
         Ok(())
     }
 
     fn normalize(self) -> GenericWeighting<T> {
-        self
+        // Convert T::Aggregated back to T
+        GenericWeighting {
+            trx: self.trx.normalize(),
+        }
     }
 }
 

@@ -243,7 +243,6 @@ where
             |(first, second)| {
                 let mut agg = first.get_subtranscript().to_aggregated();
                 agg.aggregate_with(&sc, &second.get_subtranscript()).unwrap();
-                let _ = agg.normalize();
             },
         )
     });
