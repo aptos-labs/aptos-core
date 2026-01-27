@@ -84,10 +84,7 @@ fn bench_large_msm_vs_sum_then_msm<E: Pairing>(c: &mut Criterion, curve_name: &s
         &format!("sum_219 + msm_219_random (distinct bases) {}", curve_name),
         |b| {
             b.iter(|| {
-                let sum = points_a
-                    .iter()
-                    .map(|p| p)
-                    .fold(E::G1::zero(), |acc, p| acc + p);
+                let sum = points_a.iter().fold(E::G1::zero(), |acc, p| acc + p);
 
                 let msm =
                     E::G1::msm(&points_b, &random_scalars).expect("MSM(points_b, random) failed");

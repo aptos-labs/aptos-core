@@ -39,7 +39,7 @@ pub fn all_groups(c: &mut Criterion) {
         subaggregatable_pvss_group::<Chunky_v1<Bls12_381>>(&tc, c, Some(16u8), BLS12_381);
     }
     for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
-        subaggregatable_pvss_group::<Chunky_v1<Bls12_381>>(&tc, c, Some(32u8),BLS12_381);
+        subaggregatable_pvss_group::<Chunky_v1<Bls12_381>>(&tc, c, Some(32u8), BLS12_381);
     }
 
     // Chunky_v2
@@ -312,28 +312,31 @@ fn pvss_nonaggregate_serialize<T: HasAggregatableSubtranscript, M: Measurement>(
         trs.to_bytes().len()
     };
 
-    g.bench_function(format!("serialize/{}/transcript_bytes={}", sc, transcript_size), move |b| {
-        b.iter_with_setup(
-            || {
-                let s = T::InputSecret::generate(&mut rng);
-                T::deal(
-                    &sc,
-                    &pp,
-                    &ssks[0],
-                    &spks[0],
-                    &eks,
-                    &s,
-                    &NoAux,
-                    &sc.get_player(0),
-                    &mut rng,
-                )
-            },
-            |trs| {
-                let bytes = trs.to_bytes();
-                black_box(&bytes);
-            },
-        )
-    });
+    g.bench_function(
+        format!("serialize/{}/transcript_bytes={}", sc, transcript_size),
+        move |b| {
+            b.iter_with_setup(
+                || {
+                    let s = T::InputSecret::generate(&mut rng);
+                    T::deal(
+                        &sc,
+                        &pp,
+                        &ssks[0],
+                        &spks[0],
+                        &eks,
+                        &s,
+                        &NoAux,
+                        &sc.get_player(0),
+                        &mut rng,
+                    )
+                },
+                |trs| {
+                    let bytes = trs.to_bytes();
+                    black_box(&bytes);
+                },
+            )
+        },
+    );
 }
 
 fn pvss_nonaggregate_verify<T: HasAggregatableSubtranscript, M: Measurement>(
@@ -494,7 +497,7 @@ fn pvss_transcript_random<T: Transcript, M: Measurement>(
 
 criterion_group!(
     name = benches;
-    config = Criterion::default().sample_size(10);
+    config = Criterion::default().sample_size(50);
     //config = Criterion::default();
     targets = all_groups);
 criterion_main!(benches);

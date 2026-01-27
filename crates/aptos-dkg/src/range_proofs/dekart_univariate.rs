@@ -7,12 +7,11 @@ use crate::{
     sigma_protocol::homomorphism::Trait, utils, Scalar,
 };
 use anyhow::ensure;
-use aptos_crypto::arkworks::{random::sample_field_element, GroupGenerators};
+use aptos_crypto::arkworks::{powers_of_two, random::sample_field_element, GroupGenerators};
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
     CurveGroup, PrimeGroup, VariableBaseMSM,
 };
-use aptos_crypto::arkworks::powers_of_two;
 use ark_ff::{AdditiveGroup, Field};
 use ark_poly::{self, EvaluationDomain, Radix2EvaluationDomain};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError};
@@ -576,7 +575,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         );
 
         let commitment_recomputed: E::G1 =
-            VariableBaseMSM::msm(&self.c, &vk.powers_of_two[..ell as usize]).expect("Failed to compute msm");
+            VariableBaseMSM::msm(&self.c, &vk.powers_of_two[..ell as usize])
+                .expect("Failed to compute msm");
         ensure!(comm.0 == commitment_recomputed);
 
         let public_statement = PublicStatement {

@@ -60,9 +60,9 @@ pub fn setup_dealing<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng
     );
 
     let pp = match ell {
-        None => T::PublicParameters::with_max_num_shares(
-            sc.get_total_num_shares().try_into().unwrap(),
-        ),
+        None => {
+            T::PublicParameters::with_max_num_shares(sc.get_total_num_shares().try_into().unwrap())
+        },
         Some(bit_size) => T::PublicParameters::with_max_num_shares_and_bit_size(
             sc.get_total_num_shares().try_into().unwrap(),
             bit_size,
