@@ -51,8 +51,10 @@ const BOB_ADDRESS: &str = "0xb0b";
 // =================================================================================================
 
 /// Creates a new MoveHarness with the necessary feature flags enabled, just in case they are not.
+/// When the `move-harness-with-test-only` feature is enabled, this includes #[test_only] code.
 fn setup_harness() -> MoveHarness {
     let mut h = MoveHarness::new();
+
     h.enable_features(
         vec![
             FeatureFlag::BULLETPROOFS_NATIVES,
@@ -102,7 +104,7 @@ fn get_apt_metadata_address() -> AccountAddress {
     AccountAddress::from_hex_literal("0xa").unwrap()
 }
 
-const MODULE_NAME: &'static str = "confidential_asset";
+const MODULE_NAME: &str = "confidential_asset";
 
 /// Set up the confidential asset FA store for APT.
 /// This ensures the primary FA store exists for the confidential asset module's FA store address.
@@ -433,4 +435,122 @@ fn test_call_private_function() {
     let value: AccountAddress = bcs::from_bytes(bytes).expect("Failed to deserialize address");
     println!("Called private function, returned: {}", value);
     assert_eq!(value, expected, "Wrong address returned!");
+}
+
+/// The decryption key (scalar) corresponding to DUMMY_EK.
+/// DUMMY_EK is the Ristretto255 basepoint, which equals g * 1.
+/// Therefore, the decryption key is the scalar 1 in little-endian format.
+#[cfg(feature = "move-harness-with-test-only")]
+const DUMMY_DK: [u8; 32] = [
+    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+];
+
+/// Complete test that calls a #[test_only] function with proper setup.
+/// This test:
+/// 1. Sets up a harness (with test-only code when feature is enabled)
+/// 2. Creates Alice with APT balance
+/// 3. Registers Alice for confidential assets
+/// 4. Deposits APT to Alice's confidential balance
+/// 5. Calls verify_pending_balance to verify the deposit succeeded
+#[test]
+#[cfg(feature = "move-harness-with-test-only")]
+fn call_test_only_function() {
+    // Use harness with test-only code included
+    let mut h = setup_harness();
+
+    // Create Alice with some APT
+    let alice = h.new_account_with_balance_at(
+        AccountAddress::from_hex_literal(ALICE_ADDRESS).unwrap(),
+        1_000_000_000, // 10 APT
+    );
+
+    // Set up the confidential store for APT
+    let apt_metadata = set_up_confidential_store_for_apt(&mut h);
+
+    // Register Alice for confidential assets using DUMMY_EK
+    let register_payload = create_register_payload(apt_metadata, &DUMMY_EK);
+    let status = h.run_transaction_payload(&alice, register_payload);
+    assert_success(&status, "register");
+    println!("Alice registered for confidential assets");
+
+    // Deposit 100 units to Alice's pending balance
+    let deposit_amount: u64 = 100;
+    let deposit_payload = create_deposit_to_payload(apt_metadata, *alice.address(), deposit_amount);
+    let status = h.run_transaction_payload(&alice, deposit_payload);
+    assert_success(&status, "deposit_to");
+    println!("Deposited {} to Alice's pending balance", deposit_amount);
+
+    // Now call the #[test_only] function verify_pending_balance
+    // This should succeed and return true since we just deposited `deposit_amount`
+    let result = h.exec_function_bypass_visibility(
+        EXPERIMENTAL_ADDRESS,
+        MODULE_NAME,
+        "verify_pending_balance",
+        vec![],
+        vec![
+            bcs::to_bytes(alice.address()).unwrap(),
+            bcs::to_bytes(&apt_metadata).unwrap(),
+            bcs::to_bytes(&DUMMY_DK.to_vec()).unwrap(),
+            bcs::to_bytes(&deposit_amount).unwrap(),
+        ],
+    );
+
+    match result {
+        Ok(return_values) => {
+            assert_eq!(return_values.return_values.len(), 1);
+            let (bytes, _) = &return_values.return_values[0];
+            let verified: bool = bcs::from_bytes(bytes).expect("Failed to deserialize bool");
+            println!(
+                "verify_pending_balance returned: {} (expected: true)",
+                verified
+            );
+            assert!(
+                verified,
+                "verify_pending_balance should return true for correct amount"
+            );
+            println!("SUCCESS: #[test_only] function verify_pending_balance worked correctly!");
+        },
+        Err(e) => {
+            panic!(
+                "verify_pending_balance should succeed with proper setup, but got: {:?}",
+                e
+            );
+        },
+    }
+
+    // Also verify that wrong amount returns false
+    let wrong_amount: u64 = 999;
+    let result = h.exec_function_bypass_visibility(
+        EXPERIMENTAL_ADDRESS,
+        MODULE_NAME,
+        "verify_pending_balance",
+        vec![],
+        vec![
+            bcs::to_bytes(alice.address()).unwrap(),
+            bcs::to_bytes(&apt_metadata).unwrap(),
+            bcs::to_bytes(&DUMMY_DK.to_vec()).unwrap(),
+            bcs::to_bytes(&wrong_amount).unwrap(),
+        ],
+    );
+
+    match result {
+        Ok(return_values) => {
+            let (bytes, _) = &return_values.return_values[0];
+            let verified: bool = bcs::from_bytes(bytes).expect("Failed to deserialize bool");
+            println!(
+                "verify_pending_balance with wrong amount returned: {} (expected: false)",
+                verified
+            );
+            assert!(
+                !verified,
+                "verify_pending_balance should return false for wrong amount"
+            );
+        },
+        Err(e) => {
+            panic!(
+                "verify_pending_balance should succeed (and return false), but got: {:?}",
+                e
+            );
+        },
+    }
 }

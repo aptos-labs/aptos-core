@@ -26,3 +26,7 @@ once_cell = { workspace = true }
 parking_lot = { workspace = true }
 proptest = { workspace = true }
 serde = { workspace = true }
+
+[features]
+default = []
+move-harness-with-test-only = ["aptos-vm-genesis/move-harness-with-test-only"]

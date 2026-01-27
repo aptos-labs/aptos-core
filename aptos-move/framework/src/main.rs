@@ -64,7 +64,8 @@ struct StandardRelease {
 
 impl StandardRelease {
     fn execute(self) -> anyhow::Result<()> {
-        self.target.create_release(!self.without_source_code, None)
+        self.target
+            .create_release(!self.without_source_code, None, false)
     }
 }
 
