@@ -1,7 +1,7 @@
 processed 6 tasks
-task 0 lines 1-10:  run [main() {]
-task 1 lines 12-20:  run [main() {]
-task 2 lines 22-31:  run [main() {]
-task 3 lines 33-41:  run [main() {]
-task 4 lines 43-52:  run [main() {]
-task 5 lines 54-62:  run [main() {]
+task 0 lines 1-14:  run [script]
+task 1 lines 18-29:  run [script]
+task 2 lines 33-46:  run [script]
+task 3 lines 50-61:  run [script]
+task 4 lines 65-78:  run [script]
+task 5 lines 82-93:  run [script]

@@ -1,0 +1,18 @@
+//# run --signers 0x1
+script
+entry public fun main(l0: signer)
+    ret
+
+
+
+//# run --signers 0x1 --args 0
+script
+entry public fun main(l0: signer, l1: u64)
+    ret
+
+
+
+//# run --signers 0x1 --args 0 @0x1
+script
+entry public fun main(l0: signer, l1: u64, l2: address)
+    ret

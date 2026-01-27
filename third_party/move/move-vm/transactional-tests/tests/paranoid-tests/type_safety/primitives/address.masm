@@ -1,0 +1,123 @@
+//# publish
+module 0x22::A
+struct A has drop
+  x: address
+
+public fun make_a(): A
+    ld_const<address> 1
+    pack A
+    ret
+
+public fun test(l0: &mut A)
+    ld_const<address> 1
+    move_loc l0
+    mut_borrow_field A, x
+    write_ref
+    ret
+
+public fun test_invalid(l0: &mut A)
+    ld_u64 10
+    move_loc l0
+    mut_borrow_field A, x
+    write_ref
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::A
+entry public fun main(l0: signer)
+    local l1: A::A
+    call A::make_a
+    st_loc l1
+    mut_borrow_loc l1
+    call A::test
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::A
+entry public fun main(l0: signer)
+    local l1: A::A
+    call A::make_a
+    st_loc l1
+    mut_borrow_loc l1
+    call A::test_invalid
+    ret
+
+
+
+//# run --signers 0x1
+script
+entry public fun main(l0: signer)
+    local l1: vector<address>
+    local l2: &mut address
+    vec_pack <address>, 0
+    st_loc l1
+    mut_borrow_loc l1
+    ld_true
+    vec_push_back <address>
+    mut_borrow_loc l1
+    ld_u64 0
+    vec_mut_borrow <address>
+    st_loc l2
+    ld_const<address> 1
+    move_loc l2
+    write_ref
+    ret
+
+
+
+//# run --signers 0x1
+script
+entry public fun main(l0: signer)
+    local l1: vector<address>
+    local l2: &mut address
+    vec_pack <address>, 0
+    st_loc l1
+    mut_borrow_loc l1
+    ld_true
+    vec_push_back <address>
+    mut_borrow_loc l1
+    ld_u64 0
+    vec_mut_borrow <address>
+    st_loc l2
+    ld_u64 5
+    move_loc l2
+    write_ref
+    ret
+
+
+
+//# run --signers 0x1
+script
+entry public fun main(l0: signer)
+    local l1: address
+    local l2: &mut address
+    ld_const<address> 34
+    st_loc l1
+    mut_borrow_loc l1
+    st_loc l2
+    ld_const<address> 1
+    move_loc l2
+    write_ref
+    ret
+
+
+
+//# run --signers 0x1
+script
+entry public fun main(l0: signer)
+    local l1: address
+    local l2: &mut address
+    ld_const<address> 34
+    st_loc l1
+    mut_borrow_loc l1
+    st_loc l2
+    ld_u64 10
+    move_loc l2
+    write_ref
+    ret

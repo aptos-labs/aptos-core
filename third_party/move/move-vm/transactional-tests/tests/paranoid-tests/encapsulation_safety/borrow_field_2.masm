@@ -1,0 +1,58 @@
+//# publish
+module 0x22::A
+struct C has drop
+  x: u64
+
+public fun make(): C
+    ld_u64 0
+    pack C
+    ret
+
+public fun mutate(l0: &mut C)
+    local l1: &mut u64
+    move_loc l0
+    mut_borrow_field C, x
+    st_loc l1
+    ld_u64 10
+    move_loc l1
+    write_ref
+    ret
+
+public fun value(l0: &C): u64
+    local l1: &u64
+    move_loc l0
+    borrow_field C, x
+    st_loc l1
+    move_loc l1
+    read_ref
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::A
+entry public fun main(l0: signer)
+    local l1: A::C
+    local l2: &mut A::C
+    local l3: &A::C
+    local l4: u64
+    call A::make
+    st_loc l1
+    mut_borrow_loc l1
+    st_loc l2
+    move_loc l2
+    call A::mutate
+    borrow_loc l1
+    st_loc l3
+    move_loc l3
+    call A::value
+    st_loc l4
+    move_loc l4
+    ld_u64 10
+    eq
+    not
+    br_false l0
+    ld_u64 1
+    abort
+l0: ret

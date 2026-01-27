@@ -1,0 +1,481 @@
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u128 0
+    add
+    ld_u128 0
+    eq
+    not
+    br_false l0
+    ld_u64 1000
+    abort
+l0: ld_u128 0
+    ld_u128 1
+    add
+    ld_u128 1
+    eq
+    not
+    br_false l1
+    ld_u64 1001
+    abort
+l1: ld_u128 1
+    ld_u128 1
+    add
+    ld_u128 2
+    eq
+    not
+    br_false l2
+    ld_u64 1002
+    abort
+l2: ld_u128 13
+    ld_u128 67
+    add
+    ld_u128 80
+    eq
+    not
+    br_false l3
+    ld_u64 1100
+    abort
+l3: ld_u128 100
+    ld_u128 10
+    add
+    ld_u128 110
+    eq
+    not
+    br_false l4
+    ld_u64 1101
+    abort
+l4: ld_u128 0
+    ld_u128 340282366920938463463374607431768211455
+    add
+    ld_u128 340282366920938463463374607431768211455
+    eq
+    not
+    br_false l5
+    ld_u64 1200
+    abort
+l5: ld_u128 1
+    ld_u128 340282366920938463463374607431768211454
+    add
+    ld_u128 340282366920938463463374607431768211455
+    eq
+    not
+    br_false l6
+    ld_u64 1201
+    abort
+l6: ld_u128 5
+    ld_u128 340282366920938463463374607431768211450
+    add
+    ld_u128 340282366920938463463374607431768211455
+    eq
+    not
+    br_false l7
+    ld_u64 1202
+    abort
+l7: ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 1
+    ld_u128 340282366920938463463374607431768211455
+    add
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 264235234643575437864589745863652363451
+    ld_u128 98731747836156137656137643716471364731
+    add
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u128 0
+    sub
+    ld_u128 0
+    eq
+    not
+    br_false l0
+    ld_u64 2000
+    abort
+l0: ld_u128 1
+    ld_u128 0
+    sub
+    ld_u128 1
+    eq
+    not
+    br_false l1
+    ld_u64 2001
+    abort
+l1: ld_u128 1
+    ld_u128 1
+    sub
+    ld_u128 0
+    eq
+    not
+    br_false l2
+    ld_u64 2002
+    abort
+l2: ld_u128 52
+    ld_u128 13
+    sub
+    ld_u128 39
+    eq
+    not
+    br_false l3
+    ld_u64 2100
+    abort
+l3: ld_u128 100
+    ld_u128 10
+    sub
+    ld_u128 90
+    eq
+    not
+    br_false l4
+    ld_u64 2101
+    abort
+l4: ld_u128 340282366920938463463374607431768211455
+    ld_u128 340282366920938463463374607431768211455
+    sub
+    ld_u128 0
+    eq
+    not
+    br_false l5
+    ld_u64 2200
+    abort
+l5: ld_u128 5
+    ld_u128 1
+    sub
+    ld_u128 4
+    sub
+    ld_u128 0
+    eq
+    not
+    br_false l6
+    ld_u64 2201
+    abort
+l6: ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u128 1
+    sub
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 54
+    ld_u128 100
+    sub
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u128 0
+    mul
+    ld_u128 0
+    eq
+    not
+    br_false l0
+    ld_u64 3000
+    abort
+l0: ld_u128 1
+    ld_u128 0
+    mul
+    ld_u128 0
+    eq
+    not
+    br_false l1
+    ld_u64 3001
+    abort
+l1: ld_u128 1
+    ld_u128 1
+    mul
+    ld_u128 1
+    eq
+    not
+    br_false l2
+    ld_u64 3002
+    abort
+l2: ld_u128 6
+    ld_u128 7
+    mul
+    ld_u128 42
+    eq
+    not
+    br_false l3
+    ld_u64 3100
+    abort
+l3: ld_u128 10
+    ld_u128 10
+    mul
+    ld_u128 100
+    eq
+    not
+    br_false l4
+    ld_u64 3101
+    abort
+l4: ld_u128 170141183460469231731687303715884105727
+    ld_u128 2
+    mul
+    ld_u128 340282366920938463463374607431768211454
+    eq
+    not
+    br_false l5
+    ld_u64 3200
+    abort
+l5: ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 18446744073709551616
+    ld_u128 18446744073709551616
+    mul
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 170141183460469231731687303715884105728
+    ld_u128 2
+    mul
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u128 1
+    div
+    ld_u128 0
+    eq
+    not
+    br_false l0
+    ld_u64 4000
+    abort
+l0: ld_u128 1
+    ld_u128 1
+    div
+    ld_u128 1
+    eq
+    not
+    br_false l1
+    ld_u64 4001
+    abort
+l1: ld_u128 1
+    ld_u128 2
+    div
+    ld_u128 0
+    eq
+    not
+    br_false l2
+    ld_u64 4002
+    abort
+l2: ld_u128 6
+    ld_u128 3
+    div
+    ld_u128 2
+    eq
+    not
+    br_false l3
+    ld_u64 4100
+    abort
+l3: ld_u128 340282366920938463463374607431768211455
+    ld_u128 4315342637
+    div
+    ld_u128 78854078469537403609736727246
+    eq
+    not
+    br_false l4
+    ld_u64 4101
+    abort
+l4: ld_u128 340282366920938463463374607431768211454
+    ld_u128 340282366920938463463374607431768211455
+    div
+    ld_u128 0
+    eq
+    not
+    br_false l5
+    ld_u64 4200
+    abort
+l5: ld_u128 340282366920938463463374607431768211455
+    ld_u128 340282366920938463463374607431768211455
+    div
+    ld_u128 1
+    eq
+    not
+    br_false l6
+    ld_u64 4201
+    abort
+l6: ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u128 0
+    div
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 1
+    ld_u128 0
+    div
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 340282366920938463463374607431768211455
+    ld_u128 0
+    div
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u128 1
+    mod
+    ld_u128 0
+    eq
+    not
+    br_false l0
+    ld_u64 5000
+    abort
+l0: ld_u128 1
+    ld_u128 1
+    mod
+    ld_u128 0
+    eq
+    not
+    br_false l1
+    ld_u64 5001
+    abort
+l1: ld_u128 1
+    ld_u128 2
+    mod
+    ld_u128 1
+    eq
+    not
+    br_false l2
+    ld_u64 5002
+    abort
+l2: ld_u128 8
+    ld_u128 3
+    mod
+    ld_u128 2
+    eq
+    not
+    br_false l3
+    ld_u64 5100
+    abort
+l3: ld_u128 340282366920938463463374607431768211455
+    ld_u128 4315342637
+    mod
+    ld_u128 2264823753
+    eq
+    not
+    br_false l4
+    ld_u64 5101
+    abort
+l4: ld_u128 340282366920938463463374607431768211454
+    ld_u128 340282366920938463463374607431768211455
+    mod
+    ld_u128 340282366920938463463374607431768211454
+    eq
+    not
+    br_false l5
+    ld_u64 5200
+    abort
+l5: ld_u128 340282366920938463463374607431768211455
+    ld_u128 340282366920938463463374607431768211455
+    mod
+    ld_u128 0
+    eq
+    not
+    br_false l6
+    ld_u64 5201
+    abort
+l6: ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u128 0
+    mod
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 1
+    ld_u128 0
+    mod
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 340282366920938463463374607431768211455
+    ld_u128 0
+    mod
+    pop
+    ret

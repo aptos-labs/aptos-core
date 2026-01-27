@@ -1,0 +1,98 @@
+//# publish
+module 0x42::TestMoveFrom
+use 0x1::signer
+struct Counter has key
+  i: u64
+
+public fun has(l0: &signer): bool
+    local l1: address
+    local l2: bool
+    move_loc l0
+    call signer::address_of
+    st_loc l1
+    move_loc l1
+    exists Counter
+    st_loc l2
+    move_loc l2
+    ret
+
+public fun increment(l0: &signer) acquires Counter
+    local l1: address
+    local l2: &mut Counter
+    local l3: &mut u64
+    move_loc l0
+    call signer::address_of
+    st_loc l1
+    move_loc l1
+    mut_borrow_global Counter
+    st_loc l2
+    copy_loc l2
+    mut_borrow_field Counter, i
+    st_loc l3
+    move_loc l2
+    pop
+    copy_loc l3
+    read_ref
+    ld_u64 1
+    add
+    move_loc l3
+    write_ref
+    ret
+
+public fun publish(l0: &signer)
+    local l1: Counter
+    ld_u64 0
+    pack Counter
+    st_loc l1
+    move_loc l0
+    move_loc l1
+    move_to Counter
+    ret
+
+public fun unpublish(l0: &signer) acquires Counter
+    local l1: address
+    local l2: Counter
+    local l3: u64
+    move_loc l0
+    call signer::address_of
+    st_loc l1
+    move_loc l1
+    move_from Counter
+    st_loc l2
+    move_loc l2
+    unpack Counter
+    st_loc l3
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x42::TestMoveFrom
+entry public fun main(l0: signer)
+    local l1: bool
+    local l2: bool
+    borrow_loc l0
+    call TestMoveFrom::publish
+    borrow_loc l0
+    call TestMoveFrom::increment
+    borrow_loc l0
+    call TestMoveFrom::has
+    st_loc l1
+    move_loc l1
+    not
+    br_false l0
+    ld_u64 77
+    abort
+l0: borrow_loc l0
+    call TestMoveFrom::unpublish
+    borrow_loc l0
+    call TestMoveFrom::has
+    st_loc l2
+    move_loc l2
+    not
+    not
+    br_false l1
+    ld_u64 88
+    abort
+l1: ret

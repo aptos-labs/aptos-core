@@ -1,0 +1,47 @@
+//# publish
+module 0x22::A
+struct C has drop
+  x: u64
+
+struct D
+  x: u64
+
+public fun make(): C
+    ld_u64 0
+    pack C
+    ret
+
+public fun make_d(): D
+    ld_u64 0
+    pack D
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::A
+entry public fun main(l0: signer)
+    local l1: vector<A::C>
+    local l2: A::C
+    call A::make
+    st_loc l2
+    move_loc l2
+    vec_pack <A::C>, 1
+    st_loc l1
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::A
+entry public fun main(l0: signer)
+    local l1: vector<A::D>
+    local l2: A::D
+    call A::make_d
+    st_loc l2
+    move_loc l2
+    vec_pack <A::D>, 1
+    st_loc l1
+    ret

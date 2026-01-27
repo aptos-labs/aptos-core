@@ -1,0 +1,210 @@
+//# publish
+module 0x1::Coin
+struct Coin<phantom T0> has store
+  value: u64
+
+public fun zero<T0>(): Coin<T0>
+    ld_u64 0
+    pack Coin<T0>
+    ret
+
+public fun value<T0>(l0: &Coin<T0>): u64
+    move_loc l0
+    borrow_field Coin<T0>, value
+    read_ref
+    ret
+
+public fun destroy_zero<T0>(l0: Coin<T0>)
+    move_loc l0
+    unpack Coin<T0>
+    pop
+    ret
+
+
+
+//# publish
+module 0x1::YYZ
+struct YYZ
+  unused: bool
+
+
+
+//# publish
+module 0x1::M
+use 0x1::Coin
+use 0x1::signer
+use 0x1::YYZ
+struct Foo<T0> has store
+  x: T0
+
+struct CoinWrapper has key
+  f: Foo<Coin::Coin<YYZ::YYZ>>
+
+struct InnerWrapper has key
+  f: Foo<Inner>
+
+struct Inner has store
+  b: vector<u8>
+
+public fun coin_wrapper(l0: &signer, l1: Coin::Coin<YYZ::YYZ>)
+    local l2: Foo<Coin::Coin<YYZ::YYZ>>
+    local l3: CoinWrapper
+    move_loc l1
+    pack Foo<Coin::Coin<YYZ::YYZ>>
+    st_loc l2
+    move_loc l2
+    pack CoinWrapper
+    st_loc l3
+    move_loc l0
+    move_loc l3
+    move_to CoinWrapper
+    ret
+
+public fun inner_wrapper(l0: &signer, l1: vector<u8>)
+    local l2: Foo<Inner>
+    local l3: InnerWrapper
+    local l4: Inner
+    move_loc l1
+    pack Inner
+    st_loc l4
+    move_loc l4
+    pack Foo<Inner>
+    st_loc l2
+    move_loc l2
+    pack InnerWrapper
+    st_loc l3
+    move_loc l0
+    move_loc l3
+    move_to InnerWrapper
+    ret
+
+public fun get_coin_value(l0: &signer): u64 acquires CoinWrapper
+    local l1: address
+    local l2: &CoinWrapper
+    local l3: &Foo<Coin::Coin<YYZ::YYZ>>
+    local l4: &Coin::Coin<YYZ::YYZ>
+    copy_loc l0
+    call signer::address_of
+    st_loc l1
+    move_loc l1
+    borrow_global CoinWrapper
+    st_loc l2
+    move_loc l2
+    borrow_field CoinWrapper, f
+    st_loc l3
+    move_loc l3
+    borrow_field Foo<Coin::Coin<YYZ::YYZ>>, x
+    st_loc l4
+    move_loc l4
+    call Coin::value<YYZ::YYZ>
+    ret
+
+public fun get_inner(l0: &signer): vector<u8> acquires InnerWrapper
+    local l1: address
+    local l2: &InnerWrapper
+    local l3: &Foo<Inner>
+    local l4: &Inner
+    copy_loc l0
+    call signer::address_of
+    st_loc l1
+    move_loc l1
+    borrow_global InnerWrapper
+    st_loc l2
+    move_loc l2
+    borrow_field InnerWrapper, f
+    st_loc l3
+    move_loc l3
+    borrow_field Foo<Inner>, x
+    st_loc l4
+    move_loc l4
+    borrow_field Inner, b
+    read_ref
+    ret
+
+public fun destroy(l0: &signer): Coin::Coin<YYZ::YYZ> acquires CoinWrapper
+    local l1: address
+    local l2: CoinWrapper
+    local l3: Foo<Coin::Coin<YYZ::YYZ>>
+    local l4: Coin::Coin<YYZ::YYZ>
+    copy_loc l0
+    call signer::address_of
+    st_loc l1
+    move_loc l1
+    move_from CoinWrapper
+    st_loc l2
+    move_loc l2
+    unpack CoinWrapper
+    st_loc l3
+    move_loc l3
+    unpack Foo<Coin::Coin<YYZ::YYZ>>
+    st_loc l4
+    move_loc l4
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x1::M
+use 0x1::YYZ
+use 0x1::Coin
+entry public fun main(l0: signer)
+    local l1: Coin::Coin<YYZ::YYZ>
+    local l2: vector<u8>
+    ld_const<vector<u8>> [186, 193, 172]
+    st_loc l2
+    call Coin::zero<YYZ::YYZ>
+    st_loc l1
+    borrow_loc l0
+    move_loc l1
+    call M::coin_wrapper
+    borrow_loc l0
+    move_loc l2
+    call M::inner_wrapper
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x1::M
+use 0x1::YYZ
+use 0x1::Coin
+entry public fun main(l0: signer)
+    local l1: Coin::Coin<YYZ::YYZ>
+    local l2: vector<u8>
+    ld_const<vector<u8>> [186, 193, 172]
+    st_loc l2
+    borrow_loc l0
+    call M::get_coin_value
+    ld_u64 0
+    eq
+    not
+    br_false l0
+    ld_u64 4
+    abort
+l0: borrow_loc l0
+    call M::get_inner
+    move_loc l2
+    eq
+    not
+    br_false l1
+    ld_u64 4
+    abort
+l1: ret
+
+
+
+//# run --signers 0x1
+script
+use 0x1::M
+use 0x1::YYZ
+use 0x1::Coin
+entry public fun main(l0: signer)
+    local l1: Coin::Coin<YYZ::YYZ>
+    borrow_loc l0
+    call M::destroy
+    st_loc l1
+    move_loc l1
+    call Coin::destroy_zero<YYZ::YYZ>
+    ret

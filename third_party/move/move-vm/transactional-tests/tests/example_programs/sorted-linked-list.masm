@@ -1,0 +1,645 @@
+//# publish
+module 0x1::SortedLinkedList
+use 0x1::signer
+struct Node has key
+  prev: address
+  next: address
+  head: address
+  value: u64
+
+public fun node_exists(l0: address): bool
+    move_loc l0
+    exists Node
+    ret
+
+public fun get_value_of_node(l0: address): u64 acquires Node
+    local l1: &Node
+    local l2: u64
+    copy_loc l0
+    exists Node
+    not
+    br_false l0
+    ld_u64 20
+    abort
+l0: move_loc l0
+    borrow_global Node
+    st_loc l1
+    move_loc l1
+    borrow_field Node, value
+    read_ref
+    st_loc l2
+    move_loc l2
+    ret
+
+public fun is_head_node(l0: address): bool acquires Node
+    local l1: &Node
+    local l2: address
+    local l3: bool
+    copy_loc l0
+    exists Node
+    not
+    br_false l0
+    ld_u64 19
+    abort
+l0: copy_loc l0
+    borrow_global Node
+    st_loc l1
+    move_loc l1
+    borrow_field Node, head
+    read_ref
+    st_loc l2
+    move_loc l2
+    move_loc l0
+    eq
+    st_loc l3
+    move_loc l3
+    ret
+
+public fun create_new_list(l0: &signer)
+    local l1: address
+    local l2: Node
+    copy_loc l0
+    call signer::address_of
+    st_loc l1
+    copy_loc l1
+    exists Node
+    not
+    not
+    br_false l0
+    ld_u64 1
+    abort
+l0: copy_loc l1
+    copy_loc l1
+    move_loc l1
+    ld_u64 0
+    pack Node
+    st_loc l2
+    move_loc l0
+    move_loc l2
+    move_to Node
+    ret
+
+public fun add_node(l0: &signer, l1: u64, l2: address) acquires Node
+    local l3: address
+    local l4: &Node
+    local l5: &mut Node
+    local l6: address
+    local l7: &mut Node
+    local l8: &Node
+    local l9: bool
+    local l10: bool
+    local l11: u64
+    local l12: u64
+    local l13: Node
+    local l14: address
+    copy_loc l0
+    call signer::address_of
+    st_loc l3
+    copy_loc l3
+    exists Node
+    not
+    not
+    br_false l0
+    ld_u64 3
+    abort
+l0: copy_loc l2
+    exists Node
+    not
+    br_false l1
+    ld_u64 5
+    abort
+l1: copy_loc l2
+    borrow_global Node
+    st_loc l4
+    copy_loc l4
+    borrow_field Node, next
+    read_ref
+    st_loc l6
+    copy_loc l6
+    borrow_global Node
+    st_loc l8
+    copy_loc l8
+    borrow_field Node, head
+    read_ref
+    st_loc l14
+    move_loc l4
+    borrow_field Node, value
+    read_ref
+    st_loc l11
+    move_loc l8
+    borrow_field Node, value
+    read_ref
+    st_loc l12
+    copy_loc l2
+    call is_head_node
+    st_loc l9
+    copy_loc l6
+    call is_head_node
+    st_loc l10
+    move_loc l9
+    move_loc l11
+    copy_loc l1
+    lt
+    or
+    not
+    br_false l2
+    ld_u64 6
+    abort
+l2: move_loc l10
+    move_loc l12
+    copy_loc l1
+    gt
+    or
+    not
+    br_false l3
+    ld_u64 7
+    abort
+l3: copy_loc l2
+    copy_loc l6
+    move_loc l14
+    move_loc l1
+    pack Node
+    st_loc l13
+    copy_loc l0
+    move_loc l13
+    move_to Node
+    move_loc l2
+    mut_borrow_global Node
+    st_loc l5
+    copy_loc l3
+    move_loc l5
+    mut_borrow_field Node, next
+    write_ref
+    move_loc l6
+    mut_borrow_global Node
+    st_loc l7
+    copy_loc l3
+    move_loc l7
+    mut_borrow_field Node, prev
+    write_ref
+    ret
+
+public fun remove_list(l0: &signer) acquires Node
+    local l1: address
+    local l2: &Node
+    local l3: address
+    local l4: address
+    local l5: address
+    local l6: u64
+    local l7: bool
+    move_loc l0
+    call signer::address_of
+    st_loc l1
+    copy_loc l1
+    call is_head_node
+    not
+    br_false l0
+    ld_u64 18
+    abort
+l0: copy_loc l1
+    exists Node
+    not
+    br_false l1
+    ld_u64 8
+    abort
+l1: copy_loc l1
+    borrow_global Node
+    st_loc l2
+    copy_loc l2
+    borrow_field Node, next
+    read_ref
+    st_loc l3
+    move_loc l2
+    borrow_field Node, prev
+    read_ref
+    st_loc l4
+    move_loc l3
+    copy_loc l1
+    eq
+    not
+    br_false l2
+    ld_u64 9
+    abort
+l2: move_loc l4
+    copy_loc l1
+    eq
+    not
+    br_false l3
+    ld_u64 10
+    abort
+l3: copy_loc l1
+    move_from Node
+    unpack Node
+    st_loc l6
+    st_loc l5
+    st_loc l5
+    st_loc l5
+    ret
+
+public fun remove_node_by_node_owner(l0: &signer) acquires Node
+    local l1: address
+    move_loc l0
+    call signer::address_of
+    st_loc l1
+    copy_loc l1
+    exists Node
+    not
+    br_false l0
+    ld_u64 11
+    abort
+l0: copy_loc l1
+    call is_head_node
+    not
+    not
+    br_false l1
+    ld_u64 12
+    abort
+l1: move_loc l1
+    call remove_node
+    ret
+
+public fun remove_node_by_list_owner(l0: &signer, l1: address) acquires Node
+    local l2: &Node
+    local l3: address
+    copy_loc l1
+    exists Node
+    not
+    br_false l0
+    ld_u64 13
+    abort
+l0: copy_loc l1
+    call is_head_node
+    not
+    not
+    br_false l1
+    ld_u64 14
+    abort
+l1: copy_loc l1
+    borrow_global Node
+    st_loc l2
+    move_loc l2
+    borrow_field Node, head
+    read_ref
+    st_loc l3
+    move_loc l3
+    move_loc l0
+    call signer::address_of
+    eq
+    not
+    br_false l2
+    ld_u64 15
+    abort
+l2: move_loc l1
+    call remove_node
+    ret
+
+fun remove_node(l0: address) acquires Node
+    local l1: &Node
+    local l2: address
+    local l3: &mut Node
+    local l4: address
+    local l5: &mut Node
+    local l6: address
+    local l7: u64
+    copy_loc l0
+    exists Node
+    not
+    br_false l0
+    ld_u64 16
+    abort
+l0: copy_loc l0
+    borrow_global Node
+    st_loc l1
+    copy_loc l1
+    borrow_field Node, next
+    read_ref
+    st_loc l2
+    move_loc l1
+    borrow_field Node, prev
+    read_ref
+    st_loc l4
+    copy_loc l2
+    mut_borrow_global Node
+    st_loc l3
+    copy_loc l4
+    move_loc l3
+    mut_borrow_field Node, prev
+    write_ref
+    move_loc l4
+    mut_borrow_global Node
+    st_loc l5
+    move_loc l2
+    move_loc l5
+    mut_borrow_field Node, next
+    write_ref
+    move_loc l0
+    move_from Node
+    unpack Node
+    st_loc l7
+    st_loc l6
+    st_loc l6
+    st_loc l6
+    ret
+
+
+
+//# run --signers 0xA
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call SortedLinkedList::create_new_list
+    ret
+
+
+
+//# run --signers 0xA
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call SortedLinkedList::create_new_list
+    ret
+
+
+
+//# run --signers 0xB
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    ld_u64 10
+    ld_const<address> 10
+    call SortedLinkedList::add_node
+    ret
+
+
+
+//# run --signers 0xB
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    ld_u64 12
+    ld_const<address> 10
+    call SortedLinkedList::add_node
+    ret
+
+
+
+//# run --signers 0xC
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    ld_u64 15
+    ld_const<address> 10
+    call SortedLinkedList::add_node
+    ret
+
+
+
+//# run --signers 0xC
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    ld_u64 5
+    ld_const<address> 10
+    call SortedLinkedList::add_node
+    ret
+
+
+
+//# run --signers 0xD
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    ld_u64 4
+    ld_const<address> 11
+    call SortedLinkedList::add_node
+    ret
+
+
+
+//# run --signers 0xD
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    ld_u64 15
+    ld_const<address> 11
+    call SortedLinkedList::add_node
+    ret
+
+
+
+//# run --signers 0xF
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    ld_u64 15
+    ld_const<address> 14
+    call SortedLinkedList::add_node
+    ret
+
+
+
+//# run --signers 0xE
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    ld_u64 5
+    ld_const<address> 12
+    call SortedLinkedList::add_node
+    ret
+
+
+
+//# run --signers 0xC
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    ld_u64 5
+    ld_const<address> 12
+    call SortedLinkedList::add_node
+    ret
+
+
+
+//# run --signers 0xE
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    ld_u64 7
+    ld_const<address> 12
+    call SortedLinkedList::add_node
+    ret
+
+
+
+//# run --signers 0xC
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call SortedLinkedList::remove_node_by_node_owner
+    ret
+
+
+
+//# run --signers 0xC
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call SortedLinkedList::remove_node_by_node_owner
+    ret
+
+
+
+//# run --signers 0xC
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    ld_u64 9
+    ld_const<address> 14
+    call SortedLinkedList::add_node
+    ret
+
+
+
+//# run --signers 0xA
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    ld_const<address> 11
+    call SortedLinkedList::remove_node_by_list_owner
+    ret
+
+
+
+//# run --signers 0xB
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call SortedLinkedList::remove_node_by_node_owner
+    ret
+
+
+
+//# run --signers 0xB
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    ld_const<address> 13
+    call SortedLinkedList::remove_node_by_list_owner
+    ret
+
+
+
+//# run --signers 0xA
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    ld_const<address> 10
+    call SortedLinkedList::remove_node_by_list_owner
+    ret
+
+
+
+//# run --signers 0xA
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call SortedLinkedList::remove_node_by_node_owner
+    ret
+
+
+
+//# run --signers 0xA
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call SortedLinkedList::remove_list
+    ret
+
+
+
+//# run --signers 0xA
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    ld_const<address> 12
+    call SortedLinkedList::remove_node_by_list_owner
+    borrow_loc l0
+    ld_const<address> 13
+    call SortedLinkedList::remove_node_by_list_owner
+    borrow_loc l0
+    ld_const<address> 14
+    call SortedLinkedList::remove_node_by_list_owner
+    borrow_loc l0
+    ld_const<address> 10
+    call SortedLinkedList::remove_node_by_list_owner
+    ret
+
+
+
+//# run --signers 0xA
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    ld_const<address> 13
+    call SortedLinkedList::remove_node_by_list_owner
+    borrow_loc l0
+    ld_const<address> 12
+    call SortedLinkedList::remove_node_by_list_owner
+    borrow_loc l0
+    ld_const<address> 14
+    call SortedLinkedList::remove_node_by_list_owner
+    borrow_loc l0
+    call SortedLinkedList::remove_node_by_node_owner
+    ret
+
+
+
+//# run --signers 0xA
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    ld_const<address> 14
+    call SortedLinkedList::remove_node_by_list_owner
+    borrow_loc l0
+    ld_const<address> 13
+    call SortedLinkedList::remove_node_by_list_owner
+    borrow_loc l0
+    ld_const<address> 12
+    call SortedLinkedList::remove_node_by_list_owner
+    borrow_loc l0
+    call SortedLinkedList::remove_list
+    ret
+
+
+
+//# run --signers 0xB
+script
+use 0x1::SortedLinkedList
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call SortedLinkedList::create_new_list
+    ret

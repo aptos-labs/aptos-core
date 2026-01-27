@@ -1,0 +1,81 @@
+//# publish
+module 0x22::A
+struct A has drop
+  v: u64
+
+public fun make_a(): A
+    ld_u64 10
+    pack A
+    ret
+
+public fun call(l0: u64, l1: bool, l2: u8)
+    ret
+
+public fun call_a(l0: A, l1: bool, l2: u8)
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::A
+entry public fun main(l0: signer)
+    ld_u64 10
+    ld_true
+    ld_u8 8
+    call A::call
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::A
+entry public fun main(l0: signer)
+    ld_true
+    ld_true
+    ld_u8 8
+    call A::call
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::A
+entry public fun main(l0: signer)
+    ld_u64 10
+    ld_true
+    ld_true
+    call A::call
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::A
+entry public fun main(l0: signer)
+    local l1: A::A
+    call A::make_a
+    st_loc l1
+    move_loc l1
+    ld_true
+    ld_u8 8
+    call A::call_a
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::A
+entry public fun main(l0: signer)
+    local l1: A::A
+    call A::make_a
+    st_loc l1
+    ld_u64 8
+    ld_true
+    move_loc l1
+    call A::call_a
+    ret

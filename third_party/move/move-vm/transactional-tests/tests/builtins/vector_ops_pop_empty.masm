@@ -1,0 +1,27 @@
+//# run
+script
+entry public fun main()
+    local l0: vector<u64>
+    vec_pack <u64>, 0
+    st_loc l0
+    mut_borrow_loc l0
+    vec_pop_back <u64>
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    local l0: vector<u64>
+    ld_u64 42
+    vec_pack <u64>, 1
+    st_loc l0
+    mut_borrow_loc l0
+    vec_pop_back <u64>
+    pop
+    mut_borrow_loc l0
+    vec_pop_back <u64>
+    pop
+    ret
