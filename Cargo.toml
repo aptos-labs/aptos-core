@@ -91,7 +91,6 @@ members = [
     "crates/aptos-profiler",
     "crates/aptos-proptest-helpers",
     "crates/aptos-push-metrics",
-    "crates/aptos-rate-limiter",
     "crates/aptos-rest-client",
     "crates/aptos-retrier",
     "crates/aptos-rosetta",
@@ -277,7 +276,6 @@ default-members = [
     "crates/aptos-debugger",
     "crates/aptos-faucet/service",
     "crates/aptos-keygen",
-    "crates/aptos-rate-limiter",
     "crates/aptos-rosetta",
     "crates/transaction-emitter",
     "aptos-move/framework",
@@ -432,7 +430,6 @@ aptos-proptest-helpers = { path = "crates/aptos-proptest-helpers" }
 aptos-protos = { path = "protos/rust" }
 aptos-proxy = { path = "crates/proxy" }
 aptos-push-metrics = { path = "crates/aptos-push-metrics" }
-aptos-rate-limiter = { path = "crates/aptos-rate-limiter" }
 aptos-release-builder = { path = "aptos-move/aptos-release-builder" }
 aptos-reliable-broadcast = { path = "crates/reliable-broadcast" }
 aptos-replay-benchmark = { path = "aptos-move/replay-benchmark" }
