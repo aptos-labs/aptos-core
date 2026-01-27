@@ -60,6 +60,7 @@ serde = { workspace = true }
 [features]
 default = []
 fuzzing = []
+move-harness-with-test-only = ["aptos-transaction-simulation/move-harness-with-test-only"]
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }
