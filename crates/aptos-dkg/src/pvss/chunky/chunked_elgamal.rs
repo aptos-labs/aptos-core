@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use super::chunked_elgamal_pp::PublicParameters;
 use crate::{
     dlog::bsgs,
     pvss::chunky::chunks,
@@ -9,7 +10,6 @@ use crate::{
     Scalar,
 };
 use aptos_crypto::arkworks::{
-    hashing,
     msm::{IsMsmInput, MsmInput},
     random::sample_field_element,
 };
@@ -22,7 +22,7 @@ use ark_serialize::{
 use ark_std::fmt::Debug;
 use std::collections::HashMap;
 
-pub const DST: &[u8; 35] = b"APTOS_CHUNKED_ELGAMAL_GENERATOR_DST"; // This is used to create public parameters, see `default()` below
+pub const DST: &[u8; 31] = b"APTOS_CHUNKED_ELGAMAL_SIGMA_DST"; // This is used for the sigma protocol Fiat-Shamir challenges
 
 /// Formally, given:
 /// - `G_1, H_1` ∈ G₁ (group generators)
@@ -45,43 +45,6 @@ pub const DST: &[u8; 35] = b"APTOS_CHUNKED_ELGAMAL_GENERATOR_DST"; // This is us
 pub struct WeightedHomomorphism<'a, C: CurveGroup> {
     pub pp: &'a PublicParameters<C>, // These are small so no harm in copying them here
     pub eks: &'a [C::Affine],        // TODO: capitalize to EKs ?
-}
-
-#[allow(non_snake_case)]
-#[derive(CanonicalSerialize, CanonicalDeserialize, PartialEq, Clone, Eq, Debug)]
-pub struct PublicParameters<C: CurveGroup> {
-    /// A group element $G$ that is raised to the encrypted message
-    pub G: C::Affine,
-    /// A group element $H$ that is used to exponentiate both
-    /// (1) the ciphertext randomness and (2) the DSK when computing its EK.
-    pub H: C::Affine,
-}
-
-#[allow(non_snake_case)]
-impl<C: CurveGroup> PublicParameters<C> {
-    pub fn new(G: C::Affine, H: C::Affine) -> Self {
-        Self { G, H }
-    }
-
-    pub fn message_base(&self) -> &C::Affine {
-        &self.G
-    }
-
-    pub fn pubkey_base(&self) -> &C::Affine {
-        &self.H
-    }
-}
-
-#[allow(non_snake_case)]
-impl<C: CurveGroup> Default for PublicParameters<C> {
-    fn default() -> Self {
-        let G = hashing::unsafe_hash_to_affine(b"G", DST);
-        // Chunky's encryption pubkey base must match up with the blst base, since validators
-        // reuse their consensus keypairs as encryption keypairs
-        let H = C::Affine::generator();
-        debug_assert_ne!(G, H);
-        Self { G, H }
-    }
 }
 
 // Need to manually implement `CanonicalSerialize` because `Homomorphism` has references instead of owned values
@@ -133,7 +96,7 @@ impl<C: CurveGroup> homomorphism::Trait for WeightedHomomorphism<'_, C> {
     type Domain = WeightedWitness<C::ScalarField>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
-        self.apply_msm(self.msm_terms(input))
+        self.apply_msm(self.msm_terms(input)) // TODO: use the batch mul stuff here...
     }
 }
 
@@ -319,7 +282,7 @@ pub fn decrypt_chunked_scalars<C: CurveGroup>(
     Rs_rows: &[Vec<C>],
     dk: &C::ScalarField,
     pp: &PublicParameters<C>,
-    table: &HashMap<Vec<u8>, u32>,
+    table: &HashMap<Vec<u8>, u64>,
     radix_exponent: u8,
 ) -> Vec<C::ScalarField> {
     let mut decrypted_scalars = Vec::with_capacity(Cs_rows.len());
@@ -424,7 +387,7 @@ mod tests {
             prepare_chunked_witness::<C::ScalarField>(sc, 16);
 
         // 6. Initialize the homomorphism
-        let pp: PublicParameters<C> = PublicParameters::default();
+        let pp: PublicParameters<C> = PublicParameters::new(3);
         let dks: Vec<C::ScalarField> = sample_field_elements(2, &mut thread_rng());
 
         let hom = WeightedHomomorphism::<C> {
@@ -439,7 +402,7 @@ mod tests {
         } = hom.apply(&witness);
 
         // 8. Build a baby-step giant-step table for computing discrete logs
-        let table = dlog::table::build::<C>(pp.G.into(), 1u32 << (radix_exponent / 2));
+        let table = dlog::table::build::<C>(pp.G.into(), 1u64 << (radix_exponent / 2));
 
         // 9. Perform decryption of each ciphertext and reconstruct plaintexts
         // TODO: call some built-in function for this instead

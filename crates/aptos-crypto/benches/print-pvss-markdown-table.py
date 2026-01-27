@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-import sys, csv, re
+import sys, csv, re, os, json
 from collections import defaultdict
 
 HEADER = [
     "Scheme",
+    "Ell",  # <-- need capital E here to be consistent with code later
     "Setup",
+    "Transcript Bytes",
     "Deal (ms)",
     "Serialize (ms)",
     "Aggregate (ms)",
@@ -73,6 +75,44 @@ def decorate_v2(value_ms, ratio):
 
     return display, render
 
+def parse_ell(group):
+    """
+    Extract ell from Group.
+    Examples:
+      pvss_chunky_v1_bls12-381_16  -> 16
+      pvss/chunky_v1/bls12-381/16  -> 16
+      pvss_chunky_v1_bls12-381     -> None
+    """
+    m = re.search(r"(?:/|_)(\d+)$", group)
+    return m.group(1) if m else None
+
+def parse_transcript_bytes_from_folder(folder_path):
+    """
+    Extract transcript_bytes from benchmark.json file in the folder.
+    The folder_path should be relative to the current directory (target/criterion).
+    """
+    benchmark_json = os.path.join(folder_path, "base", "benchmark.json")
+    if not os.path.exists(benchmark_json):
+        # Try "new" directory if "base" doesn't exist
+        benchmark_json = os.path.join(folder_path, "new", "benchmark.json")
+    
+    if os.path.exists(benchmark_json):
+        try:
+            with open(benchmark_json, 'r') as f:
+                data = json.load(f)
+                # Extract from function_id field
+                if 'function_id' in data:
+                    function_id = data['function_id']
+                    m = re.search(r'transcript_bytes=(\d+)$', function_id)
+                    if m:
+                        return int(m.group(1))
+        except (json.JSONDecodeError, IOError, ValueError):
+            # If the benchmark.json file is missing, unreadable, or malformed,
+            # treat it as "no transcript_bytes" and fall back to returning None.
+            pass
+    
+    return None
+
 
 def parse_group(group):
     """Parse the Group column to determine if it's v1 or v2."""
@@ -92,30 +132,58 @@ def parse_operation(ident):
 
 
 def parse_setup(ident, parameter):
-    """
-    Parse the setup identifier from either the Id column or Parameter column.
-    The Id column has format like 'deal/{config_string}', so we extract the config part.
-    If Parameter is non-empty, use that; otherwise extract from Id after the operation prefix.
-    """
     if parameter and parameter.strip():
         return parameter.strip()
     
-    # Extract from Id field: "deal/{config}" -> "{config}"
     for op in OPERATIONS:
         if ident.startswith(op + "/"):
-            return ident[len(op) + 1:]  # Remove "op/" prefix
+            setup = ident[len(op) + 1:]
         elif ident.startswith(op + "_"):
-            return ident[len(op) + 1:]  # Remove "op_" prefix
+            setup = ident[len(op) + 1:]
+        else:
+            continue
+        
+        # Strip /transcript_bytes=NNN if present
+        setup = re.sub(r"(/|_)transcript_bytes=\d+$", "", setup)
+        return setup
     
-    # Fallback: use the full ident if we can't parse it
     return ident
 
+def build_folder_map():
+    """
+    Build a mapping: (group_name, operation, setup) -> folder name with transcript_bytes.
+    Searches inside pvss_* directories for folders matching operations.
+    The setup is extracted from the folder name by removing the operation prefix and transcript_bytes suffix.
+    """
+    folder_map = {}
+    for entry in os.listdir("."):
+        if os.path.isdir(entry) and (entry.startswith("pvss_chunky_v1") or entry.startswith("pvss_chunky_v2")):
+            group_name = entry
+            group_path = os.path.join(".", entry)
+            for subentry in os.listdir(group_path):
+                subentry_path = os.path.join(group_path, subentry)
+                if os.path.isdir(subentry_path):
+                    for op in OPERATIONS:
+                        if subentry.startswith(op) and "_transcript_bytes=" in subentry:
+                            # Extract setup from folder name: "serialize_SETUP_transcript_bytes=NNN" -> "SETUP"
+                            # Remove operation prefix
+                            setup_part = subentry[len(op) + 1:]  # +1 for the underscore
+                            # Remove transcript_bytes suffix
+                            setup = re.sub(r"_transcript_bytes=\d+$", "", setup_part)
+                            key = (group_name, op, setup)
+                            # Store the full path relative to current directory
+                            folder_path = os.path.join(group_name, subentry)
+                            folder_map[key] = folder_path
+                            break
+    return folder_map
 
-def accumulate(rows):
+
+def accumulate(rows, folder_map=None):
     """
-    Build nested dict: setup -> version -> operation -> time_ns
+    Build nested dict: (setup, ell) -> version -> operation -> time_ns.
+    Also stores transcript_bytes per version.
     """
-    data = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+    data = defaultdict(dict)
 
     for r in rows:
         group = r.get("Group", "")
@@ -123,7 +191,7 @@ def accumulate(rows):
         param = r.get("Parameter", "")
         mean_ns = r.get("Mean(ns)", "")
 
-        if mean_ns == "" or mean_ns is None:
+        if mean_ns in ("", None):
             continue
         try:
             mean_ns = float(mean_ns)
@@ -138,13 +206,32 @@ def accumulate(rows):
         if operation is None:
             continue
 
+        ell = parse_ell(group)
         setup = parse_setup(ident, param)
-        data[setup][version][operation] = mean_ns
+
+        # Only serialize operations have transcript_bytes in folder names
+        tx_bytes = None
+        if folder_map and operation == "serialize":
+            key = (group, operation, setup)
+            if key in folder_map:
+                folder_path = folder_map[key]
+                tx_bytes = parse_transcript_bytes_from_folder(folder_path)
+
+        # Initialize dict for this setup/ell if missing
+        if (setup, ell) not in data:
+            data[(setup, ell)] = {"v1": {}, "v2": {}}
+
+        # Store mean_ns
+        data[(setup, ell)][version][operation] = mean_ns
+
+        # Only set tx_bytes if we actually found a value
+        if tx_bytes is not None:
+            data[(setup, ell)][version]["tx_bytes"] = tx_bytes
 
     return data
 
 
-def make_rows_for_setup(setup, v1_data, v2_data):
+def make_rows_for_setup(setup, ell, v1_data, v2_data):
     """
     Create rows comparing v1 and v2 for a single setup.
     """
@@ -157,11 +244,16 @@ def make_rows_for_setup(setup, v1_data, v2_data):
     if not v1_complete and not v2_complete:
         return rows
 
+    v1_tx_bytes = v1_data.get("tx_bytes", "—")
+    v2_tx_bytes = v2_data.get("tx_bytes", "—")
+
     # Build row for v1
     if v1_complete:
         v1_row = {
             "Scheme": V1_NAME,
+            "Ell": ell or "—",
             "Setup": setup,
+            "Transcript Bytes": v1_tx_bytes,
         }
         for op in OPERATIONS:
             v1_ms = ns_to_ms(v1_data[op])
@@ -173,9 +265,13 @@ def make_rows_for_setup(setup, v1_data, v2_data):
     if v2_complete:
         v2_row = {
             "Scheme": V2_NAME,
+            "Ell": ell or "—",
             "Setup": setup,
+            "Transcript Bytes": v2_tx_bytes,
         }
         for op in OPERATIONS:
+            if op not in v2_data:
+                continue  # Skip missing operations
             v2_ms = ns_to_ms(v2_data[op])
             if v1_complete and op in v1_data:
                 v1_ms = ns_to_ms(v1_data[op])
@@ -189,8 +285,6 @@ def make_rows_for_setup(setup, v1_data, v2_data):
         rows.append(v2_row)
 
     return rows
-
-
 def padded_table(rows):
     """
     Compute widths from the plain display strings, then emit
@@ -199,7 +293,9 @@ def padded_table(rows):
     cols = HEADER
     display_map = {
         "Scheme": "Scheme",
+        "Ell": "Ell",
         "Setup": "Setup",
+        "Transcript Bytes": "Transcript Bytes",
         "Deal (ms)": "deal_display",
         "Serialize (ms)": "serialize_display",
         "Aggregate (ms)": "aggregate_display",
@@ -208,7 +304,9 @@ def padded_table(rows):
     }
     render_map = {
         "Scheme": "Scheme",
+        "Ell": "Ell",
         "Setup": "Setup",
+        "Transcript Bytes": "Transcript Bytes",
         "Deal (ms)": "deal_render",
         "Serialize (ms)": "serialize_render",
         "Aggregate (ms)": "aggregate_render",
@@ -252,39 +350,49 @@ def padded_table(rows):
 
 
 def main():
-    # Read CSV from file or stdin
+    """
+    Main function: reads CSV, builds folder map, accumulates data, and prints tables.
+    Expects to be run from target/criterion directory.
+    """
+    # Validate we can find pvss benchmark directories
+    pvss_dirs = [d for d in os.listdir(".") if os.path.isdir(d) and (d.startswith("pvss_chunky_v1") or d.startswith("pvss_chunky_v2"))]
+    if not pvss_dirs:
+        print("Error: No pvss_chunky_v1 or pvss_chunky_v2 directories found in current directory.", file=sys.stderr)
+        print("Please run this script from target/criterion directory.", file=sys.stderr)
+        sys.exit(1)
+
+    # Read CSV data
     if len(sys.argv) > 1 and sys.argv[1] != "-":
         with open(sys.argv[1], newline="") as f:
             rows = list(read_rows(f))
     else:
         rows = list(read_rows(sys.stdin))
 
-    data = accumulate(rows)
+    # Build folder map and accumulate benchmark data
+    folder_map = build_folder_map()
+    data = accumulate(rows, folder_map)
 
     if not data:
-        print("No PVSS benchmark data found!", file=sys.stderr)
+        print("No PVSS benchmark data found in CSV!", file=sys.stderr)
         sys.exit(1)
 
-    # Generate a separate table for each setup
-    setups = sorted(data.keys())
+    # Generate tables for each setup/ell combination
+    keys = sorted(data.keys(), key=lambda x: (x[0], x[1] or ""))
     tables = []
-    
-    for setup in setups:
-        v1_data = data[setup].get("v1", {})
-        v2_data = data[setup].get("v2", {})
-        tbl_rows = make_rows_for_setup(setup, v1_data, v2_data)
-        
+
+    for setup, ell in keys:
+        v1_data = data[(setup, ell)].get("v1", {})
+        v2_data = data[(setup, ell)].get("v2", {})
+        tbl_rows = make_rows_for_setup(setup, ell, v1_data, v2_data)
         if tbl_rows:
             tables.append(padded_table(tbl_rows))
-    
+
     if not tables:
         print("No complete benchmark data found!", file=sys.stderr)
         sys.exit(1)
 
-    # Print all tables separated by double newlines
+    # Print all tables
     print("\n\n".join(tables))
-
-
 if __name__ == "__main__":
     main()
 

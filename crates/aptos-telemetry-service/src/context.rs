@@ -187,9 +187,40 @@ impl PeerStoreTuple {
 #[derive(Clone)]
 pub struct CustomContractInstance {
     pub config: crate::OnChainAuthConfig,
+    /// Whether to allow unknown/untrusted nodes to authenticate via this contract
+    pub allow_unknown_nodes: bool,
+    /// Metrics clients for trusted (allowlisted) nodes
     pub metrics_clients: HashMap<String, MetricsIngestClient>,
+    /// Metrics clients for untrusted/unknown nodes (falls back to metrics_clients if empty)
+    pub untrusted_metrics_clients: HashMap<String, MetricsIngestClient>,
+    /// Logs client for trusted (allowlisted) nodes
     pub logs_client: Option<LogIngestClient>,
+    /// Logs client for untrusted/unknown nodes (falls back to logs_client if None)
+    pub untrusted_logs_client: Option<LogIngestClient>,
     pub bigquery_client: Option<TableWriteClient>,
+}
+
+impl CustomContractInstance {
+    /// Get the appropriate metrics clients based on whether the node is trusted
+    pub fn get_metrics_clients(&self, is_trusted: bool) -> &HashMap<String, MetricsIngestClient> {
+        if is_trusted || self.untrusted_metrics_clients.is_empty() {
+            &self.metrics_clients
+        } else {
+            &self.untrusted_metrics_clients
+        }
+    }
+
+    /// Get the appropriate logs client based on whether the node is trusted
+    pub fn get_logs_client(&self, is_trusted: bool) -> Option<&LogIngestClient> {
+        if is_trusted {
+            self.logs_client.as_ref()
+        } else {
+            // Fall back to trusted logs client if untrusted not configured
+            self.untrusted_logs_client
+                .as_ref()
+                .or(self.logs_client.as_ref())
+        }
+    }
 }
 
 /// Container for all custom contract configurations

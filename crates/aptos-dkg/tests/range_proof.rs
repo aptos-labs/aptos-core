@@ -20,7 +20,7 @@ use std::fmt::Debug;
 fn assert_range_proof_correctness<E: Pairing, B: BatchedRangeProof<E>>(
     setup: &RangeProofUniversalSetup<E, B>,
     n: usize,
-    ell: usize,
+    ell: u8,
 ) {
     let mut rng = thread_rng();
     let RangeProofUniversalSetup { pk, vk } = setup;
@@ -44,7 +44,7 @@ fn assert_range_proof_correctness<E: Pairing, B: BatchedRangeProof<E>>(
         n,
         ell,
         encoded.len(),
-        2 * 8 + 48 + (48 + 96) * ell // Can get rid of the 2 * 8 here by turning the Vecs in `proof` into tuples
+        2 * 8 + 48 + (48 + 96) * ell as usize // Can get rid of the 2 * 8 here by turning the Vecs in `proof` into tuples
     );
 
     // === Round-trip deserialization ===
@@ -103,7 +103,7 @@ fn assert_keys_serialization<E: Pairing, B: BatchedRangeProof<E>>(
 }
 
 #[cfg(test)]
-const TEST_CASES: &[(usize, usize)] = &[
+const TEST_CASES: &[(usize, u8)] = &[
     // (n, \ell)
     (3, 16),
     (7, 16),
@@ -125,7 +125,7 @@ struct RangeProofUniversalSetup<E: Pairing, B: BatchedRangeProof<E>> {
 
 #[cfg(test)]
 /// Generate a fixed setup for a single curve
-fn make_single_curve_setup<E, B>(n: usize, ell: usize) -> RangeProofUniversalSetup<E, B>
+fn make_single_curve_setup<E, B>(n: usize, ell: u8) -> RangeProofUniversalSetup<E, B>
 where
     E: Pairing,
     B: BatchedRangeProof<E>,

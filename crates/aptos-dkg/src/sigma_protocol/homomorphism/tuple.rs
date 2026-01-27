@@ -6,13 +6,19 @@ use crate::{
     sigma_protocol::{
         homomorphism,
         homomorphism::{fixed_base_msms, EntrywiseMap},
+        traits::{fiat_shamir_challenge_for_sigma_protocol, prove_homomorphism, FirstProofItem},
+        Proof,
     },
 };
+use anyhow::ensure;
+use aptos_crypto::utils;
 use ark_ec::{pairing::Pairing, CurveGroup};
+use ark_ff::{UniformRand, Zero};
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid,
 };
 use ark_std::io::Write;
+use serde::Serialize;
 use std::fmt::Debug;
 
 /// `TupleHomomorphism` combines two homomorphisms with the same domain
@@ -236,15 +242,6 @@ where
         dst
     }
 }
-
-use crate::sigma_protocol::{
-    traits::{fiat_shamir_challenge_for_sigma_protocol, prove_homomorphism, FirstProofItem},
-    Proof,
-};
-use anyhow::ensure;
-use aptos_crypto::utils;
-use ark_ff::{UniformRand, Zero};
-use serde::Serialize;
 
 /// Slightly hacky implementation of a sigma protocol for `PairingTupleHomomorphism`
 ///

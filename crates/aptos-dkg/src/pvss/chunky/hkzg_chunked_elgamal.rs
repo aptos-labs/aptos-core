@@ -3,7 +3,7 @@
 
 use crate::{
     pcs::univariate_hiding_kzg,
-    pvss::chunky::chunked_elgamal,
+    pvss::chunky::{chunked_elgamal, chunked_elgamal_pp},
     sigma_protocol::{
         self,
         homomorphism::{
@@ -191,7 +191,7 @@ impl<'a, E: Pairing> WeightedHomomorphism<'a, E> {
     pub fn new(
         lagr_g1: &'a [E::G1Affine],
         xi_1: E::G1Affine,
-        pp: &'a chunked_elgamal::PublicParameters<E::G1>,
+        pp: &'a chunked_elgamal_pp::PublicParameters<E::G1>,
         eks: &'a [E::G1Affine],
     ) -> Self {
         // Set up the HKZG homomorphism, and use a projection map to lift it to HkzgElgamalWitness
