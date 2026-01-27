@@ -131,17 +131,24 @@ def parse_setup(ident, parameter):
 
 def build_folder_map():
     """
-    Build a mapping: operation -> list of folder names
-    We use a list because there may be multiple setups per operation.
+    Build a mapping: (group_name, operation) -> folder name with transcript_bytes.
+    Searches inside pvss_* directories for folders matching operations.
     """
-    folder_map = defaultdict(list)
+    folder_map = {}
     for entry in os.listdir("."):
-        if os.path.isdir(entry):
-            for op in OPERATIONS:
-                if entry.startswith(op):
-                    folder_map[op].append(entry)
-                    break
+        if os.path.isdir(entry) and (entry.startswith("pvss_chunky_v1") or entry.startswith("pvss_chunky_v2")):
+            group_name = entry
+            group_path = os.path.join(".", entry)
+            for subentry in os.listdir(group_path):
+                subentry_path = os.path.join(group_path, subentry)
+                if os.path.isdir(subentry_path):
+                    for op in OPERATIONS:
+                        if subentry.startswith(op) and "_transcript_bytes=" in subentry:
+                            key = (group_name, op)
+                            folder_map[key] = subentry
+                            break
     return folder_map
+
 
 def accumulate(rows, folder_map=None):
     """
@@ -174,23 +181,21 @@ def accumulate(rows, folder_map=None):
         ell = parse_ell(group)
         setup = parse_setup(ident, param)
 
-        # --- FIXED PART ---
-        # Find the folder for this operation
-        folder_name = None
-        if folder_map and operation in folder_map:
-            # pick the first folder that starts with the operation
-            for fname in folder_map[operation]:
-                folder_name = fname
-                break
-
-        tx_bytes = parse_transcript_bytes_from_folder(folder_name) if folder_name else None
-        # ------------------
+        # Find the folder for this operation and group
+        tx_bytes = None
+        # Only serialize operations have transcript_bytes in folder names
+        if folder_map and operation == "serialize":
+            key = (group, operation)
+            if key in folder_map:
+                folder_name = folder_map[key]
+                tx_bytes = parse_transcript_bytes_from_folder(folder_name)
 
         if (setup, ell) not in data:
             data[(setup, ell)] = {"v1": {}, "v2": {}}
 
         data[(setup, ell)][version][operation] = mean_ns
-        if "tx_bytes" not in data[(setup, ell)][version]:
+        # Store tx_bytes if not set, or if current value is None and we have a real value
+        if "tx_bytes" not in data[(setup, ell)][version] or (data[(setup, ell)][version]["tx_bytes"] is None and tx_bytes is not None):
             data[(setup, ell)][version]["tx_bytes"] = tx_bytes
 
     return data
@@ -323,15 +328,7 @@ def main():
     else:
         rows = list(read_rows(sys.stdin))
 
-    # Build folder map: operation -> folder name (to extract transcript_bytes)
-    folder_map = {}
-    for entry in os.listdir("."):
-        if os.path.isdir(entry):
-            for op in OPERATIONS:
-                if entry.startswith(op):
-                    folder_map[op] = entry
-                    break
-
+    # Build folder map: (group_name, operation) -> folder name with transcript_bytes
     # Accumulate benchmark data
     folder_map = build_folder_map()
     data = accumulate(rows, folder_map)
