@@ -1,0 +1,8 @@
+//# publish
+module 0x1::M
+fun foo<T0>(l0: T0): T0
+    local l1: T0
+    copy_loc l0
+    st_loc l1
+    move_loc l1
+    ret

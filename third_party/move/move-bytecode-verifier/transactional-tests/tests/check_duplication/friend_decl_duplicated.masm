@@ -1,0 +1,8 @@
+//# publish
+module 0x42::A
+
+
+//# publish
+module 0x42::B
+friend 0x42::A
+friend 0x42::A

@@ -1,0 +1,41 @@
+//# publish
+module 0x42::M1
+struct S<T0: copy>
+  t: T0
+
+public fun bad_sig<T0>(l0: &S<T0>)
+    ret
+
+
+
+//# publish
+module 0x42::M2
+struct S<T0: copy>
+  t: T0
+
+public fun bad_sig<T0>(l0: &mut S<T0>)
+    ret
+
+
+
+//# publish
+module 0x42::M3
+struct S<T0: copy>
+  t: T0
+
+public fun bad_sig<T0>(l0: &S)
+    ret
+
+
+
+//# publish
+module 0x42::M4
+struct Box<T0>
+  t: T0
+
+struct S<T0: copy>
+  t: T0
+
+public fun bad_sig<T0>(l0: Box<S<T0>>): Box<S<T0>>
+    move_loc l0
+    ret

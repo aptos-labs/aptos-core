@@ -1,0 +1,131 @@
+//# publish
+module 0x1::Tester
+use 0x1::signer
+struct Data has key
+  v1: u64
+  v2: u64
+
+struct Box has key
+  f: u64
+
+fun bump_and_pick(l0: &signer, l1: &mut Box, l2: &mut Box): &u64 acquires Data
+    local l3: address
+    local l4: &mut Data
+    move_loc l0
+    call signer::address_of
+    st_loc l3
+    move_loc l3
+    mut_borrow_global Data
+    st_loc l4
+    copy_loc l4
+    borrow_field Data, v1
+    read_ref
+    copy_loc l1
+    mut_borrow_field Box, f
+    write_ref
+    move_loc l4
+    borrow_field Data, v2
+    read_ref
+    copy_loc l2
+    mut_borrow_field Box, f
+    write_ref
+    copy_loc l1
+    borrow_field Box, f
+    read_ref
+    copy_loc l2
+    borrow_field Box, f
+    read_ref
+    ge
+    br_true l0
+    move_loc l1
+    pop
+    move_loc l2
+    borrow_field Box, f
+    ret
+l0: move_loc l2
+    pop
+    move_loc l1
+    borrow_field Box, f
+    ret
+
+fun larger_field(l0: &signer, l1: address, l2: &mut u64) acquires Box, Data
+    local l3: Box
+    local l4: Box
+    local l5: &u64
+    local l6: u64
+    copy_loc l0
+    call signer::address_of
+    move_from Box
+    st_loc l3
+    move_loc l1
+    move_from Box
+    st_loc l4
+    borrow_loc l3
+    borrow_field Box, f
+    read_ref
+    ld_u64 0
+    eq
+    not
+    br_false l0
+    ld_u64 42
+    abort
+l0: borrow_loc l4
+    borrow_field Box, f
+    read_ref
+    ld_u64 0
+    eq
+    not
+    br_false l1
+    ld_u64 42
+    abort
+l1: copy_loc l0
+    mut_borrow_loc l3
+    mut_borrow_loc l4
+    call bump_and_pick
+    st_loc l5
+    borrow_loc l3
+    borrow_field Box, f
+    read_ref
+    ld_u64 0
+    neq
+    not
+    br_false l2
+    ld_u64 42
+    abort
+l2: borrow_loc l4
+    borrow_field Box, f
+    read_ref
+    ld_u64 0
+    neq
+    not
+    br_false l3
+    ld_u64 42
+    abort
+l3: copy_loc l5
+    read_ref
+    borrow_loc l3
+    borrow_field Box, f
+    read_ref
+    eq
+    copy_loc l5
+    read_ref
+    borrow_loc l4
+    borrow_field Box, f
+    read_ref
+    eq
+    neq
+    not
+    br_false l4
+    ld_u64 42
+    abort
+l4: move_loc l5
+    read_ref
+    move_loc l2
+    write_ref
+    copy_loc l0
+    move_loc l3
+    move_to Box
+    move_loc l4
+    unpack Box
+    st_loc l6
+    ret

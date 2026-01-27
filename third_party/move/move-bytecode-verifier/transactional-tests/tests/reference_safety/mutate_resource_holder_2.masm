@@ -1,0 +1,61 @@
+//# publish
+module 0x42::A
+struct Coin
+  balance: u64
+
+struct A
+  c: Coin
+
+public fun zero(): Coin
+    ld_u64 0
+    pack Coin
+    ret
+
+public fun new(l0: Coin): A
+    move_loc l0
+    pack A
+    ret
+
+public fun destroy_a(l0: A)
+    local l1: Coin
+    local l2: u64
+    move_loc l0
+    unpack A
+    st_loc l1
+    move_loc l1
+    unpack Coin
+    st_loc l2
+    ret
+
+public fun mutate(l0: &mut A)
+    local l1: &mut Coin
+    local l2: &mut u64
+    move_loc l0
+    mut_borrow_field A, c
+    st_loc l1
+    move_loc l1
+    mut_borrow_field Coin, balance
+    st_loc l2
+    ld_u64 100
+    move_loc l2
+    write_ref
+    ret
+
+
+
+//# run
+script
+use 0x42::A
+entry public fun main()
+    local l0: A::Coin
+    local l1: A::A
+    call A::zero
+    st_loc l0
+    move_loc l0
+    call A::new
+    st_loc l1
+    mut_borrow_loc l1
+    call A::mutate
+    move_loc l1
+    call A::destroy_a
+    ret

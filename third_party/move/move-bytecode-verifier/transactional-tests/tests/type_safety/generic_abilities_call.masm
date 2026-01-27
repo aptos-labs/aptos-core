@@ -1,0 +1,14 @@
+//# publish
+module 0x1::M
+fun id<T0>(l0: T0): T0
+    move_loc l0
+    ret
+
+fun foo<T0: key>(l0: T0)
+    local l1: T0
+    move_loc l0
+    call id<T0>
+    st_loc l1
+    copy_loc l1
+    st_loc l1
+    ret

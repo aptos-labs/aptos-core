@@ -1,0 +1,24 @@
+//# run
+script
+entry public fun main()
+    vec_pack <u64, bool>, 0
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    vec_pack <>, 0
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    vec_pack <&u64>, 0
+    pop
+    ret

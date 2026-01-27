@@ -1,0 +1,7 @@
+//# publish
+module 0x42::M
+struct T
+  b: bool
+
+struct T
+  x: u64

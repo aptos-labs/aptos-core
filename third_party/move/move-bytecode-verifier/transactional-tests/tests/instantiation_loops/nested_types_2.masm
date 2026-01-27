@@ -1,0 +1,11 @@
+//# publish
+module 0x1::M
+struct S<T0>
+  b: bool
+
+struct R<T0, T1>
+  b: bool
+
+fun foo<T0>()
+    call foo<R<u64, S<S<T0>>>>
+    ret
