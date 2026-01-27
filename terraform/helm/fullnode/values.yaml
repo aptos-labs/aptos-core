@@ -35,6 +35,8 @@ fullnode:
       # The first item in the array `full_node_networks` must always refer to the public fullnode network
       - network_id: "public"
         identity: {}
+        inbound_rate_limit_config:
+        outbound_rate_limit_config:
 
 # -- Log level for the fullnode
 rust_log: info
