@@ -20,7 +20,7 @@ use std::fmt;
 
 /// A SLH-DSA-SHA2-128s private key (signing key)
 #[derive(DeserializeKey, SerializeKey, SilentDebug, SilentDisplay, PartialEq, Eq)]
-#[key_name("SlhDsaSha2_128sPrivateKey")]
+#[key_name("SlhDsa_Sha2_128s_PrivateKey")]
 pub struct PrivateKey(pub(crate) SlhDsaSigningKey<Sha2_128s>);
 
 #[cfg(feature = "assert-private-keys-not-cloneable")]
@@ -38,7 +38,7 @@ impl Clone for PrivateKey {
 
 /// A SLH-DSA-SHA2-128s public key (verifying key)
 #[derive(DeserializeKey, Clone, SerializeKey, PartialEq, Eq)]
-#[key_name("SlhDsaSha2_128sPublicKey")]
+#[key_name("SlhDsa_Sha2_128s_PublicKey")]
 pub struct PublicKey(pub(crate) SlhDsaVerifyingKey<Sha2_128s>);
 
 #[cfg(any(test, feature = "fuzzing"))]

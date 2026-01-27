@@ -1,0 +1,12 @@
+processed 2 tasks
+task 0 lines 1-57:  publish [module 0xc0ffee::return_overlap_test]
+task 1 lines 59-59:  run 0xc0ffee::return_overlap_test::test_overlapping_mut_refs --verbose
+Error: Function execution failed with VMError: {
+    message: Exclusive lock conflict,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(3),
+    location: 0xc0ffee::return_overlap_test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 8)],
+    exec_state: Some(ExecutionState { stack_trace: [(Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000c0ffee, name: Identifier("return_overlap_test") }), FunctionDefinitionIndex(1), 7)] }),
+}

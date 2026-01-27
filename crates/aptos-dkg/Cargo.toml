@@ -24,6 +24,7 @@ derive_more = { workspace = true }
 ff = { workspace = true }
 group = { workspace = true }
 hex = { workspace = true }
+itertools = { workspace = true }
 merlin = { workspace = true }
 more-asserts = { workspace = true }
 num-bigint = { workspace = true }
@@ -59,11 +60,27 @@ name = "lagrange"
 harness = false
 
 [[bench]]
+name = "ldt"
+harness = false
+
+[[bench]]
+name = "msm"
+harness = false
+
+[[bench]]
+name = "pcs"
+harness = false
+
+[[bench]]
 name = "pvss"
 harness = false
 
 [[bench]]
 name = "range_proof"
+harness = false
+
+[[bench]]
+name = "serialization"
 harness = false
 
 [[bench]]

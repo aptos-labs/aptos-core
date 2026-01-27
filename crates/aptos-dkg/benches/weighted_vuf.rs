@@ -146,7 +146,7 @@ where
     let mut bench_cases = vec![];
     for wc in get_weighted_configs_for_benchmarking() {
         // TODO: use a lazy pattern to avoid this expensive dealing when no benchmarks are run
-        let d = setup_dealing::<WT, ThreadRng>(&wc, &mut rng);
+        let d = setup_dealing::<WT, ThreadRng>(&wc, None, &mut rng);
 
         println!(
             "Best-case subset size: {}",

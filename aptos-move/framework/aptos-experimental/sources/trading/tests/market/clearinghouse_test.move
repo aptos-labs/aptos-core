@@ -14,7 +14,7 @@ module aptos_experimental::clearinghouse_test {
     use std::vector;
     use aptos_std::table;
     use aptos_std::table::Table;
-    use aptos_experimental::order_book_types::OrderIdType;
+    use aptos_trading::order_book_types::OrderId;
     use aptos_experimental::market_types::{
         SettleTradeResult,
         new_settle_trade_result,
@@ -51,10 +51,10 @@ module aptos_experimental::clearinghouse_test {
 
     struct GlobalState has key {
         user_positions: Table<address, Position>,
-        open_orders: Table<OrderIdType, bool>,
+        open_orders: Table<OrderId, bool>,
         bulk_open_bids: Table<address, bool>,
         bulk_open_asks: Table<address, bool>,
-        maker_order_calls: Table<OrderIdType, bool>
+        maker_order_calls: Table<OrderId, bool>
     }
 
     public(friend) fun initialize(admin: &signer) {
@@ -74,7 +74,7 @@ module aptos_experimental::clearinghouse_test {
         );
     }
 
-    public(friend) fun validate_order_placement(order_id: OrderIdType): ValidationResult acquires GlobalState {
+    public(friend) fun validate_order_placement(order_id: OrderId): ValidationResult acquires GlobalState {
         let open_orders = &mut borrow_global_mut<GlobalState>(@0x1).open_orders;
         assert!(
             !open_orders.contains(order_id),
@@ -139,7 +139,7 @@ module aptos_experimental::clearinghouse_test {
         new_settle_trade_result(size, option::none(), option::none(), new_callback_result_continue_matching(size))
     }
 
-    public(friend) fun place_maker_order(order_id: OrderIdType): PlaceMakerOrderResult<u64> acquires GlobalState {
+    public(friend) fun place_maker_order(order_id: OrderId): PlaceMakerOrderResult<u64> acquires GlobalState {
         let maker_order_calls =
             &mut borrow_global_mut<GlobalState>(@0x1).maker_order_calls;
         assert!(
@@ -150,12 +150,12 @@ module aptos_experimental::clearinghouse_test {
         new_place_maker_order_result(option::none(), option::none())
     }
 
-    public(friend) fun is_maker_order_called(order_id: OrderIdType): bool acquires GlobalState {
+    public(friend) fun is_maker_order_called(order_id: OrderId): bool acquires GlobalState {
         let maker_order_calls = &borrow_global<GlobalState>(@0x1).maker_order_calls;
         maker_order_calls.contains(order_id)
     }
 
-    public(friend) fun cleanup_order(order_id: OrderIdType) acquires GlobalState {
+    public(friend) fun cleanup_order(order_id: OrderId) acquires GlobalState {
         let open_orders = &mut borrow_global_mut<GlobalState>(@0x1).open_orders;
         assert!(
             open_orders.contains(order_id),
@@ -176,7 +176,7 @@ module aptos_experimental::clearinghouse_test {
         bulk_open_bids.remove(account);
     }
 
-    public(friend) fun order_exists(order_id: OrderIdType): bool acquires GlobalState {
+    public(friend) fun order_exists(order_id: OrderId): bool acquires GlobalState {
         let open_orders = &borrow_global<GlobalState>(@0x1).open_orders;
         open_orders.contains(order_id)
     }

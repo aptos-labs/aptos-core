@@ -7,7 +7,7 @@ module aptos_experimental::dead_mans_switch_operations_test {
     use aptos_experimental::clearinghouse_test;
     use aptos_experimental::market_types::{new_market, new_market_config, Market};
     use aptos_experimental::order_placement;
-    use aptos_experimental::order_book_types::{good_till_cancelled, new_order_id_type};
+    use aptos_trading::order_book_types::{good_till_cancelled, new_order_id_type};
     use aptos_experimental::dead_mans_switch_operations;
     use aptos_experimental::market_bulk_order;
 
@@ -42,7 +42,7 @@ module aptos_experimental::dead_mans_switch_operations_test {
         price: u64,
         size: u64,
         is_bid: bool,
-    ): aptos_experimental::order_book_types::OrderIdType {
+    ): aptos_trading::order_book_types::OrderId {
         let result = order_placement::place_limit_order(
             market,
             user,
@@ -57,7 +57,7 @@ module aptos_experimental::dead_mans_switch_operations_test {
             false, // cancel_on_match_limit
             &clearinghouse_test::test_market_callbacks()
         );
-        order_placement::get_order_id(result)
+        result.get_order_id()
     }
 
     #[test]

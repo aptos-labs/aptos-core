@@ -3,8 +3,8 @@ module aptos_experimental::pre_cancellation_tests {
     use std::option;
     use std::signer;
     use aptos_framework::timestamp;
+    use aptos_trading::order_book_types::good_till_cancelled;
     use aptos_experimental::order_operations::cancel_order_with_client_id;
-    use aptos_experimental::order_book_types::good_till_cancelled;
     use aptos_experimental::clearinghouse_test;
     use aptos_experimental::market_types;
     use aptos_experimental::clearinghouse_test::{

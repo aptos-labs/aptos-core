@@ -183,7 +183,7 @@ Creates a new keyless public key from an issuer string and an identifier bytes.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="keyless.md#0x1_keyless_new">new</a>(iss: String, idc: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="keyless.md#0x1_keyless_PublicKey">PublicKey</a> {
-    <b>assert</b>!(<a href="../../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(&iss).length() &lt;= <a href="keyless.md#0x1_keyless_MAX_ISSUER_UTF8_BYTES_LENGTH">MAX_ISSUER_UTF8_BYTES_LENGTH</a>, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="keyless.md#0x1_keyless_E_INVALID_ISSUER_UTF8_BYTES_LENGTH">E_INVALID_ISSUER_UTF8_BYTES_LENGTH</a>));
+    <b>assert</b>!(iss.bytes().length() &lt;= <a href="keyless.md#0x1_keyless_MAX_ISSUER_UTF8_BYTES_LENGTH">MAX_ISSUER_UTF8_BYTES_LENGTH</a>, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="keyless.md#0x1_keyless_E_INVALID_ISSUER_UTF8_BYTES_LENGTH">E_INVALID_ISSUER_UTF8_BYTES_LENGTH</a>));
     <b>assert</b>!(idc.length() == <a href="keyless.md#0x1_keyless_ID_COMMITMENT_BYTES_LENGTH">ID_COMMITMENT_BYTES_LENGTH</a>, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="keyless.md#0x1_keyless_E_INVALID_ID_COMMITMENT_BYTES_LENGTH">E_INVALID_ID_COMMITMENT_BYTES_LENGTH</a>));
     <a href="keyless.md#0x1_keyless_PublicKey">PublicKey</a> { iss, idc }
 }

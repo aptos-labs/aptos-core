@@ -630,7 +630,7 @@ module std::vector_tests {
         let v1 = vector[1];
         let v2 = vector[10, 20];
         let s = 0;
-        v1.zip(v2, |e1, e2| s = s + e1 * e2);
+        v1.zip(v2, |e1, e2| s += e1 * e2);
     }
 
     #[test]
@@ -721,7 +721,7 @@ module std::vector_tests {
         let v1 = vector[1];
         let v2 = vector[10, 20];
         let s = 0;
-        v1.zip_mut(&mut v2, |e1, e2| s = s + *e1 * *e2);
+        v1.zip_mut(&mut v2, |e1, e2| s += *e1 * *e2);
     }
 
     #[test]

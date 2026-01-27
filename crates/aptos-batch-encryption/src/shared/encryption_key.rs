@@ -3,12 +3,12 @@
 use crate::{
     group::G2Affine,
     shared::{
-        ark_serialize::*,
         digest::Digest,
         key_derivation::{BIBEDecryptionKey, BIBEMasterPublicKey},
     },
 };
 use anyhow::Result;
+use aptos_crypto::arkworks::serialization::{ark_de, ark_se};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

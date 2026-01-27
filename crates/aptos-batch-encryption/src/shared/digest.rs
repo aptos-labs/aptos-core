@@ -4,11 +4,12 @@
 //! which are KZG polynomial commitments which commit to a set of IDs.
 use super::ids::{ComputedCoeffs, Id, IdSet};
 use crate::{
-    errors::BatchEncryptionError,
+    errors::{BatchEncryptionError, DigestKeyInitError},
     group::{Fr, G1Affine, G1Projective, G2Affine, G2Projective, PairingSetting},
-    shared::{algebra::fk_algorithm::FKDomain, ark_serialize::*, ids::UncomputedCoeffs},
+    shared::{algebra::fk_algorithm::FKDomain, ids::UncomputedCoeffs},
 };
 use anyhow::{anyhow, Result};
+use aptos_crypto::arkworks::serialization::{ark_de, ark_se};
 use ark_ec::{pairing::Pairing, AffineRepr, ScalarMul, VariableBaseMSM};
 use ark_std::{
     rand::{CryptoRng, RngCore},
@@ -55,7 +56,17 @@ impl Digest {
 }
 
 impl DigestKey {
-    pub fn new(rng: &mut impl RngCore, batch_size: usize, num_rounds: usize) -> Option<Self> {
+    pub fn new(rng: &mut impl RngCore, batch_size: usize, num_rounds: usize) -> Result<Self> {
+        let mut i = batch_size;
+        while i > 1 {
+            (i % 2 == 0)
+                .then_some(())
+                .ok_or(BatchEncryptionError::DigestInitError(
+                    DigestKeyInitError::BatchSizeMustBePowerOfTwo,
+                ))?;
+            i >>= 1;
+        }
+
         let tau = Fr::rand(rng);
 
         let mut tau_powers_fr = vec![Fr::one()];
@@ -89,9 +100,11 @@ impl DigestKey {
 
         let tau_g2: G2Affine = (G2Affine::generator() * tau).into();
 
-        let fk_domain = FKDomain::new(batch_size, batch_size, tau_powers_g1_projective)?;
+        let fk_domain = FKDomain::new(batch_size, batch_size, tau_powers_g1_projective).ok_or(
+            BatchEncryptionError::DigestInitError(DigestKeyInitError::FKDomainInitFailure),
+        )?;
 
-        Some(DigestKey {
+        Ok(DigestKey {
             tau_g2,
             tau_powers_g1,
             fk_domain,

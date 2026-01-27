@@ -750,6 +750,16 @@ module std::features {
         is_enabled(FUNCTION_REFLECTION)
     }
 
+    /// Whether SLH-DSA-SHA2-128s signature scheme is enabled for transaction authentication.
+    /// Lifetime: transient
+    const SLH_DSA_SHA2_128S_SIGNATURE: u64 = 107;
+
+    public fun get_slh_dsa_sha2_128s_signature_feature(): u64 { SLH_DSA_SHA2_128S_SIGNATURE }
+
+    public fun slh_dsa_sha2_128s_signature_enabled(): bool acquires Features {
+        is_enabled(SLH_DSA_SHA2_128S_SIGNATURE)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

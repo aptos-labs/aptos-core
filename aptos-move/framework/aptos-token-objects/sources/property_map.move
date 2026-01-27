@@ -8,7 +8,9 @@ module aptos_token_objects::property_map {
     use aptos_std::from_bcs;
     use aptos_std::simple_map::{Self, SimpleMap};
     use aptos_std::type_info;
-    use aptos_framework::object::{Self, ConstructorRef, Object, ExtendRef, ObjectCore};
+    use aptos_framework::object::{ConstructorRef, Object, ExtendRef, ObjectCore};
+    #[test_only]
+    use aptos_framework::object::Self;
 
     // Errors
     /// The property map does not exist
@@ -66,12 +68,12 @@ module aptos_token_objects::property_map {
     }
 
     public fun init(ref: &ConstructorRef, container: PropertyMap) {
-        let signer = object::generate_signer(ref);
+        let signer = ref.generate_signer();
         move_to(&signer, container);
     }
 
     public fun extend(ref: &ExtendRef, container: PropertyMap) {
-        let signer = object::generate_signer_for_extending(ref);
+        let signer = ref.generate_signer_for_extending();
         move_to(&signer, container);
     }
 
@@ -199,20 +201,20 @@ module aptos_token_objects::property_map {
     }
 
     public fun generate_mutator_ref(ref: &ConstructorRef): MutatorRef {
-        MutatorRef { self: object::address_from_constructor_ref(ref) }
+        MutatorRef { self: ref.address_from_constructor_ref() }
     }
 
     // Accessors
 
     public fun contains_key<T: key>(object: &Object<T>, key: &String): bool acquires PropertyMap {
-        assert_exists(object::object_address(object));
-        let property_map = &PropertyMap[object::object_address(object)];
+        assert_exists(object.object_address());
+        let property_map = &PropertyMap[object.object_address()];
         property_map.inner.contains_key(key)
     }
 
     public fun length<T: key>(object: &Object<T>): u64 acquires PropertyMap {
-        assert_exists(object::object_address(object));
-        let property_map = &PropertyMap[object::object_address(object)];
+        assert_exists(object.object_address());
+        let property_map = &PropertyMap[object.object_address()];
         property_map.inner.length()
     }
 
@@ -220,8 +222,8 @@ module aptos_token_objects::property_map {
     ///
     /// The preferred method is to use `read_<type>` where the type is already known.
     public fun read<T: key>(object: &Object<T>, key: &String): (String, vector<u8>) acquires PropertyMap {
-        assert_exists(object::object_address(object));
-        let property_map = &PropertyMap[object::object_address(object)];
+        assert_exists(object.object_address());
+        let property_map = &PropertyMap[object.object_address()];
         let property_value = property_map.inner.borrow(key);
         let new_type = to_external_type(property_value.type);
         (new_type, property_value.value)
@@ -345,7 +347,7 @@ module aptos_token_objects::property_map {
     #[test(creator = @0x123)]
     fun test_end_to_end(creator: &signer) acquires PropertyMap {
         let constructor_ref = object::create_named_object(creator, b"");
-        let object = object::object_from_constructor_ref<object::ObjectCore>(&constructor_ref);
+        let object = constructor_ref.object_from_constructor_ref<object::ObjectCore>();
 
         let input = end_to_end_input();
         init(&constructor_ref, input);
@@ -513,10 +515,10 @@ module aptos_token_objects::property_map {
     #[test(creator = @0x123)]
     fun test_extend_property_map(creator: &signer) acquires PropertyMap {
         let constructor_ref = object::create_named_object(creator, b"");
-        let extend_ref = object::generate_extend_ref(&constructor_ref);
+        let extend_ref = constructor_ref.generate_extend_ref();
         extend(&extend_ref, end_to_end_input());
 
-        let object = object::object_from_constructor_ref<ObjectCore>(&constructor_ref);
+        let object = constructor_ref.object_from_constructor_ref<ObjectCore>();
         assert_end_to_end_input(object);
     }
 
@@ -634,7 +636,7 @@ module aptos_token_objects::property_map {
     #[expected_failure(abort_code = 0x10006, location = Self)]
     fun test_invalid_read(creator: &signer) acquires PropertyMap {
         let constructor_ref = object::create_named_object(creator, b"");
-        let object = object::object_from_constructor_ref<object::ObjectCore>(&constructor_ref);
+        let object = constructor_ref.object_from_constructor_ref<object::ObjectCore>();
 
         let input = prepare_input(
             vector[string::utf8(b"bool")],

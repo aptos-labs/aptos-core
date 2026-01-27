@@ -143,8 +143,13 @@ impl AptosTelemetryServiceArgs {
 
                 // Merge metrics clients from both metrics_sink and metrics_sinks
                 let metrics_clients = cc_config.make_metrics_clients();
+                let untrusted_metrics_clients = cc_config.make_untrusted_metrics_clients();
 
                 let logs_client = cc_config.logs_sink.as_ref().map(|s| s.make_client());
+                let untrusted_logs_client = cc_config
+                    .untrusted_logs_sink
+                    .as_ref()
+                    .map(|s| s.make_client());
 
                 let cc_bigquery_client = cc_config.events_sink.as_ref().and_then(|ec| {
                     bigquery_client.as_ref().map(|client| {
@@ -157,10 +162,20 @@ impl AptosTelemetryServiceArgs {
                     })
                 });
 
+                if cc_config.allow_unknown_nodes {
+                    info!(
+                        "Custom contract '{}' allows unknown/untrusted nodes",
+                        cc_config.name
+                    );
+                }
+
                 instances.insert(cc_config.name.clone(), context::CustomContractInstance {
                     config: cc_config.on_chain_auth.clone(),
+                    allow_unknown_nodes: cc_config.allow_unknown_nodes,
                     metrics_clients,
+                    untrusted_metrics_clients,
                     logs_client,
+                    untrusted_logs_client,
                     bigquery_client: cc_bigquery_client,
                 });
             }
@@ -725,6 +740,15 @@ pub struct CustomContractConfig {
     /// On-chain authentication configuration
     pub on_chain_auth: OnChainAuthConfig,
 
+    /// Allow unknown/untrusted nodes to authenticate via this custom contract endpoint.
+    /// When true, nodes that are NOT in the on-chain allowlist can still get a JWT token
+    /// (with NodeType::CustomUnknown) and send telemetry. Their data is routed to
+    /// `untrusted_metrics_sinks` and `untrusted_logs_sink` instead of the trusted sinks.
+    /// This enables custom labeling/attribution for community nodes.
+    /// Default: false (only allowlisted nodes can authenticate)
+    #[serde(default)]
+    pub allow_unknown_nodes: bool,
+
     /// Single metrics sink for this custom contract (optional, backwards compatible).
     /// Use `metrics_sinks` (array) if you need multiple sinks with different backend types.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -744,6 +768,21 @@ pub struct CustomContractConfig {
     /// BigQuery events sink for this custom contract (optional).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub events_sink: Option<CustomEventConfig>,
+
+    // ========================================================================
+    // Untrusted/Unknown Node Sinks (only used when allow_unknown_nodes: true)
+    // ========================================================================
+    /// Metrics sinks for unknown/untrusted nodes (optional).
+    /// Used when `allow_unknown_nodes: true` and the authenticating node is NOT in the allowlist.
+    /// If not specified, unknown nodes will use the regular `metrics_sinks`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub untrusted_metrics_sinks: Option<Vec<MetricsSinkConfig>>,
+
+    /// Log sink for unknown/untrusted nodes (optional).
+    /// Used when `allow_unknown_nodes: true` and the authenticating node is NOT in the allowlist.
+    /// If not specified, unknown nodes will use the regular `logs_sink`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub untrusted_logs_sink: Option<LogSinkConfig>,
 }
 
 impl CustomContractConfig {
@@ -766,6 +805,24 @@ impl CustomContractConfig {
         }
 
         clients
+    }
+
+    /// Get metrics clients for untrusted/unknown nodes.
+    /// Falls back to regular metrics clients if no untrusted sinks are configured.
+    pub fn make_untrusted_metrics_clients(&self) -> HashMap<String, MetricsIngestClient> {
+        // If untrusted sinks are configured, use them
+        if let Some(ref sinks) = self.untrusted_metrics_sinks {
+            let mut clients = HashMap::new();
+            for sink in sinks {
+                clients.extend(sink.make_clients());
+            }
+            if !clients.is_empty() {
+                return clients;
+            }
+        }
+
+        // Fall back to regular metrics clients
+        self.make_metrics_clients()
     }
 }
 
