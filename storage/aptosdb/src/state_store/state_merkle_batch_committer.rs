@@ -88,8 +88,12 @@ impl StateMerkleBatchCommitter {
                         "State snapshot committed."
                     );
                     LATEST_SNAPSHOT_VERSION.set(current_version as i64);
-                    // TODO(HotState): no pruning for hot state right now, since we always reset it
-                    // upon restart.
+                    if let Some(hot_state_merkle_pruner) =
+                        self.state_db.hot_state_merkle_pruner.as_ref()
+                    {
+                        hot_state_merkle_pruner
+                            .maybe_set_pruner_target_db_version(current_version);
+                    }
                     self.state_db
                         .state_merkle_pruner
                         .maybe_set_pruner_target_db_version(current_version);

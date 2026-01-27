@@ -57,6 +57,12 @@ impl AptosDB {
         let hot_state_merkle_db = hot_state_merkle_db.map(Arc::new);
         let state_merkle_db = Arc::new(state_merkle_db);
         let state_kv_db = Arc::new(state_kv_db);
+        let hot_state_merkle_pruner = hot_state_merkle_db.as_ref().map(|db| {
+            StateMerklePrunerManager::new(
+                Arc::clone(db),
+                pruner_config.state_merkle_pruner_config,
+            )
+        });
         let state_merkle_pruner = StateMerklePrunerManager::new(
             Arc::clone(&state_merkle_db),
             pruner_config.state_merkle_pruner_config,
@@ -72,6 +78,7 @@ impl AptosDB {
             hot_state_merkle_db,
             Arc::clone(&state_merkle_db),
             Arc::clone(&state_kv_db),
+            hot_state_merkle_pruner,
             state_merkle_pruner,
             epoch_snapshot_pruner,
             state_kv_pruner,
