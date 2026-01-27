@@ -19,7 +19,7 @@ use std::fmt::Debug;
 
 pub const DST: &[u8; 34] = b"APTOS_CHUNKED_COMMIT_HOM_SIGMA_DST";
 
-// TODO: arrange things by player...
+// TODO: arrange things by player... eh no did that already???
 /// In this file we set up the following "commitment" homomorphism:
 /// Commit to chunked scalars by unchunking them and multiplying a base group element (in affine representation)
 /// with each unchunked scalar.
@@ -33,7 +33,7 @@ pub struct Homomorphism<C: CurveGroup> {
 
 // pub type CodomainShape<T> = VectorShape<T>;
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
-pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone>(pub Vec<Vec<T>>);
+pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone>(pub Vec<T>);
 
 impl<T> EntrywiseMap<T> for CodomainShape<T>
 where
@@ -52,7 +52,7 @@ where
         CodomainShape(
             self.0
                 .into_iter()
-                .map(|row| row.into_iter().map(&mut f).collect())
+                .map(f)
                 .collect(),
         )
     }
@@ -66,15 +66,16 @@ where
     type Item = T;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter().flatten().collect::<Vec<_>>().into_iter()
+        self.0.into_iter()
     }
 }
 
+// A vector over the list of weights, and for each weight a vector of chunks
 #[derive(
     SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq,
 )]
 pub struct Witness<F: PrimeField> {
-    pub chunked_values: Vec<Vec<Vec<Scalar<F>>>>,
+    pub chunked_values: Vec<Vec<Scalar<F>>>,
 }
 
 impl<C: CurveGroup> homomorphism::Trait for Homomorphism<C> {
@@ -96,23 +97,20 @@ impl<C: CurveGroup> fixed_base_msms::Trait for Homomorphism<C> {
     type Scalar = C::ScalarField;
 
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
-        let rows: Vec<Vec<Self::MsmInput>> = input
-            .chunked_values
-            .iter()
-            .map(|row| {
-                row.iter()
-                    .map(|chunks| MsmInput {
-                        bases: vec![self.base.clone()],
-                        scalars: vec![le_chunks_to_scalar(
-                            self.ell,
-                            &Scalar::slice_as_inner(chunks),
-                        )],
-                    })
-                    .collect()
-            })
-            .collect();
 
-        CodomainShape(rows)
+    let mut terms = Vec::new();
+
+    for chunks in &input.chunked_values {
+            terms.push(MsmInput {
+                bases: vec![self.base.clone()],
+                scalars: vec![le_chunks_to_scalar(
+                    self.ell,
+                    &Scalar::slice_as_inner(chunks),
+                )],
+            });
+    }
+
+    CodomainShape(terms)
     }
 
     fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
@@ -153,13 +151,13 @@ mod tests {
         let scalars = sample_field_elements(num_scalars, &mut rng);
 
         // Chunk each scalar into little-endian chunks of size `ell`
-        let chunked_values: Vec<Vec<Vec<Scalar<_>>>> = scalars
+        let chunked_values: Vec<Vec<Scalar<_>>> = scalars
             .iter()
             .map(|s| {
-                vec![scalar_to_le_chunks(ell, s)
+                scalar_to_le_chunks(ell, s)
                     .into_iter()
                     .map(|chunk| Scalar(chunk))
-                    .collect::<Vec<_>>()]
+                    .collect::<Vec<_>>()
             })
             .collect();
 
@@ -174,8 +172,10 @@ mod tests {
 
         // Check correctness:
         // base * unchunk(chunks) == output
-        for (player_chunks, player_Vs) in chunked_values.iter().zip(outputs.iter()) {
-            for (scalar_chunks, V) in player_chunks.iter().zip(player_Vs.iter()) {
+        let mut output_iter = outputs.iter();
+        for scalar_chunks in chunked_values.iter() {
+                let V = output_iter.next().expect("Mismatch in output length");
+
                 let reconstructed =
                     le_chunks_to_scalar(ell, &Scalar::slice_as_inner(scalar_chunks));
 
@@ -185,6 +185,5 @@ mod tests {
                     "Homomorphism output does not match expected base * scalar"
                 );
             }
-        }
     }
 }

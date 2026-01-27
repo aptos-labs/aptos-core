@@ -53,12 +53,7 @@ impl<'a, E: Pairing> Proof<'a, E> {
                     first_proof_item: FirstProofItem::Commitment(TupleCodomainShape(
                         first_proof_item_inner,
                         chunked_scalar_mul::CodomainShape::<E::G2>(
-                            (0..sc.get_total_num_players()) // TODO: make this stuff less complicated!!!
-                                .map(|i| {
-                                    let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
-                                    unsafe_random_points_group(w, rng)
-                                })
-                                .collect(),
+                            unsafe_random_points_group(sc.get_total_weight(), rng),
                         ),
                     )),
                     z,
@@ -91,7 +86,7 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
             // The projection map simply unchunks the chunks
             projection: |dom: &HkzgWeightedElgamalWitness<E::ScalarField>| {
                 chunked_scalar_mul::Witness {
-                    chunked_values: dom.chunked_plaintexts.clone(),
+                    chunked_values: dom.chunked_plaintexts.iter().flatten().cloned().collect() // TODO: this iter stuff can go
                 }
             },
         };

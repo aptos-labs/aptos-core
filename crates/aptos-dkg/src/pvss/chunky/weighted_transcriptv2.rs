@@ -78,7 +78,7 @@ pub struct Subtranscript<E: Pairing> {
     pub V0: E::G2,
     // The dealt public key shares
     #[serde(deserialize_with = "ark_de")]
-    pub Vs: Vec<Vec<E::G2>>,
+    pub Vs: Vec<E::G2>,
     /// First chunked ElGamal component: C[i][j] = s_{i,j} * G + r_j * ek_i. Here s_i = \sum_j s_{i,j} * B^j // TODO: change notation because B is not a group element?
     #[serde(deserialize_with = "ark_de")]
     pub Cs: Vec<Vec<Vec<E::G1>>>, // TODO: maybe make this and the other fields affine? The verifier will have to do it anyway... and we are trying to speed that up
