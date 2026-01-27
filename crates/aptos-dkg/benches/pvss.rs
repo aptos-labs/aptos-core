@@ -172,7 +172,7 @@ fn pvss_deal<T: Transcript, M: Measurement>(
         b.iter_with_setup(
             || {
                 let s = T::InputSecret::generate(&mut rng);
-                (s, rng.clone())
+                (s, rng)
             },
             |(s, mut rng)| {
                 T::deal(
