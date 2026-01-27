@@ -409,7 +409,7 @@ impl DKGTrait for RealDKG {
         let mut agg = accumulator.main.to_aggregated();
         agg.aggregate_with(&params.pvss_config.wconfig, &element.main)
             .expect("Transcript aggregation failed");
-        accumulator.main = agg.normalize(); // TODO: this shouldn't be here
+        accumulator.main = agg.normalize(); // TODO: this should be updated
         if let (Some(acc), Some(ele), Some(config)) = (
             accumulator.fast.as_mut(),
             element.fast.as_ref(),
@@ -419,7 +419,7 @@ impl DKGTrait for RealDKG {
             fast_agg
                 .aggregate_with(config, ele)
                 .expect("Transcript aggregation failed");
-            *acc = fast_agg.normalize(); // TODO: this shouldn't be here
+            *acc = fast_agg.normalize(); // TODO: this should be updated
         }
     }
 
