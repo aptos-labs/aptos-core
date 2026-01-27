@@ -6,11 +6,11 @@ use crate::{
     event_store::EventStore,
     ledger_db::LedgerDb,
     metrics::{API_LATENCY_SECONDS, CONCURRENCY_GAUGE},
-    pruner::{LedgerPrunerManager, PrunerManager, StateKvPrunerManager, StateMerklePrunerManager},
+    pruner::{LedgerPrunerManager, PrunerManager},
     rocksdb_property_reporter::RocksdbPropertyReporter,
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
-    state_store::StateStore,
+    state_store::{StatePruner, StateStore},
     transaction_store::TransactionStore,
 };
 use aptos_config::config::{
@@ -57,24 +57,18 @@ impl AptosDB {
         let hot_state_merkle_db = hot_state_merkle_db.map(Arc::new);
         let state_merkle_db = Arc::new(state_merkle_db);
         let state_kv_db = Arc::new(state_kv_db);
-        let state_merkle_pruner = StateMerklePrunerManager::new(
+        let state_pruner = StatePruner::new(
+            hot_state_merkle_db.clone(),
             Arc::clone(&state_merkle_db),
-            pruner_config.state_merkle_pruner_config,
+            Arc::clone(&state_kv_db),
+            pruner_config,
         );
-        let epoch_snapshot_pruner = StateMerklePrunerManager::new(
-            Arc::clone(&state_merkle_db),
-            pruner_config.epoch_snapshot_pruner_config.into(),
-        );
-        let state_kv_pruner =
-            StateKvPrunerManager::new(Arc::clone(&state_kv_db), pruner_config.ledger_pruner_config);
         let state_store = Arc::new(StateStore::new(
             Arc::clone(&ledger_db),
             hot_state_merkle_db,
             Arc::clone(&state_merkle_db),
             Arc::clone(&state_kv_db),
-            state_merkle_pruner,
-            epoch_snapshot_pruner,
-            state_kv_pruner,
+            state_pruner,
             buffered_state_target_items,
             hack_for_tests,
             empty_buffered_state_for_restore,
@@ -166,18 +160,27 @@ impl AptosDB {
                     .maybe_set_pruner_target_db_version(version);
                 myself
                     .state_store
+                    .state_pruner
                     .state_kv_pruner
                     .maybe_set_pruner_target_db_version(version);
             }
             if let Some(version) = myself.get_latest_state_checkpoint_version()? {
                 myself
                     .state_store
+                    .state_pruner
                     .state_merkle_pruner
                     .maybe_set_pruner_target_db_version(version);
                 myself
                     .state_store
+                    .state_pruner
                     .epoch_snapshot_pruner
                     .maybe_set_pruner_target_db_version(version);
+                if let Some(pruner) = &myself.state_store.state_pruner.hot_state_merkle_pruner {
+                    pruner.maybe_set_pruner_target_db_version(version);
+                }
+                if let Some(pruner) = &myself.state_store.state_pruner.hot_epoch_snapshot_pruner {
+                    pruner.maybe_set_pruner_target_db_version(version);
+                }
             }
         }
 
@@ -278,6 +281,7 @@ impl AptosDB {
         let min_readable_version = self
             .state_store
             .state_db
+            .state_pruner
             .state_merkle_pruner
             .get_min_readable_version();
         if version >= min_readable_version {
@@ -287,6 +291,7 @@ impl AptosDB {
         let min_readable_epoch_snapshot_version = self
             .state_store
             .state_db
+            .state_pruner
             .epoch_snapshot_pruner
             .get_min_readable_version();
         if version >= min_readable_epoch_snapshot_version {
@@ -303,7 +308,11 @@ impl AptosDB {
     }
 
     pub(super) fn error_if_state_kv_pruned(&self, data_type: &str, version: Version) -> Result<()> {
-        let min_readable_version = self.state_store.state_kv_pruner.get_min_readable_version();
+        let min_readable_version = self
+            .state_store
+            .state_pruner
+            .state_kv_pruner
+            .get_min_readable_version();
         ensure!(
             version >= min_readable_version,
             "{} at version {} is pruned, min available version is {}.",
