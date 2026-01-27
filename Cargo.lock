@@ -12732,14 +12732,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-ir-compiler-transactional-tests"
-version = "0.1.0"
-dependencies = [
- "datatest-stable",
- "move-transactional-test-runner",
-]
-
-[[package]]
 name = "move-ir-to-bytecode"
 version = "0.1.0"
 dependencies = [
