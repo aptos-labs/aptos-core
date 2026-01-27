@@ -165,7 +165,7 @@ impl<E: Pairing> PublicParameters<E> {
     ) -> Self {
         assert!(ell > 0, "ell must be greater than zero");
 
-        let num_chunks = num_chunks_per_scalar::<E::ScalarField>(ell) as u32;
+        let num_chunks = num_chunks_per_scalar::<E::ScalarField>(ell);
         let max_num_chunks_padded = max_num_shares
             .checked_mul(num_chunks)
             .and_then(|v| v.checked_add(1))
