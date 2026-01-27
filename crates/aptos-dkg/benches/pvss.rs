@@ -4,6 +4,7 @@
 #![allow(clippy::ptr_arg)]
 #![allow(clippy::needless_borrow)]
 
+use aptos_dkg::pvss::traits::transcript::Aggregated;
 use aptos_crypto::{SecretSharingConfig, Uniform};
 use aptos_dkg::pvss::{
     chunky::{UnsignedWeightedTranscript as Chunky_v1, UnsignedWeightedTranscriptv2 as Chunky_v2},
@@ -210,8 +211,9 @@ fn pvss_aggregate<T: AggregatableTranscript, M: Measurement>(
                 );
                 (trx.clone(), trx)
             },
-            |(mut first, second)| {
-                first.aggregate_with(&sc, &second).unwrap();
+            |(first, second)| {
+                let mut agg = first.to_aggregated();
+                agg.aggregate_with(&sc, &second).unwrap();
             },
         )
     });
@@ -239,10 +241,9 @@ where
                 (trs.clone(), trs)
             },
             |(first, second)| {
-                first
-                    .get_subtranscript()
-                    .aggregate_with(&sc, &second.get_subtranscript())
-                    .unwrap();
+                let mut agg = first.get_subtranscript().to_aggregated();
+                agg.aggregate_with(&sc, &second.get_subtranscript()).unwrap();
+                let _ = agg.normalize();
             },
         )
     });

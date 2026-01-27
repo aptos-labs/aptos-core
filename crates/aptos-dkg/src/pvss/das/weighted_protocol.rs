@@ -13,7 +13,7 @@ use crate::{
         },
         LowDegreeTest, Player, ThresholdConfigBlstrs, WeightedConfigBlstrs,
     },
-    traits::transcript::Aggregatable,
+    traits::transcript::{Aggregatable, Aggregated},
     utils::{
         g1_multi_exp, g2_multi_exp,
         random::{
@@ -379,7 +379,14 @@ impl AggregatableTranscript for Transcript {
 
 impl Aggregatable for Transcript {
     type SecretSharingConfig = WeightedConfig<ThresholdConfigBlstrs>;
+    type Aggregated = Self;
 
+    fn to_aggregated(&self) -> Self::Aggregated {
+        self.clone()
+    }
+}
+
+impl Aggregated<Transcript> for Transcript {
     #[allow(non_snake_case)]
     fn aggregate_with(
         &mut self,
@@ -407,6 +414,10 @@ impl Aggregatable for Transcript {
         }
 
         Ok(())
+    }
+
+    fn normalize(self) -> Transcript {
+        self
     }
 }
 

@@ -32,6 +32,7 @@ use ark_bn254::Bn254;
 use ark_ec::pairing::Pairing;
 use rand::{rngs::StdRng, thread_rng};
 use rand_core::SeedableRng;
+use aptos_dkg::pvss::traits::transcript::Aggregated;
 
 // TODO: Add a test for public parameters serialization roundtrip?
 
@@ -255,12 +256,14 @@ fn test_pvss_aggregate_subtranscript_and_decrypt<E: Pairing, T>(
         .collect();
 
     // Use the first player's transcript as the accumulator
-    let mut agg = all_trs[0].get_subtranscript();
+    let mut agg = all_trs[0].get_subtranscript().to_aggregated();
 
     // Aggregate all other transcripts into it
     for trs in all_trs.iter().skip(1) {
         agg.aggregate_with(&sc, &trs.get_subtranscript()).unwrap();
     }
+
+    let agg = agg.normalize();
 
     #[allow(unused_variables)]
     let final_share = agg.decrypt_own_share(sc, &sc.get_player(0), &d.dks[0], &d.pp);
