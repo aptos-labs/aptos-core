@@ -378,8 +378,8 @@ impl AggregatableTranscript for Transcript {
 }
 
 impl Aggregatable for Transcript {
-    type SecretSharingConfig = WeightedConfig<ThresholdConfigBlstrs>;
     type Aggregated = Self;
+    type SecretSharingConfig = WeightedConfig<ThresholdConfigBlstrs>;
 
     fn to_aggregated(&self) -> Self::Aggregated {
         self.clone()

@@ -7,7 +7,7 @@
 /// keys, which might not be safe depending on the PVSS scheme.
 use crate::pvss::{
     traits::{
-        transcript::{Aggregatable, Aggregated, AggregatableTranscript, MalleableTranscript},
+        transcript::{Aggregatable, AggregatableTranscript, Aggregated, MalleableTranscript},
         Transcript,
     },
     Player, ThresholdConfigBlstrs, WeightedConfigBlstrs,
@@ -224,8 +224,8 @@ where
         + Transcript<SecretSharingConfig = ThresholdConfigBlstrs>,
     T::Aggregated: Aggregated<T>,
 {
-    type SecretSharingConfig = WeightedConfig<ThresholdConfigBlstrs>;
     type Aggregated = GenericWeighting<T::Aggregated>;
+    type SecretSharingConfig = WeightedConfig<ThresholdConfigBlstrs>;
 
     fn to_aggregated(&self) -> Self::Aggregated {
         GenericWeighting {
@@ -248,7 +248,8 @@ where
     ) -> anyhow::Result<()> {
         // self.trx is T::Aggregated, other.trx is T
         // Aggregate other.trx into self.trx
-        self.trx.aggregate_with(sc.get_threshold_config(), &other.trx)?;
+        self.trx
+            .aggregate_with(sc.get_threshold_config(), &other.trx)?;
         Ok(())
     }
 

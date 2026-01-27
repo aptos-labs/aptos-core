@@ -17,7 +17,7 @@ use aptos_dkg::{
     pvss,
     pvss::{
         traits::{
-            transcript::{Aggregatable, Aggregated, AggregatableTranscript},
+            transcript::{Aggregatable, AggregatableTranscript, Aggregated},
             Convert, Reconstructable, Transcript,
         },
         Player,
@@ -409,16 +409,17 @@ impl DKGTrait for RealDKG {
         let mut agg = accumulator.main.to_aggregated();
         agg.aggregate_with(&params.pvss_config.wconfig, &element.main)
             .expect("Transcript aggregation failed");
-        accumulator.main = agg.normalize();
+        accumulator.main = agg.normalize(); // TODO: this shouldn't be here
         if let (Some(acc), Some(ele), Some(config)) = (
             accumulator.fast.as_mut(),
             element.fast.as_ref(),
             params.pvss_config.fast_wconfig.as_ref(),
         ) {
             let mut fast_agg = acc.to_aggregated();
-            fast_agg.aggregate_with(config, ele)
+            fast_agg
+                .aggregate_with(config, ele)
                 .expect("Transcript aggregation failed");
-            *acc = fast_agg.normalize();
+            *acc = fast_agg.normalize(); // TODO: this shouldn't be here
         }
     }
 

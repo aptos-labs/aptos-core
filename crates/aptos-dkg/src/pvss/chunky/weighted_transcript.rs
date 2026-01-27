@@ -383,8 +383,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 }
 
 impl<E: Pairing> Aggregatable for Subtranscript<E> {
-    type SecretSharingConfig = SecretSharingConfig<E>;
     type Aggregated = Self;
+    type SecretSharingConfig = SecretSharingConfig<E>;
 
     fn to_aggregated(&self) -> Self::Aggregated {
         self.clone()

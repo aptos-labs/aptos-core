@@ -23,7 +23,7 @@ use aptos_dkg::pvss::{
         reconstruct_dealt_secret_key_randomly, NoAux,
     },
     traits::{
-        transcript::{HasAggregatableSubtranscript, Transcript, WithMaxNumShares},
+        transcript::{Aggregated, HasAggregatableSubtranscript, Transcript, WithMaxNumShares},
         Subtranscript,
     },
     GenericWeighting, ThresholdConfigBlstrs,
@@ -32,7 +32,6 @@ use ark_bn254::Bn254;
 use ark_ec::pairing::Pairing;
 use rand::{rngs::StdRng, thread_rng};
 use rand_core::SeedableRng;
-use aptos_dkg::pvss::traits::transcript::Aggregated;
 
 // TODO: Add a test for public parameters serialization roundtrip?
 
