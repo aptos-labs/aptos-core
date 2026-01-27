@@ -33,27 +33,7 @@ full_node_networks:
   {{ end }}
   {{- end }}
 
-  # be backwards compatible with the old inbound_rate_limit_config config
-  {{- if $.Values.fullnode_inbound_rate_limit }}
-  inbound_rate_limit_config:
-    {{- $.Values.fullnode_inbound_rate_limit | toYaml | nindent 6 }}
-  {{- else}}
-  {{ with .inbound_rate_limit_config }}
-  inbound_rate_limit_config: {{ . }}
-  {{ end }}
-  {{- end }}
-
-  # be backwards compatible with the old outbound_rate_limit_config config
-  {{- if $.Values.fullnode_outbound_rate_limit }}
-  outbound_rate_limit_config:
-    {{- $.Values.fullnode_outbound_rate_limit | toYaml | nindent 6 }}
-  {{- else}}
-  {{ with .outbound_rate_limit_config }}
-  outbound_rate_limit_config: {{ . }}
-  {{ end }}
-  {{- end }}
-
-  # be backwards compatible with the old outbound_rate_limit_config config
+  # be backwards compatible with the old max_inbound_connections config
   {{- if $.Values.fullnode_max_inbound_connections }}
   max_inbound_connections: {{ $.Values.fullnode_max_inbound_connections }}
   {{- else}}
