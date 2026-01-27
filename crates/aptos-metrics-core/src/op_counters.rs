@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! `OpCounters` is a collection of convenience methods to add arbitrary counters to modules.
 //! For now, it supports Int-Counters, Int-Gauges, and Histogram.

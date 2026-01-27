@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 macro_rules! dealt_secret_key_impl {
     (
@@ -100,7 +100,7 @@ macro_rules! dealt_secret_key_impl {
                 );
                 let bases = shares
                     .iter()
-                    .map(|(_, share)| share.0.h_hat)
+                    .map(|(_, share)| *share.as_group_element())
                     .collect::<Vec<$GTProjective>>();
 
                 // println!();

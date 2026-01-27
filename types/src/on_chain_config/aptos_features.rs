@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::on_chain_config::OnChainConfig;
 use move_binary_format::{
@@ -81,11 +81,13 @@ pub enum FeatureFlag {
     TRANSACTION_CONTEXT_EXTENSION = 59,
     COIN_TO_FUNGIBLE_ASSET_MIGRATION = 60,
     PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS = 61,
-    OBJECT_NATIVE_DERIVED_ADDRESS = 62,
+    // Feature rolled out, no longer can be disabled.
+    _OBJECT_NATIVE_DERIVED_ADDRESS = 62,
     DISPATCHABLE_FUNGIBLE_ASSET = 63,
     NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE = 64,
     OPERATIONS_DEFAULT_TO_FA_APT_STORE = 65,
-    AGGREGATOR_V2_IS_AT_LEAST_API = 66,
+    // Feature rolled out, no longer can be disabled.
+    _AGGREGATOR_V2_IS_AT_LEAST_API = 66,
     CONCURRENT_FUNGIBLE_BALANCE = 67,
     DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE = 68,
     /// Enabled on mainnet, cannot be disabled.
@@ -103,9 +105,10 @@ pub enum FeatureFlag {
     FEDERATED_KEYLESS = 77,
     TRANSACTION_SIMULATION_ENHANCEMENT = 78,
     COLLECTION_OWNER = 79,
-    /// covers mem::swap and vector::move_range
-    /// AIP-105 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-105.md)
-    NATIVE_MEMORY_OPERATIONS = 80,
+    /// Enabled on mainnet, cannot be rolled back. Was gating `mem::swap` and `vector::move_range`
+    /// natives. For more details, see:
+    ///   AIP-105 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-105.md)
+    _NATIVE_MEMORY_OPERATIONS = 80,
     /// The feature was used to gate the rollout of new loader used by Move VM. It was enabled on
     /// mainnet and can no longer be disabled.
     _ENABLE_LOADER_V2 = 81,
@@ -139,7 +142,9 @@ pub enum FeatureFlag {
     JWK_CONSENSUS_PER_KEY_MODE = 92,
     TRANSACTION_PAYLOAD_V2 = 93,
     ORDERLESS_TRANSACTIONS = 94,
-    // TODO(lazy-loading): Add link to AIP and its number + brief description.
+    /// With lazy loading, modules are loaded lazily (as opposed to loading the transitive closure
+    /// of dependencies). For more details, see:
+    ///   AIP-127 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-127.md)
     ENABLE_LAZY_LOADING = 95,
     CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION = 96,
     DISTRIBUTE_TRANSACTION_FEE = 97,
@@ -156,6 +161,10 @@ pub enum FeatureFlag {
     SESSION_CONTINUATION = 104,
     /// Enables function value reflection in the stdlib
     ENABLE_FUNCTION_REFLECTION = 105,
+    /// Enables bytecode version v10
+    VM_BINARY_FORMAT_V10 = 106,
+    /// Whether SLH-DSA-SHA2-128s signature scheme is enabled for transaction authentication.
+    SLH_DSA_SHA2_128S_SIGNATURE = 107,
 }
 
 impl FeatureFlag {
@@ -220,12 +229,12 @@ impl FeatureFlag {
             FeatureFlag::_REJECT_UNSTABLE_BYTECODE,
             FeatureFlag::TRANSACTION_CONTEXT_EXTENSION,
             FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION,
-            FeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS,
+            FeatureFlag::_OBJECT_NATIVE_DERIVED_ADDRESS,
             FeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET,
             FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE,
             FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE,
             FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
-            FeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API,
+            FeatureFlag::_AGGREGATOR_V2_IS_AT_LEAST_API,
             FeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
             FeatureFlag::_LIMIT_VM_TYPE_SIZE,
             FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH,
@@ -236,7 +245,7 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL,
             FeatureFlag::_REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
             FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
-            FeatureFlag::NATIVE_MEMORY_OPERATIONS,
+            FeatureFlag::_NATIVE_MEMORY_OPERATIONS,
             FeatureFlag::_ENABLE_LOADER_V2,
             FeatureFlag::_DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES,
             FeatureFlag::COLLECTION_OWNER,
@@ -262,6 +271,8 @@ impl FeatureFlag {
             FeatureFlag::VM_BINARY_FORMAT_V9,
             FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION,
             FeatureFlag::ENABLE_FUNCTION_REFLECTION,
+            FeatureFlag::VM_BINARY_FORMAT_V10,
+            FeatureFlag::SLH_DSA_SHA2_128S_SIGNATURE,
         ]
     }
 }
@@ -419,10 +430,6 @@ impl Features {
         self.is_enabled(FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT)
     }
 
-    pub fn is_native_memory_operations_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::NATIVE_MEMORY_OPERATIONS)
-    }
-
     pub fn is_call_tree_and_instruction_vm_cache_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE)
     }
@@ -476,7 +483,9 @@ impl Features {
     }
 
     pub fn get_max_binary_format_version(&self) -> u32 {
-        if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V9) {
+        if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V10) {
+            file_format_common::VERSION_10
+        } else if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V9) {
             file_format_common::VERSION_9
         } else if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V8) {
             file_format_common::VERSION_8
@@ -534,7 +543,7 @@ mod test {
             file_format_common::VERSION_MIN
         );
         assert_eq!(
-            file_format_common::VERSION_9,
+            file_format_common::VERSION_10,
             file_format_common::VERSION_MAX
         );
     }

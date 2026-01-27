@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::state_store::state_view::hot_state_view::HotStateView;
 use aptos_crypto::HashValue;
@@ -391,6 +390,7 @@ pub trait DbReader: Send + Sync {
             key_hash: &HashValue,
             version: Version,
             root_depth: usize,
+            use_hot_state: bool,
         ) -> Result<SparseMerkleProofExt>;
 
         /// Gets a state value by state key along with the proof, out of the ledger state indicated by the state
@@ -406,6 +406,7 @@ pub trait DbReader: Send + Sync {
             key_hash: &HashValue,
             version: Version,
             root_depth: usize,
+            use_hot_state: bool,
         ) -> Result<(Option<StateValue>, SparseMerkleProofExt)>;
 
         /// Gets the latest LedgerView no matter if db has been bootstrapped.
@@ -547,8 +548,14 @@ pub trait DbReader: Send + Sync {
         state_key: &StateKey,
         version: Version,
     ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
-        self.get_state_value_with_proof_by_version_ext(state_key.crypto_hash_ref(), version, 0)
-            .map(|(value, proof_ext)| (value, proof_ext.into()))
+        // TODO(HotState): check all callers and possibly query hot state first
+        self.get_state_value_with_proof_by_version_ext(
+            state_key.crypto_hash_ref(),
+            version,
+            /* root_depth = */ 0,
+            /* use_hot_state = */ false,
+        )
+        .map(|(value, proof_ext)| (value, proof_ext.into()))
     }
 
     fn ensure_synced_version(&self) -> Result<Version> {

@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 pub mod auth;
 pub mod telemetry;
@@ -39,7 +39,7 @@ pub mod common {
         }
     }
 
-    #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+    #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
     pub enum NodeType {
         Validator,
         ValidatorFullNode,
@@ -47,17 +47,52 @@ pub mod common {
         Unknown,
         UnknownValidator,
         UnknownFullNode,
+        /// Custom node type with a user-defined name (e.g., "ShelbyStorageProvider")
+        /// These are nodes that are registered in the on-chain allowlist.
+        Custom(String),
+        /// Unknown/untrusted custom node type - nodes that authenticated via custom contract
+        /// endpoint but are NOT in the on-chain allowlist. Requires `allow_unknown_nodes: true`
+        /// in the custom contract config. Routed to untrusted sinks for separate attribution.
+        CustomUnknown(String),
     }
 
     impl NodeType {
-        pub fn as_str(self) -> &'static str {
+        /// Get the string representation of the node type
+        /// For Custom types, returns "custom({name})" to prevent ambiguity with built-in types
+        pub fn as_str(&self) -> String {
             match self {
-                NodeType::Validator => "validator",
-                NodeType::ValidatorFullNode => "validator_fullnode",
-                NodeType::PublicFullNode => "public_fullnode",
-                NodeType::Unknown => "unknown_peer",
-                NodeType::UnknownValidator => "unknown_validator",
-                NodeType::UnknownFullNode => "unknown_fullnode",
+                NodeType::Validator => "validator".to_string(),
+                NodeType::ValidatorFullNode => "validator_fullnode".to_string(),
+                NodeType::PublicFullNode => "public_fullnode".to_string(),
+                NodeType::Unknown => "unknown_peer".to_string(),
+                NodeType::UnknownValidator => "unknown_validator".to_string(),
+                NodeType::UnknownFullNode => "unknown_fullnode".to_string(),
+                NodeType::Custom(name) => format!("custom({})", name),
+                NodeType::CustomUnknown(name) => format!("custom_unknown({})", name),
+            }
+        }
+
+        /// Check if this is an unknown/untrusted node type
+        pub fn is_unknown(&self) -> bool {
+            matches!(
+                self,
+                NodeType::Unknown
+                    | NodeType::UnknownValidator
+                    | NodeType::UnknownFullNode
+                    | NodeType::CustomUnknown(_)
+            )
+        }
+
+        /// Check if this is a custom contract node type (trusted or unknown)
+        pub fn is_custom(&self) -> bool {
+            matches!(self, NodeType::Custom(_) | NodeType::CustomUnknown(_))
+        }
+
+        /// Get the contract name if this is a custom node type
+        pub fn custom_contract_name(&self) -> Option<&str> {
+            match self {
+                NodeType::Custom(name) | NodeType::CustomUnknown(name) => Some(name),
+                _ => None,
             }
         }
     }
@@ -84,6 +119,12 @@ pub mod response {
     #[derive(Serialize, Deserialize)]
     pub struct IndexResponse {
         pub public_key: x25519::PublicKey,
+    }
+
+    /// Health check response for liveness/readiness probes
+    #[derive(Serialize, Deserialize)]
+    pub struct HealthResponse {
+        pub status: String,
     }
 
     #[derive(Serialize, Deserialize)]

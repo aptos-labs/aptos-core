@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_crypto::{ed25519::Ed25519PublicKey, HashValue};
 use aptos_types::transaction::{
@@ -101,6 +101,12 @@ impl TransactionFilter {
         self.add_multiple_matchers_filter(allow, vec![transaction_matcher])
     }
 
+    /// Adds an encrypted transaction matcher to the filter
+    pub fn add_encrypted_transaction_filter(self, allow: bool) -> Self {
+        let transaction_matcher = TransactionMatcher::EncryptedTransaction;
+        self.add_multiple_matchers_filter(allow, vec![transaction_matcher])
+    }
+
     /// Adds an entry function matcher to the filter
     pub fn add_entry_function_filter(
         self,
@@ -170,6 +176,7 @@ pub enum TransactionMatcher {
     EntryFunction(AccountAddress, String, String), // Matches any transaction that calls a specific entry function in a module
     AccountAddress(AccountAddress), // Matches any transaction that involves a specific account address
     PublicKey(AnyPublicKey),        // Matches any transaction that involves a specific public key
+    EncryptedTransaction,           // Matches any encrypted transaction
 }
 
 impl TransactionMatcher {
@@ -196,6 +203,9 @@ impl TransactionMatcher {
             },
             TransactionMatcher::PublicKey(public_key) => {
                 matches_transaction_authenticator_public_key(signed_transaction, public_key)
+            },
+            TransactionMatcher::EncryptedTransaction => {
+                matches_encrypted_transaction(signed_transaction)
             },
         }
     }
@@ -305,12 +315,18 @@ fn matches_any_public_key_address(any_public_key: &AnyPublicKey, address: &Accou
         AnyPublicKey::Ed25519 { .. }
         | AnyPublicKey::Secp256k1Ecdsa { .. }
         | AnyPublicKey::Secp256r1Ecdsa { .. }
+        | AnyPublicKey::SlhDsa_Sha2_128s { .. }
         | AnyPublicKey::Keyless { .. } => false,
         AnyPublicKey::FederatedKeyless { public_key } => {
             // Check if the public key's JWK address matches the given address
             public_key.jwk_addr == *address
         },
     }
+}
+
+/// Returns true iff the transaction is an encrypted transaction
+fn matches_encrypted_transaction(signed_transaction: &SignedTransaction) -> bool {
+    signed_transaction.payload().is_encrypted_variant()
 }
 
 /// Returns true iff the transaction's entry function matches the given account address, module name, and function name

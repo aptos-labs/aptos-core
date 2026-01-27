@@ -29,6 +29,9 @@ testnet:
     6617300504: 6617300504_account_restoration_verified_key_rotation_to_multi_ed_txn
     6617355090: 6617355090_multi_ed_txn
 
+    # signed integers
+    7243926737: 7243926737_signed_integers
+
 mainnet:
   transaction_stream_endpoint: https://grpc.mainnet.aptoslabs.com:443
   api_key: MAINNET_API_KEY
@@ -47,6 +50,7 @@ mainnet:
     2662373625: 2662373625_fa_secondary_store_burnt_with_deletion_event
     2975888978: 2975888978_fa_secondary_store_burnt_object_still_exists
     2424873868: 2424873868_fa_secondary_store_exists_object_core_deleted
+    2953383999: 2953383999_fa_secondary_store_deletion
 
     # token v2 processor
     1058723093: 1058723093_token_v1_mint_withdraw_deposit_events

@@ -730,7 +730,7 @@ No ZK range proof is necessary for the <code>amount</code>, which is given as a 
     <b>let</b> sigma_proof =
         <a href="sigma_protos.md#0x7_sigma_protos_deserialize_withdrawal_subproof">sigma_protos::deserialize_withdrawal_subproof</a>(withdraw_subproof);
     <b>assert</b>!(
-        std::option::is_some(&sigma_proof),
+        sigma_proof.is_some(),
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="veiled_coin.md#0x7_veiled_coin_EDESERIALIZATION_FAILED">EDESERIALIZATION_FAILED</a>)
     );
 
@@ -738,7 +738,7 @@ No ZK range proof is necessary for the <code>amount</code>, which is given as a 
     <b>let</b> zkrp_new_balance = bulletproofs::range_proof_from_bytes(zkrp_new_balance);
 
     <b>let</b> withdrawal_proof = <a href="veiled_coin.md#0x7_veiled_coin_WithdrawalProof">WithdrawalProof</a> {
-        sigma_proof: std::option::extract(&<b>mut</b> sigma_proof),
+        sigma_proof: sigma_proof.extract(),
         zkrp_new_balance
     };
 
@@ -863,14 +863,14 @@ as in 'deposit_ct' (with the same randomness) and as in <code>comm_amount</code>
     <b>let</b> transfer_subproof =
         <a href="sigma_protos.md#0x7_sigma_protos_deserialize_transfer_subproof">sigma_protos::deserialize_transfer_subproof</a>(transfer_subproof);
     <b>assert</b>!(
-        std::option::is_some(&transfer_subproof),
+        transfer_subproof.is_some(),
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="veiled_coin.md#0x7_veiled_coin_EDESERIALIZATION_FAILED">EDESERIALIZATION_FAILED</a>)
     );
 
     <b>let</b> transfer_proof = <a href="veiled_coin.md#0x7_veiled_coin_TransferProof">TransferProof</a> {
         zkrp_new_balance: bulletproofs::range_proof_from_bytes(zkrp_new_balance),
         zkrp_amount: bulletproofs::range_proof_from_bytes(zkrp_amount),
-        sigma_proof: std::option::extract(&<b>mut</b> transfer_subproof)
+        sigma_proof: transfer_subproof.extract()
     };
 
     // Do the actual work
@@ -914,7 +914,7 @@ WARNING: Precision is lost here (see "Veiled coin amounts as truncated <code>u32
     amount &gt;&gt; <a href="veiled_coin.md#0x7_veiled_coin_NUM_MOST_SIGNIFICANT_BITS_REMOVED">NUM_MOST_SIGNIFICANT_BITS_REMOVED</a>;
 
     // Removes the other `32 - <a href="veiled_coin.md#0x7_veiled_coin_NUM_MOST_SIGNIFICANT_BITS_REMOVED">NUM_MOST_SIGNIFICANT_BITS_REMOVED</a>` least significant bits.
-    amount = amount &gt;&gt; <a href="veiled_coin.md#0x7_veiled_coin_NUM_LEAST_SIGNIFICANT_BITS_REMOVED">NUM_LEAST_SIGNIFICANT_BITS_REMOVED</a>;
+    amount &gt;&gt;= <a href="veiled_coin.md#0x7_veiled_coin_NUM_LEAST_SIGNIFICANT_BITS_REMOVED">NUM_LEAST_SIGNIFICANT_BITS_REMOVED</a>;
 
     // We are now left <b>with</b> a 32-bit value
     (amount <b>as</b> u32)

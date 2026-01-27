@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This file defines the state merkle snapshot committer running in background thread.
 
@@ -7,6 +7,7 @@ use crate::{
     metrics::{LATEST_SNAPSHOT_VERSION, OTHER_TIMERS_SECONDS},
     pruner::PrunerManager,
     schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
+    state_merkle_db::StateMerkleDb,
     state_store::{buffered_state::CommitMessage, persisted_state::PersistedState, StateDb},
 };
 use anyhow::{anyhow, ensure, Result};
@@ -15,24 +16,30 @@ use aptos_logger::{info, trace};
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::batch::RawBatch;
 use aptos_storage_interface::state_store::{state::State, state_with_summary::StateWithSummary};
+use aptos_types::transaction::Version;
 use std::sync::{mpsc::Receiver, Arc};
 
-pub struct StateMerkleBatch {
+pub(crate) struct StateMerkleCommit {
+    pub snapshot: StateWithSummary,
+    pub hot_batch: Option<StateMerkleBatch>,
+    pub cold_batch: StateMerkleBatch,
+}
+
+pub(crate) struct StateMerkleBatch {
     pub top_levels_batch: RawBatch,
     pub batches_for_shards: Vec<RawBatch>,
-    pub snapshot: StateWithSummary,
 }
 
 pub(crate) struct StateMerkleBatchCommitter {
     state_db: Arc<StateDb>,
-    state_merkle_batch_receiver: Receiver<CommitMessage<StateMerkleBatch>>,
+    state_merkle_batch_receiver: Receiver<CommitMessage<StateMerkleCommit>>,
     persisted_state: PersistedState,
 }
 
 impl StateMerkleBatchCommitter {
     pub fn new(
         state_db: Arc<StateDb>,
-        state_merkle_batch_receiver: Receiver<CommitMessage<StateMerkleBatch>>,
+        state_merkle_batch_receiver: Receiver<CommitMessage<StateMerkleCommit>>,
         persisted_state: PersistedState,
     ) -> Self {
         Self {
@@ -46,13 +53,11 @@ impl StateMerkleBatchCommitter {
         while let Ok(msg) = self.state_merkle_batch_receiver.recv() {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["batch_committer_work"]);
             match msg {
-                CommitMessage::Data(state_merkle_batch) => {
-                    let StateMerkleBatch {
-                        top_levels_batch,
-                        batches_for_shards,
-                        snapshot,
-                    } = state_merkle_batch;
-
+                CommitMessage::Data(StateMerkleCommit {
+                    snapshot,
+                    hot_batch,
+                    cold_batch,
+                }) => {
                     let base_version = self.persisted_state.get_state_summary().version();
                     let current_version = snapshot
                         .version()
@@ -61,25 +66,30 @@ impl StateMerkleBatchCommitter {
                     // commit jellyfish merkle nodes
                     let _timer =
                         OTHER_TIMERS_SECONDS.timer_with(&["commit_jellyfish_merkle_nodes"]);
-                    self.state_db
-                        .state_merkle_db
-                        .commit(current_version, top_levels_batch, batches_for_shards)
-                        .expect("State merkle nodes commit failed.");
-                    if let Some(lru_cache) = self.state_db.state_merkle_db.lru_cache() {
-                        self.state_db
-                            .state_merkle_db
-                            .version_caches()
-                            .iter()
-                            .for_each(|(_, cache)| cache.maybe_evict_version(lru_cache));
+                    if let Some(hot_state_merkle_batch) = hot_batch {
+                        self.commit(
+                            self.state_db
+                                .hot_state_merkle_db
+                                .as_ref()
+                                .expect("Hot state merkle db must exist."),
+                            current_version,
+                            hot_state_merkle_batch,
+                        )
+                        .expect("Hot state merkle nodes commit failed.");
                     }
+                    self.commit(&self.state_db.state_merkle_db, current_version, cold_batch)
+                        .expect("State merkle nodes commit failed.");
 
                     info!(
                         version = current_version,
                         base_version = base_version,
                         root_hash = snapshot.summary().root_hash(),
+                        hot_root_hash = snapshot.summary().hot_root_hash(),
                         "State snapshot committed."
                     );
                     LATEST_SNAPSHOT_VERSION.set(current_version as i64);
+                    // TODO(HotState): no pruning for hot state right now, since we always reset it
+                    // upon restart.
                     self.state_db
                         .state_merkle_pruner
                         .maybe_set_pruner_target_db_version(current_version);
@@ -102,6 +112,25 @@ impl StateMerkleBatchCommitter {
             }
         }
         trace!("State merkle batch committing thread exit.")
+    }
+
+    fn commit(
+        &self,
+        db: &StateMerkleDb,
+        current_version: Version,
+        state_merkle_batch: StateMerkleBatch,
+    ) -> Result<()> {
+        let StateMerkleBatch {
+            top_levels_batch,
+            batches_for_shards,
+        } = state_merkle_batch;
+        db.commit(current_version, top_levels_batch, batches_for_shards)?;
+        if let Some(lru_cache) = db.lru_cache() {
+            db.version_caches()
+                .iter()
+                .for_each(|(_, cache)| cache.maybe_evict_version(lru_cache));
+        }
+        Ok(())
     }
 
     fn check_usage_consistency(&self, state: &State) -> Result<()> {

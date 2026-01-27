@@ -159,6 +159,8 @@ return true.
 -  [Function `is_monotonically_increasing_counter_enabled`](#0x1_features_is_monotonically_increasing_counter_enabled)
 -  [Function `get_function_reflection_feature`](#0x1_features_get_function_reflection_feature)
 -  [Function `is_function_reflection_enabled`](#0x1_features_is_function_reflection_enabled)
+-  [Function `get_slh_dsa_sha2_128s_signature_feature`](#0x1_features_get_slh_dsa_sha2_128s_signature_feature)
+-  [Function `slh_dsa_sha2_128s_signature_enabled`](#0x1_features_slh_dsa_sha2_128s_signature_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -1019,6 +1021,17 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_SINGLE_SENDER_AUTHENTICATOR">SINGLE_SENDER_AUTHENTICATOR</a>: u64 = 33;
+</code></pre>
+
+
+
+<a id="0x1_features_SLH_DSA_SHA2_128S_SIGNATURE"></a>
+
+Whether SLH-DSA-SHA2-128s signature scheme is enabled for transaction authentication.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_SLH_DSA_SHA2_128S_SIGNATURE">SLH_DSA_SHA2_128S_SIGNATURE</a>: u64 = 107;
 </code></pre>
 
 
@@ -3045,8 +3058,8 @@ Deprecated feature
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_v2_is_at_least_api_enabled">aggregator_v2_is_at_least_api_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_AGGREGATOR_V2_IS_AT_LEAST_API">AGGREGATOR_V2_IS_AT_LEAST_API</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_v2_is_at_least_api_enabled">aggregator_v2_is_at_least_api_enabled</a>(): bool {
+    <b>true</b>
 }
 </code></pre>
 
@@ -3091,8 +3104,8 @@ Deprecated feature
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_object_native_derived_address_enabled">object_native_derived_address_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_OBJECT_NATIVE_DERIVED_ADDRESS">OBJECT_NATIVE_DERIVED_ADDRESS</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_object_native_derived_address_enabled">object_native_derived_address_enabled</a>(): bool {
+    <b>true</b>
 }
 </code></pre>
 
@@ -3137,8 +3150,8 @@ Deprecated feature
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_dispatchable_fungible_asset_enabled">dispatchable_fungible_asset_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DISPATCHABLE_FUNGIBLE_ASSET">DISPATCHABLE_FUNGIBLE_ASSET</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_dispatchable_fungible_asset_enabled">dispatchable_fungible_asset_enabled</a>(): bool {
+    <b>true</b>
 }
 </code></pre>
 
@@ -3505,8 +3518,8 @@ Deprecated feature
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_native_memory_operations_enabled">is_native_memory_operations_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_NATIVE_MEMORY_OPERATIONS">NATIVE_MEMORY_OPERATIONS</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_native_memory_operations_enabled">is_native_memory_operations_enabled</a>(): bool {
+    <b>true</b>
 }
 </code></pre>
 
@@ -4062,6 +4075,52 @@ Deprecated feature
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_function_reflection_enabled">is_function_reflection_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_FUNCTION_REFLECTION">FUNCTION_REFLECTION</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_slh_dsa_sha2_128s_signature_feature"></a>
+
+## Function `get_slh_dsa_sha2_128s_signature_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_slh_dsa_sha2_128s_signature_feature">get_slh_dsa_sha2_128s_signature_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_slh_dsa_sha2_128s_signature_feature">get_slh_dsa_sha2_128s_signature_feature</a>(): u64 { <a href="features.md#0x1_features_SLH_DSA_SHA2_128S_SIGNATURE">SLH_DSA_SHA2_128S_SIGNATURE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_slh_dsa_sha2_128s_signature_enabled"></a>
+
+## Function `slh_dsa_sha2_128s_signature_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_slh_dsa_sha2_128s_signature_enabled">slh_dsa_sha2_128s_signature_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_slh_dsa_sha2_128s_signature_enabled">slh_dsa_sha2_128s_signature_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_SLH_DSA_SHA2_128S_SIGNATURE">SLH_DSA_SHA2_128S_SIGNATURE</a>)
 }
 </code></pre>
 

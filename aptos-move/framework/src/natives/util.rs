@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
@@ -51,11 +51,7 @@ fn native_from_bytes(
         .deserialize(&bytes, &layout)
     {
         Some(val) => val,
-        None => {
-            return Err(SafeNativeError::Abort {
-                abort_code: EFROM_BYTES,
-            })
-        },
+        None => return Err(SafeNativeError::abort(EFROM_BYTES)),
     };
 
     Ok(smallvec![val])

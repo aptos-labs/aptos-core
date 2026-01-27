@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::natives::create_signer;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
@@ -40,9 +39,9 @@ fn native_create_address(
     if let Ok(address) = address {
         Ok(smallvec![Value::address(address)])
     } else {
-        Err(SafeNativeError::Abort {
-            abort_code: super::status::NFE_UNABLE_TO_PARSE_ADDRESS,
-        })
+        Err(SafeNativeError::abort(
+            super::status::NFE_UNABLE_TO_PARSE_ADDRESS,
+        ))
     }
 }
 

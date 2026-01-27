@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::common::types::{CliError, CliTypedResult};
 use aptos_crypto::HashValue;
@@ -7,7 +7,7 @@ use aptos_gas_profiling::FrameName;
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_types::transaction::{AuxiliaryInfo, PersistedAuxiliaryInfo, SignedTransaction};
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
-use aptos_vm_environment::environment::AptosEnvironment;
+use aptos_vm_environment::{environment::AptosEnvironment, prod_configs};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{
     module_and_script_storage::AsAptosCodeStorage, output::VMOutput, resolver::StateStorageView,
@@ -22,6 +22,9 @@ pub fn run_transaction_using_debugger(
     _hash: HashValue,
     persisted_auxiliary_info: PersistedAuxiliaryInfo,
 ) -> CliTypedResult<(VMStatus, VMOutput)> {
+    // Enable debugging so MOVE_VM_STEP and MOVE_VM_TRACE environment variables are recognized.
+    prod_configs::set_debugging_enabled(true);
+
     let state_view = debugger.state_view_at_version(version);
     let env = AptosEnvironment::new(&state_view);
     let vm = AptosVM::new(&env);

@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::utils::{explorer_transaction_link, fund_account, strip_private_key_prefix};
 use crate::{
@@ -1511,6 +1511,10 @@ pub struct TransactionSummary {
     pub version: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub vm_status: Option<String>,
+
+    /// The address of the deployed code object. Only present for code object deployment transactions.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deployed_object_address: Option<AccountAddress>,
 }
 
 impl From<Transaction> for TransactionSummary {
@@ -1536,6 +1540,7 @@ impl From<&Transaction> for TransactionSummary {
                 version: None,
                 vm_status: None,
                 timestamp_us: None,
+                deployed_object_address: None,
             },
             Transaction::UserTransaction(txn) => TransactionSummary {
                 transaction_hash: txn.info.hash,
@@ -1552,6 +1557,7 @@ impl From<&Transaction> for TransactionSummary {
                 replay_protector: Some(txn.request.replay_protector()),
                 timestamp_us: Some(txn.timestamp.0),
                 pending: None,
+                deployed_object_address: None,
             },
             Transaction::GenesisTransaction(txn) => TransactionSummary {
                 transaction_hash: txn.info.hash,
@@ -1565,6 +1571,7 @@ impl From<&Transaction> for TransactionSummary {
                 sequence_number: None,
                 replay_protector: None,
                 timestamp_us: None,
+                deployed_object_address: None,
             },
             Transaction::BlockMetadataTransaction(txn) => TransactionSummary {
                 transaction_hash: txn.info.hash,
@@ -1578,6 +1585,7 @@ impl From<&Transaction> for TransactionSummary {
                 pending: None,
                 sequence_number: None,
                 replay_protector: None,
+                deployed_object_address: None,
             },
             Transaction::StateCheckpointTransaction(txn) => TransactionSummary {
                 transaction_hash: txn.info.hash,
@@ -1591,6 +1599,7 @@ impl From<&Transaction> for TransactionSummary {
                 pending: None,
                 sequence_number: None,
                 replay_protector: None,
+                deployed_object_address: None,
             },
             Transaction::BlockEpilogueTransaction(txn) => TransactionSummary {
                 transaction_hash: txn.info.hash,
@@ -1604,6 +1613,7 @@ impl From<&Transaction> for TransactionSummary {
                 pending: None,
                 sequence_number: None,
                 replay_protector: None,
+                deployed_object_address: None,
             },
             Transaction::ValidatorTransaction(txn) => TransactionSummary {
                 transaction_hash: txn.transaction_info().hash,
@@ -1617,6 +1627,7 @@ impl From<&Transaction> for TransactionSummary {
                 timestamp_us: Some(txn.timestamp().0),
                 version: Some(txn.transaction_info().version.0),
                 vm_status: Some(txn.transaction_info().vm_status.clone()),
+                deployed_object_address: None,
             },
         }
     }
@@ -1882,8 +1893,22 @@ impl TransactionOptions {
     }
 
     pub async fn sequence_number(&self, sender_address: AccountAddress) -> CliTypedResult<u64> {
-        let client = self.rest_client()?;
-        get_sequence_number(&client, sender_address).await
+        match &self.session {
+            None => {
+                let client = self.rest_client()?;
+                get_sequence_number(&client, sender_address).await
+            },
+            Some(session_path) => {
+                let sess = Session::load(session_path)?;
+
+                let account = sess
+                    .state_store()
+                    .get_resource::<AccountResource>(sender_address)?;
+                let seq_num = account.map(|account| account.sequence_number).unwrap_or(0);
+
+                Ok(seq_num)
+            },
+        }
     }
 
     pub async fn view(&self, payload: ViewFunction) -> CliTypedResult<Vec<serde_json::Value>> {
@@ -2181,6 +2206,7 @@ impl TransactionOptions {
             timestamp_us: None,
             version: Some(version), // The transaction is not comitted so there is no new version.
             vm_status: Some(vm_status.to_string()),
+            deployed_object_address: None,
         };
 
         Ok(summary)
@@ -2251,6 +2277,7 @@ impl TransactionOptions {
             timestamp_us: None,
             version: None,
             vm_status: Some(vm_status.to_string()),
+            deployed_object_address: None,
         };
 
         Ok(summary)
@@ -2656,19 +2683,26 @@ pub struct LargePackagesModuleOption {
 impl LargePackagesModuleOption {
     pub(crate) async fn large_packages_module_address(
         &self,
-        client: &Client,
+        txn_options: &TransactionOptions,
     ) -> Result<AccountAddress, CliError> {
         if let Some(address) = self.large_packages_module_address {
-            Ok(address)
-        } else {
-            let chain_id = ChainId::new(client.get_ledger_information().await?.inner().chain_id);
-            Ok(
-                AccountAddress::from_str_strict(default_large_packages_module_address(&chain_id))
-                    .map_err(|err| {
-                    CliError::UnableToParse("Default Large Package Module Address", err.to_string())
-                })?,
-            )
+            return Ok(address);
         }
+
+        let chain_id = match &txn_options.session {
+            None => {
+                let client = txn_options.rest_client()?;
+                ChainId::new(client.get_ledger_information().await?.inner().chain_id)
+            },
+            Some(session_path) => {
+                let sess = Session::load(session_path)?;
+                sess.state_store().get_chain_id()?
+            },
+        };
+
+        AccountAddress::from_str_strict(default_large_packages_module_address(&chain_id)).map_err(
+            |err| CliError::UnableToParse("Default Large Package Module Address", err.to_string()),
+        )
     }
 }
 

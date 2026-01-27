@@ -1,11 +1,10 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{add_accounts_impl, PipelineConfig, StorageTestConfig};
 use aptos_config::{
     config::{
-        RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
+        HotStateConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
     },
     utils::get_genesis_txn,
@@ -101,10 +100,11 @@ pub(crate) fn bootstrap_with_genesis(
             false, /* readonly */
             NO_OP_STORAGE_PRUNER_CONFIG,
             rocksdb_configs,
-            false, /* indexer */
+            false, /* enable_indexer */
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-            None,
+            None, /* internal_indexer_db */
+            HotStateConfig::default(),
         )
         .expect("DB should open."),
     );

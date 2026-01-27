@@ -4,8 +4,6 @@ module aptos_framework::transaction_validation {
     use std::option;
     use std::option::Option;
     use std::signer;
-    use std::vector;
-
     use aptos_framework::account;
     use aptos_framework::aptos_account;
     use aptos_framework::account_abstraction;
@@ -22,8 +20,9 @@ module aptos_framework::transaction_validation {
     friend aptos_framework::genesis;
 
     // We will advertise to the community that max expiration time for orderless txns is 60 seconds.
-    // Adding a 5 second slack here as the client's time and the blockchain's time may drift.
-    const MAX_EXPIRATION_TIME_SECONDS_FOR_ORDERLESS_TXNS: u64 = 65;
+    // Adding a 40 second slack here as the client's time and the blockchain's time may drift,
+    // and to account for any fallen behind fullnodes that are performing simulation on old blockchain state.
+    const MAX_EXP_TIME_SECONDS_FOR_ORDERLESS_TXNS: u64 = 100;
 
     // We need to ensure that a transaction can't be replayed.
     // There are two ways to prevent replay attacks:
@@ -146,7 +145,7 @@ module aptos_framework::transaction_validation {
 
         // Check if the authentication key is valid
         if (!skip_auth_key_check(is_simulation, &txn_authentication_key)) {
-            if (option::is_some(&txn_authentication_key)) {
+            if (txn_authentication_key.is_some()) {
                 if (
                     sender_address == gas_payer_address ||
                     account::exists_at(sender_address) ||
@@ -255,7 +254,7 @@ module aptos_framework::transaction_validation {
     ) {
         // prologue_common already checks that the current_time > txn_expiration_time
         assert!(
-            txn_expiration_time <= timestamp::now_seconds() + MAX_EXPIRATION_TIME_SECONDS_FOR_ORDERLESS_TXNS,
+            txn_expiration_time <= timestamp::now_seconds() + MAX_EXP_TIME_SECONDS_FOR_ORDERLESS_TXNS,
             error::invalid_argument(PROLOGUE_ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE),
         );
         assert!(nonce_validation::check_and_insert_nonce(sender, nonce, txn_expiration_time), error::invalid_argument(PROLOGUE_ENONCE_ALREADY_USED));
@@ -338,7 +337,7 @@ module aptos_framework::transaction_validation {
         );
         multi_agent_common_prologue(
             secondary_signer_addresses,
-            vector::map(secondary_signer_public_key_hashes, |x| option::some(x)),
+            secondary_signer_public_key_hashes.map(|x| option::some(x)),
             false
         );
     }
@@ -371,7 +370,7 @@ module aptos_framework::transaction_validation {
         );
         multi_agent_common_prologue(
             secondary_signer_addresses,
-            vector::map(secondary_signer_public_key_hashes, |x| option::some(x)),
+            secondary_signer_public_key_hashes.map(|x| option::some(x)),
             is_simulation
         );
     }
@@ -381,9 +380,9 @@ module aptos_framework::transaction_validation {
         secondary_signer_public_key_hashes: vector<Option<vector<u8>>>,
         is_simulation: bool,
     ) {
-        let num_secondary_signers = vector::length(&secondary_signer_addresses);
+        let num_secondary_signers = secondary_signer_addresses.length();
         assert!(
-            vector::length(&secondary_signer_public_key_hashes) == num_secondary_signers,
+            secondary_signer_public_key_hashes.length() == num_secondary_signers,
             error::invalid_argument(PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH),
         );
 
@@ -415,11 +414,11 @@ module aptos_framework::transaction_validation {
             // };
             (i < num_secondary_signers)
         }) {
-            let secondary_address = *vector::borrow(&secondary_signer_addresses, i);
+            let secondary_address = secondary_signer_addresses[i];
             assert!(account::exists_at(secondary_address), error::invalid_argument(PROLOGUE_EACCOUNT_DOES_NOT_EXIST));
-            let signer_public_key_hash = *vector::borrow(&secondary_signer_public_key_hashes, i);
+            let signer_public_key_hash = secondary_signer_public_key_hashes[i];
             if (!skip_auth_key_check(is_simulation, &signer_public_key_hash)) {
-                if (option::is_some(&signer_public_key_hash)) {
+                if (signer_public_key_hash.is_some()) {
                     assert!(
                         signer_public_key_hash == option::some(account::get_authentication_key(secondary_address)),
                         error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
@@ -432,7 +431,7 @@ module aptos_framework::transaction_validation {
                 };
             };
 
-            i = i + 1;
+            i += 1;
         }
     }
 
@@ -449,7 +448,6 @@ module aptos_framework::transaction_validation {
         txn_expiration_time: u64,
         chain_id: u8,
     ) {
-        assert!(features::fee_payer_enabled(), error::invalid_state(PROLOGUE_EFEE_PAYER_NOT_ENABLED));
         // prologue_common and multi_agent_common_prologue with is_simulation set to false behaves identically to the
         // original fee_payer_script_prologue function.
         prologue_common(
@@ -465,7 +463,7 @@ module aptos_framework::transaction_validation {
         );
         multi_agent_common_prologue(
             secondary_signer_addresses,
-            vector::map(secondary_signer_public_key_hashes, |x| option::some(x)),
+            secondary_signer_public_key_hashes.map(|x| option::some(x)),
             false
         );
         assert!(
@@ -491,7 +489,6 @@ module aptos_framework::transaction_validation {
         chain_id: u8,
         is_simulation: bool,
     ) {
-        assert!(features::fee_payer_enabled(), error::invalid_state(PROLOGUE_EFEE_PAYER_NOT_ENABLED));
         prologue_common(
             &sender,
             &create_signer::create_signer(fee_payer_address),
@@ -505,7 +502,7 @@ module aptos_framework::transaction_validation {
         );
         multi_agent_common_prologue(
             secondary_signer_addresses,
-            vector::map(secondary_signer_public_key_hashes, |x| option::some(x)),
+            secondary_signer_public_key_hashes.map(|x| option::some(x)),
             is_simulation
         );
         if (!skip_auth_key_check(is_simulation, &option::some(fee_payer_public_key_hash))) {
@@ -633,7 +630,7 @@ module aptos_framework::transaction_validation {
     }
 
     inline fun skip_auth_key_check(is_simulation: bool, auth_key: &Option<vector<u8>>): bool {
-        is_simulation && (option::is_none(auth_key) || vector::is_empty(option::borrow(auth_key)))
+        is_simulation && (auth_key.is_none() || auth_key.borrow().is_empty())
     }
 
     inline fun skip_gas_payment(is_simulation: bool, gas_payer: address): bool {
@@ -786,7 +783,7 @@ module aptos_framework::transaction_validation {
         multi_agent_common_prologue(secondary_signer_addresses, secondary_signer_public_key_hashes, is_simulation);
         if (!skip_auth_key_check(is_simulation, &fee_payer_public_key_hash)) {
             let fee_payer_address = signer::address_of(&fee_payer);
-            if (option::is_some(&fee_payer_public_key_hash)) {
+            if (fee_payer_public_key_hash.is_some()) {
                 assert!(
                     fee_payer_public_key_hash == option::some(account::get_authentication_key(fee_payer_address)),
                     error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)

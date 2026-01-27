@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     algebra::polynomials,
@@ -15,7 +15,9 @@ use anyhow::ensure;
 use aptos_crypto::arkworks::random::UniformRand;
 use aptos_crypto::{
     arkworks::{
+        msm::{IsMsmInput, MsmInput},
         random::{sample_field_element, unsafe_random_point},
+        srs::{lagrange_basis, powers_of_tau, SrsBasis, SrsType},
         GroupGenerators,
     },
     utils,
@@ -25,16 +27,18 @@ use ark_ec::{
     pairing::{Pairing, PairingOutput},
     AdditiveGroup, CurveGroup, VariableBaseMSM,
 };
-use ark_ff::Field;
-use ark_poly::EvaluationDomain;
+use ark_ff::{Field, PrimeField};
+use ark_poly::{
+    polynomial::univariate::DensePolynomial, univariate::DenseOrSparsePolynomial, EvaluationDomain,
+};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::{CryptoRng, RngCore};
 use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
-use std::fmt::Debug;
+use std::{borrow::Cow, fmt::Debug};
 
 pub type Commitment<E> = CodomainShape<<E as Pairing>::G1>;
 
-pub type CommitmentRandomness<E> = Scalar<E>;
+pub type CommitmentRandomness<F> = Scalar<F>;
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, PartialEq, Eq, Clone)]
 pub struct OpeningProof<E: Pairing> {
@@ -47,33 +51,41 @@ impl<E: Pairing> OpeningProof<E> {
     /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
     pub fn generate<R: rand::Rng + rand::CryptoRng>(rng: &mut R) -> Self {
         Self {
-            pi_1: sigma_protocol::homomorphism::TrivialShape(unsafe_random_point(rng)),
-            pi_2: unsafe_random_point(rng),
+            pi_1: sigma_protocol::homomorphism::TrivialShape(
+                unsafe_random_point::<E::G1, _>(rng).into(),
+            ),
+            pi_2: unsafe_random_point::<E::G1, _>(rng).into(),
         }
     }
 }
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct VerificationKey<E: Pairing> {
     pub xi_2: E::G2Affine,
     pub tau_2: E::G2Affine,
     pub group_generators: GroupGenerators<E>,
 }
 
+// For Zeromorph one also need powers of tau in g2
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
+pub struct VerificationKeyExtra<E: Pairing> {
+    pub vk: VerificationKey<E>,
+    pub g2_powers: Vec<E::G2Affine>,
+}
+
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CommitmentKey<E: Pairing> {
     pub xi_1: E::G1Affine,
     pub tau_1: E::G1Affine,
-    pub lagr_g1: Vec<E::G1Affine>,
+    pub msm_basis: SrsBasis<E::G1>,
     pub eval_dom: ark_poly::Radix2EvaluationDomain<E::ScalarField>,
     pub roots_of_unity_in_eval_dom: Vec<E::ScalarField>,
-    pub one_1: E::G1Affine,
+    pub g1: E::G1Affine,
     pub m_inv: E::ScalarField,
 }
 
 #[derive(CanonicalSerialize, Debug, Clone)]
 pub struct Trapdoor<E: Pairing> {
-    // Not sure this is the ideal location for tau...
     pub xi: E::ScalarField,
     pub tau: E::ScalarField,
 }
@@ -87,49 +99,33 @@ impl<E: Pairing> Trapdoor<E> {
     }
 }
 
-pub fn lagrange_basis<E: Pairing>(
-    n: usize,
-    g1: E::G1Affine,
-    eval_dom: ark_poly::Radix2EvaluationDomain<E::ScalarField>,
-    tau: E::ScalarField,
-) -> Vec<E::G1Affine> {
-    let powers_of_tau = utils::powers(tau, n);
-    let lagr_basis_scalars = eval_dom.ifft(&powers_of_tau);
-    debug_assert!(lagr_basis_scalars.iter().sum::<E::ScalarField>() == E::ScalarField::ONE);
-
-    let lagr_g1_proj: Vec<E::G1> = lagr_basis_scalars.iter().map(|s| g1 * s).collect();
-    E::G1::normalize_batch(&lagr_g1_proj)
-}
-
-pub fn setup<E: Pairing, R: RngCore + CryptoRng>(
+pub fn setup<E: Pairing>(
     m: usize,
+    basis_type: SrsType,
     group_generators: GroupGenerators<E>,
     trapdoor: Trapdoor<E>,
-    _rng: &mut R,
 ) -> (VerificationKey<E>, CommitmentKey<E>) {
-    assert!(
-        m.is_power_of_two(),
-        "Parameter m must be a power of 2, but got {}",
-        m
-    );
+    utils::assert_power_of_two(m as u64);
 
-    let GroupGenerators {
-        g1: one_1,
-        g2: one_2,
-    } = group_generators;
+    let GroupGenerators { g1, g2 } = group_generators;
     let Trapdoor { xi, tau } = trapdoor;
 
-    let xi_1 = (one_1 * xi).into_affine();
-    let tau_1 = (one_1 * tau).into_affine();
-
-    let xi_2 = (one_2 * xi).into_affine();
-    let tau_2 = (one_2 * tau).into_affine();
+    let (xi_1, tau_1) = ((g1 * xi).into_affine(), (g1 * tau).into_affine());
+    let (xi_2, tau_2) = ((g2 * xi).into_affine(), (g2 * tau).into_affine());
 
     let eval_dom = ark_poly::Radix2EvaluationDomain::<E::ScalarField>::new(m)
         .expect("Could not construct evaluation domain");
-    let lagr_g1 = lagrange_basis::<E>(m, one_1, eval_dom, tau);
-    let roots_of_unity_in_eval_dom: Vec<E::ScalarField> = eval_dom.elements().collect();
 
+    let msm_basis = match basis_type {
+        SrsType::Lagrange => SrsBasis::Lagrange {
+            lagr: lagrange_basis::<E::G1>(g1.into(), tau, m, eval_dom),
+        },
+        SrsType::PowersOfTau => SrsBasis::PowersOfTau {
+            tau_powers: powers_of_tau::<E::G1>(g1.into(), tau, m),
+        },
+    };
+
+    let roots_of_unity_in_eval_dom = eval_dom.elements().collect();
     let m_inv = E::ScalarField::from(m as u64).inverse().unwrap();
 
     (
@@ -141,28 +137,58 @@ pub fn setup<E: Pairing, R: RngCore + CryptoRng>(
         CommitmentKey {
             xi_1,
             tau_1,
-            lagr_g1,
+            msm_basis,
             eval_dom,
             roots_of_unity_in_eval_dom,
-            one_1,
+            g1,
             m_inv,
         },
     )
 }
 
+pub fn setup_extra<E: Pairing>(
+    m: usize,
+    basis_type: SrsType,
+    group_generators: GroupGenerators<E>,
+    trapdoor: Trapdoor<E>,
+) -> (VerificationKeyExtra<E>, CommitmentKey<E>) {
+    let tau = trapdoor.tau;
+
+    let (vk, ck) = setup(m, basis_type, group_generators, trapdoor);
+
+    let g2_powers = powers_of_tau::<E::G2>(vk.group_generators.g2.into(), tau, m);
+
+    (VerificationKeyExtra { vk, g2_powers }, ck)
+}
+
 pub fn commit_with_randomness<E: Pairing>(
     ck: &CommitmentKey<E>,
     values: &[E::ScalarField],
-    r: &CommitmentRandomness<E>,
+    r: &CommitmentRandomness<E::ScalarField>,
 ) -> Commitment<E> {
+    commit_with_randomness_and_offset(ck, values, r, 0)
+}
+
+pub fn commit_with_randomness_and_offset<E: Pairing>(
+    ck: &CommitmentKey<E>,
+    values: &[E::ScalarField],
+    r: &CommitmentRandomness<E::ScalarField>,
+    offset: usize,
+) -> Commitment<E> {
+    let msm_basis: &[E::G1Affine] = match &ck.msm_basis {
+        SrsBasis::Lagrange { lagr: lagr_g1 } => &lagr_g1[offset..],
+        SrsBasis::PowersOfTau {
+            tau_powers: tau_powers_g1,
+        } => &tau_powers_g1[offset..],
+    };
     let commitment_hom: CommitmentHomomorphism<'_, E> = CommitmentHomomorphism {
-        lagr_g1: &ck.lagr_g1,
+        msm_basis,
         xi_1: ck.xi_1,
     };
 
     let input = Witness {
         hiding_randomness: r.clone(),
-        values: Scalar::vec_from_inner_slice(values),
+        values: Scalar::vec_from_inner_slice(&values[offset..]),
     };
 
     commitment_hom.apply(&input)
@@ -171,22 +197,45 @@ pub fn commit_with_randomness<E: Pairing>(
 impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
     pub fn open(
         ck: &CommitmentKey<E>,
-        f_evals: Vec<E::ScalarField>,
+        f_vals: Vec<E::ScalarField>, // needs to be evaluations of a polynomial f OR its coefficients, depending on `ck.msm_basis`
         rho: E::ScalarField,
         x: E::ScalarField,
         y: E::ScalarField,
-        s: &CommitmentRandomness<E>,
+        s: &CommitmentRandomness<E::ScalarField>,
     ) -> OpeningProof<E> {
-        if ck.roots_of_unity_in_eval_dom.contains(&x) {
-            panic!("x is not allowed to be a root of unity");
-        }
-        let q_evals =
-            polynomials::quotient_evaluations_batch(&f_evals, &ck.roots_of_unity_in_eval_dom, x, y);
+        let q_vals = match &ck.msm_basis {
+            SrsBasis::Lagrange { .. } => {
+                // Lagrange basis expects f_vals to be evaluations, and we return q_vals with evaluations
+                // The `quotient_evaluations_batch()` function divides over `(theta_i - x)` for `theta_i` an m-th root of unity, hence:
+                if ck.roots_of_unity_in_eval_dom.contains(&x) {
+                    panic!("x is not allowed to be a root of unity");
+                }
+                polynomials::quotient_evaluations_batch(
+                    &f_vals,
+                    &ck.roots_of_unity_in_eval_dom,
+                    x,
+                    y,
+                )
+            },
+            SrsBasis::PowersOfTau { .. } => {
+                // Powers-of-Tau expects f_vals to be coefficients, and we return q_vals with coefficients
+                // For some reason arkworks only implemented `divide_with_q_and_r()` for `DenseOrSparsePolynomial`
+                let f_dense = DensePolynomial { coeffs: f_vals };
+                let f = DenseOrSparsePolynomial::DPolynomial(Cow::Owned(f_dense));
+                let divisor_dense = DensePolynomial {
+                    coeffs: vec![-x, E::ScalarField::ONE],
+                };
+                let divisor = DenseOrSparsePolynomial::DPolynomial(Cow::Owned(divisor_dense));
 
-        let pi_1 = commit_with_randomness(ck, &q_evals, s);
+                let (q, _) = f.divide_with_q_and_r(&divisor).expect("Could not divide polynomial, but that shouldn't happen because the divisor is nonzero");
+                q.coeffs
+            },
+        };
+
+        let pi_1 = commit_with_randomness(ck, &q_vals, s);
 
         // For this small MSM, the direct approach seems to be faster than using `E::G1::msm()`
-        let pi_2 = (ck.one_1 * rho) - (ck.tau_1 - ck.one_1 * x) * s.0;
+        let pi_2 = (ck.g1 * rho) - (ck.tau_1 - ck.g1 * x) * s.0;
 
         OpeningProof { pi_1, pi_2 }
     }
@@ -268,43 +317,43 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
 /// TODO: Since this code is quite similar to that of ordinary KZG, it may be possible to reduce it a bit
 #[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
 pub struct CommitmentHomomorphism<'a, E: Pairing> {
-    pub lagr_g1: &'a [E::G1Affine],
+    pub msm_basis: &'a [E::G1Affine],
     pub xi_1: E::G1Affine,
 }
 
 #[derive(
     SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq,
 )]
-pub struct Witness<E: Pairing> {
-    pub hiding_randomness: CommitmentRandomness<E>,
-    pub values: Vec<Scalar<E>>,
+pub struct Witness<F: PrimeField> {
+    pub hiding_randomness: CommitmentRandomness<F>,
+    pub values: Vec<Scalar<F>>,
 }
 
 impl<E: Pairing> homomorphism::Trait for CommitmentHomomorphism<'_, E> {
     type Codomain = CodomainShape<E::G1>;
-    type Domain = Witness<E>;
+    type Domain = Witness<E::ScalarField>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
+        // CommitmentHomomorphism::<'_, E>::normalize_output(self.apply_msm(self.msm_terms(input)))
         self.apply_msm(self.msm_terms(input))
     }
 }
 
 impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
-    type Base = E::G1Affine;
     type CodomainShape<T>
         = CodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-    type MsmInput = fixed_base_msms::MsmInput<Self::Base, Self::Scalar>;
+    type MsmInput = MsmInput<E::G1Affine, E::ScalarField>;
     type MsmOutput = E::G1;
     type Scalar = E::ScalarField;
 
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
         assert!(
-            self.lagr_g1.len() >= input.values.len(),
+            self.msm_basis.len() >= input.values.len(),
             "Not enough Lagrange basis elements for univariate hiding KZG: required {}, got {}",
             input.values.len(),
-            self.lagr_g1.len()
+            self.msm_basis.len()
         );
 
         let mut scalars = Vec::with_capacity(input.values.len() + 1);
@@ -313,17 +362,18 @@ impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
 
         let mut bases = Vec::with_capacity(input.values.len() + 1);
         bases.push(self.xi_1);
-        bases.extend(&self.lagr_g1[..input.values.len()]);
+        bases.extend(&self.msm_basis[..input.values.len()]);
 
-        CodomainShape(fixed_base_msms::MsmInput { bases, scalars })
+        CodomainShape(MsmInput { bases, scalars })
     }
 
-    fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
-        E::G1::msm(bases, &scalars).expect("MSM computation failed in univariate KZG")
+    fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
+        E::G1::msm(input.bases(), &input.scalars())
+            .expect("MSM computation failed in univariate KZG")
     }
 }
 
-impl<'a, E: Pairing> sigma_protocol::Trait<E> for CommitmentHomomorphism<'a, E> {
+impl<'a, E: Pairing> sigma_protocol::Trait<E::G1> for CommitmentHomomorphism<'a, E> {
     fn dst(&self) -> Vec<u8> {
         b"APTOS_HIDING_KZG_SIGMA_PROTOCOL_DST".to_vec()
     }
@@ -347,7 +397,7 @@ mod tests {
         let m = 64;
         let xi = sample_field_element(&mut rng);
         let tau = sample_field_element(&mut rng);
-        let (vk, ck) = setup::<E, _>(m, group_data, Trapdoor { xi, tau }, &mut rng);
+        let (vk, ck) = setup::<E>(m, SrsType::Lagrange, group_data, Trapdoor { xi, tau });
 
         let f_coeffs: Vec<Fr<E>> = sample_field_elements(m, &mut rng);
         let poly = DensePolynomial::<Fr<E>> { coeffs: f_coeffs };

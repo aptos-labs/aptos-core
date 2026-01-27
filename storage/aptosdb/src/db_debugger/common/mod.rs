@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     db_debugger::ShardingConfig, ledger_db::LedgerDb, state_kv_db::StateKvDb,
@@ -36,8 +36,10 @@ impl DbDir {
             },
             env,
             block_cache,
-            false,
-            0,
+            /* read_only = */ false,
+            /* max_nodes_per_lru_cache_shard = */ 0,
+            /* is_hot = */ false,
+            /* delete_on_restart = */ false,
         )
     }
 

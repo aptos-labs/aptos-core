@@ -21,13 +21,12 @@ pub mod tracing;
 pub mod config;
 pub mod module_traversal;
 
-// Only include debugging functionality in debug builds
-#[cfg(any(debug_assertions, feature = "debugging"))]
 mod debug;
 
 mod access_control;
 mod frame;
 mod frame_type_cache;
+mod native_models_for_runtime_ref_checks;
 mod reentrancy_checker;
 mod runtime_ref_checks;
 mod runtime_type_checks;

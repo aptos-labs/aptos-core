@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::natives::aggregator_natives::aggregator_v2::{
     EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE, EUNSUPPORTED_AGGREGATOR_TYPE,
@@ -30,7 +30,7 @@ macro_rules! get_value_impl {
             Ok(match ty {
                 Type::U128 => safely_get_struct_field_as!(struct_ref, $idx, u128),
                 Type::U64 => safely_get_struct_field_as!(struct_ref, $idx, u64) as u128,
-                _ => return Err(SafeNativeError::Abort { abort_code: $e }),
+                _ => return Err(SafeNativeError::abort($e)),
             })
         }
     };
@@ -65,7 +65,7 @@ macro_rules! get_value_as_id_impl {
                 Type::U64 | Type::U128 => {
                     safely_get_struct_field_as!(struct_ref, $idx, DelayedFieldID)
                 },
-                _ => return Err(SafeNativeError::Abort { abort_code: $e }),
+                _ => return Err(SafeNativeError::abort($e)),
             };
 
             // Make sure we validate generated id is correct, i.e. it lies within the
@@ -104,11 +104,7 @@ pub(crate) fn unbounded_aggregator_max_value(ty: &Type) -> SafeNativeResult<u128
     Ok(match ty {
         Type::U128 => u128::MAX,
         Type::U64 => u64::MAX as u128,
-        _ => {
-            return Err(SafeNativeError::Abort {
-                abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,
-            })
-        },
+        _ => return Err(SafeNativeError::abort(EUNSUPPORTED_AGGREGATOR_TYPE)),
     })
 }
 

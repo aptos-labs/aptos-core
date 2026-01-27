@@ -7,7 +7,7 @@ warning: Unused value of parameter `x`. Consider removing the parameter, or pref
   │                ^
 
 Command `disassemble --package Test --name m`:
-// Move bytecode v9
+// Move bytecode v10
 module 42.m {
 
 

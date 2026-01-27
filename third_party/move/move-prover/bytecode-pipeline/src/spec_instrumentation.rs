@@ -411,7 +411,7 @@ impl<'a> Instrumenter<'a> {
                 );
             },
             Call(id, _, MoveTo(mid, sid, targs), srcs, _) => {
-                let addr_exp = self.builder.mk_temporary(srcs[1]);
+                let addr_exp = self.builder.mk_temporary(srcs[0]);
                 self.generate_modifies_check(
                     PropKind::Assert,
                     spec,
@@ -436,7 +436,7 @@ impl<'a> Instrumenter<'a> {
                 self.builder.emit_with(|id| Jump(id, ret_label));
                 self.can_return = true;
             },
-            Abort(id, code) => {
+            Abort(id, code, _) => {
                 self.builder.set_loc_from_attr(id);
                 let abort_local = self.abort_local;
                 let abort_label = self.abort_label;
@@ -882,7 +882,7 @@ impl<'a> Instrumenter<'a> {
 
         // Emit abort
         let abort_local = self.abort_local;
-        self.builder.emit_with(|id| Abort(id, abort_local));
+        self.builder.emit_with(|id| Abort(id, abort_local, None));
     }
 
     /// Generates verification conditions for abort block.

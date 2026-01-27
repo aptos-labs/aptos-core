@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     abort_unless_feature_flag_enabled,
@@ -97,9 +97,9 @@ macro_rules! multi_pairing_internal {
         let g1_element_handles = safely_pop_arg!($args, Vec<u64>);
         let num_entries = g1_element_handles.len();
         if num_entries != g2_element_handles.len() {
-            return Err(SafeNativeError::Abort {
-                abort_code: MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING,
-            });
+            return Err(SafeNativeError::abort(
+                MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING,
+            ));
         }
 
         $context.charge($g1_proj_to_affine_gas.per::<Arg>() * NumArgs::from(num_entries as u64))?;
@@ -162,9 +162,7 @@ pub fn multi_pairing_internal(
                 ALGEBRA_ARK_BN254_G2_PROJ_TO_AFFINE
             )
         },
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
+        _ => Err(SafeNativeError::abort(MOVE_ABORT_CODE_NOT_IMPLEMENTED)),
     }
 }
 
@@ -203,8 +201,6 @@ pub fn pairing_internal(
                 ALGEBRA_ARK_BN254_G2_PROJ_TO_AFFINE
             )
         },
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
+        _ => Err(SafeNativeError::abort(MOVE_ABORT_CODE_NOT_IMPLEMENTED)),
     }
 }

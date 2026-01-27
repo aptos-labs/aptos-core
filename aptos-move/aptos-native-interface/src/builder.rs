@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     context::SafeNativeContext,
@@ -131,9 +131,14 @@ impl SafeNativeBuilder {
             match res {
                 Ok(ret_vals) => Ok(NativeResult::ok(context.legacy_gas_used, ret_vals)),
                 Err(err) => match err {
-                    Abort { abort_code } => {
-                        Ok(NativeResult::err(context.legacy_gas_used, abort_code))
-                    },
+                    Abort {
+                        abort_code,
+                        abort_message,
+                    } => Ok(NativeResult::Abort {
+                        cost: context.legacy_gas_used,
+                        abort_code,
+                        abort_message,
+                    }),
                     LimitExceeded(err) => match err {
                         LimitExceededError::LegacyOutOfGas => {
                             assert!(!context.has_direct_gas_meter_access_in_native_context());

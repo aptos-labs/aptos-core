@@ -1,7 +1,11 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use aptos_protos::indexer::v1::GetTransactionsRequest;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use tonic::Request;
+use uuid::Uuid;
 
 // Maximum number of threads for the file store
 pub const MAXIMUM_NUMBER_FILESTORE_THREADS: usize = 10;
@@ -13,6 +17,8 @@ pub const GRPC_REQUEST_NAME_HEADER: &str = "x-aptos-request-name";
 pub const GRPC_API_GATEWAY_API_KEY_HEADER: &str = "authorization";
 // Limit the message size to 15MB. By default the downstream can receive up to 15MB.
 pub const MESSAGE_SIZE_LIMIT: usize = 1024 * 1024 * 15;
+// Default maximum size in bytes for transaction filters.
+pub const DEFAULT_MAX_TRANSACTION_FILTER_SIZE_BYTES: usize = 10_000;
 
 // These come from API Gateway, see here:
 // https://github.com/aptos-labs/api-gateway/blob/0aae1c17fbd0f5e9b50bdb416f62b48d3d1d5e6b/src/common.rs
@@ -60,4 +66,41 @@ impl IndexerGrpcRequestMetadata {
             &self.processor_name,
         ]
     }
+}
+
+/// Gets the request metadata from gRPC request headers. Useful for logging and metrics.
+pub fn get_request_metadata(req: &Request<GetTransactionsRequest>) -> IndexerGrpcRequestMetadata {
+    let request_metadata_pairs = vec![
+        (
+            "request_identifier_type",
+            REQUEST_HEADER_APTOS_IDENTIFIER_TYPE,
+        ),
+        ("request_identifier", REQUEST_HEADER_APTOS_IDENTIFIER),
+        ("request_email", REQUEST_HEADER_APTOS_EMAIL),
+        (
+            "request_application_name",
+            REQUEST_HEADER_APTOS_APPLICATION_NAME,
+        ),
+        ("request_token", GRPC_AUTH_TOKEN_HEADER),
+        ("processor_name", GRPC_REQUEST_NAME_HEADER),
+    ];
+    let mut request_metadata_map: HashMap<String, String> = request_metadata_pairs
+        .into_iter()
+        .map(|(key, value)| {
+            (
+                key.to_string(),
+                req.metadata()
+                    .get(value)
+                    .map(|value| value.to_str().unwrap_or("unspecified").to_string())
+                    .unwrap_or("unspecified".to_string()),
+            )
+        })
+        .collect();
+    request_metadata_map.insert(
+        "request_connection_id".to_string(),
+        Uuid::new_v4().to_string(),
+    );
+
+    // TODO: update the request name if these are internal requests.
+    serde_json::from_str(&serde_json::to_string(&request_metadata_map).unwrap()).unwrap()
 }

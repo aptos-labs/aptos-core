@@ -1,14 +1,16 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This module provides some helper functions for arkworks.
 
 pub mod differentiate;
 pub mod hashing;
+pub mod msm;
 pub mod random;
 pub mod scrape;
 pub mod serialization;
 pub mod shamir;
+pub mod srs;
 pub mod vanishing_poly;
 pub mod weighted_sum;
 
@@ -18,7 +20,7 @@ use ark_poly::EvaluationDomain;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 /// A pair of canonical group generators for a pairing-friendly elliptic curve.
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct GroupGenerators<E: Pairing> {
     /// The generator of the G₁ group (affine coordinates).
     pub g1: E::G1Affine,

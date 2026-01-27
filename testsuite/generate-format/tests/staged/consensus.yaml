@@ -107,6 +107,11 @@ AnyPublicKey:
         STRUCT:
           - public_key:
               TYPENAME: FederatedKeylessPublicKey
+    5:
+      SlhDsa_Sha2_128s:
+        STRUCT:
+          - public_key:
+              TYPENAME: SlhDsa_Sha2_128s_PublicKey
 AnySignature:
   ENUM:
     0:
@@ -129,6 +134,11 @@ AnySignature:
         STRUCT:
           - signature:
               TYPENAME: KeylessSignature
+    4:
+      SlhDsa_Sha2_128s:
+        STRUCT:
+          - signature:
+              TYPENAME: SlhDsa_Sha2_128s_Signature
 AssertionSignature:
   ENUM:
     0:
@@ -136,12 +146,15 @@ AssertionSignature:
         STRUCT:
           - signature:
               TYPENAME: Secp256r1EcdsaSignature
-Batch:
+BIBECiphertext:
   STRUCT:
-    - batch_info:
-        TYPENAME: BatchInfo
-    - payload:
-        TYPENAME: BatchPayload
+    - id:
+        TYPENAME: Id
+    - ct_g2: BYTES
+    - padded_key:
+        TYPENAME: OneTimePaddedKey
+    - symmetric_ciphertext:
+        TYPENAME: SymmetricCiphertext
 BatchId:
   STRUCT:
     - id: U64
@@ -159,11 +172,31 @@ BatchInfo:
     - num_txns: U64
     - num_bytes: U64
     - gas_bucket_start: U64
+BatchInfoExt:
+  ENUM:
+    0:
+      V1:
+        STRUCT:
+          - info:
+              TYPENAME: BatchInfo
+    1:
+      V2:
+        STRUCT:
+          - info:
+              TYPENAME: BatchInfo
+          - extra:
+              TYPENAME: ExtraBatchInfo
+BatchKind:
+  ENUM:
+    0:
+      Normal: UNIT
+    1:
+      Encrypted: UNIT
 BatchMsg:
   STRUCT:
     - batches:
         SEQ:
-          TYPENAME: Batch
+          TYPENAME: "aptos_consensus::quorum_store::types::Batch<aptos_consensus_types::proof_of_store::BatchInfo>"
 BatchPayload:
   STRUCT:
     - author:
@@ -188,11 +221,15 @@ BatchResponse:
     0:
       Batch:
         NEWTYPE:
-          TYPENAME: Batch
+          TYPENAME: "aptos_consensus::quorum_store::types::Batch<aptos_consensus_types::proof_of_store::BatchInfo>"
     1:
       NotFound:
         NEWTYPE:
           TYPENAME: LedgerInfoWithSignatures
+    2:
+      BatchV2:
+        NEWTYPE:
+          TYPENAME: "aptos_consensus::quorum_store::types::Batch<aptos_consensus_types::proof_of_store::BatchInfoExt>"
 BitVec:
   STRUCT:
     - inner: BYTES
@@ -371,6 +408,16 @@ ChangeSet:
     - events:
         SEQ:
           TYPENAME: ContractEvent
+Ciphertext:
+  STRUCT:
+    - vk: BYTES
+    - bibe_ct:
+        TYPENAME: BIBECiphertext
+    - associated_data_bytes: BYTES
+    - signature:
+        TUPLEARRAY:
+          CONTENT: U8
+          SIZE: 64
 CommitDecision:
   STRUCT:
     - ledger_info:
@@ -447,7 +494,7 @@ ConsensusMsg:
     11:
       BatchResponse:
         NEWTYPE:
-          TYPENAME: Batch
+          TYPENAME: "aptos_consensus::quorum_store::types::Batch<aptos_consensus_types::proof_of_store::BatchInfo>"
     12:
       SignedBatchInfo:
         NEWTYPE:
@@ -488,6 +535,22 @@ ConsensusMsg:
       OptProposalMsg:
         NEWTYPE:
           TYPENAME: OptProposalMsg
+    22:
+      BatchMsgV2:
+        NEWTYPE:
+          TYPENAME: BatchMsg
+    23:
+      SignedBatchInfoMsgV2:
+        NEWTYPE:
+          TYPENAME: SignedBatchInfoMsg
+    24:
+      ProofOfStoreMsgV2:
+        NEWTYPE:
+          TYPENAME: ProofOfStoreMsg
+    25:
+      SecretShareMsg:
+        NEWTYPE:
+          TYPENAME: SecretShareNetworkMessage
 ContractEvent:
   ENUM:
     0:
@@ -537,7 +600,8 @@ EncryptedPayload:
     0:
       Encrypted:
         STRUCT:
-          - ciphertext: BYTES
+          - ciphertext:
+              TYPENAME: Ciphertext
           - extra_config:
               TYPENAME: TransactionExtraConfig
           - payload_hash:
@@ -545,21 +609,25 @@ EncryptedPayload:
     1:
       FailedDecryption:
         STRUCT:
-          - ciphertext: BYTES
+          - ciphertext:
+              TYPENAME: Ciphertext
           - extra_config:
               TYPENAME: TransactionExtraConfig
           - payload_hash:
               TYPENAME: HashValue
-          - eval_proof: BYTES
+          - eval_proof:
+              TYPENAME: EvalProof
     2:
       Decrypted:
         STRUCT:
-          - ciphertext: BYTES
+          - ciphertext:
+              TYPENAME: Ciphertext
           - extra_config:
               TYPENAME: TransactionExtraConfig
           - payload_hash:
               TYPENAME: HashValue
-          - eval_proof: BYTES
+          - eval_proof:
+              TYPENAME: EvalProof
           - executable:
               TYPENAME: TransactionExecutable
           - decryption_nonce: U64
@@ -591,11 +659,6 @@ EphemeralPublicKey:
         STRUCT:
           - public_key:
               TYPENAME: Ed25519PublicKey
-    1:
-      Secp256r1Ecdsa:
-        STRUCT:
-          - public_key:
-              TYPENAME: Secp256r1EcdsaPublicKey
 EphemeralSignature:
   ENUM:
     0:
@@ -623,11 +686,17 @@ EpochState:
     - epoch: U64
     - verifier:
         TYPENAME: ValidatorVerifier
+EvalProof:
+  NEWTYPESTRUCT: BYTES
 EventKey:
   STRUCT:
     - creation_number: U64
     - account_address:
         TYPENAME: AccountAddress
+ExtraBatchInfo:
+  STRUCT:
+    - batch_kind:
+        TYPENAME: BatchKind
 FederatedKeylessPublicKey:
   STRUCT:
     - jwk_addr:
@@ -697,6 +766,9 @@ HashValue:
         TUPLEARRAY:
           CONTENT: U8
           SIZE: 32
+Id:
+  STRUCT:
+    - root_x: BYTES
 IdCommitment:
   NEWTYPESTRUCT: BYTES
 Identifier:
@@ -787,6 +859,11 @@ MultisigTransactionPayload:
       EntryFunction:
         NEWTYPE:
           TYPENAME: EntryFunction
+OneTimePaddedKey:
+  NEWTYPESTRUCT:
+    TUPLEARRAY:
+      CONTENT: U8
+      SIZE: 16
 OpenIdSig:
   STRUCT:
     - jwt_sig: BYTES
@@ -830,6 +907,10 @@ OptQuorumStorePayload:
   ENUM:
     0:
       V1:
+        NEWTYPE:
+          TYPENAME: OptQuorumStorePayloadV1
+    1:
+      V2:
         NEWTYPE:
           TYPENAME: OptQuorumStorePayloadV1
 OptQuorumStorePayloadV1:
@@ -1058,6 +1139,10 @@ Secp256r1EcdsaPublicKey:
   NEWTYPESTRUCT: BYTES
 Secp256r1EcdsaSignature:
   NEWTYPESTRUCT: BYTES
+SecretShareNetworkMessage:
+  STRUCT:
+    - epoch: U64
+    - data: BYTES
 Signature:
   NEWTYPESTRUCT: BYTES
 SignedBatchInfo:
@@ -1085,6 +1170,12 @@ SingleKeyAuthenticator:
         TYPENAME: AnyPublicKey
     - signature:
         TYPENAME: AnySignature
+SlhDsa_Sha2_128s_PrivateKey:
+  NEWTYPESTRUCT: BYTES
+SlhDsa_Sha2_128s_PublicKey:
+  NEWTYPESTRUCT: BYTES
+SlhDsa_Sha2_128s_Signature:
+  NEWTYPESTRUCT: BYTES
 StateKey:
   ENUM:
     0:
@@ -1124,6 +1215,13 @@ StructTag:
     - type_args:
         SEQ:
           TYPENAME: TypeTag
+SymmetricCiphertext:
+  STRUCT:
+    - nonce:
+        TUPLEARRAY:
+          CONTENT: U8
+          SIZE: 12
+    - ct_body: BYTES
 SyncInfo:
   STRUCT:
     - highest_quorum_cert:
@@ -1522,3 +1620,15 @@ ZeroKnowledgeSig:
     - training_wheels_signature:
         OPTION:
           TYPENAME: EphemeralSignature
+"aptos_consensus::quorum_store::types::Batch<aptos_consensus_types::proof_of_store::BatchInfo>":
+  STRUCT:
+    - batch_info:
+        TYPENAME: BatchInfo
+    - payload:
+        TYPENAME: BatchPayload
+"aptos_consensus::quorum_store::types::Batch<aptos_consensus_types::proof_of_store::BatchInfoExt>":
+  STRUCT:
+    - batch_info:
+        TYPENAME: BatchInfoExt
+    - payload:
+        TYPENAME: BatchPayload

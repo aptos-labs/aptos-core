@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{driver_factory::DriverFactory, metadata_storage::PersistentMetadataStorage};
 use aptos_config::{
     config::{
-        RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
+        HotStateConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
     },
     utils::get_genesis_txn,
@@ -41,6 +41,7 @@ fn test_new_initialized_configs() {
         BUFFERED_STATE_TARGET_ITEMS,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
         None,
+        HotStateConfig::default(),
     )
     .unwrap();
     let (_, db_rw) = DbReaderWriter::wrap(db);

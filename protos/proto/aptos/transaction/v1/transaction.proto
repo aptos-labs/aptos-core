@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 syntax = "proto3";
 
@@ -421,6 +421,12 @@ enum MoveTypes {
   MOVE_TYPES_U64 = 3;
   MOVE_TYPES_U128 = 4;
   MOVE_TYPES_U256 = 14;
+  MOVE_TYPES_I8 = 15;
+  MOVE_TYPES_I16 = 16;
+  MOVE_TYPES_I32 = 17;
+  MOVE_TYPES_I64 = 18;
+  MOVE_TYPES_I128 = 19;
+  MOVE_TYPES_I256 = 20;
   MOVE_TYPES_ADDRESS = 5;
   MOVE_TYPES_SIGNER = 6;
   MOVE_TYPES_VECTOR = 7; // `{ items: Box<MoveType> }`,
@@ -531,6 +537,7 @@ message AnyPublicKey {
     TYPE_SECP256R1_ECDSA = 3;
     TYPE_KEYLESS = 4;
     TYPE_FEDERATED_KEYLESS = 5;
+    TYPE_SLH_DSA_SHA2_128S = 6;
   }
 
   Type type = 1;
@@ -544,6 +551,7 @@ message AnySignature {
     TYPE_SECP256K1_ECDSA = 2;
     TYPE_WEBAUTHN = 3;
     TYPE_KEYLESS = 4;
+    TYPE_SLH_DSA_SHA2_128S = 5;
   }
 
   Type type = 1;
@@ -558,6 +566,7 @@ message AnySignature {
     Secp256k1Ecdsa secp256k1_ecdsa = 4;
     WebAuthn webauthn = 5;
     Keyless keyless = 6;
+    SlhDsa_Sha2_128s slh_dsa_sha2_128s = 7;
   }
 }
 
@@ -574,6 +583,10 @@ message WebAuthn {
 }
 
 message Keyless {
+  bytes signature = 1;
+}
+
+message SlhDsa_Sha2_128s {
   bytes signature = 1;
 }
 

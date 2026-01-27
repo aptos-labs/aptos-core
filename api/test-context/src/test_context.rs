@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::{golden_output::GoldenOutputs, pretty};
 use aptos_api::{attach_poem_to_runtime, BasicError, Context};
@@ -10,8 +10,9 @@ use aptos_api_types::{
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::{
     config::{
-        NodeConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
-        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
+        HotStateConfig, NodeConfig, RocksdbConfigs, StorageDirPaths,
+        BUFFERED_STATE_TARGET_ITEMS_FOR_TEST, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+        NO_OP_STORAGE_PRUNER_CONFIG,
     },
     keys::ConfigKey,
 };
@@ -176,6 +177,7 @@ pub fn new_test_context_inner(
             BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             None,
+            HotStateConfig::default(),
         )
         .unwrap();
         if node_config

@@ -1,7 +1,8 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{stream_coordinator::IndexerStreamCoordinator, ServiceContext};
+use aptos_indexer_grpc_utils::filter_utils::parse_transaction_filter;
 use aptos_logger::{error, info};
 use aptos_protos::{
     indexer::v1::{raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse},
@@ -16,7 +17,6 @@ use tonic::{Request, Response, Status};
 // Default Values
 pub const DEFAULT_NUM_RETRIES: usize = 3;
 pub const RETRY_TIME_MILLIS: u64 = 100;
-const TRANSACTION_CHANNEL_SIZE: usize = 35;
 
 type TransactionResponseStream =
     Pin<Box<dyn Stream<Item = Result<TransactionsResponse, Status>> + Send>>;
@@ -25,8 +25,9 @@ pub struct LocalnetDataService {
     pub service_context: ServiceContext,
 }
 
-/// External service on the fullnode is for testing/local development only.
-/// Performance is not optimized, e.g., single-threaded.
+/// Exposes a transaction stream on the node that matches the interface exposed by the
+/// full production data service.
+///
 /// NOTE: code is duplicated from fullnode_data_service.rs with some minor changes.
 #[tonic::async_trait]
 impl RawData for LocalnetDataService {
@@ -41,33 +42,49 @@ impl RawData for LocalnetDataService {
         let r = req.into_inner();
         let starting_version = match r.starting_version {
             Some(version) => version,
-            None => return Err(Status::invalid_argument("Starting version must be set")),
+            None => match context.db.get_synced_version() {
+                Ok(Some(version)) => version,
+                Ok(None) => return Err(Status::unavailable("No synced version available yet")),
+                Err(e) => return Err(Status::internal(format!("{e}"))),
+            },
         };
         let ending_version = if let Some(count) = r.transactions_count {
             starting_version.saturating_add(count)
         } else {
             u64::MAX
         };
+        let processor_task_count = self.service_context.processor_task_count;
         let processor_batch_size = self.service_context.processor_batch_size;
         let output_batch_size = self.service_context.output_batch_size;
+        let transaction_channel_size = self.service_context.transaction_channel_size;
         let ledger_chain_id = context.chain_id().id();
         let transactions_count = r.transactions_count;
-        // Creates a channel to send the stream to the client
-        let (tx, mut rx) = mpsc::channel(TRANSACTION_CHANNEL_SIZE);
-        let (external_service_tx, external_service_rx) = mpsc::channel(TRANSACTION_CHANNEL_SIZE);
+
+        // Parse transaction filter if present.
+        let filter = if let Some(proto_filter) = r.transaction_filter {
+            Some(parse_transaction_filter(
+                proto_filter,
+                self.service_context.max_transaction_filter_size_bytes,
+            )?)
+        } else {
+            None
+        };
+
+        // Creates a channel to send the stream to the client.
+        let (tx, mut rx) = mpsc::channel(transaction_channel_size);
+        let (external_service_tx, external_service_rx) = mpsc::channel(transaction_channel_size);
 
         tokio::spawn(async move {
-            // Initialize the coordinator that tracks starting version and processes transactions
+            // Initialize the coordinator that tracks starting version and processes transactions.
             let mut coordinator = IndexerStreamCoordinator::new(
                 context,
                 starting_version,
                 ending_version,
-                // Performance is not important for raw data, and to make sure data is in order,
-                // single thread is used.
-                1,
+                processor_task_count,
                 processor_batch_size,
                 output_batch_size,
                 tx.clone(),
+                filter,
                 None,
             );
             while coordinator.current_version < coordinator.end_version {

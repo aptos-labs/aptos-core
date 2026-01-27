@@ -1,8 +1,10 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    clients::{big_query::TableWriteClient, humio, victoria_metrics_api::Client as MetricsClient},
+    allowlist_cache::AllowlistCache,
+    challenge_cache::ChallengeCache,
+    clients::{big_query::TableWriteClient, humio, prometheus_remote_write, victoria_metrics},
     peer_location::PeerLocation,
     types::common::EpochedPeerStore,
     LogIngestConfig, MetricsEndpointsConfig,
@@ -19,16 +21,75 @@ use std::{
 };
 use warp::Filter;
 
+/// Metrics backend client - abstracts over VictoriaMetrics and Prometheus Remote Write
+#[derive(Clone, Debug)]
+pub enum MetricsIngestClient {
+    /// VictoriaMetrics client - uses text format via /api/v1/import/prometheus
+    VictoriaMetrics(victoria_metrics::VictoriaMetricsClient),
+    /// Prometheus Remote Write client - uses protobuf+snappy via /api/v1/write
+    PrometheusRemoteWrite(prometheus_remote_write::PrometheusRemoteWriteClient),
+}
+
+impl MetricsIngestClient {
+    /// Posts Prometheus text-format metrics to the backend.
+    ///
+    /// - VictoriaMetrics: Sends text format directly
+    /// - PrometheusRemoteWrite: Parses text, converts to protobuf+snappy
+    pub async fn post_prometheus_metrics(
+        &self,
+        raw_metrics_body: warp::hyper::body::Bytes,
+        extra_labels: Vec<String>,
+        encoding: String,
+    ) -> Result<reqwest::Response, anyhow::Error> {
+        match self {
+            MetricsIngestClient::VictoriaMetrics(client) => {
+                client
+                    .post_prometheus_metrics(raw_metrics_body, extra_labels, encoding)
+                    .await
+            },
+            MetricsIngestClient::PrometheusRemoteWrite(client) => {
+                client
+                    .post_prometheus_metrics(raw_metrics_body, extra_labels, encoding)
+                    .await
+            },
+        }
+    }
+
+    /// Returns true if this is a self-hosted VM/Prometheus client
+    pub fn is_selfhosted_vm_client(&self) -> bool {
+        match self {
+            MetricsIngestClient::VictoriaMetrics(client) => client.is_selfhosted_vm_client(),
+            MetricsIngestClient::PrometheusRemoteWrite(client) => client.is_selfhosted_vm_client(),
+        }
+    }
+
+    /// Returns the backend name for logging/metrics
+    pub fn backend_name(&self) -> &'static str {
+        match self {
+            MetricsIngestClient::VictoriaMetrics(_) => "victoria_metrics",
+            MetricsIngestClient::PrometheusRemoteWrite(_) => "prometheus_remote_write",
+        }
+    }
+
+    /// Returns the base URL for this client (for logging/debugging)
+    pub fn base_url(&self) -> &url::Url {
+        match self {
+            MetricsIngestClient::VictoriaMetrics(client) => client.base_url(),
+            MetricsIngestClient::PrometheusRemoteWrite(client) => client.base_url(),
+        }
+    }
+}
+
 /// Container that holds various metric clients used for sending metrics from
-/// various sources to appropriate backends.
+/// various sources to appropriate backends (node telemetry only).
 #[derive(Clone, Default)]
 pub struct GroupedMetricsClients {
     /// Client(s) for exporting metrics of the running telemetry service
-    pub telemetry_service_metrics_clients: HashMap<String, MetricsClient>,
+    pub telemetry_service_metrics_clients: HashMap<String, MetricsIngestClient>,
     /// Clients for sending metrics from authenticated known nodes
-    pub ingest_metrics_client: HashMap<String, MetricsClient>,
+    pub ingest_metrics_client: HashMap<String, MetricsIngestClient>,
     /// Clients for sending metrics from authenticated unknown nodes
-    pub untrusted_ingest_metrics_clients: HashMap<String, MetricsClient>,
+    pub untrusted_ingest_metrics_clients: HashMap<String, MetricsIngestClient>,
 }
 
 impl GroupedMetricsClients {
@@ -52,10 +113,30 @@ impl From<MetricsEndpointsConfig> for GroupedMetricsClients {
     }
 }
 
+/// Log backend type
+#[derive(Clone, Debug)]
+pub enum LogIngestClient {
+    Humio(humio::IngestClient),
+    Loki(crate::clients::loki::LokiIngestClient),
+}
+
+impl LogIngestClient {
+    /// Ingest unstructured logs (works for both Humio and Loki)
+    pub async fn ingest_unstructured_log(
+        &self,
+        log: crate::types::humio::UnstructuredLog,
+    ) -> Result<reqwest::Response, anyhow::Error> {
+        match self {
+            LogIngestClient::Humio(client) => client.ingest_unstructured_log(log).await,
+            LogIngestClient::Loki(client) => client.ingest_unstructured_log(log).await,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct LogIngestClients {
-    pub known_logs_ingest_client: humio::IngestClient,
-    pub unknown_logs_ingest_client: humio::IngestClient,
+    pub known_logs_ingest_client: LogIngestClient,
+    pub unknown_logs_ingest_client: LogIngestClient,
     pub blacklist: Option<HashSet<PeerId>>,
 }
 
@@ -102,11 +183,59 @@ impl PeerStoreTuple {
     }
 }
 
+/// Container for a single custom contract configuration and its clients
+#[derive(Clone)]
+pub struct CustomContractInstance {
+    pub config: crate::OnChainAuthConfig,
+    /// Whether to allow unknown/untrusted nodes to authenticate via this contract
+    pub allow_unknown_nodes: bool,
+    /// Metrics clients for trusted (allowlisted) nodes
+    pub metrics_clients: HashMap<String, MetricsIngestClient>,
+    /// Metrics clients for untrusted/unknown nodes (falls back to metrics_clients if empty)
+    pub untrusted_metrics_clients: HashMap<String, MetricsIngestClient>,
+    /// Logs client for trusted (allowlisted) nodes
+    pub logs_client: Option<LogIngestClient>,
+    /// Logs client for untrusted/unknown nodes (falls back to logs_client if None)
+    pub untrusted_logs_client: Option<LogIngestClient>,
+    pub bigquery_client: Option<TableWriteClient>,
+}
+
+impl CustomContractInstance {
+    /// Get the appropriate metrics clients based on whether the node is trusted
+    pub fn get_metrics_clients(&self, is_trusted: bool) -> &HashMap<String, MetricsIngestClient> {
+        if is_trusted || self.untrusted_metrics_clients.is_empty() {
+            &self.metrics_clients
+        } else {
+            &self.untrusted_metrics_clients
+        }
+    }
+
+    /// Get the appropriate logs client based on whether the node is trusted
+    pub fn get_logs_client(&self, is_trusted: bool) -> Option<&LogIngestClient> {
+        if is_trusted {
+            self.logs_client.as_ref()
+        } else {
+            // Fall back to trusted logs client if untrusted not configured
+            self.untrusted_logs_client
+                .as_ref()
+                .or(self.logs_client.as_ref())
+        }
+    }
+}
+
+/// Container for all custom contract configurations
+#[derive(Clone, Default)]
+pub struct CustomContractClients {
+    /// Map of custom contract name to its instance
+    pub instances: HashMap<String, CustomContractInstance>,
+}
+
 #[derive(Clone)]
 pub struct ClientTuple {
     bigquery_client: Option<TableWriteClient>,
     victoria_metrics_clients: Option<GroupedMetricsClients>,
     log_ingest_clients: Option<LogIngestClients>,
+    custom_contract_clients: Option<CustomContractClients>,
 }
 
 impl ClientTuple {
@@ -114,11 +243,13 @@ impl ClientTuple {
         bigquery_client: Option<TableWriteClient>,
         victoria_metrics_clients: Option<GroupedMetricsClients>,
         log_ingest_clients: Option<LogIngestClients>,
+        custom_contract_clients: Option<CustomContractClients>,
     ) -> ClientTuple {
         Self {
             bigquery_client,
             victoria_metrics_clients,
             log_ingest_clients,
+            custom_contract_clients,
         }
     }
 }
@@ -167,6 +298,8 @@ pub struct Context {
     log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
     peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
     peer_locations: Arc<RwLock<HashMap<PeerId, PeerLocation>>>,
+    allowlist_cache: AllowlistCache,
+    challenge_cache: ChallengeCache,
 }
 
 impl Context {
@@ -187,6 +320,10 @@ impl Context {
             log_env_map,
             peer_identities,
             peer_locations,
+            // Cache is kept fresh by AllowlistCacheUpdater running in background
+            allowlist_cache: AllowlistCache::new(),
+            // Challenge cache uses same TTL as CHALLENGE_TTL_SECS (300 seconds)
+            challenge_cache: ChallengeCache::new(),
         }
     }
 
@@ -242,5 +379,33 @@ impl Context {
     #[cfg(test)]
     pub fn log_env_map_mut(&mut self) -> &mut HashMap<ChainId, HashMap<PeerId, String>> {
         &mut self.log_env_map
+    }
+
+    /// Get storage provider clients
+    pub fn custom_contract_clients(&self) -> &CustomContractClients {
+        self.clients
+            .custom_contract_clients
+            .as_ref()
+            .unwrap_or_else(|| {
+                // Return empty clients if not configured
+                static EMPTY: once_cell::sync::Lazy<CustomContractClients> =
+                    once_cell::sync::Lazy::new(CustomContractClients::default);
+                &EMPTY
+            })
+    }
+
+    /// Get a specific custom contract instance by name
+    pub fn get_custom_contract(&self, name: &str) -> Option<&CustomContractInstance> {
+        self.custom_contract_clients().instances.get(name)
+    }
+
+    /// Get the allowlist cache
+    pub fn allowlist_cache(&self) -> &AllowlistCache {
+        &self.allowlist_cache
+    }
+
+    /// Get the challenge cache for custom contract authentication
+    pub fn challenge_cache(&self) -> &ChallengeCache {
+        &self.challenge_cache
     }
 }

@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     counters::{CHANNEL_SIZE, LATENCY_MS},
@@ -50,7 +50,6 @@ type FullnodeResponseStream =
 // Default Values
 pub const DEFAULT_NUM_RETRIES: usize = 3;
 pub const RETRY_TIME_MILLIS: u64 = 100;
-const TRANSACTION_CHANNEL_SIZE: usize = 35;
 const DEFAULT_EMIT_SIZE: usize = 1000;
 const SERVICE_TYPE: &str = "indexer_fullnode";
 
@@ -73,11 +72,14 @@ impl FullnodeData for FullnodeDataService {
         let r = req.into_inner();
         let starting_version = match r.starting_version {
             Some(version) => version,
+            // Live mode unavailable for FullnodeDataService
+            // Enable use_data_service_interface in config to use LocalnetDataService instead
             None => return Err(Status::invalid_argument("Starting version must be set")),
         };
         let processor_task_count = self.service_context.processor_task_count;
         let processor_batch_size = self.service_context.processor_batch_size;
         let output_batch_size = self.service_context.output_batch_size;
+        let transaction_channel_size = self.service_context.transaction_channel_size;
         let ending_version = if let Some(count) = r.transactions_count {
             starting_version.saturating_add(count)
         } else {
@@ -88,8 +90,8 @@ impl FullnodeData for FullnodeDataService {
         let context = self.service_context.context.clone();
         let ledger_chain_id = context.chain_id().id();
 
-        // Creates a channel to send the stream to the client
-        let (tx, rx) = mpsc::channel(TRANSACTION_CHANNEL_SIZE);
+        // Creates a channel to send the stream to the client.
+        let (tx, rx) = mpsc::channel(transaction_channel_size);
 
         // Creates a moving average to track tps
         let mut ma = MovingAverage::new(10_000);
@@ -106,6 +108,11 @@ impl FullnodeData for FullnodeDataService {
                 processor_batch_size,
                 output_batch_size,
                 tx.clone(),
+                // For now the request for this interface doesn't include a txn filter
+                // because it is only used for the txn stream filestore worker, which
+                // needs every transaction. Later we may add support for txn filtering
+                // to this interface too.
+                None,
                 Some(abort_handle.clone()),
             );
             // Sends init message (one time per request) to the client in the with chain id and starting version. Basically a handshake
@@ -159,7 +166,7 @@ impl FullnodeData for FullnodeDataService {
                     Some(max_version),
                     ledger_chain_id,
                 );
-                let channel_size = TRANSACTION_CHANNEL_SIZE - tx.capacity();
+                let channel_size = transaction_channel_size - tx.capacity();
                 CHANNEL_SIZE
                     .with_label_values(&["2"])
                     .set(channel_size as i64);

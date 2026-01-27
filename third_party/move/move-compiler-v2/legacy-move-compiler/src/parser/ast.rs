@@ -639,6 +639,20 @@ pub enum QuantKind_ {
 }
 pub type QuantKind = Spanned<QuantKind_>;
 
+/// The kind of behavior predicate for function values in specifications.
+/// These predicates allow reasoning about the behavior of function-typed parameters.
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum BehaviorKind {
+    /// `requires_of<f>(x)` - the precondition of function `f`
+    RequiresOf,
+    /// `aborts_of<f>(x)` - the aborts condition of function `f`
+    AbortsOf,
+    /// `ensures_of<f>(x, y)` - the postcondition of function `f`
+    EnsuresOf,
+    /// `modifies_of<f>(x)` - the modify clauses of function `f`
+    ModifiesOf,
+}
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum CallKind {
     /// Regular function call.
@@ -729,6 +743,20 @@ pub enum Exp_ {
         Vec<Vec<Exp>>,
         Option<Box<Exp>>,
         Box<Exp>,
+    ),
+    // spec only
+    // Behavior predicate for function values in specifications:
+    // [pre_label@]requires_of<f[<T1, ..., Tn>]>(args)[@post_label]
+    // [pre_label@]aborts_of<f[<T1, ..., Tn>]>(args)[@post_label]
+    // [pre_label@]ensures_of<f[<T1, ..., Tn>]>(args)[@post_label]
+    // [pre_label@]modifies_of<f[<T1, ..., Tn>]>(args)[@post_label]
+    Behavior(
+        BehaviorKind,
+        Option<Label>,     // pre-state label
+        NameAccessChain,   // function name
+        Option<Vec<Type>>, // optional type instantiation
+        Spanned<Vec<Exp>>, // arguments
+        Option<Label>,     // post-state label
     ), // spec only
     // (e1, ..., en)
     ExpList(Vec<Exp>),
@@ -2067,6 +2095,31 @@ impl AstDebug for Exp_ {
                 w.write("spec {");
                 s.ast_debug(w);
                 w.write("}");
+            },
+            E::Behavior(kind, pre_label, fn_name, type_args, sp!(_, args), post_label) => {
+                if let Some(label) = pre_label {
+                    w.write(format!("{}@", label.value().as_str()));
+                }
+                let kind_str = match kind {
+                    BehaviorKind::RequiresOf => "requires_of",
+                    BehaviorKind::AbortsOf => "aborts_of",
+                    BehaviorKind::EnsuresOf => "ensures_of",
+                    BehaviorKind::ModifiesOf => "modifies_of",
+                };
+                w.write(kind_str);
+                w.write("<");
+                fn_name.ast_debug(w);
+                if let Some(tys) = type_args {
+                    w.write("<");
+                    w.comma(tys, |w, ty| ty.ast_debug(w));
+                    w.write(">");
+                }
+                w.write(">(");
+                w.comma(args, |w, e| e.ast_debug(w));
+                w.write(")");
+                if let Some(label) = post_label {
+                    w.write(format!("@{}", label.value().as_str()));
+                }
             },
             E::UnresolvedError => w.write("_|_"),
         }

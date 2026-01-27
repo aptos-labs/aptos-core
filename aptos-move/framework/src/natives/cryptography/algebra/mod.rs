@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #[cfg(feature = "testing")]
 use crate::natives::cryptography::algebra::rand::rand_insecure_internal;
@@ -28,7 +28,10 @@ use ark_serialize::CanonicalDeserialize;
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{language_storage::TypeTag, vm_status::StatusCode};
-use move_vm_runtime::{native_extensions::SessionListener, native_functions::NativeFunction};
+use move_vm_runtime::{
+    native_extensions::{NativeRuntimeRefCheckModelsCompleted, SessionListener},
+    native_functions::NativeFunction,
+};
 use once_cell::sync::Lazy;
 use std::{any::Any, hash::Hash, rc::Rc};
 
@@ -205,6 +208,10 @@ impl SessionListener for AlgebraContext {
     }
 }
 
+impl NativeRuntimeRefCheckModelsCompleted for AlgebraContext {
+    // No native functions in this context return references, so no models to add.
+}
+
 impl AlgebraContext {
     pub fn new() -> Self {
         Self {
@@ -239,9 +246,7 @@ macro_rules! store_element {
         let context = &mut $context.extensions_mut().get_mut::<AlgebraContext>();
         let new_size = context.bytes_used + std::mem::size_of_val(&$obj);
         if new_size > MEMORY_LIMIT_IN_BYTES {
-            Err(SafeNativeError::Abort {
-                abort_code: E_TOO_MUCH_MEMORY_USED,
-            })
+            Err(SafeNativeError::abort(E_TOO_MUCH_MEMORY_USED))
         } else {
             let target_vec = &mut context.objs;
             context.bytes_used = new_size;
@@ -285,9 +290,7 @@ macro_rules! abort_unless_feature_flag_enabled {
                 // Continue.
             },
             _ => {
-                return Err(SafeNativeError::Abort {
-                    abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-                });
+                return Err(SafeNativeError::abort(MOVE_ABORT_CODE_NOT_IMPLEMENTED));
             },
         }
     };

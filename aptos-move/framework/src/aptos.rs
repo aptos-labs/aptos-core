@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #![forbid(unsafe_code)]
 
@@ -126,7 +126,11 @@ impl ReleaseTarget {
                     output_format: None,
                 }),
                 skip_fetch_latest_git_deps: true,
-                experiments: vec!["extended-framework-optimizations=on".to_string()],
+                // enable inline optimization for framework packages
+                experiments: vec![
+                    "optimize-extra=on".to_string(),
+                    "extended-framework-optimizations=on".to_string(),
+                ],
                 ..BuildOptions::default()
             },
             packages: packages

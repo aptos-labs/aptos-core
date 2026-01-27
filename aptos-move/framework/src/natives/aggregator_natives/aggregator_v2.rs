@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::natives::aggregator_natives::{helpers_v2::*, NativeAggregatorContext};
 use aptos_aggregator::{
@@ -57,9 +57,7 @@ fn get_width_by_type(ty_arg: &Type, error_code_if_incorrect: u64) -> SafeNativeR
     match ty_arg {
         Type::U128 => Ok(16),
         Type::U64 => Ok(8),
-        _ => Err(SafeNativeError::Abort {
-            abort_code: error_code_if_incorrect,
-        }),
+        _ => Err(SafeNativeError::abort(error_code_if_incorrect)),
     }
 }
 
@@ -72,9 +70,7 @@ fn pop_value_by_type(
     match ty_arg {
         Type::U128 => Ok(safely_pop_arg!(args, u128)),
         Type::U64 => Ok(safely_pop_arg!(args, u64) as u128),
-        _ => Err(SafeNativeError::Abort {
-            abort_code: error_code_if_incorrect,
-        }),
+        _ => Err(SafeNativeError::abort(error_code_if_incorrect)),
     }
 }
 
@@ -86,9 +82,7 @@ fn create_value_by_type(
     match value_ty {
         Type::U128 => Ok(Value::u128(value)),
         Type::U64 => Ok(Value::u64(u128_to_u64(value)?)),
-        _ => Err(SafeNativeError::Abort {
-            abort_code: error_code_if_incorrect,
-        }),
+        _ => Err(SafeNativeError::abort(error_code_if_incorrect)),
     }
 }
 
@@ -409,9 +403,9 @@ fn native_copy_snapshot(
     _ty_args: &[Type],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    Err(SafeNativeError::Abort {
-        abort_code: EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED,
-    })
+    Err(SafeNativeError::abort(
+        EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED,
+    ))
 }
 
 /***************************************************************************************************
@@ -453,9 +447,9 @@ fn native_string_concat(
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     // Deprecated function in favor of `derive_string_concat`.
-    Err(SafeNativeError::Abort {
-        abort_code: EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED,
-    })
+    Err(SafeNativeError::abort(
+        EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED,
+    ))
 }
 
 /***************************************************************************************************
@@ -502,9 +496,7 @@ fn native_create_derived_string(
         .charge(AGGREGATOR_V2_CREATE_SNAPSHOT_PER_BYTE * NumBytes::new(value_bytes.len() as u64))?;
 
     if value_bytes.len() > DERIVED_STRING_INPUT_MAX_LENGTH {
-        return Err(SafeNativeError::Abort {
-            abort_code: EINPUT_STRING_LENGTH_TOO_LARGE,
-        });
+        return Err(SafeNativeError::abort(EINPUT_STRING_LENGTH_TOO_LARGE));
     }
 
     let derived_string_snapshot =
@@ -554,9 +546,7 @@ fn native_derive_string_concat(
         .checked_add(suffix.len())
         .is_some_and(|v| v > DERIVED_STRING_INPUT_MAX_LENGTH)
     {
-        return Err(SafeNativeError::Abort {
-            abort_code: EINPUT_STRING_LENGTH_TOO_LARGE,
-        });
+        return Err(SafeNativeError::abort(EINPUT_STRING_LENGTH_TOO_LARGE));
     }
 
     let derived_string_snapshot = if let Some((resolver, mut delayed_field_data)) =

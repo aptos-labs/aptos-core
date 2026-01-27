@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::round_state::NewRoundReason;
 use crate::counters;
@@ -156,6 +156,7 @@ impl TOptQSPullParamsProvider for OptQSPullParamsProvider {
         Some(OptQSPayloadPullParams {
             exclude_authors,
             minimum_batch_age_usecs: self.minimum_batch_age_usecs,
+            use_batch_v2: false,
         })
     }
 }

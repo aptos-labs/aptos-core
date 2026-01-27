@@ -1,7 +1,8 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{metrics::OTHER_TIMERS_SECONDS, state_store::hot_state::HotState};
+use aptos_config::config::HotStateConfig;
 use aptos_infallible::Mutex;
 use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::SUBTREE_DROPPER;
@@ -9,7 +10,6 @@ use aptos_storage_interface::state_store::{
     state::State, state_summary::StateSummary, state_view::hot_state_view::HotStateView,
     state_with_summary::StateWithSummary,
 };
-use aptos_types::state_store::hot_state::HotStateConfig;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -21,14 +21,10 @@ pub struct PersistedState {
 impl PersistedState {
     const MAX_PENDING_DROPS: usize = 8;
 
-    pub fn new_empty() -> Self {
-        Self::new_empty_with_config(HotStateConfig::default())
-    }
-
-    pub fn new_empty_with_config(config: HotStateConfig) -> Self {
+    pub fn new_empty(config: HotStateConfig) -> Self {
         let state = State::new_empty(config);
         let hot_state = Arc::new(HotState::new(state, config));
-        let summary = Arc::new(Mutex::new(StateSummary::new_empty()));
+        let summary = Arc::new(Mutex::new(StateSummary::new_empty(config)));
         Self { hot_state, summary }
     }
 

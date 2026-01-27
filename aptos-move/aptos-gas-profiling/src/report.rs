@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{log::TransactionGasLog, render::Render};
 use anyhow::Result;
@@ -133,6 +133,23 @@ impl TransactionGasLog {
             );
             data.insert("keyless".to_string(), json!(cost_scaled));
             data.insert("keyless-percentage".to_string(), json!(percentage));
+        }
+
+        // SLH-DSA-SHA2-128s cost
+        if !self.exec_io.slh_dsa_sha2_128s_cost.is_zero() {
+            let cost_scaled = format!(
+                "{:.8}",
+                (u64::from(self.exec_io.slh_dsa_sha2_128s_cost) as f64 / scaling_factor)
+            );
+            let percentage = format!(
+                "{:.2}%",
+                u64::from(self.exec_io.slh_dsa_sha2_128s_cost) as f64 / total_exec_io * 100.0
+            );
+            data.insert("slh_dsa_sha2_128s".to_string(), json!(cost_scaled));
+            data.insert(
+                "slh_dsa_sha2_128s-percentage".to_string(),
+                json!(percentage),
+            );
         }
 
         let mut deps = self.exec_io.dependencies.clone();
@@ -325,6 +342,12 @@ impl TransactionGasLog {
                 Value::String(discount_msg),
             );
         }
+
+        // Memory usage
+        data.insert(
+            "peak-memory-usage".to_string(),
+            Value::String(format!("{}", self.peak_memory_usage)),
+        );
 
         // Execution trace
         let mut tree = self.exec_io.to_erased(true).tree;

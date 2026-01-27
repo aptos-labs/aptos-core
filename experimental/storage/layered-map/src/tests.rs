@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{layer::MapLayer, KeyHash};
 use itertools::Itertools;
@@ -17,6 +17,10 @@ impl Hash for HashCollide {
         // artificially make collision
         state.write_u8(self.0 >> 2);
     }
+}
+
+fn naive_view_layer<K: Ord, V>(layer: Vec<(K, V)>) -> BTreeMap<K, V> {
+    layer.into_iter().collect()
 }
 
 fn naive_view_layers<K: Ord, V>(layers: impl Iterator<Item = Vec<(K, V)>>) -> BTreeMap<K, V> {
@@ -89,7 +93,8 @@ proptest! {
         let layered_map = top_layer.into_layers_view_after(base_layer);
 
         // n.b. notice items_per_update doesn't have a placeholder for the root layer
-        let all = naive_view_layers(items_per_update.drain(base..top));
+        let items_per_update = items_per_update.drain(base..top).collect_vec();
+        let all = naive_view_layers(items_per_update.clone().into_iter());
 
         // get() individually
         for (k, v) in &all {
@@ -99,6 +104,15 @@ proptest! {
         // traversed via iterator
         let traversed = layered_map.iter().collect();
         prop_assert_eq!(all, traversed);
+
+        for (inner_map, items) in layered_map.inner_maps().into_iter().zip_eq(items_per_update.into_iter()) {
+            let all = naive_view_layer(items);
+            for (k, v) in &all {
+                prop_assert_eq!(inner_map.get(k), Some(*v));
+            }
+            let traversed = inner_map.iter().collect();
+            prop_assert_eq!(all, traversed);
+        }
     }
 
     #[test]

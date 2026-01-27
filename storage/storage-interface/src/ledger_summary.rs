@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::state_store::{state::LedgerState, state_summary::LedgerStateSummary};
+use aptos_config::config::HotStateConfig;
 use aptos_types::{
     proof::accumulator::{InMemoryAccumulator, InMemoryTransactionAccumulator},
-    state_store::hot_state::HotStateConfig,
     transaction::Version,
 };
 use std::sync::Arc;
@@ -41,7 +41,7 @@ impl LedgerSummary {
 
     pub fn new_empty(hot_state_config: HotStateConfig) -> Self {
         let state = LedgerState::new_empty(hot_state_config);
-        let state_summary = LedgerStateSummary::new_empty();
+        let state_summary = LedgerStateSummary::new_empty(hot_state_config);
         Self::new(
             state,
             state_summary,

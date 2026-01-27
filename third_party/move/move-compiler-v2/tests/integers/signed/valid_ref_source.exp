@@ -98,7 +98,7 @@ module 0x42::valid_ref_resource {
     }
     fun test_move_to(account: &signer, addr: address) {
         let s1 = S1{x: 1, y: -1i64, z: -2i128};
-        if (!exists<S1>(addr)) move_to<S1>(s1, account)
+        if (!exists<S1>(addr)) move_to<S1>(account, s1)
     }
 }
 
@@ -1149,7 +1149,7 @@ fun valid_ref_resource::test_move_to($t0: &signer, $t1: address) {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0x42::valid_ref_resource
 use 0x1::signer
 struct S1 has copy + drop + key

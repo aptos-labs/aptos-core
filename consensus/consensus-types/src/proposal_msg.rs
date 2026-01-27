@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{block::Block, common::Author, proof_of_store::ProofCache, sync_info::SyncInfo};
 use anyhow::{anyhow, ensure, format_err, Context, Result};
@@ -86,6 +85,7 @@ impl ProposalMsg {
         validator: &ValidatorVerifier,
         proof_cache: &ProofCache,
         quorum_store_enabled: bool,
+        opt_qs_v2_rx_enabled: bool,
     ) -> Result<()> {
         if let Some(proposal_author) = self.proposal.author() {
             ensure!(
@@ -98,7 +98,12 @@ impl ProposalMsg {
         let (payload_result, sig_result) = rayon::join(
             || {
                 self.proposal().payload().map_or(Ok(()), |p| {
-                    p.verify(validator, proof_cache, quorum_store_enabled)
+                    p.verify(
+                        validator,
+                        proof_cache,
+                        quorum_store_enabled,
+                        opt_qs_v2_rx_enabled,
+                    )
                 })
             },
             || {

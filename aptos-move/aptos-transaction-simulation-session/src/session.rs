@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     config::{BaseState, Config},
@@ -17,8 +17,8 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::{state_key::StateKey, TStateView},
     transaction::{
-        AuxiliaryInfo, PersistedAuxiliaryInfo, SignedTransaction, TransactionExecutable,
-        TransactionOutput, TransactionPayload, TransactionPayloadInner, TransactionStatus,
+        AuxiliaryInfo, SignedTransaction, TransactionExecutable, TransactionOutput,
+        TransactionPayload, TransactionPayloadInner, TransactionStatus,
     },
     vm_status::VMStatus,
 };
@@ -284,12 +284,7 @@ impl Session {
             &code_storage,
             &txn,
             &log_context,
-            &AuxiliaryInfo::new(
-                PersistedAuxiliaryInfo::V1 {
-                    transaction_index: 0,
-                },
-                None,
-            ),
+            &AuxiliaryInfo::new_timestamp_not_yet_assigned(0),
         );
         let txn_output = vm_output.try_materialize_into_transaction_output(&resolver)?;
 

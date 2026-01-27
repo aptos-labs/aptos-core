@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 // Copyright (c) The Diem Core Contributors
 // Copyright (c) The Move Contributors
@@ -25,7 +25,7 @@ use move_core_types::{
 };
 pub use move_table_extension::{TableHandle, TableInfo, TableResolver};
 use move_vm_runtime::{
-    native_extensions::SessionListener,
+    native_extensions::{NativeRuntimeRefCheckModelsCompleted, SessionListener},
     native_functions::{LoaderContext, NativeFunctionTable},
 };
 use move_vm_types::{
@@ -123,6 +123,11 @@ impl<'a> SessionListener for NativeTableContext<'a> {
     fn abort(&mut self) {
         // TODO(sessions): implement
     }
+}
+
+impl<'a> NativeRuntimeRefCheckModelsCompleted for NativeTableContext<'a> {
+    // We have added runtime ref check models for native table functions that
+    // return references.
 }
 
 impl<'a> NativeTableContext<'a> {
@@ -422,9 +427,7 @@ fn native_add_box(
 
     let res = match gv.move_to(val) {
         Ok(_) => Ok(smallvec![]),
-        Err(_) => Err(SafeNativeError::Abort {
-            abort_code: ALREADY_EXISTS,
-        }),
+        Err(_) => Err(SafeNativeError::abort(ALREADY_EXISTS)),
     };
 
     drop(table_data);
@@ -482,9 +485,7 @@ fn native_borrow_box(
 
     let res = match gv.borrow_global() {
         Ok(ref_val) => Ok(smallvec![ref_val]),
-        Err(_) => Err(SafeNativeError::Abort {
-            abort_code: NOT_FOUND,
-        }),
+        Err(_) => Err(SafeNativeError::abort(NOT_FOUND)),
     };
 
     drop(table_data);
@@ -596,9 +597,7 @@ fn native_remove_box(
 
     let res = match gv.move_from() {
         Ok(val) => Ok(smallvec![val]),
-        Err(_) => Err(SafeNativeError::Abort {
-            abort_code: NOT_FOUND,
-        }),
+        Err(_) => Err(SafeNativeError::abort(NOT_FOUND)),
     };
 
     drop(table_data);

@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
@@ -14,7 +14,10 @@ use aptos_types::event::EventKey;
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{language_storage::TypeTag, value::MoveTypeLayout, vm_status::StatusCode};
-use move_vm_runtime::{native_extensions::SessionListener, native_functions::NativeFunction};
+use move_vm_runtime::{
+    native_extensions::{NativeRuntimeRefCheckModelsCompleted, SessionListener},
+    native_functions::NativeFunction,
+};
 #[cfg(feature = "testing")]
 use move_vm_types::values::{Reference, Struct, StructRef};
 use move_vm_types::{
@@ -44,6 +47,10 @@ impl SessionListener for NativeEventContext {
     fn abort(&mut self) {
         // TODO(sessions): implement
     }
+}
+
+impl NativeRuntimeRefCheckModelsCompleted for NativeEventContext {
+    // No native functions in this context return references, so no models to add.
 }
 
 impl NativeEventContext {
@@ -131,10 +138,8 @@ fn native_write_to_event_store(
     })?;
 
     let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
-    let event =
-        ContractEvent::new_v1(key, seq_num, ty_tag, blob).map_err(|_| SafeNativeError::Abort {
-            abort_code: ECANNOT_CREATE_EVENT,
-        })?;
+    let event = ContractEvent::new_v1(key, seq_num, ty_tag, blob)
+        .map_err(|_| SafeNativeError::abort(ECANNOT_CREATE_EVENT))?;
     // TODO(layouts): avoid cloning layouts for events with delayed fields.
     ctx.events.push((
         event,
@@ -303,9 +308,8 @@ fn native_write_module_event_to_store(
         })?;
 
     let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
-    let event = ContractEvent::new_v2(type_tag, blob).map_err(|_| SafeNativeError::Abort {
-        abort_code: ECANNOT_CREATE_EVENT,
-    })?;
+    let event = ContractEvent::new_v2(type_tag, blob)
+        .map_err(|_| SafeNativeError::abort(ECANNOT_CREATE_EVENT))?;
     // TODO(layouts): avoid cloning layouts for events with delayed fields.
     ctx.events.push((
         event,

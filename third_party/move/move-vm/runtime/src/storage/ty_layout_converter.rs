@@ -688,7 +688,7 @@ mod tests {
         let vm_config = VMConfig {
             enable_lazy_loading,
             layout_max_size: 2,
-            ..VMConfig::default()
+            ..VMConfig::default_for_test()
         };
         let loader = MockStructDefinitionLoader::new_with_config(vm_config);
         let layout_converter = LayoutConverter::new(&loader);
@@ -723,7 +723,7 @@ mod tests {
     fn test_layout_too_deep(annotated: bool) {
         let vm_config = VMConfig {
             layout_max_depth: 2,
-            ..VMConfig::default()
+            ..VMConfig::default_for_test()
         };
         let loader = MockStructDefinitionLoader::new_with_config(vm_config);
         let layout_converter = LayoutConverter::new(&loader);

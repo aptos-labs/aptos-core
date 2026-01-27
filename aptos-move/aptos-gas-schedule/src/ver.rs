@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 /// Integer representing the latest gas feature version.
 /// The general rule is that this should bumped exactly once after each release, provided there
@@ -8,9 +8,10 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V41:
+///    - Gas charging for SLH-DSA-SHA2-128s signature verification
 /// - V31:
 ///    - Gas charging for modules used in type tags
-///
 /// - V22
 ///    - Gas parameters for enums
 ///    - Gas parameters for new native function `bcs::serialized_size`
@@ -72,7 +73,7 @@
 ///       global operations.
 /// - V1
 ///   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = gas_feature_versions::RELEASE_V1_39;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = gas_feature_versions::RELEASE_V1_41;
 
 pub mod gas_feature_versions {
     pub const RELEASE_V1_8: u64 = 11;
@@ -106,4 +107,6 @@ pub mod gas_feature_versions {
     pub const RELEASE_V1_37: u64 = 41;
     pub const RELEASE_V1_38: u64 = 42;
     pub const RELEASE_V1_39: u64 = 43;
+    pub const RELEASE_V1_40: u64 = 44;
+    pub const RELEASE_V1_41: u64 = 45;
 }

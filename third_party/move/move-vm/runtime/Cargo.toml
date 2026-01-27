@@ -12,6 +12,7 @@ edition = { workspace = true }
 
 [dependencies]
 ambassador = { workspace = true }
+arc-swap = { workspace = true }
 better_any = { workspace = true }
 bitvec = { workspace = true }
 bytes = { workspace = true }
@@ -36,14 +37,8 @@ triomphe = { workspace = true }
 typed-arena = { workspace = true }
 
 [dev-dependencies]
-anyhow = { workspace = true }
-hex = { workspace = true }
-legacy-move-compiler = { workspace = true }
 move-binary-format = { workspace = true, features = ["fuzzing"] }
-move-ir-compiler = { workspace = true }
-move-vm-test-utils = { workspace = true }
 move-vm-types = { workspace = true, features = ["testing"] }
-proptest = { workspace = true }
 smallbitvec = { workspace = true }
 test-case = { workspace = true }
 
@@ -55,9 +50,6 @@ profiling = ["move-vm-profiler/probe-profiler"]
 testing = []
 fuzzing = ["move-vm-types/fuzzing"]
 failpoints = ["fail/failpoints"]
-# Enable tracing and debugging also for release builds. By default, it is only enabled for debug builds.
-debugging = []
-stacktrace = []
 # Enable this features for tests that check bytecode verification.
 disable_verifier_cache = []
 force-inline = []

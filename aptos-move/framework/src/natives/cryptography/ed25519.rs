@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #[cfg(feature = "testing")]
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
@@ -57,9 +57,7 @@ fn native_public_key_validate(
             {
                 return Ok(smallvec![Value::bool(false)]);
             } else {
-                return Err(SafeNativeError::Abort {
-                    abort_code: abort_codes::E_WRONG_PUBKEY_SIZE,
-                });
+                return Err(SafeNativeError::abort(abort_codes::E_WRONG_PUBKEY_SIZE));
             }
         },
     };

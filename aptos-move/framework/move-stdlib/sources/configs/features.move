@@ -511,8 +511,8 @@ module std::features {
 
     const AGGREGATOR_V2_IS_AT_LEAST_API: u64 = 66;
 
-    public fun aggregator_v2_is_at_least_api_enabled(): bool acquires Features {
-        is_enabled(AGGREGATOR_V2_IS_AT_LEAST_API)
+    public fun aggregator_v2_is_at_least_api_enabled(): bool {
+        true
     }
 
     /// Whether we use more efficient native implementation of computing object derived address
@@ -520,8 +520,8 @@ module std::features {
 
     public fun get_object_native_derived_address_feature(): u64 { OBJECT_NATIVE_DERIVED_ADDRESS }
 
-    public fun object_native_derived_address_enabled(): bool acquires Features {
-        is_enabled(OBJECT_NATIVE_DERIVED_ADDRESS)
+    public fun object_native_derived_address_enabled(): bool {
+        true
     }
 
     /// Whether the dispatchable fungible asset standard feature is enabled.
@@ -531,8 +531,8 @@ module std::features {
 
     public fun get_dispatchable_fungible_asset_feature(): u64 { DISPATCHABLE_FUNGIBLE_ASSET }
 
-    public fun dispatchable_fungible_asset_enabled(): bool acquires Features {
-        is_enabled(DISPATCHABLE_FUNGIBLE_ASSET)
+    public fun dispatchable_fungible_asset_enabled(): bool {
+        true
     }
 
     /// Lifetime: transient
@@ -611,8 +611,8 @@ module std::features {
 
     public fun get_native_memory_operations_feature(): u64 { NATIVE_MEMORY_OPERATIONS }
 
-    public fun is_native_memory_operations_enabled(): bool acquires Features {
-        is_enabled(NATIVE_MEMORY_OPERATIONS)
+    public fun is_native_memory_operations_enabled(): bool {
+        true
     }
 
     const PERMISSIONED_SIGNER: u64 = 84;
@@ -748,6 +748,16 @@ module std::features {
 
     public fun is_function_reflection_enabled(): bool acquires Features {
         is_enabled(FUNCTION_REFLECTION)
+    }
+
+    /// Whether SLH-DSA-SHA2-128s signature scheme is enabled for transaction authentication.
+    /// Lifetime: transient
+    const SLH_DSA_SHA2_128S_SIGNATURE: u64 = 107;
+
+    public fun get_slh_dsa_sha2_128s_signature_feature(): u64 { SLH_DSA_SHA2_128S_SIGNATURE }
+
+    public fun slh_dsa_sha2_128s_signature_enabled(): bool acquires Features {
+        is_enabled(SLH_DSA_SHA2_128S_SIGNATURE)
     }
 
     // ============================================================================================

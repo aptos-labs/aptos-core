@@ -1,13 +1,15 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{genesis::GENESIS_CHANGE_SET_HEAD, Account, AccountData};
 use anyhow::{anyhow, bail, Result};
 use aptos_types::{
     account_config::{
-        primary_apt_store, CoinStoreResource, FungibleStoreResource, ObjectGroupResource,
+        primary_apt_store, CoinStoreResource, FungibleStoreResource, ObjectCoreResource,
+        ObjectGroupResource,
     },
     chain_id::ChainId,
+    event::EventHandle,
     on_chain_config::{FeatureFlag, Features, OnChainConfig},
     state_store::{
         state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
@@ -293,6 +295,17 @@ pub trait SimulationStateStore: TStateView<Key = StateKey> {
         let mut resource_group = self
             .get_resource_group::<ObjectGroupResource>(primary_store_object_address)?
             .unwrap_or_else(BTreeMap::new);
+
+        resource_group
+            .entry(ObjectCoreResource::struct_tag())
+            .or_insert(bcs::to_bytes(&ObjectCoreResource::new(
+                address,
+                false,
+                EventHandle::new(
+                    aptos_types::event::EventKey::new(0, primary_store_object_address),
+                    0,
+                ),
+            ))?);
 
         let mut fungible_store = match resource_group.get(&FungibleStoreResource::struct_tag()) {
             Some(blob) => bcs::from_bytes(blob)?,

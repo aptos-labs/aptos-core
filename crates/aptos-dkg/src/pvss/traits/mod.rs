@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 pub mod transcript;
 
 pub use aptos_crypto::arkworks::shamir::Reconstructable;
-pub use transcript::{AggregatableTranscript, Transcript};
+pub use transcript::{Aggregatable, AggregatableTranscript, Subtranscript, Transcript};
 
 /// Converts a type `Self` to `ToType` using auxiliary data from type `AuxType`.
 pub trait Convert<ToType, AuxType> {

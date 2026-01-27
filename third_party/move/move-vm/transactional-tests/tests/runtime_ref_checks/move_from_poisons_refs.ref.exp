@@ -1,0 +1,12 @@
+processed 2 tasks
+task 0 lines 1-46:  publish [module 0xc0ffee::move_from_test]
+task 1 lines 48-48:  run 0xc0ffee::move_from_test::test_move_from_poisons --signers 0x1 --verbose
+Error: Function execution failed with VMError: {
+    message: Failed to move resource from 0000000000000000000000000000000000000000000000000000000000000001 @moving global resource with dangling reference,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(2),
+    location: 0xc0ffee::move_from_test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 14)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

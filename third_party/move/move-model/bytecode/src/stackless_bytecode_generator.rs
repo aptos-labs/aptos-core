@@ -322,7 +322,18 @@ impl<'a> StacklessBytecodeGenerator<'a> {
 
             MoveBytecode::Abort => {
                 let error_code_index = self.temp_stack.pop().unwrap();
-                self.code.push(Bytecode::Abort(attr_id, error_code_index));
+                self.code
+                    .push(Bytecode::Abort(attr_id, error_code_index, None));
+            },
+
+            MoveBytecode::AbortMsg => {
+                let error_message_index = self.temp_stack.pop().unwrap();
+                let error_code_index = self.temp_stack.pop().unwrap();
+                self.code.push(Bytecode::Abort(
+                    attr_id,
+                    error_code_index,
+                    Some(error_message_index),
+                ));
             },
 
             MoveBytecode::StLoc(idx) => {
@@ -1612,7 +1623,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                         vec![],
                     ),
                     vec![],
-                    vec![value_operand_index, signer_operand_index],
+                    vec![signer_operand_index, value_operand_index],
                 ));
             },
 
@@ -1629,7 +1640,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                         self.get_type_params(struct_instantiation.type_parameters),
                     ),
                     vec![],
-                    vec![value_operand_index, signer_operand_index],
+                    vec![signer_operand_index, value_operand_index],
                 ));
             },
 

@@ -1,0 +1,5 @@
+{
+  "message": "Transaction entry function name invalid: invalid Move function name: transfer::what::what",
+  "error_code": "invalid_input",
+  "vm_error_code": null
+}

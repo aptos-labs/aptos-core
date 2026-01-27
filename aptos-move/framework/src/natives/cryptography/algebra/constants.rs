@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     abort_unless_arithmetics_enabled_for_structure, abort_unless_feature_flag_enabled,
@@ -91,9 +91,7 @@ pub fn zero_internal(
         Some(Structure::BN254Gt) => {
             ark_constant_op_internal!(context, ark_bn254::Fq12, one, ALGEBRA_ARK_BN254_FQ12_ONE)
         },
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
+        _ => Err(SafeNativeError::abort(MOVE_ABORT_CODE_NOT_IMPLEMENTED)),
     }
 }
 
@@ -162,9 +160,7 @@ pub fn one_internal(
             let handle = store_element!(context, element)?;
             Ok(smallvec![Value::u64(handle as u64)])
         },
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
+        _ => Err(SafeNativeError::abort(MOVE_ABORT_CODE_NOT_IMPLEMENTED)),
     }
 }
 
@@ -192,8 +188,6 @@ pub fn order_internal(
         | Some(Structure::BN254G2) => Ok(smallvec![Value::vector_u8(BN254_R_LENDIAN.clone())]),
         Some(Structure::BN254Fq) => Ok(smallvec![Value::vector_u8(BN254_Q_LENDIAN.clone())]),
         Some(Structure::BN254Fq12) => Ok(smallvec![Value::vector_u8(BN254_Q12_LENDIAN.clone())]),
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
+        _ => Err(SafeNativeError::abort(MOVE_ABORT_CODE_NOT_IMPLEMENTED)),
     }
 }

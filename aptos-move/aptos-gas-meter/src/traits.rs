@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_gas_algebra::{
     AbstractValueSize, Fee, FeePerGasUnit, Gas, GasExpression, GasScalingFactor, Octa,
@@ -127,6 +127,10 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// Charges an additional cost for keyless transactions to compensate for the
     /// expensive computation required.
     fn charge_keyless(&mut self) -> VMResult<()>;
+
+    /// Charges an additional cost for SLH-DSA signature verification to compensate for the
+    /// expensive computation required (5x more expensive than ed25519).
+    fn charge_slh_dsa_sha2_128s(&mut self) -> VMResult<()>;
 
     /// Charges IO gas for the transaction itself.
     fn charge_io_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()>;
@@ -283,4 +287,8 @@ pub trait CacheValueSizes: AptosGasMeter {
         stack_size: AbstractValueSize,
         heap_size: AbstractValueSize,
     ) -> PartialVMResult<()>;
+}
+
+pub trait PeakMemoryUsage {
+    fn peak_memory_usage(&self) -> AbstractValueSize;
 }

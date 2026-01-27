@@ -1,15 +1,21 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     config::HistoricalDataServiceConfig,
     connection_manager::ConnectionManager,
     metrics::{COUNTER, TIMER},
 };
-use aptos_indexer_grpc_utils::file_store_operator_v2::file_store_reader::FileStoreReader;
+use aptos_indexer_grpc_utils::{
+    constants::{get_request_metadata, IndexerGrpcRequestMetadata},
+    counters::BYTES_READY_TO_TRANSFER_FROM_SERVER_AFTER_STRIPPING,
+    file_store_operator_v2::file_store_reader::FileStoreReader,
+    filter_utils,
+};
 use aptos_protos::indexer::v1::{GetTransactionsRequest, ProcessedRange, TransactionsResponse};
 use aptos_transaction_filter::BooleanTransactionFilter;
 use futures::executor::block_on;
+use prost::Message;
 use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -17,7 +23,6 @@ use std::{
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tonic::{Request, Status};
 use tracing::info;
-use uuid::Uuid;
 
 const DEFAULT_MAX_NUM_TRANSACTIONS_PER_BATCH: usize = 10000;
 
@@ -58,10 +63,10 @@ impl HistoricalDataService {
                 COUNTER
                     .with_label_values(&["historical_data_service_receive_request"])
                     .inc();
-                // TODO(grao): Store request metadata.
+                // Extract request metadata before consuming the request.
+                let request_metadata = Arc::new(get_request_metadata(&request));
                 let request = request.into_inner();
-                // TODO(grao): We probably should have a more stable id from the client side.
-                let id = Uuid::new_v4().to_string();
+                let id = request_metadata.request_connection_id.clone();
                 info!("Received request: {request:?}.");
 
                 if request.starting_version.is_none() {
@@ -76,17 +81,14 @@ impl HistoricalDataService {
                 let starting_version = request.starting_version.unwrap();
 
                 let filter = if let Some(proto_filter) = request.transaction_filter {
-                    match BooleanTransactionFilter::new_from_proto(
+                    match filter_utils::parse_transaction_filter(
                         proto_filter,
-                        Some(self.max_transaction_filter_size_bytes),
+                        self.max_transaction_filter_size_bytes,
                     ) {
                         Ok(filter) => Some(filter),
-                        Err(e) => {
-                            let err = Err(Status::invalid_argument(format!(
-                                "Invalid transaction_filter: {e:?}."
-                            )));
+                        Err(err) => {
                             info!("Client error: {err:?}.");
-                            let _ = response_sender.blocking_send(err);
+                            let _ = response_sender.blocking_send(Err(err));
                             COUNTER
                                 .with_label_values(&["historical_data_service_invalid_filter"])
                                 .inc();
@@ -114,6 +116,7 @@ impl HistoricalDataService {
                         ending_version,
                         max_num_transactions_per_batch,
                         filter,
+                        request_metadata,
                         response_sender,
                     )
                     .await
@@ -133,6 +136,7 @@ impl HistoricalDataService {
         ending_version: Option<u64>,
         max_num_transactions_per_batch: usize,
         filter: Option<BooleanTransactionFilter>,
+        request_metadata: Arc<IndexerGrpcRequestMetadata>,
         response_sender: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
     ) {
         COUNTER
@@ -217,6 +221,7 @@ impl HistoricalDataService {
                         .last_mut()
                         .unwrap()
                         .processed_range
+                        .as_mut()
                         .unwrap()
                         .last_version = last_processed_version;
                     responses
@@ -235,6 +240,15 @@ impl HistoricalDataService {
                     let _timer = TIMER
                         .with_label_values(&["historical_data_service_send_batch"])
                         .start_timer();
+                    // Record bytes ready to transfer after stripping for billing.
+                    let bytes_ready_to_transfer_after_stripping = response
+                        .transactions
+                        .iter()
+                        .map(|t| t.encoded_len())
+                        .sum::<usize>();
+                    BYTES_READY_TO_TRANSFER_FROM_SERVER_AFTER_STRIPPING
+                        .with_label_values(&request_metadata.get_label_values())
+                        .inc_by(bytes_ready_to_transfer_after_stripping as u64);
                     if response_sender.send(Ok(response)).await.is_err() {
                         // NOTE: We are not recalculating the version and size_bytes for the stream
                         // progress since nobody cares about the accurate if client has dropped the

@@ -1,17 +1,21 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{error::PepperServiceError, metrics, utils};
+use crate::{
+    external_resources::jwk_types::{
+        FederatedJWKIssuer, FederatedJWKIssuerInterface, FederatedJWKs, JWKCache, JWKIssuer,
+        JWKIssuerInterface, KeyID,
+    },
+    metrics, utils,
+};
 use anyhow::{anyhow, Result};
 use aptos_infallible::Mutex;
 use aptos_keyless_pepper_common::jwt::parse;
 use aptos_logger::{info, warn};
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{jwks::rsa::RSA_JWK, keyless::test_utils::get_sample_iss};
-use once_cell::sync::Lazy;
-use regex::Regex;
 use serde_json::Value;
-use std::{collections::HashMap, str::FromStr, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::Instant;
 // TODO: at some point, we should try to merge the JWK and resource fetcher code
 
@@ -29,97 +33,43 @@ pub const JWK_REFRESH_INTERVAL_SECS: u64 = 10;
 // The frequency at which to log the JWK refresh status (per loop iteration)
 const JWK_REFRESH_LOOP_LOG_FREQUENCY: u64 = 6; // e.g., 6 * 10s (per loop) = 60s per log
 
-// Useful type declarations
-pub type Issuer = String;
-pub type KeyID = String;
-pub type JWKCache = Arc<Mutex<HashMap<Issuer, HashMap<KeyID, Arc<RSA_JWK>>>>>;
+// Auth0 federated JWK constants
+pub const AUTH0_ISSUER_NAME: &str = "auth0";
+pub const AUTH0_REGEX_STR: &str = r"^https://[a-zA-Z0-9-]+\.us\.auth0\.com/$";
+pub const AUTH0_JWK_URL_SUFFIX: &str = ".well-known/jwks.json";
 
-/// A lazy static regex to match auth0 URLs
-static AUTH_0_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^https://[a-zA-Z0-9-]+\.us\.auth0\.com/$").unwrap());
+// Cognito federated JWK constants
+pub const COGNITO_ISSUER_NAME: &str = "cognito";
+pub const COGNITO_REGEX_STR: &str =
+    r"^https://cognito-idp\.[a-zA-Z0-9-_]+\.amazonaws\.com/[a-zA-Z0-9-_]+$";
+pub const COGNITO_JWK_URL_SUFFIX: &str = "/.well-known/jwks.json";
 
-/// A lazy static regex to match cognito URLs
-static COGNITO_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^https://cognito-idp\.[a-zA-Z0-9-_]+\.amazonaws\.com/[a-zA-Z0-9-_]+$").unwrap()
-});
+/// Creates and initializes the federated JWKs map
+fn initialize_federated_jwks() -> FederatedJWKs<FederatedJWKIssuer> {
+    let mut federated_jwks = Vec::new();
 
-/// A common interface offered by JWK issuers (this is especially useful for logging and testing)
-#[async_trait::async_trait]
-pub trait JWKIssuerInterface {
-    /// Returns the name of the issuer
-    fn issuer_name(&self) -> String;
+    // Add the Auth0 federated JWKs
+    let auth0_jwk = FederatedJWKIssuer::new(
+        AUTH0_ISSUER_NAME.into(),
+        AUTH0_JWK_URL_SUFFIX.into(),
+        AUTH0_REGEX_STR.into(),
+    );
+    federated_jwks.push(auth0_jwk);
 
-    /// Returns the JWK URL of the issuer
-    fn issuer_jwk_url(&self) -> String;
+    // Add the cognito federated JWKs
+    let cognito_jwk = FederatedJWKIssuer::new(
+        COGNITO_ISSUER_NAME.into(),
+        COGNITO_JWK_URL_SUFFIX.into(),
+        COGNITO_REGEX_STR.into(),
+    );
+    federated_jwks.push(cognito_jwk);
 
-    /// Fetches the JWKs from the issuer's JWK URL
-    async fn fetch_jwks(&self) -> Result<HashMap<KeyID, Arc<RSA_JWK>>>;
-}
-
-/// A simple JWK issuer struct
-#[derive(Clone, Debug)]
-pub struct JWKIssuer {
-    issuer_name: String,
-    issuer_jwk_url: String,
-}
-
-impl JWKIssuer {
-    pub fn new(issuer_name: String, issuer_jwk_url: String) -> JWKIssuer {
-        JWKIssuer {
-            issuer_name,
-            issuer_jwk_url,
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl JWKIssuerInterface for JWKIssuer {
-    fn issuer_name(&self) -> String {
-        self.issuer_name.clone()
-    }
-
-    fn issuer_jwk_url(&self) -> String {
-        self.issuer_jwk_url.clone()
-    }
-
-    async fn fetch_jwks(&self) -> Result<HashMap<KeyID, Arc<RSA_JWK>>> {
-        fetch_jwks(&self.issuer_jwk_url).await
-    }
-}
-
-impl FromStr for JWKIssuer {
-    type Err = PepperServiceError;
-
-    /// This is used to parse each jwk issuer from the command line.
-    /// The expected format is: "<iss> <jwk_url>".
-    /// NOTE: we assume there is no whitespace character in either `iss` or `jwk_url`.
-    fn from_str(string: &str) -> std::result::Result<Self, Self::Err> {
-        // Split the string by whitespace
-        let mut iterator = string.split_whitespace();
-
-        // Parse the substrings as issuer and aud
-        let issuer_name = iterator.next().ok_or(PepperServiceError::UnexpectedError(
-            "Failed to parse JWK issuer name!".into(),
-        ))?;
-        let issuer_jwk_url = iterator.next().ok_or(PepperServiceError::UnexpectedError(
-            "Failed to parse JWK issuer URL!".into(),
-        ))?;
-
-        // Verify that there are exactly 2 substrings
-        if iterator.next().is_some() {
-            return Err(PepperServiceError::UnexpectedError(
-                "Too many arguments found for JWK issuer!".into(),
-            ));
-        }
-
-        // Create the override
-        let jwk_issuer = JWKIssuer::new(issuer_name.to_string(), issuer_jwk_url.to_string());
-        Ok(jwk_issuer)
-    }
+    // Return the federated JWKs
+    FederatedJWKs::new(federated_jwks)
 }
 
 /// Fetches the JWKs from the given URL
-async fn fetch_jwks(jwk_url: &str) -> Result<HashMap<KeyID, Arc<RSA_JWK>>> {
+pub async fn fetch_jwks(jwk_url: &str) -> Result<HashMap<KeyID, Arc<RSA_JWK>>> {
     // Create the request client
     let client = utils::create_request_client();
 
@@ -164,7 +114,10 @@ pub fn get_cached_jwk_as_rsa(
 }
 
 /// Fetches the federated JWK for the given JWT
-pub async fn get_federated_jwk(jwt: &str) -> Result<Arc<RSA_JWK>> {
+pub async fn get_federated_jwk<T: FederatedJWKIssuerInterface + Clone>(
+    jwt: &str,
+    federated_jwks: FederatedJWKs<T>,
+) -> Result<Arc<RSA_JWK>> {
     // Parse the JWT to extract the issuer and key ID
     let payload = parse(jwt)?;
     let jwt_issuer = payload.claims.iss;
@@ -175,22 +128,34 @@ pub async fn get_federated_jwk(jwt: &str) -> Result<Arc<RSA_JWK>> {
 
     // Fetch the keys for the issuer
     let keys = if jwt_issuer.eq("test.federated.oidc.provider") {
+        // Use the test JWK for the test issuer
         let test_jwk = include_str!("../../../../../types/src/jwks/rsa/secure_test_jwk.json");
         parse_jwks(test_jwk).expect("The test JWK should parse successfully!")
-    } else if AUTH_0_REGEX.is_match(&jwt_issuer) {
-        let jwk_url = format!("{}.well-known/jwks.json", &jwt_issuer);
-        fetch_jwks(&jwk_url).await?
-    } else if COGNITO_REGEX.is_match(&jwt_issuer) {
-        let jwk_url = format!("{}/.well-known/jwks.json", &jwt_issuer);
-        fetch_jwks(&jwk_url).await?
     } else {
-        return Err(anyhow!("Unsupported federated issuer: {}", jwt_issuer));
+        // Fetch the JWKs for the issuer
+        let mut found_jwks = None;
+        for federated_issuer in federated_jwks.get_issuers() {
+            if federated_issuer.regex().is_match(&jwt_issuer) {
+                // Fetch the jwks from the URL
+                let fetched_jwks = federated_issuer.fetch_jwks(jwt_issuer.clone()).await?;
+
+                // Update the found jwks
+                found_jwks = Some(fetched_jwks);
+                break;
+            }
+        }
+
+        // Ensure the issuer was found
+        match found_jwks {
+            Some(jwks) => jwks,
+            None => return Err(anyhow!("Unsupported federated issuer: {}", jwt_issuer)),
+        }
     };
 
     // Fetch the key for the given key ID
     let key = keys
         .get(&jwt_key_id)
-        .ok_or_else(|| anyhow!("unknown kid: {}", jwt_key_id))?;
+        .ok_or_else(|| anyhow!("Unknown kid: {}", jwt_key_id))?;
     Ok(key.clone())
 }
 
@@ -243,7 +208,9 @@ fn parse_jwks(response_text: &str) -> Result<HashMap<KeyID, Arc<RSA_JWK>>> {
 /// JWK URLs. Otherwise, if these values were fetched from on-chain configs,
 /// an attacker who compromises governance could change these values to
 /// point to a malicious issuer (or JWK URL).
-pub fn start_jwk_fetchers(jwk_issuers_override: Vec<JWKIssuer>) -> JWKCache {
+pub fn start_jwk_fetchers(
+    jwk_issuers_override: Vec<JWKIssuer>,
+) -> (JWKCache, FederatedJWKs<FederatedJWKIssuer>) {
     // Create the JWK cache
     let jwk_cache = Arc::new(Mutex::new(HashMap::new()));
 
@@ -262,7 +229,7 @@ pub fn start_jwk_fetchers(jwk_issuers_override: Vec<JWKIssuer>) -> JWKCache {
     let jwk_issuer_map: HashMap<String, Arc<JWKIssuer>> = default_issuers
         .into_iter()
         .chain(jwk_issuers_override)
-        .map(|issuer| (issuer.issuer_name.clone(), Arc::new(issuer)))
+        .map(|issuer| (issuer.issuer_name(), Arc::new(issuer)))
         .collect();
 
     // Start the JWK refresh loops for known issuers
@@ -270,8 +237,11 @@ pub fn start_jwk_fetchers(jwk_issuers_override: Vec<JWKIssuer>) -> JWKCache {
         start_jwk_refresh_loop(jwk_issuer, jwk_cache.clone(), time_service.clone());
     }
 
-    // Return the JWK cache
-    jwk_cache
+    // Initialize the federated JWKs
+    let federated_jwks = initialize_federated_jwks();
+
+    // Return the JWK cache and federated JWKs
+    (jwk_cache, federated_jwks)
 }
 
 /// Starts a background task that periodically fetches and caches the JWKs from the given issuer

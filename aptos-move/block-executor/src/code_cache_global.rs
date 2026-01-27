@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::counters::GLOBAL_LAYOUT_CACHE_MISSES;
 use aptos_mvhashmap::types::TxnIndex;
@@ -83,8 +83,9 @@ where
     }
 }
 
-/// A global module cache for verified code that is read-only and concurrently accessed during the
-/// block execution. Modified safely only at block boundaries.
+/// A global cache for verified code and derived information (such as layouts) that is concurrently
+/// accessed during the block execution. Module cache is read-only, and modified safely only at
+/// block boundaries. Layout cache can be modified during execution of the block.
 pub struct GlobalModuleCache<K, D, V, E> {
     /// Module cache containing the verified code.
     module_cache: HashMap<K, Entry<D, V, E>>,

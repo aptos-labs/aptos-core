@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::AptosDB;
 use anyhow::anyhow;
@@ -54,6 +54,7 @@ impl FastSyncStorageWrapper {
             config.storage.buffered_state_target_items,
             config.storage.max_num_nodes_per_lru_cache_shard,
             internal_indexer_db,
+            config.storage.hot_state_config,
         )
         .map_err(|err| anyhow!("fast sync DB failed to open {}", err))?;
         if let Some(sender) = update_sender {
@@ -84,6 +85,7 @@ impl FastSyncStorageWrapper {
                 config.storage.buffered_state_target_items,
                 config.storage.max_num_nodes_per_lru_cache_shard,
                 None,
+                config.storage.hot_state_config,
             )
             .map_err(|err| anyhow!("Secondary DB failed to open {}", err))?;
 

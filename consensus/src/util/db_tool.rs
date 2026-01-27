@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #![allow(clippy::unwrap_used)]
 
@@ -11,7 +11,12 @@ use crate::{
     },
 };
 use anyhow::{bail, Result};
-use aptos_consensus_types::{block::Block, common::Payload};
+use aptos_consensus_types::{
+    block::Block,
+    common::Payload,
+    payload::OptQuorumStorePayload,
+    proof_of_store::{BatchInfo, TBatchInfo},
+};
 use aptos_crypto::HashValue;
 use aptos_types::transaction::{SignedTransaction, Transaction};
 use clap::Parser;
@@ -63,7 +68,7 @@ impl Command {
 
 fn extract_txns_from_quorum_store(
     digests: impl Iterator<Item = HashValue>,
-    all_batches: &HashMap<HashValue, PersistedValue>,
+    all_batches: &HashMap<HashValue, PersistedValue<BatchInfo>>,
 ) -> anyhow::Result<Vec<&SignedTransaction>> {
     let mut block_txns = Vec::new();
     for digest in digests {
@@ -82,7 +87,7 @@ fn extract_txns_from_quorum_store(
 
 pub fn extract_txns_from_block<'a>(
     block: &'a Block,
-    all_batches: &'a HashMap<HashValue, PersistedValue>,
+    all_batches: &'a HashMap<HashValue, PersistedValue<BatchInfo>>,
 ) -> anyhow::Result<Vec<&'a SignedTransaction>> {
     match block.payload().as_ref() {
         Some(payload) => match payload {
@@ -113,21 +118,30 @@ pub fn extract_txns_from_block<'a>(
                 }
                 Ok(all_txns)
             },
-            Payload::OptQuorumStore(opt_qs_payload) => {
+            Payload::OptQuorumStore(OptQuorumStorePayload::V1(p)) => {
                 let mut all_txns = extract_txns_from_quorum_store(
-                    opt_qs_payload
-                        .proof_with_data()
-                        .iter()
-                        .map(|proof| *proof.digest()),
+                    p.proof_with_data().iter().map(|proof| *proof.digest()),
                     all_batches,
                 )
                 .unwrap();
                 all_txns.extend(
                     extract_txns_from_quorum_store(
-                        opt_qs_payload
-                            .opt_batches()
-                            .iter()
-                            .map(|info| *info.digest()),
+                        p.opt_batches().iter().map(|info| *info.digest()),
+                        all_batches,
+                    )
+                    .unwrap(),
+                );
+                Ok(all_txns)
+            },
+            Payload::OptQuorumStore(OptQuorumStorePayload::V2(p)) => {
+                let mut all_txns = extract_txns_from_quorum_store(
+                    p.proof_with_data().iter().map(|proof| *proof.digest()),
+                    all_batches,
+                )
+                .unwrap();
+                all_txns.extend(
+                    extract_txns_from_quorum_store(
+                        p.opt_batches().iter().map(|info| *info.digest()),
                         all_batches,
                     )
                     .unwrap(),

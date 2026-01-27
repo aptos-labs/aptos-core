@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This module defines all the gas parameters for transactions, along with their initial values
 //! in the genesis and a mapping between the Rust representation and the on-chain gas schedule.
@@ -8,6 +8,7 @@ use crate::{
     gas_schedule::VMGasParameters,
     ver::gas_feature_versions::{
         RELEASE_V1_10, RELEASE_V1_11, RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_15, RELEASE_V1_26,
+        RELEASE_V1_41,
     },
 };
 use aptos_gas_algebra::{
@@ -275,7 +276,12 @@ crate::gas_schedule::macros::define_gas_parameters!(
             max_aa_gas: Gas,
             { RELEASE_V1_26.. => "max_aa_gas" },
             60,
-        ]
+        ],
+        [
+            slh_dsa_sha2_128s_base_cost: InternalGas,
+            { RELEASE_V1_41.. => "slh_dsa_sha2_128s.base" },
+            13_800_000,
+        ],
     ]
 );
 

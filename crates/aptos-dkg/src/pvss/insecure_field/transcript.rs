@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     algebra::polynomials::shamir_secret_share,
     pvss::{
         self, das, encryption_dlog,
-        traits::{self, transcript::MalleableTranscript, Convert},
+        traits::{self, transcript::MalleableTranscript, AggregatableTranscript, Convert},
         Player, ThresholdConfigBlstrs,
     },
     traits::transcript::Aggregatable,
@@ -83,7 +83,7 @@ impl traits::Transcript for Transcript {
         pp: &Self::PublicParameters,
         _ssk: &Self::SigningSecretKey,
         _spk: &Self::SigningPubKey,
-        eks: &Vec<Self::EncryptPubKey>,
+        eks: &[Self::EncryptPubKey],
         s: &Self::InputSecret,
         _aux: &A,
         dealer: &Player,
@@ -108,49 +108,6 @@ impl traits::Transcript for Transcript {
             V,
             C,
         }
-    }
-
-    fn verify<A: Serialize + Clone>(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        pp: &Self::PublicParameters,
-        _spks: &Vec<Self::SigningPubKey>,
-        eks: &Vec<Self::EncryptPubKey>,
-        _aux: &Vec<A>,
-    ) -> anyhow::Result<()> {
-        if eks.len() != sc.n {
-            bail!("Expected {} encryption keys, but got {}", sc.n, eks.len());
-        }
-
-        if self.C.len() != sc.n {
-            bail!("Expected {} ciphertexts, but got {}", sc.n, self.C.len());
-        }
-
-        if self.V.len() != sc.n + 1 {
-            bail!(
-                "Expected {} (polynomial) commitment elements, but got {}",
-                sc.n + 1,
-                self.V.len()
-            );
-        }
-
-        let alphas = random_scalars(sc.n, &mut thread_rng());
-        let g_2 = pp.get_commitment_base();
-
-        let lc_1 = g_2.mul(
-            self.C
-                .iter()
-                .zip(alphas.iter())
-                .map(|(&c, &alpha)| c * alpha)
-                .sum::<Scalar>(),
-        );
-        let lc_2 = G2Projective::multi_exp_iter(self.V.iter().take(sc.n), alphas.iter());
-
-        if lc_1 != lc_2 {
-            bail!("Expected linear combination check test to pass")
-        }
-
-        return Ok(());
     }
 
     fn get_dealers(&self) -> Vec<Player> {
@@ -196,7 +153,54 @@ impl traits::Transcript for Transcript {
     }
 }
 
-impl Aggregatable<ThresholdConfigBlstrs> for Transcript {
+impl AggregatableTranscript for Transcript {
+    fn verify<A: Serialize + Clone>(
+        &self,
+        sc: &<Self as traits::Transcript>::SecretSharingConfig,
+        pp: &Self::PublicParameters,
+        _spks: &[Self::SigningPubKey],
+        eks: &[Self::EncryptPubKey],
+        _aux: &[A],
+    ) -> anyhow::Result<()> {
+        if eks.len() != sc.n {
+            bail!("Expected {} encryption keys, but got {}", sc.n, eks.len());
+        }
+
+        if self.C.len() != sc.n {
+            bail!("Expected {} ciphertexts, but got {}", sc.n, self.C.len());
+        }
+
+        if self.V.len() != sc.n + 1 {
+            bail!(
+                "Expected {} (polynomial) commitment elements, but got {}",
+                sc.n + 1,
+                self.V.len()
+            );
+        }
+
+        let alphas = random_scalars(sc.n, &mut thread_rng());
+        let g_2 = pp.get_commitment_base();
+
+        let lc_1 = g_2.mul(
+            self.C
+                .iter()
+                .zip(alphas.iter())
+                .map(|(&c, &alpha)| c * alpha)
+                .sum::<Scalar>(),
+        );
+        let lc_2 = G2Projective::multi_exp_iter(self.V.iter().take(sc.n), alphas.iter());
+
+        if lc_1 != lc_2 {
+            bail!("Expected linear combination check test to pass")
+        }
+
+        return Ok(());
+    }
+}
+
+impl Aggregatable for Transcript {
+    type SecretSharingConfig = ThresholdConfigBlstrs;
+
     fn aggregate_with(
         &mut self,
         sc: &ThresholdConfigBlstrs,

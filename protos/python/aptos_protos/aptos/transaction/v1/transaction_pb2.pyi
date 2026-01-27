@@ -22,6 +22,12 @@ class MoveTypes(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     MOVE_TYPES_U64: _ClassVar[MoveTypes]
     MOVE_TYPES_U128: _ClassVar[MoveTypes]
     MOVE_TYPES_U256: _ClassVar[MoveTypes]
+    MOVE_TYPES_I8: _ClassVar[MoveTypes]
+    MOVE_TYPES_I16: _ClassVar[MoveTypes]
+    MOVE_TYPES_I32: _ClassVar[MoveTypes]
+    MOVE_TYPES_I64: _ClassVar[MoveTypes]
+    MOVE_TYPES_I128: _ClassVar[MoveTypes]
+    MOVE_TYPES_I256: _ClassVar[MoveTypes]
     MOVE_TYPES_ADDRESS: _ClassVar[MoveTypes]
     MOVE_TYPES_SIGNER: _ClassVar[MoveTypes]
     MOVE_TYPES_VECTOR: _ClassVar[MoveTypes]
@@ -46,6 +52,12 @@ MOVE_TYPES_U32: MoveTypes
 MOVE_TYPES_U64: MoveTypes
 MOVE_TYPES_U128: MoveTypes
 MOVE_TYPES_U256: MoveTypes
+MOVE_TYPES_I8: MoveTypes
+MOVE_TYPES_I16: MoveTypes
+MOVE_TYPES_I32: MoveTypes
+MOVE_TYPES_I64: MoveTypes
+MOVE_TYPES_I128: MoveTypes
+MOVE_TYPES_I256: MoveTypes
 MOVE_TYPES_ADDRESS: MoveTypes
 MOVE_TYPES_SIGNER: MoveTypes
 MOVE_TYPES_VECTOR: MoveTypes
@@ -1255,12 +1267,14 @@ class AnyPublicKey(_message.Message):
         TYPE_SECP256R1_ECDSA: _ClassVar[AnyPublicKey.Type]
         TYPE_KEYLESS: _ClassVar[AnyPublicKey.Type]
         TYPE_FEDERATED_KEYLESS: _ClassVar[AnyPublicKey.Type]
+        TYPE_SLH_DSA_SHA2_128S: _ClassVar[AnyPublicKey.Type]
     TYPE_UNSPECIFIED: AnyPublicKey.Type
     TYPE_ED25519: AnyPublicKey.Type
     TYPE_SECP256K1_ECDSA: AnyPublicKey.Type
     TYPE_SECP256R1_ECDSA: AnyPublicKey.Type
     TYPE_KEYLESS: AnyPublicKey.Type
     TYPE_FEDERATED_KEYLESS: AnyPublicKey.Type
+    TYPE_SLH_DSA_SHA2_128S: AnyPublicKey.Type
     TYPE_FIELD_NUMBER: _ClassVar[int]
     PUBLIC_KEY_FIELD_NUMBER: _ClassVar[int]
     type: AnyPublicKey.Type
@@ -1279,6 +1293,7 @@ class AnySignature(_message.Message):
         "secp256k1_ecdsa",
         "webauthn",
         "keyless",
+        "slh_dsa_sha2_128s",
     ]
 
     class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
@@ -1288,23 +1303,27 @@ class AnySignature(_message.Message):
         TYPE_SECP256K1_ECDSA: _ClassVar[AnySignature.Type]
         TYPE_WEBAUTHN: _ClassVar[AnySignature.Type]
         TYPE_KEYLESS: _ClassVar[AnySignature.Type]
+        TYPE_SLH_DSA_SHA2_128S: _ClassVar[AnySignature.Type]
     TYPE_UNSPECIFIED: AnySignature.Type
     TYPE_ED25519: AnySignature.Type
     TYPE_SECP256K1_ECDSA: AnySignature.Type
     TYPE_WEBAUTHN: AnySignature.Type
     TYPE_KEYLESS: AnySignature.Type
+    TYPE_SLH_DSA_SHA2_128S: AnySignature.Type
     TYPE_FIELD_NUMBER: _ClassVar[int]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     ED25519_FIELD_NUMBER: _ClassVar[int]
     SECP256K1_ECDSA_FIELD_NUMBER: _ClassVar[int]
     WEBAUTHN_FIELD_NUMBER: _ClassVar[int]
     KEYLESS_FIELD_NUMBER: _ClassVar[int]
+    SLH_DSA_SHA2_128S_FIELD_NUMBER: _ClassVar[int]
     type: AnySignature.Type
     signature: bytes
     ed25519: Ed25519
     secp256k1_ecdsa: Secp256k1Ecdsa
     webauthn: WebAuthn
     keyless: Keyless
+    slh_dsa_sha2_128s: SlhDsa_Sha2_128s
     def __init__(
         self,
         type: _Optional[_Union[AnySignature.Type, str]] = ...,
@@ -1313,6 +1332,7 @@ class AnySignature(_message.Message):
         secp256k1_ecdsa: _Optional[_Union[Secp256k1Ecdsa, _Mapping]] = ...,
         webauthn: _Optional[_Union[WebAuthn, _Mapping]] = ...,
         keyless: _Optional[_Union[Keyless, _Mapping]] = ...,
+        slh_dsa_sha2_128s: _Optional[_Union[SlhDsa_Sha2_128s, _Mapping]] = ...,
     ) -> None: ...
 
 class Ed25519(_message.Message):
@@ -1334,6 +1354,12 @@ class WebAuthn(_message.Message):
     def __init__(self, signature: _Optional[bytes] = ...) -> None: ...
 
 class Keyless(_message.Message):
+    __slots__ = ["signature"]
+    SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    signature: bytes
+    def __init__(self, signature: _Optional[bytes] = ...) -> None: ...
+
+class SlhDsa_Sha2_128s(_message.Message):
     __slots__ = ["signature"]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     signature: bytes

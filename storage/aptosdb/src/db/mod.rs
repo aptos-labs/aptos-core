@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     backup::backup_handler::BackupHandler, event_store::EventStore, ledger_db::LedgerDb,
@@ -8,7 +7,7 @@ use crate::{
     state_kv_db::StateKvDb, state_merkle_db::StateMerkleDb, state_store::StateStore,
     transaction_store::TransactionStore,
 };
-use aptos_config::config::{PrunerConfig, RocksdbConfigs, StorageDirPaths};
+use aptos_config::config::{HotStateConfig, PrunerConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_db_indexer::{db_indexer::InternalIndexerDB, Indexer};
 use aptos_logger::prelude::*;
 use aptos_schemadb::{batch::SchemaBatch, Cache, Env};
@@ -64,6 +63,7 @@ impl AptosDB {
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
         internal_indexer_db: Option<InternalIndexerDB>,
+        hot_state_config: HotStateConfig,
     ) -> Result<Self> {
         Self::open_internal(
             &db_paths,
@@ -75,6 +75,7 @@ impl AptosDB {
             max_num_nodes_per_lru_cache_shard,
             false,
             internal_indexer_db,
+            hot_state_config,
         )
     }
 
@@ -98,6 +99,7 @@ impl AptosDB {
             max_num_nodes_per_lru_cache_shard,
             true,
             internal_indexer_db,
+            HotStateConfig::default(),
         )
     }
 
@@ -108,7 +110,8 @@ impl AptosDB {
         block_cache: Option<&Cache>,
         readonly: bool,
         max_num_nodes_per_lru_cache_shard: usize,
-    ) -> Result<(LedgerDb, StateMerkleDb, StateKvDb)> {
+        reset_hot_state: bool,
+    ) -> Result<(LedgerDb, Option<StateMerkleDb>, StateMerkleDb, StateKvDb)> {
         let ledger_db = LedgerDb::new(
             db_paths.ledger_db_root_path(),
             rocksdb_configs,
@@ -124,6 +127,20 @@ impl AptosDB {
             readonly,
             ledger_db.metadata_db_arc(),
         )?;
+        let hot_state_merkle_db = if !readonly && rocksdb_configs.enable_storage_sharding {
+            Some(StateMerkleDb::new(
+                db_paths,
+                rocksdb_configs,
+                env,
+                block_cache,
+                readonly,
+                max_num_nodes_per_lru_cache_shard,
+                /* is_hot = */ true,
+                reset_hot_state,
+            )?)
+        } else {
+            None
+        };
         let state_merkle_db = StateMerkleDb::new(
             db_paths,
             rocksdb_configs,
@@ -131,9 +148,11 @@ impl AptosDB {
             block_cache,
             readonly,
             max_num_nodes_per_lru_cache_shard,
+            /* is_hot = */ false,
+            /* delete_on_restart = */ false,
         )?;
 
-        Ok((ledger_db, state_merkle_db, state_kv_db))
+        Ok((ledger_db, hot_state_merkle_db, state_merkle_db, state_kv_db))
     }
 
     pub fn add_version_update_subscriber(
@@ -162,8 +181,19 @@ impl AptosDB {
         LedgerDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref(), sharding)?;
         if sharding {
             StateKvDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
+            StateMerkleDb::create_checkpoint(
+                db_path.as_ref(),
+                cp_path.as_ref(),
+                sharding,
+                /* is_hot = */ true,
+            )?;
         }
-        StateMerkleDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref(), sharding)?;
+        StateMerkleDb::create_checkpoint(
+            db_path.as_ref(),
+            cp_path.as_ref(),
+            sharding,
+            /* is_hot = */ false,
+        )?;
 
         info!(
             db_path = db_path.as_ref(),

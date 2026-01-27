@@ -67,7 +67,7 @@ public fun m::test() {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::m
 // Function definition at index 0
 fun consume_1(l0: u64)

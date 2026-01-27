@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::{TransactionExecutable, TransactionExecutableRef};
 use crate::transaction::{user_transaction_context::MultisigPayload, EntryFunction};
@@ -76,7 +76,13 @@ impl TryFrom<VMStatus> for ExecutionError {
                 abort_location: String::from(""),
                 error_code: error as u64,
             }),
-            VMStatus::MoveAbort(abort_location, error_code) => Ok(ExecutionError {
+            VMStatus::MoveAbort {
+                location: abort_location,
+                code: error_code,
+                // Note that we ignore the message here because ExecutionError has to be serialized
+                // for multisig transactions and the serialization is not expected to fail.
+                message: _,
+            } => Ok(ExecutionError {
                 error_type: String::from("MoveAbort"),
                 abort_location: format!("{:?}", abort_location),
                 error_code,

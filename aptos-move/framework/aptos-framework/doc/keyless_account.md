@@ -148,50 +148,110 @@ The 288-byte Groth16 verification key (VK) for the ZK relation that implements k
 <dd>
  An override <code>aud</code> for the identity of a recovery service, which will help users recover their keyless accounts
  associated with dapps or wallets that have disappeared.
- IMPORTANT: This recovery service **cannot** on its own take over user accounts; a user must first sign in
+ IMPORTANT: This recovery service **cannot**, on its own, take over user accounts: a user must first sign in
  via OAuth in the recovery service in order to allow it to rotate any of that user's keyless accounts.
+
+ Furthermore, the ZKP eventually expires, so there is a limited window within which a malicious recovery
+ service could rotate accounts. In the future, we can make this window arbitrarily small by further lowering
+ the maximum expiration horizon for ZKPs used for recovery, instead of relying on the <code>max_exp_horizon_secs</code>
+ value in this resource.
+
+ If changed: There is no prover service support yet for recovery mode => ZKPs with override aud's enabled
+   will not be served by the prover service => as long as training wheels are "on," such recovery ZKPs will
+   never arrive on chain.
+   (Once support is implemented in the prover service, in an abundance of caution, the training wheel check
+    should only pass if the override aud in the public statement matches one in this list. Therefore, changes
+    to this value should be picked up automatically by the prover service.)
 </dd>
 <dt>
 <code>max_signatures_per_txn: u16</code>
 </dt>
 <dd>
  No transaction can have more than this many keyless signatures.
+
+ If changed: Only affects the Aptos validators; prover service not impacted.
 </dd>
 <dt>
 <code>max_exp_horizon_secs: u64</code>
 </dt>
 <dd>
- How far in the future from the JWT issued at time the EPK expiry can be set.
+ How far in the future from the JWT's issued-at-time can the EPK expiration date be set?
+ Specifically, validators enforce that the ZKP's expiration horizon is less than this <code>max_exp_horizon_secs</code>
+ value.
+
+ If changed: Only affects the Aptos validators; prover service not impacted.
 </dd>
 <dt>
 <code>training_wheels_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;</code>
 </dt>
 <dd>
- The training wheels PK, if training wheels are on
+ The training wheels PK, if training wheels are on.
+
+ If changed: Prover service has to be re-deployed with the associated training wheel SK.
 </dd>
 <dt>
 <code>max_commited_epk_bytes: u16</code>
 </dt>
 <dd>
  The max length of an ephemeral public key supported in our circuit (93 bytes)
+
+ Note: Currently, the circuit derives the JWT's nonce field by hashing the EPK as:
+ ```
+ Poseidon_6(
+   epk_0, epk_1, epk_2,
+   max_commited_epk_bytes,
+   exp_date,
+   epk_blinder
+ )
+ ```
+ and the public inputs hash by hashing the EPK with other inputs as:
+ ```
+ Poseidon_14(
+   epk_0, epk_1, epk_2,
+   max_commited_epk_bytes,
+   [...]
+ )
+ ```
+ where <code>max_committed_epk_byte</code> is passed in as one of the witnesses to the circuit. As a result, (some)
+ changes to this field could technically be handled by the same circuit: e.g., if we let the epk_i chunks
+ exceed 31 bytes, but no more than 32, then <code>max_commited_epk_bytes</code> could now be in (93, 96]. Whether such a
+ restricted set of changes is useful remains unclear. Therefore, the verdict will be that...
+
+ If changed: (Likely) requires a circuit change because over-decreasing (or increasing) it leads to fewer (or
+   more) EPK chunks. This would break the current way the circuit hashes the nonce and the public inputs.
+   => prover service redeployment.
 </dd>
 <dt>
 <code>max_iss_val_bytes: u16</code>
 </dt>
 <dd>
  The max length of the value of the JWT's <code>iss</code> field supported in our circuit (e.g., <code>"https://accounts.google.com"</code>)
+
+ If changed: Requires a circuit change because the <code>iss</code> field value is hashed inside the circuit as
+   <code>HashBytesToFieldWithLen(MAX_ISS_VALUE_LEN)(iss_value, iss_value_len)</code> where <code>MAX_ISS_VALUE_LEN</code> is a
+   circuit constant hard-coded to <code>max_iss_val_bytes</code> (i.e., to 120) => prover service redeployment..
 </dd>
 <dt>
 <code>max_extra_field_bytes: u16</code>
 </dt>
 <dd>
  The max length of the JWT field name and value (e.g., <code>"max_age":"18"</code>) supported in our circuit
+
+ If changed: Requires a circuit change because the extra field key-value pair is hashed inside the circuit as
+   <code>HashBytesToFieldWithLen(MAX_EXTRA_FIELD_KV_PAIR_LEN)(extra_field, extra_field_len)</code> where
+   <code>MAX_EXTRA_FIELD_KV_PAIR_LEN</code> is a circuit constant hard-coded to <code>max_extra_field_bytes</code> (i.e., to 350)
+    => prover service redeployment.
 </dd>
 <dt>
 <code>max_jwt_header_b64_bytes: u32</code>
 </dt>
 <dd>
- The max length of the base64url-encoded JWT header in bytes supported in our circuit
+ The max length of the base64url-encoded JWT header in bytes supported in our circuit.
+
+ If changed: Requires a circuit change because the JWT header is hashed inside the circuit as
+   <code>HashBytesToFieldWithLen(MAX_B64U_JWT_HEADER_W_DOT_LEN)(b64u_jwt_header_w_dot, b64u_jwt_header_w_dot_len)</code>
+   where <code>MAX_B64U_JWT_HEADER_W_DOT_LEN</code> is a circuit constant hard-coded to <code>max_jwt_header_b64_bytes</code>
+   (i.e., to 350) => prover service redeployment.
 </dd>
 </dl>
 
@@ -328,12 +388,12 @@ Pre-validate the VK to actively-prevent incorrect VKs from being set on-chain.
 
 <pre><code><b>fun</b> <a href="keyless_account.md#0x1_keyless_account_validate_groth16_vk">validate_groth16_vk</a>(vk: &<a href="keyless_account.md#0x1_keyless_account_Groth16VerificationKey">Groth16VerificationKey</a>) {
     // Could be leveraged <b>to</b> speed up the VM deserialization of the VK by 2x, since it can <b>assume</b> the points are valid.
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&<a href="../../aptos-stdlib/doc/crypto_algebra.md#0x1_crypto_algebra_deserialize">crypto_algebra::deserialize</a>&lt;<a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_G1">bn254_algebra::G1</a>, <a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_FormatG1Compr">bn254_algebra::FormatG1Compr</a>&gt;(&vk.alpha_g1)), <a href="keyless_account.md#0x1_keyless_account_E_INVALID_BN254_G1_SERIALIZATION">E_INVALID_BN254_G1_SERIALIZATION</a>);
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&<a href="../../aptos-stdlib/doc/crypto_algebra.md#0x1_crypto_algebra_deserialize">crypto_algebra::deserialize</a>&lt;<a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_G2">bn254_algebra::G2</a>, <a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_FormatG2Compr">bn254_algebra::FormatG2Compr</a>&gt;(&vk.beta_g2)), <a href="keyless_account.md#0x1_keyless_account_E_INVALID_BN254_G2_SERIALIZATION">E_INVALID_BN254_G2_SERIALIZATION</a>);
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&<a href="../../aptos-stdlib/doc/crypto_algebra.md#0x1_crypto_algebra_deserialize">crypto_algebra::deserialize</a>&lt;<a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_G2">bn254_algebra::G2</a>, <a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_FormatG2Compr">bn254_algebra::FormatG2Compr</a>&gt;(&vk.gamma_g2)), <a href="keyless_account.md#0x1_keyless_account_E_INVALID_BN254_G2_SERIALIZATION">E_INVALID_BN254_G2_SERIALIZATION</a>);
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&<a href="../../aptos-stdlib/doc/crypto_algebra.md#0x1_crypto_algebra_deserialize">crypto_algebra::deserialize</a>&lt;<a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_G2">bn254_algebra::G2</a>, <a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_FormatG2Compr">bn254_algebra::FormatG2Compr</a>&gt;(&vk.delta_g2)), <a href="keyless_account.md#0x1_keyless_account_E_INVALID_BN254_G2_SERIALIZATION">E_INVALID_BN254_G2_SERIALIZATION</a>);
-    for (i in 0..<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&vk.gamma_abc_g1)) {
-        <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&<a href="../../aptos-stdlib/doc/crypto_algebra.md#0x1_crypto_algebra_deserialize">crypto_algebra::deserialize</a>&lt;<a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_G1">bn254_algebra::G1</a>, <a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_FormatG1Compr">bn254_algebra::FormatG1Compr</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&vk.gamma_abc_g1, i))), <a href="keyless_account.md#0x1_keyless_account_E_INVALID_BN254_G1_SERIALIZATION">E_INVALID_BN254_G1_SERIALIZATION</a>);
+    <b>assert</b>!(<a href="../../aptos-stdlib/doc/crypto_algebra.md#0x1_crypto_algebra_deserialize">crypto_algebra::deserialize</a>&lt;<a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_G1">bn254_algebra::G1</a>, <a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_FormatG1Compr">bn254_algebra::FormatG1Compr</a>&gt;(&vk.alpha_g1).is_some(), <a href="keyless_account.md#0x1_keyless_account_E_INVALID_BN254_G1_SERIALIZATION">E_INVALID_BN254_G1_SERIALIZATION</a>);
+    <b>assert</b>!(<a href="../../aptos-stdlib/doc/crypto_algebra.md#0x1_crypto_algebra_deserialize">crypto_algebra::deserialize</a>&lt;<a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_G2">bn254_algebra::G2</a>, <a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_FormatG2Compr">bn254_algebra::FormatG2Compr</a>&gt;(&vk.beta_g2).is_some(), <a href="keyless_account.md#0x1_keyless_account_E_INVALID_BN254_G2_SERIALIZATION">E_INVALID_BN254_G2_SERIALIZATION</a>);
+    <b>assert</b>!(<a href="../../aptos-stdlib/doc/crypto_algebra.md#0x1_crypto_algebra_deserialize">crypto_algebra::deserialize</a>&lt;<a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_G2">bn254_algebra::G2</a>, <a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_FormatG2Compr">bn254_algebra::FormatG2Compr</a>&gt;(&vk.gamma_g2).is_some(), <a href="keyless_account.md#0x1_keyless_account_E_INVALID_BN254_G2_SERIALIZATION">E_INVALID_BN254_G2_SERIALIZATION</a>);
+    <b>assert</b>!(<a href="../../aptos-stdlib/doc/crypto_algebra.md#0x1_crypto_algebra_deserialize">crypto_algebra::deserialize</a>&lt;<a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_G2">bn254_algebra::G2</a>, <a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_FormatG2Compr">bn254_algebra::FormatG2Compr</a>&gt;(&vk.delta_g2).is_some(), <a href="keyless_account.md#0x1_keyless_account_E_INVALID_BN254_G2_SERIALIZATION">E_INVALID_BN254_G2_SERIALIZATION</a>);
+    for (i in 0..vk.gamma_abc_g1.length()) {
+        <b>assert</b>!(<a href="../../aptos-stdlib/doc/crypto_algebra.md#0x1_crypto_algebra_deserialize">crypto_algebra::deserialize</a>&lt;<a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_G1">bn254_algebra::G1</a>, <a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_FormatG1Compr">bn254_algebra::FormatG1Compr</a>&gt;(vk.gamma_abc_g1.borrow(i)).is_some(), <a href="keyless_account.md#0x1_keyless_account_E_INVALID_BN254_G1_SERIALIZATION">E_INVALID_BN254_G1_SERIALIZATION</a>);
     };
 }
 </code></pre>
@@ -424,8 +484,8 @@ WARNING: See <code>set_configuration_for_next_epoch</code> for caveats.
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
     <a href="chain_status.md#0x1_chain_status_assert_genesis">chain_status::assert_genesis</a>();
 
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&pk)) {
-        <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&pk)) == 32, <a href="keyless_account.md#0x1_keyless_account_E_TRAINING_WHEELS_PK_WRONG_SIZE">E_TRAINING_WHEELS_PK_WRONG_SIZE</a>)
+    <b>if</b> (pk.is_some()) {
+        <b>assert</b>!(pk.borrow().length() == 32, <a href="keyless_account.md#0x1_keyless_account_E_TRAINING_WHEELS_PK_WRONG_SIZE">E_TRAINING_WHEELS_PK_WRONG_SIZE</a>)
     };
 
     <b>let</b> config = <b>borrow_global_mut</b>&lt;<a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(fx));
@@ -516,7 +576,7 @@ WARNING: See <code>set_configuration_for_next_epoch</code> for caveats.
     <a href="chain_status.md#0x1_chain_status_assert_genesis">chain_status::assert_genesis</a>();
 
     <b>let</b> config = <b>borrow_global_mut</b>&lt;<a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(fx));
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> config.override_aud_vals, aud);
+    config.override_aud_vals.push_back(aud);
 }
 </code></pre>
 
@@ -609,10 +669,10 @@ WARNING: If a malicious key is set, this *could* lead to stolen funds.
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
 
     // If a PK is being set, validate it first.
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&pk)) {
-        <b>let</b> bytes = *<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&pk);
+    <b>if</b> (pk.is_some()) {
+        <b>let</b> bytes = *pk.borrow();
         <b>let</b> vpk = <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_new_validated_public_key_from_bytes">ed25519::new_validated_public_key_from_bytes</a>(bytes);
-        <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&vpk), <a href="keyless_account.md#0x1_keyless_account_E_TRAINING_WHEELS_PK_WRONG_SIZE">E_TRAINING_WHEELS_PK_WRONG_SIZE</a>)
+        <b>assert</b>!(vpk.is_some(), <a href="keyless_account.md#0x1_keyless_account_E_TRAINING_WHEELS_PK_WRONG_SIZE">E_TRAINING_WHEELS_PK_WRONG_SIZE</a>)
     };
 
     <b>let</b> config = <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>&gt;()) {
@@ -734,7 +794,7 @@ WARNING: If a malicious override <code>aud</code> is set, this *could* lead to s
         *<b>borrow_global</b>&lt;<a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(fx))
     };
 
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> config.override_aud_vals, aud);
+    config.override_aud_vals.push_back(aud);
 
     <a href="keyless_account.md#0x1_keyless_account_set_configuration_for_next_epoch">set_configuration_for_next_epoch</a>(fx, config);
 }

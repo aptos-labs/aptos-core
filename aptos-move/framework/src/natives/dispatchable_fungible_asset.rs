@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::function_info::extract_function_info;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::DISPATCHABLE_FUNGIBLE_ASSET_DISPATCH_BASE;
@@ -42,7 +42,7 @@ pub(crate) fn native_dispatch(
         }
     };
     check_visited(module_name.address(), module_name.name())
-        .map_err(|_| SafeNativeError::Abort { abort_code: 4 })?;
+        .map_err(|_| SafeNativeError::abort(4))?;
 
     context.charge(DISPATCHABLE_FUNGIBLE_ASSET_DISPATCH_BASE)?;
 

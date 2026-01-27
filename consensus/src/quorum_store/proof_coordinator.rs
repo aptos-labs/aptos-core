@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     logging::{LogEvent, LogSchema},
@@ -286,10 +286,19 @@ impl ProofCoordinator {
             signed_batch_info.batch_info().clone(),
             self.proof_timeout_ms,
         );
-        self.batch_info_to_proof.insert(
-            signed_batch_info.batch_info().clone(),
-            IncrementalProofState::new_batch_info(signed_batch_info.batch_info().info().clone()),
-        );
+        if signed_batch_info.batch_info().is_v2() {
+            self.batch_info_to_proof.insert(
+                signed_batch_info.batch_info().clone(),
+                IncrementalProofState::new_batch_info_ext(signed_batch_info.batch_info().clone()),
+            );
+        } else {
+            self.batch_info_to_proof.insert(
+                signed_batch_info.batch_info().clone(),
+                IncrementalProofState::new_batch_info(
+                    signed_batch_info.batch_info().info().clone(),
+                ),
+            );
+        }
         self.batch_info_to_time
             .entry(signed_batch_info.batch_info().clone())
             .or_insert(Instant::now());
@@ -436,30 +445,29 @@ impl ProofCoordinator {
                             let signed_batch_infos = signed_batch_infos.take();
                             let Some(signed_batch_info) = signed_batch_infos.first() else {
                                 error!("Empty signed batch info received from {}", signer.short_str().as_str());
-                                return;
+                                continue;
                             };
                             let info = signed_batch_info.batch_info().clone();
                             let approx_created_ts_usecs = signed_batch_info
                                 .expiration()
                                 .saturating_sub(self.batch_expiry_gap_when_init_usecs);
+                            let self_peer_id = self.peer_id;
+                            let enable_broadcast_proofs = self.broadcast_proofs;
 
-                            let mut proofs = vec![];
-                            for signed_batch_info in signed_batch_infos.into_iter() {
+                            let mut proofs_iter = signed_batch_infos.into_iter().filter_map(|signed_batch_info| {
                                 let peer_id = signed_batch_info.signer();
                                 let digest = *signed_batch_info.digest();
                                 let batch_id = signed_batch_info.batch_id();
                                 match self.add_signature(signed_batch_info, &validator_verifier) {
-                                    Ok(result) => {
-                                        if let Some(proof) = result {
-                                            debug!(
-                                                LogSchema::new(LogEvent::ProofOfStoreReady),
-                                                digest = digest,
-                                                batch_id = batch_id.id,
-                                            );
-                                            let (info, sig) = proof.unpack();
-                                            proofs.push(ProofOfStore::new(info.info().clone(), sig));
-                                        }
+                                    Ok(Some(proof)) => {
+                                        debug!(
+                                            LogSchema::new(LogEvent::ProofOfStoreReady),
+                                            digest = digest,
+                                            batch_id = batch_id.id,
+                                        );
+                                        Some(proof)
                                     },
+                                    Ok(None) => None,
                                     Err(e) => {
                                         // Can happen if we already garbage collected, the commit notification is late, or the peer is misbehaving.
                                         if peer_id == self.peer_id {
@@ -467,19 +475,30 @@ impl ProofCoordinator {
                                         } else {
                                             debug!("QS: could not add signature from peer {}, digest = {}, batch_id = {}, err = {:?}", peer_id, digest, batch_id, e);
                                         }
+                                        None
                                     },
+                                }
+                            }).peekable();
+                            if proofs_iter.peek().is_some() {
+                                observe_batch(approx_created_ts_usecs, self_peer_id, BatchStage::POS_FORMED);
+                                if enable_broadcast_proofs {
+                                    if proofs_iter.peek().is_some_and(|p| p.info().is_v2()) {
+                                        let proofs: Vec<_> = proofs_iter.collect();
+                                        network_sender.broadcast_proof_of_store_msg_v2(proofs).await;
+                                    } else {
+                                        let proofs: Vec<_> = proofs_iter.map(|proof| {
+                                            let (info, sig) = proof.unpack();
+                                            ProofOfStore::new(info.info().clone(), sig)
+                                        }).collect();
+                                        network_sender.broadcast_proof_of_store_msg(proofs).await;
+                                    }
+                                } else {
+                                    let proofs: Vec<_> = proofs_iter.collect();
+                                    network_sender.send_proof_of_store_msg_to_self(proofs).await;
                                 }
                             }
                             if let Some(value) = self.batch_info_to_proof.get_mut(&info) {
                                 value.observe_voting_pct(approx_created_ts_usecs, &validator_verifier);
-                            }
-                            if !proofs.is_empty() {
-                                observe_batch(approx_created_ts_usecs, self.peer_id, BatchStage::POS_FORMED);
-                                if self.broadcast_proofs {
-                                    network_sender.broadcast_proof_of_store_msg(proofs).await;
-                                } else {
-                                    network_sender.send_proof_of_store_msg_to_self(proofs).await;
-                                }
                             }
                         },
                     }

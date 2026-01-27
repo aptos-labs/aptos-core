@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     connection_manager::ConnectionManager,
@@ -9,7 +9,9 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_indexer_grpc_server_framework::RunnableConfig;
-use aptos_indexer_grpc_utils::config::IndexerGrpcFileStoreConfig;
+use aptos_indexer_grpc_utils::{
+    config::IndexerGrpcFileStoreConfig, constants::DEFAULT_MAX_TRANSACTION_FILTER_SIZE_BYTES,
+};
 use aptos_protos::{
     indexer::v1::FILE_DESCRIPTOR_SET as INDEXER_V1_FILE_DESCRIPTOR_SET,
     transaction::v1::FILE_DESCRIPTOR_SET as TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
@@ -35,7 +37,6 @@ const HTTP2_PING_INTERVAL_DURATION: std::time::Duration = std::time::Duration::f
 const HTTP2_PING_TIMEOUT_DURATION: std::time::Duration = std::time::Duration::from_secs(10);
 
 const DEFAULT_MAX_RESPONSE_CHANNEL_SIZE: usize = 5;
-const DEFAULT_MAX_TRANSACTION_FILTER_SIZE_BYTES: usize = 10_000;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

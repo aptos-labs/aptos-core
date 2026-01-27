@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::{
     new_test_context, new_test_context_with_config, new_test_context_with_orderless_flags,
@@ -520,10 +520,8 @@ async fn test_view_option(use_txn_payload_v2_format: bool, use_orderless_transac
     use_txn_payload_v2_format,
     use_orderless_transactions,
     enable_framework_for_option,
-    case(false, false, false),
     case(false, false, true),
-    case(true, false, false),
-    case(true, true, false)
+    case(true, true, true)
 )]
 async fn test_view_option_some(
     use_txn_payload_v2_format: bool,

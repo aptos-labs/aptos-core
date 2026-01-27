@@ -2406,8 +2406,8 @@ impl FunctionTranslator<'_> {
                             &mid.qualified_inst(*sid, inst),
                             &None,
                         );
-                        let value_str = str_local(srcs[0]);
-                        let signer_str = str_local(srcs[1]);
+                        let signer_str = str_local(srcs[0]);
+                        let value_str = str_local(srcs[1]);
                         emitln!(
                             writer,
                             "if ($ResourceExists({}, {}->$addr)) {{",
@@ -3254,7 +3254,7 @@ impl FunctionTranslator<'_> {
                     emitln!(writer, "}");
                 }
             },
-            Abort(_, src) => {
+            Abort(_, src, _) => {
                 let num_oper_code = global_state
                     .get_temp_index_oper(mid, fid, *src, baseline_flag)
                     .unwrap();

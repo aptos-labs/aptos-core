@@ -1,12 +1,12 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::quorum_store::{
     batch_store::{BatchStore, BatchWriter, QuotaManager},
     quorum_store_db::QuorumStoreDB,
     types::{PersistedValue, StorageMode},
 };
-use aptos_consensus_types::proof_of_store::BatchInfo;
+use aptos_consensus_types::proof_of_store::{BatchInfo, BatchInfoExt};
 use aptos_crypto::HashValue;
 use aptos_temppath::TempPath;
 use aptos_types::{
@@ -46,7 +46,7 @@ fn request_for_test(
     round: u64,
     num_bytes: u64,
     maybe_payload: Option<Vec<SignedTransaction>>,
-) -> PersistedValue {
+) -> PersistedValue<BatchInfoExt> {
     PersistedValue::new(
         BatchInfo::new(
             *TEST_REQUEST_ACCOUNT, // make sure all request come from the same account
@@ -60,6 +60,7 @@ fn request_for_test(
         ),
         maybe_payload,
     )
+    .into()
 }
 
 #[tokio::test]
@@ -96,7 +97,7 @@ async fn test_extend_expiration_vs_save() {
     let batch_store_clone2 = batch_store.clone();
 
     let digests: Vec<HashValue> = (0..num_experiments).map(|_| HashValue::random()).collect();
-    let later_exp_values: Vec<PersistedValue> = (0..num_experiments)
+    let later_exp_values: Vec<PersistedValue<BatchInfoExt>> = (0..num_experiments)
         .map(|i| {
             // Pre-insert some of them.
             if i % 2 == 0 {
@@ -282,4 +283,56 @@ async fn test_get_local_batch() {
     assert_err!(store.get_batch_from_local(&digest_1));
     assert_err!(store.get_batch_from_local(&digest_2));
     assert_err!(store.get_batch_from_local(&digest_3));
+}
+
+#[test]
+fn test_batch_store_bootstrap_gc_expiry() {
+    let tmp_dir = TempPath::new();
+    let digest_1 = HashValue::random();
+    let memory_quota = 10;
+    let tmp_dir_path = tmp_dir.path().to_path_buf();
+    let tmp_dir_path_clone = tmp_dir_path.clone();
+
+    let runtime = tokio::runtime::Builder::new_multi_thread().build().unwrap();
+    runtime.block_on(async move {
+        let db = Arc::new(QuorumStoreDB::new(&tmp_dir_path_clone));
+        let (signers, _validator_verifier) = random_validator_verifier(4, None, false);
+
+        let store = Arc::new(BatchStore::new(
+            10, // epoch
+            false,
+            10, // last committed round
+            db,
+            memory_quota, // memory_quota
+            2001,         // db quota
+            2001,         // batch quota
+            signers[0].clone(),
+            0,
+        ));
+
+        let request_1 = request_for_test(&digest_1, 50, 20, Some(vec![]));
+        // Should be stored in memory and DB.
+        assert!(!store.persist(vec![request_1]).is_empty());
+    });
+    drop(runtime);
+
+    let runtime = tokio::runtime::Builder::new_multi_thread().build().unwrap();
+    runtime.block_on(async move {
+        let db = Arc::new(QuorumStoreDB::new(&tmp_dir));
+        let (signers, _validator_verifier) = random_validator_verifier(4, None, false);
+
+        let store = Arc::new(BatchStore::new(
+            10, // epoch
+            false,
+            45, // last committed round
+            db,
+            memory_quota, // memory_quota
+            2001,         // db quota
+            2001,         // batch quota
+            signers[0].clone(),
+            10,
+        ));
+
+        store.get_batch_from_local(&digest_1).unwrap();
+    });
 }

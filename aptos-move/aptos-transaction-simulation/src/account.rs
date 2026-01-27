@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Test infrastructure for modeling Aptos accounts.
 //! Ported from the old `e2e-tests` crate.
@@ -337,10 +336,16 @@ impl TransactionBuilder {
     }
 
     pub fn raw(&self) -> RawTransaction {
+        let payload = self.program.clone().expect("transaction payload not set");
+        let sequence_number = if payload.replay_protection_nonce().is_some() {
+            u64::MAX
+        } else {
+            self.sequence_number.expect("sequence number not set")
+        };
         RawTransaction::new(
             *self.sender.address(),
-            self.sequence_number.expect("sequence number not set"),
-            self.program.clone().expect("transaction payload not set"),
+            sequence_number,
+            payload,
             self.max_gas_amount.unwrap_or(500_000),
             self.gas_unit_price.unwrap_or(0),
             self.ttl.unwrap_or(DEFAULT_EXPIRATION_TIME),

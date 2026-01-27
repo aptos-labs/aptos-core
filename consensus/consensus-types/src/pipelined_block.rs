@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     block::Block,
@@ -23,6 +22,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     randomness::Randomness,
+    secret_sharing::{SecretShare, SecretSharedKey},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
         TransactionStatus,
@@ -68,6 +68,8 @@ impl From<Error> for TaskError {
 pub type TaskResult<T> = Result<T, TaskError>;
 pub type TaskFuture<T> = Shared<BoxFuture<'static, TaskResult<T>>>;
 
+pub type MaterializeResult = (Vec<SignedTransaction>, Option<u64>, Option<u64>);
+pub type DecryptionResult = (Vec<SignedTransaction>, Option<u64>, Option<u64>);
 pub type PrepareResult = (Arc<Vec<SignatureVerifiedTransaction>>, Option<u64>);
 // First Option is whether randomness is enabled
 // Second Option is whether randomness is skipped
@@ -80,6 +82,7 @@ pub type PreCommitResult = StateComputeResult;
 pub type NotifyStateSyncResult = ();
 pub type CommitLedgerResult = Option<LedgerInfoWithSignatures>;
 pub type PostCommitResult = ();
+pub type SecretShareResult = Option<SecretShare>;
 
 #[derive(Clone)]
 pub struct PipelineFutures {
@@ -93,6 +96,7 @@ pub struct PipelineFutures {
     pub notify_state_sync_fut: TaskFuture<NotifyStateSyncResult>,
     pub commit_ledger_fut: TaskFuture<CommitLedgerResult>,
     pub post_commit_fut: TaskFuture<PostCommitResult>,
+    pub secret_sharing_derive_self_fut: TaskFuture<SecretShareResult>,
 }
 
 impl PipelineFutures {
@@ -115,6 +119,7 @@ pub struct PipelineInputTx {
     pub order_vote_tx: Option<oneshot::Sender<()>>,
     pub order_proof_tx: Option<oneshot::Sender<WrappedLedgerInfo>>,
     pub commit_proof_tx: Option<oneshot::Sender<LedgerInfoWithSignatures>>,
+    pub secret_shared_key_tx: Option<oneshot::Sender<Option<SecretSharedKey>>>,
 }
 
 pub struct PipelineInputRx {
@@ -123,6 +128,7 @@ pub struct PipelineInputRx {
     pub order_vote_rx: oneshot::Receiver<()>,
     pub order_proof_fut: TaskFuture<WrappedLedgerInfo>,
     pub commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
+    pub secret_shared_key_rx: oneshot::Receiver<Option<SecretSharedKey>>,
 }
 
 /// A window of blocks that are needed for execution with the execution pool, EXCLUDING the current block

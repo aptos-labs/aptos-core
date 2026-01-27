@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   update-version:
-    runs-on: ubuntu-latest
+    runs-on: 2cpu-gh-ubuntu24-x64
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3

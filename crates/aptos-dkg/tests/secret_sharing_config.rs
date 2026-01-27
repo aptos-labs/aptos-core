@@ -1,17 +1,17 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #![allow(clippy::ptr_arg)]
 #![allow(clippy::needless_borrow)]
 
-use aptos_crypto::traits::SecretSharingConfig as _;
+use aptos_crypto::{arkworks::shamir::ShamirThresholdConfig, traits::SecretSharingConfig as _};
 use aptos_dkg::pvss::test_utils::get_weighted_configs_for_benchmarking;
 use rand::thread_rng;
 
 #[ignore]
 #[test]
 fn print_best_worst_avg_case_subsets() {
-    let wcs = get_weighted_configs_for_benchmarking();
+    let wcs = get_weighted_configs_for_benchmarking::<ShamirThresholdConfig<ark_bn254::Fr>>();
 
     let mut rng = thread_rng();
 

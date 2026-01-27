@@ -1,13 +1,10 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::state_store::state::State;
 use aptos_experimental_layered_map::LayeredMap;
 use aptos_types::{
-    state_store::{
-        hot_state::HOT_STATE_MAX_ITEMS_PER_SHARD, state_key::StateKey, state_slot::StateSlot,
-        NUM_STATE_SHARDS,
-    },
+    state_store::{state_key::StateKey, state_slot::StateSlot, NUM_STATE_SHARDS},
     transaction::Version,
 };
 use std::sync::Arc;
@@ -53,20 +50,6 @@ impl StateDelta {
     /// `None` indicates the key is not updated in the delta.
     pub fn get_state_slot(&self, state_key: &StateKey) -> Option<StateSlot> {
         self.shards[state_key.get_shard_id()].get(state_key)
-    }
-
-    pub(crate) fn num_free_hot_slots(&self) -> [usize; NUM_STATE_SHARDS] {
-        std::array::from_fn(|shard_id| {
-            let num_items = self.current.num_hot_items(shard_id);
-            assert!(
-                num_items <= HOT_STATE_MAX_ITEMS_PER_SHARD,
-                "Number of hot state items {} exceeded max size {} in shard {}.",
-                num_items,
-                HOT_STATE_MAX_ITEMS_PER_SHARD,
-                shard_id,
-            );
-            HOT_STATE_MAX_ITEMS_PER_SHARD - num_items
-        })
     }
 
     pub fn latest_hot_key(&self, shard_id: usize) -> Option<StateKey> {

@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::{update_binary, BinaryUpdater, UpdateRequiredInfo};
 use crate::{
@@ -13,7 +13,7 @@ use self_update::update::ReleaseUpdate;
 use std::path::PathBuf;
 
 const MUTATION_TEST_BINARY_NAME: &str = "move-mutation-test";
-const TARGET_MUTATION_TEST_VERSION: &str = "2.0.0";
+const TARGET_MUTATION_TEST_VERSION: &str = "2.2.0";
 
 const MUTATION_TEST_EXE_ENV: &str = "MUTATION_TEST_EXE";
 #[cfg(target_os = "windows")]

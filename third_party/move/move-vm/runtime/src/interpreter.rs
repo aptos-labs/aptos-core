@@ -24,7 +24,7 @@ use crate::{
         loader::traits::Loader, ty_depth_checker::TypeDepthChecker,
         ty_layout_converter::LayoutConverter,
     },
-    trace, LoadedFunction, RuntimeEnvironment,
+    tracing, LoadedFunction, RuntimeEnvironment,
 };
 use fail::fail_point;
 use itertools::Itertools;
@@ -235,7 +235,7 @@ where
             loader,
             ty_depth_checker,
             layout_converter,
-            ref_state: RefCheckState::new(),
+            ref_state: RefCheckState::new(extensions.get_native_runtime_ref_checks_model()),
         };
 
         // Tracing and runtime checks (full or partial) are mutually exclusive because if we record
@@ -408,7 +408,7 @@ where
                         + current_frame.caller_value_stack_size as usize;
                     if actual_stack_size != expected_stack_size {
                         let err = current_frame
-                            .stack_size_mismatch_error(expected_stack_size, actual_stack_size);
+                            .stack_size_mismatch_error(actual_stack_size, expected_stack_size);
                         return Err(set_err_info!(current_frame, err));
                     }
 
@@ -443,7 +443,13 @@ where
                         if let PerInstructionCache::Call(ref function, ref frame_cache) =
                             current_frame_cache.per_instruction_cache[current_frame.pc as usize]
                         {
-                            (Rc::clone(function), Rc::clone(frame_cache))
+                            let frame_cache = frame_cache.upgrade().ok_or_else(|| {
+                                PartialVMError::new_invariant_violation(
+                                    "Frame cache is dropped during interpreter execution",
+                                )
+                                .finish(Location::Undefined)
+                            })?;
+                            (Rc::clone(function), frame_cache)
                         } else {
                             let (function, frame_cache) =
                                 match current_frame_cache.function_cache.entry(fh_idx) {
@@ -458,15 +464,25 @@ where
                                             .map(Rc::new)?;
                                         let frame_cache = function_caches
                                             .get_or_create_frame_cache_non_generic(&function);
-                                        e.insert((function.clone(), frame_cache.clone()));
+                                        e.insert((function.clone(), Rc::downgrade(&frame_cache)));
                                         (function, frame_cache)
                                     },
-                                    Entry::Occupied(e) => e.into_mut().clone(),
+                                    Entry::Occupied(e) => {
+                                        let (function, frame_cache) = e.get();
+                                        let frame_cache =
+                                            frame_cache.upgrade().ok_or_else(|| {
+                                                PartialVMError::new_invariant_violation(
+                                            "Frame cache is dropped during interpreter execution",
+                                        )
+                                        .finish(Location::Undefined)
+                                            })?;
+                                        (function.clone(), frame_cache)
+                                    },
                                 };
                             current_frame_cache.per_instruction_cache[current_frame.pc as usize] =
                                 PerInstructionCache::Call(
                                     Rc::clone(&function),
-                                    Rc::clone(&frame_cache),
+                                    Rc::downgrade(&frame_cache),
                                 );
                             (function, frame_cache)
                         }
@@ -540,30 +556,46 @@ where
                         if let PerInstructionCache::CallGeneric(ref function, ref frame_cache) =
                             current_frame_cache.per_instruction_cache[current_frame.pc as usize]
                         {
-                            (Rc::clone(function), Rc::clone(frame_cache))
+                            let frame_cache = frame_cache.upgrade().ok_or_else(|| {
+                                PartialVMError::new_invariant_violation(
+                                    "Frame cache is dropped during interpreter execution",
+                                )
+                                .finish(Location::Undefined)
+                            })?;
+                            (Rc::clone(function), frame_cache)
                         } else {
-                            let (function, frame_cache) =
-                                match current_frame_cache.generic_function_cache.entry(idx) {
-                                    Entry::Vacant(e) => {
-                                        let function = Rc::new(
-                                            self.load_generic_function_no_visibility_checks(
-                                                gas_meter,
-                                                traversal_context,
-                                                &current_frame,
-                                                idx,
-                                            )?,
-                                        );
-                                        let frame_cache = function_caches
-                                            .get_or_create_frame_cache_generic(&function);
-                                        e.insert((function.clone(), frame_cache.clone()));
-                                        (function, frame_cache)
-                                    },
-                                    Entry::Occupied(e) => e.into_mut().clone(),
-                                };
+                            let (function, frame_cache) = match current_frame_cache
+                                .generic_function_cache
+                                .entry(idx)
+                            {
+                                Entry::Vacant(e) => {
+                                    let function =
+                                        Rc::new(self.load_generic_function_no_visibility_checks(
+                                            gas_meter,
+                                            traversal_context,
+                                            &current_frame,
+                                            idx,
+                                        )?);
+                                    let frame_cache = function_caches
+                                        .get_or_create_frame_cache_generic(&function);
+                                    e.insert((function.clone(), Rc::downgrade(&frame_cache)));
+                                    (function, frame_cache)
+                                },
+                                Entry::Occupied(e) => {
+                                    let (function, frame_cache) = e.get();
+                                    let frame_cache = frame_cache.upgrade().ok_or_else(|| {
+                                        PartialVMError::new_invariant_violation(
+                                            "Frame cache is dropped during interpreter execution",
+                                        )
+                                        .finish(Location::Undefined)
+                                    })?;
+                                    (function.clone(), frame_cache)
+                                },
+                            };
                             current_frame_cache.per_instruction_cache[current_frame.pc as usize] =
                                 PerInstructionCache::CallGeneric(
                                     Rc::clone(&function),
-                                    Rc::clone(&frame_cache),
+                                    Rc::downgrade(&frame_cache),
                                 );
                             (function, frame_cache)
                         }
@@ -776,7 +808,7 @@ impl CallStack {
                 num_return_tys + current_frame.caller_type_stack_size as usize;
             if actual_type_stack_size != expected_type_stack_size {
                 return Err(current_frame
-                    .stack_size_mismatch_error(expected_type_stack_size, actual_type_stack_size));
+                    .stack_size_mismatch_error(actual_type_stack_size, expected_type_stack_size));
             }
             self.check_return_tys::<RTTCheck>(operand_stack, current_frame)?;
             if !caller_has_rt_checks {
@@ -793,7 +825,7 @@ impl CallStack {
             let expected_type_stack_size = current_frame.caller_type_stack_size as usize;
             if actual_type_stack_size != expected_type_stack_size {
                 return Err(current_frame
-                    .stack_size_mismatch_error(expected_type_stack_size, actual_type_stack_size));
+                    .stack_size_mismatch_error(actual_type_stack_size, expected_type_stack_size));
             }
 
             let ty_args = current_frame.function.ty_args();
@@ -948,7 +980,7 @@ where
                 }
             }
         }
-        RTRCheck::core_call_transition(num_param_tys, num_locals, mask, &mut self.ref_state)?;
+        RTRCheck::core_call_transition(&function, mask, &mut self.ref_state)?;
         Frame::make_new_frame::<RTTCheck>(
             gas_meter,
             call_type,
@@ -989,7 +1021,7 @@ where
         )
         .map_err(|e| match function.module_id() {
             Some(id) => {
-                let e = if cfg!(feature = "testing") || cfg!(feature = "stacktrace") {
+                let e = if self.vm_config.enable_debugging {
                     e.with_exec_state(self.get_internal_state())
                 } else {
                     e
@@ -1071,6 +1103,11 @@ where
             gas_meter,
             traversal_context,
         );
+
+        // Capture stack sizes before the call for later validation.
+        let pre_native_call_value_stack_size = self.operand_stack.value.len();
+        let pre_native_call_type_stack_size = self.operand_stack.types.len();
+
         let result = native_function(&mut native_context, ty_args, args)?;
 
         // Note(Gas): The order by which gas is charged / error gets returned MUST NOT be modified
@@ -1095,6 +1132,18 @@ where
                     self.operand_stack.push(value)?;
                 }
 
+                // Stack balance check after pushing return values.
+                let actual_value_stack_size = self.operand_stack.value.len();
+                let expected_value_stack_size =
+                    pre_native_call_value_stack_size + function.return_tys().len();
+                if actual_value_stack_size != expected_value_stack_size {
+                    return Err(stack_size_mismatch_error_for_function(
+                        function,
+                        actual_value_stack_size,
+                        expected_value_stack_size,
+                    ));
+                }
+
                 // If the caller requires checks, push return types of native function to
                 // satisfy runtime check protocol.
                 if RTTCheck::should_perform_checks(&current_frame.function.function) {
@@ -1108,14 +1157,36 @@ where
                             self.operand_stack.push_ty(ty)?;
                         }
                     }
+
+                    // Stack balance check after pushing return types.
+                    let actual_type_stack_size = self.operand_stack.types.len();
+                    let expected_type_stack_size =
+                        pre_native_call_type_stack_size + function.return_tys().len();
+                    if actual_type_stack_size != expected_type_stack_size {
+                        return Err(stack_size_mismatch_error_for_function(
+                            function,
+                            actual_type_stack_size,
+                            expected_type_stack_size,
+                        ));
+                    }
                 }
+                // Perform reference transition for native call-return.
+                RTRCheck::native_static_dispatch_transition(function, mask, &mut self.ref_state)?;
 
                 current_frame.pc += 1; // advance past the Call instruction in the caller
                 Ok(false)
             },
-            NativeResult::Abort { cost, abort_code } => {
+            NativeResult::Abort {
+                cost,
+                abort_code,
+                abort_message,
+            } => {
                 gas_meter.charge_native_function(cost, Option::<std::iter::Empty<&Value>>::None)?;
-                Err(PartialVMError::new(StatusCode::ABORTED).with_sub_status(abort_code))
+                let mut err = PartialVMError::new(StatusCode::ABORTED).with_sub_status(abort_code);
+                if let Some(abort_message) = abort_message {
+                    err = err.with_message(abort_message);
+                }
+                Err(err)
             },
             NativeResult::OutOfGas { partial_cost } => {
                 let err = match gas_meter
@@ -1189,7 +1260,18 @@ where
                     }
                 }
 
-                let frame_cache = function_caches.get_or_create_frame_cache(&target_func);
+                // Perform reference transition for native dynamic dispatch and preparation
+                // for calling the target function.
+                RTRCheck::native_dynamic_dispatch_transition(function, mask, &mut self.ref_state)?;
+
+                let frame_cache = if self
+                    .vm_config
+                    .enable_function_caches_for_native_dynamic_dispatch
+                {
+                    function_caches.get_or_create_frame_cache(&target_func)
+                } else {
+                    FrameTypeCache::make_rc()
+                };
                 self.set_new_call_frame::<RTTCheck, RTRCheck>(
                     current_frame,
                     gas_meter,
@@ -1722,6 +1804,8 @@ const OPERAND_STACK_SIZE_LIMIT: usize = 1024;
 const CALL_STACK_SIZE_LIMIT: usize = 1024;
 pub(crate) const ACCESS_STACK_SIZE_LIMIT: usize = 256;
 
+const ABORT_MESSAGE_SIZE_LIMIT: usize = 1024;
+
 /// The operand and runtime-type stacks.
 pub(crate) struct Stack {
     pub(crate) value: Vec<Value>,
@@ -1925,7 +2009,7 @@ impl Frame {
             trace_recorder,
         )
         .map_err(|e| {
-            let e = if cfg!(feature = "testing") || cfg!(feature = "stacktrace") {
+            let e = if interpreter.vm_config.enable_debugging {
                 e.with_exec_state(interpreter.get_internal_state())
             } else {
                 e
@@ -1955,17 +2039,21 @@ impl Frame {
 
         let frame_cache = &mut *self.frame_cache.borrow_mut();
 
+        let enable_debugging = interpreter.vm_config.enable_debugging;
+
         let code = self.function.code();
         loop {
             for instruction in &code[self.pc as usize..] {
-                trace!(
-                    &self.function,
-                    &self.locals,
-                    self.pc,
-                    instruction,
-                    interpreter.loader.runtime_environment(),
-                    interpreter
-                );
+                if enable_debugging {
+                    tracing::debug_trace(
+                        &self.function,
+                        &self.locals,
+                        self.pc,
+                        instruction,
+                        interpreter.loader.runtime_environment(),
+                        interpreter,
+                    );
+                }
 
                 fail_point!("move_vm::interpreter_loop", |_| {
                     Err(
@@ -2693,13 +2781,57 @@ impl Frame {
                             )?;
                             eprintln!("trace abort({}): {}", error_code, str);
                         }
+
+                        // Important: do not attach a message here.
+                        // We rely on the presence of an error message to distinguish
+                        // aborts with explicit messages (see below) from those without.
+                        let error =
+                            PartialVMError::new(StatusCode::ABORTED).with_sub_status(error_code);
+
+                        // Before returning an abort error, ensure the instruction is recorded in
+                        // the trace, so the trace is full.
+                        trace_recorder.record_successful_instruction(instruction);
+                        return Err(error);
+                    },
+                    Instruction::AbortMsg => {
+                        let vec = interpreter.operand_stack.pop_as::<Vector>()?;
+                        let bytes = vec.to_vec_u8()?;
+
+                        // Gas is charged per byte to account for the cost of UTF-8 validation.
+                        gas_meter.charge_abort_message(&bytes)?;
+
+                        if bytes.len() > ABORT_MESSAGE_SIZE_LIMIT {
+                            return Err(PartialVMError::new(
+                                StatusCode::ABORT_MESSAGE_LIMIT_EXCEEDED,
+                            )
+                            .with_message(format!(
+                                "Expected at most {} bytes, got {} bytes",
+                                ABORT_MESSAGE_SIZE_LIMIT,
+                                bytes.len()
+                            )));
+                        }
+
+                        let error_message = String::from_utf8(bytes).map_err(|err| {
+                            PartialVMError::new(StatusCode::INVALID_ABORT_MESSAGE)
+                                .with_message(format!("Invalid UTF-8 string: {err}"))
+                        })?;
+
+                        let error_code = interpreter.operand_stack.pop_as::<u64>()?;
+
+                        if is_tracing_for!(TraceCategory::Abort(error_code)) {
+                            let mut str = String::new();
+                            interpreter.debug_print_stack_trace(
+                                &mut str,
+                                interpreter.loader.runtime_environment(),
+                            )?;
+                            eprintln!(
+                                "trace abort_msg({}, {}): {}",
+                                error_code, error_message, str
+                            );
+                        }
                         let error = PartialVMError::new(StatusCode::ABORTED)
                             .with_sub_status(error_code)
-                            .with_message(format!(
-                                "{} at offset {}",
-                                self.function.name_as_pretty_string(),
-                                self.pc,
-                            ));
+                            .with_message(error_message);
 
                         // Before returning an abort error, ensure the instruction is recorded in
                         // the trace, so the trace is full.
@@ -2963,13 +3095,22 @@ impl Frame {
     }
 
     #[cold]
-    fn stack_size_mismatch_error(&self, expected: usize, actual: usize) -> PartialVMError {
-        let err = PartialVMError::new_invariant_violation(format!(
-            "Stack size mismatch when returning from {}: expected: {}, got: {}",
-            self.function.name_as_pretty_string(),
-            expected,
-            actual
-        ));
-        err.with_sub_status(EPARANOID_FAILURE)
+    fn stack_size_mismatch_error(&self, actual: usize, expected: usize) -> PartialVMError {
+        stack_size_mismatch_error_for_function(&self.function, actual, expected)
     }
+}
+
+#[cold]
+fn stack_size_mismatch_error_for_function(
+    function: &LoadedFunction,
+    actual: usize,
+    expected: usize,
+) -> PartialVMError {
+    let err = PartialVMError::new_invariant_violation(format!(
+        "Stack size mismatch when returning from {}: expected: {}, got: {}",
+        function.name_as_pretty_string(),
+        expected,
+        actual
+    ));
+    err.with_sub_status(EPARANOID_FAILURE)
 }

@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This submodule implements the *public parameters* for this PVSS scheme.
 
@@ -94,12 +94,16 @@ impl ValidCryptoMaterial for PublicParameters {
 }
 
 impl WithMaxNumShares for PublicParameters {
-    fn with_max_num_shares(_n: usize) -> Self {
+    fn with_max_num_shares(_n: u32) -> Self {
         Self::default()
     }
 
+    fn with_max_num_shares_and_bit_size(_n: u32, _ell: u8) -> Self {
+        panic!("This is the wrong PVSS for bit sizes")
+    }
+
     // Setup is fast enough
-    fn with_max_num_shares_for_generate(_n: usize) -> Self {
+    fn with_max_num_shares_for_generate(_n: u32) -> Self {
         Self::default()
     }
 }

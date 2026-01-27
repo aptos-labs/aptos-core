@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 // Copyright (c) The Diem Core Contributors
 // Copyright (c) The Move Contributors
@@ -100,7 +100,7 @@ fn native_sub_string(
 
     if j < i {
         // TODO: The abort code should follow the error convention.
-        return Err(aptos_native_interface::SafeNativeError::Abort { abort_code: 1 });
+        return Err(aptos_native_interface::SafeNativeError::abort(1));
     }
 
     context.charge(STRING_SUB_STRING_PER_BYTE * NumBytes::new((j - i) as u64))?;

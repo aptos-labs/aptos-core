@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
@@ -14,9 +13,12 @@ use crate::{
     network_interface::{ConsensusMsg, ConsensusNetworkClient, RPC},
     pipeline::commit_reliable_broadcast::CommitMessage,
     quorum_store::types::{Batch, BatchMsg, BatchRequest, BatchResponse},
-    rand::rand_gen::{
-        network_messages::{RandGenMessage, RandMessage},
-        types::{AugmentedData, FastShare, Share},
+    rand::{
+        rand_gen::{
+            network_messages::{RandGenMessage, RandMessage},
+            types::{AugmentedData, FastShare, Share},
+        },
+        secret_sharing::network_messages::SecretShareNetworkMessage,
     },
 };
 use anyhow::{anyhow, bail, ensure};
@@ -29,7 +31,7 @@ use aptos_consensus_types::{
     order_vote_msg::OrderVoteMsg,
     pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{
-        BatchInfo, ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg,
+        BatchInfo, BatchInfoExt, ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg,
     },
     proposal_msg::ProposalMsg,
     round_timeout::RoundTimeoutMsg,
@@ -150,6 +152,15 @@ pub struct IncomingRandGenRequest {
 }
 
 #[derive(Debug)]
+pub struct IncomingSecretShareRequest {
+    pub req: SecretShareNetworkMessage,
+    #[allow(unused)]
+    pub sender: Author,
+    pub protocol: ProtocolId,
+    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+}
+
+#[derive(Debug)]
 pub enum IncomingRpcRequest {
     /// NOTE: This is being phased out in two releases to accommodate `IncomingBlockRetrievalRequestV2`
     /// TODO @bchocho @hariria can remove after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
@@ -159,6 +170,7 @@ pub enum IncomingRpcRequest {
     CommitRequest(IncomingCommitRequest),
     RandGenRequest(IncomingRandGenRequest),
     BlockRetrieval(IncomingBlockRetrievalRequest),
+    SecretShareRequest(IncomingSecretShareRequest),
 }
 
 impl IncomingRpcRequest {
@@ -171,6 +183,7 @@ impl IncomingRpcRequest {
             IncomingRpcRequest::CommitRequest(req) => req.req.epoch(),
             IncomingRpcRequest::DeprecatedBlockRetrieval(_) => None,
             IncomingRpcRequest::BlockRetrieval(_) => None,
+            IncomingRpcRequest::SecretShareRequest(req) => Some(req.req.epoch()),
         }
     }
 }
@@ -208,13 +221,26 @@ pub trait QuorumStoreSender: Send + Clone {
         recipients: Vec<Author>,
     );
 
-    async fn broadcast_batch_msg(&mut self, batches: Vec<Batch>);
+    async fn send_signed_batch_info_msg_v2(
+        &self,
+        signed_batch_infos: Vec<SignedBatchInfo<BatchInfoExt>>,
+        recipients: Vec<Author>,
+    );
+
+    async fn broadcast_batch_msg(&mut self, batches: Vec<Batch<BatchInfo>>);
+
+    async fn broadcast_batch_msg_v2(&mut self, batches: Vec<Batch<BatchInfoExt>>);
 
     async fn broadcast_proof_of_store_msg(&mut self, proof_of_stores: Vec<ProofOfStore<BatchInfo>>);
 
+    async fn broadcast_proof_of_store_msg_v2(
+        &mut self,
+        proof_of_stores: Vec<ProofOfStore<BatchInfoExt>>,
+    );
+
     async fn send_proof_of_store_msg_to_self(
         &mut self,
-        proof_of_stores: Vec<ProofOfStore<BatchInfo>>,
+        proof_of_stores: Vec<ProofOfStore<BatchInfoExt>>,
     );
 }
 
@@ -570,9 +596,27 @@ impl QuorumStoreSender for NetworkSender {
         self.send(msg, recipients).await
     }
 
-    async fn broadcast_batch_msg(&mut self, batches: Vec<Batch>) {
+    async fn send_signed_batch_info_msg_v2(
+        &self,
+        signed_batch_infos: Vec<SignedBatchInfo<BatchInfoExt>>,
+        recipients: Vec<Author>,
+    ) {
+        fail_point!("consensus::send::signed_batch_info", |_| ());
+        let msg = ConsensusMsg::SignedBatchInfoMsgV2(Box::new(SignedBatchInfoMsg::new(
+            signed_batch_infos,
+        )));
+        self.send(msg, recipients).await
+    }
+
+    async fn broadcast_batch_msg(&mut self, batches: Vec<Batch<BatchInfo>>) {
         fail_point!("consensus::send::broadcast_batch", |_| ());
         let msg = ConsensusMsg::BatchMsg(Box::new(BatchMsg::new(batches)));
+        self.broadcast(msg).await
+    }
+
+    async fn broadcast_batch_msg_v2(&mut self, batches: Vec<Batch<BatchInfoExt>>) {
+        fail_point!("consensus::send::broadcast_batch", |_| ());
+        let msg = ConsensusMsg::BatchMsgV2(Box::new(BatchMsg::new(batches)));
         self.broadcast(msg).await
     }
 
@@ -582,9 +626,15 @@ impl QuorumStoreSender for NetworkSender {
         self.broadcast(msg).await
     }
 
-    async fn send_proof_of_store_msg_to_self(&mut self, proofs: Vec<ProofOfStore<BatchInfo>>) {
+    async fn broadcast_proof_of_store_msg_v2(&mut self, proofs: Vec<ProofOfStore<BatchInfoExt>>) {
         fail_point!("consensus::send::proof_of_store", |_| ());
-        let msg = ConsensusMsg::ProofOfStoreMsg(Box::new(ProofOfStoreMsg::new(proofs)));
+        let msg = ConsensusMsg::ProofOfStoreMsgV2(Box::new(ProofOfStoreMsg::new(proofs)));
+        self.broadcast(msg).await
+    }
+
+    async fn send_proof_of_store_msg_to_self(&mut self, proofs: Vec<ProofOfStore<BatchInfoExt>>) {
+        fail_point!("consensus::send::proof_of_store", |_| ());
+        let msg = ConsensusMsg::ProofOfStoreMsgV2(Box::new(ProofOfStoreMsg::new(proofs)));
         self.send(msg, vec![self.author]).await
     }
 }
@@ -859,6 +909,24 @@ impl NetworkTask {
                                     protocol: RPC[0],
                                     response_sender: tx,
                                 });
+                            if let Err(e) = self.rpc_tx.push(
+                                (peer_id, discriminant(&req_with_callback)),
+                                (peer_id, req_with_callback),
+                            ) {
+                                warn!(error = ?e, "aptos channel closed");
+                            };
+                        },
+                        // TODO: get rid of the rpc dummy value
+                        ConsensusMsg::SecretShareMsg(req) => {
+                            let (tx, _rx) = oneshot::channel();
+                            let req_with_callback = IncomingRpcRequest::SecretShareRequest(
+                                IncomingSecretShareRequest {
+                                    req,
+                                    sender: peer_id,
+                                    protocol: RPC[0],
+                                    response_sender: tx,
+                                },
+                            );
                             if let Err(e) = self.rpc_tx.push(
                                 (peer_id, discriminant(&req_with_callback)),
                                 (peer_id, req_with_callback),

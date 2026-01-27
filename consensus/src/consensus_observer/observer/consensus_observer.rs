@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     consensus_observer::{
@@ -16,8 +16,7 @@ use crate::{
             },
         },
         observer::{
-            block_data,
-            block_data::ObserverBlockData,
+            block_data::{self, ObserverBlockData},
             epoch_state::ObserverEpochState,
             execution_pool::ObservedOrderedBlock,
             fallback_manager::ObserverFallbackManager,
@@ -28,7 +27,7 @@ use crate::{
         publisher::consensus_publisher::ConsensusPublisher,
     },
     dag::DagCommitSigner,
-    network::{IncomingCommitRequest, IncomingRandGenRequest},
+    network::{IncomingCommitRequest, IncomingRandGenRequest, IncomingSecretShareRequest},
     network_interface::CommitMessage,
     pipeline::{execution_client::TExecutionClient, pipeline_builder::PipelineBuilder},
 };
@@ -65,7 +64,7 @@ use tokio::{sync::mpsc::UnboundedSender, time::interval};
 use tokio_stream::wrappers::IntervalStream;
 
 // Whether to log messages at the info level (useful for debugging)
-const LOG_MESSAGES_AT_INFO_LEVEL: bool = true;
+const LOG_MESSAGES_AT_INFO_LEVEL: bool = false;
 
 /// The consensus observer receives consensus updates and propagates them to the execution pipeline
 pub struct ConsensusObserver {
@@ -1080,6 +1079,10 @@ impl ConsensusObserver {
         let dummy_signer = Arc::new(DagCommitSigner::new(signer.clone()));
         let (_, rand_msg_rx) =
             aptos_channel::new::<AccountAddress, IncomingRandGenRequest>(QueueStyle::FIFO, 1, None);
+        let (_, secret_share_msg_rx) = aptos_channel::new::<
+            AccountAddress,
+            IncomingSecretShareRequest,
+        >(QueueStyle::FIFO, 1, None);
         self.execution_client
             .start_epoch(
                 sk,
@@ -1092,6 +1095,7 @@ impl ConsensusObserver {
                 None,
                 None,
                 rand_msg_rx,
+                secret_share_msg_rx,
                 0,
             )
             .await;

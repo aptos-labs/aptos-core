@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_aggregator::{
     aggregator_v1_extension::{AggregatorData, AggregatorState},
@@ -13,7 +13,7 @@ use aptos_types::state_store::{state_key::StateKey, state_value::StateValueMetad
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::value::MoveTypeLayout;
-use move_vm_runtime::native_extensions::SessionListener;
+use move_vm_runtime::native_extensions::{NativeRuntimeRefCheckModelsCompleted, SessionListener};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     cell::RefCell,
@@ -69,6 +69,10 @@ impl<'a> SessionListener for NativeAggregatorContext<'a> {
     fn abort(&mut self) {
         // TODO(sessions): implement
     }
+}
+
+impl<'a> NativeRuntimeRefCheckModelsCompleted for NativeAggregatorContext<'a> {
+    // No native functions in this context return references, so no models to add.
 }
 
 impl<'a> NativeAggregatorContext<'a> {

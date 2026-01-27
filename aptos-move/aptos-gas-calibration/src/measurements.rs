@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::measurements_helpers::{get_dir_paths, list_entrypoints, record_gas_usage};
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_gas_algebra::DynamicExpression;

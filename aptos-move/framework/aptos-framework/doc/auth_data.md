@@ -209,7 +209,7 @@
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="auth_data.md#0x1_auth_data_derivable_abstract_signature">derivable_abstract_signature</a>(self: &<a href="auth_data.md#0x1_auth_data_AbstractionAuthData">AbstractionAuthData</a>): &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    <b>assert</b>!(self is DerivableV1, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="auth_data.md#0x1_auth_data_ENOT_REGULAR_AUTH_DATA">ENOT_REGULAR_AUTH_DATA</a>));
+    <b>assert</b>!(self is DerivableV1, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="auth_data.md#0x1_auth_data_ENOT_DERIVABLE_AUTH_DATA">ENOT_DERIVABLE_AUTH_DATA</a>));
     &self.abstract_signature
 }
 </code></pre>

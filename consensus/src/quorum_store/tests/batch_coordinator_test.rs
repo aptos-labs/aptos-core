@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     network::NetworkSender,
@@ -51,7 +51,7 @@ async fn test_handle_batches_msg_filter_disabled() {
     // Create a single batch with some transactions
     let transactions = create_signed_transactions(10);
     let account_address = AccountAddress::random();
-    let batch = Batch::new(
+    let batch = Batch::new_v1(
         BatchId::new_for_test(100),
         transactions.clone(),
         1,
@@ -101,7 +101,7 @@ async fn test_handle_batches_msg_filter_enabled() {
 
     // Create a single batch
     let account_address = AccountAddress::random();
-    let batch = Batch::new(
+    let batch = Batch::new_v1(
         BatchId::new_for_test(109),
         transactions.clone(),
         1,

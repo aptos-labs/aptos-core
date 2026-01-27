@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 // NOTE: I don't think we need this DealtPubKey[Share] anymore, since we never implement any traits
 // on it, unlike the DealtSecretKey[Share]. We will keep it in case we want to implement the
@@ -17,9 +17,10 @@ macro_rules! dealt_pub_key_share_impl {
         /// The size of a serialized *dealt public key share*.
         pub(crate) const DEALT_PK_SHARE_NUM_BYTES: usize = DEALT_PK_NUM_BYTES;
 
-        /// A player's *share* of the *dealt public key* from above.
+        /// A player's *share* of the *dealt public key* from above. Wrapping around
+        /// `DealtPubKey` ensures they have the same type; it is irrelevant otherwise
         #[derive(DeserializeKey, Clone, Debug, SerializeKey, PartialEq, Eq)]
-        pub struct DealtPubKeyShare(pub(crate) DealtPubKey);
+        pub struct DealtPubKeyShare(DealtPubKey);
 
         //
         // DealtPublicKeyShare

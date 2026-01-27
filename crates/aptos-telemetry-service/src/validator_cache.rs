@@ -1,10 +1,13 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     debug, error,
     errors::ValidatorCacheUpdateError,
-    metrics::{VALIDATOR_SET_UPDATE_FAILED_COUNT, VALIDATOR_SET_UPDATE_SUCCESS_COUNT},
+    metrics::{
+        ValidatorCachePeerType, VALIDATOR_CACHE_LAST_UPDATE_TIMESTAMP, VALIDATOR_CACHE_SIZE,
+        VALIDATOR_SET_UPDATE_FAILED_COUNT, VALIDATOR_SET_UPDATE_SUCCESS_COUNT,
+    },
     types::common::{ChainCommonName, EpochedPeerStore},
 };
 use aptos_config::config::{Peer, PeerRole, PeerSet};
@@ -13,7 +16,11 @@ use aptos_rest_client::Response;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS, chain_id::ChainId, on_chain_config::ValidatorSet, PeerId,
 };
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 use tokio::time;
 use url::Url;
 
@@ -147,18 +154,31 @@ impl PeerSetCacheUpdater {
             chain_name, chain_id, state.epoch, validator_peers
         );
 
-        let result = if validator_peers.is_empty() && vfn_peers.is_empty() {
+        // Capture counts before moving into cache
+        let validator_count = validator_peers.len();
+        let vfn_count = vfn_peers.len();
+        let has_validators = !validator_peers.is_empty();
+        let has_vfns = !vfn_peers.is_empty();
+
+        let result = if !has_validators && !has_vfns {
             Err(ValidatorCacheUpdateError::BothPeerSetEmpty)
-        } else if validator_peers.is_empty() {
+        } else if !has_validators {
             Err(ValidatorCacheUpdateError::ValidatorSetEmpty)
-        } else if vfn_peers.is_empty() {
+        } else if !has_vfns {
             Err(ValidatorCacheUpdateError::VfnSetEmpty)
         } else {
             Ok(())
         };
 
-        if !validator_peers.is_empty() {
+        // Update validator cache and record metrics
+        let chain_id_str = chain_id.to_string();
+        if has_validators {
             validator_cache.insert(chain_id, (state.epoch, validator_peers));
+
+            // Record cache size for validators
+            VALIDATOR_CACHE_SIZE
+                .with_label_values(&[&chain_id_str, ValidatorCachePeerType::Validator.as_str()])
+                .set(validator_count as i64);
         }
 
         debug!(
@@ -166,8 +186,28 @@ impl PeerSetCacheUpdater {
             chain_name, chain_id, state.epoch, vfn_peers
         );
 
-        if !vfn_peers.is_empty() {
+        if has_vfns {
             vfn_cache.insert(chain_id, (state.epoch, vfn_peers));
+
+            // Record cache size for VFNs
+            VALIDATOR_CACHE_SIZE
+                .with_label_values(&[
+                    &chain_id_str,
+                    ValidatorCachePeerType::ValidatorFullnode.as_str(),
+                ])
+                .set(vfn_count as i64);
+        }
+
+        // Record last update timestamp for staleness alerting (even on partial success)
+        // Alert on: now() - this_timestamp > threshold
+        if has_validators || has_vfns {
+            let now_unix = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            VALIDATOR_CACHE_LAST_UPDATE_TIMESTAMP
+                .with_label_values(&[&chain_id_str])
+                .set(now_unix as i64);
         }
 
         result

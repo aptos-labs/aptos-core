@@ -1,11 +1,12 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     error::PepperServiceError,
     external_resources::{
         jwk_fetcher,
-        jwk_fetcher::{JWKCache, JWKIssuerInterface, KeyID, JWK_REFRESH_INTERVAL_SECS},
+        jwk_fetcher::JWK_REFRESH_INTERVAL_SECS,
+        jwk_types::{JWKCache, JWKIssuerInterface, KeyID},
     },
     tests::utils,
 };

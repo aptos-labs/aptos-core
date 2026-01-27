@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     check_aptos_packages_availability, compile_aptos_packages, compile_package,
@@ -9,21 +9,28 @@ use crate::{
 use anyhow::Result;
 use aptos_framework::APTOS_PACKAGES;
 use aptos_language_e2e_tests::executor::FakeExecutor;
+use aptos_replay_benchmark::diff::{Diff, TransactionDiffBuilder};
 use aptos_transaction_simulation::{InMemoryStateStore, SimulationStateStore};
 use aptos_types::{
-    contract_event::ContractEvent,
+    access_path::Path,
     on_chain_config::{FeatureFlag, Features, OnChainConfig},
-    transaction::{Transaction, Version},
+    state_store::state_key::{inner::StateKeyInner, StateKey},
+    transaction::{Transaction, TransactionOutput, Version},
     vm_status::VMStatus,
-    write_set::WriteSet,
+    write_set::{WriteOp, TOTAL_SUPPLY_STATE_KEY},
 };
 use aptos_validator_interface::AptosValidatorInterface;
 use clap::ValueEnum;
-use itertools::Itertools;
-use move_binary_format::file_format_common::VERSION_6;
-use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
-use move_model::metadata::CompilerVersion;
-use std::{cmp, collections::HashMap, path::PathBuf, sync::Arc};
+use move_binary_format::file_format_common::VERSION_DEFAULT;
+use move_core_types::{
+    account_address::AccountAddress,
+    language_storage::{ModuleId, StructTag},
+};
+use std::{
+    collections::{BTreeMap, HashMap},
+    path::PathBuf,
+    sync::Arc,
+};
 
 fn add_packages_to_state_store(
     state_store: &impl SimulationStateStore,
@@ -41,7 +48,7 @@ fn add_packages_to_state_store(
     }
 }
 
-fn add_aptos_packages_to_state_store(
+pub(crate) fn add_aptos_packages_to_state_store(
     state_store: &impl SimulationStateStore,
     compiled_package_map: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
 ) {
@@ -94,6 +101,8 @@ pub struct Execution {
     input_path: PathBuf,
     pub execution_mode: ExecutionMode,
     pub bytecode_version: u32,
+    pub enable_features: Vec<FeatureFlag>,
+    pub disable_features: Vec<FeatureFlag>,
 }
 
 impl Execution {
@@ -101,33 +110,47 @@ impl Execution {
         eprintln!("{}", msg);
     }
 
-    pub fn new(input_path: PathBuf, execution_mode: ExecutionMode) -> Self {
+    pub fn new(
+        input_path: PathBuf,
+        execution_mode: ExecutionMode,
+        enable_features: Vec<FeatureFlag>,
+        disable_features: Vec<FeatureFlag>,
+    ) -> Self {
         Self {
             input_path,
             execution_mode,
-            bytecode_version: VERSION_6,
+            bytecode_version: VERSION_DEFAULT,
+            enable_features,
+            disable_features,
         }
     }
 
-    pub async fn execute_txns(&self, begin: Version, num_txns_to_execute: u64) -> Result<()> {
+    pub async fn execute_txns(
+        &self,
+        begin: Version,
+        num_txns_to_execute: u64,
+        base_experiments: Vec<String>,
+        compared_experiments: Vec<String>,
+    ) -> Result<()> {
         let aptos_commons_path = self.input_path.join(APTOS_COMMONS);
         if !check_aptos_packages_availability(aptos_commons_path.clone()) {
             return Err(anyhow::Error::msg("aptos packages are missing"));
         }
-
         let mut compiled_cache = CompilationCache::default();
         if self.execution_mode.is_v1_or_compare() {
             compile_aptos_packages(
                 &aptos_commons_path,
-                &mut compiled_cache.compiled_package_cache_v1,
-                false,
+                &mut compiled_cache.base_compiled_package_cache,
+                &base_experiments,
+                "base",
             )?;
         }
         if self.execution_mode.is_v2_or_compare() {
             compile_aptos_packages(
                 &aptos_commons_path,
-                &mut compiled_cache.compiled_package_cache_v2,
-                true,
+                &mut compiled_cache.compared_compiled_package_cache,
+                &compared_experiments,
+                "compared",
             )?;
         }
 
@@ -151,7 +174,13 @@ impl Execution {
         let mut cur_version = ver.unwrap();
         let mut i = 0;
         while i < num_txns_to_execute {
-            let res = self.execute_one_txn(cur_version, &data_manager, &mut compiled_cache);
+            let res = self.execute_one_txn(
+                cur_version,
+                &data_manager,
+                &mut compiled_cache,
+                &base_experiments,
+                &compared_experiments,
+            );
             if res.is_err() {
                 self.output_result_str(format!(
                     "execution at version:{} failed, skip to the next txn",
@@ -178,6 +207,8 @@ impl Execution {
         &self,
         txn_idx: &TxnIndex,
         compiled_cache: &mut CompilationCache,
+        base_experiments: &[String],
+        compared_experiments: &[String],
     ) -> Result<()> {
         if !txn_idx.package_info.is_compilable() {
             return Err(anyhow::Error::msg("not compilable"));
@@ -191,60 +222,60 @@ impl Execution {
         let mut v2_failed = false;
         if self.execution_mode.is_v1_or_compare()
             && !compiled_cache
-                .compiled_package_cache_v1
+                .base_compiled_package_cache
                 .contains_key(&package_info)
         {
-            if compiled_cache.failed_packages_v1.contains(&package_info) {
+            if compiled_cache.failed_packages_base.contains(&package_info) {
                 v1_failed = true;
             } else {
-                let compiled_res_v1 = compile_package(
-                    package_dir.clone(),
-                    &package_info,
-                    Some(CompilerVersion::V1),
-                );
+                let compiled_res_v1 =
+                    compile_package(package_dir.clone(), &package_info, base_experiments, "base");
                 if let Ok(compiled_res) = compiled_res_v1 {
                     generate_compiled_blob(
                         &package_info,
                         &compiled_res,
-                        &mut compiled_cache.compiled_package_cache_v1,
+                        &mut compiled_cache.base_compiled_package_cache,
                     );
                 } else {
                     v1_failed = true;
                     compiled_cache
-                        .failed_packages_v1
+                        .failed_packages_base
                         .insert(package_info.clone());
                 }
             }
         }
         if self.execution_mode.is_v2_or_compare()
             && !compiled_cache
-                .compiled_package_cache_v2
+                .compared_compiled_package_cache
                 .contains_key(&package_info)
         {
-            if compiled_cache.failed_packages_v2.contains(&package_info) {
+            if compiled_cache
+                .failed_packages_compared
+                .contains(&package_info)
+            {
                 v2_failed = true;
             } else {
-                let compiled_res_v2 = compile_package(
-                    package_dir,
-                    &package_info,
-                    Some(CompilerVersion::latest_stable()),
-                );
+                let compiled_res_v2 =
+                    compile_package(package_dir, &package_info, compared_experiments, "compared");
                 if let Ok(compiled_res) = compiled_res_v2 {
                     generate_compiled_blob(
                         &package_info,
                         &compiled_res,
-                        &mut compiled_cache.compiled_package_cache_v2,
+                        &mut compiled_cache.compared_compiled_package_cache,
                     );
                 } else {
                     v2_failed = true;
                     compiled_cache
-                        .failed_packages_v2
+                        .failed_packages_compared
                         .insert(package_info.clone());
                 }
             }
         }
         if v1_failed || v2_failed {
-            let mut err_msg = "compilation failed at ".to_string();
+            let mut err_msg = format!(
+                "compilation for the package {} failed at",
+                package_info.package_name
+            );
             if v1_failed {
                 err_msg = format!("{} v1", err_msg);
             }
@@ -261,19 +292,23 @@ impl Execution {
         cur_version: Version,
         data_manager: &DataManager,
         compiled_cache: &mut CompilationCache,
+        base_experiments: &[String],
+        compared_experiments: &[String],
     ) -> Result<()> {
         if let Some(txn_idx) = data_manager.get_txn_index(cur_version) {
             // compile the code if the source code is available
             if txn_idx.package_info.is_compilable()
                 && !is_aptos_package(&txn_idx.package_info.package_name)
             {
-                let compiled_result = self.compile_code(&txn_idx, compiled_cache);
-                if compiled_result.is_err() {
-                    self.output_result_str(format!(
-                        "compilation failed for the package:{} at version:{}",
-                        txn_idx.package_info.package_name, cur_version
-                    ));
-                    return compiled_result;
+                let compiled_result = self.compile_code(
+                    &txn_idx,
+                    compiled_cache,
+                    base_experiments,
+                    compared_experiments,
+                );
+                if let Err(err) = compiled_result {
+                    self.output_result_str(format!("{} at version:{}", err, cur_version));
+                    return Err(err);
                 }
             }
             // read the state data
@@ -282,8 +317,8 @@ impl Execution {
                 cur_version,
                 state,
                 &txn_idx,
-                &compiled_cache.compiled_package_cache_v1,
-                &compiled_cache.compiled_package_cache_v2,
+                &compiled_cache.base_compiled_package_cache,
+                &compiled_cache.compared_compiled_package_cache,
                 None,
             );
         }
@@ -301,10 +336,8 @@ impl Execution {
     ) {
         let mut package_cache_main = compiled_package_cache;
         let package_cache_other = compiled_package_cache_v2;
-        let mut v2_flag = false;
         if self.execution_mode.is_v2() {
             package_cache_main = compiled_package_cache_v2;
-            v2_flag = true;
         }
         let res_main = self.execute_code(
             cur_version,
@@ -313,7 +346,6 @@ impl Execution {
             &txn_idx.txn,
             package_cache_main,
             debugger.clone(),
-            v2_flag,
         );
         if self.execution_mode.is_compare() {
             let res_other = self.execute_code(
@@ -323,15 +355,23 @@ impl Execution {
                 &txn_idx.txn,
                 package_cache_other,
                 debugger.clone(),
-                true,
             );
-            self.print_mismatches(cur_version, &res_main, &res_other);
+            self.print_mismatches(
+                cur_version,
+                &res_main,
+                &res_other,
+                Some(txn_idx.package_info.package_name.clone()),
+            );
         } else {
             match res_main {
-                Ok((write_set, events)) => {
+                Ok(res) => {
+                    let write_set = res.write_set();
+                    let events = res.events();
+                    let txn_status = res.status();
+                    let gas = res.gas_used();
                     self.output_result_str(format!(
-                        "version:{}\nwrite set:{:?}\n events:{:?}\n",
-                        cur_version, write_set, events
+                        "version:{}\nwrite set:{:?}\n events:{:?}, txn_status:{:?}, gas:{}\n",
+                        cur_version, write_set, events, txn_status, gas
                     ));
                 },
                 Err(vm_status) => {
@@ -344,6 +384,18 @@ impl Execution {
         }
     }
 
+    fn enable_features(&self, features: &mut Features, enable_features: &Vec<FeatureFlag>) {
+        for feature in enable_features {
+            features.enable(*feature);
+        }
+    }
+
+    fn disable_features(&self, features: &mut Features, disable_features: &Vec<FeatureFlag>) {
+        for feature in disable_features {
+            features.disable(*feature);
+        }
+    }
+
     fn execute_code(
         &self,
         version: Version,
@@ -352,8 +404,7 @@ impl Execution {
         txn: &Transaction,
         compiled_package_cache: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
         debugger_opt: Option<Arc<dyn AptosValidatorInterface + Send>>,
-        v2_flag: bool,
-    ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
+    ) -> Result<TransactionOutput, VMStatus> {
         // Always add Aptos (0x1) packages.
         add_aptos_packages_to_state_store(&state, compiled_package_cache);
 
@@ -364,11 +415,9 @@ impl Execution {
 
         // Update features if needed to the correct binary format used by V2 compiler.
         let mut features = Features::fetch_config(&state).unwrap_or_default();
-        if v2_flag {
-            features.enable(FeatureFlag::VM_BINARY_FORMAT_V9);
-        } else {
-            features.enable(FeatureFlag::VM_BINARY_FORMAT_V6);
-        }
+        self.enable_features(&mut features, &self.enable_features);
+        self.disable_features(&mut features, &self.disable_features);
+
         state
             .set_features(features)
             .expect("failed to set features, this should not happen");
@@ -381,21 +430,95 @@ impl Execution {
         if let Some(debugger) = debugger_opt {
             let data_view = DataStateView::new(debugger, version, state);
             executor
-                .execute_transaction_block_with_state_view(txns, &data_view)
-                .map(|mut res| res.pop().unwrap().into())
+                .execute_transaction_block_with_state_view(txns, &data_view, false)
+                .map(|mut res| res.pop().unwrap())
         } else {
             executor
-                .execute_transaction_block_with_state_view(txns, &state)
-                .map(|mut res| res.pop().unwrap().into())
+                .execute_transaction_block_with_state_view(txns, &state, false)
+                .map(|mut res| res.pop().unwrap())
         }
+    }
+
+    /// Filter out stake key related to fee so that related write set diff will be ignored
+    fn is_fee_related_stake_key(&self, key: &StateKey) -> bool {
+        if let StateKeyInner::AccessPath(p) = key.inner() {
+            let path = p.get_path();
+            if let Path::Resource(tag) = path {
+                if tag.name.as_str() == "CoinStore" && !tag.type_args.is_empty() {
+                    let para_type = &tag.type_args[0];
+                    if para_type.to_canonical_string() == "0x1::aptos_coin::AptosCoin" {
+                        return true;
+                    }
+                }
+            }
+        }
+        *key == *TOTAL_SUPPLY_STATE_KEY
+    }
+
+    /// Filter out stake key related to FA or supply so that related write set diff will be ignored
+    fn filter_stake_key_resource_group(
+        &self,
+        key: &StateKey,
+        value_1: &WriteOp,
+        value_2: &WriteOp,
+    ) -> bool {
+        if let StateKeyInner::AccessPath(p) = key.inner() {
+            let path = p.get_path();
+            if let Path::ResourceGroup(_) = path {
+                let state_value_1_opt = value_1.as_state_value_opt();
+                let state_value_2_opt = value_2.as_state_value_opt();
+                if let (Some(start_value_1), Some(start_value_2)) =
+                    (state_value_1_opt, state_value_2_opt)
+                {
+                    let byte_map_1: BTreeMap<StructTag, Vec<u8>> =
+                        bcs::from_bytes(start_value_1.bytes()).unwrap_or_default();
+                    let byte_map_2: BTreeMap<StructTag, Vec<u8>> =
+                        bcs::from_bytes(start_value_2.bytes()).unwrap_or_default();
+                    if byte_map_1.len() != byte_map_2.len() {
+                        return false;
+                    }
+                    for tag_1 in byte_map_1.keys() {
+                        if !byte_map_2.contains_key(tag_1) {
+                            return false;
+                        }
+                        if tag_1.name.as_str() != "ConcurrentSupply"
+                            && tag_1.name.as_str() != "FungibleStore"
+                        {
+                            if byte_map_1.get(tag_1).unwrap() != byte_map_2.get(tag_1).unwrap() {
+                                return false;
+                            }
+                        }
+                    }
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        }
+        false
     }
 
     fn print_mismatches(
         &self,
         cur_version: u64,
-        res_1: &Result<(WriteSet, Vec<ContractEvent>), VMStatus>,
-        res_2: &Result<(WriteSet, Vec<ContractEvent>), VMStatus>,
+        res_1: &Result<TransactionOutput, VMStatus>,
+        res_2: &Result<TransactionOutput, VMStatus>,
+        package_name: Option<String>,
     ) {
+        let gas_diff = |gas_1: u64, gas_2: u64| -> (f64, bool, bool) {
+            assert!(gas_1 > 0);
+            assert!(gas_2 > 0);
+            let gas2_ge_gas1: bool = gas_2 > gas_1;
+            let gas1_ge_gas2: bool = gas_1 > gas_2;
+            let mut denominator = gas_1;
+            let mut difference = gas_2 as i64 - gas_1 as i64;
+            if !gas2_ge_gas1 {
+                difference = gas_1 as i64 - gas_2 as i64;
+                denominator = gas_2;
+            }
+            let percentage_difference = difference as f64 / denominator as f64 * 100.0;
+            (percentage_difference, gas2_ge_gas1, gas1_ge_gas2)
+        };
         match (res_1, res_2) {
             (Err(e1), Err(e2)) => {
                 if e1.message() != e2.message() || e1.status_code() != e2.status_code() {
@@ -420,78 +543,46 @@ impl Execution {
                 ));
             },
             (Ok(res_1), Ok(res_2)) => {
-                // compare events
-                let mut event_error = false;
-                if res_1.1.len() != res_2.1.len() {
-                    event_error = true;
-                }
-                for idx in 0..cmp::min(res_1.1.len(), res_2.1.len()) {
-                    let event_1 = &res_1.1[idx];
-                    let event_2 = &res_2.1[idx];
-                    if event_1 != event_2 {
-                        event_error = true;
-                        self.output_result_str(format!(
-                            "event raised from V1: {} at index: {}",
-                            event_1, idx
-                        ));
-                        self.output_result_str(format!(
-                            "event raised from V2: {} at index: {}",
-                            event_2, idx
-                        ));
+                let transaction_diff_builder = TransactionDiffBuilder::new(true, true);
+                let transaction_diff =
+                    transaction_diff_builder.build_from_outputs(res_1.clone(), res_2.clone(), None);
+                for diff in transaction_diff.diffs {
+                    match diff {
+                        Diff::GasUsed { left, right } => {
+                            let (diff, gas2_gt_gas1, gas1_gt_gas_2) = gas_diff(left, right);
+                            let greater_version = if gas1_gt_gas_2 { "v1" } else { "v2" };
+                            let gas_equal = !(gas2_gt_gas1 || gas1_gt_gas_2);
+                            if !gas_equal {
+                                self.output_result_str(format!(
+                                    "gas v1:{}, gas v2:{}, gas diff: {}'s gas usage is {} percent more than the other at version: {}, v1 status:{:?}, v2 status:{:?} for package:{}",
+                                    left, right, greater_version, diff, cur_version, res_1.status(), res_2.status(), package_name.clone().unwrap_or("unknown package".to_string())
+                                ));
+                            }
+                        },
+                        Diff::ExecutionStatus { left, right } => {
+                            self.output_result_str(format!("txn status is different at version: {}, execution status from V1: {:?}, execution status from V2: {:?}", cur_version, left, right));
+                        },
+                        Diff::Event { left, right } => {
+                            self.output_result_str(format!("event is different at version: {}, event from V1: {:?}, event from V2: {:?}", cur_version, left, right));
+                        },
+                        Diff::WriteSet {
+                            state_key,
+                            left,
+                            right,
+                        } => {
+                            let mut fa_related = false;
+                            if let (Some(left), Some(right)) = (&left, &right) {
+                                if self.is_fee_related_stake_key(&state_key)
+                                    || self.filter_stake_key_resource_group(&state_key, left, right)
+                                {
+                                    fa_related = true;
+                                }
+                            }
+                            if !fa_related {
+                                self.output_result_str(format!("write set value is different at version: {}, for key:{:?}, write set from V1: {:?}, write set from V2: {:?}", cur_version, state_key, left, right));
+                            }
+                        },
                     }
-                }
-                if event_error {
-                    self.output_result_str(format!(
-                        "event is different at version: {}",
-                        cur_version
-                    ));
-                }
-                // compare write set
-                let mut write_set_error = false;
-                let res_1_write_set_vec = res_1.0.write_op_iter().collect_vec();
-                let res_2_write_set_vec = res_2.0.write_op_iter().collect_vec();
-                if res_1_write_set_vec.len() != res_2_write_set_vec.len() {
-                    write_set_error = true;
-                }
-                for idx in 0..cmp::min(res_1_write_set_vec.len(), res_2_write_set_vec.len()) {
-                    let write_set_1 = res_1_write_set_vec[idx];
-                    let write_set_2 = res_2_write_set_vec[idx];
-                    if write_set_1.0 != write_set_2.0 {
-                        write_set_error = true;
-                        self.output_result_str(format!(
-                            "write set key is different at version: {}, index: {}",
-                            cur_version, idx
-                        ));
-                        self.output_result_str(format!(
-                            "state key at V1: {:?} at index: {}",
-                            write_set_1.0, idx
-                        ));
-                        self.output_result_str(format!(
-                            "state key at V2: {:?} at index: {}",
-                            write_set_2.0, idx
-                        ));
-                    }
-                    if write_set_1.1 != write_set_2.1 {
-                        write_set_error = true;
-                        self.output_result_str(format!(
-                            "write set value is different at version: {}, index: {}",
-                            cur_version, idx
-                        ));
-                        self.output_result_str(format!(
-                            "state value at V1: {:?} at index: {}",
-                            write_set_1.1, idx
-                        ));
-                        self.output_result_str(format!(
-                            "state value at V2: {:?} at index: {}",
-                            write_set_2.1, idx
-                        ));
-                    }
-                }
-                if write_set_error {
-                    self.output_result_str(format!(
-                        "write set is different at version: {}",
-                        cur_version
-                    ));
                 }
             },
         }

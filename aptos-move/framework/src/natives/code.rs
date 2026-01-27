@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::unzip_metadata_str;
 use anyhow::bail;
@@ -13,8 +13,17 @@ use aptos_types::{
 };
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::{account_address::AccountAddress, gas_algebra::NumBytes};
-use move_vm_runtime::{native_extensions::SessionListener, native_functions::NativeFunction};
+use move_core_types::{
+    account_address::AccountAddress,
+    gas_algebra::NumBytes,
+    ident_str,
+    identifier::IdentStr,
+    move_resource::{MoveResource, MoveStructType},
+};
+use move_vm_runtime::{
+    native_extensions::{NativeRuntimeRefCheckModelsCompleted, SessionListener},
+    native_functions::NativeFunction,
+};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Struct, Value},
@@ -38,6 +47,13 @@ impl OnChainConfig for PackageRegistry {
     const MODULE_IDENTIFIER: &'static str = "code";
     const TYPE_IDENTIFIER: &'static str = "PackageRegistry";
 }
+
+impl MoveStructType for PackageRegistry {
+    const MODULE_NAME: &'static IdentStr = ident_str!("code");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("PackageRegistry");
+}
+
+impl MoveResource for PackageRegistry {}
 
 /// The PackageMetadata type. This must be kept in sync with `code.move`. Documentation is
 /// also found there.
@@ -188,6 +204,10 @@ impl SessionListener for NativeCodeContext {
     }
 }
 
+impl NativeRuntimeRefCheckModelsCompleted for NativeCodeContext {
+    // No native functions in this context return references, so no models to add.
+}
+
 impl NativeCodeContext {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
@@ -326,9 +346,7 @@ fn native_request_publish(
     let code_context = context.extensions_mut().get_mut::<NativeCodeContext>();
     if code_context.requested_module_bundle.is_some() || !code_context.enabled {
         // Can't request second time or if publish requests are not allowed.
-        return Err(SafeNativeError::Abort {
-            abort_code: EALREADY_REQUESTED,
-        });
+        return Err(SafeNativeError::abort(EALREADY_REQUESTED));
     }
     code_context.requested_module_bundle = Some(PublishRequest {
         destination,

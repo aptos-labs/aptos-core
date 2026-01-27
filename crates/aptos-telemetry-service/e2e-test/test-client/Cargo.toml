@@ -1,0 +1,33 @@
+[package]
+name = "telemetry-test-client"
+version = "0.1.0"
+edition = "2021"
+description = "Test client for Aptos Telemetry Service custom contract endpoints"
+license = { workspace = true }
+publish = false
+
+[[bin]]
+name = "telemetry-test-client"
+path = "src/main.rs"
+
+[dependencies]
+# Aptos dependencies
+# NOTE: fuzzing feature enables sign_arbitrary_message for signing raw challenge bytes
+aptos-crypto = { workspace = true, features = ["fuzzing"] }
+aptos-telemetry-service = { workspace = true }
+aptos-types = { workspace = true }
+
+# Workspace dependencies
+anyhow = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true }
+flate2 = { workspace = true }
+hex = { workspace = true }
+rand = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+

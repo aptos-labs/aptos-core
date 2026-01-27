@@ -1,0 +1,237 @@
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0x42::m1
+struct Holder<T0> has copy + drop
+  _0: Predicate<T0>
+
+struct Predicate<T0> has copy + drop
+  _0: |&T0|bool has copy + drop
+
+// Function definition at index 0
+public fun pack$Holder<T0>(l0: Predicate<T0>): Holder<T0>
+    local l1: Predicate<T0>
+    move_loc l0
+    pack Holder<T0>
+    ret
+
+// Function definition at index 1
+public fun unpack$Holder<T0>(l0: Holder<T0>): Predicate<T0>
+    local l1: Holder<T0>
+    move_loc l0
+    unpack Holder<T0>
+    ret
+
+// Function definition at index 2
+public fun borrow$Holder$0<T0>(l0: &Holder<T0>): &Predicate<T0>
+    local l1: &Holder<T0>
+    move_loc l0
+    borrow_field Holder<T0>, _0
+    ret
+
+// Function definition at index 3
+public fun borrow_mut$Holder$0<T0>(l0: &mut Holder<T0>): &mut Predicate<T0>
+    local l1: &mut Holder<T0>
+    move_loc l0
+    mut_borrow_field Holder<T0>, _0
+    ret
+
+// Function definition at index 4
+public fun pack$Predicate<T0>(l0: |&T0|bool has copy + drop): Predicate<T0>
+    local l1: |&T0|bool has copy + drop
+    move_loc l0
+    pack Predicate<T0>
+    ret
+
+// Function definition at index 5
+public fun unpack$Predicate<T0>(l0: Predicate<T0>): |&T0|bool has copy + drop
+    local l1: Predicate<T0>
+    move_loc l0
+    unpack Predicate<T0>
+    ret
+
+// Function definition at index 6
+public fun borrow$Predicate$0<T0>(l0: &Predicate<T0>): &|&T0|bool has copy + drop
+    local l1: &Predicate<T0>
+    move_loc l0
+    borrow_field Predicate<T0>, _0
+    ret
+
+// Function definition at index 7
+public fun borrow_mut$Predicate$0<T0>(l0: &mut Predicate<T0>): &mut |&T0|bool has copy + drop
+    local l1: &mut Predicate<T0>
+    move_loc l0
+    mut_borrow_field Predicate<T0>, _0
+    ret
+
+// Bytecode version v10
+module 0x42::m2
+use 0x42::m1
+// Function definition at index 0
+fun apply_holder(l0: m1::Holder<u64>, l1: u64): bool
+    local l2: m1::Predicate<u64>
+    move_loc l0
+    call m1::unpack$Holder<u64>
+    st_loc l2
+    borrow_loc l1
+    move_loc l2
+    // @5
+    call m1::unpack$Predicate<u64>
+    call_closure <|&u64|bool has copy + drop>
+    ret
+
+// Function definition at index 1
+fun apply_pred(l0: m1::Predicate<u64>, l1: u64): bool
+    borrow_loc l1
+    move_loc l0
+    call m1::unpack$Predicate<u64>
+    call_closure <|&u64|bool has copy + drop>
+    ret
+
+// Function definition at index 2
+fun try_direct_assignment_and_call()
+    local l0: m1::Predicate<u64>
+    local l1: u64
+    local l2: u64
+    pack_closure __lambda__1__try_direct_assignment_and_call, 0
+    call m1::pack$Predicate<u64>
+    st_loc l0
+    ld_u64 99
+    st_loc l1
+    // @5
+    borrow_loc l1
+    copy_loc l0
+    call m1::unpack$Predicate<u64>
+    call_closure <|&u64|bool has copy + drop>
+    br_false l0
+    // @10
+    ld_u64 101
+    st_loc l2
+    borrow_loc l2
+    move_loc l0
+    call m1::unpack$Predicate<u64>
+    // @15
+    call_closure <|&u64|bool has copy + drop>
+    br_true l1
+    ret
+l1: ld_u64 2
+    abort
+    // @20
+l0: ld_u64 1
+    abort
+
+// Function definition at index 3
+fun try_nested_wrapper()
+    local l0: m1::Holder<u64>
+    pack_closure __lambda__1__try_nested_wrapper, 0
+    call m1::pack$Predicate<u64>
+    call m1::pack$Holder<u64>
+    st_loc l0
+    copy_loc l0
+    // @5
+    ld_u64 42
+    call apply_holder
+    br_false l0
+    move_loc l0
+    ld_u64 99
+    // @10
+    call apply_holder
+    br_true l1
+    ret
+l1: ld_u64 8
+    abort
+    // @15
+l0: ld_u64 7
+    abort
+
+// Function definition at index 4
+fun try_pass_to_apply()
+    local l0: m1::Predicate<u64>
+    pack_closure __lambda__1__try_pass_to_apply, 0
+    call m1::pack$Predicate<u64>
+    st_loc l0
+    copy_loc l0
+    ld_u64 4
+    // @5
+    call apply_pred
+    br_false l0
+    move_loc l0
+    ld_u64 5
+    call apply_pred
+    // @10
+    br_true l1
+    ret
+l1: ld_u64 6
+    abort
+l0: ld_u64 5
+    // @15
+    abort
+
+// Function definition at index 5
+fun try_unpack_wrapper()
+    local l0: |&u64|bool has copy + drop
+    local l1: u64
+    local l2: u64
+    pack_closure __lambda__1__try_unpack_wrapper, 0
+    call m1::pack$Predicate<u64>
+    call m1::unpack$Predicate<u64>
+    st_loc l0
+    ld_u64 1
+    // @5
+    st_loc l1
+    borrow_loc l1
+    copy_loc l0
+    call_closure <|&u64|bool has copy + drop>
+    br_false l0
+    // @10
+    ld_u64 0
+    st_loc l2
+    borrow_loc l2
+    move_loc l0
+    call_closure <|&u64|bool has copy + drop>
+    // @15
+    br_true l1
+    ret
+l1: ld_u64 10
+    abort
+l0: ld_u64 9
+    // @20
+    abort
+
+// Function definition at index 6
+fun __lambda__1__try_direct_assignment_and_call(l0: &u64): bool
+    move_loc l0
+    read_ref
+    ld_u64 100
+    lt
+    ret
+
+// Function definition at index 7
+fun __lambda__1__try_nested_wrapper(l0: &u64): bool
+    move_loc l0
+    read_ref
+    ld_u64 42
+    eq
+    ret
+
+// Function definition at index 8
+fun __lambda__1__try_pass_to_apply(l0: &u64): bool
+    move_loc l0
+    read_ref
+    ld_u64 2
+    mod
+    ld_u64 0
+    // @5
+    eq
+    ret
+
+// Function definition at index 9
+fun __lambda__1__try_unpack_wrapper(l0: &u64): bool
+    move_loc l0
+    read_ref
+    ld_u64 0
+    neq
+    ret
+
+
+============ bytecode verification succeeded ========

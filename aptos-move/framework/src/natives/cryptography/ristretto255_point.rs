@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! A crate which extends Move with a RistrettoPoint struct that points to a Rust-native
 //! curve25519_dalek::ristretto::RistrettoPoint.
@@ -21,7 +21,7 @@ use curve25519_dalek::{
     traits::{Identity, VartimeMultiscalarMul},
 };
 use move_core_types::gas_algebra::{NumArgs, NumBytes};
-use move_vm_runtime::native_extensions::SessionListener;
+use move_vm_runtime::native_extensions::{NativeRuntimeRefCheckModelsCompleted, SessionListener};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Reference, StructRef, Value, VectorRef},
@@ -95,6 +95,10 @@ impl SessionListener for NativeRistrettoPointContext {
     }
 }
 
+impl NativeRuntimeRefCheckModelsCompleted for NativeRistrettoPointContext {
+    // No native functions in this context return references, so no models to add.
+}
+
 impl NativeRistrettoPointContext {
     /// Create a new instance of a native RistrettoPoint context. This must be passed in via an
     /// extension into VM session functions.
@@ -153,9 +157,7 @@ impl PointStore {
     fn safe_add_point(&mut self, point: RistrettoPoint) -> SafeNativeResult<u64> {
         let id = self.points.len();
         if id >= NUM_POINTS_LIMIT {
-            Err(SafeNativeError::Abort {
-                abort_code: E_TOO_MANY_POINTS_CREATED,
-            })
+            Err(SafeNativeError::abort(E_TOO_MANY_POINTS_CREATED))
         } else {
             self.points.push(point);
             Ok(id as u64)

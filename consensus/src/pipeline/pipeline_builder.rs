@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     block_preparer::BlockPreparer,
@@ -18,10 +18,10 @@ use aptos_consensus_types::{
     common::{Author, Round},
     pipeline::commit_vote::CommitVote,
     pipelined_block::{
-        CommitLedgerResult, CommitVoteResult, ExecuteResult, LedgerUpdateResult,
-        NotifyStateSyncResult, PipelineFutures, PipelineInputRx, PipelineInputTx, PipelinedBlock,
-        PostCommitResult, PostLedgerUpdateResult, PreCommitResult, PrepareResult, RandResult,
-        TaskError, TaskFuture, TaskResult,
+        CommitLedgerResult, CommitVoteResult, DecryptionResult, ExecuteResult, LedgerUpdateResult,
+        MaterializeResult, NotifyStateSyncResult, PipelineFutures, PipelineInputRx,
+        PipelineInputTx, PipelinedBlock, PostCommitResult, PostLedgerUpdateResult, PreCommitResult,
+        PrepareResult, RandResult, TaskError, TaskFuture, TaskResult,
     },
     quorum_cert::QuorumCert,
     wrapped_ledger_info::WrappedLedgerInfo,
@@ -39,11 +39,12 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::OnChainConsensusConfig,
     randomness::Randomness,
+    secret_sharing::SecretShareConfig,
     state_store::StateViewId,
     transaction::{
-        signature_verified_transaction::{SignatureVerifiedTransaction, TransactionProvider},
-        AuxiliaryInfo, EphemeralAuxiliaryInfo, PersistedAuxiliaryInfo, SignedTransaction,
-        Transaction, TransactionExecutableRef,
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
+        EphemeralAuxiliaryInfo, PersistedAuxiliaryInfo, SignedTransaction, Transaction,
+        TransactionExecutableRef,
     },
     validator_signer::ValidatorSigner,
     vm::module_metadata::get_randomness_annotation_for_entry_function,
@@ -137,6 +138,7 @@ pub struct PipelineBuilder {
     rand_check_enabled: bool,
     module_cache: Arc<Mutex<Option<CachedModuleView<CachedStateView>>>>,
     network_sender: Arc<NetworkSender>,
+    secret_share_config: Option<SecretShareConfig>,
 }
 
 fn spawn_shared_fut<
@@ -174,7 +176,7 @@ async fn wait_and_log_error<T, F: Future<Output = TaskResult<T>>>(f: F, msg: Str
     }
 }
 
-struct Tracker {
+pub(super) struct Tracker {
     name: &'static str,
     block_id: HashValue,
     epoch: u64,
@@ -185,7 +187,7 @@ struct Tracker {
 }
 
 impl Tracker {
-    fn start_waiting(name: &'static str, block: &Block) -> Self {
+    pub(super) fn start_waiting(name: &'static str, block: &Block) -> Self {
         Self {
             name,
             block_id: block.id(),
@@ -197,7 +199,7 @@ impl Tracker {
         }
     }
 
-    fn start_working(&mut self) {
+    pub(super) fn start_working(&mut self) {
         self.started_at = Some(Instant::now());
         self.running_guard = Some(IntGaugeGuard::new(
             counters::OP_COUNTERS.gauge(&format!("{}_running", self.name)),
@@ -260,6 +262,7 @@ impl PipelineBuilder {
         consensus_onchain_config: &OnChainConsensusConfig,
         persisted_auxiliary_info_version: u8,
         network_sender: Arc<NetworkSender>,
+        secret_share_config: Option<SecretShareConfig>,
     ) -> Self {
         let module_cache = Arc::new(Mutex::new(None));
         Self {
@@ -278,6 +281,7 @@ impl PipelineBuilder {
             rand_check_enabled: consensus_onchain_config.rand_check_enabled(),
             module_cache,
             network_sender,
+            secret_share_config,
         }
     }
 
@@ -307,6 +311,7 @@ impl PipelineBuilder {
             },
             Some(abort_handles),
         );
+        let (secret_shared_key_tx, secret_shared_key_rx) = oneshot::channel();
         (
             PipelineInputTx {
                 qc_tx: Some(qc_tx),
@@ -314,6 +319,7 @@ impl PipelineBuilder {
                 order_vote_tx: Some(order_vote_tx),
                 order_proof_tx: Some(order_proof_tx),
                 commit_proof_tx: Some(commit_proof_tx),
+                secret_shared_key_tx: Some(secret_shared_key_tx),
             },
             PipelineInputRx {
                 qc_rx,
@@ -321,6 +327,7 @@ impl PipelineBuilder {
                 order_vote_rx,
                 order_proof_fut,
                 commit_proof_fut,
+                secret_shared_key_rx,
             },
         )
     }
@@ -347,6 +354,7 @@ impl PipelineBuilder {
         let post_ledger_update_fut = spawn_ready_fut(());
         let notify_state_sync_fut = spawn_ready_fut(());
         let post_commit_fut = spawn_ready_fut(());
+        let secret_sharing_derive_self_fut = spawn_ready_fut(None);
         PipelineFutures {
             prepare_fut,
             rand_check_fut,
@@ -358,6 +366,7 @@ impl PipelineBuilder {
             notify_state_sync_fut,
             commit_ledger_fut,
             post_commit_fut,
+            secret_sharing_derive_self_fut,
         }
     }
 
@@ -432,10 +441,36 @@ impl PipelineBuilder {
             order_vote_rx,
             order_proof_fut,
             commit_proof_fut,
+            secret_shared_key_rx,
         } = rx;
 
+        let (derived_self_key_share_tx, derived_self_key_share_rx) = oneshot::channel();
+        let secret_sharing_derive_self_fut = spawn_shared_fut(
+            async move {
+                derived_self_key_share_rx
+                    .await
+                    .map_err(|_| TaskError::from(anyhow!("commit proof tx cancelled")))
+            },
+            Some(&mut abort_handles),
+        );
+
+        let materialize_fut = spawn_shared_fut(
+            Self::materialize(self.block_preparer.clone(), block.clone(), qc_rx),
+            Some(&mut abort_handles),
+        );
+        let decryption_fut = spawn_shared_fut(
+            Self::decrypt_encrypted_txns(
+                materialize_fut,
+                block.clone(),
+                self.signer.author(),
+                self.secret_share_config.clone(),
+                derived_self_key_share_tx,
+                secret_shared_key_rx,
+            ),
+            Some(&mut abort_handles),
+        );
         let prepare_fut = spawn_shared_fut(
-            Self::prepare(self.block_preparer.clone(), block.clone(), qc_rx),
+            Self::prepare(decryption_fut, self.block_preparer.clone(), block.clone()),
             Some(&mut abort_handles),
         );
         let rand_check_fut = spawn_shared_fut(
@@ -552,6 +587,7 @@ impl PipelineBuilder {
             ),
             None,
         );
+
         let all_fut = PipelineFutures {
             prepare_fut,
             rand_check_fut,
@@ -563,6 +599,7 @@ impl PipelineBuilder {
             notify_state_sync_fut,
             commit_ledger_fut,
             post_commit_fut,
+            secret_sharing_derive_self_fut,
         };
         tokio::spawn(Self::monitor(
             block.epoch(),
@@ -575,12 +612,12 @@ impl PipelineBuilder {
 
     /// Precondition: Block is inserted into block tree (all ancestors are available)
     /// What it does: Wait for all data becomes available and verify transaction signatures
-    async fn prepare(
+    async fn materialize(
         preparer: Arc<BlockPreparer>,
         block: Arc<Block>,
         qc_rx: oneshot::Receiver<Arc<QuorumCert>>,
-    ) -> TaskResult<PrepareResult> {
-        let mut tracker = Tracker::start_waiting("prepare", &block);
+    ) -> TaskResult<MaterializeResult> {
+        let mut tracker = Tracker::start_waiting("materialize", &block);
         tracker.start_working();
 
         let qc_rx = async {
@@ -594,8 +631,8 @@ impl PipelineBuilder {
         }
         .shared();
         // the loop can only be abort by the caller
-        let (input_txns, block_gas_limit) = loop {
-            match preparer.prepare_block(&block, qc_rx.clone()).await {
+        let result = loop {
+            match preparer.materialize_block(&block, qc_rx.clone()).await {
                 Ok(input_txns) => break input_txns,
                 Err(e) => {
                     warn!(
@@ -607,6 +644,28 @@ impl PipelineBuilder {
                 },
             }
         };
+        Ok(result)
+    }
+
+    async fn prepare(
+        decryption_fut: TaskFuture<DecryptionResult>,
+        preparer: Arc<BlockPreparer>,
+        block: Arc<Block>,
+    ) -> TaskResult<PrepareResult> {
+        let mut tracker = Tracker::start_waiting("prepare", &block);
+        let (input_txns, max_txns_from_block_to_execute, block_gas_limit) = decryption_fut.await?;
+
+        tracker.start_working();
+
+        let (input_txns, block_gas_limit) = preparer
+            .prepare_block(
+                &block,
+                input_txns,
+                max_txns_from_block_to_execute,
+                block_gas_limit,
+            )
+            .await;
+
         let sig_verification_start = Instant::now();
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> = SIG_VERIFY_POOL.install(|| {
             let num_txns = input_txns.len();
@@ -893,8 +952,11 @@ impl PipelineBuilder {
             // todo: avoid clone
             let txns: Vec<SignedTransaction> = user_txns
                 .iter()
-                .flat_map(|txn| txn.get_transaction().map(|t| t.try_as_signed_user_txn()))
-                .flatten()
+                .map(|txn| {
+                    txn.borrow_into_inner()
+                        .try_as_signed_user_txn()
+                        .expect("must be a user txn")
+                })
                 .cloned()
                 .collect();
 
@@ -1126,6 +1188,7 @@ impl PipelineBuilder {
             notify_state_sync_fut: _,
             commit_ledger_fut,
             post_commit_fut: _,
+            secret_sharing_derive_self_fut: _,
         } = all_futs;
         wait_and_log_error(prepare_fut, format!("{epoch} {round} {block_id} prepare")).await;
         wait_and_log_error(execute_fut, format!("{epoch} {round} {block_id} execute")).await;

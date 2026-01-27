@@ -1,0 +1,3 @@
+processed 2 tasks
+task 0 lines 4-42:  publish [module 0xc0ffe3::vec_replace_confusion_ok]
+task 1 lines 44-44:  run 0xc0ffe3::vec_replace_confusion_ok::stale_vec_replace_ok --verbose

@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 // This file implements the range proof described here: https://alinush.github.io/dekart
 
@@ -7,18 +7,25 @@ use crate::{
     algebra::polynomials,
     pcs::univariate_hiding_kzg,
     range_proofs::traits,
-    sigma_protocol::{self, homomorphism, homomorphism::Trait as _, Trait as _},
+    sigma_protocol::{
+        self,
+        homomorphism::{self, Trait as _},
+        Trait as _,
+    },
     utils, Scalar,
 };
 use aptos_crypto::arkworks::{
     self,
+    msm::MsmInput,
     random::{
-        sample_field_element, sample_field_elements, unsafe_random_point, unsafe_random_points,
+        sample_field_element, sample_field_elements, unsafe_random_point,
+        unsafe_random_points_group,
     },
+    srs::{SrsBasis, SrsType},
     GroupGenerators,
 };
 use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup, VariableBaseMSM};
-use ark_ff::{AdditiveGroup, Field};
+use ark_ff::{AdditiveGroup, Field, PrimeField};
 use ark_poly::{self, EvaluationDomain, Polynomial};
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid, Validate,
@@ -31,7 +38,7 @@ use std::{fmt::Debug, io::Write};
 #[derive(CanonicalSerialize, Debug, PartialEq, Eq, Clone, CanonicalDeserialize)]
 pub struct Proof<E: Pairing> {
     hatC: E::G1,
-    pi_PoK: sigma_protocol::Proof<E, two_term_msm::Homomorphism<E>>,
+    pi_PoK: sigma_protocol::Proof<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
     Cs: Vec<E::G1>, // has length ell
     D: E::G1,
     a: E::ScalarField,
@@ -45,10 +52,10 @@ impl<E: Pairing> Proof<E> {
     /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
     pub fn generate<R: rand::Rng + rand::CryptoRng>(ell: u8, rng: &mut R) -> Self {
         Self {
-            hatC: unsafe_random_point(rng),
+            hatC: unsafe_random_point::<E::G1, _>(rng).into(),
             pi_PoK: two_term_msm::Proof::generate(rng),
-            Cs: unsafe_random_points(ell as usize, rng),
-            D: unsafe_random_point(rng),
+            Cs: unsafe_random_points_group(ell as usize, rng),
+            D: unsafe_random_point::<E::G1, _>(rng).into(),
             a: sample_field_element(rng),
             a_h: sample_field_element(rng),
             a_js: sample_field_elements(ell as usize, rng),
@@ -69,7 +76,7 @@ pub struct ProverKey<E: Pairing> {
 #[derive(CanonicalSerialize)]
 pub struct PublicStatement<E: Pairing> {
     n: usize,
-    ell: usize,
+    ell: u8,
     comm: univariate_hiding_kzg::Commitment<E>,
 }
 
@@ -230,12 +237,14 @@ fn compute_h_denom_eval<E: Pairing>(
 impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     type Commitment = univariate_hiding_kzg::Commitment<E>;
     type CommitmentKey = univariate_hiding_kzg::CommitmentKey<E>;
-    type CommitmentRandomness = univariate_hiding_kzg::CommitmentRandomness<E>;
+    type CommitmentRandomness = univariate_hiding_kzg::CommitmentRandomness<E::ScalarField>;
     type Input = E::ScalarField;
     type ProverKey = ProverKey<E>;
     type PublicStatement = PublicStatement<E>;
     type VerificationKey = VerificationKey<E>;
 
+    /// Domain-separation tag (DST) used to ensure that all cryptographic hashes and
+    /// transcript operations within the protocol are uniquely namespaced
     const DST: &[u8] = b"APTOS_UNIVARIATE_DEKART_V2_RANGE_PROOF_DST";
 
     fn commitment_key_from_prover_key(pk: &Self::ProverKey) -> Self::CommitmentKey {
@@ -245,7 +254,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     #[allow(non_snake_case)]
     fn setup<R: RngCore + CryptoRng>(
         max_n: usize,
-        max_ell: usize,
+        max_ell: u8,
         group_generators: GroupGenerators<E>,
         rng: &mut R,
     ) -> (ProverKey<E>, VerificationKey<E>) {
@@ -256,12 +265,16 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let trapdoor = univariate_hiding_kzg::Trapdoor::<E>::rand(rng);
         let xi_1_proj: E::G1 = group_generators.g1 * trapdoor.xi;
 
-        let (vk_hkzg, ck_S) =
-            univariate_hiding_kzg::setup(max_n + 1, group_generators.clone(), trapdoor, rng);
+        let (vk_hkzg, ck_S) = univariate_hiding_kzg::setup(
+            max_n + 1,
+            SrsType::Lagrange,
+            group_generators.clone(),
+            trapdoor,
+        );
 
         let h_denom_eval = compute_h_denom_eval::<E>(&ck_S.roots_of_unity_in_eval_dom);
 
-        let powers_of_two = arkworks::powers_of_two::<E::ScalarField>(max_ell);
+        let powers_of_two = arkworks::powers_of_two::<E::ScalarField>(max_ell.into());
 
         let prover_precomputed = ProverPrecomputed {
             powers_of_two: powers_of_two.clone(),
@@ -273,9 +286,14 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             roots_of_unity: ck_S.roots_of_unity_in_eval_dom.clone(),
         };
 
+        let lagr_0: E::G1Affine = match &ck_S.msm_basis {
+            SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1[0],
+            SrsBasis::PowersOfTau { .. } => panic!("Wrong basis, this should not happen"),
+        };
+
         let vk = VerificationKey {
             xi_1: xi_1_proj.into_affine(),
-            lagr_0: ck_S.lagr_g1[0],
+            lagr_0,
             vk_hkzg,
             verifier_precomputed,
         };
@@ -305,7 +323,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     fn prove<R>(
         pk: &ProverKey<E>,
         values: &[Self::Input],
-        ell: usize,
+        ell: u8,
         comm: &Self::Commitment,
         rho: &Self::CommitmentRandomness,
         rng: &mut R,
@@ -324,7 +342,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         } = pk;
 
         let n = values.len();
-        let max_ell = prover_precomputed.powers_of_two.len();
+        let max_ell: u8 = prover_precomputed.powers_of_two.len().try_into().unwrap();
 
         assert!(
             n <= *max_n,
@@ -344,11 +362,18 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         let univariate_hiding_kzg::CommitmentKey {
             xi_1,
-            lagr_g1,
+            msm_basis,
             eval_dom,
             m_inv: num_omegas_inv,
             ..
         } = ck_S;
+
+        let lagr_g1: &[E::G1Affine] = match msm_basis {
+            SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,
+            SrsBasis::PowersOfTau { .. } => {
+                panic!("Expected Lagrange basis, somehow got PowersOfTau basis instead")
+            },
+        };
 
         debug_assert_eq!(
             *num_omegas_inv,
@@ -386,21 +411,21 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         );
 
         // Step 3b
-        fiat_shamir::append_sigma_proof(&mut fs_t, &pi_PoK);
+        fiat_shamir::append_sigma_proof::<E>(&mut fs_t, &pi_PoK);
 
         // Step 4a
         let rs: Vec<E::ScalarField> = (0..ell).map(|_| sample_field_element(rng)).collect();
 
         let f_js_evals: Vec<Vec<E::ScalarField>> = {
-            let mut f_js_evals = vec![Vec::with_capacity(num_omegas); ell];
+            let mut f_js_evals = vec![Vec::with_capacity(num_omegas); ell as usize];
 
-            for j in 0..ell {
+            for j in 0..ell as usize {
                 f_js_evals[j].push(rs[j]);
             }
 
             for &val in values.iter() {
                 let bits = utils::scalar_to_bits_le::<E>(&val);
-                for j in 0..ell {
+                for j in 0..ell as usize {
                     f_js_evals[j].push(E::ScalarField::from(bits[j]));
                 }
             }
@@ -413,11 +438,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         };
 
         let rhos: Vec<E::ScalarField> = std::iter::repeat_with(|| sample_field_element(rng))
-            .take(ell)
+            .take(ell as usize)
             .collect();
 
         let hkzg_commitment_hom = univariate_hiding_kzg::CommitmentHomomorphism::<E> {
-            lagr_g1,
+            msm_basis: lagr_g1,
             xi_1: *xi_1,
         };
         let Cs: Vec<_> = f_js_evals
@@ -436,7 +461,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         fiat_shamir::append_f_j_commitments::<E>(&mut fs_t, &Cs);
 
         // Step 6
-        let (beta, betas) = fiat_shamir::get_beta_challenges::<E>(&mut fs_t, ell);
+        let (beta, betas) = fiat_shamir::get_beta_challenges::<E>(&mut fs_t, ell as usize);
 
         let hat_f_evals: Vec<E::ScalarField> = {
             let mut v = Vec::with_capacity(num_omegas);
@@ -455,7 +480,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             result
         };
 
-        let f_j_coeffs: Vec<Vec<E::ScalarField>> = (0..ell)
+        let f_j_coeffs: Vec<Vec<E::ScalarField>> = (0..ell as usize)
             .map(|j| {
                 let mut f_j = f_js_evals[j].clone();
                 debug_assert_eq!(f_j.len(), pk.max_n + 1);
@@ -542,7 +567,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         fiat_shamir::append_h_commitment::<E>(&mut fs_t, &D);
 
         // Step 8
-        let (mu, mu_h, mus) = fiat_shamir::get_mu_challenges::<E>(&mut fs_t, ell);
+        let (mu, mu_h, mus) = fiat_shamir::get_mu_challenges::<E>(&mut fs_t, ell as usize);
 
         let u_values: Vec<_> = (0..num_omegas)
             .map(|i| {
@@ -574,7 +599,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             *num_omegas_inv,
         );
 
-        let a_js: Vec<E::ScalarField> = (0..ell)
+        let a_js: Vec<E::ScalarField> = (0..ell as usize)
             .map(|i| {
                 let poly = ark_poly::univariate::DensePolynomial {
                     coeffs: f_j_coeffs[i].clone(),
@@ -626,7 +651,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         &self,
         vk: &Self::VerificationKey,
         n: usize,
-        ell: usize,
+        ell: u8,
         comm: &Self::Commitment,
     ) -> anyhow::Result<()> {
         let mut fs_t = merlin::Transcript::new(Self::DST);
@@ -640,7 +665,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         } = vk;
 
         assert!(
-            ell <= verifier_precomputed.powers_of_two.len(),
+            ell as usize <= verifier_precomputed.powers_of_two.len(),
             "ell (got {}) must be ≤ max_ell (which is {})",
             ell,
             verifier_precomputed.powers_of_two.len()
@@ -679,19 +704,19 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         )?;
 
         // Step 4a
-        fiat_shamir::append_sigma_proof(&mut fs_t, &pi_PoK);
+        fiat_shamir::append_sigma_proof::<E>(&mut fs_t, &pi_PoK);
 
         // Step 4b
         fiat_shamir::append_f_j_commitments::<E>(&mut fs_t, &Cs);
 
         // Step 5
-        let (beta, beta_js) = fiat_shamir::get_beta_challenges::<E>(&mut fs_t, ell);
+        let (beta, beta_js) = fiat_shamir::get_beta_challenges::<E>(&mut fs_t, ell as usize);
 
         // Step 6
         fiat_shamir::append_h_commitment::<E>(&mut fs_t, &D);
 
         // Step 7
-        let (mu, mu_h, mu_js) = fiat_shamir::get_mu_challenges::<E>(&mut fs_t, ell);
+        let (mu, mu_h, mu_js) = fiat_shamir::get_mu_challenges::<E>(&mut fs_t, ell as usize);
 
         // Step 8
         let U_bases: Vec<E::G1Affine> = {
@@ -727,7 +752,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         use sigma_protocol::homomorphism::TrivialShape as HkzgCommitment;
         univariate_hiding_kzg::CommitmentHomomorphism::verify(
-            vk_hkzg.clone(),
+            *vk_hkzg,
             HkzgCommitment(U), // TODO: Ugh univariate_hiding_kzg::Commitment(U) does not work because it's a tuple struct, see https://github.com/rust-lang/rust/issues/17422; So make it a struct with one named field?
             gamma,
             a_u,
@@ -803,7 +828,7 @@ mod fiat_shamir {
     #[allow(non_snake_case)]
     pub(crate) fn append_sigma_proof<E: Pairing>(
         fs_transcript: &mut Transcript,
-        pi_PoK: &sigma_protocol::Proof<E, two_term_msm::Homomorphism<E>>,
+        pi_PoK: &sigma_protocol::Proof<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
     ) {
         <Transcript as RangeProof<E, Proof<E>>>::append_sigma_proof(fs_transcript, pi_PoK);
     }
@@ -871,23 +896,29 @@ mod fiat_shamir {
 /// Conceptually, this behaves similarly to a Pedersen commitment:
 ///
 /// `output = base_1 * scalar_1 + base_2 * scalar_2`
+///
+/// The resulting sigma protocol is also known as Okamoto's protocol (see 19.5.1 in the book of Boneh-Shoup)
 pub mod two_term_msm {
     // TODO: maybe fixed_base_msms should become a folder and put its code inside mod.rs? Then put this mod inside of that folder?
     use super::*;
     use crate::sigma_protocol::{homomorphism::fixed_base_msms, traits::FirstProofItem};
-    use aptos_crypto::arkworks::random::UniformRand;
+    use aptos_crypto::arkworks::{msm::IsMsmInput, random::UniformRand};
     use aptos_crypto_derive::SigmaProtocolWitness;
+    use ark_ec::AffineRepr;
     pub use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
-    pub type Proof<E> = sigma_protocol::Proof<E, Homomorphism<E>>;
+    pub type Proof<C> = sigma_protocol::Proof<
+        <<C as CurveGroup>::Affine as AffineRepr>::ScalarField,
+        Homomorphism<C>,
+    >;
 
-    impl<E: Pairing> Proof<E> {
+    impl<C: CurveGroup> Proof<C> {
         /// Generates a random looking proof (but not a valid one).
         /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
         pub fn generate<R: rand::Rng + rand::CryptoRng>(rng: &mut R) -> Self {
             Self {
-                first_proof_item: FirstProofItem::Commitment(CodomainShape(unsafe_random_point(
-                    rng,
-                ))),
+                first_proof_item: FirstProofItem::Commitment(CodomainShape(
+                    unsafe_random_point::<C, _>(rng).into(),
+                )),
                 z: Witness {
                     poly_randomness: Scalar::rand(rng),
                     hiding_kzg_randomness: Scalar::rand(rng),
@@ -901,22 +932,22 @@ pub mod two_term_msm {
     /// This structure defines a map from two scalars to one group element:
     /// `f(x1, x2) = base_1 * x1 + base_2 * x2`.
     #[derive(CanonicalSerialize, Clone, Debug, PartialEq, Eq)]
-    pub struct Homomorphism<E: Pairing> {
-        pub base_1: E::G1Affine,
-        pub base_2: E::G1Affine,
+    pub struct Homomorphism<C: CurveGroup> {
+        pub base_1: C::Affine,
+        pub base_2: C::Affine,
     }
 
     #[derive(
         SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq,
     )]
-    pub struct Witness<E: Pairing> {
-        pub poly_randomness: Scalar<E>,
-        pub hiding_kzg_randomness: Scalar<E>,
+    pub struct Witness<F: PrimeField> {
+        pub poly_randomness: Scalar<F>,
+        pub hiding_kzg_randomness: Scalar<F>,
     }
 
-    impl<E: Pairing> homomorphism::Trait for Homomorphism<E> {
-        type Codomain = CodomainShape<E::G1>;
-        type Domain = Witness<E>;
+    impl<C: CurveGroup> homomorphism::Trait for Homomorphism<C> {
+        type Codomain = CodomainShape<C>;
+        type Domain = Witness<C::ScalarField>;
 
         fn apply(&self, input: &Self::Domain) -> Self::Codomain {
             // Not doing `self.apply_msm(self.msm_terms(input))` because E::G1::msm is slower!
@@ -928,15 +959,14 @@ pub mod two_term_msm {
         }
     }
 
-    impl<E: Pairing> fixed_base_msms::Trait for Homomorphism<E> {
-        type Base = E::G1Affine;
+    impl<C: CurveGroup> fixed_base_msms::Trait for Homomorphism<C> {
         type CodomainShape<T>
             = CodomainShape<T>
         where
             T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq + Debug;
-        type MsmInput = fixed_base_msms::MsmInput<Self::Base, Self::Scalar>;
-        type MsmOutput = E::G1;
-        type Scalar = E::ScalarField;
+        type MsmInput = MsmInput<C::Affine, C::ScalarField>;
+        type MsmOutput = C;
+        type Scalar = C::ScalarField;
 
         fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
             let mut scalars = Vec::with_capacity(2);
@@ -947,15 +977,15 @@ pub mod two_term_msm {
             bases.push(self.base_1);
             bases.push(self.base_2);
 
-            CodomainShape(fixed_base_msms::MsmInput { bases, scalars })
+            CodomainShape(MsmInput { bases, scalars })
         }
 
-        fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
-            E::G1::msm(bases, scalars).expect("MSM failed in TwoTermMSM")
+        fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
+            C::msm(input.bases(), input.scalars()).expect("MSM failed in TwoTermMSM")
         }
     }
 
-    impl<E: Pairing> sigma_protocol::Trait<E> for Homomorphism<E> {
+    impl<C: CurveGroup> sigma_protocol::Trait<C> for Homomorphism<C> {
         fn dst(&self) -> Vec<u8> {
             b"DEKART_V2_SIGMA_PROTOCOL".to_vec()
         }

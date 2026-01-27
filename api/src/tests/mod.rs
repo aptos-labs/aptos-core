@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 mod account_abstraction_test;
 mod accounts_test;
@@ -19,6 +18,7 @@ mod resource_groups;
 mod secp256k1_ecdsa;
 mod signed_int_test;
 mod simulation_test;
+mod slh_dsa_sha2_128s;
 mod state_test;
 mod string_resource_test;
 mod transaction_vector_test;

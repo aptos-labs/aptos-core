@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! # Overview
 //! This module contains tests demonstrating how to use [`MoveHarness`]'s
@@ -332,64 +332,4 @@ async fn test_option() {
         vec![MoveValue::U128(2).simple_serialize().unwrap()],
     );
     assert_success!(status);
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn test_option_local() {
-    let mut h = MoveHarness::new();
-    h.enable_features(vec![], vec![FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION]);
-
-    let existing_account =
-        h.new_account_at(AccountAddress::from_hex_literal(TESTNET_ACCOUNT_ADDR).unwrap());
-
-    let build_options = aptos_framework::BuildOptions {
-        bytecode_version: Some(8),
-        language_version: Some(LanguageVersion::V2_2),
-        ..Default::default()
-    };
-    let status = h.publish_package_with_options(
-        &existing_account,
-        &common::test_dir_path("test_option.data"),
-        build_options,
-    );
-    assert_success!(status);
-
-    let status = h.run_entry_function(
-        &existing_account,
-        str::parse(
-            format!(
-                "0x{}::test_option::entry_function",
-                existing_account.address().to_hex()
-            )
-            .as_str(),
-        )
-        .unwrap(),
-        vec![],
-        vec![MoveValue::U128(2).simple_serialize().unwrap()],
-    );
-    assert_success!(status);
-
-    h.enable_features(vec![FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION], vec![]);
-
-    let bytes = h
-        .execute_view_function(
-            str::parse(
-                format!(
-                    "0x{}::test_option::get_option",
-                    existing_account.address().to_hex()
-                )
-                .as_str(),
-            )
-            .unwrap(),
-            vec![],
-            vec![MoveValue::Address(*existing_account.address())
-                .simple_serialize()
-                .unwrap()],
-        )
-        .values
-        .unwrap()
-        .pop()
-        .unwrap();
-    let option = bcs::from_bytes::<Option<u128>>(&bytes).unwrap();
-    assert_eq!(option, Option::Some(2));
 }

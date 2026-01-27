@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This module provides functions to sample random elements from cryptographic
 //! structures such as prime fields and elliptic curve groups; `arkworks` can
@@ -7,6 +7,7 @@
 //! `rand` crate, which may differ from the version used by `arkworks` and thus
 //! would not be accepted directly.
 
+use crate::arkworks::hashing;
 use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use rand::Rng;
@@ -19,7 +20,7 @@ pub trait UniformRand {
 
 /// NOTE: This function is "unsafe" in the sense that the caller learns the discrete log of the
 /// random point w.r.t. the generator. In many applications, this is not acceptable.
-/// Benches suggest that when generating a single point, it's roughly as fast as `unsafe_random_point()` - about 30µs
+/// Benches suggest that when generating a *single* point, it's roughly as fast as `unsafe_random_point()` - about 30µs
 pub fn unsafe_random_point_slow<C: CurveGroup, R>(rng: &mut R) -> C
 where
     R: rand_core::RngCore + rand_core::CryptoRng,
@@ -43,8 +44,8 @@ where
 }
 
 /// Faster "unsafe" random point by hashing some random bytes to the curve
-/// But still not very fast // TODO: make proper benchmarks, then probably remove the other version
-pub fn unsafe_random_point<C: CurveGroup, R>(rng: &mut R) -> C
+/// But still not very fast
+pub fn unsafe_random_point<C: CurveGroup, R>(rng: &mut R) -> C::Affine
 where
     R: rand_core::RngCore + rand_core::CryptoRng,
 {
@@ -53,19 +54,34 @@ where
     rng.fill_bytes(&mut buf);
 
     // Hash to curve (using unsafe_hash_to_affine)
-    let p: C::Affine =
-        crate::arkworks::hashing::unsafe_hash_to_affine(&buf, b"unsafe_random_point");
+    hashing::unsafe_hash_to_affine(&buf, b"unsafe_random_point")
+}
 
-    p.into() // TODO: change signature to output affine
+/// Very similar, but turns affine element into group element for convenience
+pub fn unsafe_random_point_group<C: CurveGroup, R>(rng: &mut R) -> C
+where
+    R: rand_core::RngCore + rand_core::CryptoRng,
+{
+    unsafe_random_point::<C, _>(rng).into()
 }
 
 /// Samples `n` uniformly random elements from the group, but is somewhat unsafe
 /// because it involves a hashing function which is sensitive to timing attacks
-pub fn unsafe_random_points<C: CurveGroup, R>(n: usize, rng: &mut R) -> Vec<C>
+pub fn unsafe_random_points<C: CurveGroup, R>(n: usize, rng: &mut R) -> Vec<C::Affine>
 where
     R: rand_core::RngCore + rand_core::CryptoRng,
 {
-    (0..n).map(|_| unsafe_random_point::<C, R>(rng)).collect()
+    (0..n).map(|_| unsafe_random_point::<C, _>(rng)).collect()
+}
+
+/// Very similar, but turns affine elements into group elements for convenience
+pub fn unsafe_random_points_group<C: CurveGroup, R>(n: usize, rng: &mut R) -> Vec<C>
+where
+    R: rand_core::RngCore + rand_core::CryptoRng,
+{
+    (0..n)
+        .map(|_| unsafe_random_point::<C, _>(rng).into())
+        .collect()
 }
 
 /// Samples `n` uniformly random elements from the prime field `F`.

@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use proc_macro::TokenStream;
 use quote::quote;
@@ -278,20 +277,20 @@ pub fn impl_enum_signature(
             type VerifyingKeyMaterial = #pub_kt;
             type SigningKeyMaterial = #priv_kt;
 
-            fn verify<T: aptos_crypto::hash::CryptoHash + serde::Serialize>(&self, message: &T, public_key: &Self::VerifyingKeyMaterial) -> std::result::Result<(), aptos_crypto::error::Error> {
+            fn verify<T: aptos_crypto::hash::CryptoHash + serde::Serialize>(&self, message: &T, public_key: &Self::VerifyingKeyMaterial) -> std::result::Result<(), anyhow::Error> {
                 match (self, public_key) {
                     #match_struct_arms
-                    _ => aptos_crypto::error::bail!(
+                    _ => anyhow::bail!(
                         "provided the wrong alternative in {:?}!",
                         (self, public_key)
                     ),
                 }
             }
 
-            fn verify_arbitrary_msg(&self, message: &[u8], public_key: &Self::VerifyingKeyMaterial) -> std::result::Result<(), aptos_crypto::error::Error> {
+            fn verify_arbitrary_msg(&self, message: &[u8], public_key: &Self::VerifyingKeyMaterial) -> std::result::Result<(), anyhow::Error> {
                 match (self, public_key) {
                     #match_arms
-                    _ => aptos_crypto::error::bail!(
+                    _ => anyhow::bail!(
                         "provided the wrong alternative in {:?}!",
                         (self, public_key)
                     ),

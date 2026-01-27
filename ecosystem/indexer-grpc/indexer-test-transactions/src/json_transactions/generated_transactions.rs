@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
@@ -192,6 +192,12 @@ pub const IMPORTED_MAINNET_TXNS_144201980_MULTIPLE_TRANSFER_EVENT: &[u8] = inclu
 ));
 
 pub const IMPORTED_MAINNET_TXNS_2424873868_FA_SECONDARY_STORE_EXISTS_OBJECT_CORE_DELETED: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/json_transactions/imported_mainnet_txns/2424873868_fa_secondary_store_exists_object_core_deleted.json"));
+
+pub const IMPORTED_MAINNET_TXNS_2953383999_FA_SECONDARY_STORE_DELETION: &[u8] =
+    include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/json_transactions/imported_mainnet_txns/2953383999_fa_secondary_store_deletion.json"
+    ));
 
 pub const IMPORTED_MAINNET_TXNS_2382313982_WAPAL_PLACE_OFFER: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -447,6 +453,7 @@ pub const ALL_IMPORTED_MAINNET_TXNS: &[&[u8]] = &[
     IMPORTED_MAINNET_TXNS_2277018899_TRADEPORT_V2_ACCEPT_TOKEN_DELIST_SAME_TOKEN_DATA_ID,
     IMPORTED_MAINNET_TXNS_144201980_MULTIPLE_TRANSFER_EVENT,
     IMPORTED_MAINNET_TXNS_2424873868_FA_SECONDARY_STORE_EXISTS_OBJECT_CORE_DELETED,
+    IMPORTED_MAINNET_TXNS_2953383999_FA_SECONDARY_STORE_DELETION,
     IMPORTED_MAINNET_TXNS_2382313982_WAPAL_PLACE_OFFER,
     IMPORTED_MAINNET_TXNS_152449628_COIN_INFO_WRITE,
     IMPORTED_MAINNET_TXNS_602320562_TOKEN_V2_APTOS_TOKEN_MINT,
@@ -578,6 +585,12 @@ pub const IMPORTED_TESTNET_TXNS_6617355090_MULTI_ED_TXN: &[u8] = include_bytes!(
     env!("CARGO_MANIFEST_DIR"),
     "/src/json_transactions/imported_testnet_txns/6617355090_multi_ed_txn.json"
 ));
+
+pub const IMPORTED_TESTNET_TXNS_7243926737_SIGNED_INTEGERS: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/src/json_transactions/imported_testnet_txns/7243926737_signed_integers.json"
+));
+
 pub const ALL_IMPORTED_TESTNET_TXNS: &[&[u8]] = &[
     IMPORTED_TESTNET_TXNS_5979639459_COIN_REGISTER,
     IMPORTED_TESTNET_TXNS_1255836496_V2_FA_METADATA_,
@@ -597,6 +610,7 @@ pub const ALL_IMPORTED_TESTNET_TXNS: &[&[u8]] = &[
     IMPORTED_TESTNET_TXNS_769222973_MULTISIG,
     IMPORTED_TESTNET_TXNS_1200394037_FA_V2_FROZEN_EVENT,
     IMPORTED_TESTNET_TXNS_6617355090_MULTI_ED_TXN,
+    IMPORTED_TESTNET_TXNS_7243926737_SIGNED_INTEGERS,
 ];
 
 pub const IMPORTED_DEVNET_TXNS_19922017_TOKEN_V1_OFFER_CLAIM: &[u8] = include_bytes!(concat!(

@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 // Copyright (c) The Diem Core Contributors
 // Copyright (c) The Move Contributors
@@ -81,9 +81,7 @@ fn native_to_bytes(
             Ok(layout) => layout,
             Err(_) => {
                 context.charge(BCS_TO_BYTES_FAILURE)?;
-                return Err(SafeNativeError::Abort {
-                    abort_code: NFE_BCS_SERIALIZATION_FAILURE,
-                });
+                return Err(SafeNativeError::abort(NFE_BCS_SERIALIZATION_FAILURE));
             },
         }
     };
@@ -102,9 +100,7 @@ fn native_to_bytes(
         Some(serialized_value) => serialized_value,
         None => {
             context.charge(BCS_TO_BYTES_FAILURE)?;
-            return Err(SafeNativeError::Abort {
-                abort_code: NFE_BCS_SERIALIZATION_FAILURE,
-            });
+            return Err(SafeNativeError::abort(NFE_BCS_SERIALIZATION_FAILURE));
         },
     };
     context
@@ -141,9 +137,7 @@ fn native_serialized_size(
             context.charge(BCS_SERIALIZED_SIZE_FAILURE)?;
 
             // Re-use the same abort code as bcs::to_bytes.
-            return Err(SafeNativeError::Abort {
-                abort_code: NFE_BCS_SERIALIZATION_FAILURE,
-            });
+            return Err(SafeNativeError::abort(NFE_BCS_SERIALIZATION_FAILURE));
         },
     };
     context.charge(BCS_SERIALIZED_SIZE_PER_BYTE_SERIALIZED * NumBytes::new(serialized_size))?;
@@ -193,9 +187,7 @@ fn native_constant_serialized_size(
             context.charge(BCS_SERIALIZED_SIZE_FAILURE)?;
 
             // Re-use the same abort code as bcs::to_bytes.
-            return Err(SafeNativeError::Abort {
-                abort_code: NFE_BCS_SERIALIZATION_FAILURE,
-            });
+            return Err(SafeNativeError::abort(NFE_BCS_SERIALIZATION_FAILURE));
         },
     };
 

@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     block_storage::{
@@ -33,7 +32,7 @@ use crate::{
     network::{
         DeprecatedIncomingBlockRetrievalRequest, IncomingBatchRetrievalRequest,
         IncomingBlockRetrievalRequest, IncomingDAGRequest, IncomingRandGenRequest,
-        IncomingRpcRequest, NetworkReceivers, NetworkSender,
+        IncomingRpcRequest, IncomingSecretShareRequest, NetworkReceivers, NetworkSender,
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::{
@@ -148,6 +147,9 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     reconfig_events: ReconfigNotificationListener<P>,
     // channels to rand manager
     rand_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingRandGenRequest>>,
+    // channels to secret share manager
+    secret_share_manager_tx:
+        Option<aptos_channel::Sender<AccountAddress, IncomingSecretShareRequest>>,
     // channels to round manager
     round_manager_tx: Option<
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
@@ -227,6 +229,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             vtxn_pool,
             reconfig_events,
             rand_manager_msg_tx: None,
+            secret_share_manager_tx: None,
             round_manager_tx: None,
             round_manager_close_tx: None,
             buffered_proposal_tx: None,
@@ -659,6 +662,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         // Shutdown the previous rand manager
         self.rand_manager_msg_tx = None;
 
+        // Shutdown the previous secret share manager
+        self.secret_share_manager_tx = None;
+
         // Shutdown the previous buffer manager, to release the SafetyRule client
         self.execution_client.end_epoch().await;
 
@@ -791,6 +797,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             });
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn start_round_manager(
         &mut self,
         consensus_key: Arc<PrivateKey>,
@@ -806,6 +813,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
     ) {
         let epoch = epoch_state.epoch;
         info!(
@@ -865,6 +873,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_config,
                 fast_rand_config.clone(),
                 rand_msg_rx,
+                secret_sharing_msg_rx,
                 recovery_data.commit_root_block().round(),
             )
             .await;
@@ -1272,7 +1281,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         self.rand_manager_msg_tx = Some(rand_msg_tx);
 
+        // TODO(ibalajiarun): setup counters
+        let (secret_share_manager_tx, secret_share_manager_rx) =
+            aptos_channel::new::<AccountAddress, IncomingSecretShareRequest>(
+                QueueStyle::KLAST,
+                self.config.internal_per_key_channel_size,
+                None,
+            );
+        self.secret_share_manager_tx = Some(secret_share_manager_tx);
+
         if consensus_config.is_dag_enabled() {
+            warn!("DAG doesn't support secret sharing");
             self.start_new_epoch_with_dag(
                 epoch_state,
                 loaded_consensus_key.clone(),
@@ -1286,6 +1305,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_config,
                 fast_rand_config,
                 rand_msg_rx,
+                secret_share_manager_rx,
             )
             .await
         } else {
@@ -1302,6 +1322,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_config,
                 fast_rand_config,
                 rand_msg_rx,
+                secret_share_manager_rx,
             )
             .await
         }
@@ -1357,6 +1378,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        secret_share_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
     ) {
         match self.storage.start(
             consensus_config.order_vote_enabled(),
@@ -1378,6 +1400,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     rand_config,
                     fast_rand_config,
                     rand_msg_rx,
+                    secret_share_msg_rx,
                 )
                 .await
             },
@@ -1408,6 +1431,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        secret_share_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
     ) {
         let epoch = epoch_state.epoch;
         let signer = Arc::new(ValidatorSigner::new(
@@ -1440,6 +1464,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_config,
                 fast_rand_config,
                 rand_msg_rx,
+                secret_share_msg_rx,
                 highest_committed_round,
             )
             .await;
@@ -1550,6 +1575,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .ok_or_else(|| anyhow::anyhow!("Epoch state is not available"))?;
             let proof_cache = self.proof_cache.clone();
             let quorum_store_enabled = self.quorum_store_enabled;
+            let opt_qs_v2_rx_enabled = self.config.quorum_store.enable_opt_qs_v2_rx;
             let quorum_store_msg_tx = self.quorum_store_msg_tx.clone();
             let buffered_proposal_tx = self.buffered_proposal_tx.clone();
             let round_manager_tx = self.round_manager_tx.clone();
@@ -1568,6 +1594,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                             &epoch_state.verifier,
                             &proof_cache,
                             quorum_store_enabled,
+                            opt_qs_v2_rx_enabled,
                             peer_id == my_peer_id,
                             max_num_batches,
                             max_batch_expiry_gap_usecs,
@@ -1858,6 +1885,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     error!("Round manager not started");
                     Ok(())
                 }
+            },
+            IncomingRpcRequest::SecretShareRequest(request) => {
+                let Some(tx) = &self.secret_share_manager_tx else {
+                    bail!("Secret share manager not started");
+                };
+                tx.push(peer_id, request)
             },
         }
     }

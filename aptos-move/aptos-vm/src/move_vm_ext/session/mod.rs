@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     data_cache::get_resource_group_member_from_metadata,
@@ -556,6 +556,10 @@ where
     let session_counter = session_id.session_counter();
     let txn_hash = session_id.txn_hash();
 
+    // Note: if any new native functions that return references are added,
+    // then runtime reference check models need to be added for them with
+    // `extensions.add_native_runtime_ref_checks_model`.
+    // See documentation for `NativeRuntimeRefChecksModel` for details.
     extensions.add(NativeTableContext::new(txn_hash, data_view));
     extensions.add(NativeRistrettoPointContext::new());
     extensions.add(AlgebraContext::new());

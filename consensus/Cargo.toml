@@ -14,6 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-batch-encryption = { workspace = true }
 aptos-bitvec = { workspace = true }
 aptos-bounded-executor = { workspace = true }
 aptos-channels = { workspace = true }
@@ -78,6 +79,7 @@ rand = { workspace = true }
 rayon = { workspace = true }
 scopeguard = { workspace = true }
 serde = { workspace = true }
+serde-name = { workspace = true }
 serde_bytes = { workspace = true }
 serde_json = { workspace = true }
 sha3 = { workspace = true }

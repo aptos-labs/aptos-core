@@ -705,7 +705,7 @@ public fun M::g($t0: &signer) {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0x42::M
 struct R has key
   f: u64

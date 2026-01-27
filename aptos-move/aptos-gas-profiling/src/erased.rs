@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     log::{
@@ -229,6 +229,8 @@ impl ExecutionAndIOCosts {
         nodes.push(Node::new("intrinsic", self.intrinsic_cost));
 
         nodes.push(Node::new("keyless", self.keyless_cost));
+
+        nodes.push(Node::new("slh_dsa_sha2_128s", self.slh_dsa_sha2_128s_cost));
 
         if !self.dependencies.is_empty() {
             let deps = Node::new_with_children(

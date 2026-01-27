@@ -283,7 +283,14 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 frame.check_local_tys_have_drop_ability()?;
             },
             Instruction::Abort => {
-                operand_stack.pop_ty()?;
+                let ty = operand_stack.pop_ty()?;
+                ty.paranoid_check_is_u64_ty()?;
+            },
+            Instruction::AbortMsg => {
+                let ty1 = operand_stack.pop_ty()?;
+                ty1.paranoid_check_is_vec_ty(&Type::U8)?;
+                let ty2 = operand_stack.pop_ty()?;
+                ty2.paranoid_check_is_u64_ty()?;
             },
             // StLoc needs to check before execution as we need to check the drop ability of values.
             Instruction::StLoc(idx) => {
@@ -417,7 +424,8 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             | Instruction::Call(_)
             | Instruction::CallGeneric(_)
             | Instruction::CallClosure(_)
-            | Instruction::Abort => {
+            | Instruction::Abort
+            | Instruction::AbortMsg => {
                 // Invariants hold because all of the instructions
                 // above will force VM to break from the interpreter
                 // loop and thus not hit this code path.

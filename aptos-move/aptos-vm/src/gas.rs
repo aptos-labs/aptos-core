@@ -1,15 +1,18 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{move_vm_ext::AptosMoveResolver, transaction_metadata::TransactionMetadata};
 use aptos_gas_algebra::{Gas, GasExpression, InternalGas};
 use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::{
-    gas_feature_versions::RELEASE_V1_13, gas_params::txn::KEYLESS_BASE_COST, AptosGasParameters,
-    VMGasParameters,
+    gas_feature_versions::RELEASE_V1_13,
+    gas_params::txn::{KEYLESS_BASE_COST, SLH_DSA_SHA2_128S_BASE_COST},
+    AptosGasParameters, VMGasParameters,
 };
 use aptos_logger::{enabled, Level};
-use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
+use aptos_memory_usage_tracker::{
+    MemoryAlgebra, MemoryTrackedGasMeter, MemoryTrackedGasMeterImpl, StandardMemoryAlgebra,
+};
 use aptos_types::on_chain_config::Features;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_log, speculative_warn};
 use aptos_vm_types::{
@@ -36,7 +39,25 @@ pub fn make_prod_gas_meter<T: BlockSynchronizationKillSwitch>(
     meter_balance: Gas,
     block_synchronization_kill_switch: &T,
 ) -> ProdGasMeter<'_, T> {
-    MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
+    make_prod_gas_meter_impl::<T, StandardMemoryAlgebra>(
+        gas_feature_version,
+        vm_gas_params,
+        storage_gas_params,
+        is_approved_gov_script,
+        meter_balance,
+        block_synchronization_kill_switch,
+    )
+}
+
+pub fn make_prod_gas_meter_impl<T: BlockSynchronizationKillSwitch, M: MemoryAlgebra>(
+    gas_feature_version: u64,
+    vm_gas_params: VMGasParameters,
+    storage_gas_params: StorageGasParameters,
+    is_approved_gov_script: bool,
+    meter_balance: Gas,
+    block_synchronization_kill_switch: &T,
+) -> MemoryTrackedGasMeterImpl<StandardGasMeter<StandardGasAlgebra<'_, T>>, M> {
+    MemoryTrackedGasMeterImpl::new(StandardGasMeter::new(StandardGasAlgebra::new(
         gas_feature_version,
         vm_gas_params,
         storage_gas_params,
@@ -125,10 +146,16 @@ pub(crate) fn check_gas(
     } else {
         InternalGas::zero()
     };
+    let slh_dsa_sha2_128s = if txn_metadata.is_slh_dsa_sha2_128s() {
+        SLH_DSA_SHA2_128S_BASE_COST.evaluate(gas_feature_version, &gas_params.vm)
+    } else {
+        InternalGas::zero()
+    };
     let intrinsic_gas = txn_gas_params
         .calculate_intrinsic_gas(raw_bytes_len)
         .evaluate(gas_feature_version, &gas_params.vm);
-    let total_rounded: Gas = (intrinsic_gas + keyless).to_unit_round_up_with_params(txn_gas_params);
+    let total_rounded: Gas =
+        (intrinsic_gas + keyless + slh_dsa_sha2_128s).to_unit_round_up_with_params(txn_gas_params);
     if txn_metadata.max_gas_amount() < total_rounded {
         speculative_warn!(
             log_context,

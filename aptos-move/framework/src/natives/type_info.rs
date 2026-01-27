@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::natives::transaction_context::NativeTransactionContext;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
@@ -67,9 +67,9 @@ fn native_type_of(
     if let TypeTag::Struct(struct_tag) = type_tag {
         Ok(type_of_internal(&struct_tag).expect("type_of should never fail."))
     } else {
-        Err(SafeNativeError::Abort {
-            abort_code: super::status::NFE_EXPECTED_STRUCT_TYPE_TAG,
-        })
+        Err(SafeNativeError::abort(
+            super::status::NFE_EXPECTED_STRUCT_TYPE_TAG,
+        ))
     }
 }
 

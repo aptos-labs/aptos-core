@@ -11,12 +11,13 @@ module aptos_experimental::pre_cancellation_tracker {
     friend aptos_experimental::market_types;
 
     use std::string::String;
-    use aptos_std::big_ordered_map;
     use aptos_std::big_ordered_map::BigOrderedMap;
-    use aptos_experimental::order_book_types::{
+    use aptos_trading::order_book_types::{
         AccountClientOrderId,
         new_account_client_order_id
     };
+    use aptos_experimental::order_book_utils;
+
     #[test_only]
     use std::signer;
     #[test_only]
@@ -28,15 +29,14 @@ module aptos_experimental::pre_cancellation_tracker {
 
     const MAX_ORDERS_GARBAGE_COLLECTED_PER_CALL: u64 = 10;
 
-    const BIG_MAP_INNER_DEGREE: u16 = 64;
-    const BIG_MAP_LEAF_DEGREE: u16 = 32;
-
-    struct PreCancellationTracker has store {
-        pre_cancellation_window_secs: u64,
-        // Map of order IDs with expiration time to a boolean indicating if the order is active.
-        expiration_with_order_ids: BigOrderedMap<ExpirationAndOrderId, bool>,
-        // Map of order Ids to their corresponding expiration time.
-        account_order_ids: BigOrderedMap<AccountClientOrderId, u64>
+    enum PreCancellationTracker has store {
+        V1 {
+            pre_cancellation_window_secs: u64,
+            // Map of order IDs with expiration time to a boolean indicating if the order is active.
+            expiration_with_order_ids: BigOrderedMap<ExpirationAndOrderId, bool>,
+            // Map of order Ids to their corresponding expiration time.
+            account_order_ids: BigOrderedMap<AccountClientOrderId, u64>
+        }
     }
 
     struct ExpirationAndOrderId has copy, drop, store {
@@ -44,19 +44,11 @@ module aptos_experimental::pre_cancellation_tracker {
         account_order_id: AccountClientOrderId
     }
 
-    fun new_default_big_ordered_map<K: store, V: store>(): BigOrderedMap<K, V> {
-        big_ordered_map::new_with_config(
-            BIG_MAP_INNER_DEGREE,
-            BIG_MAP_LEAF_DEGREE,
-            true
-        )
-    }
-
     public(friend) fun new_pre_cancellation_tracker(expiration_time_secs: u64): PreCancellationTracker {
-        PreCancellationTracker {
+        PreCancellationTracker::V1 {
             pre_cancellation_window_secs: expiration_time_secs,
-            expiration_with_order_ids: new_default_big_ordered_map(),
-            account_order_ids: new_default_big_ordered_map(),
+            expiration_with_order_ids: order_book_utils::new_default_big_ordered_map(),
+            account_order_ids: order_book_utils::new_default_big_ordered_map(),
         }
     }
 
@@ -135,7 +127,7 @@ module aptos_experimental::pre_cancellation_tracker {
     public fun destroy_tracker(tracker: PreCancellationTracker) {
         // This function is used to destroy the tracker in tests.
         // In production, the tracker will be garbage collected automatically.
-        let PreCancellationTracker {
+        let PreCancellationTracker::V1 {
             pre_cancellation_window_secs: _,
             expiration_with_order_ids: order_ids_with_expiration,
             account_order_ids

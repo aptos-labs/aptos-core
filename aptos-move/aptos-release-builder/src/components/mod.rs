@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use self::framework::FrameworkReleaseConfig;
 use crate::{
@@ -26,7 +26,7 @@ use aptos_types::{
 };
 use futures::executor::block_on;
 use handlebars::Handlebars;
-use move_binary_format::file_format_common::VERSION_DEFAULT_LANG_V2;
+use move_binary_format::file_format_common::VERSION_DEFAULT;
 use once_cell::sync::Lazy;
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
@@ -773,7 +773,7 @@ impl Default for ReleaseConfig {
                     metadata: ProposalMetadata::default(),
                     name: "framework".to_string(),
                     update_sequence: vec![ReleaseEntry::Framework(FrameworkReleaseConfig {
-                        bytecode_version: VERSION_DEFAULT_LANG_V2,
+                        bytecode_version: VERSION_DEFAULT,
                         git_hash: None,
                     })],
                 },

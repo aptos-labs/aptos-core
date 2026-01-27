@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::new_test_context;
 use crate::tests::{new_test_context_with_config, new_test_context_with_orderless_flags};
@@ -295,6 +294,234 @@ async fn test_post_transaction_rejected_by_mempool(
             .await;
         context.check_golden_output(resp);
     }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    case_name,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case("", false, false),
+    case("_payload_v2", true, false),
+    case("_orderless", true, true)
+)]
+async fn test_post_bcs_format_transaction_batch(
+    case_name: &str,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!() + case_name,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let mut root_account = context.root_account().await;
+    let account1 = context.gen_account();
+    let account2 = context.gen_account();
+    let txn1 = context.create_user_account_by(&mut root_account, &account1);
+    let txn2 = context.create_user_account_by(&mut root_account, &account2);
+    let body = bcs::to_bytes(&vec![txn1, txn2]).unwrap();
+    let resp = context
+        .expect_status_code(202)
+        .post_bcs_txn("/transactions/batch", body)
+        .await;
+    context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_post_invalid_bcs_format_transaction_batch(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+
+    let resp = context
+        .expect_status_code(400)
+        .post_bcs_txn(
+            "/transactions/batch",
+            bcs::to_bytes("invalid data").unwrap(),
+        )
+        .await;
+    context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_post_invalid_signature_transaction_batch(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let txn = context.create_invalid_signature_transaction().await;
+    let body = bcs::to_bytes(&vec![txn]).unwrap();
+    let resp = context
+        .expect_status_code(400)
+        .post_bcs_txn("/transactions/batch", &body)
+        .await;
+    context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_post_transaction_rejected_by_mempool_batch(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let account1 = context.gen_account();
+    let account2 = context.gen_account();
+    let txn1 = context.create_user_account(&account1).await;
+    let txn2 = context.create_user_account(&account2).await;
+
+    context
+        .expect_status_code(202)
+        .post_bcs_txn(
+            "/transactions/batch",
+            &bcs::to_bytes(&vec![txn1.clone()]).unwrap(),
+        )
+        .await;
+
+    // If txn1 and txn2 are sequence number based transactions, both of them have same sequence number.
+    // So, txn2 will be rejected by mempool.
+    // But if txn1 and txn2 are orderless transactions, both transactions should be accepted by mempool.
+    if context.use_orderless_transactions {
+        context
+            .expect_status_code(202)
+            .post_bcs_txn("/transactions/batch", &bcs::to_bytes(&vec![txn2]).unwrap())
+            .await;
+    } else {
+        let resp = context
+            .expect_status_code(400)
+            .post_bcs_txn("/transactions/batch", &bcs::to_bytes(&vec![txn2]).unwrap())
+            .await;
+        context.check_golden_output(resp);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_post_batch_with_partial_failures(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let account1 = context.gen_account();
+    let valid_txn = context.create_user_account(&account1).await;
+    let invalid_txn = context.create_invalid_signature_transaction().await;
+
+    // Submit batch with one valid and one invalid transaction
+    // Should return 206 (Partial Content) with the failure details
+    let resp = context
+        .expect_status_code(206)
+        .post_bcs_txn(
+            "/transactions/batch",
+            &bcs::to_bytes(&vec![valid_txn, invalid_txn]).unwrap(),
+        )
+        .await;
+    context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_post_batch_entry_function_api_validation(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let account = context.gen_account();
+    let txn1 = context.create_user_account(&account).await;
+    context.commit_block(&vec![txn1]).await;
+
+    // This is a way to get around the Identifier checks!
+    #[derive(serde::Serialize)]
+    struct HackStruct(pub Box<str>);
+
+    // Identifiers check when you call new, but they don't check when you deserialize, surprise!
+    let module_id: Identifier =
+        serde_json::from_str(&serde_json::to_string(&HackStruct("coin".into())).unwrap()).unwrap();
+    let func: Identifier = serde_json::from_str(
+        &serde_json::to_string(&HackStruct("transfer::what::what".into())).unwrap(),
+    )
+    .unwrap();
+
+    let invalid_txn = account.sign_with_transaction_builder(
+        context
+            .transaction_factory()
+            .entry_function(EntryFunction::new(
+                ModuleId::new(AccountAddress::from_hex_literal("0x1").unwrap(), module_id),
+                func,
+                vec![AptosCoinType::type_tag()],
+                vec![
+                    bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
+                    bcs::to_bytes(&123u64).unwrap(),
+                ],
+            ))
+            .expiration_timestamp_secs(context.get_expiration_time())
+            .upgrade_payload_with_rng(
+                &mut context.rng,
+                context.use_txn_payload_v2_format,
+                context.use_orderless_transactions,
+            ),
+    );
+
+    let body = bcs::to_bytes(&vec![invalid_txn]).unwrap();
+    // Batch should validate transaction payload and return 400
+    let resp = context
+        .expect_status_code(400)
+        .post_bcs_txn("/transactions/batch", body)
+        .await;
+    context.check_golden_output(resp);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

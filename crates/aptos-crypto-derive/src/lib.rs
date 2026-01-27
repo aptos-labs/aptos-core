@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #![forbid(unsafe_code)]
 
@@ -485,10 +484,8 @@ pub fn derive_sigma_protocol_witness(input: TokenStream) -> TokenStream {
     let field_names: Vec<_> = fields.iter().map(|f| &f.ident).collect();
 
     let expanded = quote! {
-        impl<E: Pairing> sigma_protocol::Witness<E> for #name<E> {
-            type Scalar = Scalar<E>;
-
-            fn scaled_add(self, other: &Self, c: E::ScalarField) -> Self {
+        impl<F: PrimeField> sigma_protocol::Witness<F> for #name<F> {
+            fn scaled_add(self, other: &Self, c: F) -> Self {
                 Self {
                     #(
                         #field_names: self.#field_names.scaled_add(&other.#field_names, c),

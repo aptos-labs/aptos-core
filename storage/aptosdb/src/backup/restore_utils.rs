@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This file contains utilities that are helpful for performing
 //! database restore operations, as required by restore and
@@ -267,7 +267,7 @@ pub(crate) fn save_transactions_impl(
     }
 
     if kv_replay && first_version > 0 && state_store.get_usage(Some(first_version - 1)).is_ok() {
-        let ledger_state = state_store.calculate_state_and_put_updates(
+        let (ledger_state, _hot_state_updates) = state_store.calculate_state_and_put_updates(
             &StateUpdateRefs::index_write_sets(first_version, write_sets, write_sets.len(), vec![]),
             &mut ledger_db_batch.ledger_metadata_db_batches, // used for storing the storage usage
             state_kv_batches,

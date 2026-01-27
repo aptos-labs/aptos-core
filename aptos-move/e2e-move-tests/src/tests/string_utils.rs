@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_framework::{BuildOptions, BuiltPackage};
@@ -18,13 +18,11 @@ fn initialize(h: &mut MoveHarness) {
     assert_success!(status);
 }
 
-#[rstest(enabled, disabled,
-    case(vec![FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION], vec![]),
-    case(vec![], vec![FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION]),
-)]
+#[rstest]
+#[case(vec![FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION], vec![])]
 fn test_function_value_formatting_in_modules(
-    enabled: Vec<FeatureFlag>,
-    disabled: Vec<FeatureFlag>,
+    #[case] enabled: Vec<FeatureFlag>,
+    #[case] disabled: Vec<FeatureFlag>,
 ) {
     let mut h = MoveHarness::new_with_executor(FakeExecutor::from_head_genesis());
     h.enable_features(enabled, disabled);

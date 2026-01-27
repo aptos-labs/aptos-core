@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     config::{
@@ -89,6 +88,8 @@ pub struct ApiConfig {
     pub wait_by_hash_poll_interval_ms: u64,
     /// The number of active wait_by_hash requests that can be active at any given time.
     pub wait_by_hash_max_active_connections: usize,
+    /// Allow submission of encrypted transactions via the API
+    pub allow_encrypted_txns_submission: bool,
 }
 
 const DEFAULT_ADDRESS: &str = "127.0.0.1";
@@ -141,6 +142,7 @@ impl Default for ApiConfig {
             wait_by_hash_timeout_ms: 1_000,
             wait_by_hash_poll_interval_ms: 20,
             wait_by_hash_max_active_connections: 100,
+            allow_encrypted_txns_submission: false,
         }
     }
 }

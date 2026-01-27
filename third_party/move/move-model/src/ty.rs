@@ -6,7 +6,7 @@
 
 use crate::{
     ast::{Address, ModuleName, QualifiedSymbol},
-    builder::{ith_str, pluralize},
+    builder::{ith_str, pluralize, pluralize_be},
     model::{
         FunId, GlobalEnv, Loc, ModuleId, QualifiedId, QualifiedInstId, StructEnv, StructId,
         TypeParameter, TypeParameterKind,
@@ -798,6 +798,10 @@ pub enum TypeUnificationError {
     FunResultTypeMismatch(Type, Type),
     /// The arity  of some construct mismatches: `ArityMismatch(for_type_args, actual, expected)`
     ArityMismatch(/*for_type_args*/ bool, usize, usize),
+    /// Arity mismatch in function argument types: `FunArgArityMismatch(actual, expected)`
+    FunArgArityMismatch(usize, usize),
+    /// Arity mismatch in function result types: `FunResultArityMismatch(actual, expected)`
+    FunResultArityMismatch(usize, usize),
     /// Two types have different mutability: `MutabilityMismatch(actual, expected)`.
     MutabilityMismatch(Type, Type),
     /// A generic representation of the error that a constraint wasn't satisfied, with
@@ -1341,6 +1345,11 @@ impl Type {
         } else {
             self
         }
+    }
+
+    /// Wrap the type in a reference
+    pub fn wrap_in_reference(&self, is_mut: bool) -> Type {
+        Type::Reference(ReferenceKind::from_is_mut(is_mut), Box::new(self.clone()))
     }
 
     /// If this is a reference, return its kind.
@@ -3040,61 +3049,68 @@ impl ErrorMessageContext {
                 actual,
             ),
             Argument => format!(
-                "the function takes {} {} but {} were provided",
+                "the function takes {} {} but {} {} provided",
                 expected,
                 if for_type_args {
                     pluralize("type argument", expected)
                 } else {
                     pluralize("argument", expected)
                 },
-                actual
+                actual,
+                pluralize_be(actual),
             ),
             PositionalUnpackArgument => format!(
-                "the struct/variant has {} {} but {} were provided",
+                "the struct/variant has {} {} but {} {} provided",
                 expected,
                 if for_type_args {
                     pluralize("type argument", expected)
                 } else {
                     pluralize("field", expected)
                 },
-                actual
+                actual,
+                pluralize_be(actual),
             ),
             ReceiverArgument => {
                 if for_type_args {
                     format!(
-                        "the receiver function takes {} type {} but {} were provided",
+                        "the receiver function takes {} type {} but {} {} provided",
                         expected,
                         pluralize("argument", expected),
-                        actual
+                        actual,
+                        pluralize_be(actual),
                     )
                 } else {
                     format!(
-                        "the receiver function takes {} {} but {} were provided",
+                        "the receiver function takes {} {} but {} {} provided",
                         expected - 1,
                         pluralize("argument", expected - 1),
-                        actual - 1
+                        actual - 1,
+                        pluralize_be(actual - 1),
                     )
                 }
             },
             OperatorArgument => format!(
-                "the operator takes {} {} but {} were provided",
+                "the operator takes {} {} but {} {} provided",
                 expected,
                 pluralize("argument", expected),
-                actual
+                actual,
+                pluralize_be(actual),
             ),
             TypeArgument => {
                 format!(
-                    "expected {} type {} but {} were provided",
+                    "expected {} type {} but {} {} provided",
                     expected,
                     pluralize("argument", expected),
-                    actual
+                    actual,
+                    pluralize_be(actual),
                 )
             },
             Return => format!(
-                "the function returns {} {} but {} were provided",
+                "the function returns {} {} but {} {} provided",
                 expected,
                 pluralize("argument", expected),
-                actual
+                actual,
+                pluralize_be(actual),
             ),
             SchemaInclusion(_) | General | TypeAnnotation => {
                 format!("expected {} items but found {}", expected, actual)
@@ -3189,7 +3205,13 @@ impl TypeUnificationError {
         match self {
             TypeUnificationError::TypeMismatch(t1, t2)
             | TypeUnificationError::MutabilityMismatch(t1, t2) => {
-                TypeUnificationError::FunArgTypeMismatch(t1, t2)
+                // Swap because function type arguments are unified with `order.swap()` (contra-variance), which causes
+                // `TypeMismatch`/`MutabilityMismatch` with swapped actual/expected values
+                TypeUnificationError::FunArgTypeMismatch(t2, t1)
+            },
+            TypeUnificationError::ArityMismatch(_for_type_args, actual, expected) => {
+                // Swap for the same reason as above
+                TypeUnificationError::FunArgArityMismatch(expected, actual)
             },
             _ => self,
         }
@@ -3200,6 +3222,9 @@ impl TypeUnificationError {
             TypeUnificationError::TypeMismatch(t1, t2)
             | TypeUnificationError::MutabilityMismatch(t1, t2) => {
                 TypeUnificationError::FunResultTypeMismatch(t1, t2)
+            },
+            TypeUnificationError::ArityMismatch(_for_type_args, actual, expected) => {
+                TypeUnificationError::FunResultArityMismatch(actual, expected)
             },
             _ => self,
         }
@@ -3249,8 +3274,7 @@ impl TypeUnificationError {
                 vec![],
                 vec![],
             ),
-            TypeUnificationError::FunArgTypeMismatch(expected, actual) => (
-                // Because of contra-variance, switches actual/expected order
+            TypeUnificationError::FunArgTypeMismatch(actual, expected) => (
                 format!(
                     "expected function type has argument of type `{}` but `{}` was provided",
                     expected.display(display_context),
@@ -3270,6 +3294,28 @@ impl TypeUnificationError {
             ),
             TypeUnificationError::ArityMismatch(for_type_args, actual, expected) => (
                 error_context.arity_mismatch(*for_type_args, *actual, *expected),
+                vec![],
+                vec![],
+            ),
+            TypeUnificationError::FunArgArityMismatch(actual, expected) => (
+                format!(
+                    "expected function type has {} {} but {} {} provided",
+                    expected,
+                    pluralize("argument", *expected),
+                    actual,
+                    pluralize_be(*actual)
+                ),
+                vec![],
+                vec![],
+            ),
+            TypeUnificationError::FunResultArityMismatch(actual, expected) => (
+                format!(
+                    "expected function type returns {} {} but {} {} provided",
+                    expected,
+                    pluralize("value", *expected),
+                    actual,
+                    pluralize_be(*actual)
+                ),
                 vec![],
                 vec![],
             ),

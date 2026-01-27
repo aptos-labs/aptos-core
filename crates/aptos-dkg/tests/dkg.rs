@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_crypto::{blstrs::random_scalar, hash::CryptoHash, traits::SecretSharingConfig as _};
 use aptos_dkg::pvss::{
@@ -36,15 +36,17 @@ fn test_dkg_all_weighted() {
     aggregatable_dkg::<das::WeightedTranscript>(wcs.last().unwrap(), seed.to_bytes_le());
 }
 
+use aptos_dkg::pvss::traits::Transcript;
+
 /// Deals `n` times, aggregates all transcripts, and attempts to reconstruct the secret dealt in this
 /// aggregated transcript.
 fn aggregatable_dkg<T: AggregatableTranscript + CryptoHash>(
-    sc: &T::SecretSharingConfig,
+    sc: &<T as Transcript>::SecretSharingConfig,
     seed_bytes: [u8; 32],
 ) {
     let mut rng = StdRng::from_seed(seed_bytes);
 
-    let d = test_utils::setup_dealing::<T, StdRng>(sc, &mut rng);
+    let d = test_utils::setup_dealing::<T, StdRng>(sc, None, &mut rng);
 
     let mut trxs = vec![];
 

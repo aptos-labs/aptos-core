@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::transaction_validation::APTOS_TRANSACTION_VALIDATION;
 use aptos_logger::{enabled, Level};
@@ -77,9 +76,11 @@ pub fn convert_prologue_error(
     let status = error.into_vm_status();
     Err(match status {
         VMStatus::Executed => VMStatus::Executed,
-        VMStatus::MoveAbort(location, code)
-            if !APTOS_TRANSACTION_VALIDATION.is_account_module_abort(&location) =>
-        {
+        VMStatus::MoveAbort {
+            location,
+            code,
+            message,
+        } if !APTOS_TRANSACTION_VALIDATION.is_account_module_abort(&location) => {
             let new_major_status = match error_split(code) {
                 // TODO: Update these after adding the appropriate error codes into StatusCode
                 // in the Move repo.
@@ -98,8 +99,14 @@ pub fn convert_prologue_error(
                     StatusCode::MULTISIG_TRANSACTION_PAYLOAD_DOES_NOT_MATCH
                 },
                 (category, reason) => {
-                    let err_msg = format!("[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
-                    location, code, category, reason);
+                    let mut err_msg = format!(
+                        "[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
+                        location, code, category, reason
+                    );
+                    if let Some(abort_msg) = message {
+                        err_msg.push_str(" Message: ");
+                        err_msg.push_str(&abort_msg);
+                    }
                     speculative_error!(log_context, err_msg.clone());
                     return Err(VMStatus::error(
                         StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
@@ -109,7 +116,11 @@ pub fn convert_prologue_error(
             };
             VMStatus::error(new_major_status, None)
         },
-        VMStatus::MoveAbort(location, code) => {
+        VMStatus::MoveAbort {
+            location,
+            code,
+            message,
+        } => {
             let new_major_status = match error_split(code) {
                 // Invalid authentication key
                 (INVALID_ARGUMENT, EBAD_ACCOUNT_AUTHENTICATION_KEY) => StatusCode::INVALID_AUTH_KEY,
@@ -143,8 +154,14 @@ pub fn convert_prologue_error(
                 },
                 (INVALID_ARGUMENT, ENONCE_ALREADY_USED) => StatusCode::NONCE_ALREADY_USED,
                 (category, reason) => {
-                    let err_msg = format!("[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
-                    location, code, category, reason);
+                    let mut err_msg = format!(
+                        "[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
+                        location, code, category, reason
+                    );
+                    if let Some(abort_msg) = message {
+                        err_msg.push_str(" Message: ");
+                        err_msg.push_str(&abort_msg);
+                    }
                     speculative_error!(log_context, err_msg.clone());
                     return Err(VMStatus::Error {
                         status_code: StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
@@ -186,12 +203,20 @@ pub fn convert_epilogue_error(
     let status = error.into_vm_status();
     Err(match status {
         VMStatus::Executed => VMStatus::Executed,
-        VMStatus::MoveAbort(location, code)
-            if !APTOS_TRANSACTION_VALIDATION.is_account_module_abort(&location) =>
-        {
+        VMStatus::MoveAbort {
+            location,
+            code,
+            message,
+        } if !APTOS_TRANSACTION_VALIDATION.is_account_module_abort(&location) => {
             let (category, reason) = error_split(code);
-            let err_msg = format!("[aptos_vm] Unexpected success epilogue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
-			location, code, category, reason);
+            let mut err_msg = format!(
+                "[aptos_vm] Unexpected success epilogue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
+                location, code, category, reason
+            );
+            if let Some(abort_msg) = message {
+                err_msg.push_str(" Message: ");
+                err_msg.push_str(&abort_msg);
+            }
             speculative_error!(log_context, err_msg.clone());
             VMStatus::error(
                 StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
@@ -199,11 +224,25 @@ pub fn convert_epilogue_error(
             )
         },
 
-        VMStatus::MoveAbort(location, code) => match error_split(code) {
-            (LIMIT_EXCEEDED, ECANT_PAY_GAS_DEPOSIT) => VMStatus::MoveAbort(location, code),
+        VMStatus::MoveAbort {
+            location,
+            code,
+            message,
+        } => match error_split(code) {
+            (LIMIT_EXCEEDED, ECANT_PAY_GAS_DEPOSIT) => VMStatus::MoveAbort {
+                location,
+                code,
+                message,
+            },
             (category, reason) => {
-                let err_msg = format!("[aptos_vm] Unexpected success epilogue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
-			    location, code, category, reason);
+                let mut err_msg = format!(
+                    "[aptos_vm] Unexpected success epilogue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
+                    location, code, category, reason
+                );
+                if let Some(abort_msg) = message {
+                    err_msg.push_str(" Message: ");
+                    err_msg.push_str(&abort_msg);
+                }
                 speculative_error!(log_context, err_msg.clone());
                 VMStatus::error(
                     StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,

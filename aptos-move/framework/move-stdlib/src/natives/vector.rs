@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 // Copyright (c) The Diem Core Contributors
 // Copyright (c) The Move Contributors
@@ -41,20 +41,9 @@ fn native_move_range(
     ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    if !context
-        .get_feature_flags()
-        .is_native_memory_operations_enabled()
-    {
-        return Err(SafeNativeError::Abort {
-            abort_code: error::unavailable(EFEATURE_NOT_ENABLED),
-        });
-    }
-
     context.charge(VECTOR_MOVE_RANGE_BASE)?;
 
-    let map_err = |_| SafeNativeError::Abort {
-        abort_code: error::invalid_argument(EINDEX_OUT_OF_BOUNDS),
-    };
+    let map_err = |_| SafeNativeError::abort(error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
     let insert_position = usize::try_from(safely_pop_arg!(args, u64)).map_err(map_err)?;
     let to = safely_pop_arg!(args, VectorRef);
     let length = usize::try_from(safely_pop_arg!(args, u64)).map_err(map_err)?;
@@ -72,9 +61,7 @@ fn native_move_range(
         .is_none_or(|end| end > from_len)
         || insert_position > to_len
     {
-        return Err(SafeNativeError::Abort {
-            abort_code: EINDEX_OUT_OF_BOUNDS,
-        });
+        return Err(SafeNativeError::abort(EINDEX_OUT_OF_BOUNDS));
     }
 
     // We are moving all elements in the range, all elements after range, and all elements after insertion point.
@@ -86,9 +73,8 @@ fn native_move_range(
                 (from_len - removal_position)
                     .checked_add(to_len - insert_position)
                     .and_then(|v| v.checked_add(length))
-                    .ok_or_else(|| SafeNativeError::Abort {
-                        abort_code: EINDEX_OUT_OF_BOUNDS,
-                    })? as u64,
+                    .ok_or_else(|| SafeNativeError::abort(EINDEX_OUT_OF_BOUNDS))?
+                    as u64,
             ),
     )?;
 

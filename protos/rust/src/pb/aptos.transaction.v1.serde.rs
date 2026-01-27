@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 // @generated
 impl serde::Serialize for AbstractSignature {
@@ -494,6 +494,7 @@ impl serde::Serialize for any_public_key::Type {
             Self::Secp256r1Ecdsa => "TYPE_SECP256R1_ECDSA",
             Self::Keyless => "TYPE_KEYLESS",
             Self::FederatedKeyless => "TYPE_FEDERATED_KEYLESS",
+            Self::SlhDsaSha2128s => "TYPE_SLH_DSA_SHA2_128S",
         };
         serializer.serialize_str(variant)
     }
@@ -511,6 +512,7 @@ impl<'de> serde::Deserialize<'de> for any_public_key::Type {
             "TYPE_SECP256R1_ECDSA",
             "TYPE_KEYLESS",
             "TYPE_FEDERATED_KEYLESS",
+            "TYPE_SLH_DSA_SHA2_128S",
         ];
 
         struct GeneratedVisitor;
@@ -559,6 +561,7 @@ impl<'de> serde::Deserialize<'de> for any_public_key::Type {
                     "TYPE_SECP256R1_ECDSA" => Ok(any_public_key::Type::Secp256r1Ecdsa),
                     "TYPE_KEYLESS" => Ok(any_public_key::Type::Keyless),
                     "TYPE_FEDERATED_KEYLESS" => Ok(any_public_key::Type::FederatedKeyless),
+                    "TYPE_SLH_DSA_SHA2_128S" => Ok(any_public_key::Type::SlhDsaSha2128s),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }
@@ -606,6 +609,9 @@ impl serde::Serialize for AnySignature {
                 any_signature::SignatureVariant::Keyless(v) => {
                     struct_ser.serialize_field("keyless", v)?;
                 }
+                any_signature::SignatureVariant::SlhDsaSha2128s(v) => {
+                    struct_ser.serialize_field("slhDsaSha2128s", v)?;
+                }
             }
         }
         struct_ser.end()
@@ -625,6 +631,8 @@ impl<'de> serde::Deserialize<'de> for AnySignature {
             "secp256k1Ecdsa",
             "webauthn",
             "keyless",
+            "slh_dsa_sha2_128s",
+            "slhDsaSha2128s",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -635,6 +643,7 @@ impl<'de> serde::Deserialize<'de> for AnySignature {
             Secp256k1Ecdsa,
             Webauthn,
             Keyless,
+            SlhDsaSha2128s,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -662,6 +671,7 @@ impl<'de> serde::Deserialize<'de> for AnySignature {
                             "secp256k1Ecdsa" | "secp256k1_ecdsa" => Ok(GeneratedField::Secp256k1Ecdsa),
                             "webauthn" => Ok(GeneratedField::Webauthn),
                             "keyless" => Ok(GeneratedField::Keyless),
+                            "slhDsaSha2128s" | "slh_dsa_sha2_128s" => Ok(GeneratedField::SlhDsaSha2128s),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -728,6 +738,13 @@ impl<'de> serde::Deserialize<'de> for AnySignature {
                             signature_variant__ = map.next_value::<::std::option::Option<_>>()?.map(any_signature::SignatureVariant::Keyless)
 ;
                         }
+                        GeneratedField::SlhDsaSha2128s => {
+                            if signature_variant__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("slhDsaSha2128s"));
+                            }
+                            signature_variant__ = map.next_value::<::std::option::Option<_>>()?.map(any_signature::SignatureVariant::SlhDsaSha2128s)
+;
+                        }
                     }
                 }
                 Ok(AnySignature {
@@ -752,6 +769,7 @@ impl serde::Serialize for any_signature::Type {
             Self::Secp256k1Ecdsa => "TYPE_SECP256K1_ECDSA",
             Self::Webauthn => "TYPE_WEBAUTHN",
             Self::Keyless => "TYPE_KEYLESS",
+            Self::SlhDsaSha2128s => "TYPE_SLH_DSA_SHA2_128S",
         };
         serializer.serialize_str(variant)
     }
@@ -768,6 +786,7 @@ impl<'de> serde::Deserialize<'de> for any_signature::Type {
             "TYPE_SECP256K1_ECDSA",
             "TYPE_WEBAUTHN",
             "TYPE_KEYLESS",
+            "TYPE_SLH_DSA_SHA2_128S",
         ];
 
         struct GeneratedVisitor;
@@ -815,6 +834,7 @@ impl<'de> serde::Deserialize<'de> for any_signature::Type {
                     "TYPE_SECP256K1_ECDSA" => Ok(any_signature::Type::Secp256k1Ecdsa),
                     "TYPE_WEBAUTHN" => Ok(any_signature::Type::Webauthn),
                     "TYPE_KEYLESS" => Ok(any_signature::Type::Keyless),
+                    "TYPE_SLH_DSA_SHA2_128S" => Ok(any_signature::Type::SlhDsaSha2128s),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }
@@ -5244,6 +5264,12 @@ impl serde::Serialize for MoveTypes {
             Self::U64 => "MOVE_TYPES_U64",
             Self::U128 => "MOVE_TYPES_U128",
             Self::U256 => "MOVE_TYPES_U256",
+            Self::I8 => "MOVE_TYPES_I8",
+            Self::I16 => "MOVE_TYPES_I16",
+            Self::I32 => "MOVE_TYPES_I32",
+            Self::I64 => "MOVE_TYPES_I64",
+            Self::I128 => "MOVE_TYPES_I128",
+            Self::I256 => "MOVE_TYPES_I256",
             Self::Address => "MOVE_TYPES_ADDRESS",
             Self::Signer => "MOVE_TYPES_SIGNER",
             Self::Vector => "MOVE_TYPES_VECTOR",
@@ -5270,6 +5296,12 @@ impl<'de> serde::Deserialize<'de> for MoveTypes {
             "MOVE_TYPES_U64",
             "MOVE_TYPES_U128",
             "MOVE_TYPES_U256",
+            "MOVE_TYPES_I8",
+            "MOVE_TYPES_I16",
+            "MOVE_TYPES_I32",
+            "MOVE_TYPES_I64",
+            "MOVE_TYPES_I128",
+            "MOVE_TYPES_I256",
             "MOVE_TYPES_ADDRESS",
             "MOVE_TYPES_SIGNER",
             "MOVE_TYPES_VECTOR",
@@ -5327,6 +5359,12 @@ impl<'de> serde::Deserialize<'de> for MoveTypes {
                     "MOVE_TYPES_U64" => Ok(MoveTypes::U64),
                     "MOVE_TYPES_U128" => Ok(MoveTypes::U128),
                     "MOVE_TYPES_U256" => Ok(MoveTypes::U256),
+                    "MOVE_TYPES_I8" => Ok(MoveTypes::I8),
+                    "MOVE_TYPES_I16" => Ok(MoveTypes::I16),
+                    "MOVE_TYPES_I32" => Ok(MoveTypes::I32),
+                    "MOVE_TYPES_I64" => Ok(MoveTypes::I64),
+                    "MOVE_TYPES_I128" => Ok(MoveTypes::I128),
+                    "MOVE_TYPES_I256" => Ok(MoveTypes::I256),
                     "MOVE_TYPES_ADDRESS" => Ok(MoveTypes::Address),
                     "MOVE_TYPES_SIGNER" => Ok(MoveTypes::Signer),
                     "MOVE_TYPES_VECTOR" => Ok(MoveTypes::Vector),
@@ -6833,6 +6871,99 @@ impl<'de> serde::Deserialize<'de> for SingleSender {
             }
         }
         deserializer.deserialize_struct("aptos.transaction.v1.SingleSender", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for SlhDsaSha2128s {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.signature.is_empty() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.SlhDsa_Sha2_128s", len)?;
+        if !self.signature.is_empty() {
+            struct_ser.serialize_field("signature", pbjson::private::base64::encode(&self.signature).as_str())?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for SlhDsaSha2128s {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "signature",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Signature,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "signature" => Ok(GeneratedField::Signature),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = SlhDsaSha2128s;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct aptos.transaction.v1.SlhDsa_Sha2_128s")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<SlhDsaSha2128s, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                let mut signature__ = None;
+                while let Some(k) = map.next_key()? {
+                    match k {
+                        GeneratedField::Signature => {
+                            if signature__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("signature"));
+                            }
+                            signature__ =
+                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
+                            ;
+                        }
+                    }
+                }
+                Ok(SlhDsaSha2128s {
+                    signature: signature__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("aptos.transaction.v1.SlhDsa_Sha2_128s", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for StateCheckpointTransaction {

@@ -23,10 +23,7 @@ const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGT
 
 fn make_failed_native() -> NativeFunction {
     Arc::new(move |_, _, _| -> PartialVMResult<NativeResult> {
-        Ok(NativeResult::Abort {
-            cost: InternalGas::new(0),
-            abort_code: 12,
-        })
+        Ok(NativeResult::err(InternalGas::new(0), 12))
     })
 }
 
@@ -101,7 +98,7 @@ fn test_load_module_native_result(enable_lazy_loading: bool) {
     )];
     let runtime_environment = RuntimeEnvironment::new_with_config(natives, VMConfig {
         enable_lazy_loading,
-        ..VMConfig::default()
+        ..VMConfig::default_for_test()
     });
     let mut storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
 

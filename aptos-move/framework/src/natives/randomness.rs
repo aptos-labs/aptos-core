@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_gas_schedule::{
     gas_feature_versions::RELEASE_V1_23,
@@ -9,7 +9,10 @@ use aptos_native_interface::{
     RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
 use better_any::{Tid, TidAble};
-use move_vm_runtime::{native_extensions::SessionListener, native_functions::NativeFunction};
+use move_vm_runtime::{
+    native_extensions::{NativeRuntimeRefCheckModelsCompleted, SessionListener},
+    native_functions::NativeFunction,
+};
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
@@ -39,6 +42,10 @@ impl SessionListener for RandomnessContext {
     fn abort(&mut self) {
         // No state changes to abort. Context will be reset on new session's start.
     }
+}
+
+impl NativeRuntimeRefCheckModelsCompleted for RandomnessContext {
+    // No native functions in this context return references, so no models to add.
 }
 
 impl RandomnessContext {
@@ -80,9 +87,9 @@ pub fn fetch_and_increment_txn_counter(
 
     let ctx = context.extensions_mut().get_mut::<RandomnessContext>();
     if !ctx.is_unbiasable() {
-        return Err(SafeNativeError::Abort {
-            abort_code: E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT,
-        });
+        return Err(SafeNativeError::abort(
+            E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT,
+        ));
     }
 
     let ret = ctx.txn_local_state.to_vec();

@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This module defines error types used by `AptosDB`.
 use aptos_types::state_store::errors::StateViewError;
@@ -33,6 +32,8 @@ pub enum AptosDbError {
     RecvError(String),
     #[error("AptosDB ParseInt Error: {0}")]
     ParseIntError(String),
+    #[error("Hot state not configured properly")]
+    HotStateError,
 }
 
 impl From<anyhow::Error> for AptosDbError {

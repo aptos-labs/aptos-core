@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::render::Render;
-use aptos_gas_algebra::{Fee, GasScalingFactor, InternalGas, NumBytes};
+use aptos_gas_algebra::{AbstractValueSize, Fee, GasScalingFactor, InternalGas, NumBytes};
 use aptos_types::state_store::state_key::StateKey;
 use move_binary_format::{file_format::CodeOffset, file_format_common::Opcodes};
 use move_core_types::{
@@ -133,6 +133,7 @@ pub struct ExecutionAndIOCosts {
 
     pub intrinsic_cost: InternalGas,
     pub keyless_cost: InternalGas,
+    pub slh_dsa_sha2_128s_cost: InternalGas,
     pub dependencies: Vec<Dependency>,
     pub call_graph: CallFrame,
     pub transaction_transient: Option<InternalGas>,
@@ -159,6 +160,7 @@ pub struct TransactionGasLog {
     pub exec_io: ExecutionAndIOCosts,
     pub storage: StorageFees,
     pub num_txns: usize,
+    pub peak_memory_usage: AbstractValueSize,
 }
 pub struct GasEventIter<'a> {
     stack: SmallVec<[(&'a CallFrame, usize); 16]>,
@@ -265,6 +267,7 @@ impl ExecutionAndIOCosts {
 
         total += self.intrinsic_cost;
         total += self.keyless_cost;
+        total += self.slh_dsa_sha2_128s_cost;
 
         for dep in &self.dependencies {
             total += dep.cost;
@@ -296,7 +299,7 @@ impl ExecutionAndIOCosts {
             panic!(
                 "Execution & IO costs do not add up. Check if the gas meter & the gas profiler have been implemented correctly. From gas meter: {}. Calculated: {}.",
                 self.total, total
-            )
+            );
         }
     }
 }

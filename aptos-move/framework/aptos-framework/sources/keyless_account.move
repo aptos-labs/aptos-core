@@ -3,11 +3,9 @@
 module aptos_framework::keyless_account {
     use std::bn254_algebra;
     use std::config_buffer;
-    use std::option;
     use std::option::Option;
     use std::signer;
     use std::string::String;
-    use std::vector;
     use aptos_std::crypto_algebra;
     use aptos_std::ed25519;
     use aptos_framework::chain_status;
@@ -48,22 +46,89 @@ module aptos_framework::keyless_account {
     struct Configuration has key, store, drop, copy {
         /// An override `aud` for the identity of a recovery service, which will help users recover their keyless accounts
         /// associated with dapps or wallets that have disappeared.
-        /// IMPORTANT: This recovery service **cannot** on its own take over user accounts; a user must first sign in
+        /// IMPORTANT: This recovery service **cannot**, on its own, take over user accounts: a user must first sign in
         /// via OAuth in the recovery service in order to allow it to rotate any of that user's keyless accounts.
+        ///
+        /// Furthermore, the ZKP eventually expires, so there is a limited window within which a malicious recovery
+        /// service could rotate accounts. In the future, we can make this window arbitrarily small by further lowering
+        /// the maximum expiration horizon for ZKPs used for recovery, instead of relying on the `max_exp_horizon_secs`
+        /// value in this resource.
+        ///
+        /// If changed: There is no prover service support yet for recovery mode => ZKPs with override aud's enabled
+        ///   will not be served by the prover service => as long as training wheels are "on," such recovery ZKPs will
+        ///   never arrive on chain.
+        ///   (Once support is implemented in the prover service, in an abundance of caution, the training wheel check
+        ///    should only pass if the override aud in the public statement matches one in this list. Therefore, changes
+        ///    to this value should be picked up automatically by the prover service.)
         override_aud_vals: vector<String>,
+
         /// No transaction can have more than this many keyless signatures.
+        ///
+        /// If changed: Only affects the Aptos validators; prover service not impacted.
         max_signatures_per_txn: u16,
-        /// How far in the future from the JWT issued at time the EPK expiry can be set.
+
+        /// How far in the future from the JWT's issued-at-time can the EPK expiration date be set?
+        /// Specifically, validators enforce that the ZKP's expiration horizon is less than this `max_exp_horizon_secs`
+        /// value.
+        ///
+        /// If changed: Only affects the Aptos validators; prover service not impacted.
         max_exp_horizon_secs: u64,
-        /// The training wheels PK, if training wheels are on
+
+        /// The training wheels PK, if training wheels are on.
+        ///
+        /// If changed: Prover service has to be re-deployed with the associated training wheel SK.
         training_wheels_pubkey: Option<vector<u8>>,
+
         /// The max length of an ephemeral public key supported in our circuit (93 bytes)
+        ///
+        /// Note: Currently, the circuit derives the JWT's nonce field by hashing the EPK as:
+        /// ```
+        /// Poseidon_6(
+        ///   epk_0, epk_1, epk_2,
+        ///   max_commited_epk_bytes,
+        ///   exp_date,
+        ///   epk_blinder
+        /// )
+        /// ```
+        /// and the public inputs hash by hashing the EPK with other inputs as:
+        /// ```
+        /// Poseidon_14(
+        ///   epk_0, epk_1, epk_2,
+        ///   max_commited_epk_bytes,
+        ///   [...]
+        /// )
+        /// ```
+        /// where `max_committed_epk_byte` is passed in as one of the witnesses to the circuit. As a result, (some)
+        /// changes to this field could technically be handled by the same circuit: e.g., if we let the epk_i chunks
+        /// exceed 31 bytes, but no more than 32, then `max_commited_epk_bytes` could now be in (93, 96]. Whether such a
+        /// restricted set of changes is useful remains unclear. Therefore, the verdict will be that...
+        ///
+        /// If changed: (Likely) requires a circuit change because over-decreasing (or increasing) it leads to fewer (or
+        ///   more) EPK chunks. This would break the current way the circuit hashes the nonce and the public inputs.
+        ///   => prover service redeployment.
         max_commited_epk_bytes: u16,
+
         /// The max length of the value of the JWT's `iss` field supported in our circuit (e.g., `"https://accounts.google.com"`)
+        ///
+        /// If changed: Requires a circuit change because the `iss` field value is hashed inside the circuit as
+        ///   `HashBytesToFieldWithLen(MAX_ISS_VALUE_LEN)(iss_value, iss_value_len)` where `MAX_ISS_VALUE_LEN` is a
+        ///   circuit constant hard-coded to `max_iss_val_bytes` (i.e., to 120) => prover service redeployment..
         max_iss_val_bytes: u16,
+
         /// The max length of the JWT field name and value (e.g., `"max_age":"18"`) supported in our circuit
+        ///
+        /// If changed: Requires a circuit change because the extra field key-value pair is hashed inside the circuit as
+        ///   `HashBytesToFieldWithLen(MAX_EXTRA_FIELD_KV_PAIR_LEN)(extra_field, extra_field_len)` where
+        ///   `MAX_EXTRA_FIELD_KV_PAIR_LEN` is a circuit constant hard-coded to `max_extra_field_bytes` (i.e., to 350)
+        ///    => prover service redeployment.
         max_extra_field_bytes: u16,
-        /// The max length of the base64url-encoded JWT header in bytes supported in our circuit
+
+        /// The max length of the base64url-encoded JWT header in bytes supported in our circuit.
+        ///
+        /// If changed: Requires a circuit change because the JWT header is hashed inside the circuit as
+        ///   `HashBytesToFieldWithLen(MAX_B64U_JWT_HEADER_W_DOT_LEN)(b64u_jwt_header_w_dot, b64u_jwt_header_w_dot_len)`
+        ///   where `MAX_B64U_JWT_HEADER_W_DOT_LEN` is a circuit constant hard-coded to `max_jwt_header_b64_bytes`
+        ///   (i.e., to 350) => prover service redeployment.
         max_jwt_header_b64_bytes: u32,
     }
 
@@ -115,12 +180,12 @@ module aptos_framework::keyless_account {
     /// Pre-validate the VK to actively-prevent incorrect VKs from being set on-chain.
     fun validate_groth16_vk(vk: &Groth16VerificationKey) {
         // Could be leveraged to speed up the VM deserialization of the VK by 2x, since it can assume the points are valid.
-        assert!(option::is_some(&crypto_algebra::deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Compr>(&vk.alpha_g1)), E_INVALID_BN254_G1_SERIALIZATION);
-        assert!(option::is_some(&crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(&vk.beta_g2)), E_INVALID_BN254_G2_SERIALIZATION);
-        assert!(option::is_some(&crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(&vk.gamma_g2)), E_INVALID_BN254_G2_SERIALIZATION);
-        assert!(option::is_some(&crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(&vk.delta_g2)), E_INVALID_BN254_G2_SERIALIZATION);
-        for (i in 0..vector::length(&vk.gamma_abc_g1)) {
-            assert!(option::is_some(&crypto_algebra::deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Compr>(vector::borrow(&vk.gamma_abc_g1, i))), E_INVALID_BN254_G1_SERIALIZATION);
+        assert!(crypto_algebra::deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Compr>(&vk.alpha_g1).is_some(), E_INVALID_BN254_G1_SERIALIZATION);
+        assert!(crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(&vk.beta_g2).is_some(), E_INVALID_BN254_G2_SERIALIZATION);
+        assert!(crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(&vk.gamma_g2).is_some(), E_INVALID_BN254_G2_SERIALIZATION);
+        assert!(crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(&vk.delta_g2).is_some(), E_INVALID_BN254_G2_SERIALIZATION);
+        for (i in 0..vk.gamma_abc_g1.length()) {
+            assert!(crypto_algebra::deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Compr>(vk.gamma_abc_g1.borrow(i)).is_some(), E_INVALID_BN254_G1_SERIALIZATION);
         };
     }
 
@@ -151,8 +216,8 @@ module aptos_framework::keyless_account {
         system_addresses::assert_aptos_framework(fx);
         chain_status::assert_genesis();
 
-        if (option::is_some(&pk)) {
-            assert!(vector::length(option::borrow(&pk)) == 32, E_TRAINING_WHEELS_PK_WRONG_SIZE)
+        if (pk.is_some()) {
+            assert!(pk.borrow().length() == 32, E_TRAINING_WHEELS_PK_WRONG_SIZE)
         };
 
         let config = borrow_global_mut<Configuration>(signer::address_of(fx));
@@ -183,7 +248,7 @@ module aptos_framework::keyless_account {
         chain_status::assert_genesis();
 
         let config = borrow_global_mut<Configuration>(signer::address_of(fx));
-        vector::push_back(&mut config.override_aud_vals, aud);
+        config.override_aud_vals.push_back(aud);
     }
 
     /// Queues up a change to the Groth16 verification key. The change will only be effective after reconfiguration.
@@ -217,10 +282,10 @@ module aptos_framework::keyless_account {
         system_addresses::assert_aptos_framework(fx);
 
         // If a PK is being set, validate it first.
-        if (option::is_some(&pk)) {
-            let bytes = *option::borrow(&pk);
+        if (pk.is_some()) {
+            let bytes = *pk.borrow();
             let vpk = ed25519::new_validated_public_key_from_bytes(bytes);
-            assert!(option::is_some(&vpk), E_TRAINING_WHEELS_PK_WRONG_SIZE)
+            assert!(vpk.is_some(), E_TRAINING_WHEELS_PK_WRONG_SIZE)
         };
 
         let config = if (config_buffer::does_exist<Configuration>()) {
@@ -282,7 +347,7 @@ module aptos_framework::keyless_account {
             *borrow_global<Configuration>(signer::address_of(fx))
         };
 
-        vector::push_back(&mut config.override_aud_vals, aud);
+        config.override_aud_vals.push_back(aud);
 
         set_configuration_for_next_epoch(fx, config);
     }

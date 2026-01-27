@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_types::{
     on_chain_config::Features,
@@ -235,6 +235,7 @@ pub(crate) fn validate_emit_calls(
                     | Le
                     | Ge
                     | Abort
+                    | AbortMsg
                     | Nop
                     | ImmBorrowVariantField(_)
                     | ImmBorrowVariantFieldGeneric(_)

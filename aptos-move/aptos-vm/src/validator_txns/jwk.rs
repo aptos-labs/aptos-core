@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     aptos_vm::get_system_transaction_output,
@@ -79,7 +79,11 @@ impl AptosVM {
                 // Pretend we are inside Move, and expected failures are like Move aborts.
                 debug!("Processing dkg transaction expected failure: {:?}", failure);
                 Ok((
-                    VMStatus::MoveAbort(AbortLocation::Script, failure as u64),
+                    VMStatus::MoveAbort {
+                        location: AbortLocation::Script,
+                        code: failure as u64,
+                        message: None,
+                    },
                     VMOutput::empty_with_status(TransactionStatus::Discard(StatusCode::ABORTED)),
                 ))
             },

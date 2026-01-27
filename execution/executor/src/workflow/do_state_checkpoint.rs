@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::metrics::OTHER_TIMERS;
 use anyhow::{ensure, Result};
@@ -25,6 +25,7 @@ impl DoStateCheckpoint {
 
         let state_summary = parent_state_summary.update(
             persisted_state_summary,
+            &execution_output.hot_state_updates,
             execution_output.to_commit.state_update_refs(),
         )?;
 

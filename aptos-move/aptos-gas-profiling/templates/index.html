@@ -88,6 +88,11 @@
         {{keyless}} gas units, {{keyless-percentage}} of the total cost for execution & IO.
         {{/if}}
 
+        {{#if slh_dsa_sha2_128s}}
+        <h4>SLH-DSA-SHA2-128s Cost</h4>
+        {{slh_dsa_sha2_128s}} gas units, {{slh_dsa_sha2_128s-percentage}} of the total cost for execution & IO.
+        {{/if}}
+
         <h4>Dependencies</h4>
         {{#if deps}}
         <table>
@@ -130,7 +135,7 @@
         {{else}}
         (No operations to show.)
         {{/if}}
-        <br/>
+        <br />
         {{#if methods}}
         <table>
             <tr>
@@ -151,7 +156,7 @@
         {{else}}
         (No methods to show.)
         {{/if}}
-        <br/>
+        <br />
         {{#if methods_self}}
         <table>
             <tr>
@@ -300,6 +305,13 @@
         {{else}}
         (No events to show.)
         {{/if}}
+    </section>
+
+    <section>
+        <h2>Memory Usage</h2>
+        Peak memory usage during transaction execution: {{peak-memory-usage}}.<br><br>
+
+        Note: This is measured in abstract value size, which does not map 1:1 to bytes.
     </section>
 
     <section>

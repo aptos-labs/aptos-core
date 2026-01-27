@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This module defines the gas parameters for all Move instructions.
 
 use crate::{
-    gas_feature_versions::{RELEASE_V1_18, RELEASE_V1_33, RELEASE_V1_38},
+    gas_feature_versions::{RELEASE_V1_18, RELEASE_V1_33, RELEASE_V1_38, RELEASE_V1_40},
     gas_schedule::VMGasParameters,
 };
 use aptos_gas_algebra::{
@@ -22,6 +22,8 @@ crate::gas_schedule::macros::define_gas_parameters!(
         // control flow
         [ret: InternalGas, "ret", 220],
         [abort: InternalGas, "abort", 220],
+        [abort_msg_base: InternalGas, { RELEASE_V1_40.. => "abort_msg.base" }, 440],
+        [abort_msg_per_byte: InternalGasPerByte, { RELEASE_V1_40.. => "abort_msg.per_byte" }, 45],
 
         // Note(Gas): The costs of the branch instructions have been jacked up a bit intentionally
         //            to prevent any single transaction from running for too long.

@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
@@ -44,9 +44,7 @@ fn native_ecdsa_recover(
     let msg = match libsecp256k1::Message::parse_slice(&msg) {
         Ok(msg) => msg,
         Err(_) => {
-            return Err(SafeNativeError::Abort {
-                abort_code: abort_codes::NFE_DESERIALIZE,
-            });
+            return Err(SafeNativeError::abort(abort_codes::NFE_DESERIALIZE));
         },
     };
 
@@ -54,9 +52,7 @@ fn native_ecdsa_recover(
     let rid = match libsecp256k1::RecoveryId::parse(recovery_id) {
         Ok(rid) => rid,
         Err(_) => {
-            return Err(SafeNativeError::Abort {
-                abort_code: abort_codes::NFE_DESERIALIZE,
-            });
+            return Err(SafeNativeError::abort(abort_codes::NFE_DESERIALIZE));
         },
     };
 
@@ -65,9 +61,7 @@ fn native_ecdsa_recover(
     let sig = match libsecp256k1::Signature::parse_standard_slice(&signature) {
         Ok(sig) => sig,
         Err(_) => {
-            return Err(SafeNativeError::Abort {
-                abort_code: abort_codes::NFE_DESERIALIZE,
-            });
+            return Err(SafeNativeError::abort(abort_codes::NFE_DESERIALIZE));
         },
     };
 

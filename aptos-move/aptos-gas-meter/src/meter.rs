@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     traits::{AptosGasMeter, GasAlgebra},
@@ -547,6 +547,12 @@ where
 
         self.algebra.charge_execution(cost)
     }
+
+    fn charge_abort_message(&mut self, bytes: &[u8]) -> PartialVMResult<()> {
+        let num_bytes = NumBytes::new(bytes.len() as u64);
+        let cost = ABORT_MSG_BASE + ABORT_MSG_PER_BYTE * num_bytes;
+        self.algebra.charge_execution(cost)
+    }
 }
 
 impl<A> AptosGasMeter for StandardGasMeter<A>
@@ -615,6 +621,16 @@ where
 
         self.algebra
             .charge_execution(KEYLESS_BASE_COST)
+            .map_err(|e| e.finish(Location::Undefined))
+    }
+
+    fn charge_slh_dsa_sha2_128s(&mut self) -> VMResult<()> {
+        if self.feature_version() < RELEASE_V1_41 {
+            return Ok(());
+        }
+
+        self.algebra
+            .charge_execution(SLH_DSA_SHA2_128S_BASE_COST)
             .map_err(|e| e.finish(Location::Undefined))
     }
 }

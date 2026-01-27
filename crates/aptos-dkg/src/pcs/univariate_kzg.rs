@@ -1,10 +1,11 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::sigma_protocol::{
     homomorphism,
     homomorphism::{fixed_base_msms, fixed_base_msms::Trait, TrivialShape as CodomainShape},
 };
+use aptos_crypto::arkworks::msm::{IsMsmInput, MsmInput};
 use ark_ec::{pairing::Pairing, VariableBaseMSM};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use std::fmt::Debug;
@@ -35,12 +36,11 @@ impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<'a, E> {
 }
 
 impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
-    type Base = E::G1Affine;
     type CodomainShape<T>
         = CodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-    type MsmInput = fixed_base_msms::MsmInput<Self::Base, Self::Scalar>;
+    type MsmInput = MsmInput<E::G1Affine, E::ScalarField>;
     type MsmOutput = E::G1;
     type Scalar = E::ScalarField;
 
@@ -56,13 +56,13 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
         scalars.push(input.0);
         scalars.extend_from_slice(&input.1);
 
-        CodomainShape(fixed_base_msms::MsmInput {
+        CodomainShape(MsmInput {
             bases: self.lagr_g1[..1 + input.1.len()].to_vec(),
             scalars,
         })
     }
 
-    fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
-        E::G1::msm(bases, &scalars).expect("MSM failed in univariate KZG")
+    fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
+        E::G1::msm(input.bases(), input.scalars()).expect("MSM failed in univariate KZG")
     }
 }

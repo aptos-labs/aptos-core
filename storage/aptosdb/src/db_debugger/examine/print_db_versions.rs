@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     db_debugger::ShardingConfig,
@@ -43,13 +43,15 @@ impl Cmd {
         };
         let env = None;
         let block_cache = None;
-        let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
+        // TODO(HotState): handle hot state merkle db.
+        let (ledger_db, _hot_state_merkle_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
             &StorageDirPaths::from_path(&self.db_dir),
             rocksdb_config,
             env,
             block_cache,
             /*readonly=*/ true,
             /*max_num_nodes_per_lru_cache_shard=*/ 0,
+            /*reset_hot_state=*/ false,
         )?;
 
         println!(

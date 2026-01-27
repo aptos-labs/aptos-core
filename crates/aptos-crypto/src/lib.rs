@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
@@ -15,7 +14,6 @@ pub mod constant_time;
 pub mod ed25519;
 pub mod elgamal;
 pub mod encoding_type;
-pub mod error;
 pub mod hash;
 pub mod hkdf;
 pub mod input_secret;
@@ -24,6 +22,7 @@ pub mod noise;
 pub mod player;
 pub mod secp256k1_ecdsa;
 pub mod secp256r1_ecdsa;
+pub mod slh_dsa_sha2_128s;
 pub mod test_utils;
 pub mod traits;
 pub mod utils;

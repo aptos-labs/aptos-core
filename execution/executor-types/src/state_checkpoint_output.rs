@@ -1,8 +1,9 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #![forbid(unsafe_code)]
 
+use aptos_config::config::HotStateConfig;
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DropHelper;
 use aptos_storage_interface::state_store::state_summary::LedgerStateSummary;
@@ -34,7 +35,7 @@ impl StateCheckpointOutput {
     }
 
     pub fn new_dummy() -> Self {
-        Self::new_empty(LedgerStateSummary::new_empty())
+        Self::new_empty(LedgerStateSummary::new_empty(HotStateConfig::default()))
     }
 
     fn new_impl(inner: Inner) -> Self {

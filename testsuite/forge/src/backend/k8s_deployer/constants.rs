@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 pub const FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO: &str =
     "us-docker.pkg.dev/aptos-registry/docker/forge-indexer-deployer";
@@ -10,7 +10,7 @@ pub const INDEXER_GRPC_DOCKER_IMAGE_REPO: &str =
     "us-docker.pkg.dev/aptos-registry/docker/indexer-grpc";
 
 /// The version of the forge deployer image to use.
-pub const DEFAULT_FORGE_DEPLOYER_IMAGE_TAG: &str = "a5a8bb0bc90998a874c6c2e0f8b9ae4feffe4675"; // default to the latest stable build from the main branch (2025-11-04)
+pub const DEFAULT_FORGE_DEPLOYER_IMAGE_TAG: &str = "e442e74177940f11aaa21973fea32ca4c7ee051e"; // default to the latest stable build from the main branch (2026-01-14)
 
 /// This is the service account name that the deployer will use to deploy the forge components. It may require extra permissions and additonal setup
 pub const FORGE_DEPLOYER_SERVICE_ACCOUNT_NAME: &str = "forge";

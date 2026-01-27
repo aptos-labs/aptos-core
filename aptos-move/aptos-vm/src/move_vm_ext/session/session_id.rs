@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::transaction_metadata::TransactionMetadata;
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -207,7 +207,7 @@ impl SessionId {
 
     // This is used in `monotonically_increasing_number` native function. Every call to the native function
     // will output a monotonically increasing number.
-    // monotonically_increasing_number (128 bits) = 0 (8 bits -- Reserved for future use) || timestamp (64 bits) || transaction_index_inside_block (24 bits) || session_counter_inside_transaction (8 bits) || local_counter_inside_session (16 bits)
+    // monotonically_increasing_number (128 bits) = 0 (8 bits -- Reserved for future use) || timestamp (64 bits) || transaction_index_inside_block (32 bits) || session_counter_inside_transaction (8 bits) || local_counter_inside_session (16 bits)
     // This function is used to obtain `session_counter_inside_transaction`.
     // The sessions here are organized in the increasing order in which they are created. Eg: Prologue < Txn < RunOnAbort < Epilogue.
     // When introducing new session types, please check the order in which the sessions are created during a transaction execution and assign a number here accordingly.

@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     abort_unless_feature_flag_enabled,
@@ -178,9 +178,7 @@ pub fn scalar_mul_internal(
             let new_handle = store_element!(context, new_element)?;
             Ok(smallvec![Value::u64(new_handle as u64)])
         },
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
+        _ => Err(SafeNativeError::abort(MOVE_ABORT_CODE_NOT_IMPLEMENTED)),
     }
 }
 
@@ -199,9 +197,9 @@ macro_rules! ark_msm_internal {
         let num_elements = element_handles.len();
         let num_scalars = scalar_handles.len();
         if num_elements != num_scalars {
-            return Err(SafeNativeError::Abort {
-                abort_code: MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING,
-            });
+            return Err(SafeNativeError::abort(
+                MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING,
+            ));
         }
         let mut bases = Vec::with_capacity(num_elements);
         $context.charge($proj_to_affine_cost * NumArgs::from(num_elements as u64))?;
@@ -286,8 +284,6 @@ pub fn multi_scalar_mul_internal(
                 ark_bn254::Fr
             )
         },
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
+        _ => Err(SafeNativeError::abort(MOVE_ABORT_CODE_NOT_IMPLEMENTED)),
     }
 }

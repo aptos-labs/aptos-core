@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use ark_ff::{BigInteger, PrimeField};
 
-/// Converts a field element into little-endian chunks of `num_bits` bits.
-pub(crate) fn scalar_to_le_chunks<F: PrimeField>(num_bits: u8, scalar: &F) -> Vec<F> {
+/// Converts a field element into little-endian chunks of `num_bits` bits.  Made `pub` for tests
+pub fn scalar_to_le_chunks<F: PrimeField>(num_bits: u8, scalar: &F) -> Vec<F> {
     assert!(
         num_bits.is_multiple_of(8) && num_bits > 0 && num_bits <= 64,
         "Invalid chunk size"
@@ -28,8 +28,8 @@ pub(crate) fn scalar_to_le_chunks<F: PrimeField>(num_bits: u8, scalar: &F) -> Ve
     chunks
 }
 
-/// Reconstructs a field element from `num_bits`-bit chunks (little-endian order).
-pub(crate) fn le_chunks_to_scalar<F: PrimeField>(num_bits: u8, chunks: &[F]) -> F {
+/// Reconstructs a field element from `num_bits`-bit chunks (little-endian order). Made `pub` for tests
+pub fn le_chunks_to_scalar<F: PrimeField>(num_bits: u8, chunks: &[F]) -> F {
     assert!(
         num_bits.is_multiple_of(8) && num_bits > 0 && num_bits <= 64, // TODO: so make num_bits a u8?
         "Invalid chunk size"

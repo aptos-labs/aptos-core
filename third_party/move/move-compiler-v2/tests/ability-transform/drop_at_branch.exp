@@ -385,7 +385,7 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0x42::explicate_drop
 // Function definition at index 0
 fun drop_at_branch(l0: bool): u8

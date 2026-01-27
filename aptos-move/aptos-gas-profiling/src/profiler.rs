@@ -1,12 +1,12 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::log::{
     CallFrame, Dependency, EventStorage, EventTransient, ExecutionAndIOCosts, ExecutionGasEvent,
     FrameName, StorageFees, TransactionGasLog, WriteOpType, WriteStorage, WriteTransient,
 };
 use aptos_gas_algebra::{Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes, NumTypeNodes};
-use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
+use aptos_gas_meter::{AptosGasMeter, GasAlgebra, PeakMemoryUsage};
 use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_30;
 use aptos_types::{
     contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
@@ -37,6 +37,7 @@ pub struct GasProfiler<G> {
 
     intrinsic_cost: Option<InternalGas>,
     keyless_cost: Option<InternalGas>,
+    slh_dsa_sha2_128s_cost: Option<InternalGas>,
     dependencies: Vec<Dependency>,
     frames: Vec<CallFrame>,
     transaction_transient: Option<InternalGas>,
@@ -94,6 +95,7 @@ impl<G> GasProfiler<G> {
 
             intrinsic_cost: None,
             keyless_cost: None,
+            slh_dsa_sha2_128s_cost: None,
             dependencies: vec![],
             frames: vec![CallFrame::new_script()],
             transaction_transient: None,
@@ -114,6 +116,7 @@ impl<G> GasProfiler<G> {
 
             intrinsic_cost: None,
             keyless_cost: None,
+            slh_dsa_sha2_128s_cost: None,
             dependencies: vec![],
             frames: vec![CallFrame::new_function(module_id, func_name, ty_args)],
             transaction_transient: None,
@@ -367,6 +370,9 @@ where
 
         [VEC_SWAP]
         fn charge_vec_swap(&mut self) -> PartialVMResult<()>;
+
+        [ABORT_MSG]
+        fn charge_abort_message(&mut self, bytes: &[u8]) -> PartialVMResult<()>;
     }
 
     fn balance_internal(&self) -> InternalGas {
@@ -702,9 +708,18 @@ where
     }
 
     fn charge_keyless(&mut self) -> VMResult<()> {
-        let (_cost, res) = self.delegate_charge(|base| base.charge_keyless());
+        let (cost, res) = self.delegate_charge(|base| base.charge_keyless());
 
-        // TODO: add keyless
+        self.keyless_cost = Some(cost);
+
+        res
+    }
+
+    fn charge_slh_dsa_sha2_128s(&mut self) -> VMResult<()> {
+        let (cost, res) = self.delegate_charge(|base| base.charge_slh_dsa_sha2_128s());
+
+        self.slh_dsa_sha2_128s_cost =
+            Some(self.slh_dsa_sha2_128s_cost.unwrap_or_else(|| 0.into()) + cost);
 
         res
     }
@@ -712,7 +727,7 @@ where
 
 impl<G> GasProfiler<G>
 where
-    G: AptosGasMeter,
+    G: AptosGasMeter + PeakMemoryUsage,
 {
     pub fn finish(mut self) -> TransactionGasLog {
         while self.frames.len() > 1 {
@@ -726,6 +741,7 @@ where
             total: self.algebra().execution_gas_used() + self.algebra().io_gas_used(),
             intrinsic_cost: self.intrinsic_cost.unwrap_or_else(|| 0.into()),
             keyless_cost: self.keyless_cost.unwrap_or_else(|| 0.into()),
+            slh_dsa_sha2_128s_cost: self.slh_dsa_sha2_128s_cost.unwrap_or_else(|| 0.into()),
             dependencies: self.dependencies,
             call_graph: self.frames.pop().expect("frame must exist"),
             transaction_transient: self.transaction_transient,
@@ -748,6 +764,7 @@ where
             exec_io,
             storage,
             num_txns: 1,
+            peak_memory_usage: self.base.peak_memory_usage(),
         }
     }
 }

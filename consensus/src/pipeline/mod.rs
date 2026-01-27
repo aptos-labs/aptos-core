@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 /*
  *         ┌──────────────────┐
@@ -36,6 +35,7 @@ pub mod persisting_phase;
 pub mod pipeline_phase;
 pub mod signing_phase;
 
+pub mod decryption_pipeline_builder;
 pub mod execution_client;
 pub mod pipeline_builder;
 #[cfg(test)]

@@ -2806,6 +2806,32 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
             } = unbound_names;
             EE::Spec(spec_id, unbound_vars, unbound_func_ptrs)
         },
+        PE::Behavior(kind, pre_label, fn_name, type_args, sp!(args_loc, args), post_label) => {
+            if !context.in_spec_context {
+                context.env.add_diag(diag!(
+                    Syntax::SpecContextRestricted,
+                    (
+                        loc,
+                        "behavior predicate expression only allowed in specifications"
+                    )
+                ));
+                EE::UnresolvedError
+            } else {
+                let e_fn_name = name_access_chain(
+                    context,
+                    Access::Term,
+                    fn_name,
+                    Some(DeprecatedItem::Function),
+                );
+                let e_type_args = optional_types(context, type_args);
+                let e_args = sp(args_loc, exps(context, args));
+                if let Some(fn_access) = e_fn_name {
+                    EE::Behavior(kind, pre_label, fn_access, e_type_args, e_args, post_label)
+                } else {
+                    EE::UnresolvedError
+                }
+            }
+        },
         PE::UnresolvedError => panic!("ICE error should have been thrown"),
     };
     sp(loc, e_)
@@ -3418,6 +3444,15 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
         EE::Spec(_, unbound_vars, unbound_func_ptrs) => {
             unbound.vars.extend(unbound_vars);
             unbound.func_ptrs.extend(unbound_func_ptrs);
+        },
+        EE::Behavior(_, _, fn_name, _type_args, sp!(_, args), _) => {
+            match &fn_name.value {
+                E::ModuleAccess_::Name(n) => {
+                    unbound.func_ptrs.insert(*n);
+                },
+                E::ModuleAccess_::ModuleAccess(..) => (),
+            }
+            unbound_names_exps(unbound, args);
         },
     }
 }

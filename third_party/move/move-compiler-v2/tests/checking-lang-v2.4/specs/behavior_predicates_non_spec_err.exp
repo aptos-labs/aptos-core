@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: syntax item restricted to spec contexts
+  ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_non_spec_err.move:7:13
+  │
+7 │         if (requires_of<f>(x)) {
+  │             ^^^^^^^^^^^^^^^^^ behavior predicate expression only allowed in specifications

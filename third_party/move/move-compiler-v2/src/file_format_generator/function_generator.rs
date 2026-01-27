@@ -20,9 +20,12 @@ use move_core_types::{ability, function::ClosureMask};
 use move_model::{
     ast::{ExpData, Spec, SpecBlockTarget, TempIndex},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
-    model::{FunId, FunctionEnv, Loc, NodeId, Parameter, QualifiedId, StructId, TypeParameter},
+    model::{
+        FunId, FunctionEnv, Loc, NodeId, Parameter, QualifiedId, StructEnv, StructId, TypeParameter,
+    },
     symbol::Symbol,
-    ty::{PrimitiveType, Type},
+    ty::{PrimitiveType, ReferenceKind, Type},
+    well_known,
 };
 use move_stackless_bytecode::{
     function_target::FunctionTarget,
@@ -33,7 +36,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub struct FunctionGenerator<'a> {
     /// The underlying module generator.
-    r#gen: &'a mut ModuleGenerator,
+    genr: &'a mut ModuleGenerator,
     /// The set of temporaries which need to be pinned to locals because references are taken for
     /// them, or they are used in specs.
     pinned: BTreeSet<TempIndex>,
@@ -104,40 +107,37 @@ struct LabelInfo {
 impl<'a> FunctionGenerator<'a> {
     /// Runs the function generator for the given function.
     pub fn run<'b>(
-        r#gen: &'a mut ModuleGenerator,
+        genr: &'a mut ModuleGenerator,
         ctx: &'b ModuleContext,
         fun_env: FunctionEnv<'b>,
         acquires_list: &BTreeSet<StructId>,
     ) {
         let loc = fun_env.get_id_loc();
-        let function = r#gen.function_index(ctx, &loc, &fun_env);
+        let function = genr.function_index(ctx, &loc, &fun_env);
         let visibility = fun_env.visibility();
-        let fun_count = r#gen.module.function_defs.len();
+        let fun_count = genr.module.function_defs.len();
         let def_idx = FunctionDefinitionIndex::new(ctx.checked_bound(
             &loc,
             fun_count,
             MAX_FUNCTION_DEF_COUNT,
             "defined function",
         ));
-        r#gen
-            .source_map
+        genr.source_map
             .add_top_level_function_mapping(def_idx, ctx.env.to_ir_loc(&loc), fun_env.is_native())
             .expect(SOURCE_MAP_OK);
         for TypeParameter(name, _, loc) in fun_env.get_type_parameters() {
-            r#gen
-                .source_map
+            genr.source_map
                 .add_function_type_parameter_mapping(def_idx, ctx.source_name(name, loc))
                 .expect(SOURCE_MAP_OK)
         }
         for Parameter(name, _, loc) in fun_env.get_parameters() {
-            r#gen
-                .source_map
+            genr.source_map
                 .add_parameter_mapping(def_idx, ctx.source_name(name, loc))
                 .expect(SOURCE_MAP_OK)
         }
-        let (r#gen, code) = if !fun_env.is_native() {
+        let (genr, code) = if !fun_env.is_native() {
             let mut fun_gen = Self {
-                r#gen,
+                genr,
                 pinned: Default::default(),
                 temps: Default::default(),
                 stack: vec![],
@@ -162,7 +162,7 @@ impl<'a> FunctionGenerator<'a> {
                 let transformed_code_chunk = peephole_optimizer::optimize(&code.code);
                 // Fix the source map for the optimized code.
                 fun_gen
-                    .r#gen
+                    .genr
                     .source_map
                     .remap_code_map(def_idx, &transformed_code_chunk.original_offsets)
                     .expect(SOURCE_MAP_OK);
@@ -174,15 +174,15 @@ impl<'a> FunctionGenerator<'a> {
             if !fun_gen.spec_blocks.is_empty() {
                 fun_env.get_mut_spec().on_impl = fun_gen.spec_blocks;
             }
-            (fun_gen.r#gen, Some(code))
+            (fun_gen.genr, Some(code))
         } else {
-            (r#gen, None)
+            (genr, None)
         };
         let acquires_global_resources = acquires_list
             .iter()
             .map(|id| {
                 let struct_env = fun_env.module_env.get_struct(*id);
-                r#gen.struct_def_index(ctx, &struct_env.get_loc(), &struct_env)
+                genr.struct_def_index(ctx, &struct_env.get_loc(), &struct_env)
             })
             .collect();
         let def = FF::FunctionDefinition {
@@ -193,7 +193,452 @@ impl<'a> FunctionGenerator<'a> {
             code,
         };
 
-        r#gen.module.function_defs.push(def)
+        genr.module.function_defs.push(def)
+    }
+
+    /// Common builder for generating function definitions for struct APIs
+    fn gen_struct_api_common<'b, F>(
+        genr: &'a mut ModuleGenerator,
+        ctx: &'b ModuleContext,
+        struct_env: &'b StructEnv<'b>,
+        visibility: FF::Visibility,
+        base_loc: &'b Loc,
+        type_parameters: &[Type],
+        function_indices: BTreeMap<Option<Symbol>, FF::FunctionHandleIndex>,
+        mut mk_body: F,
+    ) where
+        F: FnMut(
+            &mut ModuleGenerator,
+            &ModuleContext,
+            &StructEnv<'_>,
+            Option<Symbol>,
+            FunctionDefinitionIndex,
+            &Loc,
+            &[Type],
+        ) -> FF::CodeUnit,
+    {
+        assert!(visibility.is_public_or_friend());
+
+        for (variant, function_index) in function_indices {
+            let def_idx = FunctionDefinitionIndex::new(ctx.checked_bound(
+                base_loc,
+                genr.module.function_defs.len(),
+                MAX_FUNCTION_DEF_COUNT,
+                "defined function",
+            ));
+
+            let loc = if let Some(variant_id) = variant {
+                struct_env.get_variant_loc(variant_id)
+            } else {
+                base_loc
+            };
+
+            genr.source_map
+                .add_top_level_function_mapping(def_idx, ctx.env.to_ir_loc(loc), false)
+                .expect(SOURCE_MAP_OK);
+
+            for TypeParameter(name, _, tp_loc) in struct_env.get_type_parameters() {
+                genr.source_map
+                    .add_function_type_parameter_mapping(
+                        def_idx,
+                        ctx.source_name(name, tp_loc.clone()),
+                    )
+                    .expect(SOURCE_MAP_OK);
+            }
+
+            // Let the caller build the actual body.
+            let code = mk_body(
+                genr,
+                ctx,
+                struct_env,
+                variant,
+                def_idx,
+                loc,
+                type_parameters,
+            );
+
+            let def = FF::FunctionDefinition {
+                function: function_index,
+                visibility,
+                is_entry: false,
+                acquires_global_resources: vec![],
+                code: Some(code),
+            };
+
+            genr.module.function_defs.push(def);
+        }
+    }
+
+    /// Generates test variant APIs for all variants of an enum
+    pub fn gen_struct_test_variant_api<'b>(
+        genr: &'a mut ModuleGenerator,
+        ctx: &'b ModuleContext,
+        struct_env: &'b StructEnv<'b>,
+    ) {
+        if !struct_env.has_variants() {
+            return;
+        }
+
+        let visibility = struct_env.get_visibility();
+        assert!(visibility.is_public_or_friend());
+
+        let type_parameters = TypeParameter::vec_to_formals(struct_env.get_type_parameters());
+        let struct_ty = Type::Struct(
+            struct_env.module_env.get_id(),
+            struct_env.get_id(),
+            type_parameters.clone(),
+        );
+        let ref_struct_ty = Type::Reference(ReferenceKind::Immutable, Box::new(struct_ty));
+        let loc = struct_env.get_loc();
+
+        let raw_function_indices = genr.struct_api_test_variant_index(ctx, &loc, struct_env);
+        let function_indices = raw_function_indices
+            .into_iter()
+            .map(|(variant, fh_idx)| (Some(variant), fh_idx))
+            .collect();
+
+        Self::gen_struct_api_common(
+            genr,
+            ctx,
+            struct_env,
+            visibility,
+            &loc,
+            &type_parameters,
+            function_indices,
+            |genr, ctx, struct_env, variant_opt, def_idx, variant_loc, type_parameters| {
+                let variant = variant_opt.expect("test_variant API only generated for variants");
+
+                let input_param_name = struct_env
+                    .env()
+                    .symbol_pool()
+                    .make(well_known::PARAM_NAME_FOR_STRUCT_API);
+                genr.source_map
+                    .add_parameter_mapping(
+                        def_idx,
+                        ctx.source_name(input_param_name, variant_loc.clone()),
+                    )
+                    .expect(SOURCE_MAP_OK);
+
+                // Function body:
+                // MoveLoc(0)
+                // TestVariant/TestVariantGeneric
+                // Ret
+                let locals = genr.signature(ctx, &loc, vec![ref_struct_ty.clone()]);
+
+                let mut code = vec![FF::Bytecode::MoveLoc(0 as FF::LocalIndex)];
+
+                let test_variant_bc = if type_parameters.is_empty() {
+                    let idx = genr.struct_variant_index(ctx, &loc, struct_env, variant);
+                    FF::Bytecode::TestVariant(idx)
+                } else {
+                    let idx = genr.struct_variant_inst_index(
+                        ctx,
+                        &loc,
+                        struct_env,
+                        variant,
+                        type_parameters.to_vec(),
+                    );
+                    FF::Bytecode::TestVariantGeneric(idx)
+                };
+
+                code.push(test_variant_bc);
+                code.push(FF::Bytecode::Ret);
+
+                FF::CodeUnit { locals, code }
+            },
+        );
+    }
+
+    /// Generates pack APIs
+    pub fn gen_struct_pack_api<'b>(
+        genr: &'a mut ModuleGenerator,
+        ctx: &'b ModuleContext,
+        struct_env: &'b StructEnv<'b>,
+    ) {
+        let visibility = struct_env.get_visibility();
+        let type_parameters = TypeParameter::vec_to_formals(struct_env.get_type_parameters());
+        let loc = struct_env.get_loc();
+        let function_indices = genr.struct_api_pack_index(ctx, &loc, struct_env);
+
+        Self::gen_struct_api_common(
+            genr,
+            ctx,
+            struct_env,
+            visibility,
+            &loc,
+            type_parameters.as_slice(),
+            function_indices,
+            |genr, ctx, struct_env, variant, def_idx, loc, type_parameters| {
+                // Function body:
+                // MoveLoc(0)
+                // MoveLoc(1)
+                // ...
+                // MoveLoc(parameter_count - 1)
+                // Pack/PackGeneric/PackVariant/PackVariantGeneric
+                // Ret
+                let mut tys = vec![];
+                let mut code = vec![];
+
+                for (i, field) in struct_env.get_fields_optional_variant(variant).enumerate() {
+                    let field_symbol = struct_env.env().symbol_pool().make(&format!(
+                        "_{}",
+                        field.get_name().display(struct_env.env().symbol_pool())
+                    ));
+                    genr.source_map
+                        .add_parameter_mapping(def_idx, ctx.source_name(field_symbol, loc.clone()))
+                        .expect(SOURCE_MAP_OK);
+
+                    // number of fields will not exceed 255, so we can safely cast it
+                    code.push(FF::Bytecode::MoveLoc(i as FF::LocalIndex));
+                    tys.push(field.get_type());
+                }
+
+                let locals = genr.signature(ctx, loc, tys);
+
+                let pack_bc = match (type_parameters.is_empty(), variant) {
+                    (true, Some(variant_id)) => {
+                        let idx = genr.struct_variant_index(ctx, loc, struct_env, variant_id);
+                        FF::Bytecode::PackVariant(idx)
+                    },
+                    (true, None) => {
+                        let idx = genr.struct_def_index(ctx, loc, struct_env);
+                        FF::Bytecode::Pack(idx)
+                    },
+                    (false, Some(variant_id)) => {
+                        let idx = genr.struct_variant_inst_index(
+                            ctx,
+                            loc,
+                            struct_env,
+                            variant_id,
+                            type_parameters.to_vec(),
+                        );
+                        FF::Bytecode::PackVariantGeneric(idx)
+                    },
+                    (false, None) => {
+                        let idx = genr.struct_def_instantiation_index(
+                            ctx,
+                            loc,
+                            struct_env,
+                            type_parameters.to_vec(),
+                        );
+                        FF::Bytecode::PackGeneric(idx)
+                    },
+                };
+
+                code.push(pack_bc);
+                code.push(FF::Bytecode::Ret);
+
+                FF::CodeUnit { locals, code }
+            },
+        );
+    }
+
+    /// Generates unpack api
+    pub fn gen_struct_unpack_api<'b>(
+        genr: &'a mut ModuleGenerator,
+        ctx: &'b ModuleContext,
+        struct_env: &'b StructEnv<'b>,
+    ) {
+        let visibility = struct_env.get_visibility();
+        let type_parameters = TypeParameter::vec_to_formals(struct_env.get_type_parameters());
+        let loc = struct_env.get_loc();
+        let function_indices = genr.struct_api_unpack_index(ctx, &loc, struct_env);
+
+        let struct_ty = Type::Struct(
+            struct_env.module_env.get_id(),
+            struct_env.get_id(),
+            type_parameters.clone(),
+        );
+
+        Self::gen_struct_api_common(
+            genr,
+            ctx,
+            struct_env,
+            visibility,
+            &loc,
+            &type_parameters,
+            function_indices,
+            |genr, ctx, struct_env, variant, def_idx, loc, type_parameters| {
+                let input_param_name = struct_env
+                    .env()
+                    .symbol_pool()
+                    .make(well_known::PARAM_NAME_FOR_STRUCT_API);
+
+                genr.source_map
+                    .add_parameter_mapping(def_idx, ctx.source_name(input_param_name, loc.clone()))
+                    .expect(SOURCE_MAP_OK);
+
+                // Function body:
+                // MoveLoc(0)
+                // Unpack/UnpackGeneric/UnpackVariant/UnpackVariantGeneric
+                // Ret
+                let locals = genr.signature(ctx, loc, vec![struct_ty.clone()]);
+                let mut code = vec![FF::Bytecode::MoveLoc(0 as FF::LocalIndex)];
+
+                let unpack_bc = match (type_parameters.is_empty(), variant) {
+                    (true, Some(variant_id)) => {
+                        let idx = genr.struct_variant_index(ctx, loc, struct_env, variant_id);
+                        FF::Bytecode::UnpackVariant(idx)
+                    },
+                    (true, None) => {
+                        let idx = genr.struct_def_index(ctx, loc, struct_env);
+                        FF::Bytecode::Unpack(idx)
+                    },
+                    (false, Some(variant_id)) => {
+                        let idx = genr.struct_variant_inst_index(
+                            ctx,
+                            loc,
+                            struct_env,
+                            variant_id,
+                            type_parameters.to_vec(),
+                        );
+                        FF::Bytecode::UnpackVariantGeneric(idx)
+                    },
+                    (false, None) => {
+                        let idx = genr.struct_def_instantiation_index(
+                            ctx,
+                            loc,
+                            struct_env,
+                            type_parameters.to_vec(),
+                        );
+                        FF::Bytecode::UnpackGeneric(idx)
+                    },
+                };
+
+                code.push(unpack_bc);
+                code.push(FF::Bytecode::Ret);
+
+                FF::CodeUnit { locals, code }
+            },
+        );
+    }
+
+    /// Generates borrow field api
+    pub fn gen_struct_borrow_field_api<'b>(
+        genr: &'a mut ModuleGenerator,
+        ctx: &'b ModuleContext,
+        struct_env: &'b StructEnv<'b>,
+        is_imm: bool,
+    ) {
+        let visibility = struct_env.get_visibility();
+        assert!(visibility.is_public_or_friend());
+        if struct_env.is_empty_struct() {
+            return;
+        }
+        let type_parameters = TypeParameter::vec_to_formals(struct_env.get_type_parameters());
+        let loc = struct_env.get_loc();
+        let function_indices = genr.struct_api_borrow_index(ctx, &loc, struct_env, is_imm);
+        let struct_ty = Type::Struct(
+            struct_env.module_env.get_id(),
+            struct_env.get_id(),
+            type_parameters.clone(),
+        );
+        let ref_struct_ty = Type::Reference(
+            if is_imm {
+                ReferenceKind::Immutable
+            } else {
+                ReferenceKind::Mutable
+            },
+            Box::new(struct_ty),
+        );
+        for ((variant_opt, offset, _), function_index) in function_indices {
+            let def_idx = FunctionDefinitionIndex::new(ctx.checked_bound(
+                &loc,
+                genr.module.function_defs.len(),
+                MAX_FUNCTION_DEF_COUNT,
+                "defined function",
+            ));
+            genr.source_map
+                .add_top_level_function_mapping(def_idx, ctx.env.to_ir_loc(&loc), false)
+                .expect(SOURCE_MAP_OK);
+            for TypeParameter(name, _, loc) in struct_env.get_type_parameters() {
+                genr.source_map
+                    .add_function_type_parameter_mapping(
+                        def_idx,
+                        ctx.source_name(name, loc.clone()),
+                    )
+                    .expect(SOURCE_MAP_OK)
+            }
+            let input_param_name = struct_env
+                .env()
+                .symbol_pool()
+                .make(well_known::PARAM_NAME_FOR_STRUCT_API);
+            genr.source_map
+                .add_parameter_mapping(def_idx, ctx.source_name(input_param_name, loc.clone()))
+                .expect(SOURCE_MAP_OK);
+
+            // Function body:
+            // MoveLoc(0)
+            // ImmBorrowField/MutBorrowField/ImmBorrowFieldGeneric/MutBorrowFieldGeneric/
+            // ImmBorrowVariantField/MutBorrowVariantField/ImmBorrowVariantFieldGeneric/MutBorrowVariantFieldGeneric
+            // Ret
+            let locals = genr.signature(ctx, &loc, vec![ref_struct_ty.clone()]);
+            let mut code = vec![];
+            code.push(FF::Bytecode::MoveLoc(0 as FF::LocalIndex));
+            let field_env = &struct_env.get_field_by_offset_optional_variant(
+                variant_opt.clone().map(|variants| variants[0]),
+                offset,
+            );
+            let borrow_field_bc = match (type_parameters.is_empty(), variant_opt, is_imm) {
+                (true, Some(variants), true) => {
+                    let idx = genr.variant_field_index(ctx, &loc, &variants, field_env);
+                    FF::Bytecode::ImmBorrowVariantField(idx)
+                },
+                (true, Some(variants), false) => {
+                    let idx = genr.variant_field_index(ctx, &loc, &variants, field_env);
+                    FF::Bytecode::MutBorrowVariantField(idx)
+                },
+                (true, None, true) => {
+                    let idx = genr.field_index(ctx, &loc, field_env);
+                    FF::Bytecode::ImmBorrowField(idx)
+                },
+                (true, None, false) => {
+                    let idx = genr.field_index(ctx, &loc, field_env);
+                    FF::Bytecode::MutBorrowField(idx)
+                },
+                (false, Some(variants), true) => {
+                    let idx = genr.variant_field_inst_index(
+                        ctx,
+                        &loc,
+                        &variants,
+                        field_env,
+                        type_parameters.to_vec(),
+                    );
+                    FF::Bytecode::ImmBorrowVariantFieldGeneric(idx)
+                },
+                (false, Some(variants), false) => {
+                    let idx = genr.variant_field_inst_index(
+                        ctx,
+                        &loc,
+                        &variants,
+                        field_env,
+                        type_parameters.to_vec(),
+                    );
+                    FF::Bytecode::MutBorrowVariantFieldGeneric(idx)
+                },
+                (false, None, true) => {
+                    let idx = genr.field_inst_index(ctx, &loc, field_env, type_parameters.to_vec());
+                    FF::Bytecode::ImmBorrowFieldGeneric(idx)
+                },
+                (false, None, false) => {
+                    let idx = genr.field_inst_index(ctx, &loc, field_env, type_parameters.to_vec());
+                    FF::Bytecode::MutBorrowFieldGeneric(idx)
+                },
+            };
+            code.push(borrow_field_bc);
+            code.push(FF::Bytecode::Ret);
+            let code = FF::CodeUnit { locals, code };
+
+            let def = FF::FunctionDefinition {
+                function: function_index,
+                visibility,
+                is_entry: false,
+                acquires_global_resources: vec![],
+                code: Some(code),
+            };
+
+            genr.module.function_defs.push(def);
+        }
     }
 
     /// Generates code for a function.
@@ -253,7 +698,7 @@ impl<'a> FunctionGenerator<'a> {
         }
 
         // Deliver result
-        let locals = self.r#gen.signature(
+        let locals = self.genr.signature(
             &ctx.module,
             &ctx.loc,
             self.locals[ctx.fun.get_parameter_count()..].to_vec(),
@@ -267,7 +712,7 @@ impl<'a> FunctionGenerator<'a> {
     /// Generate file-format bytecode from a stackless bytecode and an optional next bytecode
     /// for peephole optimizations.
     fn gen_bytecode(&mut self, ctx: &BytecodeContext, bc: &Bytecode, next_bc: Option<&Bytecode>) {
-        self.r#gen
+        self.genr
             .source_map
             .add_code_mapping(
                 ctx.fun_ctx.def_idx,
@@ -335,10 +780,15 @@ impl<'a> FunctionGenerator<'a> {
                 self.add_label_reference(*label);
                 self.emit(FF::Bytecode::Branch(0));
             },
-            Bytecode::Abort(_, temp) => {
-                self.balance_stack_end_of_block(ctx, vec![*temp]);
+            Bytecode::Abort(_, temp, None) => {
+                self.balance_stack_end_of_block(ctx, [*temp]);
                 self.emit(FF::Bytecode::Abort);
                 self.abstract_pop(ctx)
+            },
+            Bytecode::Abort(_, temp0, Some(temp1)) => {
+                self.balance_stack_end_of_block(ctx, [*temp0, *temp1]);
+                self.emit(FF::Bytecode::AbortMsg);
+                self.abstract_pop_n(ctx, 2);
             },
             Bytecode::Nop(_) => {
                 // do nothing -- labels are relative
@@ -420,62 +870,170 @@ impl<'a> FunctionGenerator<'a> {
                 self.gen_invoke(ctx, dest, source);
             },
             Operation::Pack(mid, sid, inst) => {
-                self.gen_struct_oper(
-                    ctx,
-                    dest,
-                    mid.qualified(*sid),
-                    inst,
-                    source,
-                    FF::Bytecode::Pack,
-                    FF::Bytecode::PackGeneric,
-                );
+                let struct_env = &fun_ctx.module.env.get_struct(mid.qualified(*sid));
+                let fun_mid = ctx.fun_ctx.fun.func_env.module_env.get_id();
+                if mid != &fun_mid {
+                    if !struct_env
+                        .env()
+                        .language_version()
+                        .language_version_for_public_struct()
+                    {
+                        fun_ctx.internal_error(format!(
+                            "cross module struct access is not supported by language version {}",
+                            struct_env.env().language_version()
+                        ));
+                        return;
+                    }
+                    self.gen_pack_unpack_api_call::<true>(
+                        ctx, dest, source, fun_ctx, &None, inst, struct_env,
+                    );
+                } else {
+                    self.gen_struct_oper(
+                        ctx,
+                        dest,
+                        mid.qualified(*sid),
+                        inst,
+                        source,
+                        FF::Bytecode::Pack,
+                        FF::Bytecode::PackGeneric,
+                    );
+                }
             },
             Operation::PackVariant(mid, sid, variant, inst) => {
-                self.gen_struct_variant_oper(
-                    ctx,
-                    dest,
-                    mid.qualified(*sid),
-                    *variant,
-                    inst,
-                    source,
-                    FF::Bytecode::PackVariant,
-                    FF::Bytecode::PackVariantGeneric,
-                );
+                let struct_env = &fun_ctx.module.env.get_struct(mid.qualified(*sid));
+                let fun_mid = ctx.fun_ctx.fun.func_env.module_env.get_id();
+                if mid != &fun_mid {
+                    if !struct_env
+                        .env()
+                        .language_version()
+                        .language_version_for_public_struct()
+                    {
+                        fun_ctx.internal_error(format!(
+                            "cross module struct access is not supported by language version {}",
+                            struct_env.env().language_version()
+                        ));
+                        return;
+                    }
+                    self.gen_pack_unpack_api_call::<true>(
+                        ctx,
+                        dest,
+                        source,
+                        fun_ctx,
+                        &Some(*variant),
+                        inst,
+                        struct_env,
+                    );
+                } else {
+                    self.gen_struct_variant_oper(
+                        ctx,
+                        dest,
+                        mid.qualified(*sid),
+                        *variant,
+                        inst,
+                        source,
+                        FF::Bytecode::PackVariant,
+                        FF::Bytecode::PackVariantGeneric,
+                    );
+                }
             },
             Operation::Unpack(mid, sid, inst) => {
-                self.gen_struct_oper(
-                    ctx,
-                    dest,
-                    mid.qualified(*sid),
-                    inst,
-                    source,
-                    FF::Bytecode::Unpack,
-                    FF::Bytecode::UnpackGeneric,
-                );
+                let struct_env = &fun_ctx.module.env.get_struct(mid.qualified(*sid));
+                let fun_mid = ctx.fun_ctx.fun.func_env.module_env.get_id();
+                if mid != &fun_mid {
+                    if !struct_env
+                        .env()
+                        .language_version()
+                        .language_version_for_public_struct()
+                    {
+                        fun_ctx.internal_error(format!(
+                            "cross module struct access is not supported by language version {}",
+                            struct_env.env().language_version()
+                        ));
+                        return;
+                    }
+                    self.gen_pack_unpack_api_call::<false>(
+                        ctx, dest, source, fun_ctx, &None, inst, struct_env,
+                    );
+                } else {
+                    self.gen_struct_oper(
+                        ctx,
+                        dest,
+                        mid.qualified(*sid),
+                        inst,
+                        source,
+                        FF::Bytecode::Unpack,
+                        FF::Bytecode::UnpackGeneric,
+                    );
+                }
             },
             Operation::UnpackVariant(mid, sid, variant, inst) => {
-                self.gen_struct_variant_oper(
-                    ctx,
-                    dest,
-                    mid.qualified(*sid),
-                    *variant,
-                    inst,
-                    source,
-                    FF::Bytecode::UnpackVariant,
-                    FF::Bytecode::UnpackVariantGeneric,
-                );
+                let struct_env = &fun_ctx.module.env.get_struct(mid.qualified(*sid));
+                let fun_mid = ctx.fun_ctx.fun.func_env.module_env.get_id();
+                if mid != &fun_mid {
+                    if !struct_env
+                        .env()
+                        .language_version()
+                        .language_version_for_public_struct()
+                    {
+                        fun_ctx.internal_error(format!(
+                            "cross module struct access is not supported by language version {}",
+                            struct_env.env().language_version()
+                        ));
+                        return;
+                    }
+                    self.gen_pack_unpack_api_call::<false>(
+                        ctx,
+                        dest,
+                        source,
+                        fun_ctx,
+                        &Some(*variant),
+                        inst,
+                        struct_env,
+                    );
+                } else {
+                    self.gen_struct_variant_oper(
+                        ctx,
+                        dest,
+                        mid.qualified(*sid),
+                        *variant,
+                        inst,
+                        source,
+                        FF::Bytecode::UnpackVariant,
+                        FF::Bytecode::UnpackVariantGeneric,
+                    );
+                }
             },
             Operation::TestVariant(mid, sid, variant, inst) => {
-                self.gen_struct_variant_oper(
-                    ctx,
-                    dest,
-                    mid.qualified(*sid),
-                    *variant,
-                    inst,
-                    source,
-                    FF::Bytecode::TestVariant,
-                    FF::Bytecode::TestVariantGeneric,
-                );
+                let struct_env = &fun_ctx.module.env.get_struct(mid.qualified(*sid));
+                let fun_mid = ctx.fun_ctx.fun.func_env.module_env.get_id();
+                let is_mut_src = fun_ctx.fun.get_local_type(source[0]).is_mutable_reference();
+                if mid != &fun_mid {
+                    if !struct_env
+                        .env()
+                        .language_version()
+                        .language_version_for_public_struct()
+                    {
+                        fun_ctx.internal_error(format!(
+                            "cross module struct access is not supported by language version {}",
+                            struct_env.env().language_version()
+                        ));
+                        return;
+                    }
+                    self.gen_test_variant_api_call(
+                        ctx, dest, source, fun_ctx, variant, inst, struct_env, is_mut_src,
+                    );
+                } else {
+                    self.gen_struct_variant_oper(
+                        ctx,
+                        dest,
+                        mid.qualified(*sid),
+                        *variant,
+                        inst,
+                        source,
+                        FF::Bytecode::TestVariant,
+                        FF::Bytecode::TestVariantGeneric,
+                    );
+                }
             },
             Operation::MoveTo(mid, sid, inst) => {
                 self.gen_struct_oper(
@@ -520,26 +1078,71 @@ impl<'a> FunctionGenerator<'a> {
                 self.abstract_push_result(ctx, dest)
             },
             Operation::BorrowField(mid, sid, inst, offset) => {
-                self.gen_borrow_field(
-                    ctx,
-                    dest,
-                    mid.qualified(*sid),
-                    inst.clone(),
-                    None,
-                    *offset,
-                    source,
-                );
+                let struct_env = &fun_ctx.module.env.get_struct(mid.qualified(*sid));
+                let fun_mid = ctx.fun_ctx.fun.func_env.module_env.get_id();
+                if mid != &fun_mid {
+                    if !struct_env
+                        .env()
+                        .language_version()
+                        .language_version_for_public_struct()
+                    {
+                        fun_ctx.internal_error(format!(
+                            "cross module struct access is not supported by language version {}",
+                            struct_env.env().language_version()
+                        ));
+                        return;
+                    }
+                    self.gen_borrow_field_api_call(
+                        ctx, dest, source, fun_ctx, &None, inst, offset, struct_env,
+                    );
+                } else {
+                    self.gen_borrow_field(
+                        ctx,
+                        dest,
+                        mid.qualified(*sid),
+                        inst.clone(),
+                        None,
+                        *offset,
+                        source,
+                    );
+                }
             },
             Operation::BorrowVariantField(mid, sid, variants, inst, offset) => {
-                self.gen_borrow_field(
-                    ctx,
-                    dest,
-                    mid.qualified(*sid),
-                    inst.clone(),
-                    Some(variants),
-                    *offset,
-                    source,
-                );
+                let struct_env = &fun_ctx.module.env.get_struct(mid.qualified(*sid));
+                let fun_mid = ctx.fun_ctx.fun.func_env.module_env.get_id();
+                if mid != &fun_mid {
+                    if !struct_env
+                        .env()
+                        .language_version()
+                        .language_version_for_public_struct()
+                    {
+                        fun_ctx.internal_error(format!(
+                            "cross module struct access is not supported by language version {}",
+                            struct_env.env().language_version()
+                        ));
+                        return;
+                    }
+                    self.gen_borrow_field_api_call(
+                        ctx,
+                        dest,
+                        source,
+                        fun_ctx,
+                        &Some(variants.clone()),
+                        inst,
+                        offset,
+                        struct_env,
+                    );
+                } else {
+                    self.gen_borrow_field(
+                        ctx,
+                        dest,
+                        mid.qualified(*sid),
+                        inst.clone(),
+                        Some(variants),
+                        *offset,
+                        source,
+                    );
+                }
             },
             Operation::BorrowGlobal(mid, sid, inst) => {
                 let is_mut = fun_ctx.fun.get_local_type(dest[0]).is_mutable_reference();
@@ -569,7 +1172,7 @@ impl<'a> FunctionGenerator<'a> {
                     Type::new_prim(PrimitiveType::Bool)
                 };
                 let sign = self
-                    .r#gen
+                    .genr
                     .signature(&fun_ctx.module, &fun_ctx.loc, vec![elem_type]);
                 self.gen_builtin(
                     ctx,
@@ -653,6 +1256,330 @@ impl<'a> FunctionGenerator<'a> {
         }
     }
 
+    /// Generate code for calling the borrow field api.
+    fn gen_borrow_field_api_call(
+        &mut self,
+        ctx: &BytecodeContext<'_>,
+        dest: &[usize],
+        source: &[usize],
+        fun_ctx: &FunctionContext<'_>,
+        variants: &Option<Vec<Symbol>>,
+        inst: &[Type],
+        offset: &usize,
+        struct_env: &StructEnv<'_>,
+    ) {
+        let is_mut_dest = fun_ctx.fun.get_local_type(dest[0]).is_mutable_reference();
+        let is_mut_src = fun_ctx.fun.get_local_type(source[0]).is_mutable_reference();
+        let vec = self.genr.struct_api_borrow_index(
+            &ctx.fun_ctx.module,
+            &fun_ctx.loc,
+            struct_env,
+            !is_mut_dest,
+        );
+        // generate code for calling borrow field API
+        // for struct, we can directly call the API when the offset matches;
+        // for enum, there are two cases:
+        // when variants in the borrow instruction are exact match with the variants in the API, we can directly call the API;
+        // when variants in the borrow instruction are a subset of the variants in the API,
+        // we need to generate code for calling the test variant API for each variant in the instruction;
+        // when variants in the borrow instruction are intersect with the variants in the API, we need to generate an error;
+        let mut found = false;
+        for ((cur_variants_opt, cur_offset, _), borrow_field_handle_index) in &vec {
+            if offset == cur_offset {
+                // handle borrow from a struct
+                if cur_variants_opt.is_none() {
+                    assert!(variants.is_none());
+                    self.abstract_push_args(ctx, source, None);
+                    // need to freeze mutable ref if the target is an immutable reference
+                    if is_mut_src && !is_mut_dest {
+                        self.emit(FF::Bytecode::FreezeRef);
+                    }
+                    if inst.is_empty() {
+                        self.emit(FF::Bytecode::Call(*borrow_field_handle_index));
+                    } else {
+                        let function_instantiation_index =
+                            self.genr.function_instantiation_index_from_handle_index(
+                                *borrow_field_handle_index,
+                                &ctx.fun_ctx.module,
+                                &fun_ctx.loc,
+                                inst.to_vec(),
+                            );
+                        self.emit(FF::Bytecode::CallGeneric(function_instantiation_index));
+                    }
+                    self.abstract_pop_n(ctx, source.len());
+                    self.abstract_push_result(ctx, dest);
+                    found = true;
+                    break;
+                } else if let Some(cur_variants) = cur_variants_opt {
+                    // handle borrow from an enum
+                    assert!(variants.is_some());
+                    let cur_variants_set = cur_variants.iter().collect::<BTreeSet<_>>();
+                    let variants_set = variants.as_ref().unwrap().iter().collect::<BTreeSet<_>>();
+                    // case 1: exact match
+                    if cur_variants_set == variants_set {
+                        self.abstract_push_args(ctx, source, None);
+                        // need to freeze mutable ref if the target is an immutable reference
+                        if is_mut_src && !is_mut_dest {
+                            self.emit(FF::Bytecode::FreezeRef);
+                        }
+                        if inst.is_empty() {
+                            self.emit(FF::Bytecode::Call(*borrow_field_handle_index));
+                        } else {
+                            let function_instantiation_index =
+                                self.genr.function_instantiation_index_from_handle_index(
+                                    *borrow_field_handle_index,
+                                    &ctx.fun_ctx.module,
+                                    &fun_ctx.loc,
+                                    inst.to_vec(),
+                                );
+                            self.emit(FF::Bytecode::CallGeneric(function_instantiation_index));
+                        }
+                        self.abstract_pop_n(ctx, source.len());
+                        self.abstract_push_result(ctx, dest);
+                        found = true;
+                        break;
+                    } else if variants_set.is_subset(&cur_variants_set) {
+                        // case 2: variants in the borrow field are a subset of the variants in the api
+                        let intersected_variants = variants_set
+                            .intersection(&cur_variants_set)
+                            .collect::<Vec<_>>();
+                        let test_variant_api_map = self.genr.struct_api_test_variant_index(
+                            &ctx.fun_ctx.module,
+                            &fun_ctx.loc,
+                            struct_env,
+                        );
+                        // before calling the test variant function, we need to flush the stack
+                        self.abstract_flush_stack_before(ctx, 0);
+                        let mut local_to_freeze = None;
+                        if is_mut_src {
+                            self.abstract_push_args(ctx, source, Some(&AssignKind::Copy));
+                            self.emit(FF::Bytecode::FreezeRef);
+                            let (temp, _) = self.stack.pop().unwrap();
+                            let ty = fun_ctx.temp_type(temp).skip_reference();
+                            let new_local = self.new_local(fun_ctx, ty.wrap_in_reference(false));
+                            self.emit(FF::Bytecode::StLoc(new_local));
+                            local_to_freeze = Some(new_local);
+                        }
+                        // the base code offset to compute the target offset for each test variant
+                        let code_offset_for_test_variant = self.code.len();
+                        let variants_size = intersected_variants.len();
+                        // TODO(#18319): optimize code generation here.
+                        // offset count for each test variant:
+                        // if the source is a mutable reference:
+                        //    copy source
+                        //    freeze ref
+                        //    stloc new_local
+                        // code_offset_for_test_variant is the length of code here.
+                        // 1. copy source / copy new_local
+                        // 2. test variant
+                        // 3. btrue L2
+                        // 4. copy source / copy new_local
+                        // 5. test variant
+                        // 6. btrue L2
+                        let offset_count_for_each_variant = 3;
+                        // if the source is a mutable reference:
+                        //     move new_local
+                        //     pop
+                        // 7. move source to stack
+                        // 8. pop
+                        // 9. ld 64
+                        // 10. abort
+                        // L2: if the source is a mutable reference:
+                        //     move new_local
+                        //     pop
+                        // ...
+                        let offset_count_for_abort = if is_mut_src { 6 } else { 4 };
+                        for variant in intersected_variants {
+                            if let Some(test_variant_handle_index) =
+                                test_variant_api_map.get(variant)
+                            {
+                                // self.abstract_push_args(ctx, source, Some(&AssignKind::Copy));
+                                // for test variant, we need to freeze mutable ref if the source is a mutable reference
+                                if let Some(local) = local_to_freeze {
+                                    self.emit(FF::Bytecode::CopyLoc(local));
+                                } else {
+                                    self.abstract_push_args(ctx, source, Some(&AssignKind::Copy));
+                                }
+                                if inst.is_empty() {
+                                    self.emit(FF::Bytecode::Call(*test_variant_handle_index));
+                                } else {
+                                    let function_instantiation_index =
+                                        self.genr.function_instantiation_index_from_handle_index(
+                                            *test_variant_handle_index,
+                                            &ctx.fun_ctx.module,
+                                            &fun_ctx.loc,
+                                            inst.to_vec(),
+                                        );
+                                    self.emit(FF::Bytecode::CallGeneric(
+                                        function_instantiation_index,
+                                    ));
+                                }
+                                if local_to_freeze.is_none() {
+                                    self.abstract_pop_n(ctx, source.len());
+                                }
+
+                                // Block when the test variant fails.
+                                self.code.push(FF::Bytecode::BrTrue(
+                                    (code_offset_for_test_variant
+                                        + variants_size * offset_count_for_each_variant
+                                        + offset_count_for_abort)
+                                        as FF::CodeOffset,
+                                ));
+                            } else {
+                                fun_ctx.internal_error(format!(
+                                    "cannot perform test variant {} of {} at offset {}",
+                                    variant.display(struct_env.env().symbol_pool()),
+                                    struct_env.get_full_name_with_address(),
+                                    offset
+                                ));
+                            }
+                        }
+                        if let Some(local) = local_to_freeze {
+                            self.emit(FF::Bytecode::MoveLoc(local));
+                            self.emit(FF::Bytecode::Pop);
+                        }
+                        // when all the test variants fail, we need to abort the function
+                        let local = self.temp_to_local(ctx.fun_ctx, Some(ctx.attr_id), source[0]);
+                        self.code.push(FF::Bytecode::MoveLoc(local));
+                        self.code.push(FF::Bytecode::Pop);
+                        self.code
+                            .push(FF::Bytecode::LdU64(well_known::INCOMPLETE_MATCH_ABORT_CODE));
+                        self.code.push(FF::Bytecode::Abort);
+                        if let Some(local) = local_to_freeze {
+                            self.emit(FF::Bytecode::MoveLoc(local));
+                            self.emit(FF::Bytecode::Pop);
+                        }
+                        // call borrow field api
+                        self.abstract_push_args(ctx, source, None);
+                        // need to freeze mutable ref if the target is an immutable reference
+                        if is_mut_src && !is_mut_dest {
+                            self.emit(FF::Bytecode::FreezeRef);
+                        }
+                        if inst.is_empty() {
+                            self.emit(FF::Bytecode::Call(*borrow_field_handle_index));
+                        } else {
+                            let function_instantiation_index =
+                                self.genr.function_instantiation_index_from_handle_index(
+                                    *borrow_field_handle_index,
+                                    &ctx.fun_ctx.module,
+                                    &fun_ctx.loc,
+                                    inst.to_vec(),
+                                );
+                            self.emit(FF::Bytecode::CallGeneric(function_instantiation_index));
+                        }
+                        self.abstract_pop_n(ctx, source.len());
+                        self.abstract_push_result(ctx, dest);
+                        found = true;
+                        break;
+                    } else if !variants_set
+                        .intersection(&cur_variants_set)
+                        .collect::<Vec<_>>()
+                        .is_empty()
+                    {
+                        // handle the case e.x where x appears in multiple variants at the same offset but have different or may be instantiated with different types.
+                        struct_env.env().error(&fun_ctx.fun.get_bytecode_loc(ctx.attr_id), &format!("cannot perform borrow operation for field `{}` for struct `{}` since it has or may be instantiated with different types in variants",
+                        struct_env.get_field_by_offset_optional_variant(Some(cur_variants[0]), *offset).get_name().display(struct_env.env().symbol_pool()),
+                        struct_env.get_full_name_with_address()));
+                        found = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if !found {
+            fun_ctx.internal_error(format!(
+                "cannot generate borrow field for {} at offset {}",
+                struct_env.get_full_name_with_address(),
+                offset
+            ));
+        }
+    }
+
+    /// Generates call to test variant api.
+    fn gen_test_variant_api_call(
+        &mut self,
+        ctx: &BytecodeContext<'_>,
+        dest: &[usize],
+        source: &[usize],
+        fun_ctx: &FunctionContext<'_>,
+        variant: &Symbol,
+        inst: &[Type],
+        struct_env: &StructEnv<'_>,
+        is_mut_src: bool,
+    ) {
+        let test_variant_api_map =
+            self.genr
+                .struct_api_test_variant_index(&ctx.fun_ctx.module, &fun_ctx.loc, struct_env);
+        if let Some(handle_index) = test_variant_api_map.get(variant) {
+            self.abstract_push_args(ctx, source, None);
+            // need to freeze mutable ref
+            if is_mut_src {
+                self.emit(FF::Bytecode::FreezeRef);
+            }
+            if inst.is_empty() {
+                self.emit(FF::Bytecode::Call(*handle_index));
+            } else {
+                let function_instantiation_index =
+                    self.genr.function_instantiation_index_from_handle_index(
+                        *handle_index,
+                        &ctx.fun_ctx.module,
+                        &fun_ctx.loc,
+                        inst.to_vec(),
+                    );
+                self.emit(FF::Bytecode::CallGeneric(function_instantiation_index));
+            }
+            self.abstract_pop_n(ctx, source.len());
+            self.abstract_push_result(ctx, dest);
+        } else {
+            fun_ctx.internal_error(format!(
+                "variant {} not found in test variant api map",
+                variant.display(struct_env.env().symbol_pool())
+            ));
+        }
+    }
+
+    /// Generates call to pack/unpack API.
+    fn gen_pack_unpack_api_call<const IS_PACK: bool>(
+        &mut self,
+        ctx: &BytecodeContext<'_>,
+        dest: &[usize],
+        source: &[usize],
+        fun_ctx: &FunctionContext<'_>,
+        variant_opt: &Option<Symbol>,
+        inst: &[Type],
+        struct_env: &StructEnv<'_>,
+    ) {
+        let api_map = if IS_PACK {
+            self.genr
+                .struct_api_pack_index(&ctx.fun_ctx.module, &fun_ctx.loc, struct_env)
+        } else {
+            self.genr
+                .struct_api_unpack_index(&ctx.fun_ctx.module, &fun_ctx.loc, struct_env)
+        };
+        if let Some(handle_index) = api_map.get(variant_opt) {
+            self.abstract_push_args(ctx, source, None);
+            if inst.is_empty() {
+                self.emit(FF::Bytecode::Call(*handle_index));
+            } else {
+                let function_instantiation_index =
+                    self.genr.function_instantiation_index_from_handle_index(
+                        *handle_index,
+                        &ctx.fun_ctx.module,
+                        &fun_ctx.loc,
+                        inst.to_vec(),
+                    );
+                self.emit(FF::Bytecode::CallGeneric(function_instantiation_index));
+            }
+            self.abstract_pop_n(ctx, source.len());
+            self.abstract_push_result(ctx, dest);
+        } else {
+            fun_ctx.internal_error(format!(
+                "not found in {} api map",
+                if IS_PACK { "pack" } else { "unpack" }
+            ));
+        }
+    }
+
     /// Generates code for a function call.
     fn gen_call(
         &mut self,
@@ -668,20 +1595,20 @@ impl<'a> FunctionGenerator<'a> {
             &ctx.fun_ctx.loc,
             id,
             Some(
-                self.r#gen
+                self.genr
                     .signature(&ctx.fun_ctx.module, &ctx.fun_ctx.loc, inst.to_vec()),
             ),
         ) {
             self.emit(opcode)
         } else if inst.is_empty() {
-            let idx = self.r#gen.function_index(
+            let idx = self.genr.function_index(
                 &fun_ctx.module,
                 &fun_ctx.loc,
                 &fun_ctx.module.env.get_function(id),
             );
             self.emit(FF::Bytecode::Call(idx))
         } else {
-            let idx = self.r#gen.function_instantiation_index(
+            let idx = self.genr.function_instantiation_index(
                 &fun_ctx.module,
                 &fun_ctx.loc,
                 &fun_ctx.module.env.get_function(id),
@@ -706,14 +1633,14 @@ impl<'a> FunctionGenerator<'a> {
         let fun_ctx = ctx.fun_ctx;
         self.abstract_push_args(ctx, source, None);
         if inst.is_empty() {
-            let idx = self.r#gen.function_index(
+            let idx = self.genr.function_index(
                 &fun_ctx.module,
                 &fun_ctx.loc,
                 &fun_ctx.module.env.get_function(id),
             );
             self.emit(FF::Bytecode::PackClosure(idx, mask))
         } else {
-            let idx = self.r#gen.function_instantiation_index(
+            let idx = self.genr.function_instantiation_index(
                 &fun_ctx.module,
                 &fun_ctx.loc,
                 &fun_ctx.module.env.get_function(id),
@@ -732,7 +1659,7 @@ impl<'a> FunctionGenerator<'a> {
             .fun
             .get_local_type(*source.last().expect("invoke has function argument last"));
         let sign_idx = self
-            .r#gen
+            .genr
             .signature(&ctx.fun_ctx.module, &ctx.fun_ctx.loc, vec![
                 clos_type.clone()
             ]);
@@ -760,11 +1687,11 @@ impl<'a> FunctionGenerator<'a> {
         let struct_env = &fun_ctx.module.env.get_struct(id);
         if inst.is_empty() {
             let idx = self
-                .r#gen
+                .genr
                 .struct_def_index(&fun_ctx.module, &fun_ctx.loc, struct_env);
             self.emit(mk_simple(idx))
         } else {
-            let idx = self.r#gen.struct_def_instantiation_index(
+            let idx = self.genr.struct_def_instantiation_index(
                 &fun_ctx.module,
                 &fun_ctx.loc,
                 struct_env,
@@ -792,11 +1719,11 @@ impl<'a> FunctionGenerator<'a> {
         let struct_env = &fun_ctx.module.env.get_struct(id);
         if inst.is_empty() {
             let idx =
-                self.r#gen
+                self.genr
                     .struct_variant_index(&fun_ctx.module, &fun_ctx.loc, struct_env, variant);
             self.emit(mk_simple(idx))
         } else {
-            let idx = self.r#gen.struct_variant_inst_index(
+            let idx = self.genr.struct_variant_inst_index(
                 &fun_ctx.module,
                 &fun_ctx.loc,
                 struct_env,
@@ -830,7 +1757,7 @@ impl<'a> FunctionGenerator<'a> {
             let field_env =
                 &struct_env.get_field_by_offset_optional_variant(Some(variants[0]), offset);
             if inst.is_empty() {
-                let idx = self.r#gen.variant_field_index(
+                let idx = self.genr.variant_field_index(
                     &fun_ctx.module,
                     &fun_ctx.loc,
                     variants,
@@ -842,7 +1769,7 @@ impl<'a> FunctionGenerator<'a> {
                     self.emit(FF::Bytecode::ImmBorrowVariantField(idx))
                 }
             } else {
-                let idx = self.r#gen.variant_field_inst_index(
+                let idx = self.genr.variant_field_inst_index(
                     &fun_ctx.module,
                     &fun_ctx.loc,
                     variants,
@@ -859,7 +1786,7 @@ impl<'a> FunctionGenerator<'a> {
             let field_env = &struct_env.get_field_by_offset_optional_variant(None, offset);
             if inst.is_empty() {
                 let idx = self
-                    .r#gen
+                    .genr
                     .field_index(&fun_ctx.module, &fun_ctx.loc, field_env);
                 if is_mut {
                     self.emit(FF::Bytecode::MutBorrowField(idx))
@@ -868,7 +1795,7 @@ impl<'a> FunctionGenerator<'a> {
                 }
             } else {
                 let idx =
-                    self.r#gen
+                    self.genr
                         .field_inst_index(&fun_ctx.module, &fun_ctx.loc, field_env, inst);
                 if is_mut {
                     self.emit(FF::Bytecode::MutBorrowFieldGeneric(idx))
@@ -932,7 +1859,7 @@ impl<'a> FunctionGenerator<'a> {
                 self.gen_vector_load_push(ctx, vec, dest_type);
             },
             _ => {
-                let cons = self.r#gen.constant_index(
+                let cons = self.genr.constant_index(
                     &ctx.fun_ctx.module,
                     &ctx.fun_ctx.loc,
                     cons,
@@ -955,7 +1882,7 @@ impl<'a> FunctionGenerator<'a> {
             self.gen_load_push(ctx, cons, &elem_type);
         }
         let sign = self
-            .r#gen
+            .genr
             .signature(&fun_ctx.module, &fun_ctx.loc, vec![elem_type]);
         self.emit(FF::Bytecode::VecPack(sign, vec.len() as u64));
     }
@@ -1271,7 +2198,7 @@ impl<'a> FunctionGenerator<'a> {
                 };
                 // Only add to the source map if it wasn't a parameter.
                 let name = ctx.fun.get_local_name(temp);
-                self.r#gen
+                self.genr
                     .source_map
                     .add_local_mapping(ctx.def_idx, ctx.module.source_name(name, loc))
                     .expect(SOURCE_MAP_OK);

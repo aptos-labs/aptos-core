@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use aptos_gas_schedule::gas_params::natives::{
     aptos_framework::{
         IS_PERMISSIONED_SIGNER_BASE, PERMISSION_ADDRESS_BASE, SIGNER_FROM_PERMISSIONED_HANDLE_BASE,
@@ -39,9 +39,7 @@ fn native_is_permissioned_signer_impl(
         .get_feature_flags()
         .is_enabled(aptos_types::on_chain_config::FeatureFlag::PERMISSIONED_SIGNER)
     {
-        return SafeNativeResult::Err(SafeNativeError::Abort {
-            abort_code: EPERMISSION_SIGNER_DISABLED,
-        });
+        return SafeNativeResult::Err(SafeNativeError::abort(EPERMISSION_SIGNER_DISABLED));
     }
 
     let signer = safely_pop_arg!(arguments, SignerRef);
@@ -70,16 +68,14 @@ fn native_permission_address(
         .get_feature_flags()
         .is_enabled(aptos_types::on_chain_config::FeatureFlag::PERMISSIONED_SIGNER)
     {
-        return SafeNativeResult::Err(SafeNativeError::Abort {
-            abort_code: EPERMISSION_SIGNER_DISABLED,
-        });
+        return SafeNativeResult::Err(SafeNativeError::abort(EPERMISSION_SIGNER_DISABLED));
     }
 
     let signer = safely_pop_arg!(args, SignerRef);
 
     context.charge(PERMISSION_ADDRESS_BASE)?;
     if !signer.is_permissioned()? {
-        return Err(SafeNativeError::Abort { abort_code: 3 });
+        return Err(SafeNativeError::abort(3));
     }
 
     Ok(smallvec![signer.permission_address()?])
@@ -103,9 +99,7 @@ fn native_signer_from_permissioned(
         .get_feature_flags()
         .is_enabled(aptos_types::on_chain_config::FeatureFlag::PERMISSIONED_SIGNER)
     {
-        return SafeNativeResult::Err(SafeNativeError::Abort {
-            abort_code: EPERMISSION_SIGNER_DISABLED,
-        });
+        return SafeNativeResult::Err(SafeNativeError::abort(EPERMISSION_SIGNER_DISABLED));
     }
 
     let permission_addr = safely_pop_arg!(arguments, AccountAddress);
@@ -140,9 +134,7 @@ fn native_borrow_address(
         .is_enabled(aptos_types::on_chain_config::FeatureFlag::PERMISSIONED_SIGNER)
         && signer_reference.is_permissioned()?
     {
-        return SafeNativeResult::Err(SafeNativeError::Abort {
-            abort_code: EPERMISSION_SIGNER_DISABLED,
-        });
+        return SafeNativeResult::Err(SafeNativeError::abort(EPERMISSION_SIGNER_DISABLED));
     }
 
     context.charge(SIGNER_BORROW_ADDRESS_BASE)?;

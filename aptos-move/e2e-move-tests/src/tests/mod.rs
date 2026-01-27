@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 mod access_path_test;
 mod account;
@@ -24,6 +24,7 @@ mod error_map;
 mod events;
 mod fee_payer;
 mod friends;
+mod function_caches;
 mod function_value_capture_option;
 mod function_value_depth;
 mod function_values;
@@ -45,6 +46,7 @@ mod metadata;
 mod mint_nft;
 mod missing_gas_parameter;
 mod module_event;
+mod move_executor_coverage;
 mod move_feature_gating;
 mod new_integer_types;
 mod nft_dao;
@@ -52,6 +54,7 @@ mod object_code_deployment;
 mod offer_rotation_capability;
 mod offer_signer_capability;
 mod per_category_gas_limits;
+mod public_structs_enums_upgrade;
 mod randomness_test_and_abort;
 mod remote_state;
 mod resource_groups;

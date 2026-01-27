@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{db_debugger::ShardingConfig, AptosDB};
 use aptos_config::config::StorageConfig;
@@ -23,6 +23,7 @@ impl Cmd {
         config.set_data_dir(self.db_dir);
         config.rocksdb_configs.enable_storage_sharding =
             self.sharding_config.enable_storage_sharding;
+        config.hot_state_config.delete_on_restart = false;
 
         let _db = AptosDB::open(
             config.get_dir_paths(),
@@ -33,6 +34,7 @@ impl Cmd {
             config.buffered_state_target_items,
             config.max_num_nodes_per_lru_cache_shard,
             None,
+            config.hot_state_config,
         )
         .expect("Failed to open AptosDB");
 

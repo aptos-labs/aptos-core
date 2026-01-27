@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use ark_ec::CurveGroup;
 use std::collections::HashMap;
@@ -8,7 +8,7 @@ use std::collections::HashMap;
 ///
 /// Returns a HashMap: `C.to_compressed() |---> exponent`
 #[allow(non_snake_case)]
-pub fn build<C: CurveGroup>(G: C, table_size: u32) -> HashMap<Vec<u8>, u32> {
+pub fn build<C: CurveGroup>(G: C, table_size: u64) -> HashMap<Vec<u8>, u64> {
     let byte_size = G.compressed_size();
 
     let mut table = HashMap::with_capacity(table_size as usize);
@@ -25,7 +25,7 @@ pub fn build<C: CurveGroup>(G: C, table_size: u32) -> HashMap<Vec<u8>, u32> {
 }
 
 #[allow(non_snake_case)]
-pub fn build_default<C: CurveGroup>(table_size: u32) -> HashMap<Vec<u8>, u32> {
+pub fn build_default<C: CurveGroup>(table_size: u64) -> HashMap<Vec<u8>, u64> {
     let G = C::generator();
     build(G, table_size)
 }

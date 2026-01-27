@@ -1,0 +1,19 @@
+# Prometheus configuration for E2E testing
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Alerting (disabled for testing)
+alerting:
+  alertmanagers: []
+
+# Rule files (none for testing)
+rule_files: []
+
+# Scrape configurations
+scrape_configs:
+  # Self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

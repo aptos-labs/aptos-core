@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
@@ -13,7 +13,10 @@ use move_core_types::{
     gas_algebra::{InternalGas, InternalGasPerByte},
     vm_status::StatusCode,
 };
-use move_vm_runtime::{native_extensions::SessionListener, native_functions::NativeFunction};
+use move_vm_runtime::{
+    native_extensions::{NativeRuntimeRefCheckModelsCompleted, SessionListener},
+    native_functions::NativeFunction,
+};
 use move_vm_types::{
     loaded_data::runtime_types::Type, natives::function::PartialVMError, values::Value,
 };
@@ -48,6 +51,10 @@ impl SessionListener for NativeObjectContext {
     fn abort(&mut self) {
         // No state changes to abort.
     }
+}
+
+impl NativeRuntimeRefCheckModelsCompleted for NativeObjectContext {
+    // No native functions in this context return references, so no models to add.
 }
 
 /***************************************************************************************************

@@ -18,6 +18,8 @@ module 0xc0ffee::m {
         s: S,
     }
 
+    public(package) struct Empty {}
+
 }
 
 module 0xc0ffee::m_friend {

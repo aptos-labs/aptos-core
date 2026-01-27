@@ -1,0 +1,11 @@
+processed 1 task
+task 0 lines 1-6:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Invalid UTF-8 string: invalid utf-8 sequence of 1 bytes from index 0,
+    major_status: INVALID_ABORT_MESSAGE,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 3)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
