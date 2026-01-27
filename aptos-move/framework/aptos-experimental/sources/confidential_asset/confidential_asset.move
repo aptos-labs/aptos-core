@@ -30,9 +30,9 @@ module aptos_experimental::confidential_asset {
     #[test_only]
     use aptos_std::ristretto255::Scalar;
 
-    //
+    // ======
     // Errors
-    //
+    // ======
 
     /// The range proof system does not support sufficient range.
     const ERANGE_PROOF_SYSTEM_HAS_INSUFFICIENT_RANGE: u64 = 1;
@@ -91,11 +91,12 @@ module aptos_experimental::confidential_asset {
     /// [TEST-ONLY] The confidential asset module initialization failed.
     const EINIT_MODULE_FAILED: u64 = 1000;
 
-    //
+    // =========
     // Constants
-    //
+    // =========
 
     /// The maximum number of transactions can be aggregated on the pending balance before rollover is required.
+    /// TODO: Should be 2^t - 1, not -2.
     const MAX_TRANSFERS_BEFORE_ROLLOVER: u64 = 65534;
 
     /// The mainnet chain ID. If the chain ID is 1, the allow list is enabled.
@@ -104,9 +105,9 @@ module aptos_experimental::confidential_asset {
     /// The testnet chain ID.
     const TESTNET_CHAIN_ID: u8 = 2;
 
-    //
+    // =======
     // Structs
-    //
+    // =======
 
     /// The `confidential_asset` module stores a `ConfidentialAssetStore` object for each user-token pair.
     /// TODO: rename this, since there are too many stores flying around: FA stores and CFA pools
@@ -173,9 +174,9 @@ module aptos_experimental::confidential_asset {
         auditor_ek: Option<twisted_elgamal::CompressedPubkey>
     }
 
-    //
+    // ======
     // Events
-    //
+    // ======
 
     #[event]
     /// Emitted when tokens are brought into the protocol.
@@ -201,10 +202,11 @@ module aptos_experimental::confidential_asset {
         to: address
     }
 
-    //
-    // Module initialization, done only once when this module is first published on the blockchain
-    //
+    // =====================
+    // Module initialization
+    // =====================
 
+    /// Called only once, when this module is first published on the blockchain.
     fun init_module(deployer: &signer) {
         assert!(
             bulletproofs::get_max_range_bits()
@@ -226,9 +228,26 @@ module aptos_experimental::confidential_asset {
         );
     }
 
-    //
-    // Entry functions
-    //
+    /// Used to initialize the module for devnet and for tests in aptos-move/e2e-move-tests/
+    entry fun init_module_for_genesis(deployer: &signer) {
+        assert!(
+            signer::address_of(deployer) == @aptos_experimental,
+            error::invalid_argument(EINIT_MODULE_FAILED)
+        );
+        assert!(
+            chain_id::get() != MAINNET_CHAIN_ID,
+            error::invalid_state(EINIT_MODULE_FAILED)
+        );
+        assert!(
+            chain_id::get() != TESTNET_CHAIN_ID,
+            error::invalid_state(EINIT_MODULE_FAILED)
+        );
+        init_module(deployer)
+    }
+
+    // =======================
+    // Public, entry functions
+    // =======================
 
     /// Registers an account for a specified token. Users must register an account for each token they
     /// intend to transact with.
@@ -405,6 +424,7 @@ module aptos_experimental::confidential_asset {
     }
 
     /// Freezes the confidential account for the specified token, disabling all incoming transactions.
+    /// TODO(rename): pause_incoming_transactions
     public entry fun freeze_token(
         sender: &signer, token: Object<Metadata>
     ) acquires ConfidentialAssetStore {
@@ -412,6 +432,7 @@ module aptos_experimental::confidential_asset {
     }
 
     /// Unfreezes the confidential account for the specified token, re-enabling incoming transactions.
+    /// TODO(rename): resume_incoming_transactions
     public entry fun unfreeze_token(
         sender: &signer, token: Object<Metadata>
     ) acquires ConfidentialAssetStore {
@@ -456,9 +477,9 @@ module aptos_experimental::confidential_asset {
         unfreeze_token(sender, token);
     }
 
-    //
+    // ===========================
     // Public governance functions
-    //
+    // ===========================
 
     /// Enables the allow list, restricting confidential transfers to token types on the allow list.
     public fun enable_allow_list(aptos_framework: &signer) acquires FAController {
@@ -538,9 +559,9 @@ module aptos_experimental::confidential_asset {
             };
     }
 
-    //
+    // =====================
     // Public view functions
-    //
+    // =====================
 
     #[view]
     /// Checks if the user has a confidential asset store for the specified token.
@@ -694,9 +715,14 @@ module aptos_experimental::confidential_asset {
         borrow_global<ConfidentialAssetStore>(get_user_address(user, token)).pending_counter
     }
 
+    // ===========================
+    // Public, non-entry functions
+    // ===========================
     //
-    // Public functions that correspond to the entry functions and don't require serializtion of the input data.
-    // These function can be useful for external contracts that want to integrate with the Confidential Asset protocol.
+    // Note: These function can be useful for external contracts that want to integrate with the Confidential Asset
+    // protocol.
+    //
+    // TODO(rename): The `_internal` suffix is somewhat of a misnomer then.
     //
 
     /// Implementation of the `register` entry function.
@@ -1028,9 +1054,9 @@ module aptos_experimental::confidential_asset {
         ca_store.frozen = false;
     }
 
-    //
-    // Private functions.
-    //
+    // =================
+    // Private functions
+    // =================
 
     /// Ensures that the `FAConfig` object exists for the specified token.
     /// If the object does not exist, creates it.
@@ -1207,26 +1233,12 @@ module aptos_experimental::confidential_asset {
         )
     }
 
-    // Used to initialize the module for devnet and for tests in aptos-move/e2e-move-tests/
-    entry fun init_module_for_genesis(deployer: &signer) {
-        assert!(
-            signer::address_of(deployer) == @aptos_experimental,
-            error::invalid_argument(EINIT_MODULE_FAILED)
-        );
-        assert!(
-            chain_id::get() != MAINNET_CHAIN_ID,
-            error::invalid_state(EINIT_MODULE_FAILED)
-        );
-        assert!(
-            chain_id::get() != TESTNET_CHAIN_ID,
-            error::invalid_state(EINIT_MODULE_FAILED)
-        );
-        init_module(deployer)
-    }
-
-    //
+    // ===================
     // Test-only functions
+    // ===================
     //
+    // TODO: Do we really need these here?
+
     #[test_only]
     public fun init_module_for_testing(deployer: &signer) {
         init_module(deployer)
