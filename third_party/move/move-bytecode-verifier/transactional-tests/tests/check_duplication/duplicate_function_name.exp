@@ -1,9 +1,0 @@
-processed 1 task
-task 0 lines 1-5:  publish [module 0x42::M]
-Error: error: duplicate function definition `f`
-  ┌─ test:4:5
-  │
-4 │ fun f()
-  │     ^
-
-

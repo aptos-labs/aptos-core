@@ -1,9 +1,0 @@
-processed 1 task
-task 0 lines 1-16:  run [script]
-Error: error: unknown instruction `br`
-   ┌─ test:14:10
-   │
-14 │ loop_b0: br loop_cont
-   │          ^^^^^^^^^^^^
-
-

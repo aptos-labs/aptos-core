@@ -13137,7 +13137,6 @@ dependencies = [
  "move-core-types",
  "move-decompiler",
  "move-disassembler",
- "move-ir-compiler",
  "move-ir-types",
  "move-model",
  "move-resource-viewer",
