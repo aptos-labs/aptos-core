@@ -95,7 +95,12 @@ impl ReleaseTarget {
         ReleaseBundle::read(path)
     }
 
-    pub fn create_release_options(self, with_srcs: bool, out: Option<PathBuf>) -> ReleaseOptions {
+    pub fn create_release_options(
+        self,
+        with_srcs: bool,
+        out: Option<PathBuf>,
+        with_test_mode: bool,
+    ) -> ReleaseOptions {
         let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let packages = self
             .packages()
@@ -112,21 +117,29 @@ impl ReleaseTarget {
             .iter()
             .map(|(_, _, latest_language)| *latest_language)
             .collect();
+        // Skip docs entirely for test mode to avoid polluting doc files with test-only items
+        let docgen_options = if with_test_mode {
+            None
+        } else {
+            Some(DocgenOptions {
+                include_impl: true,
+                include_specs: true,
+                specs_inlined: false,
+                include_dep_diagram: false,
+                collapsed_sections: true,
+                landing_page_template: Some("doc_template/overview.md".to_string()),
+                references_file: Some("doc_template/references.md".to_string()),
+                output_format: None,
+            })
+        };
+
         ReleaseOptions {
             build_options: BuildOptions {
                 with_srcs,
                 with_abis: true,
-                with_docs: true,
-                docgen_options: Some(DocgenOptions {
-                    include_impl: true,
-                    include_specs: true,
-                    specs_inlined: false,
-                    include_dep_diagram: false,
-                    collapsed_sections: true,
-                    landing_page_template: Some("doc_template/overview.md".to_string()),
-                    references_file: Some("doc_template/references.md".to_string()),
-                    output_format: None,
-                }),
+                with_docs: !with_test_mode, // Skip docs in test mode
+                with_test_mode,
+                docgen_options,
                 skip_fetch_latest_git_deps: true,
                 // enable inline optimization for framework packages
                 experiments: vec![
@@ -142,7 +155,11 @@ impl ReleaseTarget {
             rust_bindings: packages
                 .into_iter()
                 .map(|(_, binding, _)| {
-                    if !binding.is_empty() {
+                    // Skip rust bindings generation in test mode to avoid polluting
+                    // sdk_builder files with test-only functions
+                    if with_test_mode {
+                        String::new()
+                    } else if !binding.is_empty() {
                         crate_dir.join(binding).display().to_string()
                     } else {
                         binding
@@ -159,8 +176,13 @@ impl ReleaseTarget {
         }
     }
 
-    pub fn create_release(self, with_srcs: bool, out: Option<PathBuf>) -> anyhow::Result<()> {
-        let options = self.create_release_options(with_srcs, out);
+    pub fn create_release(
+        self,
+        with_srcs: bool,
+        out: Option<PathBuf>,
+        with_test_mode: bool,
+    ) -> anyhow::Result<()> {
+        let options = self.create_release_options(with_srcs, out, with_test_mode);
         #[cfg(unix)]
         {
             options.create_release()
