@@ -266,13 +266,13 @@ fn test_chaum_pedersen() {
 
     use ark_bn254::Fr;
 
-    let chunked_values: Vec<Vec<Vec<Scalar<Fr>>>> = scalars
+    let chunked_values: Vec<Vec<Scalar<Fr>>> = scalars
         .iter()
         .map(|s| {
-            vec![chunks::scalar_to_le_chunks(ell, s)
+            chunks::scalar_to_le_chunks(ell, s)
                 .into_iter()
                 .map(Scalar)
-                .collect::<Vec<_>>()]
+                .collect::<Vec<_>>()
         })
         .collect();
 
