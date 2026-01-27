@@ -163,9 +163,14 @@ impl<E: Pairing> PublicParameters<E> {
         max_aggregation: usize,
         rng: &mut R,
     ) -> Self {
-        let max_num_chunks_padded =
-            (max_num_shares * num_chunks_per_scalar::<E::ScalarField>(ell) + 1).next_power_of_two()
-                - 1;
+        assert!(ell > 0, "ell must be greater than zero");
+
+        let num_chunks = num_chunks_per_scalar::<E::ScalarField>(ell) as u32;
+        let max_num_chunks_padded = max_num_shares
+            .checked_mul(num_chunks)
+            .and_then(|v| v.checked_add(1))
+            .map(|v| (v as u64).next_power_of_two().saturating_sub(1) as u32)
+            .expect("Overflow computing max_num_chunks_padded");
 
         let group_generators = GroupGenerators::default(); // TODO: At least one of these should come from a powers of tau ceremony?
         let pp_elgamal = chunked_elgamal_pp::PublicParameters::new(max_num_shares);

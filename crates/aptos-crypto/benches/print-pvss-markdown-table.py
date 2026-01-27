@@ -209,21 +209,23 @@ def accumulate(rows, folder_map=None):
         ell = parse_ell(group)
         setup = parse_setup(ident, param)
 
-        # Find the folder for this operation, group, and setup
-        tx_bytes = None
         # Only serialize operations have transcript_bytes in folder names
+        tx_bytes = None
         if folder_map and operation == "serialize":
             key = (group, operation, setup)
             if key in folder_map:
                 folder_path = folder_map[key]
                 tx_bytes = parse_transcript_bytes_from_folder(folder_path)
 
+        # Initialize dict for this setup/ell if missing
         if (setup, ell) not in data:
             data[(setup, ell)] = {"v1": {}, "v2": {}}
 
+        # Store mean_ns
         data[(setup, ell)][version][operation] = mean_ns
-        # Store tx_bytes if not set, or if current value is None and we have a real value
-        if "tx_bytes" not in data[(setup, ell)][version] or (data[(setup, ell)][version]["tx_bytes"] is None and tx_bytes is not None):
+
+        # Only set tx_bytes if we actually found a value
+        if tx_bytes is not None:
             data[(setup, ell)][version]["tx_bytes"] = tx_bytes
 
     return data
