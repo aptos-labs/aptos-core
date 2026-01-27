@@ -1,0 +1,44 @@
+//# publish
+module 0x1::M
+struct S
+  f: u64
+  g: u64
+  h: u64
+
+fun t1(l0: &mut S, l1: bool)
+    local l2: &mut u64
+    move_loc l1
+    br_true l0
+    copy_loc l0
+    mut_borrow_field S, g
+    st_loc l2
+    branch l1
+l0: copy_loc l0
+    mut_borrow_field S, f
+    st_loc l2
+    branch l1
+l1: ld_u64 0
+    copy_loc l0
+    mut_borrow_field S, h
+    write_ref
+    ret
+
+fun t2(l0: &mut S, l1: bool)
+    local l2: &mut u64
+    move_loc l1
+    br_true l0
+    copy_loc l0
+    mut_borrow_field S, g
+    st_loc l2
+    branch l1
+l0: copy_loc l0
+    mut_borrow_field S, f
+    st_loc l2
+    branch l1
+l1: copy_loc l0
+    mut_borrow_field S, f
+    pop
+    copy_loc l0
+    mut_borrow_field S, g
+    pop
+    ret

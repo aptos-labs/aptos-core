@@ -1,0 +1,8 @@
+//# publish
+module 0x1::M
+struct S
+  b: bool
+
+fun foo()
+    local l0: S<u64>
+    ret

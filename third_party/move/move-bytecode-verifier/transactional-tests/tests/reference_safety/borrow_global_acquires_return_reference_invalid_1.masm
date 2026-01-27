@@ -1,0 +1,17 @@
+//# publish
+module 0x1::A
+use 0x1::signer
+struct T1 has key
+  v: u64
+
+public fun test1(l0: &signer) acquires T1
+    move_loc l0
+    call borrow_acquires_t1
+    pop
+    ret
+
+fun borrow_acquires_t1(l0: &signer): &mut T1 acquires T1
+    move_loc l0
+    call signer::address_of
+    mut_borrow_global T1
+    ret

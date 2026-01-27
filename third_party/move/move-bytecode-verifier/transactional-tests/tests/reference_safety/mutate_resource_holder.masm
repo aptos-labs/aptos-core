@@ -1,0 +1,13 @@
+//# publish
+module 0x42::A
+struct Coin has store
+  value: u64
+
+struct T
+  f: Coin
+
+public fun t(l0: &mut T, l1: T)
+    move_loc l1
+    move_loc l0
+    write_ref
+    ret

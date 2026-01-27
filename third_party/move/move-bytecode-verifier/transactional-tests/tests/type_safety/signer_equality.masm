@@ -1,0 +1,19 @@
+//# run --signers 0x1
+script
+entry public fun main(l0: signer)
+    borrow_loc l0
+    borrow_loc l0
+    eq
+    not
+    br_false l0
+    ld_u64 42
+    abort
+l0: borrow_loc l0
+    borrow_loc l0
+    neq
+    not
+    not
+    br_false l1
+    ld_u64 42
+    abort
+l1: ret

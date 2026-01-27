@@ -1,0 +1,10 @@
+//# run
+script
+entry public fun main()
+    ld_true
+    br_true l0
+    ld_u64 5
+    branch l1
+l0: ld_u64 4
+    branch l1
+l1: ret

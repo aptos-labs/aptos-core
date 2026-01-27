@@ -1,0 +1,22 @@
+//# publish
+module 0x1::M
+struct Coin
+  value: u64
+
+fun zero(): Coin
+    ld_u64 0
+    pack Coin
+    ret
+
+
+
+//# run
+script
+use 0x1::M
+entry public fun main()
+    local l0: M::Coin
+    call M::zero
+    st_loc l0
+    call M::zero
+    st_loc l0
+    ret
