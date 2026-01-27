@@ -289,7 +289,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         #[cfg(feature = "range_proof_timing")]
         let start = Instant::now();
 
-        let r = correlated_randomness(rng, 2, ell.try_into().unwrap(), &r.0);
+        let r = correlated_randomness(rng, 2, ell.into(), &r.0);
 
         #[cfg(feature = "range_proof_timing")]
         {
