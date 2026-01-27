@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import sys, csv, re
+import sys, csv, re, os, json
 from collections import defaultdict
 
 HEADER = [
@@ -86,12 +86,30 @@ def parse_ell(group):
     m = re.search(r"(?:/|_)(\d+)$", group)
     return m.group(1) if m else None
 
-def parse_transcript_bytes_from_folder(name):
+def parse_transcript_bytes_from_folder(folder_path):
     """
-    Extract transcript_bytes from folder name ending with _transcript_bytes=NNN
+    Extract transcript_bytes from benchmark.json file in the folder.
+    The folder_path should be relative to the current directory (target/criterion).
     """
-    m = re.search(r"_transcript_bytes=(\d+)$", name)
-    return int(m.group(1)) if m else None
+    benchmark_json = os.path.join(folder_path, "base", "benchmark.json")
+    if not os.path.exists(benchmark_json):
+        # Try "new" directory if "base" doesn't exist
+        benchmark_json = os.path.join(folder_path, "new", "benchmark.json")
+    
+    if os.path.exists(benchmark_json):
+        try:
+            with open(benchmark_json, 'r') as f:
+                data = json.load(f)
+                # Extract from function_id field
+                if 'function_id' in data:
+                    function_id = data['function_id']
+                    m = re.search(r'transcript_bytes=(\d+)$', function_id)
+                    if m:
+                        return int(m.group(1))
+        except (json.JSONDecodeError, IOError, ValueError):
+            pass
+    
+    return None
 
 
 def parse_group(group):
@@ -131,8 +149,9 @@ def parse_setup(ident, parameter):
 
 def build_folder_map():
     """
-    Build a mapping: (group_name, operation) -> folder name with transcript_bytes.
+    Build a mapping: (group_name, operation, setup) -> folder name with transcript_bytes.
     Searches inside pvss_* directories for folders matching operations.
+    The setup is extracted from the folder name by removing the operation prefix and transcript_bytes suffix.
     """
     folder_map = {}
     for entry in os.listdir("."):
@@ -144,8 +163,15 @@ def build_folder_map():
                 if os.path.isdir(subentry_path):
                     for op in OPERATIONS:
                         if subentry.startswith(op) and "_transcript_bytes=" in subentry:
-                            key = (group_name, op)
-                            folder_map[key] = subentry
+                            # Extract setup from folder name: "serialize_SETUP_transcript_bytes=NNN" -> "SETUP"
+                            # Remove operation prefix
+                            setup_part = subentry[len(op) + 1:]  # +1 for the underscore
+                            # Remove transcript_bytes suffix
+                            setup = re.sub(r"_transcript_bytes=\d+$", "", setup_part)
+                            key = (group_name, op, setup)
+                            # Store the full path relative to current directory
+                            folder_path = os.path.join(group_name, subentry)
+                            folder_map[key] = folder_path
                             break
     return folder_map
 
@@ -181,14 +207,14 @@ def accumulate(rows, folder_map=None):
         ell = parse_ell(group)
         setup = parse_setup(ident, param)
 
-        # Find the folder for this operation and group
+        # Find the folder for this operation, group, and setup
         tx_bytes = None
         # Only serialize operations have transcript_bytes in folder names
         if folder_map and operation == "serialize":
-            key = (group, operation)
+            key = (group, operation, setup)
             if key in folder_map:
-                folder_name = folder_map[key]
-                tx_bytes = parse_transcript_bytes_from_folder(folder_name)
+                folder_path = folder_map[key]
+                tx_bytes = parse_transcript_bytes_from_folder(folder_path)
 
         if (setup, ell) not in data:
             data[(setup, ell)] = {"v1": {}, "v2": {}}
@@ -214,12 +240,11 @@ def make_rows_for_setup(setup, ell, v1_data, v2_data):
     if not v1_complete and not v2_complete:
         return rows
 
+    v1_tx_bytes = v1_data.get("tx_bytes", "—")
+    v2_tx_bytes = v2_data.get("tx_bytes", "—")
+
     # Build row for v1
     if v1_complete:
-
-        v1_tx_bytes = v1_data.get("tx_bytes", "—")
-        v2_tx_bytes = v2_data.get("tx_bytes", "—")
-
         v1_row = {
             "Scheme": V1_NAME,
             "Ell": ell or "—",
@@ -233,6 +258,7 @@ def make_rows_for_setup(setup, ell, v1_data, v2_data):
         rows.append(v1_row)
 
     # Build row for v2
+    if v2_complete:
         v2_row = {
             "Scheme": V2_NAME,
             "Ell": ell or "—",
@@ -240,6 +266,8 @@ def make_rows_for_setup(setup, ell, v1_data, v2_data):
             "Transcript Bytes": v2_tx_bytes,
         }
         for op in OPERATIONS:
+            if op not in v2_data:
+                continue  # Skip missing operations
             v2_ms = ns_to_ms(v2_data[op])
             if v1_complete and op in v1_data:
                 v1_ms = ns_to_ms(v1_data[op])
@@ -253,8 +281,6 @@ def make_rows_for_setup(setup, ell, v1_data, v2_data):
         rows.append(v2_row)
 
     return rows
-
-
 def padded_table(rows):
     """
     Compute widths from the plain display strings, then emit
@@ -318,26 +344,35 @@ def padded_table(rows):
 
     return "\n".join([header_line, sep_line] + body_lines)
 
-import os
 
 def main():
-    # Read CSV
+    """
+    Main function: reads CSV, builds folder map, accumulates data, and prints tables.
+    Expects to be run from target/criterion directory.
+    """
+    # Validate we can find pvss benchmark directories
+    pvss_dirs = [d for d in os.listdir(".") if os.path.isdir(d) and (d.startswith("pvss_chunky_v1") or d.startswith("pvss_chunky_v2"))]
+    if not pvss_dirs:
+        print("Error: No pvss_chunky_v1 or pvss_chunky_v2 directories found in current directory.", file=sys.stderr)
+        print("Please run this script from target/criterion directory.", file=sys.stderr)
+        sys.exit(1)
+
+    # Read CSV data
     if len(sys.argv) > 1 and sys.argv[1] != "-":
         with open(sys.argv[1], newline="") as f:
             rows = list(read_rows(f))
     else:
         rows = list(read_rows(sys.stdin))
 
-    # Build folder map: (group_name, operation) -> folder name with transcript_bytes
-    # Accumulate benchmark data
+    # Build folder map and accumulate benchmark data
     folder_map = build_folder_map()
     data = accumulate(rows, folder_map)
 
     if not data:
-        print("No PVSS benchmark data found!", file=sys.stderr)
+        print("No PVSS benchmark data found in CSV!", file=sys.stderr)
         sys.exit(1)
 
-    # Generate tables
+    # Generate tables for each setup/ell combination
     keys = sorted(data.keys(), key=lambda x: (x[0], x[1] or ""))
     tables = []
 
@@ -352,10 +387,8 @@ def main():
         print("No complete benchmark data found!", file=sys.stderr)
         sys.exit(1)
 
-    # Print tables
+    # Print all tables
     print("\n\n".join(tables))
-
-
 if __name__ == "__main__":
     main()
 
