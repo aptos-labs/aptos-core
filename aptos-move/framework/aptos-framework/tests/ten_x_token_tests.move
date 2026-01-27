@@ -3,11 +3,11 @@ module aptos_framework::ten_x_token_tests {
     use aptos_framework::fungible_asset::{Self, Metadata, TestToken};
     use aptos_framework::dispatchable_fungible_asset;
     use aptos_framework::primary_fungible_store;
-    use 0xcafe::ten_x_token;
+    use aptos_framework::ten_x_token;
     use std::option;
     use std::signer;
 
-    #[test(creator = @0xcafe)]
+    #[test(creator = @aptos_framework)]
     fun test_ten_x(
         creator: &signer,
     ) {
@@ -31,7 +31,7 @@ module aptos_framework::ten_x_token_tests {
         assert!(dispatchable_fungible_asset::derived_supply(metadata) == option::some(1000), 5);
     }
 
-    #[test(creator = @0xcafe)]
+    #[test(creator = @aptos_framework)]
     fun test_ten_x_pfs(
         creator: &signer,
     ) {
@@ -50,7 +50,7 @@ module aptos_framework::ten_x_token_tests {
         assert!(primary_fungible_store::is_balance_at_least(creator_address, metadata, 1000), 4);
     }
 
-    #[test(creator = @0xcafe)]
+    #[test(creator = @aptos_framework)]
     #[expected_failure(abort_code=0x1001C, location=aptos_framework::fungible_asset)]
     fun ten_x_balance_abort(
         creator: &signer,
@@ -65,7 +65,7 @@ module aptos_framework::ten_x_token_tests {
         assert!(fungible_asset::balance(creator_store) == 0, 1);
     }
 
-    #[test(creator = @0xcafe)]
+    #[test(creator = @aptos_framework)]
     #[expected_failure(abort_code=0x1001C, location=aptos_framework::fungible_asset)]
     fun ten_x_supply_abort(
         creator: &signer,
