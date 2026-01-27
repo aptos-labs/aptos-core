@@ -8,13 +8,12 @@ module aptos_experimental::order_book {
 
     use std::option::Option;
     use std::string::String;
-    use aptos_experimental::bulk_order_book_types::{BulkOrder, BulkOrderRequest, BulkOrderPlaceResponse};
+    use aptos_trading::order_book_types::{OrderId, TriggerCondition};
+    use aptos_trading::bulk_order_types::{BulkOrder, BulkOrderRequest, BulkOrderPlaceResponse};
+    use aptos_trading::order_match_types::{OrderMatch, OrderMatchDetails};
+    use aptos_trading::single_order_types::{SingleOrder, SingleOrderRequest};
     use aptos_experimental::bulk_order_book::{BulkOrderBook, new_bulk_order_book};
-    use aptos_experimental::single_order_book::{SingleOrderBook, new_single_order_book, SingleOrderRequest};
-    use aptos_experimental::order_book_types::{OrderIdType, OrderMatch, OrderMatchDetails};
-    use aptos_experimental::single_order_types::SingleOrder;
-    use aptos_experimental::order_book_types::TriggerCondition;
-    use aptos_experimental::order_book_types::TimeInForce;
+    use aptos_experimental::single_order_book::{SingleOrderBook, new_single_order_book};
     use aptos_experimental::price_time_index::{PriceTimeIndex, new_price_time_idx};
 
     const E_REINSERT_ORDER_MISMATCH: u64 = 8;
@@ -35,80 +34,46 @@ module aptos_experimental::order_book {
         }
     }
 
-    public fun new_single_order_request<M: store + copy + drop>(
-        account: address,
-        order_id: OrderIdType,
-        client_order_id: Option<String>,
-        price: u64,
-        orig_size: u64,
-        remaining_size: u64,
-        is_bid: bool,
-        trigger_condition: Option<TriggerCondition>,
-        time_in_force: TimeInForce,
-        metadata: M
-    ): SingleOrderRequest<M> {
-        aptos_experimental::single_order_book::new_single_order_request(
-            account,
-            order_id,
-            client_order_id,
-            price,
-            orig_size,
-            remaining_size,
-            is_bid,
-            trigger_condition,
-            time_in_force,
-            metadata
-        )
-    }
-
     // ============================= APIs relevant to single order only ====================================
 
-    //============================ Public Read APIs ============================
-    public fun client_order_id_exists<M: store + copy + drop>(
+    public(friend) fun client_order_id_exists<M: store + copy + drop>(
         self: &OrderBook<M>, order_creator: address, client_order_id: String
     ): bool {
         self.single_order_book.client_order_id_exists(order_creator, client_order_id)
     }
 
-    public fun get_single_order_metadata<M: store + copy + drop>(
-        self: &OrderBook<M>, order_id: OrderIdType
+    public(friend) fun get_single_order_metadata<M: store + copy + drop>(
+        self: &OrderBook<M>, order_id: OrderId
     ): Option<M> {
         self.single_order_book.get_order_metadata(order_id)
     }
 
-    public fun get_order_id_by_client_id<M: store + copy + drop>(
+    public(friend) fun get_order_id_by_client_id<M: store + copy + drop>(
         self: &OrderBook<M>, order_creator: address, client_order_id: String
-    ): Option<OrderIdType> {
+    ): Option<OrderId> {
         self.single_order_book.get_order_id_by_client_id(order_creator, client_order_id)
     }
 
-    public fun is_single_order_active<M: store + copy + drop>(
-        self: &OrderBook<M>, order_id: OrderIdType
-    ): bool {
-        self.single_order_book.is_active_order(order_id)
-    }
-
-    public fun get_single_order<M: store + copy + drop>(
-        self: &OrderBook<M>, order_id: OrderIdType
-    ): Option<aptos_experimental::single_order_types::OrderWithState<M>> {
+    public(friend) fun get_single_order<M: store + copy + drop>(
+        self: &OrderBook<M>, order_id: OrderId
+    ): Option<aptos_trading::single_order_types::OrderWithState<M>> {
         self.single_order_book.get_order(order_id)
     }
 
-    public fun get_single_remaining_size<M: store + copy + drop>(
-        self: &OrderBook<M>, order_id: OrderIdType
+    public(friend) fun get_single_remaining_size<M: store + copy + drop>(
+        self: &OrderBook<M>, order_id: OrderId
     ): u64 {
         self.single_order_book.get_remaining_size(order_id)
     }
 
-    //============================ Public(package) Write APIs ============================
     public fun cancel_single_order<M: store + copy + drop>(
-        self: &mut OrderBook<M>, order_creator: address, order_id: OrderIdType
+        self: &mut OrderBook<M>, order_creator: address, order_id: OrderId
     ): SingleOrder<M> {
         self.single_order_book.cancel_order(&mut self.price_time_idx, order_creator, order_id)
     }
 
     public(friend) fun try_cancel_single_order<M: store + copy + drop>(
-        self: &mut OrderBook<M>, order_creator: address, order_id: OrderIdType
+        self: &mut OrderBook<M>, order_creator: address, order_id: OrderId
     ): Option<SingleOrder<M>> {
         self.single_order_book.try_cancel_order(&mut self.price_time_idx, order_creator, order_id)
     }
@@ -129,13 +94,13 @@ module aptos_experimental::order_book {
     }
 
     public(friend) fun decrease_single_order_size<M: store + copy + drop>(
-        self: &mut OrderBook<M>, order_creator: address, order_id: OrderIdType, size_delta: u64
+        self: &mut OrderBook<M>, order_creator: address, order_id: OrderId, size_delta: u64
     ) {
         self.single_order_book.decrease_order_size(&mut self.price_time_idx, order_creator, order_id, size_delta)
     }
 
     public(friend) fun set_single_order_metadata<M: store + copy + drop>(
-        self: &mut OrderBook<M>, order_id: OrderIdType, metadata: M
+        self: &mut OrderBook<M>, order_id: OrderId, metadata: M
     ) {
         self.single_order_book.set_order_metadata(order_id, metadata)
     }
@@ -154,30 +119,12 @@ module aptos_experimental::order_book {
 
     // ============================= APIs relevant to both single and bulk order ====================================
 
-    public fun best_bid_price<M: store + copy + drop>(self: &OrderBook<M>): Option<u64> {
+    public(friend) fun best_bid_price<M: store + copy + drop>(self: &OrderBook<M>): Option<u64> {
         self.price_time_idx.best_bid_price()
     }
 
-    public fun best_ask_price<M: store + copy + drop>(self: &OrderBook<M>): Option<u64> {
+    public(friend) fun best_ask_price<M: store + copy + drop>(self: &OrderBook<M>): Option<u64> {
         self.price_time_idx.best_ask_price()
-    }
-
-    public fun get_mid_price<M: store + copy + drop>(self: &OrderBook<M>): Option<u64> {
-        self.price_time_idx.get_mid_price()
-    }
-
-    public fun get_slippage_price<M: store + copy + drop>(
-        self: &OrderBook<M>, is_bid: bool, slippage_bps: u64
-    ): Option<u64> {
-        self.price_time_idx.get_slippage_price(is_bid, slippage_bps)
-    }
-
-    public fun get_bulk_order_remaining_size<M: store + copy + drop>(
-        self: &OrderBook<M>,
-        order_creator: address,
-        is_bid: bool
-    ): u64 {
-        self.bulk_order_book.get_remaining_size(order_creator, is_bid)
     }
 
     /// Checks if the order is a taker order i.e., matched immediately with the active order book.
@@ -190,7 +137,7 @@ module aptos_experimental::order_book {
         if (trigger_condition.is_some()) {
             return false;
         };
-        return self.price_time_idx.is_taker_order(price, is_bid)
+        self.price_time_idx.is_taker_order(price, is_bid)
     }
 
     public fun get_single_match_for_taker<M: store + copy + drop>(
@@ -224,6 +171,15 @@ module aptos_experimental::order_book {
     }
 
     // ============================= APIs relevant to bulk order only ====================================
+
+    public(friend) fun get_bulk_order_remaining_size<M: store + copy + drop>(
+        self: &OrderBook<M>,
+        order_creator: address,
+        is_bid: bool
+    ): u64 {
+        self.bulk_order_book.get_remaining_size(order_creator, is_bid)
+    }
+
     public(friend) fun place_bulk_order<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_req: BulkOrderRequest<M>
     ) : BulkOrderPlaceResponse<M> {
@@ -243,6 +199,20 @@ module aptos_experimental::order_book {
         self: &mut OrderBook<M>, order_creator: address
     ): BulkOrder<M> {
         self.bulk_order_book.cancel_bulk_order(&mut self.price_time_idx, order_creator)
+    }
+
+    public(friend) fun cancel_bulk_order_at_price<M: store + copy + drop>(
+        self: &mut OrderBook<M>,
+        order_creator: address,
+        price: u64,
+        is_bid: bool
+    ): (u64, BulkOrder<M>) {
+        self.bulk_order_book.cancel_bulk_order_at_price(
+            &mut self.price_time_idx,
+            order_creator,
+            price,
+            is_bid
+        )
     }
 
     // ============================= test_only APIs ====================================

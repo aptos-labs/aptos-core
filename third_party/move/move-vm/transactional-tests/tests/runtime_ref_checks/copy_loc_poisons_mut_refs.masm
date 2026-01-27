@@ -1,0 +1,25 @@
+//# publish
+module 0xc0ffee::copy_loc_test
+
+// Test: CopyLoc poisons mutable references (but not immutable ones)
+public fun test_copy_loc_poisons_mut_refs(): u64
+    local x: u64
+    local mut_ref: &mut u64
+
+    ld_u64 42
+    st_loc x
+
+    // Create mutable reference to x
+    mut_borrow_loc x
+    st_loc mut_ref
+
+    // CopyLoc x (should poison mut_ref)
+    copy_loc x
+    pop
+
+    // Try to read from poisoned mutable reference (should fail)
+    move_loc mut_ref
+    read_ref
+    ret
+
+//# run 0xc0ffee::copy_loc_test::test_copy_loc_poisons_mut_refs --verbose

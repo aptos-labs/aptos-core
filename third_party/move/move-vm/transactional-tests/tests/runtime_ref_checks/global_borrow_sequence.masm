@@ -1,0 +1,47 @@
+//# publish
+module 0xc0ffee::global_seq_test
+
+struct Resource has key+drop
+    value: u64
+
+// Test: Sequential global borrows after releasing previous ones
+public fun test_global_borrow_sequence(s: &signer): u64 acquires Resource
+    local res: Resource
+    local mut_ref: &mut Resource
+    local immut_ref: &Resource
+    local result: u64
+
+    // Setup: publish resource
+    ld_u64 100
+    pack Resource
+    st_loc res
+    copy_loc s
+    move_loc res
+    move_to Resource
+
+    // First: borrow mutable, use it, then release (pop)
+    ld_const<address> 0x1
+    mut_borrow_global Resource
+    st_loc mut_ref
+
+    // Modify via mutable ref
+    ld_u64 200
+    pack Resource
+    move_loc mut_ref
+    write_ref
+
+    // Now borrow immutable (should work since mut ref was released)
+    ld_const<address> 0x1
+    borrow_global Resource
+    st_loc immut_ref
+
+    // Read value
+    move_loc immut_ref
+    borrow_field Resource, value
+    read_ref
+    st_loc result
+
+    move_loc result
+    ret
+
+//# run 0xc0ffee::global_seq_test::test_global_borrow_sequence --signers 0x1 --verbose

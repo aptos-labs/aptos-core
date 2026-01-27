@@ -72,6 +72,13 @@ struct TypeInfo {
     has_native_equality: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+struct TupleInfo {
+    arity: usize,
+    suffix: String,
+    elements: Vec<TypeInfo>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
 struct BvInfo {
     base: usize,
@@ -270,6 +277,12 @@ pub fn add_prelude(
     }
     context.insert("vec_instances", &vec_instances);
     context.insert("table_instances", &table_instances);
+    let tuple_instances = mono_info
+        .tuple_inst
+        .iter()
+        .map(|elems| TupleInfo::new(env, options, elems))
+        .collect_vec();
+    context.insert("tuple_instances", &tuple_instances);
     let table_key_instances = mono_info
         .table_inst
         .iter()
@@ -429,6 +442,21 @@ impl TypeInfo {
             name: name_fun(env, ty),
             suffix: boogie_type_suffix_bv(env, ty, bv_flag),
             has_native_equality: has_native_equality(env, options, ty),
+        }
+    }
+}
+
+impl TupleInfo {
+    fn new(env: &GlobalEnv, options: &BoogieOptions, elems: &[Type]) -> Self {
+        let elements: Vec<TypeInfo> = elems
+            .iter()
+            .map(|ty| TypeInfo::new(env, options, ty, false))
+            .collect();
+        let suffix = elements.iter().map(|e| e.suffix.as_str()).join("_");
+        Self {
+            arity: elems.len(),
+            suffix,
+            elements,
         }
     }
 }

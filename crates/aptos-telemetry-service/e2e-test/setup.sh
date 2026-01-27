@@ -104,10 +104,18 @@ load_env() {
         echo -e "${BLUE}Loading environment from config files...${NC}"
         # Load from .aptos/config.yaml if it exists
         if [ -f "$TEST_DIR/.aptos/config.yaml" ]; then
-            export DEPLOYER_ADDRESS=$(yq e '.profiles.telemetry-service-e2e-test.account' "$TEST_DIR/.aptos/config.yaml" 2>/dev/null | tr -d '"' || echo "")
-            export TEST_ACCOUNT_ADDRESS=$(yq e '.profiles.telemetry-service-e2e-test-member.account' "$TEST_DIR/.aptos/config.yaml" 2>/dev/null | tr -d '"' || echo "")
-            echo "  DEPLOYER_ADDRESS=$DEPLOYER_ADDRESS"
-            echo "  TEST_ACCOUNT_ADDRESS=$TEST_ACCOUNT_ADDRESS"
+            # yq returns "null" (literal string) when field doesn't exist, filter it out
+            local deployer_val=$(yq e '.profiles.telemetry-service-e2e-test.account' "$TEST_DIR/.aptos/config.yaml" 2>/dev/null | tr -d '"' || echo "")
+            local test_acct_val=$(yq e '.profiles.telemetry-service-e2e-test-member.account' "$TEST_DIR/.aptos/config.yaml" 2>/dev/null | tr -d '"' || echo "")
+            # Only export if not "null" or empty
+            if [ -n "$deployer_val" ] && [ "$deployer_val" != "null" ]; then
+                export DEPLOYER_ADDRESS="$deployer_val"
+            fi
+            if [ -n "$test_acct_val" ] && [ "$test_acct_val" != "null" ]; then
+                export TEST_ACCOUNT_ADDRESS="$test_acct_val"
+            fi
+            echo "  DEPLOYER_ADDRESS=${DEPLOYER_ADDRESS:-<not set>}"
+            echo "  TEST_ACCOUNT_ADDRESS=${TEST_ACCOUNT_ADDRESS:-<not set>}"
         fi
         # Load keys from key files if they exist
         if [ -f "$TEST_DIR/deployer.key" ]; then
@@ -231,10 +239,11 @@ step3_start_node() {
     echo -e "${YELLOW}[3/8]${NC} Starting Aptos test node..."
     mkdir -p "$TEST_DIR"
 
-    # Kill any existing aptos-node process on port 8080
+    # Kill any existing process LISTENING on port 8080 (only on reruns)
+    # Important: Use -sTCP:LISTEN to only get listeners, not clients
     if lsof -Pi :8080 -sTCP:LISTEN -t >/dev/null 2>&1; then
-        echo "Killing existing process on port 8080..."
-        kill $(lsof -t -i:8080) 2>/dev/null || true
+        echo "Killing existing process listening on port 8080..."
+        kill $(lsof -Pi :8080 -sTCP:LISTEN -t) 2>/dev/null || true
         sleep 2
     fi
 
@@ -298,7 +307,14 @@ step4_create_accounts() {
     $APTOS_CMD key generate --output-file $TEST_DIR/deployer.key --key-type ed25519
     DEPLOYER_KEY_HEX="0x$(cat $TEST_DIR/deployer.key)"
     $APTOS_CMD init --profile telemetry-service-e2e-test --network local --assume-yes --private-key "$DEPLOYER_KEY_HEX" 2>&1 | tee init.log || true
-    DEPLOYER_ADDRESS=$(yq e '.profiles.telemetry-service-e2e-test.account' "$TEST_DIR/.aptos/config.yaml" | tr -d '"' || echo "")
+    
+    # Extract deployer address from config, filtering out "null" literal
+    local deployer_val=$(yq e '.profiles.telemetry-service-e2e-test.account' "$TEST_DIR/.aptos/config.yaml" | tr -d '"' || echo "")
+    if [ -z "$deployer_val" ] || [ "$deployer_val" = "null" ]; then
+        echo -e "${RED}Error: Failed to create deployer account. Check init.log for details.${NC}"
+        exit 1
+    fi
+    DEPLOYER_ADDRESS="$deployer_val"
     echo "Deployer account address: $DEPLOYER_ADDRESS"
 
     # Create test member account profile
@@ -306,7 +322,14 @@ step4_create_accounts() {
     $APTOS_CMD key generate --output-file $TEST_DIR/test-member.key --key-type ed25519
     TEST_ACCOUNT_KEY_HEX="0x$(cat $TEST_DIR/test-member.key)"
     $APTOS_CMD init --profile telemetry-service-e2e-test-member --network local --assume-yes --private-key "$TEST_ACCOUNT_KEY_HEX" 2>&1 | tee -a init.log || true
-    TEST_ACCOUNT_ADDRESS=$(yq e '.profiles.telemetry-service-e2e-test-member.account' "$TEST_DIR/.aptos/config.yaml" | tr -d '"' || echo "")
+    
+    # Extract test account address from config, filtering out "null" literal
+    local test_acct_val=$(yq e '.profiles.telemetry-service-e2e-test-member.account' "$TEST_DIR/.aptos/config.yaml" | tr -d '"' || echo "")
+    if [ -z "$test_acct_val" ] || [ "$test_acct_val" = "null" ]; then
+        echo -e "${RED}Error: Failed to create test member account. Check init.log for details.${NC}"
+        exit 1
+    fi
+    TEST_ACCOUNT_ADDRESS="$test_acct_val"
     echo "Test member account address: $TEST_ACCOUNT_ADDRESS"
 
     # Copy config file to move dir for consistency
@@ -404,8 +427,15 @@ step7_setup_env() {
     # Load existing env values if running standalone
     if [ -z "$DEPLOYER_ADDRESS" ]; then
         if [ -f "$TEST_DIR/.aptos/config.yaml" ]; then
-            DEPLOYER_ADDRESS=$(yq e '.profiles.telemetry-service-e2e-test.account' "$TEST_DIR/.aptos/config.yaml" | tr -d '"' || echo "")
-            TEST_ACCOUNT_ADDRESS=$(yq e '.profiles.telemetry-service-e2e-test-member.account' "$TEST_DIR/.aptos/config.yaml" | tr -d '"' || echo "")
+            # yq returns "null" (literal string) when field doesn't exist, filter it out
+            local deployer_val=$(yq e '.profiles.telemetry-service-e2e-test.account' "$TEST_DIR/.aptos/config.yaml" | tr -d '"' || echo "")
+            local test_acct_val=$(yq e '.profiles.telemetry-service-e2e-test-member.account' "$TEST_DIR/.aptos/config.yaml" | tr -d '"' || echo "")
+            if [ -n "$deployer_val" ] && [ "$deployer_val" != "null" ]; then
+                DEPLOYER_ADDRESS="$deployer_val"
+            fi
+            if [ -n "$test_acct_val" ] && [ "$test_acct_val" != "null" ]; then
+                TEST_ACCOUNT_ADDRESS="$test_acct_val"
+            fi
         fi
         if [ -f "$TEST_DIR/deployer.key" ]; then
             DEPLOYER_KEY_HEX="0x$(cat $TEST_DIR/deployer.key)"
@@ -517,14 +547,15 @@ step8_start_telemetry() {
         rm -f "$TEST_DIR/telemetry.pid"
     fi
 
-    # Also check if something else is using port 8082
+    # Also check if something else is LISTENING on port 8082 (not just connected to it)
+    # Important: Use -sTCP:LISTEN to only get listeners, not clients like the aptos node
     if lsof -Pi :8082 -sTCP:LISTEN -t >/dev/null 2>&1; then
-        echo "Stopping process on port 8082..."
-        kill $(lsof -t -i:8082) 2>/dev/null || true
+        echo "Stopping process listening on port 8082..."
+        kill $(lsof -Pi :8082 -sTCP:LISTEN -t) 2>/dev/null || true
         sleep 2
         # Force kill if still running
         if lsof -Pi :8082 -sTCP:LISTEN -t >/dev/null 2>&1; then
-            kill -9 $(lsof -t -i:8082) 2>/dev/null || true
+            kill -9 $(lsof -Pi :8082 -sTCP:LISTEN -t) 2>/dev/null || true
             sleep 1
         fi
         echo -e "${GREEN}✓ Process on port 8082 stopped${NC}"
@@ -538,9 +569,9 @@ step8_start_telemetry() {
     TELEMETRY_PID=$!
     echo $TELEMETRY_PID > "$TEST_DIR/telemetry.pid"
 
-    # Wait for telemetry service to be ready
+    # Wait for telemetry service to be ready. This might take a while if it's compiling.
     echo "Waiting for telemetry service to be ready..."
-    for i in {1..30}; do
+    for i in {1..60}; do
         if curl -s http://localhost:8082/api/v1/health > /dev/null 2>&1; then
             echo -e "${GREEN}✓ Telemetry service is ready (PID: $TELEMETRY_PID)${NC}"
             break
@@ -551,7 +582,7 @@ step8_start_telemetry() {
             tail -50 "$TEST_DIR/telemetry.log"
             exit 1
         fi
-        sleep 2
+        sleep 5
     done
 
     echo -e "${BLUE}Telemetry service logs:${NC} $TEST_DIR/telemetry.log"

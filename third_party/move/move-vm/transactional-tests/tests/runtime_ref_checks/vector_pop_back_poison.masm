@@ -1,0 +1,36 @@
+//# publish
+module 0xc0ffee::vec_test
+
+// Test: VecPopBack poisons existing references to vector elements
+public fun test_vec_pop_back_poisons_elem_ref(): u64
+    local vec: vector<u64>
+    local elem_ref: &u64
+    local vec_ref: &mut vector<u64>
+
+    // Create a vector with 2 elements
+    ld_u64 10
+    ld_u64 20
+    vec_pack<u64> 2
+    st_loc vec
+
+    // Borrow immutable reference to an element
+    mut_borrow_loc vec
+    ld_u64 0
+    vec_borrow<u64>
+    st_loc elem_ref
+
+    // Get mutable reference to vector
+    mut_borrow_loc vec
+    st_loc vec_ref
+
+    // Pop back from vector (should poison elem_ref)
+    move_loc vec_ref
+    vec_pop_back<u64>
+    pop
+
+    // Try to read from poisoned element reference (should fail)
+    move_loc elem_ref
+    read_ref
+    ret
+
+//# run 0xc0ffee::vec_test::test_vec_pop_back_poisons_elem_ref --verbose

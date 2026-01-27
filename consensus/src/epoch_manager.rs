@@ -1575,6 +1575,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .ok_or_else(|| anyhow::anyhow!("Epoch state is not available"))?;
             let proof_cache = self.proof_cache.clone();
             let quorum_store_enabled = self.quorum_store_enabled;
+            let opt_qs_v2_rx_enabled = self.config.quorum_store.enable_opt_qs_v2_rx;
             let quorum_store_msg_tx = self.quorum_store_msg_tx.clone();
             let buffered_proposal_tx = self.buffered_proposal_tx.clone();
             let round_manager_tx = self.round_manager_tx.clone();
@@ -1593,6 +1594,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                             &epoch_state.verifier,
                             &proof_cache,
                             quorum_store_enabled,
+                            opt_qs_v2_rx_enabled,
                             peer_id == my_peer_id,
                             max_num_batches,
                             max_batch_expiry_gap_usecs,

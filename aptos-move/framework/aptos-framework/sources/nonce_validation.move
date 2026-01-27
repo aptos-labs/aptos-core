@@ -119,7 +119,7 @@ module aptos_framework::nonce_validation {
                         empty_bucket(true)
                     );
                 };
-                nonce_history.next_key = nonce_history.next_key + 1;
+                nonce_history.next_key += 1;
             }
         }
     }
@@ -147,7 +147,7 @@ module aptos_framework::nonce_validation {
                 empty_bucket(false)
             );
         };
-        let bucket = table::borrow_mut(&mut nonce_history.nonce_table, bucket_index);
+        let bucket = nonce_history.nonce_table.borrow_mut(bucket_index);
 
         let existing_exp_time = bucket.nonce_to_exp_time_map.get(&nonce_key);
         if (existing_exp_time.is_some()) {
@@ -189,7 +189,7 @@ module aptos_framework::nonce_validation {
             } else {
                 break;
             };
-            i = i + 1;
+            i += 1;
         };
 
         // Insert the (address, nonce) pair in the bucket.
@@ -218,7 +218,7 @@ module aptos_framework::nonce_validation {
         let bucket_index = sip_hash_from_value(&nonce_key) % NUM_BUCKETS;
         let nonce_history = &NonceHistory[@aptos_framework];
         if (nonce_history.nonce_table.contains(bucket_index)) {
-            let bucket = table::borrow(&nonce_history.nonce_table, bucket_index);
+            let bucket = nonce_history.nonce_table.borrow(bucket_index);
             let existing_exp_time = bucket.nonce_to_exp_time_map.get(&nonce_key);
             if (existing_exp_time.is_some()) {
                 let existing_exp_time = existing_exp_time.extract();

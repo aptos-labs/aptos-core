@@ -406,7 +406,7 @@ Authorization function for account abstraction.
     abstraction_auth_data: AbstractionAuthData
 ): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <b>acquires</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_RegisteredDelegations">RegisteredDelegations</a> {
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&<a href="account.md#0x1_account">account</a>);
-    <b>let</b> stream = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_new">bcs_stream::new</a>(*<a href="auth_data.md#0x1_auth_data_authenticator">auth_data::authenticator</a>(&abstraction_auth_data));
+    <b>let</b> stream = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_new">bcs_stream::new</a>(*abstraction_auth_data.authenticator());
     <b>let</b> public_key = new_unvalidated_public_key_from_bytes(
         <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x))
     );
@@ -417,7 +417,7 @@ Authorization function for account abstraction.
         <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_signature_verify_strict">ed25519::signature_verify_strict</a>(
             &signature,
             &public_key,
-            *<a href="auth_data.md#0x1_auth_data_digest">auth_data::digest</a>(&abstraction_auth_data),
+            *abstraction_auth_data.digest(),
         ),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="permissioned_delegation.md#0x1_permissioned_delegation_EINVALID_SIGNATURE">EINVALID_SIGNATURE</a>)
     );

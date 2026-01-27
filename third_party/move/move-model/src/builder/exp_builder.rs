@@ -1862,7 +1862,8 @@ impl ExpTranslator<'_, '_, '_> {
                     lhs,
                     &rhs_ty,
                     WideningOrder::RightToLeft,
-                    true, /*match_locals*/
+                    true,  /*match_locals*/
+                    false, /*allow_wildcard_for_tuple*/
                     &ErrorMessageContext::Assignment,
                 );
                 self.check_duplicate_assign(&lhs);
@@ -2482,6 +2483,8 @@ impl ExpTranslator<'_, '_, '_> {
                 // it is allowed to be widened to the pattern type.
                 WideningOrder::RightToLeft,
                 false,
+                // In match patterns, a single wildcard `_` is allowed for tuples.
+                true,
                 &ErrorMessageContext::Binding,
             );
             // Declare the variables in the pattern
@@ -2585,6 +2588,7 @@ impl ExpTranslator<'_, '_, '_> {
         expected_type: &Type,
         expected_order: WideningOrder,
         match_locals: bool,
+        allow_wildcard_for_tuple: bool,
         context: &ErrorMessageContext,
     ) -> Pattern {
         // Shortcut for single element case
@@ -2594,6 +2598,7 @@ impl ExpTranslator<'_, '_, '_> {
                 expected_type,
                 expected_order,
                 match_locals,
+                allow_wildcard_for_tuple,
                 context,
             );
         }
@@ -2624,7 +2629,14 @@ impl ExpTranslator<'_, '_, '_> {
         let mut args = vec![];
         let mut elem_types = vec![];
         for (lv, expected) in list.value.iter().zip(elem_expected_types.iter()) {
-            let value = self.translate_lvalue(lv, expected, expected_order, match_locals, context);
+            let value = self.translate_lvalue(
+                lv,
+                expected,
+                expected_order,
+                match_locals,
+                allow_wildcard_for_tuple,
+                context,
+            );
             elem_types.push(self.get_node_type(value.node_id()));
             args.push(value)
         }
@@ -2670,9 +2682,23 @@ impl ExpTranslator<'_, '_, '_> {
                     expected_type,
                     context,
                 );
-                self.translate_lvalue(lv, &bound_type, expected_order, match_locals, context)
+                self.translate_lvalue(
+                    lv,
+                    &bound_type,
+                    expected_order,
+                    match_locals,
+                    false,
+                    context,
+                )
             },
-            None => self.translate_lvalue(lv, expected_type, expected_order, match_locals, context),
+            None => self.translate_lvalue(
+                lv,
+                expected_type,
+                expected_order,
+                match_locals,
+                false,
+                context,
+            ),
         }
     }
 
@@ -2682,6 +2708,7 @@ impl ExpTranslator<'_, '_, '_> {
         expected_type: &Type,
         expected_order: WideningOrder,
         match_locals: bool,
+        allow_wildcard_for_tuple: bool,
         context: &ErrorMessageContext,
     ) -> Pattern {
         let loc = &self.to_loc(&lv.loc);
@@ -2690,14 +2717,16 @@ impl ExpTranslator<'_, '_, '_> {
                 let mut id = self.new_node_id_with_type_loc(expected_type, loc);
                 match maccess.value {
                     EA::ModuleAccess_::Name(n) if n.value.as_str() == "_" => {
-                        self.add_constraint_and_report(
-                            loc,
-                            &ErrorMessageContext::General,
-                            expected_type,
-                            Variance::NoVariance,
-                            Constraint::NoTuple,
-                            None,
-                        );
+                        if !allow_wildcard_for_tuple {
+                            self.add_constraint_and_report(
+                                loc,
+                                &ErrorMessageContext::General,
+                                expected_type,
+                                Variance::NoVariance,
+                                Constraint::NoTuple,
+                                None,
+                            );
+                        }
                         Pattern::Wildcard(id)
                     },
                     EA::ModuleAccess_::Name(n) => {
@@ -2856,6 +2885,7 @@ impl ExpTranslator<'_, '_, '_> {
                     expected_type,
                     expected_order,
                     match_locals,
+                    false,
                     context,
                 )
             },
@@ -2924,6 +2954,7 @@ impl ExpTranslator<'_, '_, '_> {
                             &expected_field_ty,
                             expected_order,
                             match_locals,
+                            false,
                             context,
                         );
                         args.insert(field_data.offset, translated);
@@ -2947,6 +2978,7 @@ impl ExpTranslator<'_, '_, '_> {
                         &expected_field_ty,
                         expected_order,
                         match_locals,
+                        false,
                         context,
                     );
                     args.insert(field_data.offset, translated);
@@ -3622,6 +3654,7 @@ impl ExpTranslator<'_, '_, '_> {
                         &ty,
                         order,
                         false, /*match_locals*/
+                        false, /*allow_wildcard_for_tuple*/
                         if binding.is_some() {
                             &ErrorMessageContext::Binding
                         } else {
@@ -5678,6 +5711,7 @@ impl ExpTranslator<'_, '_, '_> {
                 &elem_ty,
                 WideningOrder::LeftToRight,
                 false, /*match_locals*/
+                false, /*allow_wildcard_for_tuple*/
                 &ErrorMessageContext::Binding,
             );
             self.define_locals_of_pat(&rpat);
