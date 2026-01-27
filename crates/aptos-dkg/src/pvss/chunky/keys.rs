@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{pvss::chunky::chunked_elgamal, traits, Scalar};
+use crate::{pvss::chunky::chunked_elgamal_pp, traits, Scalar};
 use aptos_crypto::{
     arkworks,
     arkworks::serialization::{ark_de, ark_se},
@@ -71,11 +71,11 @@ impl<E: Pairing> Uniform for DecryptPrivKey<E> {
     }
 }
 
-impl<E: Pairing> traits::Convert<EncryptPubKey<E>, chunked_elgamal::PublicParameters<E::G1>>
+impl<E: Pairing> traits::Convert<EncryptPubKey<E>, chunked_elgamal_pp::PublicParameters<E::G1>>
     for DecryptPrivKey<E>
 {
     /// Given a decryption key $dk$, computes its associated encryption key $H^{dk}$
-    fn to(&self, pp_elgamal: &chunked_elgamal::PublicParameters<E::G1>) -> EncryptPubKey<E> {
+    fn to(&self, pp_elgamal: &chunked_elgamal_pp::PublicParameters<E::G1>) -> EncryptPubKey<E> {
         EncryptPubKey::<E> {
             ek: pp_elgamal.pubkey_base().mul(self.dk).into_affine(),
         }
@@ -131,7 +131,7 @@ pub type DealtSecretKeyShare<F: PrimeField> = Scalar<F>;
 #[cfg(test)]
 mod tests {
     use super::{DecryptPrivKey, EncryptPubKey};
-    use crate::pvss::{chunky::chunked_elgamal::PublicParameters, traits::Convert};
+    use crate::pvss::{chunky::chunked_elgamal_pp::PublicParameters, traits::Convert};
     use aptos_crypto::{
         bls12381::{PrivateKey, PublicKey},
         Uniform,
@@ -147,7 +147,7 @@ mod tests {
 
         let decryption_key: DecryptPrivKey<Bls12_381> = DecryptPrivKey::from(&sk);
         let encryption_key_from_decryption_key: EncryptPubKey<Bls12_381> =
-            decryption_key.to(&PublicParameters::default());
+            decryption_key.to(&PublicParameters::new(3));
 
         let encryption_key_from_blst_pk = EncryptPubKey::from(&pk);
 

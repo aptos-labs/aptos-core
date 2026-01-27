@@ -106,13 +106,17 @@ sophisticated order matching, cancellation, and reinsertion capabilities.
 -  [Function `cancel_bulk_order`](#0x7_bulk_order_book_cancel_bulk_order)
     -  [Arguments:](#@Arguments:_19)
     -  [Aborts:](#@Aborts:_20)
+-  [Function `cancel_bulk_order_at_price`](#0x7_bulk_order_book_cancel_bulk_order_at_price)
+    -  [Arguments:](#@Arguments:_21)
+    -  [Returns:](#@Returns:_22)
+    -  [Aborts:](#@Aborts:_23)
 -  [Function `get_bulk_order`](#0x7_bulk_order_book_get_bulk_order)
 -  [Function `get_remaining_size`](#0x7_bulk_order_book_get_remaining_size)
 -  [Function `get_prices`](#0x7_bulk_order_book_get_prices)
 -  [Function `get_sizes`](#0x7_bulk_order_book_get_sizes)
 -  [Function `place_bulk_order`](#0x7_bulk_order_book_place_bulk_order)
-    -  [Arguments:](#@Arguments:_21)
-    -  [Aborts:](#@Aborts:_22)
+    -  [Arguments:](#@Arguments:_24)
+    -  [Aborts:](#@Aborts:_25)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map">0x1::big_ordered_map</a>;
@@ -213,6 +217,15 @@ Main bulk order book container that manages all orders and their matching.
 
 
 
+<a id="0x7_bulk_order_book_E_INVALID_SEQUENCE_NUMBER"></a>
+
+
+
+<pre><code><b>const</b> <a href="bulk_order_book.md#0x7_bulk_order_book_E_INVALID_SEQUENCE_NUMBER">E_INVALID_SEQUENCE_NUMBER</a>: u64 = 13;
+</code></pre>
+
+
+
 <a id="0x7_bulk_order_book_EINVALID_ADD_SIZE_TO_ORDER"></a>
 
 
@@ -272,15 +285,6 @@ Main bulk order book container that manages all orders and their matching.
 
 
 <pre><code><b>const</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EPOST_ONLY_FILLED">EPOST_ONLY_FILLED</a>: u64 = 2;
-</code></pre>
-
-
-
-<a id="0x7_bulk_order_book_E_INVALID_SEQUENCE_NUMBER"></a>
-
-
-
-<pre><code><b>const</b> <a href="bulk_order_book.md#0x7_bulk_order_book_E_INVALID_SEQUENCE_NUMBER">E_INVALID_SEQUENCE_NUMBER</a>: u64 = 13;
 </code></pre>
 
 
@@ -700,6 +704,93 @@ with the same order ID in the future.
 
 </details>
 
+<a id="0x7_bulk_order_book_cancel_bulk_order_at_price"></a>
+
+## Function `cancel_bulk_order_at_price`
+
+Cancels a specific price level in a bulk order.
+
+This function removes only the specified price level from the bulk order,
+keeping all other price levels intact. If the cancelled price level was active,
+it will be removed from the active order book and the next price level (if any)
+will be activated.
+
+
+<a id="@Arguments:_21"></a>
+
+### Arguments:
+
+- <code>self</code>: Mutable reference to the bulk order book
+- <code>price_time_idx</code>: Mutable reference to the price time index
+- <code><a href="../../aptos-framework/doc/account.md#0x1_account">account</a></code>: The account whose order contains the price level to cancel
+- <code>price</code>: The price level to cancel
+- <code>is_bid</code>: True to cancel from bid side, false for ask side
+
+
+<a id="@Returns:_22"></a>
+
+### Returns:
+
+A tuple containing:
+- The cancelled size at that price level
+- The updated bulk order (copy for event emission)
+
+
+<a id="@Aborts:_23"></a>
+
+### Aborts:
+
+- If no order exists for the specified account
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_cancel_bulk_order_at_price">cancel_bulk_order_at_price</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, price: u64, is_bid: bool): (u64, <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_cancel_bulk_order_at_price">cancel_bulk_order_at_price</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">BulkOrderBook</a>&lt;M&gt;,
+    price_time_idx: &<b>mut</b> aptos_experimental::price_time_index::PriceTimeIndex,
+    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
+    price: u64,
+    is_bid: bool
+): (u64, BulkOrder&lt;M&gt;) {
+    <b>let</b> order_opt = self.orders.remove_or_none(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
+    <b>assert</b>!(order_opt.is_some(), <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
+    <b>let</b> order = order_opt.destroy_some();
+
+    // Check <b>if</b> the price <b>to</b> cancel is the currently active price
+    <b>let</b> active_price = order.get_order_request().get_active_price(is_bid);
+    <b>let</b> was_active = active_price.is_some() && active_price.destroy_some() == price;
+
+    // If this was the active price level, we need <b>to</b> cancel it from the active order book first
+    <b>if</b> (was_active) {
+        <a href="bulk_order_book.md#0x7_bulk_order_book_cancel_active_order_for_side">cancel_active_order_for_side</a>(price_time_idx, &order, is_bid);
+    };
+
+    // Cancel the specific price level
+    <b>let</b> cancelled_size = <a href="bulk_order_utils.md#0x7_bulk_order_utils_cancel_at_price_level">bulk_order_utils::cancel_at_price_level</a>(&<b>mut</b> order, price, is_bid);
+
+    // If this was the active price level, activate the next price level <b>if</b> available
+    <b>if</b> (was_active) {
+        <b>let</b> order_id = order.get_order_id();
+        <a href="bulk_order_book.md#0x7_bulk_order_book_activate_first_price_level_for_side">activate_first_price_level_for_side</a>(price_time_idx, &order, order_id, is_bid);
+    };
+
+    <b>let</b> order_copy = order;
+    self.orders.add(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order);
+    (cancelled_size, order_copy)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x7_bulk_order_book_get_bulk_order"></a>
 
 ## Function `get_bulk_order`
@@ -829,7 +920,7 @@ If an order already exists for the account, it will be replaced with the new ord
 The first price levels of both bid and ask sides will be activated in the active order book.
 
 
-<a id="@Arguments:_21"></a>
+<a id="@Arguments:_24"></a>
 
 ### Arguments:
 
@@ -838,7 +929,7 @@ The first price levels of both bid and ask sides will be activated in the active
 - <code>order_req</code>: The bulk order request to place
 
 
-<a id="@Aborts:_22"></a>
+<a id="@Aborts:_25"></a>
 
 ### Aborts:
 

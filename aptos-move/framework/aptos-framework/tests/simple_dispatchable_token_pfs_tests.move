@@ -29,7 +29,7 @@ module aptos_framework::simple_token_pfs_tests {
         // User 2 burns their primary store but should still be able to transfer afterward.
         let user_2_primary_store = primary_store(user_2_address, metadata);
         object::burn_object_with_transfer(user_2, user_2_primary_store);
-        assert!(object::is_burnt(user_2_primary_store), 0);
+        assert!(user_2_primary_store.is_burnt(), 0);
         // Balance still works
         assert!(balance(user_2_address, metadata) == 80, 0);
         // Deposit still works
@@ -55,7 +55,7 @@ module aptos_framework::simple_token_pfs_tests {
         // User 2 burns their primary store but should still be able to withdraw afterward.
         let user_2_primary_store = primary_store(user_2_address, metadata);
         object::burn_object_with_transfer(user_2, user_2_primary_store);
-        assert!(object::is_burnt(user_2_primary_store), 0);
+        assert!(user_2_primary_store.is_burnt(), 0);
         let coins = withdraw(user_2, metadata, 70);
         assert!(balance(user_2_address, metadata) == 10, 0);
         deposit(user_2_address, coins);

@@ -28,7 +28,7 @@ fn identifier_from_ref(v: Value) -> SafeNativeResult<Identifier> {
         .map_err(SafeNativeError::InvariantViolation)?
         .as_bytes_ref()
         .to_vec();
-    Identifier::from_utf8(bytes).map_err(|_| SafeNativeError::Abort { abort_code: 1 })
+    Identifier::from_utf8(bytes).map_err(|_| SafeNativeError::abort(1))
 }
 
 pub(crate) fn extract_function_info(
@@ -99,13 +99,12 @@ fn native_check_dispatch_type_compatibility_impl(
                 context.traversal_context().legacy_check_visited(a, n)
             }
         };
-        check_visited(module.address(), module.name())
-            .map_err(|_| SafeNativeError::Abort { abort_code: 2 })?;
+        check_visited(module.address(), module.name()).map_err(|_| SafeNativeError::abort(2))?;
 
         (
             context
                 .load_function(&module, &func)
-                .map_err(|_| SafeNativeError::Abort { abort_code: 2 })?,
+                .map_err(|_| SafeNativeError::abort(2))?,
             module,
         )
     };
@@ -114,13 +113,13 @@ fn native_check_dispatch_type_compatibility_impl(
         (
             context
                 .load_function(&module, &func)
-                .map_err(|_| SafeNativeError::Abort { abort_code: 2 })?,
+                .map_err(|_| SafeNativeError::abort(2))?,
             module,
         )
     };
 
     if lhs.param_tys().is_empty() {
-        return Err(SafeNativeError::Abort { abort_code: 2 });
+        return Err(SafeNativeError::abort(2));
     }
 
     Ok(smallvec![Value::bool(

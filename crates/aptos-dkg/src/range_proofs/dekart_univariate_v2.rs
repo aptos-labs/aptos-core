@@ -76,7 +76,7 @@ pub struct ProverKey<E: Pairing> {
 #[derive(CanonicalSerialize)]
 pub struct PublicStatement<E: Pairing> {
     n: usize,
-    ell: usize,
+    ell: u8,
     comm: univariate_hiding_kzg::Commitment<E>,
 }
 
@@ -254,7 +254,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     #[allow(non_snake_case)]
     fn setup<R: RngCore + CryptoRng>(
         max_n: usize,
-        max_ell: usize,
+        max_ell: u8,
         group_generators: GroupGenerators<E>,
         rng: &mut R,
     ) -> (ProverKey<E>, VerificationKey<E>) {
@@ -274,7 +274,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         let h_denom_eval = compute_h_denom_eval::<E>(&ck_S.roots_of_unity_in_eval_dom);
 
-        let powers_of_two = arkworks::powers_of_two::<E::ScalarField>(max_ell);
+        let powers_of_two = arkworks::powers_of_two::<E::ScalarField>(max_ell.into());
 
         let prover_precomputed = ProverPrecomputed {
             powers_of_two: powers_of_two.clone(),
@@ -323,7 +323,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     fn prove<R>(
         pk: &ProverKey<E>,
         values: &[Self::Input],
-        ell: usize,
+        ell: u8,
         comm: &Self::Commitment,
         rho: &Self::CommitmentRandomness,
         rng: &mut R,
@@ -342,7 +342,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         } = pk;
 
         let n = values.len();
-        let max_ell = prover_precomputed.powers_of_two.len();
+        let max_ell: u8 = prover_precomputed.powers_of_two.len().try_into().unwrap();
 
         assert!(
             n <= *max_n,
@@ -417,15 +417,15 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let rs: Vec<E::ScalarField> = (0..ell).map(|_| sample_field_element(rng)).collect();
 
         let f_js_evals: Vec<Vec<E::ScalarField>> = {
-            let mut f_js_evals = vec![Vec::with_capacity(num_omegas); ell];
+            let mut f_js_evals = vec![Vec::with_capacity(num_omegas); ell as usize];
 
-            for j in 0..ell {
+            for j in 0..ell as usize {
                 f_js_evals[j].push(rs[j]);
             }
 
             for &val in values.iter() {
                 let bits = utils::scalar_to_bits_le::<E>(&val);
-                for j in 0..ell {
+                for j in 0..ell as usize {
                     f_js_evals[j].push(E::ScalarField::from(bits[j]));
                 }
             }
@@ -438,7 +438,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         };
 
         let rhos: Vec<E::ScalarField> = std::iter::repeat_with(|| sample_field_element(rng))
-            .take(ell)
+            .take(ell as usize)
             .collect();
 
         let hkzg_commitment_hom = univariate_hiding_kzg::CommitmentHomomorphism::<E> {
@@ -461,7 +461,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         fiat_shamir::append_f_j_commitments::<E>(&mut fs_t, &Cs);
 
         // Step 6
-        let (beta, betas) = fiat_shamir::get_beta_challenges::<E>(&mut fs_t, ell);
+        let (beta, betas) = fiat_shamir::get_beta_challenges::<E>(&mut fs_t, ell as usize);
 
         let hat_f_evals: Vec<E::ScalarField> = {
             let mut v = Vec::with_capacity(num_omegas);
@@ -480,7 +480,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             result
         };
 
-        let f_j_coeffs: Vec<Vec<E::ScalarField>> = (0..ell)
+        let f_j_coeffs: Vec<Vec<E::ScalarField>> = (0..ell as usize)
             .map(|j| {
                 let mut f_j = f_js_evals[j].clone();
                 debug_assert_eq!(f_j.len(), pk.max_n + 1);
@@ -567,7 +567,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         fiat_shamir::append_h_commitment::<E>(&mut fs_t, &D);
 
         // Step 8
-        let (mu, mu_h, mus) = fiat_shamir::get_mu_challenges::<E>(&mut fs_t, ell);
+        let (mu, mu_h, mus) = fiat_shamir::get_mu_challenges::<E>(&mut fs_t, ell as usize);
 
         let u_values: Vec<_> = (0..num_omegas)
             .map(|i| {
@@ -599,7 +599,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             *num_omegas_inv,
         );
 
-        let a_js: Vec<E::ScalarField> = (0..ell)
+        let a_js: Vec<E::ScalarField> = (0..ell as usize)
             .map(|i| {
                 let poly = ark_poly::univariate::DensePolynomial {
                     coeffs: f_j_coeffs[i].clone(),
@@ -651,7 +651,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         &self,
         vk: &Self::VerificationKey,
         n: usize,
-        ell: usize,
+        ell: u8,
         comm: &Self::Commitment,
     ) -> anyhow::Result<()> {
         let mut fs_t = merlin::Transcript::new(Self::DST);
@@ -665,7 +665,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         } = vk;
 
         assert!(
-            ell <= verifier_precomputed.powers_of_two.len(),
+            ell as usize <= verifier_precomputed.powers_of_two.len(),
             "ell (got {}) must be ≤ max_ell (which is {})",
             ell,
             verifier_precomputed.powers_of_two.len()
@@ -710,13 +710,13 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         fiat_shamir::append_f_j_commitments::<E>(&mut fs_t, &Cs);
 
         // Step 5
-        let (beta, beta_js) = fiat_shamir::get_beta_challenges::<E>(&mut fs_t, ell);
+        let (beta, beta_js) = fiat_shamir::get_beta_challenges::<E>(&mut fs_t, ell as usize);
 
         // Step 6
         fiat_shamir::append_h_commitment::<E>(&mut fs_t, &D);
 
         // Step 7
-        let (mu, mu_h, mu_js) = fiat_shamir::get_mu_challenges::<E>(&mut fs_t, ell);
+        let (mu, mu_h, mu_js) = fiat_shamir::get_mu_challenges::<E>(&mut fs_t, ell as usize);
 
         // Step 8
         let U_bases: Vec<E::G1Affine> = {

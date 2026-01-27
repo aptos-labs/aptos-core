@@ -57,7 +57,7 @@ module aptos_experimental::dead_mans_switch_operations_test {
             false, // cancel_on_match_limit
             &clearinghouse_test::test_market_callbacks()
         );
-        order_placement::get_order_id(result)
+        result.get_order_id()
     }
 
     #[test]

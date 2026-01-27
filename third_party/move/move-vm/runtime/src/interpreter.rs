@@ -1176,9 +1176,17 @@ where
                 current_frame.pc += 1; // advance past the Call instruction in the caller
                 Ok(false)
             },
-            NativeResult::Abort { cost, abort_code } => {
+            NativeResult::Abort {
+                cost,
+                abort_code,
+                abort_message,
+            } => {
                 gas_meter.charge_native_function(cost, Option::<std::iter::Empty<&Value>>::None)?;
-                Err(PartialVMError::new(StatusCode::ABORTED).with_sub_status(abort_code))
+                let mut err = PartialVMError::new(StatusCode::ABORTED).with_sub_status(abort_code);
+                if let Some(abort_message) = abort_message {
+                    err = err.with_message(abort_message);
+                }
+                Err(err)
             },
             NativeResult::OutOfGas { partial_cost } => {
                 let err = match gas_meter

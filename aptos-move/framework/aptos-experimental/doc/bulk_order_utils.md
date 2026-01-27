@@ -12,6 +12,9 @@
     -  [Arguments:](#@Arguments:_2)
     -  [Returns:](#@Returns:_3)
     -  [Aborts:](#@Aborts:_4)
+-  [Function `cancel_at_price_level`](#0x7_bulk_order_utils_cancel_at_price_level)
+    -  [Arguments:](#@Arguments:_5)
+    -  [Returns:](#@Returns:_6)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
@@ -144,6 +147,66 @@ A tuple containing the next active price and size as options.
     } <b>else</b> {
         (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(prices[0]), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(sizes[0])) // Return the next active price and size
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_bulk_order_utils_cancel_at_price_level"></a>
+
+## Function `cancel_at_price_level`
+
+Cancels a specific price level in a bulk order by setting its size to 0 and removing it.
+
+This function finds the price level matching the specified price and removes it from
+the order, keeping other price levels intact.
+
+
+<a id="@Arguments:_5"></a>
+
+### Arguments:
+
+- <code>order</code>: Mutable reference to the bulk order
+- <code>price</code>: The price level to cancel
+- <code>is_bid</code>: True to cancel from bid side, false for ask side
+
+
+<a id="@Returns:_6"></a>
+
+### Returns:
+
+The size that was cancelled at that price level, or 0 if the price wasn't found
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_cancel_at_price_level">cancel_at_price_level</a>&lt;M: <b>copy</b>, drop, store&gt;(order: &<b>mut</b> <a href="bulk_order_types.md#0x7_bulk_order_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;, price: u64, is_bid: bool): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_cancel_at_price_level">cancel_at_price_level</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    order: &<b>mut</b> BulkOrder&lt;M&gt;,
+    price: u64,
+    is_bid: bool
+): u64 {
+    <b>let</b> (prices, sizes) = order.get_order_request_mut().get_prices_and_sizes_mut(is_bid);
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; prices.length()) {
+        <b>if</b> (prices[i] == price) {
+            // Found the price level, remove it
+            <b>let</b> cancelled_size = sizes[i];
+            prices.remove(i);
+            sizes.remove(i);
+            <b>return</b> cancelled_size
+        };
+        i = i + 1;
+    };
+    0 // Price not found
 }
 </code></pre>
 

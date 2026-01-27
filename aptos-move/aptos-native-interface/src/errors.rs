@@ -54,7 +54,10 @@ pub enum SafeNativeError {
     ///
     /// Equivalent to aborting in a regular Move function, so the same error convention should
     /// be followed.
-    Abort { abort_code: u64 },
+    Abort {
+        abort_code: u64,
+        abort_message: Option<String>,
+    },
 
     /// Indicating that the native function has exceeded execution limits.
     ///
@@ -92,6 +95,22 @@ pub enum SafeNativeError {
     ///
     /// Note: not used once metering in native context is enabled.
     LoadModule { module_name: ModuleId },
+}
+
+impl SafeNativeError {
+    pub fn abort(abort_code: u64) -> Self {
+        SafeNativeError::Abort {
+            abort_code,
+            abort_message: None,
+        }
+    }
+
+    pub fn abort_with_message(abort_code: u64, abort_message: impl ToString) -> Self {
+        SafeNativeError::Abort {
+            abort_code,
+            abort_message: Some(abort_message.to_string()),
+        }
+    }
 }
 
 // Allows us to keep using the `?` operator on function calls that return `PartialVMResult` inside safe natives.

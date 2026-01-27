@@ -105,7 +105,7 @@ pub fn setup<E: Pairing>(
     group_generators: GroupGenerators<E>,
     trapdoor: Trapdoor<E>,
 ) -> (VerificationKey<E>, CommitmentKey<E>) {
-    utils::assert_power_of_two(m);
+    utils::assert_power_of_two(m as u64);
 
     let GroupGenerators { g1, g2 } = group_generators;
     let Trapdoor { xi, tau } = trapdoor;

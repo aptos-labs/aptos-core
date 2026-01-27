@@ -5,6 +5,7 @@ use crate::pvss::signed::GenericSigning;
 use ark_ec::pairing::Pairing;
 
 pub mod chunked_elgamal;
+pub mod chunked_elgamal_pp;
 pub mod chunked_scalar_mul; // needs to be `pub` for tests
 pub mod chunks;
 mod hkzg_chunked_elgamal;

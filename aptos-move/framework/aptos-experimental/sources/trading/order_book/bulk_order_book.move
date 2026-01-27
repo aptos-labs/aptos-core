@@ -284,6 +284,61 @@ module aptos_experimental::bulk_order_book {
         order_copy
     }
 
+    /// Cancels a specific price level in a bulk order.
+    ///
+    /// This function removes only the specified price level from the bulk order,
+    /// keeping all other price levels intact. If the cancelled price level was active,
+    /// it will be removed from the active order book and the next price level (if any)
+    /// will be activated.
+    ///
+    /// # Arguments:
+    /// - `self`: Mutable reference to the bulk order book
+    /// - `price_time_idx`: Mutable reference to the price time index
+    /// - `account`: The account whose order contains the price level to cancel
+    /// - `price`: The price level to cancel
+    /// - `is_bid`: True to cancel from bid side, false for ask side
+    ///
+    /// # Returns:
+    /// A tuple containing:
+    /// - The cancelled size at that price level
+    /// - The updated bulk order (copy for event emission)
+    ///
+    /// # Aborts:
+    /// - If no order exists for the specified account
+    public(friend) fun cancel_bulk_order_at_price<M: store + copy + drop>(
+        self: &mut BulkOrderBook<M>,
+        price_time_idx: &mut aptos_experimental::price_time_index::PriceTimeIndex,
+        account: address,
+        price: u64,
+        is_bid: bool
+    ): (u64, BulkOrder<M>) {
+        let order_opt = self.orders.remove_or_none(&account);
+        assert!(order_opt.is_some(), EORDER_NOT_FOUND);
+        let order = order_opt.destroy_some();
+
+        // Check if the price to cancel is the currently active price
+        let active_price = order.get_order_request().get_active_price(is_bid);
+        let was_active = active_price.is_some() && active_price.destroy_some() == price;
+
+        // If this was the active price level, we need to cancel it from the active order book first
+        if (was_active) {
+            cancel_active_order_for_side(price_time_idx, &order, is_bid);
+        };
+
+        // Cancel the specific price level
+        let cancelled_size = bulk_order_utils::cancel_at_price_level(&mut order, price, is_bid);
+
+        // If this was the active price level, activate the next price level if available
+        if (was_active) {
+            let order_id = order.get_order_id();
+            activate_first_price_level_for_side(price_time_idx, &order, order_id, is_bid);
+        };
+
+        let order_copy = order;
+        self.orders.add(account, order);
+        (cancelled_size, order_copy)
+    }
+
     public(friend) fun get_bulk_order<M: store + copy + drop>(
         self: &BulkOrderBook<M>,
         account: address

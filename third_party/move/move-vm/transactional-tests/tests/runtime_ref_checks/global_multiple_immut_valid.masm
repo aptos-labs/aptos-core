@@ -1,0 +1,57 @@
+//# publish
+module 0xc0ffee::global_multi_immut_test
+
+struct Resource has key+drop
+    field1: u64
+    field2: u64
+
+// Test: Multiple immutable global borrows should work (shared locks)
+public fun test_multiple_immut_global_borrows(s: &signer): u64 acquires Resource
+    local res: Resource
+    local ref1: &Resource
+    local ref2: &Resource
+    local ref3: &Resource
+
+    // Setup
+    ld_u64 10
+    ld_u64 20
+    pack Resource
+    st_loc res
+    copy_loc s
+    move_loc res
+    move_to Resource
+
+    // Get multiple immutable references to same global (should work)
+    ld_const<address> 0x1
+    borrow_global Resource
+    st_loc ref1
+
+    ld_const<address> 0x1
+    borrow_global Resource
+    st_loc ref2
+
+    ld_const<address> 0x1
+    borrow_global Resource
+    st_loc ref3
+
+    // All should be readable
+    copy_loc ref1
+    borrow_field Resource, field1
+    read_ref
+
+    copy_loc ref2
+    borrow_field Resource, field2
+    read_ref
+    add
+
+    // Cleanup
+    move_loc ref1
+    pop
+    move_loc ref2
+    pop
+    move_loc ref3
+    pop
+
+    ret
+
+//# run 0xc0ffee::global_multi_immut_test::test_multiple_immut_global_borrows --signers 0x1 --verbose

@@ -109,9 +109,9 @@ Returns:
     <b>let</b> response = market.get_order_book_mut().<a href="market_bulk_order.md#0x7_market_bulk_order_place_bulk_order">place_bulk_order</a>(request);
 
     // Check <b>if</b> the response is a rejection
-    <b>if</b> (!is_success_response(&response)) {
+    <b>if</b> (!response.is_success_response()) {
         <b>let</b> (rejected_account, rejected_seq_num, existing_seq_num) =
-            destroy_bulk_order_place_response_rejection(response);
+            response.destroy_bulk_order_place_response_rejection();
         // Emit rejection <a href="../../aptos-framework/doc/event.md#0x1_event">event</a>
         market.emit_event_for_bulk_order_rejection(
             rejected_account,
@@ -123,7 +123,7 @@ Returns:
     };
 
     // Handle success response
-    <b>let</b> (bulk_order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num_option) = destroy_bulk_order_place_response_success(response);
+    <b>let</b> (bulk_order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num_option) = response.destroy_bulk_order_place_response_success();
     <b>let</b> (
         order_request,
         order_id,

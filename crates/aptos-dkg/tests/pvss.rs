@@ -192,7 +192,7 @@ fn pvss_deal_verify_and_reconstruct<T: AggregatableTranscript>(
     // println!("Seed: {}", hex::encode(seed_bytes.as_slice()));
     let mut rng = StdRng::from_seed(seed_bytes);
 
-    let d = test_utils::setup_dealing::<T, StdRng>(sc, &mut rng);
+    let d = test_utils::setup_dealing::<T, StdRng>(sc, None, &mut rng);
 
     // Test dealing
     let trx = T::deal(
@@ -278,7 +278,7 @@ fn nonaggregatable_pvss_deal_verify_and_reconstruct<T: HasAggregatableSubtranscr
     // println!("Seed: {}", hex::encode(seed_bytes.as_slice()));
     let mut rng = StdRng::from_seed(seed_bytes);
 
-    let d = test_utils::setup_dealing::<T, StdRng>(sc, &mut rng);
+    let d = test_utils::setup_dealing::<T, StdRng>(sc, None, &mut rng);
 
     // Test dealing
     let trx = T::deal(
@@ -361,7 +361,7 @@ fn pvss_deal_verify_and_reconstruct_from_subtranscript<
     use aptos_dkg::pvss::test_utils::reconstruct_dealt_secret_key_randomly_subtranscript;
     let mut rng = StdRng::from_seed(seed_bytes);
 
-    let d = test_utils::setup_dealing::<T, StdRng>(sc, &mut rng);
+    let d = test_utils::setup_dealing::<T, StdRng>(sc, None, &mut rng);
 
     // Test dealing
     let trx = T::deal(
@@ -393,7 +393,9 @@ fn actual_transcript_size<T: Transcript>(sc: &T::SecretSharingConfig) -> usize {
 
     let trx = T::generate(
         &sc,
-        &T::PublicParameters::with_max_num_shares_for_generate(sc.get_total_num_shares()),
+        &T::PublicParameters::with_max_num_shares_for_generate(
+            sc.get_total_num_shares().try_into().unwrap(),
+        ),
         &mut rng,
     );
     let actual_size = trx.to_bytes().len();

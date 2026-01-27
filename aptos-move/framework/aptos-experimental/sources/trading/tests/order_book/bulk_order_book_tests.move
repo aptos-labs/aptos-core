@@ -1424,4 +1424,56 @@ module aptos_experimental::bulk_order_book_tests {
         price_time_index.destroy_price_time_idx();
         order_book.destroy_bulk_order_book();
     }
+
+    #[test]
+    fun test_cancel_bulk_order_at_price() {
+        let (order_book, price_time_index) = setup_test();
+
+        // Test 1: Cancel one bid price level and verify other levels intact
+        let (cancelled_size, _) = order_book.cancel_bulk_order_at_price(
+            &mut price_time_index,
+            TEST_ACCOUNT_1,
+            BID_PRICE_1,
+            true
+        );
+        assert!(cancelled_size == SIZE_1, 0);
+
+        // Verify other bid level still exists
+        let remaining_bid_sizes = order_book.get_sizes(TEST_ACCOUNT_1, true);
+        assert!(remaining_bid_sizes.length() == 1, 1);
+        assert!(remaining_bid_sizes[0] == SIZE_2, 2);
+
+        // Verify ask levels are untouched
+        let remaining_ask_sizes = order_book.get_sizes(TEST_ACCOUNT_1, false);
+        assert!(remaining_ask_sizes.length() == 2, 3);
+
+        // Test 2: Cancel one ask price level
+        let (cancelled_size2, _) = order_book.cancel_bulk_order_at_price(
+            &mut price_time_index,
+            TEST_ACCOUNT_1,
+            ASK_PRICE_2,
+            false
+        );
+        assert!(cancelled_size2 == SIZE_2, 4);
+
+        // Verify only one ask level remains
+        let remaining_ask_sizes2 = order_book.get_sizes(TEST_ACCOUNT_1, false);
+        assert!(remaining_ask_sizes2.length() == 1, 5);
+
+        // Test 3: Try to cancel non-existent price (should return 0)
+        let (cancelled_size3, _) = order_book.cancel_bulk_order_at_price(
+            &mut price_time_index,
+            TEST_ACCOUNT_1,
+            999,
+            true
+        );
+        assert!(cancelled_size3 == 0, 6);
+
+        // Test 4: Verify next level activation - BID_PRICE_2 should now be active
+        let is_taker = price_time_index.is_taker_order(BID_PRICE_2, false);
+        assert!(is_taker, 7);
+
+        price_time_index.destroy_price_time_idx();
+        order_book.destroy_bulk_order_book();
+    }
 }

@@ -40,6 +40,24 @@ It includes functions for cleaning up expired orders based on keep-alive timeout
 
 
 
+<a id="0x7_dead_mans_switch_operations_E_TOO_MANY_ORDERS"></a>
+
+
+
+<pre><code><b>const</b> <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_E_TOO_MANY_ORDERS">E_TOO_MANY_ORDERS</a>: u64 = 1;
+</code></pre>
+
+
+
+<a id="0x7_dead_mans_switch_operations_MAX_ORDERS_CLEANED_PER_CALL"></a>
+
+
+
+<pre><code><b>const</b> <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_MAX_ORDERS_CLEANED_PER_CALL">MAX_ORDERS_CLEANED_PER_CALL</a>: u64 = 100;
+</code></pre>
+
+
+
 <a id="0x7_dead_mans_switch_operations_MICROS_PER_SECOND"></a>
 
 
@@ -66,6 +84,7 @@ Parameters:
 
 Aborts:
 - E_DEAD_MANS_SWITCH_NOT_ENABLED: If dead man's switch is not enabled for this market
+- E_TOO_MANY_ORDERS: If more than MAX_ORDERS_CLEANED_PER_CALL order IDs are provided
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_cleanup_expired_orders">cleanup_expired_orders</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, order_ids: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>&gt;, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;)
@@ -84,6 +103,8 @@ Aborts:
 ) {
     // Check <b>if</b> dead man's switch is enabled
     <b>assert</b>!(market.is_dead_mans_switch_enabled(), <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_E_DEAD_MANS_SWITCH_NOT_ENABLED">E_DEAD_MANS_SWITCH_NOT_ENABLED</a>);
+    // Cap the number of orders that can be cleaned in a single call
+    <b>assert</b>!(order_ids.length() &lt;= <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_MAX_ORDERS_CLEANED_PER_CALL">MAX_ORDERS_CLEANED_PER_CALL</a>, <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_E_TOO_MANY_ORDERS">E_TOO_MANY_ORDERS</a>);
 
     // Loop through each order ID
     <b>let</b> i = 0;
@@ -176,7 +197,7 @@ Aborts:
     <b>let</b> bulk_order = market.get_order_book().get_bulk_order(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
 
     // Get creation <a href="../../aptos-framework/doc/timestamp.md#0x1_timestamp">timestamp</a> in microseconds and convert <b>to</b> seconds
-    <b>let</b> creation_time_micros = <a href="bulk_order_types.md#0x7_bulk_order_types_get_creation_time_micros">bulk_order_types::get_creation_time_micros</a>(&bulk_order);
+    <b>let</b> creation_time_micros = bulk_order.get_creation_time_micros();
     <b>let</b> creation_time_secs = creation_time_micros / <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_MICROS_PER_SECOND">MICROS_PER_SECOND</a>;
 
     // Check <b>if</b> order is valid according <b>to</b> dead man's switch
@@ -245,9 +266,9 @@ Aborts:
     // Check <b>if</b> dead man's switch is enabled
     <b>assert</b>!(market.is_dead_mans_switch_enabled(), <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_E_DEAD_MANS_SWITCH_NOT_ENABLED">E_DEAD_MANS_SWITCH_NOT_ENABLED</a>);
 
-    <b>let</b> parent = <a href="market_types.md#0x7_market_types_get_parent">market_types::get_parent</a>(market);
-    <b>let</b> market_addr = <a href="market_types.md#0x7_market_types_get_market">market_types::get_market</a>(market);
-    <b>let</b> tracker = <a href="market_types.md#0x7_market_types_get_dead_mans_switch_tracker_mut">market_types::get_dead_mans_switch_tracker_mut</a>(market);
+    <b>let</b> parent = market.get_parent();
+    <b>let</b> market_addr = market.get_market();
+    <b>let</b> tracker = market.get_dead_mans_switch_tracker_mut();
     <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_keep_alive">dead_mans_switch_tracker::keep_alive</a>(tracker, parent, market_addr, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, timeout_seconds);
 }
 </code></pre>

@@ -64,6 +64,10 @@ name = "ldt"
 harness = false
 
 [[bench]]
+name = "msm"
+harness = false
+
+[[bench]]
 name = "pcs"
 harness = false
 

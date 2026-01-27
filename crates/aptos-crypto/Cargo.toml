@@ -48,6 +48,7 @@ libsecp256k1 = { workspace = true }
 merlin = { workspace = true }
 more-asserts = { workspace = true }
 neptune = { workspace = true }
+num = { workspace = true }
 num-bigint = { workspace = true }
 num-integer = { workspace = true }
 num-traits = { workspace = true }
@@ -101,6 +102,10 @@ assert-private-keys-not-cloneable = []
 cloneable-private-keys = []
 fuzzing = ["proptest", "proptest-derive", "cloneable-private-keys", "arbitrary"]
 testing = []
+
+[[bench]]
+name = "ark_batch_mul"
+harness = false
 
 [[bench]]
 name = "ark_bls12_381"
