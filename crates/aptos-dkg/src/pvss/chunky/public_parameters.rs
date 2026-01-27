@@ -58,7 +58,7 @@ pub struct PublicParameters<E: Pairing> {
     pub max_aggregation: usize,
 
     #[serde(skip)]
-    pub table: HashMap<Vec<u8>, u32>,
+    pub table: HashMap<Vec<u8>, u64>,
 
     #[serde(skip)]
     pub powers_of_radix: Vec<E::ScalarField>,
@@ -108,12 +108,12 @@ impl<E: Pairing> PublicParameters<E> {
         G: E::G1,
         ell: u8,
         max_aggregation: usize,
-    ) -> HashMap<Vec<u8>, u32> {
-        dlog::table::build::<E::G1>(G, 1u32 << ((ell as u32 + log2(max_aggregation)) / 2))
+    ) -> HashMap<Vec<u8>, u64> {
+        dlog::table::build::<E::G1>(G, 1u64 << ((ell as u32 + log2(max_aggregation)) / 2))
     }
 
-    pub(crate) fn get_dlog_range_bound(&self) -> u32 {
-        1u32 << (self.ell as u32 + log2(self.max_aggregation))
+    pub(crate) fn get_dlog_range_bound(&self) -> u64 {
+        1u64 << (self.ell as u32 + log2(self.max_aggregation) as u32)
     }
 }
 
@@ -213,7 +213,7 @@ impl<E: Pairing> ValidCryptoMaterial for PublicParameters<E> {
     }
 }
 
-pub const DEFAULT_ELL_FOR_TESTING: u8 = 16; // TODO: made this a const to emphasize that the parameter is completely fixed wherever this value used (namely below), might not be ideal
+pub const DEFAULT_ELL_FOR_TESTING: u8 = 64; // TODO: made this a const to emphasize that the parameter is completely fixed wherever this value used (namely below), might not be ideal
 
 impl<E: Pairing> Default for PublicParameters<E> {
     // This is only used for testing and benchmarking

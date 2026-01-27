@@ -319,7 +319,7 @@ pub fn decrypt_chunked_scalars<C: CurveGroup>(
     Rs_rows: &[Vec<C>],
     dk: &C::ScalarField,
     pp: &PublicParameters<C>,
-    table: &HashMap<Vec<u8>, u32>,
+    table: &HashMap<Vec<u8>, u64>,
     radix_exponent: u8,
 ) -> Vec<C::ScalarField> {
     let mut decrypted_scalars = Vec::with_capacity(Cs_rows.len());
@@ -439,7 +439,7 @@ mod tests {
         } = hom.apply(&witness);
 
         // 8. Build a baby-step giant-step table for computing discrete logs
-        let table = dlog::table::build::<C>(pp.G.into(), 1u32 << (radix_exponent / 2));
+        let table = dlog::table::build::<C>(pp.G.into(), 1u64 << (radix_exponent / 2));
 
         // 9. Perform decryption of each ciphertext and reconstruct plaintexts
         // TODO: call some built-in function for this instead
