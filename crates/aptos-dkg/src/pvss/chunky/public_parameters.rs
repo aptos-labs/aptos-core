@@ -7,7 +7,7 @@ use crate::{
     dlog,
     pvss::{
         chunky::{
-            chunked_elgamal, chunked_elgamal::num_chunks_per_scalar, input_secret::InputSecret,
+            chunked_elgamal::num_chunks_per_scalar, chunked_elgamal_pp, input_secret::InputSecret,
             keys,
         },
         traits,
@@ -43,8 +43,7 @@ fn compute_powers_of_radix<E: Pairing>(ell: u8) -> Vec<E::ScalarField> {
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 #[allow(non_snake_case)]
 pub struct PublicParameters<E: Pairing> {
-    #[serde(serialize_with = "ark_se")]
-    pub pp_elgamal: chunked_elgamal::PublicParameters<E::G1>,
+    pub pp_elgamal: chunked_elgamal_pp::PublicParameters<E::G1>,
 
     #[serde(serialize_with = "ark_se")]
     pub pk_range_proof: dekart_univariate_v2::ProverKey<E>,
@@ -55,10 +54,11 @@ pub struct PublicParameters<E: Pairing> {
 
     pub ell: u8,
 
+    // Meaning here it seems, the max number of times `n` that transcripts can be aggregated (which means the number of contained transcripts can be `n + 1`)
     pub max_aggregation: usize,
 
     #[serde(skip)]
-    pub table: HashMap<Vec<u8>, u32>,
+    pub table: HashMap<Vec<u8>, u64>,
 
     #[serde(skip)]
     pub powers_of_radix: Vec<E::ScalarField>,
@@ -73,8 +73,7 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
         // Deserialize the serializable fields directly
         #[derive(Deserialize)]
         struct SerializedFields<E: Pairing> {
-            #[serde(deserialize_with = "ark_de")]
-            pp_elgamal: chunked_elgamal::PublicParameters<E::G1>,
+            pp_elgamal: chunked_elgamal_pp::PublicParameters<E::G1>,
             #[serde(deserialize_with = "ark_de")]
             pk_range_proof: dekart_univariate_v2::ProverKey<E>,
             #[serde(deserialize_with = "ark_de")]
@@ -108,12 +107,12 @@ impl<E: Pairing> PublicParameters<E> {
         G: E::G1,
         ell: u8,
         max_aggregation: usize,
-    ) -> HashMap<Vec<u8>, u32> {
-        dlog::table::build::<E::G1>(G, 1u32 << ((ell as u32 + log2(max_aggregation)) / 2))
+    ) -> HashMap<Vec<u8>, u64> {
+        dlog::table::build::<E::G1>(G, 1u64 << ((ell as u64 + log2(max_aggregation) as u64) / 2))
     }
 
-    pub(crate) fn get_dlog_range_bound(&self) -> u32 {
-        1u32 << (self.ell as u32 + log2(self.max_aggregation))
+    pub(crate) fn get_dlog_range_bound(&self) -> u64 {
+        1u64 << (self.ell as u64 + log2(self.max_aggregation) as u64)
     }
 }
 
@@ -124,7 +123,7 @@ impl<E: Pairing> Valid for PublicParameters<E> {
 }
 
 impl<E: Pairing> traits::HasEncryptionPublicParams for PublicParameters<E> {
-    type EncryptionPublicParameters = chunked_elgamal::PublicParameters<E::G1>;
+    type EncryptionPublicParameters = chunked_elgamal_pp::PublicParameters<E::G1>;
 
     fn get_encryption_public_params(&self) -> &Self::EncryptionPublicParameters {
         &self.pp_elgamal
@@ -159,24 +158,28 @@ impl<E: Pairing> TryFrom<&[u8]> for PublicParameters<E> {
 impl<E: Pairing> PublicParameters<E> {
     /// Verifiably creates Aptos-specific public parameters.
     pub fn new<R: RngCore + CryptoRng>(
-        max_num_shares: usize,
+        max_num_shares: u32,
         ell: u8,
         max_aggregation: usize,
         rng: &mut R,
     ) -> Self {
-        let max_num_chunks_padded =
-            ((max_num_shares * num_chunks_per_scalar::<E::ScalarField>(ell) as usize) + 1)
-                .next_power_of_two()
-                - 1;
+        assert!(ell > 0, "ell must be greater than zero");
+
+        let num_chunks = num_chunks_per_scalar::<E::ScalarField>(ell);
+        let max_num_chunks_padded = max_num_shares
+            .checked_mul(num_chunks)
+            .and_then(|v| v.checked_add(1))
+            .map(|v| (v as u64).next_power_of_two().saturating_sub(1) as u32)
+            .expect("Overflow computing max_num_chunks_padded");
 
         let group_generators = GroupGenerators::default(); // TODO: At least one of these should come from a powers of tau ceremony?
-        let pp_elgamal = chunked_elgamal::PublicParameters::default();
+        let pp_elgamal = chunked_elgamal_pp::PublicParameters::new(max_num_shares);
         let G = *pp_elgamal.message_base();
         let pp = Self {
             pp_elgamal,
             pk_range_proof: dekart_univariate_v2::Proof::setup(
-                max_num_chunks_padded,
-                ell as usize,
+                max_num_chunks_padded.try_into().unwrap(),
+                ell,
                 group_generators,
                 rng,
             )
@@ -199,7 +202,7 @@ impl<E: Pairing> PublicParameters<E> {
         commitment_base: E::G2Affine,
         rng: &mut R,
     ) -> Self {
-        let mut pp = Self::new(n, ell, max_aggregation, rng);
+        let mut pp = Self::new(n.try_into().unwrap(), ell, max_aggregation, rng);
         pp.G_2 = commitment_base;
         pp
     }
@@ -224,13 +227,18 @@ impl<E: Pairing> Default for PublicParameters<E> {
 }
 
 impl<E: Pairing> WithMaxNumShares for PublicParameters<E> {
-    fn with_max_num_shares(n: usize) -> Self {
+    fn with_max_num_shares(n: u32) -> Self {
         let mut rng = thread_rng();
         Self::new(n, DEFAULT_ELL_FOR_TESTING, 1, &mut rng)
     }
 
+    fn with_max_num_shares_and_bit_size(n: u32, ell: u8) -> Self {
+        let mut rng = thread_rng();
+        Self::new(n, ell, 1, &mut rng)
+    }
+
     // The only thing from `pp` that `generate()` uses is `pp.ell`, so make the rest as small as possible.
-    fn with_max_num_shares_for_generate(_n: usize) -> Self {
+    fn with_max_num_shares_for_generate(_n: u32) -> Self {
         let mut rng = thread_rng();
         Self::new(1, DEFAULT_ELL_FOR_TESTING, 1, &mut rng)
     }

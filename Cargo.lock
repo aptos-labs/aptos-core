@@ -1156,6 +1156,7 @@ dependencies = [
  "merlin",
  "more-asserts",
  "neptune",
+ "num 0.4.1",
  "num-bigint 0.3.3",
  "num-integer",
  "num-traits",
