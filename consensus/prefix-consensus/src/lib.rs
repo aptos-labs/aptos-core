@@ -30,6 +30,7 @@
 //! - **Validity**: mcp({v_in_h}_{h∈H}) ⪯ v_low_i for any honest party i
 
 mod certify;
+pub mod network_messages;
 mod protocol;
 pub mod signing;
 mod types;
@@ -37,6 +38,7 @@ mod utils;
 mod verification;
 
 pub use certify::{qc1_certify, qc2_certify, qc3_certify};
+pub use network_messages::PrefixConsensusMsg;
 pub use protocol::PrefixConsensusProtocol;
 pub use signing::{
     sign_vote1, sign_vote2, sign_vote3, verify_vote1_signature, verify_vote2_signature,
