@@ -18,7 +18,7 @@ use crate::{
 use aptos_crypto::{
     arkworks::random::unsafe_random_points_group, weighted_config::WeightedConfigArkworks,
 };
-use ark_ec::{AffineRepr, CurveGroup, pairing::Pairing, scalar_mul::BatchMulPreprocessing};
+use ark_ec::{pairing::Pairing, scalar_mul::BatchMulPreprocessing, AffineRepr, CurveGroup};
 
 type HkzgElgamalHomomorphism<'a, E> = hkzg_chunked_elgamal::WeightedHomomorphism<'a, E>;
 type LiftedCommitHomomorphism<'a, C> = LiftHomomorphism<
@@ -47,16 +47,15 @@ impl<'a, E: Pairing> Proof<'a, E> {
             z,
         } = hkzg_chunked_elgamal::WeightedProof::generate(sc, number_of_chunks_per_share, rng);
         match first_proof_item {
-            FirstProofItem::Commitment(first_proof_item_inner) => {
-                Self {
-                    first_proof_item: FirstProofItem::Commitment(TupleCodomainShape(
-                        first_proof_item_inner,
-                        chunked_scalar_mul::CodomainShape::<E::G2>(
-                            unsafe_random_points_group(sc.get_total_weight(), rng),
-                        ),
+            FirstProofItem::Commitment(first_proof_item_inner) => Self {
+                first_proof_item: FirstProofItem::Commitment(TupleCodomainShape(
+                    first_proof_item_inner,
+                    chunked_scalar_mul::CodomainShape::<E::G2>(unsafe_random_points_group(
+                        sc.get_total_weight(),
+                        rng,
                     )),
-                    z,
-                }
+                )),
+                z,
             },
             FirstProofItem::Challenge(_) => {
                 panic!("Unexpected Challenge variant!");
@@ -82,11 +81,15 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
 
         // Set up the lifted commit homomorphism
         let lifted_commit_hom = LiftedCommitHomomorphism::<'a, E::G2> {
-            hom: chunked_scalar_mul::Homomorphism { base, table: G2_table, ell },
+            hom: chunked_scalar_mul::Homomorphism {
+                base,
+                table: G2_table,
+                ell,
+            },
             // The projection map simply unchunks the chunks
             projection: |dom: &HkzgWeightedElgamalWitness<E::ScalarField>| {
                 chunked_scalar_mul::Witness {
-                    chunked_values: dom.chunked_plaintexts.iter().flatten().cloned().collect() // TODO: this iter stuff can go
+                    chunked_values: dom.chunked_plaintexts.iter().flatten().cloned().collect(), // TODO: this iter stuff can go
                 }
             },
         };

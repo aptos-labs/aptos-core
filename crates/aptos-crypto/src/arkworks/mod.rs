@@ -48,14 +48,15 @@ pub fn powers_of_two<F: Field>(ell: usize) -> Vec<F> {
 /// with each scalar.
 ///
 /// Equivalent to `[base * s for s in scalars]`.
-pub fn commit_to_scalars<P: CurveGroup + ark_ec::ScalarMul>(
+pub fn batch_mul<P: CurveGroup + ark_ec::ScalarMul>(
     table: &BatchMulPreprocessing<P>,
     scalars: &[P::ScalarField],
 ) -> Vec<P> {
     scalars.iter().map(|e| windowed_mul(table, e)).collect()
 }
 
-// we're copy-pasting some arkworks code here because batch_mul does a batch normalisation, which we don't want
+// we're copy-pasting some arkworks code here because its version of `batch_mul()` insists
+// on doing a batch normalisation, which we want to postpone until more elements are computed
 fn windowed_mul<T: CurveGroup + ark_ec::ScalarMul>(
     table: &BatchMulPreprocessing<T>,
     scalar: &T::ScalarField,

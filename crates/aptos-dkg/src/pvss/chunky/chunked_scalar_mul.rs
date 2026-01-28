@@ -10,16 +10,20 @@ use crate::{
     },
     Scalar,
 };
-use aptos_crypto::arkworks::{self, msm::{IsMsmInput, MsmInput}};
+use aptos_crypto::arkworks::{
+    self,
+    msm::{IsMsmInput, MsmInput},
+};
 use aptos_crypto_derive::SigmaProtocolWitness;
-use ark_ec::{CurveGroup, scalar_mul::BatchMulPreprocessing};
+use ark_ec::{scalar_mul::BatchMulPreprocessing, CurveGroup};
 use ark_ff::PrimeField;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Write, SerializationError};
+use ark_serialize::{
+    CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
+};
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 
 pub const DST: &[u8; 34] = b"APTOS_CHUNKED_COMMIT_HOM_SIGMA_DST";
 
-// TODO: arrange things by player... eh no did that already???
 /// In this file we set up the following "commitment" homomorphism:
 /// Commit to chunked scalars by unchunking them and multiplying a base group element (in affine representation)
 /// with each unchunked scalar.
@@ -94,12 +98,7 @@ where
         F: FnMut(T) -> U,
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
     {
-        CodomainShape(
-            self.0
-                .into_iter()
-                .map(f)
-                .collect(),
-        )
+        CodomainShape(self.0.into_iter().map(f).collect())
     }
 }
 
@@ -132,19 +131,11 @@ impl<'a, C: CurveGroup> homomorphism::Trait for Homomorphism<'a, C> {
         let scalars: Vec<C::ScalarField> = input
             .chunked_values
             .iter()
-            .map(|chunks| {
-                le_chunks_to_scalar(
-                    self.ell,
-                    &Scalar::slice_as_inner(chunks),
-                )
-            })
+            .map(|chunks| le_chunks_to_scalar(self.ell, &Scalar::slice_as_inner(chunks)))
             .collect();
 
         // Batch multiply using the base element
-        let outputs = arkworks::commit_to_scalars(&self.table, &scalars);
-
-//        let outputs_affine = base_projective.batch_mul(&scalars);
-//        let outputs: Vec<C> = outputs_affine.into_iter().map(|p| p.into()).collect(); // TODO: REMOVE THIS
+        let outputs = arkworks::batch_mul(&self.table, &scalars);
 
         CodomainShape(outputs)
     }
@@ -160,10 +151,9 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for Homomorphism<'a, C> {
     type Scalar = C::ScalarField;
 
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
+        let mut terms = Vec::new();
 
-    let mut terms = Vec::new();
-
-    for chunks in &input.chunked_values {
+        for chunks in &input.chunked_values {
             terms.push(MsmInput {
                 bases: vec![self.base.clone()],
                 scalars: vec![le_chunks_to_scalar(
@@ -171,9 +161,9 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for Homomorphism<'a, C> {
                     &Scalar::slice_as_inner(chunks),
                 )],
             });
-    }
+        }
 
-    CodomainShape(terms)
+        CodomainShape(terms)
     }
 
     fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
@@ -191,11 +181,14 @@ impl<'a, C: CurveGroup> sigma_protocol::Trait<C> for Homomorphism<'a, C> {
 mod tests {
     use super::*;
     use crate::{
-        pvss::chunky::{chunked_elgamal::num_chunks_per_scalar, chunks::{le_chunks_to_scalar, scalar_to_le_chunks}},
+        pvss::chunky::{
+            chunked_elgamal::num_chunks_per_scalar,
+            chunks::{le_chunks_to_scalar, scalar_to_le_chunks},
+        },
         sigma_protocol::homomorphism::Trait as _,
     };
     use aptos_crypto::arkworks::random::{sample_field_elements, unsafe_random_point};
-    use ark_bls12_381::{G1Projective, Fr};
+    use ark_bls12_381::{Fr, G1Projective};
     use rand::thread_rng;
 
     #[test]
@@ -229,7 +222,10 @@ mod tests {
         };
 
         // Create table from projective base (same pattern as chunked_elgamal_pp.rs)
-        let table = BatchMulPreprocessing::new(base.into(), num_scalars * num_chunks_per_scalar::<Fr>(ell) as usize);
+        let table = BatchMulPreprocessing::new(
+            base.into(),
+            num_scalars * num_chunks_per_scalar::<Fr>(ell) as usize,
+        );
         let hom = Homomorphism::<G1Projective> {
             base,
             table: &table,
@@ -243,16 +239,15 @@ mod tests {
         // base * unchunk(chunks) == output
         let mut output_iter = outputs.iter();
         for scalar_chunks in chunked_values.iter() {
-                let V = output_iter.next().expect("Mismatch in output length");
+            let V = output_iter.next().expect("Mismatch in output length");
 
-                let reconstructed =
-                    le_chunks_to_scalar(ell, &Scalar::slice_as_inner(scalar_chunks));
+            let reconstructed = le_chunks_to_scalar(ell, &Scalar::slice_as_inner(scalar_chunks));
 
-                let expected = base * reconstructed;
-                assert_eq!(
-                    *V, expected,
-                    "Homomorphism output does not match expected base * scalar"
-                );
-            }
+            let expected = base * reconstructed;
+            assert_eq!(
+                *V, expected,
+                "Homomorphism output does not match expected base * scalar"
+            );
+        }
     }
 }

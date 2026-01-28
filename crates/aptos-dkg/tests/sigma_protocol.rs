@@ -209,15 +209,15 @@ mod chunked_scalar_mul {
         let g_1 = E::G1::generator().into_affine();
         let g_2 = E::G2::generator().into_affine();
 
-        let hom1 = chunked_scalar_mul::Homomorphism { 
-            base: g_1, 
-            table: table1, 
-            ell: 16 
+        let hom1 = chunked_scalar_mul::Homomorphism {
+            base: g_1,
+            table: table1,
+            ell: 16,
         };
-        let hom2 = chunked_scalar_mul::Homomorphism { 
-            base: g_2, 
-            table: table2, 
-            ell: 16 
+        let hom2 = chunked_scalar_mul::Homomorphism {
+            base: g_2,
+            table: table2,
+            ell: 16,
         };
 
         PairingTupleHomomorphism {

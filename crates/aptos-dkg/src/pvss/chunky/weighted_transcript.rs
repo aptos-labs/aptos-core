@@ -359,7 +359,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             let dealt_chunked_secret_key_share = bsgs::dlog_vec(
                 pp.pp_elgamal.G.into_group(),
                 &dealt_encrypted_secret_key_share_chunks,
-                &pp.table,
+                &pp.dlog_table,
                 pp.get_dlog_range_bound(),
             )
             .expect("BSGS dlog failed");
@@ -546,8 +546,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         // Commit to polynomial evaluations + constant term using batch_mul
         //let G_2 = pp.get_commitment_base();
-        let flattened_Vs = arkworks::commit_to_scalars::<E::G2>(&pp.G2_table, &f_evals);        
-        
+        let flattened_Vs = arkworks::batch_mul::<E::G2>(&pp.G2_table, &f_evals);
+
         debug_assert_eq!(flattened_Vs.len(), sc.get_total_weight() + 1);
 
         let Vs = sc.group_by_player(&flattened_Vs); // This won't use the last item in `flattened_Vs` because of `sc`
@@ -612,7 +612,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             &self.subtrs.Rs,
             &dk.dk,
             &pp.pp_elgamal,
-            &pp.table,
+            &pp.dlog_table,
             pp.ell,
         );
 

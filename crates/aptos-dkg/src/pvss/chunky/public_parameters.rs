@@ -23,7 +23,7 @@ use aptos_crypto::{
     },
     utils, CryptoMaterialError, ValidCryptoMaterial,
 };
-use ark_ec::{CurveGroup, pairing::Pairing, scalar_mul::BatchMulPreprocessing};
+use ark_ec::{pairing::Pairing, scalar_mul::BatchMulPreprocessing, CurveGroup};
 use ark_serialize::{SerializationError, Valid};
 use ark_std::log2;
 use rand::{thread_rng, CryptoRng, RngCore};
@@ -60,7 +60,7 @@ pub struct PublicParameters<E: Pairing> {
     pub max_aggregation: usize,
 
     #[serde(skip)]
-    pub table: HashMap<Vec<u8>, u64>,
+    pub dlog_table: HashMap<Vec<u8>, u64>,
 
     #[serde(skip)]
     pub G2_table: BatchMulPreprocessing<E::G2>,
@@ -79,7 +79,7 @@ impl<E: Pairing> Clone for PublicParameters<E> {
             G_2: self.G_2,
             ell: self.ell,
             max_aggregation: self.max_aggregation,
-            table: Self::build_dlog_table(g, self.ell, self.max_aggregation),
+            dlog_table: Self::build_dlog_table(g, self.ell, self.max_aggregation),
             G2_table: BatchMulPreprocessing::new(self.G_2.into(), self.pk_range_proof.max_n), // Recreate table
             powers_of_radix: compute_powers_of_radix::<E>(self.ell),
         }
@@ -143,8 +143,11 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
             G_2: serialized.G_2,
             ell: serialized.ell,
             max_aggregation: serialized.max_aggregation,
-            table: Self::build_dlog_table(G, serialized.ell, serialized.max_aggregation),
-            G2_table: BatchMulPreprocessing::new(serialized.G_2.into(), serialized.max_num_shares as usize),
+            dlog_table: Self::build_dlog_table(G, serialized.ell, serialized.max_aggregation),
+            G2_table: BatchMulPreprocessing::new(
+                serialized.G_2.into(),
+                serialized.max_num_shares as usize,
+            ),
             powers_of_radix: compute_powers_of_radix::<E>(serialized.ell),
         })
     }
@@ -242,7 +245,7 @@ impl<E: Pairing> PublicParameters<E> {
             G_2,
             ell,
             max_aggregation,
-            table: Self::build_dlog_table(G.into(), ell, max_aggregation),
+            dlog_table: Self::build_dlog_table(G.into(), ell, max_aggregation),
             G2_table: BatchMulPreprocessing::new(G_2.into(), max_num_shares as usize),
             powers_of_radix: compute_powers_of_radix::<E>(ell),
         };

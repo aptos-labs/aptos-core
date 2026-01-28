@@ -1,7 +1,6 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::sigma_protocol::homomorphism::tuple::PairingTupleHomomorphism;
 use crate::{
     dlog::bsgs,
     pcs::univariate_hiding_kzg,
@@ -26,7 +25,10 @@ use crate::{
     range_proofs::{dekart_univariate_v2, traits::BatchedRangeProof},
     sigma_protocol::{
         self,
-        homomorphism::{tuple::TupleCodomainShape, Trait as _},
+        homomorphism::{
+            tuple::{PairingTupleHomomorphism, TupleCodomainShape},
+            Trait as _,
+        },
     },
     Scalar,
 };
@@ -79,7 +81,7 @@ pub struct Subtranscript<E: Pairing> {
     pub V0: E::G2,
     // The dealt public key shares
     #[serde(deserialize_with = "ark_de")]
-    pub Vs: Vec<E::G2>,
+    pub Vs: Vec<Vec<E::G2>>,
     /// First chunked ElGamal component: C[i][j] = s_{i,j} * G + r_j * ek_i. Here s_i = \sum_j s_{i,j} * B^j // TODO: change notation because B is not a group element?
     #[serde(deserialize_with = "ark_de")]
     pub Cs: Vec<Vec<Vec<E::G1>>>, // TODO: maybe make this and the other fields affine? The verifier will have to do it anyway... and we are trying to speed that up
@@ -92,7 +94,9 @@ pub struct Subtranscript<E: Pairing> {
 impl<E: Pairing> BatchSerializable<E> for Subtranscript<E> {
     fn collect_points(&self, g1: &mut Vec<E::G1>, g2: &mut Vec<E::G2>) {
         g2.push(self.V0);
-        g2.extend(&self.Vs);
+        for row in &self.Vs {
+            g2.extend(row);
+        }
 
         for player_Cs in &self.Cs {
             for chunks in player_Cs {
@@ -119,9 +123,11 @@ impl<E: Pairing> BatchSerializable<E> for Subtranscript<E> {
         // V0
         let V0_affine = g2_iter.next().unwrap();
 
-        // Vs - collect all G2 points into flat vector
-        let Vs_affine: Vec<E::G2Affine> = (0..self.Vs.len())
-            .map(|_| g2_iter.next().unwrap())
+        // Vs - collect all G2 points into nested vector structure
+        let Vs_affine: Vec<Vec<E::G2Affine>> = self
+            .Vs
+            .iter()
+            .map(|row| row.iter().map(|_| g2_iter.next().unwrap()).collect())
             .collect();
 
         // Cs
@@ -189,9 +195,12 @@ impl<E: Pairing> CanonicalSerialize for Subtranscript<E> {
         // 1. V0
         let mut size = <E::G2 as CurveGroup>::Affine::zero().serialized_size(compress);
 
-        // 2. Vs (Vec<E::G2Affine>)
-        size += 4; // length
-        size += self.Vs.len() * <E::G2 as CurveGroup>::Affine::zero().serialized_size(compress);
+        // 2. Vs (Vec<Vec<E::G2Affine>>>)
+        size += 4; // outer length
+        for row in &self.Vs {
+            size += 4; // inner row length
+            size += row.len() * <E::G2 as CurveGroup>::Affine::zero().serialized_size(compress);
+        }
 
         // 3. Cs (Vec<Vec<Vec<E::G1Affine>>>)
         size += 4; // outer length
@@ -377,13 +386,13 @@ impl<E: Pairing> CanonicalDeserialize for Subtranscript<E> {
         let V0 = V0_affine.into();
 
         //
-        // 2. Deserialize Vs (Vec<E::G2Affine>) -> Vec<E::G2>
+        // 2. Deserialize Vs (Vec<Vec<E::G2Affine>>) -> Vec<Vec<E::G2>>
         //
-        let Vs_affine: Vec<<E::G2 as CurveGroup>::Affine> =
+        let Vs_affine: Vec<Vec<<E::G2 as CurveGroup>::Affine>> =
             CanonicalDeserialize::deserialize_with_mode(&mut reader, compress, validate)?;
-        let Vs: Vec<E::G2> = Vs_affine
+        let Vs: Vec<Vec<E::G2>> = Vs_affine
             .into_iter()
-            .map(|p| p.into())
+            .map(|row| row.into_iter().map(|p| p.into()).collect())
             .collect();
 
         //
@@ -471,10 +480,10 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
                 self.subtrs.Cs.len()
             );
         }
-        if self.subtrs.Vs.len() != sc.get_total_weight() {
+        if self.subtrs.Vs.len() != sc.get_total_num_players() {
             bail!(
-                "Expected {} commitment elements, but got {}",
-                sc.get_total_weight(),
+                "Expected {} arrays of commitment elements, but got {}",
+                sc.get_total_num_players(),
                 self.subtrs.Vs.len()
             );
         }
@@ -514,7 +523,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
                             randomness: self.subtrs.Rs.clone(),
                         },
                     ),
-                    chunked_scalar_mul::CodomainShape(self.subtrs.Vs.clone()),
+                    chunked_scalar_mul::CodomainShape(self.subtrs.Vs.iter().flatten().cloned().collect()),
                 ),
                 &self.sharing_proof.SoK,
                 &sok_cntxt,
@@ -543,7 +552,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             true,
             &sc.get_threshold_config().domain,
         ); // includes_zero is true here means it includes a commitment to f(0), which is in V[n]
-        let mut Vs_flat: Vec<_> = self.subtrs.Vs.clone();
+        let mut Vs_flat: Vec<_> = self.subtrs.Vs.iter().flatten().cloned().collect();
         Vs_flat.push(self.subtrs.V0);
         // could add an assert_eq here with sc.get_total_weight()
         ldt.low_degree_test_group(&Vs_flat)?;
@@ -591,12 +600,10 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     #[allow(non_snake_case)]
     fn get_public_key_share(
         &self,
-        sc: &Self::SecretSharingConfig,
+        _sc: &Self::SecretSharingConfig,
         player: &Player,
     ) -> Self::DealtPubKeyShare {
-        let offset = sc.get_player_starting_index(player);
-        let weight = sc.get_player_weight(player);
-        self.Vs[offset..offset + weight]
+        self.Vs[player.id]
             .iter()
             .map(|&V_i| keys::DealtPubKeyShare::<E>::new(keys::DealtPubKey::new(V_i.into_affine())))
             .collect()
@@ -630,7 +637,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let pk_shares = self.get_public_key_share(sc, player);
 
         let sk_shares: Vec<_> =
-            decrypt_chunked_scalars(&Cs, &self.Rs, &dk.dk, &pp.pp_elgamal, &pp.table, pp.ell);
+            decrypt_chunked_scalars(&Cs, &self.Rs, &dk.dk, &pp.pp_elgamal, &pp.dlog_table, pp.ell);
 
         (
             Scalar::vec_from_inner(sk_shares),
@@ -656,7 +663,7 @@ impl<E: Pairing> Aggregated<Subtranscript<E>> for Subtranscript<E> {
         other: &Subtranscript<E>,
     ) -> anyhow::Result<()> {
         debug_assert_eq!(self.Cs.len(), sc.get_total_num_players());
-        debug_assert_eq!(self.Vs.len(), sc.get_total_weight());
+        debug_assert_eq!(self.Vs.len(), sc.get_total_num_players());
         debug_assert_eq!(self.Cs.len(), other.Cs.len());
         debug_assert_eq!(self.Rs.len(), other.Rs.len());
         debug_assert_eq!(self.Vs.len(), other.Vs.len());
@@ -664,9 +671,13 @@ impl<E: Pairing> Aggregated<Subtranscript<E>> for Subtranscript<E> {
         // Aggregate the V0s
         self.V0 += other.V0;
 
-        // Aggregate Vs (flat) element-wise
-        for (v, other_v) in self.Vs.iter_mut().zip(&other.Vs) {
-            *v += *other_v;
+        // Aggregate Vs (nested) element-wise
+        for i in 0..self.Vs.len() {
+            debug_assert_eq!(self.Vs[i].len(), other.Vs[i].len());
+            for j in 0..self.Vs[i].len() {
+                // Aggregate the V_{i,j}s
+                self.Vs[i][j] += other.Vs[i][j];
+            }
         }
 
         for i in 0..sc.get_total_num_players() {
@@ -823,12 +834,10 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     #[allow(non_snake_case)]
     fn get_public_key_share(
         &self,
-        sc: &Self::SecretSharingConfig,
+        _sc: &Self::SecretSharingConfig,
         player: &Player,
     ) -> Self::DealtPubKeyShare {
-        let offset = sc.get_player_starting_index(player);
-        let weight = sc.get_player_weight(player);
-        self.subtrs.Vs[offset..offset + weight]
+        self.subtrs.Vs[player.id]
             .iter()
             .map(|V_i| {
                 let affine = V_i.into_affine();
@@ -886,7 +895,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             let dealt_chunked_secret_key_share = bsgs::dlog_vec(
                 pp.pp_elgamal.G.into_group(),
                 &dealt_encrypted_secret_key_share_chunks,
-                &pp.table,
+                &pp.dlog_table,
                 pp.get_dlog_range_bound(),
             )
             .expect("BSGS dlog failed");
@@ -919,10 +928,12 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             dealer: sc.get_player(0),
             subtrs: Subtranscript {
                 V0: unsafe_random_point_group::<E::G2, _>(rng),
-                Vs: unsafe_random_points_group::<E::G2, _>(
-                    sc.get_total_weight(),
-                    rng,
-                ),
+                Vs: (0..sc.get_total_num_players())
+                    .map(|i| {
+                        let w = sc.get_player_weight(&sc.get_player(i));
+                        unsafe_random_points_group::<E::G2, _>(w, rng)
+                    })
+                    .collect(),
                 Cs: (0..sc.get_total_num_players())
                     .map(|i| {
                         let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
@@ -963,7 +974,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
     ) -> (
         Vec<Vec<Vec<E::G1>>>,
         Vec<Vec<E::G1>>,
-        Vec<E::G2>,
+        Vec<Vec<E::G2>>,
         SharingProof<E>,
     ) {
         // Generate the required randomness
@@ -1032,8 +1043,12 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
                     randomness: Rs,
                 },
             ),
-            chunked_scalar_mul::CodomainShape(Vs),
+            chunked_scalar_mul::CodomainShape(Vs_flat),
         ) = statement;
+        
+        // Group Vs by player (convert flat Vec<E::G2> to Vec<Vec<E::G2>>)
+        // Vs_flat is the inner Vec<E::G2> from CodomainShape
+        let Vs: Vec<Vec<E::G2>> = sc.group_by_player(&Vs_flat);
 
         // debug_assert_eq!(
         //     Cs.len(),
