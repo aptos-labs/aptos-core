@@ -124,6 +124,7 @@ pub struct Witness<F: PrimeField> {
 
 impl<'a, C: CurveGroup> homomorphism::Trait for Homomorphism<'a, C> {
     type Codomain = CodomainShape<C>;
+    type CodomainAffine = CodomainShape<C::Affine>;
     type Domain = Witness<C::ScalarField>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {

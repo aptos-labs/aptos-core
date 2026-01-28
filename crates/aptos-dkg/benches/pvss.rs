@@ -486,9 +486,12 @@ fn pvss_decrypt_own_share<T: Transcript, M: Measurement>(
                 !debug_str.is_empty() && debug_str != "[]"
             })
             .collect();
-        
-        assert!(!valid_players.is_empty(), "No valid players found for benchmark");
-        
+
+        assert!(
+            !valid_players.is_empty(),
+            "No valid players found for benchmark"
+        );
+
         b.iter_with_setup(
             || {
                 let idx = rng.gen_range(0, valid_players.len());

@@ -27,6 +27,7 @@ pub struct Homomorphism<'a, E: Pairing> {
 
 impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<'a, E> {
     type Codomain = CodomainShape<E::G1>;
+    type CodomainAffine = CodomainShape<E::G1Affine>;
     /// Input domain: (blinding factor, remaining values)
     type Domain = (E::ScalarField, Vec<E::ScalarField>);
 

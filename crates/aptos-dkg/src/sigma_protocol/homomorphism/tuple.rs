@@ -6,8 +6,10 @@ use crate::{
     sigma_protocol::{
         homomorphism,
         homomorphism::{fixed_base_msms, EntrywiseMap},
-        traits::{fiat_shamir_challenge_for_sigma_protocol, prove_homomorphism, FirstProofItem},
-        Proof,
+        traits::{
+            fiat_shamir_challenge_for_sigma_protocol, prove_homomorphism, FirstProofItemProjective,
+        },
+        ProofProjective,
     },
 };
 use anyhow::ensure;
@@ -70,6 +72,7 @@ where
     H2::Codomain: CanonicalSerialize + CanonicalDeserialize,
 {
     type Codomain = TupleCodomainShape<H1::Codomain, H2::Codomain>;
+    type CodomainAffine = TupleCodomainShape<H1::CodomainAffine, H2::CodomainAffine>;
     type Domain = H1::Domain;
 
     fn apply(&self, x: &Self::Domain) -> Self::Codomain {
@@ -86,6 +89,7 @@ where
     H2::Codomain: CanonicalSerialize + CanonicalDeserialize,
 {
     type Codomain = TupleCodomainShape<H1::Codomain, H2::Codomain>;
+    type CodomainAffine = TupleCodomainShape<H1::CodomainAffine, H2::CodomainAffine>;
     type Domain = H1::Domain;
 
     fn apply(&self, x: &Self::Domain) -> Self::Codomain {
@@ -289,7 +293,7 @@ where
         statement: &<Self as homomorphism::Trait>::Codomain,
         cntxt: &Ct, // for SoK purposes
         rng: &mut R,
-    ) -> Proof<H1::Scalar, Self> {
+    ) -> ProofProjective<H1::Scalar, Self> {
         prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
     }
 
@@ -297,7 +301,7 @@ where
     pub fn verify<Ct: Serialize, H>(
         &self,
         public_statement: &<Self as homomorphism::Trait>::Codomain,
-        proof: &Proof<H1::Scalar, H>, // Would like to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
+        proof: &ProofProjective<H1::Scalar, H>, // Would like to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
         cntxt: &Ct,
     ) -> anyhow::Result<()>
     where
@@ -322,7 +326,7 @@ where
     fn msm_terms_for_verify<Ct: Serialize, H>(
         &self,
         public_statement: &<Self as homomorphism::Trait>::Codomain,
-        proof: &Proof<H1::Scalar, H>,
+        proof: &ProofProjective<H1::Scalar, H>,
         cntxt: &Ct,
     ) -> (H1::MsmInput, H2::MsmInput)
     where
@@ -332,8 +336,8 @@ where
         >, // need this?
     {
         let prover_first_message = match &proof.first_proof_item {
-            FirstProofItem::Commitment(A) => A,
-            FirstProofItem::Challenge(_) => {
+            FirstProofItemProjective::Commitment(A) => A,
+            FirstProofItemProjective::Challenge(_) => {
                 panic!("Missing implementation - expected commitment, not challenge")
             },
         };

@@ -22,6 +22,7 @@ pub mod tuple;
 pub trait Trait: CanonicalSerialize {
     type Domain;
     type Codomain;
+    type CodomainAffine;
 
     fn apply(&self, element: &Self::Domain) -> Self::Codomain;
 }
@@ -84,6 +85,7 @@ where
     H: Trait,
 {
     type Codomain = H::Codomain;
+    type CodomainAffine = H::CodomainAffine;
     type Domain = LargerDomain;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {

@@ -331,6 +331,7 @@ pub struct Witness<F: PrimeField> {
 
 impl<E: Pairing> homomorphism::Trait for CommitmentHomomorphism<'_, E> {
     type Codomain = CodomainShape<E::G1>;
+    type CodomainAffine = CodomainShape<E::G1Affine>;
     type Domain = Witness<E::ScalarField>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {

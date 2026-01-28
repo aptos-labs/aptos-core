@@ -103,6 +103,7 @@ mod schnorr {
         for Schnorr<C>
     {
         type Codomain = CodomainShape<C>;
+        type CodomainAffine = CodomainShape<C::Affine>;
         type Domain = Fp<P, N>;
 
         fn apply(&self, input: &Self::Domain) -> Self::Codomain {

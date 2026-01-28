@@ -95,16 +95,25 @@ pub struct WeightedWitness<F: PrimeField> {
 #[allow(non_snake_case)]
 impl<C: CurveGroup> homomorphism::Trait for WeightedHomomorphism<'_, C> {
     type Codomain = WeightedCodomainShape<C>;
+    type CodomainAffine = WeightedCodomainShape<C::Affine>;
     type Domain = WeightedWitness<C::ScalarField>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
         // Get the batch multiplication tables
-        let G_table = self.pp.G_table.as_ref().expect("G_table must be initialized");
-        let H_table = self.pp.H_table.as_ref().expect("H_table must be initialized");
+        let G_table = self
+            .pp
+            .G_table
+            .as_ref()
+            .expect("G_table must be initialized");
+        let H_table = self
+            .pp
+            .H_table
+            .as_ref()
+            .expect("H_table must be initialized");
 
         // 1. Compute C_{i,j,k} = z_{i,j,k} * G + r_{j,k} * ek_i
         //    where i is player, j is share index (which corresponds to weight level), k is chunk
-        
+
         // 1a. Batch multiply all z_{i,j,k} values with G
         let all_z_chunks: Vec<C::ScalarField> = input
             .plaintext_chunks
@@ -119,17 +128,17 @@ impl<C: CurveGroup> homomorphism::Trait for WeightedHomomorphism<'_, C> {
         //     Share index j directly corresponds to the weight level index in plaintext_randomness
         let mut chunks_result = Vec::new();
         let mut G_idx = 0;
-        
+
         for (player_idx, player_chunks) in input.plaintext_chunks.iter().enumerate() {
             let mut player_Cs = Vec::new();
             for (share_idx, share_chunks) in player_chunks.iter().enumerate() {
                 // share_idx corresponds to weight level index in plaintext_randomness
                 let r_chunks = &input.plaintext_randomness[share_idx];
-                
+
                 // Compute r_{j,k} * ek_i for each chunk k
                 // Since we have one base (ek_i) with multiple scalars, we compute each separately
                 let ek: C = self.eks[player_idx].into();
-                
+
                 // Combine: C_{i,j,k} = z_{i,j,k} * G + r_{j,k} * ek_i
                 let mut share_Cs = Vec::new();
                 for k in 0..share_chunks.len() {

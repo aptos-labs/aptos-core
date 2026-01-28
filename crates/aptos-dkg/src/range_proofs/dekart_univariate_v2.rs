@@ -38,7 +38,7 @@ use std::{fmt::Debug, io::Write};
 #[derive(CanonicalSerialize, Debug, PartialEq, Eq, Clone, CanonicalDeserialize)]
 pub struct Proof<E: Pairing> {
     hatC: E::G1,
-    pi_PoK: sigma_protocol::Proof<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
+    pi_PoK: sigma_protocol::ProofProjective<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
     Cs: Vec<E::G1>, // has length ell
     D: E::G1,
     a: E::ScalarField,
@@ -828,7 +828,7 @@ mod fiat_shamir {
     #[allow(non_snake_case)]
     pub(crate) fn append_sigma_proof<E: Pairing>(
         fs_transcript: &mut Transcript,
-        pi_PoK: &sigma_protocol::Proof<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
+        pi_PoK: &sigma_protocol::ProofProjective<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
     ) {
         <Transcript as RangeProof<E, Proof<E>>>::append_sigma_proof(fs_transcript, pi_PoK);
     }
@@ -901,12 +901,12 @@ mod fiat_shamir {
 pub mod two_term_msm {
     // TODO: maybe fixed_base_msms should become a folder and put its code inside mod.rs? Then put this mod inside of that folder?
     use super::*;
-    use crate::sigma_protocol::{homomorphism::fixed_base_msms, traits::FirstProofItem};
+    use crate::sigma_protocol::{homomorphism::fixed_base_msms, traits::FirstProofItemProjective};
     use aptos_crypto::arkworks::{msm::IsMsmInput, random::UniformRand};
     use aptos_crypto_derive::SigmaProtocolWitness;
     use ark_ec::AffineRepr;
     pub use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
-    pub type Proof<C> = sigma_protocol::Proof<
+    pub type Proof<C> = sigma_protocol::ProofProjective<
         <<C as CurveGroup>::Affine as AffineRepr>::ScalarField,
         Homomorphism<C>,
     >;
@@ -916,7 +916,7 @@ pub mod two_term_msm {
         /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
         pub fn generate<R: rand::Rng + rand::CryptoRng>(rng: &mut R) -> Self {
             Self {
-                first_proof_item: FirstProofItem::Commitment(CodomainShape(
+                first_proof_item: FirstProofItemProjective::Commitment(CodomainShape(
                     unsafe_random_point::<C, _>(rng).into(),
                 )),
                 z: Witness {
@@ -947,6 +947,7 @@ pub mod two_term_msm {
 
     impl<C: CurveGroup> homomorphism::Trait for Homomorphism<C> {
         type Codomain = CodomainShape<C>;
+        type CodomainAffine = CodomainShape<C::Affine>;
         type Domain = Witness<C::ScalarField>;
 
         fn apply(&self, input: &Self::Domain) -> Self::Codomain {

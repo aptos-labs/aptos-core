@@ -90,7 +90,6 @@ pub struct Subtranscript<E: Pairing> {
     pub Rs: Vec<Vec<E::G1Affine>>,
 }
 
-
 impl<E: Pairing> CanonicalSerialize for Subtranscript<E> {
     fn serialize_with_mode<W: Write>(
         &self,
@@ -295,7 +294,8 @@ impl<E: Pairing> CanonicalDeserialize for Subtranscript<E> {
         //
         // 1. Deserialize V0 (G2Affine)
         //
-        let V0 = <E::G2 as CurveGroup>::Affine::deserialize_with_mode(&mut reader, compress, validate)?;
+        let V0 =
+            <E::G2 as CurveGroup>::Affine::deserialize_with_mode(&mut reader, compress, validate)?;
 
         //
         // 2. Deserialize Vs (Vec<Vec<E::G2Affine>>)
@@ -414,23 +414,28 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
                 &TupleCodomainShape(
                     TupleCodomainShape(
                         self.sharing_proof.range_proof_commitment.clone(),
-                    chunked_elgamal::WeightedCodomainShape {
-                        chunks: self.subtrs.Cs
-                            .iter()
-                            .map(|mat| {
-                                mat.iter()
-                                    .map(|row| row.iter().map(|&c| c.into()).collect())
-                                    .collect()
-                            })
-                            .collect(),
-                        randomness: self.subtrs.Rs
-                            .iter()
-                            .map(|row| row.iter().map(|&r| r.into()).collect())
-                            .collect(),
-                    },
+                        chunked_elgamal::WeightedCodomainShape {
+                            chunks: self
+                                .subtrs
+                                .Cs
+                                .iter()
+                                .map(|mat| {
+                                    mat.iter()
+                                        .map(|row| row.iter().map(|&c| c.into()).collect())
+                                        .collect()
+                                })
+                                .collect(),
+                            randomness: self
+                                .subtrs
+                                .Rs
+                                .iter()
+                                .map(|row| row.iter().map(|&r| r.into()).collect())
+                                .collect(),
+                        },
                     ),
                     chunked_scalar_mul::CodomainShape(
-                        self.subtrs.Vs
+                        self.subtrs
+                            .Vs
                             .iter()
                             .flatten()
                             .map(|&v| {
@@ -467,7 +472,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             true,
             &sc.get_threshold_config().domain,
         ); // includes_zero is true here means it includes a commitment to f(0), which is in V[n]
-        // Collect affine elements for LDT (which expects affine)
+           // Collect affine elements for LDT (which expects affine)
         let mut Vs_flat: Vec<E::G2Affine> = self.subtrs.Vs.iter().flatten().copied().collect();
         Vs_flat.push(self.subtrs.V0);
         // could add an assert_eq here with sc.get_total_weight()
@@ -557,13 +562,20 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             .iter()
             .map(|row| row.iter().map(|&c| c.into()).collect())
             .collect();
-        let Rs_proj: Vec<Vec<E::G1>> = self.Rs
+        let Rs_proj: Vec<Vec<E::G1>> = self
+            .Rs
             .iter()
             .map(|row| row.iter().map(|&r| r.into()).collect())
             .collect();
-        
-        let sk_shares: Vec<_> =
-            decrypt_chunked_scalars(&Cs_proj, &Rs_proj, &dk.dk, &pp.pp_elgamal, &pp.dlog_table, pp.ell);
+
+        let sk_shares: Vec<_> = decrypt_chunked_scalars(
+            &Cs_proj,
+            &Rs_proj,
+            &dk.dk,
+            &pp.pp_elgamal,
+            &pp.dlog_table,
+            pp.ell,
+        );
 
         (
             Scalar::vec_from_inner(sk_shares),
@@ -814,9 +826,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     ) -> Self::DealtPubKeyShare {
         self.subtrs.Vs[player.id]
             .iter()
-            .map(|&V_i| {
-                keys::DealtPubKeyShare::<E>::new(keys::DealtPubKey::new(V_i))
-            })
+            .map(|&V_i| keys::DealtPubKeyShare::<E>::new(keys::DealtPubKey::new(V_i)))
             .collect()
     }
 
@@ -1059,7 +1069,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
             ),
             chunked_scalar_mul::CodomainShape(Vs_flat),
         ) = statement;
-        
+
         // Group Vs by player (convert flat Vec<E::G2> to Vec<Vec<E::G2>>)
         // Vs_flat is the inner Vec<E::G2> from CodomainShape
         let Vs: Vec<Vec<E::G2>> = sc.group_by_player(&Vs_flat);

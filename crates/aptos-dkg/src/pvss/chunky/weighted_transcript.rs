@@ -212,7 +212,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             true,
             &sc.get_threshold_config().domain,
         ); // includes_zero is true here means it includes a commitment to f(0), which is in V[n]
-        // Collect projective elements and normalize to affine
+           // Collect projective elements and normalize to affine
         let Vs_proj: Vec<E::G2> = self.subtrs.Vs.iter().flatten().cloned().collect();
         let mut Vs_flat: Vec<E::G2Affine> = E::G2::normalize_batch(&Vs_proj);
         Vs_flat.push(self.subtrs.V0.into_affine());
@@ -269,7 +269,10 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             .expect("Failed to compute MSM of Cs in chunky");
 
         // Convert affine to projective for normalize_batch, then back to affine for MSM
-        let Vs_slice_proj: Vec<E::G2> = Vs_flat[..sc.get_total_weight()].iter().map(|&v| v.into()).collect();
+        let Vs_slice_proj: Vec<E::G2> = Vs_flat[..sc.get_total_weight()]
+            .iter()
+            .map(|&v| v.into())
+            .collect();
         let Vs_slice_affine = E::G2::normalize_batch(&Vs_slice_proj);
         let weighted_Vs = E::G2::msm(
             &Vs_slice_affine, // Don't use the last entry of `Vs_flat`
@@ -442,7 +445,7 @@ impl<E: Pairing> Aggregated<Subtranscript<E>> for Subtranscript<E> {
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct SharingProof<E: Pairing> {
     /// SoK: the SK is knowledge of `witnesses` s_{i,j} yielding the commitment and the C and the R, their image is the PK, and the signed message is a certain context `cntxt`
-    pub SoK: sigma_protocol::Proof<
+    pub SoK: sigma_protocol::ProofProjective<
         E::ScalarField,
         hkzg_chunked_elgamal::WeightedHomomorphism<'static, E>,
     >, // static because we don't want the lifetime of the Proof to depend on the Homomorphism TODO: try removing it?

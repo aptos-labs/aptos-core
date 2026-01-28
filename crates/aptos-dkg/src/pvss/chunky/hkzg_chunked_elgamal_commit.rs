@@ -12,7 +12,7 @@ use crate::{
             tuple::{PairingTupleHomomorphism, TupleCodomainShape},
             LiftHomomorphism,
         },
-        traits::FirstProofItem,
+        traits::FirstProofItemProjective,
     },
 };
 use aptos_crypto::{
@@ -31,7 +31,8 @@ pub type Homomorphism<'a, E> = PairingTupleHomomorphism<
     HkzgElgamalHomomorphism<'a, E>,
     LiftedCommitHomomorphism<'a, <E as Pairing>::G2>,
 >;
-pub type Proof<'a, E> = sigma_protocol::Proof<<E as Pairing>::ScalarField, Homomorphism<'a, E>>;
+pub type Proof<'a, E> =
+    sigma_protocol::ProofProjective<<E as Pairing>::ScalarField, Homomorphism<'a, E>>;
 
 impl<'a, E: Pairing> Proof<'a, E> {
     /// Generates a random looking proof (but not a valid one).
@@ -47,8 +48,8 @@ impl<'a, E: Pairing> Proof<'a, E> {
             z,
         } = hkzg_chunked_elgamal::WeightedProof::generate(sc, number_of_chunks_per_share, rng);
         match first_proof_item {
-            FirstProofItem::Commitment(first_proof_item_inner) => Self {
-                first_proof_item: FirstProofItem::Commitment(TupleCodomainShape(
+            FirstProofItemProjective::Commitment(first_proof_item_inner) => Self {
+                first_proof_item: FirstProofItemProjective::Commitment(TupleCodomainShape(
                     first_proof_item_inner,
                     chunked_scalar_mul::CodomainShape::<E::G2>(unsafe_random_points_group(
                         sc.get_total_weight(),
@@ -57,7 +58,7 @@ impl<'a, E: Pairing> Proof<'a, E> {
                 )),
                 z,
             },
-            FirstProofItem::Challenge(_) => {
+            FirstProofItemProjective::Challenge(_) => {
                 panic!("Unexpected Challenge variant!");
             },
         }

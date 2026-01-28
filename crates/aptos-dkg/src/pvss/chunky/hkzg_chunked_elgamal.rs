@@ -10,7 +10,7 @@ use crate::{
             tuple::{TupleCodomainShape, TupleHomomorphism},
             LiftHomomorphism, TrivialShape,
         },
-        traits::FirstProofItem,
+        traits::FirstProofItemProjective,
     },
     Scalar,
 };
@@ -127,7 +127,7 @@ pub type WeightedHomomorphism<'a, E> = TupleHomomorphism<
 >;
 
 pub type WeightedProof<'a, E> =
-    sigma_protocol::Proof<<E as Pairing>::ScalarField, WeightedHomomorphism<'a, E>>;
+    sigma_protocol::ProofProjective<<E as Pairing>::ScalarField, WeightedHomomorphism<'a, E>>;
 
 impl<'a, E: Pairing> WeightedProof<'a, E> {
     /// Generates a random looking proof (but not a valid one).
@@ -139,7 +139,7 @@ impl<'a, E: Pairing> WeightedProof<'a, E> {
     ) -> Self {
         // or should number_of_chunks_per_share be a const?
         Self {
-            first_proof_item: FirstProofItem::Commitment(TupleCodomainShape(
+            first_proof_item: FirstProofItemProjective::Commitment(TupleCodomainShape(
                 TrivialShape(unsafe_random_point_group(rng)), // because TrivialShape is the codomain of univariate_hiding_kzg::CommitmentHomomorphism. TODO: develop generate() methods there? Maybe make it part of sigma_protocol::Trait ?
                 chunked_elgamal::WeightedCodomainShape {
                     chunks: (0..sc.get_total_num_players())
