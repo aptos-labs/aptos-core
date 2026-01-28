@@ -1,0 +1,72 @@
+{
+  "name": "ts-batch-encrypt",
+  "version": "1.0.0",
+  "description": "Typescript encrypt function for batch threshold encryption scheme",
+  "keywords": [
+    "starter",
+    "library",
+    "typescript"
+  ],
+  "homepage": "https://github.com/bgub/ts-base",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./browser": {
+      "import": "./dist/browser.js",
+      "types": "./dist/browser.d.ts"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "browser": "./dist/browser.js",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "lint": "biome check --error-on-warnings",
+    "format": "biome format --write",
+    "test": "vitest run --coverage",
+    "size": "size-limit"
+  },
+  "author": "Ben Gubler <nebrelbug@gmail.com>",
+  "funding": "https://github.com/bgub/ts-base?sponsor=1",
+  "repository": "github:bgub/ts-base",
+  "bugs": {
+    "url": "https://github.com/bgub/ts-base/issues"
+  },
+  "license": "Aptos",
+  "engines": {
+    "node": ">=20"
+  },
+  "size-limit": [
+    {
+      "path": "dist/browser.js",
+      "limit": "3.5 KB"
+    }
+  ],
+  "devDependencies": {
+    "@biomejs/biome": "2.2.3",
+    "@size-limit/preset-small-lib": "^8.2.4",
+    "@types/node": "^22.18.1",
+    "@vitest/coverage-istanbul": "3.2.4",
+    "size-limit": "^8.2.4",
+    "tsdown": "^0.15.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "@aptos-labs/ts-sdk": "^5.1.1",
+    "@noble/ciphers": "^2.0.1",
+    "@noble/curves": "^2.0.1",
+    "@noble/ed25519": "^3.0.0",
+    "@noble/hashes": "^2.0.1",
+    "bn254": "link:@noble/curves/bn254",
+    "ts-node": "^10.9.2"
+  }
+}
