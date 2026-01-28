@@ -19,7 +19,8 @@ use std::path::Path;
 
 /// A simple enum to represent the type of a node
 /// as determined from the config file.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum NodeType {
     Validator,
     ValidatorFullnode,
