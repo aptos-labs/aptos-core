@@ -64,8 +64,8 @@ fn test_imhomog_chaum_pedersen<
 
 use aptos_dkg::pvss::chunky::chunked_scalar_mul::Witness;
 
-fn test_imhomog_scalar_mul<E>(
-    hom: chunked_scalar_mul::InhomogChunkedScalarMul<E>,
+fn test_imhomog_scalar_mul<'a, E>(
+    hom: chunked_scalar_mul::InhomogChunkedScalarMul<'a, E>,
     witness: Witness<E::ScalarField>,
 ) where
     E: Pairing,
@@ -194,20 +194,31 @@ mod chaum_pedersen {
 mod chunked_scalar_mul {
     use super::*;
     use aptos_dkg::pvss::chunky::chunked_scalar_mul;
+    use ark_ec::scalar_mul::BatchMulPreprocessing;
 
-    pub type InhomogChunkedScalarMul<E> = PairingTupleHomomorphism<
+    pub type InhomogChunkedScalarMul<'a, E> = PairingTupleHomomorphism<
         E,
-        chunked_scalar_mul::Homomorphism<<E as Pairing>::G1>,
-        chunked_scalar_mul::Homomorphism<<E as Pairing>::G2>,
+        chunked_scalar_mul::Homomorphism<'a, <E as Pairing>::G1>,
+        chunked_scalar_mul::Homomorphism<'a, <E as Pairing>::G2>,
     >;
 
-    #[allow(non_snake_case)]
-    pub fn make_inhomogeneous_scalar_mul<E: Pairing>() -> InhomogChunkedScalarMul<E> {
-        let G_1 = E::G1::generator().into_affine();
-        let G_2 = E::G2::generator().into_affine();
+    pub fn make_inhomogeneous_scalar_mul<'a, E: Pairing>(
+        table1: &'a BatchMulPreprocessing<<E as Pairing>::G1>,
+        table2: &'a BatchMulPreprocessing<<E as Pairing>::G2>,
+    ) -> InhomogChunkedScalarMul<'a, E> {
+        let g_1 = E::G1::generator().into_affine();
+        let g_2 = E::G2::generator().into_affine();
 
-        let hom1 = chunked_scalar_mul::Homomorphism { base: G_1, ell: 16 };
-        let hom2 = chunked_scalar_mul::Homomorphism { base: G_2, ell: 16 };
+        let hom1 = chunked_scalar_mul::Homomorphism { 
+            base: g_1, 
+            table: table1, 
+            ell: 16 
+        };
+        let hom2 = chunked_scalar_mul::Homomorphism { 
+            base: g_2, 
+            table: table2, 
+            ell: 16 
+        };
 
         PairingTupleHomomorphism {
             hom1,
@@ -259,6 +270,7 @@ fn test_chaum_pedersen() {
 
     use crate::chunked_scalar_mul::make_inhomogeneous_scalar_mul;
     use aptos_dkg::pvss::chunky::{chunked_scalar_mul::Witness, chunks};
+    use ark_ec::scalar_mul::BatchMulPreprocessing;
 
     let ell = 16u8;
 
@@ -280,5 +292,12 @@ fn test_chaum_pedersen() {
         chunked_values: chunked_values.clone(),
     };
 
-    test_imhomog_scalar_mul::<Bn254>(make_inhomogeneous_scalar_mul(), witness);
+    // Create tables for batch multiplication preprocessing
+    let g_1 = <Bn254 as Pairing>::G1::generator().into_affine();
+    let g_2 = <Bn254 as Pairing>::G2::generator().into_affine();
+    let table1 = BatchMulPreprocessing::new(g_1.into(), 256);
+    let table2 = BatchMulPreprocessing::new(g_2.into(), 256);
+
+    let hom = make_inhomogeneous_scalar_mul::<Bn254>(&table1, &table2);
+    test_imhomog_scalar_mul::<Bn254>(hom, witness);
 }

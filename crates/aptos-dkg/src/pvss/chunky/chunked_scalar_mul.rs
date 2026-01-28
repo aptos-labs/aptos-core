@@ -12,10 +12,10 @@ use crate::{
 };
 use aptos_crypto::arkworks::{self, msm::{IsMsmInput, MsmInput}};
 use aptos_crypto_derive::SigmaProtocolWitness;
-use ark_ec::CurveGroup;
+use ark_ec::{CurveGroup, scalar_mul::BatchMulPreprocessing};
 use ark_ff::PrimeField;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use std::fmt::Debug;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Write, SerializationError};
+use std::fmt::{Debug, Formatter, Result as FmtResult};
 
 pub const DST: &[u8; 34] = b"APTOS_CHUNKED_COMMIT_HOM_SIGMA_DST";
 
@@ -25,10 +25,55 @@ pub const DST: &[u8; 34] = b"APTOS_CHUNKED_COMMIT_HOM_SIGMA_DST";
 /// with each unchunked scalar.
 ///
 /// Equivalent to `[base * unchunk(chunk) for chunks in chunked_scalars]`.
-#[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
-pub struct Homomorphism<C: CurveGroup> {
+pub struct Homomorphism<'a, C: CurveGroup> {
     pub base: C::Affine,
+    pub table: &'a BatchMulPreprocessing<C>,
     pub ell: u8,
+}
+
+impl<'a, C: CurveGroup> Clone for Homomorphism<'a, C> {
+    fn clone(&self) -> Self {
+        Self {
+            base: self.base.clone(),
+            table: self.table, // Just copy the reference
+            ell: self.ell,
+        }
+    }
+}
+
+impl<'a, C: CurveGroup> PartialEq for Homomorphism<'a, C> {
+    fn eq(&self, other: &Self) -> bool {
+        self.base == other.base && self.ell == other.ell
+        // table is ignored
+    }
+}
+
+impl<'a, C: CurveGroup> Eq for Homomorphism<'a, C> {}
+
+impl<'a, C: CurveGroup> Debug for Homomorphism<'a, C> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_struct("Homomorphism")
+            .field("base", &self.base)
+            .field("ell", &self.ell)
+            .field("table", &"<skipped>")
+            .finish()
+    }
+}
+
+impl<'a, C: CurveGroup> CanonicalSerialize for Homomorphism<'a, C> {
+    fn serialize_with_mode<W: Write>(
+        &self,
+        mut writer: W,
+        compress: Compress,
+    ) -> Result<(), SerializationError> {
+        self.base.serialize_with_mode(&mut writer, compress)?;
+        self.ell.serialize_with_mode(&mut writer, compress)?;
+        Ok(())
+    }
+
+    fn serialized_size(&self, compress: Compress) -> usize {
+        self.base.serialized_size(compress) + self.ell.serialized_size(compress)
+    }
 }
 
 // pub type CodomainShape<T> = VectorShape<T>;
@@ -78,7 +123,7 @@ pub struct Witness<F: PrimeField> {
     pub chunked_values: Vec<Vec<Scalar<F>>>,
 }
 
-impl<C: CurveGroup> homomorphism::Trait for Homomorphism<C> {
+impl<'a, C: CurveGroup> homomorphism::Trait for Homomorphism<'a, C> {
     type Codomain = CodomainShape<C>;
     type Domain = Witness<C::ScalarField>;
 
@@ -95,9 +140,8 @@ impl<C: CurveGroup> homomorphism::Trait for Homomorphism<C> {
             })
             .collect();
 
-        // Batch multiply using the base element (convert to projective first)
-        let base_projective: C = self.base.into();
-        let outputs = arkworks::commit_to_scalars(base_projective, &scalars);
+        // Batch multiply using the base element
+        let outputs = arkworks::commit_to_scalars(&self.table, &scalars);
 
 //        let outputs_affine = base_projective.batch_mul(&scalars);
 //        let outputs: Vec<C> = outputs_affine.into_iter().map(|p| p.into()).collect(); // TODO: REMOVE THIS
@@ -106,7 +150,7 @@ impl<C: CurveGroup> homomorphism::Trait for Homomorphism<C> {
     }
 }
 
-impl<C: CurveGroup> fixed_base_msms::Trait for Homomorphism<C> {
+impl<'a, C: CurveGroup> fixed_base_msms::Trait for Homomorphism<'a, C> {
     type CodomainShape<T>
         = CodomainShape<T>
     where
@@ -137,7 +181,7 @@ impl<C: CurveGroup> fixed_base_msms::Trait for Homomorphism<C> {
     }
 }
 
-impl<C: CurveGroup> sigma_protocol::Trait<C> for Homomorphism<C> {
+impl<'a, C: CurveGroup> sigma_protocol::Trait<C> for Homomorphism<'a, C> {
     fn dst(&self) -> Vec<u8> {
         DST.to_vec()
     }
@@ -147,11 +191,11 @@ impl<C: CurveGroup> sigma_protocol::Trait<C> for Homomorphism<C> {
 mod tests {
     use super::*;
     use crate::{
-        pvss::chunky::chunks::{le_chunks_to_scalar, scalar_to_le_chunks},
+        pvss::chunky::{chunked_elgamal::num_chunks_per_scalar, chunks::{le_chunks_to_scalar, scalar_to_le_chunks}},
         sigma_protocol::homomorphism::Trait as _,
     };
     use aptos_crypto::arkworks::random::{sample_field_elements, unsafe_random_point};
-    use ark_bls12_381::G1Projective;
+    use ark_bls12_381::{G1Projective, Fr};
     use rand::thread_rng;
 
     #[test]
@@ -184,7 +228,13 @@ mod tests {
             chunked_values: chunked_values.clone(),
         };
 
-        let hom = Homomorphism::<G1Projective> { base, ell };
+        // Create table from projective base (same pattern as chunked_elgamal_pp.rs)
+        let table = BatchMulPreprocessing::new(base.into(), num_scalars * num_chunks_per_scalar::<Fr>(ell) as usize);
+        let hom = Homomorphism::<G1Projective> {
+            base,
+            table: &table,
+            ell,
+        };
 
         // Apply the homomorphism
         let CodomainShape(outputs) = hom.apply(&witness);

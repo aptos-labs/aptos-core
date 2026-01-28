@@ -23,7 +23,7 @@ use aptos_crypto::{
     },
     utils, CryptoMaterialError, ValidCryptoMaterial,
 };
-use ark_ec::{pairing::Pairing, CurveGroup};
+use ark_ec::{CurveGroup, pairing::Pairing, scalar_mul::BatchMulPreprocessing};
 use ark_serialize::{SerializationError, Valid};
 use ark_std::log2;
 use rand::{thread_rng, CryptoRng, RngCore};
@@ -40,7 +40,7 @@ fn compute_powers_of_radix<E: Pairing>(ell: u8) -> Vec<E::ScalarField> {
 }
 
 // TODO: If we need it later, let's derive CanonicalSerialize/CanonicalDeserialize from Serialize/Deserialize? E.g. the opposite of ark_se/de...
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize)]
 #[allow(non_snake_case)]
 pub struct PublicParameters<E: Pairing> {
     pub pp_elgamal: chunked_elgamal_pp::PublicParameters<E::G1>,
@@ -54,6 +54,8 @@ pub struct PublicParameters<E: Pairing> {
 
     pub ell: u8,
 
+    pub max_num_shares: u32,
+
     // Meaning here it seems, the max number of times `n` that transcripts can be aggregated (which means the number of contained transcripts can be `n + 1`)
     pub max_aggregation: usize,
 
@@ -61,7 +63,55 @@ pub struct PublicParameters<E: Pairing> {
     pub table: HashMap<Vec<u8>, u64>,
 
     #[serde(skip)]
+    pub G2_table: BatchMulPreprocessing<E::G2>,
+
+    #[serde(skip)]
     pub powers_of_radix: Vec<E::ScalarField>,
+}
+
+impl<E: Pairing> Clone for PublicParameters<E> {
+    fn clone(&self) -> Self {
+        let g: E::G1 = self.pp_elgamal.G.into();
+        Self {
+            max_num_shares: self.max_num_shares,
+            pp_elgamal: self.pp_elgamal.clone(),
+            pk_range_proof: self.pk_range_proof.clone(),
+            G_2: self.G_2,
+            ell: self.ell,
+            max_aggregation: self.max_aggregation,
+            table: Self::build_dlog_table(g, self.ell, self.max_aggregation),
+            G2_table: BatchMulPreprocessing::new(self.G_2.into(), self.pk_range_proof.max_n), // Recreate table
+            powers_of_radix: compute_powers_of_radix::<E>(self.ell),
+        }
+    }
+}
+
+impl<E: Pairing> PartialEq for PublicParameters<E> {
+    fn eq(&self, other: &Self) -> bool {
+        self.pp_elgamal == other.pp_elgamal
+            && self.pk_range_proof == other.pk_range_proof
+            && self.G_2 == other.G_2
+            && self.ell == other.ell
+            && self.max_aggregation == other.max_aggregation
+        // table, G2_table, and powers_of_radix are ignored
+    }
+}
+
+impl<E: Pairing> Eq for PublicParameters<E> {}
+
+impl<E: Pairing> std::fmt::Debug for PublicParameters<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PublicParameters")
+            .field("pp_elgamal", &self.pp_elgamal)
+            .field("pk_range_proof", &self.pk_range_proof)
+            .field("G_2", &self.G_2)
+            .field("ell", &self.ell)
+            .field("max_aggregation", &self.max_aggregation)
+            .field("table", &"<skipped>")
+            .field("G2_table", &"<skipped>")
+            .field("powers_of_radix", &"<skipped>")
+            .finish()
+    }
 }
 
 #[allow(non_snake_case)]
@@ -79,6 +129,7 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
             #[serde(deserialize_with = "ark_de")]
             G_2: E::G2Affine,
             ell: u8,
+            max_num_shares: u32,
             max_aggregation: usize,
         }
 
@@ -86,13 +137,15 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
         let G: E::G1 = serialized.pp_elgamal.G.into();
 
         Ok(Self {
+            max_num_shares: serialized.max_num_shares,
             pp_elgamal: serialized.pp_elgamal,
             pk_range_proof: serialized.pk_range_proof,
             G_2: serialized.G_2,
             ell: serialized.ell,
-            table: Self::build_dlog_table(G, serialized.ell, serialized.max_aggregation),
-            powers_of_radix: compute_powers_of_radix::<E>(serialized.ell),
             max_aggregation: serialized.max_aggregation,
+            table: Self::build_dlog_table(G, serialized.ell, serialized.max_aggregation),
+            G2_table: BatchMulPreprocessing::new(serialized.G_2.into(), serialized.max_num_shares as usize),
+            powers_of_radix: compute_powers_of_radix::<E>(serialized.ell),
         })
     }
 }
@@ -175,7 +228,9 @@ impl<E: Pairing> PublicParameters<E> {
         let group_generators = GroupGenerators::default(); // TODO: At least one of these should come from a powers of tau ceremony?
         let pp_elgamal = chunked_elgamal_pp::PublicParameters::new(max_num_shares);
         let G = *pp_elgamal.message_base();
+        let G_2 = hashing::unsafe_hash_to_affine(b"G_2", DST);
         let pp = Self {
+            max_num_shares,
             pp_elgamal,
             pk_range_proof: dekart_univariate_v2::Proof::setup(
                 max_num_chunks_padded.try_into().unwrap(),
@@ -184,10 +239,11 @@ impl<E: Pairing> PublicParameters<E> {
                 rng,
             )
             .0,
-            G_2: hashing::unsafe_hash_to_affine(b"G_2", DST),
+            G_2,
             ell,
             max_aggregation,
             table: Self::build_dlog_table(G.into(), ell, max_aggregation),
+            G2_table: BatchMulPreprocessing::new(G_2.into(), max_num_shares as usize),
             powers_of_radix: compute_powers_of_radix::<E>(ell),
         };
 

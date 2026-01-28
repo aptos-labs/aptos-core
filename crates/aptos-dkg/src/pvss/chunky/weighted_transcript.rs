@@ -545,8 +545,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         f_evals.push(f[0]); // or *s.get_secret_a()
 
         // Commit to polynomial evaluations + constant term using batch_mul
-        let G_2 = pp.get_commitment_base();
-        let flattened_Vs = arkworks::commit_to_scalars::<E::G2>(G_2.into(), &f_evals);        
+        //let G_2 = pp.get_commitment_base();
+        let flattened_Vs = arkworks::commit_to_scalars::<E::G2>(&pp.G2_table, &f_evals);        
         
         debug_assert_eq!(flattened_Vs.len(), sc.get_total_weight() + 1);
 

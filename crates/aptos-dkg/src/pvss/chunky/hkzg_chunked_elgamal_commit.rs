@@ -18,18 +18,18 @@ use crate::{
 use aptos_crypto::{
     arkworks::random::unsafe_random_points_group, weighted_config::WeightedConfigArkworks,
 };
-use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup};
+use ark_ec::{AffineRepr, CurveGroup, pairing::Pairing, scalar_mul::BatchMulPreprocessing};
 
 type HkzgElgamalHomomorphism<'a, E> = hkzg_chunked_elgamal::WeightedHomomorphism<'a, E>;
-type LiftedCommitHomomorphism<C> = LiftHomomorphism<
-    chunked_scalar_mul::Homomorphism<C>,
+type LiftedCommitHomomorphism<'a, C> = LiftHomomorphism<
+    chunked_scalar_mul::Homomorphism<'a, C>,
     HkzgWeightedElgamalWitness<<<C as CurveGroup>::Affine as AffineRepr>::ScalarField>,
 >;
 
 pub type Homomorphism<'a, E> = PairingTupleHomomorphism<
     E,
     HkzgElgamalHomomorphism<'a, E>,
-    LiftedCommitHomomorphism<<E as Pairing>::G2>,
+    LiftedCommitHomomorphism<'a, <E as Pairing>::G2>,
 >;
 pub type Proof<'a, E> = sigma_protocol::Proof<<E as Pairing>::ScalarField, Homomorphism<'a, E>>;
 
@@ -71,6 +71,7 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
         lagr_g1: &'a [E::G1Affine],
         xi_1: E::G1Affine,
         pp: &'a chunked_elgamal_pp::PublicParameters<E::G1>,
+        G2_table: &'a BatchMulPreprocessing<E::G2>,
         eks: &'a [E::G1Affine],
         base: E::G2Affine,
         ell: u8,
@@ -80,8 +81,8 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
             hkzg_chunked_elgamal::WeightedHomomorphism::<E>::new(lagr_g1, xi_1, pp, eks);
 
         // Set up the lifted commit homomorphism
-        let lifted_commit_hom = LiftedCommitHomomorphism::<E::G2> {
-            hom: chunked_scalar_mul::Homomorphism { base, ell },
+        let lifted_commit_hom = LiftedCommitHomomorphism::<'a, E::G2> {
+            hom: chunked_scalar_mul::Homomorphism { base, table: G2_table, ell },
             // The projection map simply unchunks the chunks
             projection: |dom: &HkzgWeightedElgamalWitness<E::ScalarField>| {
                 chunked_scalar_mul::Witness {
