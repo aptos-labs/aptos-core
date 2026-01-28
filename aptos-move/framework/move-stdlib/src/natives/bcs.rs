@@ -221,7 +221,7 @@ fn constant_serialized_size(ty_layout: &MoveTypeLayout) -> (u64, PartialVMResult
         MoveTypeLayout::Vector(_) => Ok(None),
         // enums and functions have no constant size
         MoveTypeLayout::Struct(
-            MoveStructLayout::RuntimeVariants(_) | MoveStructLayout::WithVariants(_),
+            MoveStructLayout::RuntimeVariants(_) | MoveStructLayout::WithVariants { .. },
         )
         | MoveTypeLayout::Function => Ok(None),
         MoveTypeLayout::Struct(MoveStructLayout::Runtime(fields)) => {

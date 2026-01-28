@@ -582,6 +582,12 @@ impl Module {
         self.single_signature_token_map.get(&idx).unwrap()
     }
 
+    /// Returns a reference to the compiled module.
+    /// This is used for validation purposes such as checking function attributes.
+    pub fn compiled_module(&self) -> &Arc<CompiledModule> {
+        &self.module
+    }
+
     pub fn get_function(&self, function_name: &IdentStr) -> VMResult<Arc<Function>> {
         Ok(self
             .function_map
