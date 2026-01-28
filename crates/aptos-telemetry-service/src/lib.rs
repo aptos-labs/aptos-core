@@ -11,6 +11,7 @@ use crate::{
     index::routes,
     metrics::PrometheusExporter,
     peer_location::PeerLocationUpdater,
+    rate_limiter::ContractRateLimiters,
     validator_cache::PeerSetCacheUpdater,
 };
 use aptos_crypto::{x25519, ValidCryptoMaterialStringExt};
@@ -51,6 +52,7 @@ mod log_ingest;
 mod metrics;
 mod peer_location;
 mod prometheus_push_metrics;
+mod rate_limiter;
 mod remote_config;
 #[cfg(test)]
 pub(crate) mod tests;
@@ -107,25 +109,42 @@ impl AptosTelemetryServiceArgs {
                 },
             };
 
-        let bigquery_table_client = bigquery_client.as_ref().map(|client| {
-            big_query::TableWriteClient::new(
-                client.clone(),
-                config.custom_event_config.project_id.clone(),
-                config.custom_event_config.dataset_id.clone(),
-                config.custom_event_config.table_id.clone(),
-            )
+        // BigQuery table client for standard custom events (requires both BigQuery client and custom_event_config)
+        let bigquery_table_client = bigquery_client
+            .as_ref()
+            .zip(config.custom_event_config.as_ref())
+            .map(|(client, event_config)| {
+                big_query::TableWriteClient::new(
+                    client.clone(),
+                    event_config.project_id.clone(),
+                    event_config.dataset_id.clone(),
+                    event_config.table_id.clone(),
+                )
+            });
+
+        // Standard metrics clients (optional - not needed for custom-contract-only mode)
+        let (metrics_clients, telemetry_metrics_client) =
+            if let Some(metrics_config) = config.metrics_endpoints_config.clone() {
+                let clients: GroupedMetricsClients = metrics_config.into();
+                let telemetry_client = clients
+                    .telemetry_service_metrics_clients
+                    .values()
+                    .next()
+                    .cloned();
+                (Some(clients), telemetry_client)
+            } else {
+                info!("Standard metrics endpoints not configured - standard node metrics ingestion disabled");
+                (None, None)
+            };
+
+        // Standard log ingest clients (optional - not needed for custom-contract-only mode)
+        let log_ingest_clients = config.humio_ingest_config.clone().map(|cfg| {
+            let clients: LogIngestClients = cfg.into();
+            clients
         });
-
-        let metrics_clients: GroupedMetricsClients = config.metrics_endpoints_config.clone().into();
-
-        let telemetry_metrics_client = metrics_clients
-            .telemetry_service_metrics_clients
-            .values()
-            .next()
-            .cloned()
-            .unwrap();
-
-        let log_ingest_clients: LogIngestClients = config.humio_ingest_config.clone().into();
+        if log_ingest_clients.is_none() {
+            info!("Standard log ingestion not configured - standard node log ingestion disabled");
+        }
 
         // Setup custom contract clients from new config format
         let custom_contract_clients = if !config.custom_contract_configs.is_empty() {
@@ -187,6 +206,8 @@ impl AptosTelemetryServiceArgs {
                     logs_client,
                     untrusted_logs_client,
                     bigquery_client: cc_bigquery_client,
+                    peer_identities: cc_config.peer_identities.clone(),
+                    blacklist_peers: cc_config.blacklist_peers.clone(),
                 });
             }
 
@@ -206,6 +227,35 @@ impl AptosTelemetryServiceArgs {
         let peer_locations = Arc::new(aptos_infallible::RwLock::new(HashMap::new()));
         let public_fullnodes = config.pfn_allowlist.clone();
 
+        // Build per-contract rate limiters for contracts that have untrusted rate limits configured
+        let contract_metrics_rate_limiters = Arc::new(ContractRateLimiters::new());
+        let contract_logs_rate_limiters = Arc::new(ContractRateLimiters::new());
+        for cc_config in &config.custom_contract_configs {
+            // Use blocking to add limiters since we're in async context
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    if let Some(ref rate_limit) = cc_config.untrusted_metrics_rate_limit {
+                        info!(
+                            "Custom contract '{}' has untrusted metrics rate limit: {} rps, {} burst",
+                            cc_config.name, rate_limit.requests_per_second, rate_limit.burst_capacity
+                        );
+                        contract_metrics_rate_limiters
+                            .add_limiter(cc_config.name.clone(), rate_limit.clone())
+                            .await;
+                    }
+                    if let Some(ref rate_limit) = cc_config.untrusted_logs_rate_limit {
+                        info!(
+                            "Custom contract '{}' has untrusted logs rate limit: {} rps, {} burst",
+                            cc_config.name, rate_limit.requests_per_second, rate_limit.burst_capacity
+                        );
+                        contract_logs_rate_limiters
+                            .add_limiter(cc_config.name.clone(), rate_limit.clone())
+                            .await;
+                    }
+                })
+            });
+        }
+
         let context = Context::new(
             server_private_key,
             PeerStoreTuple::new(
@@ -215,23 +265,32 @@ impl AptosTelemetryServiceArgs {
             ),
             ClientTuple::new(
                 bigquery_table_client,
-                Some(metrics_clients),
-                Some(log_ingest_clients),
+                metrics_clients,
+                log_ingest_clients,
                 custom_contract_clients,
             ),
             jwt_service,
             config.log_env_map.clone(),
             config.peer_identities.clone(),
             peer_locations.clone(),
+            config.unknown_metrics_rate_limit.clone(),
+            config.unknown_logs_rate_limit.clone(),
+            contract_metrics_rate_limiters,
+            contract_logs_rate_limiters,
         );
 
-        PeerSetCacheUpdater::new(
-            validators,
-            validator_fullnodes,
-            config.trusted_full_node_addresses.clone(),
-            Duration::from_secs(config.update_interval),
-        )
-        .run();
+        // Only start PeerSetCacheUpdater if there are chains to update
+        if !config.trusted_full_node_addresses.is_empty() {
+            PeerSetCacheUpdater::new(
+                validators,
+                validator_fullnodes,
+                config.trusted_full_node_addresses.clone(),
+                Duration::from_secs(config.update_interval),
+            )
+            .run();
+        } else {
+            info!("No trusted_full_node_addresses configured - validator cache updates disabled");
+        }
 
         // PeerLocationUpdater requires BigQuery - only start if available
         if let Some(bq_client) = bigquery_client.as_ref() {
@@ -241,10 +300,15 @@ impl AptosTelemetryServiceArgs {
                 error!("Failed to start PeerLocationUpdater: {:?}", err);
             }
         } else {
-            warn!("PeerLocationUpdater disabled - BigQuery client not available");
+            info!("PeerLocationUpdater disabled - BigQuery client not available");
         }
 
-        PrometheusExporter::new(telemetry_metrics_client).run();
+        // PrometheusExporter exports service metrics - only start if telemetry metrics endpoint configured
+        if let Some(telemetry_client) = telemetry_metrics_client {
+            PrometheusExporter::new(telemetry_client).run();
+        } else {
+            info!("PrometheusExporter disabled - no telemetry service metrics endpoint configured");
+        }
 
         // Start AllowlistCacheUpdater for custom contracts (like PeerSetCacheUpdater)
         // This keeps the allowlist cache fresh in the background
@@ -811,6 +875,36 @@ pub struct CustomContractConfig {
     /// If not specified, unknown nodes will use the regular `logs_sink`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub untrusted_logs_sink: Option<LogSinkConfig>,
+
+    /// Rate limit configuration for untrusted nodes' metrics ingestion (optional).
+    /// When specified, overrides the global `unknown_metrics_rate_limit` for this contract.
+    /// Only applies to nodes that fail allowlist verification (is_trusted: false).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub untrusted_metrics_rate_limit: Option<UnknownTelemetryRateLimitConfig>,
+
+    /// Rate limit configuration for untrusted nodes' logs ingestion (optional).
+    /// When specified, overrides the global `unknown_logs_rate_limit` for this contract.
+    /// Only applies to nodes that fail allowlist verification (is_trusted: false).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub untrusted_logs_rate_limit: Option<UnknownTelemetryRateLimitConfig>,
+
+    // ========================================================================
+    // Per-Peer Configuration (optional, for fine-grained control)
+    // ========================================================================
+
+    /// Per-peer identity mapping for metrics labeling (optional).
+    /// Maps chain_id -> peer_id -> identity/common name.
+    /// Used to add `kubernetes_pod_name=peer_id:{identity}//{peer_id}` labels to metrics,
+    /// matching the standard telemetry labeling behavior.
+    /// If not specified, metrics will use `kubernetes_pod_name=peer_id:{peer_id}`.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
+
+    /// Optional set of peer IDs to block from this contract's telemetry ingestion.
+    /// Blocked peers will receive a 403 Forbidden response.
+    /// Applies to metrics, logs, and events endpoints for this contract.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blacklist_peers: Option<HashSet<PeerId>>,
 }
 
 impl CustomContractConfig {
@@ -1069,6 +1163,27 @@ impl LogIngestConfig {
 /// - `*_config` suffix for nested config structs
 /// - `backend_type` field to select between backends (e.g., victoria_metrics/prometheus, humio/loki)
 /// - Aliases are provided for backward compatibility when field names have been improved
+///
+/// ## Custom-Contract-Only Mode
+///
+/// For deployments that only need custom contract telemetry (no standard node auth),
+/// set `custom_contract_configs` and leave the standard auth fields at their defaults:
+/// - `trusted_full_node_addresses`: empty (no validator sets to fetch)
+/// - `pfn_allowlist`: empty (no public fullnode allowlist)
+/// - `metrics_endpoints_config`: None (no standard metrics ingestion)
+/// - `humio_ingest_config`: None (no standard log ingestion)
+/// - `custom_event_config`: None (optional, for BigQuery events)
+///
+/// Example minimal config:
+/// ```yaml
+/// address: "0.0.0.0:8080"
+/// custom_contract_configs:
+///   - name: "my_provider"
+///     allow_unknown_nodes: true
+///     node_type_name: "MyProvider"
+///     metrics_sinks:
+///       - endpoint_urls: {vm: "http://metrics:8428/api/v1/import/prometheus"}
+/// ```
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TelemetryServiceConfig {
@@ -1083,34 +1198,49 @@ pub struct TelemetryServiceConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls_key_path: Option<String>,
 
-    /// Map of chain name to full node REST API URL for fetching validator sets
+    /// Map of chain name to full node REST API URL for fetching validator sets.
+    /// Required for standard node authentication. Can be empty for custom-contract-only mode.
+    #[serde(default)]
     pub trusted_full_node_addresses: HashMap<ChainCommonName, String>,
 
-    /// Interval in seconds to update peer/validator caches
+    /// Interval in seconds to update peer/validator caches.
+    /// Default: 60 seconds.
+    #[serde(default = "default_update_interval")]
     pub update_interval: u64,
 
-    /// Public full node allowlist: chain_id -> peer_id -> public_key
+    /// Public full node allowlist: chain_id -> peer_id -> public_key.
+    /// Required for standard node authentication. Can be empty for custom-contract-only mode.
+    #[serde(default)]
     pub pfn_allowlist: HashMap<ChainId, HashMap<PeerId, x25519::PublicKey>>,
 
-    /// BigQuery configuration for custom events
-    pub custom_event_config: CustomEventConfig,
+    /// BigQuery configuration for custom events (optional).
+    /// Required for `/ingest/custom-event` endpoint. Can be omitted for custom-contract-only mode.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_event_config: Option<CustomEventConfig>,
 
-    /// Log ingestion configuration for known/unknown nodes.
+    /// Log ingestion configuration for known/unknown nodes (optional).
     /// Supports multiple backends (humio, loki) via `backend_type` field in endpoints.
+    /// Required for standard `/ingest/logs` endpoint. Can be omitted for custom-contract-only mode.
     /// Note: Field name preserved as `humio_ingest_config` for backward compatibility;
     /// use alias `log_ingest_config` in new configurations.
-    #[serde(alias = "log_ingest_config")]
-    pub humio_ingest_config: LogIngestConfig,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "log_ingest_config")]
+    pub humio_ingest_config: Option<LogIngestConfig>,
 
-    /// Map of chain_id -> peer_id -> environment name (for log routing)
+    /// Map of chain_id -> peer_id -> environment name (for log routing).
+    /// Can be empty for custom-contract-only mode.
+    #[serde(default)]
     pub log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
 
-    /// Map of chain_id -> peer_id -> identity string (for peer identification)
+    /// Map of chain_id -> peer_id -> identity string (for peer identification).
+    /// Can be empty for custom-contract-only mode.
+    #[serde(default)]
     pub peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
 
-    /// Metrics endpoints configuration for telemetry service, trusted, and untrusted nodes.
+    /// Metrics endpoints configuration for telemetry service, trusted, and untrusted nodes (optional).
     /// Supports multiple backends (victoria_metrics, prometheus) via `backend_type` field.
-    pub metrics_endpoints_config: MetricsEndpointsConfig,
+    /// Required for standard `/ingest/metrics` endpoint. Can be omitted for custom-contract-only mode.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metrics_endpoints_config: Option<MetricsEndpointsConfig>,
 
     /// Custom contract configurations (optional).
     /// Each entry defines authentication and data sinks for a different custom contract client type.
@@ -1122,10 +1252,73 @@ pub struct TelemetryServiceConfig {
     /// Default: 300 seconds (5 minutes). Set lower for testing (e.g., 10 seconds).
     #[serde(default = "default_allowlist_cache_ttl_secs")]
     pub allowlist_cache_ttl_secs: u64,
+
+    /// Rate limit configuration for unknown/untrusted node metrics ingestion.
+    /// Controls rate limiting for standard unknown nodes (UnknownValidator, UnknownFullNode).
+    /// Default: 100 requests/second with 200 burst capacity.
+    #[serde(default)]
+    pub unknown_metrics_rate_limit: UnknownTelemetryRateLimitConfig,
+
+    /// Rate limit configuration for unknown/untrusted node logs ingestion.
+    /// Controls rate limiting for standard unknown nodes (Unknown, UnknownValidator, UnknownFullNode).
+    /// Default: 100 requests/second with 200 burst capacity.
+    #[serde(default)]
+    pub unknown_logs_rate_limit: UnknownTelemetryRateLimitConfig,
+}
+
+fn default_update_interval() -> u64 {
+    60 // 60 seconds default
 }
 
 fn default_allowlist_cache_ttl_secs() -> u64 {
     300 // 5 minutes default
+}
+
+/// Rate limit configuration for unknown/untrusted telemetry.
+///
+/// Controls how many requests per time window are allowed from unknown/untrusted nodes.
+/// Uses a token bucket algorithm for smooth rate limiting with burst capacity.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct UnknownTelemetryRateLimitConfig {
+    /// Maximum requests per second allowed from unknown/untrusted nodes.
+    /// Set to 0 to disable rate limiting (allow unlimited requests).
+    /// Default: 100 requests per second.
+    #[serde(default = "default_unknown_rps")]
+    pub requests_per_second: u32,
+
+    /// Burst capacity - maximum number of requests that can be made in a burst.
+    /// This allows short bursts above the sustained rate.
+    /// Default: 200 requests (2x the per-second rate).
+    #[serde(default = "default_unknown_burst")]
+    pub burst_capacity: u32,
+
+    /// Whether to enable rate limiting for unknown/untrusted nodes.
+    /// Default: true.
+    #[serde(default = "default_rate_limit_enabled")]
+    pub enabled: bool,
+}
+
+fn default_unknown_rps() -> u32 {
+    100 // 100 requests per second
+}
+
+fn default_unknown_burst() -> u32 {
+    200 // 2x the per-second rate
+}
+
+fn default_rate_limit_enabled() -> bool {
+    true
+}
+
+impl Default for UnknownTelemetryRateLimitConfig {
+    fn default() -> Self {
+        Self {
+            requests_per_second: default_unknown_rps(),
+            burst_capacity: default_unknown_burst(),
+            enabled: default_rate_limit_enabled(),
+        }
+    }
 }
 
 impl TelemetryServiceConfig {

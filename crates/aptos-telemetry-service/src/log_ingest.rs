@@ -46,7 +46,36 @@ pub async fn handle_log_ingest(
 ) -> anyhow::Result<impl Reply, Rejection> {
     debug!("handling log ingest");
 
-    if let Some(blacklist) = &context.log_ingest_clients().blacklist {
+    // Apply rate limiting for unknown/untrusted nodes
+    let is_unknown = matches!(
+        claims.node_type,
+        NodeType::Unknown | NodeType::UnknownValidator | NodeType::UnknownFullNode
+    );
+    if is_unknown
+        && !context
+            .unknown_logs_rate_limiter()
+            .check_rate_limit()
+            .await
+    {
+        debug!(
+            "rate limit exceeded for unknown node logs: peer_id={}",
+            claims.peer_id
+        );
+        return Err(reject::custom(ServiceError::too_many_requests(
+            LogIngestError::RateLimitExceeded.into(),
+        )));
+    }
+
+    // Standard log ingestion requires humio_ingest_config to be configured
+    let log_clients = context.log_ingest_clients().ok_or_else(|| {
+        error!("Standard log ingestion not configured - rejecting request");
+        reject::custom(ServiceError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            LogIngestError::IngestionError.into(),
+        ))
+    })?;
+
+    if let Some(blacklist) = &log_clients.blacklist {
         if blacklist.contains(&claims.peer_id) {
             return Err(reject::custom(ServiceError::forbidden(
                 LogIngestError::Forbidden(claims.peer_id).into(),
@@ -56,9 +85,9 @@ pub async fn handle_log_ingest(
 
     let client = match claims.node_type {
         NodeType::Unknown | NodeType::UnknownValidator | NodeType::UnknownFullNode => {
-            &context.log_ingest_clients().unknown_logs_ingest_client
+            &log_clients.unknown_logs_ingest_client
         },
-        _ => &context.log_ingest_clients().known_logs_ingest_client,
+        _ => &log_clients.known_logs_ingest_client,
     };
 
     let log_messages: Vec<String> = if let Some(encoding) = encoding {

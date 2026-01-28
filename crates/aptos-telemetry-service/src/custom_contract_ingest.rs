@@ -67,6 +67,65 @@ async fn handle_metrics_ingest(
         )));
     }
 
+    // Check if the peer is blacklisted for this contract
+    if let Some(instance) = context.get_custom_contract(&contract_name) {
+        if instance.is_peer_blacklisted(&peer_id) {
+            debug!(
+                "peer_id {} is blacklisted from custom contract '{}' metrics",
+                peer_id, contract_name
+            );
+            record_custom_contract_error(
+                &contract_name,
+                CustomContractEndpoint::MetricsIngest,
+                CustomContractErrorType::NotInAllowlist,
+            );
+            return Err(reject::custom(ServiceError::forbidden(
+                ServiceErrorCode::CustomContractAuthError(
+                    format!("peer_id {} is blacklisted from this contract", peer_id),
+                    chain_id,
+                ),
+            )));
+        }
+    }
+
+    // Apply rate limiting for untrusted nodes (metrics)
+    // Check per-contract metrics rate limiter first, then fall back to global metrics rate limiter
+    if !is_trusted {
+        let contract_rate_limited = !context
+            .contract_metrics_rate_limiters()
+            .check_rate_limit(&contract_name)
+            .await;
+
+        // If no per-contract limiter exists, use global metrics rate limiter
+        let use_global = !context
+            .contract_metrics_rate_limiters()
+            .has_limiter(&contract_name)
+            .await;
+        let global_rate_limited = use_global
+            && !context
+                .unknown_metrics_rate_limiter()
+                .check_rate_limit()
+                .await;
+
+        if contract_rate_limited || global_rate_limited {
+            debug!(
+                "rate limit exceeded for untrusted custom contract '{}' metrics: peer_id={}",
+                contract_name, peer_id
+            );
+            record_custom_contract_error(
+                &contract_name,
+                CustomContractEndpoint::MetricsIngest,
+                CustomContractErrorType::RateLimitExceeded,
+            );
+            return Err(reject::custom(ServiceError::too_many_requests(
+                ServiceErrorCode::CustomContractAuthError(
+                    "rate limit exceeded for untrusted telemetry".to_string(),
+                    chain_id,
+                ),
+            )));
+        }
+    }
+
     debug!(
         "received custom contract '{}' metrics from peer_id: {}, chain_id: {}, is_trusted: {}, body length: {}",
         contract_name,
@@ -97,11 +156,29 @@ async fn handle_metrics_ingest(
     // Format: name=value (no quotes - Victoria Metrics extra_label format)
     let node_type = &instance.node_type_name;
     let trust_label = if is_trusted { "trusted" } else { "untrusted" };
+
+    // Build kubernetes_pod_name label matching standard telemetry behavior:
+    // - If peer_identity is configured: "peer_id:{identity}//{peer_id_hex}"
+    // - Otherwise: "peer_id:{peer_id_hex}"
+    let pod_name = if let Some(identity) = instance.get_peer_identity(&chain_id, &peer_id) {
+        format!(
+            "kubernetes_pod_name=peer_id:{}//{}",
+            identity,
+            peer_id.to_hex_literal()
+        )
+    } else {
+        format!(
+            "kubernetes_pod_name=peer_id:{}",
+            peer_id.to_hex_literal()
+        )
+    };
+
     let extra_labels = vec![
         format!("peer_id={}", peer_id),
         format!("node_type={}", node_type),
         format!("contract_name={}", contract_name),
         format!("trust_status={}", trust_label),
+        pod_name,
     ];
 
     // Determine encoding
@@ -184,6 +261,64 @@ async fn handle_log_ingest(
                 chain_id,
             ),
         )));
+    }
+
+    // Check if the peer is blacklisted for this contract
+    if let Some(instance) = context.get_custom_contract(&contract_name) {
+        if instance.is_peer_blacklisted(&peer_id) {
+            debug!(
+                "peer_id {} is blacklisted from custom contract '{}' logs",
+                peer_id, contract_name
+            );
+            record_custom_contract_error(
+                &contract_name,
+                CustomContractEndpoint::LogsIngest,
+                CustomContractErrorType::NotInAllowlist,
+            );
+            return Err(reject::custom(ServiceError::forbidden(
+                ServiceErrorCode::CustomContractAuthError(
+                    format!("peer_id {} is blacklisted from this contract", peer_id),
+                    chain_id,
+                ),
+            )));
+        }
+    }
+
+    // Apply rate limiting for untrusted nodes (logs)
+    // Check per-contract logs rate limiter first, then fall back to global logs rate limiter
+    if !is_trusted {
+        let contract_rate_limited = !context
+            .contract_logs_rate_limiters()
+            .check_rate_limit(&contract_name)
+            .await;
+
+        let use_global = !context
+            .contract_logs_rate_limiters()
+            .has_limiter(&contract_name)
+            .await;
+        let global_rate_limited = use_global
+            && !context
+                .unknown_logs_rate_limiter()
+                .check_rate_limit()
+                .await;
+
+        if contract_rate_limited || global_rate_limited {
+            debug!(
+                "rate limit exceeded for untrusted custom contract '{}' logs: peer_id={}",
+                contract_name, peer_id
+            );
+            record_custom_contract_error(
+                &contract_name,
+                CustomContractEndpoint::LogsIngest,
+                CustomContractErrorType::RateLimitExceeded,
+            );
+            return Err(reject::custom(ServiceError::too_many_requests(
+                ServiceErrorCode::CustomContractAuthError(
+                    "rate limit exceeded for untrusted telemetry".to_string(),
+                    chain_id,
+                ),
+            )));
+        }
     }
 
     debug!(
@@ -348,6 +483,64 @@ async fn handle_custom_event_ingest(
                 chain_id,
             ),
         )));
+    }
+
+    // Check if the peer is blacklisted for this contract
+    if let Some(instance) = context.get_custom_contract(&contract_name) {
+        if instance.is_peer_blacklisted(&peer_id) {
+            debug!(
+                "peer_id {} is blacklisted from custom contract '{}' events",
+                peer_id, contract_name
+            );
+            record_custom_contract_error(
+                &contract_name,
+                CustomContractEndpoint::EventsIngest,
+                CustomContractErrorType::NotInAllowlist,
+            );
+            return Err(reject::custom(ServiceError::forbidden(
+                ServiceErrorCode::CustomContractAuthError(
+                    format!("peer_id {} is blacklisted from this contract", peer_id),
+                    chain_id,
+                ),
+            )));
+        }
+    }
+
+    // Apply rate limiting for untrusted nodes (events use logs rate limiter)
+    // Check per-contract logs rate limiter first, then fall back to global logs rate limiter
+    if !is_trusted {
+        let contract_rate_limited = !context
+            .contract_logs_rate_limiters()
+            .check_rate_limit(&contract_name)
+            .await;
+
+        let use_global = !context
+            .contract_logs_rate_limiters()
+            .has_limiter(&contract_name)
+            .await;
+        let global_rate_limited = use_global
+            && !context
+                .unknown_logs_rate_limiter()
+                .check_rate_limit()
+                .await;
+
+        if contract_rate_limited || global_rate_limited {
+            debug!(
+                "rate limit exceeded for untrusted custom contract '{}' events: peer_id={}",
+                contract_name, peer_id
+            );
+            record_custom_contract_error(
+                &contract_name,
+                CustomContractEndpoint::EventsIngest,
+                CustomContractErrorType::RateLimitExceeded,
+            );
+            return Err(reject::custom(ServiceError::too_many_requests(
+                ServiceErrorCode::CustomContractAuthError(
+                    "rate limit exceeded for untrusted telemetry".to_string(),
+                    chain_id,
+                ),
+            )));
+        }
     }
 
     debug!(
