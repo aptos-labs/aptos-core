@@ -469,6 +469,24 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 // For testing
                 .exp(Experiment::VARIABLE_COALESCING_ANNOTATE)
         },
+        // Common exbpression elimination tests
+        TestConfig {
+            name: "common-subexp-elim-on",
+            runner: |p| run_test(p, get_config_by_name("common-subexp-elim-on")),
+            include: vec!["/common-subexp-elimination/"],
+            exp_suffix: Some("on.exp"),
+            dump_bytecode: DumpLevel::AllStages,
+            ..config().exp(Experiment::COMMON_SUBEXP_ELIMINATION)
+        },
+        TestConfig {
+            name: "common-subexp-elim-off",
+            runner: |p| run_test(p, get_config_by_name("common-subexp-elim-off")),
+            include: vec!["/common-subexp-elimination/"],
+            exp_suffix: Some("off.exp"),
+            dump_bytecode: DumpLevel::AllStages,
+            dump_bytecode_filter: Some(vec![FILE_FORMAT_STAGE]),
+            ..config().exp_off(Experiment::COMMON_SUBEXP_ELIMINATION)
+        },
         // Flush writes processor tests
         TestConfig {
             name: "flush-writes-on",

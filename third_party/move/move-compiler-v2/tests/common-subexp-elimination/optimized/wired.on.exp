@@ -1,0 +1,5028 @@
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+  1: test::merge($t2, $t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+  1: $t3 := read_ref($t4)
+  2: $t6 := borrow_local($t1)
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+  4: $t5 := read_ref($t7)
+  5: $t2 := >($t3, $t5)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := borrow_local($t1)
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+  2: $t2 := read_ref($t4)
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+  4: $t7 := read_ref($t5)
+  5: $t6 := +($t7, $t2)
+  6: write_ref($t5, $t6)
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+  0: $t1 := 3
+  1: $t0 := pack 0x42::test::W($t1)
+  2: $t5 := 0x1
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+  4: $t3 := test::greater($t4, $t0)
+  5: $t2 := !($t3)
+  6: if ($t2) goto 7 else goto 9
+  7: label L0
+  8: goto 12
+  9: label L1
+ 10: $t6 := 0
+ 11: abort($t6)
+ 12: label L2
+ 13: $t7 := 0x1
+ 14: test::foo_2($t7, $t0)
+ 15: $t11 := 0x1
+ 16: $t10 := borrow_global<0x42::test::W>($t11)
+ 17: $t12 := borrow_field<0x42::test::W>.x($t10)
+ 18: $t9 := read_ref($t12)
+ 19: $t13 := 5
+ 20: $t8 := ==($t9, $t13)
+ 21: if ($t8) goto 22 else goto 24
+ 22: label L3
+ 23: goto 27
+ 24: label L4
+ 25: $t14 := 0
+ 26: abort($t14)
+ 27: label L5
+ 28: return ()
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+  1: test::merge($t2, $t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+  1: $t3 := read_ref($t4)
+  2: $t6 := borrow_local($t1)
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+  4: $t5 := read_ref($t7)
+  5: $t2 := >($t3, $t5)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := borrow_local($t1)
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+  2: $t2 := read_ref($t4)
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+  4: $t7 := read_ref($t5)
+  5: $t6 := +($t7, $t2)
+  6: write_ref($t5, $t6)
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+  0: $t1 := 3
+  1: $t0 := pack 0x42::test::W($t1)
+  2: $t5 := 0x1
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+  4: $t3 := test::greater($t4, $t0)
+  5: $t2 := !($t3)
+  6: if ($t2) goto 7 else goto 9
+  7: label L0
+  8: goto 12
+  9: label L1
+ 10: $t6 := 0
+ 11: abort($t6)
+ 12: label L2
+ 13: $t7 := 0x1
+ 14: test::foo_2($t7, $t0)
+ 15: $t11 := 0x1
+ 16: $t10 := borrow_global<0x42::test::W>($t11)
+ 17: $t12 := borrow_field<0x42::test::W>.x($t10)
+ 18: $t9 := read_ref($t12)
+ 19: $t13 := 5
+ 20: $t8 := ==($t9, $t13)
+ 21: if ($t8) goto 22 else goto 24
+ 22: label L3
+ 23: goto 27
+ 24: label L4
+ 25: $t14 := 0
+ 26: abort($t14)
+ 27: label L5
+ 28: return ()
+}
+
+============ after uninitialized_use_checker: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+  1: test::merge($t2, $t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+  1: $t3 := read_ref($t4)
+  2: $t6 := borrow_local($t1)
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+  4: $t5 := read_ref($t7)
+  5: $t2 := >($t3, $t5)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := borrow_local($t1)
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+  2: $t2 := read_ref($t4)
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+  4: $t7 := read_ref($t5)
+  5: $t6 := +($t7, $t2)
+  6: write_ref($t5, $t6)
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+  0: $t1 := 3
+  1: $t0 := pack 0x42::test::W($t1)
+  2: $t5 := 0x1
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+  4: $t3 := test::greater($t4, $t0)
+  5: $t2 := !($t3)
+  6: if ($t2) goto 7 else goto 9
+  7: label L0
+  8: goto 12
+  9: label L1
+ 10: $t6 := 0
+ 11: abort($t6)
+ 12: label L2
+ 13: $t7 := 0x1
+ 14: test::foo_2($t7, $t0)
+ 15: $t11 := 0x1
+ 16: $t10 := borrow_global<0x42::test::W>($t11)
+ 17: $t12 := borrow_field<0x42::test::W>.x($t10)
+ 18: $t9 := read_ref($t12)
+ 19: $t13 := 5
+ 20: $t8 := ==($t9, $t13)
+ 21: if ($t8) goto 22 else goto 24
+ 22: label L3
+ 23: goto 27
+ 24: label L4
+ 25: $t14 := 0
+ 26: abort($t14)
+ 27: label L5
+ 28: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+     # live vars: $t0, $t1
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+     # live vars: $t1, $t2
+  1: test::merge($t2, $t1)
+     # live vars:
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+     # live vars: $t0, $t1
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t1, $t4
+  1: $t3 := read_ref($t4)
+     # live vars: $t1, $t3
+  2: $t6 := borrow_local($t1)
+     # live vars: $t3, $t6
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+     # live vars: $t3, $t7
+  4: $t5 := read_ref($t7)
+     # live vars: $t3, $t5
+  5: $t2 := >($t3, $t5)
+     # live vars: $t2
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+     # live vars: $t0, $t4
+  2: $t2 := read_ref($t4)
+     # live vars: $t0, $t2
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t2, $t5
+  4: $t7 := read_ref($t5)
+     # live vars: $t2, $t5, $t7
+  5: $t6 := +($t7, $t2)
+     # live vars: $t5, $t6
+  6: write_ref($t5, $t6)
+     # live vars:
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+     # live vars:
+  0: $t1 := 3
+     # live vars: $t1
+  1: $t0 := pack 0x42::test::W($t1)
+     # live vars: $t0
+  2: $t5 := 0x1
+     # live vars: $t0, $t5
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+     # live vars: $t0, $t4
+  4: $t3 := test::greater($t4, $t0)
+     # live vars: $t0, $t3
+  5: $t2 := !($t3)
+     # live vars: $t0, $t2
+  6: if ($t2) goto 7 else goto 9
+     # live vars: $t0
+  7: label L0
+     # live vars: $t0
+  8: goto 12
+     # live vars: $t0
+  9: label L1
+     # live vars:
+ 10: $t6 := 0
+     # live vars: $t6
+ 11: abort($t6)
+     # live vars: $t0
+ 12: label L2
+     # live vars: $t0
+ 13: $t7 := 0x1
+     # live vars: $t0, $t7
+ 14: test::foo_2($t7, $t0)
+     # live vars:
+ 15: $t11 := 0x1
+     # live vars: $t11
+ 16: $t10 := borrow_global<0x42::test::W>($t11)
+     # live vars: $t10
+ 17: $t12 := borrow_field<0x42::test::W>.x($t10)
+     # live vars: $t12
+ 18: $t9 := read_ref($t12)
+     # live vars: $t9
+ 19: $t13 := 5
+     # live vars: $t9, $t13
+ 20: $t8 := ==($t9, $t13)
+     # live vars: $t8
+ 21: if ($t8) goto 22 else goto 24
+     # live vars:
+ 22: label L3
+     # live vars:
+ 23: goto 27
+     # live vars:
+ 24: label L4
+     # live vars:
+ 25: $t14 := 0
+     # live vars: $t14
+ 26: abort($t14)
+     # live vars:
+ 27: label L5
+     # live vars:
+ 28: return ()
+}
+
+============ after UnusedAssignmentChecker: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+     # live vars: $t0, $t1
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+     # live vars: $t1, $t2
+  1: test::merge($t2, $t1)
+     # live vars:
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+     # live vars: $t0, $t1
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t1, $t4
+  1: $t3 := read_ref($t4)
+     # live vars: $t1, $t3
+  2: $t6 := borrow_local($t1)
+     # live vars: $t3, $t6
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+     # live vars: $t3, $t7
+  4: $t5 := read_ref($t7)
+     # live vars: $t3, $t5
+  5: $t2 := >($t3, $t5)
+     # live vars: $t2
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+     # live vars: $t0, $t4
+  2: $t2 := read_ref($t4)
+     # live vars: $t0, $t2
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t2, $t5
+  4: $t7 := read_ref($t5)
+     # live vars: $t2, $t5, $t7
+  5: $t6 := +($t7, $t2)
+     # live vars: $t5, $t6
+  6: write_ref($t5, $t6)
+     # live vars:
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+     # live vars:
+  0: $t1 := 3
+     # live vars: $t1
+  1: $t0 := pack 0x42::test::W($t1)
+     # live vars: $t0
+  2: $t5 := 0x1
+     # live vars: $t0, $t5
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+     # live vars: $t0, $t4
+  4: $t3 := test::greater($t4, $t0)
+     # live vars: $t0, $t3
+  5: $t2 := !($t3)
+     # live vars: $t0, $t2
+  6: if ($t2) goto 7 else goto 9
+     # live vars: $t0
+  7: label L0
+     # live vars: $t0
+  8: goto 12
+     # live vars: $t0
+  9: label L1
+     # live vars:
+ 10: $t6 := 0
+     # live vars: $t6
+ 11: abort($t6)
+     # live vars: $t0
+ 12: label L2
+     # live vars: $t0
+ 13: $t7 := 0x1
+     # live vars: $t0, $t7
+ 14: test::foo_2($t7, $t0)
+     # live vars:
+ 15: $t11 := 0x1
+     # live vars: $t11
+ 16: $t10 := borrow_global<0x42::test::W>($t11)
+     # live vars: $t10
+ 17: $t12 := borrow_field<0x42::test::W>.x($t10)
+     # live vars: $t12
+ 18: $t9 := read_ref($t12)
+     # live vars: $t9
+ 19: $t13 := 5
+     # live vars: $t9, $t13
+ 20: $t8 := ==($t9, $t13)
+     # live vars: $t8
+ 21: if ($t8) goto 22 else goto 24
+     # live vars:
+ 22: label L3
+     # live vars:
+ 23: goto 27
+     # live vars:
+ 24: label L4
+     # live vars:
+ 25: $t14 := 0
+     # live vars: $t14
+ 26: abort($t14)
+     # live vars:
+ 27: label L5
+     # live vars:
+ 28: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+     # live vars: $t0, $t1
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+     # live vars: $t1, $t2
+  1: test::merge($t2, $t1)
+     # live vars:
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+     # live vars: $t0, $t1
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t1, $t4
+  1: $t3 := read_ref($t4)
+     # live vars: $t1, $t3
+  2: $t6 := borrow_local($t1)
+     # live vars: $t3, $t6
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+     # live vars: $t3, $t7
+  4: $t5 := read_ref($t7)
+     # live vars: $t3, $t5
+  5: $t2 := >($t3, $t5)
+     # live vars: $t2
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+     # live vars: $t0, $t4
+  2: $t2 := read_ref($t4)
+     # live vars: $t0, $t2
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t2, $t5
+  4: $t7 := read_ref($t5)
+     # live vars: $t2, $t5, $t7
+  5: $t6 := +($t7, $t2)
+     # live vars: $t5, $t6
+  6: write_ref($t5, $t6)
+     # live vars:
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+     # live vars:
+  0: $t1 := 3
+     # live vars: $t1
+  1: $t0 := pack 0x42::test::W($t1)
+     # live vars: $t0
+  2: $t5 := 0x1
+     # live vars: $t0, $t5
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+     # live vars: $t0, $t4
+  4: $t3 := test::greater($t4, $t0)
+     # live vars: $t0, $t3
+  5: $t2 := !($t3)
+     # live vars: $t0, $t2
+  6: if ($t2) goto 7 else goto 9
+     # live vars: $t0
+  7: label L0
+     # live vars: $t0
+  8: goto 12
+     # live vars: $t0
+  9: label L1
+     # live vars:
+ 10: $t6 := 0
+     # live vars: $t6
+ 11: abort($t6)
+     # live vars: $t0
+ 12: label L2
+     # live vars: $t0
+ 13: $t7 := 0x1
+     # live vars: $t0, $t7
+ 14: test::foo_2($t7, $t0)
+     # live vars:
+ 15: $t11 := 0x1
+     # live vars: $t11
+ 16: $t10 := borrow_global<0x42::test::W>($t11)
+     # live vars: $t10
+ 17: $t12 := borrow_field<0x42::test::W>.x($t10)
+     # live vars: $t12
+ 18: $t9 := read_ref($t12)
+     # live vars: $t9
+ 19: $t13 := 5
+     # live vars: $t9, $t13
+ 20: $t8 := ==($t9, $t13)
+     # live vars: $t8
+ 21: if ($t8) goto 22 else goto 24
+     # live vars:
+ 22: label L3
+     # live vars:
+ 23: goto 27
+     # live vars:
+ 24: label L4
+     # live vars:
+ 25: $t14 := 0
+     # live vars: $t14
+ 26: abort($t14)
+     # live vars:
+ 27: label L5
+     # live vars:
+ 28: return ()
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+     # live vars: $t1, $t2
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   -> (mut) #2 via [struct `test::W`] at line 17
+     #
+  1: test::merge($t2, $t1)
+     # live vars:
+     # refs: []
+     #
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t1, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := read_ref($t4)
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  2: $t6 := borrow_local($t1)
+     # live vars: $t3, $t6
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `s`] at line 9
+     #
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+     # live vars: $t3, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `s`, field `x`] at line 9
+     #
+  4: $t5 := read_ref($t7)
+     # live vars: $t3, $t5
+     # refs: []
+     #
+  5: $t2 := >($t3, $t5)
+     # live vars: $t2
+     # refs: []
+     #
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `s`] at line 13
+     #
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+     # live vars: $t0, $t4
+     # refs: [$t0 => #0, $t4 => #4]
+     # #0
+     #   <no edges>
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `s`, field `x`] at line 13
+     #
+  2: $t2 := read_ref($t4)
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t2, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  4: $t7 := read_ref($t5)
+     # live vars: $t2, $t5, $t7
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  5: $t6 := +($t7, $t2)
+     # live vars: $t5, $t6
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  6: write_ref($t5, $t6)
+     # live vars:
+     # refs: []
+     #
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+     # live vars:
+     # refs: []
+     #
+  0: $t1 := 3
+     # live vars: $t1
+     # refs: []
+     #
+  1: $t0 := pack 0x42::test::W($t1)
+     # live vars: $t0
+     # refs: []
+     #
+  2: $t5 := 0x1
+     # live vars: $t0, $t5
+     # refs: []
+     #
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+     # live vars: $t0, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #4 via [struct `test::W`] at line 24
+     #
+  4: $t3 := test::greater($t4, $t0)
+     # live vars: $t0, $t3
+     # refs: []
+     #
+  5: $t2 := !($t3)
+     # live vars: $t0, $t2
+     # refs: []
+     #
+  6: if ($t2) goto 7 else goto 9
+     # live vars: $t0
+     # refs: []
+     #
+  7: label L0
+     # live vars: $t0
+     # refs: []
+     #
+  8: goto 12
+     # live vars: $t0
+     # refs: []
+     #
+  9: label L1
+     # live vars:
+     # refs: []
+     #
+ 10: $t6 := 0
+     # live vars: $t6
+     # refs: []
+     #
+ 11: abort($t6)
+     # live vars: $t0
+     # refs: []
+     #
+ 12: label L2
+     # live vars: $t0
+     # refs: []
+     #
+ 13: $t7 := 0x1
+     # live vars: $t0, $t7
+     # refs: []
+     #
+ 14: test::foo_2($t7, $t0)
+     # live vars:
+     # refs: []
+     #
+ 15: $t11 := 0x1
+     # live vars: $t11
+     # refs: []
+     #
+ 16: $t10 := borrow_global<0x42::test::W>($t11)
+     # live vars: $t10
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   -> #10 via [struct `test::W`] at line 26
+     #
+ 17: $t12 := borrow_field<0x42::test::W>.x($t10)
+     # live vars: $t12
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   -> #12 via [struct `test::W`] at line 26
+     #
+ 18: $t9 := read_ref($t12)
+     # live vars: $t9
+     # refs: []
+     #
+ 19: $t13 := 5
+     # live vars: $t9, $t13
+     # refs: []
+     #
+ 20: $t8 := ==($t9, $t13)
+     # live vars: $t8
+     # refs: []
+     #
+ 21: if ($t8) goto 22 else goto 24
+     # live vars:
+     # refs: []
+     #
+ 22: label L3
+     # live vars:
+     # refs: []
+     #
+ 23: goto 27
+     # live vars:
+     # refs: []
+     #
+ 24: label L4
+     # live vars:
+     # refs: []
+     #
+ 25: $t14 := 0
+     # live vars: $t14
+     # refs: []
+     #
+ 26: abort($t14)
+     # live vars:
+     # refs: []
+     #
+ 27: label L5
+     # live vars:
+     # refs: []
+     #
+ 28: return ()
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   -> (mut) #2 via [struct `test::W`] at line 17
+     #
+  1: test::merge($t2, $t1)
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := read_ref($t4)
+     # abort state: {returns}
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  2: $t6 := borrow_local($t1)
+     # abort state: {returns}
+     # live vars: $t3, $t6
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `s`] at line 9
+     #
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+     # abort state: {returns}
+     # live vars: $t3, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `s`, field `x`] at line 9
+     #
+  4: $t5 := read_ref($t7)
+     # abort state: {returns}
+     # live vars: $t3, $t5
+     # refs: []
+     #
+  5: $t2 := >($t3, $t5)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t3 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `s`] at line 13
+     #
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t4
+     # refs: [$t0 => #0, $t4 => #4]
+     # #0
+     #   <no edges>
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `s`, field `x`] at line 13
+     #
+  2: $t2 := read_ref($t4)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  4: $t7 := read_ref($t5)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t7
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  5: $t6 := +($t7, $t2)
+     # abort state: {returns}
+     # live vars: $t5, $t6
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  6: write_ref($t5, $t6)
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+  0: $t1 := 3
+     # abort state: {returns,aborts}
+     # live vars: $t1
+     # refs: []
+     #
+  1: $t0 := pack 0x42::test::W($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  2: $t5 := 0x1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t5
+     # refs: []
+     #
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #4 via [struct `test::W`] at line 24
+     #
+  4: $t3 := test::greater($t4, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3
+     # refs: []
+     #
+  5: $t2 := !($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: []
+     #
+  6: if ($t2) goto 7 else goto 9
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  7: label L0
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  8: goto 12
+     # abort state: {aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  9: label L1
+     # abort state: {aborts}
+     # live vars:
+     # refs: []
+     #
+ 10: $t6 := 0
+     # abort state: {aborts}
+     # live vars: $t6
+     # refs: []
+     #
+ 11: abort($t6)
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 12: label L2
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 13: $t7 := 0x1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7
+     # refs: []
+     #
+ 14: test::foo_2($t7, $t0)
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+ 15: $t11 := 0x1
+     # abort state: {returns,aborts}
+     # live vars: $t11
+     # refs: []
+     #
+ 16: $t10 := borrow_global<0x42::test::W>($t11)
+     # abort state: {returns,aborts}
+     # live vars: $t10
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   -> #10 via [struct `test::W`] at line 26
+     #
+ 17: $t12 := borrow_field<0x42::test::W>.x($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t12
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   -> #12 via [struct `test::W`] at line 26
+     #
+ 18: $t9 := read_ref($t12)
+     # abort state: {returns,aborts}
+     # live vars: $t9
+     # refs: []
+     #
+ 19: $t13 := 5
+     # abort state: {returns,aborts}
+     # live vars: $t9, $t13
+     # refs: []
+     #
+ 20: $t8 := ==($t9, $t13)
+     # abort state: {returns,aborts}
+     # live vars: $t8
+     # refs: []
+     #
+ 21: if ($t8) goto 22 else goto 24
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 22: label L3
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 23: goto 27
+     # abort state: {aborts}
+     # live vars:
+     # refs: []
+     #
+ 24: label L4
+     # abort state: {aborts}
+     # live vars:
+     # refs: []
+     #
+ 25: $t14 := 0
+     # abort state: {aborts}
+     # live vars: $t14
+     # refs: []
+     #
+ 26: abort($t14)
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 27: label L5
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 28: return ()
+}
+
+============ after AbilityProcessor: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+  1: test::merge($t2, $t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+  1: $t3 := read_ref($t4)
+  2: $t6 := borrow_local($t1)
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+  4: $t5 := read_ref($t7)
+  5: $t2 := >($t3, $t5)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := borrow_local($t1)
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+  2: $t2 := read_ref($t4)
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+  4: $t7 := read_ref($t5)
+  5: $t6 := +($t7, $t2)
+  6: write_ref($t5, $t6)
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+  0: $t1 := 3
+  1: $t0 := pack 0x42::test::W($t1)
+  2: $t5 := 0x1
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+  4: $t3 := test::greater($t4, $t0)
+  5: $t2 := !($t3)
+  6: if ($t2) goto 7 else goto 9
+  7: label L0
+  8: goto 12
+  9: label L1
+ 10: $t6 := 0
+ 11: abort($t6)
+ 12: label L2
+ 13: $t7 := 0x1
+ 14: test::foo_2($t7, $t0)
+ 15: $t11 := 0x1
+ 16: $t10 := borrow_global<0x42::test::W>($t11)
+ 17: $t12 := borrow_field<0x42::test::W>.x($t10)
+ 18: $t9 := read_ref($t12)
+ 19: $t13 := 5
+ 20: $t8 := ==($t9, $t13)
+ 21: if ($t8) goto 22 else goto 24
+ 22: label L3
+ 23: goto 27
+ 24: label L4
+ 25: $t14 := 0
+ 26: abort($t14)
+ 27: label L5
+ 28: return ()
+}
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+  1: test::merge($t2, $t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+  1: $t3 := read_ref($t4)
+  2: $t6 := borrow_local($t1)
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+  4: $t5 := read_ref($t7)
+  5: $t2 := >($t3, $t5)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := borrow_local($t1)
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+  2: $t2 := read_ref($t4)
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+  4: $t7 := read_ref($t5)
+  5: $t6 := +($t7, $t2)
+  6: write_ref($t5, $t6)
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+  0: $t1 := 3
+  1: $t0 := pack 0x42::test::W($t1)
+  2: $t5 := 0x1
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+  4: $t3 := test::greater($t4, $t0)
+  5: $t2 := !($t3)
+  6: if ($t2) goto 7 else goto 9
+  7: label L0
+  8: goto 12
+  9: label L1
+ 10: $t6 := 0
+ 11: abort($t6)
+ 12: label L2
+ 13: $t7 := 0x1
+ 14: test::foo_2($t7, $t0)
+ 15: $t11 := 0x1
+ 16: $t10 := borrow_global<0x42::test::W>($t11)
+ 17: $t12 := borrow_field<0x42::test::W>.x($t10)
+ 18: $t9 := read_ref($t12)
+ 19: $t13 := 5
+ 20: $t8 := ==($t9, $t13)
+ 21: if ($t8) goto 22 else goto 24
+ 22: label L3
+ 23: goto 27
+ 24: label L4
+ 25: $t14 := 0
+ 26: abort($t14)
+ 27: label L5
+ 28: return ()
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+  1: test::merge($t2, $t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+  1: $t3 := read_ref($t4)
+  2: $t6 := borrow_local($t1)
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+  4: $t5 := read_ref($t7)
+  5: $t2 := >($t3, $t5)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := borrow_local($t1)
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+  2: $t2 := read_ref($t4)
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+  4: $t7 := read_ref($t5)
+  5: $t6 := +($t7, $t2)
+  6: write_ref($t5, $t6)
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+  0: $t1 := 3
+  1: $t0 := pack 0x42::test::W($t1)
+  2: $t5 := 0x1
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+  4: $t3 := test::greater($t4, $t0)
+  5: $t2 := !($t3)
+  6: if ($t2) goto 7 else goto 9
+  7: label L0
+  8: goto 12
+  9: label L1
+ 10: $t6 := 0
+ 11: abort($t6)
+ 12: label L2
+ 13: $t7 := 0x1
+ 14: test::foo_2($t7, $t0)
+ 15: $t11 := 0x1
+ 16: $t10 := borrow_global<0x42::test::W>($t11)
+ 17: $t12 := borrow_field<0x42::test::W>.x($t10)
+ 18: $t9 := read_ref($t12)
+ 19: $t13 := 5
+ 20: $t8 := ==($t9, $t13)
+ 21: if ($t8) goto 22 else goto 24
+ 22: label L3
+ 23: goto 27
+ 24: label L4
+ 25: $t14 := 0
+ 26: abort($t14)
+ 27: label L5
+ 28: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+     # live vars: $t0, $t1
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+     # live vars: $t1, $t2
+  1: test::merge($t2, $t1)
+     # live vars:
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+     # live vars: $t0, $t1
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t1, $t4
+  1: $t3 := read_ref($t4)
+     # live vars: $t1, $t3
+  2: $t6 := borrow_local($t1)
+     # live vars: $t3, $t6
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+     # live vars: $t3, $t7
+  4: $t5 := read_ref($t7)
+     # live vars: $t3, $t5
+  5: $t2 := >($t3, $t5)
+     # live vars: $t2
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+     # live vars: $t0, $t4
+  2: $t2 := read_ref($t4)
+     # live vars: $t0, $t2
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t2, $t5
+  4: $t7 := read_ref($t5)
+     # live vars: $t2, $t5, $t7
+  5: $t6 := +($t7, $t2)
+     # live vars: $t5, $t6
+  6: write_ref($t5, $t6)
+     # live vars:
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+     # live vars:
+  0: $t1 := 3
+     # live vars: $t1
+  1: $t0 := pack 0x42::test::W($t1)
+     # live vars: $t0
+  2: $t5 := 0x1
+     # live vars: $t0, $t5
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+     # live vars: $t0, $t4
+  4: $t3 := test::greater($t4, $t0)
+     # live vars: $t0, $t3
+  5: $t2 := !($t3)
+     # live vars: $t0, $t2
+  6: if ($t2) goto 7 else goto 9
+     # live vars: $t0
+  7: label L0
+     # live vars: $t0
+  8: goto 12
+     # live vars: $t0
+  9: label L1
+     # live vars:
+ 10: $t6 := 0
+     # live vars: $t6
+ 11: abort($t6)
+     # live vars: $t0
+ 12: label L2
+     # live vars: $t0
+ 13: $t7 := 0x1
+     # live vars: $t0, $t7
+ 14: test::foo_2($t7, $t0)
+     # live vars:
+ 15: $t11 := 0x1
+     # live vars: $t11
+ 16: $t10 := borrow_global<0x42::test::W>($t11)
+     # live vars: $t10
+ 17: $t12 := borrow_field<0x42::test::W>.x($t10)
+     # live vars: $t12
+ 18: $t9 := read_ref($t12)
+     # live vars: $t9
+ 19: $t13 := 5
+     # live vars: $t9, $t13
+ 20: $t8 := ==($t9, $t13)
+     # live vars: $t8
+ 21: if ($t8) goto 22 else goto 24
+     # live vars:
+ 22: label L3
+     # live vars:
+ 23: goto 27
+     # live vars:
+ 24: label L4
+     # live vars:
+ 25: $t14 := 0
+     # live vars: $t14
+ 26: abort($t14)
+     # live vars:
+ 27: label L5
+     # live vars:
+ 28: return ()
+}
+
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+     # live vars: $t0, $t1
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+     # live vars: $t1, $t2
+  1: test::merge($t2, $t1)
+     # live vars:
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+     # live vars: $t0, $t1
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t1, $t4
+  1: $t3 := read_ref($t4)
+     # live vars: $t1, $t3
+  2: $t6 := borrow_local($t1)
+     # live vars: $t3, $t6
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+     # live vars: $t3, $t7
+  4: $t5 := read_ref($t7)
+     # live vars: $t3, $t5
+  5: $t2 := >($t3, $t5)
+     # live vars: $t2
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+     # flush: $t2
+     # live vars: $t0, $t4
+  2: $t2 := read_ref($t4)
+     # flush: $t5, $t6
+     # live vars: $t0, $t2
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t2, $t5
+  4: $t7 := read_ref($t5)
+     # live vars: $t2, $t5, $t7
+  5: $t6 := +($t7, $t2)
+     # live vars: $t5, $t6
+  6: write_ref($t5, $t6)
+     # live vars:
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+     # live vars:
+  0: $t1 := 3
+     # flush: $t0
+     # live vars: $t1
+  1: $t0 := pack 0x42::test::W($t1)
+     # live vars: $t0
+  2: $t5 := 0x1
+     # live vars: $t0, $t5
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+     # live vars: $t0, $t4
+  4: $t3 := test::greater($t4, $t0)
+     # live vars: $t0, $t3
+  5: $t2 := !($t3)
+     # live vars: $t0, $t2
+  6: if ($t2) goto 7 else goto 9
+     # live vars: $t0
+  7: label L0
+     # live vars: $t0
+  8: goto 12
+     # live vars: $t0
+  9: label L1
+     # live vars:
+ 10: $t6 := 0
+     # live vars: $t6
+ 11: abort($t6)
+     # live vars: $t0
+ 12: label L2
+     # live vars: $t0
+ 13: $t7 := 0x1
+     # live vars: $t0, $t7
+ 14: test::foo_2($t7, $t0)
+     # live vars:
+ 15: $t11 := 0x1
+     # live vars: $t11
+ 16: $t10 := borrow_global<0x42::test::W>($t11)
+     # live vars: $t10
+ 17: $t12 := borrow_field<0x42::test::W>.x($t10)
+     # live vars: $t12
+ 18: $t9 := read_ref($t12)
+     # live vars: $t9
+ 19: $t13 := 5
+     # live vars: $t9, $t13
+ 20: $t8 := ==($t9, $t13)
+     # live vars: $t8
+ 21: if ($t8) goto 22 else goto 24
+     # live vars:
+ 22: label L3
+     # live vars:
+ 23: goto 27
+     # live vars:
+ 24: label L4
+     # live vars:
+ 25: $t14 := 0
+     # live vars: $t14
+ 26: abort($t14)
+     # live vars:
+ 27: label L5
+     # live vars:
+ 28: return ()
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+     # live vars: $t1, $t2
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   -> (mut) #2 via [struct `test::W`] at line 17
+     #
+  1: test::merge($t2, $t1)
+     # live vars:
+     # refs: []
+     #
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t1, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := read_ref($t4)
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  2: $t6 := borrow_local($t1)
+     # live vars: $t3, $t6
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `s`] at line 9
+     #
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+     # live vars: $t3, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `s`, field `x`] at line 9
+     #
+  4: $t5 := read_ref($t7)
+     # live vars: $t3, $t5
+     # refs: []
+     #
+  5: $t2 := >($t3, $t5)
+     # live vars: $t2
+     # refs: []
+     #
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `s`] at line 13
+     #
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+     # flush: $t2
+     # live vars: $t0, $t4
+     # refs: [$t0 => #0, $t4 => #4]
+     # #0
+     #   <no edges>
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `s`, field `x`] at line 13
+     #
+  2: $t2 := read_ref($t4)
+     # flush: $t5, $t6
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t2, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  4: $t7 := read_ref($t5)
+     # live vars: $t2, $t5, $t7
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  5: $t6 := +($t7, $t2)
+     # live vars: $t5, $t6
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  6: write_ref($t5, $t6)
+     # live vars:
+     # refs: []
+     #
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+     # live vars:
+     # refs: []
+     #
+  0: $t1 := 3
+     # flush: $t0
+     # live vars: $t1
+     # refs: []
+     #
+  1: $t0 := pack 0x42::test::W($t1)
+     # live vars: $t0
+     # refs: []
+     #
+  2: $t5 := 0x1
+     # live vars: $t0, $t5
+     # refs: []
+     #
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+     # live vars: $t0, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #4 via [struct `test::W`] at line 24
+     #
+  4: $t3 := test::greater($t4, $t0)
+     # live vars: $t0, $t3
+     # refs: []
+     #
+  5: $t2 := !($t3)
+     # live vars: $t0, $t2
+     # refs: []
+     #
+  6: if ($t2) goto 7 else goto 9
+     # live vars: $t0
+     # refs: []
+     #
+  7: label L0
+     # live vars: $t0
+     # refs: []
+     #
+  8: goto 12
+     # live vars: $t0
+     # refs: []
+     #
+  9: label L1
+     # live vars:
+     # refs: []
+     #
+ 10: $t6 := 0
+     # live vars: $t6
+     # refs: []
+     #
+ 11: abort($t6)
+     # live vars: $t0
+     # refs: []
+     #
+ 12: label L2
+     # live vars: $t0
+     # refs: []
+     #
+ 13: $t7 := 0x1
+     # live vars: $t0, $t7
+     # refs: []
+     #
+ 14: test::foo_2($t7, $t0)
+     # live vars:
+     # refs: []
+     #
+ 15: $t11 := 0x1
+     # live vars: $t11
+     # refs: []
+     #
+ 16: $t10 := borrow_global<0x42::test::W>($t11)
+     # live vars: $t10
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   -> #10 via [struct `test::W`] at line 26
+     #
+ 17: $t12 := borrow_field<0x42::test::W>.x($t10)
+     # live vars: $t12
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   -> #12 via [struct `test::W`] at line 26
+     #
+ 18: $t9 := read_ref($t12)
+     # live vars: $t9
+     # refs: []
+     #
+ 19: $t13 := 5
+     # live vars: $t9, $t13
+     # refs: []
+     #
+ 20: $t8 := ==($t9, $t13)
+     # live vars: $t8
+     # refs: []
+     #
+ 21: if ($t8) goto 22 else goto 24
+     # live vars:
+     # refs: []
+     #
+ 22: label L3
+     # live vars:
+     # refs: []
+     #
+ 23: goto 27
+     # live vars:
+     # refs: []
+     #
+ 24: label L4
+     # live vars:
+     # refs: []
+     #
+ 25: $t14 := 0
+     # live vars: $t14
+     # refs: []
+     #
+ 26: abort($t14)
+     # live vars:
+     # refs: []
+     #
+ 27: label L5
+     # live vars:
+     # refs: []
+     #
+ 28: return ()
+}
+
+============ after ReachingDefProcessor: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+     # live vars: $t0, $t1
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+     # live vars: $t1, $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   -> (mut) #2 via [struct `test::W`] at line 17
+     #
+  1: test::merge($t2, $t1)
+     # live vars:
+     # reaching instruction #2: `t2` @ {0}, `Struct QualifiedId { module_id: ModuleId(1), id: StructId(Symbol(133)) }` @ {1}
+     # refs: []
+     #
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+     # live vars: $t0, $t1
+     # reaching instruction #0:
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t1, $t4
+     # reaching instruction #1: `t4` @ {0}
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := read_ref($t4)
+     # live vars: $t1, $t3
+     # reaching instruction #2: `t3` @ {1}, `t4` @ {0}
+     # refs: []
+     #
+  2: $t6 := borrow_local($t1)
+     # live vars: $t3, $t6
+     # reaching instruction #3: `t3` @ {1}, `t4` @ {0}, `t6` @ {2}
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `s`] at line 9
+     #
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+     # live vars: $t3, $t7
+     # reaching instruction #4: `t3` @ {1}, `t4` @ {0}, `t6` @ {2}, `t7` @ {3}
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `s`, field `x`] at line 9
+     #
+  4: $t5 := read_ref($t7)
+     # live vars: $t3, $t5
+     # reaching instruction #5: `t3` @ {1}, `t4` @ {0}, `t5` @ {4}, `t6` @ {2}, `t7` @ {3}
+     # refs: []
+     #
+  5: $t2 := >($t3, $t5)
+     # live vars: $t2
+     # reaching instruction #6: `t2` @ {5}, `t3` @ {1}, `t4` @ {0}, `t5` @ {4}, `t6` @ {2}, `t7` @ {3}
+     # refs: []
+     #
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+     # reaching instruction #0:
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+     # reaching instruction #1: `t3` @ {0}
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `s`] at line 13
+     #
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+     # flush: $t2
+     # live vars: $t0, $t4
+     # reaching instruction #2: `t3` @ {0}, `t4` @ {1}
+     # refs: [$t0 => #0, $t4 => #4]
+     # #0
+     #   <no edges>
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `s`, field `x`] at line 13
+     #
+  2: $t2 := read_ref($t4)
+     # flush: $t5, $t6
+     # live vars: $t0, $t2
+     # reaching instruction #3: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t2, $t5
+     # reaching instruction #4: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t5` @ {3}
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  4: $t7 := read_ref($t5)
+     # live vars: $t2, $t5, $t7
+     # reaching instruction #5: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t5` @ {3}, `t7` @ {4}
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  5: $t6 := +($t7, $t2)
+     # live vars: $t5, $t6
+     # reaching instruction #6: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t5` @ {3}, `t6` @ {5}, `t7` @ {4}
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  6: write_ref($t5, $t6)
+     # live vars:
+     # reaching instruction #7: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t5` @ {3}, `t6` @ {5}, `t7` @ {4}
+     # refs: []
+     #
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+     # live vars:
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t1 := 3
+     # flush: $t0
+     # live vars: $t1
+     # reaching instruction #1: `t1` @ {0}
+     # refs: []
+     #
+  1: $t0 := pack 0x42::test::W($t1)
+     # live vars: $t0
+     # reaching instruction #2: `t0` @ {1}, `t1` @ {0}
+     # refs: []
+     #
+  2: $t5 := 0x1
+     # live vars: $t0, $t5
+     # reaching instruction #3: `t0` @ {1}, `t1` @ {0}, `t5` @ {2}
+     # refs: []
+     #
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+     # live vars: $t0, $t4
+     # reaching instruction #4: `t0` @ {1}, `t1` @ {0}, `t4` @ {3}, `t5` @ {2}
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #4 via [struct `test::W`] at line 24
+     #
+  4: $t3 := test::greater($t4, $t0)
+     # live vars: $t0, $t3
+     # reaching instruction #5: `t0` @ {1}, `t1` @ {0}, `t3` @ {4}, `t4` @ {3}, `t5` @ {2}
+     # refs: []
+     #
+  5: $t2 := !($t3)
+     # live vars: $t0, $t2
+     # reaching instruction #6: `t0` @ {1}, `t1` @ {0}, `t2` @ {5}, `t3` @ {4}, `t4` @ {3}, `t5` @ {2}
+     # refs: []
+     #
+  6: if ($t2) goto 7 else goto 9
+     # live vars: $t0
+     # reaching instruction #7: `t0` @ {1}, `t1` @ {0}, `t2` @ {5}, `t3` @ {4}, `t4` @ {3}, `t5` @ {2}
+     # refs: []
+     #
+  7: label L0
+     # live vars: $t0
+     # reaching instruction #8: `t0` @ {1}, `t1` @ {0}, `t2` @ {5}, `t3` @ {4}, `t4` @ {3}, `t5` @ {2}
+     # refs: []
+     #
+  8: goto 12
+     # live vars: $t0
+     # reaching instruction #9: `t0` @ {1}, `t1` @ {0}, `t2` @ {5}, `t3` @ {4}, `t4` @ {3}, `t5` @ {2}
+     # refs: []
+     #
+  9: label L1
+     # live vars:
+     # reaching instruction #10: `t0` @ {1}, `t1` @ {0}, `t2` @ {5}, `t3` @ {4}, `t4` @ {3}, `t5` @ {2}
+     # refs: []
+     #
+ 10: $t6 := 0
+     # live vars: $t6
+     # reaching instruction #11: `t0` @ {1}, `t1` @ {0}, `t2` @ {5}, `t3` @ {4}, `t4` @ {3}, `t5` @ {2}, `t6` @ {10}
+     # refs: []
+     #
+ 11: abort($t6)
+     # live vars: $t0
+     # reaching instruction #12: `t0` @ {1}, `t1` @ {0}, `t2` @ {5}, `t3` @ {4}, `t4` @ {3}, `t5` @ {2}
+     # refs: []
+     #
+ 12: label L2
+     # live vars: $t0
+     # reaching instruction #13: `t0` @ {1}, `t1` @ {0}, `t2` @ {5}, `t3` @ {4}, `t4` @ {3}, `t5` @ {2}
+     # refs: []
+     #
+ 13: $t7 := 0x1
+     # live vars: $t0, $t7
+     # reaching instruction #14: `t0` @ {1}, `t1` @ {0}, `t2` @ {5}, `t3` @ {4}, `t4` @ {3}, `t5` @ {2}, `t7` @ {13}
+     # refs: []
+     #
+ 14: test::foo_2($t7, $t0)
+     # live vars:
+     # reaching instruction #15: `t0` @ {1}, `t1` @ {0}, `t2` @ {5}, `t3` @ {4}, `t4` @ {3}, `t5` @ {2}, `t7` @ {13}, `Struct QualifiedId { module_id: ModuleId(1), id: StructId(Symbol(133)) }` @ {14}
+     # refs: []
+     #
+ 15: $t11 := 0x1
+     # live vars: $t11
+     # reaching instruction #16: `t0` @ {1}, `t1` @ {0}, `t2` @ {5}, `t3` @ {4}, `t4` @ {3}, `t5` @ {2}, `t7` @ {13}, `t11` @ {15}, `Struct QualifiedId { module_id: ModuleId(1), id: StructId(Symbol(133)) }` @ {14}
+     # refs: []
+     #
+ 16: $t10 := borrow_global<0x42::test::W>($t11)
+     # live vars: $t10
+     # reaching instruction #17: `t0` @ {1}, `t1` @ {0}, `t2` @ {5}, `t3` @ {4}, `t4` @ {3}, `t5` @ {2}, `t7` @ {13}, `t10` @ {16}, `t11` @ {15}, `Struct QualifiedId { module_id: ModuleId(1), id: StructId(Symbol(133)) }` @ {14}
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   -> #10 via [struct `test::W`] at line 26
+     #
+ 17: $t12 := borrow_field<0x42::test::W>.x($t10)
+     # live vars: $t12
+     # reaching instruction #18: `t0` @ {1}, `t1` @ {0}, `t2` @ {5}, `t3` @ {4}, `t4` @ {3}, `t5` @ {2}, `t7` @ {13}, `t10` @ {16}, `t11` @ {15}, `t12` @ {17}, `Struct QualifiedId { module_id: ModuleId(1), id: StructId(Symbol(133)) }` @ {14}
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   -> #12 via [struct `test::W`] at line 26
+     #
+ 18: $t9 := read_ref($t12)
+     # live vars: $t9
+     # reaching instruction #19: `t0` @ {1}, `t1` @ {0}, `t2` @ {5}, `t3` @ {4}, `t4` @ {3}, `t5` @ {2}, `t7` @ {13}, `t9` @ {18}, `t10` @ {16}, `t11` @ {15}, `t12` @ {17}, `Struct QualifiedId { module_id: ModuleId(1), id: StructId(Symbol(133)) }` @ {14}
+     # refs: []
+     #
+ 19: $t13 := 5
+     # live vars: $t9, $t13
+     # reaching instruction #20: `t0` @ {1}, `t1` @ {0}, `t2` @ {5}, `t3` @ {4}, `t4` @ {3}, `t5` @ {2}, `t7` @ {13}, `t9` @ {18}, `t10` @ {16}, `t11` @ {15}, `t12` @ {17}, `t13` @ {19}, `Struct QualifiedId { module_id: ModuleId(1), id: StructId(Symbol(133)) }` @ {14}
+     # refs: []
+     #
+ 20: $t8 := ==($t9, $t13)
+     # live vars: $t8
+     # reaching instruction #21: `t0` @ {1}, `t1` @ {0}, `t2` @ {5}, `t3` @ {4}, `t4` @ {3}, `t5` @ {2}, `t7` @ {13}, `t8` @ {20}, `t9` @ {18}, `t10` @ {16}, `t11` @ {15}, `t12` @ {17}, `t13` @ {19}, `Struct QualifiedId { module_id: ModuleId(1), id: StructId(Symbol(133)) }` @ {14}
+     # refs: []
+     #
+ 21: if ($t8) goto 22 else goto 24
+     # live vars:
+     # reaching instruction #22: `t0` @ {1}, `t1` @ {0}, `t2` @ {5}, `t3` @ {4}, `t4` @ {3}, `t5` @ {2}, `t7` @ {13}, `t8` @ {20}, `t9` @ {18}, `t10` @ {16}, `t11` @ {15}, `t12` @ {17}, `t13` @ {19}, `Struct QualifiedId { module_id: ModuleId(1), id: StructId(Symbol(133)) }` @ {14}
+     # refs: []
+     #
+ 22: label L3
+     # live vars:
+     # reaching instruction #23: `t0` @ {1}, `t1` @ {0}, `t2` @ {5}, `t3` @ {4}, `t4` @ {3}, `t5` @ {2}, `t7` @ {13}, `t8` @ {20}, `t9` @ {18}, `t10` @ {16}, `t11` @ {15}, `t12` @ {17}, `t13` @ {19}, `Struct QualifiedId { module_id: ModuleId(1), id: StructId(Symbol(133)) }` @ {14}
+     # refs: []
+     #
+ 23: goto 27
+     # live vars:
+     # reaching instruction #24: `t0` @ {1}, `t1` @ {0}, `t2` @ {5}, `t3` @ {4}, `t4` @ {3}, `t5` @ {2}, `t7` @ {13}, `t8` @ {20}, `t9` @ {18}, `t10` @ {16}, `t11` @ {15}, `t12` @ {17}, `t13` @ {19}, `Struct QualifiedId { module_id: ModuleId(1), id: StructId(Symbol(133)) }` @ {14}
+     # refs: []
+     #
+ 24: label L4
+     # live vars:
+     # reaching instruction #25: `t0` @ {1}, `t1` @ {0}, `t2` @ {5}, `t3` @ {4}, `t4` @ {3}, `t5` @ {2}, `t7` @ {13}, `t8` @ {20}, `t9` @ {18}, `t10` @ {16}, `t11` @ {15}, `t12` @ {17}, `t13` @ {19}, `Struct QualifiedId { module_id: ModuleId(1), id: StructId(Symbol(133)) }` @ {14}
+     # refs: []
+     #
+ 25: $t14 := 0
+     # live vars: $t14
+     # reaching instruction #26: `t0` @ {1}, `t1` @ {0}, `t2` @ {5}, `t3` @ {4}, `t4` @ {3}, `t5` @ {2}, `t7` @ {13}, `t8` @ {20}, `t9` @ {18}, `t10` @ {16}, `t11` @ {15}, `t12` @ {17}, `t13` @ {19}, `t14` @ {25}, `Struct QualifiedId { module_id: ModuleId(1), id: StructId(Symbol(133)) }` @ {14}
+     # refs: []
+     #
+ 26: abort($t14)
+     # live vars:
+     # reaching instruction #27: `t0` @ {1}, `t1` @ {0}, `t2` @ {5}, `t3` @ {4}, `t4` @ {3}, `t5` @ {2}, `t7` @ {13}, `t8` @ {20}, `t9` @ {18}, `t10` @ {16}, `t11` @ {15}, `t12` @ {17}, `t13` @ {19}, `Struct QualifiedId { module_id: ModuleId(1), id: StructId(Symbol(133)) }` @ {14}
+     # refs: []
+     #
+ 27: label L5
+     # live vars:
+     # reaching instruction #28: `t0` @ {1}, `t1` @ {0}, `t2` @ {5}, `t3` @ {4}, `t4` @ {3}, `t5` @ {2}, `t7` @ {13}, `t8` @ {20}, `t9` @ {18}, `t10` @ {16}, `t11` @ {15}, `t12` @ {17}, `t13` @ {19}, `Struct QualifiedId { module_id: ModuleId(1), id: StructId(Symbol(133)) }` @ {14}
+     # refs: []
+     #
+ 28: return ()
+}
+
+============ after CommonSubexpElimination: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+  1: test::merge($t2, $t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+  1: $t3 := read_ref($t4)
+  2: $t6 := borrow_local($t1)
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+  4: $t5 := read_ref($t7)
+  5: $t2 := >($t3, $t5)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := borrow_local($t1)
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+  2: $t2 := read_ref($t4)
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+  4: $t7 := read_ref($t5)
+  5: $t6 := +($t7, $t2)
+  6: write_ref($t5, $t6)
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+  0: $t1 := 3
+  1: $t0 := pack 0x42::test::W($t1)
+  2: $t5 := 0x1
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+  4: $t3 := test::greater($t4, $t0)
+  5: $t2 := !($t3)
+  6: if ($t2) goto 7 else goto 9
+  7: label L0
+  8: goto 12
+  9: label L1
+ 10: $t6 := 0
+ 11: abort($t6)
+ 12: label L2
+ 13: $t7 := 0x1
+ 14: test::foo_2($t7, $t0)
+ 15: $t11 := 0x1
+ 16: $t10 := borrow_global<0x42::test::W>($t11)
+ 17: $t12 := borrow_field<0x42::test::W>.x($t10)
+ 18: $t9 := read_ref($t12)
+ 19: $t13 := 5
+ 20: $t8 := ==($t9, $t13)
+ 21: if ($t8) goto 22 else goto 24
+ 22: label L3
+ 23: goto 27
+ 24: label L4
+ 25: $t14 := 0
+ 26: abort($t14)
+ 27: label L5
+ 28: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+     # live vars: $t0, $t1
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+     # live vars: $t1, $t2
+  1: test::merge($t2, $t1)
+     # live vars:
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+     # live vars: $t0, $t1
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t1, $t4
+  1: $t3 := read_ref($t4)
+     # live vars: $t1, $t3
+  2: $t6 := borrow_local($t1)
+     # live vars: $t3, $t6
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+     # live vars: $t3, $t7
+  4: $t5 := read_ref($t7)
+     # live vars: $t3, $t5
+  5: $t2 := >($t3, $t5)
+     # live vars: $t2
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+     # live vars: $t0, $t4
+  2: $t2 := read_ref($t4)
+     # live vars: $t0, $t2
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t2, $t5
+  4: $t7 := read_ref($t5)
+     # live vars: $t2, $t5, $t7
+  5: $t6 := +($t7, $t2)
+     # live vars: $t5, $t6
+  6: write_ref($t5, $t6)
+     # live vars:
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+     # live vars:
+  0: $t1 := 3
+     # live vars: $t1
+  1: $t0 := pack 0x42::test::W($t1)
+     # live vars: $t0
+  2: $t5 := 0x1
+     # live vars: $t0, $t5
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+     # live vars: $t0, $t4
+  4: $t3 := test::greater($t4, $t0)
+     # live vars: $t0, $t3
+  5: $t2 := !($t3)
+     # live vars: $t0, $t2
+  6: if ($t2) goto 7 else goto 9
+     # live vars: $t0
+  7: label L0
+     # live vars: $t0
+  8: goto 12
+     # live vars: $t0
+  9: label L1
+     # live vars:
+ 10: $t6 := 0
+     # live vars: $t6
+ 11: abort($t6)
+     # live vars: $t0
+ 12: label L2
+     # live vars: $t0
+ 13: $t7 := 0x1
+     # live vars: $t0, $t7
+ 14: test::foo_2($t7, $t0)
+     # live vars:
+ 15: $t11 := 0x1
+     # live vars: $t11
+ 16: $t10 := borrow_global<0x42::test::W>($t11)
+     # live vars: $t10
+ 17: $t12 := borrow_field<0x42::test::W>.x($t10)
+     # live vars: $t12
+ 18: $t9 := read_ref($t12)
+     # live vars: $t9
+ 19: $t13 := 5
+     # live vars: $t9, $t13
+ 20: $t8 := ==($t9, $t13)
+     # live vars: $t8
+ 21: if ($t8) goto 22 else goto 24
+     # live vars:
+ 22: label L3
+     # live vars:
+ 23: goto 27
+     # live vars:
+ 24: label L4
+     # live vars:
+ 25: $t14 := 0
+     # live vars: $t14
+ 26: abort($t14)
+     # live vars:
+ 27: label L5
+     # live vars:
+ 28: return ()
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+     # live vars: $t1, $t2
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   -> (mut) #2 via [struct `test::W`] at line 17
+     #
+  1: test::merge($t2, $t1)
+     # live vars:
+     # refs: []
+     #
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t1, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := read_ref($t4)
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  2: $t6 := borrow_local($t1)
+     # live vars: $t3, $t6
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `s`] at line 9
+     #
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+     # live vars: $t3, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `s`, field `x`] at line 9
+     #
+  4: $t5 := read_ref($t7)
+     # live vars: $t3, $t5
+     # refs: []
+     #
+  5: $t2 := >($t3, $t5)
+     # live vars: $t2
+     # refs: []
+     #
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `s`] at line 13
+     #
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+     # live vars: $t0, $t4
+     # refs: [$t0 => #0, $t4 => #4]
+     # #0
+     #   <no edges>
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `s`, field `x`] at line 13
+     #
+  2: $t2 := read_ref($t4)
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t2, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  4: $t7 := read_ref($t5)
+     # live vars: $t2, $t5, $t7
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  5: $t6 := +($t7, $t2)
+     # live vars: $t5, $t6
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  6: write_ref($t5, $t6)
+     # live vars:
+     # refs: []
+     #
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+     # live vars:
+     # refs: []
+     #
+  0: $t1 := 3
+     # live vars: $t1
+     # refs: []
+     #
+  1: $t0 := pack 0x42::test::W($t1)
+     # live vars: $t0
+     # refs: []
+     #
+  2: $t5 := 0x1
+     # live vars: $t0, $t5
+     # refs: []
+     #
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+     # live vars: $t0, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #4 via [struct `test::W`] at line 24
+     #
+  4: $t3 := test::greater($t4, $t0)
+     # live vars: $t0, $t3
+     # refs: []
+     #
+  5: $t2 := !($t3)
+     # live vars: $t0, $t2
+     # refs: []
+     #
+  6: if ($t2) goto 7 else goto 9
+     # live vars: $t0
+     # refs: []
+     #
+  7: label L0
+     # live vars: $t0
+     # refs: []
+     #
+  8: goto 12
+     # live vars: $t0
+     # refs: []
+     #
+  9: label L1
+     # live vars:
+     # refs: []
+     #
+ 10: $t6 := 0
+     # live vars: $t6
+     # refs: []
+     #
+ 11: abort($t6)
+     # live vars: $t0
+     # refs: []
+     #
+ 12: label L2
+     # live vars: $t0
+     # refs: []
+     #
+ 13: $t7 := 0x1
+     # live vars: $t0, $t7
+     # refs: []
+     #
+ 14: test::foo_2($t7, $t0)
+     # live vars:
+     # refs: []
+     #
+ 15: $t11 := 0x1
+     # live vars: $t11
+     # refs: []
+     #
+ 16: $t10 := borrow_global<0x42::test::W>($t11)
+     # live vars: $t10
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   -> #10 via [struct `test::W`] at line 26
+     #
+ 17: $t12 := borrow_field<0x42::test::W>.x($t10)
+     # live vars: $t12
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   -> #12 via [struct `test::W`] at line 26
+     #
+ 18: $t9 := read_ref($t12)
+     # live vars: $t9
+     # refs: []
+     #
+ 19: $t13 := 5
+     # live vars: $t9, $t13
+     # refs: []
+     #
+ 20: $t8 := ==($t9, $t13)
+     # live vars: $t8
+     # refs: []
+     #
+ 21: if ($t8) goto 22 else goto 24
+     # live vars:
+     # refs: []
+     #
+ 22: label L3
+     # live vars:
+     # refs: []
+     #
+ 23: goto 27
+     # live vars:
+     # refs: []
+     #
+ 24: label L4
+     # live vars:
+     # refs: []
+     #
+ 25: $t14 := 0
+     # live vars: $t14
+     # refs: []
+     #
+ 26: abort($t14)
+     # live vars:
+     # refs: []
+     #
+ 27: label L5
+     # live vars:
+     # refs: []
+     #
+ 28: return ()
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   -> (mut) #2 via [struct `test::W`] at line 17
+     #
+  1: test::merge($t2, $t1)
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := read_ref($t4)
+     # abort state: {returns}
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  2: $t6 := borrow_local($t1)
+     # abort state: {returns}
+     # live vars: $t3, $t6
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `s`] at line 9
+     #
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+     # abort state: {returns}
+     # live vars: $t3, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `s`, field `x`] at line 9
+     #
+  4: $t5 := read_ref($t7)
+     # abort state: {returns}
+     # live vars: $t3, $t5
+     # refs: []
+     #
+  5: $t2 := >($t3, $t5)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t3 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `s`] at line 13
+     #
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t4
+     # refs: [$t0 => #0, $t4 => #4]
+     # #0
+     #   <no edges>
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `s`, field `x`] at line 13
+     #
+  2: $t2 := read_ref($t4)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  4: $t7 := read_ref($t5)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t7
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  5: $t6 := +($t7, $t2)
+     # abort state: {returns}
+     # live vars: $t5, $t6
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  6: write_ref($t5, $t6)
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+  0: $t1 := 3
+     # abort state: {returns,aborts}
+     # live vars: $t1
+     # refs: []
+     #
+  1: $t0 := pack 0x42::test::W($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  2: $t5 := 0x1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t5
+     # refs: []
+     #
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #4 via [struct `test::W`] at line 24
+     #
+  4: $t3 := test::greater($t4, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3
+     # refs: []
+     #
+  5: $t2 := !($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: []
+     #
+  6: if ($t2) goto 7 else goto 9
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  7: label L0
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  8: goto 12
+     # abort state: {aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  9: label L1
+     # abort state: {aborts}
+     # live vars:
+     # refs: []
+     #
+ 10: $t6 := 0
+     # abort state: {aborts}
+     # live vars: $t6
+     # refs: []
+     #
+ 11: abort($t6)
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 12: label L2
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 13: $t7 := 0x1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7
+     # refs: []
+     #
+ 14: test::foo_2($t7, $t0)
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+ 15: $t11 := 0x1
+     # abort state: {returns,aborts}
+     # live vars: $t11
+     # refs: []
+     #
+ 16: $t10 := borrow_global<0x42::test::W>($t11)
+     # abort state: {returns,aborts}
+     # live vars: $t10
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   -> #10 via [struct `test::W`] at line 26
+     #
+ 17: $t12 := borrow_field<0x42::test::W>.x($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t12
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   -> #12 via [struct `test::W`] at line 26
+     #
+ 18: $t9 := read_ref($t12)
+     # abort state: {returns,aborts}
+     # live vars: $t9
+     # refs: []
+     #
+ 19: $t13 := 5
+     # abort state: {returns,aborts}
+     # live vars: $t9, $t13
+     # refs: []
+     #
+ 20: $t8 := ==($t9, $t13)
+     # abort state: {returns,aborts}
+     # live vars: $t8
+     # refs: []
+     #
+ 21: if ($t8) goto 22 else goto 24
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 22: label L3
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 23: goto 27
+     # abort state: {aborts}
+     # live vars:
+     # refs: []
+     #
+ 24: label L4
+     # abort state: {aborts}
+     # live vars:
+     # refs: []
+     #
+ 25: $t14 := 0
+     # abort state: {aborts}
+     # live vars: $t14
+     # refs: []
+     #
+ 26: abort($t14)
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 27: label L5
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 28: return ()
+}
+
+============ after AbilityProcessor: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+  1: test::merge($t2, $t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+  1: $t3 := read_ref($t4)
+  2: $t6 := borrow_local($t1)
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+  4: $t5 := read_ref($t7)
+  5: $t2 := >($t3, $t5)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := borrow_local($t1)
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+  2: $t2 := read_ref($t4)
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+  4: $t7 := read_ref($t5)
+  5: $t6 := +($t7, $t2)
+  6: write_ref($t5, $t6)
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+  0: $t1 := 3
+  1: $t0 := pack 0x42::test::W($t1)
+  2: $t5 := 0x1
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+  4: $t3 := test::greater($t4, $t0)
+  5: $t2 := !($t3)
+  6: if ($t2) goto 7 else goto 9
+  7: label L0
+  8: goto 12
+  9: label L1
+ 10: $t6 := 0
+ 11: abort($t6)
+ 12: label L2
+ 13: $t7 := 0x1
+ 14: test::foo_2($t7, $t0)
+ 15: $t11 := 0x1
+ 16: $t10 := borrow_global<0x42::test::W>($t11)
+ 17: $t12 := borrow_field<0x42::test::W>.x($t10)
+ 18: $t9 := read_ref($t12)
+ 19: $t13 := 5
+ 20: $t8 := ==($t9, $t13)
+ 21: if ($t8) goto 22 else goto 24
+ 22: label L3
+ 23: goto 27
+ 24: label L4
+ 25: $t14 := 0
+ 26: abort($t14)
+ 27: label L5
+ 28: return ()
+}
+
+============ after ControlFlowGraphSimplifier: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+  1: test::merge($t2, $t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+  1: $t3 := read_ref($t4)
+  2: $t6 := borrow_local($t1)
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+  4: $t5 := read_ref($t7)
+  5: $t2 := >($t3, $t5)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := borrow_local($t1)
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+  2: $t2 := read_ref($t4)
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+  4: $t7 := read_ref($t5)
+  5: $t6 := +($t7, $t2)
+  6: write_ref($t5, $t6)
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+  0: $t1 := 3
+  1: $t0 := pack 0x42::test::W($t1)
+  2: $t5 := 0x1
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+  4: $t3 := test::greater($t4, $t0)
+  5: $t2 := !($t3)
+  6: if ($t2) goto 7 else goto 22
+  7: label L0
+  8: $t7 := 0x1
+  9: test::foo_2($t7, $t0)
+ 10: $t11 := 0x1
+ 11: $t10 := borrow_global<0x42::test::W>($t11)
+ 12: $t12 := borrow_field<0x42::test::W>.x($t10)
+ 13: $t9 := read_ref($t12)
+ 14: $t13 := 5
+ 15: $t8 := ==($t9, $t13)
+ 16: if ($t8) goto 17 else goto 19
+ 17: label L3
+ 18: return ()
+ 19: label L4
+ 20: $t14 := 0
+ 21: abort($t14)
+ 22: label L1
+ 23: $t6 := 0
+ 24: abort($t6)
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+  1: test::merge($t2, $t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+  1: $t3 := read_ref($t4)
+  2: $t6 := borrow_local($t1)
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+  4: $t5 := read_ref($t7)
+  5: $t2 := >($t3, $t5)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := borrow_local($t1)
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+  2: $t2 := read_ref($t4)
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+  4: $t7 := read_ref($t5)
+  5: $t6 := +($t7, $t2)
+  6: write_ref($t5, $t6)
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+  0: $t1 := 3
+  1: $t0 := pack 0x42::test::W($t1)
+  2: $t5 := 0x1
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+  4: $t3 := test::greater($t4, $t0)
+  5: $t2 := !($t3)
+  6: if ($t2) goto 7 else goto 22
+  7: label L0
+  8: $t7 := 0x1
+  9: test::foo_2($t7, $t0)
+ 10: $t11 := 0x1
+ 11: $t10 := borrow_global<0x42::test::W>($t11)
+ 12: $t12 := borrow_field<0x42::test::W>.x($t10)
+ 13: $t9 := read_ref($t12)
+ 14: $t13 := 5
+ 15: $t8 := ==($t9, $t13)
+ 16: if ($t8) goto 17 else goto 19
+ 17: label L3
+ 18: return ()
+ 19: label L4
+ 20: $t14 := 0
+ 21: abort($t14)
+ 22: label L1
+ 23: $t6 := 0
+ 24: abort($t6)
+}
+
+============ after UnreachableCodeProcessor: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+     # maybe
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+     # maybe
+  1: test::merge($t2, $t1)
+     # maybe
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+     # maybe
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+     # maybe
+  1: $t3 := read_ref($t4)
+     # maybe
+  2: $t6 := borrow_local($t1)
+     # maybe
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+     # maybe
+  4: $t5 := read_ref($t7)
+     # maybe
+  5: $t2 := >($t3, $t5)
+     # maybe
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+     # maybe
+  0: $t3 := borrow_local($t1)
+     # maybe
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+     # maybe
+  2: $t2 := read_ref($t4)
+     # maybe
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+     # maybe
+  4: $t7 := read_ref($t5)
+     # maybe
+  5: $t6 := +($t7, $t2)
+     # maybe
+  6: write_ref($t5, $t6)
+     # maybe
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+     # maybe
+  0: $t1 := 3
+     # maybe
+  1: $t0 := pack 0x42::test::W($t1)
+     # maybe
+  2: $t5 := 0x1
+     # maybe
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+     # maybe
+  4: $t3 := test::greater($t4, $t0)
+     # maybe
+  5: $t2 := !($t3)
+     # maybe
+  6: if ($t2) goto 7 else goto 22
+     # maybe
+  7: label L0
+     # maybe
+  8: $t7 := 0x1
+     # maybe
+  9: test::foo_2($t7, $t0)
+     # maybe
+ 10: $t11 := 0x1
+     # maybe
+ 11: $t10 := borrow_global<0x42::test::W>($t11)
+     # maybe
+ 12: $t12 := borrow_field<0x42::test::W>.x($t10)
+     # maybe
+ 13: $t9 := read_ref($t12)
+     # maybe
+ 14: $t13 := 5
+     # maybe
+ 15: $t8 := ==($t9, $t13)
+     # maybe
+ 16: if ($t8) goto 17 else goto 19
+     # maybe
+ 17: label L3
+     # maybe
+ 18: return ()
+     # maybe
+ 19: label L4
+     # maybe
+ 20: $t14 := 0
+     # maybe
+ 21: abort($t14)
+     # maybe
+ 22: label L1
+     # maybe
+ 23: $t6 := 0
+     # maybe
+ 24: abort($t6)
+}
+
+============ after UnreachableCodeRemover: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+  1: test::merge($t2, $t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+  1: $t3 := read_ref($t4)
+  2: $t6 := borrow_local($t1)
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+  4: $t5 := read_ref($t7)
+  5: $t2 := >($t3, $t5)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := borrow_local($t1)
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+  2: $t2 := read_ref($t4)
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+  4: $t7 := read_ref($t5)
+  5: $t6 := +($t7, $t2)
+  6: write_ref($t5, $t6)
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+  0: $t1 := 3
+  1: $t0 := pack 0x42::test::W($t1)
+  2: $t5 := 0x1
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+  4: $t3 := test::greater($t4, $t0)
+  5: $t2 := !($t3)
+  6: if ($t2) goto 7 else goto 22
+  7: label L0
+  8: $t7 := 0x1
+  9: test::foo_2($t7, $t0)
+ 10: $t11 := 0x1
+ 11: $t10 := borrow_global<0x42::test::W>($t11)
+ 12: $t12 := borrow_field<0x42::test::W>.x($t10)
+ 13: $t9 := read_ref($t12)
+ 14: $t13 := 5
+ 15: $t8 := ==($t9, $t13)
+ 16: if ($t8) goto 17 else goto 19
+ 17: label L3
+ 18: return ()
+ 19: label L4
+ 20: $t14 := 0
+ 21: abort($t14)
+ 22: label L1
+ 23: $t6 := 0
+ 24: abort($t6)
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+     # live vars: $t0, $t1
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+     # live vars: $t1, $t2
+  1: test::merge($t2, $t1)
+     # live vars:
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+     # live vars: $t0, $t1
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t1, $t4
+  1: $t3 := read_ref($t4)
+     # live vars: $t1, $t3
+  2: $t6 := borrow_local($t1)
+     # live vars: $t3, $t6
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+     # live vars: $t3, $t7
+  4: $t5 := read_ref($t7)
+     # live vars: $t3, $t5
+  5: $t2 := >($t3, $t5)
+     # live vars: $t2
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+     # live vars: $t0, $t4
+  2: $t2 := read_ref($t4)
+     # live vars: $t0, $t2
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t2, $t5
+  4: $t7 := read_ref($t5)
+     # live vars: $t2, $t5, $t7
+  5: $t6 := +($t7, $t2)
+     # live vars: $t5, $t6
+  6: write_ref($t5, $t6)
+     # live vars:
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+     # live vars:
+  0: $t1 := 3
+     # live vars: $t1
+  1: $t0 := pack 0x42::test::W($t1)
+     # live vars: $t0
+  2: $t5 := 0x1
+     # live vars: $t0, $t5
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+     # live vars: $t0, $t4
+  4: $t3 := test::greater($t4, $t0)
+     # live vars: $t0, $t3
+  5: $t2 := !($t3)
+     # live vars: $t0, $t2
+  6: if ($t2) goto 7 else goto 22
+     # live vars: $t0
+  7: label L0
+     # live vars: $t0
+  8: $t7 := 0x1
+     # live vars: $t0, $t7
+  9: test::foo_2($t7, $t0)
+     # live vars:
+ 10: $t11 := 0x1
+     # live vars: $t11
+ 11: $t10 := borrow_global<0x42::test::W>($t11)
+     # live vars: $t10
+ 12: $t12 := borrow_field<0x42::test::W>.x($t10)
+     # live vars: $t12
+ 13: $t9 := read_ref($t12)
+     # live vars: $t9
+ 14: $t13 := 5
+     # live vars: $t9, $t13
+ 15: $t8 := ==($t9, $t13)
+     # live vars: $t8
+ 16: if ($t8) goto 17 else goto 19
+     # live vars:
+ 17: label L3
+     # live vars:
+ 18: return ()
+     # live vars:
+ 19: label L4
+     # live vars:
+ 20: $t14 := 0
+     # live vars: $t14
+ 21: abort($t14)
+     # live vars: $t0
+ 22: label L1
+     # live vars:
+ 23: $t6 := 0
+     # live vars: $t6
+ 24: abort($t6)
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+  1: test::merge($t2, $t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+  1: $t3 := read_ref($t4)
+  2: $t6 := borrow_local($t1)
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+  4: $t5 := read_ref($t7)
+  5: $t2 := >($t3, $t5)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := borrow_local($t1)
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+  2: $t2 := read_ref($t4)
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+  4: $t7 := read_ref($t5)
+  5: $t6 := +($t7, $t2)
+  6: write_ref($t5, $t6)
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+  0: $t1 := 3
+  1: $t0 := pack 0x42::test::W($t1)
+  2: $t5 := 0x1
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+  4: $t3 := test::greater($t4, $t0)
+  5: $t2 := !($t3)
+  6: if ($t2) goto 7 else goto 22
+  7: label L0
+  8: $t7 := 0x1
+  9: test::foo_2($t7, $t0)
+ 10: $t11 := 0x1
+ 11: $t10 := borrow_global<0x42::test::W>($t11)
+ 12: $t12 := borrow_field<0x42::test::W>.x($t10)
+ 13: $t9 := read_ref($t12)
+ 14: $t13 := 5
+ 15: $t8 := ==($t9, $t13)
+ 16: if ($t8) goto 17 else goto 19
+ 17: label L3
+ 18: return ()
+ 19: label L4
+ 20: $t14 := 0
+ 21: abort($t14)
+ 22: label L1
+ 23: $t6 := 0
+ 24: abort($t6)
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+     # live vars: $t0, $t1
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+     # live vars: $t1, $t2
+  1: test::merge($t2, $t1)
+     # live vars:
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W
+     var $t7: &u64
+     # live vars: $t0, $t1
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t1, $t4
+  1: $t3 := read_ref($t4)
+     # live vars: $t1, $t3
+  2: $t6 := borrow_local($t1)
+     # live vars: $t3, $t6
+  3: $t7 := borrow_field<0x42::test::W>.x($t6)
+     # live vars: $t3, $t7
+  4: $t5 := read_ref($t7)
+     # live vars: $t3, $t5
+  5: $t2 := >($t3, $t5)
+     # live vars: $t2
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+     # live vars: $t0, $t4
+  2: $t2 := read_ref($t4)
+     # live vars: $t0, $t2
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t2, $t5
+  4: $t7 := read_ref($t5)
+     # live vars: $t2, $t5, $t7
+  5: $t6 := +($t7, $t2)
+     # live vars: $t5, $t6
+  6: write_ref($t5, $t6)
+     # live vars:
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64
+     var $t7: address
+     var $t8: bool
+     var $t9: u64
+     var $t10: &0x42::test::W
+     var $t11: address
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64
+     # live vars:
+  0: $t1 := 3
+     # live vars: $t1
+  1: $t0 := pack 0x42::test::W($t1)
+     # live vars: $t0
+  2: $t5 := 0x1
+     # live vars: $t0, $t5
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+     # live vars: $t0, $t4
+  4: $t3 := test::greater($t4, $t0)
+     # live vars: $t0, $t3
+  5: $t2 := !($t3)
+     # live vars: $t0, $t2
+  6: if ($t2) goto 7 else goto 22
+     # live vars: $t0
+  7: label L0
+     # live vars: $t0
+  8: $t7 := 0x1
+     # live vars: $t0, $t7
+  9: test::foo_2($t7, $t0)
+     # live vars:
+ 10: $t11 := 0x1
+     # live vars: $t11
+ 11: $t10 := borrow_global<0x42::test::W>($t11)
+     # live vars: $t10
+ 12: $t12 := borrow_field<0x42::test::W>.x($t10)
+     # live vars: $t12
+ 13: $t9 := read_ref($t12)
+     # live vars: $t9
+ 14: $t13 := 5
+     # live vars: $t9, $t13
+ 15: $t8 := ==($t9, $t13)
+     # live vars: $t8
+ 16: if ($t8) goto 17 else goto 19
+     # live vars:
+ 17: label L3
+     # live vars:
+ 18: return ()
+     # live vars:
+ 19: label L4
+     # live vars:
+ 20: $t14 := 0
+     # live vars: $t14
+ 21: abort($t14)
+     # live vars: $t0
+ 22: label L1
+     # live vars:
+ 23: $t6 := 0
+     # live vars: $t6
+ 24: abort($t6)
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+  1: test::merge($t2, $t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W [unused]
+     var $t7: &u64 [unused]
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+  1: $t3 := read_ref($t4)
+  2: $t0 := borrow_local($t1)
+  3: $t4 := borrow_field<0x42::test::W>.x($t0)
+  4: $t5 := read_ref($t4)
+  5: $t2 := >($t3, $t5)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64 [unused]
+     var $t7: u64
+  0: $t3 := borrow_local($t1)
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+  2: $t2 := read_ref($t4)
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+  4: $t7 := read_ref($t5)
+  5: $t2 := +($t7, $t2)
+  6: write_ref($t5, $t2)
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool [unused]
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64 [unused]
+     var $t7: address [unused]
+     var $t8: bool [unused]
+     var $t9: u64 [unused]
+     var $t10: &0x42::test::W [unused]
+     var $t11: address [unused]
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64 [unused]
+  0: $t1 := 3
+  1: $t0 := pack 0x42::test::W($t1)
+  2: $t5 := 0x1
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+  4: $t3 := test::greater($t4, $t0)
+  5: $t3 := !($t3)
+  6: if ($t3) goto 7 else goto 22
+  7: label L0
+  8: $t5 := 0x1
+  9: test::foo_2($t5, $t0)
+ 10: $t5 := 0x1
+ 11: $t4 := borrow_global<0x42::test::W>($t5)
+ 12: $t12 := borrow_field<0x42::test::W>.x($t4)
+ 13: $t1 := read_ref($t12)
+ 14: $t13 := 5
+ 15: $t3 := ==($t1, $t13)
+ 16: if ($t3) goto 17 else goto 19
+ 17: label L3
+ 18: return ()
+ 19: label L4
+ 20: $t1 := 0
+ 21: abort($t1)
+ 22: label L1
+ 23: $t1 := 0
+ 24: abort($t1)
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+     # live vars: $t0, $t1
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+     # live vars: $t1, $t2
+  1: test::merge($t2, $t1)
+     # live vars:
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W [unused]
+     var $t7: &u64 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t1, $t4
+  1: $t3 := read_ref($t4)
+     # live vars: $t1, $t3
+  2: $t0 := borrow_local($t1)
+     # live vars: $t0, $t3
+  3: $t4 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t3, $t4
+  4: $t5 := read_ref($t4)
+     # live vars: $t3, $t5
+  5: $t2 := >($t3, $t5)
+     # live vars: $t2
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64 [unused]
+     var $t7: u64
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+     # live vars: $t0, $t4
+  2: $t2 := read_ref($t4)
+     # live vars: $t0, $t2
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t2, $t5
+  4: $t7 := read_ref($t5)
+     # live vars: $t2, $t5, $t7
+  5: $t2 := +($t7, $t2)
+     # live vars: $t2, $t5
+  6: write_ref($t5, $t2)
+     # live vars:
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool [unused]
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64 [unused]
+     var $t7: address [unused]
+     var $t8: bool [unused]
+     var $t9: u64 [unused]
+     var $t10: &0x42::test::W [unused]
+     var $t11: address [unused]
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64 [unused]
+     # live vars:
+  0: $t1 := 3
+     # live vars: $t1
+  1: $t0 := pack 0x42::test::W($t1)
+     # live vars: $t0
+  2: $t5 := 0x1
+     # live vars: $t0, $t5
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+     # live vars: $t0, $t4
+  4: $t3 := test::greater($t4, $t0)
+     # live vars: $t0, $t3
+  5: $t3 := !($t3)
+     # live vars: $t0, $t3
+  6: if ($t3) goto 7 else goto 22
+     # live vars: $t0
+  7: label L0
+     # live vars: $t0
+  8: $t5 := 0x1
+     # live vars: $t0, $t5
+  9: test::foo_2($t5, $t0)
+     # live vars:
+ 10: $t5 := 0x1
+     # live vars: $t5
+ 11: $t4 := borrow_global<0x42::test::W>($t5)
+     # live vars: $t4
+ 12: $t12 := borrow_field<0x42::test::W>.x($t4)
+     # live vars: $t12
+ 13: $t1 := read_ref($t12)
+     # live vars: $t1
+ 14: $t13 := 5
+     # live vars: $t1, $t13
+ 15: $t3 := ==($t1, $t13)
+     # live vars: $t3
+ 16: if ($t3) goto 17 else goto 19
+     # live vars:
+ 17: label L3
+     # live vars:
+ 18: return ()
+     # live vars:
+ 19: label L4
+     # live vars:
+ 20: $t1 := 0
+     # live vars: $t1
+ 21: abort($t1)
+     # live vars: $t0
+ 22: label L1
+     # live vars:
+ 23: $t1 := 0
+     # live vars: $t1
+ 24: abort($t1)
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+  1: test::merge($t2, $t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W [unused]
+     var $t7: &u64 [unused]
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+  1: $t3 := read_ref($t4)
+  2: $t0 := borrow_local($t1)
+  3: $t4 := borrow_field<0x42::test::W>.x($t0)
+  4: $t5 := read_ref($t4)
+  5: $t2 := >($t3, $t5)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64 [unused]
+     var $t7: u64
+  0: $t3 := borrow_local($t1)
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+  2: $t2 := read_ref($t4)
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+  4: $t7 := read_ref($t5)
+  5: $t2 := +($t7, $t2)
+  6: write_ref($t5, $t2)
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool [unused]
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64 [unused]
+     var $t7: address [unused]
+     var $t8: bool [unused]
+     var $t9: u64 [unused]
+     var $t10: &0x42::test::W [unused]
+     var $t11: address [unused]
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64 [unused]
+  0: $t1 := 3
+  1: $t0 := pack 0x42::test::W($t1)
+  2: $t5 := 0x1
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+  4: $t3 := test::greater($t4, $t0)
+  5: $t3 := !($t3)
+  6: if ($t3) goto 7 else goto 22
+  7: label L0
+  8: $t5 := 0x1
+  9: test::foo_2($t5, $t0)
+ 10: $t5 := 0x1
+ 11: $t4 := borrow_global<0x42::test::W>($t5)
+ 12: $t12 := borrow_field<0x42::test::W>.x($t4)
+ 13: $t1 := read_ref($t12)
+ 14: $t13 := 5
+ 15: $t3 := ==($t1, $t13)
+ 16: if ($t3) goto 17 else goto 19
+ 17: label L3
+ 18: return ()
+ 19: label L4
+ 20: $t1 := 0
+ 21: abort($t1)
+ 22: label L1
+ 23: $t1 := 0
+ 24: abort($t1)
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+     # live vars: $t0, $t1
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+     # live vars: $t1, $t2
+  1: test::merge($t2, $t1)
+     # live vars:
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W [unused]
+     var $t7: &u64 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t1, $t4
+  1: $t3 := read_ref($t4)
+     # live vars: $t1, $t3
+  2: $t0 := borrow_local($t1)
+     # live vars: $t0, $t3
+  3: $t4 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t3, $t4
+  4: $t5 := read_ref($t4)
+     # live vars: $t3, $t5
+  5: $t2 := >($t3, $t5)
+     # live vars: $t2
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64 [unused]
+     var $t7: u64
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+     # live vars: $t0, $t4
+  2: $t2 := read_ref($t4)
+     # live vars: $t0, $t2
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t2, $t5
+  4: $t7 := read_ref($t5)
+     # live vars: $t2, $t5, $t7
+  5: $t2 := +($t7, $t2)
+     # live vars: $t2, $t5
+  6: write_ref($t5, $t2)
+     # live vars:
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool [unused]
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64 [unused]
+     var $t7: address [unused]
+     var $t8: bool [unused]
+     var $t9: u64 [unused]
+     var $t10: &0x42::test::W [unused]
+     var $t11: address [unused]
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64 [unused]
+     # live vars:
+  0: $t1 := 3
+     # live vars: $t1
+  1: $t0 := pack 0x42::test::W($t1)
+     # live vars: $t0
+  2: $t5 := 0x1
+     # live vars: $t0, $t5
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+     # live vars: $t0, $t4
+  4: $t3 := test::greater($t4, $t0)
+     # live vars: $t0, $t3
+  5: $t3 := !($t3)
+     # live vars: $t0, $t3
+  6: if ($t3) goto 7 else goto 22
+     # live vars: $t0
+  7: label L0
+     # live vars: $t0
+  8: $t5 := 0x1
+     # live vars: $t0, $t5
+  9: test::foo_2($t5, $t0)
+     # live vars:
+ 10: $t5 := 0x1
+     # live vars: $t5
+ 11: $t4 := borrow_global<0x42::test::W>($t5)
+     # live vars: $t4
+ 12: $t12 := borrow_field<0x42::test::W>.x($t4)
+     # live vars: $t12
+ 13: $t1 := read_ref($t12)
+     # live vars: $t1
+ 14: $t13 := 5
+     # live vars: $t1, $t13
+ 15: $t3 := ==($t1, $t13)
+     # live vars: $t3
+ 16: if ($t3) goto 17 else goto 19
+     # live vars:
+ 17: label L3
+     # live vars:
+ 18: return ()
+     # live vars:
+ 19: label L4
+     # live vars:
+ 20: $t1 := 0
+     # live vars: $t1
+ 21: abort($t1)
+     # live vars: $t0
+ 22: label L1
+     # live vars:
+ 23: $t1 := 0
+     # live vars: $t1
+ 24: abort($t1)
+}
+
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun test::foo_2($t0: address, $t1: 0x42::test::W) {
+     var $t2: &mut 0x42::test::W
+     # live vars: $t0, $t1
+  0: $t2 := borrow_global<0x42::test::W>($t0)
+     # live vars: $t1, $t2
+  1: test::merge($t2, $t1)
+     # live vars:
+  2: return ()
+}
+
+
+[variant baseline]
+fun test::greater($t0: &0x42::test::W, $t1: 0x42::test::W): bool {
+     var $t2: bool
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &0x42::test::W [unused]
+     var $t7: &u64 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t1, $t4
+  1: $t3 := read_ref($t4)
+     # live vars: $t1, $t3
+  2: $t0 := borrow_local($t1)
+     # live vars: $t0, $t3
+  3: $t4 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t3, $t4
+  4: $t5 := read_ref($t4)
+     # live vars: $t3, $t5
+  5: $t2 := >($t3, $t5)
+     # live vars: $t2
+  6: return $t2
+}
+
+
+[variant baseline]
+fun test::merge($t0: &mut 0x42::test::W, $t1: 0x42::test::W) {
+     var $t2: u64
+     var $t3: &0x42::test::W
+     var $t4: &u64
+     var $t5: &mut u64
+     var $t6: u64 [unused]
+     var $t7: u64
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+  1: $t4 := borrow_field<0x42::test::W>.x($t3)
+     # flush: $t2
+     # live vars: $t0, $t4
+  2: $t2 := read_ref($t4)
+     # flush: $t2, $t5
+     # live vars: $t0, $t2
+  3: $t5 := borrow_field<0x42::test::W>.x($t0)
+     # live vars: $t2, $t5
+  4: $t7 := read_ref($t5)
+     # live vars: $t2, $t5, $t7
+  5: $t2 := +($t7, $t2)
+     # live vars: $t2, $t5
+  6: write_ref($t5, $t2)
+     # live vars:
+  7: return ()
+}
+
+
+[variant baseline]
+fun test::test_receiver() {
+     var $t0: 0x42::test::W
+     var $t1: u64
+     var $t2: bool [unused]
+     var $t3: bool
+     var $t4: &0x42::test::W
+     var $t5: address
+     var $t6: u64 [unused]
+     var $t7: address [unused]
+     var $t8: bool [unused]
+     var $t9: u64 [unused]
+     var $t10: &0x42::test::W [unused]
+     var $t11: address [unused]
+     var $t12: &u64
+     var $t13: u64
+     var $t14: u64 [unused]
+     # live vars:
+  0: $t1 := 3
+     # flush: $t0
+     # live vars: $t1
+  1: $t0 := pack 0x42::test::W($t1)
+     # live vars: $t0
+  2: $t5 := 0x1
+     # live vars: $t0, $t5
+  3: $t4 := borrow_global<0x42::test::W>($t5)
+     # live vars: $t0, $t4
+  4: $t3 := test::greater($t4, $t0)
+     # live vars: $t0, $t3
+  5: $t3 := !($t3)
+     # live vars: $t0, $t3
+  6: if ($t3) goto 7 else goto 22
+     # live vars: $t0
+  7: label L0
+     # live vars: $t0
+  8: $t5 := 0x1
+     # live vars: $t0, $t5
+  9: test::foo_2($t5, $t0)
+     # live vars:
+ 10: $t5 := 0x1
+     # live vars: $t5
+ 11: $t4 := borrow_global<0x42::test::W>($t5)
+     # live vars: $t4
+ 12: $t12 := borrow_field<0x42::test::W>.x($t4)
+     # live vars: $t12
+ 13: $t1 := read_ref($t12)
+     # live vars: $t1
+ 14: $t13 := 5
+     # live vars: $t1, $t13
+ 15: $t3 := ==($t1, $t13)
+     # live vars: $t3
+ 16: if ($t3) goto 17 else goto 19
+     # live vars:
+ 17: label L3
+     # live vars:
+ 18: return ()
+     # live vars:
+ 19: label L4
+     # live vars:
+ 20: $t1 := 0
+     # live vars: $t1
+ 21: abort($t1)
+     # live vars: $t0
+ 22: label L1
+     # live vars:
+ 23: $t1 := 0
+     # live vars: $t1
+ 24: abort($t1)
+}
+
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0x42::test
+struct W has copy + drop + store + key
+  x: u64
+
+// Function definition at index 0
+fun foo_2(l0: address, l1: W) acquires W
+    move_loc l0
+    mut_borrow_global W
+    move_loc l1
+    call merge
+    ret
+
+// Function definition at index 1
+fun greater(l0: &W, l1: W): bool
+    move_loc l0
+    borrow_field W, x
+    read_ref
+    borrow_loc l1
+    borrow_field W, x
+    // @5
+    read_ref
+    gt
+    ret
+
+// Function definition at index 2
+fun merge(l0: &mut W, l1: W)
+    local l2: u64
+    local l3: &mut u64
+    borrow_loc l1
+    borrow_field W, x
+    read_ref
+    st_loc l2
+    move_loc l0
+    // @5
+    mut_borrow_field W, x
+    st_loc l3
+    copy_loc l3
+    read_ref
+    move_loc l2
+    // @10
+    add
+    move_loc l3
+    write_ref
+    ret
+
+// Function definition at index 3
+fun test_receiver() acquires W
+    local l0: W
+    ld_u64 3
+    pack W
+    st_loc l0
+    ld_const<address> 1
+    borrow_global W
+    // @5
+    copy_loc l0
+    call greater
+    br_true l0
+    ld_const<address> 1
+    move_loc l0
+    // @10
+    call foo_2
+    ld_const<address> 1
+    borrow_global W
+    borrow_field W, x
+    read_ref
+    // @15
+    ld_u64 5
+    eq
+    br_false l1
+    ret
+l1: ld_u64 0
+    // @20
+    abort
+l0: ld_u64 0
+    abort
+
+
+============ bytecode verification succeeded ========
