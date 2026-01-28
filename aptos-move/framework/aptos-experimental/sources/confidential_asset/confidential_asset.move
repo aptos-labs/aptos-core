@@ -1299,4 +1299,148 @@ module aptos_experimental::confidential_asset {
 
         auditor_amounts_bytes
     }
+
+    // =========================================
+    // Test-only proof generation wrapper functions
+    // =========================================
+    // These functions compute proofs and return serialized bytes that can be used
+    // to call the corresponding entry functions from Rust e2e tests.
+
+    /// Generates the proof bytes needed to call `withdraw_to`.
+    /// Returns (new_balance_bytes, zkrp_new_balance_bytes, sigma_proof_bytes).
+    #[test_only]
+    public fun generate_withdrawal_proof_bytes(
+        sender: address,
+        token: Object<Metadata>,
+        sender_dk_bytes: vector<u8>,
+        withdraw_amount: u64,
+        new_balance_amount: u128
+    ): (vector<u8>, vector<u8>, vector<u8>) acquires ConfidentialAssetStore {
+        let sender_dk = ristretto255::new_scalar_from_bytes(sender_dk_bytes).extract();
+        let sender_ek = encryption_key(sender, token);
+        let current_balance = confidential_balance::decompress_balance(
+            &actual_balance(sender, token)
+        );
+
+        let (proof, new_balance) = confidential_proof::prove_withdrawal(
+            &sender_dk,
+            &sender_ek,
+            withdraw_amount,
+            new_balance_amount,
+            &current_balance
+        );
+
+        let new_balance_bytes = confidential_balance::balance_to_bytes(&new_balance);
+        let (sigma_proof_bytes, zkrp_new_balance_bytes) =
+            confidential_proof::serialize_withdrawal_proof(&proof);
+
+        (new_balance_bytes, zkrp_new_balance_bytes, sigma_proof_bytes)
+    }
+
+    /// Generates the proof bytes needed to call `confidential_transfer`.
+    /// Returns (new_balance_bytes, sender_amount_bytes, recipient_amount_bytes,
+    ///          zkrp_new_balance_bytes, zkrp_transfer_amount_bytes, sigma_proof_bytes).
+    #[test_only]
+    public fun generate_transfer_proof_bytes(
+        sender: address,
+        recipient: address,
+        token: Object<Metadata>,
+        sender_dk_bytes: vector<u8>,
+        transfer_amount: u64,
+        new_balance_amount: u128
+    ): (vector<u8>, vector<u8>, vector<u8>, vector<u8>, vector<u8>, vector<u8>) acquires ConfidentialAssetStore {
+        let sender_dk = ristretto255::new_scalar_from_bytes(sender_dk_bytes).extract();
+        let sender_ek = encryption_key(sender, token);
+        let recipient_ek = encryption_key(recipient, token);
+        let current_balance = confidential_balance::decompress_balance(
+            &actual_balance(sender, token)
+        );
+
+        let (proof, new_balance, sender_amount, recipient_amount, _auditor_amounts) =
+            confidential_proof::prove_transfer(
+                &sender_dk,
+                &sender_ek,
+                &recipient_ek,
+                transfer_amount,
+                new_balance_amount,
+                &current_balance,
+                &vector[] // no auditors for simplicity
+            );
+
+        let (sigma_proof_bytes, zkrp_new_balance_bytes, zkrp_transfer_amount_bytes) =
+            confidential_proof::serialize_transfer_proof(&proof);
+
+        (
+            confidential_balance::balance_to_bytes(&new_balance),
+            confidential_balance::balance_to_bytes(&sender_amount),
+            confidential_balance::balance_to_bytes(&recipient_amount),
+            zkrp_new_balance_bytes,
+            zkrp_transfer_amount_bytes,
+            sigma_proof_bytes
+        )
+    }
+
+    /// Generates the proof bytes needed to call `rotate_encryption_key`.
+    /// Returns (new_balance_bytes, zkrp_new_balance_bytes, sigma_proof_bytes).
+    #[test_only]
+    public fun generate_rotation_proof_bytes(
+        sender: address,
+        token: Object<Metadata>,
+        sender_dk_bytes: vector<u8>,
+        new_dk_bytes: vector<u8>,
+        new_ek_bytes: vector<u8>,
+        balance_amount: u128
+    ): (vector<u8>, vector<u8>, vector<u8>) acquires ConfidentialAssetStore {
+        let sender_dk = ristretto255::new_scalar_from_bytes(sender_dk_bytes).extract();
+        let new_dk = ristretto255::new_scalar_from_bytes(new_dk_bytes).extract();
+        let new_ek = twisted_elgamal::new_pubkey_from_bytes(new_ek_bytes).extract();
+        let sender_ek = encryption_key(sender, token);
+        let current_balance = confidential_balance::decompress_balance(
+            &actual_balance(sender, token)
+        );
+
+        let (proof, new_balance) = confidential_proof::prove_rotation(
+            &sender_dk,
+            &new_dk,
+            &sender_ek,
+            &new_ek,
+            balance_amount,
+            &current_balance
+        );
+
+        let new_balance_bytes = confidential_balance::balance_to_bytes(&new_balance);
+        let (sigma_proof_bytes, zkrp_new_balance_bytes) =
+            confidential_proof::serialize_rotation_proof(&proof);
+
+        (new_balance_bytes, zkrp_new_balance_bytes, sigma_proof_bytes)
+    }
+
+    /// Generates the proof bytes needed to call `normalize`.
+    /// Returns (new_balance_bytes, zkrp_new_balance_bytes, sigma_proof_bytes).
+    #[test_only]
+    public fun generate_normalization_proof_bytes(
+        sender: address,
+        token: Object<Metadata>,
+        sender_dk_bytes: vector<u8>,
+        balance_amount: u128
+    ): (vector<u8>, vector<u8>, vector<u8>) acquires ConfidentialAssetStore {
+        let sender_dk = ristretto255::new_scalar_from_bytes(sender_dk_bytes).extract();
+        let sender_ek = encryption_key(sender, token);
+        let current_balance = confidential_balance::decompress_balance(
+            &actual_balance(sender, token)
+        );
+
+        let (proof, new_balance) = confidential_proof::prove_normalization(
+            &sender_dk,
+            &sender_ek,
+            balance_amount,
+            &current_balance
+        );
+
+        let new_balance_bytes = confidential_balance::balance_to_bytes(&new_balance);
+        let (sigma_proof_bytes, zkrp_new_balance_bytes) =
+            confidential_proof::serialize_normalization_proof(&proof);
+
+        (new_balance_bytes, zkrp_new_balance_bytes, sigma_proof_bytes)
+    }
 }
