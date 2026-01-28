@@ -79,6 +79,7 @@ pub trait TExecutionClient: Send + Sync {
         onchain_randomness_config: &OnChainRandomnessConfig,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
+        secret_share_config: Option<SecretShareConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
         highest_committed_round: Round,
@@ -335,21 +336,25 @@ impl ExecutionProxyClient {
                         let _ = rand_manager_input_tx.send(ordered_blocks.clone()).await;
                         let _ = secret_share_manager_input_tx.send(ordered_blocks.clone()).await;
                         let first_block_id = ordered_blocks.ordered_blocks.first().expect("Cannot be empty").id();
+                        info!("Coordinator: sent to managers: {}", first_block_id);
                         inflight_block_tracker.insert(first_block_id, (ordered_blocks, false, false));
                         inflight_block_tracker.entry(first_block_id)
                     },
                     Some(rand_ready_block) = rand_ready_block_rx.next() => {
                         let first_block_id = rand_ready_block.ordered_blocks.first().expect("Cannot be empty").id();
+                        info!("Coordinator: rand_ready: {}", first_block_id);
                         inflight_block_tracker.entry(first_block_id).and_modify(|result| {
                             result.1 = true;
                         })
                     },
                     Some(secret_ready_block) = secret_ready_block_rx.next() => {
                         let first_block_id = secret_ready_block.ordered_blocks.first().expect("Cannot be empty").id();
+                        info!("Coordinator: secret_ready: {}", first_block_id);
                         inflight_block_tracker.entry(first_block_id).and_modify(|result| {
                             result.2 = true;
                         })
                     },
+                    else => break,
                 };
                 let Entry::Occupied(o) = entry else {
                     unreachable!("Entry must exist");
@@ -372,7 +377,7 @@ impl ExecutionProxyClient {
         epoch_state: Arc<EpochState>,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
-        secret_sharing_config: Option<SecretShareConfig>,
+        secret_share_config: Option<SecretShareConfig>,
         onchain_consensus_config: &OnChainConsensusConfig,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
@@ -396,8 +401,8 @@ impl ExecutionProxyClient {
             execution_ready_block_rx,
             maybe_reset_tx_to_rand_manager,
             maybe_reset_tx_to_secret_share_manager,
-        ) = match (rand_config, secret_sharing_config) {
-            (Some(rand_config), Some(secret_sharing_config)) => {
+        ) = match (rand_config, secret_share_config) {
+            (Some(rand_config), Some(secret_share_config)) => {
                 let (rand_manager_input_tx, rand_ready_block_rx, reset_tx_to_rand_manager) = self
                     .make_rand_manager(
                         &epoch_state,
@@ -415,7 +420,7 @@ impl ExecutionProxyClient {
                     reset_tx_to_secret_share_manager,
                 ) = self.make_secret_sharing_manager(
                     &epoch_state,
-                    secret_sharing_config,
+                    secret_share_config,
                     secret_sharing_msg_rx,
                     highest_committed_round,
                     &network_sender,
@@ -530,6 +535,7 @@ impl TExecutionClient for ExecutionProxyClient {
         onchain_randomness_config: &OnChainRandomnessConfig,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
+        secret_share_config: Option<SecretShareConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
         highest_committed_round: Round,
@@ -546,7 +552,7 @@ impl TExecutionClient for ExecutionProxyClient {
             epoch_state.clone(),
             rand_config,
             fast_rand_config,
-            None,
+            secret_share_config.clone(),
             onchain_consensus_config,
             rand_msg_rx,
             secret_sharing_msg_rx,
@@ -578,6 +584,7 @@ impl TExecutionClient for ExecutionProxyClient {
             onchain_consensus_config.clone(),
             aux_version,
             network_sender,
+            secret_share_config,
         );
 
         maybe_rand_msg_tx
@@ -779,6 +786,7 @@ impl TExecutionClient for DummyExecutionClient {
         _onchain_randomness_config: &OnChainRandomnessConfig,
         _rand_config: Option<RandConfig>,
         _fast_rand_config: Option<RandConfig>,
+        _secret_share_config: Option<SecretShareConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         _secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
         _highest_committed_round: Round,

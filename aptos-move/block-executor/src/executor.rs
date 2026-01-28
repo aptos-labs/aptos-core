@@ -2282,6 +2282,12 @@ where
                                     .block_gas_limit_type
                                     .include_user_txn_size_in_block_output()
                                 {
+                                    // info!(
+                                    //     "metadata: {:?}, user_txn_bytes_len: {}, txn: {:?}",
+                                    //     transaction_slice_metadata,
+                                    //     txn.user_txn_bytes_len(),
+                                    //     txn.try_as_signed_user_txn(),
+                                    // );
                                     txn.user_txn_bytes_len()
                                 } else {
                                     0

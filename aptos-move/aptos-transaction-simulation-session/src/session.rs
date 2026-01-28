@@ -303,6 +303,7 @@ impl Session {
                 TransactionExecutable::Empty => {
                     unimplemented!("empty executable -- unclear how this should be handled")
                 },
+                TransactionExecutable::Encrypted => unimplemented!("encrypted payload"),
             }
         }
         let name = match &txn.payload() {

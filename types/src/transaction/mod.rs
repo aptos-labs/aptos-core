@@ -597,6 +597,39 @@ impl RawTransaction {
     pub fn signing_message(&self) -> Result<Vec<u8>, CryptoMaterialError> {
         signing_message(self)
     }
+
+    /// Converts a RawTransaction with an EncryptedPayload into a variant that uses
+    /// TransactionExecutable::Encrypted for signature verification.
+    /// This is needed because signatures are verified over the executable, not the encrypted ciphertext.
+    pub fn into_encrypted_variant(self) -> Self {
+        match self.payload {
+            TransactionPayload::EncryptedPayload(EncryptedPayload::Decrypted {
+                ciphertext,
+                extra_config,
+                payload_hash,
+                ..
+            })
+            | TransactionPayload::EncryptedPayload(EncryptedPayload::FailedDecryption {
+                ciphertext,
+                extra_config,
+                payload_hash,
+                ..
+            }) => RawTransaction {
+                sender: self.sender,
+                sequence_number: self.sequence_number,
+                payload: TransactionPayload::EncryptedPayload(EncryptedPayload::Encrypted {
+                    ciphertext,
+                    extra_config,
+                    payload_hash,
+                }),
+                max_gas_amount: self.max_gas_amount,
+                gas_unit_price: self.gas_unit_price,
+                expiration_timestamp_secs: self.expiration_timestamp_secs,
+                chain_id: self.chain_id,
+            },
+            _ => self,
+        }
+    }
 }
 
 fn gen_auth(
@@ -718,6 +751,7 @@ pub enum TransactionExecutable {
     Script(Script),
     EntryFunction(EntryFunction),
     Empty,
+    Encrypted,
 }
 
 impl TransactionExecutable {
@@ -740,6 +774,7 @@ impl TransactionExecutable {
             },
             TransactionExecutable::Script(script) => TransactionExecutableRef::Script(script),
             TransactionExecutable::Empty => TransactionExecutableRef::Empty,
+            TransactionExecutable::Encrypted => TransactionExecutableRef::Encrypted,
         }
     }
 }
@@ -749,6 +784,7 @@ pub enum TransactionExecutableRef<'a> {
     Script(&'a Script),
     EntryFunction(&'a EntryFunction),
     Empty,
+    Encrypted,
 }
 
 impl TransactionExecutableRef<'_> {
@@ -880,6 +916,7 @@ impl TransactionPayload {
             .into(),
             Ok(TransactionExecutableRef::Script(_)) => "script".into(),
             Ok(TransactionExecutableRef::Empty) => "empty".into(),
+            Ok(TransactionExecutableRef::Encrypted) => "encrypted".into(),
             Err(_) => "deprecated_payload".into(),
         }
     }
@@ -1293,7 +1330,12 @@ impl SignedTransaction {
 
     pub fn raw_txn_bytes_len(&self) -> usize {
         *self.raw_txn_size.get_or_init(|| {
-            bcs::serialized_size(&self.raw_txn).expect("Unable to serialize RawTransaction")
+            if self.is_encrypted_txn() {
+                let enc_raw_txn = self.raw_txn.clone().into_encrypted_variant();
+                bcs::serialized_size(&enc_raw_txn).expect("Unable to serialize RawTransaction")
+            } else {
+                bcs::serialized_size(&self.raw_txn).expect("Unable to serialize RawTransaction")
+            }
         })
     }
 
@@ -1333,9 +1375,13 @@ impl SignedTransaction {
 
     /// Returns the hash when the transaction is committed onchain.
     pub fn committed_hash(&self) -> HashValue {
-        *self
-            .committed_hash
-            .get_or_init(|| Transaction::UserTransaction(self.clone()).hash())
+        *self.committed_hash.get_or_init(|| {
+            if self.is_encrypted_txn() {
+                Transaction::UserTransaction(self.clone().into_encrypted_variant()).hash()
+            } else {
+                Transaction::UserTransaction(self.clone()).hash()
+            }
+        })
     }
 
     pub fn replay_protector(&self) -> ReplayProtector {
@@ -1348,6 +1394,19 @@ impl SignedTransaction {
 
     pub fn payload_mut(&mut self) -> &mut TransactionPayload {
         &mut self.raw_txn.payload
+    }
+
+    /// Converts a SignedTransaction with an EncryptedPayload into a variant that uses
+    /// TransactionExecutable::Encrypted for signature verification.
+    /// This is needed because signatures are verified over the executable, not the encrypted ciphertext.
+    pub fn into_encrypted_variant(self) -> Self {
+        SignedTransaction {
+            raw_txn: self.raw_txn.into_encrypted_variant(),
+            authenticator: self.authenticator,
+            raw_txn_size: OnceCell::new(),
+            authenticator_size: OnceCell::new(),
+            committed_hash: OnceCell::new(),
+        }
     }
 }
 
@@ -1415,7 +1474,7 @@ impl TransactionWithProof {
     }
 
     pub fn verify(&self, ledger_info: &LedgerInfo) -> Result<()> {
-        let txn_hash = self.transaction.hash();
+        let txn_hash = self.transaction.committed_hash();
         ensure!(
             txn_hash == self.proof.transaction_info().transaction_hash(),
             "Transaction hash ({}) not expected ({}).",
@@ -2604,7 +2663,7 @@ impl TransactionOutputListWithProof {
             );
 
             // Verify the transaction hashes match those of the transaction infos
-            let txn_hash = txn.hash();
+            let txn_hash = txn.committed_hash();
             ensure!(
                 txn_hash == txn_info.transaction_hash(),
                 "The transaction hash does not match the hash in transaction info. \
@@ -3069,6 +3128,16 @@ impl Transaction {
             | Transaction::UserTransaction(_)
             | Transaction::GenesisTransaction(_)
             | Transaction::ValidatorTransaction(_) => false,
+        }
+    }
+
+    /// Returns the committed hash of the transaction.
+    /// For user transactions, this uses the committed_hash which accounts for encrypted payload variants.
+    /// For other transaction types, this uses the regular hash.
+    pub fn committed_hash(&self) -> HashValue {
+        match self {
+            Transaction::UserTransaction(user_txn) => user_txn.committed_hash(),
+            _ => self.hash(),
         }
     }
 }

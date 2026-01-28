@@ -12,7 +12,7 @@ use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     proof::accumulator::{InMemoryEventAccumulator, InMemoryTransactionAccumulator},
-    transaction::{PersistedAuxiliaryInfo, TransactionInfo},
+    transaction::{PersistedAuxiliaryInfo, SignedTransaction, TransactionInfo},
 };
 use rayon::prelude::*;
 use std::sync::Arc;
@@ -75,7 +75,7 @@ impl DoLedgerUpdate {
                     InMemoryEventAccumulator::from_leaves(&event_hashes).root_hash();
                 let write_set_hash = CryptoHash::hash(txn_output.write_set());
                 let txn_info = TransactionInfo::new(
-                    txn.hash(),
+                    txn.committed_hash(),
                     write_set_hash,
                     event_root_hash,
                     state_checkpoint_hash,

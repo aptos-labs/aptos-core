@@ -418,7 +418,9 @@ impl AptosVM {
                     // and so no need to delay any checks (as there are none).
                     !f.module().address().is_special()
                 },
-                Ok(TransactionExecutableRef::Empty) | Err(_) => false,
+                Ok(TransactionExecutableRef::Empty)
+                | Ok(TransactionExecutableRef::Encrypted)
+                | Err(_) => false,
             }
     }
 
@@ -1233,6 +1235,13 @@ impl AptosVM {
                 let s = VMStatus::error(
                     StatusCode::FEATURE_UNDER_GATING,
                     Some("Multisig transaction does not support script payload".to_string()),
+                );
+                return Ok((s, discarded_output(StatusCode::FEATURE_UNDER_GATING)));
+            },
+            TransactionExecutableRef::Encrypted => {
+                let s = VMStatus::error(
+                    StatusCode::FEATURE_UNDER_GATING,
+                    Some("Multisig transaction does not support encrypted payload".to_string()),
                 );
                 return Ok((s, discarded_output(StatusCode::FEATURE_UNDER_GATING)));
             },
@@ -3245,9 +3254,9 @@ impl VMValidator for AptosVM {
             }
         }
 
-        if transaction.payload().is_encrypted_variant() {
-            return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
-        }
+        // if transaction.payload().is_encrypted_variant() {
+        //     return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+        // }
         let txn = match transaction.check_signature() {
             Ok(t) => t,
             _ => {

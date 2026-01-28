@@ -187,6 +187,7 @@ impl ProofManager {
 
         let response = if let Some(ref params) = request.maybe_optqs_payload_pull_params {
             // Determine whether to use V2 payload based on the flag
+            // TODO(ibalajiarun): If v2 is not pulled, then drop all V2 proofs, because they will fail verification
             if params.use_batch_v2 {
                 // Keep BatchInfoExt for V2
                 Payload::OptQuorumStore(OptQuorumStorePayload::new_v2(

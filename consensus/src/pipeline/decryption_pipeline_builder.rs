@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::pipeline::pipeline_builder::{PipelineBuilder, Tracker};
+use anyhow::anyhow;
 use aptos_batch_encryption::{
     schemes::fptx_weighted::FPTXWeighted, traits::BatchThresholdEncryption,
 };
@@ -10,13 +11,18 @@ use aptos_consensus_types::{
     common::Author,
     pipelined_block::{DecryptionResult, MaterializeResult, TaskFuture, TaskResult},
 };
+use aptos_logger::{error, info};
 use aptos_types::{
     secret_sharing::{
         Ciphertext, DigestKey, MasterSecretKeyShare, SecretShare, SecretShareConfig,
         SecretShareMetadata, SecretSharedKey,
     },
-    transaction::encrypted_payload::DecryptedPayload,
+    transaction::{
+        encrypted_payload::{DecryptedPayload, PayloadAssociatedData},
+        TransactionExecutable,
+    },
 };
+use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::sync::Arc;
 use tokio::sync::oneshot;
@@ -37,28 +43,30 @@ impl PipelineBuilder {
 
         tracker.start_working();
 
-        if secret_share_config.is_none() {
-            return Ok((
-                input_txns,
-                max_txns_from_block_to_execute,
-                block_gas_limit,
-                None,
-            ));
-        }
+        assert!(secret_share_config.is_some());
+
+        // if secret_share_config.is_none() {
+        //     return Ok((
+        //         input_txns,
+        //         max_txns_from_block_to_execute,
+        //         block_gas_limit,
+        //         None,
+        //     ));
+        // }
 
         let (encrypted_txns, unencrypted_txns): (Vec<_>, Vec<_>) = input_txns
             .into_iter()
             .partition(|txn| txn.is_encrypted_txn());
 
         // TODO: figure out handling of
-        if encrypted_txns.is_empty() {
-            return Ok((
-                unencrypted_txns,
-                max_txns_from_block_to_execute,
-                block_gas_limit,
-                None,
-            ));
-        }
+        // if encrypted_txns.is_empty() {
+        //     return Ok((
+        //         unencrypted_txns,
+        //         max_txns_from_block_to_execute,
+        //         block_gas_limit,
+        //         None,
+        //     ));
+        // }
 
         let digest_key: DigestKey = secret_share_config
             .as_ref()
@@ -116,11 +124,17 @@ impl PipelineBuilder {
             .expect("must send properly");
 
         // TODO(ibalajiarun): improve perf
+        info!(
+            "block {}, eval_proofs_promise {:?}",
+            block.round(),
+            proofs_promise
+        );
         let proofs = FPTXWeighted::eval_proofs_compute_all(&proofs_promise, &digest_key);
+        info!("block {}, eval_proofs {:?}", block.round(), proofs);
 
         let maybe_decryption_key = secret_shared_key_rx
             .await
-            .expect("decryption key should be available");
+            .map_err(|e| anyhow!("secret_shared_key_rx dropped"))?;
         // TODO(ibalajiarun): account for the case where decryption key is not available
         let decryption_key = maybe_decryption_key.expect("decryption key should be available");
 
@@ -129,25 +143,33 @@ impl PipelineBuilder {
             .zip(txn_ciphertexts)
             .map(|(mut txn, ciphertext)| {
                 let eval_proof = proofs.get(&ciphertext.id()).expect("must exist");
-                if let Ok(payload) = FPTXWeighted::decrypt_individual::<DecryptedPayload>(
+                match FPTXWeighted::decrypt_individual::<DecryptedPayload>(
                     &decryption_key.key,
                     &ciphertext,
                     &digest,
                     &eval_proof,
                 ) {
-                    let (executable, nonce) = payload.unwrap();
-                    txn.payload_mut()
-                        .as_encrypted_payload_mut()
-                        .map(|p| {
-                            p.into_decrypted(eval_proof, executable, nonce)
-                                .expect("must happen")
-                        })
-                        .expect("must exist");
-                } else {
-                    txn.payload_mut()
-                        .as_encrypted_payload_mut()
-                        .map(|p| p.into_failed_decryption(eval_proof).expect("must happen"))
-                        .expect("must exist");
+                    Ok(payload) => {
+                        let (executable, nonce) = payload.unwrap();
+                        txn.payload_mut()
+                            .as_encrypted_payload_mut()
+                            .map(|p| {
+                                p.into_decrypted(eval_proof, executable, nonce)
+                                    .expect("must happen")
+                            })
+                            .expect("must exist");
+                    },
+                    Err(e) => {
+                        error!(
+                            "Failed to decrypt transaction with ciphertext id {:?}: {:?}",
+                            ciphertext.id(),
+                            e
+                        );
+                        txn.payload_mut()
+                            .as_encrypted_payload_mut()
+                            .map(|p| p.into_failed_decryption(eval_proof).expect("must happen"))
+                            .expect("must exist");
+                    },
                 }
                 txn
             })

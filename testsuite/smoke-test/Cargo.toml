@@ -56,6 +56,7 @@ diesel = { workspace = true, features = [
 ] }
 digest = { workspace = true }
 ethers = { workspace = true }
+env_logger = { workspace = true }
 hex = { workspace = true }
 hyper = { workspace = true }
 move-binary-format = { workspace = true }

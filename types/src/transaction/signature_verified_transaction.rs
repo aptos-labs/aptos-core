@@ -74,8 +74,8 @@ impl SignatureVerifiedTransaction {
 
     pub fn hash(&self) -> HashValue {
         match self {
-            SignatureVerifiedTransaction::Valid(txn) => txn.hash(),
-            SignatureVerifiedTransaction::Invalid(txn) => txn.hash(),
+            SignatureVerifiedTransaction::Valid(txn) => txn.committed_hash(),
+            SignatureVerifiedTransaction::Invalid(txn) => txn.committed_hash(),
         }
     }
 

@@ -145,7 +145,7 @@ impl TransactionDb {
             }
         }
 
-        let transaction_hash = transaction.hash();
+        let transaction_hash = transaction.committed_hash();
 
         if let Some(signed_txn) = transaction.try_as_signed_user_txn() {
             let txn_summary = IndexedTransactionSummary::V1 {

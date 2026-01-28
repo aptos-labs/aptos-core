@@ -8,13 +8,22 @@ use crate::{
         transaction::{authenticator::AuthenticationKey, RawTransaction, TransactionPayload},
     },
 };
+use anyhow::Result;
+use aptos_batch_encryption::{
+    schemes::fptx_weighted::FPTXWeighted, traits::BatchThresholdEncryption,
+};
 pub use aptos_cached_packages::aptos_stdlib;
-use aptos_crypto::{ed25519::Ed25519PublicKey, HashValue};
+use aptos_crypto::{ed25519::Ed25519PublicKey, hash::CryptoHash, HashValue};
 use aptos_global_constants::{GAS_UNIT_PRICE, MAX_GAS_AMOUNT};
 use aptos_types::{
     function_info::FunctionInfo,
-    transaction::{EntryFunction, Script},
+    secret_sharing::EncryptionKey,
+    transaction::{
+        encrypted_payload::{DecryptedPayload, EncryptedPayload, PayloadAssociatedData},
+        EntryFunction, Script,
+    },
 };
+use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 use rand::{thread_rng, Rng};
 
 pub struct TransactionBuilder {
@@ -25,6 +34,7 @@ pub struct TransactionBuilder {
     gas_unit_price: u64,
     expiration_timestamp_secs: u64,
     chain_id: ChainId,
+    encryption_key: Option<EncryptionKey>,
 }
 
 impl TransactionBuilder {
@@ -42,6 +52,7 @@ impl TransactionBuilder {
             gas_unit_price: std::cmp::max(GAS_UNIT_PRICE, 1),
             sender: None,
             sequence_number: None,
+            encryption_key: None,
         }
     }
 
@@ -96,7 +107,19 @@ impl TransactionBuilder {
         self
     }
 
-    pub fn build(self) -> RawTransaction {
+    pub fn build(mut self) -> RawTransaction {
+        // If encryption key is set and payload is not already encrypted, encrypt it now
+        if let Some(ref encryption_key) = self.encryption_key {
+            assert!(!self.payload.is_encrypted_variant());
+            let encrypted_payload = TransactionFactory::encrypt_payload(
+                self.payload.clone(),
+                self.sender.expect("sender must have been set"),
+                encryption_key,
+            )
+            .expect("Payload must encrypt");
+            self.payload = TransactionPayload::EncryptedPayload(encrypted_payload);
+        }
+
         let sequence_number = if self.has_nonce() {
             u64::MAX
         } else {
@@ -130,6 +153,7 @@ pub struct TransactionFactory {
 
     use_txn_payload_v2_format: bool,
     use_replay_protection_nonce: bool,
+    encryption_key: Option<EncryptionKey>,
 }
 
 impl TransactionFactory {
@@ -144,7 +168,44 @@ impl TransactionFactory {
             chain_id,
             use_txn_payload_v2_format: false,
             use_replay_protection_nonce: false,
+            encryption_key: None,
         }
+    }
+
+    /// Sets the encryption key for the factory.
+    /// When set, payloads will be automatically encrypted when using `payload()` method.
+    pub fn with_encryption_key(mut self, encryption_key: EncryptionKey) -> Self {
+        self.encryption_key = Some(encryption_key);
+        self
+    }
+
+    /// Generates encryption key setup for testing using FPTXWeighted::setup_for_testing.
+    /// Returns the encryption key that can be used with `with_encryption_key()`.
+    ///
+    /// # Arguments
+    /// * `seed` - Random seed for key generation
+    /// * `max_batch_size` - Maximum batch size for encryption
+    /// * `number_of_rounds` - Number of rounds for encryption
+    /// * `threshold_config` - Threshold configuration for secret sharing
+    ///
+    /// # Note
+    /// This is a convenience method. For full control, use `FPTXWeighted::setup_for_testing` directly
+    /// from the `aptos-batch-encryption` crate. The threshold_config type must match FPTXWeighted's
+    /// ThresholdConfig type (WeightedConfigArkworks<Fr> where Fr is from ark_bls12_381).
+    pub fn setup_for_testing(
+        seed: u64,
+        max_batch_size: usize,
+        number_of_rounds: usize,
+        threshold_config: &<FPTXWeighted as BatchThresholdEncryption>::ThresholdConfig,
+    ) -> Result<EncryptionKey> {
+        let (encryption_key, _digest_key, _verification_keys, _msk_shares) =
+            FPTXWeighted::setup_for_testing(
+                seed,
+                max_batch_size,
+                number_of_rounds,
+                threshold_config,
+            )?;
+        Ok(encryption_key)
     }
 
     pub fn with_max_gas_amount(mut self, max_gas_amount: u64) -> Self {
@@ -369,7 +430,50 @@ impl TransactionFactory {
             gas_unit_price: self.gas_unit_price,
             expiration_timestamp_secs: self.expiration_timestamp(),
             chain_id: self.chain_id,
+            encryption_key: self.encryption_key.clone(),
         }
+    }
+
+    /// Encrypts a transaction payload using the provided encryption key.
+    /// This is a helper method used internally by `with_encrypted_payload` and `payload`.
+    fn encrypt_payload(
+        payload: TransactionPayload,
+        sender: AccountAddress,
+        encryption_key: &EncryptionKey,
+    ) -> Result<EncryptedPayload> {
+        // Convert payload to executable
+        let executable = payload.executable()?;
+        let extra_config = payload.extra_config();
+
+        // Generate decryption nonce
+        let decryption_nonce: u64 = rand::random();
+
+        // Create DecryptedPayload for encryption
+        let decrypted_payload = DecryptedPayload::new(executable, decryption_nonce);
+
+        // Create associated data
+        let associated_data = PayloadAssociatedData::new(sender);
+
+        // Encrypt the payload
+        // Note: FPTXWeighted::encrypt requires CryptoRng from ark_std::rand, so we use StdRng
+        let mut rng = StdRng::from_entropy();
+        let ciphertext = FPTXWeighted::encrypt(
+            encryption_key,
+            &mut rng,
+            &decrypted_payload,
+            &associated_data,
+        )?;
+
+        // Compute payload hash from the executable
+        // We need to compute hash before encryption, so we use the executable directly
+        let payload_hash = CryptoHash::hash(&decrypted_payload);
+
+        // Create encrypted payload
+        Ok(EncryptedPayload::Encrypted {
+            ciphertext,
+            extra_config,
+            payload_hash,
+        })
     }
 
     fn expiration_timestamp(&self) -> u64 {

@@ -30,7 +30,9 @@ use aptos_sdk::{
 use aptos_transaction_generator_lib::{
     create_txn_generator_creator, AccountType, TransactionType, SEND_AMOUNT,
 };
-use aptos_types::account_config::aptos_test_root_address;
+use aptos_types::{
+    account_config::aptos_test_root_address, dkg::chunky_dkg::ChunkyDKGThresholdConfig,
+};
 use futures::future::{join_all, try_join_all, FutureExt};
 use log::{error, info, warn};
 use once_cell::sync::Lazy;
@@ -754,12 +756,25 @@ impl TxnEmitter {
             num_accounts, num_accounts
         );
 
+        let num_validators = 4;
+        info!("Number of clients/validators: {}", num_validators);
+        let weights: Vec<usize> = vec![1; num_validators];
+        // For testing, use a simple threshold of 2f+1 where f = (n-1)/3
+        let threshold = (2 * (num_validators - 1) / 3 + 1).max(1);
+        let encryption_key = TransactionFactory::setup_for_testing(
+            100,
+            32,
+            200,
+            &ChunkyDKGThresholdConfig::new(threshold, weights).expect("msg"),
+        )
+        .expect("must exist");
         let txn_factory = self
             .txn_factory
             .clone()
             .with_transaction_expiration_time(mode_params.txn_expiration_time_secs)
             .with_gas_unit_price(req.gas_price)
-            .with_max_gas_amount(req.max_gas_per_txn);
+            .with_max_gas_amount(req.max_gas_per_txn)
+            .with_encryption_key(encryption_key);
 
         let init_expiration_time =
             (mode_params.txn_expiration_time_secs as f64 * req.init_expiration_multiplier) as u64;

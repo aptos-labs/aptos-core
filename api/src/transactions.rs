@@ -1319,6 +1319,13 @@ impl TransactionsApi {
                         ));
                     }
                 },
+                TransactionExecutable::Encrypted => {
+                    return Err(SubmitTransactionError::bad_request_with_code(
+                        "Payload cannot be encrypted. Use EncryptedPayload instead",
+                        AptosErrorCode::InvalidInput,
+                        ledger_info,
+                    ));
+                },
             },
             TransactionPayload::EncryptedPayload(payload) => {
                 if !self.context.node_config.api.allow_encrypted_txns_submission {

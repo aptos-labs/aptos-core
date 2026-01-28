@@ -409,10 +409,14 @@ impl InnerBuilder {
                     batch_store.get_batch_from_local(&rpc_request.req.digest())
                 {
                     let batch: Batch<BatchInfoExt> = value.try_into().unwrap();
-                    let batch: Batch<BatchInfo> = batch
-                        .try_into()
-                        .expect("Batch retieval requests must be for V1 batch");
-                    BatchResponse::Batch(batch)
+                    if batch.is_v2() {
+                        BatchResponse::BatchV2(batch)
+                    } else {
+                        let batch: Batch<BatchInfo> = batch
+                            .try_into()
+                            .expect("Batch retieval requests must be for V1 batch");
+                        BatchResponse::Batch(batch)
+                    }
                 } else {
                     match aptos_db_clone.get_latest_ledger_info() {
                         Ok(ledger_info) => BatchResponse::NotFound(ledger_info),

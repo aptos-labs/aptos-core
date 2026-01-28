@@ -155,6 +155,7 @@ impl SecretShareConfig {
         verification_keys: Vec<VerificationKey>,
         config: <FPTXWeighted as BatchThresholdEncryption>::ThresholdConfig,
         encryption_key: EncryptionKey,
+        weights: HashMap<Author, u64>,
     ) -> Self {
         Self {
             _author: author,
@@ -165,7 +166,7 @@ impl SecretShareConfig {
             verification_keys,
             config,
             encryption_key,
-            weights: HashMap::new(),
+            weights,
         }
     }
 

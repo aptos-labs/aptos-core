@@ -8,16 +8,26 @@ use crate::{
 use anyhow::{bail, Result};
 use aptos_batch_encryption::traits::{AssociatedData, Plaintext};
 use aptos_crypto::HashValue;
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(
+    Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
+)]
 pub struct DecryptedPayload {
     executable: TransactionExecutable,
     decryption_nonce: u64,
 }
 
 impl DecryptedPayload {
+    pub fn new(executable: TransactionExecutable, decryption_nonce: u64) -> Self {
+        Self {
+            executable,
+            decryption_nonce,
+        }
+    }
+
     pub fn unwrap(self) -> (TransactionExecutable, u64) {
         (self.executable, self.decryption_nonce)
     }
@@ -31,7 +41,7 @@ pub struct PayloadAssociatedData {
 }
 
 impl PayloadAssociatedData {
-    fn new(sender: AccountAddress) -> Self {
+    pub fn new(sender: AccountAddress) -> Self {
         Self { sender }
     }
 }
@@ -73,17 +83,21 @@ impl EncryptedPayload {
     }
 
     pub fn executable(&self) -> Result<TransactionExecutable> {
-        let Self::Decrypted { executable, .. } = self else {
-            bail!("Transaction is encrypted");
-        };
-        Ok(executable.clone())
+        Ok(match self {
+            EncryptedPayload::Encrypted { .. } | EncryptedPayload::FailedDecryption { .. } => {
+                TransactionExecutable::Encrypted
+            },
+            EncryptedPayload::Decrypted { executable, .. } => executable.clone(),
+        })
     }
 
     pub fn executable_ref(&self) -> Result<TransactionExecutableRef<'_>> {
-        let Self::Decrypted { executable, .. } = self else {
-            bail!("Transaction is encrypted");
-        };
-        Ok(executable.as_ref())
+        Ok(match self {
+            EncryptedPayload::Encrypted { .. } | EncryptedPayload::FailedDecryption { .. } => {
+                TransactionExecutableRef::Encrypted
+            },
+            EncryptedPayload::Decrypted { executable, .. } => executable.as_ref(),
+        })
     }
 
     pub fn extra_config(&self) -> &TransactionExtraConfig {

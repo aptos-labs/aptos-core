@@ -142,10 +142,10 @@ impl Default for QuorumStoreConfig {
             allow_batches_without_pos_in_proposal: true,
             enable_opt_quorum_store: true,
             opt_qs_minimum_batch_age_usecs: Duration::from_millis(50).as_micros() as u64,
-            enable_payload_v2: false,
-            enable_batch_v2: false,
-            enable_opt_qs_v2_tx: false,
-            enable_opt_qs_v2_rx: false,
+            enable_payload_v2: true,
+            enable_batch_v2: true,
+            enable_opt_qs_v2_tx: true,
+            enable_opt_qs_v2_rx: true,
         }
     }
 }

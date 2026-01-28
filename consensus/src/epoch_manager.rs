@@ -55,6 +55,9 @@ use crate::{
     util::time_service::TimeService,
 };
 use anyhow::{anyhow, bail, ensure, Context};
+use aptos_batch_encryption::{
+    group::Fr, schemes::fptx_weighted::FPTXWeighted, traits::BatchThresholdEncryption,
+};
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{
@@ -68,7 +71,7 @@ use aptos_consensus_types::{
     proof_of_store::ProofCache,
     utils::PayloadTxnsSize,
 };
-use aptos_crypto::bls12381::PrivateKey;
+use aptos_crypto::{bls12381::PrivateKey, weighted_config::WeightedConfigArkworks};
 use aptos_dkg::{
     pvss::{traits::Transcript, Player},
     weighted_vuf::traits::WeightedVUF,
@@ -83,7 +86,10 @@ use aptos_safety_rules::{
 };
 use aptos_types::{
     account_address::AccountAddress,
-    dkg::{real_dkg::maybe_dk_from_bls_sk, DKGState, DKGTrait, DefaultDKG},
+    dkg::{
+        chunky_dkg::ChunkyDKGThresholdConfig, real_dkg::maybe_dk_from_bls_sk, DKGState, DKGTrait,
+        DefaultDKG,
+    },
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     jwks::SupportedOIDCProviders,
@@ -94,6 +100,7 @@ use aptos_types::{
         RandomnessConfigSeqNum, ValidatorSet,
     },
     randomness::{RandKeys, WvufPP, WVUF},
+    secret_sharing::SecretShareConfig,
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
@@ -812,6 +819,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         payload_manager: Arc<dyn TPayloadManager>,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
+        secret_sharing_config: Option<SecretShareConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
     ) {
@@ -872,6 +880,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 &onchain_randomness_config,
                 rand_config,
                 fast_rand_config.clone(),
+                secret_sharing_config.clone(),
                 rand_msg_rx,
                 secret_sharing_msg_rx,
                 recovery_data.commit_root_block().round(),
@@ -906,6 +915,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.config.quorum_store.enable_opt_quorum_store,
             self.config.quorum_store.opt_qs_minimum_batch_age_usecs,
             failures_tracker.clone(),
+            self.config.quorum_store.enable_batch_v2,
         ));
 
         info!(epoch = epoch, "Create ProposalGenerator");
@@ -1260,6 +1270,60 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             },
         };
 
+        info!("Generating secret share config");
+
+        let secret_sharing_config = {
+            // TODO(ibalajiarun): Replace with proper DKG-based setup for production
+            let seed = 100u64; // Use epoch as seed for deterministic testing
+            let max_batch_size = 32; // Maximum number of transactions in a batch
+            let number_of_rounds = 200; // Number of rounds for the encryption scheme
+
+            let num_validators = epoch_state.verifier.len();
+            // For testing, use equal weights for all validators
+            let weights: Vec<usize> = vec![1; num_validators];
+            // For testing, use a simple threshold of 2f+1 where f = (n-1)/3
+            let threshold = (2 * (num_validators - 1) / 3 + 1).max(1);
+
+            let threshold_config = ChunkyDKGThresholdConfig::new(threshold, weights)
+                .expect("Failed to create threshold config");
+
+            let (encryption_key, digest_key, verification_keys, msk_shares) =
+                FPTXWeighted::setup_for_testing(
+                    seed,
+                    max_batch_size,
+                    number_of_rounds,
+                    &threshold_config,
+                )
+                .expect("Failed to setup secret sharing config");
+
+            let my_index = epoch_state
+                .verifier
+                .address_to_validator_index()
+                .get(&self.author)
+                .copied()
+                .expect("Author not found in validator set");
+
+            // Create weights HashMap from validator set (currently all weights are 1 for testing)
+            let validator_weights: HashMap<Author, u64> = epoch_state
+                .verifier
+                .address_to_validator_index()
+                .keys()
+                .map(|author| (*author, 1u64))
+                .collect();
+
+            Some(SecretShareConfig::new(
+                self.author,
+                epoch_state.epoch,
+                epoch_state.verifier.clone(),
+                digest_key,
+                msk_shares[my_index].clone(),
+                verification_keys,
+                threshold_config,
+                encryption_key,
+                validator_weights,
+            ))
+        };
+
         info!(
             "[Randomness] start_new_epoch: epoch={}, rand_config={:?}, fast_rand_config={:?}",
             epoch_state.epoch, rand_config, fast_rand_config
@@ -1321,6 +1385,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 payload_manager,
                 rand_config,
                 fast_rand_config,
+                secret_sharing_config,
                 rand_msg_rx,
                 secret_share_manager_rx,
             )
@@ -1377,6 +1442,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         payload_manager: Arc<dyn TPayloadManager>,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
+        secret_sharing_config: Option<SecretShareConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_share_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
     ) {
@@ -1399,6 +1465,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     payload_manager,
                     rand_config,
                     fast_rand_config,
+                    secret_sharing_config,
                     rand_msg_rx,
                     secret_share_msg_rx,
                 )
@@ -1463,6 +1530,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 &onchain_randomness_config,
                 rand_config,
                 fast_rand_config,
+                None,
                 rand_msg_rx,
                 secret_share_msg_rx,
                 highest_committed_round,
@@ -1641,9 +1709,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             | ConsensusMsg::CommitVoteMsg(_)
             | ConsensusMsg::CommitDecisionMsg(_)
             | ConsensusMsg::BatchMsg(_)
+            | ConsensusMsg::BatchMsgV2(_)
             | ConsensusMsg::BatchRequestMsg(_)
             | ConsensusMsg::SignedBatchInfo(_)
-            | ConsensusMsg::ProofOfStoreMsg(_) => {
+            | ConsensusMsg::SignedBatchInfoMsgV2(_)
+            | ConsensusMsg::ProofOfStoreMsg(_)
+            | ConsensusMsg::ProofOfStoreMsgV2(_) => {
                 let event: UnverifiedEvent = msg.into();
                 if event.epoch()? == self.epoch() {
                     return Ok(Some(event));

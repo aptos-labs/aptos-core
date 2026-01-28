@@ -357,6 +357,7 @@ fn matches_entry_function(
                 TransactionExecutableRef::EntryFunction(entry_function) => {
                     compare_entry_function(entry_function, address, module_name, function)
                 },
+                TransactionExecutableRef::Encrypted => false,
             }
         },
         TransactionPayload::EncryptedPayload(payload) => {
@@ -366,6 +367,7 @@ fn matches_entry_function(
                     TransactionExecutableRef::EntryFunction(entry_function) => {
                         compare_entry_function(entry_function, address, module_name, function)
                     },
+                    TransactionExecutableRef::Encrypted => false,
                 }
             } else {
                 false
@@ -400,6 +402,7 @@ fn matches_entry_function_module_address(
                 TransactionExecutableRef::EntryFunction(entry_function) => {
                     compare_entry_function_module_address(entry_function, module_address)
                 },
+                TransactionExecutableRef::Encrypted => false,
             }
         },
         TransactionPayload::EncryptedPayload(payload) => {
@@ -409,6 +412,7 @@ fn matches_entry_function_module_address(
                     TransactionExecutableRef::EntryFunction(entry_function) => {
                         compare_entry_function_module_address(entry_function, module_address)
                     },
+                    TransactionExecutableRef::Encrypted => false,
                 }
             } else {
                 false
@@ -466,6 +470,7 @@ fn matches_script_argument_address(
                 TransactionExecutableRef::Script(script) => {
                     compare_script_argument_address(script, address)
                 },
+                TransactionExecutableRef::Encrypted => false,
             }
         },
         TransactionPayload::EncryptedPayload(payload) => {
@@ -476,6 +481,7 @@ fn matches_script_argument_address(
                     TransactionExecutableRef::Script(script) => {
                         compare_script_argument_address(script, address)
                     },
+                    TransactionExecutableRef::Encrypted => false,
                 }
             } else {
                 false

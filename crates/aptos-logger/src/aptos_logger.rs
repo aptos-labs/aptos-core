@@ -58,7 +58,7 @@ static RUST_LOG_FIELD_MAX_LEN: Lazy<usize> = Lazy::new(|| {
 struct TruncatedLogString(String);
 
 impl TruncatedLogString {
-    const DEFAULT_MAX_LEN: usize = 10 * 1024;
+    const DEFAULT_MAX_LEN: usize = 10 * 10 * 1024;
     const TRUNCATION_SUFFIX: &'static str = "(truncated)";
 
     fn new(s: String) -> Self {
