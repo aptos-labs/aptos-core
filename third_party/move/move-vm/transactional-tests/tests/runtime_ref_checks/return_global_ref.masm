@@ -1,0 +1,29 @@
+//# publish
+module 0xc0ffee::return_global_test
+
+struct Resource has key+drop
+    value: u64
+
+// Test: Cannot return a reference to global storage (not derived from parameter)
+public fun test_return_global_ref(s: &signer): &Resource acquires Resource
+    local res: Resource
+    local global_ref: &Resource
+
+    // Setup: publish a resource
+    ld_u64 42
+    pack Resource
+    st_loc res
+    copy_loc s
+    move_loc res
+    move_to Resource
+
+    // Borrow global resource
+    ld_const<address> 0x1
+    borrow_global Resource
+    st_loc global_ref
+
+    // Try to return global reference (should fail - not derived from parameter)
+    move_loc global_ref
+    ret
+
+//# run 0xc0ffee::return_global_test::test_return_global_ref --signers 0x1 --verbose

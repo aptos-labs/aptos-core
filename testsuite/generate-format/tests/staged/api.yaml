@@ -113,6 +113,11 @@ AnyPublicKey:
         STRUCT:
           - public_key:
               TYPENAME: FederatedKeylessPublicKey
+    5:
+      SlhDsa_Sha2_128s:
+        STRUCT:
+          - public_key:
+              TYPENAME: SlhDsa_Sha2_128s_PublicKey
 AnySignature:
   ENUM:
     0:
@@ -135,6 +140,11 @@ AnySignature:
         STRUCT:
           - signature:
               TYPENAME: KeylessSignature
+    4:
+      SlhDsa_Sha2_128s:
+        STRUCT:
+          - signature:
+              TYPENAME: SlhDsa_Sha2_128s_Signature
 AssertionSignature:
   ENUM:
     0:
@@ -145,7 +155,7 @@ AssertionSignature:
 BIBECiphertext:
   STRUCT:
     - id:
-        TYPENAME: FreeRootId
+        TYPENAME: Id
     - ct_g2: BYTES
     - padded_key:
         TYPENAME: OneTimePaddedKey
@@ -417,9 +427,6 @@ FeeDistribution:
               MAP:
                 KEY: U64
                 VALUE: U64
-FreeRootId:
-  STRUCT:
-    - root_x: BYTES
 FunctionInfo:
   STRUCT:
     - module_address:
@@ -474,6 +481,9 @@ HashValue:
         TUPLEARRAY:
           CONTENT: U8
           SIZE: 32
+Id:
+  STRUCT:
+    - root_x: BYTES
 IdCommitment:
   NEWTYPESTRUCT: BYTES
 Identifier:
@@ -648,6 +658,12 @@ SingleKeyAuthenticator:
         TYPENAME: AnyPublicKey
     - signature:
         TYPENAME: AnySignature
+SlhDsa_Sha2_128s_PrivateKey:
+  NEWTYPESTRUCT: BYTES
+SlhDsa_Sha2_128s_PublicKey:
+  NEWTYPESTRUCT: BYTES
+SlhDsa_Sha2_128s_Signature:
+  NEWTYPESTRUCT: BYTES
 StateKey:
   ENUM:
     0:

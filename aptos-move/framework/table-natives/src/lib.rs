@@ -427,9 +427,7 @@ fn native_add_box(
 
     let res = match gv.move_to(val) {
         Ok(_) => Ok(smallvec![]),
-        Err(_) => Err(SafeNativeError::Abort {
-            abort_code: ALREADY_EXISTS,
-        }),
+        Err(_) => Err(SafeNativeError::abort(ALREADY_EXISTS)),
     };
 
     drop(table_data);
@@ -487,9 +485,7 @@ fn native_borrow_box(
 
     let res = match gv.borrow_global() {
         Ok(ref_val) => Ok(smallvec![ref_val]),
-        Err(_) => Err(SafeNativeError::Abort {
-            abort_code: NOT_FOUND,
-        }),
+        Err(_) => Err(SafeNativeError::abort(NOT_FOUND)),
     };
 
     drop(table_data);
@@ -601,9 +597,7 @@ fn native_remove_box(
 
     let res = match gv.move_from() {
         Ok(val) => Ok(smallvec![val]),
-        Err(_) => Err(SafeNativeError::Abort {
-            abort_code: NOT_FOUND,
-        }),
+        Err(_) => Err(SafeNativeError::abort(NOT_FOUND)),
     };
 
     drop(table_data);

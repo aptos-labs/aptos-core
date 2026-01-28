@@ -1,0 +1,4 @@
+processed 2 tasks
+task 0 lines 1-49:  publish [module 0xc0ffee::return_transform_test]
+task 1 lines 51-51:  run 0xc0ffee::return_transform_test::caller_with_nesting --verbose
+return values: 42

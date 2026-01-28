@@ -18,9 +18,6 @@ pub struct BlockHotStateOpAccumulator<Key> {
     writes: hashbrown::HashSet<Key>,
     /// To prevent the block epilogue from being too heavy.
     max_promotions_per_block: usize,
-    /// Every now and then refresh `hot_since_version` for hot items to prevent them from being
-    /// evicted.
-    _refresh_interval_versions: usize,
 }
 
 impl<Key> BlockHotStateOpAccumulator<Key>
@@ -29,25 +26,16 @@ where
 {
     /// TODO(HotState): make on-chain config
     const MAX_PROMOTIONS_PER_BLOCK: usize = 1024 * 10;
-    /// TODO(HotState): make on-chain config
-    const REFRESH_INTERVAL_VERSIONS: usize = 1_000_000;
 
     pub fn new() -> Self {
-        Self::new_with_config(
-            Self::MAX_PROMOTIONS_PER_BLOCK,
-            Self::REFRESH_INTERVAL_VERSIONS,
-        )
+        Self::new_with_config(Self::MAX_PROMOTIONS_PER_BLOCK)
     }
 
-    pub fn new_with_config(
-        max_promotions_per_block: usize,
-        refresh_interval_versions: usize,
-    ) -> Self {
+    pub fn new_with_config(max_promotions_per_block: usize) -> Self {
         Self {
             to_make_hot: BTreeSet::new(),
             writes: hashbrown::HashSet::new(),
             max_promotions_per_block,
-            _refresh_interval_versions: refresh_interval_versions,
         }
     }
 

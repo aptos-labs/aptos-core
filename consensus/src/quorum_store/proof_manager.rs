@@ -185,31 +185,40 @@ impl ProofManager {
         counters::NUM_INLINE_BATCHES.observe(inline_block.len() as f64);
         counters::NUM_INLINE_TXNS.observe(inline_block_size.count() as f64);
 
-        // TODO(ibalajiarun): Avoid clones
-        let inline_block: Vec<_> = inline_block
-            .into_iter()
-            .map(|(info, txns)| (info.info().clone(), txns))
-            .collect();
-        let opt_batches: Vec<_> = opt_batches
-            .into_iter()
-            .map(|info| info.info().clone())
-            .collect();
-        let proof_block: Vec<_> = proof_block
-            .into_iter()
-            .map(|proof| {
-                let (info, sig) = proof.unpack();
-                ProofOfStore::new(info.info().clone(), sig)
-            })
-            .collect();
-
-        let response = if request.maybe_optqs_payload_pull_params.is_some() {
-            let inline_batches = inline_block.into();
-            Payload::OptQuorumStore(OptQuorumStorePayload::new(
-                inline_batches,
-                opt_batches.into(),
-                proof_block.into(),
-                PayloadExecutionLimit::None,
-            ))
+        let response = if let Some(ref params) = request.maybe_optqs_payload_pull_params {
+            // Determine whether to use V2 payload based on the flag
+            if params.use_batch_v2 {
+                // Keep BatchInfoExt for V2
+                Payload::OptQuorumStore(OptQuorumStorePayload::new_v2(
+                    inline_block.into(),
+                    opt_batches.into(),
+                    proof_block.into(),
+                    PayloadExecutionLimit::None,
+                ))
+            } else {
+                // Convert to BatchInfo for V1
+                let inline_block_v1: Vec<_> = inline_block
+                    .into_iter()
+                    .map(|(info, txns)| (info.info().clone(), txns))
+                    .collect();
+                let opt_batches_v1: Vec<_> = opt_batches
+                    .into_iter()
+                    .map(|info| info.info().clone())
+                    .collect();
+                let proof_block_v1: Vec<_> = proof_block
+                    .into_iter()
+                    .map(|proof| {
+                        let (info, sig) = proof.unpack();
+                        ProofOfStore::new(info.info().clone(), sig)
+                    })
+                    .collect();
+                Payload::OptQuorumStore(OptQuorumStorePayload::new(
+                    inline_block_v1.into(),
+                    opt_batches_v1.into(),
+                    proof_block_v1.into(),
+                    PayloadExecutionLimit::None,
+                ))
+            }
         } else if proof_block.is_empty() && inline_block.is_empty() {
             Payload::empty(true, self.allow_batches_without_pos_in_proposal)
         } else {
@@ -219,16 +228,30 @@ impl ProofManager {
                 proof_block.len(),
                 inline_block.len()
             );
+            // Both QuorumStoreInlineHybrid and QuorumStoreInlineHybridV2 use BatchInfo
+            // So we need to convert BatchInfoExt to BatchInfo
+            let inline_block_v1: Vec<_> = inline_block
+                .into_iter()
+                .map(|(info, txns)| (info.info().clone(), txns))
+                .collect();
+            let proof_block_v1: Vec<_> = proof_block
+                .into_iter()
+                .map(|proof| {
+                    let (info, sig) = proof.unpack();
+                    ProofOfStore::new(info.info().clone(), sig)
+                })
+                .collect();
+
             if self.enable_payload_v2 {
                 Payload::QuorumStoreInlineHybridV2(
-                    inline_block,
-                    ProofWithData::new(proof_block),
+                    inline_block_v1,
+                    ProofWithData::new(proof_block_v1),
                     PayloadExecutionLimit::None,
                 )
             } else {
                 Payload::QuorumStoreInlineHybrid(
-                    inline_block,
-                    ProofWithData::new(proof_block),
+                    inline_block_v1,
+                    ProofWithData::new(proof_block_v1),
                     None,
                 )
             }

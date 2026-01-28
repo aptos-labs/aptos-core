@@ -304,7 +304,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "7.14.0"
+version = "7.14.1"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -1156,6 +1156,7 @@ dependencies = [
  "merlin",
  "more-asserts",
  "neptune",
+ "num 0.4.1",
  "num-bigint 0.3.3",
  "num-integer",
  "num-traits",
@@ -1166,6 +1167,7 @@ dependencies = [
  "proptest-derive",
  "rand 0.7.3",
  "rand_core 0.5.1",
+ "rayon",
  "ring 0.16.20",
  "serde",
  "serde-name",
@@ -1419,6 +1421,7 @@ dependencies = [
  "ff",
  "group",
  "hex",
+ "itertools 0.13.0",
  "merlin",
  "more-asserts",
  "num-bigint 0.3.3",

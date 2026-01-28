@@ -4,7 +4,7 @@
 //! How and where to record the Serde format of interesting Aptos types.
 //! See API documentation with `cargo doc -p serde-reflection --open`
 
-use aptos_batch_encryption::shared::ids::FreeRootId;
+use aptos_batch_encryption::shared::ids::Id;
 use aptos_crypto::ed25519::{Ed25519PublicKey, Ed25519Signature};
 use aptos_types::{
     keyless::{self, EphemeralCertificate, Groth16Proof, IdCommitment, Pepper, ZeroKnowledgeSig},
@@ -120,7 +120,7 @@ fn trace_encrypted_txn_structs(
     samples: &mut Samples,
 ) -> serde_reflection::Result<()> {
     tracer.trace_value(samples, &Ciphertext::random())?;
-    tracer.trace_value(samples, &FreeRootId::zero())?;
+    tracer.trace_value(samples, &Id::one())?;
     tracer.trace_value(samples, &EvalProof::random())?;
 
     Ok(())

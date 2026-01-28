@@ -46,7 +46,7 @@ fn aggregatable_dkg<T: AggregatableTranscript + CryptoHash>(
 ) {
     let mut rng = StdRng::from_seed(seed_bytes);
 
-    let d = test_utils::setup_dealing::<T, StdRng>(sc, &mut rng);
+    let d = test_utils::setup_dealing::<T, StdRng>(sc, None, &mut rng);
 
     let mut trxs = vec![];
 

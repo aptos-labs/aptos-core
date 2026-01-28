@@ -14,7 +14,7 @@ use crate::{
     schema::stale_node_index::StaleNodeIndexSchema,
 };
 use aptos_config::config::{
-    EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, RocksdbConfigs,
+    EpochSnapshotPrunerConfig, HotStateConfig, LedgerPrunerConfig, PrunerConfig, RocksdbConfigs,
     StateMerklePrunerConfig, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
 };
@@ -128,6 +128,7 @@ fn test_error_if_version_pruned() {
     let db = AptosDB::new_for_test(&tmp_dir);
     db.state_store
         .state_db
+        .state_pruner
         .state_merkle_pruner
         .save_min_readable_version(5)
         .unwrap();
@@ -256,7 +257,7 @@ pub fn test_state_merkle_pruning_impl(
         BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
         None,
-        /* reset_hot_state = */ true,
+        HotStateConfig::default(),
     )
     .unwrap();
 
@@ -292,8 +293,8 @@ pub fn test_state_merkle_pruning_impl(
             .collect();
 
         // Prune till the oldest snapshot readable.
-        let pruner = &db.state_store.state_db.state_merkle_pruner;
-        let epoch_snapshot_pruner = &db.state_store.state_db.epoch_snapshot_pruner;
+        let pruner = &db.state_store.state_db.state_pruner.state_merkle_pruner;
+        let epoch_snapshot_pruner = &db.state_store.state_db.state_pruner.epoch_snapshot_pruner;
         pruner.set_worker_target_version(*snapshots.first().unwrap());
         epoch_snapshot_pruner.set_worker_target_version(std::cmp::min(
             *snapshots.first().unwrap(),

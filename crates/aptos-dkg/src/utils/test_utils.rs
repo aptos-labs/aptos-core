@@ -9,7 +9,7 @@ use rand::{CryptoRng, RngCore};
 pub fn range_proof_random_instance<E: Pairing, B: BatchedRangeProof<E>, R: RngCore + CryptoRng>(
     pk: &B::ProverKey,
     n: usize,
-    ell: usize,
+    ell: u8,
     rng: &mut R,
 ) -> (Vec<B::Input>, B::Commitment, B::CommitmentRandomness) {
     // TODO: One might want to assert something like n <= pk.max_n here, for which you'd have to e.g. add a trait HasMaxN to ProverKey

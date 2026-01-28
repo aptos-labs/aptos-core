@@ -23,10 +23,7 @@ const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGT
 
 fn make_failed_native() -> NativeFunction {
     Arc::new(move |_, _, _| -> PartialVMResult<NativeResult> {
-        Ok(NativeResult::Abort {
-            cost: InternalGas::new(0),
-            abort_code: 12,
-        })
+        Ok(NativeResult::err(InternalGas::new(0), 12))
     })
 }
 

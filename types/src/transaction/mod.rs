@@ -26,7 +26,7 @@ use aptos_crypto::{
     ed25519::*,
     hash::CryptoHash,
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
-    secp256k1_ecdsa,
+    secp256k1_ecdsa, slh_dsa_sha2_128s,
     traits::{signing_message, SigningKey},
     CryptoMaterialError, HashValue,
 };
@@ -530,6 +530,21 @@ impl RawTransaction {
         let signature = private_key.sign(&self)?;
         Ok(SignatureCheckedTransaction(
             SignedTransaction::new_secp256k1_ecdsa(self, public_key, signature),
+        ))
+    }
+
+    /// Signs the given `RawTransaction` using SLH-DSA-SHA2-128s. Note that this consumes the `RawTransaction` and turns it
+    /// into a `SignatureCheckedTransaction`.
+    ///
+    /// For a transaction that has just been signed, its signature is expected to be valid.
+    pub fn sign_slh_dsa_sha2_128s(
+        self,
+        private_key: &slh_dsa_sha2_128s::PrivateKey,
+        public_key: slh_dsa_sha2_128s::PublicKey,
+    ) -> Result<SignatureCheckedTransaction> {
+        let signature = private_key.sign(&self)?;
+        Ok(SignatureCheckedTransaction(
+            SignedTransaction::new_slh_dsa_sha2_128s(self, public_key, signature),
         ))
     }
 
@@ -1166,6 +1181,18 @@ impl SignedTransaction {
         let authenticator = AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
             AnyPublicKey::secp256k1_ecdsa(public_key),
             AnySignature::secp256k1_ecdsa(signature),
+        ));
+        Self::new_single_sender(raw_txn, authenticator)
+    }
+
+    pub fn new_slh_dsa_sha2_128s(
+        raw_txn: RawTransaction,
+        public_key: slh_dsa_sha2_128s::PublicKey,
+        signature: slh_dsa_sha2_128s::Signature,
+    ) -> SignedTransaction {
+        let authenticator = AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
+            AnyPublicKey::slh_dsa_sha2_128s(public_key),
+            AnySignature::slh_dsa_sha2_128s(signature),
         ));
         Self::new_single_sender(raw_txn, authenticator)
     }

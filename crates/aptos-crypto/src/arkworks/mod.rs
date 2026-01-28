@@ -10,6 +10,7 @@ pub mod random;
 pub mod scrape;
 pub mod serialization;
 pub mod shamir;
+pub mod srs;
 pub mod vanishing_poly;
 pub mod weighted_sum;
 
@@ -19,7 +20,7 @@ use ark_poly::EvaluationDomain;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 /// A pair of canonical group generators for a pairing-friendly elliptic curve.
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct GroupGenerators<E: Pairing> {
     /// The generator of the G₁ group (affine coordinates).
     pub g1: E::G1Affine,

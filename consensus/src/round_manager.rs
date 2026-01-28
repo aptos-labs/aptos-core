@@ -111,6 +111,7 @@ impl UnverifiedEvent {
         validator: &ValidatorVerifier,
         proof_cache: &ProofCache,
         quorum_store_enabled: bool,
+        opt_qs_v2_rx_enabled: bool,
         self_message: bool,
         max_num_batches: usize,
         max_batch_expiry_gap_usecs: u64,
@@ -119,7 +120,13 @@ impl UnverifiedEvent {
         Ok(match self {
             UnverifiedEvent::ProposalMsg(p) => {
                 if !self_message {
-                    p.verify(peer_id, validator, proof_cache, quorum_store_enabled)?;
+                    p.verify(
+                        peer_id,
+                        validator,
+                        proof_cache,
+                        quorum_store_enabled,
+                        opt_qs_v2_rx_enabled,
+                    )?;
                     counters::VERIFY_MSG
                         .with_label_values(&["proposal"])
                         .observe(start_time.elapsed().as_secs_f64());
@@ -128,7 +135,13 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::OptProposalMsg(p) => {
                 if !self_message {
-                    p.verify(peer_id, validator, proof_cache, quorum_store_enabled)?;
+                    p.verify(
+                        peer_id,
+                        validator,
+                        proof_cache,
+                        quorum_store_enabled,
+                        opt_qs_v2_rx_enabled,
+                    )?;
                     counters::VERIFY_MSG
                         .with_label_values(&["opt_proposal"])
                         .observe(start_time.elapsed().as_secs_f64());

@@ -122,7 +122,7 @@ impl PipelineBuilder {
             .into_par_iter()
             .zip(txn_ciphertexts)
             .map(|(mut txn, ciphertext)| {
-                let eval_proof = proofs.get(&ciphertext.id()).expect("must exist").into();
+                let eval_proof = proofs.get(&ciphertext.id()).expect("must exist");
                 if let Ok(payload) = FPTXWeighted::decrypt_individual::<DecryptedPayload>(
                     &decryption_key.key,
                     &ciphertext,

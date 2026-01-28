@@ -74,7 +74,7 @@ enum Commands {
         file: Option<PathBuf>,
 
         /// Sample metric name (used when no file provided)
-        #[clap(long, default_value = "test_metric")]
+        #[clap(long, default_value = "telemetry_e2e_test_metric")]
         metric_name: String,
 
         /// Sample metric value (used when no file provided)
@@ -90,7 +90,10 @@ enum Commands {
         file: Option<PathBuf>,
 
         /// Sample log message (used when no file provided)
-        #[clap(long, default_value = "Test log message from telemetry-test-client")]
+        #[clap(
+            long,
+            default_value = "E2E test log message from telemetry-test-client"
+        )]
         message: String,
 
         /// Number of sample logs to send (used when no file provided)
@@ -106,7 +109,7 @@ enum Commands {
         file: Option<PathBuf>,
 
         /// Sample event name (used when no file provided)
-        #[clap(long, default_value = "TEST_EVENT")]
+        #[clap(long, default_value = "TELEMETRY_E2E_TEST_EVENT")]
         event_name: String,
     },
 
@@ -550,20 +553,23 @@ async fn main() -> Result<()> {
                     client.authenticate().await?;
                 }
 
-                // Send metrics
-                let metrics = generate_sample_metrics("test_iteration_metric", i as f64);
+                // Send metrics with telemetry_e2e_test_ prefix
+                let metrics =
+                    generate_sample_metrics("telemetry_e2e_test_iteration_metric", i as f64);
                 if let Err(e) = client.send_metrics(&metrics).await {
                     warn!("Failed to send metrics: {}", e);
                 }
 
                 // Send logs
-                let logs = generate_sample_logs(&format!("Iteration {} log", i), 2);
+                let logs =
+                    generate_sample_logs(&format!("telemetry_e2e_test iteration {} log", i), 2);
                 if let Err(e) = client.send_logs(logs).await {
                     warn!("Failed to send logs: {}", e);
                 }
 
-                // Send events
-                let events = generate_sample_events(&format!("TEST_EVENT_ITER_{}", i));
+                // Send events with telemetry_e2e_test_ prefix
+                let events =
+                    generate_sample_events(&format!("TELEMETRY_E2E_TEST_EVENT_ITER_{}", i));
                 if let Err(e) = client.send_events(events).await {
                     warn!("Failed to send events: {}", e);
                 }

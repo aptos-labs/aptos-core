@@ -136,7 +136,7 @@ module aptos_token_objects::aptos_token {
             uri,
         );
 
-        let object_signer = object::generate_signer(&constructor_ref);
+        let object_signer = constructor_ref.generate_signer();
         let mutator_ref = if (mutable_description || mutable_uri) {
             option::some(collection::generate_mutator_ref(&constructor_ref))
         } else {
@@ -144,7 +144,7 @@ module aptos_token_objects::aptos_token {
         };
 
         let royalty_mutator_ref = if (mutable_royalty) {
-            option::some(royalty::generate_mutator_ref(object::generate_extend_ref(&constructor_ref)))
+            option::some(royalty::generate_mutator_ref(constructor_ref.generate_extend_ref()))
         } else {
             option::none()
         };
@@ -162,7 +162,7 @@ module aptos_token_objects::aptos_token {
             tokens_freezable_by_creator,
         };
         move_to(&object_signer, aptos_collection);
-        object::object_from_constructor_ref(&constructor_ref)
+        constructor_ref.object_from_constructor_ref()
     }
 
     /// With an existing collection, directly mint a viable token into the creators account.
@@ -206,13 +206,13 @@ module aptos_token_objects::aptos_token {
         // If tokens are freezable, add a transfer ref to be able to freeze transfers
         let freezable_by_creator = are_collection_tokens_freezable(collection);
         if (freezable_by_creator) {
-            let aptos_token_addr = object::address_from_constructor_ref(&constructor_ref);
+            let aptos_token_addr = constructor_ref.address_from_constructor_ref();
             let aptos_token = &mut AptosToken[aptos_token_addr];
-            let transfer_ref = object::generate_transfer_ref(&constructor_ref);
+            let transfer_ref = constructor_ref.generate_transfer_ref();
             aptos_token.transfer_ref.fill(transfer_ref);
         };
 
-        object::object_from_constructor_ref(&constructor_ref)
+        constructor_ref.object_from_constructor_ref()
     }
 
     /// With an existing collection, directly mint a soul bound token into the recipient's account.
@@ -263,12 +263,12 @@ module aptos_token_objects::aptos_token {
             property_values,
         );
 
-        let transfer_ref = object::generate_transfer_ref(&constructor_ref);
-        let linear_transfer_ref = object::generate_linear_transfer_ref(&transfer_ref);
-        object::transfer_with_ref(linear_transfer_ref, soul_bound_to);
-        object::disable_ungated_transfer(&transfer_ref);
+        let transfer_ref = constructor_ref.generate_transfer_ref();
+        let linear_transfer_ref = transfer_ref.generate_linear_transfer_ref();
+        linear_transfer_ref.transfer_with_ref(soul_bound_to);
+        transfer_ref.disable_ungated_transfer();
 
-        object::object_from_constructor_ref(&constructor_ref)
+        constructor_ref.object_from_constructor_ref()
     }
 
     fun mint_internal(
@@ -283,7 +283,7 @@ module aptos_token_objects::aptos_token {
     ): ConstructorRef acquires AptosCollection {
         let constructor_ref = token::create(creator, collection, description, name, option::none(), uri);
 
-        let object_signer = object::generate_signer(&constructor_ref);
+        let object_signer = constructor_ref.generate_signer();
 
         let collection_obj = collection_object(creator, &collection);
         let collection = borrow_collection(&collection_obj);
@@ -321,7 +321,7 @@ module aptos_token_objects::aptos_token {
     // Token accessors
 
     inline fun borrow<T: key>(token: &Object<T>): &AptosToken {
-        let token_address = object::object_address(token);
+        let token_address = token.object_address();
         assert!(
             exists<AptosToken>(token_address),
             error::not_found(ETOKEN_DOES_NOT_EXIST),
@@ -363,7 +363,7 @@ module aptos_token_objects::aptos_token {
     // Token mutators
 
     inline fun authorized_borrow<T: key>(token: &Object<T>, creator: &signer): &AptosToken {
-        let token_address = object::object_address(token);
+        let token_address = token.object_address();
         assert!(
             exists<AptosToken>(token_address),
             error::not_found(ETOKEN_DOES_NOT_EXIST),
@@ -383,7 +383,7 @@ module aptos_token_objects::aptos_token {
             error::permission_denied(ETOKEN_NOT_BURNABLE),
         );
         move aptos_token;
-        let aptos_token = move_from<AptosToken>(object::object_address(&token));
+        let aptos_token = move_from<AptosToken>(token.object_address());
         let AptosToken {
             burn_ref,
             transfer_ref: _,
@@ -401,7 +401,7 @@ module aptos_token_objects::aptos_token {
                 && aptos_token.transfer_ref.is_some(),
             error::permission_denied(EFIELD_NOT_MUTABLE),
         );
-        object::disable_ungated_transfer(aptos_token.transfer_ref.borrow());
+        aptos_token.transfer_ref.borrow().disable_ungated_transfer();
     }
 
     public entry fun unfreeze_transfer<T: key>(
@@ -414,7 +414,7 @@ module aptos_token_objects::aptos_token {
                 && aptos_token.transfer_ref.is_some(),
             error::permission_denied(EFIELD_NOT_MUTABLE),
         );
-        object::enable_ungated_transfer(aptos_token.transfer_ref.borrow());
+        aptos_token.transfer_ref.borrow().enable_ungated_transfer();
     }
 
     public entry fun set_description<T: key>(
@@ -540,7 +540,7 @@ module aptos_token_objects::aptos_token {
     }
 
     inline fun borrow_collection<T: key>(token: &Object<T>): &AptosCollection {
-        let collection_address = object::object_address(token);
+        let collection_address = token.object_address();
         assert!(
             exists<AptosCollection>(collection_address),
             error::not_found(ECOLLECTION_DOES_NOT_EXIST),
@@ -605,7 +605,7 @@ module aptos_token_objects::aptos_token {
     // Collection mutators
 
     inline fun authorized_borrow_collection<T: key>(collection: &Object<T>, creator: &signer): &AptosCollection {
-        let collection_address = object::object_address(collection);
+        let collection_address = collection.object_address();
         assert!(
             exists<AptosCollection>(collection_address),
             error::not_found(ECOLLECTION_DOES_NOT_EXIST),
@@ -682,9 +682,9 @@ module aptos_token_objects::aptos_token {
         create_collection_helper(creator, collection_name, true);
         let token = mint_helper(creator, collection_name, token_name);
 
-        assert!(object::owner(token) == signer::address_of(creator), 1);
+        assert!(token.owner() == signer::address_of(creator), 1);
         object::transfer(creator, token, @0x345);
-        assert!(object::owner(token) == @0x345, 1);
+        assert!(token.owner() == @0x345, 1);
     }
 
     #[test(creator = @0x123, bob = @0x456)]
@@ -893,7 +893,7 @@ module aptos_token_objects::aptos_token {
 
         create_collection_helper(creator, collection_name, true);
         let token = mint_helper(creator, collection_name, token_name);
-        let token_addr = object::object_address(&token);
+        let token_addr = token.object_address();
 
         assert!(exists<AptosToken>(token_addr), 0);
         burn(creator, token);

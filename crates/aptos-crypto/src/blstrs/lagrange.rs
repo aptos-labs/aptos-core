@@ -13,7 +13,7 @@ use ff::{BatchInvert, Field};
 use more_asserts::{assert_gt, debug_assert_le};
 use std::ops::{Mul, MulAssign};
 
-const FFT_THRESH: usize = 64;
+const FFT_THRESH: usize = 64 * 2; // It was previously set to 64
 
 /// Returns all the $N$ Lagrange coefficients for the interpolating set $T = \{\omega^0, \omega^1, \ldots, \omega^{N-1}\}$,
 /// where $\omega$ is an $N$th root of unity and $N$ is the size of `dom`.

@@ -127,7 +127,7 @@
 <pre><code><b>public</b> <b>fun</b> <a href="rate_limiter.md#0x1_rate_limiter_request">request</a>(limiter: &<b>mut</b> <a href="rate_limiter.md#0x1_rate_limiter_RateLimiter">RateLimiter</a>, num_token_requested: u64): bool {
     <a href="rate_limiter.md#0x1_rate_limiter_refill">refill</a>(limiter);
     <b>if</b> (limiter.current_amount &gt;= num_token_requested) {
-        limiter.current_amount = limiter.current_amount - num_token_requested;
+        limiter.current_amount -= num_token_requested;
         <b>true</b>
     } <b>else</b> {
         <b>false</b>
@@ -164,7 +164,7 @@
         limiter.current_amount = limiter.capacity;
         limiter.fractional_accumulated = 0;
     } <b>else</b> {
-        limiter.current_amount = limiter.current_amount + new_tokens;
+        limiter.current_amount += new_tokens;
         // Update the fractional amount accumulated for the next refill cycle
         limiter.fractional_accumulated = accumulated_amount % limiter.refill_interval;
     };

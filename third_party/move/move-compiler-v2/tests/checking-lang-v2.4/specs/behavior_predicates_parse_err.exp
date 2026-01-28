@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_parse_err.move:11:30
+   │
+11 │         ensures requires_of<f(x, y);
+   │                              ^
+   │                              │
+   │                              Unexpected '('
+   │                              Expected '>'

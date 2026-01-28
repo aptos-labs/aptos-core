@@ -346,9 +346,7 @@ fn native_request_publish(
     let code_context = context.extensions_mut().get_mut::<NativeCodeContext>();
     if code_context.requested_module_bundle.is_some() || !code_context.enabled {
         // Can't request second time or if publish requests are not allowed.
-        return Err(SafeNativeError::Abort {
-            abort_code: EALREADY_REQUESTED,
-        });
+        return Err(SafeNativeError::abort(EALREADY_REQUESTED));
     }
     code_context.requested_module_bundle = Some(PublishRequest {
         destination,

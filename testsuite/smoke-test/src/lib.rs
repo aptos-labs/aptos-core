@@ -46,6 +46,8 @@ mod rest_api;
 #[cfg(test)]
 mod rosetta;
 #[cfg(test)]
+mod slh_dsa;
+#[cfg(test)]
 mod state_sync;
 #[cfg(test)]
 mod state_sync_utils;

@@ -33,11 +33,12 @@ use aptos_crypto::{
     arkworks::{
         self,
         random::{
-            sample_field_element, sample_field_elements, unsafe_random_point, unsafe_random_points,
-            UniformRand,
+            sample_field_element, sample_field_elements, unsafe_random_point_group,
+            unsafe_random_points_group, UniformRand,
         },
         scrape::LowDegreeTest,
         serialization::{ark_de, ark_se},
+        srs::SrsBasis,
     },
     bls12381::{self},
     utils,
@@ -64,7 +65,7 @@ pub struct Transcript<E: Pairing> {
     dealer: Player,
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     /// This is the aggregatable subtranscript
-    pub subtrs: SubTranscript<E>,
+    pub subtrs: Subtranscript<E>,
     /// Proof (of knowledge) showing that the s_{i,j}'s in C are base-B representations (of the s_i's in V, but this is not part of the proof), and that the r_j's in R are used in C
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub sharing_proof: SharingProof<E>,
@@ -74,7 +75,7 @@ pub struct Transcript<E: Pairing> {
 #[derive(
     CanonicalSerialize, CanonicalDeserialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq,
 )]
-pub struct SubTranscript<E: Pairing> {
+pub struct Subtranscript<E: Pairing> {
     // The dealt public key
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub V0: E::G2,
@@ -89,7 +90,7 @@ pub struct SubTranscript<E: Pairing> {
     pub Rs: Vec<Vec<E::G1>>,
 }
 
-impl<E: Pairing> ValidCryptoMaterial for SubTranscript<E> {
+impl<E: Pairing> ValidCryptoMaterial for Subtranscript<E> {
     const AIP_80_PREFIX: &'static str = "";
 
     fn to_bytes(&self) -> Vec<u8> {
@@ -98,11 +99,11 @@ impl<E: Pairing> ValidCryptoMaterial for SubTranscript<E> {
     }
 }
 
-impl<E: Pairing> TryFrom<&[u8]> for SubTranscript<E> {
+impl<E: Pairing> TryFrom<&[u8]> for Subtranscript<E> {
     type Error = CryptoMaterialError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        bcs::from_bytes::<SubTranscript<E>>(bytes)
+        bcs::from_bytes::<Subtranscript<E>>(bytes)
             .map_err(|_| CryptoMaterialError::DeserializationError)
     }
 }
@@ -114,7 +115,7 @@ type SecretSharingConfig<E: Pairing> = WeightedConfigArkworks<E::ScalarField>;
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
     HasAggregatableSubtranscript for Transcript<E>
 {
-    type Subtranscript = SubTranscript<E>;
+    type Subtranscript = Subtranscript<E>;
 
     fn get_subtranscript(&self) -> Self::Subtranscript {
         self.subtrs.clone()
@@ -162,8 +163,14 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         {
             // Verify the PoK
             let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
-            let hom = hkzg_chunked_elgamal::WeightedHomomorphism::new(
-                &pp.pk_range_proof.ck_S.lagr_g1,
+            let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
+                SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,
+                SrsBasis::PowersOfTau { .. } => {
+                    bail!("Expected a Lagrange basis, received powers of tau basis instead")
+                },
+            };
+            let hom = hkzg_chunked_elgamal::WeightedHomomorphism::<E>::new(
+                lagr_g1,
                 pp.pk_range_proof.ck_S.xi_1,
                 &pp.pp_elgamal,
                 &eks_inner,
@@ -186,7 +193,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             if let Err(err) = self.sharing_proof.range_proof.verify(
                 &pp.pk_range_proof.vk,
                 sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize,
-                pp.ell as usize,
+                pp.ell,
                 &self.sharing_proof.range_proof_commitment,
             ) {
                 bail!("Range proof batch verification failed: {:?}", err);
@@ -280,7 +287,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
 }
 
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Subtranscript
-    for SubTranscript<E>
+    for Subtranscript<E>
 {
     type DealtPubKey = keys::DealtPubKey<E>;
     type DealtPubKeyShare = Vec<keys::DealtPubKeyShare<E>>;
@@ -373,7 +380,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     }
 }
 
-impl<E: Pairing> Aggregatable for SubTranscript<E> {
+impl<E: Pairing> Aggregatable for Subtranscript<E> {
     type SecretSharingConfig = SecretSharingConfig<E>;
 
     #[allow(non_snake_case)]
@@ -451,6 +458,8 @@ type SokContext<'a, A: Serialize + Clone> = (
     Vec<u8>, // This is for the DST
 );
 
+use crate::pvss::chunky::chunked_elgamal::decrypt_chunked_scalars;
+
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Transcript
     for Transcript<E>
 {
@@ -467,7 +476,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     type SigningSecretKey = bls12381::PrivateKey;
 
     fn scheme_name() -> String {
-        "chunky_pvss".to_string()
+        "chunky_v1".to_string()
     }
 
     /// Fetches the domain-separation tag (DST)
@@ -528,7 +537,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         Transcript {
             dealer: *dealer,
-            subtrs: SubTranscript { V0, Vs, Cs, Rs },
+            subtrs: Subtranscript { V0, Vs, Cs, Rs },
             sharing_proof,
         }
     }
@@ -565,61 +574,33 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         dk: &Self::DecryptPrivKey,
         pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        let weight = sc.get_player_weight(player);
-
         let Cs = &self.subtrs.Cs[player.id];
+        debug_assert_eq!(Cs.len(), sc.get_player_weight(player));
 
-        // TODO: put an assert here saying that len(Cs) = weight
-
-        let ephemeral_keys: Vec<_> = self
-            .subtrs
-            .Rs
-            .iter()
-            .take(weight)
-            .map(|R_i_vec| R_i_vec.iter().map(|R_i| R_i.mul(dk.dk)).collect::<Vec<_>>())
-            .collect();
-
-        if let Some(first_key) = ephemeral_keys.first() {
-            debug_assert_eq!(
-                first_key.len(),
-                Cs[0].len(),
-                "Number of ephemeral keys does not match the number of ciphertext chunks"
-            );
+        if !Cs.is_empty() {
+            if let Some(first_key) = self.subtrs.Rs.first() {
+                debug_assert_eq!(
+                    first_key.len(),
+                    Cs[0].len(),
+                    "Number of ephemeral keys does not match the number of ciphertext chunks"
+                );
+            }
         }
 
-        let mut sk_shares: Vec<Scalar<E::ScalarField>> = Vec::with_capacity(weight);
         let pk_shares = self.get_public_key_share(sc, player);
 
-        for i in 0..weight {
-            // TODO: should really put this in a separate function
-            let dealt_encrypted_secret_key_share_chunks: Vec<_> = Cs[i]
-                .iter()
-                .zip(ephemeral_keys[i].iter())
-                .map(|(C_ij, ephemeral_key)| C_ij.sub(ephemeral_key))
-                .collect();
-
-            let dealt_chunked_secret_key_share = bsgs::dlog_vec(
-                pp.pp_elgamal.G.into_group(),
-                &dealt_encrypted_secret_key_share_chunks,
-                &pp.table,
-                pp.get_dlog_range_bound(),
-            )
-            .expect("BSGS dlog failed");
-
-            let dealt_chunked_secret_key_share_fr: Vec<E::ScalarField> =
-                dealt_chunked_secret_key_share
-                    .iter()
-                    .map(|&x| E::ScalarField::from(x))
-                    .collect();
-
-            let dealt_secret_key_share =
-                chunks::le_chunks_to_scalar(pp.ell, &dealt_chunked_secret_key_share_fr);
-
-            sk_shares.push(Scalar(dealt_secret_key_share));
-        }
+        let sk_shares: Vec<_> = decrypt_chunked_scalars(
+            &Cs,
+            &self.subtrs.Rs,
+            &dk.dk,
+            &pp.pp_elgamal,
+            &pp.table,
+            pp.ell,
+        );
 
         (
-            sk_shares, pk_shares, // TODO: review this formalism... wh ydo we need this here?
+            Scalar::vec_from_inner(sk_shares),
+            pk_shares, // TODO: review this formalism... why do we need this here?
         )
     }
 
@@ -632,9 +613,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         Transcript {
             dealer: sc.get_player(0),
-            subtrs: SubTranscript {
-                V0: unsafe_random_point::<E::G2, _>(rng),
-                Vs: sc.group_by_player(&unsafe_random_points::<E::G2, _>(
+            subtrs: Subtranscript {
+                V0: unsafe_random_point_group::<E::G2, _>(rng),
+                Vs: sc.group_by_player(&unsafe_random_points_group::<E::G2, _>(
                     sc.get_total_weight(),
                     rng,
                 )),
@@ -642,17 +623,17 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
                     .map(|i| {
                         let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
                         (0..w)
-                            .map(|_| unsafe_random_points(num_chunks_per_share, rng))
+                            .map(|_| unsafe_random_points_group(num_chunks_per_share, rng))
                             .collect() // todo: use vec![vec![]]... like in the generate functions
                     })
                     .collect(),
                 Rs: (0..sc.get_max_weight())
-                    .map(|_| unsafe_random_points(num_chunks_per_share, rng))
+                    .map(|_| unsafe_random_points_group(num_chunks_per_share, rng))
                     .collect(),
             },
             sharing_proof: SharingProof {
                 range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
-                    unsafe_random_point(rng),
+                    unsafe_random_point_group(rng),
                 ),
                 SoK: hkzg_chunked_elgamal::WeightedProof::generate(sc, num_chunks_per_share, rng),
                 range_proof: dekart_univariate_v2::Proof::generate(pp.ell, rng),
@@ -685,6 +666,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
                         rng,
                         1 << pp.ell as u64,
                         num_chunks_per_scalar::<E::ScalarField>(pp.ell),
+                        &E::ScalarField::ZERO,
                     )
                 })
                 .collect(),
@@ -711,8 +693,14 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         // (2) Compute its image under the corresponding homomorphism, and produce an SoK
         //   (2a) Set up the tuple homomorphism
         let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect(); // TODO: this is a bit ugly
-        let hom = hkzg_chunked_elgamal::WeightedHomomorphism::new(
-            &pp.pk_range_proof.ck_S.lagr_g1,
+        let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
+            SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,
+            SrsBasis::PowersOfTau { .. } => {
+                panic!("Expected a Lagrange basis, received powers of tau basis instead")
+            },
+        };
+        let hom = hkzg_chunked_elgamal::WeightedHomomorphism::<E>::new(
+            lagr_g1,
             pp.pk_range_proof.ck_S.xi_1,
             &pp.pp_elgamal,
             &eks_inner,
@@ -743,7 +731,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         let range_proof = dekart_univariate_v2::Proof::prove(
             &pp.pk_range_proof,
             &f_evals_chunked_flat,
-            pp.ell as usize,
+            pp.ell,
             &range_proof_commitment,
             &hkzg_randomness,
             rng,

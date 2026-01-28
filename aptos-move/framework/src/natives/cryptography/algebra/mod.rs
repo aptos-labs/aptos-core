@@ -246,9 +246,7 @@ macro_rules! store_element {
         let context = &mut $context.extensions_mut().get_mut::<AlgebraContext>();
         let new_size = context.bytes_used + std::mem::size_of_val(&$obj);
         if new_size > MEMORY_LIMIT_IN_BYTES {
-            Err(SafeNativeError::Abort {
-                abort_code: E_TOO_MUCH_MEMORY_USED,
-            })
+            Err(SafeNativeError::abort(E_TOO_MUCH_MEMORY_USED))
         } else {
             let target_vec = &mut context.objs;
             context.bytes_used = new_size;
@@ -292,9 +290,7 @@ macro_rules! abort_unless_feature_flag_enabled {
                 // Continue.
             },
             _ => {
-                return Err(SafeNativeError::Abort {
-                    abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-                });
+                return Err(SafeNativeError::abort(MOVE_ABORT_CODE_NOT_IMPLEMENTED));
             },
         }
     };

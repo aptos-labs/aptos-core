@@ -6,7 +6,7 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     hash::{CryptoHasher as _, TestOnlyHasher},
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
-    secp256k1_ecdsa, secp256r1_ecdsa,
+    secp256k1_ecdsa, secp256r1_ecdsa, slh_dsa_sha2_128s,
     traits::{SigningKey, Uniform},
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -81,6 +81,14 @@ fn trace_crypto_values(tracer: &mut Tracer, samples: &mut Samples) -> Result<()>
     tracer.trace_value(samples, &bls12381_signature)?;
 
     crate::trace_encrypted_txn_structs(tracer, samples)?;
+
+    let slh_dsa_sha2_128s_private_key = slh_dsa_sha2_128s::PrivateKey::generate(&mut rng);
+    let slh_dsa_sha2_128s_public_key =
+        slh_dsa_sha2_128s::PublicKey::from(&slh_dsa_sha2_128s_private_key);
+    let slh_dsa_sha2_128s_signature = slh_dsa_sha2_128s_private_key.sign(&message).unwrap();
+    tracer.trace_value(samples, &slh_dsa_sha2_128s_private_key)?;
+    tracer.trace_value(samples, &slh_dsa_sha2_128s_public_key)?;
+    tracer.trace_value(samples, &slh_dsa_sha2_128s_signature)?;
 
     crate::trace_keyless_structs(tracer, samples, public_key, signature)?;
 

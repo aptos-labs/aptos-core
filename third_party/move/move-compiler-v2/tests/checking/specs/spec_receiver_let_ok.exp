@@ -1,0 +1,53 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::M {
+    struct S {
+        value: u64,
+    }
+    private fun borrow(self: &S): &S {
+        self
+    }
+    private fun get_value(self: &S): u64 {
+        select M::S.value<&S>(self)
+    }
+    private fun test_borrow(c: S): u64 {
+        select M::S.value<S>(c)
+    }
+    spec {
+      let s_ref = M::$borrow($t0);
+      ensures Eq<u64>(result0(), select M::S.value<0x42::M::S>(s_ref));
+    }
+
+    private fun test_borrow_get_value(data: &S): u64 {
+        select M::S.value<&S>(data)
+    }
+    spec {
+      let data_value = M::$get_value(M::$borrow($t0));
+      ensures Eq<u64>(result0(), data_value);
+    }
+
+    spec fun $borrow(self: S): S {
+        self
+    }
+    spec fun $get_value(self: S): u64 {
+        select M::S.value<0x42::M::S>(self)
+    }
+} // end 0x42::M
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::M {
+    struct S {
+        value: u64,
+    }
+    fun borrow(self: &S): &S {
+        self
+    }
+    fun get_value(self: &S): u64 {
+        self.value
+    }
+    fun test_borrow(c: S): u64 {
+        c.value
+    }
+    fun test_borrow_get_value(data: &S): u64 {
+        data.value
+    }
+}

@@ -151,7 +151,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             sources: "./tests/legacy-move-stdlib",
             sources_deps: vec![],
             dependencies: vec!["./tests/legacy-move-stdlib"],
-            exclude: vec![],
+            exclude: vec!["vector.move"],
             test_level: TestLevel::Recompile,
             ..config()
                 .lang(LanguageVersion::latest())

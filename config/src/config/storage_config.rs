@@ -243,15 +243,23 @@ impl Default for RocksdbConfigs {
 pub struct HotStateConfig {
     /// Max number of items in each shard.
     pub max_items_per_shard: usize,
+    /// Every now and then refresh `hot_since_version` for hot items to prevent them from being
+    /// evicted.
+    pub refresh_interval_versions: u64,
     /// Whether to delete persisted data on disk on restart. Used during development.
     pub delete_on_restart: bool,
+    /// Whether we compute root hashes for hot state in executor and commit the resulting JMT to
+    /// db.
+    pub compute_root_hash: bool,
 }
 
 impl Default for HotStateConfig {
     fn default() -> Self {
         Self {
             max_items_per_shard: 250_000,
+            refresh_interval_versions: 100_000,
             delete_on_restart: true,
+            compute_root_hash: true,
         }
     }
 }
@@ -657,6 +665,13 @@ impl ConfigOptimizer for StorageConfig {
                 && config_yaml["rocksdb_configs"]["enable_storage_sharding"].as_bool() != Some(true)
             {
                 panic!("Storage sharding (AIP-97) is not enabled in node config. Please follow the guide to migration your node, and set storage.rocksdb_configs.enable_storage_sharding to true explicitly in your node config. https://aptoslabs.notion.site/DB-Sharding-Migration-Public-Full-Nodes-1978b846eb7280b29f17ceee7d480730");
+            }
+            // TODO(HotState): Hot state root hash computation is off by default in Mainnet unless
+            // explicitly enabled.
+            if chain_id.is_mainnet()
+                && config_yaml["hot_state_config"]["compute_root_hash"].as_bool() != Some(true)
+            {
+                config.hot_state_config.compute_root_hash = false;
             }
         }
 

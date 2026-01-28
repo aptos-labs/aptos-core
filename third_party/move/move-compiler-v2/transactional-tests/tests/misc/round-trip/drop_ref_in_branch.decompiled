@@ -5,6 +5,9 @@ module 0x42::m {
     struct R has key {
         v: u64,
     }
+    fun some(p0: &mut R) {
+        ()
+    }
     fun do()
         acquires R
     {
@@ -18,8 +21,5 @@ module 0x42::m {
     }
     fun get_vmut(p0: &mut R): &mut u64 {
         &mut p0.v
-    }
-    fun some(p0: &mut R) {
-        ()
     }
 }
