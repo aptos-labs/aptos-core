@@ -79,7 +79,7 @@ impl BasicApi {
         // Insert chain ID and node type
         info.insert(
             "chain_id".to_string(),
-            serde_json::to_value(self.context.chain_id().id()).unwrap(),
+            serde_json::to_value(format!("{:?}", self.context.chain_id())).unwrap(),
         );
         let node_type = NodeType::extract_from_config(&self.context.node_config);
         info.insert(
