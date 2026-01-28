@@ -6,11 +6,11 @@ use crate::{
     sigma_protocol,
     sigma_protocol::{
         homomorphism,
-        homomorphism::{fixed_base_msms, fixed_base_msms::Trait, EntrywiseMap},
+        homomorphism::{fixed_base_msms, EntrywiseMap},
     },
     Scalar,
 };
-use aptos_crypto::arkworks::msm::{IsMsmInput, MsmInput};
+use aptos_crypto::arkworks::{self, msm::{IsMsmInput, MsmInput}};
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
@@ -44,7 +44,7 @@ where
     where
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
 
-    fn map<U, F>(self, mut f: F) -> Self::Output<U>
+    fn map<U, F>(self, f: F) -> Self::Output<U>
     where
         F: FnMut(T) -> U,
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
@@ -83,7 +83,26 @@ impl<C: CurveGroup> homomorphism::Trait for Homomorphism<C> {
     type Domain = Witness<C::ScalarField>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
-        self.apply_msm(self.msm_terms(input))
+        // Convert each chunked value to a scalar entrywise
+        let scalars: Vec<C::ScalarField> = input
+            .chunked_values
+            .iter()
+            .map(|chunks| {
+                le_chunks_to_scalar(
+                    self.ell,
+                    &Scalar::slice_as_inner(chunks),
+                )
+            })
+            .collect();
+
+        // Batch multiply using the base element (convert to projective first)
+        let base_projective: C = self.base.into();
+        let outputs = arkworks::commit_to_scalars(base_projective, &scalars);
+
+//        let outputs_affine = base_projective.batch_mul(&scalars);
+//        let outputs: Vec<C> = outputs_affine.into_iter().map(|p| p.into()).collect(); // TODO: REMOVE THIS
+
+        CodomainShape(outputs)
     }
 }
 

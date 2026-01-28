@@ -14,7 +14,7 @@ pub mod srs;
 pub mod vanishing_poly;
 pub mod weighted_sum;
 
-use ark_ec::{pairing::Pairing, AffineRepr};
+use ark_ec::{pairing::Pairing, scalar_mul::BatchMulPreprocessing, AffineRepr, CurveGroup};
 use ark_ff::{BigInteger, FftField, Field, PrimeField};
 use ark_poly::EvaluationDomain;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -48,11 +48,34 @@ pub fn powers_of_two<F: Field>(ell: usize) -> Vec<F> {
 /// with each scalar.
 ///
 /// Equivalent to `[base * s for s in scalars]`.
-pub fn commit_to_scalars<P: AffineRepr>(
-    commitment_base: &P,
+pub fn commit_to_scalars<P: CurveGroup + ark_ec::ScalarMul>(
+    commitment_base: P,
     scalars: &[P::ScalarField],
-) -> Vec<P::Group> {
-    scalars.iter().map(|s| *commitment_base * s).collect()
+) -> Vec<P> {
+    let table = BatchMulPreprocessing::new(commitment_base, scalars.len());
+    scalars.iter().map(|e| windowed_mul(&table, e)).collect()
+}
+
+// we're copy-pasting some arkworks code here because batch_mul does a batch normalisation, which we don't want
+fn windowed_mul<T: CurveGroup + ark_ec::ScalarMul>(
+    table: &BatchMulPreprocessing<T>,
+    scalar: &T::ScalarField,
+) -> T {
+    let outerc = (table.max_scalar_size + table.window - 1) / table.window;
+    let modulus_size = T::ScalarField::MODULUS_BIT_SIZE as usize;
+    let scalar_val = scalar.into_bigint().to_bits_le();
+
+    let mut res = T::from(table.table[0][0]);
+    for outer in 0..outerc {
+        let mut inner = 0usize;
+        for i in 0..table.window {
+            if outer * table.window + i < modulus_size && scalar_val[outer * table.window + i] {
+                inner |= 1 << i;
+            }
+        }
+        res += &table.table[outer][inner];
+    }
+    res
 }
 
 // TODO: There's probably a better way to do this?
