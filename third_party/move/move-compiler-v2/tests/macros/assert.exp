@@ -15,6 +15,13 @@ module 0x1::string_utils {
     }
 } // end 0x1::string_utils
 module 0x42::M {
+    private fun bar<T0>(cond: bool,a: T0) {
+        if cond {
+          Tuple()
+        } else {
+          Abort(14566554180833181696, string::into_bytes(string_utils::format1<T0>(Borrow(Immutable)([97, 32, 61, 32, 123, 123, 123, 125, 125, 125]), a)))
+        }
+    }
     private fun foo1(cond: bool) {
         if cond {
           Tuple()
@@ -83,6 +90,9 @@ module 0x1::string_utils {
     }
 }
 module 0x42::M {
+    fun bar<T0: drop>(cond: bool, a: T0) {
+        if (cond) () else abort 0x1::string::into_bytes(0x1::string_utils::format1<T0>(&vector[97u8, 32u8, 61u8, 32u8, 123u8, 123u8, 123u8, 125u8, 125u8, 125u8], a))
+    }
     fun foo1(cond: bool) {
         if (cond) () else abort 14566554180833181696
     }
@@ -123,6 +133,13 @@ module 0x1::string_utils {
     }
 } // end 0x1::string_utils
 module 0x42::M {
+    private fun bar<T0>(cond: bool,a: T0) {
+        if cond {
+          Tuple()
+        } else {
+          Abort(14566554180833181696, string::into_bytes(string_utils::format1<T0>(Borrow(Immutable)([97, 32, 61, 32, 123, 123, 123, 125, 125, 125]), a)))
+        }
+    }
     private fun foo1(cond: bool) {
         if cond {
           Tuple()
