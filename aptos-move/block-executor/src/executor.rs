@@ -167,6 +167,42 @@ where
         }
     }
 
+    /// Verifies that all pre-written keys are present in the actual write set.
+    ///
+    /// Pre-write optimization populates the MVHashMap with expected writes before execution.
+    /// If the transaction doesn't actually write those keys (e.g., aborts early), speculative
+    /// reads by other transactions would see incorrect data. This verification ensures that
+    /// all pre-written keys were actually written, triggering fallback to sequential execution
+    /// if not.
+    fn verify_pre_writes(
+        txn: &T,
+        maybe_output: Option<&E::Output>,
+    ) -> Result<(), PanicError> {
+        let pre_write_entries = T::pre_write_values(txn);
+        if pre_write_entries.is_empty() {
+            return Ok(()); // No pre-writes, nothing to verify
+        }
+
+        // If there are pre-writes, there must be output with matching writes
+        let output = maybe_output.ok_or_else(|| {
+            code_invariant_error(
+                "Pre-write verification failed: transaction with pre-writes produced no output",
+            )
+        })?;
+
+        let output_before_guard = output.before_materialization()?;
+        let resource_write_set = output_before_guard.resource_write_set();
+
+        for (key, _) in pre_write_entries {
+            if !resource_write_set.contains_key(&key) {
+                return Err(code_invariant_error(
+                    "Pre-write verification failed: transaction did not write expected key",
+                ));
+            }
+        }
+        Ok(())
+    }
+
     fn process_resource_output_v2(
         maybe_output: Option<&E::Output>,
         idx_to_execute: TxnIndex,
@@ -440,6 +476,11 @@ where
             return Ok(());
         }
 
+        // Verify that all pre-written keys were actually written by the transaction.
+        // If not, fallback to sequential execution to avoid speculative reads seeing
+        // incorrect pre-write values.
+        Self::verify_pre_writes(txn, maybe_output)?;
+
         // TODO: BlockSTMv2: use estimates for delayed field reads? (see V1 update on abort).
         Self::process_delayed_field_output(
             maybe_output,
@@ -573,6 +614,11 @@ where
         }
         let (processed_output, _) =
             Self::process_execution_result(&execution_result, &mut read_set, idx_to_execute)?;
+
+        // Verify that all pre-written keys were actually written by the transaction.
+        // If not, fallback to sequential execution to avoid speculative reads seeing
+        // incorrect pre-write values.
+        Self::verify_pre_writes(txn, processed_output)?;
 
         let mut prev_modified_resource_keys = last_input_output
             .modified_resource_keys(idx_to_execute)
