@@ -926,7 +926,6 @@ impl DbReader for AptosDB {
             Ok(self
                 .state_store
                 .state_db
-                .state_pruner
                 .state_merkle_pruner
                 .is_pruner_enabled())
         })
@@ -937,7 +936,6 @@ impl DbReader for AptosDB {
             Ok(self
                 .state_store
                 .state_db
-                .state_pruner
                 .epoch_snapshot_pruner
                 .get_prune_window() as usize)
         })
