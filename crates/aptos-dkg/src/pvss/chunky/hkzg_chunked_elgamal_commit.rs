@@ -17,7 +17,7 @@ use crate::{
 };
 use aptos_crypto::{
     arkworks::random::unsafe_random_points_group, weighted_config::WeightedConfigArkworks,
-    SecretSharingConfig,
+    TSecretSharingConfig,
 };
 use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup};
 

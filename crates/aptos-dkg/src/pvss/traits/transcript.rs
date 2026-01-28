@@ -53,7 +53,7 @@ use crate::pvss::{
 };
 use anyhow::bail;
 use aptos_crypto::{
-    arkworks::shamir::Reconstructable, SecretSharingConfig, SigningKey, Uniform,
+    arkworks::shamir::Reconstructable, SigningKey, TSecretSharingConfig, Uniform,
     ValidCryptoMaterial, VerifyingKey,
 };
 use num_traits::Zero;
@@ -71,7 +71,7 @@ pub trait Subtranscript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         + Debug
         + PartialEq
         + Eq;
-    type SecretSharingConfig: SecretSharingConfig
+    type SecretSharingConfig: TSecretSharingConfig
         + DeserializeOwned
         + Serialize
         + Debug
@@ -145,7 +145,7 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         + Debug
         + PartialEq
         + Eq;
-    type SecretSharingConfig: SecretSharingConfig
+    type SecretSharingConfig: TSecretSharingConfig
         + DeserializeOwned
         + Serialize
         + Debug

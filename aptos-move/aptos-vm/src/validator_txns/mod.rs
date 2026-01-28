@@ -5,7 +5,7 @@ use crate::{
     move_vm_ext::{AptosMoveResolver, SessionId},
     AptosVM,
 };
-use aptos_types::validator_txn::ValidatorTransaction;
+use aptos_types::{validator_txn::ValidatorTransaction, vm_status::StatusCode};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{
     module_and_script_storage::module_storage::AptosModuleStorage, output::VMOutput,
@@ -32,6 +32,11 @@ impl AptosVM {
                 session_id,
                 jwk_update,
             ),
+            ValidatorTransaction::ChunkyDKGResult(_) => Err(VMStatus::Error {
+                status_code: StatusCode::FEATURE_UNDER_GATING,
+                sub_status: None,
+                message: Some("ChunkyDKG Validator Transaction isn't supported".into()),
+            }),
         }
     }
 }

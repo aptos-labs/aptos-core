@@ -20,7 +20,7 @@ use aptos_crypto::{
         unsafe_random_points_group, UniformRand,
     },
     weighted_config::WeightedConfigArkworks,
-    SecretSharingConfig,
+    TSecretSharingConfig,
 };
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{pairing::Pairing, AdditiveGroup, AffineRepr, CurveGroup};

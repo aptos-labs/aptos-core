@@ -6,7 +6,7 @@
 #![allow(clippy::extra_unused_type_parameters)]
 #![allow(clippy::needless_borrow)]
 
-use aptos_crypto::traits::SecretSharingConfig as _;
+use aptos_crypto::traits::TSecretSharingConfig as _;
 use aptos_dkg::{
     pvss::{
         das,

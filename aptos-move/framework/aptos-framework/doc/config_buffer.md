@@ -109,9 +109,7 @@ Config buffer operations failed with permission denied.
 <pre><code><b>public</b> <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
     <b>if</b> (!<b>exists</b>&lt;<a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a>&gt;(@aptos_framework)) {
-        <b>move_to</b>(aptos_framework, <a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a> {
-            configs: <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_new">simple_map::new</a>(),
-        })
+        <b>move_to</b>(aptos_framework, <a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a> { configs: <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_new">simple_map::new</a>() })
     }
 }
 </code></pre>
@@ -139,10 +137,15 @@ Check whether there is a pending config payload for <code>T</code>.
 <pre><code><b>public</b> <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_does_exist">does_exist</a>&lt;T: store&gt;(): bool <b>acquires</b> <a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a> {
     <b>if</b> (<b>exists</b>&lt;<a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a>&gt;(@aptos_framework)) {
         <b>let</b> config = <b>borrow_global</b>&lt;<a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a>&gt;(@aptos_framework);
+<<<<<<< HEAD
         config.configs.contains_key(&<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;())
     } <b>else</b> {
         <b>false</b>
     }
+=======
+        <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_contains_key">simple_map::contains_key</a>(&config.configs, &<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;())
+    } <b>else</b> { <b>false</b> }
+>>>>>>> a4708fd245d (dkg impl #1)
 }
 </code></pre>
 

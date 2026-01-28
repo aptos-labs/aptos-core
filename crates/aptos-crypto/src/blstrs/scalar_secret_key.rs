@@ -6,7 +6,7 @@
 use crate::{
     arkworks::shamir::{Reconstructable, ShamirShare},
     blstrs::{lagrange::lagrange_coefficients, threshold_config::ThresholdConfigBlstrs},
-    traits::{SecretSharingConfig as _, ThresholdConfig as _},
+    traits::{TSecretSharingConfig as _, ThresholdConfig as _},
 };
 use blstrs::Scalar;
 use ff::Field;

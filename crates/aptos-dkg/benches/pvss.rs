@@ -4,7 +4,7 @@
 #![allow(clippy::ptr_arg)]
 #![allow(clippy::needless_borrow)]
 
-use aptos_crypto::{SecretSharingConfig, Uniform};
+use aptos_crypto::{TSecretSharingConfig, Uniform};
 use aptos_dkg::pvss::{
     chunky::{UnsignedWeightedTranscript as Chunky_v1, UnsignedWeightedTranscriptv2 as Chunky_v2},
     das,

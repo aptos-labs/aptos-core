@@ -43,7 +43,7 @@ use aptos_crypto::{
     bls12381::{self},
     utils,
     weighted_config::WeightedConfigArkworks,
-    CryptoMaterialError, SecretSharingConfig as _, ValidCryptoMaterial,
+    CryptoMaterialError, TSecretSharingConfig as _, ValidCryptoMaterial,
 };
 use ark_ec::{
     pairing::{Pairing, PairingOutput},

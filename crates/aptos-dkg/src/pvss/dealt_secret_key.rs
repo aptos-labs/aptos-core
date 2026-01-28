@@ -23,7 +23,7 @@ macro_rules! dealt_secret_key_impl {
         use blstrs::{$GTProjective, Scalar};
         use ff::Field;
         use more_asserts::{assert_ge, assert_le};
-        use aptos_crypto::traits::{SecretSharingConfig as _};
+        use aptos_crypto::traits::{TSecretSharingConfig as _};
         use aptos_crypto::traits::{ThresholdConfig as _};
         use aptos_crypto::arkworks::shamir::Reconstructable;
         use aptos_crypto::arkworks::shamir::ShamirShare;
