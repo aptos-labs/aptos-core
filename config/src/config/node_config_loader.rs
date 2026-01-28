@@ -14,12 +14,13 @@ use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{Transaction, WriteSetPayload},
 };
+use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use std::path::Path;
 
 /// A simple enum to represent the type of a node
 /// as determined from the config file.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum NodeType {
     Validator,
     ValidatorFullnode,
