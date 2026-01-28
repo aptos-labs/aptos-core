@@ -153,6 +153,37 @@ Where `Hasher::seed()` is a domain separation prefix.
 
 ---
 
+## Documentation Created
+
+### Transaction Format Specifications (`specifications/transaction-formats/`)
+
+1. **01-raw-transaction.md** - Core RawTransaction BCS format with byte-level details
+2. **02-ed25519-authenticator.md** - Ed25519 authentication format
+3. **03-single-key-authenticator.md** - SingleKey unified authentication format
+4. **04-multi-key-authenticator.md** - MultiKey K-of-N multi-signature format
+5. **05-multi-ed25519-authenticator.md** - Legacy MultiEd25519 format
+
+### Signing Process Documentation (`specifications/signing/`)
+
+1. **01-transaction-hashing.md** - Domain separation and signing message construction
+2. **02-ed25519-signing.md** - Ed25519 EdDSA signing process
+3. **03-multi-ed25519-signing.md** - K-of-N multi-signature coordination
+4. **04-secp256k1-signing.md** - Secp256k1 ECDSA with low-S normalization
+5. **05-secp256r1-signing.md** - Secp256r1/WebAuthn/Passkey signing
+6. **06-keyless-signing.md** - OIDC-based keyless authentication (ZK and OpenID paths)
+
+### Advanced Transaction Documentation (`specifications/advanced/`)
+
+1. **01-multi-agent-transactions.md** - Multiple independent signers
+2. **02-fee-payer-transactions.md** - Sponsored/gasless transactions
+3. **03-multisig-transactions.md** - On-chain multisig workflow
+
+### Overview Documentation
+
+- **specifications/README.md** - Navigation guide and quick reference tables
+
+---
+
 ## Commits Made
 
 | Commit Hash | Description |
