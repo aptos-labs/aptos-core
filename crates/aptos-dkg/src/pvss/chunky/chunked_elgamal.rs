@@ -6,10 +6,11 @@ use crate::{
     dlog::bsgs,
     pvss::chunky::chunks,
     sigma_protocol,
-    sigma_protocol::homomorphism::{self, fixed_base_msms, fixed_base_msms::Trait, EntrywiseMap},
+    sigma_protocol::homomorphism::{self, fixed_base_msms, EntrywiseMap},
     Scalar,
 };
 use aptos_crypto::arkworks::{
+    self,
     msm::{IsMsmInput, MsmInput},
     random::sample_field_element,
 };
@@ -91,12 +92,81 @@ pub struct WeightedWitness<F: PrimeField> {
     pub plaintext_randomness: Vec<Vec<Scalar<F>>>, // For at most max_weight, there needs to be a vector of randomness to encrypt a vector of chunks
 }
 
+#[allow(non_snake_case)]
 impl<C: CurveGroup> homomorphism::Trait for WeightedHomomorphism<'_, C> {
     type Codomain = WeightedCodomainShape<C>;
     type Domain = WeightedWitness<C::ScalarField>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
-        self.apply_msm(self.msm_terms(input)) // TODO: use the batch mul stuff here...
+        // Get the batch multiplication tables
+        let G_table = self.pp.G_table.as_ref().expect("G_table must be initialized");
+        let H_table = self.pp.H_table.as_ref().expect("H_table must be initialized");
+
+        // 1. Compute C_{i,j,k} = z_{i,j,k} * G + r_{j,k} * ek_i
+        //    where i is player, j is share index (which corresponds to weight level), k is chunk
+        
+        // 1a. Batch multiply all z_{i,j,k} values with G
+        let all_z_chunks: Vec<C::ScalarField> = input
+            .plaintext_chunks
+            .iter()
+            .flatten()
+            .flatten()
+            .map(|scalar| scalar.0)
+            .collect();
+        let G_mults = arkworks::batch_mul(G_table, &all_z_chunks);
+
+        // 1b. For each player i and share j, compute r_{j,k} * ek_i for all chunks k
+        //     Share index j directly corresponds to the weight level index in plaintext_randomness
+        let mut chunks_result = Vec::new();
+        let mut G_idx = 0;
+        
+        for (player_idx, player_chunks) in input.plaintext_chunks.iter().enumerate() {
+            let mut player_Cs = Vec::new();
+            for (share_idx, share_chunks) in player_chunks.iter().enumerate() {
+                // share_idx corresponds to weight level index in plaintext_randomness
+                let r_chunks = &input.plaintext_randomness[share_idx];
+                
+                // Compute r_{j,k} * ek_i for each chunk k
+                // Since we have one base (ek_i) with multiple scalars, we compute each separately
+                let ek: C = self.eks[player_idx].into();
+                
+                // Combine: C_{i,j,k} = z_{i,j,k} * G + r_{j,k} * ek_i
+                let mut share_Cs = Vec::new();
+                for k in 0..share_chunks.len() {
+                    let ek_mult = ek * r_chunks[k].0;
+                    share_Cs.push(G_mults[G_idx] + ek_mult);
+                    G_idx += 1;
+                }
+                player_Cs.push(share_Cs);
+            }
+            chunks_result.push(player_Cs);
+        }
+
+        // 2. Compute R_{j,k} = r_{j,k} * H for all weight levels j and chunks k
+        let all_r_chunks: Vec<C::ScalarField> = input
+            .plaintext_randomness
+            .iter()
+            .flatten()
+            .map(|scalar| scalar.0)
+            .collect();
+        let H_mults = arkworks::batch_mul(H_table, &all_r_chunks);
+
+        // 3. Gather R results into nested structure matching plaintext_randomness
+        let mut randomness_result = Vec::new();
+        let mut H_idx = 0;
+        for r_row in &input.plaintext_randomness {
+            let mut R_row = Vec::new();
+            for _ in r_row {
+                R_row.push(H_mults[H_idx]);
+                H_idx += 1;
+            }
+            randomness_result.push(R_row);
+        }
+
+        WeightedCodomainShape {
+            chunks: chunks_result,
+            randomness: randomness_result,
+        }
     }
 }
 

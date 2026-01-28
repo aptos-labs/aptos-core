@@ -212,10 +212,12 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             true,
             &sc.get_threshold_config().domain,
         ); // includes_zero is true here means it includes a commitment to f(0), which is in V[n]
-        let mut Vs_flat: Vec<_> = self.subtrs.Vs.iter().flatten().cloned().collect();
-        Vs_flat.push(self.subtrs.V0);
+        // Collect projective elements and normalize to affine
+        let Vs_proj: Vec<E::G2> = self.subtrs.Vs.iter().flatten().cloned().collect();
+        let mut Vs_flat: Vec<E::G2Affine> = E::G2::normalize_batch(&Vs_proj);
+        Vs_flat.push(self.subtrs.V0.into_affine());
         // could add an assert_eq here with sc.get_total_weight()
-        ldt.low_degree_test_group(&Vs_flat)?;
+        ldt.low_degree_test_group::<E::G2>(&Vs_flat)?;
 
         // let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
         // let hom = hkzg_chunked_elgamal::WeightedHomomorphism::new(
@@ -266,8 +268,11 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         let weighted_Cs = E::G1::msm(&E::G1::normalize_batch(&base_vec), &exp_vec)
             .expect("Failed to compute MSM of Cs in chunky");
 
+        // Convert affine to projective for normalize_batch, then back to affine for MSM
+        let Vs_slice_proj: Vec<E::G2> = Vs_flat[..sc.get_total_weight()].iter().map(|&v| v.into()).collect();
+        let Vs_slice_affine = E::G2::normalize_batch(&Vs_slice_proj);
         let weighted_Vs = E::G2::msm(
-            &E::G2::normalize_batch(&Vs_flat[..sc.get_total_weight()]), // Don't use the last entry of `Vs_flat`
+            &Vs_slice_affine, // Don't use the last entry of `Vs_flat`
             &powers_of_beta[..sc.get_total_weight()],
         )
         .expect("Failed to compute MSM of Vs in chunky");

@@ -141,10 +141,10 @@ impl<'a, F: PrimeField> LowDegreeTest<'a, F> {
     /// the corresponding dual-codeword scalars.
     pub fn ldt_msm_input<C: CurveGroup<ScalarField = F>>(
         &self,
-        evals: &[C],
+        bases: &[C::Affine],
     ) -> anyhow::Result<MsmInput<C::Affine, F>> {
-        if evals.len() != self.n {
-            bail!("Expected {} evaluations; got {}", self.n, evals.len())
+        if bases.len() != self.n {
+            bail!("Expected {} evaluations; got {}", self.n, bases.len())
         }
 
         if self.t == self.n {
@@ -158,19 +158,18 @@ impl<'a, F: PrimeField> LowDegreeTest<'a, F> {
 
         let v_times_f = self.dual_code_word();
 
-        let bases = C::normalize_batch(evals);
         let scalars = v_times_f;
 
-        Ok(MsmInput::new(bases, scalars).expect("Could not construct MsmInput"))
+        Ok(MsmInput::new(bases.to_vec(), scalars).expect("Could not construct MsmInput"))
     }
 
     /// Performs the LDT given group elements $G^{p(\omega^i)} \in
     pub fn low_degree_test_group<C: CurveGroup<ScalarField = F>>(
         &self,
-        evals: &[C],
+        evals: &[C::Affine],
     ) -> anyhow::Result<()> {
         // Step 1: build MSM input
-        let msm_input = self.ldt_msm_input(evals)?;
+        let msm_input = self.ldt_msm_input::<C>(evals)?;
 
         // Early return in the trivial case
         if msm_input.bases.is_empty() {
