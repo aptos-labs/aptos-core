@@ -141,6 +141,9 @@ impl AptosTelemetryServiceArgs {
                     );
                 }
 
+                // Validate the configuration (panics if invalid)
+                cc_config.validate();
+
                 // Merge metrics clients from both metrics_sink and metrics_sinks
                 let metrics_clients = cc_config.make_metrics_clients();
                 let untrusted_metrics_clients = cc_config.make_untrusted_metrics_clients();
@@ -162,7 +165,13 @@ impl AptosTelemetryServiceArgs {
                     })
                 });
 
-                if cc_config.allow_unknown_nodes {
+                // Log the contract mode
+                if cc_config.on_chain_auth.is_none() {
+                    info!(
+                        "Custom contract '{}' in open telemetry mode (no on_chain_auth, all nodes treated as unknown)",
+                        cc_config.name
+                    );
+                } else if cc_config.allow_unknown_nodes {
                     info!(
                         "Custom contract '{}' allows unknown/untrusted nodes",
                         cc_config.name
@@ -171,6 +180,7 @@ impl AptosTelemetryServiceArgs {
 
                 instances.insert(cc_config.name.clone(), context::CustomContractInstance {
                     config: cc_config.on_chain_auth.clone(),
+                    node_type_name: cc_config.effective_node_type_name(),
                     allow_unknown_nodes: cc_config.allow_unknown_nodes,
                     metrics_clients,
                     untrusted_metrics_clients,
@@ -730,6 +740,14 @@ impl LogSinkConfig {
 /// For multiple metrics sinks with different backend types (e.g., victoria_metrics AND
 /// prometheus_remote_write), use the `metrics_sinks` array field. Both `metrics_sink`
 /// and `metrics_sinks` can be used together - they will be merged.
+///
+/// ## Open Telemetry Mode (no on_chain_auth)
+///
+/// When `on_chain_auth` is omitted, `allow_unknown_nodes` MUST be `true`.
+/// In this mode, ALL nodes are treated as unknown/untrusted. Signature verification
+/// is still required (nodes must prove address ownership), but no on-chain allowlist
+/// check is performed. This is useful for collecting telemetry from community nodes
+/// without requiring an on-chain registry.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct CustomContractConfig {
@@ -737,8 +755,18 @@ pub struct CustomContractConfig {
     /// Used in routing and logging.
     pub name: String,
 
-    /// On-chain authentication configuration
-    pub on_chain_auth: OnChainAuthConfig,
+    /// On-chain authentication configuration (optional).
+    /// When provided, nodes are verified against an on-chain allowlist.
+    /// When omitted, `allow_unknown_nodes` MUST be true and all nodes are treated as unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_chain_auth: Option<OnChainAuthConfig>,
+
+    /// Custom node type name for labeling telemetry from this contract.
+    /// Used in metrics labels as `node_type={node_type_name}`.
+    /// If not specified, falls back to `on_chain_auth.node_type_name` (if on_chain_auth is configured),
+    /// otherwise defaults to "custom".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub node_type_name: Option<String>,
 
     /// Allow unknown/untrusted nodes to authenticate via this custom contract endpoint.
     /// When true, nodes that are NOT in the on-chain allowlist can still get a JWT token
@@ -786,6 +814,32 @@ pub struct CustomContractConfig {
 }
 
 impl CustomContractConfig {
+    /// Validate the configuration.
+    /// Panics if the configuration is invalid.
+    pub fn validate(&self) {
+        // If on_chain_auth is not configured, allow_unknown_nodes MUST be true
+        if self.on_chain_auth.is_none() && !self.allow_unknown_nodes {
+            panic!(
+                "Custom contract '{}' has no on_chain_auth configured but allow_unknown_nodes is false. \
+                 When on_chain_auth is omitted, allow_unknown_nodes MUST be true (open telemetry mode).",
+                self.name
+            );
+        }
+    }
+
+    /// Get the effective node type name for this contract.
+    /// Priority: 1) explicit node_type_name, 2) on_chain_auth.node_type_name, 3) "custom"
+    pub fn effective_node_type_name(&self) -> String {
+        self.node_type_name
+            .clone()
+            .or_else(|| {
+                self.on_chain_auth
+                    .as_ref()
+                    .map(|auth| auth.node_type_name.clone())
+            })
+            .unwrap_or_else(|| "custom".to_string())
+    }
+
     /// Get all metrics clients from both `metrics_sink` and `metrics_sinks` fields.
     /// This allows backwards compatibility with single sink configs while supporting
     /// multiple sinks with different backend types.

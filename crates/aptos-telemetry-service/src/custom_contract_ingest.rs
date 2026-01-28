@@ -95,7 +95,7 @@ async fn handle_metrics_ingest(
 
     // Prepare extra labels for metrics - include contract name, node_type_name, and trust status
     // Format: name=value (no quotes - Victoria Metrics extra_label format)
-    let node_type = &instance.config.node_type_name;
+    let node_type = &instance.node_type_name;
     let trust_label = if is_trusted { "trusted" } else { "untrusted" };
     let extra_labels = vec![
         format!("peer_id={}", peer_id),
@@ -270,9 +270,9 @@ async fn handle_log_ingest(
 
     // Get the node type from the contract instance config, marked as unknown if not trusted
     let node_type = if is_trusted {
-        NodeType::Custom(instance.config.node_type_name.clone())
+        NodeType::Custom(instance.node_type_name.clone())
     } else {
-        NodeType::CustomUnknown(instance.config.node_type_name.clone())
+        NodeType::CustomUnknown(instance.node_type_name.clone())
     };
 
     let trust_label = if is_trusted { "trusted" } else { "untrusted" };
@@ -416,9 +416,9 @@ async fn handle_custom_event_ingest(
 
         // Get the node type from the contract instance config, marked as unknown if not trusted
         let node_type = if is_trusted {
-            NodeType::Custom(instance.config.node_type_name.clone())
+            NodeType::Custom(instance.node_type_name.clone())
         } else {
-            NodeType::CustomUnknown(instance.config.node_type_name.clone())
+            NodeType::CustomUnknown(instance.node_type_name.clone())
         };
 
         let trust_label = if is_trusted { "trusted" } else { "untrusted" };

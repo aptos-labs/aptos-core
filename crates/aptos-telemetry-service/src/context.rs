@@ -186,7 +186,12 @@ impl PeerStoreTuple {
 /// Container for a single custom contract configuration and its clients
 #[derive(Clone)]
 pub struct CustomContractInstance {
-    pub config: crate::OnChainAuthConfig,
+    /// On-chain auth configuration (optional).
+    /// When `None`, this is "open telemetry mode" - all nodes are treated as unknown.
+    pub config: Option<crate::OnChainAuthConfig>,
+    /// Custom node type name for labeling telemetry from this contract.
+    /// Used in metrics labels as `node_type={node_type_name}`.
+    pub node_type_name: String,
     /// Whether to allow unknown/untrusted nodes to authenticate via this contract
     pub allow_unknown_nodes: bool,
     /// Metrics clients for trusted (allowlisted) nodes

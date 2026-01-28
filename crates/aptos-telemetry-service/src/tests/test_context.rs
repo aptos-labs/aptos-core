@@ -44,7 +44,8 @@ pub async fn new_test_context_with_multiple_contracts(
                 .into_iter()
                 .map(|(name, auth_config)| crate::CustomContractConfig {
                     name,
-                    on_chain_auth: auth_config,
+                    on_chain_auth: Some(auth_config),
+                    node_type_name: Some("test_node_type".to_string()),
                     allow_unknown_nodes: false,
                     metrics_sink: None,
                     metrics_sinks: None,
@@ -88,6 +89,7 @@ pub async fn new_test_context_with_multiple_contracts(
                 cc_config.name.clone(),
                 crate::context::CustomContractInstance {
                     config: cc_config.on_chain_auth.clone(),
+                    node_type_name: cc_config.effective_node_type_name(),
                     allow_unknown_nodes: cc_config.allow_unknown_nodes,
                     metrics_clients: HashMap::new(),
                     untrusted_metrics_clients: HashMap::new(),
