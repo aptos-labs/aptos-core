@@ -196,7 +196,6 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             runner: |p| run_test(p, get_config_by_name("macros")),
             include: vec!["/macros/"],
             exclude: vec![],
-            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::EndStage,
             ..config()
         },
