@@ -791,20 +791,116 @@ The next major milestone is comprehensive testing with multi-party simulations t
 - ❌ Real BLS signature signing/verification in protocol - Phase 10
 - ❌ Documentation - Phase 11
 
-### Next Steps (Phase 2-11)
+### Phase 2: Network Message Types (COMPLETED ✅)
 
-**Immediate (Phase 2)**: Create network message types
-- Create `consensus/prefix-consensus/src/network_messages.rs`
-- Define `PrefixConsensusMsg` enum with Vote1Msg/Vote2Msg/Vote3Msg variants
-- Implement helper methods (name, epoch, author)
-- Add serialization unit tests
+**Date**: 2026-01-28
+**Status**: ✅ Complete - All tests passing (70/70)
 
-**Short-term (Phase 3-4)**: Network adapter and manager
-- Create `network_interface.rs` with sender trait and adapter
-- Create `manager.rs` with event-driven manager
-- Wire protocol to network callbacks
+**File Created**:
+- `consensus/prefix-consensus/src/network_messages.rs` (443 lines)
 
-**Medium-term (Phase 5-6)**: Integration
+**Changes Made**:
+1. **PrefixConsensusMsg Enum**:
+   - `Vote1Msg(Box<Vote1>)` - Round 1 vote envelope
+   - `Vote2Msg(Box<Vote2>)` - Round 2 vote envelope
+   - `Vote3Msg(Box<Vote3>)` - Round 3 vote envelope
+   - Used boxed variants to prevent large enum size (following Aptos `ConsensusMsg` pattern)
+
+2. **Helper Methods**:
+   - `name()` - Returns message type name for logging
+   - `epoch()` - Extracts epoch from inner vote
+   - `slot()` - Extracts slot from inner vote
+   - `author()` - Extracts author/sender address
+   - `as_vote1/2/3()` - Type-safe reference accessors
+   - `into_vote1/2/3()` - Type-safe consuming accessors
+
+3. **Convenience Traits**:
+   - `From<Vote1/2/3>` implementations for easy wrapping
+   - Full BCS serialization support via derived traits
+
+4. **Comprehensive Tests** (16 tests):
+   - Message name extraction
+   - Epoch/slot/author extraction from all variants
+   - Type-safe conversions (as_* and into_*)
+   - BCS serialization round-trips (critical for network)
+   - Serialization with embedded QCs (Vote2 with QC1, Vote3 with QC2)
+   - Message size verification
+
+**Test Results**: ✅ 70 tests passing (54 existing + 16 new), zero warnings
+
+**Key Design**: Network envelope types separated from protocol logic, ready for Phase 3 network integration
+
+---
+
+### Phase 3: Network Interface Adapter (COMPLETED ✅)
+
+**Date**: 2026-01-28
+**Status**: ✅ Complete - All tests passing (71/71)
+
+**File Created**:
+- `consensus/prefix-consensus/src/network_interface.rs` (224 lines)
+
+**Files Modified**:
+- `consensus/prefix-consensus/src/lib.rs` - Exported network_interface module
+- `consensus/prefix-consensus/Cargo.toml` - Added 7 network dependencies
+
+**Changes Made**:
+
+1. **PrefixConsensusNetworkSender Trait**:
+   ```rust
+   pub trait PrefixConsensusNetworkSender: Send + Sync + Clone {
+       async fn broadcast_vote1(&self, vote: Vote1);
+       async fn broadcast_vote2(&self, vote: Vote2);
+       async fn broadcast_vote3(&self, vote: Vote3);
+   }
+   ```
+   - Async broadcast methods for all vote types
+   - Clone bound for passing to async tasks
+   - Send + Sync for multi-threaded usage
+
+2. **PrefixConsensusNetworkClient Wrapper**:
+   - Wraps generic `NetworkClient<PrefixConsensusMsg>`
+   - Provides `send_to_many()` for broadcasting to multiple validators
+   - Handles PeerId → PeerNetworkId conversion
+   - Mirrors `ConsensusNetworkClient` pattern from AptosBFT
+
+3. **NetworkSenderAdapter Implementation**:
+   - Implements `PrefixConsensusNetworkSender` trait
+   - **Self-send**: Via `UnboundedSender` channel (network layer doesn't support self-send)
+   - **Broadcast**: Via `send_to_many()` to other validators
+   - **Generic helper**: Single `broadcast_vote<V>()` method eliminates code duplication
+   - Proper error logging with structured fields (`vote_type`)
+
+4. **Code Quality**:
+   - Reduced from 248 to 224 lines via generic helper
+   - Eliminated 3 nearly identical broadcast methods
+   - DRY principle: One broadcast implementation for all vote types
+   - Uses `Into<PrefixConsensusMsg>` trait bound for type safety
+
+**Dependencies Added**:
+- `aptos-channels` - UnboundedSender for self-messages
+- `aptos-config` - NetworkId, PeerNetworkId
+- `aptos-consensus-types` - Author type
+- `aptos-network` - NetworkClientInterface
+- `aptos-time-service` - Time service
+- `async-trait` - Async trait macro
+- `prometheus` (dev) - Test gauge creation
+
+**Test Results**: ✅ 71 tests passing, zero warnings
+
+**Architecture**: Fully mirrors Aptos network patterns, ready for Phase 4 manager implementation
+
+---
+
+### Next Steps (Phase 4-11)
+
+**Immediate (Phase 4)**: Create PrefixConsensusManager
+- Event-driven manager for protocol lifecycle
+- Route network messages to protocol
+- Trigger broadcasts via network sender
+- Handle verification and validation
+
+**Short-term (Phase 5-6)**: Integration with consensus layer
 - Create `consensus/src/prefix_consensus_provider.rs`
 - Register with network layer
 - Set up channels and runtime
@@ -821,8 +917,8 @@ The next major milestone is comprehensive testing with multi-party simulations t
 ### Implementation Plan Reference
 - **Full Plan**: `.plans/network-integration.md` (project-local)
 - **Estimated Total Time**: 8-11 days
-- **Current Progress**: Phase 1/11 complete (~9%)
-- **Time Spent on Phase 1**: ~4 hours (significant debugging of BCS serialization vs CryptoHash)
+- **Current Progress**: Phase 3/11 complete (~27%)
+- **Time Spent**: Phase 1 (~4h), Phase 2 (~1h), Phase 3 (~2h)
 
 ---
 

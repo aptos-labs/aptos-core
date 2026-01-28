@@ -14,10 +14,16 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-channels = { workspace = true }
+aptos-config = { workspace = true }
+aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
 aptos-crypto-derive = { workspace = true }
 aptos-logger = { workspace = true }
+aptos-network = { workspace = true }
+aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
+async-trait = { workspace = true }
 bcs = { workspace = true }
 futures = { workspace = true }
 once_cell = { workspace = true }
@@ -27,6 +33,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
+prometheus = { workspace = true }
 proptest = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
 
