@@ -3724,12 +3724,15 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
+ "aptos-crypto-derive",
  "aptos-logger",
  "aptos-types",
  "bcs 0.1.4",
  "futures",
+ "once_cell",
  "proptest",
  "serde",
+ "sha3 0.9.1",
  "thiserror 1.0.69",
  "tokio",
 ]

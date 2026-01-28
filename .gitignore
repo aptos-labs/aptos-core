@@ -165,3 +165,6 @@ test-data/
 # Any test keys
 **/*.key
 **/*.pub
+
+# Project-local plans (personal working notes)
+.plans/

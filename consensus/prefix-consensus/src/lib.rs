@@ -31,15 +31,20 @@
 
 mod certify;
 mod protocol;
+pub mod signing;
 mod types;
 mod utils;
 mod verification;
 
 pub use certify::{qc1_certify, qc2_certify, qc3_certify};
 pub use protocol::PrefixConsensusProtocol;
+pub use signing::{
+    sign_vote1, sign_vote2, sign_vote3, verify_vote1_signature, verify_vote2_signature,
+    verify_vote3_signature,
+};
 pub use types::{
-    PartyId, PrefixConsensusInput, PrefixConsensusOutput, Round, Vote1, Vote2, Vote3, QC1, QC2,
-    QC3,
+    Element, PartyId, PrefixConsensusInput, PrefixConsensusOutput, PrefixVector, Round, Vote1,
+    Vote2, Vote3, QC1, QC2, QC3,
 };
 pub use utils::{consistency_check, max_common_prefix, min_common_extension};
 pub use verification::{verify_qc1, verify_qc2, verify_qc3, verify_vote1, verify_vote2, verify_vote3};

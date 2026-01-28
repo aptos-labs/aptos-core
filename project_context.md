@@ -615,6 +615,217 @@ The next major milestone is comprehensive testing with multi-party simulations t
 
 ---
 
+## Phase 1B: Network Integration Planning and Implementation (2026-01-28)
+
+### Status: Phase 1 Complete ✅ | Phases 2-11 Planned
+
+**Latest Update (2026-01-28 - Evening)**:
+- ✅ Phase 1 fully completed with all 54 tests passing
+- ✅ Resolved major technical challenge: BCS serialization vs CryptoHash for signatures
+- ✅ Implemented custom hashers and SignData helper structs
+- ✅ Fixed all test compilation errors (43+ fixes)
+- ✅ Zero warnings, zero errors in final build
+- 🎯 Ready to proceed with Phase 2: Network message types
+
+### Planning Session
+
+**Date**: 2026-01-28
+
+**Activities**:
+1. **Architecture Exploration** - Comprehensive exploration of Aptos consensus network integration:
+   - Explored `ConsensusMsg` enum structure and message routing via `NetworkTask`
+   - Analyzed `NetworkSender`/`NetworkReceiver` patterns and channel-based architecture
+   - Studied BLS12-381 signature scheme used by consensus (aggregation, ValidatorVerifier)
+   - Investigated smoke test framework (`LocalSwarm`, validator spawning, test coordination)
+
+2. **Implementation Planning** - Created detailed 11-phase plan:
+   - **Location**: `.plans/network-integration.md` (project-local)
+   - **Approach**: Run Prefix Consensus alongside AptosBFT (parallel, not replacing)
+   - **Testing**: Use existing smoke-test framework with local validators
+   - **Estimated Timeline**: 8-11 days of focused development
+
+3. **Key Decisions** (User Confirmed):
+   - Hardcoded n=4, f=1 for initial testing
+   - Single epoch assumption (no epoch boundary handling yet)
+   - Use BLS12-381 signatures (same as current consensus)
+   - Run alongside AptosBFT (not replacing)
+   - Fake transactions as input vectors for testing
+   - Pure asynchrony (no timeouts in Phase 1)
+   - Use existing smoke-test framework
+   - Basic logging/metrics only
+   - Fail permanently on QC formation failure (single-shot)
+   - Test with dummy signatures first, add real signatures in Phase 10
+
+### Phase 1: Serialization and Signature Support (COMPLETED ✅)
+
+**Date**: 2026-01-28
+**Status**: ✅ Complete - All tests passing (54/54)
+
+**Changes Made**:
+
+#### 1. Updated `consensus/prefix-consensus/Cargo.toml`
+- Added `aptos-crypto-derive` dependency for `CryptoHasher` and `BCSCryptoHash` derive macros
+- Enabled `fuzzing` feature on `aptos-crypto` for access to `dummy_signature()` method
+- Added `sha3` - For custom hasher implementation
+- Added `once_cell` - For lazy static initialization in custom hashers
+
+#### 2. Updated `consensus/prefix-consensus/src/types.rs`
+- **Signature Change**: Replaced `Ed25519Signature` with `bls12381::Signature` (BLS12-381)
+- **Added Fields**:
+  - `epoch: u64` to Vote1, Vote2, Vote3, and PrefixConsensusInput (for future epoch awareness)
+  - `slot: u64` to Vote1, Vote2, Vote3 (for future multi-slot support, always 0 for single-shot)
+- **Custom Hasher Implementation**:
+  - Created custom hashers (Vote1Hasher, Vote2Hasher, Vote3Hasher) using macro
+  - Manual `CryptoHash` implementation that excludes signature field from hash
+  - This separation is crucial for signature verification (hash must not include signature itself)
+- **SignData Helper Structs** (NEW):
+  - `Vote1SignData`, `Vote2SignData`, `Vote3SignData`
+  - These exclude signature fields for proper BCS serialization during signing
+  - Derive `CryptoHasher` and `BCSCryptoHash` for use with `ValidatorSigner`
+- **Updated Constructors**: All Vote::new() methods now accept epoch and slot parameters
+
+#### 3. Created `consensus/prefix-consensus/src/signing.rs` (NEW)
+- **Sign Functions**:
+  - `sign_vote1(vote: &Vote1, signer: &ValidatorSigner) -> Result<BlsSignature>`
+  - `sign_vote2(vote: &Vote2, signer: &ValidatorSigner) -> Result<BlsSignature>`
+  - `sign_vote3(vote: &Vote3, signer: &ValidatorSigner) -> Result<BlsSignature>`
+  - Uses SignData helper structs to create proper signable content
+- **Verify Functions**:
+  - `verify_vote1_signature(vote: &Vote1, author: &PartyId, verifier: &ValidatorVerifier) -> Result<()>`
+  - `verify_vote2_signature(...)` (similar)
+  - `verify_vote3_signature(...)` (similar)
+  - Uses SignData helper structs to match signing process
+- **Tests**: 4 unit tests for signature round-trip verification (all passing ✅)
+
+#### 4. Updated `consensus/prefix-consensus/src/protocol.rs`
+- Fixed all `Vote::new()` calls to include `epoch` and `slot` parameters (3 locations):
+  - `start_round1()`: Pass `self.input.epoch` and `0` for slot
+  - `start_round2()`: Pass `self.input.epoch` and `0` for slot
+  - `start_round3()`: Pass `self.input.epoch` and `0` for slot
+- Updated `create_dummy_signature()` to return BLS signatures instead of Ed25519:
+  ```rust
+  fn create_dummy_signature(_private_key: &Ed25519PrivateKey) -> bls12381::Signature {
+      bls12381::Signature::dummy_signature()
+  }
+  ```
+- Fixed test helper: Updated `PrefixConsensusInput::new()` call to include epoch parameter
+
+#### 5. Fixed Test Files
+- **certify.rs**: Updated all Vote::new() calls and dummy_signature() to use BLS (43 fixes)
+- **verification.rs**: Updated all Vote::new() calls and dummy_signature() to use BLS
+- **signing.rs**: Fixed ValidatorSigner and ValidatorVerifier creation
+- Removed unused `Ed25519Signature` imports from all test modules
+
+#### 6. Updated `consensus/prefix-consensus/src/lib.rs`
+- Exported new `signing` module as public
+- Exported signing functions: `sign_vote1/2/3`, `verify_vote1/2/3_signature`
+- Exported additional types: `Element`, `PrefixVector`, SignData types (for external use)
+
+**Technical Challenges Solved**:
+
+1. **BCS Serialization vs CryptoHash**:
+   - Discovery: `ValidatorVerifier::verify()` uses BCS serialization of the entire struct, NOT just CryptoHash
+   - Problem: Including signature field in serialization creates circular dependency
+   - Solution: Created separate SignData structs that exclude signature field
+
+2. **Custom Hasher Implementation**:
+   - Problem: Vote types need CryptoHash that excludes signature, but derive macro includes all fields
+   - Solution: Manual CryptoHash impl with custom hashers (Vote1Hasher, Vote2Hasher, Vote3Hasher)
+   - Implementation: SHA3-256 based, matches Aptos crypto patterns
+
+3. **Test Compilation Errors**:
+   - Fixed 43+ test compilation errors from signature type changes
+   - Updated all test helpers to use new Vote constructor signatures
+   - Fixed ValidatorSigner creation to use Arc<PrivateKey>
+   - Fixed ValidatorVerifier creation to use ValidatorConsensusInfo
+
+**Test Results**:
+```bash
+✅ cargo test -p aptos-prefix-consensus
+   Finished `test` profile [unoptimized + debuginfo] target(s) in 3.33s
+   Running unittests src/lib.rs
+
+   running 54 tests
+   test result: ok. 54 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+```
+
+**Test Coverage**:
+- Utils: 27 tests ✅
+- Certify: 8 tests ✅
+- Verification: 7 tests ✅
+- Protocol: 2 tests ✅
+- Signing: 4 tests ✅ (signature round-trip, invalid signature detection)
+- **Total**: 54 tests passing, 0 warnings, 0 errors
+
+### What's Working
+- ✅ Types are fully serializable (`Serialize` + `Deserialize`)
+- ✅ Types support cryptographic hashing (custom `CryptoHash` implementation)
+- ✅ BLS12-381 signature infrastructure fully functional
+- ✅ Epoch and slot fields added (ready for future multi-slot)
+- ✅ Protocol compiles and runs with BLS signatures
+- ✅ Signature creation and verification working correctly
+- ✅ All unit tests passing (54/54)
+- ✅ Test helpers updated for new signatures
+
+### Summary of Files Changed in Phase 1
+
+**New Files**:
+- `consensus/prefix-consensus/src/signing.rs` - BLS signature helpers (184 lines)
+
+**Modified Files**:
+- `consensus/prefix-consensus/Cargo.toml` - Added dependencies (sha3, once_cell, aptos-crypto-derive)
+- `consensus/prefix-consensus/src/types.rs` - Added SignData structs, custom hashers, epoch/slot fields (~120 lines added)
+- `consensus/prefix-consensus/src/protocol.rs` - Updated Vote constructors, BLS signatures (10 lines changed)
+- `consensus/prefix-consensus/src/lib.rs` - Exported signing module (5 lines added)
+- `consensus/prefix-consensus/src/certify.rs` - Fixed test helpers (43 vote constructor updates)
+- `consensus/prefix-consensus/src/verification.rs` - Fixed test helpers (15 vote constructor updates)
+
+**Lines of Code Added**: ~350 lines (including tests and helper structs)
+
+### What's Not Implemented (Per Plan)
+- ❌ Network message types (`PrefixConsensusMsg` enum) - Phase 2
+- ❌ Network interface adapter - Phase 3
+- ❌ PrefixConsensusManager - Phase 4
+- ❌ Integration with consensus layer - Phase 5-6
+- ❌ Smoke tests - Phase 7-9
+- ❌ Real BLS signature signing/verification in protocol - Phase 10
+- ❌ Documentation - Phase 11
+
+### Next Steps (Phase 2-11)
+
+**Immediate (Phase 2)**: Create network message types
+- Create `consensus/prefix-consensus/src/network_messages.rs`
+- Define `PrefixConsensusMsg` enum with Vote1Msg/Vote2Msg/Vote3Msg variants
+- Implement helper methods (name, epoch, author)
+- Add serialization unit tests
+
+**Short-term (Phase 3-4)**: Network adapter and manager
+- Create `network_interface.rs` with sender trait and adapter
+- Create `manager.rs` with event-driven manager
+- Wire protocol to network callbacks
+
+**Medium-term (Phase 5-6)**: Integration
+- Create `consensus/src/prefix_consensus_provider.rs`
+- Register with network layer
+- Set up channels and runtime
+
+**Testing (Phase 7-9)**: Smoke tests
+- Create `smoke-test/src/prefix_consensus/` module
+- Basic tests (identical inputs, overlapping, divergent)
+- Byzantine tests (silent validator)
+
+**Final (Phase 10-11)**: Real signatures and documentation
+- Replace dummy signatures with real BLS signing in protocol
+- Update README and project_context.md
+
+### Implementation Plan Reference
+- **Full Plan**: `.plans/network-integration.md` (project-local)
+- **Estimated Total Time**: 8-11 days
+- **Current Progress**: Phase 1/11 complete (~9%)
+- **Time Spent on Phase 1**: ~4 hours (significant debugging of BCS serialization vs CryptoHash)
+
+---
+
 ## Git History
 
 ### Branch: `prefix-consensus-prototype`

@@ -15,7 +15,7 @@ use crate::{
     verification::{verify_qc1, verify_qc2, verify_qc3, verify_vote1, verify_vote2, verify_vote3},
 };
 use anyhow::{bail, Result};
-use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519Signature};
+use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_logger::{debug, error, info};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -138,6 +138,8 @@ impl PrefixConsensusProtocol {
         let vote = Vote1::new(
             self.input.party_id,
             self.input.input_vector.clone(),
+            self.input.epoch,
+            0, // slot: always 0 for single-shot
             signature,
         );
 
@@ -247,7 +249,14 @@ impl PrefixConsensusProtocol {
         // Create Vote2
         // For the prototype, we create a dummy signature
         let signature = create_dummy_signature(private_key);
-        let vote = Vote2::new(self.input.party_id, certified.clone(), qc1, signature);
+        let vote = Vote2::new(
+            self.input.party_id,
+            certified.clone(),
+            qc1,
+            self.input.epoch,
+            0, // slot: always 0 for single-shot
+            signature,
+        );
 
         // Add own vote to pending votes
         self.process_vote2(vote.clone()).await?;
@@ -354,7 +363,14 @@ impl PrefixConsensusProtocol {
         // Create Vote3
         // For the prototype, we create a dummy signature
         let signature = create_dummy_signature(private_key);
-        let vote = Vote3::new(self.input.party_id, mcp.clone(), qc2, signature);
+        let vote = Vote3::new(
+            self.input.party_id,
+            mcp.clone(),
+            qc2,
+            self.input.epoch,
+            0, // slot: always 0 for single-shot
+            signature,
+        );
 
         // Add own vote to pending votes
         self.process_vote3(vote.clone()).await?;
@@ -479,10 +495,10 @@ impl PrefixConsensusProtocol {
 ///
 /// Note: This is a placeholder for the prototype. In production, votes would be
 /// properly signed using the private key with the correct message format.
-fn create_dummy_signature(_private_key: &Ed25519PrivateKey) -> Ed25519Signature {
-    // Create a dummy 64-byte signature
+fn create_dummy_signature(_private_key: &Ed25519PrivateKey) -> aptos_crypto::bls12381::Signature {
+    // Create a dummy BLS signature
     // In a real implementation, this would properly sign the vote content
-    Ed25519Signature::try_from(&[0u8; 64][..]).unwrap()
+    aptos_crypto::bls12381::Signature::dummy_signature()
 }
 
 #[cfg(test)]
@@ -501,7 +517,7 @@ mod tests {
         n: usize,
         f: usize,
     ) -> PrefixConsensusInput {
-        PrefixConsensusInput::new(vector, PartyId::new([party_id; 32]), n, f)
+        PrefixConsensusInput::new(vector, PartyId::new([party_id; 32]), n, f, 0)
     }
 
     #[tokio::test]

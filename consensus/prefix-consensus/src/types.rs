@@ -3,15 +3,120 @@
 
 //! Core types for Prefix Consensus protocol
 
-use aptos_crypto::{ed25519::Ed25519Signature, HashValue};
+use aptos_crypto::{
+    bls12381::Signature as BlsSignature,
+    hash::{CryptoHash, CryptoHasher},
+    HashValue,
+};
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+// Define custom hashers for Vote types using the same pattern as aptos-crypto
+macro_rules! define_vote_hasher {
+    ($hasher_type:ident, $salt:expr) => {
+        #[derive(Clone)]
+        pub struct $hasher_type(sha3::Sha3_256);
+
+        impl $hasher_type {
+            fn new() -> Self {
+                let mut hasher = sha3::Sha3_256::default();
+                if !$salt.is_empty() {
+                    use sha3::Digest;
+                    hasher.update($salt);
+                }
+                Self(hasher)
+            }
+        }
+
+        impl Default for $hasher_type {
+            fn default() -> Self {
+                Self::new()
+            }
+        }
+
+        impl std::io::Write for $hasher_type {
+            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+                use sha3::Digest;
+                self.0.update(bytes);
+                Ok(bytes.len())
+            }
+
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+
+        impl CryptoHasher for $hasher_type {
+            fn seed() -> &'static [u8; 32] {
+                use once_cell::sync::Lazy;
+                static SEED: Lazy<[u8; 32]> = Lazy::new(|| {
+                    let mut hasher = sha3::Sha3_256::default();
+                    use sha3::Digest;
+                    hasher.update($salt);
+                    let hash = hasher.finalize();
+                    let mut seed = [0u8; 32];
+                    seed.copy_from_slice(hash.as_ref());
+                    seed
+                });
+                &SEED
+            }
+
+            fn update(&mut self, bytes: &[u8]) {
+                use sha3::Digest;
+                self.0.update(bytes);
+            }
+
+            fn finish(self) -> HashValue {
+                use sha3::Digest;
+                HashValue::from_slice(&self.0.finalize()[..]).unwrap()
+            }
+        }
+    };
+}
+
+define_vote_hasher!(Vote1Hasher, b"PrefixConsensus::Vote1");
+define_vote_hasher!(Vote2Hasher, b"PrefixConsensus::Vote2");
+define_vote_hasher!(Vote3Hasher, b"PrefixConsensus::Vote3");
 
 /// Represents a party's unique identifier (validator account address)
 pub type PartyId = aptos_types::account_address::AccountAddress;
 
 /// Round number in the protocol (1, 2, or 3)
 pub type Round = u8;
+
+// ============================================================================
+// Signable Data Types (for creating signatures, excludes signature field)
+// ============================================================================
+
+/// Signable data for Vote1 (excludes signature)
+#[derive(Clone, Debug, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+pub struct Vote1SignData {
+    pub author: PartyId,
+    pub input_vector: PrefixVector,
+    pub epoch: u64,
+    pub slot: u64,
+}
+
+/// Signable data for Vote2 (excludes signature)
+#[derive(Clone, Debug, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+pub struct Vote2SignData {
+    pub author: PartyId,
+    pub certified_prefix: PrefixVector,
+    pub qc1: QC1,
+    pub epoch: u64,
+    pub slot: u64,
+}
+
+/// Signable data for Vote3 (excludes signature)
+#[derive(Clone, Debug, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+pub struct Vote3SignData {
+    pub author: PartyId,
+    pub mcp_prefix: PrefixVector,
+    pub qc2: QC2,
+    pub epoch: u64,
+    pub slot: u64,
+}
 
 /// Generic vector element type for prefix consensus
 /// In practice, this could be transaction hashes, block hashes, or other values
@@ -33,26 +138,47 @@ pub struct Vote1 {
     /// The input vector this party is voting for
     pub input_vector: PrefixVector,
 
-    /// Signature over the vote data
-    pub signature: Ed25519Signature,
+    /// Epoch number (for future use)
+    pub epoch: u64,
+
+    /// Slot number (for future multi-slot, always 0 for single-shot)
+    pub slot: u64,
+
+    /// Signature over the vote data (not included in hash)
+    pub signature: BlsSignature,
 }
 
 impl Vote1 {
     /// Create a new Round 1 vote
-    pub fn new(author: PartyId, input_vector: PrefixVector, signature: Ed25519Signature) -> Self {
+    pub fn new(
+        author: PartyId,
+        input_vector: PrefixVector,
+        epoch: u64,
+        slot: u64,
+        signature: BlsSignature,
+    ) -> Self {
         Self {
             author,
             input_vector,
+            epoch,
+            slot,
             signature,
         }
     }
+}
 
-    /// Get the hash of this vote for signing/verification
-    pub fn hash(&self) -> HashValue {
-        let mut bytes = bcs::to_bytes(&self.author).unwrap();
-        bytes.extend(bcs::to_bytes(&self.input_vector).unwrap());
-        bytes.extend(b"VOTE1");
-        HashValue::sha3_256_of(&bytes)
+/// Manual CryptoHash implementation that excludes the signature field
+impl CryptoHash for Vote1 {
+    type Hasher = Vote1Hasher;
+
+    fn hash(&self) -> HashValue {
+        let mut state = Self::Hasher::default();
+        state.update(&bcs::to_bytes(&self.author).expect("Serialization should not fail"));
+        state.update(&bcs::to_bytes(&self.input_vector).expect("Serialization should not fail"));
+        state.update(&bcs::to_bytes(&self.epoch).expect("Serialization should not fail"));
+        state.update(&bcs::to_bytes(&self.slot).expect("Serialization should not fail"));
+        // Note: signature is intentionally NOT included in the hash
+        state.finish()
     }
 }
 
@@ -68,8 +194,14 @@ pub struct Vote2 {
     /// The QC1 that certifies this prefix
     pub qc1: QC1,
 
-    /// Signature over the vote data
-    pub signature: Ed25519Signature,
+    /// Epoch number (for future use)
+    pub epoch: u64,
+
+    /// Slot number (for future multi-slot, always 0 for single-shot)
+    pub slot: u64,
+
+    /// Signature over the vote data (not included in hash)
+    pub signature: BlsSignature,
 }
 
 impl Vote2 {
@@ -78,23 +210,34 @@ impl Vote2 {
         author: PartyId,
         certified_prefix: PrefixVector,
         qc1: QC1,
-        signature: Ed25519Signature,
+        epoch: u64,
+        slot: u64,
+        signature: BlsSignature,
     ) -> Self {
         Self {
             author,
             certified_prefix,
             qc1,
+            epoch,
+            slot,
             signature,
         }
     }
+}
 
-    /// Get the hash of this vote for signing/verification
-    pub fn hash(&self) -> HashValue {
-        let mut bytes = bcs::to_bytes(&self.author).unwrap();
-        bytes.extend(bcs::to_bytes(&self.certified_prefix).unwrap());
-        bytes.extend(bcs::to_bytes(&self.qc1.hash()).unwrap());
-        bytes.extend(b"VOTE2");
-        HashValue::sha3_256_of(&bytes)
+/// Manual CryptoHash implementation that excludes the signature field
+impl CryptoHash for Vote2 {
+    type Hasher = Vote2Hasher;
+
+    fn hash(&self) -> HashValue {
+        let mut state = Self::Hasher::default();
+        state.update(&bcs::to_bytes(&self.author).expect("Serialization should not fail"));
+        state.update(&bcs::to_bytes(&self.certified_prefix).expect("Serialization should not fail"));
+        state.update(&bcs::to_bytes(&self.qc1).expect("Serialization should not fail"));
+        state.update(&bcs::to_bytes(&self.epoch).expect("Serialization should not fail"));
+        state.update(&bcs::to_bytes(&self.slot).expect("Serialization should not fail"));
+        // Note: signature is intentionally NOT included in the hash
+        state.finish()
     }
 }
 
@@ -110,8 +253,14 @@ pub struct Vote3 {
     /// The QC2 that certifies this prefix
     pub qc2: QC2,
 
-    /// Signature over the vote data
-    pub signature: Ed25519Signature,
+    /// Epoch number (for future use)
+    pub epoch: u64,
+
+    /// Slot number (for future multi-slot, always 0 for single-shot)
+    pub slot: u64,
+
+    /// Signature over the vote data (not included in hash)
+    pub signature: BlsSignature,
 }
 
 impl Vote3 {
@@ -120,23 +269,34 @@ impl Vote3 {
         author: PartyId,
         mcp_prefix: PrefixVector,
         qc2: QC2,
-        signature: Ed25519Signature,
+        epoch: u64,
+        slot: u64,
+        signature: BlsSignature,
     ) -> Self {
         Self {
             author,
             mcp_prefix,
             qc2,
+            epoch,
+            slot,
             signature,
         }
     }
+}
 
-    /// Get the hash of this vote for signing/verification
-    pub fn hash(&self) -> HashValue {
-        let mut bytes = bcs::to_bytes(&self.author).unwrap();
-        bytes.extend(bcs::to_bytes(&self.mcp_prefix).unwrap());
-        bytes.extend(bcs::to_bytes(&self.qc2.hash()).unwrap());
-        bytes.extend(b"VOTE3");
-        HashValue::sha3_256_of(&bytes)
+/// Manual CryptoHash implementation that excludes the signature field
+impl CryptoHash for Vote3 {
+    type Hasher = Vote3Hasher;
+
+    fn hash(&self) -> HashValue {
+        let mut state = Self::Hasher::default();
+        state.update(&bcs::to_bytes(&self.author).expect("Serialization should not fail"));
+        state.update(&bcs::to_bytes(&self.mcp_prefix).expect("Serialization should not fail"));
+        state.update(&bcs::to_bytes(&self.qc2).expect("Serialization should not fail"));
+        state.update(&bcs::to_bytes(&self.epoch).expect("Serialization should not fail"));
+        state.update(&bcs::to_bytes(&self.slot).expect("Serialization should not fail"));
+        // Note: signature is intentionally NOT included in the hash
+        state.finish()
     }
 }
 
@@ -264,16 +424,26 @@ pub struct PrefixConsensusInput {
 
     /// Maximum number of Byzantine parties
     pub f: usize,
+
+    /// Epoch number (for future use)
+    pub epoch: u64,
 }
 
 impl PrefixConsensusInput {
     /// Create a new input for prefix consensus
-    pub fn new(input_vector: PrefixVector, party_id: PartyId, n: usize, f: usize) -> Self {
+    pub fn new(
+        input_vector: PrefixVector,
+        party_id: PartyId,
+        n: usize,
+        f: usize,
+        epoch: u64,
+    ) -> Self {
         Self {
             input_vector,
             party_id,
             n,
             f,
+            epoch,
         }
     }
 

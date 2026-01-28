@@ -166,7 +166,7 @@ pub fn is_valid_quorum(author_count: usize, n: usize, f: usize) -> bool {
 mod tests {
     use super::*;
     use crate::types::PrefixVector;
-    use aptos_crypto::{ed25519::Ed25519Signature, HashValue};
+    use aptos_crypto::HashValue;
 
     fn hash(i: u64) -> HashValue {
         HashValue::sha3_256_of(&i.to_le_bytes())
@@ -176,12 +176,12 @@ mod tests {
         PartyId::new([i; 32])
     }
 
-    fn dummy_signature() -> Ed25519Signature {
-        Ed25519Signature::try_from(&[0u8; 64][..]).unwrap()
+    fn dummy_signature() -> aptos_crypto::bls12381::Signature {
+        aptos_crypto::bls12381::Signature::dummy_signature()
     }
 
     fn create_vote1(author_id: u8, vector: PrefixVector) -> Vote1 {
-        Vote1::new(dummy_party_id(author_id), vector, dummy_signature())
+        Vote1::new(dummy_party_id(author_id), vector, 0, 0, dummy_signature())
     }
 
     #[test]
@@ -269,15 +269,17 @@ mod tests {
                 dummy_party_id(0),
                 vec![hash(1)],
                 qc1.clone(),
+                0, 0,
                 dummy_signature(),
             ),
             Vote2::new(
                 dummy_party_id(1),
                 vec![hash(1)],
                 qc1.clone(),
+                0, 0,
                 dummy_signature(),
             ),
-            Vote2::new(dummy_party_id(2), vec![hash(1)], qc1, dummy_signature()),
+            Vote2::new(dummy_party_id(2), vec![hash(1)], qc1, 0, 0, dummy_signature()),
         ];
 
         let qc2 = QC2::new(votes);
@@ -299,15 +301,17 @@ mod tests {
                 dummy_party_id(0),
                 vec![hash(1)],
                 qc1.clone(),
+                0, 0,
                 dummy_signature(),
             ),
             Vote2::new(
                 dummy_party_id(1),
                 vec![hash(1)],
                 qc1.clone(),
+                0, 0,
                 dummy_signature(),
             ),
-            Vote2::new(dummy_party_id(2), vec![hash(1)], qc1, dummy_signature()),
+            Vote2::new(dummy_party_id(2), vec![hash(1)], qc1, 0, 0, dummy_signature()),
         ]);
 
         let votes = vec![
@@ -315,15 +319,17 @@ mod tests {
                 dummy_party_id(0),
                 vec![hash(1)],
                 qc2.clone(),
+                0, 0,
                 dummy_signature(),
             ),
             Vote3::new(
                 dummy_party_id(1),
                 vec![hash(1)],
                 qc2.clone(),
+                0, 0,
                 dummy_signature(),
             ),
-            Vote3::new(dummy_party_id(2), vec![hash(1)], qc2, dummy_signature()),
+            Vote3::new(dummy_party_id(2), vec![hash(1)], qc2, 0, 0, dummy_signature()),
         ];
 
         let qc3 = QC3::new(votes);
