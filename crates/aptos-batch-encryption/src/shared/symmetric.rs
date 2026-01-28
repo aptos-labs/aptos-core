@@ -187,10 +187,8 @@ pub fn hash_g2_element(g2_element: G2Affine) -> Result<G1Affine> {
 
         // TODO vary the sign of y??
         if let Some(x3b_sqrt) = x3b.sqrt() {
-            println!("{:?}", x3b_sqrt);
             let p = G1Affine::new_unchecked(x, x3b_sqrt).clear_cofactor();
             assert!(p.is_in_correct_subgroup_assuming_on_curve());
-            println!("{:?}", p);
             return Ok(p);
         }
     }
