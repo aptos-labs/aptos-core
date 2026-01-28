@@ -3,8 +3,6 @@
 import type { Fp2 } from '@noble/curves/abstract/tower.js';
 import type { WeierstrassPoint, WeierstrassPointCons } from '@noble/curves/abstract/weierstrass.js';
 import { bls12_381 } from '@noble/curves/bls12-381.js';
-import { leBytesToBigint, bigintToLEBytesFq, bigintToLEBytesFr } from './fieldSerialization.ts';
-import { bls } from '@noble/curves/abstract/bls.js';
 
 
 export const G1_SIZE = 48;
