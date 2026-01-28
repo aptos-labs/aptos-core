@@ -1960,7 +1960,7 @@ impl<'a> FunctionGenerator<'a> {
         // Ensure that temps on the stack which are used after this point are saved to locals.
         self.save_used_after(ctx, temps);
         // Now compute which temps need to be pushed, on top of any which are already on the stack
-        let mut temps_to_push = self.analyze_stack(temps);
+        let mut temps_to_push = self.analyze_stack(temps, push_kind);
         // If any of the temps we need to push now are actually underneath the temps already on the stack,
         // and their values were not copied from locals, we need to even flush more of the stack to reach them.
         let mut stack_to_flush = self.stack.len();
@@ -1987,7 +1987,7 @@ impl<'a> FunctionGenerator<'a> {
                     copied = false;
                     self.emit(FF::Bytecode::MoveLoc(local));
                 },
-                Some(AssignKind::Copy) => {
+                Some(AssignKind::Copy) | Some(AssignKind::Dup) => {
                     copied = true;
                     self.emit(FF::Bytecode::CopyLoc(local));
                 },
@@ -2063,7 +2063,15 @@ impl<'a> FunctionGenerator<'a> {
 
     /// Determines the maximal prefix of `temps` which are already on the stack, and
     /// returns the temps which are not and need to be pushed.
-    fn analyze_stack<'t>(&mut self, temps: &'t [TempIndex]) -> &'t [TempIndex] {
+    fn analyze_stack<'t>(
+        &mut self,
+        temps: &'t [TempIndex],
+        push_kind: Option<&AssignKind>,
+    ) -> &'t [TempIndex] {
+        // In case of a `Dup`, we always push the srcs on to stack instead of consuming the existing values
+        if let Some(AssignKind::Dup) = push_kind {
+            return temps;
+        }
         let mut temps_to_push = temps; // worst case need to push all
         let stack = self.stack.iter().map(|(t, _)| *t).collect::<Vec<_>>();
         for end in (1..=temps.len()).rev() {
@@ -2123,8 +2131,14 @@ impl<'a> FunctionGenerator<'a> {
                 // need to flush this right away and maintain a local for it
                 flush_mark = flush_mark.min(i);
             }
-            // The result was not copied from a local.
-            self.stack.push((*temp, false));
+            // if we are duplicating itself, the temp (which is also the `src`) must have been copied from a local
+            // why: `Dup` mandates that `src` is always copied to the stack, instead of consuming from the stack
+            if ctx.is_dup_self() {
+                self.stack.push((*temp, true));
+            } else {
+                // The result was not copied from a local.
+                self.stack.push((*temp, false));
+            }
         }
         // Check if there are any temps that could be flushed right away.
         // We only need to check from below the `flush_mark` (everything at `flush_mark`
@@ -2288,10 +2302,28 @@ impl BytecodeContext<'_> {
 
     /// Get the set of temps to flush if possible at the current code offset.
     pub fn get_writes_to_flush(&self) -> Option<&BTreeSet<TempIndex>> {
+        // If duplicating itself, the `dest` (i.e., the `src`) must have been flushed already
+        // why: `Dup` mandates `src` is always copied to the stack, instead of consuming from the stack
+        if self.is_dup_self() {
+            return None;
+        }
         self.fun_ctx
             .fun
             .get_annotations()
             .get::<FlushWritesAnnotation>()
             .and_then(|annotation| annotation.0.get(&self.code_offset))
+    }
+
+    /// Check if the current inst duplicates a value onto itself.
+    pub fn is_dup_self(&self) -> bool {
+        let bc = &self.fun_ctx.fun.data.code[self.code_offset as usize];
+        if let Bytecode::Assign(_, dst, src, kind) = bc
+            && kind == &AssignKind::Dup
+            && dst == src
+        {
+            true
+        } else {
+            false
+        }
     }
 }

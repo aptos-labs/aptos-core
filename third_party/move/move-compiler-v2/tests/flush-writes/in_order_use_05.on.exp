@@ -23,26 +23,80 @@ public fun m::test() {
      var $t1: u64
      var $t2: u64
      var $t3: u64
-     var $t4: u64 [unused]
-     var $t5: u64 [unused]
+     var $t4: u64
+     var $t5: u64
      # live vars:
   0: $t0 := m::one()
+     # flush: $t1
      # live vars: $t0
   1: $t1 := m::one()
      # live vars: $t0, $t1
   2: $t2 := m::one()
+     # flush: $t3
      # live vars: $t0, $t1, $t2
   3: $t3 := m::one()
      # live vars: $t0, $t1, $t2, $t3
-  4: $t2 := move($t2)
-     # live vars: $t0, $t1, $t2, $t3
-  5: m::consume_2($t2, $t3)
+  4: $t4 := infer($t2)
+     # live vars: $t0, $t1, $t3, $t4
+  5: m::consume_2($t4, $t3)
      # live vars: $t0, $t1
-  6: $t0 := move($t0)
-     # live vars: $t0, $t1
-  7: m::consume_2($t0, $t1)
+  6: $t5 := infer($t0)
+     # live vars: $t1, $t5
+  7: m::consume_2($t5, $t1)
      # live vars:
   8: return ()
+}
+
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun m::consume_2($t0: u64, $t1: u64) {
+     # live vars: $t0, $t1
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::one(): u64 {
+     var $t0: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64 [unused]
+     var $t5: u64 [unused]
+     # flush: $t0
+     # live vars:
+  0: $t0 := m::one()
+     # flush: $t0
+     # live vars: $t0
+  1: $t0 := dup($t0)
+     # flush: $t1
+     # live vars: $t0
+  2: $t1 := dup($t0)
+     # live vars: $t0, $t1
+  3: $t2 := dup($t0)
+     # live vars: $t0, $t1, $t2
+  4: $t3 := dup($t0)
+     # live vars: $t0, $t1, $t2, $t3
+  5: $t2 := move($t2)
+     # live vars: $t0, $t1, $t2, $t3
+  6: m::consume_2($t2, $t3)
+     # live vars: $t0, $t1
+  7: $t0 := move($t0)
+     # live vars: $t0, $t1
+  8: m::consume_2($t0, $t1)
+     # live vars:
+  9: return ()
 }
 
 
@@ -65,12 +119,17 @@ fun one(): u64
     local l2: u64
     local l3: u64
     call one
-    call one
-    call one
-    call one
-    call consume_2
+    st_loc l0
+    copy_loc l0
+    copy_loc l0
+    st_loc l1
     // @5
+    copy_loc l0
+    copy_loc l0
     call consume_2
+    move_loc l1
+    call consume_2
+    // @10
     ret
 
 

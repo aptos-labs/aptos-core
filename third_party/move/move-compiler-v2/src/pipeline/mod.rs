@@ -12,6 +12,7 @@ use crate::pipeline::{
 use move_stackless_bytecode::function_target::FunctionTarget;
 
 pub mod ability_processor;
+pub mod common_subexp_elimination;
 pub mod control_flow_graph_simplifier;
 pub mod dead_store_elimination;
 pub mod exit_state_analysis;

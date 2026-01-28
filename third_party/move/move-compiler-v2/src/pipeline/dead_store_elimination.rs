@@ -23,7 +23,7 @@ use move_model::{ast::TempIndex, model::FunctionEnv};
 use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    stackless_bytecode::Bytecode,
+    stackless_bytecode::{AssignKind, Bytecode},
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -90,7 +90,10 @@ impl ReducedDefUseGraph {
         for (offset, instr) in code.iter().enumerate() {
             use Bytecode::*;
             match instr {
-                Assign(_, dst, src, _) if dst == src => {
+                // `Dup` a value itself is intended, so we do not consider it a self-assign here.
+                Assign(_, dst, src, assign_kind)
+                    if *assign_kind != AssignKind::Dup && dst == src =>
+                {
                     self_assigns.push(offset as CodeOffset);
                     self.incorporate_definition(*dst, offset as CodeOffset, live_vars);
                 },

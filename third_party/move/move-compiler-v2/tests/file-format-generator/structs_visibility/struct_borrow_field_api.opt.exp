@@ -303,6 +303,7 @@ l0: ld_u64 11
     local l2: &m1::S<u64>
     local l3: &m1::T<u64>
     local l4: &m1::T<u64>
+    local l5: bool
     ld_u64 9
     call m1::pack$T<u64>
     st_loc l0
@@ -339,42 +340,38 @@ l0: ld_u64 11
     ld_u64 9
     eq
     // @30
+    st_loc l5
+    copy_loc l5
     br_false l2
-    borrow_loc l1
-    call m1::borrow$S$1<u64>
-    call m1::borrow$T$0<u64>
-    read_ref
-    // @35
-    ld_u64 9
-    eq
+    copy_loc l5
     br_false l3
+    // @35
     borrow_loc l1
     st_loc l2
-    // @40
     copy_loc l2
     call m1::borrow$S$0<u64>
     move_loc l2
+    // @40
     call m1::borrow$S$1<u64>
     pop
-    // @45
     read_ref
     ld_u64 8
     eq
+    // @45
     br_false l4
     ret
-    // @50
 l4: ld_u64 15
     abort
 l3: ld_u64 15
+    // @50
     abort
 l2: ld_u64 14
-    // @55
     abort
 l1: ld_u64 12
     abort
+    // @55
 l0: move_loc l3
     pop
-    // @60
     ld_u64 11
     abort
 

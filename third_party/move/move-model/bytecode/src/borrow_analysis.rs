@@ -684,7 +684,7 @@ impl TransferFunctions for BorrowAnalysis<'_> {
                             state.del_node(&src_node)
                         }
                     },
-                    AssignKind::Copy | AssignKind::Store => {
+                    AssignKind::Copy | AssignKind::Dup | AssignKind::Store => {
                         if self.func_target.get_local_type(*src).is_mutable_reference() {
                             assert!(self
                                 .func_target

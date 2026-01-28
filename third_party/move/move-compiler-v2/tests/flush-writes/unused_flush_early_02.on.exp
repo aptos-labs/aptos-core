@@ -19,6 +19,69 @@ fun m::one(): u64 {
 
 [variant baseline]
 public fun m::test(): (u64, u64) {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: bool
+     var $t6: u64
+     var $t7: u64
+     # flush: $t2
+     # live vars:
+  0: $t2 := m::one()
+     # live vars: $t2
+  1: $t3 := m::one()
+     # flush: $t4
+     # live vars: $t2, $t3
+  2: $t4 := m::one()
+     # live vars: $t2, $t3, $t4
+  3: $t6 := infer($t3)
+     # live vars: $t2, $t4, $t6
+  4: $t7 := 0
+     # live vars: $t2, $t4, $t6, $t7
+  5: $t5 := ==($t6, $t7)
+     # live vars: $t2, $t4, $t5
+  6: if ($t5) goto 7 else goto 10
+     # live vars: $t2, $t4
+  7: label L0
+     # live vars: $t2, $t4
+  8: m::bar()
+     # live vars: $t2, $t4
+  9: goto 11
+     # live vars: $t2, $t4
+ 10: label L1
+     # live vars: $t2, $t4
+ 11: label L2
+     # live vars: $t2, $t4
+ 12: $t0 := infer($t2)
+     # live vars: $t0, $t4
+ 13: $t1 := infer($t4)
+     # live vars: $t0, $t1
+ 14: return ($t0, $t1)
+}
+
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun m::bar() {
+     # live vars:
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::one(): u64 {
+     var $t0: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test(): (u64, u64) {
      var $t0: u64 [unused]
      var $t1: u64 [unused]
      var $t2: u64
@@ -31,10 +94,10 @@ public fun m::test(): (u64, u64) {
      # live vars:
   0: $t2 := m::one()
      # live vars: $t2
-  1: $t3 := m::one()
+  1: $t3 := copy($t2)
      # flush: $t4
      # live vars: $t2, $t3
-  2: $t4 := m::one()
+  2: $t4 := copy($t2)
      # live vars: $t2, $t3, $t4
   3: $t3 := move($t3)
      # live vars: $t2, $t3, $t4
@@ -78,8 +141,8 @@ fun one(): u64
     local l1: u64
     call one
     st_loc l0
-    call one
-    call one
+    copy_loc l0
+    copy_loc l0
     st_loc l1
     // @5
     ld_u64 0

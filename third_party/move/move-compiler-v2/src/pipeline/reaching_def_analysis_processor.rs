@@ -340,6 +340,13 @@ impl TransferFunctions for ReachingDefAnalysis<'_> {
                         state.kill(Object::Local(*dest));
                         state.def(Object::Local(*dest), offset);
                     },
+                    AssignKind::Dup => {
+                        // `Dup` a value itself is intended, so we do not consider it a kill and re-gen here
+                        if dest != src {
+                            state.kill(Object::Local(*dest));
+                            state.def(Object::Local(*dest), offset);
+                        }
+                    },
                     AssignKind::Move => {
                         state.kill(Object::Local(*dest));
                         state.def(Object::Local(*dest), offset);

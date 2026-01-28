@@ -26,12 +26,12 @@ public fun m::test() {
      var $t4: u64
      var $t5: u64
      var $t6: u64
-     var $t7: u64 [unused]
-     var $t8: u64 [unused]
-     var $t9: u64 [unused]
-     var $t10: u64 [unused]
-     var $t11: u64 [unused]
-     var $t12: u64 [unused]
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
      # flush: $t0
      # live vars:
   0: $t0 := m::one()
@@ -47,6 +47,73 @@ public fun m::test() {
   5: $t5 := m::one()
      # live vars: $t0, $t1, $t2, $t3, $t4, $t5
   6: $t6 := m::one()
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5, $t6
+  7: $t7 := infer($t1)
+     # live vars: $t0, $t2, $t3, $t4, $t5, $t6, $t7
+  8: $t8 := infer($t2)
+     # live vars: $t0, $t3, $t4, $t5, $t6, $t7, $t8
+  9: $t9 := infer($t3)
+     # live vars: $t0, $t4, $t5, $t6, $t7, $t8, $t9
+ 10: $t10 := infer($t4)
+     # live vars: $t0, $t5, $t6, $t7, $t8, $t9, $t10
+ 11: $t11 := infer($t5)
+     # live vars: $t0, $t6, $t7, $t8, $t9, $t10, $t11
+ 12: $t12 := infer($t6)
+     # live vars: $t0, $t7, $t8, $t9, $t10, $t11, $t12
+ 13: m::consume($t7, $t8, $t9, $t10, $t11, $t12, $t0)
+     # live vars:
+ 14: return ()
+}
+
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+public fun m::consume($t0: u64, $t1: u64, $t2: u64, $t3: u64, $t4: u64, $t5: u64, $t6: u64) {
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5, $t6
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::one(): u64 {
+     var $t0: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64 [unused]
+     var $t8: u64 [unused]
+     var $t9: u64 [unused]
+     var $t10: u64 [unused]
+     var $t11: u64 [unused]
+     var $t12: u64 [unused]
+     # flush: $t0
+     # live vars:
+  0: $t0 := m::one()
+     # live vars: $t0
+  1: $t1 := copy($t0)
+     # live vars: $t0, $t1
+  2: $t2 := copy($t0)
+     # live vars: $t0, $t1, $t2
+  3: $t3 := copy($t0)
+     # live vars: $t0, $t1, $t2, $t3
+  4: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t2, $t3, $t4
+  5: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5
+  6: $t6 := copy($t0)
      # live vars: $t0, $t1, $t2, $t3, $t4, $t5, $t6
   7: $t1 := move($t1)
      # live vars: $t0, $t1, $t2, $t3, $t4, $t5, $t6
@@ -89,13 +156,13 @@ module 0xc0ffee::m
     local l6: u64
     call one
     st_loc l0
-    call one
-    call one
-    call one
+    copy_loc l0
+    copy_loc l0
+    copy_loc l0
     // @5
-    call one
-    call one
-    call one
+    copy_loc l0
+    copy_loc l0
+    copy_loc l0
     move_loc l0
     call consume
     // @10

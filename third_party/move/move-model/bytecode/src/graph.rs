@@ -137,7 +137,7 @@ impl<T: Ord + Copy + Debug> Graph<T> {
     }
 }
 
-struct DomRelation<T: Ord + Copy + Debug> {
+pub struct DomRelation<T: Ord + Copy + Debug> {
     node_to_postorder_num: BTreeMap<T, usize>,
     postorder_num_to_node: Vec<T>,
     idom_tree: BTreeMap<usize, usize>,
@@ -260,6 +260,37 @@ impl<T: Ord + Copy + Debug> DomRelation<T> {
             }
         }
         finger1
+    }
+
+    /// Function to traverse the dominator tree in preorder
+    pub fn traverse_preorder(&self) -> Vec<T> {
+        // build the parent-children map based on domination relation
+        let mut children_map = BTreeMap::<usize, Vec<usize>>::new();
+        for (&node, &idom) in &self.idom_tree {
+            if node == idom {
+                continue;
+            } // skip root
+            children_map.entry(idom).or_default().push(node);
+        }
+
+        // DFS the parent-children map to run preorder traversal
+        let mut result = Vec::new();
+        fn dfs(node: usize, children_map: &BTreeMap<usize, Vec<usize>>, result: &mut Vec<usize>) {
+            result.push(node);
+            if let Some(children) = children_map.get(&node) {
+                for &child in children {
+                    dfs(child, children_map, result);
+                }
+            }
+        }
+        let entry = self.entry_num();
+        dfs(entry, &children_map, &mut result);
+
+        // map back to original nodes
+        result
+            .iter()
+            .map(|&n| self.postorder_num_to_node[n])
+            .collect()
     }
 }
 

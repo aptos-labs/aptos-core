@@ -5,6 +5,175 @@ fun m::bytes($t0: &u64): vector<u8> {
      var $t1: vector<u8>
      # live vars: $t0
   0: $t1 := ["1", "2"]
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+fun m::cons_2($t0: u64, $t1: &mut u64): u64 {
+     var $t2: u64
+     # live vars: $t0, $t1
+  0: $t2 := infer($t0)
+     # live vars: $t2
+  1: return $t2
+}
+
+
+[variant baseline]
+fun m::cons_2_another($t0: &u64, $t1: u64) {
+     # live vars: $t0, $t1
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::cons_7($t0: vector<u8>, $t1: u64, $t2: u64, $t3: u64, $t4: u64, $t5: u64, $t6: u64): u64 {
+     var $t7: u64
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5, $t6
+  0: $t7 := 0
+     # live vars: $t7
+  1: return $t7
+}
+
+
+[variant baseline]
+fun m::id($t0: u64): u64 {
+     var $t1: u64
+     # live vars: $t0
+  0: $t1 := infer($t0)
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+fun m::one(): u64 {
+     var $t0: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+fun m::test($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: vector<u8>
+     var $t4: &u64
+     var $t5: bool
+     var $t6: u64
+     var $t7: &vector<u8>
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: &mut u64
+     var $t14: u64
+     var $t15: u64
+     var $t16: u64
+     var $t17: &mut u64
+     var $t18: u64
+     var $t19: &u64
+     var $t20: u64
+     var $t21: vector<u8>
+     var $t22: u64
+     var $t23: u64
+     var $t24: u64
+     var $t25: u64
+     var $t26: u64
+     var $t27: u64
+     var $t28: u64
+     var $t29: u64
+     # flush: $t2
+     # live vars: $t0
+  0: $t2 := m::id($t0)
+     # live vars: $t0, $t2
+  1: $t4 := borrow_local($t0)
+     # flush: $t3
+     # live vars: $t0, $t2, $t4
+  2: $t3 := m::bytes($t4)
+     # live vars: $t0, $t2, $t3
+  3: $t7 := borrow_local($t3)
+     # live vars: $t0, $t2, $t3, $t7
+  4: $t6 := vector::length<u8>($t7)
+     # live vars: $t0, $t2, $t3, $t6
+  5: $t8 := 2
+     # live vars: $t0, $t2, $t3, $t6, $t8
+  6: $t5 := ==($t6, $t8)
+     # live vars: $t0, $t2, $t3, $t5
+  7: if ($t5) goto 8 else goto 10
+     # live vars: $t0, $t2, $t3
+  8: label L0
+     # live vars: $t0, $t2, $t3
+  9: goto 13
+     # live vars: $t0, $t2, $t3
+ 10: label L1
+     # live vars:
+ 11: $t9 := 42
+     # live vars: $t9
+ 12: abort($t9)
+     # live vars: $t0, $t2, $t3
+ 13: label L2
+     # flush: $t10
+     # live vars: $t0, $t2, $t3
+ 14: $t10 := 0
+     # live vars: $t0, $t2, $t3, $t10
+ 15: $t12 := infer($t0)
+     # live vars: $t0, $t2, $t3, $t10, $t12
+ 16: $t13 := borrow_local($t10)
+     # live vars: $t0, $t2, $t3, $t10, $t12, $t13
+ 17: $t11 := m::cons_2($t12, $t13)
+     # live vars: $t0, $t2, $t3, $t10, $t11
+ 18: $t14 := m::id($t11)
+     # live vars: $t0, $t2, $t3, $t10, $t14
+ 19: $t16 := infer($t0)
+     # live vars: $t2, $t3, $t10, $t14, $t16
+ 20: $t17 := borrow_local($t10)
+     # live vars: $t2, $t3, $t10, $t14, $t16, $t17
+ 21: $t15 := m::cons_2($t16, $t17)
+     # live vars: $t2, $t3, $t10, $t14, $t15
+ 22: $t18 := m::id($t15)
+     # live vars: $t2, $t3, $t10, $t14, $t18
+ 23: $t19 := borrow_local($t2)
+     # live vars: $t2, $t3, $t10, $t14, $t18, $t19
+ 24: $t21 := infer($t3)
+     # live vars: $t2, $t10, $t14, $t18, $t19, $t21
+ 25: $t22 := 0
+     # live vars: $t2, $t10, $t14, $t18, $t19, $t21, $t22
+ 26: $t23 := infer($t10)
+     # live vars: $t2, $t14, $t18, $t19, $t21, $t22, $t23
+ 27: $t24 := infer($t14)
+     # live vars: $t2, $t18, $t19, $t21, $t22, $t23, $t24
+ 28: $t25 := infer($t18)
+     # live vars: $t2, $t19, $t21, $t22, $t23, $t24, $t25
+ 29: $t27 := m::one()
+     # live vars: $t2, $t19, $t21, $t22, $t23, $t24, $t25, $t27
+ 30: $t26 := m::id($t27)
+     # live vars: $t2, $t19, $t21, $t22, $t23, $t24, $t25, $t26
+ 31: $t29 := m::one()
+     # live vars: $t2, $t19, $t21, $t22, $t23, $t24, $t25, $t26, $t29
+ 32: $t28 := m::id($t29)
+     # live vars: $t2, $t19, $t21, $t22, $t23, $t24, $t25, $t26, $t28
+ 33: $t20 := m::cons_7($t21, $t22, $t23, $t24, $t25, $t26, $t28)
+     # live vars: $t2, $t19, $t20
+ 34: m::cons_2_another($t19, $t20)
+     # live vars: $t2
+ 35: $t1 := infer($t2)
+     # live vars: $t1
+ 36: return $t1
+}
+
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun m::bytes($t0: &u64): vector<u8> {
+     var $t1: vector<u8>
+     # live vars: $t0
+  0: $t1 := ["1", "2"]
      # live vars: $t0, $t1
   1: drop($t0)
      # live vars: $t1
@@ -88,8 +257,8 @@ fun m::test($t0: u64): u64 {
      var $t25: u64 [unused]
      var $t26: u64 [unused]
      var $t27: u64
-     var $t28: u64 [unused]
-     var $t29: u64
+     var $t28: u64
+     var $t29: u64 [unused]
      # flush: $t2
      # live vars: $t0
   0: $t2 := m::id($t0)
@@ -145,14 +314,16 @@ fun m::test($t0: u64): u64 {
  23: $t8 := move($t8)
      # live vars: $t2, $t4, $t6, $t8, $t21, $t22, $t23
  24: $t27 := m::one()
+     # flush: $t27
      # live vars: $t2, $t4, $t6, $t8, $t21, $t22, $t23, $t27
  25: $t27 := m::id($t27)
+     # flush: $t27
      # live vars: $t2, $t4, $t6, $t8, $t21, $t22, $t23, $t27
- 26: $t29 := m::one()
-     # live vars: $t2, $t4, $t6, $t8, $t21, $t22, $t23, $t27, $t29
- 27: $t29 := m::id($t29)
-     # live vars: $t2, $t4, $t6, $t8, $t21, $t22, $t23, $t27, $t29
- 28: $t6 := m::cons_7($t21, $t22, $t23, $t6, $t8, $t27, $t29)
+ 26: $t27 := dup($t27)
+     # live vars: $t2, $t4, $t6, $t8, $t21, $t22, $t23, $t27
+ 27: $t28 := dup($t27)
+     # live vars: $t2, $t4, $t6, $t8, $t21, $t22, $t23, $t27, $t28
+ 28: $t6 := m::cons_7($t21, $t22, $t23, $t6, $t8, $t27, $t28)
      # live vars: $t2, $t4, $t6
  29: m::cons_2_another($t4, $t6)
      # live vars: $t2
@@ -213,6 +384,7 @@ fun test(l0: u64): u64
     local l3: u64
     local l4: u64
     local l5: u64
+    local l6: u64
     copy_loc l0
     call id
     st_loc l1
@@ -250,11 +422,12 @@ fun test(l0: u64): u64
     call one
     // @30
     call id
-    call one
-    call id
+    st_loc l6
+    copy_loc l6
+    copy_loc l6
     call cons_7
-    call cons_2_another
     // @35
+    call cons_2_another
     move_loc l1
     ret
 l0: ld_u64 42
