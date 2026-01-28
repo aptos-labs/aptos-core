@@ -92,7 +92,8 @@ impl JWKObserver {
                     let secs = timer.elapsed().as_secs_f64();
                     if let Ok((mut jwks, nonce)) = result {
                         OBSERVATION_SECONDS.with_label_values(&[issuer.as_str(), "ok"]).observe(secs);
-                        jwks.sort();
+                        // In gravity oracle, we shouldn't do sort since the returned jwks are already sorted.
+                        // jwks.sort();
                         let _ = observation_tx.push((), (issuer.as_bytes().to_vec(), jwks, nonce));
                     } else {
                         OBSERVATION_SECONDS.with_label_values(&[issuer.as_str(), "err"]).observe(secs);
