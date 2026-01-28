@@ -37,7 +37,11 @@ specifications/
 └── advanced/                              # Advanced transaction types
     ├── 01-multi-agent-transactions.md    # Multi-signer transactions
     ├── 02-fee-payer-transactions.md      # Sponsored transactions
-    └── 03-multisig-transactions.md       # On-chain multisig
+    ├── 03-multisig-transactions.md       # On-chain multisig
+    ├── 04-gas-estimation.md              # Gas estimation and selection
+    ├── 05-sequence-numbers.md            # Sequence number management
+    ├── 06-orderless-transactions.md      # Nonce-based replay protection
+    └── 07-transaction-lifecycle.md       # Submission and confirmation
 ```
 
 ## Quick Reference
@@ -142,7 +146,10 @@ For new implementers, we recommend reading in this order:
 2. **[Raw Transaction Format](transaction-formats/01-raw-transaction.md)** - Core transaction structure
 3. **[Ed25519 Authenticator](transaction-formats/02-ed25519-authenticator.md)** - Simplest authentication
 4. **[Ed25519 Signing](signing/02-ed25519-signing.md)** - Basic signing process
-5. Continue with other formats as needed
+5. **[Gas Estimation](advanced/04-gas-estimation.md)** - How to set gas parameters
+6. **[Sequence Numbers](advanced/05-sequence-numbers.md)** - Replay protection basics
+7. **[Transaction Lifecycle](advanced/07-transaction-lifecycle.md)** - Submission and confirmation
+8. Continue with other formats as needed
 
 ## Test Vectors
 

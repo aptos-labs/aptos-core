@@ -177,6 +177,10 @@ Where `Hasher::seed()` is a domain separation prefix.
 1. **01-multi-agent-transactions.md** - Multiple independent signers
 2. **02-fee-payer-transactions.md** - Sponsored/gasless transactions
 3. **03-multisig-transactions.md** - On-chain multisig workflow
+4. **04-gas-estimation.md** - Gas estimation, simulation, and price selection
+5. **05-sequence-numbers.md** - Sequence number management and concurrency
+6. **06-orderless-transactions.md** - Nonce-based replay protection (experimental)
+7. **07-transaction-lifecycle.md** - Transaction submission, waiting, and confirmation
 
 ### Overview Documentation
 
