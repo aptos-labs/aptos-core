@@ -5,6 +5,7 @@
 use crate::pipeline::{
     exit_state_analysis::ExitStateAnalysisProcessor, flush_writes_processor::FlushWritesProcessor,
     livevar_analysis_processor::LiveVarAnalysisProcessor,
+    reaching_def_analysis_processor::ReachingDefProcessor,
     uninitialized_use_checker::UninitializedUseChecker,
     unreachable_code_analysis::UnreachableCodeProcessor, variable_coalescing::VariableCoalescing,
 };
@@ -17,6 +18,7 @@ pub mod exit_state_analysis;
 pub mod flush_writes_processor;
 pub mod lint_processor;
 pub mod livevar_analysis_processor;
+pub mod reaching_def_analysis_processor;
 pub mod reference_safety;
 pub mod split_critical_edges_processor;
 pub mod uninitialized_use_checker;
@@ -32,6 +34,7 @@ pub fn register_formatters(target: &FunctionTarget) {
     ExitStateAnalysisProcessor::register_formatters(target);
     FlushWritesProcessor::register_formatters(target);
     LiveVarAnalysisProcessor::register_formatters(target);
+    ReachingDefProcessor::register_formatters(target);
     reference_safety::register_formatters(target);
     UninitializedUseChecker::register_formatters(target);
     UnreachableCodeProcessor::register_formatters(target);

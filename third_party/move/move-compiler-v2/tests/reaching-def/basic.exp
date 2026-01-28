@@ -1,0 +1,445 @@
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun basic::conditional_tuple($t0: bool): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+  0: if ($t0) goto 1 else goto 6
+  1: label L0
+  2: $t4 := 1
+  3: $t5 := 2
+  4: ($t2, $t3) := basic::return_pair($t4, $t5)
+  5: goto 10
+  6: label L1
+  7: $t6 := 10
+  8: $t7 := 20
+  9: ($t2, $t3) := basic::return_pair($t6, $t7)
+ 10: label L2
+ 11: $t8 := infer($t2)
+ 12: $t1 := +($t8, $t3)
+ 13: return $t1
+}
+
+
+[variant baseline]
+fun basic::move_test(): u64 {
+     var $t0: u64
+     var $t1: 0x42::basic::R
+     var $t2: u64
+     var $t3: 0x42::basic::R
+     var $t4: &0x42::basic::R
+     var $t5: &u64
+  0: $t2 := 42
+  1: $t1 := pack 0x42::basic::R($t2)
+  2: $t3 := infer($t1)
+  3: $t4 := borrow_local($t3)
+  4: $t5 := borrow_field<0x42::basic::R>.value($t4)
+  5: $t0 := read_ref($t5)
+  6: return $t0
+}
+
+
+[variant baseline]
+fun basic::reassign($t0: bool): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := 1
+  1: if ($t0) goto 2 else goto 6
+  2: label L0
+  3: $t3 := 2
+  4: $t2 := infer($t3)
+  5: goto 7
+  6: label L1
+  7: label L2
+  8: $t1 := infer($t2)
+  9: return $t1
+}
+
+
+[variant baseline]
+fun basic::return_pair($t0: u64, $t1: u64): (u64, u64) {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t4 := infer($t0)
+  1: $t5 := 1
+  2: $t2 := +($t4, $t5)
+  3: $t6 := infer($t1)
+  4: $t7 := 1
+  5: $t3 := +($t6, $t7)
+  6: return ($t2, $t3)
+}
+
+
+[variant baseline]
+fun basic::simple_assign($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t4 := infer($t0)
+  1: $t3 := +($t4, $t1)
+  2: $t6 := infer($t3)
+  3: $t7 := 2
+  4: $t5 := *($t6, $t7)
+  5: $t2 := infer($t5)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun basic::tuple_destructure(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t3 := 1
+  1: $t4 := 2
+  2: ($t1, $t2) := basic::return_pair($t3, $t4)
+  3: $t5 := infer($t1)
+  4: $t0 := +($t5, $t2)
+  5: return $t0
+}
+
+============ after ReachingDefProcessor: ================
+
+[variant baseline]
+fun basic::conditional_tuple($t0: bool): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: if ($t0) goto 1 else goto 6
+     # live vars:
+     # reaching instruction #1:
+     # refs: []
+     #
+  1: label L0
+     # live vars:
+     # reaching instruction #2:
+     # refs: []
+     #
+  2: $t4 := 1
+     # live vars: $t4
+     # reaching instruction #3: `t4` @ {2}
+     # refs: []
+     #
+  3: $t5 := 2
+     # live vars: $t4, $t5
+     # reaching instruction #4: `t4` @ {2}, `t5` @ {3}
+     # refs: []
+     #
+  4: ($t2, $t3) := basic::return_pair($t4, $t5)
+     # live vars: $t2, $t3
+     # reaching instruction #5: `t2` @ {4}, `t3` @ {4}, `t4` @ {2}, `t5` @ {3}
+     # refs: []
+     #
+  5: goto 10
+     # live vars:
+     # reaching instruction #6:
+     # refs: []
+     #
+  6: label L1
+     # live vars:
+     # reaching instruction #7:
+     # refs: []
+     #
+  7: $t6 := 10
+     # live vars: $t6
+     # reaching instruction #8: `t6` @ {7}
+     # refs: []
+     #
+  8: $t7 := 20
+     # live vars: $t6, $t7
+     # reaching instruction #9: `t6` @ {7}, `t7` @ {8}
+     # refs: []
+     #
+  9: ($t2, $t3) := basic::return_pair($t6, $t7)
+     # live vars: $t2, $t3
+     # reaching instruction #10: `t2` @ {4, 9}, `t3` @ {4, 9}, `t4` @ {2}, `t5` @ {3}, `t6` @ {7}, `t7` @ {8}
+     # refs: []
+     #
+ 10: label L2
+     # live vars: $t2, $t3
+     # reaching instruction #11: `t2` @ {4, 9}, `t3` @ {4, 9}, `t4` @ {2}, `t5` @ {3}, `t6` @ {7}, `t7` @ {8}
+     # refs: []
+     #
+ 11: $t8 := infer($t2)
+     # live vars: $t3, $t8
+     # reaching instruction #12: `t3` @ {4, 9}, `t4` @ {2}, `t5` @ {3}, `t6` @ {7}, `t7` @ {8}, `t8` @ {11}
+     # refs: []
+     #
+ 12: $t1 := +($t8, $t3)
+     # live vars: $t1
+     # reaching instruction #13: `t1` @ {12}, `t3` @ {4, 9}, `t4` @ {2}, `t5` @ {3}, `t6` @ {7}, `t7` @ {8}, `t8` @ {11}
+     # refs: []
+     #
+ 13: return $t1
+}
+
+
+[variant baseline]
+fun basic::move_test(): u64 {
+     var $t0: u64
+     var $t1: 0x42::basic::R
+     var $t2: u64
+     var $t3: 0x42::basic::R
+     var $t4: &0x42::basic::R
+     var $t5: &u64
+     # live vars:
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t2 := 42
+     # live vars: $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: []
+     #
+  1: $t1 := pack 0x42::basic::R($t2)
+     # live vars: $t1
+     # reaching instruction #2: `t1` @ {1}, `t2` @ {0}
+     # refs: []
+     #
+  2: $t3 := infer($t1)
+     # live vars: $t3
+     # reaching instruction #3: `t2` @ {0}, `t3` @ {2}
+     # refs: []
+     #
+  3: $t4 := borrow_local($t3)
+     # live vars: $t4
+     # reaching instruction #4: `t2` @ {0}, `t3` @ {2}, `t4` @ {3}
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `r2`] at line 25
+     #
+  4: $t5 := borrow_field<0x42::basic::R>.value($t4)
+     # live vars: $t5
+     # reaching instruction #5: `t2` @ {0}, `t3` @ {2}, `t4` @ {3}, `t5` @ {4}
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `r2`, field `value`] at line 25
+     #
+  5: $t0 := read_ref($t5)
+     # live vars: $t0
+     # reaching instruction #6: `t0` @ {5}, `t2` @ {0}, `t3` @ {2}, `t4` @ {3}, `t5` @ {4}
+     # refs: []
+     #
+  6: return $t0
+}
+
+
+[variant baseline]
+fun basic::reassign($t0: bool): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t2 := 1
+     # live vars: $t0, $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: []
+     #
+  1: if ($t0) goto 2 else goto 6
+     # live vars: $t2
+     # reaching instruction #2: `t2` @ {0}
+     # refs: []
+     #
+  2: label L0
+     # live vars:
+     # reaching instruction #3: `t2` @ {0}
+     # refs: []
+     #
+  3: $t3 := 2
+     # live vars: $t3
+     # reaching instruction #4: `t2` @ {0}, `t3` @ {3}
+     # refs: []
+     #
+  4: $t2 := infer($t3)
+     # live vars: $t2
+     # reaching instruction #5: `t2` @ {4}
+     # refs: []
+     #
+  5: goto 7
+     # live vars: $t2
+     # reaching instruction #6: `t2` @ {0}
+     # refs: []
+     #
+  6: label L1
+     # live vars: $t2
+     # reaching instruction #7: `t2` @ {0, 4}
+     # refs: []
+     #
+  7: label L2
+     # live vars: $t2
+     # reaching instruction #8: `t2` @ {0, 4}
+     # refs: []
+     #
+  8: $t1 := infer($t2)
+     # live vars: $t1
+     # reaching instruction #9: `t1` @ {8}
+     # refs: []
+     #
+  9: return $t1
+}
+
+
+[variant baseline]
+fun basic::return_pair($t0: u64, $t1: u64): (u64, u64) {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # live vars: $t1, $t4
+     # reaching instruction #1: `t4` @ {0}
+     # refs: []
+     #
+  1: $t5 := 1
+     # live vars: $t1, $t4, $t5
+     # reaching instruction #2: `t4` @ {0}, `t5` @ {1}
+     # refs: []
+     #
+  2: $t2 := +($t4, $t5)
+     # live vars: $t1, $t2
+     # reaching instruction #3: `t2` @ {2}, `t4` @ {0}, `t5` @ {1}
+     # refs: []
+     #
+  3: $t6 := infer($t1)
+     # live vars: $t2, $t6
+     # reaching instruction #4: `t2` @ {2}, `t4` @ {0}, `t5` @ {1}, `t6` @ {3}
+     # refs: []
+     #
+  4: $t7 := 1
+     # live vars: $t2, $t6, $t7
+     # reaching instruction #5: `t2` @ {2}, `t4` @ {0}, `t5` @ {1}, `t6` @ {3}, `t7` @ {4}
+     # refs: []
+     #
+  5: $t3 := +($t6, $t7)
+     # live vars: $t2, $t3
+     # reaching instruction #6: `t2` @ {2}, `t3` @ {5}, `t4` @ {0}, `t5` @ {1}, `t6` @ {3}, `t7` @ {4}
+     # refs: []
+     #
+  6: return ($t2, $t3)
+}
+
+
+[variant baseline]
+fun basic::simple_assign($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # live vars: $t1, $t4
+     # reaching instruction #1: `t4` @ {0}
+     # refs: []
+     #
+  1: $t3 := +($t4, $t1)
+     # live vars: $t3
+     # reaching instruction #2: `t3` @ {1}, `t4` @ {0}
+     # refs: []
+     #
+  2: $t6 := infer($t3)
+     # live vars: $t6
+     # reaching instruction #3: `t4` @ {0}, `t6` @ {2}
+     # refs: []
+     #
+  3: $t7 := 2
+     # live vars: $t6, $t7
+     # reaching instruction #4: `t4` @ {0}, `t6` @ {2}, `t7` @ {3}
+     # refs: []
+     #
+  4: $t5 := *($t6, $t7)
+     # live vars: $t5
+     # reaching instruction #5: `t4` @ {0}, `t5` @ {4}, `t6` @ {2}, `t7` @ {3}
+     # refs: []
+     #
+  5: $t2 := infer($t5)
+     # live vars: $t2
+     # reaching instruction #6: `t2` @ {5}, `t4` @ {0}, `t6` @ {2}, `t7` @ {3}
+     # refs: []
+     #
+  6: return $t2
+}
+
+
+[variant baseline]
+fun basic::tuple_destructure(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     # live vars:
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t3 := 1
+     # live vars: $t3
+     # reaching instruction #1: `t3` @ {0}
+     # refs: []
+     #
+  1: $t4 := 2
+     # live vars: $t3, $t4
+     # reaching instruction #2: `t3` @ {0}, `t4` @ {1}
+     # refs: []
+     #
+  2: ($t1, $t2) := basic::return_pair($t3, $t4)
+     # live vars: $t1, $t2
+     # reaching instruction #3: `t1` @ {2}, `t2` @ {2}, `t3` @ {0}, `t4` @ {1}
+     # refs: []
+     #
+  3: $t5 := infer($t1)
+     # live vars: $t2, $t5
+     # reaching instruction #4: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t5` @ {3}
+     # refs: []
+     #
+  4: $t0 := +($t5, $t2)
+     # live vars: $t0
+     # reaching instruction #5: `t0` @ {4}, `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t5` @ {3}
+     # refs: []
+     #
+  5: return $t0
+}

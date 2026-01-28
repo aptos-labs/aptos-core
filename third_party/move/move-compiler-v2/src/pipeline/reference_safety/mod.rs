@@ -3,12 +3,25 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_binary_format::file_format::CodeOffset;
-use move_model::{ast::TempIndex, ty::ReferenceKind};
+use move_model::{
+    ast::TempIndex,
+    model::{QualifiedId, StructId},
+    ty::ReferenceKind,
+};
 use move_stackless_bytecode::function_target::FunctionTarget;
-use std::{collections::BTreeMap, rc::Rc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    rc::Rc,
+};
 
 pub mod reference_safety_processor_v2;
 pub mod reference_safety_processor_v3;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub enum Object {
+    Local(TempIndex),
+    Global(QualifiedId<StructId>),
+}
 
 /// Annotation produced by implementations
 #[derive(Clone)]
@@ -57,6 +70,17 @@ impl LifetimeInfoAtCodeOffset {
         self.after.borrow_kind(temp)
     }
 
+    /// Returns the list of objects referenced by `temp` before the given program point.
+    /// If `temp` itself is not a reference, nothing will be returned.
+    pub fn referenced_objects_before(&self, temp: TempIndex) -> BTreeSet<Object> {
+        self.before.referenced_objects(temp)
+    }
+
+    /// Same as `referenced_objects_before` but after the given program point.
+    pub fn referenced_objects_after(&self, temp: TempIndex) -> BTreeSet<Object> {
+        self.after.referenced_objects(temp)
+    }
+
     /// Returns true if the given temporary is borrowed before or after the program point.
     pub fn is_borrowed(&self, temp: TempIndex) -> bool {
         self.borrow_kind_before(temp).is_some() || self.borrow_kind_after(temp).is_some()
@@ -66,6 +90,8 @@ impl LifetimeInfoAtCodeOffset {
 /// A trait to be implemented by reference safety processors
 pub trait LifetimeInfo {
     fn borrow_kind(&self, temp: TempIndex) -> Option<ReferenceKind>;
+
+    fn referenced_objects(&self, temp: TempIndex) -> BTreeSet<Object>;
 
     // For debugging
     fn display(&self, target: &FunctionTarget) -> Option<String>;
@@ -81,6 +107,10 @@ impl LifetimeInfo for NoLifetimeInfo {
 
     fn display(&self, _target: &FunctionTarget) -> Option<String> {
         None
+    }
+
+    fn referenced_objects(&self, _temp: TempIndex) -> BTreeSet<Object> {
+        BTreeSet::new()
     }
 }
 

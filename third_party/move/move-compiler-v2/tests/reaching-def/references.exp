@@ -1,0 +1,1420 @@
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun references::call_in_conditional($t0: bool): u64 {
+     var $t1: u64
+     var $t2: 0x42::references::S
+     var $t3: u64
+     var $t4: u64
+     var $t5: &mut 0x42::references::S
+     var $t6: &0x42::references::S
+     var $t7: &u64
+  0: $t3 := 1
+  1: $t4 := 2
+  2: $t2 := pack 0x42::references::S($t3, $t4)
+  3: if ($t0) goto 4 else goto 8
+  4: label L0
+  5: $t5 := borrow_local($t2)
+  6: references::modify_struct($t5)
+  7: goto 9
+  8: label L1
+  9: label L2
+ 10: $t6 := borrow_local($t2)
+ 11: $t7 := borrow_field<0x42::references::S>.x($t6)
+ 12: $t1 := read_ref($t7)
+ 13: return $t1
+}
+
+
+[variant baseline]
+fun references::call_modify_struct(): u64 {
+     var $t0: u64
+     var $t1: 0x42::references::S
+     var $t2: u64
+     var $t3: u64
+     var $t4: &mut 0x42::references::S
+     var $t5: &0x42::references::S
+     var $t6: &u64
+  0: $t2 := 1
+  1: $t3 := 2
+  2: $t1 := pack 0x42::references::S($t2, $t3)
+  3: $t4 := borrow_local($t1)
+  4: references::modify_struct($t4)
+  5: $t5 := borrow_local($t1)
+  6: $t6 := borrow_field<0x42::references::S>.x($t5)
+  7: $t0 := read_ref($t6)
+  8: return $t0
+}
+
+
+[variant baseline]
+fun references::call_with_immut_ref(): u64 {
+     var $t0: u64
+     var $t1: 0x42::references::S
+     var $t2: u64
+     var $t3: u64
+     var $t4: &u64
+     var $t5: &0x42::references::S
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: &0x42::references::S
+     var $t10: &u64
+  0: $t2 := 1
+  1: $t3 := 2
+  2: $t1 := pack 0x42::references::S($t2, $t3)
+  3: $t5 := borrow_local($t1)
+  4: $t4 := borrow_field<0x42::references::S>.x($t5)
+  5: $t6 := references::read_ref($t4)
+  6: $t7 := infer($t6)
+  7: $t9 := borrow_local($t1)
+  8: $t10 := borrow_field<0x42::references::S>.y($t9)
+  9: $t8 := read_ref($t10)
+ 10: $t0 := +($t7, $t8)
+ 11: return $t0
+}
+
+
+[variant baseline]
+fun references::call_with_mut_ref(): u64 {
+     var $t0: u64
+     var $t1: 0x42::references::S
+     var $t2: u64
+     var $t3: u64
+     var $t4: &mut u64
+     var $t5: &mut 0x42::references::S
+     var $t6: &0x42::references::S
+     var $t7: &u64
+  0: $t2 := 1
+  1: $t3 := 2
+  2: $t1 := pack 0x42::references::S($t2, $t3)
+  3: $t5 := borrow_local($t1)
+  4: $t4 := borrow_field<0x42::references::S>.x($t5)
+  5: references::modify_ref($t4)
+  6: $t6 := borrow_local($t1)
+  7: $t7 := borrow_field<0x42::references::S>.x($t6)
+  8: $t0 := read_ref($t7)
+  9: return $t0
+}
+
+
+[variant baseline]
+fun references::conditional_borrow($t0: bool): u64 {
+     var $t1: u64
+     var $t2: 0x42::references::S
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: &u64
+     var $t7: &0x42::references::S
+     var $t8: u64
+     var $t9: &u64
+     var $t10: &0x42::references::S
+     var $t11: u64
+  0: $t3 := 1
+  1: $t4 := 2
+  2: $t2 := pack 0x42::references::S($t3, $t4)
+  3: if ($t0) goto 4 else goto 10
+  4: label L0
+  5: $t7 := borrow_local($t2)
+  6: $t6 := borrow_field<0x42::references::S>.x($t7)
+  7: $t8 := read_ref($t6)
+  8: $t5 := infer($t8)
+  9: goto 15
+ 10: label L1
+ 11: $t10 := borrow_local($t2)
+ 12: $t9 := borrow_field<0x42::references::S>.y($t10)
+ 13: $t11 := read_ref($t9)
+ 14: $t5 := infer($t11)
+ 15: label L2
+ 16: $t1 := infer($t5)
+ 17: return $t1
+}
+
+
+[variant baseline]
+fun references::modify_ref($t0: &mut u64) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: write_ref($t0, $t1)
+  4: return ()
+}
+
+
+[variant baseline]
+fun references::modify_struct($t0: &mut 0x42::references::S) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &mut u64
+  0: $t3 := borrow_field<0x42::references::S>.x($t0)
+  1: $t2 := read_ref($t3)
+  2: $t4 := 10
+  3: $t1 := +($t2, $t4)
+  4: $t5 := borrow_field<0x42::references::S>.x($t0)
+  5: write_ref($t5, $t1)
+  6: return ()
+}
+
+
+[variant baseline]
+fun references::multiple_calls(): u64 {
+     var $t0: u64
+     var $t1: 0x42::references::S
+     var $t2: u64
+     var $t3: u64
+     var $t4: &mut u64
+     var $t5: &mut 0x42::references::S
+     var $t6: &mut u64
+     var $t7: &mut 0x42::references::S
+     var $t8: u64
+     var $t9: &0x42::references::S
+     var $t10: &u64
+     var $t11: u64
+     var $t12: &0x42::references::S
+     var $t13: &u64
+  0: $t2 := 1
+  1: $t3 := 2
+  2: $t1 := pack 0x42::references::S($t2, $t3)
+  3: $t5 := borrow_local($t1)
+  4: $t4 := borrow_field<0x42::references::S>.x($t5)
+  5: references::modify_ref($t4)
+  6: $t7 := borrow_local($t1)
+  7: $t6 := borrow_field<0x42::references::S>.y($t7)
+  8: references::modify_ref($t6)
+  9: $t9 := borrow_local($t1)
+ 10: $t10 := borrow_field<0x42::references::S>.x($t9)
+ 11: $t8 := read_ref($t10)
+ 12: $t12 := borrow_local($t1)
+ 13: $t13 := borrow_field<0x42::references::S>.y($t12)
+ 14: $t11 := read_ref($t13)
+ 15: $t0 := +($t8, $t11)
+ 16: return $t0
+}
+
+
+[variant baseline]
+fun references::multiple_field_borrows(): u64 {
+     var $t0: u64
+     var $t1: 0x42::references::S
+     var $t2: u64
+     var $t3: u64
+     var $t4: &u64
+     var $t5: &0x42::references::S
+     var $t6: &u64
+     var $t7: &0x42::references::S
+     var $t8: u64
+     var $t9: u64
+  0: $t2 := 1
+  1: $t3 := 2
+  2: $t1 := pack 0x42::references::S($t2, $t3)
+  3: $t5 := borrow_local($t1)
+  4: $t4 := borrow_field<0x42::references::S>.x($t5)
+  5: $t7 := borrow_local($t1)
+  6: $t6 := borrow_field<0x42::references::S>.y($t7)
+  7: $t8 := read_ref($t4)
+  8: $t9 := read_ref($t6)
+  9: $t0 := +($t8, $t9)
+ 10: return $t0
+}
+
+
+[variant baseline]
+fun references::nested_borrow(): u64 {
+     var $t0: u64
+     var $t1: 0x42::references::Outer
+     var $t2: 0x42::references::S
+     var $t3: u64
+     var $t4: u64
+     var $t5: &u64
+     var $t6: &0x42::references::S
+     var $t7: &0x42::references::Outer
+  0: $t3 := 10
+  1: $t4 := 20
+  2: $t2 := pack 0x42::references::S($t3, $t4)
+  3: $t1 := pack 0x42::references::Outer($t2)
+  4: $t7 := borrow_local($t1)
+  5: $t6 := borrow_field<0x42::references::Outer>.inner($t7)
+  6: $t5 := borrow_field<0x42::references::S>.x($t6)
+  7: $t0 := read_ref($t5)
+  8: return $t0
+}
+
+
+[variant baseline]
+fun references::read_ref($t0: &u64): u64 {
+     var $t1: u64
+  0: $t1 := read_ref($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun references::reassign_ref($t0: bool): u64 {
+     var $t1: u64
+     var $t2: 0x42::references::S
+     var $t3: u64
+     var $t4: u64
+     var $t5: &u64
+     var $t6: &0x42::references::S
+     var $t7: &u64
+     var $t8: &0x42::references::S
+  0: $t3 := 1
+  1: $t4 := 2
+  2: $t2 := pack 0x42::references::S($t3, $t4)
+  3: $t6 := borrow_local($t2)
+  4: $t5 := borrow_field<0x42::references::S>.x($t6)
+  5: if ($t0) goto 6 else goto 11
+  6: label L0
+  7: $t8 := borrow_local($t2)
+  8: $t7 := borrow_field<0x42::references::S>.y($t8)
+  9: $t5 := infer($t7)
+ 10: goto 12
+ 11: label L1
+ 12: label L2
+ 13: $t1 := read_ref($t5)
+ 14: return $t1
+}
+
+
+[variant baseline]
+fun references::simple_mut_ref(): u64 {
+     var $t0: u64
+     var $t1: 0x42::references::S
+     var $t2: u64
+     var $t3: u64
+     var $t4: &mut u64
+     var $t5: &mut 0x42::references::S
+     var $t6: u64
+     var $t7: &0x42::references::S
+     var $t8: &u64
+  0: $t2 := 1
+  1: $t3 := 2
+  2: $t1 := pack 0x42::references::S($t2, $t3)
+  3: $t5 := borrow_local($t1)
+  4: $t4 := borrow_field<0x42::references::S>.x($t5)
+  5: $t6 := 10
+  6: write_ref($t4, $t6)
+  7: $t7 := borrow_local($t1)
+  8: $t8 := borrow_field<0x42::references::S>.x($t7)
+  9: $t0 := read_ref($t8)
+ 10: return $t0
+}
+
+============ after ReachingDefProcessor: ================
+
+[variant baseline]
+fun references::call_in_conditional($t0: bool): u64 {
+     var $t1: u64
+     var $t2: 0x42::references::S
+     var $t3: u64
+     var $t4: u64
+     var $t5: &mut 0x42::references::S
+     var $t6: &0x42::references::S
+     var $t7: &u64
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t3 := 1
+     # live vars: $t0, $t3
+     # reaching instruction #1: `t3` @ {0}
+     # refs: []
+     #
+  1: $t4 := 2
+     # live vars: $t0, $t3, $t4
+     # reaching instruction #2: `t3` @ {0}, `t4` @ {1}
+     # refs: []
+     #
+  2: $t2 := pack 0x42::references::S($t3, $t4)
+     # live vars: $t0, $t2
+     # reaching instruction #3: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}
+     # refs: []
+     #
+  3: if ($t0) goto 4 else goto 8
+     # live vars: $t2
+     # reaching instruction #4: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}
+     # refs: []
+     #
+  4: label L0
+     # live vars: $t2
+     # reaching instruction #5: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}
+     # refs: []
+     #
+  5: $t5 := borrow_local($t2)
+     # live vars: $t2, $t5
+     # reaching instruction #6: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t5` @ {5}
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => (mut) #5 via [local `s`] at line 113
+     #
+  6: references::modify_struct($t5)
+     # live vars: $t2
+     # reaching instruction #7: `t2` @ {6}, `t3` @ {0}, `t4` @ {1}, `t5` @ {5}
+     # refs: []
+     #
+  7: goto 9
+     # live vars: $t2
+     # reaching instruction #8: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}
+     # refs: []
+     #
+  8: label L1
+     # live vars: $t2
+     # reaching instruction #9: `t2` @ {2, 6}, `t3` @ {0}, `t4` @ {1}, `t5` @ {5}
+     # refs: []
+     #
+  9: label L2
+     # live vars: $t2
+     # reaching instruction #10: `t2` @ {2, 6}, `t3` @ {0}, `t4` @ {1}, `t5` @ {5}
+     # refs: []
+     #
+ 10: $t6 := borrow_local($t2)
+     # live vars: $t6
+     # reaching instruction #11: `t2` @ {2, 6}, `t3` @ {0}, `t4` @ {1}, `t5` @ {5}, `t6` @ {10}
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `s`] at line 115
+     #
+ 11: $t7 := borrow_field<0x42::references::S>.x($t6)
+     # live vars: $t7
+     # reaching instruction #12: `t2` @ {2, 6}, `t3` @ {0}, `t4` @ {1}, `t5` @ {5}, `t6` @ {10}, `t7` @ {11}
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `s`, field `x`] at line 115
+     #
+ 12: $t1 := read_ref($t7)
+     # live vars: $t1
+     # reaching instruction #13: `t1` @ {12}, `t2` @ {2, 6}, `t3` @ {0}, `t4` @ {1}, `t5` @ {5}, `t6` @ {10}, `t7` @ {11}
+     # refs: []
+     #
+ 13: return $t1
+}
+
+
+[variant baseline]
+fun references::call_modify_struct(): u64 {
+     var $t0: u64
+     var $t1: 0x42::references::S
+     var $t2: u64
+     var $t3: u64
+     var $t4: &mut 0x42::references::S
+     var $t5: &0x42::references::S
+     var $t6: &u64
+     # live vars:
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t2 := 1
+     # live vars: $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: []
+     #
+  1: $t3 := 2
+     # live vars: $t2, $t3
+     # reaching instruction #2: `t2` @ {0}, `t3` @ {1}
+     # refs: []
+     #
+  2: $t1 := pack 0x42::references::S($t2, $t3)
+     # live vars: $t1
+     # reaching instruction #3: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}
+     # refs: []
+     #
+  3: $t4 := borrow_local($t1)
+     # live vars: $t1, $t4
+     # reaching instruction #4: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}, `t4` @ {3}
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => (mut) #4 via [local `s`] at line 95
+     #
+  4: references::modify_struct($t4)
+     # live vars: $t1
+     # reaching instruction #5: `t1` @ {4}, `t2` @ {0}, `t3` @ {1}, `t4` @ {3}
+     # refs: []
+     #
+  5: $t5 := borrow_local($t1)
+     # live vars: $t5
+     # reaching instruction #6: `t1` @ {4}, `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `t5` @ {5}
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `s`] at line 96
+     #
+  6: $t6 := borrow_field<0x42::references::S>.x($t5)
+     # live vars: $t6
+     # reaching instruction #7: `t1` @ {4}, `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `t5` @ {5}, `t6` @ {6}
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `s`, field `x`] at line 96
+     #
+  7: $t0 := read_ref($t6)
+     # live vars: $t0
+     # reaching instruction #8: `t0` @ {7}, `t1` @ {4}, `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `t5` @ {5}, `t6` @ {6}
+     # refs: []
+     #
+  8: return $t0
+}
+
+
+[variant baseline]
+fun references::call_with_immut_ref(): u64 {
+     var $t0: u64
+     var $t1: 0x42::references::S
+     var $t2: u64
+     var $t3: u64
+     var $t4: &u64
+     var $t5: &0x42::references::S
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: &0x42::references::S
+     var $t10: &u64
+     # live vars:
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t2 := 1
+     # live vars: $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: []
+     #
+  1: $t3 := 2
+     # live vars: $t2, $t3
+     # reaching instruction #2: `t2` @ {0}, `t3` @ {1}
+     # refs: []
+     #
+  2: $t1 := pack 0x42::references::S($t2, $t3)
+     # live vars: $t1
+     # reaching instruction #3: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}
+     # refs: []
+     #
+  3: $t5 := borrow_local($t1)
+     # live vars: $t1, $t5
+     # reaching instruction #4: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}, `t5` @ {3}
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `s`] at line 87
+     #
+  4: $t4 := borrow_field<0x42::references::S>.x($t5)
+     # live vars: $t1, $t4
+     # reaching instruction #5: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `s`, field `x`] at line 87
+     #
+  5: $t6 := references::read_ref($t4)
+     # live vars: $t1, $t6
+     # reaching instruction #6: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t6` @ {5}
+     # refs: []
+     #
+  6: $t7 := infer($t6)
+     # live vars: $t1, $t7
+     # reaching instruction #7: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t7` @ {6}
+     # refs: []
+     #
+  7: $t9 := borrow_local($t1)
+     # live vars: $t7, $t9
+     # reaching instruction #8: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t7` @ {6}, `t9` @ {7}
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `s`] at line 89
+     #
+  8: $t10 := borrow_field<0x42::references::S>.y($t9)
+     # live vars: $t7, $t10
+     # reaching instruction #9: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t7` @ {6}, `t9` @ {7}, `t10` @ {8}
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   => #10 via [local `s`, field `y`] at line 89
+     #
+  9: $t8 := read_ref($t10)
+     # live vars: $t7, $t8
+     # reaching instruction #10: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t7` @ {6}, `t8` @ {9}, `t9` @ {7}, `t10` @ {8}
+     # refs: []
+     #
+ 10: $t0 := +($t7, $t8)
+     # live vars: $t0
+     # reaching instruction #11: `t0` @ {10}, `t1` @ {2}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t7` @ {6}, `t8` @ {9}, `t9` @ {7}, `t10` @ {8}
+     # refs: []
+     #
+ 11: return $t0
+}
+
+
+[variant baseline]
+fun references::call_with_mut_ref(): u64 {
+     var $t0: u64
+     var $t1: 0x42::references::S
+     var $t2: u64
+     var $t3: u64
+     var $t4: &mut u64
+     var $t5: &mut 0x42::references::S
+     var $t6: &0x42::references::S
+     var $t7: &u64
+     # live vars:
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t2 := 1
+     # live vars: $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: []
+     #
+  1: $t3 := 2
+     # live vars: $t2, $t3
+     # reaching instruction #2: `t2` @ {0}, `t3` @ {1}
+     # refs: []
+     #
+  2: $t1 := pack 0x42::references::S($t2, $t3)
+     # live vars: $t1
+     # reaching instruction #3: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}
+     # refs: []
+     #
+  3: $t5 := borrow_local($t1)
+     # live vars: $t1, $t5
+     # reaching instruction #4: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}, `t5` @ {3}
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => (mut) #5 via [local `s`] at line 79
+     #
+  4: $t4 := borrow_field<0x42::references::S>.x($t5)
+     # live vars: $t1, $t4
+     # reaching instruction #5: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => (mut) #4 via [local `s`, field `x`] at line 79
+     #
+  5: references::modify_ref($t4)
+     # live vars: $t1
+     # reaching instruction #6: `t1` @ {5}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}
+     # refs: []
+     #
+  6: $t6 := borrow_local($t1)
+     # live vars: $t6
+     # reaching instruction #7: `t1` @ {5}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t6` @ {6}
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `s`] at line 81
+     #
+  7: $t7 := borrow_field<0x42::references::S>.x($t6)
+     # live vars: $t7
+     # reaching instruction #8: `t1` @ {5}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t6` @ {6}, `t7` @ {7}
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `s`, field `x`] at line 81
+     #
+  8: $t0 := read_ref($t7)
+     # live vars: $t0
+     # reaching instruction #9: `t0` @ {8}, `t1` @ {5}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t6` @ {6}, `t7` @ {7}
+     # refs: []
+     #
+  9: return $t0
+}
+
+
+[variant baseline]
+fun references::conditional_borrow($t0: bool): u64 {
+     var $t1: u64
+     var $t2: 0x42::references::S
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: &u64
+     var $t7: &0x42::references::S
+     var $t8: u64
+     var $t9: &u64
+     var $t10: &0x42::references::S
+     var $t11: u64
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t3 := 1
+     # live vars: $t0, $t3
+     # reaching instruction #1: `t3` @ {0}
+     # refs: []
+     #
+  1: $t4 := 2
+     # live vars: $t0, $t3, $t4
+     # reaching instruction #2: `t3` @ {0}, `t4` @ {1}
+     # refs: []
+     #
+  2: $t2 := pack 0x42::references::S($t3, $t4)
+     # live vars: $t0, $t2
+     # reaching instruction #3: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}
+     # refs: []
+     #
+  3: if ($t0) goto 4 else goto 10
+     # live vars: $t2
+     # reaching instruction #4: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}
+     # refs: []
+     #
+  4: label L0
+     # live vars: $t2
+     # reaching instruction #5: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}
+     # refs: []
+     #
+  5: $t7 := borrow_local($t2)
+     # live vars: $t7
+     # reaching instruction #6: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t7` @ {5}
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `s`] at line 29
+     #
+  6: $t6 := borrow_field<0x42::references::S>.x($t7)
+     # live vars: $t6
+     # reaching instruction #7: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t6` @ {6}, `t7` @ {5}
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `s`, field `x`] at line 29
+     #
+  7: $t8 := read_ref($t6)
+     # live vars: $t8
+     # reaching instruction #8: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t6` @ {6}, `t7` @ {5}, `t8` @ {7}
+     # refs: []
+     #
+  8: $t5 := infer($t8)
+     # live vars: $t5
+     # reaching instruction #9: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t5` @ {8}, `t6` @ {6}, `t7` @ {5}
+     # refs: []
+     #
+  9: goto 15
+     # live vars: $t2
+     # reaching instruction #10: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}
+     # refs: []
+     #
+ 10: label L1
+     # live vars: $t2
+     # reaching instruction #11: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}
+     # refs: []
+     #
+ 11: $t10 := borrow_local($t2)
+     # live vars: $t10
+     # reaching instruction #12: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t10` @ {11}
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   => #10 via [local `s`] at line 32
+     #
+ 12: $t9 := borrow_field<0x42::references::S>.y($t10)
+     # live vars: $t9
+     # reaching instruction #13: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t9` @ {12}, `t10` @ {11}
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `s`, field `y`] at line 32
+     #
+ 13: $t11 := read_ref($t9)
+     # live vars: $t11
+     # reaching instruction #14: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t9` @ {12}, `t10` @ {11}, `t11` @ {13}
+     # refs: []
+     #
+ 14: $t5 := infer($t11)
+     # live vars: $t5
+     # reaching instruction #15: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t5` @ {8, 14}, `t6` @ {6}, `t7` @ {5}, `t9` @ {12}, `t10` @ {11}
+     # refs: []
+     #
+ 15: label L2
+     # live vars: $t5
+     # reaching instruction #16: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t5` @ {8, 14}, `t6` @ {6}, `t7` @ {5}, `t9` @ {12}, `t10` @ {11}
+     # refs: []
+     #
+ 16: $t1 := infer($t5)
+     # live vars: $t1
+     # reaching instruction #17: `t1` @ {16}, `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t6` @ {6}, `t7` @ {5}, `t9` @ {12}, `t10` @ {11}
+     # refs: []
+     #
+ 17: return $t1
+}
+
+
+[variant baseline]
+fun references::modify_ref($t0: &mut u64) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := read_ref($t0)
+     # live vars: $t0, $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := 1
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #2: `t2` @ {0}, `t3` @ {1}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t1 := +($t2, $t3)
+     # live vars: $t0, $t1
+     # reaching instruction #3: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: write_ref($t0, $t1)
+     # live vars:
+     # reaching instruction #4: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}
+     # refs: []
+     #
+  4: return ()
+}
+
+
+[variant baseline]
+fun references::modify_struct($t0: &mut 0x42::references::S) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &mut u64
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t3 := borrow_field<0x42::references::S>.x($t0)
+     # live vars: $t0, $t3
+     # reaching instruction #1: `t3` @ {0}
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   => #3 via [field `x`] at line 73
+     # #3
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t2 := read_ref($t3)
+     # live vars: $t0, $t2
+     # reaching instruction #2: `t2` @ {1}, `t3` @ {0}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t4 := 10
+     # live vars: $t0, $t2, $t4
+     # reaching instruction #3: `t2` @ {1}, `t3` @ {0}, `t4` @ {2}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: $t1 := +($t2, $t4)
+     # live vars: $t0, $t1
+     # reaching instruction #4: `t1` @ {3}, `t2` @ {1}, `t3` @ {0}, `t4` @ {2}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  4: $t5 := borrow_field<0x42::references::S>.x($t0)
+     # live vars: $t1, $t5
+     # reaching instruction #5: `t1` @ {3}, `t2` @ {1}, `t3` @ {0}, `t4` @ {2}, `t5` @ {4}
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  5: write_ref($t5, $t1)
+     # live vars:
+     # reaching instruction #6: `t1` @ {3}, `t2` @ {1}, `t3` @ {0}, `t4` @ {2}, `t5` @ {4}
+     # refs: []
+     #
+  6: return ()
+}
+
+
+[variant baseline]
+fun references::multiple_calls(): u64 {
+     var $t0: u64
+     var $t1: 0x42::references::S
+     var $t2: u64
+     var $t3: u64
+     var $t4: &mut u64
+     var $t5: &mut 0x42::references::S
+     var $t6: &mut u64
+     var $t7: &mut 0x42::references::S
+     var $t8: u64
+     var $t9: &0x42::references::S
+     var $t10: &u64
+     var $t11: u64
+     var $t12: &0x42::references::S
+     var $t13: &u64
+     # live vars:
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t2 := 1
+     # live vars: $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: []
+     #
+  1: $t3 := 2
+     # live vars: $t2, $t3
+     # reaching instruction #2: `t2` @ {0}, `t3` @ {1}
+     # refs: []
+     #
+  2: $t1 := pack 0x42::references::S($t2, $t3)
+     # live vars: $t1
+     # reaching instruction #3: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}
+     # refs: []
+     #
+  3: $t5 := borrow_local($t1)
+     # live vars: $t1, $t5
+     # reaching instruction #4: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}, `t5` @ {3}
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => (mut) #5 via [local `s`] at line 102
+     #
+  4: $t4 := borrow_field<0x42::references::S>.x($t5)
+     # live vars: $t1, $t4
+     # reaching instruction #5: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => (mut) #4 via [local `s`, field `x`] at line 102
+     #
+  5: references::modify_ref($t4)
+     # live vars: $t1
+     # reaching instruction #6: `t1` @ {5}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}
+     # refs: []
+     #
+  6: $t7 := borrow_local($t1)
+     # live vars: $t1, $t7
+     # reaching instruction #7: `t1` @ {5}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t7` @ {6}
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `s`] at line 104
+     #
+  7: $t6 := borrow_field<0x42::references::S>.y($t7)
+     # live vars: $t1, $t6
+     # reaching instruction #8: `t1` @ {5}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t6` @ {7}, `t7` @ {6}
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => (mut) #6 via [local `s`, field `y`] at line 104
+     #
+  8: references::modify_ref($t6)
+     # live vars: $t1
+     # reaching instruction #9: `t1` @ {8}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t6` @ {7}, `t7` @ {6}
+     # refs: []
+     #
+  9: $t9 := borrow_local($t1)
+     # live vars: $t1, $t9
+     # reaching instruction #10: `t1` @ {8}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t6` @ {7}, `t7` @ {6}, `t9` @ {9}
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `s`] at line 106
+     #
+ 10: $t10 := borrow_field<0x42::references::S>.x($t9)
+     # live vars: $t1, $t10
+     # reaching instruction #11: `t1` @ {8}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t6` @ {7}, `t7` @ {6}, `t9` @ {9}, `t10` @ {10}
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   => #10 via [local `s`, field `x`] at line 106
+     #
+ 11: $t8 := read_ref($t10)
+     # live vars: $t1, $t8
+     # reaching instruction #12: `t1` @ {8}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t6` @ {7}, `t7` @ {6}, `t8` @ {11}, `t9` @ {9}, `t10` @ {10}
+     # refs: []
+     #
+ 12: $t12 := borrow_local($t1)
+     # live vars: $t8, $t12
+     # reaching instruction #13: `t1` @ {8}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t6` @ {7}, `t7` @ {6}, `t8` @ {11}, `t9` @ {9}, `t10` @ {10}, `t12` @ {12}
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   => #12 via [local `s`] at line 106
+     #
+ 13: $t13 := borrow_field<0x42::references::S>.y($t12)
+     # live vars: $t8, $t13
+     # reaching instruction #14: `t1` @ {8}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t6` @ {7}, `t7` @ {6}, `t8` @ {11}, `t9` @ {9}, `t10` @ {10}, `t12` @ {12}, `t13` @ {13}
+     # refs: [$t13 => #13]
+     # #13
+     #   <no edges>
+     # #root
+     #   => #13 via [local `s`, field `y`] at line 106
+     #
+ 14: $t11 := read_ref($t13)
+     # live vars: $t8, $t11
+     # reaching instruction #15: `t1` @ {8}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t6` @ {7}, `t7` @ {6}, `t8` @ {11}, `t9` @ {9}, `t10` @ {10}, `t11` @ {14}, `t12` @ {12}, `t13` @ {13}
+     # refs: []
+     #
+ 15: $t0 := +($t8, $t11)
+     # live vars: $t0
+     # reaching instruction #16: `t0` @ {15}, `t1` @ {8}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t6` @ {7}, `t7` @ {6}, `t8` @ {11}, `t9` @ {9}, `t10` @ {10}, `t11` @ {14}, `t12` @ {12}, `t13` @ {13}
+     # refs: []
+     #
+ 16: return $t0
+}
+
+
+[variant baseline]
+fun references::multiple_field_borrows(): u64 {
+     var $t0: u64
+     var $t1: 0x42::references::S
+     var $t2: u64
+     var $t3: u64
+     var $t4: &u64
+     var $t5: &0x42::references::S
+     var $t6: &u64
+     var $t7: &0x42::references::S
+     var $t8: u64
+     var $t9: u64
+     # live vars:
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t2 := 1
+     # live vars: $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: []
+     #
+  1: $t3 := 2
+     # live vars: $t2, $t3
+     # reaching instruction #2: `t2` @ {0}, `t3` @ {1}
+     # refs: []
+     #
+  2: $t1 := pack 0x42::references::S($t2, $t3)
+     # live vars: $t1
+     # reaching instruction #3: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}
+     # refs: []
+     #
+  3: $t5 := borrow_local($t1)
+     # live vars: $t1, $t5
+     # reaching instruction #4: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}, `t5` @ {3}
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `s`] at line 19
+     #
+  4: $t4 := borrow_field<0x42::references::S>.x($t5)
+     # live vars: $t1, $t4
+     # reaching instruction #5: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `s`, field `x`] at line 19
+     #
+  5: $t7 := borrow_local($t1)
+     # live vars: $t4, $t7
+     # reaching instruction #6: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t7` @ {5}
+     # refs: [$t4 => #4, $t7 => #7]
+     # #4
+     #   <no edges>
+     # #7
+     #   => #4 via [field `x`] at line 19
+     # #root
+     #   => #7 via [local `s`] at line 20
+     #
+  6: $t6 := borrow_field<0x42::references::S>.y($t7)
+     # live vars: $t4, $t6
+     # reaching instruction #7: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t6` @ {6}, `t7` @ {5}
+     # refs: [$t4 => #4, $t6 => #6]
+     # #4
+     #   <no edges>
+     # #6
+     #   <no edges>
+     # #root
+     #   => #4 via [local `s`, field `x`] at line 19
+     #   => #6 via [local `s`, field `y`] at line 20
+     #
+  7: $t8 := read_ref($t4)
+     # live vars: $t6, $t8
+     # reaching instruction #8: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t6` @ {6}, `t7` @ {5}, `t8` @ {7}
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `s`, field `y`] at line 20
+     #
+  8: $t9 := read_ref($t6)
+     # live vars: $t8, $t9
+     # reaching instruction #9: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t6` @ {6}, `t7` @ {5}, `t8` @ {7}, `t9` @ {8}
+     # refs: []
+     #
+  9: $t0 := +($t8, $t9)
+     # live vars: $t0
+     # reaching instruction #10: `t0` @ {9}, `t1` @ {2}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t6` @ {6}, `t7` @ {5}, `t8` @ {7}, `t9` @ {8}
+     # refs: []
+     #
+ 10: return $t0
+}
+
+
+[variant baseline]
+fun references::nested_borrow(): u64 {
+     var $t0: u64
+     var $t1: 0x42::references::Outer
+     var $t2: 0x42::references::S
+     var $t3: u64
+     var $t4: u64
+     var $t5: &u64
+     var $t6: &0x42::references::S
+     var $t7: &0x42::references::Outer
+     # live vars:
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t3 := 10
+     # live vars: $t3
+     # reaching instruction #1: `t3` @ {0}
+     # refs: []
+     #
+  1: $t4 := 20
+     # live vars: $t3, $t4
+     # reaching instruction #2: `t3` @ {0}, `t4` @ {1}
+     # refs: []
+     #
+  2: $t2 := pack 0x42::references::S($t3, $t4)
+     # live vars: $t2
+     # reaching instruction #3: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}
+     # refs: []
+     #
+  3: $t1 := pack 0x42::references::Outer($t2)
+     # live vars: $t1
+     # reaching instruction #4: `t1` @ {3}, `t2` @ {2}, `t3` @ {0}, `t4` @ {1}
+     # refs: []
+     #
+  4: $t7 := borrow_local($t1)
+     # live vars: $t7
+     # reaching instruction #5: `t1` @ {3}, `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t7` @ {4}
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `o`] at line 55
+     #
+  5: $t6 := borrow_field<0x42::references::Outer>.inner($t7)
+     # live vars: $t6
+     # reaching instruction #6: `t1` @ {3}, `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t6` @ {5}, `t7` @ {4}
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `o`, field `inner`] at line 55
+     #
+  6: $t5 := borrow_field<0x42::references::S>.x($t6)
+     # live vars: $t5
+     # reaching instruction #7: `t1` @ {3}, `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t5` @ {6}, `t6` @ {5}, `t7` @ {4}
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `o`, field `inner`, field `x`] at line 55
+     #
+  7: $t0 := read_ref($t5)
+     # live vars: $t0
+     # reaching instruction #8: `t0` @ {7}, `t1` @ {3}, `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t5` @ {6}, `t6` @ {5}, `t7` @ {4}
+     # refs: []
+     #
+  8: return $t0
+}
+
+
+[variant baseline]
+fun references::read_ref($t0: &u64): u64 {
+     var $t1: u64
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t1 := read_ref($t0)
+     # live vars: $t1
+     # reaching instruction #1: `t1` @ {0}
+     # refs: []
+     #
+  1: return $t1
+}
+
+
+[variant baseline]
+fun references::reassign_ref($t0: bool): u64 {
+     var $t1: u64
+     var $t2: 0x42::references::S
+     var $t3: u64
+     var $t4: u64
+     var $t5: &u64
+     var $t6: &0x42::references::S
+     var $t7: &u64
+     var $t8: &0x42::references::S
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t3 := 1
+     # live vars: $t0, $t3
+     # reaching instruction #1: `t3` @ {0}
+     # refs: []
+     #
+  1: $t4 := 2
+     # live vars: $t0, $t3, $t4
+     # reaching instruction #2: `t3` @ {0}, `t4` @ {1}
+     # refs: []
+     #
+  2: $t2 := pack 0x42::references::S($t3, $t4)
+     # live vars: $t0, $t2
+     # reaching instruction #3: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}
+     # refs: []
+     #
+  3: $t6 := borrow_local($t2)
+     # live vars: $t0, $t2, $t6
+     # reaching instruction #4: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t6` @ {3}
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `s`] at line 41
+     #
+  4: $t5 := borrow_field<0x42::references::S>.x($t6)
+     # live vars: $t0, $t2, $t5
+     # reaching instruction #5: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t5` @ {4}, `t6` @ {3}
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `s`, field `x`] at line 41
+     #
+  5: if ($t0) goto 6 else goto 11
+     # live vars: $t2, $t5
+     # reaching instruction #6: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t5` @ {4}, `t6` @ {3}
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `s`, field `x`] at line 41
+     #
+  6: label L0
+     # live vars: $t2
+     # reaching instruction #7: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t5` @ {4}, `t6` @ {3}
+     # refs: []
+     #
+  7: $t8 := borrow_local($t2)
+     # live vars: $t8
+     # reaching instruction #8: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t5` @ {4}, `t6` @ {3}, `t8` @ {7}
+     # refs: [$t8 => #8]
+     # #8
+     #   <no edges>
+     # #root
+     #   => #8 via [local `s`] at line 43
+     #
+  8: $t7 := borrow_field<0x42::references::S>.y($t8)
+     # live vars: $t7
+     # reaching instruction #9: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t5` @ {4}, `t6` @ {3}, `t7` @ {8}, `t8` @ {7}
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `s`, field `y`] at line 43
+     #
+  9: $t5 := infer($t7)
+     # live vars: $t5
+     # reaching instruction #10: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t5` @ {9}, `t6` @ {3}, `t8` @ {7}
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `s`, field `y`] at line 43
+     #
+ 10: goto 12
+     # live vars: $t2, $t5
+     # reaching instruction #11: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t5` @ {4}, `t6` @ {3}
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `s`, field `x`] at line 41
+     #
+ 11: label L1
+     # live vars: $t5
+     # reaching instruction #12: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t5` @ {4, 9}, `t6` @ {3}, `t8` @ {7}
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `s`, field `x`] at line 41
+     #   => #5 via [local `s`, field `y`] at line 43
+     #
+ 12: label L2
+     # live vars: $t5
+     # reaching instruction #13: `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t5` @ {4, 9}, `t6` @ {3}, `t8` @ {7}
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `s`, field `x`] at line 41
+     #   => #5 via [local `s`, field `y`] at line 43
+     #
+ 13: $t1 := read_ref($t5)
+     # live vars: $t1
+     # reaching instruction #14: `t1` @ {13}, `t2` @ {2}, `t3` @ {0}, `t4` @ {1}, `t5` @ {4, 9}, `t6` @ {3}, `t8` @ {7}
+     # refs: []
+     #
+ 14: return $t1
+}
+
+
+[variant baseline]
+fun references::simple_mut_ref(): u64 {
+     var $t0: u64
+     var $t1: 0x42::references::S
+     var $t2: u64
+     var $t3: u64
+     var $t4: &mut u64
+     var $t5: &mut 0x42::references::S
+     var $t6: u64
+     var $t7: &0x42::references::S
+     var $t8: &u64
+     # live vars:
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t2 := 1
+     # live vars: $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: []
+     #
+  1: $t3 := 2
+     # live vars: $t2, $t3
+     # reaching instruction #2: `t2` @ {0}, `t3` @ {1}
+     # refs: []
+     #
+  2: $t1 := pack 0x42::references::S($t2, $t3)
+     # live vars: $t1
+     # reaching instruction #3: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}
+     # refs: []
+     #
+  3: $t5 := borrow_local($t1)
+     # live vars: $t1, $t5
+     # reaching instruction #4: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}, `t5` @ {3}
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => (mut) #5 via [local `s`] at line 11
+     #
+  4: $t4 := borrow_field<0x42::references::S>.x($t5)
+     # live vars: $t1, $t4
+     # reaching instruction #5: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => (mut) #4 via [local `s`, field `x`] at line 11
+     #
+  5: $t6 := 10
+     # live vars: $t1, $t4, $t6
+     # reaching instruction #6: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t6` @ {5}
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => (mut) #4 via [local `s`, field `x`] at line 11
+     #
+  6: write_ref($t4, $t6)
+     # live vars: $t1
+     # reaching instruction #7: `t1` @ {6}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t6` @ {5}
+     # refs: []
+     #
+  7: $t7 := borrow_local($t1)
+     # live vars: $t7
+     # reaching instruction #8: `t1` @ {6}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t6` @ {5}, `t7` @ {7}
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `s`] at line 13
+     #
+  8: $t8 := borrow_field<0x42::references::S>.x($t7)
+     # live vars: $t8
+     # reaching instruction #9: `t1` @ {6}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t6` @ {5}, `t7` @ {7}, `t8` @ {8}
+     # refs: [$t8 => #8]
+     # #8
+     #   <no edges>
+     # #root
+     #   => #8 via [local `s`, field `x`] at line 13
+     #
+  9: $t0 := read_ref($t8)
+     # live vars: $t0
+     # reaching instruction #10: `t0` @ {9}, `t1` @ {6}, `t2` @ {0}, `t3` @ {1}, `t4` @ {4}, `t5` @ {3}, `t6` @ {5}, `t7` @ {7}, `t8` @ {8}
+     # refs: []
+     #
+ 10: return $t0
+}

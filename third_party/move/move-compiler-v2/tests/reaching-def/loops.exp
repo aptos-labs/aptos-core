@@ -1,0 +1,911 @@
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun loops::loop_with_break($t0: bool): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+  0: $t2 := 1
+  1: $t3 := 0
+  2: label L0
+  3: $t5 := infer($t3)
+  4: $t6 := 10
+  5: $t4 := <($t5, $t6)
+  6: if ($t4) goto 7 else goto 25
+  7: label L2
+  8: if ($t0) goto 9 else goto 14
+  9: label L5
+ 10: $t7 := 99
+ 11: $t2 := infer($t7)
+ 12: goto 29
+ 13: goto 15
+ 14: label L6
+ 15: label L7
+ 16: $t9 := infer($t2)
+ 17: $t10 := 1
+ 18: $t8 := +($t9, $t10)
+ 19: $t2 := infer($t8)
+ 20: $t12 := infer($t3)
+ 21: $t13 := 1
+ 22: $t11 := +($t12, $t13)
+ 23: $t3 := infer($t11)
+ 24: goto 27
+ 25: label L3
+ 26: goto 29
+ 27: label L4
+ 28: goto 2
+ 29: label L1
+ 30: $t1 := infer($t2)
+ 31: return $t1
+}
+
+
+[variant baseline]
+fun loops::loop_with_continue($t0: bool): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+  0: $t2 := 0
+  1: $t3 := 0
+  2: label L0
+  3: $t5 := infer($t3)
+  4: $t6 := 10
+  5: $t4 := <($t5, $t6)
+  6: if ($t4) goto 7 else goto 23
+  7: label L2
+  8: $t8 := infer($t3)
+  9: $t9 := 1
+ 10: $t7 := +($t8, $t9)
+ 11: $t3 := infer($t7)
+ 12: if ($t0) goto 13 else goto 16
+ 13: label L5
+ 14: goto 2
+ 15: goto 17
+ 16: label L6
+ 17: label L7
+ 18: $t11 := infer($t2)
+ 19: $t12 := 1
+ 20: $t10 := +($t11, $t12)
+ 21: $t2 := infer($t10)
+ 22: goto 25
+ 23: label L3
+ 24: goto 27
+ 25: label L4
+ 26: goto 2
+ 27: label L1
+ 28: $t1 := infer($t2)
+ 29: return $t1
+}
+
+
+[variant baseline]
+fun loops::nested_loops(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: bool
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+     var $t15: u64
+     var $t16: u64
+     var $t17: u64
+     var $t18: u64
+  0: $t1 := 0
+  1: $t2 := 0
+  2: label L0
+  3: $t4 := infer($t2)
+  4: $t5 := 3
+  5: $t3 := <($t4, $t5)
+  6: if ($t3) goto 7 else goto 34
+  7: label L2
+  8: $t6 := 0
+  9: label L5
+ 10: $t8 := infer($t6)
+ 11: $t9 := 3
+ 12: $t7 := <($t8, $t9)
+ 13: if ($t7) goto 14 else goto 24
+ 14: label L7
+ 15: $t11 := infer($t1)
+ 16: $t12 := 1
+ 17: $t10 := +($t11, $t12)
+ 18: $t1 := infer($t10)
+ 19: $t14 := infer($t6)
+ 20: $t15 := 1
+ 21: $t13 := +($t14, $t15)
+ 22: $t6 := infer($t13)
+ 23: goto 26
+ 24: label L8
+ 25: goto 28
+ 26: label L9
+ 27: goto 9
+ 28: label L6
+ 29: $t17 := infer($t2)
+ 30: $t18 := 1
+ 31: $t16 := +($t17, $t18)
+ 32: $t2 := infer($t16)
+ 33: goto 36
+ 34: label L3
+ 35: goto 38
+ 36: label L4
+ 37: goto 2
+ 38: label L1
+ 39: $t0 := infer($t1)
+ 40: return $t0
+}
+
+
+[variant baseline]
+fun loops::while_loop(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+  0: $t1 := 0
+  1: $t2 := 0
+  2: label L0
+  3: $t4 := infer($t2)
+  4: $t5 := 10
+  5: $t3 := <($t4, $t5)
+  6: if ($t3) goto 7 else goto 17
+  7: label L2
+  8: $t7 := infer($t1)
+  9: $t8 := 1
+ 10: $t6 := +($t7, $t8)
+ 11: $t1 := infer($t6)
+ 12: $t10 := infer($t2)
+ 13: $t11 := 1
+ 14: $t9 := +($t10, $t11)
+ 15: $t2 := infer($t9)
+ 16: goto 19
+ 17: label L3
+ 18: goto 21
+ 19: label L4
+ 20: goto 2
+ 21: label L1
+ 22: $t0 := infer($t1)
+ 23: return $t0
+}
+
+============ after ReachingDefProcessor: ================
+
+[variant baseline]
+fun loops::loop_with_break($t0: bool): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t2 := 1
+     # live vars: $t0, $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: []
+     #
+  1: $t3 := 0
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #2: `t2` @ {0, 19}, `t3` @ {1, 23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+  2: label L0
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #3: `t2` @ {0, 19}, `t3` @ {1, 23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+  3: $t5 := infer($t3)
+     # live vars: $t0, $t2, $t3, $t5
+     # reaching instruction #4: `t2` @ {0, 19}, `t3` @ {1, 23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+  4: $t6 := 10
+     # live vars: $t0, $t2, $t3, $t5, $t6
+     # reaching instruction #5: `t2` @ {0, 19}, `t3` @ {1, 23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+  5: $t4 := <($t5, $t6)
+     # live vars: $t0, $t2, $t3, $t4
+     # reaching instruction #6: `t2` @ {0, 19}, `t3` @ {1, 23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+  6: if ($t4) goto 7 else goto 25
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #7: `t2` @ {0, 19}, `t3` @ {1, 23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+  7: label L2
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #8: `t2` @ {0, 19}, `t3` @ {1, 23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+  8: if ($t0) goto 9 else goto 14
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #9: `t2` @ {0, 19}, `t3` @ {1, 23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+  9: label L5
+     # live vars:
+     # reaching instruction #10: `t2` @ {0, 19}, `t3` @ {1, 23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+ 10: $t7 := 99
+     # live vars: $t7
+     # reaching instruction #11: `t2` @ {0, 19}, `t3` @ {1, 23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t7` @ {10}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+ 11: $t2 := infer($t7)
+     # live vars: $t2
+     # reaching instruction #12: `t2` @ {11}, `t3` @ {1, 23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+ 12: goto 29
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #13:
+ 13: goto 15
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #14: `t2` @ {0, 19}, `t3` @ {1, 23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+ 14: label L6
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #15: `t2` @ {0, 19}, `t3` @ {1, 23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+ 15: label L7
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #16: `t2` @ {0, 19}, `t3` @ {1, 23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+ 16: $t9 := infer($t2)
+     # live vars: $t0, $t3, $t9
+     # reaching instruction #17: `t3` @ {1, 23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+ 17: $t10 := 1
+     # live vars: $t0, $t3, $t9, $t10
+     # reaching instruction #18: `t3` @ {1, 23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+ 18: $t8 := +($t9, $t10)
+     # live vars: $t0, $t3, $t8
+     # reaching instruction #19: `t3` @ {1, 23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {18}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+ 19: $t2 := infer($t8)
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #20: `t2` @ {19}, `t3` @ {1, 23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+ 20: $t12 := infer($t3)
+     # live vars: $t0, $t2, $t12
+     # reaching instruction #21: `t2` @ {19}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+ 21: $t13 := 1
+     # live vars: $t0, $t2, $t12, $t13
+     # reaching instruction #22: `t2` @ {19}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+ 22: $t11 := +($t12, $t13)
+     # live vars: $t0, $t2, $t11
+     # reaching instruction #23: `t2` @ {19}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t11` @ {22}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+ 23: $t3 := infer($t11)
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #24: `t2` @ {19}, `t3` @ {23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+ 24: goto 27
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #25: `t2` @ {0, 19}, `t3` @ {1, 23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+ 25: label L3
+     # live vars: $t2
+     # reaching instruction #26: `t2` @ {0, 19}, `t3` @ {1, 23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+ 26: goto 29
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #27: `t2` @ {19}, `t3` @ {23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+ 27: label L4
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #28: `t2` @ {19}, `t3` @ {23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+ 28: goto 2
+     # live vars: $t2
+     # reaching instruction #29: `t2` @ {0, 11, 19}, `t3` @ {1, 23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+ 29: label L1
+     # live vars: $t2
+     # reaching instruction #30: `t2` @ {0, 11, 19}, `t3` @ {1, 23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+ 30: $t1 := infer($t2)
+     # live vars: $t1
+     # reaching instruction #31: `t1` @ {30}, `t3` @ {1, 23}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t9` @ {16}, `t10` @ {17}, `t12` @ {20}, `t13` @ {21}
+     # refs: []
+     #
+ 31: return $t1
+}
+
+
+[variant baseline]
+fun loops::loop_with_continue($t0: bool): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t2 := 0
+     # live vars: $t0, $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: []
+     #
+  1: $t3 := 0
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #2: `t2` @ {0, 21}, `t3` @ {1, 11}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+  2: label L0
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #3: `t2` @ {0, 21}, `t3` @ {1, 11}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+  3: $t5 := infer($t3)
+     # live vars: $t0, $t2, $t3, $t5
+     # reaching instruction #4: `t2` @ {0, 21}, `t3` @ {1, 11}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+  4: $t6 := 10
+     # live vars: $t0, $t2, $t3, $t5, $t6
+     # reaching instruction #5: `t2` @ {0, 21}, `t3` @ {1, 11}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+  5: $t4 := <($t5, $t6)
+     # live vars: $t0, $t2, $t3, $t4
+     # reaching instruction #6: `t2` @ {0, 21}, `t3` @ {1, 11}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+  6: if ($t4) goto 7 else goto 23
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #7: `t2` @ {0, 21}, `t3` @ {1, 11}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+  7: label L2
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #8: `t2` @ {0, 21}, `t3` @ {1, 11}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+  8: $t8 := infer($t3)
+     # live vars: $t0, $t2, $t8
+     # reaching instruction #9: `t2` @ {0, 21}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+  9: $t9 := 1
+     # live vars: $t0, $t2, $t8, $t9
+     # reaching instruction #10: `t2` @ {0, 21}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+ 10: $t7 := +($t8, $t9)
+     # live vars: $t0, $t2, $t7
+     # reaching instruction #11: `t2` @ {0, 21}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t7` @ {10}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+ 11: $t3 := infer($t7)
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #12: `t2` @ {0, 21}, `t3` @ {11}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+ 12: if ($t0) goto 13 else goto 16
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #13: `t2` @ {0, 21}, `t3` @ {11}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+ 13: label L5
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #14: `t2` @ {0, 21}, `t3` @ {11}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+ 14: goto 2
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #15:
+ 15: goto 17
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #16: `t2` @ {0, 21}, `t3` @ {11}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+ 16: label L6
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #17: `t2` @ {0, 21}, `t3` @ {11}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+ 17: label L7
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #18: `t2` @ {0, 21}, `t3` @ {11}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+ 18: $t11 := infer($t2)
+     # live vars: $t0, $t3, $t11
+     # reaching instruction #19: `t3` @ {11}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+ 19: $t12 := 1
+     # live vars: $t0, $t3, $t11, $t12
+     # reaching instruction #20: `t3` @ {11}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+ 20: $t10 := +($t11, $t12)
+     # live vars: $t0, $t3, $t10
+     # reaching instruction #21: `t3` @ {11}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t10` @ {20}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+ 21: $t2 := infer($t10)
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #22: `t2` @ {21}, `t3` @ {11}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+ 22: goto 25
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #23: `t2` @ {0, 21}, `t3` @ {1, 11}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+ 23: label L3
+     # live vars: $t2
+     # reaching instruction #24: `t2` @ {0, 21}, `t3` @ {1, 11}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+ 24: goto 27
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #25: `t2` @ {21}, `t3` @ {11}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+ 25: label L4
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #26: `t2` @ {21}, `t3` @ {11}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+ 26: goto 2
+     # live vars: $t2
+     # reaching instruction #27: `t2` @ {0, 21}, `t3` @ {1, 11}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+ 27: label L1
+     # live vars: $t2
+     # reaching instruction #28: `t2` @ {0, 21}, `t3` @ {1, 11}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+ 28: $t1 := infer($t2)
+     # live vars: $t1
+     # reaching instruction #29: `t1` @ {28}, `t3` @ {1, 11}, `t4` @ {5}, `t5` @ {3}, `t6` @ {4}, `t8` @ {8}, `t9` @ {9}, `t11` @ {18}, `t12` @ {19}
+     # refs: []
+     #
+ 29: return $t1
+}
+
+
+[variant baseline]
+fun loops::nested_loops(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: bool
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+     var $t15: u64
+     var $t16: u64
+     var $t17: u64
+     var $t18: u64
+     # live vars:
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t1 := 0
+     # live vars: $t1
+     # reaching instruction #1: `t1` @ {0}
+     # refs: []
+     #
+  1: $t2 := 0
+     # live vars: $t1, $t2
+     # reaching instruction #2: `t1` @ {0, 18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+  2: label L0
+     # live vars: $t1, $t2
+     # reaching instruction #3: `t1` @ {0, 18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+  3: $t4 := infer($t2)
+     # live vars: $t1, $t2, $t4
+     # reaching instruction #4: `t1` @ {0, 18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+  4: $t5 := 3
+     # live vars: $t1, $t2, $t4, $t5
+     # reaching instruction #5: `t1` @ {0, 18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+  5: $t3 := <($t4, $t5)
+     # live vars: $t1, $t2, $t3
+     # reaching instruction #6: `t1` @ {0, 18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+  6: if ($t3) goto 7 else goto 34
+     # live vars: $t1, $t2
+     # reaching instruction #7: `t1` @ {0, 18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+  7: label L2
+     # live vars: $t1, $t2
+     # reaching instruction #8: `t1` @ {0, 18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+  8: $t6 := 0
+     # live vars: $t1, $t2, $t6
+     # reaching instruction #9: `t1` @ {0, 18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+  9: label L5
+     # live vars: $t1, $t2, $t6
+     # reaching instruction #10: `t1` @ {0, 18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 10: $t8 := infer($t6)
+     # live vars: $t1, $t2, $t6, $t8
+     # reaching instruction #11: `t1` @ {0, 18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 11: $t9 := 3
+     # live vars: $t1, $t2, $t6, $t8, $t9
+     # reaching instruction #12: `t1` @ {0, 18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 12: $t7 := <($t8, $t9)
+     # live vars: $t1, $t2, $t6, $t7
+     # reaching instruction #13: `t1` @ {0, 18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 13: if ($t7) goto 14 else goto 24
+     # live vars: $t1, $t2, $t6
+     # reaching instruction #14: `t1` @ {0, 18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 14: label L7
+     # live vars: $t1, $t2, $t6
+     # reaching instruction #15: `t1` @ {0, 18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 15: $t11 := infer($t1)
+     # live vars: $t2, $t6, $t11
+     # reaching instruction #16: `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 16: $t12 := 1
+     # live vars: $t2, $t6, $t11, $t12
+     # reaching instruction #17: `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 17: $t10 := +($t11, $t12)
+     # live vars: $t2, $t6, $t10
+     # reaching instruction #18: `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t10` @ {17}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 18: $t1 := infer($t10)
+     # live vars: $t1, $t2, $t6
+     # reaching instruction #19: `t1` @ {18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 19: $t14 := infer($t6)
+     # live vars: $t1, $t2, $t14
+     # reaching instruction #20: `t1` @ {18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 20: $t15 := 1
+     # live vars: $t1, $t2, $t14, $t15
+     # reaching instruction #21: `t1` @ {18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 21: $t13 := +($t14, $t15)
+     # live vars: $t1, $t2, $t13
+     # reaching instruction #22: `t1` @ {18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t13` @ {21}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 22: $t6 := infer($t13)
+     # live vars: $t1, $t2, $t6
+     # reaching instruction #23: `t1` @ {18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 23: goto 26
+     # live vars: $t1, $t2, $t6
+     # reaching instruction #24: `t1` @ {0, 18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 24: label L8
+     # live vars: $t1, $t2
+     # reaching instruction #25: `t1` @ {0, 18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 25: goto 28
+     # live vars: $t1, $t2, $t6
+     # reaching instruction #26: `t1` @ {18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 26: label L9
+     # live vars: $t1, $t2, $t6
+     # reaching instruction #27: `t1` @ {18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 27: goto 9
+     # live vars: $t1, $t2
+     # reaching instruction #28: `t1` @ {0, 18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 28: label L6
+     # live vars: $t1, $t2
+     # reaching instruction #29: `t1` @ {0, 18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 29: $t17 := infer($t2)
+     # live vars: $t1, $t17
+     # reaching instruction #30: `t1` @ {0, 18}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 30: $t18 := 1
+     # live vars: $t1, $t17, $t18
+     # reaching instruction #31: `t1` @ {0, 18}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 31: $t16 := +($t17, $t18)
+     # live vars: $t1, $t16
+     # reaching instruction #32: `t1` @ {0, 18}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t16` @ {31}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 32: $t2 := infer($t16)
+     # live vars: $t1, $t2
+     # reaching instruction #33: `t1` @ {0, 18}, `t2` @ {32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 33: goto 36
+     # live vars: $t1, $t2
+     # reaching instruction #34: `t1` @ {0, 18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 34: label L3
+     # live vars: $t1
+     # reaching instruction #35: `t1` @ {0, 18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 35: goto 38
+     # live vars: $t1, $t2
+     # reaching instruction #36: `t1` @ {0, 18}, `t2` @ {32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 36: label L4
+     # live vars: $t1, $t2
+     # reaching instruction #37: `t1` @ {0, 18}, `t2` @ {32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 37: goto 2
+     # live vars: $t1
+     # reaching instruction #38: `t1` @ {0, 18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 38: label L1
+     # live vars: $t1
+     # reaching instruction #39: `t1` @ {0, 18}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 39: $t0 := infer($t1)
+     # live vars: $t0
+     # reaching instruction #40: `t0` @ {39}, `t2` @ {1, 32}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {8, 22}, `t7` @ {12}, `t8` @ {10}, `t9` @ {11}, `t11` @ {15}, `t12` @ {16}, `t14` @ {19}, `t15` @ {20}, `t17` @ {29}, `t18` @ {30}
+     # refs: []
+     #
+ 40: return $t0
+}
+
+
+[variant baseline]
+fun loops::while_loop(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     # live vars:
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t1 := 0
+     # live vars: $t1
+     # reaching instruction #1: `t1` @ {0}
+     # refs: []
+     #
+  1: $t2 := 0
+     # live vars: $t1, $t2
+     # reaching instruction #2: `t1` @ {0, 11}, `t2` @ {1, 15}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t7` @ {8}, `t8` @ {9}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+  2: label L0
+     # live vars: $t1, $t2
+     # reaching instruction #3: `t1` @ {0, 11}, `t2` @ {1, 15}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t7` @ {8}, `t8` @ {9}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+  3: $t4 := infer($t2)
+     # live vars: $t1, $t2, $t4
+     # reaching instruction #4: `t1` @ {0, 11}, `t2` @ {1, 15}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t7` @ {8}, `t8` @ {9}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+  4: $t5 := 10
+     # live vars: $t1, $t2, $t4, $t5
+     # reaching instruction #5: `t1` @ {0, 11}, `t2` @ {1, 15}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t7` @ {8}, `t8` @ {9}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+  5: $t3 := <($t4, $t5)
+     # live vars: $t1, $t2, $t3
+     # reaching instruction #6: `t1` @ {0, 11}, `t2` @ {1, 15}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t7` @ {8}, `t8` @ {9}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+  6: if ($t3) goto 7 else goto 17
+     # live vars: $t1, $t2
+     # reaching instruction #7: `t1` @ {0, 11}, `t2` @ {1, 15}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t7` @ {8}, `t8` @ {9}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+  7: label L2
+     # live vars: $t1, $t2
+     # reaching instruction #8: `t1` @ {0, 11}, `t2` @ {1, 15}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t7` @ {8}, `t8` @ {9}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+  8: $t7 := infer($t1)
+     # live vars: $t2, $t7
+     # reaching instruction #9: `t2` @ {1, 15}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t7` @ {8}, `t8` @ {9}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+  9: $t8 := 1
+     # live vars: $t2, $t7, $t8
+     # reaching instruction #10: `t2` @ {1, 15}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t7` @ {8}, `t8` @ {9}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+ 10: $t6 := +($t7, $t8)
+     # live vars: $t2, $t6
+     # reaching instruction #11: `t2` @ {1, 15}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t6` @ {10}, `t7` @ {8}, `t8` @ {9}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+ 11: $t1 := infer($t6)
+     # live vars: $t1, $t2
+     # reaching instruction #12: `t1` @ {11}, `t2` @ {1, 15}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t7` @ {8}, `t8` @ {9}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+ 12: $t10 := infer($t2)
+     # live vars: $t1, $t10
+     # reaching instruction #13: `t1` @ {11}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t7` @ {8}, `t8` @ {9}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+ 13: $t11 := 1
+     # live vars: $t1, $t10, $t11
+     # reaching instruction #14: `t1` @ {11}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t7` @ {8}, `t8` @ {9}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+ 14: $t9 := +($t10, $t11)
+     # live vars: $t1, $t9
+     # reaching instruction #15: `t1` @ {11}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t7` @ {8}, `t8` @ {9}, `t9` @ {14}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+ 15: $t2 := infer($t9)
+     # live vars: $t1, $t2
+     # reaching instruction #16: `t1` @ {11}, `t2` @ {15}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t7` @ {8}, `t8` @ {9}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+ 16: goto 19
+     # live vars: $t1, $t2
+     # reaching instruction #17: `t1` @ {0, 11}, `t2` @ {1, 15}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t7` @ {8}, `t8` @ {9}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+ 17: label L3
+     # live vars: $t1
+     # reaching instruction #18: `t1` @ {0, 11}, `t2` @ {1, 15}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t7` @ {8}, `t8` @ {9}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+ 18: goto 21
+     # live vars: $t1, $t2
+     # reaching instruction #19: `t1` @ {11}, `t2` @ {15}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t7` @ {8}, `t8` @ {9}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+ 19: label L4
+     # live vars: $t1, $t2
+     # reaching instruction #20: `t1` @ {11}, `t2` @ {15}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t7` @ {8}, `t8` @ {9}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+ 20: goto 2
+     # live vars: $t1
+     # reaching instruction #21: `t1` @ {0, 11}, `t2` @ {1, 15}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t7` @ {8}, `t8` @ {9}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+ 21: label L1
+     # live vars: $t1
+     # reaching instruction #22: `t1` @ {0, 11}, `t2` @ {1, 15}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t7` @ {8}, `t8` @ {9}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+ 22: $t0 := infer($t1)
+     # live vars: $t0
+     # reaching instruction #23: `t0` @ {22}, `t2` @ {1, 15}, `t3` @ {5}, `t4` @ {3}, `t5` @ {4}, `t7` @ {8}, `t8` @ {9}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+ 23: return $t0
+}
