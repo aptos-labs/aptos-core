@@ -1,0 +1,166 @@
+# Aptos Transaction Format and Signing Specifications
+
+> **Version:** 1.0.0  
+> **Last Updated:** January 28, 2026  
+> **Target Audience:** SDK Developers, Application Integrators, Language Binding Authors
+
+## Overview
+
+This documentation provides comprehensive specifications for building and signing Aptos blockchain transactions. It is designed to enable developers to implement Aptos transaction support in any programming language by providing byte-level details of the Binary Canonical Serialization (BCS) format used by Aptos.
+
+## Prerequisites
+
+Before using this documentation, readers should be familiar with:
+
+- **BCS (Binary Canonical Serialization)**: Aptos uses BCS for all serialization. A separate BCS specification document will be provided for detailed encoding rules.
+- **Cryptographic primitives**: Ed25519, ECDSA (secp256k1/secp256r1), SHA3-256
+- **Basic blockchain concepts**: Transactions, signatures, addresses
+
+## Document Structure
+
+```
+specifications/
+├── README.md                              # This file
+├── transaction-formats/                   # BCS format specifications
+│   ├── 01-raw-transaction.md             # Base RawTransaction structure
+│   ├── 02-ed25519-authenticator.md       # Ed25519 authentication format
+│   ├── 03-single-key-authenticator.md    # SingleKey (unified) authentication
+│   ├── 04-multi-key-authenticator.md     # MultiKey (multi-sig) authentication
+│   └── 05-multi-ed25519-authenticator.md # Legacy MultiEd25519 format
+├── signing/                               # Signing process documentation
+│   ├── 01-transaction-hashing.md         # How to hash transactions for signing
+│   ├── 02-ed25519-signing.md             # Ed25519 signing process
+│   ├── 03-multi-ed25519-signing.md       # MultiEd25519 signing
+│   ├── 04-secp256k1-signing.md           # Secp256k1 ECDSA signing
+│   ├── 05-secp256r1-signing.md           # Secp256r1/WebAuthn signing
+│   └── 06-keyless-signing.md             # Keyless (OIDC) signing
+└── advanced/                              # Advanced transaction types
+    ├── 01-multi-agent-transactions.md    # Multi-signer transactions
+    ├── 02-fee-payer-transactions.md      # Sponsored transactions
+    └── 03-multisig-transactions.md       # On-chain multisig
+```
+
+## Quick Reference
+
+### Chain IDs
+
+| Network | Chain ID (u8) | Description |
+|---------|---------------|-------------|
+| Mainnet | `1` | Production network |
+| Testnet | `2` | Test network |
+| Devnet | `3` | Development network (ID may vary) |
+| Local | `4` | Local testing |
+
+### Authentication Schemes
+
+| Scheme | ID (u8) | Description |
+|--------|---------|-------------|
+| Ed25519 | `0` | Single Ed25519 signature |
+| MultiEd25519 | `1` | K-of-N Ed25519 multisig |
+| SingleKey | `2` | Unified single-key (supports multiple algorithms) |
+| MultiKey | `3` | Unified multi-key (supports multiple algorithms) |
+| Abstraction | `4` | Account abstraction |
+
+### Supported Key Types in SingleKey/MultiKey
+
+| Key Type | Variant Index | Description |
+|----------|---------------|-------------|
+| Ed25519 | `0` | Ed25519 public key |
+| Secp256k1Ecdsa | `1` | Secp256k1 ECDSA public key |
+| Secp256r1Ecdsa | `2` | Secp256r1 ECDSA public key (WebAuthn) |
+| Keyless | `3` | OIDC-based keyless authentication |
+| FederatedKeyless | `4` | Federated keyless authentication |
+
+### Transaction Authenticator Variants
+
+| Variant | Index | Use Case |
+|---------|-------|----------|
+| Ed25519 | `0` | Simple Ed25519 signed transaction |
+| MultiEd25519 | `1` | Legacy multi-sig transaction |
+| MultiAgent | `2` | Multiple signers transaction |
+| FeePayer | `3` | Sponsored transaction with fee payer |
+| SingleSender | `4` | Modern single-sender transaction |
+
+## Transaction Lifecycle
+
+```mermaid
+flowchart TD
+    A[Build RawTransaction] --> B[Compute Signing Message]
+    B --> C[Sign Message]
+    C --> D[Build Authenticator]
+    D --> E[Assemble SignedTransaction]
+    E --> F[BCS Serialize]
+    F --> G[Submit to Network]
+    
+    subgraph "Signing Message"
+        B1[Domain Separator Prefix] --> B2[BCS Serialized RawTransaction]
+        B2 --> B3[Concatenate]
+    end
+    
+    B --> B1
+```
+
+## Common Data Types
+
+### AccountAddress
+- **Size**: 32 bytes (fixed)
+- **Format**: 256-bit value, typically displayed as hex with `0x` prefix
+- **Derivation**: Last 32 bytes of `AuthenticationKey`
+
+### AuthenticationKey
+- **Size**: 32 bytes (fixed)
+- **Derivation**: `SHA3-256(public_key_bytes || scheme_id)`
+
+### Sequence Number
+- **Type**: `u64` (8 bytes, little-endian)
+- **Purpose**: Replay protection, must match on-chain account sequence
+
+### Gas Parameters
+- **max_gas_amount**: `u64` - Maximum gas units for transaction
+- **gas_unit_price**: `u64` - Price per gas unit in Octas (1 APT = 10^8 Octas)
+
+### Expiration
+- **Type**: `u64` - Unix timestamp in seconds
+- **Validation**: Transaction rejected if current time ≥ expiration
+
+## Constants
+
+```
+MAX_NUM_OF_SIGS = 32                    // Maximum signatures per transaction
+ED25519_PUBLIC_KEY_LENGTH = 32          // Ed25519 public key size
+ED25519_SIGNATURE_LENGTH = 64           // Ed25519 signature size
+SECP256K1_PUBLIC_KEY_LENGTH = 65        // Uncompressed secp256k1 public key
+SECP256R1_PUBLIC_KEY_LENGTH = 65        // Uncompressed secp256r1 public key
+MULTI_ED25519_BITMAP_LENGTH = 4         // Bitmap for multi-ed25519
+```
+
+## Reading Order
+
+For new implementers, we recommend reading in this order:
+
+1. **[Transaction Hashing](signing/01-transaction-hashing.md)** - Understand the signing message format
+2. **[Raw Transaction Format](transaction-formats/01-raw-transaction.md)** - Core transaction structure
+3. **[Ed25519 Authenticator](transaction-formats/02-ed25519-authenticator.md)** - Simplest authentication
+4. **[Ed25519 Signing](signing/02-ed25519-signing.md)** - Basic signing process
+5. Continue with other formats as needed
+
+## Test Vectors
+
+Each specification document includes test vectors with:
+- Known inputs (private keys, transaction data)
+- Expected outputs (serialized bytes, signatures)
+- Step-by-step intermediate values
+
+Test vectors are generated from the Aptos core codebase to ensure accuracy.
+
+## Version Compatibility
+
+This specification covers the transaction format as of Aptos Core version compatible with mainnet. Future versions may introduce new authenticator types or transaction formats while maintaining backward compatibility.
+
+## Contributing
+
+If you find errors or have suggestions for improvement, please submit issues or pull requests to the Aptos Core repository.
+
+## License
+
+This documentation is part of the Aptos Core project and is licensed under the Apache License 2.0.
