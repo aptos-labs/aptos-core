@@ -104,7 +104,7 @@ impl JWKManager {
             .into_provider_vec()
             .into_iter()
             .filter_map(|provider| {
-                let OIDCProvider { name, config_url, onchain_block_number } = provider;
+                let OIDCProvider { name, config_url, onchain_nonce } = provider;
                 let maybe_issuer = String::from_utf8(name);
                 let maybe_config_url = String::from_utf8(config_url);
                 match (maybe_issuer, maybe_config_url) {
@@ -141,9 +141,9 @@ impl JWKManager {
                 qc_update = self.qc_update_rx.select_next_some() => {
                     self.process_quorum_certified_update(qc_update)
                 },
-                (issuer, jwks) = local_observation_rx.select_next_some() => {
+                (issuer, jwks, observed_nonce) = local_observation_rx.select_next_some() => {
                     let jwks = jwks.into_iter().map(JWKMoveStruct::from).collect();
-                    self.process_new_observation(issuer, jwks)
+                    self.process_new_observation(issuer, jwks, observed_nonce)
                 },
                 ack_tx = close_rx.select_next_some() => {
                     self.tear_down(ack_tx.ok()).await
@@ -177,15 +177,41 @@ impl JWKManager {
         &mut self,
         issuer: Issuer,
         jwks: Vec<JWKMoveStruct>,
+        observed_nonce: Option<u64>,
     ) -> Result<()> {
         debug!(
             epoch = self.epoch_state.epoch,
             issuer = String::from_utf8(issuer.clone()).ok(),
+            observed_nonce = ?observed_nonce,
             "Processing new observation."
         );
         let state = self.states_by_issuer.entry(issuer.clone()).or_default();
         state.observed = Some(jwks.clone());
-        if state.observed.as_ref() != state.on_chain.as_ref().map(ProviderJWKs::jwks) {
+        
+        // Determine if update is needed based on source type
+        let needs_update = match observed_nonce {
+            Some(nonce) => {
+                // For blockchain events: compare nonce (version) only
+                let on_chain_version = state.on_chain_version();
+                let should_update = nonce > on_chain_version;
+                if should_update {
+                    debug!(
+                        epoch = self.epoch_state.epoch,
+                        issuer = String::from_utf8(issuer.clone()).ok(),
+                        observed_nonce = nonce,
+                        on_chain_version = on_chain_version,
+                        "Blockchain source needs update (version comparison)"
+                    );
+                }
+                should_update
+            }
+            None => {
+                // For JWK sources (https://): compare full jwks content
+                state.observed.as_ref() != state.on_chain.as_ref().map(ProviderJWKs::jwks)
+            }
+        };
+        
+        if needs_update {
             let observed = ProviderJWKs {
                 issuer: issuer.clone(),
                 version: state.on_chain_version() + 1,

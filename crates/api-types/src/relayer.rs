@@ -7,8 +7,11 @@ use std::sync::{Arc, OnceLock};
 pub struct PollResult {
     /// JWK structures from the observed state
     pub jwk_structs: Vec<JWKStruct>,
-    /// Maximum block number that was fetched in this poll
+    /// Maximum block number that was fetched in this poll (used for polling progress)
     pub max_block_number: u64,
+    /// Nonce from the observed source (used for version comparison in JWKManager)
+    /// For blockchain events: GravityPortal.MessageSent nonce
+    pub nonce: Option<u64>,
     /// Whether the state was updated in this poll
     pub updated: bool,
 }

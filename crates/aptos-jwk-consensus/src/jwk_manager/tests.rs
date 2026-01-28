@@ -160,7 +160,7 @@ async fn test_jwk_manager_state_transition() {
     // When JWK consensus is `NotStarted` for issuer Bob, JWKConsensusManager should:
     // do nothing to an observation equal to on-chain state (except storing it, which may be unnecessary).
     assert!(jwk_manager
-        .process_new_observation(issuer_bob.clone(), bob_jwks.clone())
+        .process_new_observation(issuer_bob.clone(), bob_jwks.clone(), None)
         .is_ok());
     expected_states.get_mut(&issuer_bob).unwrap().observed = Some(bob_jwks.clone());
     assert_eq!(expected_states, jwk_manager.states_by_issuer);
@@ -173,7 +173,7 @@ async fn test_jwk_manager_state_transition() {
     ))
     .into()];
     assert!(jwk_manager
-        .process_new_observation(issuer_alice.clone(), alice_jwks_new.clone())
+        .process_new_observation(issuer_alice.clone(), alice_jwks_new.clone(), None)
         .is_ok());
     {
         let expected_alice_state = expected_states.get_mut(&issuer_alice).unwrap();
@@ -202,7 +202,7 @@ async fn test_jwk_manager_state_transition() {
     ))
     .into()];
     assert!(jwk_manager
-        .process_new_observation(issuer_carl.clone(), carl_jwks_new.clone())
+        .process_new_observation(issuer_carl.clone(), carl_jwks_new.clone(), None)
         .is_ok());
     {
         let expected_carl_state = expected_states.get_mut(&issuer_carl).unwrap();
@@ -280,7 +280,7 @@ async fn test_jwk_manager_state_transition() {
         .into(),
     ];
     assert!(jwk_manager
-        .process_new_observation(issuer_alice.clone(), alice_jwks_new_2.clone())
+        .process_new_observation(issuer_alice.clone(), alice_jwks_new_2.clone(), None)
         .is_ok());
     {
         let expected_alice_state = expected_states.get_mut(&issuer_alice).unwrap();

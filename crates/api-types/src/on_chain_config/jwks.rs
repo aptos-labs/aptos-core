@@ -36,7 +36,7 @@ pub struct ObservedJWKs {
 pub struct OIDCProvider {
     pub name: String,
     pub config_url: String,
-    pub onchain_block_number: Option<u64>,
+    pub onchain_nonce: Option<u64>,
 }
 
 #[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]

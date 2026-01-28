@@ -56,7 +56,7 @@ pub fn dummy_issuer() -> Issuer {
 pub struct OIDCProvider {
     pub name: Issuer,
     pub config_url: Vec<u8>,
-    pub onchain_block_number: Option<u64>,
+    pub onchain_nonce: Option<u64>,
 }
 
 impl OIDCProvider {
@@ -64,7 +64,7 @@ impl OIDCProvider {
         Self {
             name: name.as_bytes().to_vec(),
             config_url: config_url.as_bytes().to_vec(),
-            onchain_block_number: None,
+            onchain_nonce: None,
         }
     }
 }
@@ -74,7 +74,7 @@ impl From<crate::on_chain_config::OIDCProvider> for OIDCProvider {
         OIDCProvider {
             name: value.name.as_bytes().to_vec(),
             config_url: value.config_url.as_bytes().to_vec(),
-            onchain_block_number: None,
+            onchain_nonce: None,
         }
     }
 }
@@ -83,10 +83,10 @@ impl TryFrom<OIDCProvider> for crate::on_chain_config::OIDCProvider {
     type Error = anyhow::Error;
 
     fn try_from(value: OIDCProvider) -> Result<Self, Self::Error> {
-        let OIDCProvider { name, config_url, onchain_block_number } = value;
+        let OIDCProvider { name, config_url, onchain_nonce } = value;
         let name = String::from_utf8(name)?;
         let config_url = String::from_utf8(config_url)?;
-        Ok(crate::on_chain_config::OIDCProvider { name, config_url, onchain_block_number })
+        Ok(crate::on_chain_config::OIDCProvider { name, config_url, onchain_nonce })
     }
 }
 

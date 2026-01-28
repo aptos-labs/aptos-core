@@ -22,7 +22,7 @@ impl AsMoveAny for ConfigOff {
 pub struct OIDCProvider {
     pub name: String,
     pub config_url: String,
-    pub onchain_block_number: Option<u64>,
+    pub onchain_nonce: Option<u64>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -47,7 +47,7 @@ impl OnChainJWKConsensusConfig {
                 name: "https://accounts.google.com".to_string(),
                 config_url: "https://accounts.google.com/.well-known/openid-configuration"
                     .to_string(),
-                onchain_block_number: None,
+                onchain_nonce: None,
             }],
         })
     }
@@ -108,7 +108,7 @@ impl OnChainConfig for OnChainJWKConsensusConfig {
                     .map(|oidc_provider| OIDCProvider {
                         name: oidc_provider.name.clone(),
                         config_url: oidc_provider.config_url.clone(),
-                        onchain_block_number: oidc_provider.onchain_block_number,
+                        onchain_nonce: oidc_provider.onchain_nonce,
                     })
                     .collect(),
             }))
