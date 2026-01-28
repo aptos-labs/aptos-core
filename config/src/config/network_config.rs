@@ -49,6 +49,8 @@ pub const MAX_APPLICATION_MESSAGE_SIZE: usize =
 pub const MAX_FRAME_SIZE: usize = 4 * 1024 * 1024; /* 4 MiB large messages will be chunked into multiple frames and streamed */
 pub const MAX_MESSAGE_SIZE: usize = 64 * 1024 * 1024; /* 64 MiB */
 pub const CONNECTION_BACKOFF_BASE: u64 = 2;
+pub const IP_BYTE_BUCKET_RATE: usize = 102400 /* 100 KiB */;
+pub const IP_BYTE_BUCKET_SIZE: usize = IP_BYTE_BUCKET_RATE;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -111,6 +113,10 @@ pub struct NetworkConfig {
     pub max_outbound_connections: usize,
     /// Maximum number of outbound connections, limited by PeerManager
     pub max_inbound_connections: usize,
+    /// Inbound rate limiting configuration, if not specified, no rate limiting
+    pub inbound_rate_limit_config: Option<RateLimitConfig>,
+    /// Outbound rate limiting configuration, if not specified, no rate limiting
+    pub outbound_rate_limit_config: Option<RateLimitConfig>,
     /// The maximum size of an inbound or outbound message (it may be divided into multiple frame)
     pub max_message_size: usize,
     /// The maximum number of parallel message deserialization tasks that can run (per application)
@@ -149,6 +155,8 @@ impl NetworkConfig {
             ping_failures_tolerated: PING_FAILURES_TOLERATED,
             max_outbound_connections: MAX_FULLNODE_OUTBOUND_CONNECTIONS,
             max_inbound_connections: MAX_INBOUND_CONNECTIONS,
+            inbound_rate_limit_config: None,
+            outbound_rate_limit_config: None,
             max_message_size: MAX_MESSAGE_SIZE,
             inbound_rx_buffer_size_bytes: None,
             inbound_tx_buffer_size_bytes: None,
@@ -353,6 +361,30 @@ pub struct FileDiscovery {
 pub struct RestDiscovery {
     pub url: url::Url,
     pub interval_secs: u64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RateLimitConfig {
+    /// Maximum number of bytes/s for an IP
+    pub ip_byte_bucket_rate: usize,
+    /// Maximum burst of bytes for an IP
+    pub ip_byte_bucket_size: usize,
+    /// Initial amount of tokens initially in the bucket
+    pub initial_bucket_fill_percentage: u8,
+    /// Allow for disabling the throttles
+    pub enabled: bool,
+}
+
+impl Default for RateLimitConfig {
+    fn default() -> Self {
+        Self {
+            ip_byte_bucket_rate: IP_BYTE_BUCKET_RATE,
+            ip_byte_bucket_size: IP_BYTE_BUCKET_SIZE,
+            initial_bucket_fill_percentage: 25,
+            enabled: true,
+        }
+    }
 }
 
 pub type PeerSet = HashMap<PeerId, Peer>;

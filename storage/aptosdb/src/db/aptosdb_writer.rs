@@ -224,15 +224,12 @@ impl DbWriter for AptosDB {
 
             self.ledger_pruner.save_min_readable_version(version)?;
             self.state_store
-                .state_pruner
                 .state_merkle_pruner
                 .save_min_readable_version(version)?;
             self.state_store
-                .state_pruner
                 .epoch_snapshot_pruner
                 .save_min_readable_version(version)?;
             self.state_store
-                .state_pruner
                 .state_kv_pruner
                 .save_min_readable_version(version)?;
 
@@ -631,7 +628,6 @@ impl AptosDB {
             self.ledger_pruner
                 .maybe_set_pruner_target_db_version(version);
             self.state_store
-                .state_pruner
                 .state_kv_pruner
                 .maybe_set_pruner_target_db_version(version);
 
