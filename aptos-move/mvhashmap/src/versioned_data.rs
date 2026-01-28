@@ -629,6 +629,8 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
         value: ValueWithLayout<V>,
         dependencies: BTreeMap<TxnIndex, Incarnation>,
     ) -> Result<(), PanicError> {
+        // Clone is cheap here: ValueWithLayout only contains Arc references,
+        // so cloning is just atomic reference count increments (O(1)).
         let value_clone = value.clone();
         let prev_entry = versioned_values.versioned_map.insert(
             ShiftedTxnIndex::new(txn_idx),
@@ -636,6 +638,12 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
         );
 
         // Check that the previous entry for txn_idx, if present, had lower incarnation.
+        // This invariant ensures we never regress to an older incarnation.
+        //
+        // Special case for incarnation 0: Pre-write optimization may write the same key-value
+        // at incarnation 0 before execution starts. When execution later writes the same value
+        // at incarnation 0, we allow this as long as the values are identical. This is safe
+        // because identical values have no semantic difference.
         if !prev_entry.is_none_or(|entry| -> bool {
             if let EntryCell::ResourceWrite {
                 incarnation: prev_incarnation,
