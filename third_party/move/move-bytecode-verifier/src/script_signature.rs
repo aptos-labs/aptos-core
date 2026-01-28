@@ -32,11 +32,47 @@ pub type FnCheckScriptSignature = fn(
     Option<SignatureIndex>,
 ) -> PartialVMResult<()>;
 
+/// Verifies that scripts do not have illegal function attributes.
+/// Illegal attributes for scripts:
+/// - Pack, PackVariant, Unpack, UnpackVariant, TestVariant: Struct API attributes
+/// - BorrowFieldImmutable, BorrowFieldMutable: Struct API attributes
+fn verify_script_no_illegal_function_attributes(script: &CompiledScript) -> VMResult<()> {
+    use move_binary_format::file_format::FunctionAttribute;
+
+    for (idx, function_handle) in script.function_handles.iter().enumerate() {
+        for attr in &function_handle.attributes {
+            let is_illegal = matches!(
+                attr,
+                |FunctionAttribute::Pack| FunctionAttribute::PackVariant(_)
+                    | FunctionAttribute::Unpack
+                    | FunctionAttribute::UnpackVariant(_)
+                    | FunctionAttribute::TestVariant(_)
+                    | FunctionAttribute::BorrowFieldImmutable(_)
+                    | FunctionAttribute::BorrowFieldMutable(_)
+            );
+
+            if is_illegal {
+                return Err(PartialVMError::new(StatusCode::INVALID_OPERATION_IN_SCRIPT)
+                    .with_message(format!(
+                        "Scripts cannot have attribute {:?}. Function handle at index {}",
+                        attr, idx
+                    ))
+                    .at_index(IndexKind::FunctionHandle, idx as TableIndex)
+                    .finish(Location::Script));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// This function checks the extra requirements on the signature of the main function of a script.
 pub fn verify_script(
     script: &CompiledScript,
     check_signature: FnCheckScriptSignature,
 ) -> VMResult<()> {
+    // Check that scripts don't have illegal function attributes
+    verify_script_no_illegal_function_attributes(script)?;
+
     if script.version >= VERSION_5 {
         return Ok(());
     }

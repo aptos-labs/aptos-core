@@ -1,0 +1,14 @@
+//# publish --print-bytecode
+module 0x66::test_variant_wrong_reference
+
+enum Color has drop
+  Red
+    value: u64
+  Green
+    value: u64
+
+// Invalid: test_variant should take immutable reference &Color, not mutable reference &mut Color
+#[test_variant=0] public fun test_variant$Color$Red(l0: &mut Color): bool
+    move_loc l0
+    test_variant Color, Red
+    ret

@@ -1,0 +1,19 @@
+//# publish --print-bytecode
+module 0x66::test_variant_parameter_invalid
+
+enum Color has drop
+  Red
+    value: u64
+  Green
+    value: u64
+
+struct S
+    x: u64
+
+// Invalid: test_variant$Color$Red should take Color, not S
+#[test_variant=0] public fun test_variant$Color$Red(l0: S): u8
+    move_loc l0
+    unpack S
+    pop
+    ld_u8 1
+    ret

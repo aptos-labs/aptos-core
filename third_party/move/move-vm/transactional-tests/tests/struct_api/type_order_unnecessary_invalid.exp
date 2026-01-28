@@ -1,0 +1,18 @@
+processed 1 task
+task 0 lines 1-12:  publish --print-bytecode [module 0x66::test_type_order_unnecessary]
+
+== BEGIN Bytecode ==
+// Bytecode version v9
+module 0x66::test_type_order_unnecessary
+struct S
+  x: u64
+  y: u64
+
+// Function definition at index 0
+#[borrow=0] public fun borrow$S$0$0(l0: &S): &u64
+    move_loc l0
+    borrow_field S, x
+    ret
+
+
+== END Bytecode ==

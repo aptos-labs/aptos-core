@@ -1,0 +1,13 @@
+//# publish --print-bytecode
+module 0x66::test_pack_missing_parameters
+
+struct S
+    x: u64
+    y: u64
+
+// Invalid: Pack function has correct naming but takes no parameters (should take u64, u64 for struct S fields)
+#[pack] public fun pack$S(): S
+    ld_u64 1
+    ld_u64 2
+    pack S
+    ret

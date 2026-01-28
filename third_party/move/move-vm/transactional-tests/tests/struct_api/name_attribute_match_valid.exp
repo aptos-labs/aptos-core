@@ -1,0 +1,59 @@
+processed 1 task
+task 0 lines 1-53:  publish --print-bytecode [module 0x66::test_name_attribute_match]
+
+== BEGIN Bytecode ==
+// Bytecode version v9
+module 0x66::test_name_attribute_match
+struct Point
+  x: u64
+  y: u64
+
+enum Color has drop
+  Red
+  Green
+  Blue
+
+// Function definition at index 0
+#[pack] public fun pack$Point(l0: u64, l1: u64): Point
+    move_loc l0
+    move_loc l1
+    pack Point
+    ret
+
+// Function definition at index 1
+#[pack_variant=0] public fun pack$Color$Red(): Color
+    pack_variant Color, Red
+    ret
+
+// Function definition at index 2
+#[unpack] public fun unpack$Point(l0: Point): (u64, u64)
+    move_loc l0
+    unpack Point
+    ret
+
+// Function definition at index 3
+#[unpack_variant=1] public fun unpack$Color$Green(l0: Color)
+    move_loc l0
+    unpack_variant Color, Green
+    ret
+
+// Function definition at index 4
+#[test_variant=2] public fun test_variant$Color$Blue(l0: &Color): bool
+    move_loc l0
+    test_variant Color, Blue
+    ret
+
+// Function definition at index 5
+#[borrow=0] public fun borrow$Point$0(l0: &Point): &u64
+    move_loc l0
+    borrow_field Point, x
+    ret
+
+// Function definition at index 6
+#[borrow_mut=1] public fun borrow_mut$Point$1(l0: &mut Point): &mut u64
+    move_loc l0
+    mut_borrow_field Point, y
+    ret
+
+
+== END Bytecode ==
