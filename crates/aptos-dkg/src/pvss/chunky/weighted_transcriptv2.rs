@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use crate::pvss::chunky::chunked_elgamal::decrypt_chunked_scalars;
 use crate::{
     dlog::bsgs,
     pcs::univariate_hiding_kzg,
@@ -504,8 +505,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
     }
 }
 
-use crate::pvss::chunky::chunked_elgamal::decrypt_chunked_scalars;
-
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Subtranscript
     for Subtranscript<E>
 {
@@ -557,20 +556,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         let pk_shares = self.get_public_key_share(sc, player);
 
-        // Convert affine to projective for decrypt_chunked_scalars
-        let Cs_proj: Vec<Vec<E::G1>> = Cs
-            .iter()
-            .map(|row| row.iter().map(|&c| c.into()).collect())
-            .collect();
-        let Rs_proj: Vec<Vec<E::G1>> = self
-            .Rs
-            .iter()
-            .map(|row| row.iter().map(|&r| r.into()).collect())
-            .collect();
-
         let sk_shares: Vec<_> = decrypt_chunked_scalars(
-            &Cs_proj,
-            &Rs_proj,
+            &Cs,
+            &self.Rs,
             &dk.dk,
             &pp.pp_elgamal,
             &pp.dlog_table,

@@ -22,6 +22,7 @@ use ark_serialize::{
 };
 use ark_std::fmt::Debug;
 use std::collections::HashMap;
+use std::ops::Sub;
 
 pub const DST: &[u8; 31] = b"APTOS_CHUNKED_ELGAMAL_SIGMA_DST"; // This is used for the sigma protocol Fiat-Shamir challenges
 
@@ -357,8 +358,8 @@ pub fn num_chunks_per_scalar<F: PrimeField>(ell: u8) -> u32 {
 /// - Vec of decrypted scalars.
 #[allow(non_snake_case)]
 pub fn decrypt_chunked_scalars<C: CurveGroup>(
-    Cs_rows: &[Vec<C>],
-    Rs_rows: &[Vec<C>],
+    Cs_rows: &[Vec<C::Affine>],
+    Rs_rows: &[Vec<C::Affine>],
     dk: &C::ScalarField,
     pp: &PublicParameters<C>,
     table: &HashMap<Vec<u8>, u64>,
@@ -487,9 +488,27 @@ mod tests {
         // TODO: call some built-in function for this instead
         let mut decrypted_scalars = Vec::new();
         for player_id in 0..Cs.len() {
+            // Convert projective Cs[player_id] to affine
+            let Cs_player_affine: Vec<Vec<C::Affine>> = Cs[player_id]
+                .iter()
+                .map(|row| {
+                    let proj_vec: Vec<C> = row.iter().copied().collect();
+                    C::normalize_batch(&proj_vec)
+                })
+                .collect();
+
+            // Convert projective Rs to affine
+            let Rs_affine: Vec<Vec<C::Affine>> = Rs
+                .iter()
+                .map(|row| {
+                    let proj_vec: Vec<C> = row.iter().copied().collect();
+                    C::normalize_batch(&proj_vec)
+                })
+                .collect();
+
             let decrypted_for_player = decrypt_chunked_scalars(
-                &Cs[player_id],
-                &Rs,
+                &Cs_player_affine,
+                &Rs_affine,
                 &dks[player_id],
                 &pp,
                 &table,
