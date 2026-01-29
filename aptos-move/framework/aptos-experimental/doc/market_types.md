@@ -31,6 +31,9 @@
 -  [Function `order_cancellation_reason_dead_mans_switch_expired`](#0x7_market_types_order_cancellation_reason_dead_mans_switch_expired)
 -  [Function `order_cancellation_reason_disallowed_self_trading`](#0x7_market_types_order_cancellation_reason_disallowed_self_trading)
 -  [Function `order_cancellation_reason_cancelled_by_user`](#0x7_market_types_order_cancellation_reason_cancelled_by_user)
+-  [Function `order_cancellation_reason_cancelled_by_system`](#0x7_market_types_order_cancellation_reason_cancelled_by_system)
+-  [Function `order_cancellation_reason_cancelled_by_system_due_to_error`](#0x7_market_types_order_cancellation_reason_cancelled_by_system_due_to_error)
+-  [Function `order_cancellation_reason_clearinghouse_stopped_matching`](#0x7_market_types_order_cancellation_reason_clearinghouse_stopped_matching)
 -  [Function `order_status_open`](#0x7_market_types_order_status_open)
 -  [Function `order_status_filled`](#0x7_market_types_order_status_filled)
 -  [Function `order_status_cancelled`](#0x7_market_types_order_status_cancelled)
@@ -339,6 +342,22 @@ Reasons why an order was cancelled
 
 <details>
 <summary>OrderCancelledBySystemDueToError</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+</dl>
+
+
+</details>
+
+</details>
+
+<details>
+<summary>ClearinghouseStoppedMatching</summary>
 
 
 <details>
@@ -1764,6 +1783,78 @@ enum <a href="market_types.md#0x7_market_types_BulkOrderRejectionEvent">BulkOrde
 
 <pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_order_cancellation_reason_cancelled_by_user">order_cancellation_reason_cancelled_by_user</a>(): <a href="market_types.md#0x7_market_types_OrderCancellationReason">OrderCancellationReason</a> {
     OrderCancellationReason::OrderCancelledByUser
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_market_types_order_cancellation_reason_cancelled_by_system"></a>
+
+## Function `order_cancellation_reason_cancelled_by_system`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_order_cancellation_reason_cancelled_by_system">order_cancellation_reason_cancelled_by_system</a>(): <a href="market_types.md#0x7_market_types_OrderCancellationReason">market_types::OrderCancellationReason</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_order_cancellation_reason_cancelled_by_system">order_cancellation_reason_cancelled_by_system</a>(): <a href="market_types.md#0x7_market_types_OrderCancellationReason">OrderCancellationReason</a> {
+    OrderCancellationReason::OrderCancelledBySystem
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_market_types_order_cancellation_reason_cancelled_by_system_due_to_error"></a>
+
+## Function `order_cancellation_reason_cancelled_by_system_due_to_error`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_order_cancellation_reason_cancelled_by_system_due_to_error">order_cancellation_reason_cancelled_by_system_due_to_error</a>(): <a href="market_types.md#0x7_market_types_OrderCancellationReason">market_types::OrderCancellationReason</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_order_cancellation_reason_cancelled_by_system_due_to_error">order_cancellation_reason_cancelled_by_system_due_to_error</a>(): <a href="market_types.md#0x7_market_types_OrderCancellationReason">OrderCancellationReason</a> {
+    OrderCancellationReason::OrderCancelledBySystemDueToError
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_market_types_order_cancellation_reason_clearinghouse_stopped_matching"></a>
+
+## Function `order_cancellation_reason_clearinghouse_stopped_matching`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_order_cancellation_reason_clearinghouse_stopped_matching">order_cancellation_reason_clearinghouse_stopped_matching</a>(): <a href="market_types.md#0x7_market_types_OrderCancellationReason">market_types::OrderCancellationReason</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_order_cancellation_reason_clearinghouse_stopped_matching">order_cancellation_reason_clearinghouse_stopped_matching</a>(): <a href="market_types.md#0x7_market_types_OrderCancellationReason">OrderCancellationReason</a> {
+    OrderCancellationReason::ClearinghouseStoppedMatching
 }
 </code></pre>
 

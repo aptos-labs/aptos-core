@@ -12,7 +12,8 @@ module aptos_experimental::market_tests_common {
         test_market_callbacks,
         new_test_order_metadata,
         get_position_size,
-        test_market_callbacks_with_taker_cancelled
+        test_market_callbacks_with_taker_cancelled,
+        test_market_callbacks_with_stop_matching
     };
     use aptos_experimental::market_test_utils::{
         place_order_and_verify,
@@ -22,7 +23,7 @@ module aptos_experimental::market_tests_common {
         verify_fills, verify_fills_with_bulk
     };
     use aptos_experimental::event_utils;
-    use aptos_experimental::order_placement::{OrderMatchResult};
+    use aptos_experimental::order_placement::{OrderMatchResult, is_clearinghouse_stopped_matching};
     use aptos_experimental::market_types::{new_market, new_market_config, Market};
 
     const PRE_CANCEL_WINDOW_SECS: u64 = 1; // 1 second
@@ -649,6 +650,63 @@ module aptos_experimental::market_tests_common {
             assert!(clearinghouse_test::order_exists(maker_order_id));
         };
         assert!(!clearinghouse_test::order_exists(taker_order_id));
+        market.destroy_market()
+    }
+
+    /// Test that when clearinghouse signals stop matching (without a taker cancellation reason),
+    /// the order returns ClearinghouseStoppedMatching as the cancellation reason.
+    public fun test_clearinghouse_stopped_matching_reason_helper(
+        admin: &signer,
+        market_signer: &signer,
+        maker: &signer,
+        taker: &signer,
+    ) {
+        let market = setup_market(admin, market_signer);
+        let maker_addr = signer::address_of(maker);
+        let event_store = event_utils::new_event_store();
+
+        // Place a maker order smaller than taker's order
+        let maker_order_id = place_maker_order(
+            &mut market,
+            maker,
+            1000,
+            500000, // Maker order is 500000
+            true,
+            &mut event_store,
+            false, // not bulk
+        );
+
+        // Order not filled yet, so size is 0
+        verify_positions(maker_addr, signer::address_of(taker), 0, 0);
+
+        // Place taker order (1000000) larger than maker (500000)
+        // After matching 500000 with maker, clearinghouse signals stop matching
+        // Taker will have 500000 remaining
+        let (_taker_order_id, result) = place_taker_order(
+            &mut market,
+            taker,
+            option::none(), // client_order_id
+            option::some(1000),
+            1000000, // Taker wants to buy 1000000
+            false,
+            good_till_cancelled(),
+            &mut event_store,
+            option::none(), // max_matches
+            new_test_order_metadata(1),
+            &test_market_callbacks_with_stop_matching()
+        );
+
+        // Verify the cancellation reason is ClearinghouseStoppedMatching
+        let cancel_reason = result.get_cancel_reason();
+        assert!(cancel_reason.is_some());
+        assert!(is_clearinghouse_stopped_matching(cancel_reason.destroy_some()));
+
+        // Taker has 500000 remaining (1000000 - 500000 filled)
+        assert!(result.get_remaining_size_from_result() == 500000);
+
+        // Maker order should be fully consumed
+        assert!(!clearinghouse_test::order_exists(maker_order_id));
+
         market.destroy_market()
     }
 
