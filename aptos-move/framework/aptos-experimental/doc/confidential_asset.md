@@ -617,6 +617,7 @@ The testnet chain ID.
         deployer,
         <a href="confidential_asset.md#0x7_confidential_asset_FAController">FAController</a> {
             allow_list_enabled: <a href="../../aptos-framework/doc/chain_id.md#0x1_chain_id_get">chain_id::get</a>() == <a href="confidential_asset.md#0x7_confidential_asset_MAINNET_CHAIN_ID">MAINNET_CHAIN_ID</a>,
+            // DO NOT CHANGE: using long syntax until framework change is released <b>to</b> mainnet
             extend_ref: <a href="../../aptos-framework/doc/object.md#0x1_object_generate_extend_ref">object::generate_extend_ref</a>(fa_controller_ctor_ref)
         }
     );
