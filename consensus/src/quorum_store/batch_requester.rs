@@ -150,8 +150,10 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
                                     return Err(ExecutorError::CouldNotGetData);
                                 }
                             }
-                            Ok(BatchResponse::BatchV2(_)) => {
-                                error!("Batch V2 response is not supported");
+                            Ok(BatchResponse::BatchV2(batch)) => {
+                                counters::RECEIVED_BATCH_RESPONSE_COUNT.inc();
+                                let payload = batch.into_transactions();
+                                return Ok(payload)
                             }
                             Err(e) => {
                                 counters::RECEIVED_BATCH_RESPONSE_ERROR_COUNT.inc();
