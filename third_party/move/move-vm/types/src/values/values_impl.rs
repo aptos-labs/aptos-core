@@ -5080,6 +5080,223 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveStructLayout, 
     }
 }
 
+impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Container> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use MoveTypeLayout as L;
+
+        self.ctx.check_depth(self.depth).map_err(S::Error::custom)?;
+        match (self.layout, self.value) {
+            (L::Struct(struct_layout), Container::Struct(r)) => {
+                let values = r.borrow();
+                let field_layouts = struct_layout.fields(None);
+                if field_layouts.len() != values.len() {
+                    return Err(invariant_violation::<S>(format!(
+                        "cannot serialize struct value {:?} as {:?} -- number of fields mismatch",
+                        self.value, self.layout
+                    )));
+                }
+                let mut t = serializer.serialize_tuple(values.len())?;
+                for (layout, value) in field_layouts.iter().zip(values.iter()) {
+                    t.serialize_element(&SerializationReadyValue {
+                        ctx: self.ctx,
+                        layout,
+                        value,
+                        depth: self.depth + 1,
+                    })?;
+                }
+                t.end()
+            },
+            (L::Vector(layout), c) => {
+                let layout = layout.as_ref();
+                match (layout, c) {
+                    (L::U8, Container::VecU8(r)) => r.borrow().serialize(serializer),
+                    (L::U16, Container::VecU16(r)) => r.borrow().serialize(serializer),
+                    (L::U32, Container::VecU32(r)) => r.borrow().serialize(serializer),
+                    (L::U64, Container::VecU64(r)) => r.borrow().serialize(serializer),
+                    (L::U128, Container::VecU128(r)) => r.borrow().serialize(serializer),
+                    (L::U256, Container::VecU256(r)) => r.borrow().serialize(serializer),
+                    (L::I8, Container::VecI8(r)) => r.borrow().serialize(serializer),
+                    (L::I16, Container::VecI16(r)) => r.borrow().serialize(serializer),
+                    (L::I32, Container::VecI32(r)) => r.borrow().serialize(serializer),
+                    (L::I64, Container::VecI64(r)) => r.borrow().serialize(serializer),
+                    (L::I128, Container::VecI128(r)) => r.borrow().serialize(serializer),
+                    (L::I256, Container::VecI256(r)) => r.borrow().serialize(serializer),
+                    (L::Bool, Container::VecBool(r)) => r.borrow().serialize(serializer),
+                    (L::Address, Container::VecAddress(r)) => r.borrow().serialize(serializer),
+                    (_, Container::Vec(r)) => {
+                        let v = r.borrow();
+                        let mut t = serializer.serialize_seq(Some(v.len()))?;
+                        for value in v.iter() {
+                            t.serialize_element(&SerializationReadyValue {
+                                ctx: self.ctx,
+                                layout,
+                                value,
+                                depth: self.depth + 1,
+                            })?;
+                        }
+                        t.end()
+                    },
+                    (layout, container) => Err(invariant_violation::<S>(format!(
+                        "cannot serialize container {:?} as {:?}",
+                        container, layout
+                    ))),
+                }
+            },
+            // Signer.
+            (L::Signer, Container::Struct(r)) => {
+                if self.ctx.legacy_signer {
+                    // Only allow serialization of master signer.
+                    if *r.borrow()[0].as_value_ref::<u16>().map_err(|_| {
+                        invariant_violation::<S>(format!(
+                            "First field of a signer needs to be an enum descriminator, got {:?}",
+                            self.value
+                        ))
+                    })? != MASTER_SIGNER_VARIANT
+                    {
+                        return Err(S::Error::custom(PartialVMError::new(StatusCode::ABORTED)));
+                    }
+                    r.borrow()
+                        .get(MASTER_ADDRESS_FIELD_OFFSET)
+                        .ok_or_else(|| {
+                            invariant_violation::<S>(format!(
+                                "cannot serialize container {:?} as {:?}",
+                                self.value, self.layout
+                            ))
+                        })?
+                        .as_value_ref::<AccountAddress>()
+                        .map_err(|_| {
+                            invariant_violation::<S>(format!(
+                                "cannot serialize container {:?} as {:?}",
+                                self.value, self.layout
+                            ))
+                        })?
+                        .serialize(serializer)
+                } else {
+                    (SerializationReadyValue {
+                        ctx: self.ctx,
+                        layout: &MoveStructLayout::signer_serialization_layout(),
+                        value: &*r.borrow(),
+                        depth: self.depth,
+                    })
+                    .serialize(serializer)
+                }
+            },
+            (layout, value) => Err(invariant_violation::<S>(format!(
+                "cannot serialize value {:?} as {:?}",
+                value, layout
+            ))),
+        }
+    }
+}
+
+impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Reference> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.ctx.check_depth(self.depth).map_err(S::Error::custom)?;
+        match &self.value.0 {
+            ReferenceImpl::ContainerRef(r) => {
+                let container = r.container();
+                (SerializationReadyValue {
+                    ctx: self.ctx,
+                    layout: self.layout,
+                    value: container,
+                    depth: self.depth + 1,
+                })
+                .serialize(serializer)
+            },
+            ReferenceImpl::IndexedRef(r) => {
+                // Check tag first!
+                r.check_tag().map_err(S::Error::custom)?;
+                let container = r.container_ref.container();
+                match container {
+                    Container::Vec(vals) | Container::Locals(vals) | Container::Struct(vals) => {
+                        let vals = vals.borrow();
+                        let val = vals.get(r.idx as usize).ok_or_else(|| {
+                            invariant_violation::<S>("index out of bounds".to_string())
+                        })?;
+                        (SerializationReadyValue {
+                            ctx: self.ctx,
+                            layout: self.layout,
+                            value: val,
+                            depth: self.depth + 1,
+                        })
+                        .serialize(serializer)
+                    },
+                    Container::VecU8(vals) => {
+                        serializer.serialize_u8(*vals.borrow().get(r.idx as usize).ok_or_else(
+                            || invariant_violation::<S>("index out of bounds".to_string()),
+                        )?)
+                    },
+                    Container::VecU64(vals) => {
+                        serializer.serialize_u64(*vals.borrow().get(r.idx as usize).ok_or_else(
+                            || invariant_violation::<S>("index out of bounds".to_string()),
+                        )?)
+                    },
+                    Container::VecU128(vals) => {
+                        serializer.serialize_u128(*vals.borrow().get(r.idx as usize).ok_or_else(
+                            || invariant_violation::<S>("index out of bounds".to_string()),
+                        )?)
+                    },
+                    Container::VecBool(vals) => {
+                        serializer.serialize_bool(*vals.borrow().get(r.idx as usize).ok_or_else(
+                            || invariant_violation::<S>("index out of bounds".to_string()),
+                        )?)
+                    },
+                    Container::VecAddress(vals) => vals
+                        .borrow()
+                        .get(r.idx as usize)
+                        .ok_or_else(|| invariant_violation::<S>("index out of bounds".to_string()))?
+                        .serialize(serializer),
+                    Container::VecU16(vals) => {
+                        serializer.serialize_u16(*vals.borrow().get(r.idx as usize).ok_or_else(
+                            || invariant_violation::<S>("index out of bounds".to_string()),
+                        )?)
+                    },
+                    Container::VecU32(vals) => {
+                        serializer.serialize_u32(*vals.borrow().get(r.idx as usize).ok_or_else(
+                            || invariant_violation::<S>("index out of bounds".to_string()),
+                        )?)
+                    },
+                    Container::VecU256(vals) => vals
+                        .borrow()
+                        .get(r.idx as usize)
+                        .ok_or_else(|| invariant_violation::<S>("index out of bounds".to_string()))?
+                        .serialize(serializer),
+                    Container::VecI8(vals) => {
+                        serializer.serialize_i8(*vals.borrow().get(r.idx as usize).ok_or_else(
+                            || invariant_violation::<S>("index out of bounds".to_string()),
+                        )?)
+                    },
+                    Container::VecI16(vals) => {
+                        serializer.serialize_i16(*vals.borrow().get(r.idx as usize).ok_or_else(
+                            || invariant_violation::<S>("index out of bounds".to_string()),
+                        )?)
+                    },
+                    Container::VecI32(vals) => {
+                        serializer.serialize_i32(*vals.borrow().get(r.idx as usize).ok_or_else(
+                            || invariant_violation::<S>("index out of bounds".to_string()),
+                        )?)
+                    },
+                    Container::VecI64(vals) => {
+                        serializer.serialize_i64(*vals.borrow().get(r.idx as usize).ok_or_else(
+                            || invariant_violation::<S>("index out of bounds".to_string()),
+                        )?)
+                    },
+                    Container::VecI128(vals) => {
+                        serializer.serialize_i128(*vals.borrow().get(r.idx as usize).ok_or_else(
+                            || invariant_violation::<S>("index out of bounds".to_string()),
+                        )?)
+                    },
+                    Container::VecI256(vals) => vals
+                        .borrow()
+                        .get(r.idx as usize)
+                        .ok_or_else(|| invariant_violation::<S>("index out of bounds".to_string()))?
+                        .serialize(serializer),
+                }
+            },
+        }
+    }
+}
+
 // Seed used by deserializer to ensure there is information about the value
 // being deserialized.
 pub(crate) struct DeserializationSeed<'c, L> {
