@@ -61,7 +61,8 @@ Memory allocations for these caches are managed in epoch-based reclamation
 style, so that garbage collection (GC) only runs between transaction blocks.
 With this design, only concurrent allocations to the cache need to be
 supported, but not deallocations.
-**This imposes an invariant that our various limits need to imply caches cannot get full within a block.**
+
+> **INVARIANT: Limits need to enforce caches cannot get full within a block.**
 
 #### Rationale
 
@@ -70,7 +71,7 @@ supported, but not deallocations.
    (efficiently).
 2. For smart contract code, deallocations are rarely needed.
    Either code-derived data can be indefinitely persisted (e.g., interning
-   strings as unique IDs), or becomes dead seldomly (on module upgrade).
+   strings), or becomes dead seldomly (on module upgrade).
 
 #### Data Structures
 
@@ -82,7 +83,7 @@ The global context is a 2-phase state machine that can either be in
 2. **Maintenance**: no workers allowed; context is checked if GC is needed,
    data may be deallocated.
 
-To enforce these state at compile time, a guard pattern is used.
+To enforce these states at compile time, a guard pattern is used.
 There are two distinct RAII guards:
 
 - **`ExecutionGuard`**: obtained by workers during block execution.
@@ -93,6 +94,23 @@ There are two distinct RAII guards:
   blocks*.
   While held, no new `ExecutionGuard` can be created. This provides a clear
   "border" when deallocation finishes.
+
+```text
+
+    End of block i                                                Start of block i+1
+  -----------------------+                                      +-----------------------
+    Execution:           |      Maintenance:                    | Execution:
+                         |      (between blocks)                |
+    - workers hold       |                                      | - workers acquire
+      &'a ExecutionGuard |      - executor holds                |   &'a ExecutionGuard
+    - workers may read   |        &'a mut MaintenanceGuard      |   again
+      ExecutionGuard     |      - GC runs to check limits       |
+      and allocate data  |        and deallocate data           |
+    - lifetime of read   |      - caches may be reset           |
+      data is also 'a    |      - promotion of cold / hot       |
+                         |        data between tiers            |
+  -----------------------+                                      +-----------------------
+```
 
 ##### Implementation Sketch
 
@@ -146,70 +164,74 @@ impl GlobalExecutionContext {
 ### 2. Global Identifiers
 
 Module address-name pairs, function/struct identifiers, and fully-instantiated
-types (and type lists) are interned as compact integer IDs.
-Interning is managed by the global context which owns the interner tables and
-the corresponding caches (e.g., for reverse lookups).
-These IDs (and the data interned behind them: addresses, strings, and type
-representations) are executor-only implementation details:
+types (and type lists) are interned using stable pointers to allocated data.
+Interning is managed by the global context, which owns the interner tables.
+Interning is an executor-only implementation detail with the following
+properties:
 
-- **Not persisted**:
-  IDs are never written to storage and are never included in transaction
-  outputs.
-- **Non-deterministic**:
-  IDs may differ across nodes and process runs.
-- **Safe across module upgrades**:
-  Module upgrades do not invalidate IDs.
-- **Memory management**:
-  Global context may perform a reset of interner tables at transaction block
-  boundaries to reclaim memory or prevent ID overflow.
-  A reset invalidates **all** dependent interned tables and caches (IDs,
-  reverse lookups, and type-derived caches such as abilities).
-- **Per-table counters**:
-  Each interner table maintains its own counter (e.g., types, type lists,
-  module IDs, name strings).
-  Counters are checked at transaction block boundaries so overflow (and hence
-  the deallocation) never happens at runtime.
-- **No leakage across reset**:
-  IDs must not leak into unguarded long-lived state that may outlive
-  a reset.
-  This is a reasonable assumption in practice because resets only occur near
-  ID-counter exhaustion or when memory usage becomes unmanageable, which should
-  be rare (e.g., after long node uptime, with traffic skewed toward a stable set
-  of types).
-  Using an ID after a reset is a code-invariant violation and may lead
-  to non-determinism (and chain halt), but must never cause UB.
-  It could also lead to type confusion, but because of ID non-determinsim, type
-  confusion is likely non-deterministic across nodes (leading to chain halt).
+1. Interned data is never written to storage and is never included in
+   transaction outputs.
 
-#### 2.1 Module Identifiers
+2. Pointer addresses for the same data can vary across nodes and process runs.
 
-Address-name pairs or `language_storage::ModuleId`s are interned as a 32-bit
-identifier.
-The most significant bit of the integer identifier is reserved to indicate if
-the address is special (0x0, 0x1, ..., 0xF) or not.
+3. Interned data is not invalidated by module upgrades.
+
+4. `ExecutionGuard` can read from interner tables and can allocate more data.
+   `MaintenanceGuard` checks allocation limits at transaction block boundaries
+   so that allocation always succeeds during block execution time.
+   `ExecutionGuard` returns `&'a T` references (not owned IDs) with
+   lifetimes tied to the guard, so Rust enforces at compile-time that these
+   references cannot be stored in long-lived state that outlives block execution
+   (the safety requirement).
+   The pointer-backed representation also allows storing additional cached data
+   behind `T`.
+
+5. Only `MaintenanceGuard` can deallocate interned data.
+   For example, this guard can reset interner tables at transaction block
+   boundaries to reclaim memory.
+   A reset may invalidate **all** dependent interner tables and loaded code.
+
+#### 2.1 String Identifiers
+
+All string data (module names, function names, struct names) is interned.
+Data structures owned by global context store raw pointers (`NonNull<str>`).
+External APIs do not see these pointers directly.
+
+#### 2.2 Module Identifiers
+
+Identifiers for modules are interned as `ExecutableId`s.
+When interning, the module name is interned using the string interner first.
+Then, `ExecutableId` is created and allocated in the module interning table and
+the reference to the allocated data is returned.
 
 ```rust
-/// Compact module identifier (32-bit) encoding address-name pair.
-/// MSB is reserved to indicate if address is special (1) or not (0).
-pub struct ModuleId(u32);
+// Intentionally non-`Copy` and non-`Clone`.
+// Uses references tied to `ExecutionGuard`.
+pub struct ExecutableId {
+   address: AccountAddress,
+   name: NonNull<str>,
+   // ... cached data can be stored here ...
+};
 
-impl MaintenanceGuard<'_> {
-   pub fn module_id(id: &language_storage::ModuleId) -> ModuleId {
+impl ExecutableId {
+   pub fn address(&self) -> &AccountAddress { .. }
+   pub fn name(&self) -> &str { .. }
+}
+
+impl ExecutionGuard<'_> {
+   // Note: also have APIs to intern address-name pair directly.
+   pub fn intern_module_id<'a>(
+      &'a self,
+      id: &language_storage::ModuleId,
+   ) -> &'a ExecutableId {
+      // On cache miss, creates `ExecutableId`, allocates it, and
+      // returns a reference to it.
       ...
    }
-
-   pub fn module_id_for_addr_name(
-      addr: &AccountAddress,
-      name: &IdentStr,
-   ) -> ModuleId {
-      ...
-   }
-
-   // Possibility: APIs to return ID with the size.
 }
 ```
 
-`ModuleId`s are obtained in 2 ways:
+Interning can happen in 2 scenarios:
 1. When a module is loaded for the first time (or a script is loaded), all
    addresses, and module names are interned.
 2. When transaction payload is executed in Aptos VM, entry function module
@@ -217,128 +239,158 @@ impl MaintenanceGuard<'_> {
 As a result, even if modules are cached, at least 1 lookup is done per user
 transaction.
 
-A reverse lookup also needs to be supported for the following scenarios:
-1. Setting the location of an error or debug information.
-   This is needed only for aborts which are infrequent (< 90% of transactions
-   traffic).
-2. To calculate the size of the storage key corresponding to this ID (when
-   publishing modules, storage keys are charged for).
-   If bottleneck, size can be cached in ID itself (with `Hash`, `Eq`, etc.
-   ignoring this field).
+This design allows to obtain module address or name directly from the
+`ExecutableId` reference, e.g., when setting the location of an error or
+getting debug information context-free.
+`ExecutableIdData` can also store cached information about the module.
+For example, when publishing modules, gas is charged proportionally to storage
+key sizes.
+To speed up the computation, the key size can be cached in `ExecutableIdData`.
 
-#### 2.2 Fully-Instantiated Types
+#### 2.3 Fully-Instantiated Types
 
 Fully-instantiated types and type lists are interned as well.
-Every type is a 32-bit identifier.
-Two most significant bits are reserved to indicate if the type is a reference
-(immutable or mutable).
-This design is chosen because:
-
-1. 30 bits is large enough to encode many possible types.
-2. References can only be top-level in Move.
-   References inside structs are unlikely to be implemented any time soon.
-3. Reference and dereference operations are common, tagging IDs allows to avoid
-   context accesses.
-
-All primitive types such as `u64`, `address` are pre-defined ID values and are
-not stored in the interning table.
-This allows to avoid any lookups to the context for primitive types and ensures
-that the invariant is that tables only store compound types.
-
-Every list of types (e.g., type argument list) is also interned as a 32-bit
-identifier.
-A most significant bit is reserved to indicate if this is a small list with a
-single type as a payload.
-As a result, there is no need to "decode" `TypeListId` for single-type list
-via context.
-Empty `TypeSliceId` is always 0.
-
 
 ```rust
-/// Type representation.
-/// Two MSBs are reserved for references:
-///   00 - not a reference
-///   01 - immutable reference
-///   11 - mutable reference
-///   10 - reserved.
-pub struct TypeId(u32);
+/// Represents any type. Non-`Clone` and non-`Copy`.
+pub struct Type(TypeImpl)
 
-/// Represents a list of types.
-/// For empty list, 0 is reserved.
-/// Two MSBs are reserved for small-vec optimization:
-///   00 - not a small-vec
-///   01 - this list has a single element directly encoded
-///   10 / 11 -- reserved.
-pub struct TypeListId(u32);
-```
+enum TypeImpl {
+   U8,
+   ..
+   Signer,
 
-For type interning, fully-instantiated `SignatureToken`s are converted to
-`TypeId`s.
-This is done via hash-consing approach and auxiliary data structure storing
-compound types:
-
-```rust
-enum TypeRepr {
-   Vector {
-      elem_id: TypeId,
-   },
-   Struct {
-      // Uniquely identifies struct instantiation, see below.
-      struct_id: StructId,
-   },
+   Vector { elem: NonNull<Type> },
+   Struct { id: NonNull<StructId> },
    Function {
-      args: TypeSliceId,
-      results: TypeSliceId,
-      // Ability set is represented as u8.
+      args: TypeListId,
+      results: TypeListId,
       abilities: AbilitySet,
    },
+
+   Ref { to: NonNull<Type> },
+   RefMut { to: NonNull<Type> },
+}
+
+pub struct TypeList(*const [NonNull<Type>]);
+
+impl TypeList {
+   // Safe because guard guarantees the lifetime of list.
+   pub fn get_unchecked<'a>(&'a self, i: usize) -> &'a Type {
+      ...
+   }
+}
+
+impl ExecutionGuard<'_> {
+   pub fn intern_type<'a>(&'a self, tok: &SignatureToken) -> &'a Type {
+      // On cache miss, allocate canonical node, then unsafe cast.
+      ...
+   }
+
+   pub fn intern_type_list<'a>(&'a self, toks: &[SignatureToken]) -> &'a TypeList {
+      // On cache miss, allocate canonical node, then unsafe cast.
+      ...
+   }
 }
 ```
 
-For every compound type, an additional metadata is tracked:
+All fully-instantiated signature tokens are converted to a cononical `Type`
+representation via `ExecutionGuard`.
+All primitive types such as `u64`, `address` are pre-defined static values and
+are not stored in the interning table.
+This makes checks like "is this type a vector of `u8`" cheaper (no extra
+pointer dereference to get vector element type).
 
-1. Ability sets - used for paranoid type checks.
-2. Element type for vector types - used for paranoid type checks.
-3. Argument and result types for function types - used for paranoid type checks.
-4. Number of argument and result types for function types - used for paranoid
-   stack balance checks.
+```rust
+static U8_TYPE: Type = Type(TypeImpl::U8);
+```
 
-The reverse lookups for this data are predominantly part of runtime type
-checks.
-This checks can be moved out of the hot path via tracing (see later
-sections).
+Like with execution IDs, `ExecutionGuard` owns all types and provides the only
+way to obtain type reference.
+This design makes it impoossible for types to leak across execution boundaries.
 
-#### 2.3 Struct and Function Identifiers
+Every list of types (e.g., type argument list) is also interned as `TypeList`
+in a seprate interner table.
+It stores a pointer to list allocation which stores pointers to types in type
+interner table.
+Only `ExecutionGuard` can create and give out references to type lists.
+As a result,it is also safe for `TypeList` to provides a safe Rust API to
+obtain a reference to a type at specified index.
+Empty type list cam be set statically to null to avoid empty list allocations,
+prevent lookups, etc.
+
+```rust
+static EMPTY_TYPE_LIST: TypeList = TypeList(core::ptr::null());
+```
+
+Pointer-based design has the following benefits:
+
+1. Types are uniquely identified by pointer addresses and are still compact
+   (pointer-sized).
+
+2. Structural information is preserved.
+   For example, for runtime checks one can obtain element type of a vector
+   via pointer dereference (no extra lookups or synchronization).
+
+3. Data behind the pointer can cache more information.
+   For example, type abilities can be computed during interning.
+
+Note that pointer-based approach still does not eliminate possibility of
+"type confusion" entirely.
+If there is a bug in interner, pointer equality may be broken and lead
+to structurally same types being different, etc.
+
+#### 2.4 Struct and Function Identifiers
 
 Structs and functions are uniquely identified by IDs obtained via interning
 table.
-These IDs include:
 
-- `ModuleId` indicating the module owning this struct or function.
-- 32-bit integer encoding struct or function name.
-- `TypeListId` for type arguments (set to 0 if non-generic).
-
-```rust
-/// Represents struct / function ID without type argument list. Can
-/// only be derived from struct or function IDs.
-pub struct TemplateId(ModuleId, u32);
-
-/// Represents a struct identifier: module ID, struct name ID and
-/// type argument list ID (0 for non-generic structs).
-/// TODO: consider using a bit to indicate this is a resource group tag.
-pub struct StructId(TemplateId, TypeListId);
-
-/// Represents a function identifier: module ID, function name ID
-/// and type argument list ID (0 if non-generic).
-pub struct FunctionId(TemplateId, TypeListId);
-```
-
-Like `ModuleId`s, function and struct IDs are obtained:
+Like `ExecutionId`s, function and struct IDs are obtained:
 1. When a module is loaded for the first time (or a script is loaded).
    All data in the module is interned and the loaded module is cached.
 2. When transaction payload is executed in Aptos VM, entry function identifiers
-   and type argument tags are interned.
+   and type argument tags are interned:
 
+   - Entry function payload arguments are collapsed to do 1 lookup in
+     cache for `NonNull<FunctionId>`.
+   - On a miss, intern type arguments and generic function Id.
+   - Worst-case number of lookups is still 5+ (because of type tags).
+     As an optimization, composite hashes can be pre-computed when
+     decoding the payload (when in validaotr's mempool).
+
+```rust
+/// Represents generic function ID without type argument list. Can
+/// only be derived from struct or function IDs.
+pub struct GenericFunctionId {
+   // Pointer to interned module ID data.
+   executable_id: NonNull<ExecutableId>,
+   // Pointer to interned string data.
+   name: NonNull<str>
+}
+
+/// Represents a struct identifier: module ID, struct name ID and
+/// type argument list ID.
+pub struct FunctionId {
+   id: NonNull<GenericFunctionId>,
+   ty_args: TypeList,
+};
+
+impl ExecutionGuard<'_> {
+   pub fn intern_function_id<'a>(&'a self, ...) -> &'a FunctionId {
+      // On cache miss, allocate canonical node, then unsafe cast.
+      ...
+   }
+}
+
+// Same as above.
+pub struct GenericStructId { .. }
+pub struct StructId { .. };
+```
+
+`ExecutionGuard` gives out references to all these identifiers.
+As a result, keys are still compact (pointer-size) integers.
+At the same time, the structural data can be obtained through pointer
+dereferences (e.g., for debugging).
 
 ### 3. Executables
 
@@ -428,8 +480,8 @@ struct Function {
    metadata: FunctionMetadata,
 
    // Type signature of this function. 
-   param_types: NonNull<[TypeId]>,
-   return_types: NonNull<[TypeId]>,
+   param_types: NonNull<[Type]>,
+   return_types: NonNull<[Type]>,
 
    // The code to execute. Wrapped in atomic pointer to be able to change the
    // representaton during execution.
@@ -452,7 +504,7 @@ enum Code {
    MoveExecIR {
       // Pointer to local types. This points to the same start as the parameter
       // types slice but can be larger in size if there are more locals.
-      locals: *const [TypeId],
+      locals: NonNull<[Type]>,
 
       // Raw instructions (fixed-size).
       instructions: NonNull<[Instruction]>,
@@ -608,11 +660,11 @@ pub struct GenericType {
 }
 
 impl GlobalExecutionContextGuard<'_> {
-   fn instantiate_generic_type(
-      &self,
+   fn instantiate_generic_type<'a>(
+      &'a self,
       ty: &GenericType,
-      ty_args: &[TypeId],
-   ) -> TypeId {
+      ty_args: &'a TypeList,
+   ) -> &'a Type {
       // Walks the type tokens, interning what is needed.
       // We can also use a cache, because each ty_args list has a unique ID
       // so we can have a cache for each generic type.
