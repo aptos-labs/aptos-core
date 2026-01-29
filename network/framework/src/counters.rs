@@ -83,6 +83,25 @@ pub fn connections_rejected(
     ])
 }
 
+static APTOS_PRIORITY_PEER_EVICTIONS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_priority_peer_evictions",
+        "Number of non-priority peers evicted to make room for priority peers",
+        &["role_type", "network_id"]
+    )
+    .unwrap()
+});
+
+/// Updates the counter for priority peer evictions
+pub fn update_priority_peer_evictions(network_context: &NetworkContext) {
+    APTOS_PRIORITY_PEER_EVICTIONS
+        .with_label_values(&[
+            network_context.role().as_str(),
+            network_context.network_id().as_str(),
+        ])
+        .inc();
+}
+
 pub static APTOS_NETWORK_PEER_CONNECTED: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "aptos_network_peer_connected",
