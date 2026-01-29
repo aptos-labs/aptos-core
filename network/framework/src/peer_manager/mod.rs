@@ -22,7 +22,10 @@ use crate::{
     ProtocolId,
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::{NetworkContext, PeerNetworkId};
+use aptos_config::{
+    config::InboundRateLimitConfig,
+    network_id::{NetworkContext, PeerNetworkId},
+};
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::{ConnectionOrigin, Transport};
 use aptos_short_hex_str::AsShortHexStr;
@@ -116,6 +119,8 @@ where
     max_message_size: usize,
     /// Inbound connection limit separate of outbound connections
     inbound_connection_limit: usize,
+    /// Inbound rate limit configuration
+    inbound_rate_limit_config: Option<InboundRateLimitConfig>,
 }
 
 impl<TTransport, TSocket> PeerManager<TTransport, TSocket>
@@ -143,6 +148,7 @@ where
         max_frame_size: usize,
         max_message_size: usize,
         inbound_connection_limit: usize,
+        inbound_rate_limit_config: Option<InboundRateLimitConfig>,
     ) -> Self {
         let (transport_notifs_tx, transport_notifs_rx) = aptos_channels::new(
             channel_size,
@@ -184,6 +190,7 @@ where
             max_frame_size,
             max_message_size,
             inbound_connection_limit,
+            inbound_rate_limit_config,
         }
     }
 
@@ -675,6 +682,7 @@ where
             constants::MAX_CONCURRENT_OUTBOUND_RPCS,
             self.max_frame_size,
             self.max_message_size,
+            self.inbound_rate_limit_config.clone(),
         );
         self.executor.spawn(peer.start());
 

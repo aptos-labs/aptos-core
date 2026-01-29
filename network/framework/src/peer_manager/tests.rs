@@ -115,6 +115,7 @@ fn build_test_peer_manager(
         constants::MAX_FRAME_SIZE,
         constants::MAX_MESSAGE_SIZE,
         MAX_INBOUND_CONNECTIONS,
+        None,
     );
 
     (

@@ -11,9 +11,10 @@
 //! long as the latter is in its trusted peers set.
 use aptos_config::{
     config::{
-        DiscoveryMethod, NetworkConfig, Peer, PeerRole, PeerSet, RoleType, CONNECTION_BACKOFF_BASE,
-        CONNECTIVITY_CHECK_INTERVAL_MS, MAX_CONNECTION_DELAY_MS, MAX_FRAME_SIZE,
-        MAX_FULLNODE_OUTBOUND_CONNECTIONS, MAX_INBOUND_CONNECTIONS, NETWORK_CHANNEL_SIZE,
+        DiscoveryMethod, InboundRateLimitConfig, NetworkConfig, Peer, PeerRole, PeerSet, RoleType,
+        CONNECTION_BACKOFF_BASE, CONNECTIVITY_CHECK_INTERVAL_MS, MAX_CONNECTION_DELAY_MS,
+        MAX_FRAME_SIZE, MAX_FULLNODE_OUTBOUND_CONNECTIONS, MAX_INBOUND_CONNECTIONS,
+        NETWORK_CHANNEL_SIZE,
     },
     network_id::NetworkContext,
 };
@@ -84,6 +85,7 @@ impl NetworkBuilder {
         network_channel_size: usize,
         inbound_connection_limit: usize,
         tcp_buffer_cfg: TCPBufferCfg,
+        inbound_rate_limit_config: Option<InboundRateLimitConfig>,
     ) -> Self {
         // A network cannot exist without a PeerManager
         // TODO:  construct this in create and pass it to new() as a parameter. The complication is manual construction of NetworkBuilder in various tests.
@@ -100,6 +102,7 @@ impl NetworkBuilder {
             enable_proxy_protocol,
             inbound_connection_limit,
             tcp_buffer_cfg,
+            inbound_rate_limit_config,
         );
 
         NetworkBuilder {
@@ -139,6 +142,7 @@ impl NetworkBuilder {
             NETWORK_CHANNEL_SIZE,
             MAX_INBOUND_CONNECTIONS,
             TCPBufferCfg::default(),
+            None, /* No rate limiting */
         );
 
         builder.add_connectivity_manager(
@@ -194,6 +198,7 @@ impl NetworkBuilder {
                 config.outbound_rx_buffer_size_bytes,
                 config.outbound_tx_buffer_size_bytes,
             ),
+            config.inbound_rate_limit_config.clone(),
         );
 
         network_builder.add_connection_monitoring(

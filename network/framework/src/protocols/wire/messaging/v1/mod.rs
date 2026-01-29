@@ -31,6 +31,8 @@ use tokio_util::{
     compat::{Compat, FuturesAsyncReadCompatExt, FuturesAsyncWriteCompatExt},
 };
 
+pub mod rate_limited_stream;
+
 #[cfg(test)]
 mod test;
 

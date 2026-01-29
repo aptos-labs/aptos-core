@@ -50,6 +50,29 @@ pub const MAX_FRAME_SIZE: usize = 4 * 1024 * 1024; /* 4 MiB large messages will 
 pub const MAX_MESSAGE_SIZE: usize = 64 * 1024 * 1024; /* 64 MiB */
 pub const CONNECTION_BACKOFF_BASE: u64 = 2;
 
+/// Configuration for inbound network rate limiting per connection.
+/// Uses a token bucket algorithm to limit both bytes/second and messages/second.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(default)]
+pub struct InboundRateLimitConfig {
+    /// Maximum bytes per second per connection (None = no limit)
+    pub max_bytes_per_sec: Option<u64>,
+    /// Maximum messages per second per connection (None = no limit)
+    pub max_messages_per_sec: Option<u64>,
+    /// Initial bucket fill percentage (i.e., 0 to 100)
+    pub initial_bucket_percentage: u64,
+}
+
+impl Default for InboundRateLimitConfig {
+    fn default() -> Self {
+        InboundRateLimitConfig {
+            max_bytes_per_sec: None,
+            max_messages_per_sec: None,
+            initial_bucket_percentage: 100, // Default to a full bucket
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct NetworkConfig {
@@ -117,6 +140,8 @@ pub struct NetworkConfig {
     pub max_parallel_deserialization_tasks: Option<usize>,
     /// Whether or not to enable latency aware peer dialing
     pub enable_latency_aware_dialing: bool,
+    /// Inbound connection rate limiting configuration
+    pub inbound_rate_limit_config: Option<InboundRateLimitConfig>,
 }
 
 impl Default for NetworkConfig {
@@ -156,6 +181,7 @@ impl NetworkConfig {
             outbound_tx_buffer_size_bytes: None,
             max_parallel_deserialization_tasks: None,
             enable_latency_aware_dialing: true,
+            inbound_rate_limit_config: None,
         };
 
         // Configure the number of parallel deserialization tasks
