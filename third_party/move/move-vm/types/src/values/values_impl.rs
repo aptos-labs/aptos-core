@@ -4884,43 +4884,8 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Va
             },
 
             // Signer.
-            (L::Signer, Value::Container(Container::Struct(r))) => {
-                if self.ctx.legacy_signer {
-                    // Only allow serialization of master signer.
-                    if *r.borrow()[0].as_value_ref::<u16>().map_err(|_| {
-                        invariant_violation::<S>(format!(
-                            "First field of a signer needs to be an enum descriminator, got {:?}",
-                            self.value
-                        ))
-                    })? != MASTER_SIGNER_VARIANT
-                    {
-                        return Err(S::Error::custom(PartialVMError::new(StatusCode::ABORTED)));
-                    }
-                    r.borrow()
-                        .get(MASTER_ADDRESS_FIELD_OFFSET)
-                        .ok_or_else(|| {
-                            invariant_violation::<S>(format!(
-                                "cannot serialize container {:?} as {:?}",
-                                self.value, self.layout
-                            ))
-                        })?
-                        .as_value_ref::<AccountAddress>()
-                        .map_err(|_| {
-                            invariant_violation::<S>(format!(
-                                "cannot serialize container {:?} as {:?}",
-                                self.value, self.layout
-                            ))
-                        })?
-                        .serialize(serializer)
-                } else {
-                    (SerializationReadyValue {
-                        ctx: self.ctx,
-                        layout: &MoveStructLayout::signer_serialization_layout(),
-                        value: &*r.borrow(),
-                        depth: self.depth,
-                    })
-                    .serialize(serializer)
-                }
+            (L::Signer, Value::Container(c)) => {
+                serialize_signer_container(self.ctx, self.depth, c, serializer)
             },
 
             // Delayed values. For their serialization, we must have custom
@@ -4972,6 +4937,60 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Va
                 value, layout
             ))),
         }
+    }
+}
+
+fn serialize_signer_container<S: serde::Serializer>(
+    ctx: &ValueSerDeContext,
+    depth: u64,
+    container: &Container,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    use serde::Serialize;
+
+    match container {
+        Container::Struct(r) => {
+            if ctx.legacy_signer {
+                // Only allow serialization of master signer.
+                if *r.borrow()[0].as_value_ref::<u16>().map_err(|_| {
+                    invariant_violation::<S>(format!(
+                        "First field of a signer needs to be an enum descriminator, got {:?}",
+                        container
+                    ))
+                })? != MASTER_SIGNER_VARIANT
+                {
+                    return Err(S::Error::custom(PartialVMError::new(StatusCode::ABORTED)));
+                }
+                r.borrow()
+                    .get(MASTER_ADDRESS_FIELD_OFFSET)
+                    .ok_or_else(|| {
+                        invariant_violation::<S>(format!(
+                            "cannot serialize container {:?} as signer",
+                            container
+                        ))
+                    })?
+                    .as_value_ref::<AccountAddress>()
+                    .map_err(|_| {
+                        invariant_violation::<S>(format!(
+                            "cannot serialize container {:?} as signer",
+                            container
+                        ))
+                    })?
+                    .serialize(serializer)
+            } else {
+                (SerializationReadyValue {
+                    ctx,
+                    layout: &MoveStructLayout::signer_serialization_layout(),
+                    value: &*r.borrow(),
+                    depth,
+                })
+                .serialize(serializer)
+            }
+        },
+        _ => Err(invariant_violation::<S>(format!(
+            "cannot serialize container {:?} as signer",
+            container
+        ))),
     }
 }
 
@@ -5179,44 +5198,7 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Co
                 serialize_vector_container(self.ctx, self.depth, layout, c, serializer)
             },
             // Signer.
-            (L::Signer, Container::Struct(r)) => {
-                if self.ctx.legacy_signer {
-                    // Only allow serialization of master signer.
-                    if *r.borrow()[0].as_value_ref::<u16>().map_err(|_| {
-                        invariant_violation::<S>(format!(
-                            "First field of a signer needs to be an enum descriminator, got {:?}",
-                            self.value
-                        ))
-                    })? != MASTER_SIGNER_VARIANT
-                    {
-                        return Err(S::Error::custom(PartialVMError::new(StatusCode::ABORTED)));
-                    }
-                    r.borrow()
-                        .get(MASTER_ADDRESS_FIELD_OFFSET)
-                        .ok_or_else(|| {
-                            invariant_violation::<S>(format!(
-                                "cannot serialize container {:?} as {:?}",
-                                self.value, self.layout
-                            ))
-                        })?
-                        .as_value_ref::<AccountAddress>()
-                        .map_err(|_| {
-                            invariant_violation::<S>(format!(
-                                "cannot serialize container {:?} as {:?}",
-                                self.value, self.layout
-                            ))
-                        })?
-                        .serialize(serializer)
-                } else {
-                    (SerializationReadyValue {
-                        ctx: self.ctx,
-                        layout: &MoveStructLayout::signer_serialization_layout(),
-                        value: &*r.borrow(),
-                        depth: self.depth,
-                    })
-                    .serialize(serializer)
-                }
-            },
+            (L::Signer, c) => serialize_signer_container(self.ctx, self.depth, c, serializer),
             (layout, value) => Err(invariant_violation::<S>(format!(
                 "cannot serialize value {:?} as {:?}",
                 value, layout
