@@ -193,25 +193,7 @@ impl<'a> ValueSerDeContext<'a> {
             value,
             depth: 1,
         };
-
-        match bcs::to_bytes(&value).ok() {
-            Some(bytes) => Ok(Some(bytes)),
-            None => {
-                // Check if the error is due to too many delayed fields. If so, to be compatible
-                // with the older implementation return an error.
-                if let Some(delayed_fields_extension) = self.delayed_fields_extension {
-                    if delayed_fields_extension.delayed_fields_count.into_inner()
-                        > DelayedFieldsExtension::MAX_DELAYED_FIELDS_PER_RESOURCE
-                    {
-                        return Err(PartialVMError::new(StatusCode::TOO_MANY_DELAYED_FIELDS)
-                            .with_message(
-                                "Too many Delayed fields in a single resource.".to_string(),
-                            ));
-                    }
-                }
-                Ok(None)
-            },
-        }
+        self.serialize_internal(&value)
     }
 
     /// Serializes a [Reference] based on the provided layout. For legacy reasons, all serialization
@@ -228,14 +210,20 @@ impl<'a> ValueSerDeContext<'a> {
             value,
             depth: 1,
         };
+        self.serialize_internal(&value)
+    }
 
-        match bcs::to_bytes(&value).ok() {
+    fn serialize_internal<V: serde::Serialize>(
+        &self,
+        value: &V,
+    ) -> PartialVMResult<Option<Vec<u8>>> {
+        match bcs::to_bytes(value).ok() {
             Some(bytes) => Ok(Some(bytes)),
             None => {
                 // Check if the error is due to too many delayed fields. If so, to be compatible
                 // with the older implementation return an error.
-                if let Some(delayed_fields_extension) = self.delayed_fields_extension {
-                    if delayed_fields_extension.delayed_fields_count.into_inner()
+                if let Some(delayed_fields_extension) = &self.delayed_fields_extension {
+                    if *delayed_fields_extension.delayed_fields_count.borrow()
                         > DelayedFieldsExtension::MAX_DELAYED_FIELDS_PER_RESOURCE
                     {
                         return Err(PartialVMError::new(StatusCode::TOO_MANY_DELAYED_FIELDS)
@@ -258,12 +246,7 @@ impl<'a> ValueSerDeContext<'a> {
             value,
             depth: 1,
         };
-        bcs::serialized_size(&value).map_err(|e| {
-            PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR).with_message(format!(
-                "failed to compute serialized size of a value: {:?}",
-                e
-            ))
-        })
+        self.serialized_size_internal(&value)
     }
 
     /// Returns the serialized size of a [Reference] with the associated layout. All errors are mapped
@@ -279,7 +262,11 @@ impl<'a> ValueSerDeContext<'a> {
             value,
             depth: 1,
         };
-        bcs::serialized_size(&value).map_err(|e| {
+        self.serialized_size_internal(&value)
+    }
+
+    fn serialized_size_internal<V: serde::Serialize>(&self, value: &V) -> PartialVMResult<usize> {
+        bcs::serialized_size(value).map_err(|e| {
             PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR).with_message(format!(
                 "failed to compute serialized size of a value: {:?}",
                 e
