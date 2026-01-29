@@ -892,33 +892,162 @@ The next major milestone is comprehensive testing with multi-party simulations t
 
 ---
 
-### Next Steps (Phase 4-11)
+### Phase 4: PrefixConsensusManager (COMPLETED ✅)
 
-**Immediate (Phase 4)**: Create PrefixConsensusManager
-- Event-driven manager for protocol lifecycle
-- Route network messages to protocol
-- Trigger broadcasts via network sender
-- Handle verification and validation
+**Date**: 2026-01-28
+**Status**: ✅ Complete - All tests passing (74/74)
 
-**Short-term (Phase 5-6)**: Integration with consensus layer
-- Create `consensus/src/prefix_consensus_provider.rs`
-- Register with network layer
-- Set up channels and runtime
+**File Created**:
+- `consensus/prefix-consensus/src/manager.rs` (658 lines)
 
-**Testing (Phase 7-9)**: Smoke tests
+**Files Modified**:
+- `consensus/prefix-consensus/src/lib.rs` - Exported manager module
+- `consensus/prefix-consensus/src/network_interface.rs` - Removed unused imports
+
+**Changes Made**:
+
+1. **Event-Driven Manager Structure**:
+   ```rust
+   pub struct PrefixConsensusManager<NetworkSender> {
+       party_id, n, f, epoch,
+       protocol: Arc<PrefixConsensusProtocol>,
+       network_sender: NetworkSender,
+       validator_signer, validator_verifier,
+       dummy_private_key: Ed25519PrivateKey,  // Temporary until Phase 10
+       seen_vote1/2/3: Arc<RwLock<HashSet<PartyId>>>,
+   }
+   ```
+   - Generic over `NetworkSender: PrefixConsensusNetworkSender` trait for testability
+   - Duplicate detection via `Arc<RwLock<HashSet<PartyId>>>` per round
+   - Dummy Ed25519 private key for protocol signatures (Phase 10 will add real BLS)
+   - validator_signer field unused until Phase 10
+
+2. **Key Methods**:
+   - `new()` - Create manager with protocol, network sender, and validators
+   - `init()` - Initialize manager (minimal setup, no broadcasting)
+   - `run()` - **Main event loop** (consumes self, follows RoundManager pattern):
+     - Broadcasts Vote1 FIRST before entering message loop
+     - `tokio::select!` over message_rx and close_rx channels
+     - Auto-exits when protocol completes (QC3 forms) or shutdown signaled
+   - `process_message()` - Routes incoming messages, validates epoch
+   - `process_vote1/2/3()` - Verifies signatures, checks duplicates, passes to protocol
+   - `start_round2/3()` - Triggered when QCs form, broadcasts next vote
+   - Public getters: `party_id()`, `epoch()`, `is_complete()`, `get_output()`
+
+3. **Architectural Pattern** (Matches AptosBFT RoundManager):
+   - `init()` called before spawning event loop (no broadcasting)
+   - `run()` consumes self and runs until completion or shutdown
+   - Broadcasts Vote1 FIRST in run() before processing messages
+   - Receives messages via `UnboundedReceiver` channel
+   - Graceful shutdown via oneshot close channel
+   - **Race condition fixed**: Receiver starts BEFORE Vote1 self-send
+
+4. **Error Handling**:
+   - **Soft failures**: Invalid votes logged with `warn!()`, don't crash manager
+   - Epoch mismatches rejected gracefully
+   - Duplicate votes silently ignored after logging
+   - Signature verification failures logged but don't propagate errors
+
+5. **Structured Logging**:
+   - All operations logged with party_id, epoch, round, author fields
+   - `info!` for major events (start, QC formation, completion)
+   - `debug!` for vote processing
+   - `warn!` for rejections and validation failures
+
+**Tests Added**:
+- `test_manager_creation` - Basic instantiation
+- `test_duplicate_vote_rejection` - Duplicate detection works
+- `test_epoch_mismatch_rejection` - Epoch validation rejects wrong-epoch votes
+
+**Test Results**: ✅ 74 tests passing (71 existing + 3 new)
+
+**Race Condition Fix**:
+- **Before**: `init()` broadcast Vote1 → self-send to channel → `run()` starts receiver
+- **After**: `run()` starts receiver → broadcast Vote1 → self-send arrives safely
+
+**Commits**:
+1. `8b7ad1b60e` - Initial manager implementation with event loop
+2. `e4376f5e9a` - Refactoring to match RoundManager pattern and fix race condition
+
+---
+
+### Phase 5 Plan: Integration with EpochManager
+
+**Approach**: Integrate prefix consensus INTO existing `consensus/src/epoch_manager.rs`
+
+**Architecture**: On-demand single-shot execution triggered from smoke tests
+
+**EpochManager Changes Required**:
+
+1. **Add Channel Fields**:
+   ```rust
+   // In EpochManager struct
+   prefix_consensus_tx: Option<aptos_channels::UnboundedSender<(Author, PrefixConsensusMsg)>>,
+   prefix_consensus_close_tx: Option<futures::channel::oneshot::Sender<...>>,
+   ```
+
+2. **Message Routing** (in `process_message()`):
+   - Check if `msg` is `ConsensusMsg::PrefixConsensusMsg(_)`
+   - Verify epoch matches
+   - Forward to `prefix_consensus_tx` channel
+
+3. **On-Demand Start** (new method `start_prefix_consensus()`):
+   ```rust
+   async fn start_prefix_consensus(&mut self, input: PrefixConsensusInput) {
+       // Create channel
+       let (tx, rx) = aptos_channels::unbounded();
+       self.prefix_consensus_tx = Some(tx);
+
+       // Create manager
+       let manager = PrefixConsensusManager::new(...);
+       manager.init().await;
+
+       // Spawn event loop
+       let (close_tx, close_rx) = oneshot::channel();
+       self.prefix_consensus_close_tx = Some(close_tx);
+       tokio::spawn(manager.run(rx, close_rx));
+   }
+   ```
+
+4. **Network Registration**:
+   - Register `PrefixConsensusMsg` protocol with network layer
+   - Define protocol ID in `network_interface.rs`
+   - Wire up consensus_messages receiver to process `PrefixConsensusMsg`
+
+**Testing Strategy** (Phases 7-9):
+- Smoke tests will call `start_prefix_consensus()` on-demand
+- Test with 4 validators
+- Scenarios: identical inputs, overlapping inputs, divergent inputs, Byzantine validators
+
+---
+
+### Next Steps (Phase 5-11)
+
+**Immediate (Phase 5)**: EpochManager Integration
+- Add prefix_consensus_tx/close_tx channel fields to EpochManager
+- Implement start_prefix_consensus() method for on-demand start
+- Add PrefixConsensusMsg routing in process_message()
+- Register PrefixConsensusMsg protocol with network layer
+
+**Short-term (Phase 6)**: Network Registration
+- Define protocol ID constants
+- Register with NetworkClient
+- Wire up message receivers
+
+**Testing (Phase 7-9)**: Smoke Tests
 - Create `smoke-test/src/prefix_consensus/` module
 - Basic tests (identical inputs, overlapping, divergent)
 - Byzantine tests (silent validator)
 
-**Final (Phase 10-11)**: Real signatures and documentation
-- Replace dummy signatures with real BLS signing in protocol
+**Final (Phase 10-11)**: Real Signatures and Documentation
+- Replace dummy Ed25519 with real BLS signing
 - Update README and project_context.md
 
 ### Implementation Plan Reference
 - **Full Plan**: `.plans/network-integration.md` (project-local)
 - **Estimated Total Time**: 8-11 days
-- **Current Progress**: Phase 3/11 complete (~27%)
-- **Time Spent**: Phase 1 (~4h), Phase 2 (~1h), Phase 3 (~2h)
+- **Current Progress**: Phase 4/11 complete (~36%)
+- **Time Spent**: Phase 1 (~4h), Phase 2 (~1h), Phase 3 (~2h), Phase 4 (~3h)
 
 ---
 
@@ -943,4 +1072,34 @@ The next major milestone is comprehensive testing with multi-party simulations t
 
 **Status**: ✅ Committed locally
 **Remote**: ⏳ Pending push (requires authentication)
+
+#### Commit: 8b7ad1b60e
+**Date**: 2026-01-28
+**Message**: `[consensus] Implement PrefixConsensusManager (Phase 4)`
+
+**Changes**:
+- Created `consensus/prefix-consensus/src/manager.rs` (580+ lines)
+- Modified `consensus/prefix-consensus/src/lib.rs` - Exported manager module
+- Modified `consensus/prefix-consensus/src/network_interface.rs` - Cleaned up imports
+- Event-driven manager with RoundManager pattern
+- Duplicate detection, signature verification, round progression
+- **Files changed**: 3 files, 587 insertions(+), 2 deletions(-)
+
+**Status**: ✅ Committed locally
+**Tests**: ✅ 74/74 passing
+
+#### Commit: e4376f5e9a
+**Date**: 2026-01-28
+**Message**: `[consensus] Refactor manager to match RoundManager pattern and fix race condition`
+
+**Changes**:
+- Refactored `init()` method - removed broadcasting logic
+- Refactored `run()` method - added Vote1 broadcast at start of event loop
+- Fixed race condition where Vote1 self-send could arrive before receiver started
+- Updated tests to remove unnecessary init() calls
+- **Files changed**: 1 file, 88 insertions(+), 17 deletions(-)
+
+**Status**: ✅ Committed locally
+**Tests**: ✅ 74/74 passing
+**Key Fix**: Receiver now starts before Vote1 broadcast, eliminating race condition
 
