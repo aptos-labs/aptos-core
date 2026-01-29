@@ -165,6 +165,8 @@ pub enum FeatureFlag {
     VM_BINARY_FORMAT_V10 = 106,
     /// Whether SLH-DSA-SHA2-128s signature scheme is enabled for transaction authentication.
     SLH_DSA_SHA2_128S_SIGNATURE = 107,
+    /// Whether the generic algebra implementation for BLS12377 operations are enabled.
+    BLS12_377_STRUCTURES = 108,
 }
 
 impl FeatureFlag {
