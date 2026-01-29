@@ -4880,39 +4880,7 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Va
             // Vectors.
             (L::Vector(layout), Value::Container(c)) => {
                 let layout = layout.as_ref();
-                match (layout, c) {
-                    (L::U8, Container::VecU8(r)) => r.borrow().serialize(serializer),
-                    (L::U16, Container::VecU16(r)) => r.borrow().serialize(serializer),
-                    (L::U32, Container::VecU32(r)) => r.borrow().serialize(serializer),
-                    (L::U64, Container::VecU64(r)) => r.borrow().serialize(serializer),
-                    (L::U128, Container::VecU128(r)) => r.borrow().serialize(serializer),
-                    (L::U256, Container::VecU256(r)) => r.borrow().serialize(serializer),
-                    (L::I8, Container::VecI8(r)) => r.borrow().serialize(serializer),
-                    (L::I16, Container::VecI16(r)) => r.borrow().serialize(serializer),
-                    (L::I32, Container::VecI32(r)) => r.borrow().serialize(serializer),
-                    (L::I64, Container::VecI64(r)) => r.borrow().serialize(serializer),
-                    (L::I128, Container::VecI128(r)) => r.borrow().serialize(serializer),
-                    (L::I256, Container::VecI256(r)) => r.borrow().serialize(serializer),
-                    (L::Bool, Container::VecBool(r)) => r.borrow().serialize(serializer),
-                    (L::Address, Container::VecAddress(r)) => r.borrow().serialize(serializer),
-                    (_, Container::Vec(r)) => {
-                        let v = r.borrow();
-                        let mut t = serializer.serialize_seq(Some(v.len()))?;
-                        for value in v.iter() {
-                            t.serialize_element(&SerializationReadyValue {
-                                ctx: self.ctx,
-                                layout,
-                                value,
-                                depth: self.depth + 1,
-                            })?;
-                        }
-                        t.end()
-                    },
-                    (layout, container) => Err(invariant_violation::<S>(format!(
-                        "cannot serialize container {:?} as {:?}",
-                        container, layout
-                    ))),
-                }
+                serialize_vector_container(self.ctx, self.depth, layout, c, serializer)
             },
 
             // Signer.
@@ -5004,6 +4972,52 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Va
                 value, layout
             ))),
         }
+    }
+}
+
+fn serialize_vector_container<S: serde::Serializer>(
+    ctx: &ValueSerDeContext,
+    depth: u64,
+    layout: &MoveTypeLayout,
+    container: &Container,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    use serde::Serialize;
+    use MoveTypeLayout as L;
+    // layout is already &MoveTypeLayout
+
+    match (layout, container) {
+        (L::U8, Container::VecU8(r)) => r.borrow().serialize(serializer),
+        (L::U16, Container::VecU16(r)) => r.borrow().serialize(serializer),
+        (L::U32, Container::VecU32(r)) => r.borrow().serialize(serializer),
+        (L::U64, Container::VecU64(r)) => r.borrow().serialize(serializer),
+        (L::U128, Container::VecU128(r)) => r.borrow().serialize(serializer),
+        (L::U256, Container::VecU256(r)) => r.borrow().serialize(serializer),
+        (L::I8, Container::VecI8(r)) => r.borrow().serialize(serializer),
+        (L::I16, Container::VecI16(r)) => r.borrow().serialize(serializer),
+        (L::I32, Container::VecI32(r)) => r.borrow().serialize(serializer),
+        (L::I64, Container::VecI64(r)) => r.borrow().serialize(serializer),
+        (L::I128, Container::VecI128(r)) => r.borrow().serialize(serializer),
+        (L::I256, Container::VecI256(r)) => r.borrow().serialize(serializer),
+        (L::Bool, Container::VecBool(r)) => r.borrow().serialize(serializer),
+        (L::Address, Container::VecAddress(r)) => r.borrow().serialize(serializer),
+        (_, Container::Vec(r)) => {
+            let v = r.borrow();
+            let mut t = serializer.serialize_seq(Some(v.len()))?;
+            for value in v.iter() {
+                t.serialize_element(&SerializationReadyValue {
+                    ctx,
+                    layout,
+                    value,
+                    depth: depth + 1,
+                })?;
+            }
+            t.end()
+        },
+        (layout, container) => Err(invariant_violation::<S>(format!(
+            "cannot serialize container {:?} as {:?}",
+            container, layout
+        ))),
     }
 }
 
@@ -5162,39 +5176,7 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Co
             },
             (L::Vector(layout), c) => {
                 let layout = layout.as_ref();
-                match (layout, c) {
-                    (L::U8, Container::VecU8(r)) => r.borrow().serialize(serializer),
-                    (L::U16, Container::VecU16(r)) => r.borrow().serialize(serializer),
-                    (L::U32, Container::VecU32(r)) => r.borrow().serialize(serializer),
-                    (L::U64, Container::VecU64(r)) => r.borrow().serialize(serializer),
-                    (L::U128, Container::VecU128(r)) => r.borrow().serialize(serializer),
-                    (L::U256, Container::VecU256(r)) => r.borrow().serialize(serializer),
-                    (L::I8, Container::VecI8(r)) => r.borrow().serialize(serializer),
-                    (L::I16, Container::VecI16(r)) => r.borrow().serialize(serializer),
-                    (L::I32, Container::VecI32(r)) => r.borrow().serialize(serializer),
-                    (L::I64, Container::VecI64(r)) => r.borrow().serialize(serializer),
-                    (L::I128, Container::VecI128(r)) => r.borrow().serialize(serializer),
-                    (L::I256, Container::VecI256(r)) => r.borrow().serialize(serializer),
-                    (L::Bool, Container::VecBool(r)) => r.borrow().serialize(serializer),
-                    (L::Address, Container::VecAddress(r)) => r.borrow().serialize(serializer),
-                    (_, Container::Vec(r)) => {
-                        let v = r.borrow();
-                        let mut t = serializer.serialize_seq(Some(v.len()))?;
-                        for value in v.iter() {
-                            t.serialize_element(&SerializationReadyValue {
-                                ctx: self.ctx,
-                                layout,
-                                value,
-                                depth: self.depth + 1,
-                            })?;
-                        }
-                        t.end()
-                    },
-                    (layout, container) => Err(invariant_violation::<S>(format!(
-                        "cannot serialize container {:?} as {:?}",
-                        container, layout
-                    ))),
-                }
+                serialize_vector_container(self.ctx, self.depth, layout, c, serializer)
             },
             // Signer.
             (L::Signer, Container::Struct(r)) => {
