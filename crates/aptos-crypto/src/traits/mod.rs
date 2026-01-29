@@ -319,7 +319,7 @@ pub trait Genesis: PrivateKey {
 }
 
 /// Trait defining the interface for secret sharing schemes.
-pub trait SecretSharingConfig: Display {
+pub trait TSecretSharingConfig: Display {
     /// Creates a new player ID; a number from 0 to `n-1`, where `n = get_total_num_players(&self)`.
     fn get_player(&self, i: usize) -> Player {
         let n = self.get_total_num_players();
@@ -354,7 +354,7 @@ pub trait SecretSharingConfig: Display {
 }
 
 /// Trait for secret sharing schemes that expose a threshold `t`.
-pub trait ThresholdConfig: SecretSharingConfig + Sized {
+pub trait ThresholdConfig: TSecretSharingConfig + Sized {
     /// Constructs a new threshold configuration given `t` (threshold) and `n` (number of players). Only used in `get_threshold_configs_for_testing()`, maybe not ideal here
     fn new(t: usize, n: usize) -> anyhow::Result<Self>;
 

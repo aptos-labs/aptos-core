@@ -21,7 +21,7 @@ use anyhow::{anyhow, Result};
 use aptos_crypto::{
     arkworks::serialization::{ark_de, ark_se},
     weighted_config::WeightedConfigArkworks,
-    SecretSharingConfig as _,
+    TSecretSharingConfig as _,
 };
 use aptos_dkg::pvss::{
     traits::{Reconstructable as _, Subtranscript},
