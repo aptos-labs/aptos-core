@@ -60,7 +60,7 @@ module aptos_experimental::order_book {
         self.single_order_book.get_order(order_id)
     }
 
-    public(friend) fun get_single_remaining_size<M: store + copy + drop>(
+    public fun get_single_remaining_size<M: store + copy + drop>(
         self: &OrderBook<M>, order_id: OrderId
     ): u64 {
         self.single_order_book.get_remaining_size(order_id)
@@ -125,6 +125,12 @@ module aptos_experimental::order_book {
 
     public(friend) fun best_ask_price<M: store + copy + drop>(self: &OrderBook<M>): Option<u64> {
         self.price_time_idx.best_ask_price()
+    }
+
+    public fun get_slippage_price<M: store + copy + drop>(
+        self: &OrderBook<M>, is_bid: bool, slippage_bps: u64
+    ): Option<u64> {
+        self.price_time_idx.get_slippage_price(is_bid, slippage_bps)
     }
 
     /// Checks if the order is a taker order i.e., matched immediately with the active order book.
