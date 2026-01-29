@@ -179,6 +179,8 @@ async fn handle_auth(
         })?;
 
     // Verify the signature over the challenge
+    // This is ALWAYS required - even in open telemetry mode (no on_chain_auth),
+    // nodes must prove they control the claimed address
     verify_signature(&body).map_err(|e| {
         warn!("signature verification failed: {}", e);
         record_custom_contract_error(
@@ -191,57 +193,68 @@ async fn handle_auth(
         ))
     })?;
 
-    // Check allowlist status and determine node type
-    let allowlist_status =
-        check_allowlist_status(&context, &contract_name, &body.address, &body.chain_id);
+    // Determine node type based on whether on_chain_auth is configured
+    let node_type = if instance.config.is_none() {
+        // Open telemetry mode: no on_chain_auth configured
+        // All nodes are treated as unknown (allow_unknown_nodes is required to be true in this mode)
+        debug!(
+            "open telemetry mode for contract '{}': treating address {} as unknown",
+            contract_name, body.address
+        );
+        NodeType::CustomUnknown(contract_name.clone())
+    } else {
+        // Standard mode: check allowlist status
+        let allowlist_status =
+            check_allowlist_status(&context, &contract_name, &body.address, &body.chain_id);
 
-    let node_type = match allowlist_status {
-        AllowlistStatus::InAllowlist => NodeType::Custom(contract_name.clone()),
+        match allowlist_status {
+            AllowlistStatus::InAllowlist => NodeType::Custom(contract_name.clone()),
 
-        AllowlistStatus::NotInAllowlist if instance.allow_unknown_nodes => {
-            // Issue token for unknown nodes - routed to untrusted sinks
-            NodeType::CustomUnknown(contract_name.clone())
-        },
+            AllowlistStatus::NotInAllowlist if instance.allow_unknown_nodes => {
+                // Issue token for unknown nodes - routed to untrusted sinks
+                NodeType::CustomUnknown(contract_name.clone())
+            },
 
-        AllowlistStatus::NotInAllowlist => {
-            // Unknown nodes not allowed - reject
-            warn!(
-                "address {} NOT in allowlist for contract '{}' and unknown nodes not allowed",
-                body.address, contract_name
-            );
-            record_custom_contract_error(
-                &contract_name,
-                CustomContractEndpoint::Auth,
-                CustomContractErrorType::NotInAllowlist,
-            );
-            return Err(reject::custom(ServiceError::forbidden(
-                ServiceErrorCode::CustomContractAuthError(
-                    format!(
-                        "address {} not in allowlist for contract '{}'",
-                        body.address, contract_name
+            AllowlistStatus::NotInAllowlist => {
+                // Unknown nodes not allowed - reject
+                warn!(
+                    "address {} NOT in allowlist for contract '{}' and unknown nodes not allowed",
+                    body.address, contract_name
+                );
+                record_custom_contract_error(
+                    &contract_name,
+                    CustomContractEndpoint::Auth,
+                    CustomContractErrorType::NotInAllowlist,
+                );
+                return Err(reject::custom(ServiceError::forbidden(
+                    ServiceErrorCode::CustomContractAuthError(
+                        format!(
+                            "address {} not in allowlist for contract '{}'",
+                            body.address, contract_name
+                        ),
+                        body.chain_id,
                     ),
-                    body.chain_id,
-                ),
-            )));
-        },
+                )));
+            },
 
-        AllowlistStatus::CacheMiss => {
-            // Can't verify - allowlist data not available yet
-            record_custom_contract_error(
-                &contract_name,
-                CustomContractEndpoint::Auth,
-                CustomContractErrorType::NotInAllowlist,
-            );
-            return Err(reject::custom(ServiceError::forbidden(
-                ServiceErrorCode::CustomContractAuthError(
-                    format!(
-                        "allowlist not available for contract '{}' (cache miss)",
-                        contract_name
+            AllowlistStatus::CacheMiss => {
+                // Can't verify - allowlist data not available yet
+                record_custom_contract_error(
+                    &contract_name,
+                    CustomContractEndpoint::Auth,
+                    CustomContractErrorType::NotInAllowlist,
+                );
+                return Err(reject::custom(ServiceError::forbidden(
+                    ServiceErrorCode::CustomContractAuthError(
+                        format!(
+                            "allowlist not available for contract '{}' (cache miss)",
+                            contract_name
+                        ),
+                        body.chain_id,
                     ),
-                    body.chain_id,
-                ),
-            )));
-        },
+                )));
+            },
+        }
     };
 
     // Create JWT token for the custom contract client

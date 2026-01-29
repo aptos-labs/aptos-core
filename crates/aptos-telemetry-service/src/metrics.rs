@@ -137,6 +137,7 @@ pub enum CustomContractErrorType {
     TokenMismatch,
     IngestionFailed,
     InvalidPayload,
+    RateLimitExceeded,
 }
 
 impl CustomContractErrorType {
@@ -150,6 +151,7 @@ impl CustomContractErrorType {
             Self::TokenMismatch => "token_mismatch",
             Self::IngestionFailed => "ingestion_failed",
             Self::InvalidPayload => "invalid_payload",
+            Self::RateLimitExceeded => "rate_limit_exceeded",
         }
     }
 }
