@@ -553,6 +553,8 @@ impl CliTestFramework {
             skip_faucet: false,
             ledger: false,
             hardware_wallet_options: Default::default(),
+            encrypt_credentials: None,
+            use_keychain: None,
         }
         .execute()
         .await
