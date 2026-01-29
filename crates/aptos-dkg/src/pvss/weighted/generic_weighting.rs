@@ -14,7 +14,7 @@ use crate::pvss::{
 };
 use crate::traits::transcript::Aggregatable;
 use aptos_crypto::{
-    traits::SecretSharingConfig as _, weighted_config::WeightedConfig, CryptoMaterialError,
+    traits::TSecretSharingConfig as _, weighted_config::WeightedConfig, CryptoMaterialError,
     ValidCryptoMaterial,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
