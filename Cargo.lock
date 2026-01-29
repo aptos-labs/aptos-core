@@ -3791,19 +3791,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-rate-limiter"
-version = "0.1.0"
-dependencies = [
- "aptos-infallible",
- "aptos-logger",
- "aptos-metrics-core",
- "futures",
- "pin-project 1.1.3",
- "tokio",
- "tokio-util 0.7.10",
-]
-
-[[package]]
 name = "aptos-release-builder"
 version = "0.1.0"
 dependencies = [
