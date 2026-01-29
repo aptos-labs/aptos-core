@@ -216,6 +216,7 @@ module aptos_experimental::confidential_asset {
             deployer,
             FAController {
                 allow_list_enabled: chain_id::get() == MAINNET_CHAIN_ID,
+                // DO NOT CHANGE: using long syntax until framework change is released to mainnet
                 extend_ref: object::generate_extend_ref(fa_controller_ctor_ref)
             }
         );
