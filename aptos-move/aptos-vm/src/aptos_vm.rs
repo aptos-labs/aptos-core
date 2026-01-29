@@ -163,6 +163,7 @@ static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
 static DISCARD_FAILED_BLOCKS: OnceCell<bool> = OnceCell::new();
 static PROCESSED_TRANSACTIONS_DETAILED_COUNTERS: OnceCell<bool> = OnceCell::new();
+static ENABLE_PRE_WRITE: OnceCell<bool> = OnceCell::new();
 
 macro_rules! deprecated_module_bundle {
     () => {
@@ -451,6 +452,20 @@ impl AptosVM {
         match BLOCKSTM_V2_ENABLED.get() {
             Some(blockstm_v2_enabled) => *blockstm_v2_enabled,
             None => false,
+        }
+    }
+
+    /// Sets enable_pre_write flag when invoked the first time.
+    pub fn set_enable_pre_write_once(enable_pre_write: bool) {
+        // Only the first call succeeds, due to OnceCell semantics.
+        ENABLE_PRE_WRITE.set(enable_pre_write).ok();
+    }
+
+    /// Get the enable_pre_write flag if already set, otherwise return default (true)
+    pub fn get_enable_pre_write() -> bool {
+        match ENABLE_PRE_WRITE.get() {
+            Some(enable_pre_write) => *enable_pre_write,
+            None => true,
         }
     }
 
@@ -3114,6 +3129,7 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
                 allow_fallback: true,
                 discard_failed_blocks: AptosVM::get_discard_failed_blocks(),
                 module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
+                enable_pre_write: AptosVM::get_enable_pre_write(),
             },
             onchain: onchain_config,
         };

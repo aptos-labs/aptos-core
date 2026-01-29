@@ -253,7 +253,9 @@ where
             map.group_data()
                 .mark_estimate(&key, idx, tags_5.iter().collect());
         } else {
-            map.data().write(key.clone(), idx, 0, Arc::new(value), None);
+            map.data()
+                .write(key.clone(), idx, 0, Arc::new(value), None)
+                .unwrap();
             map.data().mark_estimate(&key, idx);
         }
     }
@@ -370,7 +372,8 @@ where
                                 .unwrap();
                         } else {
                             map.data()
-                                .write(key, idx as TxnIndex, 1, Arc::new(value), None);
+                                .write(key, idx as TxnIndex, 1, Arc::new(value), None)
+                                .unwrap();
                         }
                     },
                     Operator::Insert(v) => {
@@ -389,7 +392,8 @@ where
                                 .unwrap();
                         } else {
                             map.data()
-                                .write(key, idx as TxnIndex, 1, Arc::new(value), None);
+                                .write(key, idx as TxnIndex, 1, Arc::new(value), None)
+                                .unwrap();
                         }
                     },
                     Operator::Update(delta) => {
