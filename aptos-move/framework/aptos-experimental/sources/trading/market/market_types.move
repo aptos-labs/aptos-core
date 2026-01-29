@@ -151,7 +151,9 @@ module aptos_experimental::market_types {
             settled_size: u64,
             maker_cancellation_reason: Option<String>,
             taker_cancellation_reason: Option<String>,
-            callback_result: CallbackResult<R>
+            callback_result: CallbackResult<R>,
+            /// Fee charged to the maker for the fill. Negative means rebate.
+            maker_fee: i64,
         }
     }
 
@@ -194,13 +196,15 @@ module aptos_experimental::market_types {
         settled_size: u64,
         maker_cancellation_reason: Option<String>,
         taker_cancellation_reason: Option<String>,
-        callback_result: CallbackResult<R>
+        callback_result: CallbackResult<R>,
+        maker_fee: i64,
     ): SettleTradeResult<R> {
         SettleTradeResult::V1 {
             settled_size,
             maker_cancellation_reason,
             taker_cancellation_reason,
-            callback_result
+            callback_result,
+            maker_fee,
         }
     }
 
@@ -258,6 +262,10 @@ module aptos_experimental::market_types {
 
     public fun get_callback_result<R: store + copy + drop>(self: &SettleTradeResult<R>): &CallbackResult<R> {
         &self.callback_result
+    }
+
+    public fun get_maker_fee<R: store + copy + drop>(self: &SettleTradeResult<R>): i64 {
+        self.maker_fee
     }
 
     public fun is_validation_result_valid(self: &ValidationResult): bool {
@@ -493,6 +501,8 @@ module aptos_experimental::market_types {
             orig_price: u64,
             is_bid: bool,
             fill_id: u128,
+            /// Fee charged for the fill. Negative means rebate.
+            fee: i64,
         }
     }
 
@@ -806,6 +816,7 @@ module aptos_experimental::market_types {
         orig_price: u64,
         is_bid: bool,
         fill_id: u128,
+        fee: i64,
     ) {
         // Final check whether event sending is enabled
         if (self.config.allow_events_emission) {
@@ -821,6 +832,7 @@ module aptos_experimental::market_types {
                     orig_price,
                     is_bid,
                     fill_id,
+                    fee,
                 }
             );
         };
