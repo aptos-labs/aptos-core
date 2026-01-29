@@ -60,6 +60,7 @@
 -  [Function `place_maker_order`](#0x7_market_types_place_maker_order)
 -  [Function `cleanup_order`](#0x7_market_types_cleanup_order)
 -  [Function `cleanup_bulk_order_at_price`](#0x7_market_types_cleanup_bulk_order_at_price)
+-  [Function `place_bulk_order`](#0x7_market_types_place_bulk_order)
 -  [Function `decrease_order_size`](#0x7_market_types_decrease_order_size)
 -  [Function `get_order_metadata_bytes`](#0x7_market_types_get_order_metadata_bytes)
 -  [Function `new_market_config`](#0x7_market_types_new_market_config)
@@ -744,6 +745,13 @@ Reasons why an order was cancelled
 </dt>
 <dd>
  cleanup_bulk_orders_f arguments: account, is_bid, remaining_sizes
+</dd>
+<dt>
+<code>place_bulk_order_f: |<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &M| <b>has</b> <b>copy</b> + drop</code>
+</dt>
+<dd>
+ place_bulk_order_f arguments: account, order_id, bid_prices, bid_sizes, ask_prices, ask_sizes,
+ cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, metadata
 </dd>
 <dt>
 <code>decrease_order_size_f: |<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">market_clearinghouse_order_info::MarketClearinghouseOrderInfo</a>&lt;M&gt;, u64| <b>has</b> <b>copy</b> + drop</code>
@@ -2005,7 +2013,7 @@ enum <a href="market_types.md#0x7_market_types_BulkOrderRejectionEvent">BulkOrde
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_market_clearinghouse_callbacks">new_market_clearinghouse_callbacks</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(settle_trade_f: |&<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">market_clearinghouse_order_info::MarketClearinghouseOrderInfo</a>&lt;M&gt;, <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">market_clearinghouse_order_info::MarketClearinghouseOrderInfo</a>&lt;M&gt;, u128, u64, u64|<a href="market_types.md#0x7_market_types_SettleTradeResult">market_types::SettleTradeResult</a>&lt;R&gt; <b>has</b> <b>copy</b> + drop, validate_order_placement_f: |<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">market_clearinghouse_order_info::MarketClearinghouseOrderInfo</a>&lt;M&gt;, u64|<a href="market_types.md#0x7_market_types_ValidationResult">market_types::ValidationResult</a> <b>has</b> <b>copy</b> + drop, validate_bulk_order_placement_f: |<b>address</b>, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &M|<a href="market_types.md#0x7_market_types_ValidationResult">market_types::ValidationResult</a> <b>has</b> <b>copy</b> + drop, place_maker_order_f: |<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">market_clearinghouse_order_info::MarketClearinghouseOrderInfo</a>&lt;M&gt;, u64|<a href="market_types.md#0x7_market_types_PlaceMakerOrderResult">market_types::PlaceMakerOrderResult</a>&lt;R&gt; <b>has</b> <b>copy</b> + drop, cleanup_order_f: |<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">market_clearinghouse_order_info::MarketClearinghouseOrderInfo</a>&lt;M&gt;, u64, bool| <b>has</b> <b>copy</b> + drop, cleanup_bulk_order_at_price_f: |<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>, bool, u64, u64| <b>has</b> <b>copy</b> + drop, decrease_order_size_f: |<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">market_clearinghouse_order_info::MarketClearinghouseOrderInfo</a>&lt;M&gt;, u64| <b>has</b> <b>copy</b> + drop, get_order_metadata_bytes: |&M|<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; <b>has</b> <b>copy</b> + drop): <a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_market_clearinghouse_callbacks">new_market_clearinghouse_callbacks</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(settle_trade_f: |&<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">market_clearinghouse_order_info::MarketClearinghouseOrderInfo</a>&lt;M&gt;, <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">market_clearinghouse_order_info::MarketClearinghouseOrderInfo</a>&lt;M&gt;, u128, u64, u64|<a href="market_types.md#0x7_market_types_SettleTradeResult">market_types::SettleTradeResult</a>&lt;R&gt; <b>has</b> <b>copy</b> + drop, validate_order_placement_f: |<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">market_clearinghouse_order_info::MarketClearinghouseOrderInfo</a>&lt;M&gt;, u64|<a href="market_types.md#0x7_market_types_ValidationResult">market_types::ValidationResult</a> <b>has</b> <b>copy</b> + drop, validate_bulk_order_placement_f: |<b>address</b>, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &M|<a href="market_types.md#0x7_market_types_ValidationResult">market_types::ValidationResult</a> <b>has</b> <b>copy</b> + drop, place_maker_order_f: |<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">market_clearinghouse_order_info::MarketClearinghouseOrderInfo</a>&lt;M&gt;, u64|<a href="market_types.md#0x7_market_types_PlaceMakerOrderResult">market_types::PlaceMakerOrderResult</a>&lt;R&gt; <b>has</b> <b>copy</b> + drop, cleanup_order_f: |<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">market_clearinghouse_order_info::MarketClearinghouseOrderInfo</a>&lt;M&gt;, u64, bool| <b>has</b> <b>copy</b> + drop, cleanup_bulk_order_at_price_f: |<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>, bool, u64, u64| <b>has</b> <b>copy</b> + drop, place_bulk_order_f: |<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &M| <b>has</b> <b>copy</b> + drop, decrease_order_size_f: |<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">market_clearinghouse_order_info::MarketClearinghouseOrderInfo</a>&lt;M&gt;, u64| <b>has</b> <b>copy</b> + drop, get_order_metadata_bytes: |&M|<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; <b>has</b> <b>copy</b> + drop): <a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;
 </code></pre>
 
 
@@ -2021,6 +2029,7 @@ enum <a href="market_types.md#0x7_market_types_BulkOrderRejectionEvent">BulkOrde
     place_maker_order_f: |MarketClearinghouseOrderInfo&lt;M&gt;, u64| <a href="market_types.md#0x7_market_types_PlaceMakerOrderResult">PlaceMakerOrderResult</a>&lt;R&gt; <b>has</b> drop + <b>copy</b>,
     cleanup_order_f: |MarketClearinghouseOrderInfo&lt;M&gt;, u64, bool| <b>has</b> drop + <b>copy</b>,
     cleanup_bulk_order_at_price_f: |<b>address</b>, OrderId, bool, u64, u64| <b>has</b> drop + <b>copy</b>,
+    place_bulk_order_f: |<b>address</b>, OrderId, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, &M| <b>has</b> drop + <b>copy</b>,
     decrease_order_size_f: |MarketClearinghouseOrderInfo&lt;M&gt;, u64| <b>has</b> drop + <b>copy</b>,
     get_order_metadata_bytes: |&M| <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; <b>has</b> drop + <b>copy</b>
 ): <a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">MarketClearinghouseCallbacks</a>&lt;M, R&gt; {
@@ -2031,6 +2040,7 @@ enum <a href="market_types.md#0x7_market_types_BulkOrderRejectionEvent">BulkOrde
         place_maker_order_f,
         cleanup_order_f,
         cleanup_bulk_order_at_price_f,
+        place_bulk_order_f,
         decrease_order_size_f,
         get_order_metadata_bytes
     }
@@ -2528,6 +2538,43 @@ enum <a href="market_types.md#0x7_market_types_BulkOrderRejectionEvent">BulkOrde
     cleanup_size: u64,
 ) {
     (self.cleanup_bulk_order_at_price_f)(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, is_bid, price, cleanup_size)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_market_types_place_bulk_order"></a>
+
+## Function `place_bulk_order`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_place_bulk_order">place_bulk_order</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>, bid_prices: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, bid_sizes: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_prices: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_sizes: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_bid_prices: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_bid_sizes: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_ask_prices: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_ask_sizes: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, metadata: &M)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_place_bulk_order">place_bulk_order</a>&lt;M: store + <b>copy</b> + drop, R: store + <b>copy</b> + drop&gt;(
+    self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">MarketClearinghouseCallbacks</a>&lt;M, R&gt;,
+    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
+    order_id: OrderId,
+    bid_prices: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    bid_sizes: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    ask_prices: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    ask_sizes: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    cancelled_bid_prices: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    cancelled_bid_sizes: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    cancelled_ask_prices: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    cancelled_ask_sizes: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    metadata: &M,
+) {
+    (self.place_bulk_order_f)(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, bid_prices, bid_sizes, ask_prices, ask_sizes, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, metadata)
 }
 </code></pre>
 
