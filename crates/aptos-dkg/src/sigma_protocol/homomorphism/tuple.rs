@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use aptos_crypto::arkworks::msm::IsMsmInput;
 use crate::{
     sigma_protocol,
     sigma_protocol::{
@@ -217,6 +218,12 @@ where
 
     fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
         H1::msm_eval(input)
+    }
+
+    fn batch_normalize(
+            msm_output: Vec<Self::MsmOutput>
+        ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
+        H1::batch_normalize(msm_output)
     }
 }
 

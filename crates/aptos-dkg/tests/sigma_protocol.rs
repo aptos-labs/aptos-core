@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use aptos_dkg::pvss::chunky::chunked_scalar_mul::Witness;
 use aptos_crypto::arkworks::{
     msm::{IsMsmInput, MsmInput},
     random::{sample_field_element, sample_field_elements},
@@ -61,8 +62,6 @@ fn test_imhomog_chaum_pedersen<
     hom.verify(&statement, &proof, CNTXT)
         .expect("Inhomogeneous Chaum Pederson sigma proof failed verification");
 }
-
-use aptos_dkg::pvss::chunky::chunked_scalar_mul::Witness;
 
 fn test_imhomog_scalar_mul<'a, E>(
     hom: chunked_scalar_mul::InhomogChunkedScalarMul<'a, E>,
@@ -133,6 +132,12 @@ mod schnorr {
             // for the homomorphism we only need `input.bases()[0] * input.scalars()[0]`
             // but the verification needs a 3-term MSM... so we should really do a custom MSM which dispatches based on length TODO
             C::msm(input.bases(), input.scalars()).expect("MSM failed in Schnorr")
+        }
+
+        fn batch_normalize(
+                msm_output: Vec<Self::MsmOutput>
+            ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
+            C::normalize_batch(&msm_output)
         }
     }
 
@@ -269,15 +274,16 @@ fn test_chaum_pedersen() {
         witness_bls,
     );
 
+    // TODO: move this to a separate test?
     use crate::chunked_scalar_mul::make_inhomogeneous_scalar_mul;
     use aptos_dkg::pvss::chunky::{chunked_scalar_mul::Witness, chunks};
     use ark_ec::scalar_mul::BatchMulPreprocessing;
+    use ark_bn254::Fr;
 
     let ell = 16u8;
 
     let scalars = sample_field_elements(1, &mut rng);
 
-    use ark_bn254::Fr;
 
     let chunked_values: Vec<Vec<Scalar<Fr>>> = scalars
         .iter()
@@ -296,8 +302,8 @@ fn test_chaum_pedersen() {
     // Create tables for batch multiplication preprocessing
     let g_1 = <Bn254 as Pairing>::G1::generator().into_affine();
     let g_2 = <Bn254 as Pairing>::G2::generator().into_affine();
-    let table1 = BatchMulPreprocessing::new(g_1.into(), 256);
-    let table2 = BatchMulPreprocessing::new(g_2.into(), 256);
+    let table1 = BatchMulPreprocessing::new(g_1.into(), 256); // TODO: change 256?
+    let table2 = BatchMulPreprocessing::new(g_2.into(), 256); // TODO: change 256?
 
     let hom = make_inhomogeneous_scalar_mul::<Bn254>(&table1, &table2);
     test_imhomog_scalar_mul::<Bn254>(hom, witness);

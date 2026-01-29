@@ -372,6 +372,12 @@ impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
         E::G1::msm(input.bases(), &input.scalars())
             .expect("MSM computation failed in univariate KZG")
     }
+
+    fn batch_normalize(
+            msm_output: Vec<Self::MsmOutput>
+        ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
+        E::G1::normalize_batch(&msm_output)
+    }
 }
 
 impl<'a, E: Pairing> sigma_protocol::Trait<E::G1> for CommitmentHomomorphism<'a, E> {

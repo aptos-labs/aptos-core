@@ -9,6 +9,7 @@ use aptos_crypto::arkworks::msm::{IsMsmInput, MsmInput};
 use ark_ec::{pairing::Pairing, VariableBaseMSM};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use std::fmt::Debug;
+use ark_ec::CurveGroup;
 
 /// Homomorphism for univariate KZG commitments using a Lagrange basis.
 ///
@@ -65,5 +66,11 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
 
     fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
         E::G1::msm(input.bases(), input.scalars()).expect("MSM failed in univariate KZG")
+    }
+
+    fn batch_normalize(
+            msm_output: Vec<Self::MsmOutput>
+        ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
+        E::G1::normalize_batch(&msm_output)
     }
 }
