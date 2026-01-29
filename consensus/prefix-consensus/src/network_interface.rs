@@ -183,8 +183,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use aptos_crypto::{bls12381::Signature as BlsSignature, HashValue};
     use aptos_types::{
         validator_signer::ValidatorSigner,
         validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},

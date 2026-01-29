@@ -30,6 +30,7 @@
 //! - **Validity**: mcp({v_in_h}_{h∈H}) ⪯ v_low_i for any honest party i
 
 mod certify;
+pub mod manager;
 pub mod network_interface;
 pub mod network_messages;
 mod protocol;
@@ -39,6 +40,7 @@ mod utils;
 mod verification;
 
 pub use certify::{qc1_certify, qc2_certify, qc3_certify};
+pub use manager::PrefixConsensusManager;
 pub use network_interface::{
     NetworkSenderAdapter, PrefixConsensusNetworkClient, PrefixConsensusNetworkSender,
 };
