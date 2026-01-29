@@ -39,8 +39,9 @@ fn native_create_address(
     if let Ok(address) = address {
         Ok(smallvec![Value::address(address)])
     } else {
-        Err(SafeNativeError::abort(
+        Err(SafeNativeError::abort_with_message(
             super::status::NFE_UNABLE_TO_PARSE_ADDRESS,
+            "Invalid account address format or incorrect length",
         ))
     }
 }

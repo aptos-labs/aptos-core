@@ -67,8 +67,9 @@ fn native_type_of(
     if let TypeTag::Struct(struct_tag) = type_tag {
         Ok(type_of_internal(&struct_tag).expect("type_of should never fail."))
     } else {
-        Err(SafeNativeError::abort(
+        Err(SafeNativeError::abort_with_message(
             super::status::NFE_EXPECTED_STRUCT_TYPE_TAG,
+            "Expected a struct type tag",
         ))
     }
 }

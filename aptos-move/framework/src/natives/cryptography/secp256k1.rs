@@ -43,16 +43,22 @@ fn native_ecdsa_recover(
     // which seems to be 32 bytes, so O(1) cost for all intents and purposes.)
     let msg = match libsecp256k1::Message::parse_slice(&msg) {
         Ok(msg) => msg,
-        Err(_) => {
-            return Err(SafeNativeError::abort(abort_codes::NFE_DESERIALIZE));
+        Err(err) => {
+            return Err(SafeNativeError::abort_with_message(
+                abort_codes::NFE_DESERIALIZE,
+                format!("Failed to parse message: {}", err),
+            ));
         },
     };
 
     // NOTE(Gas): O(1) cost
     let rid = match libsecp256k1::RecoveryId::parse(recovery_id) {
         Ok(rid) => rid,
-        Err(_) => {
-            return Err(SafeNativeError::abort(abort_codes::NFE_DESERIALIZE));
+        Err(err) => {
+            return Err(SafeNativeError::abort_with_message(
+                abort_codes::NFE_DESERIALIZE,
+                format!("Failed to parse recovery ID: {}", err),
+            ));
         },
     };
 
@@ -60,8 +66,11 @@ fn native_ecdsa_recover(
     // which seems to be 64 bytes, so O(1) cost for all intents and purposes.
     let sig = match libsecp256k1::Signature::parse_standard_slice(&signature) {
         Ok(sig) => sig,
-        Err(_) => {
-            return Err(SafeNativeError::abort(abort_codes::NFE_DESERIALIZE));
+        Err(err) => {
+            return Err(SafeNativeError::abort_with_message(
+                abort_codes::NFE_DESERIALIZE,
+                format!("Failed to parse signature: {}", err),
+            ));
         },
     };
 

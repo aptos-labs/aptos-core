@@ -138,8 +138,12 @@ fn native_write_to_event_store(
     })?;
 
     let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
-    let event = ContractEvent::new_v1(key, seq_num, ty_tag, blob)
-        .map_err(|_| SafeNativeError::abort(ECANNOT_CREATE_EVENT))?;
+    let event = ContractEvent::new_v1(key, seq_num, ty_tag, blob).map_err(|err| {
+        SafeNativeError::abort_with_message(
+            ECANNOT_CREATE_EVENT,
+            format!("Cannot create event v1: {}", err),
+        )
+    })?;
     // TODO(layouts): avoid cloning layouts for events with delayed fields.
     ctx.events.push((
         event,
@@ -308,8 +312,12 @@ fn native_write_module_event_to_store(
         })?;
 
     let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
-    let event = ContractEvent::new_v2(type_tag, blob)
-        .map_err(|_| SafeNativeError::abort(ECANNOT_CREATE_EVENT))?;
+    let event = ContractEvent::new_v2(type_tag, blob).map_err(|err| {
+        SafeNativeError::abort_with_message(
+            ECANNOT_CREATE_EVENT,
+            format!("Cannot create event v2: {}", err),
+        )
+    })?;
     // TODO(layouts): avoid cloning layouts for events with delayed fields.
     ctx.events.push((
         event,

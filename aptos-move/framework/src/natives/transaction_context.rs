@@ -171,9 +171,10 @@ fn native_monotonically_increasing_counter_internal(
         .extensions_mut()
         .get_mut::<NativeTransactionContext>();
     if transaction_context.local_counter == u16::MAX {
-        return Err(SafeNativeError::abort(error::invalid_state(
-            abort_codes::EMONOTONICALLY_INCREASING_COUNTER_OVERFLOW,
-        )));
+        return Err(SafeNativeError::abort_with_message(
+            error::invalid_state(abort_codes::EMONOTONICALLY_INCREASING_COUNTER_OVERFLOW),
+            "Monotonically increasing counter has reached maximum value (too many calls in this session)",
+        ));
     }
     transaction_context.local_counter += 1;
     let local_counter = transaction_context.local_counter as u128;
@@ -195,9 +196,10 @@ fn native_monotonically_increasing_counter_internal(
                 (1u128, transaction_index)
             },
             TransactionIndexKind::NotAvailable => {
-                return Err(SafeNativeError::abort(error::invalid_state(
-                    abort_codes::ETRANSACTION_INDEX_NOT_AVAILABLE,
-                )));
+                return Err(SafeNativeError::abort_with_message(
+                    error::invalid_state(abort_codes::ETRANSACTION_INDEX_NOT_AVAILABLE),
+                    "Transaction index is not available in this execution context",
+                ));
             },
         };
 
@@ -209,9 +211,10 @@ fn native_monotonically_increasing_counter_internal(
         Ok(smallvec![Value::u128(monotonically_increasing_counter)])
     } else {
         // When transaction context is not available, return an error
-        Err(SafeNativeError::abort(error::invalid_state(
-            abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE,
-        )))
+        Err(SafeNativeError::abort_with_message(
+            error::invalid_state(abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE),
+            "Transaction context is not available (must be called during transaction execution)",
+        ))
     }
 }
 
@@ -235,9 +238,10 @@ fn native_monotonically_increasing_counter_internal_for_test_only(
         .extensions_mut()
         .get_mut::<NativeTransactionContext>();
     if transaction_context.local_counter == u16::MAX {
-        return Err(SafeNativeError::abort(error::invalid_state(
-            abort_codes::EMONOTONICALLY_INCREASING_COUNTER_OVERFLOW,
-        )));
+        return Err(SafeNativeError::abort_with_message(
+            error::invalid_state(abort_codes::EMONOTONICALLY_INCREASING_COUNTER_OVERFLOW),
+            "Monotonically increasing counter has reached maximum value (too many calls in this session)",
+        ));
     }
     transaction_context.local_counter += 1;
     let local_counter = transaction_context.local_counter as u128;
@@ -277,9 +281,10 @@ fn native_sender_internal(
     if let Some(transaction_context) = user_transaction_context_opt {
         Ok(smallvec![Value::address(transaction_context.sender())])
     } else {
-        Err(SafeNativeError::abort(error::invalid_state(
-            abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE,
-        )))
+        Err(SafeNativeError::abort_with_message(
+            error::invalid_state(abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE),
+            "Transaction context is not available (sender information can only be accessed during transaction execution)",
+        ))
     }
 }
 
@@ -299,9 +304,10 @@ fn native_secondary_signers_internal(
         )?;
         Ok(smallvec![Value::vector_address(secondary_signers)])
     } else {
-        Err(SafeNativeError::abort(error::invalid_state(
-            abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE,
-        )))
+        Err(SafeNativeError::abort_with_message(
+            error::invalid_state(abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE),
+            "Transaction context is not available (secondary signers can only be accessed during transaction execution)",
+        ))
     }
 }
 
@@ -316,9 +322,10 @@ fn native_gas_payer_internal(
     if let Some(transaction_context) = user_transaction_context_opt {
         Ok(smallvec![Value::address(transaction_context.gas_payer())])
     } else {
-        Err(SafeNativeError::abort(error::invalid_state(
-            abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE,
-        )))
+        Err(SafeNativeError::abort_with_message(
+            error::invalid_state(abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE),
+            "Transaction context is not available (gas payer information can only be accessed during transaction execution)",
+        ))
     }
 }
 
@@ -333,9 +340,10 @@ fn native_max_gas_amount_internal(
     if let Some(transaction_context) = user_transaction_context_opt {
         Ok(smallvec![Value::u64(transaction_context.max_gas_amount())])
     } else {
-        Err(SafeNativeError::abort(error::invalid_state(
-            abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE,
-        )))
+        Err(SafeNativeError::abort_with_message(
+            error::invalid_state(abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE),
+            "Transaction context is not available (max gas amount can only be accessed during transaction execution)",
+        ))
     }
 }
 
@@ -350,9 +358,10 @@ fn native_gas_unit_price_internal(
     if let Some(transaction_context) = user_transaction_context_opt {
         Ok(smallvec![Value::u64(transaction_context.gas_unit_price())])
     } else {
-        Err(SafeNativeError::abort(error::invalid_state(
-            abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE,
-        )))
+        Err(SafeNativeError::abort_with_message(
+            error::invalid_state(abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE),
+            "Transaction context is not available (gas unit price can only be accessed during transaction execution)",
+        ))
     }
 }
 
@@ -367,9 +376,10 @@ fn native_chain_id_internal(
     if let Some(transaction_context) = user_transaction_context_opt {
         Ok(smallvec![Value::u8(transaction_context.chain_id())])
     } else {
-        Err(SafeNativeError::abort(error::invalid_state(
-            abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE,
-        )))
+        Err(SafeNativeError::abort_with_message(
+            error::invalid_state(abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE),
+            "Transaction context is not available (chain ID can only be accessed during transaction execution)",
+        ))
     }
 }
 
@@ -458,9 +468,10 @@ fn native_entry_function_payload_internal(
             Ok(smallvec![create_option_none(enum_option_enabled)?])
         }
     } else {
-        Err(SafeNativeError::abort(error::invalid_state(
-            abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE,
-        )))
+        Err(SafeNativeError::abort_with_message(
+            error::invalid_state(abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE),
+            "Transaction context is not available (entry function payload can only be accessed during transaction execution)",
+        ))
     }
 }
 
@@ -500,9 +511,10 @@ fn native_multisig_payload_internal(
             Ok(smallvec![create_option_none(enum_option_enabled)?])
         }
     } else {
-        Err(SafeNativeError::abort(error::invalid_state(
-            abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE,
-        )))
+        Err(SafeNativeError::abort_with_message(
+            error::invalid_state(abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE),
+            "Transaction context is not available (multisig payload can only be accessed during transaction execution)",
+        ))
     }
 }
 
