@@ -6,6 +6,8 @@ module aptos_experimental::market_bulk_order_tests {
     use aptos_experimental::clearinghouse_test::{
         test_market_callbacks,
         new_test_order_metadata,
+        place_bulk_order_callback_called,
+        get_place_bulk_order_callback_data,
     };
     use aptos_experimental::market_test_utils::{
         place_taker_order_and_verify_fill,
@@ -313,6 +315,85 @@ module aptos_experimental::market_bulk_order_tests {
 
         // Verify that the event contains the correct cancelled order details
         bulk_order_cancelled_event.verify_bulk_order_modified_event(order_id, sequence_number, market.get_market_address(), maker_addr, vector[], vector[], vector[], vector[], vector[bid_price], vector[bid_size], vector[ask_price], vector[ask_size], sequence_number);
+
+        market.destroy_market();
+    }
+
+    #[test(admin = @0x1, market_signer = @0x123, maker = @0x456)]
+    public fun test_place_bulk_order_callback(
+        admin: &signer,
+        market_signer: &signer,
+        maker: &signer,
+    ) {
+        use aptos_experimental::market_bulk_order;
+
+        let market = setup_market(admin, market_signer);
+        let maker_addr = signer::address_of(maker);
+
+        // Verify callback has not been called yet
+        assert!(!place_bulk_order_callback_called(maker_addr), 0);
+
+        // Place initial bulk order with sequence number 1
+        let bid_prices = vector[100u64, 90u64];
+        let bid_sizes = vector[50u64, 60u64];
+        let ask_prices = vector[110u64, 120u64];
+        let ask_sizes = vector[70u64, 80u64];
+
+        let order_id_option = market_bulk_order::place_bulk_order(
+            &mut market,
+            maker_addr,
+            1, // sequence number
+            bid_prices,
+            bid_sizes,
+            ask_prices,
+            ask_sizes,
+            new_test_order_metadata(1),
+            &test_market_callbacks()
+        );
+        assert!(order_id_option.is_some(), 1);
+        let order_id = order_id_option.destroy_some();
+
+        // Verify callback was called with correct parameters
+        assert!(place_bulk_order_callback_called(maker_addr), 2);
+        let (callback_order_id, callback_bid_prices, callback_bid_sizes, callback_ask_prices, callback_ask_sizes, callback_cancelled_bid_prices, callback_cancelled_bid_sizes, callback_cancelled_ask_prices, callback_cancelled_ask_sizes) = get_place_bulk_order_callback_data(maker_addr);
+        assert!(callback_order_id == order_id, 3);
+        assert!(callback_bid_prices == bid_prices, 4);
+        assert!(callback_bid_sizes == bid_sizes, 5);
+        assert!(callback_ask_prices == ask_prices, 6);
+        assert!(callback_ask_sizes == ask_sizes, 7);
+        // For fresh order placement, cancelled vectors should be empty
+        assert!(callback_cancelled_bid_prices == vector[], 8);
+        assert!(callback_cancelled_bid_sizes == vector[], 9);
+        assert!(callback_cancelled_ask_prices == vector[], 10);
+        assert!(callback_cancelled_ask_sizes == vector[], 11);
+
+        // Place a replacement bulk order with sequence number 2
+        let new_bid_prices = vector[100u64];
+        let new_bid_sizes = vector[55u64];
+        let new_ask_prices = vector[115u64, 125u64];
+        let new_ask_sizes = vector[75u64, 85u64];
+
+        let new_order_id_option = market_bulk_order::place_bulk_order(
+            &mut market,
+            maker_addr,
+            2, // sequence number - must be higher than previous
+            new_bid_prices,
+            new_bid_sizes,
+            new_ask_prices,
+            new_ask_sizes,
+            new_test_order_metadata(2),
+            &test_market_callbacks()
+        );
+        assert!(new_order_id_option.is_some(), 12);
+        let new_order_id = new_order_id_option.destroy_some();
+
+        // Verify callback was called with correct parameters for replacement order
+        let (callback_order_id, callback_bid_prices, callback_bid_sizes, callback_ask_prices, callback_ask_sizes, _callback_cancelled_bid_prices, _callback_cancelled_bid_sizes, _callback_cancelled_ask_prices, _callback_cancelled_ask_sizes) = get_place_bulk_order_callback_data(maker_addr);
+        assert!(callback_order_id == new_order_id, 13);
+        assert!(callback_bid_prices == new_bid_prices, 14);
+        assert!(callback_bid_sizes == new_bid_sizes, 15);
+        assert!(callback_ask_prices == new_ask_prices, 16);
+        assert!(callback_ask_sizes == new_ask_sizes, 17);
 
         market.destroy_market();
     }

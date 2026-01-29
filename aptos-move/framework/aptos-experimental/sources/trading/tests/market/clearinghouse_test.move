@@ -49,12 +49,25 @@ module aptos_experimental::clearinghouse_test {
         is_long: bool
     }
 
+    struct PlaceBulkOrderCallbackData has store, drop {
+        order_id: OrderId,
+        bid_prices: vector<u64>,
+        bid_sizes: vector<u64>,
+        ask_prices: vector<u64>,
+        ask_sizes: vector<u64>,
+        cancelled_bid_prices: vector<u64>,
+        cancelled_bid_sizes: vector<u64>,
+        cancelled_ask_prices: vector<u64>,
+        cancelled_ask_sizes: vector<u64>,
+    }
+
     struct GlobalState has key {
         user_positions: Table<address, Position>,
         open_orders: Table<OrderId, bool>,
         bulk_open_bids: Table<address, bool>,
         bulk_open_asks: Table<address, bool>,
-        maker_order_calls: Table<OrderId, bool>
+        maker_order_calls: Table<OrderId, bool>,
+        place_bulk_order_calls: Table<address, PlaceBulkOrderCallbackData>
     }
 
     public(friend) fun initialize(admin: &signer) {
@@ -69,7 +82,8 @@ module aptos_experimental::clearinghouse_test {
                 open_orders: table::new(),
                 bulk_open_bids: table::new(),
                 bulk_open_asks: table::new(),
-                maker_order_calls: table::new()
+                maker_order_calls: table::new(),
+                place_bulk_order_calls: table::new()
             }
         );
     }
@@ -186,6 +200,57 @@ module aptos_experimental::clearinghouse_test {
         open_orders.contains(account)
     }
 
+    public(friend) fun record_place_bulk_order(
+        account: address,
+        order_id: OrderId,
+        bid_prices: &vector<u64>,
+        bid_sizes: &vector<u64>,
+        ask_prices: &vector<u64>,
+        ask_sizes: &vector<u64>,
+        cancelled_bid_prices: &vector<u64>,
+        cancelled_bid_sizes: &vector<u64>,
+        cancelled_ask_prices: &vector<u64>,
+        cancelled_ask_sizes: &vector<u64>,
+    ) acquires GlobalState {
+        let place_bulk_order_calls = &mut borrow_global_mut<GlobalState>(@0x1).place_bulk_order_calls;
+        let callback_data = PlaceBulkOrderCallbackData {
+            order_id,
+            bid_prices: *bid_prices,
+            bid_sizes: *bid_sizes,
+            ask_prices: *ask_prices,
+            ask_sizes: *ask_sizes,
+            cancelled_bid_prices: *cancelled_bid_prices,
+            cancelled_bid_sizes: *cancelled_bid_sizes,
+            cancelled_ask_prices: *cancelled_ask_prices,
+            cancelled_ask_sizes: *cancelled_ask_sizes,
+        };
+        if (place_bulk_order_calls.contains(account)) {
+            place_bulk_order_calls.remove(account);
+        };
+        place_bulk_order_calls.add(account, callback_data);
+    }
+
+    public(friend) fun place_bulk_order_callback_called(account: address): bool acquires GlobalState {
+        let place_bulk_order_calls = &borrow_global<GlobalState>(@0x1).place_bulk_order_calls;
+        place_bulk_order_calls.contains(account)
+    }
+
+    public(friend) fun get_place_bulk_order_callback_data(account: address): (OrderId, vector<u64>, vector<u64>, vector<u64>, vector<u64>, vector<u64>, vector<u64>, vector<u64>, vector<u64>) acquires GlobalState {
+        let place_bulk_order_calls = &borrow_global<GlobalState>(@0x1).place_bulk_order_calls;
+        let callback_data = place_bulk_order_calls.borrow(account);
+        (
+            callback_data.order_id,
+            callback_data.bid_prices,
+            callback_data.bid_sizes,
+            callback_data.ask_prices,
+            callback_data.ask_sizes,
+            callback_data.cancelled_bid_prices,
+            callback_data.cancelled_bid_sizes,
+            callback_data.cancelled_ask_prices,
+            callback_data.cancelled_ask_sizes,
+        )
+    }
+
     public(friend) fun settle_trade_with_taker_cancelled(
         _taker: address,
         _maker: address,
@@ -221,6 +286,9 @@ module aptos_experimental::clearinghouse_test {
             |account, _order_id, _is_bid, _price, _size| {
                 cleanup_bulk_order(account);
             },
+            |account, order_id, bid_prices, bid_sizes, ask_prices, ask_sizes, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, _metadata| {
+                record_place_bulk_order(account, order_id, bid_prices, bid_sizes, ask_prices, ask_sizes, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes);
+            },
             |_order_info, _size| {
                 // decrease order size is not used in this test
             },
@@ -252,6 +320,9 @@ module aptos_experimental::clearinghouse_test {
             |account, _order_id, _is_bid, _price, _size| {
                 cleanup_bulk_order(account);
             },
+            |_account, _order_id, _bid_prices, _bid_sizes, _ask_prices, _ask_sizes, _cancelled_bid_prices, _cancelled_bid_sizes, _cancelled_ask_prices, _cancelled_ask_sizes, _metadata| {
+                // place_bulk_order callback - no-op for this test
+            },
             |_order_info, _size| {
                 // decrease order size is not used in this test
             },
@@ -281,6 +352,9 @@ module aptos_experimental::clearinghouse_test {
             },
             |account, _order_id, _is_bid, _price, _size| {
                 cleanup_bulk_order(account);
+            },
+            |_account, _order_id, _bid_prices, _bid_sizes, _ask_prices, _ask_sizes, _cancelled_bid_prices, _cancelled_bid_sizes, _cancelled_ask_prices, _cancelled_ask_sizes, _metadata| {
+                // place_bulk_order callback - no-op for this test
             },
             |_order_info, _size| {
                 // decrease order size is not used in this test

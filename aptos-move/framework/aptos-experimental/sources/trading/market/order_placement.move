@@ -268,7 +268,6 @@ module aptos_experimental::order_placement {
                 fill_sizes,
                 match_count,
                 is_bid,
-                true, // is_taker is true as this order hasn't been placed in the book yet
                 market_types::order_cancellation_reason_ioc_violation(),
                 std::string::utf8(b"IOC Violation"),
                 trigger_condition,
@@ -332,7 +331,6 @@ module aptos_experimental::order_placement {
                 fill_sizes,
                 match_count,
                 is_bid,
-                true, // is_taker is true as this order hasn't been placed in the book yet
                 market_types::order_cancellation_reason_place_maker_order_violation(),
                 result.get_place_maker_order_cancellation_reason().destroy_some(),
                 option::none(), // trigger_condition
@@ -520,7 +518,6 @@ module aptos_experimental::order_placement {
         fill_sizes: vector<u64>,
         match_count: u32,
         is_bid: bool,
-        is_taker: bool,
         cancel_reason: OrderCancellationReason,
         cancel_details: String,
         trigger_condition: Option<TriggerCondition>,
@@ -540,7 +537,7 @@ module aptos_experimental::order_placement {
                 orig_size,
                 limit_price,
                 is_bid,
-                is_taker,
+                true, // is_taker - always true for taker orders
                 market_types::order_status_open(),
                 std::string::utf8(b""),
                 metadata,
@@ -559,7 +556,7 @@ module aptos_experimental::order_placement {
             size_delta,
             limit_price,
             is_bid,
-            is_taker,
+            true, // is_taker - always true for taker orders
             market_types::order_status_cancelled(),
             cancel_details,
             metadata,
@@ -581,7 +578,7 @@ module aptos_experimental::order_placement {
                 metadata
             ),
             size_delta,
-            is_taker,
+            true, // is_taker - always true for taker orders
         );
         OrderMatchResult::V1 {
             order_id,
@@ -658,7 +655,6 @@ module aptos_experimental::order_placement {
                 *fill_sizes,
                 0, // match_count - doesn't matter as we don't use the result.
                 is_bid,
-                true, // is_taker
                 market_types::order_cancellation_reason_dead_mans_switch_expired(),
                 taker_cancellation_reason,
                 option::none(), // trigger_condition
@@ -816,7 +812,6 @@ module aptos_experimental::order_placement {
                 *fill_sizes,
                 0, // match_count - doesn't matter as we don't use the result.
                 is_bid,
-                true, // is_taker
                 market_types::order_cancellation_reason_clearinghouse_settle_violation(),
                 taker_cancellation_reason_str.destroy_some(),
                 option::none(), // trigger_condition
@@ -933,7 +928,6 @@ module aptos_experimental::order_placement {
                 vector[],
                 0, // match_count
                 is_bid,
-                true, // is_taker
                 market_types::order_cancellation_reason_position_update_violation(),
                 validation_result.get_validation_failure_reason().destroy_some(),
                 trigger_condition,
@@ -959,7 +953,6 @@ module aptos_experimental::order_placement {
                     vector[],
                     0, // match_count
                     is_bid,
-                    true, // is_taker
                     market_types::order_cancellation_reason_duplicate_client_order_id(),
                     std::string::utf8(b"Duplicate client order id"),
                     trigger_condition,
@@ -987,7 +980,6 @@ module aptos_experimental::order_placement {
                     vector[],
                     0, // match_count
                     is_bid,
-                    true, // is_taker
                     market_types::order_cancellation_reason_order_pre_cancelled(),
                     std::string::utf8(b"Order pre cancelled"),
                     trigger_condition,
@@ -1037,7 +1029,6 @@ module aptos_experimental::order_placement {
                 vector[],
                 0, // match_count
                 is_bid,
-                true, // is_taker
                 market_types::order_cancellation_reason_post_only_violation(),
                 std::string::utf8(b"Post Only violation"),
                 option::none(), // trigger_condition
@@ -1139,7 +1130,6 @@ module aptos_experimental::order_placement {
                         fill_sizes,
                         match_count,
                         is_bid,
-                        true, // is_taker
                         market_types::order_cancellation_reason_ioc_violation(),
                         std::string::utf8(b"IOC_VIOLATION"),
                         option::none(), // trigger_condition
@@ -1185,7 +1175,6 @@ module aptos_experimental::order_placement {
                         fill_sizes,
                         match_count,
                         is_bid,
-                        true, // is_taker
                         market_types::order_cancellation_reason_max_fill_limit_violation(),
                         std::string::utf8(b"Max fill limit reached"),
                         option::none(), // trigger_condition
