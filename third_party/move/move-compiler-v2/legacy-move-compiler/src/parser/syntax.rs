@@ -1898,6 +1898,11 @@ fn parse_match_arms(
 //          | <NameAccessChain> "!" <CallArgs>
 //          | <NameAccessChain> <OptionalTypeArgs>
 fn parse_name_exp(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
+    // Check for behavioral predicates first, before parsing as a regular name
+    if is_behavior_predicate(context) {
+        return parse_behavior(context);
+    }
+
     let n = parse_name_access_chain(context, false, || {
         panic!("parse_name_exp with something other than a ModuleAccess")
     })?;
@@ -2081,8 +2086,26 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
         Tok::Pipe | Tok::PipePipe => {
             parse_lambda(context, start_loc, LambdaCaptureKind::default(), token)?
         },
-        Tok::Identifier if is_quant(context) => parse_quant(context)?,
-        Tok::Identifier if is_behavior_predicate(context) => parse_behavior(context)?,
+        Tok::Identifier if is_quant(context) => {
+            let quant_exp = parse_quant(context)?;
+            let loc = make_loc(
+                context.tokens.file_hash(),
+                start_loc,
+                context.tokens.previous_end_loc(),
+            );
+            let lhs = sp(loc, quant_exp);
+            return parse_binop_exp(context, lhs, /* min_prec */ 1);
+        },
+        Tok::Identifier if is_behavior_predicate(context) => {
+            let behavior_exp = parse_behavior(context)?;
+            let loc = make_loc(
+                context.tokens.file_hash(),
+                start_loc,
+                context.tokens.previous_end_loc(),
+            );
+            let lhs = sp(loc, behavior_exp);
+            return parse_binop_exp(context, lhs, /* min_prec */ 1);
+        },
         _ => {
             // This could be either an assignment, operator assignment (e.g., +=), or a binary operator
             // expression, or a cast or test
@@ -2466,6 +2489,7 @@ fn behavior_kind_from_str(s: &str) -> Option<BehaviorKind> {
         "aborts_of" => Some(BehaviorKind::AbortsOf),
         "ensures_of" => Some(BehaviorKind::EnsuresOf),
         "modifies_of" => Some(BehaviorKind::ModifiesOf),
+        "result_of" => Some(BehaviorKind::ResultOf),
         _ => None,
     }
 }
@@ -2525,7 +2549,7 @@ fn parse_behavior(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
                 (
                     current_token_loc(context.tokens),
                     format!(
-                        "expected a behavior predicate keyword (requires_of, aborts_of, ensures_of, modifies_of), found '{}'",
+                        "expected a behavior predicate keyword (requires_of, aborts_of, ensures_of, modifies_of, result_of), found '{}'",
                         kind_content
                     )
                 )

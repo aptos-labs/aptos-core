@@ -4,48 +4,40 @@ module 0x42::M {
         (f)(x)
     }
     spec {
-      aborts_if M::$aborts_of$apply_aborts$f($t1);
+      aborts_if aborts_of($t0, $t1);
     }
 
     private fun apply_binary(f: |u64, u64|u64,a: u64,b: u64): u64 {
         (f)(a, b)
     }
     spec {
-      ensures M::$requires_of$apply_binary$f($t1, $t2);
-      ensures M::$ensures_of$apply_binary$f($t1, $t2, result0());
-      aborts_if M::$aborts_of$apply_binary$f($t1, $t2);
+      ensures requires_of($t0, $t1, $t2);
+      ensures ensures_of($t0, $t1, $t2, result0());
+      aborts_if aborts_of($t0, $t1, $t2);
     }
 
     private fun apply_ensures(f: |u64|u64,x: u64): u64 {
         (f)(x)
     }
     spec {
-      ensures M::$ensures_of$apply_ensures$f($t1, result0());
+      ensures ensures_of($t0, $t1, result0());
     }
 
     private fun apply_generic<T>(f: |T|T,x: T): T {
         (f)(x)
     }
     spec {
-      ensures M::$requires_of$apply_generic$f($t1);
-      ensures M::$ensures_of$apply_generic$f($t1, result0());
+      ensures requires_of($t0, $t1);
+      ensures ensures_of($t0, $t1, result0());
     }
 
     private fun apply_requires(f: |u64|u64,x: u64): u64 {
         (f)(x)
     }
     spec {
-      ensures M::$requires_of$apply_requires$f($t1);
+      ensures requires_of($t0, $t1);
     }
 
-    spec fun $aborts_of$apply_aborts$f(arg0: u64): bool;
-    spec fun $requires_of$apply_binary$f(arg0: u64,arg1: u64): bool;
-    spec fun $ensures_of$apply_binary$f(arg0: u64,arg1: u64,result0: u64): bool;
-    spec fun $aborts_of$apply_binary$f(arg0: u64,arg1: u64): bool;
-    spec fun $ensures_of$apply_ensures$f(arg0: u64,result0: u64): bool;
-    spec fun $requires_of$apply_generic$f<T>(arg0: #0): bool;
-    spec fun $ensures_of$apply_generic$f<T>(arg0: #0,result0: #0): bool;
-    spec fun $requires_of$apply_requires$f(arg0: u64): bool;
 } // end 0x42::M
 
 // -- Sourcified model before first bytecode pipeline
@@ -116,48 +108,40 @@ module 0x42::M {
         (f)(x)
     }
     spec {
-      aborts_if M::$aborts_of$apply_aborts$f($t1);
+      aborts_if aborts_of($t0, $t1);
     }
 
     private fun apply_binary(f: |u64, u64|u64,a: u64,b: u64): u64 {
         (f)(a, b)
     }
     spec {
-      ensures M::$requires_of$apply_binary$f($t1, $t2);
-      ensures M::$ensures_of$apply_binary$f($t1, $t2, result0());
-      aborts_if M::$aborts_of$apply_binary$f($t1, $t2);
+      ensures requires_of($t0, $t1, $t2);
+      ensures ensures_of($t0, $t1, $t2, result0());
+      aborts_if aborts_of($t0, $t1, $t2);
     }
 
     private fun apply_ensures(f: |u64|u64,x: u64): u64 {
         (f)(x)
     }
     spec {
-      ensures M::$ensures_of$apply_ensures$f($t1, result0());
+      ensures ensures_of($t0, $t1, result0());
     }
 
     private fun apply_generic<T>(f: |T|T,x: T): T {
         (f)(x)
     }
     spec {
-      ensures M::$requires_of$apply_generic$f($t1);
-      ensures M::$ensures_of$apply_generic$f($t1, result0());
+      ensures requires_of($t0, $t1);
+      ensures ensures_of($t0, $t1, result0());
     }
 
     private fun apply_requires(f: |u64|u64,x: u64): u64 {
         (f)(x)
     }
     spec {
-      ensures M::$requires_of$apply_requires$f($t1);
+      ensures requires_of($t0, $t1);
     }
 
-    spec fun $aborts_of$apply_aborts$f(arg0: u64): bool;
-    spec fun $requires_of$apply_binary$f(arg0: u64,arg1: u64): bool;
-    spec fun $ensures_of$apply_binary$f(arg0: u64,arg1: u64,result0: u64): bool;
-    spec fun $aborts_of$apply_binary$f(arg0: u64,arg1: u64): bool;
-    spec fun $ensures_of$apply_ensures$f(arg0: u64,result0: u64): bool;
-    spec fun $requires_of$apply_generic$f<T>(arg0: #0): bool;
-    spec fun $ensures_of$apply_generic$f<T>(arg0: #0,result0: #0): bool;
-    spec fun $requires_of$apply_requires$f(arg0: u64): bool;
 } // end 0x42::M
 
 ============ bytecode before second stackless bytecode pipeline ================
