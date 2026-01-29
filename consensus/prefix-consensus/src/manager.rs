@@ -19,6 +19,7 @@ use aptos_consensus_types::common::Author;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, Uniform};
 use aptos_logger::prelude::*;
 use aptos_types::{validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier};
+use futures::{FutureExt, StreamExt};
 use std::{
     collections::HashSet,
     sync::Arc,
@@ -100,32 +101,107 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
         }
     }
 
-    /// Start the protocol by initiating Round 1
+    /// Initialize the protocol
     ///
-    /// This creates a Vote1 with our input vector and broadcasts it to all validators.
-    pub async fn start(&self) -> Result<()> {
+    /// This should be called after creating the manager and before starting the event loop.
+    /// Unlike AptosBFT's RoundManager::init(), this doesn't need to process existing state
+    /// since Prefix Consensus is a single-shot protocol.
+    pub async fn init(&self) -> Result<()> {
         info!(
             party_id = %self.party_id,
             epoch = self.epoch,
             n = self.n,
             f = self.f,
-            "Starting Prefix Consensus"
+            "Initializing Prefix Consensus"
         );
 
-        // Start Round 1 - protocol creates and stores Vote1
-        let vote1 = self.protocol.start_round1(&self.dummy_private_key).await?;
+        Ok(())
+    }
+
+    /// Main event loop for processing incoming Prefix Consensus messages
+    ///
+    /// Consumes self and runs until either:
+    /// - The protocol completes (QC3 forms)
+    /// - A shutdown signal is received via close_rx
+    ///
+    /// This follows the RoundManager pattern from AptosBFT consensus.
+    pub async fn run(
+        self,
+        mut message_rx: aptos_channels::UnboundedReceiver<(Author, PrefixConsensusMsg)>,
+        close_rx: futures::channel::oneshot::Receiver<futures::channel::oneshot::Sender<()>>,
+    ) {
+        info!(
+            party_id = %self.party_id,
+            epoch = self.epoch,
+            "PrefixConsensusManager event loop started"
+        );
+
+        // Broadcast Vote1 FIRST before entering message loop
+        // This ensures the receiver is ready before our own Vote1 arrives via self-send
+        match self.protocol.start_round1(&self.dummy_private_key).await {
+            Ok(vote1) => {
+                info!(
+                    party_id = %self.party_id,
+                    vote_author = %vote1.author,
+                    input_len = vote1.input_vector.len(),
+                    "Broadcasting Vote1"
+                );
+                self.network_sender.broadcast_vote1(vote1).await;
+            }
+            Err(e) => {
+                error!(
+                    party_id = %self.party_id,
+                    error = ?e,
+                    "Failed to start Round 1"
+                );
+                return;
+            }
+        }
+
+        let mut close_rx = close_rx.into_stream();
+
+        loop {
+            tokio::select! {
+                biased;
+
+                // Handle shutdown signal
+                close_req = close_rx.select_next_some() => {
+                    info!(
+                        party_id = %self.party_id,
+                        "Received shutdown signal"
+                    );
+                    if let Ok(ack_sender) = close_req {
+                        ack_sender.send(()).expect("[PrefixConsensusManager] Failed to ack shutdown");
+                    }
+                    break;
+                }
+
+                // Handle incoming messages
+                Some((author, msg)) = message_rx.next() => {
+                    if let Err(e) = self.process_message(author, msg).await {
+                        warn!(
+                            party_id = %self.party_id,
+                            error = ?e,
+                            "Failed to process message"
+                        );
+                    }
+
+                    // Check if protocol is complete
+                    if self.is_complete().await {
+                        info!(
+                            party_id = %self.party_id,
+                            "Prefix Consensus protocol complete"
+                        );
+                        break;
+                    }
+                }
+            }
+        }
 
         info!(
             party_id = %self.party_id,
-            vote_author = %vote1.author,
-            input_len = vote1.input_vector.len(),
-            "Broadcasting Vote1"
+            "PrefixConsensusManager event loop terminated"
         );
-
-        // Broadcast our Vote1 to all validators
-        self.network_sender.broadcast_vote1(vote1).await;
-
-        Ok(())
     }
 
     /// Process an incoming network message
@@ -513,9 +589,6 @@ mod tests {
             verifier,
         );
 
-        // Start to get into Round1 state
-        manager.start().await.unwrap();
-
         // Create a duplicate vote (same author twice)
         let vote = Vote1::new(
             signers[1].author(),
@@ -562,8 +635,6 @@ mod tests {
             signers.remove(0),
             verifier,
         );
-
-        manager.start().await.unwrap();
 
         // Create vote with wrong epoch
         let vote = Vote1::new(
