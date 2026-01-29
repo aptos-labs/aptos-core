@@ -96,7 +96,7 @@ pub struct WeightedWitness<F: PrimeField> {
 #[allow(non_snake_case)]
 impl<C: CurveGroup> homomorphism::Trait for WeightedHomomorphism<'_, C> {
     type Codomain = WeightedCodomainShape<C>;
-    type CodomainAffine = WeightedCodomainShape<C::Affine>;
+    type CodomainNormalized = WeightedCodomainShape<C::Affine>;
     type Domain = WeightedWitness<C::ScalarField>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
@@ -177,6 +177,10 @@ impl<C: CurveGroup> homomorphism::Trait for WeightedHomomorphism<'_, C> {
             chunks: chunks_result,
             randomness: randomness_result,
         }
+    }
+
+    fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
+        <WeightedHomomorphism<C> as fixed_base_msms::Trait>::normalize_output(value)
     }
 }
 

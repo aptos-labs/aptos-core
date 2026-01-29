@@ -945,9 +945,10 @@ pub mod two_term_msm {
         pub hiding_kzg_randomness: Scalar<F>,
     }
 
+
     impl<C: CurveGroup> homomorphism::Trait for Homomorphism<C> {
         type Codomain = CodomainShape<C>;
-        type CodomainAffine = CodomainShape<C::Affine>;
+        type CodomainNormalized = CodomainShape<C::Affine>;
         type Domain = Witness<C::ScalarField>;
 
         fn apply(&self, input: &Self::Domain) -> Self::Codomain {
@@ -957,6 +958,10 @@ pub mod two_term_msm {
             CodomainShape(
                 self.base_1 * input.poly_randomness.0 + self.base_2 * input.hiding_kzg_randomness.0,
             )
+        }
+
+        fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
+            <Homomorphism<C> as fixed_base_msms::Trait>::normalize_output(value)
         }
     }
 

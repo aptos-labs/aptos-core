@@ -28,12 +28,16 @@ pub struct Homomorphism<'a, E: Pairing> {
 
 impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<'a, E> {
     type Codomain = CodomainShape<E::G1>;
-    type CodomainAffine = CodomainShape<E::G1Affine>;
+    type CodomainNormalized = CodomainShape<E::G1Affine>;
     /// Input domain: (blinding factor, remaining values)
     type Domain = (E::ScalarField, Vec<E::ScalarField>);
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
         self.apply_msm(self.msm_terms(input))
+    }
+
+    fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
+        <Homomorphism<E> as fixed_base_msms::Trait>::normalize_output(value)
     }
 }
 

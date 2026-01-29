@@ -73,11 +73,15 @@ where
     H2::Codomain: CanonicalSerialize + CanonicalDeserialize,
 {
     type Codomain = TupleCodomainShape<H1::Codomain, H2::Codomain>;
-    type CodomainAffine = TupleCodomainShape<H1::CodomainAffine, H2::CodomainAffine>;
+    type CodomainNormalized = TupleCodomainShape<H1::CodomainNormalized, H2::CodomainNormalized>;
     type Domain = H1::Domain;
 
     fn apply(&self, x: &Self::Domain) -> Self::Codomain {
         TupleCodomainShape(self.hom1.apply(x), self.hom2.apply(x))
+    }
+
+    fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
+        TupleCodomainShape(H1::normalize(&self.hom1, &value.0), H2::normalize(&self.hom2, &value.1))
     }
 }
 
@@ -90,11 +94,15 @@ where
     H2::Codomain: CanonicalSerialize + CanonicalDeserialize,
 {
     type Codomain = TupleCodomainShape<H1::Codomain, H2::Codomain>;
-    type CodomainAffine = TupleCodomainShape<H1::CodomainAffine, H2::CodomainAffine>;
+    type CodomainNormalized = TupleCodomainShape<H1::CodomainNormalized, H2::CodomainNormalized>;
     type Domain = H1::Domain;
 
     fn apply(&self, x: &Self::Domain) -> Self::Codomain {
         TupleCodomainShape(self.hom1.apply(x), self.hom2.apply(x))
+    }
+
+    fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
+        TupleCodomainShape(H1::normalize(&self.hom1, &value.0), H2::normalize(&self.hom2, &value.1))
     }
 }
 

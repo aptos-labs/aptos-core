@@ -25,7 +25,7 @@ use std::fmt::Debug;
 /// - Methods for computing the MSM representations of a homomorphism input.
 /// - A uniform “shape” abstraction for collecting and flattening MSM outputs
 ///   for batch verification in Σ-protocols.
-pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOutput>> {
+pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOutput>, CodomainNormalized = Self::CodomainShape<<Self::MsmInput as IsMsmInput>::Base>> {
     // Type representing the scalar used in the `MsmInput`s. Convenient to repeat here, and currently used in `prove_homomorphism()` where it could be replaced by e.g. `C::ScalarField`... (or maybe by going inside of MsmInput)
     type Scalar: ark_ff::PrimeField; // Probably need less here but this what it'll be in practice
 
@@ -96,12 +96,12 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
     ) -> Vec<<Self::MsmInput as IsMsmInput>::Base>;
 
     fn normalize_output(
-        projective_output: &mut Self::CodomainShape<Self::MsmOutput>
-    ) -> Self::CodomainShape<<Self::MsmInput as IsMsmInput>::Base> 
+        projective_output: &Self::Codomain
+    ) -> Self::CodomainNormalized 
     where
-        Self::CodomainShape<Self::MsmOutput>: EntrywiseMap<
+        Self::Codomain: EntrywiseMap<
             Self::MsmOutput,
-            Output<<Self::MsmInput as IsMsmInput>::Base> = Self::CodomainShape<<Self::MsmInput as IsMsmInput>::Base>,
+            Output<<Self::MsmInput as IsMsmInput>::Base> = Self::CodomainNormalized,
         >,    
     {
     // 1. Collect all elements into a Vec

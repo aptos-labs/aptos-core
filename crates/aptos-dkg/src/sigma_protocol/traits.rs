@@ -248,9 +248,9 @@ where
 #[derive(Clone, Debug, Eq)]
 pub enum FirstProofItem<F: PrimeField, H: homomorphism::Trait>
 where
-    H::CodomainAffine: Statement,
+    H::CodomainNormalized: Statement,
 {
-    Commitment(H::CodomainAffine),
+    Commitment(H::CodomainNormalized),
     Challenge(F), // In more generality, this should be H::Domain::Scalar
 }
 
@@ -275,7 +275,7 @@ where
 
 impl<F: PrimeField, H: homomorphism::Trait> PartialEq for FirstProofItem<F, H>
 where
-    H::CodomainAffine: Statement,
+    H::CodomainNormalized: Statement,
 {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -304,7 +304,7 @@ where
 impl<F: PrimeField, H: homomorphism::Trait> Valid for FirstProofItem<F, H>
 where
     H::Domain: Witness<F>,
-    H::CodomainAffine: Statement + Valid,
+    H::CodomainNormalized: Statement + Valid,
 {
     fn check(&self) -> Result<(), SerializationError> {
         match self {
@@ -347,7 +347,7 @@ where
 impl<F: PrimeField, H: homomorphism::Trait> CanonicalSerialize for FirstProofItem<F, H>
 where
     H::Domain: Witness<F>,
-    H::CodomainAffine: Statement + CanonicalSerialize,
+    H::CodomainNormalized: Statement + CanonicalSerialize,
 {
     fn serialize_with_mode<W: Write>(
         &self,
@@ -411,7 +411,7 @@ where
 impl<F: PrimeField, H: homomorphism::Trait> CanonicalDeserialize for FirstProofItem<F, H>
 where
     H::Domain: Witness<F>,
-    H::CodomainAffine: Statement + CanonicalDeserialize + Valid,
+    H::CodomainNormalized: Statement + CanonicalDeserialize + Valid,
 {
     fn deserialize_with_mode<R: Read>(
         mut reader: R,
@@ -423,7 +423,7 @@ where
 
         let item = match tag {
             0 => {
-                let c = H::CodomainAffine::deserialize_with_mode(reader, compress, validate)?;
+                let c = H::CodomainNormalized::deserialize_with_mode(reader, compress, validate)?;
                 FirstProofItem::Commitment(c)
             },
             1 => {
@@ -460,7 +460,7 @@ where
 pub struct Proof<F: PrimeField, H: homomorphism::Trait>
 where
     H::Domain: Witness<F>,
-    H::CodomainAffine: Statement,
+    H::CodomainNormalized: Statement,
 {
     /// The “first item” recorded in the proof, which can be either:
     /// - the prover's commitment (H::Codomain)
@@ -509,7 +509,7 @@ where
 impl<F: PrimeField, H: homomorphism::Trait> PartialEq for Proof<F, H>
 where
     H::Domain: Witness<F>,
-    H::CodomainAffine: Statement,
+    H::CodomainNormalized: Statement,
 {
     fn eq(&self, other: &Self) -> bool {
         self.first_proof_item == other.first_proof_item && self.z == other.z
@@ -527,7 +527,7 @@ where
 impl<F: PrimeField, H: homomorphism::Trait> Eq for Proof<F, H>
 where
     H::Domain: Witness<F>,
-    H::CodomainAffine: Statement,
+    H::CodomainNormalized: Statement,
 {
 }
 

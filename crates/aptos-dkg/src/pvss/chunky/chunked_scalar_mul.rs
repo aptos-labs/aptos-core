@@ -124,7 +124,7 @@ pub struct Witness<F: PrimeField> {
 
 impl<'a, C: CurveGroup> homomorphism::Trait for Homomorphism<'a, C> {
     type Codomain = CodomainShape<C>;
-    type CodomainAffine = CodomainShape<C::Affine>;
+    type CodomainNormalized = CodomainShape<C::Affine>;
     type Domain = Witness<C::ScalarField>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
@@ -139,6 +139,10 @@ impl<'a, C: CurveGroup> homomorphism::Trait for Homomorphism<'a, C> {
         let outputs = arkworks::batch_mul(&self.table, &scalars);
 
         CodomainShape(outputs)
+    }
+
+    fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
+        <Homomorphism<C> as fixed_base_msms::Trait>::normalize_output(value)
     }
 }
 

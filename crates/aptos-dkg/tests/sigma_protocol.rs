@@ -102,11 +102,15 @@ mod schnorr {
         for Schnorr<C>
     {
         type Codomain = CodomainShape<C>;
-        type CodomainAffine = CodomainShape<C::Affine>;
+        type CodomainNormalized = CodomainShape<C::Affine>;
         type Domain = Fp<P, N>;
 
         fn apply(&self, input: &Self::Domain) -> Self::Codomain {
             self.apply_msm(self.msm_terms(input))
+        }
+
+        fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
+            <Schnorr<C> as fixed_base_msms::Trait>::normalize_output(value)
         }
     }
 
