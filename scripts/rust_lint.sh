@@ -27,6 +27,9 @@ fi
 set -e
 set -x
 
+# Check if `Cargo.lock` is up-to-date.
+cargo metadata --locked > /dev/null
+
 # Run clippy with the aptos-core specific configuration.
 cargo xclippy
 
