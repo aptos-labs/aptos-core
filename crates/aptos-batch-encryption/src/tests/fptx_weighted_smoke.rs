@@ -91,13 +91,18 @@ fn weighted_smoke_with_pvss() {
     let mut rng_aptos = rand::thread_rng();
 
     let tc = WeightedConfigArkworks::new(3, vec![1, 2, 5]).unwrap();
-    let pp = <T as Transcript>::PublicParameters::new_with_commitment_base(
-        tc.get_total_weight(),
-        aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_TESTING,
-        tc.get_total_num_players(),
-        G2Affine::generator(),
-        &mut rng_aptos,
-    );
+    // This emulates the creation of the Public Parameters across different validators.
+    let pps = (0..tc.get_total_num_players())
+        .map(|_| {
+            <T as Transcript>::PublicParameters::new_with_commitment_base(
+                tc.get_total_weight(),
+                aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_TESTING,
+                tc.get_total_num_players(),
+                G2Affine::generator(),
+                &mut rng_aptos,
+            )
+        })
+        .collect::<Vec<_>>();
 
     let ssks = (0..tc.get_total_num_players())
         .map(|_| <T as Transcript>::SigningSecretKey::generate(&mut rng_aptos))
@@ -112,7 +117,7 @@ fn weighted_smoke_with_pvss() {
         .collect();
     let eks: Vec<<T as Transcript>::EncryptPubKey> = dks
         .iter()
-        .map(|dk| dk.to(pp.get_encryption_public_params()))
+        .map(|dk| dk.to(pps[0].get_encryption_public_params()))
         .collect();
 
     let secrets: Vec<<T as Transcript>::InputSecret> = (0..tc.get_total_num_players())
@@ -124,9 +129,9 @@ fn weighted_smoke_with_pvss() {
         .iter()
         .enumerate()
         .map(|(i, s)| {
-            T::deal(
+            let t = T::deal(
                 &tc,
-                &pp,
+                &pps[i],
                 &ssks[i],
                 &spks[i],
                 &eks,
@@ -134,8 +139,11 @@ fn weighted_smoke_with_pvss() {
                 &NoAux,
                 &tc.get_player(i),
                 &mut rng_aptos,
-            )
-            .get_subtranscript()
+            );
+            // Regardless of which public param was used to deal the transcript, always use pps[0] to verify.
+            // This emulates another validator verifying the transcript.
+            t.verify(&tc, &pps[0], &spks, &eks, &NoAux).unwrap();
+            t.get_subtranscript()
         })
         .collect();
 
@@ -147,14 +155,15 @@ fn weighted_smoke_with_pvss() {
     let dk = DigestKey::new(&mut rng, 8, 1).unwrap();
 
     let (ek, vks, _) =
-        FPTXWeighted::setup(&dk, &pp, &subtranscript, &tc, tc.get_player(0), &dks[0]).unwrap();
+        FPTXWeighted::setup(&dk, &pps[0], &subtranscript, &tc, tc.get_player(0), &dks[0]).unwrap();
 
     let msk_shares: Vec<<FPTXWeighted as BatchThresholdEncryption>::MasterSecretKeyShare> = tc
         .get_players()
         .into_iter()
         .map(|p| {
             let (_, _, msk_share) =
-                FPTXWeighted::setup(&dk, &pp, &subtranscript, &tc, p, &dks[p.get_id()]).unwrap();
+                FPTXWeighted::setup(&dk, &pps[0], &subtranscript, &tc, p, &dks[p.get_id()])
+                    .unwrap();
             msk_share
         })
         .collect();
