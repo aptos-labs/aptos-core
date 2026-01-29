@@ -8,7 +8,9 @@ mod aptos;
 mod helpers;
 mod move_mutation_test;
 mod movefmt;
+#[cfg(feature = "prover-deps")]
 mod prover_dependencies;
+#[cfg(feature = "prover-deps")]
 mod prover_dependency_installer;
 mod revela;
 mod tool;
