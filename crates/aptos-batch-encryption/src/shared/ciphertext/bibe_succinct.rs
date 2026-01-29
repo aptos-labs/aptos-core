@@ -141,7 +141,7 @@ pub mod tests {
         let msk = Fr::rand(&mut rng);
         let (mpk, _, msk_shares) = key_derivation::gen_msk_shares(msk, &mut rng, &tc);
 
-        let ek = AugmentedEncryptionKey::new(mpk.0, dk.tau_g2, (dk.tau_g2 * msk).into());
+        let ek = AugmentedEncryptionKey::new(mpk, dk.tau_g2, (dk.tau_g2 * msk).into());
 
         let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
         let mut counter = Fr::zero();
