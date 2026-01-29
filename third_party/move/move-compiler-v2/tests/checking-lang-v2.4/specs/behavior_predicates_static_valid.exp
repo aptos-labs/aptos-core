@@ -105,78 +105,78 @@ module 0x42::M {
         M::increment(x)
     }
     spec {
-      aborts_if false;
+      aborts_if aborts_of(closure#0M::increment(), $t0);
     }
 
     private fun test_aborts_generic_explicit(x: u64): u64 {
         M::identity<u64>(x)
     }
     spec {
-      aborts_if false;
+      aborts_if aborts_of(closure#0M::identity<u64>(), $t0);
     }
 
     private fun test_aborts_generic_inferred(x: u64): u64 {
         M::identity<u64>(x)
     }
     spec {
-      aborts_if false;
+      aborts_if aborts_of(closure#0M::identity<u64>(), $t0);
     }
 
     private fun test_ensures_binary(a: u64,b: u64): u64 {
         M::add(a, b)
     }
     spec {
-      ensures Eq<u64>(result0(), Add($t0, $t1));
+      ensures ensures_of(closure#0M::add(), $t0, $t1, result0());
     }
 
     private fun test_ensures_generic_explicit(x: u64): u64 {
         M::identity<u64>(x)
     }
     spec {
-      ensures Eq<u64>(result0(), $t0);
+      ensures ensures_of(closure#0M::identity<u64>(), $t0, result0());
     }
 
     private fun test_ensures_generic_inferred(x: u64): u64 {
         M::identity<u64>(x)
     }
     spec {
-      ensures Eq<_>(result0(), $t0);
+      ensures ensures_of(closure#0M::identity<u64>(), $t0, result0());
     }
 
     private fun test_ensures_generic_unit(x: u64) {
         M::generic_noop<u64>(x)
     }
     spec {
-      ensures true;
+      ensures ensures_of(closure#0M::generic_noop<u64>(), $t0);
     }
 
     private fun test_ensures_multi(x: u64): (u64, u64) {
         M::split(x)
     }
     spec {
-      ensures Eq<num>(Add(result0(), result1()), $t0);
+      ensures ensures_of(closure#0M::split(), $t0, result0(), result1());
     }
 
     private fun test_ensures_unary(x: u64): u64 {
         M::increment(x)
     }
     spec {
-      ensures Eq<u64>(result0(), Add($t0, 1));
+      ensures ensures_of(closure#0M::increment(), $t0, result0());
     }
 
     private fun test_ensures_unit(x: u64) {
         M::do_nothing(x)
     }
     spec {
-      ensures true;
+      ensures ensures_of(closure#0M::do_nothing(), $t0);
     }
 
     private fun test_mixed_params(x: u64,b: bool): u64 {
         M::mixed_params(x, b)
     }
     spec {
-      ensures true;
-      ensures true;
+      ensures requires_of(closure#0M::mixed_params(), $t0, $t1);
+      ensures ensures_of(closure#0M::mixed_params(), $t0, $t1, result0());
     }
 
     private fun test_modifies_multi(addr1: address,addr2: address)
@@ -185,7 +185,7 @@ module 0x42::M {
         M::swap_counters(addr1, addr2)
     }
     spec {
-      ensures true;
+      ensures modifies_of(closure#0M::swap_counters(), global<0x42::M::Counter>($t0), global<0x42::M::Counter>($t1));
     }
 
     private fun test_modifies_single(addr: address)
@@ -194,67 +194,67 @@ module 0x42::M {
         M::increment_counter(addr)
     }
     spec {
-      ensures true;
+      ensures modifies_of(closure#0M::increment_counter(), global<0x42::M::Counter>($t0));
     }
 
     private fun test_pair_generic_explicit(x: u64,y: bool): (u64, bool) {
         M::pair<u64, bool>(x, y)
     }
     spec {
-      ensures true;
-      ensures And<u64>(Eq<u64>(result0(), $t0), Eq<bool>(result1(), $t1));
+      ensures requires_of(closure#0M::pair<u64, bool>(), $t0, $t1);
+      ensures ensures_of(closure#0M::pair<u64, bool>(), $t0, $t1, result0(), result1());
     }
 
     private fun test_requires_binary(a: u64,b: u64): u64 {
         M::add(a, b)
     }
     spec {
-      ensures Le(Add($t0, $t1), 18446744073709551615);
+      ensures requires_of(closure#0M::add(), $t0, $t1);
     }
 
     private fun test_requires_generic_explicit(x: u64): u64 {
         M::identity<u64>(x)
     }
     spec {
-      ensures true;
+      ensures requires_of(closure#0M::identity<u64>(), $t0);
     }
 
     private fun test_requires_generic_inferred(x: u64): u64 {
         M::identity<u64>(x)
     }
     spec {
-      ensures true;
+      ensures requires_of(closure#0M::identity<u64>(), $t0);
     }
 
     private fun test_requires_unary(x: u64): u64 {
         M::increment(x)
     }
     spec {
-      ensures Lt($t0, 18446744073709551615);
+      ensures requires_of(closure#0M::increment(), $t0);
     }
 
     private fun test_swap_generic_explicit(a: u64,b: u64): (u64, u64) {
         M::swap<u64>(a, b)
     }
     spec {
-      ensures true;
-      ensures And<u64>(Eq<u64>(result0(), $t1), Eq<u64>(result1(), $t0));
+      ensures requires_of(closure#0M::swap<u64>(), $t0, $t1);
+      ensures ensures_of(closure#0M::swap<u64>(), $t0, $t1, result0(), result1());
     }
 
     private fun test_swap_generic_inferred(a: u64,b: u64): (u64, u64) {
         M::swap<u64>(a, b)
     }
     spec {
-      ensures true;
-      ensures And<_>(Eq<_>(result0(), $t1), Eq<_>(result1(), $t0));
+      ensures requires_of(closure#0M::swap<u64>(), $t0, $t1);
+      ensures ensures_of(closure#0M::swap<u64>(), $t0, $t1, result0(), result1());
     }
 
     private fun test_unbox_inferred(b: Box<u64>): u64 {
         M::unbox<u64>(b)
     }
     spec {
-      ensures true;
-      ensures Eq<_>(result0(), select M::Box.value<0x42::M::Box<_>>($t0));
+      ensures requires_of(closure#0M::unbox<u64>(), $t0);
+      ensures ensures_of(closure#0M::unbox<u64>(), $t0, result0());
     }
 
     public fun unbox<T>(b: Box<T>): T {
@@ -264,6 +264,58 @@ module 0x42::M {
       ensures Eq<#0>(result0(), select M::Box.value<0x42::M::Box<#0>>($t0));
     }
 
+    spec fun $swap<T>(a: #0,b: #0): (#0, #0) {
+        Tuple(b, a)
+    }
+    spec fun $add(a: u64,b: u64): u64 {
+        Add<u64>(a, b)
+    }
+    spec fun $do_nothing(_x: u64) {
+        Tuple()
+    }
+    spec fun $generic_noop<T>(_x: #0) {
+        Tuple()
+    }
+    spec fun $identity<T>(x: #0): #0 {
+        x
+    }
+    spec fun $increment(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    spec fun $increment_counter(addr: address) {
+        {
+          let counter: &mut 0x42::M::Counter = BorrowGlobal(Mutable)<0x42::M::Counter>(addr);
+          select M::Counter.value<0x42::M::Counter>(counter) = Add<u64>(select M::Counter.value<0x42::M::Counter>(counter), 1);
+          Tuple()
+        }
+    }
+    spec fun $mixed_params(x: u64,flag: bool): u64 {
+        if flag {
+          Add<u64>(x, 1)
+        } else {
+          x
+        }
+    }
+    spec fun $pair<T,U>(x: #0,y: #1): (#0, #1) {
+        Tuple(x, y)
+    }
+    spec fun $split(x: u64): (u64, u64) {
+        Tuple(Div<u64>(x, 2), Sub<u64>(x, Div<u64>(x, 2)))
+    }
+    spec fun $swap_counters(addr1: address,addr2: address) {
+        {
+          let v1: u64 = select M::Counter.value<0x42::M::Counter>(global<0x42::M::Counter>(addr1));
+          {
+            let v2: u64 = select M::Counter.value<0x42::M::Counter>(global<0x42::M::Counter>(addr2));
+            select M::Counter.value<0x42::M::Counter>(BorrowGlobal(Mutable)<0x42::M::Counter>(addr1)) = v2;
+            select M::Counter.value<0x42::M::Counter>(BorrowGlobal(Mutable)<0x42::M::Counter>(addr2)) = v1;
+            Tuple()
+          }
+        }
+    }
+    spec fun $unbox<T>(b: Box<#0>): #0 {
+        select M::Box.value<0x42::M::Box<#0>>(b)
+    }
 } // end 0x42::M
 module 0x42::N {
     use 0x42::M; // resolved as: 0x42::M
@@ -271,16 +323,16 @@ module 0x42::N {
         M::add(a, b)
     }
     spec {
-      ensures Le(Add($t0, $t1), 18446744073709551615);
-      ensures Eq<u64>(result0(), Add($t0, $t1));
+      ensures requires_of(closure#0M::add(), $t0, $t1);
+      ensures ensures_of(closure#0M::add(), $t0, $t1, result0());
     }
 
     private fun call_increment(x: u64): u64 {
         M::increment(x)
     }
     spec {
-      ensures Lt($t0, 18446744073709551615);
-      ensures Eq<u64>(result0(), Add($t0, 1));
+      ensures requires_of(closure#0M::increment(), $t0);
+      ensures ensures_of(closure#0M::increment(), $t0, result0());
     }
 
 } // end 0x42::N
@@ -882,78 +934,78 @@ module 0x42::M {
         M::increment(x)
     }
     spec {
-      aborts_if false;
+      aborts_if aborts_of(closure#0M::increment(), $t0);
     }
 
     private fun test_aborts_generic_explicit(x: u64): u64 {
         M::identity<u64>(x)
     }
     spec {
-      aborts_if false;
+      aborts_if aborts_of(closure#0M::identity<u64>(), $t0);
     }
 
     private fun test_aborts_generic_inferred(x: u64): u64 {
         M::identity<u64>(x)
     }
     spec {
-      aborts_if false;
+      aborts_if aborts_of(closure#0M::identity<u64>(), $t0);
     }
 
     private fun test_ensures_binary(a: u64,b: u64): u64 {
         M::add(a, b)
     }
     spec {
-      ensures Eq<u64>(result0(), Add($t0, $t1));
+      ensures ensures_of(closure#0M::add(), $t0, $t1, result0());
     }
 
     private fun test_ensures_generic_explicit(x: u64): u64 {
         M::identity<u64>(x)
     }
     spec {
-      ensures Eq<u64>(result0(), $t0);
+      ensures ensures_of(closure#0M::identity<u64>(), $t0, result0());
     }
 
     private fun test_ensures_generic_inferred(x: u64): u64 {
         M::identity<u64>(x)
     }
     spec {
-      ensures Eq<_>(result0(), $t0);
+      ensures ensures_of(closure#0M::identity<u64>(), $t0, result0());
     }
 
     private fun test_ensures_generic_unit(x: u64) {
         M::generic_noop<u64>(x)
     }
     spec {
-      ensures true;
+      ensures ensures_of(closure#0M::generic_noop<u64>(), $t0);
     }
 
     private fun test_ensures_multi(x: u64): (u64, u64) {
         M::split(x)
     }
     spec {
-      ensures Eq<num>(Add(result0(), result1()), $t0);
+      ensures ensures_of(closure#0M::split(), $t0, result0(), result1());
     }
 
     private fun test_ensures_unary(x: u64): u64 {
         M::increment(x)
     }
     spec {
-      ensures Eq<u64>(result0(), Add($t0, 1));
+      ensures ensures_of(closure#0M::increment(), $t0, result0());
     }
 
     private fun test_ensures_unit(x: u64) {
         M::do_nothing(x)
     }
     spec {
-      ensures true;
+      ensures ensures_of(closure#0M::do_nothing(), $t0);
     }
 
     private fun test_mixed_params(x: u64,b: bool): u64 {
         M::mixed_params(x, b)
     }
     spec {
-      ensures true;
-      ensures true;
+      ensures requires_of(closure#0M::mixed_params(), $t0, $t1);
+      ensures ensures_of(closure#0M::mixed_params(), $t0, $t1, result0());
     }
 
     private fun test_modifies_multi(addr1: address,addr2: address)
@@ -962,7 +1014,7 @@ module 0x42::M {
         M::swap_counters(addr1, addr2)
     }
     spec {
-      ensures true;
+      ensures modifies_of(closure#0M::swap_counters(), global<0x42::M::Counter>($t0), global<0x42::M::Counter>($t1));
     }
 
     private fun test_modifies_single(addr: address)
@@ -971,67 +1023,67 @@ module 0x42::M {
         M::increment_counter(addr)
     }
     spec {
-      ensures true;
+      ensures modifies_of(closure#0M::increment_counter(), global<0x42::M::Counter>($t0));
     }
 
     private fun test_pair_generic_explicit(x: u64,y: bool): (u64, bool) {
         M::pair<u64, bool>(x, y)
     }
     spec {
-      ensures true;
-      ensures And<u64>(Eq<u64>(result0(), $t0), Eq<bool>(result1(), $t1));
+      ensures requires_of(closure#0M::pair<u64, bool>(), $t0, $t1);
+      ensures ensures_of(closure#0M::pair<u64, bool>(), $t0, $t1, result0(), result1());
     }
 
     private fun test_requires_binary(a: u64,b: u64): u64 {
         M::add(a, b)
     }
     spec {
-      ensures Le(Add($t0, $t1), 18446744073709551615);
+      ensures requires_of(closure#0M::add(), $t0, $t1);
     }
 
     private fun test_requires_generic_explicit(x: u64): u64 {
         M::identity<u64>(x)
     }
     spec {
-      ensures true;
+      ensures requires_of(closure#0M::identity<u64>(), $t0);
     }
 
     private fun test_requires_generic_inferred(x: u64): u64 {
         M::identity<u64>(x)
     }
     spec {
-      ensures true;
+      ensures requires_of(closure#0M::identity<u64>(), $t0);
     }
 
     private fun test_requires_unary(x: u64): u64 {
         M::increment(x)
     }
     spec {
-      ensures Lt($t0, 18446744073709551615);
+      ensures requires_of(closure#0M::increment(), $t0);
     }
 
     private fun test_swap_generic_explicit(a: u64,b: u64): (u64, u64) {
         M::swap<u64>(a, b)
     }
     spec {
-      ensures true;
-      ensures And<u64>(Eq<u64>(result0(), $t1), Eq<u64>(result1(), $t0));
+      ensures requires_of(closure#0M::swap<u64>(), $t0, $t1);
+      ensures ensures_of(closure#0M::swap<u64>(), $t0, $t1, result0(), result1());
     }
 
     private fun test_swap_generic_inferred(a: u64,b: u64): (u64, u64) {
         M::swap<u64>(a, b)
     }
     spec {
-      ensures true;
-      ensures And<_>(Eq<_>(result0(), $t1), Eq<_>(result1(), $t0));
+      ensures requires_of(closure#0M::swap<u64>(), $t0, $t1);
+      ensures ensures_of(closure#0M::swap<u64>(), $t0, $t1, result0(), result1());
     }
 
     private fun test_unbox_inferred(b: Box<u64>): u64 {
         M::unbox<u64>(b)
     }
     spec {
-      ensures true;
-      ensures Eq<_>(result0(), select M::Box.value<0x42::M::Box<_>>($t0));
+      ensures requires_of(closure#0M::unbox<u64>(), $t0);
+      ensures ensures_of(closure#0M::unbox<u64>(), $t0, result0());
     }
 
     public fun unbox<T>(b: Box<T>): T {
@@ -1041,6 +1093,58 @@ module 0x42::M {
       ensures Eq<#0>(result0(), select M::Box.value<0x42::M::Box<#0>>($t0));
     }
 
+    spec fun $swap<T>(a: #0,b: #0): (#0, #0) {
+        Tuple(b, a)
+    }
+    spec fun $add(a: u64,b: u64): u64 {
+        Add<u64>(a, b)
+    }
+    spec fun $do_nothing(_x: u64) {
+        Tuple()
+    }
+    spec fun $generic_noop<T>(_x: #0) {
+        Tuple()
+    }
+    spec fun $identity<T>(x: #0): #0 {
+        x
+    }
+    spec fun $increment(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    spec fun $increment_counter(addr: address) {
+        {
+          let counter: &mut 0x42::M::Counter = BorrowGlobal(Mutable)<0x42::M::Counter>(addr);
+          select M::Counter.value<0x42::M::Counter>(counter) = Add<u64>(select M::Counter.value<0x42::M::Counter>(counter), 1);
+          Tuple()
+        }
+    }
+    spec fun $mixed_params(x: u64,flag: bool): u64 {
+        if flag {
+          Add<u64>(x, 1)
+        } else {
+          x
+        }
+    }
+    spec fun $pair<T,U>(x: #0,y: #1): (#0, #1) {
+        Tuple(x, y)
+    }
+    spec fun $split(x: u64): (u64, u64) {
+        Tuple(Div<u64>(x, 2), Sub<u64>(x, Div<u64>(x, 2)))
+    }
+    spec fun $swap_counters(addr1: address,addr2: address) {
+        {
+          let v1: u64 = select M::Counter.value<0x42::M::Counter>(global<0x42::M::Counter>(addr1));
+          {
+            let v2: u64 = select M::Counter.value<0x42::M::Counter>(global<0x42::M::Counter>(addr2));
+            select M::Counter.value<0x42::M::Counter>(BorrowGlobal(Mutable)<0x42::M::Counter>(addr1)) = v2;
+            select M::Counter.value<0x42::M::Counter>(BorrowGlobal(Mutable)<0x42::M::Counter>(addr2)) = v1;
+            Tuple()
+          }
+        }
+    }
+    spec fun $unbox<T>(b: Box<#0>): #0 {
+        select M::Box.value<0x42::M::Box<#0>>(b)
+    }
 } // end 0x42::M
 module 0x42::N {
     use 0x42::M; // resolved as: 0x42::M
@@ -1048,16 +1152,16 @@ module 0x42::N {
         M::add(a, b)
     }
     spec {
-      ensures Le(Add($t0, $t1), 18446744073709551615);
-      ensures Eq<u64>(result0(), Add($t0, $t1));
+      ensures requires_of(closure#0M::add(), $t0, $t1);
+      ensures ensures_of(closure#0M::add(), $t0, $t1, result0());
     }
 
     private fun call_increment(x: u64): u64 {
         M::increment(x)
     }
     spec {
-      ensures Lt($t0, 18446744073709551615);
-      ensures Eq<u64>(result0(), Add($t0, 1));
+      ensures requires_of(closure#0M::increment(), $t0);
+      ensures ensures_of(closure#0M::increment(), $t0, result0());
     }
 
 } // end 0x42::N

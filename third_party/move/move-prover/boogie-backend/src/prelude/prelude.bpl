@@ -418,6 +418,8 @@ function $InRange(r: $Range, i: int): bool {
    r->lb <= i && i < r->ub
 }
 
+axiom (forall r: $Range, i:int:: r->lb <= i && i < r->ub ==> $InRange(r, i));
+
 function {:inline} $IsEqual'num'(x: int, y: int): bool {
     x == y
 }
