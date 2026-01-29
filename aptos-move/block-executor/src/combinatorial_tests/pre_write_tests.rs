@@ -95,6 +95,7 @@ fn make_value(byte: u8) -> ValueType {
 /// This test creates a transaction that:
 /// 1. Declares a pre-write for key A
 /// 2. Actually writes to key A during execution
+///
 /// The pre-write verification should pass and execution should succeed.
 #[test]
 fn pre_write_matching_actual_writes_succeeds_v1() {
@@ -112,16 +113,16 @@ fn pre_write_matching_actual_writes_succeeds(block_stm_v2: bool) {
 
     // Create a transaction that writes to key_a
     let behavior = MockIncarnation::new(
-        vec![],                                      // no reads
-        vec![(key_a.clone(), value.clone(), false)], // write to key_a
-        vec![],                                      // no deltas
-        vec![],                                      // no events
-        1,                                           // gas
+        vec![],                              // no reads
+        vec![(key_a, value.clone(), false)], // write to key_a
+        vec![],                              // no deltas
+        vec![],                              // no events
+        1,                                   // gas
     );
 
     // Create transaction with pre-writes that match actual writes
     let txn = MockTransaction::from_behavior(behavior)
-        .with_pre_writes(vec![(key_a.clone(), value.clone())]);
+        .with_pre_writes(vec![(key_a, value.clone())]);
 
     let txn_provider = DefaultTxnProvider::new_without_info(vec![txn]);
     let state_view = MockStateView::empty();
@@ -155,11 +156,11 @@ fn no_pre_writes_succeeds(block_stm_v2: bool) {
 
     // Create a transaction that writes to key_a (no pre-writes)
     let behavior = MockIncarnation::new(
-        vec![],                                      // no reads
-        vec![(key_a.clone(), value.clone(), false)], // write to key_a
-        vec![],                                      // no deltas
-        vec![],                                      // no events
-        1,                                           // gas
+        vec![],                              // no reads
+        vec![(key_a, value.clone(), false)], // write to key_a
+        vec![],                              // no deltas
+        vec![],                              // no events
+        1,                                   // gas
     );
 
     // Create transaction without pre-writes (default)
@@ -182,6 +183,7 @@ fn no_pre_writes_succeeds(block_stm_v2: bool) {
 /// This test creates a transaction that:
 /// 1. Declares a pre-write for key A
 /// 2. Actually writes to key B during execution (different key)
+///
 /// The pre-write verification should fail and trigger fallback (Err).
 #[test]
 fn pre_write_mismatched_keys_triggers_fallback_v1() {
@@ -200,16 +202,16 @@ fn pre_write_mismatched_keys_triggers_fallback(block_stm_v2: bool) {
 
     // Create a transaction that writes to key_b (not key_a)
     let behavior = MockIncarnation::new(
-        vec![],                                      // no reads
-        vec![(key_b.clone(), value.clone(), false)], // write to key_b
-        vec![],                                      // no deltas
-        vec![],                                      // no events
-        1,                                           // gas
+        vec![],                              // no reads
+        vec![(key_b, value.clone(), false)], // write to key_b
+        vec![],                              // no deltas
+        vec![],                              // no events
+        1,                                   // gas
     );
 
     // Create transaction with pre-writes for key_a (mismatched)
     let txn = MockTransaction::from_behavior(behavior)
-        .with_pre_writes(vec![(key_a.clone(), value.clone())]);
+        .with_pre_writes(vec![(key_a, value.clone())]);
 
     let txn_provider = DefaultTxnProvider::new_without_info(vec![txn]);
     let state_view = MockStateView::empty();
@@ -228,6 +230,7 @@ fn pre_write_mismatched_keys_triggers_fallback(block_stm_v2: bool) {
 /// This test creates a transaction that:
 /// 1. Declares a pre-write for key A
 /// 2. Produces no writes during execution
+///
 /// The pre-write verification should fail and trigger fallback (Err).
 #[test]
 fn pre_write_with_empty_output_triggers_fallback_v1() {
@@ -254,7 +257,7 @@ fn pre_write_with_empty_output_triggers_fallback(block_stm_v2: bool) {
 
     // Create transaction with pre-writes for key_a
     let txn = MockTransaction::from_behavior(behavior)
-        .with_pre_writes(vec![(key_a.clone(), value.clone())]);
+        .with_pre_writes(vec![(key_a, value.clone())]);
 
     let txn_provider = DefaultTxnProvider::new_without_info(vec![txn]);
     let state_view = MockStateView::empty();
@@ -273,6 +276,7 @@ fn pre_write_with_empty_output_triggers_fallback(block_stm_v2: bool) {
 /// This test creates multiple transactions where:
 /// - Transaction 0: Normal write (no pre-writes) - should succeed
 /// - Transaction 1: Pre-write for key A, but writes key B - should trigger fallback
+///
 /// The entire block should fail due to the verification failure.
 #[test]
 fn mixed_transactions_one_fails_verification_v1() {
@@ -293,7 +297,7 @@ fn mixed_transactions_one_fails_verification(block_stm_v2: bool) {
     // Transaction 0: Normal write without pre-writes
     let behavior0 = MockIncarnation::new(
         vec![],
-        vec![(key_c.clone(), value.clone(), false)],
+        vec![(key_c, value.clone(), false)],
         vec![],
         vec![],
         1,
@@ -303,13 +307,13 @@ fn mixed_transactions_one_fails_verification(block_stm_v2: bool) {
     // Transaction 1: Pre-write for key_a but writes key_b (mismatch)
     let behavior1 = MockIncarnation::new(
         vec![],
-        vec![(key_b.clone(), value.clone(), false)],
+        vec![(key_b, value.clone(), false)],
         vec![],
         vec![],
         1,
     );
     let txn1 = MockTransaction::from_behavior(behavior1)
-        .with_pre_writes(vec![(key_a.clone(), value.clone())]);
+        .with_pre_writes(vec![(key_a, value.clone())]);
 
     let txn_provider = DefaultTxnProvider::new_without_info(vec![txn0, txn1]);
     let state_view = MockStateView::empty();
@@ -346,24 +350,24 @@ fn multiple_transactions_all_matching_pre_writes(block_stm_v2: bool) {
     // Transaction 0: Pre-write and actual write to key_a
     let behavior0 = MockIncarnation::new(
         vec![],
-        vec![(key_a.clone(), value_a.clone(), false)],
+        vec![(key_a, value_a.clone(), false)],
         vec![],
         vec![],
         1,
     );
     let txn0 = MockTransaction::from_behavior(behavior0)
-        .with_pre_writes(vec![(key_a.clone(), value_a.clone())]);
+        .with_pre_writes(vec![(key_a, value_a.clone())]);
 
     // Transaction 1: Pre-write and actual write to key_b
     let behavior1 = MockIncarnation::new(
         vec![],
-        vec![(key_b.clone(), value_b.clone(), false)],
+        vec![(key_b, value_b.clone(), false)],
         vec![],
         vec![],
         1,
     );
     let txn1 = MockTransaction::from_behavior(behavior1)
-        .with_pre_writes(vec![(key_b.clone(), value_b.clone())]);
+        .with_pre_writes(vec![(key_b, value_b.clone())]);
 
     let txn_provider = DefaultTxnProvider::new_without_info(vec![txn0, txn1]);
     let state_view = MockStateView::empty();
