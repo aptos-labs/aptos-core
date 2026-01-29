@@ -66,8 +66,8 @@ use aptos_types::{
     block_info::BlockInfo,
     epoch_state::EpochState,
     on_chain_config::{
-        OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
-        ValidatorTxnConfig,
+        OnChainChunkyDKGConfig, OnChainConsensusConfig, OnChainJWKConsensusConfig,
+        OnChainRandomnessConfig, ValidatorTxnConfig,
     },
     randomness::RandMetadata,
     validator_verifier::ValidatorVerifier,
@@ -329,6 +329,7 @@ pub struct RoundManager {
     local_config: ConsensusConfig,
     randomness_config: OnChainRandomnessConfig,
     jwk_consensus_config: OnChainJWKConsensusConfig,
+    chunky_dkg_config: OnChainChunkyDKGConfig,
     fast_rand_config: Option<RandConfig>,
     // Stores the order votes from all the rounds above highest_ordered_round
     pending_order_votes: PendingOrderVotes,
@@ -391,6 +392,7 @@ impl RoundManager {
             local_config,
             randomness_config,
             jwk_consensus_config,
+            chunky_dkg_config: OnChainChunkyDKGConfig::Off,
             fast_rand_config,
             pending_order_votes: PendingOrderVotes::new(),
             blocks_with_broadcasted_fast_shares: LruCache::new(
@@ -1140,7 +1142,12 @@ impl RoundManager {
             for vtxn in vtxns {
                 let vtxn_type_name = vtxn.type_name();
                 ensure!(
-                    is_vtxn_expected(&self.randomness_config, &self.jwk_consensus_config, vtxn),
+                    is_vtxn_expected(
+                        &self.randomness_config,
+                        &self.jwk_consensus_config,
+                        &self.chunky_dkg_config,
+                        vtxn
+                    ),
                     "unexpected validator txn: {:?}",
                     vtxn_type_name
                 );

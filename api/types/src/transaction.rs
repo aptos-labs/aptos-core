@@ -20,7 +20,9 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     block_metadata_ext::BlockMetadataExt,
     contract_event::{ContractEvent, EventWithVersion},
-    dkg::{DKGTranscript, DKGTranscriptMetadata},
+    dkg::{
+        chunky_dkg::CertifiedAggregatedChunkySubtranscript, DKGTranscript, DKGTranscriptMetadata,
+    },
     function_info::FunctionInfo,
     jwks::{jwk::JWK, ProviderJWKs, QuorumCertifiedUpdate},
     keyless,
@@ -696,6 +698,7 @@ impl BlockMetadataTransaction {
 pub enum ValidatorTransaction {
     ObservedJwkUpdate(JWKUpdateTransaction),
     DkgResult(DKGResultTransaction),
+    ChunkyDKGResult(ChunkyDKGResultTransaction),
 }
 
 impl ValidatorTransaction {
@@ -705,6 +708,7 @@ impl ValidatorTransaction {
                 "validator_transaction__observed_jwk_update"
             },
             ValidatorTransaction::DkgResult(_) => "validator_transaction__dkg_result",
+            ValidatorTransaction::ChunkyDKGResult(_) => "validator_transaction__chunky_dkg_result",
         }
     }
 
@@ -712,6 +716,7 @@ impl ValidatorTransaction {
         match self {
             ValidatorTransaction::ObservedJwkUpdate(t) => &t.info,
             ValidatorTransaction::DkgResult(t) => &t.info,
+            ValidatorTransaction::ChunkyDKGResult(t) => &t.info,
         }
     }
 
@@ -719,6 +724,7 @@ impl ValidatorTransaction {
         match self {
             ValidatorTransaction::ObservedJwkUpdate(t) => &mut t.info,
             ValidatorTransaction::DkgResult(t) => &mut t.info,
+            ValidatorTransaction::ChunkyDKGResult(t) => &mut t.info,
         }
     }
 
@@ -726,6 +732,7 @@ impl ValidatorTransaction {
         match self {
             ValidatorTransaction::ObservedJwkUpdate(t) => t.timestamp,
             ValidatorTransaction::DkgResult(t) => t.timestamp,
+            ValidatorTransaction::ChunkyDKGResult(t) => t.timestamp,
         }
     }
 
@@ -733,6 +740,7 @@ impl ValidatorTransaction {
         match self {
             ValidatorTransaction::ObservedJwkUpdate(t) => &t.events,
             ValidatorTransaction::DkgResult(t) => &t.events,
+            ValidatorTransaction::ChunkyDKGResult(t) => &t.events,
         }
     }
 }
@@ -770,6 +778,14 @@ impl
                 timestamp: U64::from(timestamp),
                 quorum_certified_update: quorum_certified_update.into(),
             }),
+            aptos_types::validator_txn::ValidatorTransaction::ChunkyDKGResult(certified_subtrx) => {
+                Self::ChunkyDKGResult(ChunkyDKGResultTransaction {
+                    info,
+                    events,
+                    timestamp: U64::from(timestamp),
+                    certified_subtrx: certified_subtrx.into(),
+                })
+            },
         }
     }
 }
@@ -874,6 +890,45 @@ impl From<DKGTranscript> for ExportedDKGTranscript {
             epoch: epoch.into(),
             author: author.into(),
             payload: HexEncodedBytes::from(transcript_bytes),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct ChunkyDKGResultTransaction {
+    #[serde(flatten)]
+    #[oai(flatten)]
+    pub info: TransactionInfo,
+    pub events: Vec<Event>,
+    pub timestamp: U64,
+    pub certified_subtrx: ExportedCertifiedAggregatedChunkySubtranscript,
+}
+
+/// A more API-friendly representation of the on-chain
+/// `aptos_types::dkg::chunky_dkg::CertifiedAggregatedChunkySubtranscript`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct ExportedCertifiedAggregatedChunkySubtranscript {
+    pub epoch: U64,
+    pub author: Address,
+    pub subtrx: HexEncodedBytes,
+    pub signature: ExportedAggregateSignature,
+}
+
+impl From<CertifiedAggregatedChunkySubtranscript>
+    for ExportedCertifiedAggregatedChunkySubtranscript
+{
+    fn from(value: CertifiedAggregatedChunkySubtranscript) -> Self {
+        let CertifiedAggregatedChunkySubtranscript {
+            metadata,
+            transcript_bytes,
+            signature,
+        } = value;
+        let DKGTranscriptMetadata { epoch, author } = metadata;
+        Self {
+            epoch: epoch.into(),
+            author: author.into(),
+            subtrx: HexEncodedBytes::from(transcript_bytes),
+            signature: signature.into(),
         }
     }
 }

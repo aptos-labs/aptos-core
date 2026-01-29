@@ -426,6 +426,13 @@ BlockType:
       OptimisticProposal:
         NEWTYPE:
           TYPENAME: OptBlockBody
+CertifiedAggregatedChunkySubtranscript:
+  STRUCT:
+    - metadata:
+        TYPENAME: DKGTranscriptMetadata
+    - transcript_bytes: BYTES
+    - signature:
+        TYPENAME: AggregateSignature
 ChainId:
   NEWTYPESTRUCT: U8
 ChangeSet:
@@ -1538,6 +1545,10 @@ ValidatorTransaction:
       ObservedJWKUpdate:
         NEWTYPE:
           TYPENAME: QuorumCertifiedUpdate
+    2:
+      ChunkyDKGResult:
+        NEWTYPE:
+          TYPENAME: CertifiedAggregatedChunkySubtranscript
 ValidatorVerifier:
   STRUCT:
     - validator_infos:
