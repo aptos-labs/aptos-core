@@ -5,7 +5,7 @@ module aptos_framework::fungible_asset {
     use aptos_framework::create_signer;
     use aptos_framework::event;
     use aptos_framework::function_info::{Self, FunctionInfo};
-    use aptos_framework::object::{Self, Object, ConstructorRef, DeleteRef, ExtendRef};
+    use aptos_framework::object::{Object, ConstructorRef, DeleteRef, ExtendRef};
     use aptos_framework::permissioned_signer;
     use std::string;
     use std::features;
@@ -14,6 +14,9 @@ module aptos_framework::fungible_asset {
     use std::option::{Self, Option};
     use std::signer;
     use std::string::String;
+
+    #[test_only]
+    use aptos_framework::object;
 
     friend aptos_framework::coin;
     friend aptos_framework::primary_fungible_store;

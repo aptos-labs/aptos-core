@@ -2,15 +2,15 @@ spec aptos_std::bls12381 {
 
     spec public_key_from_bytes {
         aborts_if false;
-        ensures spec_validate_pubkey_internal(bytes) ==> (std::option::is_some(result) && std::option::borrow(result).bytes == bytes);
-        ensures !spec_validate_pubkey_internal(bytes) ==> std::option::is_none(result);
+        ensures spec_validate_pubkey_internal(bytes) ==> (result.is_some() && result.borrow().bytes == bytes);
+        ensures !spec_validate_pubkey_internal(bytes) ==> result.is_none();
     }
 
     spec public_key_from_bytes_with_pop {
         pragma opaque;
         aborts_if false;
-        ensures spec_verify_proof_of_possession_internal(pk_bytes, pop.bytes) ==> (std::option::is_some(result) && std::option::borrow(result).bytes == pk_bytes);
-        ensures !spec_verify_proof_of_possession_internal(pk_bytes, pop.bytes) ==> std::option::is_none(result);
+        ensures spec_verify_proof_of_possession_internal(pk_bytes, pop.bytes) ==> (result.is_some() && result.borrow().bytes == pk_bytes);
+        ensures !spec_verify_proof_of_possession_internal(pk_bytes, pop.bytes) ==> result.is_none();
         ensures [abstract] result == spec_public_key_from_bytes_with_pop(pk_bytes, pop);
     }
 
@@ -32,8 +32,8 @@ spec aptos_std::bls12381 {
         aborts_if false;
         let bytes = spec_aggregate_signatures_internal_1(signatures);
         let success = spec_aggregate_signatures_internal_2(signatures);
-        ensures success ==> (std::option::is_some(result) && std::option::borrow(result).bytes == bytes);
-        ensures !success ==> std::option::is_none(result);
+        ensures success ==> (result.is_some() && result.borrow().bytes == bytes);
+        ensures !success ==> result.is_none();
     }
 
     spec aggregate_signatures_internal {
