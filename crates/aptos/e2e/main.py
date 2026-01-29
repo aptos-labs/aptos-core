@@ -41,8 +41,112 @@ from cases.account import (
     test_account_resource_account,
     test_account_rotate_key,
 )
+from cases.account_e2e import (
+    # Flag regression tests (CLI stability)
+    test_account_help_subcommands,
+    test_account_create_flags,
+    test_account_create_resource_account_flags,
+    test_account_derive_resource_account_flags,
+    test_account_fund_with_faucet_flags,
+    test_account_balance_flags,
+    test_account_list_flags,
+    test_account_lookup_address_flags,
+    test_account_rotate_key_flags,
+    test_account_transfer_flags,
+    # Functional E2E tests
+    test_account_balance_command,
+    test_account_balance_with_coin_type,
+    test_account_list_resources,
+    test_account_list_modules,
+    test_account_list_balance_query,
+    test_account_transfer_coins,
+    test_account_fund_with_faucet_explicit,
+    test_account_lookup_address_with_auth_key,
+    test_account_lookup_address_with_public_key,
+    test_account_derive_resource_account_address,
+    test_account_derive_resource_account_with_utf8_encoding,
+    test_account_derive_resource_account_with_hex_encoding,
+    test_account_create_resource_account,
+    test_account_rotate_key_with_skip_profile,
+    # Error handling tests
+    test_account_balance_invalid_address,
+    test_account_transfer_missing_amount,
+    test_account_create_resource_account_missing_seed,
+    # JSON output format tests
+    test_account_balance_json_format,
+    test_account_list_json_format,
+)
 from cases.config import test_config_show_profiles
+from cases.config_e2e import (
+    # Flag regression tests
+    test_config_help_subcommands,
+    test_config_generate_shell_completions_flags,
+    test_config_set_global_config_flags,
+    test_config_show_profiles_flags,
+    test_config_show_private_key_flags,
+    test_config_delete_profile_flags,
+    test_config_rename_profile_flags,
+    # Functional tests
+    test_config_show_global_config,
+    test_config_show_profiles_default,
+    test_config_show_profiles_specific,
+    test_config_show_private_key_default,
+    # Error handling tests
+    test_config_show_private_key_nonexistent_profile,
+    test_config_delete_profile_nonexistent,
+    test_config_rename_profile_nonexistent,
+)
+from cases.info_e2e import (
+    # Flag regression tests
+    test_info_help,
+    # Functional tests
+    test_info_command,
+    test_info_json_format,
+)
 from cases.init import test_aptos_header_included, test_init, test_metrics_accessible
+from cases.init_e2e import (
+    # Flag regression tests
+    test_init_help,
+    test_init_flags,
+    test_init_network_options_in_help,
+    # Functional tests
+    test_init_creates_config,
+    test_init_config_has_profile,
+    test_init_config_has_network,
+    test_init_with_named_profile,
+    test_init_with_skip_faucet,
+    test_init_with_private_key,
+    # JSON format tests
+    test_init_profiles_json_format,
+)
+from cases.key_e2e import (
+    # Flag regression tests
+    test_key_help_subcommands,
+    test_key_generate_flags,
+    test_key_extract_public_key_flags,
+    test_key_extract_peer_flags,
+    # Functional tests
+    test_key_generate_ed25519,
+    test_key_generate_x25519,
+    test_key_generate_bls12381,
+    test_key_extract_public_key,
+    # Error handling tests
+    test_key_generate_missing_output_file,
+    test_key_extract_public_key_missing_input,
+)
+from cases.update_e2e import (
+    # Flag regression tests
+    test_update_help_subcommands,
+    test_update_aptos_flags,
+    test_update_revela_flags,
+    test_update_movefmt_flags,
+    test_update_move_mutation_test_flags,
+    test_update_prover_dependencies_flags,
+    # Functional tests (check only)
+    test_update_aptos_check,
+    test_update_revela_check,
+    test_update_movefmt_check,
+)
 from cases.move import (
     test_move_compile,
     test_move_compile_script,
@@ -142,22 +246,166 @@ async def run_tests(run_helper):
     # Make sure the metrics port is accessible.
     test_metrics_accessible(run_helper)
 
+    # =========================================================================
+    # CLI Flag Regression Tests (run first - no network operations needed)
+    # These tests verify CLI interface stability and catch flag regressions.
+    # =========================================================================
+    
+    # Account subcommand flag tests
+    test_account_help_subcommands(run_helper)
+    test_account_create_flags(run_helper)
+    test_account_create_resource_account_flags(run_helper)
+    test_account_derive_resource_account_flags(run_helper)
+    test_account_fund_with_faucet_flags(run_helper)
+    test_account_balance_flags(run_helper)
+    test_account_list_flags(run_helper)
+    test_account_lookup_address_flags(run_helper)
+    test_account_rotate_key_flags(run_helper)
+    test_account_transfer_flags(run_helper)
+
+    # Config subcommand flag tests
+    test_config_help_subcommands(run_helper)
+    test_config_generate_shell_completions_flags(run_helper)
+    test_config_set_global_config_flags(run_helper)
+    test_config_show_profiles_flags(run_helper)
+    test_config_show_private_key_flags(run_helper)
+    test_config_delete_profile_flags(run_helper)
+    test_config_rename_profile_flags(run_helper)
+
+    # Info command flag tests
+    test_info_help(run_helper)
+
+    # Init command flag tests
+    test_init_help(run_helper)
+    test_init_flags(run_helper)
+    test_init_network_options_in_help(run_helper)
+
+    # Key subcommand flag tests
+    test_key_help_subcommands(run_helper)
+    test_key_generate_flags(run_helper)
+    test_key_extract_public_key_flags(run_helper)
+    test_key_extract_peer_flags(run_helper)
+
+    # Update subcommand flag tests
+    test_update_help_subcommands(run_helper)
+    test_update_aptos_flags(run_helper)
+    test_update_revela_flags(run_helper)
+    test_update_movefmt_flags(run_helper)
+    test_update_move_mutation_test_flags(run_helper)
+    test_update_prover_dependencies_flags(run_helper)
+
+    # =========================================================================
+    # Initialize CLI - must run before functional tests
+    # =========================================================================
+    
     # Run init tests. We run these first to set up the CLI.
     test_init(run_helper)
 
     # Run config tests.
     test_config_show_profiles(run_helper)
 
-    # Run account tests.
+    # =========================================================================
+    # Init Functional E2E Tests
+    # =========================================================================
+    
+    test_init_creates_config(run_helper)
+    test_init_config_has_profile(run_helper)
+    test_init_config_has_network(run_helper)
+    test_init_with_named_profile(run_helper)
+    test_init_with_skip_faucet(run_helper)
+    test_init_with_private_key(run_helper)
+    test_init_profiles_json_format(run_helper)
+
+    # =========================================================================
+    # Config Functional E2E Tests
+    # =========================================================================
+    
+    test_config_show_global_config(run_helper)
+    test_config_show_profiles_default(run_helper)
+    test_config_show_profiles_specific(run_helper)
+    test_config_show_private_key_default(run_helper)
+    
+    # Config error handling tests
+    test_config_show_private_key_nonexistent_profile(run_helper)
+    test_config_delete_profile_nonexistent(run_helper)
+    test_config_rename_profile_nonexistent(run_helper)
+
+    # =========================================================================
+    # Info Functional E2E Tests
+    # =========================================================================
+    
+    test_info_command(run_helper)
+    test_info_json_format(run_helper)
+
+    # =========================================================================
+    # Key Functional E2E Tests
+    # =========================================================================
+    
+    test_key_generate_ed25519(run_helper)
+    test_key_generate_x25519(run_helper)
+    test_key_generate_bls12381(run_helper)
+    test_key_extract_public_key(run_helper)
+    
+    # Key error handling tests
+    test_key_generate_missing_output_file(run_helper)
+    test_key_extract_public_key_missing_input(run_helper)
+
+    # =========================================================================
+    # Update Functional E2E Tests (check only, no actual updates)
+    # =========================================================================
+    
+    test_update_aptos_check(run_helper)
+    test_update_revela_check(run_helper)
+    test_update_movefmt_check(run_helper)
+
+    # =========================================================================
+    # Account Functional E2E Tests
+    # =========================================================================
+    
+    # Original account tests
     await test_account_fund_with_faucet(run_helper)
     await test_account_create_and_transfer(run_helper)
     test_account_list(run_helper)
     test_account_lookup_address(run_helper)
     test_account_resource_account(run_helper)
 
+    # New comprehensive account tests - balance
+    await test_account_balance_command(run_helper)
+    test_account_balance_with_coin_type(run_helper)
+    test_account_balance_json_format(run_helper)
+    
+    # New comprehensive account tests - list
+    test_account_list_resources(run_helper)
+    test_account_list_modules(run_helper)
+    test_account_list_balance_query(run_helper)
+    test_account_list_json_format(run_helper)
+    
+    # New comprehensive account tests - lookup address
+    test_account_lookup_address_with_auth_key(run_helper)
+    test_account_lookup_address_with_public_key(run_helper)
+    
+    # New comprehensive account tests - derive resource account
+    test_account_derive_resource_account_address(run_helper)
+    test_account_derive_resource_account_with_utf8_encoding(run_helper)
+    test_account_derive_resource_account_with_hex_encoding(run_helper)
+    
+    # New comprehensive account tests - create operations
+    await test_account_transfer_coins(run_helper)
+    await test_account_fund_with_faucet_explicit(run_helper)
+    test_account_create_resource_account(run_helper)
+    
+    # Error handling tests
+    test_account_balance_invalid_address(run_helper)
+    test_account_transfer_missing_amount(run_helper)
+    test_account_create_resource_account_missing_seed(run_helper)
+
     # Make sure the aptos-cli header is included on the original request
     test_aptos_header_included(run_helper)
 
+    # =========================================================================
+    # Move Subcommand Tests
+    # =========================================================================
+    
     # Run move subcommand group tests.
     test_move_compile(run_helper)
     test_move_compile_script(run_helper)
@@ -179,14 +427,23 @@ async def run_tests(run_helper):
     test_stake_request_commission(run_helper)
     """
 
+    # =========================================================================
+    # Node Subcommand Tests
+    # =========================================================================
+    
     # Run node subcommand group tests.
     time.sleep(5)
     test_node_show_validator_set(run_helper)
     test_node_update_consensus_key(run_helper)
     test_node_update_validator_network_address(run_helper)
 
-    # WARNING: This has to stay at the end, else key will get rotated
+    # =========================================================================
+    # Key Rotation Tests - MUST BE LAST (changes authentication)
+    # =========================================================================
+    
+    # WARNING: These must stay at the end, else key will get rotated
     test_account_rotate_key(run_helper)
+    test_account_rotate_key_with_skip_profile(run_helper)
 
 
 async def main():
