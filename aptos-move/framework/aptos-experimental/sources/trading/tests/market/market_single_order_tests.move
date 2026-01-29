@@ -37,7 +37,10 @@ module aptos_experimental::market_single_order_tests {
         test_gtc_taker_fully_filled_internal,
         test_gtc_taker_partially_filled_helper,
         test_post_only_success_helper,
-        test_post_only_failure_helper, test_self_matching_not_allowed_helper, test_self_matching_allowed_helper,
+        test_post_only_failure_helper,
+        test_self_matching_not_allowed_helper,
+        test_self_matching_allowed_helper,
+        test_clearinghouse_stopped_matching_reason_helper,
     };
 
     const PRE_CANCEL_WINDOW_MICROS: u64 = 1000000; // 1 second
@@ -379,6 +382,20 @@ module aptos_experimental::market_single_order_tests {
         taker: &signer
     ) {
         test_taker_partial_cancelled_maker_reinserted_helper(admin, market_signer, maker, taker, false);
+    }
+
+    #[test(
+        admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
+    )]
+    /// Test that when clearinghouse signals stop matching without a taker cancellation reason,
+    /// the order returns ClearinghouseStoppedMatching as the cancellation reason.
+    public fun test_clearinghouse_stopped_matching_reason(
+        admin: &signer,
+        market_signer: &signer,
+        maker: &signer,
+        taker: &signer
+    ) {
+        test_clearinghouse_stopped_matching_reason_helper(admin, market_signer, maker, taker);
     }
 
     #[test(
