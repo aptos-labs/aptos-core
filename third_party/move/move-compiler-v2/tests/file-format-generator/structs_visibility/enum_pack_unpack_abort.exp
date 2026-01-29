@@ -9,70 +9,70 @@ enum Result<T0: copy + drop, T1: copy + drop> has copy + drop
     _0: T1
 
 // Function definition at index 0
-public fun test_variant$Result$Ok<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): bool
+#[test_variant] public fun test_variant$Result$Ok<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): bool
     local l1: &Result<T0, T1>
     move_loc l0
     test_variant Result<T0, T1>, Ok
     ret
 
 // Function definition at index 1
-public fun test_variant$Result$Err<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): bool
+#[test_variant] public fun test_variant$Result$Err<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): bool
     local l1: &Result<T0, T1>
     move_loc l0
     test_variant Result<T0, T1>, Err
     ret
 
 // Function definition at index 2
-public fun pack$Result$Ok<T0: copy + drop, T1: copy + drop>(l0: T0): Result<T0, T1>
+#[pack_variant] public fun pack$Result$Ok<T0: copy + drop, T1: copy + drop>(l0: T0): Result<T0, T1>
     local l1: T0
     move_loc l0
     pack_variant Result<T0, T1>, Ok
     ret
 
 // Function definition at index 3
-public fun pack$Result$Err<T0: copy + drop, T1: copy + drop>(l0: T1): Result<T0, T1>
+#[pack_variant] public fun pack$Result$Err<T0: copy + drop, T1: copy + drop>(l0: T1): Result<T0, T1>
     local l1: T1
     move_loc l0
     pack_variant Result<T0, T1>, Err
     ret
 
 // Function definition at index 4
-public fun unpack$Result$Ok<T0: copy + drop, T1: copy + drop>(l0: Result<T0, T1>): T0
+#[unpack_variant] public fun unpack$Result$Ok<T0: copy + drop, T1: copy + drop>(l0: Result<T0, T1>): T0
     local l1: Result<T0, T1>
     move_loc l0
     unpack_variant Result<T0, T1>, Ok
     ret
 
 // Function definition at index 5
-public fun unpack$Result$Err<T0: copy + drop, T1: copy + drop>(l0: Result<T0, T1>): T1
+#[unpack_variant] public fun unpack$Result$Err<T0: copy + drop, T1: copy + drop>(l0: Result<T0, T1>): T1
     local l1: Result<T0, T1>
     move_loc l0
     unpack_variant Result<T0, T1>, Err
     ret
 
 // Function definition at index 6
-public fun borrow$Result$0$0<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): &T0
+#[borrow] public fun borrow$Result$0$0<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): &T0
     local l1: &Result<T0, T1>
     move_loc l0
     borrow_variant_field Result<T0, T1>, Ok::_0
     ret
 
 // Function definition at index 7
-public fun borrow$Result$0$1<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): &T1
+#[borrow] public fun borrow$Result$0$1<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): &T1
     local l1: &Result<T0, T1>
     move_loc l0
     borrow_variant_field Result<T0, T1>, Err::_0
     ret
 
 // Function definition at index 8
-public fun borrow_mut$Result$0$0<T0: copy + drop, T1: copy + drop>(l0: &mut Result<T0, T1>): &mut T0
+#[borrow_mut] public fun borrow_mut$Result$0$0<T0: copy + drop, T1: copy + drop>(l0: &mut Result<T0, T1>): &mut T0
     local l1: &mut Result<T0, T1>
     move_loc l0
     mut_borrow_variant_field Result<T0, T1>, Ok::_0
     ret
 
 // Function definition at index 9
-public fun borrow_mut$Result$0$1<T0: copy + drop, T1: copy + drop>(l0: &mut Result<T0, T1>): &mut T1
+#[borrow_mut] public fun borrow_mut$Result$0$1<T0: copy + drop, T1: copy + drop>(l0: &mut Result<T0, T1>): &mut T1
     local l1: &mut Result<T0, T1>
     move_loc l0
     mut_borrow_variant_field Result<T0, T1>, Err::_0

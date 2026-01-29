@@ -6,28 +6,28 @@ struct Scalar has copy + drop + store
   data: vector<u8>
 
 // Function definition at index 0
-public fun pack$Scalar(l0: vector<u8>): Scalar
+#[pack] public fun pack$Scalar(l0: vector<u8>): Scalar
     local l1: vector<u8>
     move_loc l0
     pack Scalar
     ret
 
 // Function definition at index 1
-public fun unpack$Scalar(l0: Scalar): vector<u8>
+#[unpack] public fun unpack$Scalar(l0: Scalar): vector<u8>
     local l1: Scalar
     move_loc l0
     unpack Scalar
     ret
 
 // Function definition at index 2
-public fun borrow$Scalar$0(l0: &Scalar): &vector<u8>
+#[borrow] public fun borrow$Scalar$0(l0: &Scalar): &vector<u8>
     local l1: &Scalar
     move_loc l0
     borrow_field Scalar, data
     ret
 
 // Function definition at index 3
-public fun borrow_mut$Scalar$0(l0: &mut Scalar): &mut vector<u8>
+#[borrow_mut] public fun borrow_mut$Scalar$0(l0: &mut Scalar): &mut vector<u8>
     local l1: &mut Scalar
     move_loc l0
     mut_borrow_field Scalar, data
