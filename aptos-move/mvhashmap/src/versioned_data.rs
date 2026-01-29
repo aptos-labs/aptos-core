@@ -642,9 +642,10 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
         //
         // Special case for incarnation 0: Pre-write optimization may write the same key-value
         // at incarnation 0 before execution starts. When execution later writes the same value
-        // at incarnation 0, we allow this as long as the values are identical. This is safe
-        // because identical values have no semantic difference.
-        if !prev_entry.is_none_or(|entry| -> bool {
+        // at incarnation 0, we allow this as long as the values are identical and neither has
+        // a layout. Values with layouts (delayed fields) require special handling and cannot
+        // be safely compared this way.
+        if let Some(entry) = prev_entry {
             if let EntryCell::ResourceWrite {
                 incarnation: prev_incarnation,
                 value_with_layout: prev_value,
@@ -652,21 +653,37 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
             } = &entry.value
             {
                 // For BlockSTMv1, the dependencies are always empty.
-                *prev_incarnation < incarnation
-                    || (incarnation == 0
-                        && prev_value.extract_value_no_layout()
-                            == value_clone.extract_value_no_layout())
                 // TODO(BlockSTMv2): when AggregatorV1 is deprecated, we can assert that
                 // prev_dependencies is empty: they must have been drained beforehand
                 // (into dependencies) if there was an entry at the same index before.
-            } else {
-                true
+                if *prev_incarnation >= incarnation {
+                    // At incarnation 0, allow overwrite if values match and neither has a layout.
+                    // This supports the pre-write optimization where we pre-populate MVHashMap.
+                    if incarnation == 0
+                        && !prev_value.has_layout()
+                        && !value_clone.has_layout()
+                        && prev_value.extract_value() == value_clone.extract_value()
+                    {
+                        return Ok(());
+                    }
+
+                    // Determine the error cause for a more descriptive message.
+                    let error_cause = if incarnation == 0 && *prev_incarnation == 0 {
+                        if prev_value.has_layout() || value_clone.has_layout() {
+                            "pre-write mismatch: values have layouts that cannot be compared"
+                        } else {
+                            "pre-write mismatch: values differ"
+                        }
+                    } else {
+                        "incarnation regression"
+                    };
+
+                    return Err(code_invariant_error(format!(
+                        "Write failed for txn_idx {} ({}): prev_incarnation={}, current_incarnation={}",
+                        txn_idx, error_cause, prev_incarnation, incarnation
+                    )));
+                }
             }
-        }) {
-            return Err(code_invariant_error(format!(
-                "Previous entry for txn_idx {} had invalid incarnation. Current incarnation: {}",
-                txn_idx, incarnation
-            )));
         }
         Ok(())
     }
