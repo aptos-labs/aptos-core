@@ -44,3 +44,6 @@ cargo sort --grouped --workspace $CHECK_ARG
 
 # Check for unused rust dependencies.
 cargo machete
+
+# Check that no files (e.g. Cargo.lock) are changed in the above process.
+git diff --exit-code
