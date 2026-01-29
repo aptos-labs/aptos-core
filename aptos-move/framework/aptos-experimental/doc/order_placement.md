@@ -70,6 +70,7 @@ TimeBased(time): The order is triggered when the current time is greater than or
 -  [Function `is_ioc_violation`](#0x7_order_placement_is_ioc_violation)
 -  [Function `is_fill_limit_violation`](#0x7_order_placement_is_fill_limit_violation)
 -  [Function `is_dead_mans_switch_expired`](#0x7_order_placement_is_dead_mans_switch_expired)
+-  [Function `is_clearinghouse_stopped_matching`](#0x7_order_placement_is_clearinghouse_stopped_matching)
 -  [Function `get_order_id`](#0x7_order_placement_get_order_id)
 -  [Function `place_limit_order`](#0x7_order_placement_place_limit_order)
 -  [Function `place_market_order`](#0x7_order_placement_place_market_order)
@@ -437,6 +438,32 @@ Includes fills and cancels
     cancel_reason: OrderCancellationReason
 ): bool {
     cancel_reason == <a href="market_types.md#0x7_market_types_order_cancellation_reason_dead_mans_switch_expired">market_types::order_cancellation_reason_dead_mans_switch_expired</a>()
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_placement_is_clearinghouse_stopped_matching"></a>
+
+## Function `is_clearinghouse_stopped_matching`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_placement.md#0x7_order_placement_is_clearinghouse_stopped_matching">is_clearinghouse_stopped_matching</a>(cancel_reason: <a href="market_types.md#0x7_market_types_OrderCancellationReason">market_types::OrderCancellationReason</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_placement.md#0x7_order_placement_is_clearinghouse_stopped_matching">is_clearinghouse_stopped_matching</a>(
+    cancel_reason: OrderCancellationReason
+): bool {
+    cancel_reason == <a href="market_types.md#0x7_market_types_order_cancellation_reason_clearinghouse_stopped_matching">market_types::order_cancellation_reason_clearinghouse_stopped_matching</a>()
 }
 </code></pre>
 
@@ -1593,23 +1620,22 @@ is done before calling this function if needed.
                 match_count
             }
         };
-        <b>if</b> (should_stop) {
-            <b>return</b> OrderMatchResult::V1 {
-                order_id,
-                remaining_size,
-                cancel_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
-                fill_sizes,
-                callback_results,
-                match_count
-            }
-        };
         <b>if</b> (remaining_size == 0) {
             <a href="order_placement.md#0x7_order_placement_cleanup_order_internal">cleanup_order_internal</a>(
                 user_addr, order_id, client_order_id, single_order_type(), is_bid, time_in_force, 0, limit_price, trigger_condition, metadata, callbacks, <b>true</b>
             );
             <b>break</b>;
         };
-
+        <b>if</b> (should_stop) {
+            <b>return</b> OrderMatchResult::V1 {
+                order_id,
+                remaining_size,
+                cancel_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(order_cancellation_reason_clearinghouse_stopped_matching()),
+                fill_sizes,
+                callback_results,
+                match_count
+            }
+        };
         // Check <b>if</b> the next iteration will still match
         <b>let</b> is_taker_order =
             market.is_taker_order(limit_price, is_bid, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>());
