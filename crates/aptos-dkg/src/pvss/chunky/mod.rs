@@ -16,7 +16,9 @@ pub mod public_parameters;
 mod weighted_transcript;
 mod weighted_transcriptv2;
 
-pub use public_parameters::DEFAULT_ELL_FOR_TESTING;
+pub use input_secret::InputSecret;
+pub use keys::EncryptPubKey;
+pub use public_parameters::{PublicParameters, DEFAULT_ELL_FOR_TESTING};
 pub use weighted_transcript::{
     Subtranscript as WeightedSubtranscript, Transcript as UnsignedWeightedTranscript,
 };
