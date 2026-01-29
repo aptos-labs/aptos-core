@@ -339,7 +339,7 @@ and there is unique owner for each slot.
 
 <pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_allocate_spare_slots">allocate_spare_slots</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">StorageSlotsAllocator</a>&lt;T&gt;, num_to_allocate: u64) {
     <b>assert</b>!(self.should_reuse, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_ECANNOT_HAVE_SPARES_WITHOUT_REUSE">ECANNOT_HAVE_SPARES_WITHOUT_REUSE</a>));
-    for (i in 0..num_to_allocate) {
+    for (_i in 0..num_to_allocate) {
         <b>let</b> slot_index = self.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_next_slot_index">next_slot_index</a>();
         self.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_maybe_push_to_reuse_queue">maybe_push_to_reuse_queue</a>(slot_index);
     };
