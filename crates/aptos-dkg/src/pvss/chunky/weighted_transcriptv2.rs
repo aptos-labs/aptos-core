@@ -16,7 +16,9 @@ use crate::{
         },
         traits::{
             self,
-            transcript::{Aggregatable, HasAggregatableSubtranscript, MalleableTranscript},
+            transcript::{
+                Aggregatable, Aggregated, HasAggregatableSubtranscript, MalleableTranscript,
+            },
         },
         Player,
     },
@@ -644,10 +646,21 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 }
 
 impl<E: Pairing> Aggregatable for Subtranscript<E> {
+    type Aggregated = Self;
     type SecretSharingConfig = SecretSharingConfig<E>;
 
+    fn to_aggregated(&self) -> Self::Aggregated {
+        self.clone()
+    }
+}
+
+impl<E: Pairing> Aggregated<Subtranscript<E>> for Subtranscript<E> {
     #[allow(non_snake_case)]
-    fn aggregate_with(&mut self, sc: &SecretSharingConfig<E>, other: &Self) -> anyhow::Result<()> {
+    fn aggregate_with(
+        &mut self,
+        sc: &SecretSharingConfig<E>,
+        other: &Subtranscript<E>,
+    ) -> anyhow::Result<()> {
         debug_assert_eq!(self.Cs.len(), sc.get_total_num_players());
         debug_assert_eq!(self.Vs.len(), sc.get_total_num_players());
         debug_assert_eq!(self.Cs.len(), other.Cs.len());
@@ -676,6 +689,10 @@ impl<E: Pairing> Aggregatable for Subtranscript<E> {
         }
 
         Ok(())
+    }
+
+    fn normalize(self) -> Subtranscript<E> {
+        self
     }
 }
 

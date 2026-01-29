@@ -23,7 +23,7 @@ use aptos_dkg::pvss::{
         reconstruct_dealt_secret_key_randomly, NoAux,
     },
     traits::{
-        transcript::{HasAggregatableSubtranscript, Transcript, WithMaxNumShares},
+        transcript::{Aggregated, HasAggregatableSubtranscript, Transcript, WithMaxNumShares},
         Subtranscript,
     },
     GenericWeighting, ThresholdConfigBlstrs,
@@ -255,12 +255,14 @@ fn test_pvss_aggregate_subtranscript_and_decrypt<E: Pairing, T>(
         .collect();
 
     // Use the first player's transcript as the accumulator
-    let mut agg = all_trs[0].get_subtranscript();
+    let mut agg = all_trs[0].get_subtranscript().to_aggregated();
 
     // Aggregate all other transcripts into it
     for trs in all_trs.iter().skip(1) {
         agg.aggregate_with(&sc, &trs.get_subtranscript()).unwrap();
     }
+
+    let agg = agg.normalize();
 
     #[allow(unused_variables)]
     let final_share = agg.decrypt_own_share(sc, &sc.get_player(0), &d.dks[0], &d.pp);
