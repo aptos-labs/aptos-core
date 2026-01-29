@@ -77,7 +77,7 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         let (mpk, vks, msk_shares) = key_derivation::gen_msk_shares(msk, &mut rng, tc);
 
         let ek = AugmentedEncryptionKey {
-            sig_mpk_g2: mpk.0,
+            sig_mpk_g2: mpk,
             tau_g2: digest_key.tau_g2,
             tau_mpk_g2: (digest_key.tau_g2 * msk).into(),
         };
@@ -180,6 +180,14 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         decryption_key_share: &Self::DecryptionKeyShare,
     ) -> anyhow::Result<()> {
         verification_key_share.verify_decryption_key_share(digest, decryption_key_share)
+    }
+
+    fn verify_decryption_key(
+        encryption_key: &Self::EncryptionKey,
+        digest: &Self::Digest,
+        decryption_key: &Self::DecryptionKey,
+    ) -> Result<()> {
+        encryption_key.verify_decryption_key(digest, decryption_key)
     }
 
     fn decrypt_individual<P: Plaintext>(

@@ -80,7 +80,7 @@ impl BatchThresholdEncryption for FPTX {
             key_derivation::gen_msk_shares(msk, &mut rng, threshold_config);
 
         let ek = EncryptionKey {
-            sig_mpk_g2: mpk.0,
+            sig_mpk_g2: mpk,
             tau_g2: digest_key.tau_g2,
         };
 
@@ -182,6 +182,14 @@ impl BatchThresholdEncryption for FPTX {
         decryption_key_share: &Self::DecryptionKeyShare,
     ) -> anyhow::Result<()> {
         verification_key_share.verify_decryption_key_share(digest, decryption_key_share)
+    }
+
+    fn verify_decryption_key(
+        encryption_key: &Self::EncryptionKey,
+        digest: &Self::Digest,
+        decryption_key: &Self::DecryptionKey,
+    ) -> Result<()> {
+        encryption_key.verify_decryption_key(digest, decryption_key)
     }
 
     fn decrypt_individual<P: Plaintext>(
