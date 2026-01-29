@@ -1,5 +1,5 @@
 processed 2 tasks
-task 0 lines 1-12:  run [main() {]
+task 0 lines 1-18:  run [script]
 Error: Script execution failed with VMError: {
     major_status: VEC_UPDATE_EXISTS_MUTABLE_BORROW_ERROR,
     sub_status: None,
@@ -7,7 +7,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 10)],
 }
-task 1 lines 14-25:  run [main() {]
+task 1 lines 22-39:  run [script]
 Error: Script execution failed with VMError: {
     major_status: VEC_UPDATE_EXISTS_MUTABLE_BORROW_ERROR,
     sub_status: None,

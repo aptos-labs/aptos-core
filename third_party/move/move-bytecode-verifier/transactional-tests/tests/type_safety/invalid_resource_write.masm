@@ -1,0 +1,17 @@
+//# publish
+module 0x42::RTest
+struct Coin has store
+  value: u64
+
+struct T
+  f: Coin
+
+public fun update(l0: &mut T, l1: Coin)
+    local l2: &mut Coin
+    move_loc l0
+    mut_borrow_field T, f
+    st_loc l2
+    move_loc l1
+    move_loc l2
+    write_ref
+    ret

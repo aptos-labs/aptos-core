@@ -1,0 +1,31 @@
+//# publish
+module 0x1::M
+struct Foo<T0>
+  x: T0
+
+fun foo()
+    local l0: u64
+    ld_u64 42
+    pack Foo<u64>
+    unpack Foo<u64>
+    st_loc l0
+    ret
+
+
+
+//# publish
+module 0x1::N
+struct Foo<T0: copy + drop, T1>
+  x: T0
+  y: T1
+
+fun foo()
+    local l0: u64
+    local l1: bool
+    ld_u64 42
+    ld_true
+    pack Foo<u64, bool>
+    unpack Foo<u64, bool>
+    st_loc l1
+    st_loc l0
+    ret

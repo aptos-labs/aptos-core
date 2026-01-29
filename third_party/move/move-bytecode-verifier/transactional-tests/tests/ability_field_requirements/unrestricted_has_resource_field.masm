@@ -1,0 +1,9 @@
+//# publish
+module 0x42::Test
+use 0x1::XUS
+struct Coin has store
+  value: u64
+
+struct T has copy + drop
+  fc: Coin
+  fint: u64

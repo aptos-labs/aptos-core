@@ -1,0 +1,45 @@
+//# run
+script
+entry public fun main()
+    ld_u8 3
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u16 3
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u32 3
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 3
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 3
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u256 3
+    ret

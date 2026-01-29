@@ -1,0 +1,34 @@
+//# publish
+module 0x1::Token
+struct T has key
+  b: bool
+
+public fun test()
+    local l0: T
+    local l1: &T
+    local l2: bool
+    ld_true
+    pack T
+    st_loc l0
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    move_loc l1
+    eq
+    not
+    br_false l0
+    ld_u64 42
+    abort
+l0: move_loc l0
+    unpack T
+    st_loc l2
+    ret
+
+
+
+//# run
+script
+use 0x1::Token
+entry public fun main()
+    call Token::test
+    ret

@@ -1,0 +1,22 @@
+//# publish
+module 0x1::A
+struct S
+  value: u64
+
+public fun t(l0: bool, l1: &mut S)
+    move_loc l0
+    br_true l0
+    ret
+l0: move_loc l1
+    mut_borrow_field S, value
+    call foo
+    ret
+
+fun foo(l0: &mut u64)
+    copy_loc l0
+    read_ref
+    ld_u64 1
+    add
+    copy_loc l0
+    write_ref
+    ret

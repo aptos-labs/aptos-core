@@ -1,0 +1,50 @@
+//# publish
+module 0x22::A
+struct A has key
+  x: u64
+
+struct B has store
+  x: u64
+
+struct C has store
+  x: u64
+
+public fun make(): C
+    ld_u64 0
+    pack C
+    ret
+
+public fun store(l0: &B, l1: &signer)
+    move_loc l1
+    ld_u64 0
+    pack A
+    move_to A
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::A
+entry public fun main(l0: signer)
+    local l1: A::C
+    call A::make
+    st_loc l1
+    borrow_loc l1
+    borrow_loc l0
+    call A::store
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::A
+entry public fun main(l0: signer)
+    local l1: A::C
+    call A::make
+    st_loc l1
+    borrow_loc l1
+    borrow_loc l0
+    call A::store
+    ret

@@ -1,0 +1,7 @@
+//# publish
+module 0x43::M
+
+
+//# publish
+module 0x44::N
+friend 0x43::M

@@ -1,0 +1,144 @@
+//# publish
+module 0x1::M
+struct R
+  f: bool
+
+fun t0()
+    local l0: R
+    local l1: bool
+    ld_false
+    pack R
+    st_loc l0
+    ld_true
+    br_true l0
+    move_loc l0
+    unpack R
+    st_loc l1
+    ld_false
+    pack R
+    st_loc l0
+    branch l1
+l0: move_loc l0
+    unpack R
+    st_loc l1
+l1: move_loc l0
+    unpack R
+    st_loc l1
+    ret
+
+
+
+//# publish
+module 0x1::M
+struct R
+  f: bool
+
+fun t0()
+    local l0: R
+    local l1: bool
+    ld_false
+    pack R
+    st_loc l0
+    ld_true
+    br_true l0
+    move_loc l0
+    unpack R
+    st_loc l1
+    ld_false
+    pack R
+    st_loc l0
+    branch l1
+l0: move_loc l0
+    unpack R
+    st_loc l1
+l1: ret
+
+
+
+//# publish
+module 0x1::M
+struct R
+  f: bool
+
+fun t0()
+    local l0: R
+    local l1: bool
+    ld_false
+    pack R
+    st_loc l0
+    ld_true
+    br_true l0
+    move_loc l0
+    unpack R
+    st_loc l1
+    ld_false
+    pack R
+    st_loc l0
+    branch l1
+l0: move_loc l0
+    unpack R
+    st_loc l1
+l1: ld_false
+    pack R
+    st_loc l0
+    ret
+
+
+
+//# publish
+module 0x1::M
+struct R has copy + drop
+  f: bool
+
+fun t0()
+    local l0: R
+    local l1: bool
+    ld_false
+    pack R
+    st_loc l0
+    ld_true
+    br_true l0
+    move_loc l0
+    unpack R
+    st_loc l1
+    ld_false
+    pack R
+    st_loc l0
+    branch l1
+l0: move_loc l0
+    unpack R
+    st_loc l1
+l1: copy_loc l0
+    unpack R
+    st_loc l1
+    ret
+
+
+
+//# publish
+module 0x1::M
+struct R
+  f: bool
+
+fun t0()
+    local l0: R
+    local l1: &R
+    local l2: bool
+    ld_false
+    pack R
+    st_loc l0
+    ld_true
+    br_true l0
+    move_loc l0
+    unpack R
+    st_loc l2
+    ld_false
+    pack R
+    st_loc l0
+    branch l1
+l0: move_loc l0
+    unpack R
+    st_loc l2
+l1: borrow_loc l0
+    st_loc l1
+    ret
