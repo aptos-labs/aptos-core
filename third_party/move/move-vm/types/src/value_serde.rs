@@ -149,7 +149,10 @@ impl<'a> ValueSerDeContext<'a> {
     }
 
     pub(crate) fn check_depth(&self, depth: u64) -> PartialVMResult<()> {
-        if self.max_value_nested_depth.unwrap_or(2048).lt(&depth) {
+        if self
+            .max_value_nested_depth
+            .is_some_and(|max_depth| depth > max_depth)
+        {
             return Err(PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED));
         }
         Ok(())
