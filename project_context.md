@@ -971,73 +971,120 @@ The next major milestone is comprehensive testing with multi-party simulations t
 
 ---
 
-### Phase 5 Plan: Integration with EpochManager
+### Phase 5: EpochManager Integration (COMPLETED ✅)
 
-**Approach**: Integrate prefix consensus INTO existing `consensus/src/epoch_manager.rs`
+**Date**: 2026-01-29
+**Status**: ✅ Complete - All tests passing (74/74)
 
-**Architecture**: On-demand single-shot execution triggered from smoke tests
+**Files Modified**:
+- `Cargo.toml` - Added aptos-prefix-consensus to workspace dependencies
+- `consensus/Cargo.toml` - Added aptos-prefix-consensus dependency
+- `consensus/src/network_interface.rs` - Added PrefixConsensusMsg variant
+- `consensus/src/epoch_manager.rs` - Added integration (140+ lines)
 
-**EpochManager Changes Required**:
+**Changes Implemented**:
 
-1. **Add Channel Fields**:
+1. **ConsensusMsg Enum Extension**:
    ```rust
-   // In EpochManager struct
-   prefix_consensus_tx: Option<aptos_channels::UnboundedSender<(Author, PrefixConsensusMsg)>>,
-   prefix_consensus_close_tx: Option<futures::channel::oneshot::Sender<...>>,
-   ```
-
-2. **Message Routing** (in `process_message()`):
-   - Check if `msg` is `ConsensusMsg::PrefixConsensusMsg(_)`
-   - Verify epoch matches
-   - Forward to `prefix_consensus_tx` channel
-
-3. **On-Demand Start** (new method `start_prefix_consensus()`):
-   ```rust
-   async fn start_prefix_consensus(&mut self, input: PrefixConsensusInput) {
-       // Create channel
-       let (tx, rx) = aptos_channels::unbounded();
-       self.prefix_consensus_tx = Some(tx);
-
-       // Create manager
-       let manager = PrefixConsensusManager::new(...);
-       manager.init().await;
-
-       // Spawn event loop
-       let (close_tx, close_rx) = oneshot::channel();
-       self.prefix_consensus_close_tx = Some(close_tx);
-       tokio::spawn(manager.run(rx, close_rx));
+   pub enum ConsensusMsg {
+       // ... existing variants
+       PrefixConsensusMsg(Box<PrefixConsensusMsg>),
    }
    ```
+   - Added to `consensus/src/network_interface.rs`
+   - Added match arm in `name()` method for message identification
 
-4. **Network Registration**:
-   - Register `PrefixConsensusMsg` protocol with network layer
-   - Define protocol ID in `network_interface.rs`
-   - Wire up consensus_messages receiver to process `PrefixConsensusMsg`
+2. **EpochManager Structure**:
+   - Added channel fields:
+     - `prefix_consensus_tx: Option<UnboundedSender<(Author, PrefixConsensusMsg)>>`
+     - `prefix_consensus_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>`
+   - Initialized both to `None` in `new()` method
 
-**Testing Strategy** (Phases 7-9):
-- Smoke tests will call `start_prefix_consensus()` on-demand
-- Test with 4 validators
-- Scenarios: identical inputs, overlapping inputs, divergent inputs, Byzantine validators
+3. **Message Routing** (in `check_epoch()` method):
+   ```rust
+   ConsensusMsg::PrefixConsensusMsg(msg) => {
+       let msg_epoch = msg.epoch();
+       if msg_epoch == self.epoch() {
+           if let Some(tx) = &mut self.prefix_consensus_tx {
+               tx.send((peer_id, *msg))?;
+           } else {
+               warn!("Received PrefixConsensusMsg but prefix consensus not running");
+           }
+       } else {
+           warn!("PrefixConsensusMsg epoch mismatch");
+       }
+   }
+   ```
+   - Validates epoch matches before routing
+   - Forwards to `prefix_consensus_tx` if manager running
+   - Returns `Ok(None)` - bypasses UnverifiedEvent flow (see architectural discussion below)
+
+4. **On-Demand Start Method**:
+   ```rust
+   pub async fn start_prefix_consensus(&mut self, input: PrefixConsensusInput) -> Result<()>
+   ```
+   - Public method for smoke tests to trigger prefix consensus
+   - Checks if already running (prevents duplicate instances)
+   - Creates unbounded channel with counter metric
+   - Reuses existing `network_sender` and `validator_verifier`
+   - Creates `NetworkSenderAdapter` with self-send channel
+   - Loads consensus private key via `load_consensus_key()`
+   - Creates `ValidatorSigner` with `Arc<PrivateKey>`
+   - Creates `PrefixConsensusProtocol` and `PrefixConsensusManager`
+   - Calls `manager.init()` for initialization
+   - Spawns `tokio::spawn(manager.run(rx, close_rx))`
+   - Stores channels for later cleanup
+
+5. **Stop Method**:
+   ```rust
+   pub async fn stop_prefix_consensus(&mut self) -> Result<()>
+   ```
+   - Sends shutdown signal via `close_tx`
+   - Waits for acknowledgment with 5-second timeout
+   - Clears channel fields
+
+**Architectural Discussion: Why Not Use UnverifiedEvent Pattern?**
+
+**Decision**: PrefixConsensusMsg intentionally bypasses the `UnverifiedEvent` → `VerifiedEvent` → `forward_event()` pipeline.
+
+**Rationale**:
+1. **Future Replacement**: Prefix consensus will eventually REPLACE RoundManager with SlotManager for multi-slot protocol
+2. **Avoid Migration Debt**: Integrating with RoundManager's types now means extracting later during replacement
+3. **Independent Evolution**: Prefix consensus is the future consensus, not an add-on to current consensus
+4. **Cleaner Architecture**: When RoundManager is removed, prefix consensus infrastructure is already separate
+5. **Multi-Slot Ready**: SlotManager can directly reuse `PrefixConsensusManager` without refactoring
+
+**Trade-offs Accepted**:
+- Short-term: Different pattern than ProposalMsg, VoteMsg, etc.
+- Short-term: No proof cache integration, separate metrics
+- Long-term: Clean replacement path, no rework needed
+
+**Alternative Considered and Rejected**:
+- Adding `PrefixConsensusVote1/2/3` variants to `UnverifiedEvent` enum
+- This would create coupling to types that will be removed
+- Verification would happen in two places (UnverifiedEvent::verify() and PrefixConsensusManager)
+- Adds migration work when transitioning to SlotManager
+
+**Pattern Precedent**: Similar to `EpochRetrievalRequest` which also routes directly in `check_epoch()` without going through UnverifiedEvent.
+
+**Test Results**: ✅ All 74 aptos-prefix-consensus tests pass
+
+**Commit**: `349a557e6d` - Phase 5 implementation complete
 
 ---
 
-### Next Steps (Phase 5-11)
+### Next Steps (Phase 6-11)
 
-**Immediate (Phase 5)**: EpochManager Integration
-- Add prefix_consensus_tx/close_tx channel fields to EpochManager
-- Implement start_prefix_consensus() method for on-demand start
-- Add PrefixConsensusMsg routing in process_message()
-- Register PrefixConsensusMsg protocol with network layer
+**Immediate (Phase 6)**: Network Registration
+- Phase 5 already added PrefixConsensusMsg to ConsensusMsg enum
+- Network layer should automatically handle it via existing protocols
+- May need protocol ID if separate protocol needed (TBD in Phase 6)
 
-**Short-term (Phase 6)**: Network Registration
-- Define protocol ID constants
-- Register with NetworkClient
-- Wire up message receivers
-
-**Testing (Phase 7-9)**: Smoke Tests
+**Short-term (Phase 7-9)**: Smoke Tests
 - Create `smoke-test/src/prefix_consensus/` module
 - Basic tests (identical inputs, overlapping, divergent)
 - Byzantine tests (silent validator)
+- Call EpochManager::start_prefix_consensus() from smoke tests
 
 **Final (Phase 10-11)**: Real Signatures and Documentation
 - Replace dummy Ed25519 with real BLS signing
@@ -1046,8 +1093,8 @@ The next major milestone is comprehensive testing with multi-party simulations t
 ### Implementation Plan Reference
 - **Full Plan**: `.plans/network-integration.md` (project-local)
 - **Estimated Total Time**: 8-11 days
-- **Current Progress**: Phase 4/11 complete (~36%)
-- **Time Spent**: Phase 1 (~4h), Phase 2 (~1h), Phase 3 (~2h), Phase 4 (~3h)
+- **Current Progress**: Phase 5/11 complete (~45%)
+- **Time Spent**: Phase 1 (~4h), Phase 2 (~1h), Phase 3 (~2h), Phase 4 (~3h), Phase 5 (~2h)
 
 ---
 
@@ -1102,4 +1149,36 @@ The next major milestone is comprehensive testing with multi-party simulations t
 **Status**: ✅ Committed locally
 **Tests**: ✅ 74/74 passing
 **Key Fix**: Receiver now starts before Vote1 broadcast, eliminating race condition
+
+#### Commit: 6c5eec0fe8
+**Date**: 2026-01-28
+**Message**: `[docs] Update project context with Phase 4 completion and Phase 5 plan`
+
+**Changes**:
+- Documented Phase 4 (PrefixConsensusManager) completion
+- Added detailed Phase 5 plan for EpochManager integration
+- Updated progress tracking (Phase 4/11 complete, ~36%)
+- Added time estimates for completed phases
+- **Files changed**: 1 file, 174 insertions(+), 15 deletions(-)
+
+**Status**: ✅ Committed locally
+
+#### Commit: 349a557e6d
+**Date**: 2026-01-29
+**Message**: `[consensus] Integrate PrefixConsensusManager into EpochManager (Phase 5)`
+
+**Changes**:
+- Added `PrefixConsensusMsg` variant to `ConsensusMsg` enum
+- Added workspace dependency for `aptos-prefix-consensus`
+- Modified `EpochManager` struct with prefix consensus channels
+- Added message routing in `check_epoch()` method
+- Implemented `start_prefix_consensus()` public method (140+ lines)
+- Implemented `stop_prefix_consensus()` method
+- Bypasses UnverifiedEvent pattern (architectural decision documented)
+- **Files changed**: 5 files, 153 insertions(+)
+
+**Status**: ✅ Committed locally
+**Tests**: ✅ 74/74 passing (aptos-prefix-consensus)
+**Rust Code**: ✅ Compiles successfully
+**Key Decision**: PrefixConsensusMsg intentionally separate from UnverifiedEvent pattern to enable future RoundManager replacement
 
