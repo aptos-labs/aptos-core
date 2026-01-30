@@ -142,11 +142,12 @@ impl BlockExecutableTransaction for SignatureVerifiedTransaction {
                 // Use typed StateKey creation to avoid string parsing.
                 // These unwraps are safe: TimestampResource is a valid MoveResource type,
                 // and u64 serialization via BCS cannot fail.
-                let state_key =
-                    StateKey::resource_typed::<TimestampResource>(&AccountAddress::ONE)
-                        .expect("TimestampResource is a valid MoveResource");
+                let state_key = StateKey::resource_typed::<TimestampResource>(&AccountAddress::ONE)
+                    .expect("TimestampResource is a valid MoveResource");
                 let value = WriteOp::legacy_modification(
-                    bcs::to_bytes(&ts).expect("u64 BCS serialization cannot fail").into(),
+                    bcs::to_bytes(&ts)
+                        .expect("u64 BCS serialization cannot fail")
+                        .into(),
                 );
                 vec![(state_key, value)]
             },
@@ -202,11 +203,11 @@ mod tests {
         let timestamp_usecs = 1234567890u64;
         let block_metadata = BlockMetadata::new(
             HashValue::zero(),
-            1,  // epoch
-            1,  // round
+            1, // epoch
+            1, // round
             AccountAddress::ONE,
-            vec![],  // previous_block_votes_bitvec
-            vec![],  // failed_proposer_indices
+            vec![], // previous_block_votes_bitvec
+            vec![], // failed_proposer_indices
             timestamp_usecs,
         );
 

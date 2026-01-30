@@ -174,10 +174,7 @@ where
     /// reads by other transactions would see incorrect data. This verification ensures that
     /// all pre-written keys were actually written, triggering fallback to sequential execution
     /// if not.
-    fn verify_pre_writes(
-        txn: &T,
-        maybe_output: Option<&E::Output>,
-    ) -> Result<(), PanicError> {
+    fn verify_pre_writes(txn: &T, maybe_output: Option<&E::Output>) -> Result<(), PanicError> {
         let pre_write_entries = T::pre_write_values(txn);
         if pre_write_entries.is_empty() {
             return Ok(()); // No pre-writes, nothing to verify

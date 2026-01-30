@@ -121,8 +121,8 @@ fn pre_write_matching_actual_writes_succeeds(block_stm_v2: bool) {
     );
 
     // Create transaction with pre-writes that match actual writes
-    let txn = MockTransaction::from_behavior(behavior)
-        .with_pre_writes(vec![(key_a, value.clone())]);
+    let txn =
+        MockTransaction::from_behavior(behavior).with_pre_writes(vec![(key_a, value.clone())]);
 
     let txn_provider = DefaultTxnProvider::new_without_info(vec![txn]);
     let state_view = MockStateView::empty();
@@ -210,8 +210,8 @@ fn pre_write_mismatched_keys_triggers_fallback(block_stm_v2: bool) {
     );
 
     // Create transaction with pre-writes for key_a (mismatched)
-    let txn = MockTransaction::from_behavior(behavior)
-        .with_pre_writes(vec![(key_a, value.clone())]);
+    let txn =
+        MockTransaction::from_behavior(behavior).with_pre_writes(vec![(key_a, value.clone())]);
 
     let txn_provider = DefaultTxnProvider::new_without_info(vec![txn]);
     let state_view = MockStateView::empty();
@@ -256,8 +256,8 @@ fn pre_write_with_empty_output_triggers_fallback(block_stm_v2: bool) {
     );
 
     // Create transaction with pre-writes for key_a
-    let txn = MockTransaction::from_behavior(behavior)
-        .with_pre_writes(vec![(key_a, value.clone())]);
+    let txn =
+        MockTransaction::from_behavior(behavior).with_pre_writes(vec![(key_a, value.clone())]);
 
     let txn_provider = DefaultTxnProvider::new_without_info(vec![txn]);
     let state_view = MockStateView::empty();
@@ -312,8 +312,8 @@ fn mixed_transactions_one_fails_verification(block_stm_v2: bool) {
         vec![],
         1,
     );
-    let txn1 = MockTransaction::from_behavior(behavior1)
-        .with_pre_writes(vec![(key_a, value.clone())]);
+    let txn1 =
+        MockTransaction::from_behavior(behavior1).with_pre_writes(vec![(key_a, value.clone())]);
 
     let txn_provider = DefaultTxnProvider::new_without_info(vec![txn0, txn1]);
     let state_view = MockStateView::empty();
@@ -355,8 +355,8 @@ fn multiple_transactions_all_matching_pre_writes(block_stm_v2: bool) {
         vec![],
         1,
     );
-    let txn0 = MockTransaction::from_behavior(behavior0)
-        .with_pre_writes(vec![(key_a, value_a.clone())]);
+    let txn0 =
+        MockTransaction::from_behavior(behavior0).with_pre_writes(vec![(key_a, value_a.clone())]);
 
     // Transaction 1: Pre-write and actual write to key_b
     let behavior1 = MockIncarnation::new(
@@ -366,8 +366,8 @@ fn multiple_transactions_all_matching_pre_writes(block_stm_v2: bool) {
         vec![],
         1,
     );
-    let txn1 = MockTransaction::from_behavior(behavior1)
-        .with_pre_writes(vec![(key_b, value_b.clone())]);
+    let txn1 =
+        MockTransaction::from_behavior(behavior1).with_pre_writes(vec![(key_b, value_b.clone())]);
 
     let txn_provider = DefaultTxnProvider::new_without_info(vec![txn0, txn1]);
     let state_view = MockStateView::empty();
