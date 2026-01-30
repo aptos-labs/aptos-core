@@ -143,7 +143,7 @@ impl NetworkBuilder {
             false, /* Disable proxy protocol */
             NETWORK_CHANNEL_SIZE,
             MAX_INBOUND_CONNECTIONS,
-            1, /* max_connections_per_peer: default to 1 for backward compatibility */
+            5, /* max_connections_per_peer: enable for CI testing */
             TCPBufferCfg::default(),
             None, /* access_control_policy */
         );
@@ -157,9 +157,9 @@ impl NetworkBuilder {
             CONNECTIVITY_CHECK_INTERVAL_MS,
             NETWORK_CHANNEL_SIZE,
             mutual_authentication,
-            true,  /* enable_latency_aware_dialing */
-            None,  /* access_control_policy */
-            1,    /* max_connections_per_peer: default to 1 for backward compatibility */
+            true, /* enable_latency_aware_dialing */
+            None, /* access_control_policy */
+            5,    /* max_connections_per_peer: enable for CI testing */
             true, /* enable_active_multi_connection_dialing: enable for CI testing */
         );
 

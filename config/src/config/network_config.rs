@@ -191,7 +191,7 @@ impl NetworkConfig {
             max_parallel_deserialization_tasks: None,
             enable_latency_aware_dialing: true,
             access_control_policy: None,
-            max_connections_per_peer: 1, // Default to 1 for backward compatibility
+            max_connections_per_peer: 5, // Enable for CI testing
             enable_active_multi_connection_dialing: true, // Enable for CI testing
         };
 
