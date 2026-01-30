@@ -79,6 +79,7 @@ struct PeerManagerContext {
     max_frame_size: usize,
     max_message_size: usize,
     inbound_connection_limit: usize,
+    max_connections_per_peer: usize,
     tcp_buffer_cfg: TCPBufferCfg,
     access_control_policy: Option<Arc<AccessControlPolicy>>,
 }
@@ -102,6 +103,7 @@ impl PeerManagerContext {
         max_frame_size: usize,
         max_message_size: usize,
         inbound_connection_limit: usize,
+        max_connections_per_peer: usize,
         tcp_buffer_cfg: TCPBufferCfg,
         access_control_policy: Option<Arc<AccessControlPolicy>>,
     ) -> Self {
@@ -119,6 +121,7 @@ impl PeerManagerContext {
             max_frame_size,
             max_message_size,
             inbound_connection_limit,
+            max_connections_per_peer,
             tcp_buffer_cfg,
             access_control_policy,
         }
@@ -177,6 +180,7 @@ impl PeerManagerBuilder {
         max_message_size: usize,
         enable_proxy_protocol: bool,
         inbound_connection_limit: usize,
+        max_connections_per_peer: usize,
         tcp_buffer_cfg: TCPBufferCfg,
         access_control_policy: Option<Arc<AccessControlPolicy>>,
     ) -> Self {
@@ -212,6 +216,7 @@ impl PeerManagerBuilder {
                 max_frame_size,
                 max_message_size,
                 inbound_connection_limit,
+                max_connections_per_peer,
                 tcp_buffer_cfg,
                 access_control_policy,
             )),
@@ -347,6 +352,7 @@ impl PeerManagerBuilder {
             pm_context.max_frame_size,
             pm_context.max_message_size,
             pm_context.inbound_connection_limit,
+            pm_context.max_connections_per_peer,
             pm_context.access_control_policy,
         );
 

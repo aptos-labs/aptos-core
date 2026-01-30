@@ -84,6 +84,7 @@ impl NetworkBuilder {
         enable_proxy_protocol: bool,
         network_channel_size: usize,
         inbound_connection_limit: usize,
+        max_connections_per_peer: usize,
         tcp_buffer_cfg: TCPBufferCfg,
         access_control_policy: Option<Arc<AccessControlPolicy>>,
     ) -> Self {
@@ -101,6 +102,7 @@ impl NetworkBuilder {
             max_message_size,
             enable_proxy_protocol,
             inbound_connection_limit,
+            max_connections_per_peer,
             tcp_buffer_cfg,
             access_control_policy,
         );
@@ -141,6 +143,7 @@ impl NetworkBuilder {
             false, /* Disable proxy protocol */
             NETWORK_CHANNEL_SIZE,
             MAX_INBOUND_CONNECTIONS,
+            1, /* max_connections_per_peer: default to 1 for backward compatibility */
             TCPBufferCfg::default(),
             None, /* access_control_policy */
         );
@@ -154,8 +157,9 @@ impl NetworkBuilder {
             CONNECTIVITY_CHECK_INTERVAL_MS,
             NETWORK_CHANNEL_SIZE,
             mutual_authentication,
-            true, /* enable_latency_aware_dialing */
-            None, /* access_control_policy */
+            true,  /* enable_latency_aware_dialing */
+            None,  /* access_control_policy */
+            1,     /* max_connections_per_peer: default to 1 for backward compatibility */
         );
 
         builder
@@ -196,6 +200,7 @@ impl NetworkBuilder {
             config.enable_proxy_protocol,
             config.network_channel_size,
             config.max_inbound_connections,
+            config.max_connections_per_peer,
             TCPBufferCfg::new_configs(
                 config.inbound_rx_buffer_size_bytes,
                 config.inbound_tx_buffer_size_bytes,
@@ -226,6 +231,7 @@ impl NetworkBuilder {
             config.mutual_authentication,
             config.enable_latency_aware_dialing,
             access_control_policy,
+            config.max_connections_per_peer,
         );
 
         network_builder.discovery_listeners = Some(Vec::new());
@@ -316,6 +322,7 @@ impl NetworkBuilder {
     ///
     /// Note: a connectivity manager should only be added if the network is
     /// permissioned.
+    #[allow(clippy::too_many_arguments)]
     pub fn add_connectivity_manager(
         &mut self,
         seeds: PeerSet,
@@ -328,6 +335,7 @@ impl NetworkBuilder {
         mutual_authentication: bool,
         enable_latency_aware_dialing: bool,
         access_control_policy: Option<Arc<AccessControlPolicy>>,
+        max_connections_per_peer: usize,
     ) -> &mut Self {
         let pm_conn_mgr_notifs_rx = self.peer_manager_builder.add_connection_event_listener();
         let outbound_connection_limit = if !self.network_context.network_id().is_validator_network()
@@ -352,6 +360,7 @@ impl NetworkBuilder {
             mutual_authentication,
             enable_latency_aware_dialing,
             access_control_policy,
+            max_connections_per_peer,
         ));
         self
     }

@@ -1,11 +1,13 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
-    peer::DisconnectReason,
+    peer::{DisconnectReason, PeerRequest},
     peer_manager::PeerManagerError,
     protocols::{direct_send::Message, rpc::OutboundRpcRequest},
-    transport::{Connection, ConnectionMetadata},
+    transport::{Connection, ConnectionId, ConnectionMetadata},
+    ProtocolId,
 };
+use aptos_channels::aptos_channel;
 use aptos_config::network_id::NetworkId;
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use futures::channel::oneshot;
@@ -66,4 +68,14 @@ impl fmt::Display for ConnectionNotification {
 pub enum TransportNotification<TSocket> {
     NewConnection(#[serde(skip)] Connection<TSocket>),
     Disconnected(ConnectionMetadata, DisconnectReason),
+}
+
+/// Represents a single active connection to a peer.
+/// Used by PeerManager to track multiple connections per peer.
+#[derive(Debug)]
+pub struct PeerConnection {
+    pub connection_id: ConnectionId,
+    pub peer_id: PeerId,
+    pub metadata: ConnectionMetadata,
+    pub sender: aptos_channel::Sender<ProtocolId, PeerRequest>,
 }
