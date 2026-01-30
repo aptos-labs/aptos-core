@@ -192,7 +192,7 @@ impl NetworkConfig {
             enable_latency_aware_dialing: true,
             access_control_policy: None,
             max_connections_per_peer: 1, // Default to 1 for backward compatibility
-            enable_active_multi_connection_dialing: false, // Default to false for safe rollout
+            enable_active_multi_connection_dialing: true, // Enable for CI testing
         };
 
         // Configure the number of parallel deserialization tasks
