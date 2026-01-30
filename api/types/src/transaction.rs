@@ -752,6 +752,7 @@ impl
                 timestamp: U64::from(timestamp),
                 quorum_certified_update: quorum_certified_update.into(),
             }),
+            aptos_types::validator_txn::ValidatorTransaction::ChunkyDKGResult(_) => todo!(),
         }
     }
 }
