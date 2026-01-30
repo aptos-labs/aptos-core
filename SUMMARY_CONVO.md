@@ -190,6 +190,13 @@ Where `Hasher::seed()` is a domain separation prefix.
 4. **04-events-api.md** - Event retrieval by creation number and handle
 5. **05-view-functions.md** - Read-only Move function execution
 
+### Transaction Payload Documentation (`specifications/payloads/`)
+
+1. **01-payload-overview.md** - Comparison of payload types and when to use each
+2. **02-entry-function.md** - Entry function payload BCS specification
+3. **03-script-payload.md** - Script payload and TransactionArgument encoding
+4. **04-move-types.md** - TypeTag, StructTag, ModuleId, Identifier encoding
+
 ### Overview Documentation
 
 - **specifications/README.md** - Navigation guide and quick reference tables
@@ -212,6 +219,10 @@ Where `Hasher::seed()` is a domain separation prefix.
 ### Follow-up Request 2
 - REST API specification documents
 
+### Follow-up Request 3
+- Entry Function and Script payload specifications
+- Move type encoding (TypeTag, ModuleId, StructTag)
+
 ---
 
 ## Commits Made
@@ -219,7 +230,9 @@ Where `Hasher::seed()` is a domain separation prefix.
 | Commit | Description |
 |--------|-------------|
 | (multiple) | Initial specification documentation |
-| (pending) | Add REST API specification documents |
+| bdd5aee082 | Add REST API specification documents |
+| 8cc560281e | Update README and conversation summary for API docs |
+| (pending) | Add payload specification documents |
 
 ---
 

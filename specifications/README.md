@@ -34,6 +34,11 @@ specifications/
 │   ├── 04-secp256k1-signing.md           # Secp256k1 ECDSA signing
 │   ├── 05-secp256r1-signing.md           # Secp256r1/WebAuthn signing
 │   └── 06-keyless-signing.md             # Keyless (OIDC) signing
+├── payloads/                              # Transaction payload specifications
+│   ├── 01-payload-overview.md            # Payload types comparison
+│   ├── 02-entry-function.md              # Entry function payload
+│   ├── 03-script-payload.md              # Script payload
+│   └── 04-move-types.md                  # TypeTag, ModuleId, StructTag encoding
 ├── advanced/                              # Advanced transaction types
 │   ├── 01-multi-agent-transactions.md    # Multi-signer transactions
 │   ├── 02-fee-payer-transactions.md      # Sponsored transactions
@@ -90,6 +95,16 @@ specifications/
 | MultiAgent | `2` | Multiple signers transaction |
 | FeePayer | `3` | Sponsored transaction with fee payer |
 | SingleSender | `4` | Modern single-sender transaction |
+
+### Transaction Payload Types
+
+| Variant | Index | Use Case |
+|---------|-------|----------|
+| Script | `0` | Execute custom Move bytecode |
+| ModuleBundle | `1` | Deprecated |
+| EntryFunction | `2` | Call existing module function (most common) |
+| Multisig | `3` | Execute as multisig account |
+| Payload (V1) | `4` | New format with extra config (orderless) |
 
 ## Transaction Lifecycle
 
@@ -151,8 +166,11 @@ For new implementers, we recommend reading in this order:
 ### Core Transaction Building
 1. **[Transaction Hashing](signing/01-transaction-hashing.md)** - Understand the signing message format
 2. **[Raw Transaction Format](transaction-formats/01-raw-transaction.md)** - Core transaction structure
-3. **[Ed25519 Authenticator](transaction-formats/02-ed25519-authenticator.md)** - Simplest authentication
-4. **[Ed25519 Signing](signing/02-ed25519-signing.md)** - Basic signing process
+3. **[Payload Overview](payloads/01-payload-overview.md)** - Understanding payload types
+4. **[Entry Function Payload](payloads/02-entry-function.md)** - Most common payload type
+5. **[Move Types](payloads/04-move-types.md)** - TypeTag and argument encoding
+6. **[Ed25519 Authenticator](transaction-formats/02-ed25519-authenticator.md)** - Simplest authentication
+7. **[Ed25519 Signing](signing/02-ed25519-signing.md)** - Basic signing process
 
 ### Transaction Submission
 5. **[API Overview](api/01-api-overview.md)** - REST API basics and error handling
