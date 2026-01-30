@@ -12,6 +12,7 @@ use crate::{
         secret_sharing::network_messages::SecretShareNetworkMessage,
     },
 };
+use aptos_prefix_consensus::PrefixConsensusMsg;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalResponse},
@@ -102,6 +103,8 @@ pub enum ConsensusMsg {
     ProofOfStoreMsgV2(Box<ProofOfStoreMsg<BatchInfoExt>>),
     /// Secret share message: Used to share secrets per consensus round
     SecretShareMsg(SecretShareNetworkMessage),
+    /// Prefix Consensus message: Vote1, Vote2, or Vote3 for prefix consensus protocol
+    PrefixConsensusMsg(Box<PrefixConsensusMsg>),
 }
 
 /// Network type for consensus
@@ -136,6 +139,7 @@ impl ConsensusMsg {
             ConsensusMsg::SignedBatchInfoMsgV2(_) => "SignedBatchInfoMsgV2",
             ConsensusMsg::ProofOfStoreMsgV2(_) => "ProofOfStoreMsgV2",
             ConsensusMsg::SecretShareMsg(_) => "SecretShareMsg",
+            ConsensusMsg::PrefixConsensusMsg(_) => "PrefixConsensusMsg",
         }
     }
 }

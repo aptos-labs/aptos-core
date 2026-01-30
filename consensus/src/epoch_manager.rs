@@ -181,6 +181,10 @@ pub struct EpochManager<P: OnChainConfigProvider> {
 
     consensus_txn_filter_config: BlockTransactionFilterConfig,
     quorum_store_txn_filter_config: BatchTransactionFilterConfig,
+
+    // Prefix Consensus channels
+    prefix_consensus_tx: Option<aptos_channels::UnboundedSender<(Author, aptos_prefix_consensus::PrefixConsensusMsg)>>,
+    prefix_consensus_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -257,6 +261,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             key_storage,
             consensus_txn_filter_config,
             quorum_store_txn_filter_config,
+            prefix_consensus_tx: None,
+            prefix_consensus_close_tx: None,
         }
     }
 
@@ -1686,6 +1692,30 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     self.process_epoch_retrieval(*request, peer_id)
                 )?;
             },
+            ConsensusMsg::PrefixConsensusMsg(msg) => {
+                let msg_epoch = msg.epoch();
+                if msg_epoch == self.epoch() {
+                    // Route to prefix consensus manager if running
+                    if let Some(tx) = &mut self.prefix_consensus_tx {
+                        tx.send((peer_id, *msg)).map_err(|e| {
+                            anyhow::anyhow!("Failed to send to prefix_consensus_tx: {:?}", e)
+                        })?;
+                    } else {
+                        warn!(
+                            remote_peer = peer_id,
+                            epoch = msg_epoch,
+                            "[EpochManager] Received PrefixConsensusMsg but prefix consensus not running"
+                        );
+                    }
+                } else {
+                    warn!(
+                        remote_peer = peer_id,
+                        msg_epoch = msg_epoch,
+                        local_epoch = self.epoch(),
+                        "[EpochManager] PrefixConsensusMsg epoch mismatch"
+                    );
+                }
+            },
             _ => {
                 bail!("[EpochManager] Unexpected messages: {:?}", msg);
             },
@@ -1893,6 +1923,122 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 tx.push(peer_id, request)
             },
         }
+    }
+
+    /// Start prefix consensus with the given input
+    ///
+    /// Creates a PrefixConsensusManager and spawns it to run prefix consensus protocol.
+    /// This is called on-demand from smoke tests.
+    pub async fn start_prefix_consensus(
+        &mut self,
+        input: aptos_prefix_consensus::PrefixConsensusInput,
+    ) -> anyhow::Result<()> {
+        // Check if already running
+        if self.prefix_consensus_tx.is_some() {
+            warn!(
+                epoch = self.epoch(),
+                "Prefix consensus already running, ignoring start request"
+            );
+            return Ok(());
+        }
+
+        info!(
+            epoch = self.epoch(),
+            party_id = %input.party_id(),
+            "Starting prefix consensus"
+        );
+
+        // Create unbounded channel for messages
+        let (tx, rx) = aptos_channels::unbounded(
+            &counters::OP_COUNTERS.gauge("prefix_consensus_channel_msgs"),
+        );
+        self.prefix_consensus_tx = Some(tx.clone());
+
+        // Get epoch state and validators
+        let epoch_state = self.epoch_state().clone();
+        let validators = epoch_state.verifier.clone();
+
+        // Create network sender adapter
+        let network_sender = aptos_prefix_consensus::NetworkSenderAdapter::new(
+            input.party_id(),
+            aptos_prefix_consensus::PrefixConsensusNetworkClient::new(
+                self.network_sender.clone(),
+            ),
+            tx.clone(),
+            validators.clone(),
+        );
+
+        // Get validator signer
+        let private_key = self.load_consensus_key(&validators)?;
+        let validator_signer = aptos_types::validator_signer::ValidatorSigner::new(
+            input.party_id(),
+            std::sync::Arc::new(private_key),
+        );
+
+        // Create protocol
+        let protocol = std::sync::Arc::new(
+            aptos_prefix_consensus::PrefixConsensusProtocol::new(input.clone())
+        );
+
+        // Create manager
+        let manager = aptos_prefix_consensus::PrefixConsensusManager::new(
+            input.party_id(),
+            input.n(),
+            input.f(),
+            input.epoch(),
+            protocol,
+            network_sender,
+            validator_signer,
+            validators,
+        );
+
+        // Initialize manager
+        manager.init().await?;
+
+        // Create shutdown channel
+        let (close_tx, close_rx) = futures::channel::oneshot::channel();
+        self.prefix_consensus_close_tx = Some(close_tx);
+
+        // Spawn manager task
+        tokio::spawn(manager.run(rx, close_rx));
+
+        info!(
+            epoch = self.epoch(),
+            party_id = %input.party_id(),
+            "Prefix consensus manager spawned"
+        );
+
+        Ok(())
+    }
+
+    /// Stop prefix consensus if running
+    pub async fn stop_prefix_consensus(&mut self) -> anyhow::Result<()> {
+        if let Some(close_tx) = self.prefix_consensus_close_tx.take() {
+            info!(epoch = self.epoch(), "Stopping prefix consensus");
+
+            // Send shutdown signal
+            let (ack_tx, ack_rx) = futures::channel::oneshot::channel();
+            if close_tx.send(ack_tx).is_err() {
+                warn!("Prefix consensus manager already stopped");
+            } else {
+                // Wait for acknowledgment with timeout
+                if tokio::time::timeout(
+                    Duration::from_secs(5),
+                    ack_rx
+                ).await.is_err() {
+                    warn!("Timeout waiting for prefix consensus shutdown acknowledgment");
+                }
+            }
+
+            // Clear channel
+            self.prefix_consensus_tx = None;
+
+            info!(epoch = self.epoch(), "Prefix consensus stopped");
+        } else {
+            warn!("Prefix consensus not running");
+        }
+
+        Ok(())
     }
 
     fn process_local_timeout(&mut self, round: u64) {

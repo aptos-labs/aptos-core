@@ -994,6 +994,7 @@ dependencies = [
  "aptos-netcore",
  "aptos-network",
  "aptos-peer-monitoring-service-types",
+ "aptos-prefix-consensus",
  "aptos-reliable-broadcast",
  "aptos-resource-viewer",
  "aptos-runtimes",
