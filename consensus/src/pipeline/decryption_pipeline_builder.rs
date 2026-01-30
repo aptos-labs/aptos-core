@@ -78,12 +78,10 @@ impl PipelineBuilder {
         let txn_ciphertexts: Vec<Ciphertext> = encrypted_txns
             .iter()
             .map(|txn| {
-                // TODO(ibalajiarun): Avoid clone and use reference instead
                 txn.payload()
                     .as_encrypted_payload()
                     .expect("must be a encrypted txn")
                     .ciphertext()
-                    .clone()
             })
             .collect();
 
@@ -130,20 +128,16 @@ impl PipelineBuilder {
                     &eval_proof,
                 ) {
                     let (executable, nonce) = payload.unwrap();
-                    txn.with_payload_mut(|p| {
-                        p.as_encrypted_payload_mut()
-                            .map(|ep| {
-                                ep.into_decrypted(eval_proof, executable, nonce)
-                                    .expect("must happen")
-                            })
-                            .expect("must exist")
-                    });
+                    txn.with_encrypted_payload_mut(|ep| {
+                        ep.into_decrypted(eval_proof, executable, nonce)
+                            .expect("must happen")
+                    })
+                    .expect("must be encrypted payload");
                 } else {
-                    txn.with_payload_mut(|p| {
-                        p.as_encrypted_payload_mut()
-                            .map(|ep| ep.into_failed_decryption(eval_proof).expect("must happen"))
-                            .expect("must exist")
-                    });
+                    txn.with_encrypted_payload_mut(|ep| {
+                        ep.into_failed_decryption(eval_proof).expect("must happen")
+                    })
+                    .expect("must be encrypted payload");
                 }
                 txn
             })

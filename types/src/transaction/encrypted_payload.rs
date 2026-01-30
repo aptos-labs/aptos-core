@@ -149,3 +149,97 @@ impl EncryptedPayload {
         self.ciphertext().verify(&associated_data)
     }
 }
+
+/// A wrapper around `Mutex<EncryptedPayload>` that provides interior mutability
+/// for encrypted payload decryption while implementing necessary traits for
+/// use in `TransactionPayload`.
+#[derive(Debug)]
+pub struct SyncEncryptedPayload(aptos_infallible::Mutex<EncryptedPayload>);
+
+impl SyncEncryptedPayload {
+    pub fn new(payload: EncryptedPayload) -> Self {
+        Self(aptos_infallible::Mutex::new(payload))
+    }
+
+    /// Get a reference to the inner payload by locking the mutex.
+    pub fn lock(&self) -> aptos_infallible::MutexGuard<'_, EncryptedPayload> {
+        self.0.lock()
+    }
+
+    /// Get read-only access to the inner payload.
+    /// Caller must ensure the lock is held for the duration of the borrow.
+    pub fn with<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&EncryptedPayload) -> R,
+    {
+        f(&self.0.lock())
+    }
+
+    /// Get mutable access to the inner payload.
+    pub fn with_mut<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut EncryptedPayload) -> R,
+    {
+        f(&mut self.0.lock())
+    }
+
+    // Delegation methods for accessing inner EncryptedPayload
+
+    pub fn ciphertext(&self) -> Ciphertext {
+        self.0.lock().ciphertext().clone()
+    }
+
+    pub fn executable(&self) -> Result<TransactionExecutable> {
+        self.0.lock().executable()
+    }
+
+    pub fn extra_config(&self) -> TransactionExtraConfig {
+        self.0.lock().extra_config().clone()
+    }
+
+    pub fn is_encrypted(&self) -> bool {
+        self.0.lock().is_encrypted()
+    }
+
+    pub fn verify(&self, sender: AccountAddress) -> Result<()> {
+        self.0.lock().verify(sender)
+    }
+}
+
+impl Clone for SyncEncryptedPayload {
+    fn clone(&self) -> Self {
+        Self::new(self.0.lock().clone())
+    }
+}
+
+impl PartialEq for SyncEncryptedPayload {
+    fn eq(&self, other: &Self) -> bool {
+        *self.0.lock() == *other.0.lock()
+    }
+}
+
+impl Eq for SyncEncryptedPayload {}
+
+impl std::hash::Hash for SyncEncryptedPayload {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.lock().hash(state)
+    }
+}
+
+impl Serialize for SyncEncryptedPayload {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.0.lock().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for SyncEncryptedPayload {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(Self::new(EncryptedPayload::deserialize(deserializer)?))
+    }
+}
