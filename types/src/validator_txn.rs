@@ -3,7 +3,11 @@
 
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::dkg::DKGTranscriptMetadata;
-use crate::{dkg::DKGTranscript, jwks, validator_verifier::ValidatorVerifier};
+use crate::{
+    dkg::{chunky_dkg::CertifiedAggregatedChunkySubtranscript, DKGTranscript},
+    jwks,
+    validator_verifier::ValidatorVerifier,
+};
 use anyhow::Context;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 #[cfg(any(test, feature = "fuzzing"))]
@@ -15,6 +19,7 @@ use std::fmt::Debug;
 pub enum ValidatorTransaction {
     DKGResult(DKGTranscript),
     ObservedJWKUpdate(jwks::QuorumCertifiedUpdate),
+    ChunkyDKGResult(CertifiedAggregatedChunkySubtranscript),
 }
 
 impl ValidatorTransaction {
@@ -39,6 +44,7 @@ impl ValidatorTransaction {
             ValidatorTransaction::ObservedJWKUpdate(_) => {
                 "validator_transaction__observed_jwk_update"
             },
+            ValidatorTransaction::ChunkyDKGResult(_) => "validator_transaction__chunky_dkg_result",
         }
     }
 
@@ -48,6 +54,10 @@ impl ValidatorTransaction {
                 .verify(verifier)
                 .context("DKGResult verification failed"),
             ValidatorTransaction::ObservedJWKUpdate(_) => Ok(()),
+            ValidatorTransaction::ChunkyDKGResult(_) => {
+                // TODO: Implement verification for ChunkyDKGResult
+                Ok(())
+            },
         }
     }
 }
@@ -61,4 +71,5 @@ pub enum Topic {
         issuer: jwks::Issuer,
         kid: jwks::KID,
     },
+    ChunkyDKG,
 }
