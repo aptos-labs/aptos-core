@@ -46,8 +46,16 @@ pub(crate) fn native_dispatch(
             context.traversal_context().legacy_check_visited(a, n)
         }
     };
-    check_visited(module_name.address(), module_name.name())
-        .map_err(|_| SafeNativeError::abort(abort_codes::ENOT_LOADED))?;
+    check_visited(module_name.address(), module_name.name()).map_err(|_| {
+        SafeNativeError::abort_with_message(
+            abort_codes::ENOT_LOADED,
+            format!(
+                "Module {}::{} is not loaded prior to native dispatch",
+                module_name.address(),
+                module_name.name()
+            ),
+        )
+    })?;
 
     context.charge(DISPATCHABLE_FUNGIBLE_ASSET_DISPATCH_BASE)?;
 

@@ -508,7 +508,7 @@ fn native_create_derived_string(
         return Err(SafeNativeError::abort_with_message(
             EINPUT_STRING_LENGTH_TOO_LARGE,
             format!(
-                "Input string length {} exceeds maximum {}",
+                "Derived snapshot cannot be constructed: input string length ({}) exceeds maximum {}",
                 value_bytes.len(),
                 DERIVED_STRING_INPUT_MAX_LENGTH
             ),
@@ -563,8 +563,8 @@ fn native_derive_string_concat(
         return Err(SafeNativeError::abort_with_message(
             EINPUT_STRING_LENGTH_TOO_LARGE,
             format!(
-                "Concatenated string length {} exceeds maximum {}",
-                len, DERIVED_STRING_INPUT_MAX_LENGTH
+                "Derived snapshot cannot be constructed: prefix and suffix string lengths ({} + {} = {}) exceed maximum {}",
+                prefix.len(), suffix.len(), len, DERIVED_STRING_INPUT_MAX_LENGTH
             ),
         ));
     }

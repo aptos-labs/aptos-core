@@ -277,7 +277,7 @@ fn native_test_only_batch_prove_range(
         return Err(SafeNativeError::abort_with_message(
             abort_codes::NFE_VECTOR_LENGTHS_MISMATCH,
             format!(
-                "Values length {} does not match blinding factors length {}",
+                "Number of committed values ({}) must equal number of blinding factors ({})",
                 vs.len(),
                 v_blindings.len()
             ),

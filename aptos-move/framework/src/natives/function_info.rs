@@ -112,7 +112,7 @@ fn native_check_dispatch_type_compatibility_impl(
             SafeNativeError::abort_with_message(
                 abort_codes::EINVALID_FUNCTION,
                 format!(
-                    "Function module not properly charged: {}::{}",
+                    "Module {}::{} is not loaded prior to native dispatch",
                     module.address(),
                     module.name()
                 ),
@@ -156,7 +156,7 @@ fn native_check_dispatch_type_compatibility_impl(
         return Err(SafeNativeError::abort_with_message(
             abort_codes::EINVALID_FUNCTION,
             format!(
-                "LHS function has no parameters: {}::{}::{}",
+                "Expected LHS function {}::{}::{} to have 1 or more parameters",
                 lhs_id.address(),
                 lhs_id.name(),
                 lhs_func_name

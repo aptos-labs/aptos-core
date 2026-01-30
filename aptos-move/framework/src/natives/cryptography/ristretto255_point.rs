@@ -160,7 +160,7 @@ impl PointStore {
             Err(SafeNativeError::abort_with_message(
                 E_TOO_MANY_POINTS_CREATED,
                 format!(
-                    "Too many points created: current count={}, limit={}",
+                    "Too many points created: {}. Limit is {}.",
                     id, NUM_POINTS_LIMIT
                 ),
             ))

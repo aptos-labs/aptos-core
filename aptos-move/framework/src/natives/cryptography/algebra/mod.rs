@@ -249,8 +249,8 @@ macro_rules! store_element {
             Err(SafeNativeError::abort_with_message(
                 E_TOO_MUCH_MEMORY_USED,
                 format!(
-                    "Algebra context memory limit exceeded: current={}, new={}, limit={}",
-                    context.bytes_used, new_size, MEMORY_LIMIT_IN_BYTES
+                    "Algebra context memory {}-byte limit exceeded: currently using {} bytes; was asked for {} bytes",
+                    MEMORY_LIMIT_IN_BYTES, context.bytes_used, new_size,
                 ),
             ))
         } else {
