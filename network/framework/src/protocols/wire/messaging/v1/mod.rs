@@ -18,7 +18,14 @@ use futures::{
 };
 use pin_project::pin_project;
 #[cfg(any(test, feature = "fuzzing"))]
+use proptest::prelude::*;
+#[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
+
+#[cfg(any(test, feature = "fuzzing"))]
+fn arbitrary_bytes() -> impl Strategy<Value = Bytes> {
+    proptest::collection::vec(any::<u8>(), 0..1024).prop_map(Bytes::from)
+}
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     io,
@@ -104,7 +111,7 @@ pub type Priority = u8;
 
 pub trait IncomingRequest {
     fn protocol_id(&self) -> crate::ProtocolId;
-    fn data(&self) -> &Vec<u8>;
+    fn data(&self) -> &Bytes;
 
     /// Converts the `SerializedMessage` into its deserialized version of `TMessage` based on the
     /// `ProtocolId`.  See: [`crate::ProtocolId::from_bytes`]
@@ -123,8 +130,9 @@ pub struct RpcRequest {
     /// Request priority in the range 0..=255.
     pub priority: Priority,
     /// Request payload. This will be parsed by the application-level handler.
-    #[serde(with = "serde_bytes")]
-    pub raw_request: Vec<u8>,
+    #[serde(with = "crate::protocols::wire::serde_bytes_compat")]
+    #[cfg_attr(any(test, feature = "fuzzing"), proptest(strategy = "arbitrary_bytes()"))]
+    pub raw_request: Bytes,
 }
 
 impl IncomingRequest for RpcRequest {
@@ -132,7 +140,7 @@ impl IncomingRequest for RpcRequest {
         self.protocol_id
     }
 
-    fn data(&self) -> &Vec<u8> {
+    fn data(&self) -> &Bytes {
         &self.raw_request
     }
 }
@@ -146,8 +154,9 @@ pub struct RpcResponse {
     /// corresponding request.
     pub priority: Priority,
     /// Response payload.
-    #[serde(with = "serde_bytes")]
-    pub raw_response: Vec<u8>,
+    #[serde(with = "crate::protocols::wire::serde_bytes_compat")]
+    #[cfg_attr(any(test, feature = "fuzzing"), proptest(strategy = "arbitrary_bytes()"))]
+    pub raw_response: Bytes,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
@@ -158,8 +167,9 @@ pub struct DirectSendMsg {
     /// Message priority in the range 0..=255.
     pub priority: Priority,
     /// Message payload.
-    #[serde(with = "serde_bytes")]
-    pub raw_msg: Vec<u8>,
+    #[serde(with = "crate::protocols::wire::serde_bytes_compat")]
+    #[cfg_attr(any(test, feature = "fuzzing"), proptest(strategy = "arbitrary_bytes()"))]
+    pub raw_msg: Bytes,
 }
 
 impl IncomingRequest for DirectSendMsg {
@@ -167,7 +177,7 @@ impl IncomingRequest for DirectSendMsg {
         self.protocol_id
     }
 
-    fn data(&self) -> &Vec<u8> {
+    fn data(&self) -> &Bytes {
         &self.raw_msg
     }
 }
