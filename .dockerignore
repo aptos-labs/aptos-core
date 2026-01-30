@@ -42,4 +42,4 @@
 !testsuite/testcases/src/data/
 !types/src/jwks/rsa/insecure_test_jwk.json
 !types/src/jwks/rsa/secure_test_jwk.json
-!types/src/jwks/rsa/insecure_test_jwk_private_key.pem
+!types/src/jwks/rsa/insecure_test_jwk_private_key.txt
