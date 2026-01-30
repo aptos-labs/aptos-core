@@ -22,11 +22,14 @@ const FRAMEWORK_DIRS: &[&str] = &[
     "move-stdlib",
 ];
 
-/// Compute a SHA256 hash of all Move source files and Move.toml files in the framework directories.
+/// Compute a SHA256 hash of all inputs that affect the framework build:
+/// - All .move files and Move.toml files in framework directories
+/// - Compiler crate versions (via DEP_* environment variables from their build.rs)
 fn compute_framework_hash(framework_root: &Path) -> Result<String> {
     let mut hasher = Sha256::new();
     let mut file_count = 0;
 
+    // Hash Move source files
     for dir_name in FRAMEWORK_DIRS {
         let dir_path = framework_root.join(dir_name);
         if !dir_path.exists() {
@@ -40,8 +43,8 @@ fn compute_framework_hash(framework_root: &Path) -> Result<String> {
             .filter(|e| {
                 let path = e.path();
                 path.is_file()
-                    && (path.extension().map_or(false, |ext| ext == "move")
-                        || path.file_name().map_or(false, |name| name == "Move.toml"))
+                    && (path.extension().is_some_and(|ext| ext == "move")
+                        || path.file_name().is_some_and(|name| name == "Move.toml"))
             })
             .map(|e| e.path().to_path_buf())
             .collect();
@@ -51,9 +54,7 @@ fn compute_framework_hash(framework_root: &Path) -> Result<String> {
 
         for file_path in files {
             // Hash the relative path to detect renames/moves
-            let relative_path = file_path
-                .strip_prefix(framework_root)
-                .unwrap_or(&file_path);
+            let relative_path = file_path.strip_prefix(framework_root).unwrap_or(&file_path);
             hasher.update(relative_path.to_string_lossy().as_bytes());
             hasher.update(b"\0");
 
@@ -70,6 +71,26 @@ fn compute_framework_hash(framework_root: &Path) -> Result<String> {
         }
     }
 
+    // Include move-package build marker to detect compiler changes.
+    // When move-package rebuilds, it writes a new timestamp to this marker file.
+    let marker_path = std::env::var("CARGO_TARGET_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            framework_root
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .join("target")
+        })
+        .join(".move_package_build_marker");
+
+    if let Ok(marker_content) = fs::read_to_string(&marker_path) {
+        hasher.update(b"move-package-build:");
+        hasher.update(marker_content.trim().as_bytes());
+        hasher.update(b"\0");
+    }
+
     // Include file count in hash to detect additions/deletions
     hasher.update(file_count.to_string().as_bytes());
 
@@ -78,18 +99,11 @@ fn compute_framework_hash(framework_root: &Path) -> Result<String> {
 }
 
 /// Get a stable cache directory that persists across OUT_DIR changes.
-fn get_cache_dir(framework_root: &Path) -> PathBuf {
+fn get_cache_dir(workspace_root: &Path) -> PathBuf {
     // Use CARGO_TARGET_DIR if set, otherwise default to workspace_root/target
     std::env::var("CARGO_TARGET_DIR")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| {
-            // framework_root is aptos-move/framework
-            // Go up twice to get to workspace root (aptos-core)
-            let mut workspace_root = framework_root.to_path_buf();
-            workspace_root.pop(); // aptos-move/framework -> aptos-move
-            workspace_root.pop(); // aptos-move -> aptos-core (workspace root)
-            workspace_root.join("target")
-        })
+        .unwrap_or_else(|_| workspace_root.join("target"))
         .join(".framework_cache")
 }
 
@@ -127,6 +141,10 @@ fn emit_rerun_if_changed(framework_root: &Path) {
             println!("cargo:rerun-if-changed={}", move_toml.display());
         }
     }
+
+    // Compiler crate changes are tracked via a marker file written by
+    // move-package's build.rs. When move-package rebuilds, it writes a new
+    // timestamp to target/.move_package_build_marker, which changes the hash.
 }
 
 fn main() -> Result<()> {
@@ -142,14 +160,19 @@ fn main() -> Result<()> {
     let mut framework_root = current_dir;
     framework_root.pop();
 
+    // Get workspace root (aptos-core)
+    let mut workspace_root = framework_root.clone();
+    workspace_root.pop(); // aptos-move/framework -> aptos-move
+    workspace_root.pop(); // aptos-move -> aptos-core
+
     // Emit rerun-if-changed directives
     emit_rerun_if_changed(&framework_root);
 
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR defined"));
     let output_path = out_dir.join("head.mrb");
-    let cache_dir = get_cache_dir(&framework_root);
+    let cache_dir = get_cache_dir(&workspace_root);
 
-    // Compute hash of all Move source files
+    // Compute hash of all inputs (Move sources + compiler crates)
     let current_hash =
         compute_framework_hash(&framework_root).context("Failed to compute framework hash")?;
 
