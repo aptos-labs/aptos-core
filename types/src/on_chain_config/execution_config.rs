@@ -29,13 +29,13 @@ impl OnChainExecutionConfig {
     pub fn transaction_shuffler_type(&self) -> TransactionShufflerType {
         match &self {
             OnChainExecutionConfig::Missing => TransactionShufflerType::NoShuffling,
-            OnChainExecutionConfig::V1(config) => config.transaction_shuffler_type.clone(),
-            OnChainExecutionConfig::V2(config) => config.transaction_shuffler_type.clone(),
-            OnChainExecutionConfig::V3(config) => config.transaction_shuffler_type.clone(),
-            OnChainExecutionConfig::V4(config) => config.transaction_shuffler_type.clone(),
-            OnChainExecutionConfig::V5(config) => config.transaction_shuffler_type.clone(),
-            OnChainExecutionConfig::V6(config) => config.transaction_shuffler_type.clone(),
-            OnChainExecutionConfig::V7(config) => config.transaction_shuffler_type.clone(),
+            OnChainExecutionConfig::V1(config) => config.transaction_shuffler_type,
+            OnChainExecutionConfig::V2(config) => config.transaction_shuffler_type,
+            OnChainExecutionConfig::V3(config) => config.transaction_shuffler_type,
+            OnChainExecutionConfig::V4(config) => config.transaction_shuffler_type,
+            OnChainExecutionConfig::V5(config) => config.transaction_shuffler_type,
+            OnChainExecutionConfig::V6(config) => config.transaction_shuffler_type,
+            OnChainExecutionConfig::V7(config) => config.transaction_shuffler_type,
         }
     }
 
@@ -50,10 +50,10 @@ impl OnChainExecutionConfig {
             OnChainExecutionConfig::V3(config) => config
                 .block_gas_limit
                 .map_or(BlockGasLimitType::NoLimit, BlockGasLimitType::Limit),
-            OnChainExecutionConfig::V4(config) => config.block_gas_limit_type.clone(),
-            OnChainExecutionConfig::V5(config) => config.block_gas_limit_type.clone(),
-            OnChainExecutionConfig::V6(config) => config.block_gas_limit_type.clone(),
-            OnChainExecutionConfig::V7(config) => config.block_gas_limit_type.clone(),
+            OnChainExecutionConfig::V4(config) => config.block_gas_limit_type,
+            OnChainExecutionConfig::V5(config) => config.block_gas_limit_type,
+            OnChainExecutionConfig::V6(config) => config.block_gas_limit_type,
+            OnChainExecutionConfig::V7(config) => config.block_gas_limit_type,
         }
     }
 
@@ -111,11 +111,11 @@ impl OnChainExecutionConfig {
             OnChainExecutionConfig::Missing => TransactionDeduperType::TxnHashAndAuthenticatorV1,
             OnChainExecutionConfig::V1(_config) => TransactionDeduperType::NoDedup,
             OnChainExecutionConfig::V2(_config) => TransactionDeduperType::NoDedup,
-            OnChainExecutionConfig::V3(config) => config.transaction_deduper_type.clone(),
-            OnChainExecutionConfig::V4(config) => config.transaction_deduper_type.clone(),
-            OnChainExecutionConfig::V5(config) => config.transaction_deduper_type.clone(),
-            OnChainExecutionConfig::V6(config) => config.transaction_deduper_type.clone(),
-            OnChainExecutionConfig::V7(config) => config.transaction_deduper_type.clone(),
+            OnChainExecutionConfig::V3(config) => config.transaction_deduper_type,
+            OnChainExecutionConfig::V4(config) => config.transaction_deduper_type,
+            OnChainExecutionConfig::V5(config) => config.transaction_deduper_type,
+            OnChainExecutionConfig::V6(config) => config.transaction_deduper_type,
+            OnChainExecutionConfig::V7(config) => config.transaction_deduper_type,
         }
     }
 
@@ -225,7 +225,7 @@ pub struct ExecutionConfigV7 {
     pub persisted_auxiliary_info_version: u8,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")] // cannot use tag = "type" as nested enums cannot work, and bcs doesn't support it
 pub enum TransactionShufflerType {
     NoShuffling,
@@ -262,14 +262,14 @@ impl TransactionShufflerType {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")] // cannot use tag = "type" as nested enums cannot work, and bcs doesn't support it
 pub enum TransactionDeduperType {
     NoDedup,
     TxnHashAndAuthenticatorV1,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")] // cannot use tag = "type" as nested enums cannot work, and bcs doesn't support it
 pub enum BlockGasLimitType {
     NoLimit,
