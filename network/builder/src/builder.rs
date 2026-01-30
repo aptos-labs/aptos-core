@@ -160,6 +160,7 @@ impl NetworkBuilder {
             true,  /* enable_latency_aware_dialing */
             None,  /* access_control_policy */
             1,     /* max_connections_per_peer: default to 1 for backward compatibility */
+            false, /* enable_active_multi_connection_dialing: default to false for safe rollout */
         );
 
         builder
@@ -232,6 +233,7 @@ impl NetworkBuilder {
             config.enable_latency_aware_dialing,
             access_control_policy,
             config.max_connections_per_peer,
+            config.enable_active_multi_connection_dialing,
         );
 
         network_builder.discovery_listeners = Some(Vec::new());
@@ -336,6 +338,7 @@ impl NetworkBuilder {
         enable_latency_aware_dialing: bool,
         access_control_policy: Option<Arc<AccessControlPolicy>>,
         max_connections_per_peer: usize,
+        enable_active_multi_connection_dialing: bool,
     ) -> &mut Self {
         let pm_conn_mgr_notifs_rx = self.peer_manager_builder.add_connection_event_listener();
         let outbound_connection_limit = if !self.network_context.network_id().is_validator_network()
@@ -361,6 +364,7 @@ impl NetworkBuilder {
             enable_latency_aware_dialing,
             access_control_policy,
             max_connections_per_peer,
+            enable_active_multi_connection_dialing,
         ));
         self
     }

@@ -136,6 +136,8 @@ pub struct ConnectivityManager<TBackoff> {
     access_control_policy: Option<Arc<AccessControlPolicy>>,
     /// Maximum number of connections to maintain per peer
     max_connections_per_peer: usize,
+    /// Whether to actively dial peers to establish additional connections
+    enable_active_multi_connection_dialing: bool,
 }
 
 /// Different sources for peer addresses, ordered by priority (Onchain=highest,
@@ -368,6 +370,7 @@ where
         enable_latency_aware_dialing: bool,
         access_control_policy: Option<Arc<AccessControlPolicy>>,
         max_connections_per_peer: usize,
+        enable_active_multi_connection_dialing: bool,
     ) -> Self {
         // Verify that the trusted peers set exists and that it is empty
         let trusted_peers = peers_and_metadata
@@ -383,9 +386,10 @@ where
 
         info!(
             NetworkSchema::new(&network_context),
-            "{} Initialized connectivity manager with max_connections_per_peer={}",
+            "{} Initialized connectivity manager with max_connections_per_peer={}, enable_active_multi_connection_dialing={}",
             network_context,
-            max_connections_per_peer
+            max_connections_per_peer,
+            enable_active_multi_connection_dialing
         );
 
         let mut connmgr = Self {
@@ -408,6 +412,7 @@ where
             enable_latency_aware_dialing,
             access_control_policy,
             max_connections_per_peer,
+            enable_active_multi_connection_dialing,
         };
 
         // Set the initial seed config addresses and public keys
@@ -431,9 +436,18 @@ where
             .unwrap_or(0)
     }
 
-    /// Returns true if we need more connections to this peer
+    /// Returns true if we need more connections to this peer.
+    /// When `enable_active_multi_connection_dialing` is false, only dials for the first connection.
+    /// When true, dials until we reach `max_connections_per_peer`.
     fn needs_more_connections(&self, peer_id: &PeerId) -> bool {
-        self.connection_count(peer_id) < self.max_connections_per_peer
+        let current_count = self.connection_count(peer_id);
+        if self.enable_active_multi_connection_dialing {
+            // Active multi-connection dialing enabled: dial until we reach the limit
+            current_count < self.max_connections_per_peer
+        } else {
+            // Active multi-connection dialing disabled: only dial for the first connection
+            current_count == 0
+        }
     }
 
     /// Handles the result of a dial attempt

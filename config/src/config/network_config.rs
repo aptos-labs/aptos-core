@@ -146,6 +146,11 @@ pub struct NetworkConfig {
     /// Setting this higher allows multiple TCP connections to the same peer for increased
     /// throughput and reduced head-of-line blocking.
     pub max_connections_per_peer: usize,
+    /// Whether to actively dial peers to establish additional connections up to max_connections_per_peer.
+    /// When false (default), the node will only accept incoming connections but won't actively dial
+    /// for additional connections beyond the first one. This allows for safe rollout of multi-connection
+    /// support by first enabling passive acceptance before enabling active dialing.
+    pub enable_active_multi_connection_dialing: bool,
 }
 
 impl Default for NetworkConfig {
@@ -187,6 +192,7 @@ impl NetworkConfig {
             enable_latency_aware_dialing: true,
             access_control_policy: None,
             max_connections_per_peer: 1, // Default to 1 for backward compatibility
+            enable_active_multi_connection_dialing: false, // Default to false for safe rollout
         };
 
         // Configure the number of parallel deserialization tasks

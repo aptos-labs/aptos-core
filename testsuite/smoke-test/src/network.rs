@@ -312,22 +312,25 @@ pub fn write_peerset_to_file(path: &Path, peers: PeerSet) {
 }
 
 /// Test that multiple connections can be established between the same two validators
-/// when max_connections_per_peer > 1.
+/// when max_connections_per_peer > 1 and enable_active_multi_connection_dialing = true.
 ///
 /// This test creates a 2-validator network where both validators can dial each other,
-/// and verifies that with max_connections_per_peer = 5, both outbound and inbound
-/// connections can coexist between the same pair of validators.
+/// and verifies that with max_connections_per_peer = 5 and active dialing enabled,
+/// both validators will establish multiple connections to each other.
 #[tokio::test]
 async fn test_multi_connection_per_peer_validators() {
     const MAX_CONNECTIONS_PER_PEER: usize = 5;
 
     // Create a swarm with 2 validators configured to allow multiple connections per peer
+    // and enable active multi-connection dialing
     let swarm = SwarmBuilder::new_local(2)
         .with_aptos()
         .with_init_config(Arc::new(|_, config, _| {
             // Configure validator network to allow multiple connections per peer
             if let Some(validator_network) = config.validator_network.as_mut() {
                 validator_network.max_connections_per_peer = MAX_CONNECTIONS_PER_PEER;
+                // Enable active dialing for additional connections
+                validator_network.enable_active_multi_connection_dialing = true;
             }
         }))
         .build()
@@ -380,21 +383,23 @@ async fn test_multi_connection_per_peer_validators() {
     );
 }
 
-/// Test that with max_connections_per_peer = 1 (default), simultaneous dials result
-/// in only one connection being kept (tie-breaking behavior).
+/// Test that with max_connections_per_peer > 1 and enable_active_multi_connection_dialing = true,
+/// multiple connections can be actively established between validators.
 ///
-/// Then verify that with max_connections_per_peer > 1, both connections can coexist.
+/// This test verifies that connectivity manager actively dials to establish multiple connections.
 #[tokio::test]
 async fn test_multi_connection_allows_simultaneous_dial() {
     const MAX_CONNECTIONS_PER_PEER: usize = 5;
 
     // Create a 4-validator swarm with multiple connections per peer allowed
-    // This increases the chance of simultaneous dials between validators
+    // and active multi-connection dialing enabled
     let swarm = SwarmBuilder::new_local(4)
         .with_aptos()
         .with_init_config(Arc::new(|_, config, _| {
             if let Some(validator_network) = config.validator_network.as_mut() {
                 validator_network.max_connections_per_peer = MAX_CONNECTIONS_PER_PEER;
+                // Enable active dialing for additional connections
+                validator_network.enable_active_multi_connection_dialing = true;
                 // Enable faster connectivity checks to trigger more connection attempts
                 validator_network.connectivity_check_interval_ms = 1000;
             }
