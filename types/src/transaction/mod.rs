@@ -31,6 +31,7 @@ use aptos_crypto::{
     CryptoMaterialError, HashValue,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_infallible::Mutex;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use rand::Rng;
@@ -41,6 +42,7 @@ use std::{
     collections::BTreeMap,
     convert::TryFrom,
     fmt::{self, Debug, Display, Formatter},
+    sync::Arc,
 };
 
 pub mod analyzed_transaction;
@@ -88,12 +90,7 @@ pub use script::{
     TypeArgumentABI,
 };
 use serde::de::DeserializeOwned;
-use std::{
-    collections::BTreeSet,
-    hash::Hash,
-    ops::Deref,
-    sync::{atomic::AtomicU64, Arc},
-};
+use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;
@@ -1034,13 +1031,13 @@ impl WriteSetPayload {
 /// **IMPORTANT:** The signature of a `SignedTransaction` is not guaranteed to be verified. For a
 /// transaction whose signature is statically guaranteed to be verified, see
 /// [`SignatureCheckedTransaction`].
-#[derive(Clone, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct SignedTransaction {
     /// The raw transaction
-    raw_txn: RawTransaction,
+    raw_txn: Arc<RawTransaction>,
 
     /// Public key and signature to authenticate
-    authenticator: TransactionAuthenticator,
+    authenticator: Arc<TransactionAuthenticator>,
 
     /// A cached size of the raw transaction bytes.
     /// Prevents serializing the same transaction multiple times to determine size.
@@ -1055,14 +1052,51 @@ pub struct SignedTransaction {
     /// A cached hash of the transaction.
     #[serde(skip)]
     committed_hash: OnceCell<HashValue>,
+
+    /// Mutable payload for encrypted transactions after decryption.
+    /// This allows mutation without cloning the entire RawTransaction.
+    #[serde(skip)]
+    payload_override: Mutex<Option<TransactionPayload>>,
 }
 
-/// PartialEq ignores the cached OnceCell fields that may or may not be initialized.
+impl Clone for SignedTransaction {
+    fn clone(&self) -> Self {
+        let override_guard = self.payload_override.lock();
+        if let Some(ref override_payload) = *override_guard {
+            // Commit the override to a new RawTransaction
+            let mut new_raw_txn = (*self.raw_txn).clone();
+            new_raw_txn.payload = override_payload.clone();
+            drop(override_guard);
+            SignedTransaction {
+                raw_txn: Arc::new(new_raw_txn),
+                authenticator: Arc::clone(&self.authenticator),
+                raw_txn_size: OnceCell::new(), // Reset cache since payload changed
+                authenticator_size: self.authenticator_size.clone(),
+                committed_hash: OnceCell::new(), // Reset cache since payload changed
+                payload_override: Mutex::new(None),
+            }
+        } else {
+            drop(override_guard);
+            SignedTransaction {
+                raw_txn: Arc::clone(&self.raw_txn),
+                authenticator: Arc::clone(&self.authenticator),
+                raw_txn_size: self.raw_txn_size.clone(),
+                authenticator_size: self.authenticator_size.clone(),
+                committed_hash: self.committed_hash.clone(),
+                payload_override: Mutex::new(None),
+            }
+        }
+    }
+}
+
+/// PartialEq ignores the cached OnceCell fields and payload_override.
 impl PartialEq for SignedTransaction {
     fn eq(&self, other: &Self) -> bool {
         self.raw_txn == other.raw_txn && self.authenticator == other.authenticator
     }
 }
+
+impl Eq for SignedTransaction {}
 
 /// A transaction for which the signature has been verified. Created by
 /// [`SignedTransaction::check_signature`] and [`RawTransaction::sign`].
@@ -1109,11 +1143,12 @@ impl SignedTransaction {
         authenticator: TransactionAuthenticator,
     ) -> SignedTransaction {
         SignedTransaction {
-            raw_txn,
-            authenticator,
+            raw_txn: Arc::new(raw_txn),
+            authenticator: Arc::new(authenticator),
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
             committed_hash: OnceCell::new(),
+            payload_override: Mutex::new(None),
         }
     }
 
@@ -1124,11 +1159,12 @@ impl SignedTransaction {
     ) -> SignedTransaction {
         let authenticator = TransactionAuthenticator::ed25519(public_key, signature);
         SignedTransaction {
-            raw_txn,
-            authenticator,
+            raw_txn: Arc::new(raw_txn),
+            authenticator: Arc::new(authenticator),
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
             committed_hash: OnceCell::new(),
+            payload_override: Mutex::new(None),
         }
     }
 
@@ -1232,7 +1268,7 @@ impl SignedTransaction {
     }
 
     pub fn authenticator(&self) -> TransactionAuthenticator {
-        self.authenticator.clone()
+        (*self.authenticator).clone()
     }
 
     pub fn authenticator_ref(&self) -> &TransactionAuthenticator {
@@ -1244,7 +1280,7 @@ impl SignedTransaction {
     }
 
     pub fn into_raw_transaction(self) -> RawTransaction {
-        self.raw_txn
+        Arc::unwrap_or_clone(self.raw_txn)
     }
 
     pub fn raw_transaction_ref(&self) -> &RawTransaction {
@@ -1257,10 +1293,6 @@ impl SignedTransaction {
 
     pub fn chain_id(&self) -> ChainId {
         self.raw_txn.chain_id
-    }
-
-    pub fn payload(&self) -> &TransactionPayload {
-        &self.raw_txn.payload
     }
 
     pub fn executable_ref(&self) -> Result<TransactionExecutableRef<'_>> {
@@ -1326,7 +1358,7 @@ impl SignedTransaction {
 
     pub fn is_multi_agent(&self) -> bool {
         matches!(
-            self.authenticator,
+            *self.authenticator,
             TransactionAuthenticator::MultiAgent { .. }
         )
     }
@@ -1346,8 +1378,26 @@ impl SignedTransaction {
         self.payload().is_encrypted_variant()
     }
 
-    pub fn payload_mut(&mut self) -> &mut TransactionPayload {
-        &mut self.raw_txn.payload
+    /// Provides mutable access to the payload for encrypted transactions.
+    /// Uses interior mutability via Mutex to avoid cloning the entire RawTransaction.
+    /// The closure receives a mutable reference to the payload override.
+    /// Note: After using this, clone the transaction to commit the override to raw_txn.
+    pub fn with_payload_mut<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut TransactionPayload) -> R,
+    {
+        let mut guard = self.payload_override.lock();
+        if guard.is_none() {
+            *guard = Some(self.raw_txn.payload.clone());
+        }
+        f(guard.as_mut().expect("just initialized"))
+    }
+
+    /// Returns a reference to the payload.
+    /// Note: For encrypted transactions that have been decrypted via with_payload_mut(),
+    /// clone the transaction first to commit the decrypted payload.
+    pub fn payload(&self) -> &TransactionPayload {
+        &self.raw_txn.payload
     }
 }
 

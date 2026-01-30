@@ -671,7 +671,7 @@ impl TestContext {
                     self.use_orderless_transactions,
                 ),
         );
-        self.commit_block(&vec![txn]).await;
+        self.commit_block(&[txn]).await;
     }
 
     pub async fn approve_multisig_transaction(
@@ -691,7 +691,7 @@ impl TestContext {
                     self.use_orderless_transactions,
                 ),
         );
-        self.commit_block(&vec![txn]).await;
+        self.commit_block(&[txn]).await;
     }
 
     pub async fn reject_multisig_transaction(
@@ -711,7 +711,7 @@ impl TestContext {
                     self.use_orderless_transactions,
                 ),
         );
-        self.commit_block(&vec![txn]).await;
+        self.commit_block(&[txn]).await;
     }
 
     pub async fn create_multisig_transaction_with_payload_hash(
@@ -731,7 +731,7 @@ impl TestContext {
                     self.use_orderless_transactions,
                 ),
         );
-        self.commit_block(&vec![txn]).await;
+        self.commit_block(&[txn]).await;
     }
 
     pub fn account_transfer(
