@@ -1739,7 +1739,7 @@ where
         );
 
         let block_limit_processor = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
-            self.config.onchain.block_gas_limit_type.clone(),
+            self.config.onchain.block_gas_limit_type,
             self.config.onchain.block_gas_limit_override(),
             num_txns,
         ));
@@ -1890,7 +1890,7 @@ where
 
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
         let block_limit_processor = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
-            self.config.onchain.block_gas_limit_type.clone(),
+            self.config.onchain.block_gas_limit_type,
             self.config.onchain.block_gas_limit_override(),
             num_txns + 1,
         ));
@@ -2222,7 +2222,7 @@ where
         let mut ret = Vec::with_capacity(num_txns + 1);
 
         let mut block_limit_processor = BlockGasLimitProcessor::<T>::new(
-            self.config.onchain.block_gas_limit_type.clone(),
+            self.config.onchain.block_gas_limit_type,
             self.config.onchain.block_gas_limit_override(),
             num_txns + 1,
         );
