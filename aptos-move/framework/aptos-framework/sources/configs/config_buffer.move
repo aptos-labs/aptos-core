@@ -19,6 +19,7 @@ module aptos_framework::config_buffer {
     use aptos_std::type_info;
     use aptos_framework::system_addresses;
 
+    friend aptos_framework::chunky_dkg_config;
     friend aptos_framework::consensus_config;
     friend aptos_framework::execution_config;
     friend aptos_framework::gas_schedule;
