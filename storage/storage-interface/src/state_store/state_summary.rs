@@ -93,9 +93,20 @@ impl StateSummary {
         assert_ne!(self.global_state_summary.root_hash(), *CORRUPTION_SENTINEL);
 
         // Persisted must be before or at my version.
-        assert!(persisted.next_version() <= self.next_version());
+        assert!(
+            persisted.next_version() <= self.next_version(),
+            "persisted version: {}, self version: {}",
+            persisted.next_version(),
+            self.next_version()
+        );
         // Updates must start at exactly my version.
-        assert_eq!(updates.first_version(), self.next_version());
+        assert_eq!(
+            updates.first_version(),
+            self.next_version(),
+            "updates first version: {}, self next version: {}",
+            updates.first_version(),
+            self.next_version()
+        );
 
         let (hot_smt_result, smt_result) = rayon::join(
             || self.update_hot_state_summary(persisted, hot_updates),
