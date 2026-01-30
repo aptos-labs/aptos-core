@@ -5120,78 +5120,14 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Co
         self.ctx.check_depth(self.depth).map_err(S::Error::custom)?;
         match (self.layout, self.value) {
             (L::Struct(struct_layout), Container::Struct(r)) => {
-                let values_ref = r.borrow();
-                let mut values = values_ref.as_slice();
-
-                if let Some((tag, variant_layouts)) =
-                    try_get_variant_field_layouts(struct_layout, values)
-                {
-                    let tag_idx = tag as usize;
-                    let variant_tag = tag_idx as u32;
-                    let variant_names = value::variant_name_placeholder((tag + 1) as usize)
-                        .map_err(|e| serde::ser::Error::custom(format!("{}", e)))?;
-                    let variant_name = variant_names[tag_idx];
-                    values = &values[1..];
-                    if variant_layouts.len() != values.len() {
-                        return Err(invariant_violation::<S>(format!(
-                            "cannot serialize struct value {:?} as {:?} -- number of fields mismatch",
-                            self.value, self.layout
-                        )));
-                    }
-                    match values.len() {
-                        0 => serializer.serialize_unit_variant(
-                            value::MOVE_ENUM_NAME,
-                            variant_tag,
-                            variant_name,
-                        ),
-                        1 => serializer.serialize_newtype_variant(
-                            value::MOVE_ENUM_NAME,
-                            variant_tag,
-                            variant_name,
-                            &SerializationReadyValue {
-                                ctx: self.ctx,
-                                layout: &variant_layouts[0],
-                                value: &values[0],
-                                depth: self.depth + 1,
-                            },
-                        ),
-                        _ => {
-                            let mut t = serializer.serialize_tuple_variant(
-                                value::MOVE_ENUM_NAME,
-                                variant_tag,
-                                variant_name,
-                                values.len(),
-                            )?;
-                            for (layout, value) in variant_layouts.iter().zip(values) {
-                                t.serialize_field(&SerializationReadyValue {
-                                    ctx: self.ctx,
-                                    layout,
-                                    value,
-                                    depth: self.depth + 1,
-                                })?
-                            }
-                            t.end()
-                        },
-                    }
-                } else {
-                    let field_layouts = struct_layout.fields(None);
-                    if field_layouts.len() != values.len() {
-                        return Err(invariant_violation::<S>(format!(
-                            "cannot serialize struct value {:?} as {:?} -- number of fields mismatch",
-                            self.value, self.layout
-                        )));
-                    }
-                    let mut t = serializer.serialize_tuple(values.len())?;
-                    for (layout, value) in field_layouts.iter().zip(values.iter()) {
-                        t.serialize_element(&SerializationReadyValue {
-                            ctx: self.ctx,
-                            layout,
-                            value,
-                            depth: self.depth + 1,
-                        })?;
-                    }
-                    t.end()
-                }
+                let values = r.borrow();
+                (SerializationReadyValue {
+                    ctx: self.ctx,
+                    layout: struct_layout,
+                    value: &*values,
+                    depth: self.depth,
+                })
+                .serialize(serializer)
             },
             (L::Vector(layout), c) => {
                 let layout = layout.as_ref();
