@@ -839,6 +839,8 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
+ "sha2 0.9.9",
+ "walkdir",
 ]
 
 [[package]]
