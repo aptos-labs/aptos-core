@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_crypto::{blstrs::random_scalar, hash::CryptoHash, traits::SecretSharingConfig as _};
+use aptos_crypto::{blstrs::random_scalar, hash::CryptoHash, traits::TSecretSharingConfig as _};
 use aptos_dkg::pvss::{
     das::{self, unweighted_protocol},
     insecure_field,
