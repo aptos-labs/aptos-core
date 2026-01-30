@@ -182,17 +182,44 @@ Where `Hasher::seed()` is a domain separation prefix.
 6. **06-orderless-transactions.md** - Nonce-based replay protection (experimental)
 7. **07-transaction-lifecycle.md** - Transaction submission, waiting, and confirmation
 
+### REST API Documentation (`specifications/api/`)
+
+1. **01-api-overview.md** - API basics, base URLs, headers, error handling
+2. **02-accounts-api.md** - Account, resource, and module endpoints
+3. **03-transactions-api.md** - Transaction submission, simulation, and querying
+4. **04-events-api.md** - Event retrieval by creation number and handle
+5. **05-view-functions.md** - Read-only Move function execution
+
 ### Overview Documentation
 
 - **specifications/README.md** - Navigation guide and quick reference tables
 
 ---
 
+## User Requests Log
+
+### Initial Request
+- Transaction format specifications (Ed25519, SingleKey, MultiKey, MultiEd25519)
+- Signing documentation (Ed25519, MultiEd25519, secp256k1, Secp256r1, Keyless)
+- Advanced transaction building (hashing, multi-agent, fee payer, multisig)
+
+### Follow-up Request 1
+- Gas estimation and selection
+- Sequence number management
+- Orderless transactions
+- Transaction lifecycle and waiting
+
+### Follow-up Request 2
+- REST API specification documents
+
+---
+
 ## Commits Made
 
-| Commit Hash | Description |
-|-------------|-------------|
-| (pending) | Initial documentation structure |
+| Commit | Description |
+|--------|-------------|
+| (multiple) | Initial specification documentation |
+| (pending) | Add REST API specification documents |
 
 ---
 

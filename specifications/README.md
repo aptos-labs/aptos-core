@@ -34,14 +34,20 @@ specifications/
 │   ├── 04-secp256k1-signing.md           # Secp256k1 ECDSA signing
 │   ├── 05-secp256r1-signing.md           # Secp256r1/WebAuthn signing
 │   └── 06-keyless-signing.md             # Keyless (OIDC) signing
-└── advanced/                              # Advanced transaction types
-    ├── 01-multi-agent-transactions.md    # Multi-signer transactions
-    ├── 02-fee-payer-transactions.md      # Sponsored transactions
-    ├── 03-multisig-transactions.md       # On-chain multisig
-    ├── 04-gas-estimation.md              # Gas estimation and selection
-    ├── 05-sequence-numbers.md            # Sequence number management
-    ├── 06-orderless-transactions.md      # Nonce-based replay protection
-    └── 07-transaction-lifecycle.md       # Submission and confirmation
+├── advanced/                              # Advanced transaction types
+│   ├── 01-multi-agent-transactions.md    # Multi-signer transactions
+│   ├── 02-fee-payer-transactions.md      # Sponsored transactions
+│   ├── 03-multisig-transactions.md       # On-chain multisig
+│   ├── 04-gas-estimation.md              # Gas estimation and selection
+│   ├── 05-sequence-numbers.md            # Sequence number management
+│   ├── 06-orderless-transactions.md      # Nonce-based replay protection
+│   └── 07-transaction-lifecycle.md       # Submission and confirmation
+└── api/                                   # REST API specifications
+    ├── 01-api-overview.md                # API basics, headers, errors
+    ├── 02-accounts-api.md                # Account, resource, module queries
+    ├── 03-transactions-api.md            # Transaction submission and querying
+    ├── 04-events-api.md                  # Event retrieval
+    └── 05-view-functions.md              # Read-only function calls
 ```
 
 ## Quick Reference
@@ -142,14 +148,26 @@ MULTI_ED25519_BITMAP_LENGTH = 4         // Bitmap for multi-ed25519
 
 For new implementers, we recommend reading in this order:
 
+### Core Transaction Building
 1. **[Transaction Hashing](signing/01-transaction-hashing.md)** - Understand the signing message format
 2. **[Raw Transaction Format](transaction-formats/01-raw-transaction.md)** - Core transaction structure
 3. **[Ed25519 Authenticator](transaction-formats/02-ed25519-authenticator.md)** - Simplest authentication
 4. **[Ed25519 Signing](signing/02-ed25519-signing.md)** - Basic signing process
-5. **[Gas Estimation](advanced/04-gas-estimation.md)** - How to set gas parameters
-6. **[Sequence Numbers](advanced/05-sequence-numbers.md)** - Replay protection basics
-7. **[Transaction Lifecycle](advanced/07-transaction-lifecycle.md)** - Submission and confirmation
-8. Continue with other formats as needed
+
+### Transaction Submission
+5. **[API Overview](api/01-api-overview.md)** - REST API basics and error handling
+6. **[Transactions API](api/03-transactions-api.md)** - Submitting and querying transactions
+7. **[Gas Estimation](advanced/04-gas-estimation.md)** - How to set gas parameters
+8. **[Sequence Numbers](advanced/05-sequence-numbers.md)** - Replay protection basics
+9. **[Transaction Lifecycle](advanced/07-transaction-lifecycle.md)** - Submission and confirmation
+
+### Querying State
+10. **[Accounts API](api/02-accounts-api.md)** - Account and resource queries
+11. **[View Functions](api/05-view-functions.md)** - Read-only function execution
+12. **[Events API](api/04-events-api.md)** - Event retrieval
+
+### Advanced Topics
+Continue with other formats and advanced topics as needed based on your use case.
 
 ## Test Vectors
 
