@@ -25,6 +25,16 @@ impl EncryptionKey {
         Self { sig_mpk_g2, tau_g2 }
     }
 
+    #[cfg(test)]
+    pub(crate) fn new_for_testing() -> Self {
+        use ark_ec::AffineRepr as _;
+
+        Self {
+            sig_mpk_g2: G2Affine::generator(),
+            tau_g2: G2Affine::generator(),
+        }
+    }
+
     pub fn verify_decryption_key(
         &self,
         digest: &Digest,
