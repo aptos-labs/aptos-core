@@ -7,6 +7,7 @@ package aptos.indexer.v1;
 
 import "aptos/indexer/v1/filter.proto";
 import "aptos/transaction/v1/transaction.proto";
+import "aptos/util/timestamp/timestamp.proto";
 
 // This is for storage only.
 message TransactionsInStorage {
@@ -46,6 +47,12 @@ message TransactionsResponse {
   optional uint64 chain_id = 2 [jstype = JS_STRING];
 
   optional ProcessedRange processed_range = 3;
+
+  // Optional; the timestamp of the last transaction in the processed range
+  // (before any filtering is applied). This is useful when the transactions
+  // list is empty due to filtering, as the client cannot derive the timestamp
+  // from the transactions themselves.
+  optional aptos.util.timestamp.Timestamp processed_range_end_timestamp = 4;
 }
 
 service RawData {

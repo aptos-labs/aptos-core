@@ -3140,6 +3140,9 @@ impl serde::Serialize for TransactionsResponse {
         if self.processed_range.is_some() {
             len += 1;
         }
+        if self.processed_range_end_timestamp.is_some() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("aptos.indexer.v1.TransactionsResponse", len)?;
         if !self.transactions.is_empty() {
             struct_ser.serialize_field("transactions", &self.transactions)?;
@@ -3149,6 +3152,9 @@ impl serde::Serialize for TransactionsResponse {
         }
         if let Some(v) = self.processed_range.as_ref() {
             struct_ser.serialize_field("processedRange", v)?;
+        }
+        if let Some(v) = self.processed_range_end_timestamp.as_ref() {
+            struct_ser.serialize_field("processedRangeEndTimestamp", v)?;
         }
         struct_ser.end()
     }
@@ -3165,6 +3171,8 @@ impl<'de> serde::Deserialize<'de> for TransactionsResponse {
             "chainId",
             "processed_range",
             "processedRange",
+            "processed_range_end_timestamp",
+            "processedRangeEndTimestamp",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -3172,6 +3180,7 @@ impl<'de> serde::Deserialize<'de> for TransactionsResponse {
             Transactions,
             ChainId,
             ProcessedRange,
+            ProcessedRangeEndTimestamp,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -3196,6 +3205,7 @@ impl<'de> serde::Deserialize<'de> for TransactionsResponse {
                             "transactions" => Ok(GeneratedField::Transactions),
                             "chainId" | "chain_id" => Ok(GeneratedField::ChainId),
                             "processedRange" | "processed_range" => Ok(GeneratedField::ProcessedRange),
+                            "processedRangeEndTimestamp" | "processed_range_end_timestamp" => Ok(GeneratedField::ProcessedRangeEndTimestamp),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -3218,6 +3228,7 @@ impl<'de> serde::Deserialize<'de> for TransactionsResponse {
                 let mut transactions__ = None;
                 let mut chain_id__ = None;
                 let mut processed_range__ = None;
+                let mut processed_range_end_timestamp__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::Transactions => {
@@ -3240,12 +3251,19 @@ impl<'de> serde::Deserialize<'de> for TransactionsResponse {
                             }
                             processed_range__ = map.next_value()?;
                         }
+                        GeneratedField::ProcessedRangeEndTimestamp => {
+                            if processed_range_end_timestamp__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("processedRangeEndTimestamp"));
+                            }
+                            processed_range_end_timestamp__ = map.next_value()?;
+                        }
                     }
                 }
                 Ok(TransactionsResponse {
                     transactions: transactions__.unwrap_or_default(),
                     chain_id: chain_id__,
                     processed_range: processed_range__,
+                    processed_range_end_timestamp: processed_range_end_timestamp__,
                 })
             }
         }

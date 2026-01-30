@@ -214,16 +214,19 @@ impl HistoricalDataService {
                                     first_version,
                                     last_version,
                                 }),
+                                // Will be set on the last response.
+                                processed_range_end_timestamp: None,
                             }
                         })
                         .collect();
-                    responses
-                        .last_mut()
-                        .unwrap()
+                    let last_response = responses.last_mut().unwrap();
+                    last_response
                         .processed_range
                         .as_mut()
                         .unwrap()
                         .last_version = last_processed_version;
+                    // Set the end timestamp on the last response.
+                    last_response.processed_range_end_timestamp = Some(timestamp);
                     responses
                 } else {
                     vec![TransactionsResponse {
@@ -233,6 +236,7 @@ impl HistoricalDataService {
                             first_version: first_processed_version,
                             last_version: last_processed_version,
                         }),
+                        processed_range_end_timestamp: Some(timestamp),
                     }]
                 };
 

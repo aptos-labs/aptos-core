@@ -142,6 +142,7 @@ impl GrpcManager for GrpcManagerService {
             chain_id: Some(self.chain_id),
             // Not used.
             processed_range: None,
+            processed_range_end_timestamp: None,
         }))
     }
 

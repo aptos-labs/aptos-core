@@ -133,6 +133,7 @@ impl RawData for LocalnetDataService {
                         _ => panic!("Unexpected response type."),
                     },
                     processed_range: None,
+                    processed_range_end_timestamp: None,
                 });
                 match external_service_tx.send(response).await {
                     Ok(_) => {},

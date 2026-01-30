@@ -685,6 +685,7 @@ fn get_transactions_responses_builder(
             chain_id: Some(chain_id as u64),
             transactions: chunk,
             processed_range: None,
+            processed_range_end_timestamp: None,
         })
         .collect();
     (responses, num_stripped)

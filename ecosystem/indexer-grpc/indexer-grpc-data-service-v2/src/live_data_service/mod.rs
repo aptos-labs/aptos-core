@@ -182,16 +182,16 @@ impl<'a> LiveDataService<'a> {
                 continue;
             }
 
-            if let Some((transactions, batch_size_bytes, last_processed_version)) = self
-                .in_memory_cache
-                .get_data(
-                    next_version,
-                    ending_version,
-                    max_num_transactions_per_batch,
-                    max_bytes_per_batch,
-                    &filter,
-                )
-                .await
+            if let Some((transactions, batch_size_bytes, last_processed_version, last_timestamp)) =
+                self.in_memory_cache
+                    .get_data(
+                        next_version,
+                        ending_version,
+                        max_num_transactions_per_batch,
+                        max_bytes_per_batch,
+                        &filter,
+                    )
+                    .await
             {
                 let _timer = TIMER
                     .with_label_values(&["live_data_service_send_batch"])
@@ -203,6 +203,7 @@ impl<'a> LiveDataService<'a> {
                         first_version: next_version,
                         last_version: last_processed_version,
                     }),
+                    processed_range_end_timestamp: last_timestamp,
                 };
                 // Record bytes ready to transfer after stripping for billing.
                 let bytes_ready_to_transfer_after_stripping = response

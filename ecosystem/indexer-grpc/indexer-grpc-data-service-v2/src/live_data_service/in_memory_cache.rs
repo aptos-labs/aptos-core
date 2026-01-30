@@ -6,7 +6,7 @@ use crate::{
     live_data_service::{data_manager::DataManager, fetch_manager::FetchManager},
     metrics::TIMER,
 };
-use aptos_protos::transaction::v1::Transaction;
+use aptos_protos::{transaction::v1::Transaction, util::timestamp::Timestamp};
 use aptos_transaction_filter::{BooleanTransactionFilter, Filterable};
 use prost::Message;
 use std::sync::Arc;
@@ -37,6 +37,10 @@ impl<'a> InMemoryCache<'a> {
         }
     }
 
+    /// Returns data from the cache for the specified version range.
+    /// Returns: (transactions, total_bytes, last_processed_version, last_timestamp)
+    /// The timestamp is from the last transaction in the processed range (before filtering),
+    /// so clients can always get the timestamp even if all transactions were filtered out.
     pub(super) async fn get_data(
         &'a self,
         starting_version: u64,
@@ -44,7 +48,7 @@ impl<'a> InMemoryCache<'a> {
         max_num_transactions_per_batch: usize,
         max_bytes_per_batch: usize,
         filter: &Option<BooleanTransactionFilter>,
-    ) -> Option<(Vec<Transaction>, usize, u64)> {
+    ) -> Option<(Vec<Transaction>, usize, u64, Option<Timestamp>)> {
         let _timer = TIMER.with_label_values(&["cache_get_data"]).start_timer();
 
         while starting_version >= self.data_manager.read().await.end_version {
@@ -81,11 +85,14 @@ impl<'a> InMemoryCache<'a> {
             let ending_version = ending_version.min(data_manager.end_version);
 
             let mut result = Vec::new();
+            let mut last_timestamp: Option<Timestamp> = None;
             while version < ending_version
                 && total_bytes < max_bytes_per_batch
                 && result.len() < max_num_transactions_per_batch
             {
                 if let Some(transaction) = data_manager.get_data(version).as_ref() {
+                    // Track the timestamp of the last processed transaction (before filtering).
+                    last_timestamp = transaction.timestamp;
                     // NOTE: We allow 1 more txn beyond the size limit here, for simplicity.
                     if filter.is_none() || filter.as_ref().unwrap().matches(transaction) {
                         total_bytes += transaction.encoded_len();
@@ -97,7 +104,7 @@ impl<'a> InMemoryCache<'a> {
                 }
             }
             trace!("Data was sent from cache, last version: {}.", version - 1);
-            return Some((result, total_bytes, version - 1));
+            return Some((result, total_bytes, version - 1, last_timestamp));
         }
     }
 }

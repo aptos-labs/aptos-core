@@ -154,6 +154,12 @@ pub struct TransactionsResponse {
     pub chain_id: ::core::option::Option<u64>,
     #[prost(message, optional, tag="3")]
     pub processed_range: ::core::option::Option<ProcessedRange>,
+    /// Optional; the timestamp of the last transaction in the processed range
+    /// (before any filtering is applied). This is useful when the transactions
+    /// list is empty due to filtering, as the client cannot derive the timestamp
+    /// from the transactions themselves.
+    #[prost(message, optional, tag="4")]
+    pub processed_range_end_timestamp: ::core::option::Option<super::super::util::timestamp::Timestamp>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
