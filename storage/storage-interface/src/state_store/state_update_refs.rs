@@ -48,11 +48,17 @@ impl<'kv> PerVersionStateUpdateRefs<'kv> {
         let mut shards = arr![Vec::with_capacity(num_versions / 8); 16];
 
         let mut versions_seen = 0;
+        let mut tmp = Vec::new();
         for update_iter in updates_by_version.into_iter() {
             let version = first_version + versions_seen as Version;
             versions_seen += 1;
 
-            for (key, write_op) in update_iter.into_iter() {
+            tmp.clear();
+            for (key, write_op) in update_iter {
+                tmp.push((key, write_op));
+            }
+            tmp.sort_by_key(|x| x.0);
+            for (key, write_op) in tmp.drain(..) {
                 shards[key.get_shard_id()].push((key, StateUpdateRef {
                     version,
                     state_op: write_op,
@@ -412,5 +418,25 @@ mod tests {
         verify_batching(for_latest, "A", 11, "A1");
         verify_batching(for_latest, "B", 10, "B0");
         verify_batching(for_latest, "C", 12, "C2");
+    }
+
+    #[test]
+    fn test_per_version_updates_sorted_by_key() {
+        // Verify that updates within each version are sorted by state key,
+        // regardless of the order they appear in the input write set.
+        // Keys are intentionally provided in non-alphabetical order.
+        let v0 = write_set(&[("Z", "Z0"), ("A", "A0"), ("M", "M0")]);
+        let all_checkpoint_indices = vec![0];
+        let ret = StateUpdateRefs::index_write_sets(0, vec![&v0], 1, all_checkpoint_indices);
+
+        let per_version = ret.for_last_checkpoint_per_version().unwrap();
+
+        // Verify keys are sorted within each shard.
+        for shard in &per_version.shards {
+            assert!(
+                shard.is_sorted_by_key(|(k, _)| *k),
+                "Keys within shard should be sorted"
+            );
+        }
     }
 }
