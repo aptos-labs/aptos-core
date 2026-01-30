@@ -220,11 +220,8 @@ impl HistoricalDataService {
                         })
                         .collect();
                     let last_response = responses.last_mut().unwrap();
-                    last_response
-                        .processed_range
-                        .as_mut()
-                        .unwrap()
-                        .last_version = last_processed_version;
+                    last_response.processed_range.as_mut().unwrap().last_version =
+                        last_processed_version;
                     // Set the end timestamp on the last response.
                     last_response.processed_range_end_timestamp = Some(timestamp);
                     responses
