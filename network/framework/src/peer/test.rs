@@ -349,7 +349,7 @@ fn peers_send_message_concurrent() {
             NetworkMessage::DirectSendMsg(DirectSendMsg {
                 protocol_id: PROTOCOL,
                 priority: 0,
-                raw_msg: msg_b.mdata.into(),
+                raw_msg: msg_b.mdata.clone(),
             })
         );
         assert_eq!(
@@ -357,7 +357,7 @@ fn peers_send_message_concurrent() {
             NetworkMessage::DirectSendMsg(DirectSendMsg {
                 protocol_id: PROTOCOL,
                 priority: 0,
-                raw_msg: msg_a.mdata.into(),
+                raw_msg: msg_a.mdata.clone(),
             })
         );
 
@@ -1000,7 +1000,7 @@ fn peers_send_multiplex() {
             NetworkMessage::DirectSendMsg(DirectSendMsg {
                 protocol_id: PROTOCOL,
                 priority: 0,
-                raw_msg: msg_b.mdata.into(),
+                raw_msg: msg_b.mdata.clone(),
             })
         );
         assert_eq!(
@@ -1008,7 +1008,7 @@ fn peers_send_multiplex() {
             NetworkMessage::DirectSendMsg(DirectSendMsg {
                 protocol_id: PROTOCOL,
                 priority: 0,
-                raw_msg: msg_a.mdata.into(),
+                raw_msg: msg_a.mdata.clone(),
             })
         );
 
