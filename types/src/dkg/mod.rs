@@ -3,6 +3,7 @@
 
 use self::real_dkg::RealDKG;
 
+pub mod chunky_dkg;
 pub mod dummy_dkg;
 pub mod randomness_dkg;
 pub mod real_dkg;
