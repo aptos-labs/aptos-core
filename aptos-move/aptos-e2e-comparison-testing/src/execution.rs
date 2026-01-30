@@ -62,8 +62,9 @@ pub(crate) fn add_aptos_packages_to_state_store(
     }
 }
 
-#[derive(ValueEnum, Clone, Copy, Debug, Eq, PartialEq, PartialOrd)]
+#[derive(ValueEnum, Clone, Copy, Debug, Default, Eq, PartialEq, PartialOrd)]
 pub enum ExecutionMode {
+    #[default]
     V1,
     V2,
     Compare,
@@ -88,12 +89,6 @@ impl ExecutionMode {
 
     pub fn is_v2_or_compare(&self) -> bool {
         self.is_v2() || self.is_compare()
-    }
-}
-
-impl Default for ExecutionMode {
-    fn default() -> Self {
-        Self::V1
     }
 }
 
