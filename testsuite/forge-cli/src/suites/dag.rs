@@ -126,6 +126,10 @@ fn dag_realistic_env_max_load_test(
                     config_v7.block_gas_limit_type = BlockGasLimitType::NoLimit;
                     config_v7.transaction_shuffler_type = TransactionShufflerType::default_for_genesis();
                 }
+                OnChainExecutionConfig::V8(config_v8) => {
+                    config_v8.block_gas_limit_type = BlockGasLimitType::NoLimit;
+                    config_v8.transaction_shuffler_type = TransactionShufflerType::default_for_genesis();
+                }
             }
             helm_values["chain"]["on_chain_execution_config"] =
                 serde_yaml::to_value(on_chain_execution_config).expect("must serialize");
@@ -235,6 +239,9 @@ fn dag_reconfig_enable_test() -> ForgeConfig {
                     }
                     OnChainExecutionConfig::V7(config_v7) => {
                         config_v7.block_gas_limit_type = BlockGasLimitType::NoLimit;
+                    }
+                    OnChainExecutionConfig::V8(config_v8) => {
+                        config_v8.block_gas_limit_type = BlockGasLimitType::NoLimit;
                     }
             }
             helm_values["chain"]["on_chain_execution_config"] =
