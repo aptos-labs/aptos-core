@@ -48,6 +48,7 @@ module aptos_experimental::market_types {
         OrderCancelledByUser,
         OrderCancelledBySystem,
         OrderCancelledBySystemDueToError,
+        ClearinghouseStoppedMatching,
     }
 
     public fun order_cancellation_reason_post_only_violation(): OrderCancellationReason {
@@ -92,6 +93,18 @@ module aptos_experimental::market_types {
 
     public fun order_cancellation_reason_cancelled_by_user(): OrderCancellationReason {
         OrderCancellationReason::OrderCancelledByUser
+    }
+
+    public fun order_cancellation_reason_cancelled_by_system(): OrderCancellationReason {
+        OrderCancellationReason::OrderCancelledBySystem
+    }
+
+    public fun order_cancellation_reason_cancelled_by_system_due_to_error(): OrderCancellationReason {
+        OrderCancellationReason::OrderCancelledBySystemDueToError
+    }
+
+    public fun order_cancellation_reason_clearinghouse_stopped_matching(): OrderCancellationReason {
+        OrderCancellationReason::ClearinghouseStoppedMatching
     }
 
     enum OrderStatus has drop, copy, store {

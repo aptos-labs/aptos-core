@@ -272,19 +272,19 @@ module aptos_experimental::confidential_asset_tests {
             vector[]
         );
 
-        let token = ctor_ref.object_from_constructor_ref<Metadata>();
+        let token = object::object_from_constructor_ref<Metadata>(ctor_ref);
 
         let sender_store =
             primary_fungible_store::ensure_primary_store_exists(
                 signer::address_of(sender), token
             );
-        mint_ref.mint_to(sender_store, sender_amount);
+        fungible_asset::mint_to(&mint_ref, sender_store, sender_amount);
 
         let recipient_store =
             primary_fungible_store::ensure_primary_store_exists(
                 signer::address_of(recipient), token
             );
-        mint_ref.mint_to(recipient_store, recipient_amount);
+        fungible_asset::mint_to(&mint_ref, recipient_store, recipient_amount);
 
         token
     }

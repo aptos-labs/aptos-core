@@ -8,7 +8,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;
 
 pub trait BatchThresholdEncryption {
-    type ThresholdConfig: aptos_crypto::SecretSharingConfig;
+    type ThresholdConfig: aptos_crypto::TSecretSharingConfig;
     type SubTranscript: Subtranscript;
 
     /// An encryption key for the scheme. Allows for generating ciphertexts. If we want to actually
@@ -139,6 +139,8 @@ pub trait BatchThresholdEncryption {
         digest: &Self::Digest,
     ) -> Result<Self::DecryptionKeyShare>;
 
+    /// With respect to a verification key and a digest, verify that a decryption key share was
+    /// honestly derived.
     fn verify_decryption_key_share(
         verification_key: &Self::VerificationKey,
         digest: &Self::Digest,
@@ -152,7 +154,13 @@ pub trait BatchThresholdEncryption {
         config: &Self::ThresholdConfig,
     ) -> Result<Self::DecryptionKey>;
 
-    // TODO: verify decryption key?
+    /// With respect to the scheme's encryption key and a digest, verify that the decryption key
+    /// was honestly reconstructed from honestly-derived decryption key shares.
+    fn verify_decryption_key(
+        encryption_key: &Self::EncryptionKey,
+        digest: &Self::Digest,
+        decryption_key: &Self::DecryptionKey,
+    ) -> Result<()>;
 
     fn prepare_cts(
         cts: &[Self::Ciphertext],

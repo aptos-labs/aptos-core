@@ -74,7 +74,7 @@ module aptos_experimental::order_placement {
         Self,
         MarketClearinghouseCallbacks,
         Market, CallbackResult, new_callback_result_not_available,
-        OrderCancellationReason
+        OrderCancellationReason, order_cancellation_reason_clearinghouse_stopped_matching
     };
     use aptos_framework::transaction_context;
     use aptos_experimental::dead_mans_switch_tracker::is_order_valid;
@@ -141,6 +141,12 @@ module aptos_experimental::order_placement {
         cancel_reason: OrderCancellationReason
     ): bool {
         cancel_reason == market_types::order_cancellation_reason_dead_mans_switch_expired()
+    }
+
+    public fun is_clearinghouse_stopped_matching(
+        cancel_reason: OrderCancellationReason
+    ): bool {
+        cancel_reason == market_types::order_cancellation_reason_clearinghouse_stopped_matching()
     }
 
     public fun get_order_id<R: store + copy + drop>(self: OrderMatchResult<R>): OrderId {
@@ -1097,23 +1103,22 @@ module aptos_experimental::order_placement {
                     match_count
                 }
             };
-            if (should_stop) {
-                return OrderMatchResult::V1 {
-                    order_id,
-                    remaining_size,
-                    cancel_reason: option::none(),
-                    fill_sizes,
-                    callback_results,
-                    match_count
-                }
-            };
             if (remaining_size == 0) {
                 cleanup_order_internal(
                     user_addr, order_id, client_order_id, single_order_type(), is_bid, time_in_force, 0, limit_price, trigger_condition, metadata, callbacks, true
                 );
                 break;
             };
-
+            if (should_stop) {
+                return OrderMatchResult::V1 {
+                    order_id,
+                    remaining_size,
+                    cancel_reason: option::some(order_cancellation_reason_clearinghouse_stopped_matching()),
+                    fill_sizes,
+                    callback_results,
+                    match_count
+                }
+            };
             // Check if the next iteration will still match
             let is_taker_order =
                 market.is_taker_order(limit_price, is_bid, option::none());

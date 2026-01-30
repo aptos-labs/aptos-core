@@ -71,7 +71,7 @@ impl Display for ThresholdConfigBlstrs {
     }
 }
 
-impl traits::SecretSharingConfig for ThresholdConfigBlstrs {
+impl traits::TSecretSharingConfig for ThresholdConfigBlstrs {
     /// For testing only.
     fn get_random_player<R>(&self, rng: &mut R) -> Player
     where

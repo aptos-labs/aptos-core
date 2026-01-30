@@ -265,6 +265,23 @@ module aptos_experimental::clearinghouse_test {
         )
     }
 
+    /// Similar to settle_trade_with_taker_cancelled but does NOT provide a taker cancellation reason.
+    /// This tests the scenario where the clearinghouse signals to stop matching without cancelling
+    /// the taker order explicitly. The trade is fully settled but then matching is stopped.
+    public(friend) fun settle_trade_with_stop_matching(
+        _taker: address,
+        _maker: address,
+        size: u64,
+        _is_taker_long: bool
+    ): SettleTradeResult<u64> {
+        new_settle_trade_result(
+            size, // Fully settle this trade
+            option::none(),
+            option::none(), // No taker cancellation reason
+            new_callback_result_stop_matching(size)
+        )
+    }
+
     public(friend) fun test_market_callbacks():
         MarketClearinghouseCallbacks<TestOrderMetadata, u64> acquires GlobalState {
         new_market_clearinghouse_callbacks(
@@ -313,6 +330,41 @@ module aptos_experimental::clearinghouse_test {
             |_order_info, _size| {
                 new_place_maker_order_result(option::none(), option::none())
                 // place_maker_order is not used in this test
+            },
+            |order_info, _remaining_size, _| {
+                cleanup_order(order_info.get_order_id());
+            },
+            |account, _order_id, _is_bid, _price, _size| {
+                cleanup_bulk_order(account);
+            },
+            |_account, _order_id, _bid_prices, _bid_sizes, _ask_prices, _ask_sizes, _cancelled_bid_prices, _cancelled_bid_sizes, _cancelled_ask_prices, _cancelled_ask_sizes, _metadata| {
+                // place_bulk_order callback - no-op for this test
+            },
+            |_order_info, _size| {
+                // decrease order size is not used in this test
+            },
+            |order_metadata| {
+                get_order_metadata_bytes(order_metadata)
+            }
+        )
+    }
+
+    /// Test callbacks that stop matching without providing a taker cancellation reason.
+    /// This is used to test the ClearinghouseStoppedMatching cancellation reason.
+    public(friend) fun test_market_callbacks_with_stop_matching():
+        MarketClearinghouseCallbacks<TestOrderMetadata, u64> acquires GlobalState {
+        new_market_clearinghouse_callbacks(
+            |_market, taker_order_info, maker_order_info, _fill_id, _price, size| {
+                settle_trade_with_stop_matching(taker_order_info.get_account(), maker_order_info.get_account(), size, taker_order_info.is_bid())
+            },
+            |order_info, _size| {
+                validate_order_placement(order_info.get_order_id())
+            },
+            |account, _bid_prices, _bid_sizes, _ask_prices, _ask_sizes, _order_metadata| {
+                validate_bulk_order_placement(account)
+            },
+            |_order_info, _size| {
+                new_place_maker_order_result(option::none(), option::none())
             },
             |order_info, _remaining_size, _| {
                 cleanup_order(order_info.get_order_id());
