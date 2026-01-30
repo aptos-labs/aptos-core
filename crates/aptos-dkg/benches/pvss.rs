@@ -13,8 +13,8 @@ use aptos_dkg::pvss::{
         DealingArgs, NoAux,
     },
     traits::transcript::{
-        Aggregatable, AggregatableTranscript, HasAggregatableSubtranscript, MalleableTranscript,
-        Transcript, WithMaxNumShares,
+        Aggregatable, AggregatableTranscript, Aggregated, HasAggregatableSubtranscript,
+        MalleableTranscript, Transcript, WithMaxNumShares,
     },
     WeightedConfigBlstrs,
 };
@@ -210,8 +210,9 @@ fn pvss_aggregate<T: AggregatableTranscript, M: Measurement>(
                 );
                 (trx.clone(), trx)
             },
-            |(mut first, second)| {
-                first.aggregate_with(&sc, &second).unwrap();
+            |(first, second)| {
+                let mut agg = first.to_aggregated();
+                agg.aggregate_with(&sc, &second).unwrap();
             },
         )
     });
@@ -239,9 +240,8 @@ where
                 (trs.clone(), trs)
             },
             |(first, second)| {
-                first
-                    .get_subtranscript()
-                    .aggregate_with(&sc, &second.get_subtranscript())
+                let mut agg = first.get_subtranscript().to_aggregated();
+                agg.aggregate_with(&sc, &second.get_subtranscript())
                     .unwrap();
             },
         )
