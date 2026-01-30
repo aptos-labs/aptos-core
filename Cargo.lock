@@ -379,6 +379,7 @@ dependencies = [
  "move-model",
  "move-package",
  "move-prover-boogie-backend",
+ "move-query",
  "move-symbol-pool",
  "move-unit-test",
  "move-vm-runtime",
@@ -3788,19 +3789,6 @@ dependencies = [
  "rand 0.7.3",
  "ureq",
  "url",
-]
-
-[[package]]
-name = "aptos-rate-limiter"
-version = "0.1.0"
-dependencies = [
- "aptos-infallible",
- "aptos-logger",
- "aptos-metrics-core",
- "futures",
- "pin-project 1.1.3",
- "tokio",
- "tokio-util 0.7.10",
 ]
 
 [[package]]
@@ -13013,6 +13001,23 @@ dependencies = [
  "move-command-line-common",
  "prettydiff",
  "regex",
+]
+
+[[package]]
+name = "move-query"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-framework",
+ "aptos-types",
+ "move-binary-format",
+ "move-core-types",
+ "move-model",
+ "move-package",
+ "regex",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

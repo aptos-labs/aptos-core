@@ -253,6 +253,7 @@ members = [
     "third_party/move/tools/move-disassembler",
     "third_party/move/tools/move-linter",
     "third_party/move/tools/move-package",
+    "third_party/move/tools/move-query",
     "third_party/move/tools/move-package-cache",
     "third_party/move/tools/move-package-manifest",
     "third_party/move/tools/move-package-resolver",
@@ -890,6 +891,7 @@ move-linter = { path = "third_party/move/tools/move-linter" }
 move-model = { path = "third_party/move/move-model" }
 move-package = { path = "third_party/move/tools/move-package" }
 move-package-cache = { path = "third_party/move/tools/move-package-cache" }
+move-query = { path = "third_party/move/tools/move-query" }
 move-package-manifest = { path = "third_party/move/tools/move-package-manifest" }
 move-prover = { path = "third_party/move/move-prover" }
 move-prover-boogie-backend = { path = "third_party/move/move-prover/boogie-backend" }
