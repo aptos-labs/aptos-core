@@ -5153,7 +5153,7 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Re
                     ctx: self.ctx,
                     layout: self.layout,
                     value: container,
-                    depth: self.depth + 1,
+                    depth: self.depth,
                 })
                 .serialize(serializer)
             },
@@ -5171,7 +5171,7 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Re
                             ctx: self.ctx,
                             layout: self.layout,
                             value: val,
-                            depth: self.depth + 1,
+                            depth: self.depth,
                         })
                         .serialize(serializer)
                     },
