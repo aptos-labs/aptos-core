@@ -11,7 +11,7 @@ use bcs::test_helpers::assert_canonical_encode_decode;
 use bytes::Bytes;
 use futures::{executor::block_on, future, sink::SinkExt, stream::StreamExt};
 use futures_util::stream::select;
-use proptest::{collection::vec, prelude::*};
+use proptest::collection::vec;
 
 // Ensure serialization of ProtocolId enum takes 1 byte.
 #[test]
