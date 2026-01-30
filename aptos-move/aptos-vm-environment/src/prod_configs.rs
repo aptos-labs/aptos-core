@@ -263,6 +263,8 @@ pub fn aptos_prod_vm_config(
         enable_framework_for_option,
         enable_function_caches_for_native_dynamic_dispatch,
         enable_debugging,
+        // Public struct/enum transaction arguments are enabled with VM binary format v10
+        enable_public_struct_args: features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V10),
     };
 
     // Note: if max_value_nest_depth changed, make sure the constant is in-sync. Do not remove this
