@@ -1,0 +1,16 @@
+//# publish --print-bytecode
+module 0x66::test_bytecode_pattern_pack_variant
+
+enum Color has drop
+  Red
+    value: u64
+  Green
+    value: u64
+
+// Invalid: pack_variant function has extra instructions (not exactly N+2 instructions where N is number of fields)
+#[pack_variant=0] public fun pack$Color$Red(l0: u64): Color
+    move_loc l0
+    ld_u64 999
+    pop
+    pack_variant Color, Red
+    ret

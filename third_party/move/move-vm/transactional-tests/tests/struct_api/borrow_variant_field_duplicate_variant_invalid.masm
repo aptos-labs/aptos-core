@@ -1,0 +1,17 @@
+//# publish --print-bytecode
+module 0x66::test_borrow_variant_field_duplicate
+
+enum Color has drop
+  Red
+    r: u8
+  Green
+    g: u16
+  Blue
+    b: u8
+
+// Invalid: variants list contains Red::r twice
+// This violates both completeness (Blue is missing) and ordering (Red::r, Red::r is not strictly ascending)
+#[borrow=0] public fun borrow$Color$0$0(l0: &Color): &u8
+    move_loc l0
+    borrow_variant_field Color, Red::r, Red::r
+    ret

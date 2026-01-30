@@ -11,7 +11,7 @@ use crate::{
     meter::{BoundMeter, Meter, Scope},
     reference_safety,
     stack_usage_verifier::StackUsageVerifier,
-    type_safety,
+    struct_api_checker, type_safety,
     verifier::VerifierConfig,
 };
 use move_binary_format::{
@@ -45,7 +45,7 @@ impl<'a> CodeUnitVerifier<'a> {
 
     fn verify_module_impl(
         verifier_config: &VerifierConfig,
-        module: &CompiledModule,
+        module: &'a CompiledModule,
     ) -> PartialVMResult<()> {
         let mut meter = BoundMeter::new(verifier_config);
         let mut name_def_map = HashMap::new();
@@ -53,6 +53,11 @@ impl<'a> CodeUnitVerifier<'a> {
             let fh = module.function_handle_at(func_def.function);
             name_def_map.insert(fh.name, FunctionDefinitionIndex(idx as u16));
         }
+
+        // Pre-compute struct API context once for the entire module.
+        let struct_api_ctx = struct_api_checker::StructApiContext::new(module);
+        let resolver = BinaryIndexedView::Module(module);
+
         let mut total_back_edges = 0;
         for (idx, function_definition) in module.function_defs().iter().enumerate() {
             let index = FunctionDefinitionIndex(idx as TableIndex);
@@ -66,6 +71,15 @@ impl<'a> CodeUnitVerifier<'a> {
             )
             .map_err(|err| err.at_index(IndexKind::FunctionDefinition, index.0))?;
             total_back_edges += num_back_edges;
+            // Check whether struct APIs related code are well-formed.
+            // Uses pre-computed context for O(1) lookups.
+            struct_api_checker::check_struct_api_impl(
+                &resolver,
+                module,
+                function_definition,
+                &struct_api_ctx,
+            )
+            .map_err(|err| err.at_index(IndexKind::FunctionDefinition, index.0))?;
         }
         if let Some(limit) = verifier_config.max_back_edges_per_module {
             if total_back_edges > limit {

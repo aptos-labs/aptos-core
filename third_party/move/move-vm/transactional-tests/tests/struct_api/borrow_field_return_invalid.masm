@@ -1,0 +1,13 @@
+//# publish --print-bytecode
+module 0x66::test_borrow_field_return_invalid
+
+struct S
+    x: u64
+    y: u64
+
+// Invalid: borrow$S$0 should return &u64, not u64 (not a reference)
+#[borrow=0] public fun borrow$S$0(l0: &S): u64
+    move_loc l0
+    borrow_field S, x
+    read_ref
+    ret

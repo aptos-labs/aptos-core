@@ -1,0 +1,17 @@
+//# publish --print-bytecode
+module 0x66::test_variant_bytecode_index_mismatch
+
+enum Color has drop
+  Red
+    value: u64
+  Green
+    value: u64
+  Blue
+    value: u64
+
+// Invalid: attribute says test_variant=1 (Green) but bytecode tests Red (index 0)
+// This tests that the variant index in the bytecode must match the attribute
+#[test_variant=1] public fun test_variant$Color$Green(l0: &Color): bool
+    move_loc l0
+    test_variant Color, Red
+    ret

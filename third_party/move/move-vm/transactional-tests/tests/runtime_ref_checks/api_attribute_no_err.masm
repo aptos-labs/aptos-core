@@ -14,13 +14,13 @@ struct S<T0: drop + store> has drop
   f: u64
   g: T<T0>
 
-public fun pack$T<T0: drop + store>(l0: T0): T<T0>
+#[pack] public fun pack$T<T0: drop + store>(l0: T0): T<T0>
     local l1: T0
     move_loc l0
     pack T<T0>
     ret
 
-public fun pack$S<T0: drop + store>(l0: u64, l1: T<T0>): S<T0>
+#[pack] public fun pack$S<T0: drop + store>(l0: u64, l1: T<T0>): S<T0>
     local l2: u64
     local l3: T<T0>
     move_loc l0
@@ -28,13 +28,13 @@ public fun pack$S<T0: drop + store>(l0: u64, l1: T<T0>): S<T0>
     pack S<T0>
     ret
 
-#[borrow_mut 0] public fun borrow_mut$S$0<T0: drop + store>(l0: &mut S<T0>): &mut u64
+#[borrow_mut=0] public fun borrow_mut$S$0<T0: drop + store>(l0: &mut S<T0>): &mut u64
     local l1: &mut S<T0>
     move_loc l0
     mut_borrow_field S<T0>, f
     ret
 
-#[borrow_mut 1] public fun borrow_mut$S$1<T0: drop + store>(l0: &mut S<T0>): &mut T<T0>
+#[borrow_mut=1] public fun borrow_mut$S$1<T0: drop + store>(l0: &mut S<T0>): &mut T<T0>
     local l1: &mut S<T0>
     move_loc l0
     mut_borrow_field S<T0>, g

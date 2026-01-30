@@ -1,0 +1,18 @@
+//# publish --print-bytecode
+module 0x66::test_type_order_invalid_value
+
+enum Color has drop
+  Red
+    r: u8
+  Green
+    g: u16
+
+// In this enum, offset 0 has two type_orders:
+// - Red.r: offset 0, type u8 -> type_order 0
+// - Green.g: offset 0, type u16 -> type_order 1
+
+// Invalid: type_order 2 doesn't exist for offset 0 (only 0 and 1 are valid)
+#[borrow=0] public fun borrow$Color$0$2(l0: &Color): &u8
+    move_loc l0
+    borrow_variant_field Color, Red::r
+    ret

@@ -1,0 +1,39 @@
+//# publish --print-bytecode
+module 0x66::test_borrow_variant_field_valid
+
+enum Color has drop
+  Red
+    r: u8
+  Green
+    g: u16
+  Blue
+    b: u8
+
+// In this enum, offset 0 has two different types:
+// - Red.r: offset 0, type u8 -> type_order 0 (first encounter)
+// - Green.g: offset 0, type u16 -> type_order 1 (second encounter)
+// - Blue.b: offset 0, type u8 -> type_order 0 (already assigned)
+
+// Valid: borrow$Color$0$0 borrows u8 field at offset 0 (Red.r or Blue.b)
+#[borrow=0] public fun borrow$Color$0$0(l0: &Color): &u8
+    move_loc l0
+    borrow_variant_field Color, Red::r, Blue::b
+    ret
+
+// Valid: borrow$Color$0$1 borrows u16 field at offset 0 (Green.g)
+#[borrow=0] public fun borrow$Color$0$1(l0: &Color): &u16
+    move_loc l0
+    borrow_variant_field Color, Green::g
+    ret
+
+// Valid: borrow_mut$Color$0$0 mutably borrows u8 field at offset 0
+#[borrow_mut=0] public fun borrow_mut$Color$0$0(l0: &mut Color): &mut u8
+    move_loc l0
+    mut_borrow_variant_field Color, Red::r, Blue::b
+    ret
+
+// Valid: borrow_mut$Color$0$1 mutably borrows u16 field at offset 0
+#[borrow_mut=0] public fun borrow_mut$Color$0$1(l0: &mut Color): &mut u16
+    move_loc l0
+    mut_borrow_variant_field Color, Green::g
+    ret

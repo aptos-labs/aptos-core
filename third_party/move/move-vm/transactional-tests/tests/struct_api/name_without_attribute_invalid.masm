@@ -1,0 +1,14 @@
+//# publish --print-bytecode
+module 0x66::test_name_without_attribute
+
+enum Color has drop
+    Red
+    Green
+    Blue
+
+// Test 1: Function named test_variant$Color$Blue with NO attribute
+public fun test_variant$Color$Blue(l0: &Color): bool
+    move_loc l0
+    test_variant Color, Blue
+    ret
+

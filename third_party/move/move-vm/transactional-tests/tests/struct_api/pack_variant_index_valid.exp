@@ -1,0 +1,34 @@
+processed 1 task
+task 0 lines 1-28:  publish --print-bytecode [module 0x66::test_pack_variant_valid]
+
+== BEGIN Bytecode ==
+// Bytecode version v9
+module 0x66::test_pack_variant_valid
+enum Color has drop
+  Red
+    value: u64
+  Green
+    value: u64
+  Blue
+    value: u64
+
+// Function definition at index 0
+#[pack_variant=0] public fun pack$Color$Red(l0: u64): Color
+    move_loc l0
+    pack_variant Color, Red
+    ret
+
+// Function definition at index 1
+#[pack_variant=1] public fun pack$Color$Green(l0: u64): Color
+    move_loc l0
+    pack_variant Color, Green
+    ret
+
+// Function definition at index 2
+#[pack_variant=2] public fun pack$Color$Blue(l0: u64): Color
+    move_loc l0
+    pack_variant Color, Blue
+    ret
+
+
+== END Bytecode ==

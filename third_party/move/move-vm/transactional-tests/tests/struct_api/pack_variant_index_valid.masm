@@ -1,0 +1,28 @@
+//# publish --print-bytecode
+module 0x66::test_pack_variant_valid
+
+enum Color has drop
+  Red
+    value: u64
+  Green
+    value: u64
+  Blue
+    value: u64
+
+// Valid: pack$Color$Red with variant index 0 (Red is first variant)
+#[pack_variant=0] public fun pack$Color$Red(l0: u64): Color
+    move_loc l0
+    pack_variant Color, Red
+    ret
+
+// Valid: pack$Color$Green with variant index 1 (Green is second variant)
+#[pack_variant=1] public fun pack$Color$Green(l0: u64): Color
+    move_loc l0
+    pack_variant Color, Green
+    ret
+
+// Valid: pack$Color$Blue with variant index 2 (Blue is third variant)
+#[pack_variant=2] public fun pack$Color$Blue(l0: u64): Color
+    move_loc l0
+    pack_variant Color, Blue
+    ret

@@ -1,0 +1,12 @@
+//# publish --print-bytecode
+module 0x66::test_type_order_non_numeric
+
+enum Color has drop
+  Red
+    r: u8
+
+// Invalid: type_order must be numeric, not 'abc'
+#[borrow=0] public fun borrow$Color$0$abc(l0: &Color): &u8
+    move_loc l0
+    borrow_variant_field Color, Red::r
+    ret
