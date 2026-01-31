@@ -11,6 +11,11 @@ use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::SmallVec;
 use std::collections::VecDeque;
 
+mod abort_codes {
+    /// Dispatch target is not loaded
+    pub const ENOT_LOADED: u64 = 4;
+}
+
 /***************************************************************************************************
  * native fun dispatchable_withdraw / dispatchable_deposit / dispatchable_derived_balance / dispatchable_derived_supply
  *
@@ -41,8 +46,16 @@ pub(crate) fn native_dispatch(
             context.traversal_context().legacy_check_visited(a, n)
         }
     };
-    check_visited(module_name.address(), module_name.name())
-        .map_err(|_| SafeNativeError::abort(4))?;
+    check_visited(module_name.address(), module_name.name()).map_err(|_| {
+        SafeNativeError::abort_with_message(
+            abort_codes::ENOT_LOADED,
+            format!(
+                "Module {}::{} is not loaded prior to native dispatch",
+                module_name.address(),
+                module_name.name()
+            ),
+        )
+    })?;
 
     context.charge(DISPATCHABLE_FUNGIBLE_ASSET_DISPATCH_BASE)?;
 

@@ -19,6 +19,11 @@ use move_vm_types::{
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
+mod abort_codes {
+    /// Access permission information from a master signer
+    pub const ENOT_PERMISSIONED_SIGNER: u64 = 3;
+}
+
 const EPERMISSION_SIGNER_DISABLED: u64 = 9;
 
 /***************************************************************************************************
@@ -75,7 +80,9 @@ fn native_permission_address(
 
     context.charge(PERMISSION_ADDRESS_BASE)?;
     if !signer.is_permissioned()? {
-        return Err(SafeNativeError::abort(3));
+        return Err(SafeNativeError::abort(
+            abort_codes::ENOT_PERMISSIONED_SIGNER,
+        ));
     }
 
     Ok(smallvec![signer.permission_address()?])

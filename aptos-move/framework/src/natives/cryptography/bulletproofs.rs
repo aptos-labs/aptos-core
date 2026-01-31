@@ -88,7 +88,13 @@ fn native_verify_range_proof(
     let comm_point = CompressedRistretto::from_slice(comm_bytes.as_slice());
 
     if !is_supported_number_of_bits(num_bits) {
-        return Err(SafeNativeError::abort(abort_codes::NFE_RANGE_NOT_SUPPORTED));
+        return Err(SafeNativeError::abort_with_message(
+            abort_codes::NFE_RANGE_NOT_SUPPORTED,
+            format!(
+                "Range of {} bits is not supported (must be 8, 16, 32, or 64)",
+                num_bits
+            ),
+        ));
     }
 
     let pg = {
@@ -129,11 +135,21 @@ fn native_verify_batch_range_proof(
         .collect::<Vec<_>>();
 
     if !is_supported_number_of_bits(num_bits) {
-        return Err(SafeNativeError::abort(abort_codes::NFE_RANGE_NOT_SUPPORTED));
+        return Err(SafeNativeError::abort_with_message(
+            abort_codes::NFE_RANGE_NOT_SUPPORTED,
+            format!(
+                "Range of {} bits is not supported (must be 8, 16, 32, or 64)",
+                num_bits
+            ),
+        ));
     }
     if !is_supported_batch_size(comm_points.len()) {
-        return Err(SafeNativeError::abort(
+        return Err(SafeNativeError::abort_with_message(
             abort_codes::NFE_BATCH_SIZE_NOT_SUPPORTED,
+            format!(
+                "Batch size {} is not supported (must be 1, 2, 4, 8, or 16)",
+                comm_points.len()
+            ),
         ));
     }
 
@@ -172,7 +188,13 @@ fn native_test_only_prove_range(
     let v = pop_scalar_from_bytes(&mut args)?;
 
     if !is_supported_number_of_bits(num_bits) {
-        return Err(SafeNativeError::abort(abort_codes::NFE_RANGE_NOT_SUPPORTED));
+        return Err(SafeNativeError::abort_with_message(
+            abort_codes::NFE_RANGE_NOT_SUPPORTED,
+            format!(
+                "Range of {} bits is not supported (must be 8, 16, 32, or 64)",
+                num_bits
+            ),
+        ));
     }
 
     // Make sure only the first 64 bits are set.
@@ -234,16 +256,31 @@ fn native_test_only_batch_prove_range(
     let vs = pop_scalars_from_bytes(&mut args)?;
 
     if !is_supported_number_of_bits(num_bits) {
-        return Err(SafeNativeError::abort(abort_codes::NFE_RANGE_NOT_SUPPORTED));
+        return Err(SafeNativeError::abort_with_message(
+            abort_codes::NFE_RANGE_NOT_SUPPORTED,
+            format!(
+                "Range of {} bits is not supported (must be 8, 16, 32, or 64)",
+                num_bits
+            ),
+        ));
     }
     if !is_supported_batch_size(vs.len()) {
-        return Err(SafeNativeError::abort(
+        return Err(SafeNativeError::abort_with_message(
             abort_codes::NFE_BATCH_SIZE_NOT_SUPPORTED,
+            format!(
+                "Batch size {} is not supported (must be 1, 2, 4, 8, or 16)",
+                vs.len()
+            ),
         ));
     }
     if vs.len() != v_blindings.len() {
-        return Err(SafeNativeError::abort(
+        return Err(SafeNativeError::abort_with_message(
             abort_codes::NFE_VECTOR_LENGTHS_MISMATCH,
+            format!(
+                "Number of committed values ({}) must equal number of blinding factors ({})",
+                vs.len(),
+                v_blindings.len()
+            ),
         ));
     }
 

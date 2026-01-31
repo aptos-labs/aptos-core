@@ -35,12 +35,18 @@ fn native_create_address(
     context.charge(ACCOUNT_CREATE_ADDRESS_BASE)?;
 
     let bytes = safely_pop_arg!(arguments, Vec<u8>);
+    let bytes_len = bytes.len();
     let address = AccountAddress::from_bytes(bytes);
     if let Ok(address) = address {
         Ok(smallvec![Value::address(address)])
     } else {
-        Err(SafeNativeError::abort(
+        Err(SafeNativeError::abort_with_message(
             super::status::NFE_UNABLE_TO_PARSE_ADDRESS,
+            format!(
+                "Unable to create address from bytes, expected {} bytes, got {}",
+                AccountAddress::LENGTH,
+                bytes_len,
+            ),
         ))
     }
 }
