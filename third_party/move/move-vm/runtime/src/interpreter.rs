@@ -1748,6 +1748,28 @@ where
     fn get_internal_state(&self) -> ExecutionState {
         self.get_stack_frames(usize::MAX)
     }
+
+    /// Check that the depth of captured closure values does not exceed the configured maximum.
+    ///
+    /// Closures can capture other closures, creating arbitrary nesting depth that is not visible
+    /// in the type system (all closures have the same function type regardless of what they capture).
+    /// This check ensures that deeply nested closure chains cannot be created, preventing potential
+    /// stack overflows or excessive resource consumption when operating on such values.
+    ///
+    /// The check uses `max_depth - 1` because the closure being packed adds one additional level
+    /// of nesting on top of its captured values.
+    fn check_depth_of_closure_captured_values(&self, captured: &[Value]) -> PartialVMResult<()> {
+        if !self.vm_config.enable_closure_depth_check {
+            return Ok(());
+        }
+        if let Some(max_depth) = self.vm_config.max_value_nest_depth {
+            let limit = max_depth.saturating_sub(1);
+            for v in captured.iter() {
+                v.check_depth_of_value(limit)?;
+            }
+        }
+        Ok(())
+    }
 }
 
 impl<LoaderImpl> InterpreterDebugInterface for InterpreterImpl<'_, LoaderImpl>
@@ -2543,6 +2565,7 @@ impl Frame {
                             )?;
                         }
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
+                        interpreter.check_depth_of_closure_captured_values(&captured)?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
                             interpreter.layout_converter,
                             gas_meter,
@@ -2580,6 +2603,7 @@ impl Frame {
                         RTTCheck::check_pack_closure_visibility(&self.function, &function)?;
 
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
+                        interpreter.check_depth_of_closure_captured_values(&captured)?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
                             interpreter.layout_converter,
                             gas_meter,
