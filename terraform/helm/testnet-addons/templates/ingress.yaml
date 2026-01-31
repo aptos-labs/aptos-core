@@ -60,6 +60,7 @@ spec:
             name: {{ include "testnet-addons.fullname" . }}-waypoint
             port:
               number: 80
+      {{- if .Values.ingress.routeToNodeApi }}
       - path: /
         pathType: Prefix
         backend:
@@ -67,6 +68,7 @@ spec:
             name: {{ include "testnet-addons.fullname" . }}-api
             port:
               number: 80
+      {{- end }}
 ---
 {{- if .Values.ingress.gce_managed_certificate }}
 apiVersion: networking.gke.io/v1beta1
