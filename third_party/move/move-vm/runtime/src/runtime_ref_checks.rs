@@ -374,6 +374,16 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
         ref_state: &mut RefCheckState,
     ) -> PartialVMResult<()> {
         use Instruction::*;
+        // Need to skip pre-execution reference checks for borrow field mut API functions to
+        // align with the behavior of bypassing reference checks in the bytecode verifier.
+        if frame
+            .function
+            .function
+            .borrow_field_mut_api_at_offset()
+            .is_some()
+        {
+            return Ok(());
+        }
         match instruction {
             Call(_) | CallGeneric(_) | Branch(_) => {
                 // `Call` and `CallGeneric` are handled by calling `core_call_transition` elsewhere
@@ -500,6 +510,18 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
         ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
         use Instruction::*;
+        // TODO: improve performance by introducing a dedicated instruction for
+        // this API to avoid the need to check for it here.
+        // Need to skip post-execution reference checks for borrow field mut API functions to
+        // align with the behavior of bypassing reference checks in the bytecode verifier.
+        if frame
+            .function
+            .function
+            .borrow_field_mut_api_at_offset()
+            .is_some()
+        {
+            return Ok(());
+        }
         match instruction {
             Pop => {
                 let top = ref_state.pop_from_shadow_stack()?;
@@ -1788,6 +1810,11 @@ impl RefCheckState {
         function: &LoadedFunction,
         mask: ClosureMask,
     ) -> PartialVMResult<()> {
+        // when calling a borrow field mut api, we directly check mutably borrowing the field at offset
+        // see the test case api_attribute.masm and api_attribute_no_err.masm in transactional-tests for more details.
+        if let Some(offset) = function.function.borrow_field_mut_api_at_offset() {
+            return self.borrow_child_with_label::<true>(offset as usize);
+        }
         // Keep track of all reference argument's IDs.
         let mut ref_arg_ids = Vec::new();
         // Keep track of mutable reference param indexes.
