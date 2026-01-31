@@ -28,6 +28,9 @@ fn feature_flag_of_casting(
         (Some(Structure::BLS12381Fq12), Some(Structure::BLS12381Gt)) => {
             Some(FeatureFlag::BLS12_381_STRUCTURES)
         },
+        (Some(Structure::BLS12377Fq12), Some(Structure::BLS12377Gt)) => {
+            Some(FeatureFlag::BLS12_377_STRUCTURES)
+        },
         (Some(Structure::BN254Fq12), Some(Structure::BN254Gt)) => {
             Some(FeatureFlag::BN254_STRUCTURES)
         },
@@ -62,6 +65,16 @@ pub fn downcast_internal(
                 Ok(smallvec![Value::bool(false), Value::u64(handle as u64)])
             }
         },
+        (Some(Structure::BLS12377Fq12), Some(Structure::BLS12377Gt)) => {
+            let handle = safely_pop_arg!(args, u64) as usize;
+            safe_borrow_element!(context, handle, ark_bls12_377::Fq12, element_ptr, element);
+            context.charge(ALGEBRA_ARK_BLS12_381_FQ12_POW_U256)?;
+            if element.pow(super::BLS12377_R_SCALAR.0) == ark_bls12_377::Fq12::one() {
+                Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])
+            } else {
+                Ok(smallvec![Value::bool(false), Value::u64(handle as u64)])
+            }
+        },
         (Some(Structure::BN254Fq12), Some(Structure::BN254Gt)) => {
             let handle = safely_pop_arg!(args, u64) as usize;
             safe_borrow_element!(context, handle, ark_bn254::Fq12, element_ptr, element);
@@ -87,6 +100,10 @@ pub fn upcast_internal(
     abort_unless_casting_enabled!(context, super_opt, sub_opt);
     match (sub_opt, super_opt) {
         (Some(Structure::BLS12381Gt), Some(Structure::BLS12381Fq12)) => {
+            let handle = safely_pop_arg!(args, u64);
+            Ok(smallvec![Value::u64(handle)])
+        },
+        (Some(Structure::BLS12377Gt), Some(Structure::BLS12377Fq12)) => {
             let handle = safely_pop_arg!(args, u64);
             Ok(smallvec![Value::u64(handle)])
         },

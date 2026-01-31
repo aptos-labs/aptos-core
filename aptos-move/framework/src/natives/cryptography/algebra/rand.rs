@@ -78,6 +78,27 @@ pub fn rand_insecure_internal(
                 Err(abort_code) => Err(SafeNativeError::abort(abort_code)),
             }
         },
+        Some(Structure::BLS12377Fr) => {
+            ark_rand_internal!(context, ark_bls12_377::Fr)
+        },
+        Some(Structure::BLS12377Fq12) => {
+            ark_rand_internal!(context, ark_bls12_377::Fq12)
+        },
+        Some(Structure::BLS12377G1) => {
+            ark_rand_internal!(context, ark_bls12_377::G1Projective)
+        },
+        Some(Structure::BLS12377G2) => {
+            ark_rand_internal!(context, ark_bls12_377::G2Projective)
+        },
+        Some(Structure::BLS12377Gt) => {
+            let k = ark_bls12_377::Fr::rand(&mut test_rng());
+            let k_bigint: ark_ff::BigInteger256 = k.into();
+            let element = super::BLS12377_GT_GENERATOR.pow(k_bigint);
+            match store_element!(context, element) {
+                Ok(handle) => Ok(smallvec![Value::u64(handle as u64)]),
+                Err(abort_code) => Err(SafeNativeError::Abort { abort_code }),
+            }
+        },
         Some(Structure::BN254Fr) => {
             ark_rand_internal!(context, ark_bn254::Fr)
         },
