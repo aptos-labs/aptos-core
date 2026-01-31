@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct PeerMonitoringServiceConfig {
+    pub enable_metadata_sanitization: bool, // Whether to sanitize (omit) metadata from responses
     pub enable_peer_monitoring_client: bool, // Whether or not to spawn the monitoring client
     pub latency_monitoring: LatencyMonitoringConfig,
     pub max_concurrent_requests: u64, // Max num of concurrent server tasks
@@ -21,6 +22,7 @@ pub struct PeerMonitoringServiceConfig {
 impl Default for PeerMonitoringServiceConfig {
     fn default() -> Self {
         Self {
+            enable_metadata_sanitization: true, // Enabled by default
             enable_peer_monitoring_client: true,
             latency_monitoring: LatencyMonitoringConfig::default(),
             max_concurrent_requests: 1000,
