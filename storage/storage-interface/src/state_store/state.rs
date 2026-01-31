@@ -161,6 +161,7 @@ impl State {
         per_version_updates: &PerVersionStateUpdateRefs,
         all_checkpoint_versions: &[Version],
         state_cache: &ShardedStateCache,
+        clear_hot_state: bool,
     ) -> (Self, [HotStateShardUpdates; NUM_STATE_SHARDS]) {
         let _timer = TIMER.timer_with(&["state__update"]);
 
@@ -222,11 +223,19 @@ impl State {
                             }
                         }
                         // Only evict at the checkpoints.
-                        evictions.extend(lru.maybe_evict().into_iter().map(|(key, slot)| {
-                            insertions.remove(&key);
-                            assert!(slot.is_hot());
-                            key
-                        }));
+                        if clear_hot_state {
+                            evictions.extend(lru.evict_all().into_iter().map(|(key, slot)| {
+                                insertions.remove(&key);
+                                assert!(slot.is_hot());
+                                key
+                            }));
+                        } else {
+                            evictions.extend(lru.maybe_evict().into_iter().map(|(key, slot)| {
+                                insertions.remove(&key);
+                                assert!(slot.is_hot());
+                                key
+                            }));
+                        }
                     }
                     for (key, update) in all_updates {
                         evictions.remove(*key);
@@ -428,6 +437,7 @@ impl LedgerState {
         persisted_snapshot: &State,
         updates: &StateUpdateRefs,
         reads: &ShardedStateCache,
+        clear_hot_state: bool,
     ) -> (LedgerState, HotStateUpdates) {
         let _timer = TIMER.timer_with(&["ledger_state__update"]);
 
@@ -443,6 +453,7 @@ impl LedgerState {
                 per_version,
                 updates.all_checkpoint_versions(),
                 reads,
+                clear_hot_state,
             );
             all_hot_state_updates.for_last_checkpoint = Some(hot_state_updates);
             new_ckpt
@@ -456,6 +467,7 @@ impl LedgerState {
             &last_checkpoint
         };
         let latest = if let Some(batched) = updates.for_latest_batched() {
+            assert!(!clear_hot_state);
             let per_version = updates
                 .for_latest_per_version()
                 .expect("Both per-version and batched updates should exist.");
@@ -466,6 +478,7 @@ impl LedgerState {
                 per_version,
                 &[],
                 reads,
+                false,
             );
             all_hot_state_updates.for_latest = Some(hot_state_updates);
             new_latest
@@ -502,6 +515,7 @@ impl LedgerState {
             persisted_snapshot,
             updates,
             state_view.memorized_reads(),
+            false,
         );
         let state_reads = state_view.into_memorized_reads();
         Ok((updated, state_reads, hot_state_updates))

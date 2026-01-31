@@ -105,6 +105,23 @@ impl<'a> HotStateLRU<'a> {
         evicted
     }
 
+    pub fn evict_all(&mut self) -> Vec<(StateKey, StateSlot)> {
+        let mut current = self.tail.clone();
+        let mut evicted = Vec::new();
+
+        while let Some(key) = current {
+            let slot = self.expect_hot_slot(&key);
+            evicted.push((key.clone(), slot.clone()));
+            current = slot.prev().cloned();
+            self.pending.insert(key, slot.to_cold());
+        }
+
+        self.head = None;
+        self.tail = None;
+        self.num_items = 0;
+        evicted
+    }
+
     /// Returns the deleted slot, or `None` if the key doesn't exist or is not hot.
     fn delete(&mut self, key: &StateKey) -> Option<StateSlot> {
         // Fetch the slot corresponding to the given key. Note that `self.pending` and
