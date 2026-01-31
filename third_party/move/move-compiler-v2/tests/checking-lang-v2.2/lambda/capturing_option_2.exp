@@ -1,11 +1,3 @@
-
-Diagnostics:
-warning: capturing option values is currently not supported
-   ┌─ tests/checking-lang-v2.2/lambda/capturing_option_2.move:14:67
-   │
-14 │         let _f: ||option::Option<u64> has copy+drop+store = || id(v);
-   │                                                                   ^
-
 // -- Model dump before first bytecode pipeline
 module 0x99::m {
     use std::option;
