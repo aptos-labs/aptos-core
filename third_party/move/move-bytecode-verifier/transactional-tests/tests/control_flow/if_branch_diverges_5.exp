@@ -1,9 +1,15 @@
 processed 1 task
-task 0 lines 1-14:  run [main() {]
-Error: Script execution failed with VMError: {
-    major_status: CODE_DESERIALIZATION_ERROR,
-    sub_status: None,
-    location: script,
-    indices: [],
-    offsets: [],
-}
+task 0 lines 1-14:  run [script]
+Error: error: unknown instruction `br`
+   ┌─ test:12:7
+   │
+12 │ loop: br loop_cont
+   │       ^^^^^^^^^^^^
+
+error: unknown instruction `br`
+   ┌─ test:13:5
+   │
+13 │     br loop
+   │     ^^^^^^^
+
+

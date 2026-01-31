@@ -1,0 +1,25 @@
+//# publish
+module 0x1::M
+struct Foo<T0>
+  x: T0
+
+fun baz(l0: u64)
+    ret
+
+fun bar<T0>(l0: Foo<u64>)
+    local l1: &Foo<u64>
+    local l2: &u64
+    local l3: u64
+    borrow_loc l0
+    st_loc l1
+    borrow_loc l0
+    borrow_field Foo<u64>, x
+    st_loc l2
+    move_loc l1
+    pop
+    move_loc l2
+    pop
+    move_loc l0
+    unpack Foo<u64>
+    st_loc l3
+    ret

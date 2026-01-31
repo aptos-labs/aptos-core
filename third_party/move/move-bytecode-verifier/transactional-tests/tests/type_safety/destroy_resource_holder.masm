@@ -1,0 +1,24 @@
+//# publish
+module 0x42::A
+struct Coin has store
+  value: u64
+
+struct A
+  c: Coin
+
+public fun destroy_zero(l0: Coin)
+    move_loc l0
+    unpack Coin
+    ld_u64 0
+    eq
+    not
+    br_false l0
+    ld_u64 42
+    abort
+l0: ret
+
+public fun destroy_a(l0: A)
+    move_loc l0
+    unpack A
+    call destroy_zero
+    ret

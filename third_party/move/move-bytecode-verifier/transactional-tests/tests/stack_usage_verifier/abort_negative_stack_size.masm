@@ -1,0 +1,4 @@
+//# run
+script
+entry public fun main()
+    abort

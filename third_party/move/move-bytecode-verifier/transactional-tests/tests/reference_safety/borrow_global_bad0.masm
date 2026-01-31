@@ -1,0 +1,21 @@
+//# publish
+module 0x1::A
+use 0x1::signer
+struct T has key
+  v: u64
+
+public fun A0(l0: &signer) acquires T
+    local l1: address
+    local l2: &mut T
+    move_loc l0
+    call signer::address_of
+    st_loc l1
+    copy_loc l1
+    mut_borrow_global T
+    st_loc l2
+    move_loc l1
+    mut_borrow_global T
+    st_loc l2
+    move_loc l2
+    pop
+    ret
