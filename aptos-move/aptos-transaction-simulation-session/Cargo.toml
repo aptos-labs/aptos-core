@@ -16,6 +16,7 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 bcs = { workspace = true }
 hex = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tokio = { workspace = true }
