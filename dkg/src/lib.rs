@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 mod agg_trx_producer;
+mod chunky;
 mod counters;
 mod dkg_manager;
 pub mod epoch_manager;
