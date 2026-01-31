@@ -42,7 +42,7 @@ async fn test_renders_move_acsii_string_into_utf8_string(
                 context.use_orderless_transactions,
             ),
     );
-    context.commit_block(&vec![txn]).await;
+    context.commit_block(&[txn]).await;
 
     context
         .api_execute_entry_function(

@@ -3,7 +3,7 @@
 
 use crate::transaction::{
     signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction, Transaction,
-    TransactionExecutableRef, TransactionPayload,
+    TransactionExecutable, TransactionExecutableRef, TransactionPayload,
 };
 use move_core_types::account_address::AccountAddress;
 
@@ -27,41 +27,40 @@ impl std::fmt::Debug for UseCaseKey {
     }
 }
 
+/// Helper to extract the module address from an entry function for use case classification.
+fn get_use_case_from_module_address(addr: &AccountAddress) -> UseCaseKey {
+    if addr.is_special() {
+        UseCaseKey::Platform
+    } else {
+        UseCaseKey::ContractAddress(*addr)
+    }
+}
+
 fn parse_use_case(payload: &TransactionPayload) -> UseCaseKey {
     use TransactionPayload::*;
     use UseCaseKey::*;
 
-    let maybe_entry_func = match payload {
-        Script(_) | ModuleBundle(_) | Multisig(_) => None,
-        EntryFunction(entry_fun) => Some(entry_fun),
+    match payload {
+        Script(_) | ModuleBundle(_) | Multisig(_) => Others,
+        EntryFunction(entry_fun) => get_use_case_from_module_address(entry_fun.module().address()),
         v2 @ Payload(_) => {
             if let Ok(TransactionExecutableRef::EntryFunction(entry_fun)) = v2.executable_ref() {
-                Some(entry_fun)
+                get_use_case_from_module_address(entry_fun.module().address())
             } else {
-                None
+                Others
             }
         },
+        // For encrypted payloads, we need to use executable() which returns owned data
+        // since we can't return references through the Mutex.
         EncryptedPayload(encrypted_payload) => {
-            if let Ok(TransactionExecutableRef::EntryFunction(entry_fun)) =
-                encrypted_payload.executable_ref()
+            if let Ok(TransactionExecutable::EntryFunction(entry_fun)) =
+                encrypted_payload.executable()
             {
-                Some(entry_fun)
+                get_use_case_from_module_address(entry_fun.module().address())
             } else {
-                None
+                Others
             }
         },
-    };
-
-    match maybe_entry_func {
-        Some(entry_func) => {
-            let module_id = entry_func.module();
-            if module_id.address().is_special() {
-                Platform
-            } else {
-                ContractAddress(*module_id.address())
-            }
-        },
-        None => Others,
     }
 }
 

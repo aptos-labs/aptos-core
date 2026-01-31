@@ -51,7 +51,7 @@ async fn test_account_abstraction_single_signer(
     context.publish_package(&mut account, txn).await;
 
     let txn0 = context.mint_user_account(&account).await;
-    context.commit_block(&vec![txn0]).await;
+    context.commit_block(&[txn0]).await;
 
     context
         .api_execute_entry_function(
@@ -70,7 +70,7 @@ async fn test_account_abstraction_single_signer(
     let txn3 = context
         .add_dispatchable_authentication_function(&account, func_info.clone())
         .await;
-    context.commit_block(&vec![txn3]).await;
+    context.commit_block(&[txn3]).await;
 
     let factory = context.transaction_factory();
 
@@ -90,7 +90,7 @@ async fn test_account_abstraction_single_signer(
             ),
     );
 
-    let txn_status = context.try_commit_block(&vec![aa_txn]).await;
+    let txn_status = context.try_commit_block(&[aa_txn]).await;
     assert!(matches!(
         txn_status.last(),
         Some(TransactionStatus::Discard(StatusCode::ABORTED))
@@ -168,11 +168,11 @@ async fn test_account_abstraction_multi_agent_with_abstracted_sender(
     context.publish_package(&mut a, txn).await;
 
     let txn1 = context.mint_user_account(&a).await;
-    context.commit_block(&vec![txn1]).await;
+    context.commit_block(&[txn1]).await;
     let txn2 = context.mint_user_account(&b).await;
-    context.commit_block(&vec![txn2]).await;
+    context.commit_block(&[txn2]).await;
     let txn3 = context.mint_user_account(&c).await;
-    context.commit_block(&vec![txn3]).await;
+    context.commit_block(&[txn3]).await;
 
     // Convert c to aa
     context
@@ -187,7 +187,7 @@ async fn test_account_abstraction_multi_agent_with_abstracted_sender(
     let txn = context
         .add_dispatchable_authentication_function(&c, func_info.clone())
         .await;
-    context.commit_block(&vec![txn]).await;
+    context.commit_block(&[txn]).await;
 
     let sign_func = Arc::new(move |x: &[u8]| {
         key_pair
