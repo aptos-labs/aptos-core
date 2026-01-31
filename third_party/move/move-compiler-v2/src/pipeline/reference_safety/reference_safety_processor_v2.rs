@@ -113,7 +113,7 @@
 use crate::{
     pipeline::{
         livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},
-        reference_safety::{LifetimeAnnotation, LifetimeInfo, LifetimeInfoAtCodeOffset},
+        reference_safety::{LifetimeAnnotation, LifetimeInfo, LifetimeInfoAtCodeOffset, Object},
     },
     Experiment, Options,
 };
@@ -2151,6 +2151,32 @@ impl LifetimeInfo for LifetimeState {
 
     fn display(&self, target: &FunctionTarget) -> Option<String> {
         Some(self.display(target).to_string())
+    }
+
+    /// Get all objects which are referenced by the given `temp` before a given program point
+    /// If ``temp`` is not a reference, an empty set is returned.
+    fn referenced_objects(&self, temp: TempIndex) -> BTreeSet<Object> {
+        let label = self.label_for_temp(temp);
+        let Some(label) = label else {
+            return BTreeSet::new();
+        };
+        let mut result = BTreeSet::new();
+        // Collect the roots of this nodes, which are the original locations being borrowed
+        for root in self.roots(label).iter() {
+            let node = self.node(root);
+            for loc in node.locations.iter() {
+                match loc {
+                    MemoryLocation::Local(t) => {
+                        result.insert(Object::Local(*t));
+                    },
+                    MemoryLocation::Global(qid) => {
+                        result.insert(Object::Global(qid.to_qualified_id()));
+                    },
+                    _ => {},
+                }
+            }
+        }
+        result
     }
 }
 
