@@ -324,6 +324,15 @@ impl<'env> BoogieTranslator<'env> {
                 .get_modules()
                 .any(|m| m.get_full_name_str() == "0x1::cmp")
             {
+                // Emit uninterpreted function for arbitrary ordering of generic type
+                emitln!(
+                    writer,
+                    "function $Arbitrary_cmp_ordering'{}'(v1: {}, v2: {}): $1_cmp_Ordering;",
+                    suffix,
+                    param_type,
+                    param_type
+                );
+
                 self.emit_function(
                     writer,
                     &format!(
@@ -336,7 +345,7 @@ impl<'env> BoogieTranslator<'env> {
                             "if $IsEqual'{}'(v1, v2) then $1_cmp_Ordering_Equal()",
                             suffix
                         );
-                        emitln!(writer, "else $Arbitrary_value_of'$1_cmp_Ordering'()");
+                        emitln!(writer, "else $Arbitrary_cmp_ordering'{}'(v1, v2)", suffix);
                     },
                 );
 
@@ -905,6 +914,16 @@ impl StructTranslator<'_> {
     fn emit_cmp_for_enum(&self, struct_env: &StructEnv, struct_name: &str) {
         let writer = self.parent.writer;
         let suffix: String = boogie_type_suffix_for_struct(struct_env, self.type_inst, false);
+
+        // Emit uninterpreted function for arbitrary ordering fallback
+        emitln!(
+            writer,
+            "function $Arbitrary_cmp_ordering'{}'(v1: {}, v2: {}): $1_cmp_Ordering;",
+            suffix,
+            struct_name,
+            struct_name
+        );
+
         self.emit_function(
             &format!(
                 "$1_cmp_$compare'{}'(v1: {}, v2: {}): $1_cmp_Ordering",
@@ -947,7 +966,7 @@ impl StructTranslator<'_> {
                     );
                     emitln!(writer, "{}", cmp_order);
                 }
-                emitln!(writer, "else $Arbitrary_value_of'$1_cmp_Ordering'()");
+                emitln!(writer, "else $Arbitrary_cmp_ordering'{}'(v1, v2)", suffix);
             },
         );
         for variant in struct_env.get_variants().collect_vec().iter() {
