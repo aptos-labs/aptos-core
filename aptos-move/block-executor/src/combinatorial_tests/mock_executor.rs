@@ -989,6 +989,7 @@ where
                 incarnation_counter,
                 incarnation_behaviors,
                 delta_test_kind,
+                ..
             } => {
                 // Use incarnation counter value as an index to determine the read-
                 // and write-sets of the execution. Increment incarnation counter to

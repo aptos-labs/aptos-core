@@ -175,6 +175,20 @@ impl<V: TransactionWrite> ValueWithLayout<V> {
             ValueWithLayout::Exchanged(_, Some(_)) => panic!("Unexpected layout"),
         }
     }
+
+    /// Returns a reference to the underlying value, regardless of whether a layout is present.
+    /// Unlike `extract_value_no_layout`, this method does not panic when a layout is present.
+    pub fn extract_value(&self) -> &V {
+        match self {
+            ValueWithLayout::RawFromStorage(value) => value.as_ref(),
+            ValueWithLayout::Exchanged(value, _) => value.as_ref(),
+        }
+    }
+
+    /// Returns true if this value has a layout (i.e., contains delayed fields).
+    pub fn has_layout(&self) -> bool {
+        matches!(self, ValueWithLayout::Exchanged(_, Some(_)))
+    }
 }
 
 #[derive(Clone, Debug)]
