@@ -26,7 +26,7 @@ async fn simulate_aptos_transfer(
     let alice = &mut context.gen_account();
     let bob = &mut context.gen_account();
     let txn = context.mint_user_account(alice).await;
-    context.commit_block(&vec![txn]).await;
+    context.commit_block(&[txn]).await;
 
     let txn = context.account_transfer_to(alice, bob.address(), transfer_amount);
 
@@ -104,7 +104,7 @@ async fn simulate_aptos_transfer_bcs(
     let alice = &mut context.gen_account();
     let bob = &mut context.gen_account();
     let txn = context.mint_user_account(alice).await;
-    context.commit_block(&vec![txn]).await;
+    context.commit_block(&[txn]).await;
 
     let txn = context.account_transfer_to(alice, bob.address(), transfer_amount);
 
@@ -297,7 +297,7 @@ async fn test_simulate_txn_with_aggregator(
     let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("src/tests/move/pack_counter");
     let payload = TestContext::build_package(path, named_addresses);
     let txn = account.sign_with_transaction_builder(context.transaction_factory().payload(payload));
-    context.commit_block(&vec![txn]).await;
+    context.commit_block(&[txn]).await;
 
     let payload = TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(account.address(), ident_str!("counter").to_owned()),
@@ -379,7 +379,7 @@ async fn test_bcs_simulate_simple(
     let alice = &mut context.gen_account();
     let bob = &mut context.gen_account();
     let txn = context.mint_user_account(alice).await;
-    context.commit_block(&vec![txn]).await;
+    context.commit_block(&[txn]).await;
 
     let txn = context.account_transfer_to(alice, bob.address(), transfer_amount);
     let body = bcs::to_bytes(&txn).unwrap();
@@ -439,7 +439,7 @@ async fn test_bcs_simulate_without_auth_key_check(
     let alice = &mut context.gen_account();
     let bob = &mut context.gen_account();
     let txn = context.mint_user_account(alice).await;
-    context.commit_block(&vec![txn]).await;
+    context.commit_block(&[txn]).await;
 
     // Construct a signed transaction.
     let txn = context.account_transfer_to(alice, bob.address(), transfer_amount);
@@ -465,7 +465,7 @@ async fn bcs_simulate_fee_payer_transaction_without_gas_fee_check(context: &mut 
     let alice = &mut context.gen_account();
     let bob = &mut context.gen_account();
     let txn = context.mint_user_account(alice).await;
-    context.commit_block(&vec![txn]).await;
+    context.commit_block(&[txn]).await;
 
     let transfer_amount: u64 = SMALL_TRANSFER_AMOUNT;
     let txn = context.account_transfer_to(alice, bob.address(), transfer_amount);
@@ -553,31 +553,14 @@ async fn test_bcs_simulate_automated_account_creation(
         .post_bcs_txn("/transactions/simulate", body)
         .await;
     assert!(!resp[0]["success"].as_bool().unwrap(), "{}", pretty(&resp));
-    if !context.use_orderless_transactions
-        && !context
-            .is_feature_enabled(
-                aptos_types::on_chain_config::FeatureFlag::ORDERLESS_TRANSACTIONS as u64,
-            )
-            .await
-    {
-        assert!(
-            resp[0]["vm_status"]
-                .as_str()
-                .unwrap()
-                .contains("INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE"),
-            "{}",
-            pretty(&resp)
-        );
-    } else {
-        assert!(
-            resp[0]["vm_status"]
-                .as_str()
-                .unwrap()
-                .contains("INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE"),
-            "{}",
-            pretty(&resp)
-        );
-    }
+    assert!(
+        resp[0]["vm_status"]
+            .as_str()
+            .unwrap()
+            .contains("INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE"),
+        "{}",
+        pretty(&resp)
+    );
 
     let txn =
         SignedTransaction::new_signed_transaction(raw_txn, TransactionAuthenticator::FeePayer {
@@ -617,7 +600,7 @@ async fn test_bcs_execute_simple_no_authenticator_fail(
     let alice = &mut context.gen_account();
     let bob = &mut context.gen_account();
     let txn = context.mint_user_account(alice).await;
-    context.commit_block(&vec![txn]).await;
+    context.commit_block(&[txn]).await;
 
     // Construct a signed transaction.
     let txn = context.account_transfer_to(alice, bob.address(), transfer_amount);
@@ -662,7 +645,7 @@ async fn test_bcs_execute_fee_payer_transaction_no_authenticator_fail(
     let alice = &mut context.gen_account();
     let bob = &mut context.gen_account();
     let txn = context.mint_user_account(alice).await;
-    context.commit_block(&vec![txn]).await;
+    context.commit_block(&[txn]).await;
 
     let transfer_amount: u64 = SMALL_TRANSFER_AMOUNT;
     let txn = context.account_transfer_to(alice, bob.address(), transfer_amount);
@@ -697,7 +680,7 @@ async fn test_simulate_txn_with_randomness() {
     let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("src/tests/move/pack_rand");
     let payload = TestContext::build_package(path, named_addresses);
     let txn = account.sign_with_transaction_builder(context.transaction_factory().payload(payload));
-    context.commit_block(&vec![txn]).await;
+    context.commit_block(&[txn]).await;
 
     let payload = TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(account.address(), ident_str!("rand").to_owned()),

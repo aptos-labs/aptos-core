@@ -1157,20 +1157,15 @@ impl RestOptions {
 }
 
 /// Options for optimization level
-#[derive(Debug, Clone, Parser)]
+#[derive(Debug, Clone, Default, Parser)]
 pub enum OptimizationLevel {
     /// No optimizations
     None,
     /// Default optimization level
+    #[default]
     Default,
     /// Extra optimizations, that may take more time
     Extra,
-}
-
-impl Default for OptimizationLevel {
-    fn default() -> Self {
-        Self::Default
-    }
 }
 
 impl FromStr for OptimizationLevel {

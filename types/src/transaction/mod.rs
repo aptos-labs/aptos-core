@@ -1740,17 +1740,12 @@ pub struct TransactionAuxiliaryDataV1 {
     pub detail_error_message: Option<VMErrorDetail>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub enum TransactionAuxiliaryData {
+    #[default]
     None,
     V1(TransactionAuxiliaryDataV1),
-}
-
-impl Default for TransactionAuxiliaryData {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 impl TransactionAuxiliaryData {

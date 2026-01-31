@@ -417,7 +417,7 @@ async fn test_jwk_manager_state_transition() {
         };
     }
     assert_eq!(expected_states, jwk_manager.states_by_issuer);
-    let expected_vtxn_hashes = vec![
+    let expected_vtxn_hashes = [
         ValidatorTransaction::ObservedJWKUpdate(qc_update_for_alice),
         ValidatorTransaction::ObservedJWKUpdate(qc_update_for_carl),
     ]

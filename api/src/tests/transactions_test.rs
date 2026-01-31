@@ -74,7 +74,7 @@ async fn test_get_transactions_returns_last_page_when_start_version_is_not_speci
     for _i in 0..20 {
         let account = context.gen_account();
         let txn = context.create_user_account_by(&mut root_account, &account);
-        context.commit_block(&vec![txn.clone()]).await;
+        context.commit_block(std::slice::from_ref(&txn)).await;
     }
 
     let resp = context.get("/transactions").await;
@@ -152,7 +152,7 @@ async fn test_get_transactions_output_user_transaction_with_entry_function_paylo
     let initial_ledger_version = u64::from(context.get_latest_ledger_info().ledger_version);
     let account = context.gen_account();
     let txn = context.create_user_account(&account).await;
-    context.commit_block(&vec![txn.clone()]).await;
+    context.commit_block(std::slice::from_ref(&txn)).await;
 
     let txns = context.get("/transactions?start=1").await;
     assert_eq!(
@@ -481,7 +481,7 @@ async fn test_post_batch_entry_function_api_validation(
     );
     let account = context.gen_account();
     let txn1 = context.create_user_account(&account).await;
-    context.commit_block(&vec![txn1]).await;
+    context.commit_block(&[txn1]).await;
 
     // This is a way to get around the Identifier checks!
     #[derive(serde::Serialize)]
@@ -819,7 +819,7 @@ async fn test_multi_ed25519_signed_transaction() {
                 context.use_orderless_transactions,
             ),
     );
-    context.commit_block(&vec![create_account_txn]).await;
+    context.commit_block(&[create_account_txn]).await;
 
     let raw_txn = factory
         .mint(auth_key.account_address(), 1000)
@@ -896,7 +896,7 @@ async fn test_get_transaction_by_hash(
     );
     let account = context.gen_account();
     let txn = context.create_user_account(&account).await;
-    context.commit_block(&vec![txn.clone()]).await;
+    context.commit_block(std::slice::from_ref(&txn)).await;
 
     let txns = context.get("/transactions?start=2&limit=1").await;
     assert_eq!(1, txns.as_array().unwrap().len());
@@ -962,7 +962,7 @@ async fn test_get_transaction_by_version(
     );
     let account = context.gen_account();
     let txn = context.create_user_account(&account).await;
-    context.commit_block(&vec![txn.clone()]).await;
+    context.commit_block(std::slice::from_ref(&txn)).await;
 
     let txns = context.get("/transactions?start=2&limit=1").await;
     assert_eq!(1, txns.as_array().unwrap().len());
@@ -1042,7 +1042,7 @@ async fn test_wait_transaction_by_hash(
     );
     let account = context.gen_account();
     let txn = context.create_user_account(&account).await;
-    context.commit_block(&vec![txn.clone()]).await;
+    context.commit_block(std::slice::from_ref(&txn)).await;
 
     let txns = context.get("/transactions?start=2&limit=1").await;
     assert_eq!(1, txns.as_array().unwrap().len());
@@ -1327,7 +1327,7 @@ async fn test_account_transaction_with_context(mut context: TestContext) {
     let initial_ledger_version = u64::from(context.get_latest_ledger_info().ledger_version);
     let account = context.gen_account();
     let txn = context.create_user_account(&account).await;
-    context.commit_block(&vec![txn]).await;
+    context.commit_block(&[txn]).await;
 
     if let Some(indexer_reader) = context.context.indexer_reader.as_ref() {
         indexer_reader
@@ -1392,7 +1392,7 @@ async fn test_get_account_transactions_filter_transactions_by_start_sequence_num
     let initial_sequence_number = context.root_account().await.sequence_number();
     let account = context.gen_account();
     let txn = context.create_user_account(&account).await;
-    context.commit_block(&vec![txn.clone()]).await;
+    context.commit_block(std::slice::from_ref(&txn)).await;
 
     let txns = context
         .get(
@@ -1426,7 +1426,7 @@ async fn test_get_account_transactions_filter_transactions_by_start_sequence_num
     );
     let account = context.gen_account();
     let txn = context.create_user_account(&account).await;
-    context.commit_block(&vec![txn]).await;
+    context.commit_block(&[txn]).await;
 
     let txns = context
         .get(
@@ -1464,7 +1464,7 @@ async fn test_get_account_transactions_filter_transactions_by_limit(
     let txn1 = context.create_user_account_by(&mut root_account, &account1);
     let account2 = context.gen_account();
     let txn2 = context.create_user_account_by(&mut root_account, &account2);
-    context.commit_block(&vec![txn1, txn2]).await;
+    context.commit_block(&[txn1, txn2]).await;
 
     if !context.use_orderless_transactions {
         let txns = context
@@ -1740,7 +1740,7 @@ async fn test_get_txn_execute_failed_by_entry_function_validation(
     );
     let account = context.gen_account();
     let txn1 = context.create_user_account(&account).await;
-    context.commit_block(&vec![txn1]).await;
+    context.commit_block(&[txn1]).await;
 
     test_get_txn_execute_failed_by_invalid_entry_function(
         context,
@@ -1776,7 +1776,7 @@ async fn test_get_txn_execute_failed_by_entry_function_invalid_module_name(
     );
     let account = context.gen_account();
     let txn1 = context.create_user_account(&account).await;
-    context.commit_block(&vec![txn1]).await;
+    context.commit_block(&[txn1]).await;
 
     test_submit_entry_function_api_validation(
         context,
@@ -1812,7 +1812,7 @@ async fn test_get_txn_execute_failed_by_entry_function_invalid_function_name(
     );
     let account = context.gen_account();
     let txn1 = context.create_user_account(&account).await;
-    context.commit_block(&vec![txn1]).await;
+    context.commit_block(&[txn1]).await;
 
     test_submit_entry_function_api_validation(
         context,
@@ -2827,7 +2827,7 @@ async fn test_get_transactions_auxiliary_info_with_valid_params() {
 
     // Commit all transactions in a single block with auxiliary info
     // This will create: [BlockMetadata(idx=0), UserTxn1(idx=1), UserTxn2(idx=2), UserTxn3(idx=3)]
-    context.try_commit_block(&vec![txn1, txn2, txn3]).await;
+    context.try_commit_block(&[txn1, txn2, txn3]).await;
 
     // Based on debug output, we know we have versions 0-5 after the commit
     // Test starting from version 1 (skip genesis) to version 4

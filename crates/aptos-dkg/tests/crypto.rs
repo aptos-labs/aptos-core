@@ -187,7 +187,7 @@ fn test_parallel_multi_pairing() {
     let pool1 = spawn_rayon_thread_pool("testmultpair".to_string(), Some(1));
     let pool32 = spawn_rayon_thread_pool("testmultpair".to_string(), Some(32));
 
-    for (g1, g2) in vec![
+    for (g1, g2) in [
         ([G1Projective::identity(), r1[0]], r2),
         (r1, r2),
         (r1, [G2Projective::identity(), r2[0]]),

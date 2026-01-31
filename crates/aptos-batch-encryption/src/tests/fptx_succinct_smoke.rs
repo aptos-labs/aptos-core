@@ -22,7 +22,7 @@ fn smoke_with_setup<R: RngCore + CryptoRng>(
     let ct = FPTXSuccinct::encrypt(&ek, rng, &plaintext, &associated_data).unwrap();
     FPTXSuccinct::verify_ct(&ct, &associated_data).unwrap();
 
-    let (d, pfs_promise) = FPTXSuccinct::digest(&dk, &vec![ct.clone()], 0).unwrap();
+    let (d, pfs_promise) = FPTXSuccinct::digest(&dk, std::slice::from_ref(&ct), 0).unwrap();
     let pfs = FPTXSuccinct::eval_proofs_compute_all(&pfs_promise, &dk);
 
     let dk_shares: Vec<<FPTXSuccinct as BatchThresholdEncryption>::DecryptionKeyShare> = msk_shares
@@ -49,7 +49,7 @@ fn smoke_with_setup<R: RngCore + CryptoRng>(
     ek.verify_decryption_key(&d, &dk).unwrap();
 
     let decrypted_plaintexts: Vec<String> =
-        FPTXSuccinct::decrypt(&dk, &vec![ct.prepare(&d, &pfs).unwrap()]).unwrap();
+        FPTXSuccinct::decrypt(&dk, &[ct.prepare(&d, &pfs).unwrap()]).unwrap();
 
     assert_eq!(decrypted_plaintexts[0], plaintext);
 

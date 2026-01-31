@@ -28,8 +28,9 @@ use move_core_types::account_address::AccountAddress;
 use rand::{prelude::StdRng, thread_rng, SeedableRng};
 use std::{sync::Arc, time::Duration};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 enum InnerState {
+    #[default]
     NotStarted,
     InProgress {
         start_time: Duration,
@@ -42,12 +43,6 @@ enum InnerState {
         my_transcript: DKGTranscript,
         proposed: bool,
     },
-}
-
-impl Default for InnerState {
-    fn default() -> Self {
-        Self::NotStarted
-    }
 }
 
 pub struct DKGManager<DKG: DKGTrait> {

@@ -491,9 +491,10 @@ impl QualifiedInstId<StructId> {
 /// # Verification Scope
 
 /// Defines what functions to verify.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VerificationScope {
     /// Verify only public functions.
+    #[default]
     Public,
     /// Verify all functions.
     All,
@@ -503,12 +504,6 @@ pub enum VerificationScope {
     OnlyModule(String),
     /// Verify no functions
     None,
-}
-
-impl Default for VerificationScope {
-    fn default() -> Self {
-        Self::Public
-    }
 }
 
 impl VerificationScope {

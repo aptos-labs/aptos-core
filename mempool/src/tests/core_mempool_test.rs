@@ -92,7 +92,7 @@ fn test_transaction_ordering_seqnos_and_nonces() {
     );
 
     // Expected transaction order in priority queue
-    let ordered_transactions = vec![
+    let ordered_transactions = [
         TestTransaction::new(0, ReplayProtector::Nonce(200), 7),
         TestTransaction::new(0, ReplayProtector::SequenceNumber(1), 5),
         TestTransaction::new(0, ReplayProtector::Nonce(150), 3),

@@ -136,7 +136,7 @@ async fn test_account_resources_by_ledger_version_with_context(mut context: Test
 
     let account = context.gen_account();
     let txn = context.create_user_account(&account).await;
-    context.commit_block(&vec![txn.clone()]).await;
+    context.commit_block(std::slice::from_ref(&txn)).await;
 
     if let Some(indexer_reader) = context.context.indexer_reader.as_ref() {
         // Waiting for the above transaction, block metadata and state checkpoint to get indexed.
@@ -270,9 +270,7 @@ async fn test_account_auto_creation() {
     let txn2 = root_account.sign_with_transaction_builder(context.transaction_factory().payload(
         aptos_stdlib::aptos_account_fungible_transfer_only(account.address(), 10_000_000_000),
     ));
-    context
-        .commit_block(&vec![txn1.clone(), txn2.clone()])
-        .await;
+    context.commit_block(&[txn1.clone(), txn2.clone()]).await;
     let txn = account.sign_with_transaction_builder(
         context
             .transaction_factory()
@@ -282,7 +280,7 @@ async fn test_account_auto_creation() {
             ))
             .gas_unit_price(1),
     );
-    context.commit_block(&vec![txn.clone()]).await;
+    context.commit_block(std::slice::from_ref(&txn)).await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -324,7 +322,7 @@ async fn test_get_account_balance(
                 context.use_orderless_transactions,
             ),
     );
-    context.commit_block(&vec![txn.clone()]).await;
+    context.commit_block(std::slice::from_ref(&txn)).await;
 
     // Check coin balance after migration
     let coin_balance_after = context
@@ -363,7 +361,7 @@ async fn test_get_account_balance(
                 context.use_orderless_transactions,
             ),
     );
-    context.commit_block(&vec![txn.clone()]).await;
+    context.commit_block(std::slice::from_ref(&txn)).await;
 
     // Check concurrent fungible asset balance
     let concurrent_fa_balance = context
@@ -392,7 +390,7 @@ async fn test_get_account_modules_by_ledger_version_with_context(mut context: Te
                 context.use_orderless_transactions,
             ),
     );
-    context.commit_block(&vec![txn.clone()]).await;
+    context.commit_block(std::slice::from_ref(&txn)).await;
 
     if let Some(indexer_reader) = context.context.indexer_reader.as_ref() {
         // Waiting for the above transaction, block metadata, and state checkpoint to be indexed.
