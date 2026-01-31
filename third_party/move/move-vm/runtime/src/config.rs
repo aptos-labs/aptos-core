@@ -56,6 +56,11 @@ pub struct VMConfig {
     /// Whether this VM should support debugging. If set, environment variables
     /// `MOVE_VM_TRACE` and `MOVE_VM_STEP` will be recognized.
     pub enable_debugging: bool,
+    /// When enabled, checks the depth of captured values when packing closures.
+    /// This prevents deeply nested closure chains that could cause stack overflow.
+    /// Also controls whether error messages format values (which could cause stack
+    /// overflow during Display formatting).
+    pub enable_closure_depth_check: bool,
 }
 
 impl Default for VMConfig {
@@ -85,6 +90,7 @@ impl Default for VMConfig {
             enable_framework_for_option: true,
             enable_function_caches_for_native_dynamic_dispatch: true,
             enable_debugging: false,
+            enable_closure_depth_check: true,
         }
     }
 }
