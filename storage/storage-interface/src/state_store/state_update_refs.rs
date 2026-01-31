@@ -48,11 +48,17 @@ impl<'kv> PerVersionStateUpdateRefs<'kv> {
         let mut shards = arr![Vec::with_capacity(num_versions / 8); 16];
 
         let mut versions_seen = 0;
+        // We want to sort the ops by key within each version. Allocate one vector here to be
+        // cleared and reused for each version.
+        let mut one_version = Vec::new();
         for update_iter in updates_by_version.into_iter() {
             let version = first_version + versions_seen as Version;
             versions_seen += 1;
 
-            for (key, write_op) in update_iter.into_iter() {
+            assert!(one_version.is_empty());
+            one_version.extend(update_iter.into_iter());
+            one_version.sort_by_key(|(key, _)| *key);
+            for (key, write_op) in one_version.drain(..) {
                 shards[key.get_shard_id()].push((key, StateUpdateRef {
                     version,
                     state_op: write_op,
@@ -412,5 +418,26 @@ mod tests {
         verify_batching(for_latest, "A", 11, "A1");
         verify_batching(for_latest, "B", 10, "B0");
         verify_batching(for_latest, "C", 12, "C2");
+    }
+
+    #[test]
+    fn test_per_version_updates_sorted_by_key() {
+        // Verify that updates within each version are sorted by state key,
+        // regardless of the order they appear in the input write set.
+        // Keys are intentionally provided in non-alphabetical order.
+        let v0 = write_set(&[("C", "C0"), ("A", "A0"), ("B", "B0")]);
+        let v1 = write_set(&[("A", "A1"), ("D", "D1")]);
+        let all_checkpoint_indices = vec![1];
+        let ret = StateUpdateRefs::index_write_sets(0, vec![&v0, &v1], 2, all_checkpoint_indices);
+
+        let per_version = ret.for_last_checkpoint_per_version().unwrap();
+
+        // Verify keys are sorted within each shard.
+        for shard in &per_version.shards {
+            assert!(
+                shard.is_sorted_by_key(|(k, u)| (u.version, *k)),
+                "Keys within shard should be sorted"
+            );
+        }
     }
 }
