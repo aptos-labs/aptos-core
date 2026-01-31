@@ -21,6 +21,7 @@ pub enum OnChainExecutionConfig {
     V5(ExecutionConfigV5),
     V6(ExecutionConfigV6),
     V7(ExecutionConfigV7),
+    V8(ExecutionConfigV8),
 }
 
 /// The public interface that exposes all values with safe fallback.
@@ -36,6 +37,7 @@ impl OnChainExecutionConfig {
             Self::V5(config) => config.transaction_shuffler_type,
             Self::V6(config) => config.transaction_shuffler_type,
             Self::V7(config) => config.transaction_shuffler_type,
+            Self::V8(config) => config.transaction_shuffler_type,
         }
     }
 
@@ -54,6 +56,7 @@ impl OnChainExecutionConfig {
             Self::V5(config) => config.block_gas_limit_type,
             Self::V6(config) => config.block_gas_limit_type,
             Self::V7(config) => config.block_gas_limit_type,
+            Self::V8(config) => config.block_gas_limit_type,
         }
     }
 
@@ -63,6 +66,7 @@ impl OnChainExecutionConfig {
             Self::V5(config) => config.enable_per_block_gas_limit,
             Self::V6(config) => config.enable_per_block_gas_limit,
             Self::V7(config) => config.enable_per_block_gas_limit,
+            Self::V8(config) => config.enable_per_block_gas_limit,
         }
     }
 
@@ -73,6 +77,7 @@ impl OnChainExecutionConfig {
             },
             Self::V6(config) => Some(config.gas_price_to_burn),
             Self::V7(config) => Some(config.gas_price_to_burn),
+            Self::V8(config) => Some(config.gas_price_to_burn),
         }
     }
 
@@ -86,6 +91,7 @@ impl OnChainExecutionConfig {
             | Self::V5(_)
             | Self::V6(_) => 0,
             Self::V7(config) => config.persisted_auxiliary_info_version,
+            Self::V8(config) => config.persisted_auxiliary_info_version,
         }
     }
 
@@ -109,19 +115,21 @@ impl OnChainExecutionConfig {
             Self::V5(config) => config.transaction_deduper_type,
             Self::V6(config) => config.transaction_deduper_type,
             Self::V7(config) => config.transaction_deduper_type,
+            Self::V8(config) => config.transaction_deduper_type,
         }
     }
 
     /// The default values to use for new networks, e.g., devnet, forge.
     /// Features that are ready for deployment can be enabled here.
     pub fn default_for_genesis() -> Self {
-        Self::V7(ExecutionConfigV7 {
+        Self::V8(ExecutionConfigV8 {
             transaction_shuffler_type: TransactionShufflerType::default_for_genesis(),
             block_gas_limit_type: BlockGasLimitType::default_for_genesis(),
             enable_per_block_gas_limit: false,
             transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
             gas_price_to_burn: 90,
             persisted_auxiliary_info_version: 1,
+            hot_state_config: HotStateConfig::default_for_genesis(),
         })
     }
 
@@ -216,6 +224,17 @@ pub struct ExecutionConfigV7 {
     pub transaction_deduper_type: TransactionDeduperType,
     pub gas_price_to_burn: u64,
     pub persisted_auxiliary_info_version: u8,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct ExecutionConfigV8 {
+    pub transaction_shuffler_type: TransactionShufflerType,
+    pub block_gas_limit_type: BlockGasLimitType,
+    pub enable_per_block_gas_limit: bool,
+    pub transaction_deduper_type: TransactionDeduperType,
+    pub gas_price_to_burn: u64,
+    pub persisted_auxiliary_info_version: u8,
+    pub hot_state_config: HotStateConfig,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -407,6 +426,26 @@ impl BlockGasLimitType {
                 use_granular_resource_group_conflicts,
                 ..
             } => *use_granular_resource_group_conflicts,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")] // cannot use tag = "type" as nested enums cannot work, and bcs doesn't support it
+pub enum HotStateConfig {
+    V0 {
+        max_items_per_shard: u64,
+        max_bytes_per_shard: u64,
+        refresh_interval_versions: u64,
+    },
+}
+
+impl HotStateConfig {
+    fn default_for_genesis() -> Self {
+        Self::V0 {
+            max_items_per_shard: 250_000,
+            max_bytes_per_shard: 256 * (1 << 20),
+            refresh_interval_versions: 100_000,
         }
     }
 }
