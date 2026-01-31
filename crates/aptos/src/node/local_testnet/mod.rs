@@ -57,9 +57,11 @@ const TESTNET_FOLDER: &str = "testnet";
 /// Hint about ulimit that we show when the localnet fails to start, since "too many open files"
 /// is a common issue due to RocksDB opening many file descriptors.
 const ULIMIT_HINT: &str = r#"
-Hint: If you see "Too many open files" errors, try increasing your file descriptor limit:
-  On macOS/Linux: ulimit -n 65536
-  You can make this permanent by adding it to your shell profile (~/.bashrc, ~/.zshrc, etc.)
+Hint: If you see "Too many open files" errors, try increasing your file descriptor limit.
+  Run this command in your shell before starting the localnet:
+    ulimit -n 1048576
+  Note: This only affects the current shell session. For system-wide changes, the configuration
+  differs by OS (e.g., launchd on macOS, /etc/security/limits.conf or systemd on Linux).
 "#;
 
 /// Run a localnet
