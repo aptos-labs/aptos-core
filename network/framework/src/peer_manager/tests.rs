@@ -116,6 +116,7 @@ fn build_test_peer_manager(
         constants::MAX_FRAME_SIZE,
         constants::MAX_MESSAGE_SIZE,
         MAX_INBOUND_CONNECTIONS,
+        1,    /* max_connections_per_peer */
         None, /* access_control_policy */
     );
 
@@ -585,7 +586,7 @@ fn peer_manager_simultaneous_dial_disconnect_event() {
         );
         peer_manager.handle_connection_event(event);
         // The active connection should still remain.
-        assert!(peer_manager.active_peers.contains_key(&ids[0]));
+        assert!(peer_manager.has_connection(&ids[0]));
     };
 
     runtime.block_on(test);
@@ -795,6 +796,7 @@ fn create_peer_manager_with_policy(
         constants::MAX_FRAME_SIZE,
         constants::MAX_MESSAGE_SIZE,
         MAX_INBOUND_CONNECTIONS,
+        1, /* max_connections_per_peer */
         policy.map(std::sync::Arc::new),
     )
 }
