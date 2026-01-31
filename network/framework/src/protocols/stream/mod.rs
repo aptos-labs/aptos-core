@@ -5,11 +5,19 @@ use crate::protocols::wire::messaging::v1::{MultiplexMessage, NetworkMessage};
 use anyhow::{bail, ensure};
 use aptos_channels::Sender;
 use aptos_id_generator::{IdGenerator, U32IdGenerator};
+use bytes::{Bytes, BytesMut};
 use futures_util::SinkExt;
+#[cfg(any(test, feature = "fuzzing"))]
+use proptest::prelude::*;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
+
+#[cfg(any(test, feature = "fuzzing"))]
+fn arbitrary_bytes() -> impl Strategy<Value = Bytes> {
+    proptest::collection::vec(any::<u8>(), 0..1024).prop_map(Bytes::from)
+}
 
 // Estimated overhead per frame (in bytes)
 const FRAME_OVERHEAD_BYTES: usize = 64;
@@ -48,8 +56,9 @@ impl Debug for StreamHeader {
 pub struct StreamFragment {
     pub request_id: u32,
     pub fragment_id: u8,
-    #[serde(with = "serde_bytes")]
-    pub raw_data: Vec<u8>,
+    #[serde(with = "crate::protocols::wire::serde_bytes_compat")]
+    #[cfg_attr(any(test, feature = "fuzzing"), proptest(strategy = "arbitrary_bytes()"))]
+    pub raw_data: Bytes,
 }
 
 impl Debug for StreamFragment {
@@ -118,6 +127,11 @@ pub struct InboundStream {
     num_fragments: u8,
     received_fragment_id: u8,
     message: NetworkMessage,
+    /// Accumulated fragment data. We collect all fragments and concatenate once at the end
+    /// to avoid O(n²) copying that would occur if we appended to a growing buffer on each fragment.
+    fragments: Vec<Bytes>,
+    /// Total size of accumulated fragments for pre-allocation
+    total_fragment_size: usize,
 }
 
 impl InboundStream {
@@ -157,11 +171,13 @@ impl InboundStream {
             num_fragments: header_num_fragments,
             received_fragment_id: 0,
             message: header_message,
+            fragments: Vec::with_capacity(header_num_fragments as usize),
+            total_fragment_size: 0,
         })
     }
 
     /// Append a fragment to the stream (returns true if the stream is complete)
-    fn append_fragment(&mut self, mut fragment: StreamFragment) -> anyhow::Result<bool> {
+    fn append_fragment(&mut self, fragment: StreamFragment) -> anyhow::Result<bool> {
         // Verify the stream request ID and fragment request ID
         ensure!(
             self.request_id == fragment.request_id,
@@ -197,20 +213,65 @@ impl InboundStream {
         // Update the received fragment ID
         self.received_fragment_id = expected_fragment_id;
 
-        // Append the fragment data to the message
-        let raw_data = &mut fragment.raw_data;
-        match &mut self.message {
+        // Store the fragment data (zero-copy, just increments refcount)
+        self.total_fragment_size += fragment.raw_data.len();
+        self.fragments.push(fragment.raw_data);
+
+        // Check if the stream is complete
+        let is_stream_complete = self.received_fragment_id == self.num_fragments;
+
+        // If complete, concatenate all fragments into the message in one pass (O(n) total)
+        if is_stream_complete {
+            self.finalize_message();
+        }
+
+        Ok(is_stream_complete)
+    }
+
+    /// Concatenate all accumulated fragments into the message payload.
+    /// This is called once when all fragments are received, making the total
+    /// copy operation O(n) instead of O(n²).
+    fn finalize_message(&mut self) {
+        // Get the initial data from the header and calculate total size
+        let (initial_data, total_size) = match &self.message {
             NetworkMessage::Error(_) => {
                 panic!("StreamHeader for NetworkMessage::Error(_) should be rejected!")
             },
-            NetworkMessage::RpcRequest(request) => request.raw_request.append(raw_data),
-            NetworkMessage::RpcResponse(response) => response.raw_response.append(raw_data),
-            NetworkMessage::DirectSendMsg(message) => message.raw_msg.append(raw_data),
+            NetworkMessage::RpcRequest(request) => {
+                (request.raw_request.clone(), request.raw_request.len() + self.total_fragment_size)
+            },
+            NetworkMessage::RpcResponse(response) => {
+                (response.raw_response.clone(), response.raw_response.len() + self.total_fragment_size)
+            },
+            NetworkMessage::DirectSendMsg(message) => {
+                (message.raw_msg.clone(), message.raw_msg.len() + self.total_fragment_size)
+            },
+        };
+
+        // Allocate once with exact capacity needed
+        let mut buf = BytesMut::with_capacity(total_size);
+        buf.extend_from_slice(&initial_data);
+        for fragment in &self.fragments {
+            buf.extend_from_slice(fragment);
+        }
+        let final_data = buf.freeze();
+
+        // Update the message with the final concatenated data
+        match &mut self.message {
+            NetworkMessage::Error(_) => unreachable!(),
+            NetworkMessage::RpcRequest(request) => {
+                request.raw_request = final_data;
+            },
+            NetworkMessage::RpcResponse(response) => {
+                response.raw_response = final_data;
+            },
+            NetworkMessage::DirectSendMsg(message) => {
+                message.raw_msg = final_data;
+            },
         }
 
-        // Return whether the stream is complete
-        let is_stream_complete = self.received_fragment_id == self.num_fragments;
-        Ok(is_stream_complete)
+        // Clear fragments to free memory
+        self.fragments.clear();
     }
 }
 
@@ -283,25 +344,35 @@ impl OutboundStream {
         // Generate a new request ID for the stream
         let request_id = self.request_id_gen.next();
 
-        // Split the message data into chunks
+        // Split the message data into chunks using zero-copy slicing
+        // The header keeps the first chunk, rest is split into fragments
         let rest = match &mut message {
             NetworkMessage::Error(_) => {
                 unreachable!("NetworkMessage::Error(_) should always fit into a single frame!")
             },
             NetworkMessage::RpcRequest(request) => {
-                request.raw_request.split_off(self.max_frame_size)
+                let data = std::mem::take(&mut request.raw_request);
+                request.raw_request = data.slice(..self.max_frame_size);
+                data.slice(self.max_frame_size..)
             },
             NetworkMessage::RpcResponse(response) => {
-                response.raw_response.split_off(self.max_frame_size)
+                let data = std::mem::take(&mut response.raw_response);
+                response.raw_response = data.slice(..self.max_frame_size);
+                data.slice(self.max_frame_size..)
             },
             NetworkMessage::DirectSendMsg(message) => {
-                message.raw_msg.split_off(self.max_frame_size)
+                let data = std::mem::take(&mut message.raw_msg);
+                message.raw_msg = data.slice(..self.max_frame_size);
+                data.slice(self.max_frame_size..)
             },
         };
-        let chunks = rest.chunks(self.max_frame_size);
+        // Calculate number of chunks (each chunk is max_frame_size except possibly the last)
+        let rest_len = rest.len();
+        let num_full_chunks = rest_len / self.max_frame_size;
+        let has_partial_chunk = (rest_len % self.max_frame_size) > 0;
+        let num_chunks = num_full_chunks + if has_partial_chunk { 1 } else { 0 };
 
         // Ensure that the number of chunks does not exceed u8::MAX
-        let num_chunks = chunks.len();
         ensure!(
             num_chunks <= (u8::MAX as usize),
             "Number of fragments overflowed the u8 limit: {} (max: {})!",
@@ -319,18 +390,23 @@ impl OutboundStream {
             .send(MultiplexMessage::Stream(header))
             .await?;
 
-        // Send each fragment
-        for (index, chunk) in chunks.enumerate() {
+        // Send each fragment using zero-copy slicing
+        for index in 0..num_chunks {
             // Calculate the fragment ID (note: fragment IDs start at 1)
             let fragment_id = index.checked_add(1).ok_or_else(|| {
                 anyhow::anyhow!("Fragment ID overflowed when adding 1: {}", index)
             })?;
 
+            // Calculate the slice range for this chunk
+            let start = index * self.max_frame_size;
+            let end = std::cmp::min(start + self.max_frame_size, rest_len);
+            let chunk = rest.slice(start..end);
+
             // Send the fragment message
             let message = StreamMessage::Fragment(StreamFragment {
                 request_id,
                 fragment_id: fragment_id as u8,
-                raw_data: Vec::from(chunk),
+                raw_data: chunk, // Zero-copy: Bytes::slice() shares the underlying buffer
             });
             self.stream_tx
                 .send(MultiplexMessage::Stream(message))
@@ -511,7 +587,7 @@ mod tests {
         StreamFragment {
             request_id,
             fragment_id,
-            raw_data: vec![0; 10], // Dummy data
+            raw_data: Bytes::from(vec![0u8; 10]), // Dummy data
         }
     }
 
@@ -523,7 +599,7 @@ mod tests {
             message: NetworkMessage::DirectSendMsg(DirectSendMsg {
                 protocol_id: ConsensusRpcBcs,
                 priority: 0,
-                raw_msg: vec![],
+                raw_msg: Bytes::new(),
             }),
         }
     }
