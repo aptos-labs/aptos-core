@@ -34,11 +34,19 @@ pub struct FunctionSummary {
     pub covered: u64,
 }
 
+/// Information about a function's control flow structure for path coverage analysis.
+///
+/// Note: This structure is used internally by `summarize_path_cov` and captures
+/// static control flow information. Dynamic dispatch through closures (`CallClosure`)
+/// is not represented in this structure.
 pub struct FunctionInfo {
     pub fn_name: Identifier,
     pub fn_entry: CodeOffset,
-    pub fn_returns: BTreeSet<CodeOffset>,
+    /// All exit points of the function (Ret, Abort, AbortMsg bytecodes)
+    pub fn_exits: BTreeSet<CodeOffset>,
+    /// Branch points mapping from source instruction to possible destinations
     pub fn_branches: BTreeMap<CodeOffset, BTreeSet<CodeOffset>>,
+    /// Total number of statically-determined paths through this function
     pub fn_num_paths: u64,
 }
 
@@ -181,6 +189,23 @@ pub fn summarize_inst_cov(
     summarize_inst_cov_by_module(module, module_map)
 }
 
+/// Summarizes path coverage for a module based on execution traces.
+///
+/// This function analyzes the control flow graph of each function to identify
+/// possible execution paths, then examines the trace map to determine which
+/// paths were actually executed.
+///
+/// # Limitations
+///
+/// **Closures**: This analysis has limited support for closures (`CallClosure` bytecode).
+/// When a closure is invoked, the target function is determined dynamically at runtime
+/// from the closure value, not statically from the bytecode. As a result:
+/// - The path coverage analysis cannot accurately trace calls through closures
+/// - Functions invoked via closures may not have their paths properly attributed
+/// - The total path count may be inaccurate for code using closures extensively
+///
+/// **Exit Points**: The analysis recognizes `Ret`, `Abort`, and `AbortMsg` as function
+/// exit points. Paths ending in aborts are counted as valid execution paths.
 pub fn summarize_path_cov(module: &CompiledModule, trace_map: &TraceMap) -> ModuleSummary {
     let module_name = module.self_id();
 
@@ -195,13 +220,16 @@ pub fn summarize_path_cov(module: &CompiledModule, trace_map: &TraceMap) -> Modu
                     // build control-flow graph
                     let fn_cfg = VMControlFlowGraph::new(code_unit.code.as_slice());
 
-                    // get function entry and return points
+                    // get function entry and exit points (returns and aborts)
                     let fn_entry = fn_cfg.block_start(fn_cfg.entry_block_id());
-                    let mut fn_returns: BTreeSet<CodeOffset> = BTreeSet::new();
+                    let mut fn_exits: BTreeSet<CodeOffset> = BTreeSet::new();
                     for block_id in fn_cfg.blocks().into_iter() {
                         for i in fn_cfg.block_start(block_id)..=fn_cfg.block_end(block_id) {
-                            if let Bytecode::Ret = &code_unit.code[i as usize] {
-                                fn_returns.insert(i);
+                            match &code_unit.code[i as usize] {
+                                Bytecode::Ret | Bytecode::Abort | Bytecode::AbortMsg => {
+                                    fn_exits.insert(i);
+                                },
+                                _ => {},
                             }
                         }
                     }
@@ -318,7 +346,7 @@ pub fn summarize_path_cov(module: &CompiledModule, trace_map: &TraceMap) -> Modu
                     Some((fn_name.clone(), FunctionInfo {
                         fn_name,
                         fn_entry,
-                        fn_returns,
+                        fn_exits,
                         fn_branches,
                         fn_num_paths,
                     }))
@@ -377,17 +405,17 @@ pub fn summarize_path_cov(module: &CompiledModule, trace_map: &TraceMap) -> Modu
                 }
             }
 
-            // pop stacks if we returned
-            if info.fn_returns.contains(&record.func_pc) {
+            // pop stacks if we exited (returned or aborted)
+            if info.fn_exits.contains(&record.func_pc) {
                 call_stack.pop().unwrap();
                 // save the full path temporarily in path_store
                 path_store.push((record.func_name.clone(), path_stack.pop().unwrap()));
             }
         }
 
-        // assert matches between calls and returns
+        // check if all calls were matched with exits
         if !call_stack.is_empty() {
-            // execution aborted...
+            // execution ended unexpectedly (e.g., VM error or incomplete trace)
             // TODO: it is better to confirm this by adding a trace record
             call_stack.clear();
             path_stack.clear();
@@ -452,5 +480,402 @@ impl ExecCoverageMapWithModules {
                 (module_path, module_summary)
             })
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use move_binary_format::file_format::{
+        self, CodeUnit, FunctionDefinition, FunctionHandle, FunctionHandleIndex, IdentifierIndex,
+        ModuleHandleIndex, SignatureIndex, Visibility,
+    };
+    use move_core_types::account_address::AccountAddress;
+
+    fn test_addr() -> AccountAddress {
+        AccountAddress::from_hex_literal("0x1").unwrap()
+    }
+
+    #[test]
+    fn test_function_summary_percent_coverage() {
+        let summary = FunctionSummary {
+            fn_is_native: false,
+            total: 100,
+            covered: 50,
+        };
+        assert!((summary.percent_coverage() - 50.0).abs() < f64::EPSILON);
+
+        let summary_full = FunctionSummary {
+            fn_is_native: false,
+            total: 100,
+            covered: 100,
+        };
+        assert!((summary_full.percent_coverage() - 100.0).abs() < f64::EPSILON);
+
+        let summary_zero = FunctionSummary {
+            fn_is_native: false,
+            total: 100,
+            covered: 0,
+        };
+        assert!((summary_zero.percent_coverage() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_module_summary_csv_output() {
+        let module_name = ModuleId::new(test_addr(), Identifier::new("TestModule").unwrap());
+        let mut function_summaries = BTreeMap::new();
+
+        function_summaries.insert(
+            Identifier::new("test_func").unwrap(),
+            FunctionSummary {
+                fn_is_native: false,
+                total: 10,
+                covered: 5,
+            },
+        );
+        function_summaries.insert(
+            Identifier::new("native_func").unwrap(),
+            FunctionSummary {
+                fn_is_native: true,
+                total: 0,
+                covered: 0,
+            },
+        );
+
+        let summary = ModuleSummary {
+            module_name,
+            function_summaries,
+        };
+
+        let mut output = Vec::new();
+        summary.summarize_csv(&mut output).unwrap();
+        let output_str = String::from_utf8(output).unwrap();
+
+        // Native functions should be excluded from CSV output
+        assert!(!output_str.contains("native_func"));
+        // Non-native function should be included
+        assert!(output_str.contains("test_func"));
+        assert!(output_str.contains("0000000000000000000000000000000000000000000000000000000000000001::TestModule"));
+    }
+
+    #[test]
+    fn test_module_summary_human_output() {
+        let module_name = ModuleId::new(test_addr(), Identifier::new("TestModule").unwrap());
+        let mut function_summaries = BTreeMap::new();
+
+        function_summaries.insert(
+            Identifier::new("func1").unwrap(),
+            FunctionSummary {
+                fn_is_native: false,
+                total: 10,
+                covered: 5,
+            },
+        );
+        function_summaries.insert(
+            Identifier::new("func2").unwrap(),
+            FunctionSummary {
+                fn_is_native: false,
+                total: 20,
+                covered: 20,
+            },
+        );
+
+        let summary = ModuleSummary {
+            module_name,
+            function_summaries,
+        };
+
+        let mut output = Vec::new();
+        let (total, covered) = summary.summarize_human(&mut output, true).unwrap();
+
+        assert_eq!(total, 30);
+        assert_eq!(covered, 25);
+
+        let output_str = String::from_utf8(output).unwrap();
+        assert!(output_str.contains("Module"));
+        assert!(output_str.contains("TestModule"));
+        assert!(output_str.contains("func1"));
+        assert!(output_str.contains("func2"));
+        assert!(output_str.contains("% coverage"));
+    }
+
+    #[test]
+    fn test_module_summary_human_output_without_function_details() {
+        let module_name = ModuleId::new(test_addr(), Identifier::new("TestModule").unwrap());
+        let mut function_summaries = BTreeMap::new();
+
+        function_summaries.insert(
+            Identifier::new("func1").unwrap(),
+            FunctionSummary {
+                fn_is_native: false,
+                total: 10,
+                covered: 5,
+            },
+        );
+
+        let summary = ModuleSummary {
+            module_name,
+            function_summaries,
+        };
+
+        let mut output = Vec::new();
+        summary.summarize_human(&mut output, false).unwrap();
+
+        let output_str = String::from_utf8(output).unwrap();
+        // Should contain module info
+        assert!(output_str.contains("Module"));
+        // Should NOT contain detailed function info (no tab-indented output)
+        assert!(!output_str.contains("\tfun"));
+    }
+
+    #[test]
+    fn test_function_info_creation() {
+        let fn_name = Identifier::new("test_func").unwrap();
+        let mut fn_exits = BTreeSet::new();
+        fn_exits.insert(5); // Ret at PC 5
+        fn_exits.insert(10); // Abort at PC 10
+
+        let mut fn_branches = BTreeMap::new();
+        let mut branch_targets = BTreeSet::new();
+        branch_targets.insert(3);
+        branch_targets.insert(7);
+        fn_branches.insert(2, branch_targets);
+
+        let info = FunctionInfo {
+            fn_name: fn_name.clone(),
+            fn_entry: 0,
+            fn_exits: fn_exits.clone(),
+            fn_branches: fn_branches.clone(),
+            fn_num_paths: 2,
+        };
+
+        assert_eq!(info.fn_name, fn_name);
+        assert_eq!(info.fn_entry, 0);
+        assert!(info.fn_exits.contains(&5));
+        assert!(info.fn_exits.contains(&10));
+        assert_eq!(info.fn_exits.len(), 2);
+        assert_eq!(info.fn_num_paths, 2);
+    }
+
+    #[test]
+    fn test_bytecode_exit_detection() {
+        // Test that Ret, Abort, and AbortMsg are all considered exit points
+        use move_binary_format::file_format::Bytecode;
+
+        let test_cases = vec![
+            (Bytecode::Ret, true),
+            (Bytecode::Abort, true),
+            (Bytecode::AbortMsg, true),
+            (Bytecode::Pop, false),
+            (Bytecode::LdU64(0), false),
+            (Bytecode::Branch(0), false),
+            (Bytecode::BrTrue(0), false),
+        ];
+
+        for (bytecode, is_exit) in test_cases {
+            let is_match = matches!(
+                bytecode,
+                Bytecode::Ret | Bytecode::Abort | Bytecode::AbortMsg
+            );
+            assert_eq!(
+                is_match, is_exit,
+                "Bytecode {:?} should {}be an exit",
+                bytecode,
+                if is_exit { "" } else { "not " }
+            );
+        }
+    }
+
+    /// Helper to create a test module with specified functions
+    fn create_test_module_with_functions(
+        module_name: &str,
+        functions: Vec<(&str, Vec<Bytecode>)>,
+    ) -> CompiledModule {
+        let mut module = file_format::empty_module();
+        module.identifiers[0] = Identifier::new(module_name).unwrap();
+
+        for (func_name, code) in functions {
+            // Add function handle
+            module.function_handles.push(FunctionHandle {
+                module: ModuleHandleIndex(0),
+                name: IdentifierIndex(module.identifiers.len() as u16),
+                parameters: SignatureIndex(0),
+                return_: SignatureIndex(0),
+                type_parameters: vec![],
+                access_specifiers: None,
+                attributes: vec![],
+            });
+            module
+                .identifiers
+                .push(Identifier::new(func_name).unwrap());
+
+            // Add function definition with the specified code
+            module.function_defs.push(FunctionDefinition {
+                function: FunctionHandleIndex((module.function_defs.len()) as u16),
+                visibility: Visibility::Private,
+                is_entry: false,
+                acquires_global_resources: vec![],
+                code: Some(CodeUnit {
+                    locals: SignatureIndex(0),
+                    code,
+                }),
+            });
+        }
+
+        module
+    }
+
+    #[test]
+    fn test_summarize_inst_cov_with_module() {
+        // Create a module with two functions
+        let module = create_test_module_with_functions(
+            "TestModule",
+            vec![
+                ("returns_normally", vec![Bytecode::LdU64(0), Bytecode::Pop, Bytecode::Ret]),
+                ("aborts", vec![Bytecode::LdU64(1), Bytecode::Abort]),
+            ],
+        );
+
+        // Create coverage map with partial coverage
+        let addr = AccountAddress::ZERO;
+        let module_name = Identifier::new("TestModule").unwrap();
+        let mut coverage_map = crate::coverage_map::ModuleCoverageMap::new(addr, module_name.clone());
+
+        // Cover first two instructions of returns_normally
+        let func1 = Identifier::new("returns_normally").unwrap();
+        coverage_map.insert(func1.clone(), 0);
+        coverage_map.insert(func1.clone(), 1);
+
+        // Cover first instruction of aborts
+        let func2 = Identifier::new("aborts").unwrap();
+        coverage_map.insert(func2.clone(), 0);
+
+        let summary = summarize_inst_cov_by_module(&module, Some(&coverage_map));
+
+        // Check returns_normally: 3 total instructions, 2 covered
+        let func1_summary = summary.function_summaries.get(&func1).unwrap();
+        assert_eq!(func1_summary.total, 3);
+        assert_eq!(func1_summary.covered, 2);
+        assert!(!func1_summary.fn_is_native);
+
+        // Check aborts: 2 total instructions, 1 covered
+        let func2_summary = summary.function_summaries.get(&func2).unwrap();
+        assert_eq!(func2_summary.total, 2);
+        assert_eq!(func2_summary.covered, 1);
+        assert!(!func2_summary.fn_is_native);
+    }
+
+    #[test]
+    fn test_summarize_inst_cov_no_coverage() {
+        let module = create_test_module_with_functions(
+            "TestModule",
+            vec![("func", vec![Bytecode::Ret])],
+        );
+
+        let summary = summarize_inst_cov_by_module(&module, None);
+
+        let func = Identifier::new("func").unwrap();
+        let func_summary = summary.function_summaries.get(&func).unwrap();
+        assert_eq!(func_summary.total, 1);
+        assert_eq!(func_summary.covered, 0);
+    }
+
+    #[test]
+    fn test_path_coverage_detects_abort_exits() {
+        // Create a module with a function that has conditional abort
+        // Code: if (true) abort else return
+        // Bytecodes: LdTrue, BrFalse(3), LdU64(0), Abort, Ret
+        let module = create_test_module_with_functions(
+            "TestModule",
+            vec![(
+                "conditional_abort",
+                vec![
+                    Bytecode::LdTrue,     // 0
+                    Bytecode::BrFalse(4), // 1: if false, jump to Ret
+                    Bytecode::LdU64(0),   // 2: load abort code
+                    Bytecode::Abort,      // 3: abort
+                    Bytecode::Ret,        // 4: return
+                ],
+            )],
+        );
+
+        // Create empty trace map (no executions)
+        let trace_map = TraceMap {
+            exec_maps: BTreeMap::new(),
+        };
+
+        let summary = summarize_path_cov(&module, &trace_map);
+
+        let func = Identifier::new("conditional_abort").unwrap();
+        let func_summary = summary.function_summaries.get(&func).unwrap();
+
+        // Should have 2 paths: one through abort (0->1->2->3), one through ret (0->1->4)
+        assert_eq!(func_summary.total, 2, "Should detect 2 paths (abort and ret)");
+        assert_eq!(func_summary.covered, 0, "No paths covered (empty trace)");
+    }
+
+    #[test]
+    fn test_path_coverage_with_abortmsg() {
+        // Create a module with AbortMsg
+        let module = create_test_module_with_functions(
+            "TestModule",
+            vec![(
+                "abort_with_message",
+                vec![
+                    Bytecode::LdU64(1),                    // 0: error code
+                    Bytecode::VecPack(SignatureIndex(0), 0), // 1: empty vector for message
+                    Bytecode::AbortMsg,                    // 2: abort with message
+                ],
+            )],
+        );
+
+        let trace_map = TraceMap {
+            exec_maps: BTreeMap::new(),
+        };
+
+        let summary = summarize_path_cov(&module, &trace_map);
+
+        let func = Identifier::new("abort_with_message").unwrap();
+        let func_summary = summary.function_summaries.get(&func).unwrap();
+
+        // Should have 1 path through AbortMsg
+        assert_eq!(func_summary.total, 1, "Should detect 1 path through AbortMsg");
+    }
+
+    #[test]
+    fn test_path_coverage_multiple_exit_types() {
+        // Create a module with Ret, Abort, and AbortMsg in different functions
+        let module = create_test_module_with_functions(
+            "TestModule",
+            vec![
+                ("returns", vec![Bytecode::Ret]),
+                ("aborts", vec![Bytecode::LdU64(0), Bytecode::Abort]),
+                (
+                    "aborts_msg",
+                    vec![
+                        Bytecode::LdU64(0),
+                        Bytecode::VecPack(SignatureIndex(0), 0),
+                        Bytecode::AbortMsg,
+                    ],
+                ),
+            ],
+        );
+
+        let trace_map = TraceMap {
+            exec_maps: BTreeMap::new(),
+        };
+
+        let summary = summarize_path_cov(&module, &trace_map);
+
+        // Each function should have exactly 1 path
+        for name in ["returns", "aborts", "aborts_msg"] {
+            let func = Identifier::new(name).unwrap();
+            let func_summary = summary.function_summaries.get(&func).unwrap();
+            assert_eq!(
+                func_summary.total, 1,
+                "Function {} should have 1 path",
+                name
+            );
+        }
     }
 }
