@@ -13,7 +13,10 @@ use aptos_protos::{
     indexer::v1::{
         raw_data_server::RawDataServer, FILE_DESCRIPTOR_SET as INDEXER_V1_FILE_DESCRIPTOR_SET,
     },
-    internal::fullnode::v1::fullnode_data_server::FullnodeDataServer,
+    internal::fullnode::v1::{
+        fullnode_data_server::FullnodeDataServer,
+        FILE_DESCRIPTOR_SET as FULLNODE_V1_FILE_DESCRIPTOR_SET,
+    },
     transaction::v1::FILE_DESCRIPTOR_SET as TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
     util::timestamp::FILE_DESCRIPTOR_SET as UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
 };
@@ -84,13 +87,19 @@ pub fn bootstrap(
         };
         let localnet_data_server = LocalnetDataService { service_context };
 
+        let data_server_descriptor_set = if use_data_service_interface {
+            INDEXER_V1_FILE_DESCRIPTOR_SET
+        } else {
+            FULLNODE_V1_FILE_DESCRIPTOR_SET
+        };
+
         let reflection_service = tonic_reflection::server::Builder::configure()
             // Note: It is critical that the file descriptor set is registered for every
             // file that the top level API proto depends on recursively. If you don't,
             // compilation will still succeed but reflection will fail at runtime.
             //
             // TODO: Add a test for this / something in build.rs, this is a big footgun.
-            .register_encoded_file_descriptor_set(INDEXER_V1_FILE_DESCRIPTOR_SET)
+            .register_encoded_file_descriptor_set(data_server_descriptor_set)
             .register_encoded_file_descriptor_set(TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET)
             .register_encoded_file_descriptor_set(UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET)
             .build_v1()
