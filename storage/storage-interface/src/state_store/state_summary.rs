@@ -10,7 +10,7 @@ use crate::{
     },
     DbReader,
 };
-use anyhow::Result;
+use anyhow::{ensure, Result};
 use aptos_config::config::HotStateConfig;
 use aptos_crypto::{
     hash::{CryptoHash, CORRUPTION_SENTINEL},
@@ -93,7 +93,7 @@ impl StateSummary {
         assert_ne!(self.global_state_summary.root_hash(), *CORRUPTION_SENTINEL);
 
         // Persisted must be before or at my version.
-        assert!(
+        ensure!(
             persisted.next_version() <= self.next_version(),
             "persisted next version: {}, self next version: {}",
             persisted.next_version(),
