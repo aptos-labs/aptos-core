@@ -10,12 +10,13 @@ use crate::{
     },
     DbReader,
 };
-use anyhow::Result;
+use anyhow::{bail, Result};
 use aptos_config::config::HotStateConfig;
 use aptos_crypto::{
     hash::{CryptoHash, CORRUPTION_SENTINEL},
     HashValue,
 };
+use aptos_logger::warn;
 use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::{ProofRead, SparseMerkleTree};
 use aptos_types::{
@@ -93,7 +94,19 @@ impl StateSummary {
         assert_ne!(self.global_state_summary.root_hash(), *CORRUPTION_SENTINEL);
 
         // Persisted must be before or at my version.
+<<<<<<< HEAD
         assert!(persisted.next_version() <= self.next_version());
+=======
+        if persisted.next_version() > self.next_version() {
+            let msg = format!(
+                "Persisted version ({}) is ahead of current version ({}), possibly due to a fork.",
+                persisted.next_version(),
+                self.next_version(),
+            );
+            warn!("{}", msg);
+            bail!("{}", msg);
+        }
+>>>>>>> 069beddb1e ([Storage] Fix for panics in state update code)
         // Updates must start at exactly my version.
         assert_eq!(updates.first_version(), self.next_version());
 
