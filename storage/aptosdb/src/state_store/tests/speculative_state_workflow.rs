@@ -563,12 +563,14 @@ fn update_state(
         });
         let memorized_reads = state_view.into_memorized_reads();
 
-        let (next_state, hot_state_updates) = parent_state.update_with_memorized_reads(
-            hot_state.clone(),
-            &persisted_state,
-            block.update_refs(),
-            &memorized_reads,
-        );
+        let (next_state, hot_state_updates) = parent_state
+            .update_with_memorized_reads(
+                hot_state.clone(),
+                &persisted_state,
+                block.update_refs(),
+                &memorized_reads,
+            )
+            .unwrap();
 
         state_by_version.assert_ledger_state(&next_state);
 

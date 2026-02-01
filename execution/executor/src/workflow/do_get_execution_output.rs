@@ -422,7 +422,7 @@ impl Parser {
             base_state_view.persisted_state(),
             to_commit.state_update_refs(),
             base_state_view.memorized_reads(),
-        );
+        )?;
         let state_reads = base_state_view.into_memorized_reads();
 
         let out = ExecutionOutput::new(
