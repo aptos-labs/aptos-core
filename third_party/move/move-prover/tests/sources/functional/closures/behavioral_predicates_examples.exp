@@ -1,0 +1,164 @@
+Move prover returns: exiting with verification errors
+error: precondition does not hold at this call
+    ┌─ tests/sources/functional/closures/behavioral_predicates_examples.move:111:9
+    │
+111 │         requires !aborts_of<f>(x); // expected fail from test_fail
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:151: apply_no_abort_test_fail
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:152: apply_no_abort_test_fail
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:111: apply_no_abort (spec)
+
+error: precondition does not hold at this call
+    ┌─ tests/sources/functional/closures/behavioral_predicates_examples.move:123:9
+    │
+123 │         requires !aborts_of<f>(x); // expected fail from test_fail
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:162: apply_no_abort_opaque_test_fail
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:163: apply_no_abort_opaque_test_fail
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:123: apply_no_abort_opaque (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates_examples.move:199:9
+    │
+199 │         ensures result == (exists k in 0..len(v): ensures_of<pred>(v[k], true)); // TODO(#18560)
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:176: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:197: contains (spec)
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:176: contains
+    =         v = <redacted>
+    =         pred = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:177: contains
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:178: contains
+    =         len = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:179: contains
+    =         found_idx = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:181: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:182: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:183: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:184: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:185: contains
+    =     enter loop, variable(s) i, found_idx, $t7 havocked and reassigned
+    =         i = <redacted>
+    =         found_idx = <redacted>
+    =         <redacted> = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:182: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:183: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:184: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:185: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:187: contains
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:180: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:194: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:176: contains
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:198: contains (spec)
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:199: contains (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates_examples.move:234:9
+    │
+234 │         ensures result == true;  // TODO(#18560)
+    │         ^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:231: contains_test_found
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:197: contains (spec)
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:231: contains_test_found
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:197: contains (spec)
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:176: contains
+    =         v = <redacted>
+    =         pred = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:177: contains
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:178: contains
+    =         len = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:179: contains
+    =         found_idx = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:181: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:182: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:183: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:184: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:185: contains
+    =     enter loop, variable(s) i, found_idx, $t7 havocked and reassigned
+    =         i = <redacted>
+    =         found_idx = <redacted>
+    =         <redacted> = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:182: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:183: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:184: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:185: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:187: contains
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:180: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:194: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:176: contains
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:195: contains
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:232: contains_test_found
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:234: contains_test_found (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates_examples.move:242:9
+    │
+242 │         ensures result == true;  // TODO(#18560)
+    │         ^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:239: contains_opaque_test_found
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:224: contains_opaque (spec)
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:239: contains_opaque_test_found
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:240: contains_opaque_test_found
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:242: contains_opaque_test_found (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates_examples.move:403:9
+    │
+403 │         ensures result == 7; // expected failure: result == 8
+    │         ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:400: reduce_test_fail
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:334: reduce
+    =         vec = <redacted>
+    =         start = <redacted>
+    =         reducer = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:335: reduce
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:336: reduce
+    =         len = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:337: reduce
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:342: reduce
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:343: reduce
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:344: reduce
+    =     enter loop, variable(s) i, result havocked and reassigned
+    =         i = <redacted>
+    =         result = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:343: reduce
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:344: reduce
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:338: reduce
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:334: reduce
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:347: reduce
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:401: reduce_test_fail
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:403: reduce_test_fail (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates_examples.move:411:9
+    │
+411 │         ensures result == 7; // expected failure: result == 8
+    │         ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:408: reduce_opaque_test_fail
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:409: reduce_opaque_test_fail
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:411: reduce_opaque_test_fail (spec)

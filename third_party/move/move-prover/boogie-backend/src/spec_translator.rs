@@ -6,13 +6,13 @@
 
 use crate::{
     boogie_helpers::{
-        boogie_address, boogie_address_blob, boogie_bv_type, boogie_byte_blob,
-        boogie_choice_fun_name, boogie_declare_global, boogie_field_sel, boogie_inst_suffix,
-        boogie_modifies_memory_name, boogie_num_type_base, boogie_num_type_base_bv,
-        boogie_reflection_type_info, boogie_reflection_type_is_struct, boogie_reflection_type_name,
-        boogie_resource_memory_name, boogie_spec_fun_name, boogie_spec_var_name,
-        boogie_struct_name, boogie_struct_variant_name, boogie_type, boogie_type_suffix,
-        boogie_type_suffix_bv, boogie_value_blob, boogie_well_formed_expr,
+        boogie_address, boogie_address_blob, boogie_behavioral_eval_fun_name, boogie_bv_type,
+        boogie_byte_blob, boogie_choice_fun_name, boogie_closure_pack_name, boogie_declare_global,
+        boogie_field_sel, boogie_inst_suffix, boogie_modifies_memory_name, boogie_num_type_base,
+        boogie_num_type_base_bv, boogie_reflection_type_info, boogie_reflection_type_is_struct,
+        boogie_reflection_type_name, boogie_resource_memory_name, boogie_spec_fun_name,
+        boogie_spec_var_name, boogie_struct_name, boogie_struct_variant_name, boogie_type,
+        boogie_type_suffix, boogie_type_suffix_bv, boogie_value_blob, boogie_well_formed_expr,
         boogie_well_formed_expr_bv, MAX_TUPLE_SIZE,
     },
     options::BoogieOptions,
@@ -22,8 +22,8 @@ use itertools::Itertools;
 use log::{debug, info, warn};
 use move_model::{
     ast::{
-        Condition, ConditionKind, Exp, ExpData, MemoryLabel, Operation, Pattern, QuantKind,
-        SpecFunDecl, SpecVarDecl, TempIndex, Value,
+        BehaviorKind, Condition, ConditionKind, Exp, ExpData, MemoryLabel, Operation, Pattern,
+        QuantKind, SpecFunDecl, SpecVarDecl, TempIndex, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -348,6 +348,218 @@ impl SpecTranslator<'_> {
         }
     }
 
+    /// Emit a functionality axiom for ensures_of behavioral predicates.
+    ///
+    /// For an `ensures_of` predicate on a function `|T1, T2| R`, the parameters are
+    /// `(arg0: T1, arg1: T2, result0: R)`. This axiom asserts that for fixed inputs,
+    /// the result is unique:
+    ///
+    /// ```boogie
+    /// axiom (forall arg0: T1, arg1: T2, result0_1: R, result0_2: R ::
+    ///     ensures_of(arg0, arg1, result0_1) && ensures_of(arg0, arg1, result0_2)
+    ///     ==> result0_1 == result0_2);
+    /// ```
+    ///
+    /// This allows the prover to derive equality between choice expression results
+    /// and actual function call results when both satisfy the ensures_of predicate.
+    fn emit_ensures_of_functionality_axiom(
+        &self,
+        fun: &SpecFunDecl,
+        module_env: &ModuleEnv,
+        boogie_name: &str,
+    ) {
+        // Check if this is an ensures_of behavioral predicate by name pattern
+        let fun_name = fun.name.display(module_env.symbol_pool()).to_string();
+        let ensures_of_marker = format!("${}$", BehaviorKind::EnsuresOf);
+        if !fun_name.contains(&ensures_of_marker) {
+            return;
+        }
+
+        // Partition parameters into input args (argN) and result params (resultN)
+        let pool = module_env.symbol_pool();
+        let mut arg_params = vec![];
+        let mut result_params = vec![];
+
+        for param in &fun.params {
+            let name = param.0.display(pool).to_string();
+            if name.starts_with("result") {
+                result_params.push(param);
+            } else {
+                arg_params.push(param);
+            }
+        }
+
+        // Only emit axiom if there are result parameters
+        if result_params.is_empty() {
+            return;
+        }
+
+        // Build forall parameter list:
+        // - Input args: as-is
+        // - Result params: duplicated with _1 and _2 suffixes
+        let arg_param_strs: Vec<String> = arg_params
+            .iter()
+            .map(|Parameter(name, ty, _)| {
+                format!(
+                    "{}: {}",
+                    name.display(pool),
+                    boogie_type(self.env, &self.inst(ty))
+                )
+            })
+            .collect();
+
+        let result_param_strs_1: Vec<String> = result_params
+            .iter()
+            .map(|Parameter(name, ty, _)| {
+                format!(
+                    "{}_1: {}",
+                    name.display(pool),
+                    boogie_type(self.env, &self.inst(ty))
+                )
+            })
+            .collect();
+
+        let result_param_strs_2: Vec<String> = result_params
+            .iter()
+            .map(|Parameter(name, ty, _)| {
+                format!(
+                    "{}_2: {}",
+                    name.display(pool),
+                    boogie_type(self.env, &self.inst(ty))
+                )
+            })
+            .collect();
+
+        let forall_params = arg_param_strs
+            .iter()
+            .chain(result_param_strs_1.iter())
+            .chain(result_param_strs_2.iter())
+            .join(", ");
+
+        // Build call arguments for two instances of the predicate
+        let arg_names: Vec<String> = arg_params
+            .iter()
+            .map(|Parameter(name, _, _)| name.display(pool).to_string())
+            .collect();
+
+        let result_names_1: Vec<String> = result_params
+            .iter()
+            .map(|Parameter(name, _, _)| format!("{}_1", name.display(pool)))
+            .collect();
+
+        let result_names_2: Vec<String> = result_params
+            .iter()
+            .map(|Parameter(name, _, _)| format!("{}_2", name.display(pool)))
+            .collect();
+
+        let call_args_1 = arg_names.iter().chain(result_names_1.iter()).join(", ");
+        let call_args_2 = arg_names.iter().chain(result_names_2.iter()).join(", ");
+
+        // Check if we have exactly one boolean result parameter
+        // If so, we can emit a simpler single-trigger axiom that fires more reliably
+        let single_bool_result = result_params.len() == 1
+            && matches!(
+                self.inst(&result_params[0].1),
+                Type::Primitive(PrimitiveType::Bool)
+            );
+
+        if single_bool_result {
+            // For boolean results, emit: forall args, r :: {pred(args, r)} pred(args, r) ==> !pred(args, !r)
+            // This uses a single trigger and directly expresses functionality for booleans
+            let result_name = result_params[0].0.display(pool).to_string();
+            let single_forall_params = arg_param_strs
+                .iter()
+                .chain(std::iter::once(&format!("{}: bool", result_name)))
+                .join(", ");
+            let single_call_args = arg_names
+                .iter()
+                .chain(std::iter::once(&result_name))
+                .join(", ");
+            let negated_call_args = arg_names
+                .iter()
+                .map(|s| s.as_str())
+                .chain(std::iter::once(format!("!{}", result_name).as_str()))
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            emitln!(
+                self.writer,
+                "axiom (forall {} :: {{{}({})}} {}({}) ==> !{}({}));",
+                single_forall_params,
+                boogie_name,
+                single_call_args,
+                boogie_name,
+                single_call_args,
+                boogie_name,
+                negated_call_args
+            );
+        } else {
+            // For non-boolean results, emit the standard functionality axiom
+            // Standard form: forall x, y1, y2 :: R(x,y1) && R(x,y2) ==> y1 == y2
+            let equalities: Vec<String> = result_params
+                .iter()
+                .map(|Parameter(name, _, _)| {
+                    let name_str = name.display(pool).to_string();
+                    format!("{}_1 == {}_2", name_str, name_str)
+                })
+                .collect();
+            let equality_cond = equalities.join(" && ");
+
+            emitln!(
+                self.writer,
+                "axiom (forall {} :: {}({}) && {}({}) ==> {});",
+                forall_params,
+                boogie_name,
+                call_args_1,
+                boogie_name,
+                call_args_2,
+                equality_cond
+            );
+        }
+
+        // Also emit a validity axiom: if ensures_of(x, y) holds, then y is well-formed
+        // This is needed because the choice predicate requires both ensures_of AND validity
+        let orig_param_list = arg_params
+            .iter()
+            .chain(result_params.iter())
+            .map(|Parameter(name, ty, _)| {
+                format!(
+                    "{}: {}",
+                    name.display(pool),
+                    boogie_type(self.env, &self.inst(ty))
+                )
+            })
+            .join(", ");
+
+        let orig_call_args = arg_params
+            .iter()
+            .chain(result_params.iter())
+            .map(|Parameter(name, _, _)| name.display(pool).to_string())
+            .join(", ");
+
+        // Generate validity conditions for result parameters
+        let result_validity: Vec<String> = result_params
+            .iter()
+            .map(|Parameter(name, ty, _)| {
+                boogie_well_formed_expr(self.env, &name.display(pool).to_string(), &self.inst(ty))
+            })
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        if !result_validity.is_empty() {
+            emitln!(
+                self.writer,
+                "axiom (forall {} :: {{{}({})}} {}({}) ==> {});",
+                orig_param_list,
+                boogie_name,
+                orig_call_args,
+                boogie_name,
+                orig_call_args,
+                result_validity.join(" && ")
+            );
+        }
+    }
+
     #[allow(clippy::literal_string_with_formatting_args)]
     fn translate_spec_fun(&self, module_env: &ModuleEnv, id: SpecFunId, fun: &SpecFunDecl) {
         if fun.body.is_none() && !fun.uninterpreted {
@@ -541,7 +753,9 @@ impl SpecTranslator<'_> {
             }
             // Generate axioms from the spec block attached to the spec function
             // TODO(#16256): support general condition kinds, exploration use of `spec_translator` in `move_model`
-            self.generate_spec_function_axioms(fun, module_env, boogie_name, param_list);
+            self.generate_spec_function_axioms(fun, module_env, boogie_name.clone(), param_list);
+            // For ensures_of behavioral predicates, emit functionality axiom
+            self.emit_ensures_of_functionality_axiom(fun, module_env, &boogie_name);
         } else {
             emitln!(self.writer, " {");
             self.writer.indent();
@@ -640,6 +854,8 @@ impl SpecTranslator<'_> {
             );
 
             // Emit predicate function characterizing the choice.
+            // Note: This function is marked {:inline} so Boogie expands it at use sites,
+            // allowing Z3 to reason directly about the expanded constraints.
             emitln!(
                 new_spec_trans.writer,
                 "function {{:inline}} {}_pred({}): bool {{",
@@ -730,12 +946,24 @@ impl SpecTranslator<'_> {
                 emitln!(new_spec_trans.writer, "axiom");
             }
             new_spec_trans.writer.indent();
-            emitln!(
-                new_spec_trans.writer,
-                "(exists {}:: {}) ==> ",
-                mk_decl(&var_decl),
-                predicate
+
+            // Check if condition is a functional behavioral predicate (ensures_of).
+            // For ensures_of, existence is guaranteed since the predicate functionally
+            // determines the result, so we can skip the existence check.
+            let is_functional = matches!(
+                info.condition.as_ref(),
+                ExpData::Call(_, Operation::Behavior(BehaviorKind::EnsuresOf, _), _)
             );
+
+            if !is_functional {
+                // General case: include existence check
+                emitln!(
+                    new_spec_trans.writer,
+                    "(exists {}:: {}) ==> ",
+                    mk_decl(&var_decl),
+                    predicate
+                );
+            }
             emitln!(
                 new_spec_trans.writer,
                 "(var {} := {}; {}",
@@ -1244,6 +1472,65 @@ impl SpecTranslator<'_> {
                     )
                 );
             },
+            Operation::Behavior(kind, _mem_label) => {
+                // args[0] is the function expression (Temporary or Closure)
+                // args[1..] are the predicate arguments
+                if args.is_empty() {
+                    self.env.error(
+                        &self.env.get_node_loc(node_id),
+                        "bug: Operation::Behavior has no arguments",
+                    );
+                    return;
+                }
+                let fun_exp = &args[0];
+                let pred_args = &args[1..];
+
+                // Get the function type from the expression and instantiate
+                let fun_type = self.env.get_node_type(fun_exp.node_id());
+                let inst_fun_type = fun_type.instantiate(&self.type_inst);
+                let eval_fun_name =
+                    boogie_behavioral_eval_fun_name(self.env, &inst_fun_type, *kind);
+
+                emit!(self.writer, "{}(", eval_fun_name);
+                // Translate the function expression - Closure is only allowed here
+                match fun_exp.as_ref() {
+                    ExpData::Temporary(_, temp_idx) => {
+                        emit!(self.writer, "$t{}", temp_idx);
+                    },
+                    ExpData::LocalVar(_, name) => {
+                        // For spec function parameters
+                        emit!(self.writer, "{}", name.display(self.env.symbol_pool()));
+                    },
+                    ExpData::Call(closure_id, Operation::Closure(mid, fid, mask), closure_args) => {
+                        // Translate closure to a packed function value
+                        let inst = self.env.get_node_instantiation(*closure_id);
+                        let inst = Type::instantiate_slice(&inst, &self.type_inst);
+                        let fun_qid = mid.qualified_inst(*fid, inst);
+                        let ctor_name = boogie_closure_pack_name(self.env, &fun_qid, *mask);
+                        emit!(self.writer, "{}(", ctor_name);
+                        let mut first = true;
+                        for arg in closure_args {
+                            if !first {
+                                emit!(self.writer, ", ");
+                            }
+                            first = false;
+                            self.translate_exp(arg);
+                        }
+                        emit!(self.writer, ")");
+                    },
+                    _ => {
+                        self.env.error(
+                            &self.env.get_node_loc(fun_exp.node_id()),
+                            "bug: Operation::Behavior expects Temporary, LocalVar, or Closure as first arg",
+                        );
+                    },
+                }
+                for arg in pred_args {
+                    emit!(self.writer, ", ");
+                    self.translate_exp(arg);
+                }
+                emit!(self.writer, ")");
+            },
             Operation::MoveFunction(_, _)
             | Operation::BorrowGlobal(_)
             | Operation::Borrow(..)
@@ -1251,7 +1538,6 @@ impl SpecTranslator<'_> {
             | Operation::MoveTo
             | Operation::MoveFrom
             | Operation::Closure(..)
-            | Operation::Behavior(..)
             | Operation::Old => {
                 self.env.error(
                     &self.env.get_node_loc(node_id),
@@ -1963,7 +2249,7 @@ impl SpecTranslator<'_> {
             .filter(|(s, _)| *s != some_var)
             .map(|(s, ty)| (s, self.inst(ty.skip_reference())))
             .collect_vec();
-        let used_temps = range_and_body
+        let used_temps: Vec<(TempIndex, Type)> = range_and_body
             .used_temporaries_with_types(self.env)
             .into_iter()
             .collect_vec();
