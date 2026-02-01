@@ -240,49 +240,118 @@ impl JWKManager {
         Ok(())
     }
 
+    /// Extract (sourceType, sourceId) from gravity:// issuer URI
+    /// Handles both formats:
+    /// - Full URI: "gravity://0/1/events?portal=..."
+    /// - Simplified: "gravity://0/1"
+    fn extract_source_key(issuer: &Issuer) -> Option<(u32, u64)> {
+        let issuer_str = String::from_utf8(issuer.clone()).ok()?;
+        if !issuer_str.starts_with("gravity://") {
+            return None;
+        }
+        let rest = &issuer_str[10..]; // skip "gravity://"
+        let parts: Vec<&str> = rest.split('/').collect();
+        if parts.len() >= 2 {
+            let source_type: u32 = parts[0].parse().ok()?;
+            // Handle case where source_id might have query params attached
+            let source_id: u64 = parts[1].split('?').next()?.parse().ok()?;
+            Some((source_type, source_id))
+        } else {
+            None
+        }
+    }
+
     /// Invoked on start, or on on-chain JWK updated event.
+    /// NOTE(Gravity): Modified for incremental update model - only updates entries
+    /// that are present in on_chain_state, does not delete missing entries.
     pub fn reset_with_on_chain_state(&mut self, on_chain_state: AllProvidersJWKs) -> Result<()> {
         info!(
             epoch = self.epoch_state.epoch,
             "reset_with_on_chain_state starting."
         );
-        let onchain_issuer_set: HashSet<Issuer> = on_chain_state
-            .entries
-            .iter()
-            .map(|entry| entry.issuer.clone())
-            .collect();
-        let local_issuer_set: HashSet<Issuer> = self.states_by_issuer.keys().cloned().collect();
 
-        for issuer in local_issuer_set.difference(&onchain_issuer_set) {
-            info!(
-                epoch = self.epoch_state.epoch,
-                op = "delete",
-                issuer = issuer.clone(),
-                "reset_with_on_chain_state"
-            );
-        }
+        // NOTE(Gravity): Commented out delete logic for incremental update model.
+        // The new design from gravity-reth sends only entries that had DataRecorded events,
+        // not the complete set. Missing entries means "no update", not "deleted".
+        // Keeping this commented for easier upstream merge comparison.
+        //
+        // let onchain_issuer_set: HashSet<Issuer> = on_chain_state
+        //     .entries
+        //     .iter()
+        //     .map(|entry| entry.issuer.clone())
+        //     .collect();
+        // let local_issuer_set: HashSet<Issuer> = self.states_by_issuer.keys().cloned().collect();
+        //
+        // for issuer in local_issuer_set.difference(&onchain_issuer_set) {
+        //     info!(
+        //         epoch = self.epoch_state.epoch,
+        //         op = "delete",
+        //         issuer = issuer.clone(),
+        //         "reset_with_on_chain_state"
+        //     );
+        // }
+        //
+        // self.states_by_issuer
+        //     .retain(|issuer, _| onchain_issuer_set.contains(issuer));
 
-        self.states_by_issuer
-            .retain(|issuer, _| onchain_issuer_set.contains(issuer));
         for on_chain_provider_jwks in on_chain_state.entries {
-            let issuer = on_chain_provider_jwks.issuer.clone();
+            let incoming_issuer = on_chain_provider_jwks.issuer.clone();
+
+            // Match by source key to handle issuer format differences
+            // Aptos uses: gravity://0/1/events?portal=...
+            // Reth uses:  gravity://0/1
+            let source_key = Self::extract_source_key(&incoming_issuer);
+            let matching_local_issuer = source_key.and_then(|key| {
+                self.states_by_issuer
+                    .keys()
+                    .find(|local| Self::extract_source_key(local) == Some(key))
+                    .cloned()
+            });
+
+            // Use local format if match found, otherwise use incoming
+            let target_issuer = match &matching_local_issuer {
+                Some(local) => local.clone(),
+                None => {
+                    // Log error if this is a gravity:// source with no local match
+                    if source_key.is_some() {
+                        error!(
+                            epoch = self.epoch_state.epoch,
+                            incoming_issuer = String::from_utf8_lossy(&incoming_issuer).to_string(),
+                            source_key = ?source_key,
+                            "No matching local issuer found for gravity:// source"
+                        );
+                    }
+                    incoming_issuer.clone()
+                }
+            };
+
             let locally_cached = self
                 .states_by_issuer
-                .get(&on_chain_provider_jwks.issuer)
+                .get(&target_issuer)
                 .and_then(|s| s.on_chain.as_ref());
-            if locally_cached == Some(&on_chain_provider_jwks) {
-                // The on-chain update did not touch this provider.
-                // The corresponding local state does not have to be reset.
+
+            // Compare by version for gravity:// sources, by content otherwise
+            let is_same = match (locally_cached, source_key) {
+                (Some(cached), Some(_)) => cached.version >= on_chain_provider_jwks.version,
+                (Some(cached), None) => cached == &on_chain_provider_jwks,
+                (None, _) => false,
+            };
+
+            if is_same {
                 info!(
                     epoch = self.epoch_state.epoch,
                     op = "no-op",
-                    issuer = issuer,
+                    issuer = String::from_utf8_lossy(&target_issuer).to_string(),
                     "reset_with_on_chain_state"
                 );
             } else {
+                // Update with local issuer format preserved
+                let mut updated_jwks = on_chain_provider_jwks.clone();
+                updated_jwks.issuer = target_issuer.clone();
+
                 let old_value = self.states_by_issuer.insert(
-                    on_chain_provider_jwks.issuer.clone(),
-                    PerProviderState::new(on_chain_provider_jwks),
+                    target_issuer.clone(),
+                    PerProviderState::new(updated_jwks),
                 );
                 let op = if old_value.is_some() {
                     "update"
@@ -292,7 +361,7 @@ impl JWKManager {
                 info!(
                     epoch = self.epoch_state.epoch,
                     op = op,
-                    issuer = issuer,
+                    issuer = String::from_utf8_lossy(&target_issuer).to_string(),
                     "reset_with_on_chain_state"
                 );
             }
