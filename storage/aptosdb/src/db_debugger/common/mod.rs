@@ -55,8 +55,10 @@ impl DbDir {
             },
             env,
             block_cache,
-            true,
+            /* read_only = */ true,
             leger_db.metadata_db_arc(),
+            /* is_hot = */ false,
+            /* delete_on_restart = */ false,
         )
     }
 
