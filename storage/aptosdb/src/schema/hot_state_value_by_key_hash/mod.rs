@@ -18,7 +18,10 @@ use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
 };
-use aptos_types::{state_store::state_value::StateValue, transaction::Version};
+use aptos_types::{
+    state_store::{state_key::StateKey, state_value::StateValue},
+    transaction::Version,
+};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -33,10 +36,13 @@ type Key = (HashValue, Version);
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub(crate) enum HotStateValue {
     Occupied {
+        state_key: StateKey,
         value_version: Version,
         value: StateValue,
     },
-    Vacant,
+    Vacant {
+        state_key: StateKey,
+    },
 }
 define_schema!(
     HotStateValueByKeyHashSchema,
