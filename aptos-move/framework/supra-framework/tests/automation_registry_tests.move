@@ -12,7 +12,7 @@ module std::automation_registry_tests {
     use supra_framework::multisig_account;
     use supra_framework::automation_registry::{
         check_task_priority, check_cycle_state_and_duration, check_next_task_index_to_be_processed,
-        calculate_automation_fee_multiplier_for_committed_occupancy, AutomationRegistryConfigV2,
+        calculate_automation_fee_multiplier_for_committed_occupancy, AutomationRegistryConfigV2, check_locked_fee,
     };
     use supra_framework::coin;
     use supra_framework::config_buffer;
@@ -2841,11 +2841,12 @@ module std::automation_registry_tests {
         });
 
         // 0.002 (*4) - automation_epoch_fee_per_second, 7200 epoch duration
-        let expected_automation_fee = 4 * (max_gas_amount * EPOCH_INTERVAL_FOR_TEST_IN_SECS / 100000);
-        expected_current_balance = expected_current_balance - expected_automation_fee;
-        expected_registry_balance = expected_registry_balance + expected_automation_fee;
-        check_account_balance(user_account, expected_current_balance );
-        check_account_balance( registry_fee_address, expected_registry_balance );
+        let expected_automation_fees = 4 * (max_gas_amount * EPOCH_INTERVAL_FOR_TEST_IN_SECS / 100000);
+        expected_current_balance = expected_current_balance - expected_automation_fees;
+        expected_registry_balance = expected_registry_balance + expected_automation_fees;
+        check_account_balance(user_account, expected_current_balance);
+        check_account_balance(registry_fee_address, expected_registry_balance);
+        check_locked_fee(expected_automation_fees);
 
         timestamp::update_global_time_for_test_secs(
             EPOCH_INTERVAL_FOR_TEST_IN_SECS + (EPOCH_INTERVAL_FOR_TEST_IN_SECS / 2)
@@ -2869,6 +2870,8 @@ module std::automation_registry_tests {
         expected_registry_balance = expected_registry_balance - expected_refund;
         check_account_balance(user_account, expected_current_balance);
         check_account_balance(registry_fee_address, expected_registry_balance);
+        // locked cycle fees are deducted by the full cycle fee amount for the user
+        check_locked_fee((expected_automation_fees * 3) / 4);
 
         // Add and stop the task in the same epoch. Task index will be 4
         assert!(automation_registry::get_next_task_index() == 4, 1);
@@ -2903,6 +2906,8 @@ module std::automation_registry_tests {
         expected_refund = automation_fee_cap / REFUND_FACTOR;
         check_account_balance(user_account, expected_current_balance + expected_refund);
         check_account_balance(registry_fee_address, expected_registry_balance - expected_refund);
+        // As long as the task was not active, no locked fee for it will be unlocked
+        check_locked_fee((expected_automation_fees * 3) / 4);
     }
 
     #[test(framework = @supra_framework, user = @0x1cafe, user2 = @0x1cafa)]

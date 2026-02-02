@@ -135,6 +135,8 @@ module supra_framework::automation_registry {
     const EREGISTRY_SYSTEM_MAX_GAS_CAP_NON_ZERO: u64 = 46;
     /// The input address is not identified as multisig account.
     const EUNKNOWN_MULTISIG_ADDRESS: u64 = 47;
+    /// The refund fee for remaining cycle time is greater than total cycle fee for the task.
+    const EINVALID_CYCLE_REFUND_FEE: u64 = 48;
 
     /// The length of the transaction hash.
     const TXN_HASH_LENGTH: u64 = 32;
@@ -1286,7 +1288,7 @@ module supra_framework::automation_registry {
 
         let stopped_task_details = vector[];
         let total_refund_fee = 0;
-        let epoch_locked_fees = automation_registry.epoch_locked_fees;
+        let total_cycle_locked_fees = automation_registry.epoch_locked_fees;
 
         // Calculate refundable fee for this remaining time task in current epoch
         let current_time = timestamp::now_seconds();
@@ -1323,8 +1325,14 @@ module supra_framework::automation_registry {
                     automation_registry.gas_committed_for_next_epoch = automation_registry.gas_committed_for_next_epoch - task.max_gas_amount;
                 };
 
-                let (epoch_fee_refund, deposit_refund) = if (task.state != PENDING) {
-                    let task_fee = calculate_task_fee(
+                let (cycle_locked_fee_for_task, cycle_fee_refund, deposit_refund) = if (task.state != PENDING) {
+                    let task_fee_for_full_cycle =
+                        calculate_automation_fee_for_interval(
+                            cycle_info.duration_secs,
+                            task.max_gas_amount,
+                            automation_fee_per_sec,
+                            arc.registry_max_gas_cap);
+                    let task_fee_for_residual_time = calculate_task_fee(
                         &arc,
                         &task,
                         residual_interval,
@@ -1332,27 +1340,28 @@ module supra_framework::automation_registry {
                         automation_fee_per_sec
                     );
                     // Refund full deposit and the half of the remaining run-time fee when task is active or cancelled stage
-                    (task_fee / REFUND_FRACTION, task.locked_fee_for_next_epoch)
+                    (task_fee_for_full_cycle, task_fee_for_residual_time / REFUND_FRACTION, task.locked_fee_for_next_epoch)
                 } else {
-                    (0, (task.locked_fee_for_next_epoch / REFUND_FRACTION))
+                    (0, 0, (task.locked_fee_for_next_epoch / REFUND_FRACTION))
                 };
                 let result = safe_unlock_locked_deposit(
                     refund_bookkeeping,
                     task.locked_fee_for_next_epoch,
                     task.task_index);
                 assert!(result, EDEPOSIT_REFUND);
-                let (result, remaining_epoch_locked_fees) = safe_unlock_locked_epoch_fee(
-                    epoch_locked_fees,
-                    epoch_fee_refund,
+                assert!(cycle_locked_fee_for_task >= cycle_fee_refund, EINVALID_CYCLE_REFUND_FEE);
+                let (result, remaining_cycle_locked_fees) = safe_unlock_locked_epoch_fee(
+                    total_cycle_locked_fees,
+                    cycle_locked_fee_for_task,
                     task.task_index);
                 assert!(result, EEPOCH_FEE_REFUND);
-                epoch_locked_fees = remaining_epoch_locked_fees;
+                total_cycle_locked_fees = remaining_cycle_locked_fees;
 
-                total_refund_fee = total_refund_fee + (epoch_fee_refund + deposit_refund);
+                total_refund_fee = total_refund_fee + (cycle_fee_refund + deposit_refund);
 
                 vector::push_back(
                     &mut stopped_task_details,
-                    TaskStoppedV2 { task_index, deposit_refund, epoch_fee_refund, registration_hash: task.tx_hash }
+                    TaskStoppedV2 { task_index, deposit_refund, epoch_fee_refund: cycle_fee_refund, registration_hash: task.tx_hash }
                 );
             }
         });
@@ -1366,6 +1375,7 @@ module supra_framework::automation_registry {
             let resource_account_balance = coin::balance<SupraCoin>(automation_registry.registry_fee_address);
             assert!(resource_account_balance >= total_refund_fee, EINSUFFICIENT_BALANCE_FOR_REFUND);
             coin::transfer<SupraCoin>(&resource_signer, owner, total_refund_fee);
+            automation_registry.epoch_locked_fees = total_cycle_locked_fees;
 
             // Emit task stopped event
             event::emit(TasksStoppedV2 {
@@ -3332,6 +3342,14 @@ module supra_framework::automation_registry {
     ) acquires AutomationRegistryV2 {
         let automation_registry = borrow_global_mut<AutomationRegistryV2>(@supra_framework);
         automation_registry.main.epoch_locked_fees = locked_fee;
+    }
+
+    #[test_only]
+    public(friend) fun check_locked_fee(
+        locked_fee: u64,
+    ) acquires AutomationRegistryV2 {
+        let automation_registry = borrow_global_mut<AutomationRegistryV2>(@supra_framework);
+        assert!(automation_registry.main.epoch_locked_fees == locked_fee, locked_fee);
     }
 
     #[test_only]
