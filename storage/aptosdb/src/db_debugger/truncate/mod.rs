@@ -70,20 +70,22 @@ impl Cmd {
         };
         let env = None;
         let block_cache = None;
-        // TODO(HotState): handle hot state merkle db.
-        let (ledger_db, hot_state_merkle_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
-            &StorageDirPaths::from_path(&self.db_dir),
-            rocksdb_config,
-            env,
-            block_cache,
-            /*readonly=*/ false,
-            /*max_num_nodes_per_lru_cache_shard=*/ 0,
-            /*reset_hot_state=*/ true,
-        )?;
+        // TODO(HotState): handle hot state merkle db and hot state kv db.
+        let (ledger_db, hot_state_merkle_db, state_merkle_db, hot_state_kv_db, state_kv_db) =
+            AptosDB::open_dbs(
+                &StorageDirPaths::from_path(&self.db_dir),
+                rocksdb_config,
+                env,
+                block_cache,
+                /*readonly=*/ false,
+                /*max_num_nodes_per_lru_cache_shard=*/ 0,
+                /*reset_hot_state=*/ true,
+            )?;
 
         let ledger_db = Arc::new(ledger_db);
         let hot_state_merkle_db = hot_state_merkle_db.map(Arc::new);
         let state_merkle_db = Arc::new(state_merkle_db);
+        let hot_state_kv_db = hot_state_kv_db.map(Arc::new);
         let state_kv_db = Arc::new(state_kv_db);
         let overall_version = ledger_db
             .metadata_db()
@@ -153,6 +155,7 @@ impl Cmd {
                     Arc::clone(&ledger_db),
                     hot_state_merkle_db,
                     Arc::clone(&state_merkle_db),
+                    hot_state_kv_db,
                     Arc::clone(&state_kv_db),
                 )?;
                 println!("Done! current_version: {:?}", version);
@@ -252,19 +255,21 @@ mod test {
 
             let env = None;
             let block_cache = None;
-            // TODO(HotState): handle `_hot_state_merkle_db` here.
-            let (ledger_db, _hot_state_merkle_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
-                &StorageDirPaths::from_path(tmp_dir.path()),
-                RocksdbConfigs {
-                    enable_storage_sharding: input.1,
-                    ..Default::default()
-                },
-                env,
-                block_cache,
-                /*readonly=*/ false,
-                /*max_num_nodes_per_lru_cache_shard=*/ 0,
-                /*reset_hot_state=*/ true,
-            ).unwrap();
+            // TODO(HotState): handle `_hot_state_merkle_db` and `_hot_state_kv_db` here.
+            let (ledger_db, _hot_state_merkle_db, state_merkle_db, _hot_state_kv_db, state_kv_db) =
+                AptosDB::open_dbs(
+                    &StorageDirPaths::from_path(tmp_dir.path()),
+                    RocksdbConfigs {
+                        enable_storage_sharding: input.1,
+                        ..Default::default()
+                    },
+                    env,
+                    block_cache,
+                    /*readonly=*/ false,
+                    /*max_num_nodes_per_lru_cache_shard=*/ 0,
+                    /*reset_hot_state=*/ true,
+                )
+                .unwrap();
 
             let ledger_metadata_db = ledger_db.metadata_db_arc();
 

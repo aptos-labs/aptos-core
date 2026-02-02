@@ -569,6 +569,12 @@ impl StorageDirPaths {
             .unwrap_or(&self.default_path)
     }
 
+    pub fn hot_state_kv_db_metadata_root_path(&self) -> &PathBuf {
+        self.hot_state_kv_db_paths
+            .metadata_path()
+            .unwrap_or(&self.default_path)
+    }
+
     pub fn hot_state_merkle_db_metadata_root_path(&self) -> &PathBuf {
         self.hot_state_merkle_db_paths
             .metadata_path()
