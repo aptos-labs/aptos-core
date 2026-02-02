@@ -67,6 +67,8 @@ pub(crate) enum CustomEventIngestError {
     BigQueryInsertError(DebugIgnore<TableDataInsertAllResponseInsertErrors>),
     #[error("{0}")]
     Other(DebugIgnore<anyhow::Error>),
+    #[error("rate limit exceeded for unknown telemetry")]
+    RateLimitExceeded,
 }
 
 impl From<BQError> for CustomEventIngestError {

@@ -8,6 +8,7 @@
 /// to avoid mixing with node telemetry data.
 use crate::{
     clients::humio::{PEER_ID_FIELD_NAME, PEER_ROLE_TAG_NAME},
+    constants::MAX_DECOMPRESSED_LENGTH,
     context::Context,
     custom_contract_auth::with_custom_contract_auth,
     debug, error,
@@ -330,11 +331,13 @@ async fn handle_log_ingest(
         body.len()
     );
 
-    // Decode the body if gzip encoded
+    // Decode the body if gzip encoded (with size limit to prevent decompression bombs)
     let log_data = if content_encoding.as_deref() == Some("gzip") {
-        let mut decoder = GzDecoder::new(&body[..]);
+        let decoder = GzDecoder::new(&body[..]);
+        // Limit decompressed size to prevent decompression bomb attacks
+        let mut limited_decoder = decoder.take(MAX_DECOMPRESSED_LENGTH as u64);
         let mut decompressed = Vec::new();
-        decoder.read_to_end(&mut decompressed).map_err(|_| {
+        limited_decoder.read_to_end(&mut decompressed).map_err(|_| {
             record_custom_contract_error(
                 &contract_name,
                 CustomContractEndpoint::LogsIngest,
@@ -552,8 +555,18 @@ async fn handle_custom_event_ingest(
         body.events.len()
     );
 
-    // Validate the user_id matches the peer_id
-    if body.user_id != peer_id.to_string() {
+    // Validate the user_id matches the peer_id (parse to handle different string formats)
+    let body_peer_id = PeerId::from_hex_literal(&body.user_id).map_err(|_| {
+        record_custom_contract_error(
+            &contract_name,
+            CustomContractEndpoint::EventsIngest,
+            CustomContractErrorType::InvalidPayload,
+        );
+        reject::custom(ServiceError::bad_request(
+            CustomEventIngestError::InvalidEvent(body.user_id.clone(), peer_id).into(),
+        ))
+    })?;
+    if body_peer_id != peer_id {
         record_custom_contract_error(
             &contract_name,
             CustomContractEndpoint::EventsIngest,

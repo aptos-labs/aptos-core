@@ -190,6 +190,9 @@ pub struct CustomContractInstance {
     /// On-chain auth configuration (optional).
     /// When `None`, this is "open telemetry mode" - all nodes are treated as unknown.
     pub config: Option<crate::OnChainAuthConfig>,
+    /// Static allowlist - addresses here are treated as "trusted" without on-chain verification.
+    /// Maps chain_id -> set of addresses.
+    pub static_allowlist: HashMap<ChainId, HashSet<PeerId>>,
     /// Custom node type name for labeling telemetry from this contract.
     /// Used in metrics labels as `node_type={node_type_name}`.
     pub node_type_name: String,
@@ -246,6 +249,15 @@ impl CustomContractInstance {
         self.blacklist_peers
             .as_ref()
             .map(|bl| bl.contains(peer_id))
+            .unwrap_or(false)
+    }
+
+    /// Check if an address is in the static allowlist for a given chain.
+    /// Used to grant "trusted" status without on-chain verification.
+    pub fn is_in_static_allowlist(&self, chain_id: &ChainId, address: &PeerId) -> bool {
+        self.static_allowlist
+            .get(chain_id)
+            .map(|addrs| addrs.contains(address))
             .unwrap_or(false)
     }
 }

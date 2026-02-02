@@ -193,17 +193,28 @@ async fn handle_auth(
         ))
     })?;
 
-    // Determine node type based on whether on_chain_auth is configured
-    let node_type = if instance.config.is_none() {
-        // Open telemetry mode: no on_chain_auth configured
-        // All nodes are treated as unknown (allow_unknown_nodes is required to be true in this mode)
+    // Determine node type based on trust status
+    // Priority: 1) static_allowlist (config-based trust)
+    //           2) on_chain_auth allowlist (on-chain trust)
+    //           3) allow_unknown_nodes (untrusted)
+    //           4) reject
+    let node_type = if instance.is_in_static_allowlist(&body.chain_id, &body.address) {
+        // Static allowlist: trusted via config without on-chain verification
+        debug!(
+            "address {} in static_allowlist for contract '{}' chain {}: trusted",
+            body.address, contract_name, body.chain_id
+        );
+        NodeType::Custom(contract_name.clone())
+    } else if instance.config.is_none() {
+        // Open telemetry mode: no on_chain_auth configured, not in static_allowlist
+        // Treat as unknown (allow_unknown_nodes is required to be true in this mode)
         debug!(
             "open telemetry mode for contract '{}': treating address {} as unknown",
             contract_name, body.address
         );
         NodeType::CustomUnknown(contract_name.clone())
     } else {
-        // Standard mode: check allowlist status
+        // Standard mode: check on-chain allowlist status
         let allowlist_status =
             check_allowlist_status(&context, &contract_name, &body.address, &body.chain_id);
 
@@ -297,11 +308,7 @@ pub(crate) fn verify_signature(request: &CustomAuthRequest) -> Result<()> {
     // Verify the public key matches the address
     let derived_address = aptos_types::account_address::from_public_key(&public_key);
     if derived_address != request.address {
-        return Err(anyhow!(
-            "public key does not match address: expected {}, got {}",
-            request.address,
-            derived_address
-        ));
+        return Err(anyhow!("public key does not match claimed address"));
     }
 
     // Parse the signature

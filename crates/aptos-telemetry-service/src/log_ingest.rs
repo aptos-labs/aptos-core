@@ -7,7 +7,7 @@ use crate::{
         CHAIN_ID_TAG_NAME, EPOCH_FIELD_NAME, PEER_ID_FIELD_NAME, PEER_ROLE_TAG_NAME,
         RUN_UUID_TAG_NAME,
     },
-    constants::MAX_CONTENT_LENGTH,
+    constants::{MAX_CONTENT_LENGTH, MAX_DECOMPRESSED_LENGTH},
     context::Context,
     debug, error,
     errors::{LogIngestError, ServiceError},
@@ -16,7 +16,7 @@ use crate::{
 };
 use flate2::bufread::GzDecoder;
 use reqwest::{header::CONTENT_ENCODING, StatusCode};
-use std::collections::HashMap;
+use std::{collections::HashMap, io::Read};
 use tokio::time::Instant;
 use warp::{filters::BoxedFilter, reject, reply, Buf, Filter, Rejection, Reply};
 
@@ -93,7 +93,9 @@ pub async fn handle_log_ingest(
     let log_messages: Vec<String> = if let Some(encoding) = encoding {
         if encoding.eq_ignore_ascii_case("gzip") {
             let decoder = GzDecoder::new(body.reader());
-            serde_json::from_reader(decoder).map_err(|e| {
+            // Limit decompressed size to prevent decompression bomb attacks
+            let limited_reader = decoder.take(MAX_DECOMPRESSED_LENGTH as u64);
+            serde_json::from_reader(limited_reader).map_err(|e| {
                 debug!("unable to decode and deserialize body: {}", e);
                 ServiceError::bad_request(LogIngestError::UnexpectedPayloadBody.into())
             })?

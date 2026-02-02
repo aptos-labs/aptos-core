@@ -48,7 +48,7 @@ pub async fn handle_metrics_ingest(
     // Apply rate limiting for unknown/untrusted nodes
     let is_unknown = matches!(
         claims.node_type,
-        NodeType::UnknownValidator | NodeType::UnknownFullNode
+        NodeType::Unknown | NodeType::UnknownValidator | NodeType::UnknownFullNode
     );
     if is_unknown
         && !context

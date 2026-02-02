@@ -199,6 +199,7 @@ impl AptosTelemetryServiceArgs {
 
                 instances.insert(cc_config.name.clone(), context::CustomContractInstance {
                     config: cc_config.on_chain_auth.clone(),
+                    static_allowlist: cc_config.static_allowlist.clone(),
                     node_type_name: cc_config.effective_node_type_name(),
                     allow_unknown_nodes: cc_config.allow_unknown_nodes,
                     metrics_clients,
@@ -825,6 +826,21 @@ pub struct CustomContractConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub on_chain_auth: Option<OnChainAuthConfig>,
 
+    /// Static allowlist - addresses here are treated as "trusted" without on-chain verification.
+    /// Maps chain_id -> set of addresses. Useful for RPCs where you know the operators
+    /// but don't want on-chain overhead.
+    ///
+    /// Trust determination priority:
+    /// 1. On-chain allowlist (if `on_chain_auth` configured) → trusted
+    /// 2. Static allowlist → trusted
+    /// 3. `allow_unknown_nodes: true` → untrusted
+    /// 4. Otherwise → rejected
+    ///
+    /// This allows you to grant "trusted" status to known addresses via config,
+    /// routing their telemetry to trusted sinks without on-chain verification.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub static_allowlist: HashMap<ChainId, HashSet<PeerId>>,
+
     /// Custom node type name for labeling telemetry from this contract.
     /// Used in metrics labels as `node_type={node_type_name}`.
     /// If not specified, falls back to `on_chain_auth.node_type_name` (if on_chain_auth is configured),
@@ -911,14 +927,25 @@ impl CustomContractConfig {
     /// Validate the configuration.
     /// Panics if the configuration is invalid.
     pub fn validate(&self) {
-        // If on_chain_auth is not configured, allow_unknown_nodes MUST be true
-        if self.on_chain_auth.is_none() && !self.allow_unknown_nodes {
+        // If neither on_chain_auth nor static_allowlist is configured, allow_unknown_nodes MUST be true
+        let has_on_chain = self.on_chain_auth.is_some();
+        let has_static = !self.static_allowlist.is_empty();
+        if !has_on_chain && !has_static && !self.allow_unknown_nodes {
             panic!(
-                "Custom contract '{}' has no on_chain_auth configured but allow_unknown_nodes is false. \
-                 When on_chain_auth is omitted, allow_unknown_nodes MUST be true (open telemetry mode).",
+                "Custom contract '{}' has no on_chain_auth or static_allowlist configured but \
+                 allow_unknown_nodes is false. When both allowlists are omitted, \
+                 allow_unknown_nodes MUST be true (open telemetry mode).",
                 self.name
             );
         }
+    }
+
+    /// Check if an address is in the static allowlist for a given chain.
+    pub fn is_in_static_allowlist(&self, chain_id: &ChainId, address: &PeerId) -> bool {
+        self.static_allowlist
+            .get(chain_id)
+            .map(|addrs| addrs.contains(address))
+            .unwrap_or(false)
     }
 
     /// Get the effective node type name for this contract.
