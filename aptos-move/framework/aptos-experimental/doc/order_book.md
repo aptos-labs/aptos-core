@@ -23,6 +23,7 @@
 -  [Function `take_ready_time_based_orders`](#0x7_order_book_take_ready_time_based_orders)
 -  [Function `best_bid_price`](#0x7_order_book_best_bid_price)
 -  [Function `best_ask_price`](#0x7_order_book_best_ask_price)
+-  [Function `get_slippage_price`](#0x7_order_book_get_slippage_price)
 -  [Function `is_taker_order`](#0x7_order_book_is_taker_order)
 -  [Function `get_single_match_for_taker`](#0x7_order_book_get_single_match_for_taker)
 -  [Function `reinsert_order`](#0x7_order_book_reinsert_order)
@@ -249,7 +250,7 @@
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_get_single_remaining_size">get_single_remaining_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_single_remaining_size">get_single_remaining_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>): u64
 </code></pre>
 
 
@@ -258,7 +259,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_get_single_remaining_size">get_single_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_single_remaining_size">get_single_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_id: OrderId
 ): u64 {
     self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.get_remaining_size(order_id)
@@ -521,6 +522,32 @@
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_best_ask_price">best_ask_price</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;): Option&lt;u64&gt; {
     self.price_time_idx.<a href="order_book.md#0x7_order_book_best_ask_price">best_ask_price</a>()
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_get_slippage_price"></a>
+
+## Function `get_slippage_price`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_slippage_price">get_slippage_price</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, is_bid: bool, slippage_bps: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_slippage_price">get_slippage_price</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, is_bid: bool, slippage_bps: u64
+): Option&lt;u64&gt; {
+    self.price_time_idx.<a href="order_book.md#0x7_order_book_get_slippage_price">get_slippage_price</a>(is_bid, slippage_bps)
 }
 </code></pre>
 

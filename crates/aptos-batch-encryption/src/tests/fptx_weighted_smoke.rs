@@ -6,7 +6,7 @@ use crate::{
     traits::BatchThresholdEncryption,
 };
 use anyhow::Result;
-use aptos_crypto::{weighted_config::WeightedConfigArkworks, SecretSharingConfig as _};
+use aptos_crypto::{weighted_config::WeightedConfigArkworks, TSecretSharingConfig as _};
 use aptos_dkg::pvss::traits::transcript::Aggregated;
 use ark_ec::AffineRepr as _;
 use ark_std::rand::{seq::SliceRandom, thread_rng, CryptoRng, Rng as _, RngCore};

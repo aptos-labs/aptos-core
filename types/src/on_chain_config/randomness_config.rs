@@ -158,16 +158,16 @@ impl TryFrom<RandomnessConfigMoveStruct> for OnChainRandomnessConfig {
         let RandomnessConfigMoveStruct { variant } = value;
         let variant_type_name = variant.type_name.as_str();
         match variant_type_name {
-            ConfigOff::MOVE_TYPE_NAME => Ok(OnChainRandomnessConfig::Off),
+            ConfigOff::MOVE_TYPE_NAME => Ok(Self::Off),
             ConfigV1::MOVE_TYPE_NAME => {
                 let v1 = MoveAny::unpack(ConfigV1::MOVE_TYPE_NAME, variant)
                     .map_err(|e| anyhow!("unpack as v1 failed: {e}"))?;
-                Ok(OnChainRandomnessConfig::V1(v1))
+                Ok(Self::V1(v1))
             },
             ConfigV2::MOVE_TYPE_NAME => {
                 let v2 = MoveAny::unpack(ConfigV2::MOVE_TYPE_NAME, variant)
                     .map_err(|e| anyhow!("unpack as v2 failed: {e}"))?;
-                Ok(OnChainRandomnessConfig::V2(v2))
+                Ok(Self::V2(v2))
             },
             _ => Err(anyhow!("unknown variant type")),
         }
@@ -181,64 +181,64 @@ impl From<OnChainRandomnessConfig> for RandomnessConfigMoveStruct {
             OnChainRandomnessConfig::V1(v1) => MoveAny::pack(ConfigV1::MOVE_TYPE_NAME, v1),
             OnChainRandomnessConfig::V2(v2) => MoveAny::pack(ConfigV2::MOVE_TYPE_NAME, v2),
         };
-        RandomnessConfigMoveStruct { variant }
+        Self { variant }
     }
 }
 
 impl OnChainRandomnessConfig {
     pub fn default_enabled() -> Self {
-        OnChainRandomnessConfig::V2(ConfigV2::default())
+        Self::V2(ConfigV2::default())
     }
 
     pub fn default_disabled() -> Self {
-        OnChainRandomnessConfig::Off
+        Self::Off
     }
 
     pub fn default_if_missing() -> Self {
-        OnChainRandomnessConfig::Off
+        Self::Off
     }
 
     pub fn default_for_genesis() -> Self {
-        OnChainRandomnessConfig::V2(ConfigV2::default())
+        Self::V2(ConfigV2::default())
     }
 
     pub fn randomness_enabled(&self) -> bool {
         match self {
-            OnChainRandomnessConfig::Off => false,
-            OnChainRandomnessConfig::V1(_) => true,
-            OnChainRandomnessConfig::V2(_) => true,
+            Self::Off => false,
+            Self::V1(_) => true,
+            Self::V2(_) => true,
         }
     }
 
     pub fn fast_randomness_enabled(&self) -> bool {
         match self {
-            OnChainRandomnessConfig::Off => false,
-            OnChainRandomnessConfig::V1(_) => false,
-            OnChainRandomnessConfig::V2(_) => true,
+            Self::Off => false,
+            Self::V1(_) => false,
+            Self::V2(_) => true,
         }
     }
 
     pub fn secrecy_threshold(&self) -> Option<U64F64> {
         match self {
-            OnChainRandomnessConfig::Off => None,
-            OnChainRandomnessConfig::V1(v1) => Some(v1.secrecy_threshold.as_u64f64()),
-            OnChainRandomnessConfig::V2(v2) => Some(v2.secrecy_threshold.as_u64f64()),
+            Self::Off => None,
+            Self::V1(v1) => Some(v1.secrecy_threshold.as_u64f64()),
+            Self::V2(v2) => Some(v2.secrecy_threshold.as_u64f64()),
         }
     }
 
     pub fn reconstruct_threshold(&self) -> Option<U64F64> {
         match self {
-            OnChainRandomnessConfig::Off => None,
-            OnChainRandomnessConfig::V1(v1) => Some(v1.reconstruction_threshold.as_u64f64()),
-            OnChainRandomnessConfig::V2(v2) => Some(v2.reconstruction_threshold.as_u64f64()),
+            Self::Off => None,
+            Self::V1(v1) => Some(v1.reconstruction_threshold.as_u64f64()),
+            Self::V2(v2) => Some(v2.reconstruction_threshold.as_u64f64()),
         }
     }
 
     pub fn fast_path_secrecy_threshold(&self) -> Option<U64F64> {
         match self {
-            OnChainRandomnessConfig::Off => None,
-            OnChainRandomnessConfig::V1(_) => None,
-            OnChainRandomnessConfig::V2(v2) => Some(v2.fast_path_secrecy_threshold.as_u64f64()),
+            Self::Off => None,
+            Self::V1(_) => None,
+            Self::V2(v2) => Some(v2.fast_path_secrecy_threshold.as_u64f64()),
         }
     }
 }

@@ -108,6 +108,7 @@ pub struct OptQSPullParamsProvider {
     enable_opt_qs: bool,
     minimum_batch_age_usecs: u64,
     failure_tracker: Arc<Mutex<ExponentialWindowFailureTracker>>,
+    enable_opt_qs_v2_payload: bool,
 }
 
 impl OptQSPullParamsProvider {
@@ -115,11 +116,13 @@ impl OptQSPullParamsProvider {
         enable_opt_qs: bool,
         minimum_batch_age_usecs: u64,
         failure_tracker: Arc<Mutex<ExponentialWindowFailureTracker>>,
+        enable_opt_qs_v2_payload: bool,
     ) -> Self {
         Self {
             enable_opt_qs,
             minimum_batch_age_usecs,
             failure_tracker,
+            enable_opt_qs_v2_payload,
         }
     }
 }
@@ -156,7 +159,7 @@ impl TOptQSPullParamsProvider for OptQSPullParamsProvider {
         Some(OptQSPayloadPullParams {
             exclude_authors,
             minimum_batch_age_usecs: self.minimum_batch_age_usecs,
-            use_batch_v2: false,
+            enable_opt_qs_v2_payload: self.enable_opt_qs_v2_payload,
         })
     }
 }

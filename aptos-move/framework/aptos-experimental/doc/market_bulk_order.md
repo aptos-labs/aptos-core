@@ -130,7 +130,7 @@ Returns:
         _unique_priority_idx,
         _creation_time_micros,
     ) = bulk_order.destroy_bulk_order();
-    <b>let</b> (<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, _metadata) = order_request.destroy_bulk_order_request(); // We don't need <b>to</b> keep the bulk order <b>struct</b> after placement
+    <b>let</b> (<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, order_metadata) = order_request.destroy_bulk_order_request();
 
     <b>assert</b>!(sequence_number == order_sequence_number, <a href="market_bulk_order.md#0x7_market_bulk_order_E_SEQUENCE_NUMBER_MISMATCH">E_SEQUENCE_NUMBER_MISMATCH</a>);
     // Extract previous_seq_num from <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">option</a>, defaulting <b>to</b> 0 <b>if</b> none
@@ -149,6 +149,20 @@ Returns:
         cancelled_ask_prices,
         cancelled_ask_sizes,
         previous_seq_num
+    );
+    // Invoke the place_bulk_order callback after successful placement
+    callbacks.<a href="market_bulk_order.md#0x7_market_bulk_order_place_bulk_order">place_bulk_order</a>(
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        order_id,
+        &bid_prices,
+        &bid_sizes,
+        &ask_prices,
+        &ask_sizes,
+        &cancelled_bid_prices,
+        &cancelled_bid_sizes,
+        &cancelled_ask_prices,
+        &cancelled_ask_sizes,
+        &order_metadata,
     );
     <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(order_id)
 }

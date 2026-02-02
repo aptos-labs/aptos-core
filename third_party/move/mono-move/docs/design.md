@@ -49,7 +49,7 @@ Throughout the document, the following execution model is used.
    Move VM).
    Aptos VM dispatches calls to Move VM to execute specified functions or
    scripts.
-   
+
 
 ## MonoMove Design
 
@@ -313,7 +313,7 @@ sections).
 Structs and functions are uniquely identified by IDs obtained via interning
 table.
 These IDs include:
- 
+
 - `ModuleId` indicating the module owning this struct or function.
 - 32-bit integer encoding struct or function name.
 - `TypeListId` for type arguments (set to 0 if non-generic).
@@ -375,3 +375,393 @@ impl GlobalExecutionContextGuard<'_> {
    }
 }
 ```
+
+### 4. Transaction Memory Management & Value Representation
+
+During execution, the VM needs to manage memory for values — vectors (dynamically sized),
+structs (large ones may need to be on the heap), and global values (may need a separate region).
+
+This is distinct from memory for types, code and global context, which is covered in ealier sections.
+
+MonoMove uses a **two-level memory management system** organized around the BlockSTM execution model:
+
+1. **Block Level**: Manages shared state across all transactions -- the storage cache and allocation
+   of memory subspaces for individual transactions.
+2. **Transaction Level**: Each transaction receives a dedicated memory region with its own
+   allocator.
+
+*Note*: We may also want some data to live across blocks in the future. The block-level cache could
+potentially be retained (rather than discarded) for use in subsequent blocks. TBD.
+
+This separation enables bounding total memory usage and supports parallel transaction execution
+with shared access to global values.
+
+#### 4.1 Block Memory Manager
+
+The block memory manager owns two key responsibilities:
+
+1. **Storage Cache**: Caches resources loaded from storage, shared across all transactions
+   within the block. The cached version is the resource state at the beginning of the block.
+   This avoids redundant storage reads and BCS deserialization for frequently accessed resources.
+
+2. **Transaction Memory Allocation**: Hands out memory subspaces to individual transactions.
+   Each transaction receives a dedicated region that is then managed by its own
+   transaction-level memory manager.
+
+##### Sharing Global Values Across Transactions
+
+While temporary values created during execution (local variables, intermediate results,
+newly allocated structs and vectors) are exclusively local to a transaction, writes to
+global values need to be made visible to subsequent transactions.
+
+Two approaches can enable this sharing:
+
+**Option 1: Freeze-on-Finish**
+
+After a transaction finishes, freeze its memory space and expose it as read-only to
+subsequent transactions.
+
+- *Pros*: Simple to implement; less error-prone; provides a consistent view to readers.
+- *Cons*: Coarse granularity; read-write conflicts are detected late.
+
+**Option 2: Concurrent Data Structures**
+
+Use a multi-version data structure to provide concurrent shared access to global values.
+
+- *Pros*: Read-write conflicts are detected immediately.
+- *Cons*: More complex -- requires a separate shared mutable subspace at the block level
+  (similar to the storage cache, but mutable); may expose inconsistent views to readers;
+  may require copying data between memory regions; interacts poorly with GC-managed memory
+  (references held by block-level structures must be updated when GC moves memory, unlike
+  freeze-on-finish where frozen regions are not subject to GC).
+
+*TODO*: Analyze mainnet transaction history to better understand real-world read/write
+patterns and inform the choice between these approaches.
+
+##### Per-Block Memory Limits
+
+A per-block memory limit sets the upper bound of memory a node may use for values at any
+given time. This is important for resource planning and preventing out-of-memory conditions.
+
+**Why This Matters**
+
+Current node configuration uses a few dozen transactions per block to ensure low latency.
+However, throughput-focused benchmarks may run hundreds or thousands of transactions per block.
+
+Consider a default maximum of 10 MB per transaction (for values only — this excludes code
+and other global context data):
+- 1,000 transactions × 10 MB = 10 GB baseline memory usage.
+
+This is already high, and several factors can further increase memory consumption:
+- **Memory freezing + re-execution**: A transaction under re-execution may require two
+  memory spaces -- one frozen (finished state) and one active (speculative execution).
+- **Garbage collection**: A copying GC requires an additional "to-space", effectively
+  doubling the memory footprint during collection.
+
+In the worst case (all factors combined), peak memory usage could reach 30–40 GB. Typical
+usage would be significantly lower, but we need to plan for adversarial conditions.
+
+Such limits may be acceptable today, but pose concerns for future scalability. As VM
+execution speed improves, we may want to include more transactions per block without
+compromising latency significantly.
+
+**Mitigations**
+
+1. **Conservative initial allocation**: Start with a small allocation per transaction and
+   grow as needed (e.g., 1 MB -> 4 MB -> 10 MB). The idea is that typical high-frequency
+   transactions fit comfortably in the default allocation. Transactions with higher memory
+   demands can request more, but may require pre-declaration or incur significant memory fees.
+2. **Hard per-block memory limit**: Enforce a block-level cap and cut off remaining
+   transactions if approaching the limit. We already have a per-block gas limit that
+   functions in a similar way.
+3. **Compact-on-freeze**: When freezing a transaction's memory space, retain only the
+   global value writes and discard temporary values. This significantly reduces the
+   footprint of frozen regions for typical transactions, but has limited effect on
+   malicious transactions that maximize global value writes. Note: we may need to do
+   this anyway for write-set generation This scan may also be required for gas metering
+   purposes.
+
+#### 4.2 Transaction Memory Manager
+
+Each transaction gets its own memory manager for its subspace. The design has two
+major goals:
+
+1. **Blazingly fast allocation**: Allocation is on the hot path and must be minimal overhead.
+2. **Bulk deallocation**: Reclaim memory in batches rather than per-object — both at
+   transaction end (discarding temporaries) and during GC runs (if needed).
+
+Two designs are under consideration:
+
+**Option 1: Simple Bump Allocator**
+
+Allocate by advancing a pointer; never deallocate individual objects. At transaction end,
+destroy everything at once.
+
+- *Pros*: Simplicity; speed — allocation is just a pointer bump.
+- *Cons*: Limited scalability — if the allocator needs to grow, why not also run GC?
+  Cannot handle pathological cases (e.g., a loop allocating large amounts of temporary data
+  that could otherwise be reclaimed). Though some nuance here: (1) if these cases are truly
+  pathological, is handling them important? (2) real-world Move code should be examined for
+  compelling examples; (3) these considerations may be moot if GC is justified for other
+  reasons.
+
+**Option 2: Compacting GC**
+
+A compacting garbage collector is well-suited for MonoMove because we only care about latency
+at the block level. Pausing the world within a single transaction is a non-issue, provided that
+the cost of running is GC is accounted for (e.g. via gas).
+
+- *Pros*: Similar allocation speed (bump allocation) and bulk deallocation
+  capabilities as Option 1, but with much better scalability — can reclaim memory mid-transaction
+  or grow the heap, with defragmentation as a free byproduct of each GC run.
+- *Cons*: Complexity — requires tracking of live set, and either pointer fixup or indirection.
+
+Two implementation approaches are under consideration:
+
+**Design A: Direct Pointers with Pointer Fixup**
+
+References are raw pointers. During garbage collection, the collector traverses values
+recursively to move them into the to-space while fixing all internal pointers.
+
+- The memory manager must understand value layouts to locate and update pointers.
+- Live set discovery starts from externally-managed roots (e.g., the operand stack, locals).
+- *Pros*: No indirection overhead on value access.
+- *Cons*: Tight coupling between memory manager and runtime; pointer fixup adds complexity
+  and cost to each GC cycle; memory may need to be moved in fragmented pieces rather than
+  large contiguous chunks.
+
+**Design B: Handle-Based Indirection**
+
+References are handle IDs. Each handle stores: (1) the actual memory address and size, and
+(2) a parent field indicating ownership status.
+
+```rust
+enum Parent {
+    None,            // Dead — memory can be reclaimed
+    Root,            // Owned externally (e.g., on the operand stack)
+    Handle(HandleId) // Owned by another managed value (e.g., element in a vector)
+}
+
+struct Handle {
+    mem_ptr: *mut u8,
+    size: usize,
+    parent: Parent,
+}
+```
+
+Key properties:
+
+- **Index stability**: Once allocated, a handle's ID never changes while alive. This allows
+  safe references via handle IDs. *TODO*: How do cross-transaction reads work here? If stable
+  data must be copied on read, this could be expensive for read-heavy workloads. A CoW-like
+  approach may be worth considering.
+- **Liveness via parent chains**: A handle is alive if its parent is `Root`, or if its parent
+  is another handle that is itself alive. This can be computed efficiently via memoization.
+- **Handle recycling**: Dead handles are recycled to prevent the handle table from growing
+  unboundedly.
+
+During GC, the collector scans the handle table to partition handles into alive and dead sets.
+Live memory is moved to the to-space in bulk; only the `mem_ptr` fields in handles need
+updating. Dead handles are recycled, and their memory is implicitly reclaimed by not copying it.
+
+- *Pros*: Decouples memory manager from value layout; simpler and faster GC; enables
+  moving whole chunks without fragmentation.
+- *Cons*: Adds an indirection layer on every access; requires the runtime to report
+  ownership changes (e.g., when a value moves into or out of a container).
+
+##### Design Considerations
+
+The choice between Design A and Design B involves several trade-offs:
+
+| Aspect | Design A (Direct Pointers) | Design B (Handles) |
+|--------|---------------------------|-------------------|
+| Access speed | No indirection | One extra pointer chase per access |
+| GC complexity | Must traverse values, fix pointers | Scan handle table, follow parent chains |
+| Memory movement | Fragmented pieces | Large contiguous chunks |
+| Coupling | Memory manager must know value layouts | Memory manager is layout-agnostic |
+| Runtime burden | None | Must report ownership changes |
+
+Design A favors raw access speed at the cost of tighter coupling and more complex GC.
+Design B favors architectural simplicity and bulk operations at the cost of indirection.
+
+The indirection cost in Design B is predictable and may actually be cache-friendly
+(the handle table is likely to stay hot). Whether this overhead is acceptable depends
+on workload characteristics and should be validated with benchmarks.
+The ownership reporting burden in Design B aligns naturally with Move's explicit ownership semantics,
+but adds plumbing throughout the runtime.
+
+A decision will need to be made based on performance measurements and implementation
+complexity assessment.
+
+##### Handling Global Values
+
+Beyond temporary values, the transaction memory manager also handles operations on global
+resources (e.g., `move_from`, `move_to`, `borrow_global`).
+
+**Reading global values**: When a transaction reads a global resource, the value may come
+from:
+- The block-level storage cache (base value at block start), or
+- Another transaction's writes or modifications (if using concurrent sharing).
+
+The transaction tracks what it has read for later validation (BlockSTM needs to detect
+read-write conflicts). *Possible optimization*: track not just values but also read constraints
+(e.g., "checked that resource exists" vs "read the actual contents") for finer-grained
+conflict detection.
+
+An open question is whether reads require copying the value into local memory, or whether
+the transaction can reference the source directly. This depends on the memory manager design
+and the sharing approach.
+
+**Modifying global values**: When a transaction modifies a global resource, it performs a
+copy-on-write (CoW) into its own memory subspace. This keeps all modifications isolated, which:
+- Enables rollback if the transaction aborts or needs re-execution.
+- Allows other transactions to reference these modifications (the local memory holds the
+  authoritative version of the transaction's writes).
+
+In BlockSTM, each transaction's modifications integrate with `MVHashMap` — the transaction's
+local memory effectively becomes a slot in the multi-version structure, replacing the current
+`Arc<Value>` approach.
+
+Open questions:
+
+- **CoW timing**: Should CoW happen eagerly on `borrow_global_mut`, or lazily on actual
+  write? Lazy CoW avoids unnecessary copies but requires tracking borrowed references to
+  detect when a write occurs.
+- **GC interaction**: If GC runs mid-transaction, references to the transaction's modified
+  values (held by block-level structures for sharing) must be updated to reflect moved
+  memory locations. This is likely not a concern if using freeze-on-finish (Section 4.1),
+  since frozen memory is not subject to additional GC runs.
+
+#### 4.3 Value Representation
+
+Values are represented flat in memory. All values created by the VM and any modifications
+are allocated in the transaction's memory region. Primitives (`u8`, `u64`, `bool`, `address`,
+etc.) are trivially represented as raw bytes of the specified size.
+
+**Structs**
+
+The naive approach is to store structs on the heap, with a reference (pointer or handle) on
+the stack pointing to the heap-allocated data.
+
+However, inline structs have merits worth considering:
+- **Field access**: With heap-allocated structs, accessing a field at a certain offset
+  requires dynamic pointer arithmetic at load-time. Inline structs allow direct access to
+  inner memory without pointer chasing.
+- **Performance**: Pointer chasing everywhere is not ideal for performance and also
+  complicates GC (more pointers to track/update).
+- **Copyable structs**: For these, `memcpy` is fast, making inline storage attractive.
+- **Trade-off**: The main concern is added complexity — supporting both inline and heap
+  representations means two code paths to maintain. Inline structs may also require padding to
+  a fixed size (though this does give predictable stack frame sizes).
+
+Understanding struct size distributions in real-world Move code would help inform this
+decision (what fraction are "small"? what threshold makes sense?).
+
+*Possible optimization*: Small structs could be stored inline on the stack to avoid heap
+allocation and indirection. This keeps the stack frame predictable in size (small structs
+would be padded to a fixed size). For copyable structs this is particularly attractive since
+`memcpy` is fast. The threshold size and whether this optimization is worthwhile depends on
+complexity analysis.
+
+**Enums**
+
+Similar considerations apply as with structs. The naive approach stores enums on the heap,
+with a reference on the stack pointing to the discriminant and variant payload.
+
+Inline enums would need zero-padding so all variants occupy the same size (important for
+monomorphization). The same trade-offs apply: better field access performance vs. added
+complexity from dual representations.
+
+*Note*: For simple enums with explicit representation (e.g., `#[repr(u64)]`), heap allocation
+should be avoided entirely — this could be enforced at the language level.
+
+**Vectors**
+
+Vectors use a layout similar to Rust's `Vec`: a header containing a reference to heap-allocated
+element storage, length, and capacity. The reference is a pointer (Design A) or handle
+(Design B).
+
+```
+Stack: [ref | len | capacity]
+        |
+        v
+Heap:  [elem 0][elem 1][elem 2]...
+```
+
+The underlying memory address can be used to distinguish whether the vector's storage
+resides in transaction-local memory or in the global storage cache.
+
+**Function Values**
+
+Function values are represented as a pointer to a `Function` object. The object may initially
+be shallow (unresolved), with full resolution deferred until the function is actually invoked.
+
+*Note*: Embedding function pointers directly works within a block, but if we implement a
+cross-block value cache, cached values containing function pointers would need updating when
+function metadata is invalidated or relocated.
+
+**References**
+
+The representation of references depends on the memory manager design:
+- **Design A (Direct Pointers)**: References are raw pointers into managed memory. Interior
+  references (e.g., to a struct field or vector element) are simply pointers to that location.
+- **Design B (Handles)**: References are handle IDs, requiring a table lookup to obtain
+  the actual memory address. Interior references require an additional offset field to
+  locate data within the handle's managed memory.
+
+#### 4.4 Memory Safety
+
+The memory management design should consider safety at runtime — preventing memory corruption,
+invalid access, and undefined behavior. Below are some areas worth considering -- this list
+is not exhaustive.
+
+##### Reference Validity
+
+Move's bytecode verifier provides static guarantees about reference safety (no dangling
+references, proper borrow semantics). However, runtime checks may be valuable as
+defense-in-depth against verifier bugs or interpreter errors.
+
+Potential runtime checks to consider:
+- **Epoch/generation counters**: Each handle or allocated memory chunk tracks a generation number.
+  References include the expected generation; access fails if they don't match. This could
+  catch use-after-free when handles are recycled.
+- **Bounds checking**: Reference accesses validate indices/offsets are within bounds.
+
+The cost of these checks would need to be weighed against the safety benefit. They could
+potentially be disabled in production once the implementation is mature.
+
+##### Memory Region Isolation
+
+Transactions should only access:
+- Their own local memory region.
+- The block-level storage cache (read-only base values).
+- Other transactions' frozen memory (if using freeze-on-finish sharing).
+
+Violations would indicate serious bugs in the interpreter.
+
+##### GC Safety
+
+If using a compacting GC:
+- **Design A**: All pointers must be updated after memory moves. Missing a pointer could
+  lead to dangling references.
+- **Design B**: Only handle table entries need updating. References via handle IDs remain
+  valid as long as the handle is alive.
+
+Design B may provide stronger GC safety guarantees since the indirection layer isolates
+application code from memory movement.
+
+##### Type Safety
+
+With flat memory representation, values are raw bytes interpreted according to type
+information. The runtime should ensure values are accessed with the correct type.
+
+TBD: Anything the memory manager can do to help mitigate this risk?
+
+### 5. Runtime Instruction Set
+TBA
+
+### 6. The Interpreter Loop
+TBA
+
+### 7. Extension Points
+TBA: Native Function Interfaces, Gas Metering, Runtime Instrumentation Interfaces

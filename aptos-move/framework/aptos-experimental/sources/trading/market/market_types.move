@@ -48,6 +48,7 @@ module aptos_experimental::market_types {
         OrderCancelledByUser,
         OrderCancelledBySystem,
         OrderCancelledBySystemDueToError,
+        ClearinghouseStoppedMatching,
     }
 
     public fun order_cancellation_reason_post_only_violation(): OrderCancellationReason {
@@ -92,6 +93,18 @@ module aptos_experimental::market_types {
 
     public fun order_cancellation_reason_cancelled_by_user(): OrderCancellationReason {
         OrderCancellationReason::OrderCancelledByUser
+    }
+
+    public fun order_cancellation_reason_cancelled_by_system(): OrderCancellationReason {
+        OrderCancellationReason::OrderCancelledBySystem
+    }
+
+    public fun order_cancellation_reason_cancelled_by_system_due_to_error(): OrderCancellationReason {
+        OrderCancellationReason::OrderCancelledBySystemDueToError
+    }
+
+    public fun order_cancellation_reason_clearinghouse_stopped_matching(): OrderCancellationReason {
+        OrderCancellationReason::ClearinghouseStoppedMatching
     }
 
     enum OrderStatus has drop, copy, store {
@@ -183,6 +196,9 @@ module aptos_experimental::market_types {
             cleanup_order_f: |MarketClearinghouseOrderInfo<M>, u64, bool| has drop + copy,
             /// cleanup_bulk_orders_f arguments: account, is_bid, remaining_sizes
             cleanup_bulk_order_at_price_f: |address, OrderId, bool, u64, u64| has drop + copy,
+            /// place_bulk_order_f arguments: account, order_id, bid_prices, bid_sizes, ask_prices, ask_sizes,
+            /// cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, metadata
+            place_bulk_order_f: |address, OrderId, &vector<u64>, &vector<u64>, &vector<u64>, &vector<u64>, &vector<u64>, &vector<u64>, &vector<u64>, &vector<u64>, &M| has drop + copy,
             /// decrease_order_size_f arguments: order_info, size
             decrease_order_size_f: |MarketClearinghouseOrderInfo<M>, u64| has drop + copy,
             /// get a string representation of order metadata to be used in events
@@ -229,6 +245,7 @@ module aptos_experimental::market_types {
         place_maker_order_f: |MarketClearinghouseOrderInfo<M>, u64| PlaceMakerOrderResult<R> has drop + copy,
         cleanup_order_f: |MarketClearinghouseOrderInfo<M>, u64, bool| has drop + copy,
         cleanup_bulk_order_at_price_f: |address, OrderId, bool, u64, u64| has drop + copy,
+        place_bulk_order_f: |address, OrderId, &vector<u64>, &vector<u64>, &vector<u64>, &vector<u64>, &vector<u64>, &vector<u64>, &vector<u64>, &vector<u64>, &M| has drop + copy,
         decrease_order_size_f: |MarketClearinghouseOrderInfo<M>, u64| has drop + copy,
         get_order_metadata_bytes: |&M| vector<u8> has drop + copy
     ): MarketClearinghouseCallbacks<M, R> {
@@ -239,6 +256,7 @@ module aptos_experimental::market_types {
             place_maker_order_f,
             cleanup_order_f,
             cleanup_bulk_order_at_price_f,
+            place_bulk_order_f,
             decrease_order_size_f,
             get_order_metadata_bytes
         }
@@ -356,6 +374,23 @@ module aptos_experimental::market_types {
         cleanup_size: u64,
     ) {
         (self.cleanup_bulk_order_at_price_f)(account, order_id, is_bid, price, cleanup_size)
+    }
+
+    public fun place_bulk_order<M: store + copy + drop, R: store + copy + drop>(
+        self: &MarketClearinghouseCallbacks<M, R>,
+        account: address,
+        order_id: OrderId,
+        bid_prices: &vector<u64>,
+        bid_sizes: &vector<u64>,
+        ask_prices: &vector<u64>,
+        ask_sizes: &vector<u64>,
+        cancelled_bid_prices: &vector<u64>,
+        cancelled_bid_sizes: &vector<u64>,
+        cancelled_ask_prices: &vector<u64>,
+        cancelled_ask_sizes: &vector<u64>,
+        metadata: &M,
+    ) {
+        (self.place_bulk_order_f)(account, order_id, bid_prices, bid_sizes, ask_prices, ask_sizes, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, metadata)
     }
 
     public fun decrease_order_size<M: store + copy + drop, R: store + copy + drop>(

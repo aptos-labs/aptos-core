@@ -26,7 +26,7 @@ use anyhow::bail;
 use aptos_crypto::{
     bls12381,
     blstrs::{multi_pairing, random_scalar},
-    traits::SecretSharingConfig as _,
+    traits::TSecretSharingConfig as _,
     CryptoMaterialError, Genesis, SigningKey, ValidCryptoMaterial,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};

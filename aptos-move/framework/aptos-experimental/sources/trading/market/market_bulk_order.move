@@ -81,7 +81,7 @@ module aptos_experimental::market_bulk_order {
             _unique_priority_idx,
             _creation_time_micros,
         ) = bulk_order.destroy_bulk_order();
-        let (account, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, _metadata) = order_request.destroy_bulk_order_request(); // We don't need to keep the bulk order struct after placement
+        let (account, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, order_metadata) = order_request.destroy_bulk_order_request();
 
         assert!(sequence_number == order_sequence_number, E_SEQUENCE_NUMBER_MISMATCH);
         // Extract previous_seq_num from option, defaulting to 0 if none
@@ -100,6 +100,20 @@ module aptos_experimental::market_bulk_order {
             cancelled_ask_prices,
             cancelled_ask_sizes,
             previous_seq_num
+        );
+        // Invoke the place_bulk_order callback after successful placement
+        callbacks.place_bulk_order(
+            account,
+            order_id,
+            &bid_prices,
+            &bid_sizes,
+            &ask_prices,
+            &ask_sizes,
+            &cancelled_bid_prices,
+            &cancelled_bid_sizes,
+            &cancelled_ask_prices,
+            &cancelled_ask_sizes,
+            &order_metadata,
         );
         option::some(order_id)
     }
