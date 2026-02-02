@@ -348,34 +348,79 @@ module 0x42::M {
     public fun swap<T>(a: T, b: T): (T, T) {
         (b, a)
     }
+
+    spec swap<T>(a: T, b: T): (T, T) {
+        ensures result_1 == b;
+        ensures result_2 == a;
+    }
+
     public fun add(a: u64, b: u64): u64 {
         a + b
     }
+
+    spec add(a: u64, b: u64): u64 {
+        requires a + b <= 18446744073709551615;
+        ensures result == a + b;
+    }
+
     fun do_nothing(_x: u64) {
     }
+
+    spec do_nothing(_x: u64) {
+        ensures true;
+    }
+
     fun generic_noop<T: drop>(_x: T) {
     }
     public fun identity<T>(x: T): T {
         x
     }
+
+    spec identity<T>(x: T): T {
+        ensures result == x;
+    }
+
     public fun increment(x: u64): u64 {
         x + 1
     }
+
+    spec increment(x: u64): u64 {
+        requires x < 18446744073709551615;
+        ensures result == x + 1;
+    }
+
     public fun increment_counter(addr: address)
         acquires Counter
     {
         let counter = borrow_global_mut<Counter>(addr);
         counter.value = counter.value + 1;
     }
+
+    spec increment_counter(addr: address) {
+        modifies global<Counter>(addr);
+        ensures global<Counter>(addr).value == old(global<Counter>(addr)).value + 1;
+    }
+
     fun mixed_params(x: u64, flag: bool): u64 {
         if (flag) x + 1 else x
     }
     public fun pair<T, U>(x: T, y: U): (T, U) {
         (x, y)
     }
+
+    spec pair<T, U>(x: T, y: U): (T, U) {
+        ensures result_1 == x;
+        ensures result_2 == y;
+    }
+
     fun split(x: u64): (u64, u64) {
         (x / 2, x - x / 2)
     }
+
+    spec split(x: u64): (u64, u64) {
+        ensures result_1 + result_2 == x;
+    }
+
     public fun swap_counters(addr1: address, addr2: address)
         acquires Counter
     {
@@ -384,85 +429,218 @@ module 0x42::M {
         borrow_global_mut<Counter>(addr1).value = v2;
         borrow_global_mut<Counter>(addr2).value = v1;
     }
+
+    spec swap_counters(addr1: address, addr2: address) {
+        modifies global<Counter>(addr1);
+        modifies global<Counter>(addr2);
+    }
+
     fun test_aborts(x: u64): u64 {
         increment(x)
     }
+
+    spec test_aborts(x: u64): u64 {
+        aborts_if aborts_of<increment>(x);
+    }
+
     fun test_aborts_generic_explicit(x: u64): u64 {
         identity<u64>(x)
     }
+
+    spec test_aborts_generic_explicit(x: u64): u64 {
+        aborts_if aborts_of<identity<u64>>(x);
+    }
+
     fun test_aborts_generic_inferred(x: u64): u64 {
         identity<u64>(x)
     }
+
+    spec test_aborts_generic_inferred(x: u64): u64 {
+        aborts_if aborts_of<identity<u64>>(x);
+    }
+
     fun test_ensures_binary(a: u64, b: u64): u64 {
         add(a, b)
     }
+
+    spec test_ensures_binary(a: u64, b: u64): u64 {
+        ensures ensures_of<add>(a, b, result);
+    }
+
     fun test_ensures_generic_explicit(x: u64): u64 {
         identity<u64>(x)
     }
+
+    spec test_ensures_generic_explicit(x: u64): u64 {
+        ensures ensures_of<identity<u64>>(x, result);
+    }
+
     fun test_ensures_generic_inferred(x: u64): u64 {
         identity<u64>(x)
     }
+
+    spec test_ensures_generic_inferred(x: u64): u64 {
+        ensures ensures_of<identity<u64>>(x, result);
+    }
+
     fun test_ensures_generic_unit(x: u64) {
         generic_noop<u64>(x)
     }
+
+    spec test_ensures_generic_unit(x: u64) {
+        ensures ensures_of<generic_noop<u64>>(x);
+    }
+
     fun test_ensures_multi(x: u64): (u64, u64) {
         split(x)
     }
+
+    spec test_ensures_multi(x: u64): (u64, u64) {
+        ensures ensures_of<split>(x, result_1, result_2);
+    }
+
     fun test_ensures_unary(x: u64): u64 {
         increment(x)
     }
+
+    spec test_ensures_unary(x: u64): u64 {
+        ensures ensures_of<increment>(x, result);
+    }
+
     fun test_ensures_unit(x: u64) {
         do_nothing(x)
     }
+
+    spec test_ensures_unit(x: u64) {
+        ensures ensures_of<do_nothing>(x);
+    }
+
     fun test_mixed_params(x: u64, b: bool): u64 {
         mixed_params(x, b)
     }
+
+    spec test_mixed_params(x: u64, b: bool): u64 {
+        ensures requires_of<mixed_params>(x, b);
+        ensures ensures_of<mixed_params>(x, b, result);
+    }
+
     fun test_modifies_multi(addr1: address, addr2: address)
         acquires Counter
     {
         swap_counters(addr1, addr2)
     }
+
+    spec test_modifies_multi(addr1: address, addr2: address) {
+        ensures modifies_of<swap_counters>(global<Counter>(addr1), global<Counter>(addr2));
+    }
+
     fun test_modifies_single(addr: address)
         acquires Counter
     {
         increment_counter(addr)
     }
+
+    spec test_modifies_single(addr: address) {
+        ensures modifies_of<increment_counter>(global<Counter>(addr));
+    }
+
     fun test_pair_generic_explicit(x: u64, y: bool): (u64, bool) {
         pair<u64,bool>(x, y)
     }
+
+    spec test_pair_generic_explicit(x: u64, y: bool): (u64, bool) {
+        ensures requires_of<pair<u64, bool>>(x, y);
+        ensures ensures_of<pair<u64, bool>>(x, y, result_1, result_2);
+    }
+
     fun test_requires_binary(a: u64, b: u64): u64 {
         add(a, b)
     }
+
+    spec test_requires_binary(a: u64, b: u64): u64 {
+        ensures requires_of<add>(a, b);
+    }
+
     fun test_requires_generic_explicit(x: u64): u64 {
         identity<u64>(x)
     }
+
+    spec test_requires_generic_explicit(x: u64): u64 {
+        ensures requires_of<identity<u64>>(x);
+    }
+
     fun test_requires_generic_inferred(x: u64): u64 {
         identity<u64>(x)
     }
+
+    spec test_requires_generic_inferred(x: u64): u64 {
+        ensures requires_of<identity<u64>>(x);
+    }
+
     fun test_requires_unary(x: u64): u64 {
         increment(x)
     }
+
+    spec test_requires_unary(x: u64): u64 {
+        ensures requires_of<increment>(x);
+    }
+
     fun test_swap_generic_explicit(a: u64, b: u64): (u64, u64) {
         swap<u64>(a, b)
     }
+
+    spec test_swap_generic_explicit(a: u64, b: u64): (u64, u64) {
+        ensures requires_of<swap<u64>>(a, b);
+        ensures ensures_of<swap<u64>>(a, b, result_1, result_2);
+    }
+
     fun test_swap_generic_inferred(a: u64, b: u64): (u64, u64) {
         swap<u64>(a, b)
     }
+
+    spec test_swap_generic_inferred(a: u64, b: u64): (u64, u64) {
+        ensures requires_of<swap<u64>>(a, b);
+        ensures ensures_of<swap<u64>>(a, b, result_1, result_2);
+    }
+
     fun test_unbox_inferred(b: Box<u64>): u64 {
         unbox<u64>(b)
     }
+
+    spec test_unbox_inferred(b: Box<u64>): u64 {
+        ensures requires_of<unbox<u64>>(b);
+        ensures ensures_of<unbox<u64>>(b, result);
+    }
+
     public fun unbox<T: copy + drop>(b: Box<T>): T {
         b.value
     }
+
+    spec unbox<T: copy + drop>(b: Box<T>): T {
+        ensures result == b.value;
+    }
+
 }
 module 0x42::N {
     use 0x42::M;
     fun call_add(a: u64, b: u64): u64 {
         M::add(a, b)
     }
+
+    spec call_add(a: u64, b: u64): u64 {
+        ensures requires_of<M::add>(a, b);
+        ensures ensures_of<M::add>(a, b, result);
+    }
+
     fun call_increment(x: u64): u64 {
         M::increment(x)
     }
+
+    spec call_increment(x: u64): u64 {
+        ensures requires_of<M::increment>(x);
+        ensures ensures_of<M::increment>(x, result);
+    }
+
 }
 
 ============ bytecode before first stackless bytecode pipeline ================

@@ -24,19 +24,13 @@ module 0x42::inline_specs {
 module 0x42::inline_specs {
     fun specs(): u64 {
         let x = 0;
-
-        /* spec {
-          assert Eq<u64>(x, 0);
-        }
-         */
-        ;
+        spec {
+            assert x == 0;
+        };
         x = succ(x);
-
-        /* spec {
-          assert Eq<u64>(x, 1);
-        }
-         */
-        ;
+        spec {
+            assert x == 1;
+        };
         x
     }
     fun succ(x: u64): u64 {

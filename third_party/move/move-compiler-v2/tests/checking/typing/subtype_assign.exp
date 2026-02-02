@@ -40,20 +40,20 @@ module 0x8675309::M {
     }
     fun t0() {
         let x;
-        x = /*freeze*/&mut 0;
+        x = &mut 0;
         x;
     }
     fun t1() {
         let (x,y);
-        (x,y) = (&mut 0, /*freeze*/&mut 0);
+        (x,y) = (&mut 0, &mut 0);
         x;
         y;
         let (x,y);
-        (x,y) = (/*freeze*/&mut 0, &mut 0);
+        (x,y) = (&mut 0, &mut 0);
         x;
         y;
         let (x,y);
-        (x,y) = (/*freeze*/&mut 0, /*freeze*/&mut 0);
+        (x,y) = (&mut 0, &mut 0);
         x;
         y;
     }

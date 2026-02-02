@@ -403,11 +403,11 @@ module 0x3::OneToOneMarket {
         let sender = 0x1::signer::address_of(account);
         if (!exists<BorrowRecord<In, Out>>(sender)) move_to<BorrowRecord<In, Out>>(account, BorrowRecord<In,Out>{record: Map::empty<address,u64>()});
         let record = &mut borrow_global_mut<BorrowRecord<In, Out>>(sender).record;
-        if (Map::contains_key<address,u64>(/*freeze*/record, &pool_owner)) {
-            let old_amount = Map::remove<address,u64>(/*freeze*/record, &pool_owner);
+        if (Map::contains_key<address,u64>(record, &pool_owner)) {
+            let old_amount = Map::remove<address,u64>(record, &pool_owner);
             amount = amount + old_amount;
         };
-        Map::insert<address,u64>(/*freeze*/record, pool_owner, amount)
+        Map::insert<address,u64>(record, pool_owner, amount)
     }
     fun update_deposit_record<In: copy + drop + store, Out: copy + drop + store>(account: &signer, pool_owner: address, amount: u64)
         acquires DepositRecord
@@ -415,11 +415,11 @@ module 0x3::OneToOneMarket {
         let sender = 0x1::signer::address_of(account);
         if (!exists<DepositRecord<In, Out>>(sender)) move_to<DepositRecord<In, Out>>(account, DepositRecord<In,Out>{record: Map::empty<address,u64>()});
         let record = &mut borrow_global_mut<DepositRecord<In, Out>>(sender).record;
-        if (Map::contains_key<address,u64>(/*freeze*/record, &pool_owner)) {
-            let old_amount = Map::remove<address,u64>(/*freeze*/record, &pool_owner);
+        if (Map::contains_key<address,u64>(record, &pool_owner)) {
+            let old_amount = Map::remove<address,u64>(record, &pool_owner);
             amount = amount + old_amount;
         };
-        Map::insert<address,u64>(/*freeze*/record, pool_owner, amount)
+        Map::insert<address,u64>(record, pool_owner, amount)
     }
 }
 module 0x70dd::ToddNickels {
