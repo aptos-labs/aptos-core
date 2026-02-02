@@ -118,6 +118,7 @@ impl StatePruner {
     pub fn new(
         hot_state_merkle_db: Option<Arc<StateMerkleDb>>,
         state_merkle_db: Arc<StateMerkleDb>,
+        hot_state_kv_db: Option<Arc<StateKvDb>>,
         state_kv_db: Arc<StateKvDb>,
         config: PrunerConfig,
     ) -> Self {
@@ -135,6 +136,8 @@ impl StatePruner {
             state_merkle_db,
             config.epoch_snapshot_pruner_config.into(),
         );
+        // TODO(HotState): Add hot_state_kv_pruner once hot state KV persistence is implemented
+        let _ = hot_state_kv_db; // Placeholder for future hot state KV pruner
         let state_kv_pruner = StateKvPrunerManager::new(state_kv_db, config.ledger_pruner_config);
 
         Self {
@@ -151,6 +154,7 @@ pub(crate) struct StateDb {
     pub ledger_db: Arc<LedgerDb>,
     pub hot_state_merkle_db: Option<Arc<StateMerkleDb>>,
     pub state_merkle_db: Arc<StateMerkleDb>,
+    pub hot_state_kv_db: Option<Arc<StateKvDb>>,
     pub state_kv_db: Arc<StateKvDb>,
     pub state_pruner: StatePruner,
     pub skip_usage: bool,
@@ -378,6 +382,7 @@ impl StateStore {
         ledger_db: Arc<LedgerDb>,
         hot_state_merkle_db: Option<Arc<StateMerkleDb>>,
         state_merkle_db: Arc<StateMerkleDb>,
+        hot_state_kv_db: Option<Arc<StateKvDb>>,
         state_kv_db: Arc<StateKvDb>,
         state_pruner: StatePruner,
         buffered_state_target_items: usize,
@@ -399,6 +404,7 @@ impl StateStore {
             ledger_db,
             hot_state_merkle_db,
             state_merkle_db,
+            hot_state_kv_db,
             state_kv_db,
             state_pruner,
             skip_usage,
@@ -541,11 +547,13 @@ impl StateStore {
         ledger_db: Arc<LedgerDb>,
         hot_state_merkle_db: Option<Arc<StateMerkleDb>>,
         state_merkle_db: Arc<StateMerkleDb>,
+        hot_state_kv_db: Option<Arc<StateKvDb>>,
         state_kv_db: Arc<StateKvDb>,
     ) -> Result<Option<Version>> {
         let state_pruner = StatePruner::new(
             hot_state_merkle_db.clone(),
             Arc::clone(&state_merkle_db),
+            hot_state_kv_db.clone(),
             Arc::clone(&state_kv_db),
             aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG,
         );
@@ -553,6 +561,7 @@ impl StateStore {
             ledger_db,
             hot_state_merkle_db,
             state_merkle_db,
+            hot_state_kv_db,
             state_kv_db,
             state_pruner,
             skip_usage: false,
