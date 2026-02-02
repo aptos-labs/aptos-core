@@ -6,8 +6,12 @@ use crate::{
     natives::cryptography::algebra::{
         feature_flag_from_structure, AlgebraContext, Structure, BLS12381_GT_GENERATOR,
         BLS12381_Q12_LENDIAN, BLS12381_R_LENDIAN, BN254_GT_GENERATOR, BN254_Q12_LENDIAN,
-        BN254_Q_LENDIAN, BN254_R_LENDIAN, E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES,
-        MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        BN254_Q_LENDIAN, BN254_R_LENDIAN, E_CONSTANTS_BLS12381FQ12_Q12_ORDER_LOADING_FAILED,
+        E_CONSTANTS_BLS12381GT_GT_GENERATOR_LOADING_FAILED,
+        E_CONSTANTS_BLS12381_R_ORDER_LOADING_FAILED,
+        E_CONSTANTS_BN254FQ12_Q12_ORDER_LOADING_FAILED,
+        E_CONSTANTS_BN254GT_GT_GENERATOR_LOADING_FAILED, E_TOO_MUCH_MEMORY_USED,
+        MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
     },
     store_element, structure_from_ty_arg,
 };
@@ -16,7 +20,6 @@ use aptos_native_interface::{SafeNativeContext, SafeNativeError, SafeNativeResul
 use ark_ec::PrimeGroup;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use num_traits::{One, Zero};
-use once_cell::sync::Lazy;
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, rc::Rc};
 
@@ -129,8 +132,13 @@ pub fn one_internal(
         ),
         Some(Structure::BLS12381Gt) => {
             context.charge(ALGEBRA_ARK_BLS12_381_FQ12_CLONE)?;
-            let element = *Lazy::force(&BLS12381_GT_GENERATOR);
-            let handle = store_element!(context, element)?;
+            let element = BLS12381_GT_GENERATOR.as_ref().ok_or_else(|| {
+                SafeNativeError::abort_with_message(
+                    E_CONSTANTS_BLS12381GT_GT_GENERATOR_LOADING_FAILED,
+                    "BLS12381 GT generator loading failed",
+                )
+            })?;
+            let handle = store_element!(context, *element)?;
             Ok(smallvec![Value::u64(handle as u64)])
         },
         Some(Structure::BN254Fr) => {
@@ -156,8 +164,13 @@ pub fn one_internal(
         ),
         Some(Structure::BN254Gt) => {
             context.charge(ALGEBRA_ARK_BN254_FQ12_CLONE)?;
-            let element = *Lazy::force(&BN254_GT_GENERATOR);
-            let handle = store_element!(context, element)?;
+            let element = BN254_GT_GENERATOR.as_ref().ok_or_else(|| {
+                SafeNativeError::abort_with_message(
+                    E_CONSTANTS_BN254GT_GT_GENERATOR_LOADING_FAILED,
+                    "BN254 GT generator loading failed",
+                )
+            })?;
+            let handle = store_element!(context, *element)?;
             Ok(smallvec![Value::u64(handle as u64)])
         },
         _ => Err(SafeNativeError::abort(MOVE_ABORT_CODE_NOT_IMPLEMENTED)),
@@ -177,17 +190,40 @@ pub fn order_internal(
         | Some(Structure::BLS12381G1)
         | Some(Structure::BLS12381G2)
         | Some(Structure::BLS12381Gt) => {
-            Ok(smallvec![Value::vector_u8(BLS12381_R_LENDIAN.clone())])
+            let bytes = BLS12381_R_LENDIAN.as_ref().cloned().ok_or_else(|| {
+                SafeNativeError::abort_with_message(
+                    E_CONSTANTS_BLS12381_R_ORDER_LOADING_FAILED,
+                    "BLS12381 R order loading failed",
+                )
+            })?;
+            Ok(smallvec![Value::vector_u8(bytes)])
         },
         Some(Structure::BLS12381Fq12) => {
-            Ok(smallvec![Value::vector_u8(BLS12381_Q12_LENDIAN.clone())])
+            let bytes = BLS12381_Q12_LENDIAN.as_ref().cloned().ok_or_else(|| {
+                SafeNativeError::abort_with_message(
+                    E_CONSTANTS_BLS12381FQ12_Q12_ORDER_LOADING_FAILED,
+                    "BLS12381 Fq12 Q12 order loading failed",
+                )
+            })?;
+            Ok(smallvec![Value::vector_u8(bytes)])
         },
         Some(Structure::BN254Fr)
         | Some(Structure::BN254Gt)
         | Some(Structure::BN254G1)
         | Some(Structure::BN254G2) => Ok(smallvec![Value::vector_u8(BN254_R_LENDIAN.clone())]),
         Some(Structure::BN254Fq) => Ok(smallvec![Value::vector_u8(BN254_Q_LENDIAN.clone())]),
-        Some(Structure::BN254Fq12) => Ok(smallvec![Value::vector_u8(BN254_Q12_LENDIAN.clone())]),
-        _ => Err(SafeNativeError::abort(MOVE_ABORT_CODE_NOT_IMPLEMENTED)),
+        Some(Structure::BN254Fq12) => {
+            let bytes = BN254_Q12_LENDIAN.as_ref().cloned().ok_or_else(|| {
+                SafeNativeError::abort_with_message(
+                    E_CONSTANTS_BN254FQ12_Q12_ORDER_LOADING_FAILED,
+                    "BN254 Fq12 Q12 order loading failed",
+                )
+            })?;
+            Ok(smallvec![Value::vector_u8(bytes)])
+        },
+        _ => Err(SafeNativeError::abort_with_message(
+            MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+            "Not implemented",
+        )),
     }
 }

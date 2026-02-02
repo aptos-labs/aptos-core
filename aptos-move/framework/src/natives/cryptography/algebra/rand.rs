@@ -5,7 +5,8 @@
 use crate::{
     natives::cryptography::algebra::{
         AlgebraContext, Structure, BLS12381_GT_GENERATOR, BN254_GT_GENERATOR,
-        E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES,
+        E_RAND_BLS12381GT_GT_GENERATOR_LOADING_FAILED, E_RAND_BN254GT_GT_GENERATOR_LOADING_FAILED,
+        E_RAND_INSECURE_NOT_IMPLEMENTED, E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES,
     },
     structure_from_ty_arg,
 };
@@ -70,9 +71,15 @@ pub fn rand_insecure_internal(
             ark_rand_internal!(context, ark_bls12_381::G2Projective)
         },
         Some(Structure::BLS12381Gt) => {
+            let generator = BLS12381_GT_GENERATOR.as_ref().ok_or_else(|| {
+                SafeNativeError::abort_with_message(
+                    E_RAND_BLS12381GT_GT_GENERATOR_LOADING_FAILED,
+                    "BLS12381 GT generator loading failed",
+                )
+            })?;
             let k = ark_bls12_381::Fr::rand(&mut test_rng());
             let k_bigint: ark_ff::BigInteger256 = k.into();
-            let element = BLS12381_GT_GENERATOR.pow(k_bigint);
+            let element = generator.pow(k_bigint);
             match store_element!(context, element) {
                 Ok(handle) => Ok(smallvec![Value::u64(handle as u64)]),
                 Err(abort_code) => Err(SafeNativeError::abort(abort_code)),
@@ -94,14 +101,23 @@ pub fn rand_insecure_internal(
             ark_rand_internal!(context, ark_bn254::G2Projective)
         },
         Some(Structure::BN254Gt) => {
+            let generator = BN254_GT_GENERATOR.as_ref().ok_or_else(|| {
+                SafeNativeError::abort_with_message(
+                    E_RAND_BN254GT_GT_GENERATOR_LOADING_FAILED,
+                    "BN254 GT generator loading failed",
+                )
+            })?;
             let k = ark_bn254::Fr::rand(&mut test_rng());
             let k_bigint: ark_ff::BigInteger256 = k.into();
-            let element = BN254_GT_GENERATOR.pow(k_bigint);
+            let element = generator.pow(k_bigint);
             match store_element!(context, element) {
                 Ok(handle) => Ok(smallvec![Value::u64(handle as u64)]),
                 Err(abort_code) => Err(SafeNativeError::abort(abort_code)),
             }
         },
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::abort_with_message(
+            E_RAND_INSECURE_NOT_IMPLEMENTED,
+            "Not implemented",
+        )),
     }
 }

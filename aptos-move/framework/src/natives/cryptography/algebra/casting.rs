@@ -5,7 +5,7 @@ use crate::{
     abort_unless_feature_flag_enabled,
     natives::cryptography::algebra::{
         abort_invariant_violated, AlgebraContext, Structure, BLS12381_R_SCALAR, BN254_R_SCALAR,
-        MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        E_CASTING_BLS12381_R_SCALAR_LOADING_FAILED, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
     },
     safe_borrow_element, structure_from_ty_arg,
 };
@@ -55,8 +55,14 @@ pub fn downcast_internal(
         (Some(Structure::BLS12381Fq12), Some(Structure::BLS12381Gt)) => {
             let handle = safely_pop_arg!(args, u64) as usize;
             safe_borrow_element!(context, handle, ark_bls12_381::Fq12, element_ptr, element);
+            let r_scalar = BLS12381_R_SCALAR.as_ref().ok_or_else(|| {
+                SafeNativeError::abort_with_message(
+                    E_CASTING_BLS12381_R_SCALAR_LOADING_FAILED,
+                    "BLS12381 R scalar loading failed",
+                )
+            })?;
             context.charge(ALGEBRA_ARK_BLS12_381_FQ12_POW_U256)?;
-            if element.pow(BLS12381_R_SCALAR.0) == ark_bls12_381::Fq12::one() {
+            if element.pow(r_scalar.0) == ark_bls12_381::Fq12::one() {
                 Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])
             } else {
                 Ok(smallvec![Value::bool(false), Value::u64(handle as u64)])

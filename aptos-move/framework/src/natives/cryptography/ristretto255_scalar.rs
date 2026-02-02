@@ -6,7 +6,7 @@ use crate::natives::cryptography::ristretto255::{
 };
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
-    safely_assert_eq, safely_pop_arg, SafeNativeContext, SafeNativeResult,
+    safely_assert_eq, safely_pop_arg, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
 use curve25519_dalek::scalar::Scalar;
 use move_core_types::gas_algebra::{NumArgs, NumBytes};
@@ -22,6 +22,9 @@ use std::{
     convert::TryFrom,
     ops::{Add, Mul, Neg, Sub},
 };
+
+/// Equivalent to `std::errors::internal(1)` in Move.
+const E_RISTRETTO255_SCALAR_INVALID_BYTES_LENGTH: u64 = 0x0A_0001;
 
 #[cfg(feature = "testing")]
 /// This is a test-only native that charges zero gas. It is only exported in testing mode.
@@ -60,7 +63,12 @@ pub(crate) fn native_scalar_is_canonical(
         return Ok(smallvec![Value::bool(false)]);
     }
 
-    let bytes_slice = <[u8; SCALAR_NUM_BYTES]>::try_from(bytes).unwrap();
+    let bytes_slice = <[u8; SCALAR_NUM_BYTES]>::try_from(bytes.as_slice()).map_err(|_| {
+        SafeNativeError::abort_with_message(
+            E_RISTRETTO255_SCALAR_INVALID_BYTES_LENGTH,
+            "Invalid Ristretto scalar bytes length",
+        )
+    })?;
 
     let s = Scalar::from_canonical_bytes(bytes_slice);
 

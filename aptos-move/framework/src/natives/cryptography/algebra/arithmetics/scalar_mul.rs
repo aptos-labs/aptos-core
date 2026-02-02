@@ -5,9 +5,10 @@ use crate::{
     abort_unless_feature_flag_enabled,
     natives::cryptography::{
         algebra::{
-            abort_invariant_violated, AlgebraContext, Structure, E_TOO_MUCH_MEMORY_USED,
-            MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING,
-            MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+            abort_invariant_violated, AlgebraContext, Structure,
+            E_SCALAR_MUL_MSM_COMPUTATION_FAILED, E_SCALAR_MUL_MSM_WINDOW_SIZE_FAILED,
+            E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES,
+            MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         },
         helpers::log2_ceil,
     },
@@ -67,12 +68,13 @@ macro_rules! ark_scalar_mul_internal {
     }};
 }
 
-/// WARNING: Be careful with the unwrap() below, if you modify this if statement.
-fn ark_msm_window_size(num_entries: usize) -> usize {
+/// Returns the MSM window size for the given number of entries, or `None` if it cannot be computed
+/// (e.g. `num_entries == 0` so that `log2_ceil` is `None`).
+fn ark_msm_window_size(num_entries: usize) -> Option<usize> {
     if num_entries < 32 {
-        3
+        Some(3)
     } else {
-        (log2_ceil(num_entries).unwrap() * 69 / 100) + 2
+        log2_ceil(num_entries).map(|log2| (log2 * 69 / 100) + 2)
     }
 }
 
@@ -80,7 +82,15 @@ fn ark_msm_window_size(num_entries: usize) -> usize {
 macro_rules! ark_msm_bigint_wnaf_cost {
     ($cost_add:expr, $cost_double:expr, $num_entries:expr $(,)?) => {{
         let num_entries: usize = $num_entries;
-        let window_size = ark_msm_window_size(num_entries);
+        let window_size = match ark_msm_window_size(num_entries) {
+            Some(w) => w,
+            None => {
+                return Err(SafeNativeError::abort_with_message(
+                    E_SCALAR_MUL_MSM_WINDOW_SIZE_FAILED,
+                    "MSM window size computation failed",
+                ))
+            },
+        };
         let num_windows = 255_usize.div_ceil(window_size);
         let num_buckets = 1_usize << window_size;
         $cost_add * NumArgs::from(((num_entries + num_buckets + 1) * num_windows) as u64)
@@ -224,7 +234,12 @@ macro_rules! ark_msm_internal {
             num_elements,
         ))?;
         let new_element: $element_typ =
-            ark_ec::VariableBaseMSM::msm(bases.as_slice(), scalars.as_slice()).unwrap();
+            ark_ec::VariableBaseMSM::msm(bases.as_slice(), scalars.as_slice()).map_err(|_e| {
+                SafeNativeError::abort_with_message(
+                    E_SCALAR_MUL_MSM_COMPUTATION_FAILED,
+                    "MSM computation failed",
+                )
+            })?;
         let new_handle = store_element!($context, new_element)?;
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};

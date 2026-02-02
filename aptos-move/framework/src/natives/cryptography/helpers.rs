@@ -41,7 +41,7 @@ pub fn log2_ceil(n: usize) -> Option<usize> {
     match n {
         0 => None,
         1 => Some(0),
-        _ => Some(log2_floor(n - 1).unwrap() + 1),
+        _ => log2_floor(n - 1).map(|x| x + 1),
     }
 }
 
