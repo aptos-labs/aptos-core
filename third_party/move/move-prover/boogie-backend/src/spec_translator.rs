@@ -952,7 +952,7 @@ impl SpecTranslator<'_> {
             // determines the result, so we can skip the existence check.
             let is_functional = matches!(
                 info.condition.as_ref(),
-                ExpData::Call(_, Operation::Behavior(BehaviorKind::EnsuresOf, _), _)
+                ExpData::Call(_, Operation::Behavior(BehaviorKind::EnsuresOf, ..), _)
             );
 
             if !is_functional {
@@ -1472,7 +1472,7 @@ impl SpecTranslator<'_> {
                     )
                 );
             },
-            Operation::Behavior(kind, _mem_label) => {
+            Operation::Behavior(kind, _state) => {
                 // args[0] is the function expression (Temporary or Closure)
                 // args[1..] are the predicate arguments
                 if args.is_empty() {
