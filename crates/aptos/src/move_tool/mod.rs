@@ -2352,6 +2352,10 @@ pub struct Replay {
     #[clap(long)]
     pub(crate) profile_gas: bool,
 
+    /// Analyze the transaction and collect statistics about execution trace.
+    #[clap(long)]
+    pub(crate) analyze: bool,
+
     /// If present, skip the comparison against the expected transaction output.
     #[clap(long)]
     pub(crate) skip_comparison: bool,
@@ -2382,9 +2386,10 @@ impl CliCommand<TransactionSummary> for Replay {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        if self.profile_gas && self.benchmark {
+        let exclusive_options = [self.profile_gas, self.benchmark, self.analyze];
+        if exclusive_options.iter().filter(|&&x| x).count() > 1 {
             return Err(CliError::UnexpectedError(
-                "Cannot perform benchmarking and gas profiling at the same time.".to_string(),
+                "Cannot use --profile-gas, --benchmark, and --analyze together.".to_string(),
             ));
         }
 
@@ -2430,6 +2435,15 @@ impl CliCommand<TransactionSummary> for Replay {
         } else if self.benchmark {
             println!("Benchmarking transaction...");
             local_simulation::benchmark_transaction_using_debugger(
+                &debugger,
+                self.txn_id,
+                txn.clone(),
+                hash,
+                aux_info,
+            )?
+        } else if self.analyze {
+            println!("Analyzing transaction...");
+            local_simulation::analyze_transaction_using_debugger(
                 &debugger,
                 self.txn_id,
                 txn.clone(),

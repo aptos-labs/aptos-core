@@ -56,6 +56,17 @@ use triomphe::Arc as TriompheArc;
 /// used there now).
 pub const DEFAULT_MAX_VM_VALUE_NESTED_DEPTH: u64 = 128;
 
+/// Controls how structs are represented when computing copy sizes
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CopyMode {
+    /// All structs and variants use pointer semantics (8-byte headers)
+    AllPointers,
+    /// Only enum variants use pointer semantics, regular structs are inline
+    VariantPointers,
+    /// All structs and variants are inline
+    AllInline,
+}
+
 /***************************************************************************************
  *
  * Types
@@ -335,6 +346,27 @@ enum ValueKind {
 }
 
 impl Value {
+    /// Returns true if the value is a primitive type
+    pub fn is_primitive(&self) -> bool {
+        matches!(
+            self,
+            Value::U8(_)
+                | Value::U16(_)
+                | Value::U32(_)
+                | Value::U64(_)
+                | Value::U128(_)
+                | Value::U256(_)
+                | Value::I8(_)
+                | Value::I16(_)
+                | Value::I32(_)
+                | Value::I64(_)
+                | Value::I128(_)
+                | Value::I256(_)
+                | Value::Bool(_)
+                | Value::Address(_)
+        )
+    }
+
     /// Returns value's kind. This method must be kept in sync with checks below which return an
     /// error if value's kind is not valid for a specific use case.
     fn kind(&self) -> ValueKind {
@@ -824,6 +856,463 @@ impl ContainerRef {
 impl Value {
     pub fn copy_value_with_depth(&self, max_depth: u64) -> PartialVMResult<Self> {
         self.copy_value(1, Some(max_depth))
+    }
+}
+
+/***************************************************************************************
+ *
+ * Copy Size Estimation
+ *
+ *   Estimate the size and number of memcopies needed to copy a value in a flat
+ *   memory C-like model.
+ *
+ **************************************************************************************/
+
+impl Value {
+    pub fn estimate_copy_size(&self, layout: &MoveTypeLayout, mode: CopyMode) -> Vec<usize> {
+        use MoveTypeLayout as L;
+        match (self, layout) {
+            (Value::U8(_), L::U8) => vec![1],
+            (Value::U16(_), L::U16) => vec![2],
+            (Value::U32(_), L::U32) => vec![4],
+            (Value::U64(_), L::U64) => vec![8],
+            (Value::U128(_), L::U128) => vec![16],
+            (Value::U256(_), L::U256) => vec![32],
+            (Value::I8(_), L::I8) => vec![1],
+            (Value::I16(_), L::I16) => vec![2],
+            (Value::I32(_), L::I32) => vec![4],
+            (Value::I64(_), L::I64) => vec![8],
+            (Value::I128(_), L::I128) => vec![16],
+            (Value::I256(_), L::I256) => vec![32],
+            (Value::Bool(_), L::Bool) => vec![1],
+            (Value::Address(_), L::Address) => vec![32],
+            (Value::DelayedFieldID { .. }, L::Native(_, _)) => vec![8],
+            (Value::Container(_), L::Signer) => {
+                // Treat as address.
+                vec![32]
+            },
+            (Value::Container(c), layout) => c.estimate_copy_size(layout, mode),
+            (Value::ContainerRef(_), _) | (Value::IndexedRef(_), _) | (Value::Invalid, _) => {
+                unreachable!("Cannot estimate copy size for refs, invalid, or closures")
+            },
+            (Value::ClosureValue(_), _) => {
+                // Treat as pointer for now!
+                vec![8]
+            },
+            (v, l) => {
+                panic!("Layout mismatch in estimate_copy_size: {:?} and {:?}", v, l)
+            },
+        }
+    }
+}
+
+impl Container {
+    fn estimate_copy_size(&self, layout: &MoveTypeLayout, mode: CopyMode) -> Vec<usize> {
+        use MoveTypeLayout as L;
+        match (self, layout) {
+            // Specialized vectors
+            (Self::VecU8(r), L::Vector(inner)) if matches!(inner.as_ref(), L::U8) => {
+                vec![24, r.borrow().len()]
+            },
+            (Self::VecU16(r), L::Vector(inner)) if matches!(inner.as_ref(), L::U16) => {
+                vec![24, r.borrow().len() * 2]
+            },
+            (Self::VecU32(r), L::Vector(inner)) if matches!(inner.as_ref(), L::U32) => {
+                vec![24, r.borrow().len() * 4]
+            },
+            (Self::VecU64(r), L::Vector(inner)) if matches!(inner.as_ref(), L::U64) => {
+                vec![24, r.borrow().len() * 8]
+            },
+            (Self::VecU128(r), L::Vector(inner)) if matches!(**inner, L::U128) => {
+                vec![24, r.borrow().len() * 16]
+            },
+            (Self::VecU256(r), L::Vector(inner)) if matches!(**inner, L::U256) => {
+                vec![24, r.borrow().len() * 32]
+            },
+            (Self::VecI8(r), L::Vector(inner)) if matches!(**inner, L::I8) => {
+                vec![24, r.borrow().len() * 1]
+            },
+            (Self::VecI16(r), L::Vector(inner)) if matches!(inner.as_ref(), L::I16) => {
+                vec![24, r.borrow().len() * 2]
+            },
+            (Self::VecI32(r), L::Vector(inner)) if matches!(inner.as_ref(), L::I32) => {
+                vec![24, r.borrow().len() * 4]
+            },
+            (Self::VecI64(r), L::Vector(inner)) if matches!(inner.as_ref(), L::I64) => {
+                vec![24, r.borrow().len() * 8]
+            },
+            (Self::VecI128(r), L::Vector(inner)) if matches!(inner.as_ref(), L::I128) => {
+                vec![24, r.borrow().len() * 16]
+            },
+            (Self::VecI256(r), L::Vector(inner)) if matches!(inner.as_ref(), L::I256) => {
+                vec![24, r.borrow().len() * 32]
+            },
+            (Self::VecBool(r), L::Vector(inner)) if matches!(inner.as_ref(), L::Bool) => {
+                vec![24, r.borrow().len() * 1]
+            },
+            (Self::VecAddress(r), L::Vector(inner)) if matches!(**inner, L::Address) => {
+                vec![24, r.borrow().len() * 32]
+            },
+
+            // Non-specialized vector (contains structs)
+            (Self::Vec(r), L::Vector(elem_layout)) => {
+                let vals = r.borrow();
+                // Vector header, followed by payload.
+                let mut results = vec![24, 0];
+                for val in vals.iter() {
+                    let sizes = val.estimate_copy_size(elem_layout.as_ref(), mode);
+                    results[1] += sizes[0];
+                    results.extend(&sizes[1..])
+                }
+                results
+            },
+
+            // Struct
+            (Self::Struct(r), MoveTypeLayout::Struct(struct_layout)) => {
+                let vals = r.borrow();
+                match struct_layout {
+                    MoveStructLayout::Runtime(field_layouts) => {
+                        assert_eq!(vals.len(), field_layouts.len());
+
+                        let mut results = vec![0];
+                        for (val, field_layout) in vals.iter().zip(field_layouts.iter()) {
+                            let sizes = val.estimate_copy_size(field_layout, mode);
+                            results[0] += sizes[0];
+                            results.extend(&sizes[1..])
+                        }
+
+                        match mode {
+                            CopyMode::AllPointers => {
+                                // Pointer size.
+                                results.insert(0, 8);
+                            },
+                            CopyMode::VariantPointers | CopyMode::AllInline => {
+                                // Do nothing!
+                            },
+                        }
+                        results
+                    },
+                    MoveStructLayout::RuntimeVariants(variants) => {
+                        let tag = self.get_enum_tag().expect("Must be an enum") as usize;
+                        let field_layouts = &variants[tag];
+                        assert_eq!(vals[1..].len(), field_layouts.len());
+
+                        // Start with 2 byte value for tag.
+                        let mut results = vec![2];
+                        for (val, field_layout) in vals[1..].iter().zip(field_layouts.iter()) {
+                            let sizes = val.estimate_copy_size(field_layout, mode);
+                            results[0] += sizes[0];
+                            results.extend(&sizes[1..])
+                        }
+
+                        match mode {
+                            CopyMode::AllPointers | CopyMode::VariantPointers => {
+                                // Pointer size.
+                                results.insert(0, 8);
+                            },
+                            CopyMode::AllInline => {
+                                // Do nothing!
+                            },
+                        };
+                        results
+                    },
+                    MoveStructLayout::WithFields(_)
+                    | MoveStructLayout::WithTypes { .. }
+                    | MoveStructLayout::WithVariants(_) => {
+                        unreachable!("Can only have runtime layouts");
+                    },
+                }
+            },
+
+            (Self::Locals(_), _) => {
+                unreachable!("Cannot estimate copy size for Locals container")
+            },
+            (v, l) => panic!(
+                "Container layout mismatch in estimate_copy_size: {:?} and {:?}",
+                v, l
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+mod estimate_copy_size_tests {
+    use super::*;
+
+    #[test]
+    fn test_primitives() {
+        // Test all primitive types
+        assert_eq!(
+            Value::u8(42).estimate_copy_size(&MoveTypeLayout::U8, CopyMode::AllInline),
+            vec![1]
+        );
+        assert_eq!(
+            Value::u16(42).estimate_copy_size(&MoveTypeLayout::U16, CopyMode::AllInline),
+            vec![2]
+        );
+        assert_eq!(
+            Value::u32(42).estimate_copy_size(&MoveTypeLayout::U32, CopyMode::AllInline),
+            vec![4]
+        );
+        assert_eq!(
+            Value::u64(42).estimate_copy_size(&MoveTypeLayout::U64, CopyMode::AllInline),
+            vec![8]
+        );
+        assert_eq!(
+            Value::u128(42).estimate_copy_size(&MoveTypeLayout::U128, CopyMode::AllInline),
+            vec![16]
+        );
+        assert_eq!(
+            Value::u256(int256::U256::ZERO)
+                .estimate_copy_size(&MoveTypeLayout::U256, CopyMode::AllInline),
+            vec![32]
+        );
+        assert_eq!(
+            Value::bool(true).estimate_copy_size(&MoveTypeLayout::Bool, CopyMode::AllInline),
+            vec![1]
+        );
+        assert_eq!(
+            Value::address(AccountAddress::ZERO)
+                .estimate_copy_size(&MoveTypeLayout::Address, CopyMode::AllInline),
+            vec![32]
+        );
+    }
+
+    #[test]
+    fn test_specialized_vector_u8() {
+        // vector<u8> with 5 elements
+        let vec_val = Value::vector_u8(vec![1, 2, 3, 4, 5]);
+        let layout = MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8));
+        assert_eq!(
+            vec_val.estimate_copy_size(&layout, CopyMode::AllInline),
+            vec![24, 5]
+        );
+    }
+
+    #[test]
+    fn test_specialized_vector_u64() {
+        // vector<u64> with 5 elements
+        let vec_val = Value::vector_u64(vec![1, 2, 3, 4, 5]);
+        let layout = MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U64));
+        assert_eq!(
+            vec_val.estimate_copy_size(&layout, CopyMode::AllInline),
+            vec![24, 40] // 5 * 8
+        );
+    }
+
+    #[test]
+    fn test_struct_with_vector_field() {
+        // struct Point { x: u64, y: u64, data: vector<u8> }
+        let data_vec = Value::vector_u8(vec![1, 2, 3]);
+        let struct_val =
+            Value::struct_(Struct::pack(vec![Value::u64(10), Value::u64(20), data_vec]));
+
+        let layout = MoveTypeLayout::Struct(MoveStructLayout::Runtime(vec![
+            MoveTypeLayout::U64,
+            MoveTypeLayout::U64,
+            MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
+        ]));
+
+        // All modes should give same result for standalone struct
+        assert_eq!(
+            struct_val.estimate_copy_size(&layout, CopyMode::AllInline),
+            vec![40, 3] // struct: 8 + 8 + 24 = 40, vector data: 3
+        );
+        assert_eq!(
+            struct_val.estimate_copy_size(&layout, CopyMode::VariantPointers),
+            vec![40, 3]
+        );
+        assert_eq!(
+            struct_val.estimate_copy_size(&layout, CopyMode::AllPointers),
+            vec![8, 40, 3]
+        );
+    }
+
+    #[test]
+    fn test_vector_of_structs_inline() {
+        // struct Item { id: u64, tags: vector<u64> }
+        // vector[
+        //   Item { id: 1, tags: [1,2,3,4,5] },
+        //   Item { id: 2, tags: [6,7,8] }
+        // ]
+        let item1 = Value::struct_(Struct::pack(vec![
+            Value::u64(1),
+            Value::vector_u64(vec![1, 2, 3, 4, 5]),
+        ]));
+        let item2 = Value::struct_(Struct::pack(vec![
+            Value::u64(2),
+            Value::vector_u64(vec![6, 7, 8]),
+        ]));
+
+        let vec_val = Value::vector_unchecked(vec![item1, item2]).unwrap();
+
+        let layout = MoveTypeLayout::Vector(Box::new(MoveTypeLayout::Struct(
+            MoveStructLayout::Runtime(vec![
+                MoveTypeLayout::U64,
+                MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U64)),
+            ]),
+        )));
+
+        // AllInline mode
+        assert_eq!(
+            vec_val.estimate_copy_size(&layout, CopyMode::AllInline),
+            vec![24, 64, 40, 24] // 24: vector metadata
+                                 // 64: vector data (2 structs × 32 bytes each)
+                                 // 40: item1 tags data (5 × 8)
+                                 // 24: item2 tags data (3 × 8)
+        );
+    }
+
+    #[test]
+    fn test_vector_of_structs_pointers() {
+        // Same as above but with AllPointers mode
+        let item1 = Value::struct_(Struct::pack(vec![
+            Value::u64(1),
+            Value::vector_u64(vec![1, 2, 3, 4, 5]),
+        ]));
+        let item2 = Value::struct_(Struct::pack(vec![
+            Value::u64(2),
+            Value::vector_u64(vec![6, 7, 8]),
+        ]));
+
+        let vec_val = Value::vector_unchecked(vec![item1, item2]).unwrap();
+
+        let layout = MoveTypeLayout::Vector(Box::new(MoveTypeLayout::Struct(
+            MoveStructLayout::Runtime(vec![
+                MoveTypeLayout::U64,
+                MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U64)),
+            ]),
+        )));
+
+        // AllPointers mode
+        assert_eq!(
+            vec_val.estimate_copy_size(&layout, CopyMode::AllPointers),
+            vec![24, 16, 32, 40, 32, 24] // 24: vector metadata
+                                         // 16: vector data (2 struct headers × 8), pointers
+                                         // 32: item1 struct data (8 + 24)
+                                         // 40: item1 tags data
+                                         // 32: item2 struct data (8 + 24)
+                                         // 24: item2 tags data
+        );
+    }
+
+    #[test]
+    fn test_enum_variants_inline() {
+        // enum Variant { A(u64) }
+        // vector[A(10), A(20)]
+
+        // Create enum value: [tag=0, field=10]
+        let variant1 = Value::struct_(Struct::pack(vec![Value::u16(0), Value::u64(10)]));
+        let variant2 = Value::struct_(Struct::pack(vec![Value::u16(0), Value::u64(20)]));
+
+        let vec_val = Value::vector_unchecked(vec![variant1, variant2]).unwrap();
+
+        let layout = MoveTypeLayout::Vector(Box::new(MoveTypeLayout::Struct(
+            MoveStructLayout::RuntimeVariants(vec![
+                vec![MoveTypeLayout::U64], // Variant A has one u64 field
+            ]),
+        )));
+
+        // AllInline mode
+        assert_eq!(
+            vec_val.estimate_copy_size(&layout, CopyMode::AllInline),
+            vec![24, 20] // 24: vector metadata
+                         // 20: variant1 + variant2 data (2 for tag + 8 for field each = 10 each)
+        );
+    }
+
+    #[test]
+    fn test_enum_variants_pointers() {
+        // Same as above but with VariantPointers mode
+        let variant1 = Value::struct_(Struct::pack(vec![Value::u16(0), Value::u64(10)]));
+        let variant2 = Value::struct_(Struct::pack(vec![Value::u16(0), Value::u64(20)]));
+
+        let vec_val = Value::vector_unchecked(vec![variant1, variant2]).unwrap();
+
+        let layout = MoveTypeLayout::Vector(Box::new(MoveTypeLayout::Struct(
+            MoveStructLayout::RuntimeVariants(vec![
+                vec![MoveTypeLayout::U64], // Variant A has one u64 field
+            ]),
+        )));
+
+        // VariantPointers mode: variants use pointers
+        assert_eq!(
+            vec_val.estimate_copy_size(&layout, CopyMode::VariantPointers),
+            vec![24, 16, 10, 10] // 24: vector metadata
+                                 // 16: vector data (2 headers × 8) storing pointers to variants
+                                 // 10: variant1 data (2 for tag + 8 for field)
+                                 // 10: variant2 data (2 for tag + 8 for field)
+        );
+
+        // AllPointers mode: same result for variants
+        assert_eq!(
+            vec_val.estimate_copy_size(&layout, CopyMode::AllPointers),
+            vec![24, 16, 10, 10]
+        );
+    }
+
+    #[test]
+    fn test_mixed_mode_regular_struct_vs_variant() {
+        // Regular struct
+        let regular_struct = Value::struct_(Struct::pack(vec![Value::u64(42)]));
+        let vec_regular = Value::vector_unchecked(vec![regular_struct]).unwrap();
+
+        let regular_layout = MoveTypeLayout::Vector(Box::new(MoveTypeLayout::Struct(
+            MoveStructLayout::Runtime(vec![MoveTypeLayout::U64]),
+        )));
+
+        // VariantPointers mode: regular structs are inline
+        assert_eq!(
+            vec_regular.estimate_copy_size(&regular_layout, CopyMode::VariantPointers),
+            vec![24, 8] // 24: vector metadata
+                        // 8: struct data (inline)
+        );
+
+        // Variant struct
+        let variant_struct = Value::struct_(Struct::pack(vec![Value::u16(0), Value::u64(42)]));
+        let vec_variant = Value::vector_unchecked(vec![variant_struct]).unwrap();
+
+        let variant_layout = MoveTypeLayout::Vector(Box::new(MoveTypeLayout::Struct(
+            MoveStructLayout::RuntimeVariants(vec![vec![MoveTypeLayout::U64]]),
+        )));
+
+        // VariantPointers mode: variants use pointers
+        assert_eq!(
+            vec_variant.estimate_copy_size(&variant_layout, CopyMode::VariantPointers),
+            vec![24, 8, 10] // 24: vector metadata
+                            // 8: vector data storing pointer header
+                            // 10: variant data (2 tag + 8 field)
+        );
+    }
+
+    #[test]
+    fn test_empty_vector() {
+        let empty_vec = Value::vector_u64(vec![]);
+        let layout = MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U64));
+        assert_eq!(
+            empty_vec.estimate_copy_size(&layout, CopyMode::AllInline),
+            vec![24, 0]
+        );
+    }
+
+    #[test]
+    fn test_nested_vectors() {
+        // vector<vector<u8>>
+        let inner1 = Value::vector_u8(vec![1, 2, 3]);
+        let inner2 = Value::vector_u8(vec![4, 5]);
+        let outer = Value::vector_unchecked(vec![inner1, inner2]).unwrap();
+
+        let layout = MoveTypeLayout::Vector(Box::new(MoveTypeLayout::Vector(Box::new(
+            MoveTypeLayout::U8,
+        ))));
+
+        assert_eq!(
+            outer.estimate_copy_size(&layout, CopyMode::AllInline),
+            vec![24, 48, 3, 2] // 24: outer vector metadata
+                               // 48: outer vector data (2 × 24 for inner vector metadata)
+                               // 3: inner1 data
+                               // 2: inner2 data
+        );
     }
 }
 
@@ -4398,6 +4887,15 @@ impl GlobalValue {
                 GlobalDataStatus::Dirty => Some(Op::Modify(value)),
                 GlobalDataStatus::Clean => None,
             },
+        }
+    }
+
+    pub fn as_value(&self) -> Option<&Value> {
+        match &self.0 {
+            GlobalValueImpl::None => None,
+            GlobalValueImpl::Deleted => None,
+            GlobalValueImpl::Fresh { value } => Some(value),
+            GlobalValueImpl::Cached { value, .. } => Some(value),
         }
     }
 

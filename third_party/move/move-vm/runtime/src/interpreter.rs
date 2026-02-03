@@ -11,7 +11,7 @@ use crate::{
     frame_type_cache::{FrameTypeCache, PerInstructionCache},
     interpreter_caches::InterpreterFunctionCaches,
     loader::LazyLoadedFunction,
-    module_traversal::TraversalContext,
+    module_traversal::{TraversalContext, TraversalStorage},
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
     reentrancy_checker::{CallType, ReentrancyChecker},
@@ -24,7 +24,7 @@ use crate::{
         loader::traits::Loader, ty_depth_checker::TypeDepthChecker,
         ty_layout_converter::LayoutConverter,
     },
-    tracing, LoadedFunction, RuntimeEnvironment,
+    tracing, LoadedFunction, RuntimeEnvironment, SizeEstimates,
 };
 use fail::fail_point;
 use itertools::Itertools;
@@ -38,6 +38,7 @@ use move_core_types::{
     function::ClosureMask,
     gas_algebra::{NumArgs, NumBytes, NumTypeNodes},
     language_storage::TypeTag,
+    value::MoveTypeLayout,
     vm_status::{
         sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode, StatusType,
     },
@@ -45,7 +46,7 @@ use move_core_types::{
 use move_vm_profiler::{FnGuard, Profiler, VM_PROFILER};
 use move_vm_types::{
     debug_write, debug_writeln,
-    gas::{GasMeter, SimpleInstruction},
+    gas::{GasMeter, SimpleInstruction, UnmeteredGasMeter},
     instr::Instruction,
     loaded_data::{runtime_access_specifier::AccessInstance, runtime_types::Type},
     natives::function::NativeResult,
@@ -210,6 +211,87 @@ impl<LoaderImpl> InterpreterImpl<'_, LoaderImpl>
 where
     LoaderImpl: Loader,
 {
+    fn ty_to_string(&self, ty: &Type) -> String {
+        let ty = TypeWithRuntimeEnvironment {
+            ty,
+            runtime_environment: self.loader.runtime_environment(),
+        };
+        ty.to_type_tag().to_canonical_string()
+    }
+
+    fn ty_to_layout(&self, ty: &Type) -> triomphe::Arc<MoveTypeLayout> {
+        let traversal_storage = TraversalStorage::new();
+        self.layout_converter
+            .type_to_type_layout_with_delayed_fields(
+                &mut UnmeteredGasMeter,
+                &mut TraversalContext::new(&traversal_storage),
+                &ty,
+                false,
+            )
+            .unwrap_or_else(|err| panic!("Layout construction failed: {}", err))
+            .layout
+    }
+
+    fn record_write_ref(&self, size: SizeEstimates, is_primitive: bool) {
+        let stats = self.loader.runtime_environment().statistics.get();
+        stats.record_write_ref(size, is_primitive);
+    }
+
+    fn record_read_ref(&self, size: SizeEstimates, is_primitive: bool) {
+        let stats = self.loader.runtime_environment().statistics.get();
+        stats.record_read_ref(size, is_primitive);
+    }
+
+    fn record_copy_loc(&self, size: SizeEstimates, is_primitive: bool, is_reference: bool) {
+        let stats = self.loader.runtime_environment().statistics.get();
+        stats.record_copy_loc(size, is_primitive, is_reference);
+    }
+
+    fn record_move_loc(&self, size: SizeEstimates, is_primitive: bool, is_reference: bool) {
+        let stats = self.loader.runtime_environment().statistics.get();
+        stats.record_move_loc(size, is_primitive, is_reference);
+    }
+
+    fn record_st_loc(&self, size: SizeEstimates, is_primitive: bool, is_reference: bool) {
+        let stats = self.loader.runtime_environment().statistics.get();
+        stats.record_st_loc(size, is_primitive, is_reference);
+    }
+
+    fn record_pack(&self, struct_name: String, size: SizeEstimates) {
+        let stats = self.loader.runtime_environment().statistics.get();
+        stats.record_pack(struct_name, size);
+    }
+
+    fn record_pack_variant(&self, struct_name: String, size: SizeEstimates) {
+        let stats = self.loader.runtime_environment().statistics.get();
+        stats.record_pack_variant(struct_name, size);
+    }
+
+    fn record_unpack(&self, struct_name: String, size: SizeEstimates) {
+        let stats = self.loader.runtime_environment().statistics.get();
+        stats.record_unpack(struct_name, size);
+    }
+
+    fn record_unpack_variant(&self, struct_name: String, size: SizeEstimates) {
+        let stats = self.loader.runtime_environment().statistics.get();
+        stats.record_unpack_variant(struct_name, size);
+    }
+
+    fn record_borrow_global(&self, struct_name: String, size: SizeEstimates, is_mutable: bool) {
+        let stats = self.loader.runtime_environment().statistics.get();
+        stats.record_borrow_global(struct_name, size, is_mutable);
+    }
+
+    fn record_move_to(&self, struct_name: String, size: SizeEstimates) {
+        let stats = self.loader.runtime_environment().statistics.get();
+        stats.record_move_to(struct_name, size);
+    }
+
+    fn record_move_from(&self, struct_name: String, size: SizeEstimates) {
+        let stats = self.loader.runtime_environment().statistics.get();
+        stats.record_move_from(struct_name, size);
+    }
+
     /// Entrypoint into the interpreter. All external calls need to be routed through this
     /// function.
     pub(crate) fn entrypoint(
@@ -1354,6 +1436,7 @@ where
     ) -> PartialVMResult<&'cache mut GlobalValue> {
         let (gv, bytes_loaded) =
             data_cache.load_resource_mut(gas_meter, traversal_context, &addr, ty)?;
+
         if let Some(bytes_loaded) = bytes_loaded {
             gas_meter.charge_load_resource(
                 addr,
@@ -1412,6 +1495,15 @@ where
         } else {
             self.load_resource(data_cache, gas_meter, traversal_context, addr, ty)?
         };
+
+        // INSTRUMENTATION START
+        let v = gv
+            .as_value()
+            .expect("Borrow global should always be an existing value");
+        let size = SizeEstimates::new(v, self.ty_to_layout(ty).as_ref());
+        let struct_name = self.ty_to_string(ty);
+        self.record_borrow_global(struct_name, size, is_mut);
+        // INSTRUMENTATION END
 
         let res = gv.borrow_global();
         gas_meter.charge_borrow_global(
@@ -1537,6 +1629,13 @@ where
                 return Err(err.with_message(format!("Failed to move resource from {:?}", addr)));
             },
         };
+
+        // INSTRUMENTATION START
+        let size = SizeEstimates::new(&resource, self.ty_to_layout(ty).as_ref());
+        let struct_name = self.ty_to_string(ty);
+        self.record_move_from(struct_name, size);
+        // INSTRUMENTATION END
+
         self.operand_stack.push(resource)?;
         Ok(())
     }
@@ -1554,6 +1653,13 @@ where
     ) -> PartialVMResult<()> {
         let runtime_environment = self.loader.runtime_environment();
         let gv = self.load_resource_mut(data_cache, gas_meter, traversal_context, addr, ty)?;
+
+        // INSTRUMENTATION START
+        let size = SizeEstimates::new(&resource, self.ty_to_layout(ty).as_ref());
+        let struct_name = self.ty_to_string(ty);
+        self.record_move_to(struct_name, size);
+        // INSTRUMENTATION END
+
         // NOTE(Gas): To maintain backward compatibility, we need to charge gas after attempting
         //            the move_to operation.
         match gv.move_to(resource) {
@@ -2081,6 +2187,9 @@ impl Frame {
                 )?;
                 RTRCheck::pre_execution_transition(self, instruction, &mut interpreter.ref_state)?;
 
+                let stats = interpreter.loader.runtime_environment().statistics.get();
+                stats.record_instruction(instruction.name());
+
                 match instruction {
                     Instruction::Pop => {
                         let popped_val = interpreter.operand_stack.pop()?;
@@ -2202,16 +2311,59 @@ impl Frame {
                     Instruction::CopyLoc(idx) => {
                         // TODO(Gas): We should charge gas before copying the value.
                         let local = self.locals.copy_loc(*idx as usize)?;
+
+                        // INSTRUMENTATION START
+                        let ty = self.local_ty_at(*idx as usize);
+                        let is_reference = ty.get_ref_inner_ty().is_some();
+                        let size = if is_reference {
+                            SizeEstimates::reference()
+                        } else {
+                            SizeEstimates::new(&local, interpreter.ty_to_layout(ty).as_ref())
+                        };
+                        interpreter.record_copy_loc(size, local.is_primitive(), is_reference);
+                        // INSTRUMENTATION END
+
                         gas_meter.charge_copy_loc(&local)?;
                         interpreter.operand_stack.push(local)?;
                     },
                     Instruction::MoveLoc(idx) => {
                         let local = self.locals.move_loc(*idx as usize)?;
+
+                        // INSTRUMENTATION START
+                        let ty = self.local_ty_at(*idx as usize);
+                        let is_reference = ty.get_ref_inner_ty().is_some();
+                        let size = if is_reference {
+                            SizeEstimates::reference()
+                        } else {
+                            SizeEstimates::new(&local, interpreter.ty_to_layout(ty).as_ref())
+                        };
+                        interpreter.record_move_loc(size, local.is_primitive(), is_reference);
+                        // INSTRUMENTATION END
+
                         gas_meter.charge_move_loc(&local)?;
                         interpreter.operand_stack.push(local)?;
                     },
                     Instruction::StLoc(idx) => {
                         let value_to_store = interpreter.operand_stack.pop()?;
+
+                        // INSTRUMENTATION START
+                        let ty = self.local_ty_at(*idx as usize);
+                        let is_reference = ty.get_ref_inner_ty().is_some();
+                        let size = if is_reference {
+                            SizeEstimates::reference()
+                        } else {
+                            SizeEstimates::new(
+                                &value_to_store,
+                                interpreter.ty_to_layout(ty).as_ref(),
+                            )
+                        };
+                        interpreter.record_st_loc(
+                            size,
+                            value_to_store.is_primitive(),
+                            is_reference,
+                        );
+                        // INSTRUMENTATION END
+
                         gas_meter.charge_store_loc(&value_to_store)?;
                         self.locals.store_loc(*idx as usize, value_to_store)?;
                     },
@@ -2349,9 +2501,18 @@ impl Frame {
                             interpreter.operand_stack.last_n(field_count as usize)?,
                         )?;
                         let args = interpreter.operand_stack.popn(field_count)?;
-                        interpreter
-                            .operand_stack
-                            .push(Value::struct_(Struct::pack(args)))?;
+                        let packed_struct = Value::struct_(Struct::pack(args));
+
+                        // INSTRUMENTATION START
+                        let struct_name = interpreter.ty_to_string(&struct_type);
+                        let size = SizeEstimates::new(
+                            &packed_struct,
+                            interpreter.ty_to_layout(&struct_type).as_ref(),
+                        );
+                        interpreter.record_pack(struct_name, size);
+                        // INSTRUMENTATION END
+
+                        interpreter.operand_stack.push(packed_struct)?;
                     },
                     Instruction::PackVariant(idx) => {
                         let info = self.get_struct_variant_at(*idx);
@@ -2368,9 +2529,19 @@ impl Frame {
                                 .last_n(info.field_count as usize)?,
                         )?;
                         let args = interpreter.operand_stack.popn(info.field_count)?;
-                        interpreter
-                            .operand_stack
-                            .push(Value::struct_(Struct::pack_variant(info.variant, args)))?;
+                        let packed_variant =
+                            Value::struct_(Struct::pack_variant(info.variant, args));
+
+                        // INSTRUMENTATION START
+                        let struct_name = interpreter.ty_to_string(&struct_type);
+                        let size = SizeEstimates::new(
+                            &packed_variant,
+                            interpreter.ty_to_layout(&struct_type).as_ref(),
+                        );
+                        interpreter.record_pack_variant(struct_name, size);
+                        // INSTRUMENTATION END
+
+                        interpreter.operand_stack.push(packed_variant)?;
                     },
                     Instruction::PackGeneric(si_idx) => {
                         // TODO: Even though the types are not needed for execution, we still
@@ -2397,9 +2568,18 @@ impl Frame {
                             interpreter.operand_stack.last_n(field_count as usize)?,
                         )?;
                         let args = interpreter.operand_stack.popn(field_count)?;
-                        interpreter
-                            .operand_stack
-                            .push(Value::struct_(Struct::pack(args)))?;
+                        let packed_struct = Value::struct_(Struct::pack(args));
+
+                        // INSTRUMENTATION START
+                        let struct_name = interpreter.ty_to_string(ty);
+                        let size = SizeEstimates::new(
+                            &packed_struct,
+                            interpreter.ty_to_layout(ty).as_ref(),
+                        );
+                        interpreter.record_pack(struct_name, size);
+                        // INSTRUMENTATION END
+
+                        interpreter.operand_stack.push(packed_struct)?;
                     },
                     Instruction::PackVariantGeneric(si_idx) => {
                         let field_tys =
@@ -2425,23 +2605,60 @@ impl Frame {
                                 .last_n(info.field_count as usize)?,
                         )?;
                         let args = interpreter.operand_stack.popn(info.field_count)?;
-                        interpreter
-                            .operand_stack
-                            .push(Value::struct_(Struct::pack_variant(info.variant, args)))?;
+                        let packed_variant =
+                            Value::struct_(Struct::pack_variant(info.variant, args));
+
+                        // INSTRUMENTATION START
+                        let struct_name = interpreter.ty_to_string(ty);
+                        let size = SizeEstimates::new(
+                            &packed_variant,
+                            interpreter.ty_to_layout(ty).as_ref(),
+                        );
+                        interpreter.record_pack_variant(struct_name, size);
+                        // INSTRUMENTATION END
+
+                        interpreter.operand_stack.push(packed_variant)?;
                     },
-                    Instruction::Unpack(_sd_idx) => {
+                    Instruction::Unpack(sd_idx) => {
+                        // INSTRUMENTATION START
+                        let ty = self.get_struct_ty(*sd_idx);
+                        let struct_name = interpreter.ty_to_string(&ty);
+                        let val = interpreter
+                            .operand_stack
+                            .value
+                            .last()
+                            .expect("Value at top of stack exists");
+                        let size = SizeEstimates::new(&val, interpreter.ty_to_layout(&ty).as_ref());
+                        interpreter.record_unpack(struct_name, size);
+                        // INSTRUMENTATION END
+
                         let struct_value = interpreter.operand_stack.pop_as::<Struct>()?;
+
                         gas_meter.charge_unpack(false, struct_value.field_views())?;
                         for value in struct_value.unpack()? {
                             interpreter.operand_stack.push(value)?;
                         }
                     },
                     Instruction::UnpackVariant(sd_idx) => {
-                        let struct_value = interpreter.operand_stack.pop_as::<Struct>()?;
-
-                        gas_meter.charge_unpack_variant(false, struct_value.field_views())?;
-
                         let info = self.get_struct_variant_at(*sd_idx);
+                        let struct_type = self.create_struct_ty(&info.definition_struct_type);
+
+                        // INSTRUMENTATION START
+                        let struct_name = interpreter.ty_to_string(&struct_type);
+                        let val = interpreter
+                            .operand_stack
+                            .value
+                            .last()
+                            .expect("Value at top of stack exists");
+                        let size = SizeEstimates::new(
+                            &val,
+                            interpreter.ty_to_layout(&struct_type).as_ref(),
+                        );
+                        interpreter.record_unpack_variant(struct_name, size);
+                        // INSTRUMENTATION END
+
+                        let struct_value = interpreter.operand_stack.pop_as::<Struct>()?;
+                        gas_meter.charge_unpack_variant(false, struct_value.field_views())?;
                         for value in struct_value.unpack_variant(info.variant, &|v| {
                             info.definition_struct_type.variant_name_for_message(v)
                         })? {
@@ -2460,12 +2677,23 @@ impl Frame {
                             gas_meter.charge_create_ty(*ty_count)?;
                         }
 
-                        let (_, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
+                        let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
 
-                        let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
-                        gas_meter.charge_unpack(true, struct_.field_views())?;
-                        for value in struct_.unpack()? {
+                        // INSTRUMENTATION START
+                        let struct_name = interpreter.ty_to_string(ty);
+                        let val = interpreter
+                            .operand_stack
+                            .value
+                            .last()
+                            .expect("Value at top of stack exists");
+                        let size = SizeEstimates::new(&val, interpreter.ty_to_layout(ty).as_ref());
+                        interpreter.record_unpack(struct_name, size);
+                        // INSTRUMENTATION END
+
+                        let struct_value = interpreter.operand_stack.pop_as::<Struct>()?;
+                        gas_meter.charge_unpack(true, struct_value.field_views())?;
+                        for value in struct_value.unpack()? {
                             interpreter.operand_stack.push(value)?;
                         }
                     },
@@ -2476,8 +2704,19 @@ impl Frame {
                             gas_meter.charge_create_ty(*ty_count)?;
                         }
 
-                        let (_, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
+                        let (ty, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
+
+                        // INSTRUMENTATION START
+                        let struct_name = interpreter.ty_to_string(ty);
+                        let val = interpreter
+                            .operand_stack
+                            .value
+                            .last()
+                            .expect("Value at top of stack exists");
+                        let size = SizeEstimates::new(&val, interpreter.ty_to_layout(ty).as_ref());
+                        interpreter.record_unpack_variant(struct_name, size);
+                        // INSTRUMENTATION END
 
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
                         gas_meter.charge_unpack_variant(true, struct_.field_views())?;
@@ -2604,11 +2843,37 @@ impl Frame {
                         let reference = interpreter.operand_stack.pop_as::<Reference>()?;
                         gas_meter.charge_read_ref(reference.value_view())?;
                         let value = reference.read_ref()?;
+
+                        // INSTRUMENTATION START
+                        let ty = interpreter
+                            .operand_stack
+                            .types
+                            .last()
+                            .and_then(|ty| ty.get_ref_inner_ty())
+                            .expect("Reference type must exist on the stack");
+                        let size =
+                            SizeEstimates::new(&value, interpreter.ty_to_layout(ty).as_ref());
+                        interpreter.record_read_ref(size, value.is_primitive());
+                        // INSTRUMENTATION END
+
                         interpreter.operand_stack.push(value)?;
                     },
                     Instruction::WriteRef => {
                         let reference = interpreter.operand_stack.pop_as::<Reference>()?;
                         let value = interpreter.operand_stack.pop()?;
+
+                        // INSTRUMENTATION START
+                        let idx = interpreter.operand_stack.types.len() - 2;
+                        let ty = interpreter
+                            .operand_stack
+                            .types
+                            .get(idx)
+                            .expect("At least 2 values must exist!");
+                        let size =
+                            SizeEstimates::new(&value, interpreter.ty_to_layout(ty).as_ref());
+                        interpreter.record_write_ref(size, value.is_primitive());
+                        // INSTRUMENTATION END
+
                         gas_meter.charge_write_ref(&value, reference.value_view())?;
                         reference.write_ref(value)?;
                     },

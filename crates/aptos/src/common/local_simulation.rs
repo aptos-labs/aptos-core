@@ -13,6 +13,7 @@ use aptos_vm_types::{
     module_and_script_storage::AsAptosCodeStorage, output::VMOutput, resolver::StateStorageView,
 };
 use move_core_types::vm_status::VMStatus;
+use move_vm_runtime::WithRuntimeEnvironment;
 use std::{path::Path, time::Instant};
 
 pub fn run_transaction_using_debugger(
@@ -120,6 +121,35 @@ pub fn benchmark_transaction_using_debugger(
 
     println!("Running time (cold code cache): {:?}", time_cold);
     println!("Running time (warm code cache): {:?}", time_warm);
+
+    Ok((vm_status, vm_output))
+}
+
+/// Analyzes a transaction using the debugger and collects execution statistics.
+pub fn analyze_transaction_using_debugger(
+    debugger: &AptosDebugger,
+    version: u64,
+    transaction: SignedTransaction,
+    _hash: HashValue,
+    persisted_auxiliary_info: PersistedAuxiliaryInfo,
+) -> CliTypedResult<(VMStatus, VMOutput)> {
+    let state_view = debugger.state_view_at_version(version);
+    let env = AptosEnvironment::new(&state_view);
+    let vm = AptosVM::new(&env);
+    let log_context = AdapterLogSchema::new(state_view.id(), 0);
+
+    let resolver = state_view.as_move_resolver();
+    let code_storage = state_view.as_aptos_code_storage(&env);
+    let (vm_status, vm_output) = vm.execute_user_transaction(
+        &resolver,
+        &code_storage,
+        &transaction,
+        &log_context,
+        &AuxiliaryInfo::new(persisted_auxiliary_info, None),
+    );
+
+    let statistics = env.runtime_environment().statistics.get();
+    statistics.display();
 
     Ok((vm_status, vm_output))
 }

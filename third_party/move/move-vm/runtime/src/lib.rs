@@ -39,7 +39,8 @@ pub use storage::{
     code_storage::CodeStorage,
     dependencies_gas_charging::check_dependencies_and_charge_gas,
     environment::{
-        ambassador_impl_WithRuntimeEnvironment, RuntimeEnvironment, WithRuntimeEnvironment,
+        ambassador_impl_WithRuntimeEnvironment, FunctionCallStats, RuntimeEnvironment,
+        SizeEstimates, WithRuntimeEnvironment,
     },
     implementations::{
         unsync_code_storage::{AsUnsyncCodeStorage, UnsyncCodeStorage},

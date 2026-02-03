@@ -202,7 +202,7 @@ pub fn aptos_prod_vm_config(
     timed_features: &TimedFeatures,
     ty_builder: TypeBuilder,
 ) -> VMConfig {
-    let paranoid_type_checks = get_paranoid_type_checks();
+    let _paranoid_type_checks = get_paranoid_type_checks();
     let paranoid_ref_checks = get_paranoid_ref_checks();
     let enable_layout_caches = get_layout_caches();
     let enable_debugging = get_debugging_enabled();
@@ -237,7 +237,7 @@ pub fn aptos_prod_vm_config(
     let config = VMConfig {
         verifier_config,
         deserializer_config,
-        paranoid_type_checks,
+        paranoid_type_checks: true,
         legacy_check_invariant_in_swap_loc: false,
         // Note: if updating, make sure the constant is in-sync.
         max_value_nest_depth: Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH),
@@ -254,7 +254,7 @@ pub fn aptos_prod_vm_config(
         enable_function_caches,
         enable_lazy_loading: features.is_lazy_loading_enabled(),
         enable_depth_checks,
-        optimize_trusted_code: features.is_trusted_code_enabled(),
+        optimize_trusted_code: false, // features.is_trusted_code_enabled(),
         paranoid_ref_checks,
         enable_capture_option,
         enable_enum_option,

@@ -32,7 +32,7 @@ use triomphe::Arc as TriompheArc;
 /// Stores type layout as well as a flag if it contains any delayed fields.
 #[derive(Debug, Clone)]
 pub struct LayoutWithDelayedFields {
-    layout: TriompheArc<MoveTypeLayout>,
+    pub layout: TriompheArc<MoveTypeLayout>,
     contains_delayed_fields: bool,
 }
 
