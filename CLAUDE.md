@@ -107,7 +107,7 @@ fn test_helper() { ... }
 
 ## Move Coding Conventions
 
-- Struct names: CamlCase (`OrderedMap`)
+- Struct names: CamelCase (`OrderedMap`)
 - Module names: snake_case (`ordered_map`)
 - Function names: snake_case (`register_currency`)
 - Constants: UPPER_SNAKE_CASE (`TREASURY_ADDRESS`)
