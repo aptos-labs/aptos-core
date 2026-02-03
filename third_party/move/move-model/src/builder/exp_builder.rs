@@ -5,8 +5,8 @@
 use crate::{
     ast::{
         AbortKind, AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, BehaviorKind,
-        Exp, ExpData, LambdaCaptureKind, MatchArm, ModuleName, Operation, Pattern, QualifiedSymbol,
-        QuantKind, ResourceSpecifier, RewriteResult, Spec, TempIndex, Value,
+        BehaviorState, Exp, ExpData, LambdaCaptureKind, MatchArm, ModuleName, Operation, Pattern,
+        QualifiedSymbol, QuantKind, ResourceSpecifier, RewriteResult, Spec, TempIndex, Value,
     },
     builder::{
         model_builder::{
@@ -2040,10 +2040,12 @@ impl ExpTranslator<'_, '_, '_> {
                 }
                 ExpData::Call(id, Operation::NoOp, vec![])
             },
-            EA::Exp_::Behavior(kind, _pre_label, fn_name, type_args, sp!(_, args), _post_label) => {
+            EA::Exp_::Behavior(kind, pre_label, fn_name, type_args, sp!(_, args), post_label) => {
                 self.translate_behavior_predicate(
                     &loc,
                     *kind,
+                    pre_label,
+                    post_label,
                     fn_name,
                     type_args,
                     args,
@@ -5746,6 +5748,8 @@ impl ExpTranslator<'_, '_, '_> {
         &mut self,
         loc: &Loc,
         kind: PA::BehaviorKind,
+        pre_label: &Option<PA::Label>,
+        post_label: &Option<PA::Label>,
         fn_name: &EA::ModuleAccess,
         type_args: &Option<Vec<EA::Type>>,
         args: &[EA::Exp],
@@ -5760,6 +5764,10 @@ impl ExpTranslator<'_, '_, '_> {
             PA::BehaviorKind::ModifiesOf => BehaviorKind::ModifiesOf,
             PA::BehaviorKind::ResultOf => BehaviorKind::ResultOf,
         };
+
+        // Validate and translate state labels
+        let behavior_state =
+            self.translate_behavior_state_labels(loc, &model_kind, pre_label, post_label);
 
         // Resolve the function name to a function expression (Closure or Temporary)
         let Some((fun_exp, expected_arg_types)) =
@@ -5786,7 +5794,47 @@ impl ExpTranslator<'_, '_, '_> {
         let mut all_args = vec![fun_exp];
         all_args.extend(translated_args);
 
-        ExpData::Call(id, Operation::Behavior(model_kind, None), all_args)
+        ExpData::Call(
+            id,
+            Operation::Behavior(model_kind, behavior_state),
+            all_args,
+        )
+    }
+
+    /// Validates and translates state labels for behavior predicates.
+    /// Returns a BehaviorState with the translated memory labels and names.
+    fn translate_behavior_state_labels(
+        &mut self,
+        loc: &Loc,
+        kind: &BehaviorKind,
+        pre_label: &Option<PA::Label>,
+        post_label: &Option<PA::Label>,
+    ) -> BehaviorState {
+        // Validate label usage based on behavior kind
+        // Only ensures_of and result_of can have both pre and post labels
+        // Other predicates (requires_of, aborts_of, modifies_of) should not have post labels
+        if !matches!(kind, BehaviorKind::EnsuresOf | BehaviorKind::ResultOf) && post_label.is_some()
+        {
+            self.error(
+                loc,
+                &format!(
+                    "only ensures_of and result_of can have a post-state label (@post), not {}",
+                    kind
+                ),
+            );
+        }
+
+        // Convert labels to memory labels and extract names
+        let pre = pre_label.as_ref().map(|_| self.env().new_global_id());
+        let post = post_label.as_ref().map(|_| self.env().new_global_id());
+        let pre_name = pre_label
+            .as_ref()
+            .map(|l| self.symbol_pool().make(l.value().as_str()));
+        let post_name = post_label
+            .as_ref()
+            .map(|l| self.symbol_pool().make(l.value().as_str()));
+
+        BehaviorState::new(pre, post, pre_name, post_name)
     }
 
     /// Resolves the target of a behavior predicate to either a local variable or a function.

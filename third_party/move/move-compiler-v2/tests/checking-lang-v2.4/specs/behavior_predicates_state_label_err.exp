@@ -1,0 +1,47 @@
+
+Diagnostics:
+error: only ensures_of and result_of can have a post-state label (@post), not requires_of
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_state_label_err.move:11:17
+   │
+11 │         ensures requires_of<f>(x)@post; // Error: post-state label not allowed on requires_of
+   │                 ^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `post` is defined but never referenced; every post-state label must be referenced by a pre-state label in another behavior predicate
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_state_label_err.move:11:17
+   │
+11 │         ensures requires_of<f>(x)@post; // Error: post-state label not allowed on requires_of
+   │                 ^^^^^^^^^^^^^^^^^^^^^^
+
+error: only ensures_of and result_of can have a post-state label (@post), not aborts_of
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_state_label_err.move:20:19
+   │
+20 │         aborts_if aborts_of<f>(x)@post; // Error: post-state label not allowed on aborts_of
+   │                   ^^^^^^^^^^^^^^^^^^^^
+
+error: state label `post` is defined but never referenced; every post-state label must be referenced by a pre-state label in another behavior predicate
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_state_label_err.move:20:19
+   │
+20 │         aborts_if aborts_of<f>(x)@post; // Error: post-state label not allowed on aborts_of
+   │                   ^^^^^^^^^^^^^^^^^^^^
+
+error: state label `undefined` is not defined; pre-state labels must reference a post-state label defined by another behavior predicate in the same spec
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_state_label_err.move:29:17
+   │
+29 │         ensures undefined@ensures_of<f>(x, result); // Error: 'undefined' label not defined
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `orphan` is defined but never referenced; every post-state label must be referenced by a pre-state label in another behavior predicate
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_state_label_err.move:38:17
+   │
+38 │         ensures ensures_of<f>(x, result)@orphan; // Error: 'orphan' is never referenced
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: cyclic state label reference detected: a -> b -> a
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_state_label_err.move:46:5
+   │
+46 │ ╭     spec apply_cycle {
+47 │ │         // a references b's post-state, b references a's post-state - cycle!
+48 │ │         ensures a@ensures_of<f>(x, result)@b;
+49 │ │         ensures b@ensures_of<f>(x, result)@a;
+50 │ │     }
+   │ ╰─────^
