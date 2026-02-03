@@ -51,26 +51,23 @@ fn test_gas_profiling_report() {
     // Publish the test module
     assert_success!(harness.publish_package(&account, &test_dir_path("gas_profiling.data/pack")));
 
-    // Setup: Initialize storage with some items (not profiled)
+    // Setup: Create a counter (not profiled)
     assert_success!(harness.run_entry_function(
         &account,
-        str::parse("0xcafe::gas_profiling_test::init_storage").unwrap(),
+        str::parse("0xcafe::gas_profiling_test::setup").unwrap(),
         vec![],
-        vec![bcs::to_bytes(&10u64).unwrap()], // Create 10 items
+        vec![],
     ));
 
-    // Run profiled transaction: writes new items, removes old items (refund), emits event
+    // Profiled transaction: replace counter (delete + create = refund + write), emit event
     let module_id = ModuleId::new(mod_addr, ident_str!("gas_profiling_test").to_owned());
     let (gas_log, _gas_used, _fee_statement) = harness.evaluate_gas_with_profiler(
         &account,
         TransactionPayload::EntryFunction(EntryFunction::new(
             module_id,
-            ident_str!("write_and_refund").to_owned(),
+            ident_str!("replace").to_owned(),
             vec![],
-            vec![
-                bcs::to_bytes(&5u64).unwrap(), // add 5 items
-                bcs::to_bytes(&3u64).unwrap(), // remove 3 items
-            ],
+            vec![],
         )),
     );
 
