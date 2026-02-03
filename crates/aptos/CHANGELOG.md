@@ -4,6 +4,9 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+## [7.14.3]
+- No changes, just fixing release.
+
 ## [7.14.2]
 - Transaction Simulation Session: fix support for simulating transactions that use on-chain randomness (local mode only)
 
