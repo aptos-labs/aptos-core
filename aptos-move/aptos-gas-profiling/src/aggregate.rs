@@ -150,6 +150,11 @@ impl ExecutionAndIOCosts {
     }
 }
 
+/// Check if a name looks like a function call (e.g., "0xcafe::module::function")
+fn is_function_name(name: &str) -> bool {
+    name.contains("::")
+}
+
 fn compute_method_recursive_cost(
     node: &Node<GasQuantity<InternalGasUnit>>,
     methods: &mut BTreeMap<String, (usize, GasQuantity<InternalGasUnit>)>,
@@ -159,7 +164,8 @@ fn compute_method_recursive_cost(
         sum += compute_method_recursive_cost(child, methods);
     }
 
-    if !node.children.is_empty() {
+    // Only include entries that look like function names (contain "::")
+    if !node.children.is_empty() && is_function_name(&node.text) {
         insert_or_add(methods, node.text.clone(), sum);
     }
     sum
@@ -177,7 +183,8 @@ fn compute_method_self_cost(
         sum += child.val;
     }
 
-    if !node.children.is_empty() {
+    // Only include entries that look like function names (contain "::")
+    if !node.children.is_empty() && is_function_name(&node.text) {
         insert_or_add(methods, node.text.clone(), sum);
     }
 }

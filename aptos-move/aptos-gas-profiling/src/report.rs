@@ -132,54 +132,71 @@ impl TransactionGasLog {
             Value::String(fmt_apt(self.storage.total_refund)),
         );
 
-        // Intrinsic cost
-        let total_exec_io = u64::from(self.exec_io.total()) as f64;
+        // Separate totals for execution and IO categories
+        let total_execution = u64::from(self.exec_io.execution_gas) as f64;
+        let total_io = u64::from(self.exec_io.io_gas) as f64;
 
+        // Helper to calculate percentage against execution gas
+        let exec_percentage = |cost: InternalGas| -> String {
+            if total_execution == 0.0 {
+                "/".to_string()
+            } else {
+                format!("{:.2}%", u64::from(cost) as f64 / total_execution * 100.0)
+            }
+        };
+
+        // Helper to calculate percentage against IO gas
+        let io_percentage = |cost: InternalGas| -> String {
+            if total_io == 0.0 {
+                "/".to_string()
+            } else {
+                format!("{:.2}%", u64::from(cost) as f64 / total_io * 100.0)
+            }
+        };
+
+        // Intrinsic cost (execution category)
         let cost_scaled = format!(
             "{:.8}",
             (u64::from(self.exec_io.intrinsic_cost) as f64 / scaling_factor)
         );
         let cost_scaled = crate::misc::strip_trailing_zeros_and_decimal_point(&cost_scaled);
-        let percentage = format!(
-            "{:.2}%",
-            u64::from(self.exec_io.intrinsic_cost) as f64 / total_exec_io * 100.0
-        );
         data.insert("intrinsic".to_string(), json!(cost_scaled));
-        if !self.exec_io.total().is_zero() {
-            data.insert("intrinsic-percentage".to_string(), json!(percentage));
+        if !self.exec_io.execution_gas.is_zero() {
+            data.insert(
+                "intrinsic-percentage".to_string(),
+                json!(exec_percentage(self.exec_io.intrinsic_cost)),
+            );
         }
 
-        // Keyless cost
+        // Keyless cost (execution category)
         if !self.exec_io.keyless_cost.is_zero() {
             let cost_scaled = format!(
                 "{:.8}",
                 (u64::from(self.exec_io.keyless_cost) as f64 / scaling_factor)
             );
-            let percentage = format!(
-                "{:.2}%",
-                u64::from(self.exec_io.keyless_cost) as f64 / total_exec_io * 100.0
-            );
+            let cost_scaled = crate::misc::strip_trailing_zeros_and_decimal_point(&cost_scaled);
             data.insert("keyless".to_string(), json!(cost_scaled));
-            data.insert("keyless-percentage".to_string(), json!(percentage));
+            data.insert(
+                "keyless-percentage".to_string(),
+                json!(exec_percentage(self.exec_io.keyless_cost)),
+            );
         }
 
-        // SLH-DSA-SHA2-128s cost
+        // SLH-DSA-SHA2-128s cost (execution category)
         if !self.exec_io.slh_dsa_sha2_128s_cost.is_zero() {
             let cost_scaled = format!(
                 "{:.8}",
                 (u64::from(self.exec_io.slh_dsa_sha2_128s_cost) as f64 / scaling_factor)
             );
-            let percentage = format!(
-                "{:.2}%",
-                u64::from(self.exec_io.slh_dsa_sha2_128s_cost) as f64 / total_exec_io * 100.0
-            );
+            let cost_scaled = crate::misc::strip_trailing_zeros_and_decimal_point(&cost_scaled);
             data.insert("slh_dsa_sha2_128s".to_string(), json!(cost_scaled));
             data.insert(
                 "slh_dsa_sha2_128s-percentage".to_string(),
-                json!(percentage),
+                json!(exec_percentage(self.exec_io.slh_dsa_sha2_128s_cost)),
             );
         }
 
+        // Dependencies (execution category - loading modules is CPU work)
         let mut deps = self.exec_io.dependencies.clone();
         deps.sort_by(|lhs, rhs| rhs.cost.cmp(&lhs.cost));
         data.insert(
@@ -192,14 +209,12 @@ impl TransactionGasLog {
                             format!("{:.8}", (u64::from(dep.cost) as f64 / scaling_factor));
                         let cost_scaled =
                             crate::misc::strip_trailing_zeros_and_decimal_point(&cost_scaled);
-                        let percentage =
-                            format!("{:.2}%", u64::from(dep.cost) as f64 / total_exec_io * 100.0);
 
                         json!({
                             "name": name,
                             "size": u64::from(dep.size),
                             "cost": cost_scaled,
-                            "percentage": percentage,
+                            "percentage": exec_percentage(dep.cost),
                         })
                     })
                     .collect(),
@@ -209,26 +224,72 @@ impl TransactionGasLog {
         // Execution & IO (aggregated)
         let aggregated: crate::aggregate::AggregatedExecutionGasEvents =
             self.exec_io.aggregate_gas_events();
-        let convert_op = |(op, hits, cost): (String, usize, InternalGas)| {
+
+        // Combined total for methods tables (they span both execution and IO)
+        let total_combined = total_execution + total_io;
+        let combined_percentage = |cost: InternalGas| -> String {
+            if total_combined == 0.0 {
+                "/".to_string()
+            } else {
+                format!("{:.2}%", u64::from(cost) as f64 / total_combined * 100.0)
+            }
+        };
+
+        // Converter for execution category items
+        let convert_exec_op = |(op, hits, cost): (String, usize, InternalGas)| {
             let cost_scaled = format!("{:.8}", (u64::from(cost) as f64 / scaling_factor));
             let cost_scaled = crate::misc::strip_trailing_zeros_and_decimal_point(&cost_scaled);
-
-            let percentage = format!("{:.2}%", u64::from(cost) as f64 / total_exec_io * 100.0);
 
             json!({
                 "name": op,
                 "hits": hits,
                 "cost": cost_scaled,
-                "percentage": percentage,
+                "percentage": exec_percentage(cost),
             })
         };
+
+        // Converter for IO category items
+        let convert_io_op = |(op, hits, cost): (String, usize, InternalGas)| {
+            let cost_scaled = format!("{:.8}", (u64::from(cost) as f64 / scaling_factor));
+            let cost_scaled = crate::misc::strip_trailing_zeros_and_decimal_point(&cost_scaled);
+
+            json!({
+                "name": op,
+                "hits": hits,
+                "cost": cost_scaled,
+                "percentage": io_percentage(cost),
+            })
+        };
+
+        // Converter for combined (execution + IO) items like methods
+        let convert_combined_op = |(op, hits, cost): (String, usize, InternalGas)| {
+            let cost_scaled = format!("{:.8}", (u64::from(cost) as f64 / scaling_factor));
+            let cost_scaled = crate::misc::strip_trailing_zeros_and_decimal_point(&cost_scaled);
+
+            json!({
+                "name": op,
+                "hits": hits,
+                "cost": cost_scaled,
+                "percentage": combined_percentage(cost),
+            })
+        };
+
+        // Execution category: ops (bytecodes and natives)
         data.insert(
             "ops".to_string(),
-            Value::Array(aggregated.ops.into_iter().map(convert_op).collect()),
+            Value::Array(aggregated.ops.into_iter().map(convert_exec_op).collect()),
         );
+
+        // Methods tables use combined total (they include both execution and IO costs)
         data.insert(
             "methods".to_string(),
-            Value::Array(aggregated.methods.into_iter().map(convert_op).collect()),
+            Value::Array(
+                aggregated
+                    .methods
+                    .into_iter()
+                    .map(convert_combined_op)
+                    .collect(),
+            ),
         );
         data.insert(
             "methods_self".to_string(),
@@ -236,17 +297,19 @@ impl TransactionGasLog {
                 aggregated
                     .methods_self
                     .into_iter()
-                    .map(convert_op)
+                    .map(convert_combined_op)
                     .collect(),
             ),
         );
+
+        // IO category: reads, writes, events
         data.insert(
             "reads".to_string(),
             Value::Array(
                 aggregated
                     .storage_reads
                     .into_iter()
-                    .map(convert_op)
+                    .map(convert_io_op)
                     .collect(),
             ),
         );
@@ -256,13 +319,13 @@ impl TransactionGasLog {
                 aggregated
                     .storage_writes
                     .into_iter()
-                    .map(convert_op)
+                    .map(convert_io_op)
                     .collect(),
             ),
         );
         data.insert(
             "transaction_write".to_string(),
-            convert_op((
+            convert_io_op((
                 "transaction_write".to_string(),
                 1,
                 aggregated.transaction_write,
@@ -274,7 +337,7 @@ impl TransactionGasLog {
                 aggregated
                     .event_writes
                     .into_iter()
-                    .map(convert_op)
+                    .map(convert_io_op)
                     .collect(),
             ),
         );
@@ -377,7 +440,7 @@ impl TransactionGasLog {
             Value::String(format!("{}", self.peak_memory_usage)),
         );
 
-        // Execution trace
+        // Execution trace (shows raw costs without percentages)
         let mut tree = self.exec_io.to_erased(true).tree;
         tree.include_child_costs();
 
@@ -386,14 +449,12 @@ impl TransactionGasLog {
             let text_indented = format!("{}{}", " ".repeat(depth * 4), text);
 
             if cost.is_zero() {
-                table.push([text_indented, "".to_string(), "".to_string()])
+                table.push([text_indented, "".to_string()])
             } else {
                 let cost_scaled = format!("{:.8}", (u64::from(cost) as f64 / scaling_factor));
                 let cost_scaled = crate::misc::strip_trailing_zeros_and_decimal_point(&cost_scaled);
 
-                let percentage = format!("{:.2}%", u64::from(cost) as f64 / total_exec_io * 100.0);
-
-                table.push([text_indented, cost_scaled.to_string(), percentage])
+                table.push([text_indented, cost_scaled.to_string()])
             }
         });
 
