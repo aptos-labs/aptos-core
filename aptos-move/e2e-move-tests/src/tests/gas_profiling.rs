@@ -68,8 +68,8 @@ fn test_gas_profiling_report() {
             ident_str!("write_and_refund").to_owned(),
             vec![],
             vec![
-                bcs::to_bytes(&5u64).unwrap(),  // add 5 items
-                bcs::to_bytes(&3u64).unwrap(),  // remove 3 items
+                bcs::to_bytes(&5u64).unwrap(), // add 5 items
+                bcs::to_bytes(&3u64).unwrap(), // remove 3 items
             ],
         )),
     );
@@ -108,8 +108,5 @@ fn test_gas_profiling_report() {
     );
 
     // Verify events section exists (our transaction emits an event)
-    assert!(
-        html.contains("Events"),
-        "Report should have Events section"
-    );
+    assert!(html.contains("Events"), "Report should have Events section");
 }

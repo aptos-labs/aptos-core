@@ -129,9 +129,9 @@ impl Dependency {
 #[derive(Debug, Clone)]
 pub struct ExecutionAndIOCosts {
     pub gas_scaling_factor: GasScalingFactor,
-    /// Execution gas only (CPU time) - corresponds to FeeStatement::execution_gas_units.
+    /// Execution gas - corresponds to FeeStatement::execution_gas_units.
     pub execution_gas: InternalGas,
-    /// IO gas only (storage IO bandwidth) - corresponds to FeeStatement::io_gas_units.
+    /// IO gas - corresponds to FeeStatement::io_gas_units.
     pub io_gas: InternalGas,
 
     pub intrinsic_cost: InternalGas,

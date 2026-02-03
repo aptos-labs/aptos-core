@@ -68,7 +68,7 @@
                 <td><b>Execution Gas</b></td>
                 <td style="text-align: right">{{summary-execution-gas}}</td>
                 <td>gas units</td>
-                <td>CPU time</td>
+                <td>Transient resources for execution, like CPU time or memory</td>
             </tr>
             <tr>
                 <td><b>IO Gas</b></td>
@@ -115,8 +115,8 @@
         Execution and IO are measured in gas units; storage is measured in APT.
 
         <h3>Execution</h3>
-        Execution costs cover transient resources used for executing the transaction, including
-        CPU time for running bytecode and native functions.
+        Execution costs cover transient resources used for executing the transaction,
+        such as CPU time or memory usage.
         <p>Total: {{summary-execution-gas}} gas units</p>
 
         <h4>Intrinsic Cost</h4>
