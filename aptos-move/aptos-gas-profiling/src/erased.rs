@@ -247,7 +247,7 @@ impl ExecutionAndIOCosts {
 
         TypeErasedExecutionAndIoCosts {
             gas_scaling_factor: self.gas_scaling_factor,
-            total: self.total,
+            total: self.total(),
             tree: Node::new_with_children("execution & IO (gas unit, full trace)", 0, nodes),
         }
     }

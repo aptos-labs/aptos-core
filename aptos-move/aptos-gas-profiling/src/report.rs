@@ -103,9 +103,37 @@ impl TransactionGasLog {
             Value::Bool(graph_storage.is_some()),
         );
 
-        // Intrinsic cost
         let scaling_factor = u64::from(self.exec_io.gas_scaling_factor) as f64;
-        let total_exec_io = u64::from(self.exec_io.total) as f64;
+
+        // FeeStatement Summary - matches the on-chain FeeStatement event
+        let fmt_gas_units = |gas: InternalGas| -> String {
+            let scaled = format!("{:.8}", (u64::from(gas) as f64 / scaling_factor));
+            crate::misc::strip_trailing_zeros_and_decimal_point(&scaled).to_string()
+        };
+        let fmt_apt = |fee: Fee| -> String {
+            let scaled = format!("{:.8}", (u64::from(fee) as f64 / 1_0000_0000f64));
+            crate::misc::strip_trailing_zeros_and_decimal_point(&scaled).to_string()
+        };
+
+        data.insert(
+            "summary-execution-gas".to_string(),
+            Value::String(fmt_gas_units(self.exec_io.execution_gas)),
+        );
+        data.insert(
+            "summary-io-gas".to_string(),
+            Value::String(fmt_gas_units(self.exec_io.io_gas)),
+        );
+        data.insert(
+            "summary-storage-fee".to_string(),
+            Value::String(fmt_apt(self.storage.total)),
+        );
+        data.insert(
+            "summary-storage-refund".to_string(),
+            Value::String(fmt_apt(self.storage.total_refund)),
+        );
+
+        // Intrinsic cost
+        let total_exec_io = u64::from(self.exec_io.total()) as f64;
 
         let cost_scaled = format!(
             "{:.8}",
@@ -117,7 +145,7 @@ impl TransactionGasLog {
             u64::from(self.exec_io.intrinsic_cost) as f64 / total_exec_io * 100.0
         );
         data.insert("intrinsic".to_string(), json!(cost_scaled));
-        if !self.exec_io.total.is_zero() {
+        if !self.exec_io.total().is_zero() {
             data.insert("intrinsic-percentage".to_string(), json!(percentage));
         }
 

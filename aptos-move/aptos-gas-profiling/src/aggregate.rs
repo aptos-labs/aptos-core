@@ -137,7 +137,7 @@ impl ExecutionAndIOCosts {
 
         AggregatedExecutionGasEvents {
             gas_scaling_factor: self.gas_scaling_factor,
-            total: self.total,
+            total: self.total(),
 
             ops: into_sorted_vec(ops),
             methods: into_sorted_vec(methods),

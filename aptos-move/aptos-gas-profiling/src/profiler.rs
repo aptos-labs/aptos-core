@@ -738,7 +738,8 @@ where
 
         let exec_io = ExecutionAndIOCosts {
             gas_scaling_factor: self.base.gas_unit_scaling_factor(),
-            total: self.algebra().execution_gas_used() + self.algebra().io_gas_used(),
+            execution_gas: self.algebra().execution_gas_used(),
+            io_gas: self.algebra().io_gas_used(),
             intrinsic_cost: self.intrinsic_cost.unwrap_or_else(|| 0.into()),
             keyless_cost: self.keyless_cost.unwrap_or_else(|| 0.into()),
             slh_dsa_sha2_128s_cost: self.slh_dsa_sha2_128s_cost.unwrap_or_else(|| 0.into()),

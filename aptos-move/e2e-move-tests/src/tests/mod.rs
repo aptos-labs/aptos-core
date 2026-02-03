@@ -31,6 +31,7 @@ mod function_values;
 mod fungible_asset;
 mod fv_as_table_keys;
 mod gas;
+mod gas_profiling;
 mod generate_upgrade_script;
 mod generic_cmp;
 mod governance_updates;

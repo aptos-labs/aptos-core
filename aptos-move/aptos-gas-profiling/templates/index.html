@@ -53,6 +53,48 @@
     </header>
 
     <section>
+        <h2>Summary</h2>
+        <p>
+            This summary corresponds to the <code>FeeStatement</code> event emitted by the transaction.
+        </p>
+        <table>
+            <tr>
+                <th>Category</th>
+                <th style="text-align: right">Value</th>
+                <th>Unit</th>
+                <th>Description</th>
+            </tr>
+            <tr>
+                <td><b>Execution Gas</b></td>
+                <td style="text-align: right">{{summary-execution-gas}}</td>
+                <td>gas units</td>
+                <td>CPU time</td>
+            </tr>
+            <tr>
+                <td><b>IO Gas</b></td>
+                <td style="text-align: right">{{summary-io-gas}}</td>
+                <td>gas units</td>
+                <td>Storage reads and writes</td>
+            </tr>
+            <tr>
+                <td><b>Storage Fee</b></td>
+                <td style="text-align: right">{{summary-storage-fee}}</td>
+                <td>APT</td>
+                <td>Cost for new or expanded storage slots</td>
+            </tr>
+            <tr>
+                <td><b>Storage Refund</b></td>
+                <td style="text-align: right">{{summary-storage-refund}}</td>
+                <td>APT</td>
+                <td>Refund for deleted storage slots</td>
+            </tr>
+        </table>
+        <p style="font-size: 0.9em; color: #666;">
+            <b>Note:</b> Values may differ slightly from the <code>FeeStatement</code> due to rounding.
+        </p>
+    </section>
+
+    <section>
         <h2>Flamegraphs</h2>
         {{#if graph-exec-io}}
         <object data="assets/exec_io.svg" type="image/svg+xml" class="flamegraph"></object>
@@ -78,10 +120,8 @@
         the network is not at capacity.
 
         <h4>Intrinsic Cost</h4>
-        {{intrinsic}} gas units
-        {{#if intrinsic-percentage}}
-        , {{intrinsic-percentage}} of the total cost for execution & IO.
-        {{/if}}
+        {{intrinsic}} gas units{{#if intrinsic-percentage}}, {{intrinsic-percentage}} of the total cost for execution &
+        IO.{{/if}}
 
         {{#if keyless}}
         <h4>Keyless Cost</h4>
