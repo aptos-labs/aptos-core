@@ -1,19 +1,23 @@
 # This workflow monitors that the latest Aptos CLI release is downloadable
 # using the official installation scripts from aptos.dev.
-# It runs hourly and alerts via Slack if downloads fail.
+# It should be triggered hourly via PIES and alerts via Slack if downloads fail.
+#
+# NOTE: This workflow uses workflow_dispatch instead of schedule triggers.
+# To run this hourly, configure PIES to trigger this workflow on schedule.
 
 name: "Monitor CLI Release Downloads"
 
 on:
-  schedule:
-    # Run once an hour at minute 15 (to avoid peak times at the top of the hour)
-    - cron: "15 * * * *"
-  # Allow manual triggering for testing
+  # Triggered via PIES on a schedule (hourly)
   workflow_dispatch:
   # Also run on changes to this workflow file
   pull_request:
     paths:
       - ".github/workflows/cli-release-monitoring.yaml"
+
+# Explicit permissions following security best practices
+permissions:
+  contents: read
 
 # Prevent concurrent runs to avoid alert spam
 concurrency:
