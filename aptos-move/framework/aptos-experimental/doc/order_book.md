@@ -131,7 +131,7 @@
     OrderBook::UnifiedV1 {
         <a href="single_order_book.md#0x7_single_order_book">single_order_book</a>: new_single_order_book(),
         <a href="bulk_order_book.md#0x7_bulk_order_book">bulk_order_book</a>: new_bulk_order_book(),
-        price_time_idx: new_price_time_idx(),
+        price_time_idx: new_price_time_idx()
     }
 }
 </code></pre>
@@ -288,7 +288,9 @@
 <pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_cancel_single_order">cancel_single_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, order_id: OrderId
 ): SingleOrder&lt;M&gt; {
-    self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.cancel_order(&<b>mut</b> self.price_time_idx, order_creator, order_id)
+    self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.cancel_order(
+        &<b>mut</b> self.price_time_idx, order_creator, order_id
+    )
 }
 </code></pre>
 
@@ -314,7 +316,9 @@
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_try_cancel_single_order">try_cancel_single_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, order_id: OrderId
 ): Option&lt;SingleOrder&lt;M&gt;&gt; {
-    self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.try_cancel_order(&<b>mut</b> self.price_time_idx, order_creator, order_id)
+    self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.try_cancel_order(
+        &<b>mut</b> self.price_time_idx, order_creator, order_id
+    )
 }
 </code></pre>
 
@@ -340,7 +344,9 @@
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_try_cancel_single_order_with_client_order_id">try_cancel_single_order_with_client_order_id</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, client_order_id: String
 ): Option&lt;SingleOrder&lt;M&gt;&gt; {
-    self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.try_cancel_order_with_client_order_id(&<b>mut</b> self.price_time_idx, order_creator, client_order_id)
+    self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.try_cancel_order_with_client_order_id(
+        &<b>mut</b> self.price_time_idx, order_creator, client_order_id
+    )
 }
 </code></pre>
 
@@ -367,8 +373,7 @@
     self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_req: SingleOrderRequest&lt;M&gt;
 ) {
     self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.place_maker_or_pending_order(
-        &<b>mut</b> self.price_time_idx,
-        order_req
+        &<b>mut</b> self.price_time_idx, order_req
     );
 }
 </code></pre>
@@ -393,9 +398,17 @@
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_decrease_single_order_size">decrease_single_order_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, order_id: OrderId, size_delta: u64
+    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;,
+    order_creator: <b>address</b>,
+    order_id: OrderId,
+    size_delta: u64
 ) {
-    self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.decrease_order_size(&<b>mut</b> self.price_time_idx, order_creator, order_id, size_delta)
+    self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.decrease_order_size(
+        &<b>mut</b> self.price_time_idx,
+        order_creator,
+        order_id,
+        size_delta
+    )
 }
 </code></pre>
 
@@ -496,7 +509,9 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_best_bid_price">best_bid_price</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;): Option&lt;u64&gt; {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_best_bid_price">best_bid_price</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;
+): Option&lt;u64&gt; {
     self.price_time_idx.<a href="order_book.md#0x7_order_book_best_bid_price">best_bid_price</a>()
 }
 </code></pre>
@@ -520,7 +535,9 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_best_ask_price">best_ask_price</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;): Option&lt;u64&gt; {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_best_ask_price">best_ask_price</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;
+): Option&lt;u64&gt; {
     self.price_time_idx.<a href="order_book.md#0x7_order_book_best_ask_price">best_ask_price</a>()
 }
 </code></pre>
@@ -613,7 +630,9 @@ Checks if the order is a taker order i.e., matched immediately with the active o
     <b>if</b> (result.is_active_matched_book_type_single_order()) {
         self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.<a href="order_book.md#0x7_order_book_get_single_match_for_taker">get_single_match_for_taker</a>(result)
     } <b>else</b> {
-        self.<a href="bulk_order_book.md#0x7_bulk_order_book">bulk_order_book</a>.<a href="order_book.md#0x7_order_book_get_single_match_for_taker">get_single_match_for_taker</a>(&<b>mut</b> self.price_time_idx, result, is_bid)
+        self.<a href="bulk_order_book.md#0x7_bulk_order_book">bulk_order_book</a>.<a href="order_book.md#0x7_order_book_get_single_match_for_taker">get_single_match_for_taker</a>(
+            &<b>mut</b> self.price_time_idx, result, is_bid
+        )
     }
 }
 </code></pre>
@@ -640,7 +659,7 @@ Checks if the order is a taker order i.e., matched immediately with the active o
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_reinsert_order">reinsert_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;,
     reinsert_order: OrderMatchDetails&lt;M&gt;,
-    original_order: &OrderMatchDetails&lt;M&gt;,
+    original_order: &OrderMatchDetails&lt;M&gt;
 ) {
     <b>if</b> (reinsert_order.is_single_order_from_match_details()) {
         self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.<a href="order_book.md#0x7_order_book_reinsert_order">reinsert_order</a>(
@@ -674,9 +693,7 @@ Checks if the order is a taker order i.e., matched immediately with the active o
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_get_bulk_order_remaining_size">get_bulk_order_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;,
-    order_creator: <b>address</b>,
-    is_bid: bool
+    self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, is_bid: bool
 ): u64 {
     self.<a href="bulk_order_book.md#0x7_bulk_order_book">bulk_order_book</a>.get_remaining_size(order_creator, is_bid)
 }
@@ -703,11 +720,8 @@ Checks if the order is a taker order i.e., matched immediately with the active o
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book.md#0x7_order_book_place_bulk_order">place_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_req: BulkOrderRequest&lt;M&gt;
-) : BulkOrderPlaceResponse&lt;M&gt; {
-    self.<a href="bulk_order_book.md#0x7_bulk_order_book">bulk_order_book</a>.<a href="order_book.md#0x7_order_book_place_bulk_order">place_bulk_order</a>(
-        &<b>mut</b> self.price_time_idx,
-        order_req
-    )
+): BulkOrderPlaceResponse&lt;M&gt; {
+    self.<a href="bulk_order_book.md#0x7_bulk_order_book">bulk_order_book</a>.<a href="order_book.md#0x7_order_book_place_bulk_order">place_bulk_order</a>(&<b>mut</b> self.price_time_idx, order_req)
 }
 </code></pre>
 

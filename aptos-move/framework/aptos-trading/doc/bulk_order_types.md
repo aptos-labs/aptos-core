@@ -54,13 +54,10 @@ price levels with associated sizes.
 ```move
 // Create a new bulk order
 let order = bulk_order_types::new_bulk_order(
+order_request,
 order_id,
-@trader,
 unique_priority_idx,
-bid_prices,
-bid_sizes,
-ask_prices,
-ask_sizes
+creation_time_micros
 );
 ```
 (work in progress)
@@ -79,22 +76,20 @@ ask_sizes
     -  [Fields:](#@Fields:_8)
 -  [Enum `BulkOrderPlaceResponse`](#0x5_bulk_order_types_BulkOrderPlaceResponse)
 -  [Constants](#@Constants_9)
--  [Function `trim_start`](#0x5_bulk_order_types_trim_start)
 -  [Function `new_bulk_order`](#0x5_bulk_order_types_new_bulk_order)
     -  [Arguments:](#@Arguments:_10)
-    -  [Returns:](#@Returns:_11)
 -  [Function `new_bulk_order_request`](#0x5_bulk_order_types_new_bulk_order_request)
-    -  [Arguments:](#@Arguments:_12)
-    -  [Returns:](#@Returns:_13)
-    -  [Aborts:](#@Aborts:_14)
+    -  [Arguments:](#@Arguments:_11)
+    -  [Returns:](#@Returns:_12)
+    -  [Aborts:](#@Aborts:_13)
 -  [Function `new_bulk_order_place_response_success`](#0x5_bulk_order_types_new_bulk_order_place_response_success)
 -  [Function `new_bulk_order_place_response_rejection`](#0x5_bulk_order_types_new_bulk_order_place_response_rejection)
 -  [Function `get_unique_priority_idx`](#0x5_bulk_order_types_get_unique_priority_idx)
-    -  [Arguments:](#@Arguments:_15)
-    -  [Returns:](#@Returns:_16)
+    -  [Arguments:](#@Arguments:_14)
+    -  [Returns:](#@Returns:_15)
 -  [Function `get_order_id`](#0x5_bulk_order_types_get_order_id)
-    -  [Arguments:](#@Arguments:_17)
-    -  [Returns:](#@Returns:_18)
+    -  [Arguments:](#@Arguments:_16)
+    -  [Returns:](#@Returns:_17)
 -  [Function `get_creation_time_micros`](#0x5_bulk_order_types_get_creation_time_micros)
 -  [Function `get_order_request`](#0x5_bulk_order_types_get_order_request)
 -  [Function `get_order_request_mut`](#0x5_bulk_order_types_get_order_request_mut)
@@ -102,32 +97,32 @@ ask_sizes
 -  [Function `get_sequence_number`](#0x5_bulk_order_types_get_sequence_number)
 -  [Function `get_total_remaining_size`](#0x5_bulk_order_types_get_total_remaining_size)
 -  [Function `get_active_price`](#0x5_bulk_order_types_get_active_price)
-    -  [Arguments:](#@Arguments:_19)
-    -  [Returns:](#@Returns:_20)
+    -  [Arguments:](#@Arguments:_18)
+    -  [Returns:](#@Returns:_19)
 -  [Function `get_all_prices`](#0x5_bulk_order_types_get_all_prices)
+-  [Function `get_all_prices_mut`](#0x5_bulk_order_types_get_all_prices_mut)
 -  [Function `get_all_sizes`](#0x5_bulk_order_types_get_all_sizes)
+-  [Function `get_all_sizes_mut`](#0x5_bulk_order_types_get_all_sizes_mut)
 -  [Function `get_active_size`](#0x5_bulk_order_types_get_active_size)
-    -  [Arguments:](#@Arguments:_21)
-    -  [Returns:](#@Returns:_22)
+    -  [Arguments:](#@Arguments:_20)
+    -  [Returns:](#@Returns:_21)
 -  [Function `get_prices_and_sizes_mut`](#0x5_bulk_order_types_get_prices_and_sizes_mut)
 -  [Function `is_success_response`](#0x5_bulk_order_types_is_success_response)
 -  [Function `is_rejection_response`](#0x5_bulk_order_types_is_rejection_response)
 -  [Function `destroy_bulk_order_place_response_success`](#0x5_bulk_order_types_destroy_bulk_order_place_response_success)
 -  [Function `destroy_bulk_order_place_response_rejection`](#0x5_bulk_order_types_destroy_bulk_order_place_response_rejection)
 -  [Function `validate_not_zero_sizes`](#0x5_bulk_order_types_validate_not_zero_sizes)
-    -  [Arguments:](#@Arguments:_23)
+    -  [Arguments:](#@Arguments:_22)
 -  [Function `validate_price_ordering`](#0x5_bulk_order_types_validate_price_ordering)
-    -  [Arguments:](#@Arguments:_24)
--  [Function `discard_price_crossing_levels`](#0x5_bulk_order_types_discard_price_crossing_levels)
+    -  [Arguments:](#@Arguments:_23)
 -  [Function `new_bulk_order_match`](#0x5_bulk_order_types_new_bulk_order_match)
 -  [Function `set_empty`](#0x5_bulk_order_types_set_empty)
-    -  [Arguments:](#@Arguments:_25)
+    -  [Arguments:](#@Arguments:_24)
 -  [Function `destroy_bulk_order`](#0x5_bulk_order_types_destroy_bulk_order)
 -  [Function `destroy_bulk_order_request`](#0x5_bulk_order_types_destroy_bulk_order_request)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
-<b>use</b> <a href="../../aptos-framework/doc/timestamp.md#0x1_timestamp">0x1::timestamp</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
 <b>use</b> <a href="order_book_types.md#0x5_order_book_types">0x5::order_book_types</a>;
 <b>use</b> <a href="order_match_types.md#0x5_order_match_types">0x5::order_match_types</a>;
@@ -539,32 +534,6 @@ This limit prevents gas DoS scenarios when cancelling bulk orders.
 
 
 
-<a id="0x5_bulk_order_types_trim_start"></a>
-
-## Function `trim_start`
-
-
-
-<pre><code><b>fun</b> <a href="bulk_order_types.md#0x5_bulk_order_types_trim_start">trim_start</a>&lt;Element&gt;(v: &<b>mut</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Element&gt;, new_start: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Element&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="bulk_order_types.md#0x5_bulk_order_types_trim_start">trim_start</a>&lt;Element&gt;(v: &<b>mut</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Element&gt;, new_start: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Element&gt; {
-    <b>let</b> other = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
-    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_move_range">vector::move_range</a>(v, 0, new_start, &<b>mut</b> other, 0);
-    other
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x5_bulk_order_types_new_bulk_order"></a>
 
 ## Function `new_bulk_order`
@@ -576,26 +545,15 @@ Creates a new bulk order with the specified parameters.
 
 ### Arguments:
 
+- <code>order_request</code>: The bulk order request containing all order details
 - <code>order_id</code>: Unique identifier for the order
 - <code>unique_priority_idx</code>: Priority index for time-based ordering
-- <code>order_req</code>: The bulk order request containing all order details
-- <code>best_bid_price</code>: Current best bid price in the market
-- <code>best_ask_price</code>: Current best ask price in the market
+- <code>creation_time_micros</code>: Creation time of the order
+
+Does no validation itself.
 
 
-<a id="@Returns:_11"></a>
-
-### Returns:
-
-A tuple containing:
-- <code><a href="bulk_order_types.md#0x5_bulk_order_types_BulkOrder">BulkOrder</a>&lt;M&gt;</code>: The created bulk order with non-crossing levels
-- <code><a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>: Cancelled bid prices (levels that crossed the spread)
-- <code><a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>: Cancelled bid sizes corresponding to cancelled prices
-- <code><a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>: Cancelled ask prices (levels that crossed the spread)
-- <code><a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>: Cancelled ask sizes corresponding to cancelled prices
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x5_bulk_order_types_new_bulk_order">new_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(order_id: <a href="order_book_types.md#0x5_order_book_types_OrderId">order_book_types::OrderId</a>, unique_priority_idx: <a href="order_book_types.md#0x5_order_book_types_IncreasingIdx">order_book_types::IncreasingIdx</a>, order_req: <a href="bulk_order_types.md#0x5_bulk_order_types_BulkOrderRequest">bulk_order_types::BulkOrderRequest</a>&lt;M&gt;, best_bid_price: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, best_ask_price: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;): (<a href="bulk_order_types.md#0x5_bulk_order_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x5_bulk_order_types_new_bulk_order">new_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(order_request: <a href="bulk_order_types.md#0x5_bulk_order_types_BulkOrderRequest">bulk_order_types::BulkOrderRequest</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x5_order_book_types_OrderId">order_book_types::OrderId</a>, unique_priority_idx: <a href="order_book_types.md#0x5_order_book_types_IncreasingIdx">order_book_types::IncreasingIdx</a>, creation_time_micros: u64): <a href="bulk_order_types.md#0x5_bulk_order_types_BulkOrder">bulk_order_types::BulkOrder</a>&lt;M&gt;
 </code></pre>
 
 
@@ -605,52 +563,17 @@ A tuple containing:
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x5_bulk_order_types_new_bulk_order">new_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    order_request: <a href="bulk_order_types.md#0x5_bulk_order_types_BulkOrderRequest">BulkOrderRequest</a>&lt;M&gt;,
     order_id: OrderId,
     unique_priority_idx: IncreasingIdx,
-    order_req: <a href="bulk_order_types.md#0x5_bulk_order_types_BulkOrderRequest">BulkOrderRequest</a>&lt;M&gt;,
-    best_bid_price: Option&lt;u64&gt;,
-    best_ask_price: Option&lt;u64&gt;
-): (<a href="bulk_order_types.md#0x5_bulk_order_types_BulkOrder">BulkOrder</a>&lt;M&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;) {
-    <b>let</b> creation_time_micros = <a href="../../aptos-framework/doc/timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>();
-    <b>let</b> bid_price_crossing_idx =
-        <a href="bulk_order_types.md#0x5_bulk_order_types_discard_price_crossing_levels">discard_price_crossing_levels</a>(&order_req.bid_prices, best_ask_price, <b>true</b>);
-    <b>let</b> ask_price_crossing_idx =
-        <a href="bulk_order_types.md#0x5_bulk_order_types_discard_price_crossing_levels">discard_price_crossing_levels</a>(&order_req.ask_prices, best_bid_price, <b>false</b>);
-
-    // Extract cancelled levels (the ones that were discarded)
-    <b>let</b> (cancelled_bid_prices, cancelled_bid_sizes) =
-        <b>if</b> (bid_price_crossing_idx &gt; 0) {
-            <b>let</b> cancelled_bid_prices =
-                <a href="bulk_order_types.md#0x5_bulk_order_types_trim_start">trim_start</a>(&<b>mut</b> order_req.bid_prices, bid_price_crossing_idx);
-            <b>let</b> cancelled_bid_sizes =
-                <a href="bulk_order_types.md#0x5_bulk_order_types_trim_start">trim_start</a>(&<b>mut</b> order_req.bid_sizes, bid_price_crossing_idx);
-            (cancelled_bid_prices, cancelled_bid_sizes)
-        } <b>else</b> {
-            (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u64&gt;(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u64&gt;())
-        };
-    <b>let</b> (cancelled_ask_prices, cancelled_ask_sizes) =
-        <b>if</b> (ask_price_crossing_idx &gt; 0) {
-            <b>let</b> cancelled_ask_prices =
-                <a href="bulk_order_types.md#0x5_bulk_order_types_trim_start">trim_start</a>(&<b>mut</b> order_req.ask_prices, ask_price_crossing_idx);
-            <b>let</b> cancelled_ask_sizes =
-                <a href="bulk_order_types.md#0x5_bulk_order_types_trim_start">trim_start</a>(&<b>mut</b> order_req.ask_sizes, ask_price_crossing_idx);
-            (cancelled_ask_prices, cancelled_ask_sizes)
-        } <b>else</b> {
-            (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u64&gt;(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u64&gt;())
-        };
-    <b>let</b> bulk_order = BulkOrder::V1 {
-        order_request: order_req,
+    creation_time_micros: u64
+): <a href="bulk_order_types.md#0x5_bulk_order_types_BulkOrder">BulkOrder</a>&lt;M&gt; {
+    BulkOrder::V1 {
+        order_request,
         order_id,
         unique_priority_idx,
         creation_time_micros
-    };
-    (
-        bulk_order,
-        cancelled_bid_prices,
-        cancelled_bid_sizes,
-        cancelled_ask_prices,
-        cancelled_ask_sizes
-    )
+    }
 }
 </code></pre>
 
@@ -665,7 +588,7 @@ A tuple containing:
 Creates a new bulk order request with the specified price levels and sizes.
 
 
-<a id="@Arguments:_12"></a>
+<a id="@Arguments:_11"></a>
 
 ### Arguments:
 
@@ -677,14 +600,14 @@ Creates a new bulk order request with the specified price levels and sizes.
 - <code>metadata</code>: Additional metadata for the order
 
 
-<a id="@Returns:_13"></a>
+<a id="@Returns:_12"></a>
 
 ### Returns:
 
 A <code><a href="bulk_order_types.md#0x5_bulk_order_types_BulkOrderRequest">BulkOrderRequest</a></code> instance.
 
 
-<a id="@Aborts:_14"></a>
+<a id="@Aborts:_13"></a>
 
 ### Aborts:
 
@@ -807,9 +730,7 @@ A <code><a href="bulk_order_types.md#0x5_bulk_order_types_BulkOrderRequest">Bulk
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x5_bulk_order_types_new_bulk_order_place_response_rejection">new_bulk_order_place_response_rejection</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
-    sequence_number: u64,
-    existing_sequence_number: u64
+    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, sequence_number: u64, existing_sequence_number: u64
 ): <a href="bulk_order_types.md#0x5_bulk_order_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M&gt; {
     BulkOrderPlaceResponse::Rejection_V1 {
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
@@ -830,14 +751,14 @@ A <code><a href="bulk_order_types.md#0x5_bulk_order_types_BulkOrderRequest">Bulk
 Gets the unique priority index of a bulk order.
 
 
-<a id="@Arguments:_15"></a>
+<a id="@Arguments:_14"></a>
 
 ### Arguments:
 
 - <code>self</code>: Reference to the bulk order
 
 
-<a id="@Returns:_16"></a>
+<a id="@Returns:_15"></a>
 
 ### Returns:
 
@@ -871,14 +792,14 @@ The unique priority index for time-based ordering.
 Gets the order ID of a bulk order.
 
 
-<a id="@Arguments:_17"></a>
+<a id="@Arguments:_16"></a>
 
 ### Arguments:
 
 - <code>self</code>: Reference to the bulk order
 
 
-<a id="@Returns:_18"></a>
+<a id="@Returns:_17"></a>
 
 ### Returns:
 
@@ -944,9 +865,8 @@ The unique order identifier.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x5_bulk_order_types_get_order_request">get_order_request</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<a href="bulk_order_types.md#0x5_bulk_order_types_BulkOrder">BulkOrder</a>&lt;M&gt;
-): &<a href="bulk_order_types.md#0x5_bulk_order_types_BulkOrderRequest">BulkOrderRequest</a>&lt;M&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x5_bulk_order_types_get_order_request">get_order_request</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="bulk_order_types.md#0x5_bulk_order_types_BulkOrder">BulkOrder</a>&lt;M&gt;)
+    : &<a href="bulk_order_types.md#0x5_bulk_order_types_BulkOrderRequest">BulkOrderRequest</a>&lt;M&gt; {
     &self.order_request
 }
 </code></pre>
@@ -1068,7 +988,7 @@ The unique order identifier.
 Gets the active price for a specific side of a bulk order.
 
 
-<a id="@Arguments:_19"></a>
+<a id="@Arguments:_18"></a>
 
 ### Arguments:
 
@@ -1076,7 +996,7 @@ Gets the active price for a specific side of a bulk order.
 - <code>is_bid</code>: True to get bid price, false for ask price
 
 
-<a id="@Returns:_20"></a>
+<a id="@Returns:_19"></a>
 
 ### Returns:
 
@@ -1143,6 +1063,36 @@ An option containing the active price if available, none otherwise.
 
 </details>
 
+<a id="0x5_bulk_order_types_get_all_prices_mut"></a>
+
+## Function `get_all_prices_mut`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x5_bulk_order_types_get_all_prices_mut">get_all_prices_mut</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="bulk_order_types.md#0x5_bulk_order_types_BulkOrderRequest">bulk_order_types::BulkOrderRequest</a>&lt;M&gt;, is_bid: bool): &<b>mut</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x5_bulk_order_types_get_all_prices_mut">get_all_prices_mut</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="bulk_order_types.md#0x5_bulk_order_types_BulkOrderRequest">BulkOrderRequest</a>&lt;M&gt;, is_bid: bool
+): &<b>mut</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt; {
+    <b>if</b> (is_bid) {
+        &<b>mut</b> self.bid_prices
+    } <b>else</b> {
+        &<b>mut</b> self.ask_prices
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x5_bulk_order_types_get_all_sizes"></a>
 
 ## Function `get_all_sizes`
@@ -1173,6 +1123,36 @@ An option containing the active price if available, none otherwise.
 
 </details>
 
+<a id="0x5_bulk_order_types_get_all_sizes_mut"></a>
+
+## Function `get_all_sizes_mut`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x5_bulk_order_types_get_all_sizes_mut">get_all_sizes_mut</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="bulk_order_types.md#0x5_bulk_order_types_BulkOrderRequest">bulk_order_types::BulkOrderRequest</a>&lt;M&gt;, is_bid: bool): &<b>mut</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x5_bulk_order_types_get_all_sizes_mut">get_all_sizes_mut</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="bulk_order_types.md#0x5_bulk_order_types_BulkOrderRequest">BulkOrderRequest</a>&lt;M&gt;, is_bid: bool
+): &<b>mut</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt; {
+    <b>if</b> (is_bid) {
+        &<b>mut</b> self.bid_sizes
+    } <b>else</b> {
+        &<b>mut</b> self.ask_sizes
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x5_bulk_order_types_get_active_size"></a>
 
 ## Function `get_active_size`
@@ -1180,7 +1160,7 @@ An option containing the active price if available, none otherwise.
 Gets the active size for a specific side of a bulk order.
 
 
-<a id="@Arguments:_21"></a>
+<a id="@Arguments:_20"></a>
 
 ### Arguments:
 
@@ -1188,7 +1168,7 @@ Gets the active size for a specific side of a bulk order.
 - <code>is_bid</code>: True to get bid size, false for ask size
 
 
-<a id="@Returns:_22"></a>
+<a id="@Returns:_21"></a>
 
 ### Returns:
 
@@ -1393,7 +1373,7 @@ An option containing the active size if available, none otherwise.
 Validates that all sizes in the vector are greater than 0.
 
 
-<a id="@Arguments:_23"></a>
+<a id="@Arguments:_22"></a>
 
 ### Arguments:
 
@@ -1432,7 +1412,7 @@ Validates that all sizes in the vector are greater than 0.
 Validates that prices are in the correct order (descending for bids, ascending for asks).
 
 
-<a id="@Arguments:_24"></a>
+<a id="@Arguments:_23"></a>
 
 ### Arguments:
 
@@ -1469,45 +1449,6 @@ Validates that prices are in the correct order (descending for bids, ascending f
         i += 1;
     };
     <b>true</b>
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x5_bulk_order_types_discard_price_crossing_levels"></a>
-
-## Function `discard_price_crossing_levels`
-
-
-
-<pre><code><b>fun</b> <a href="bulk_order_types.md#0x5_bulk_order_types_discard_price_crossing_levels">discard_price_crossing_levels</a>(prices: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, best_price: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, is_bid: bool): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="bulk_order_types.md#0x5_bulk_order_types_discard_price_crossing_levels">discard_price_crossing_levels</a>(
-    prices: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, best_price: Option&lt;u64&gt;, is_bid: bool
-): u64 {
-    // Discard bid levels that are &gt;= best ask price
-    <b>let</b> i = 0;
-    <b>if</b> (best_price.is_some()) {
-        <b>let</b> best_price = best_price.destroy_some();
-        <b>while</b> (i &lt; prices.length()) {
-            <b>if</b> (is_bid && prices[i] &lt; best_price) {
-                <b>break</b>;
-            } <b>else</b> <b>if</b> (!is_bid && prices[i] &gt; best_price) {
-                <b>break</b>;
-            };
-            i += 1;
-        };
-    };
-    i // Return the index of the first non-crossing level
 }
 </code></pre>
 
@@ -1571,7 +1512,7 @@ This function is used during order cancellation to clear the order state
 while preserving the order ID for potential reuse.
 
 
-<a id="@Arguments:_25"></a>
+<a id="@Arguments:_24"></a>
 
 ### Arguments:
 

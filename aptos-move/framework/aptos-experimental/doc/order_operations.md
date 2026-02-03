@@ -85,12 +85,19 @@ It it the caller's responsibility to ensure that the account is authorized to ca
         );
     <b>if</b> (order.is_some()) {
         // Order is already placed in the order book, so we can cancel it
-        <b>return</b> <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>(market, order.destroy_some(), <b>true</b>, cancellation_reason, cancel_reason, callbacks);
+        <b>return</b> <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>(
+            market,
+            order.destroy_some(),
+            <b>true</b>,
+            cancellation_reason,
+            cancel_reason,
+            callbacks
+        );
     };
     pre_cancel_order_for_tracker(
         market.get_pre_cancellation_tracker_mut(),
         user,
-        client_order_id,
+        client_order_id
     );
 }
 </code></pre>
@@ -136,7 +143,14 @@ It it the caller's responsibility to ensure that the account is authorized to ca
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ): SingleOrder&lt;M&gt; {
     <b>let</b> order = market.get_order_book_mut().cancel_single_order(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id);
-    <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>(market, order, emit_event, cancellation_reason, cancel_reason, callbacks);
+    <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>(
+        market,
+        order,
+        emit_event,
+        cancellation_reason,
+        cancel_reason,
+        callbacks
+    );
     order
 }
 </code></pre>
@@ -172,10 +186,18 @@ if it was successfully cancelled, or None if the order does not exist.
     cancel_reason: String,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;SingleOrder&lt;M&gt;&gt; {
-    <b>let</b> maybe_order = market.get_order_book_mut().try_cancel_single_order(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id);
+    <b>let</b> maybe_order =
+        market.get_order_book_mut().try_cancel_single_order(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id);
     <b>if</b> (maybe_order.is_some()) {
         <b>let</b> order = maybe_order.destroy_some();
-        <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>(market, order, emit_event, cancellation_reason, cancel_reason, callbacks);
+        <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>(
+            market,
+            order,
+            emit_event,
+            cancellation_reason,
+            cancel_reason,
+            callbacks
+        );
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(order)
     } <b>else</b> {
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
@@ -222,9 +244,22 @@ It it the caller's responsibility to ensure that the account is authorized to mo
 ) {
     <b>let</b> <a href="order_book.md#0x7_order_book">order_book</a> = market.get_order_book_mut();
     <a href="order_book.md#0x7_order_book">order_book</a>.decrease_single_order_size(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, size_delta);
-    <b>let</b> (order, _) = <a href="order_book.md#0x7_order_book">order_book</a>.get_single_order(order_id).destroy_some().destroy_order_from_state();
+    <b>let</b> (order, _) =
+        <a href="order_book.md#0x7_order_book">order_book</a>.get_single_order(order_id).destroy_some().destroy_order_from_state();
     <b>let</b> (order_request, _unique_priority_idx) = order.destroy_single_order();
-    <b>let</b> (user, order_id, client_order_id, price, orig_size, remaining_size, is_bid, trigger_condition, time_in_force, _creation_time_micros, metadata) = order_request.destroy_single_order_request();
+    <b>let</b> (
+        user,
+        order_id,
+        client_order_id,
+        price,
+        orig_size,
+        remaining_size,
+        is_bid,
+        trigger_condition,
+        time_in_force,
+        _creation_time_micros,
+        metadata
+    ) = order_request.destroy_single_order_request();
     callbacks.<a href="order_operations.md#0x7_order_operations_decrease_order_size">decrease_order_size</a>(
         new_clearinghouse_order_info(
             user,
@@ -290,9 +325,32 @@ It it the caller's responsibility to ensure that the account is authorized to mo
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ) {
     <b>let</b> (order_request, _unique_priority_idx) = order.destroy_single_order();
-    <b>let</b> (<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, client_order_id, price, orig_size, remaining_size, is_bid, trigger_condition, time_in_force, _creation_time_micros, metadata) = order_request.destroy_single_order_request();
+    <b>let</b> (
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        order_id,
+        client_order_id,
+        price,
+        orig_size,
+        remaining_size,
+        is_bid,
+        trigger_condition,
+        time_in_force,
+        _creation_time_micros,
+        metadata
+    ) = order_request.destroy_single_order_request();
     cleanup_order_internal(
-        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, client_order_id, single_order_type(), is_bid, time_in_force, remaining_size, price, trigger_condition, metadata, callbacks, <b>false</b>
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        order_id,
+        client_order_id,
+        single_order_type(),
+        is_bid,
+        time_in_force,
+        remaining_size,
+        price,
+        trigger_condition,
+        metadata,
+        callbacks,
+        <b>false</b>
     );
     <b>if</b> (emit_event) {
         market.emit_event_for_order(

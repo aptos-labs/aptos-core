@@ -136,7 +136,15 @@
     metadata: M
 ): <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt; {
     MarketClearinghouseOrderInfo::V1 {
-        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, client_order_id, is_bid, limit_price, time_in_force, order_type, trigger_condition, metadata,
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        order_id,
+        client_order_id,
+        is_bid,
+        limit_price,
+        time_in_force,
+        order_type,
+        trigger_condition,
+        metadata
     }
 }
 </code></pre>
@@ -160,7 +168,9 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_get_account">get_account</a>&lt;M: <b>copy</b> + drop&gt;(self: &<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt;): <b>address</b> {
+<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_get_account">get_account</a>&lt;M: <b>copy</b> + drop&gt;(
+    self: &<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt;
+): <b>address</b> {
     self.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>
 }
 </code></pre>
@@ -184,7 +194,9 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_get_order_id">get_order_id</a>&lt;M: <b>copy</b> + drop&gt;(self: &<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt;): OrderId {
+<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_get_order_id">get_order_id</a>&lt;M: <b>copy</b> + drop&gt;(
+    self: &<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt;
+): OrderId {
     self.order_id
 }
 </code></pre>
@@ -208,7 +220,9 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_is_bid">is_bid</a>&lt;M: <b>copy</b> + drop&gt;(self: &<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt;): bool {
+<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_is_bid">is_bid</a>&lt;M: <b>copy</b> + drop&gt;(
+    self: &<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt;
+): bool {
     self.is_bid
 }
 </code></pre>
@@ -232,7 +246,9 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_get_client_order_id">get_client_order_id</a>&lt;M: <b>copy</b> + drop&gt;(self: &<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt;): Option&lt;String&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_get_client_order_id">get_client_order_id</a>&lt;M: <b>copy</b> + drop&gt;(
+    self: &<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt;
+): Option&lt;String&gt; {
     self.client_order_id
 }
 </code></pre>
@@ -256,7 +272,9 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_get_metadata">get_metadata</a>&lt;M: <b>copy</b> + drop&gt;(self: &<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt;): &M {
+<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_get_metadata">get_metadata</a>&lt;M: <b>copy</b> + drop&gt;(
+    self: &<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt;
+): &M {
     &self.metadata
 }
 </code></pre>
@@ -280,7 +298,19 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_into_inner">into_inner</a>&lt;M: <b>copy</b> + drop&gt;(self: <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt;): (<b>address</b>, OrderId, Option&lt;String&gt;, bool, u64, TimeInForce, OrderType, Option&lt;TriggerCondition&gt;, M) {
+<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_into_inner">into_inner</a>&lt;M: <b>copy</b> + drop&gt;(
+    self: <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt;
+): (
+    <b>address</b>,
+    OrderId,
+    Option&lt;String&gt;,
+    bool,
+    u64,
+    TimeInForce,
+    OrderType,
+    Option&lt;TriggerCondition&gt;,
+    M
+) {
     <b>let</b> MarketClearinghouseOrderInfo::V1 {
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
         order_id,
@@ -290,9 +320,19 @@
         time_in_force,
         order_type,
         trigger_condition,
-        metadata,
+        metadata
     } = self;
-    (<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, client_order_id, is_bid, limit_price, time_in_force, order_type, trigger_condition, metadata)
+    (
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        order_id,
+        client_order_id,
+        is_bid,
+        limit_price,
+        time_in_force,
+        order_type,
+        trigger_condition,
+        metadata
+    )
 }
 </code></pre>
 

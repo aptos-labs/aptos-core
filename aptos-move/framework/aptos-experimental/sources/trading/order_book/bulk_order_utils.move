@@ -3,10 +3,7 @@ module aptos_experimental::bulk_order_utils {
     use std::vector;
     use aptos_std::timestamp;
     use aptos_trading::bulk_order_types::{Self, BulkOrder, BulkOrderRequest};
-    use aptos_trading::order_book_types::{
-        OrderId,
-        IncreasingIdx,
-    };
+    use aptos_trading::order_book_types::{OrderId, IncreasingIdx};
     use aptos_trading::order_match_types::OrderMatchDetails;
 
     friend aptos_experimental::bulk_order_book;
@@ -38,17 +35,25 @@ module aptos_experimental::bulk_order_utils {
     ): (BulkOrder<M>, vector<u64>, vector<u64>, vector<u64>, vector<u64>) {
         let creation_time_micros = timestamp::now_microseconds();
         let bid_price_crossing_idx =
-            discard_price_crossing_levels(&order_req.get_all_prices(true), best_ask_price, true);
+            discard_price_crossing_levels(
+                &order_req.get_all_prices(true), best_ask_price, true
+            );
         let ask_price_crossing_idx =
-            discard_price_crossing_levels(&order_req.get_all_prices(false), best_bid_price, false);
+            discard_price_crossing_levels(
+                &order_req.get_all_prices(false), best_bid_price, false
+            );
 
         // Extract cancelled levels (the ones that were discarded)
         let (cancelled_bid_prices, cancelled_bid_sizes) =
             if (bid_price_crossing_idx > 0) {
                 let cancelled_bid_prices =
-                    trim_start(order_req.get_all_prices_mut(true), bid_price_crossing_idx);
+                    trim_start(
+                        order_req.get_all_prices_mut(true), bid_price_crossing_idx
+                    );
                 let cancelled_bid_sizes =
-                    trim_start(order_req.get_all_sizes_mut(true), bid_price_crossing_idx);
+                    trim_start(
+                        order_req.get_all_sizes_mut(true), bid_price_crossing_idx
+                    );
                 (cancelled_bid_prices, cancelled_bid_sizes)
             } else {
                 (vector::empty<u64>(), vector::empty<u64>())
@@ -56,14 +61,24 @@ module aptos_experimental::bulk_order_utils {
         let (cancelled_ask_prices, cancelled_ask_sizes) =
             if (ask_price_crossing_idx > 0) {
                 let cancelled_ask_prices =
-                    trim_start(order_req.get_all_prices_mut(false), ask_price_crossing_idx);
+                    trim_start(
+                        order_req.get_all_prices_mut(false), ask_price_crossing_idx
+                    );
                 let cancelled_ask_sizes =
-                    trim_start(order_req.get_all_sizes_mut(false), ask_price_crossing_idx);
+                    trim_start(
+                        order_req.get_all_sizes_mut(false), ask_price_crossing_idx
+                    );
                 (cancelled_ask_prices, cancelled_ask_sizes)
             } else {
                 (vector::empty<u64>(), vector::empty<u64>())
             };
-        let bulk_order = bulk_order_types::new_bulk_order(order_req, order_id, unique_priority_idx, creation_time_micros);
+        let bulk_order =
+            bulk_order_types::new_bulk_order(
+                order_req,
+                order_id,
+                unique_priority_idx,
+                creation_time_micros
+            );
         (
             bulk_order,
             cancelled_bid_prices,
@@ -98,7 +113,6 @@ module aptos_experimental::bulk_order_utils {
         i // Return the index of the first non-crossing level
     }
 
-
     /// Reinserts an order into a bulk order.
     ///
     /// This function adds the reinserted order's price and size to the appropriate side
@@ -112,7 +126,10 @@ module aptos_experimental::bulk_order_utils {
         order: &mut BulkOrder<M>, other: &OrderMatchDetails<M>
     ) {
         // Reinsert the order into the bulk order
-        let (prices, sizes) = order.get_order_request_mut().get_prices_and_sizes_mut(other.is_bid_from_match_details());
+        let (prices, sizes) =
+            order.get_order_request_mut().get_prices_and_sizes_mut(
+                other.is_bid_from_match_details()
+            );
         // Reinsert the price and size at the front of the respective vectors - if the price already exists, we ensure that
         // it is same as the reinsertion price and we just increase the size
         // If the price does not exist, we insert it at the front.
@@ -143,7 +160,8 @@ module aptos_experimental::bulk_order_utils {
     public(friend) fun match_order_and_get_next_from_bulk_order<M: store + copy + drop>(
         order: &mut BulkOrder<M>, is_bid: bool, matched_size: u64
     ): (Option<u64>, Option<u64>) {
-        let (prices, sizes) = order.get_order_request_mut().get_prices_and_sizes_mut(is_bid);
+        let (prices, sizes) =
+            order.get_order_request_mut().get_prices_and_sizes_mut(is_bid);
         assert!(matched_size <= sizes[0], EUNEXPECTED_MATCH_SIZE); // Ensure the remaining size is not more than the size at the first price level
         sizes[0] -= matched_size; // Decrease the size at the first price level by the matched size
         if (sizes[0] == 0) {
@@ -171,11 +189,10 @@ module aptos_experimental::bulk_order_utils {
     /// # Returns:
     /// The size that was cancelled at that price level, or 0 if the price wasn't found
     public(friend) fun cancel_at_price_level<M: store + copy + drop>(
-        order: &mut BulkOrder<M>,
-        price: u64,
-        is_bid: bool
+        order: &mut BulkOrder<M>, price: u64, is_bid: bool
     ): u64 {
-        let (prices, sizes) = order.get_order_request_mut().get_prices_and_sizes_mut(is_bid);
+        let (prices, sizes) =
+            order.get_order_request_mut().get_prices_and_sizes_mut(is_bid);
         let i = 0;
         while (i < prices.length()) {
             if (prices[i] == price) {

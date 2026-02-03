@@ -416,7 +416,10 @@ there are o buys / sells, returns None.
     self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>, is_bid: bool, slippage_bps: u64
 ): Option&lt;u64&gt; {
     <b>if</b> (!is_bid) {
-        <b>assert</b>!(slippage_bps &lt;= <a href="price_time_index.md#0x7_price_time_index_get_slippage_pct_precision">get_slippage_pct_precision</a>() * 100, <a href="price_time_index.md#0x7_price_time_index_EINVALID_SLIPPAGE_BPS">EINVALID_SLIPPAGE_BPS</a>);
+        <b>assert</b>!(
+            slippage_bps &lt;= <a href="price_time_index.md#0x7_price_time_index_get_slippage_pct_precision">get_slippage_pct_precision</a>() * 100,
+            <a href="price_time_index.md#0x7_price_time_index_EINVALID_SLIPPAGE_BPS">EINVALID_SLIPPAGE_BPS</a>
+        );
     };
     <b>let</b> mid_price = self.<a href="price_time_index.md#0x7_price_time_index_get_mid_price">get_mid_price</a>();
     <b>if</b> (mid_price.is_none()) {
@@ -460,7 +463,10 @@ there are o buys / sells, returns None.
     is_bid: bool
 ): u64 {
     <b>if</b> (is_bid) {
-        <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceDescTime">PriceDescTime</a> { price, tie_breaker: unique_priority_idx.into_decreasing_idx_type() };
+        <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceDescTime">PriceDescTime</a> {
+            price,
+            tie_breaker: unique_priority_idx.into_decreasing_idx_type()
+        };
         self.buys.remove(&key).size
     } <b>else</b> {
         <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceAscTime">PriceAscTime</a> { price, tie_breaker: unique_priority_idx };
@@ -535,7 +541,9 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
             cur_value.size
         } <b>else</b> {
             <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
-                orders, &cur_key, |order_data| {
+                orders,
+                &cur_key,
+                |order_data| {
                     order_data.size -= remaining_size;
                 }
             );
@@ -637,7 +645,9 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 
 
 <pre><code>inline <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>&lt;K: drop + <b>copy</b> + store&gt;(
-    orders: &<b>mut</b> BigOrderedMap&lt;K, <a href="price_time_index.md#0x7_price_time_index_OrderData">OrderData</a>&gt;, key: &K, modify_fn: |&<b>mut</b>  <a href="price_time_index.md#0x7_price_time_index_OrderData">OrderData</a>|
+    orders: &<b>mut</b> BigOrderedMap&lt;K, <a href="price_time_index.md#0x7_price_time_index_OrderData">OrderData</a>&gt;,
+    key: &K,
+    modify_fn: |&<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_OrderData">OrderData</a>|
 ) {
     <b>let</b> order = orders.borrow_mut(key);
     modify_fn(order);
@@ -705,16 +715,23 @@ Increase the size of the order in the orderbook without altering its position in
     is_bid: bool
 ) {
     <b>if</b> (is_bid) {
-        <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceDescTime">PriceDescTime</a> { price, tie_breaker: unique_priority_idx.into_decreasing_idx_type() };
+        <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceDescTime">PriceDescTime</a> {
+            price,
+            tie_breaker: unique_priority_idx.into_decreasing_idx_type()
+        };
         <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
-            &<b>mut</b> self.buys, &key, |order_data| {
+            &<b>mut</b> self.buys,
+            &key,
+            |order_data| {
                 order_data.size += size_delta;
             }
         );
     } <b>else</b> {
         <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceAscTime">PriceAscTime</a> { price, tie_breaker: unique_priority_idx };
         <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
-            &<b>mut</b> self.sells, &key, |order_data| {
+            &<b>mut</b> self.sells,
+            &key,
+            |order_data| {
                 order_data.size += size_delta;
             }
         );
@@ -750,16 +767,23 @@ Decrease the size of the order in the order book without altering its position i
     is_bid: bool
 ) {
     <b>if</b> (is_bid) {
-        <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceDescTime">PriceDescTime</a> { price, tie_breaker: unique_priority_idx.into_decreasing_idx_type() };
+        <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceDescTime">PriceDescTime</a> {
+            price,
+            tie_breaker: unique_priority_idx.into_decreasing_idx_type()
+        };
         <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
-            &<b>mut</b> self.buys, &key, |order_data| {
+            &<b>mut</b> self.buys,
+            &key,
+            |order_data| {
                 order_data.size -= size_delta;
             }
         );
     } <b>else</b> {
         <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceAscTime">PriceAscTime</a> { price, tie_breaker: unique_priority_idx };
         <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
-            &<b>mut</b> self.sells, &key, |order_data| {
+            &<b>mut</b> self.sells,
+            &key,
+            |order_data| {
                 order_data.size -= size_delta;
             }
         );
@@ -799,7 +823,10 @@ Decrease the size of the order in the order book without altering its position i
     // Assert that this is not a taker order
     <b>assert</b>!(!self.<a href="price_time_index.md#0x7_price_time_index_is_taker_order">is_taker_order</a>(price, is_bid), <a href="price_time_index.md#0x7_price_time_index_EINVALID_MAKER_ORDER">EINVALID_MAKER_ORDER</a>);
     <b>if</b> (is_bid) {
-        <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceDescTime">PriceDescTime</a> { price, tie_breaker: unique_priority_idx.into_decreasing_idx_type() };
+        <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceDescTime">PriceDescTime</a> {
+            price,
+            tie_breaker: unique_priority_idx.into_decreasing_idx_type()
+        };
         self.buys.add(key, value);
     } <b>else</b> {
         <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceAscTime">PriceAscTime</a> { price, tie_breaker: unique_priority_idx };

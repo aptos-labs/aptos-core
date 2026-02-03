@@ -1137,9 +1137,8 @@ This should only be called on bulk orders, aborts if called for non-bulk order.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_match_types.md#0x5_order_match_types_destroy_active_matched_order">destroy_active_matched_order</a>(
-    self: <a href="order_match_types.md#0x5_order_match_types_ActiveMatchedOrder">ActiveMatchedOrder</a>
-): (OrderId, u64, u64, OrderType) {
+<pre><code><b>public</b> <b>fun</b> <a href="order_match_types.md#0x5_order_match_types_destroy_active_matched_order">destroy_active_matched_order</a>(self: <a href="order_match_types.md#0x5_order_match_types_ActiveMatchedOrder">ActiveMatchedOrder</a>)
+    : (OrderId, u64, u64, OrderType) {
     <b>let</b> ActiveMatchedOrder::V1 {
         order_id,
         matched_size,

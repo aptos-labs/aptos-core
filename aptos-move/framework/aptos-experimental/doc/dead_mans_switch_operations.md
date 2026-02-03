@@ -127,13 +127,15 @@ Aborts:
             <b>let</b> <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> = order.get_order_request().get_account();
 
             // Get creation <a href="../../aptos-framework/doc/timestamp.md#0x1_timestamp">timestamp</a> in microseconds and convert <b>to</b> seconds
-            <b>let</b> creation_time_micros = order.get_order_request().get_creation_time_micros();
+            <b>let</b> creation_time_micros =
+                order.get_order_request().get_creation_time_micros();
             <b>let</b> creation_time_secs = creation_time_micros / <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_MICROS_PER_SECOND">MICROS_PER_SECOND</a>;
 
             // Check <b>if</b> order is valid according <b>to</b> dead man's switch
             // We get tracker each time <b>to</b> avoid borrowing conflicts
             <b>let</b> tracker = market.get_dead_mans_switch_tracker();
-            <b>let</b> is_valid = is_order_valid(tracker, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(creation_time_secs));
+            <b>let</b> is_valid =
+                is_order_valid(tracker, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(creation_time_secs));
 
             <b>if</b> (!is_valid) {
                 // Cancel the order
@@ -202,7 +204,9 @@ Aborts:
 
     // Check <b>if</b> order is valid according <b>to</b> dead man's switch
     <b>let</b> tracker = market.get_dead_mans_switch_tracker();
-    <b>let</b> is_valid = is_order_valid(tracker, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(creation_time_secs));
+    <b>let</b> is_valid = is_order_valid(
+        tracker, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(creation_time_secs)
+    );
 
     <b>if</b> (!is_valid) {
         // Cancel the bulk order
@@ -259,9 +263,7 @@ Aborts:
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_keep_alive">keep_alive</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    market: &<b>mut</b> Market&lt;M&gt;,
-    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
-    timeout_seconds: u64
+    market: &<b>mut</b> Market&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, timeout_seconds: u64
 ) {
     // Check <b>if</b> dead man's switch is enabled
     <b>assert</b>!(market.is_dead_mans_switch_enabled(), <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_E_DEAD_MANS_SWITCH_NOT_ENABLED">E_DEAD_MANS_SWITCH_NOT_ENABLED</a>);
@@ -269,7 +271,13 @@ Aborts:
     <b>let</b> parent = market.get_parent();
     <b>let</b> market_addr = market.get_market();
     <b>let</b> tracker = market.get_dead_mans_switch_tracker_mut();
-    <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_keep_alive">dead_mans_switch_tracker::keep_alive</a>(tracker, parent, market_addr, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, timeout_seconds);
+    <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_keep_alive">dead_mans_switch_tracker::keep_alive</a>(
+        tracker,
+        parent,
+        market_addr,
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        timeout_seconds
+    );
 }
 </code></pre>
 

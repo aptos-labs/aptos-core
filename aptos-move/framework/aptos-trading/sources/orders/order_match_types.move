@@ -1,7 +1,16 @@
 module aptos_trading::order_match_types {
     friend aptos_trading::single_order_types;
 
-    use aptos_trading::order_book_types::{OrderId, OrderType, IncreasingIdx, TimeInForce, good_till_cancelled, single_order_type, bulk_order_type, is_single_order_type};
+    use aptos_trading::order_book_types::{
+        OrderId,
+        OrderType,
+        IncreasingIdx,
+        TimeInForce,
+        good_till_cancelled,
+        single_order_type,
+        bulk_order_type,
+        is_single_order_type
+    };
     use std::option::{Option, Self};
     use std::string::String;
 
@@ -71,7 +80,6 @@ module aptos_trading::order_match_types {
             order_book_type: OrderType
         }
     }
-
 
     public fun new_single_order_match_details<M: store + copy + drop>(
         order_id: OrderId,
@@ -363,9 +371,8 @@ module aptos_trading::order_match_types {
             && self.sequence_number == other.sequence_number
     }
 
-    public fun destroy_active_matched_order(
-        self: ActiveMatchedOrder
-    ): (OrderId, u64, u64, OrderType) {
+    public fun destroy_active_matched_order(self: ActiveMatchedOrder)
+        : (OrderId, u64, u64, OrderType) {
         let ActiveMatchedOrder::V1 {
             order_id,
             matched_size,

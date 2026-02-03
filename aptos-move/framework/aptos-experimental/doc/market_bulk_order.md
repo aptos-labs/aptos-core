@@ -88,24 +88,29 @@ Returns:
     metadata: M,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ): Option&lt;OrderId&gt; {
-    <b>let</b> validation_result = callbacks.validate_bulk_order_placement(
-        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
-        &bid_prices,
-        &bid_sizes,
-        &ask_prices,
-        &ask_sizes,
-        &metadata,
+    <b>let</b> validation_result =
+        callbacks.validate_bulk_order_placement(
+            <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+            &bid_prices,
+            &bid_sizes,
+            &ask_prices,
+            &ask_sizes,
+            &metadata
+        );
+    <b>assert</b>!(
+        validation_result.is_validation_result_valid(),
+        <a href="market_bulk_order.md#0x7_market_bulk_order_E_CLEARINGHOUSE_VALIDATION_FAILED">E_CLEARINGHOUSE_VALIDATION_FAILED</a>
     );
-    <b>assert</b>!(validation_result.is_validation_result_valid(), <a href="market_bulk_order.md#0x7_market_bulk_order_E_CLEARINGHOUSE_VALIDATION_FAILED">E_CLEARINGHOUSE_VALIDATION_FAILED</a>);
-    <b>let</b> request = new_bulk_order_request(
-        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
-        sequence_number,
-        bid_prices,
-        bid_sizes,
-        ask_prices,
-        ask_sizes,
-        metadata,
-    );
+    <b>let</b> request =
+        new_bulk_order_request(
+            <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+            sequence_number,
+            bid_prices,
+            bid_sizes,
+            ask_prices,
+            ask_sizes,
+            metadata
+        );
     <b>let</b> response = market.get_order_book_mut().<a href="market_bulk_order.md#0x7_market_bulk_order_place_bulk_order">place_bulk_order</a>(request);
 
     // Check <b>if</b> the response is a rejection
@@ -123,14 +128,25 @@ Returns:
     };
 
     // Handle success response
-    <b>let</b> (bulk_order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num_option) = response.destroy_bulk_order_place_response_success();
     <b>let</b> (
-        order_request,
-        order_id,
-        _unique_priority_idx,
-        _creation_time_micros,
-    ) = bulk_order.destroy_bulk_order();
-    <b>let</b> (<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, order_metadata) = order_request.destroy_bulk_order_request();
+        bulk_order,
+        cancelled_bid_prices,
+        cancelled_bid_sizes,
+        cancelled_ask_prices,
+        cancelled_ask_sizes,
+        previous_seq_num_option
+    ) = response.destroy_bulk_order_place_response_success();
+    <b>let</b> (order_request, order_id, _unique_priority_idx, _creation_time_micros) =
+        bulk_order.destroy_bulk_order();
+    <b>let</b> (
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        order_sequence_number,
+        bid_prices,
+        bid_sizes,
+        ask_prices,
+        ask_sizes,
+        order_metadata
+    ) = order_request.destroy_bulk_order_request();
 
     <b>assert</b>!(sequence_number == order_sequence_number, <a href="market_bulk_order.md#0x7_market_bulk_order_E_SEQUENCE_NUMBER_MISMATCH">E_SEQUENCE_NUMBER_MISMATCH</a>);
     // Extract previous_seq_num from <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">option</a>, defaulting <b>to</b> 0 <b>if</b> none
@@ -162,7 +178,7 @@ Returns:
         &cancelled_bid_sizes,
         &cancelled_ask_prices,
         &cancelled_ask_sizes,
-        &order_metadata,
+        &order_metadata
     );
     <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(order_id)
 }
@@ -203,7 +219,12 @@ Parameters:
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ) {
     <b>let</b> <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(user);
-    <a href="market_bulk_order.md#0x7_market_bulk_order_cancel_bulk_order_internal">cancel_bulk_order_internal</a>(market, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, cancellation_reason, callbacks);
+    <a href="market_bulk_order.md#0x7_market_bulk_order_cancel_bulk_order_internal">cancel_bulk_order_internal</a>(
+        market,
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        cancellation_reason,
+        callbacks
+    );
 }
 </code></pre>
 
@@ -233,16 +254,37 @@ Parameters:
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ) {
     <b>let</b> cancelled_bulk_order = market.get_order_book_mut().<a href="market_bulk_order.md#0x7_market_bulk_order_cancel_bulk_order">cancel_bulk_order</a>(user);
-    <b>let</b> (order_request, order_id, _unique_priority_idx, _creation_time_micros) = cancelled_bulk_order.destroy_bulk_order();
-    <b>let</b> (_account, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, _metadata) = order_request.destroy_bulk_order_request();
+    <b>let</b> (order_request, order_id, _unique_priority_idx, _creation_time_micros) =
+        cancelled_bulk_order.destroy_bulk_order();
+    <b>let</b> (
+        _account,
+        order_sequence_number,
+        bid_prices,
+        bid_sizes,
+        ask_prices,
+        ask_sizes,
+        _metadata
+    ) = order_request.destroy_bulk_order_request();
     <b>let</b> i = 0;
     <b>while</b> (i &lt; bid_sizes.length()) {
-        callbacks.cleanup_bulk_order_at_price(user, order_id, <b>true</b>, bid_prices[i], bid_sizes[i]);
+        callbacks.cleanup_bulk_order_at_price(
+            user,
+            order_id,
+            <b>true</b>,
+            bid_prices[i],
+            bid_sizes[i]
+        );
         i += 1;
     };
     <b>let</b> j = 0;
     <b>while</b> (j &lt; ask_sizes.length()) {
-        callbacks.cleanup_bulk_order_at_price(user, order_id, <b>false</b>, ask_prices[j], ask_sizes[j]);
+        callbacks.cleanup_bulk_order_at_price(
+            user,
+            order_id,
+            <b>false</b>,
+            ask_prices[j],
+            ask_sizes[j]
+        );
         j += 1;
     };
     market.emit_event_for_bulk_order_cancelled(

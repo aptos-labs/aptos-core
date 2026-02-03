@@ -7,7 +7,7 @@ module aptos_trading::single_order_types {
         OrderId,
         IncreasingIdx,
         TimeInForce,
-        TriggerCondition,
+        TriggerCondition
     };
     use aptos_trading::order_match_types::OrderMatchDetails;
 

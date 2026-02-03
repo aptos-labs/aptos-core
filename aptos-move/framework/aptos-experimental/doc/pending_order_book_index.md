@@ -223,7 +223,7 @@
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_cancel_pending_order">cancel_pending_order</a>(
     self: &<b>mut</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_PendingOrderBookIndex">PendingOrderBookIndex</a>,
     trigger_condition: TriggerCondition,
-    unique_priority_idx: IncreasingIdx,
+    unique_priority_idx: IncreasingIdx
 ) {
     <b>let</b> (price_move_down_index, price_move_up_index, time_based_index) =
         trigger_condition.get_trigger_condition_indices();
@@ -244,10 +244,12 @@
         );
     };
     <b>if</b> (time_based_index.is_some()) {
-        self.time_based_index.remove(&<a href="pending_order_book_index.md#0x7_pending_order_book_index_PendingTimeKey">PendingTimeKey</a> {
-            time: time_based_index.destroy_some(),
-            tie_breaker: unique_priority_idx
-        });
+        self.time_based_index.remove(
+            &<a href="pending_order_book_index.md#0x7_pending_order_book_index_PendingTimeKey">PendingTimeKey</a> {
+                time: time_based_index.destroy_some(),
+                tie_breaker: unique_priority_idx
+            }
+        );
     };
 }
 </code></pre>
@@ -275,7 +277,7 @@
     self: &<b>mut</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_PendingOrderBookIndex">PendingOrderBookIndex</a>,
     order_id: OrderId,
     trigger_condition: TriggerCondition,
-    unique_priority_idx: IncreasingIdx,
+    unique_priority_idx: IncreasingIdx
 ) {
     // Add this order <b>to</b> the pending order book index
     <b>let</b> (price_move_down_index, price_move_up_index, time_based_index) =
@@ -304,7 +306,8 @@
                 time: time_based_index.destroy_some(),
                 tie_breaker: unique_priority_idx
             },
-            order_id);
+            order_id
+        );
     };
 }
 </code></pre>
@@ -334,7 +337,7 @@
     orders: &<b>mut</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;OrderId&gt;,
     limit: u64
 ) {
-    <b>while</b> (!self.price_move_up_index.is_empty() && orders.length() &lt; limit ) {
+    <b>while</b> (!self.price_move_up_index.is_empty() && orders.length() &lt; limit) {
         <b>let</b> (key, order_id) = self.price_move_up_index.borrow_front();
         <b>if</b> (current_price &gt;= key.price) {
             orders.push_back(*order_id);
@@ -406,7 +409,11 @@
     self: &<b>mut</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_PendingOrderBookIndex">PendingOrderBookIndex</a>, current_price: u64, order_limit: u64
 ): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;OrderId&gt; {
     <b>let</b> orders = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
-    self.<a href="pending_order_book_index.md#0x7_pending_order_book_index_take_ready_price_move_up_orders">take_ready_price_move_up_orders</a>(current_price, &<b>mut</b> orders, <a href="../../aptos-framework/../aptos-stdlib/doc/math64.md#0x1_math64_ceil_div">math64::ceil_div</a>(order_limit, 2));
+    self.<a href="pending_order_book_index.md#0x7_pending_order_book_index_take_ready_price_move_up_orders">take_ready_price_move_up_orders</a>(
+        current_price,
+        &<b>mut</b> orders,
+        <a href="../../aptos-framework/../aptos-stdlib/doc/math64.md#0x1_math64_ceil_div">math64::ceil_div</a>(order_limit, 2)
+    );
     self.<a href="pending_order_book_index.md#0x7_pending_order_book_index_take_ready_price_move_down_orders">take_ready_price_move_down_orders</a>(current_price, &<b>mut</b> orders, order_limit);
     // Try <b>to</b> fill the rest of the space <b>if</b> available.
     self.<a href="pending_order_book_index.md#0x7_pending_order_book_index_take_ready_price_move_up_orders">take_ready_price_move_up_orders</a>(current_price, &<b>mut</b> orders, order_limit);

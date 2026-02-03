@@ -36,11 +36,7 @@ module aptos_trading::bulk_order_types {
     use std::option;
     use std::option::Option;
     use std::vector;
-    use aptos_std::timestamp;
-    use aptos_trading::order_book_types::{
-        OrderId,
-        IncreasingIdx,
-    };
+    use aptos_trading::order_book_types::{OrderId, IncreasingIdx};
     use aptos_trading::order_match_types::{
         OrderMatch,
         new_bulk_order_match_details,
@@ -233,9 +229,7 @@ module aptos_trading::bulk_order_types {
     }
 
     public fun new_bulk_order_place_response_rejection<M: store + copy + drop>(
-        account: address,
-        sequence_number: u64,
-        existing_sequence_number: u64
+        account: address, sequence_number: u64, existing_sequence_number: u64
     ): BulkOrderPlaceResponse<M> {
         BulkOrderPlaceResponse::Rejection_V1 {
             account,
@@ -274,9 +268,8 @@ module aptos_trading::bulk_order_types {
         self.creation_time_micros
     }
 
-    public fun get_order_request<M: store + copy + drop>(
-        self: &BulkOrder<M>
-    ): &BulkOrderRequest<M> {
+    public fun get_order_request<M: store + copy + drop>(self: &BulkOrder<M>)
+        : &BulkOrderRequest<M> {
         &self.order_request
     }
 
@@ -369,7 +362,6 @@ module aptos_trading::bulk_order_types {
             &mut self.ask_sizes
         }
     }
-
 
     /// Gets the active size for a specific side of a bulk order.
     ///
