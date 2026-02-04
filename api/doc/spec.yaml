@@ -12087,17 +12087,26 @@ components:
       oneOf:
       - $ref: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionEmpty'
       - $ref: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomness'
+      - $ref: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomnessAndDecKey'
       discriminator:
         propertyName: type
         mapping:
           v0: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionEmpty'
           v1: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomness'
+          v2: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomnessAndDecKey'
     BlockMetadataExtensionEmpty:
       type: object
     BlockMetadataExtensionRandomness:
       type: object
       properties:
         randomness:
+          $ref: '#/components/schemas/HexEncodedBytes'
+    BlockMetadataExtensionRandomnessAndDecKey:
+      type: object
+      properties:
+        randomness:
+          $ref: '#/components/schemas/HexEncodedBytes'
+        decryption_key:
           $ref: '#/components/schemas/HexEncodedBytes'
     BlockMetadataExtension_BlockMetadataExtensionEmpty:
       allOf:
@@ -12123,6 +12132,18 @@ components:
             - v1
             example: v1
       - $ref: '#/components/schemas/BlockMetadataExtensionRandomness'
+    BlockMetadataExtension_BlockMetadataExtensionRandomnessAndDecKey:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - v2
+            example: v2
+      - $ref: '#/components/schemas/BlockMetadataExtensionRandomnessAndDecKey'
     BlockMetadataTransaction:
       type: object
       description: |-
