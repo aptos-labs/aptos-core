@@ -482,7 +482,7 @@ fn test_transaction_and_output_list_with_proof() {
         vec![],
         0,
     ));
-    let txn_hash = transaction.hash();
+    let txn_hash = transaction.committed_hash();
     let event = create_event();
     let event_root_hash = event.hash();
     let write_set = WriteSet::default();

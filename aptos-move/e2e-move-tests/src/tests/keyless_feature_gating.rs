@@ -424,7 +424,7 @@ fn spend_keyless_account(
     };
     println!(
         "Submitted TXN hash: {}",
-        Transaction::UserTransaction(transaction.clone()).hash()
+        Transaction::UserTransaction(transaction.clone()).committed_hash()
     );
     transaction
 }

@@ -1415,7 +1415,7 @@ impl TransactionWithProof {
     }
 
     pub fn verify(&self, ledger_info: &LedgerInfo) -> Result<()> {
-        let txn_hash = self.transaction.hash();
+        let txn_hash = self.transaction.committed_hash();
         ensure!(
             txn_hash == self.proof.transaction_info().transaction_hash(),
             "Transaction hash ({}) not expected ({}).",
@@ -2599,7 +2599,7 @@ impl TransactionOutputListWithProof {
             );
 
             // Verify the transaction hashes match those of the transaction infos
-            let txn_hash = txn.hash();
+            let txn_hash = txn.committed_hash();
             ensure!(
                 txn_hash == txn_info.transaction_hash(),
                 "The transaction hash does not match the hash in transaction info. \
@@ -3064,6 +3064,15 @@ impl Transaction {
             | Transaction::UserTransaction(_)
             | Transaction::GenesisTransaction(_)
             | Transaction::ValidatorTransaction(_) => false,
+        }
+    }
+
+    /// Returns the hash used when the transaction is committed to the ledger.
+    /// For user transactions, this leverages the cached hash in SignedTransaction.
+    pub fn committed_hash(&self) -> HashValue {
+        match self {
+            Transaction::UserTransaction(txn) => txn.committed_hash(),
+            _ => self.hash(),
         }
     }
 }

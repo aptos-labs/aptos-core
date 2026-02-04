@@ -176,7 +176,7 @@ prop_compose! {
                 let auxiliary_info = AuxiliaryInfo::new(PersistedAuxiliaryInfo::V1 { transaction_index: idx as u32 }, None);
 
                 let txn_info = TransactionInfo::new(
-                    txn.transaction().hash(),
+                    txn.transaction().committed_hash(),
                     txn.write_set().hash(),
                     event_root_hash,
                     state_checkpoint_hash,
@@ -629,7 +629,7 @@ fn verify_account_txn_summaries(
         for (expected_txn, actual_txn_summary) in
             expected_txns.iter().zip(actual_txn_summaries.unwrap())
         {
-            assert_eq!(actual_txn_summary.transaction_hash(), expected_txn.hash());
+            assert_eq!(actual_txn_summary.transaction_hash(), expected_txn.committed_hash());
             assert_eq!(
                 actual_txn_summary.replay_protector(),
                 expected_txn
@@ -827,7 +827,7 @@ pub fn verify_committed_transactions(
         // Verify transaction hash.
         assert_eq!(
             txn_info.transaction_hash(),
-            txn_to_commit.transaction().hash()
+            txn_to_commit.transaction().committed_hash()
         );
 
         // Fetch and verify account states.
@@ -844,12 +844,12 @@ pub fn verify_committed_transactions(
                 .try_as_signed_user_txn()
                 .unwrap();
             let txn_with_proof = db
-                .get_transaction_by_hash(txn_to_commit.transaction().hash(), ledger_version, true)
+                .get_transaction_by_hash(txn_to_commit.transaction().committed_hash(), ledger_version, true)
                 .unwrap()
                 .unwrap();
             assert_eq!(
-                txn_with_proof.transaction.hash(),
-                txn_to_commit.transaction().hash()
+                txn_with_proof.transaction.committed_hash(),
+                txn_to_commit.transaction().committed_hash()
             );
             txn_with_proof
                 .verify_user_txn(ledger_info, cur_ver, txn.sender(), txn.replay_protector())
