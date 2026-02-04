@@ -17,205 +17,205 @@ error: abort not covered by any of the `aborts_if` clauses
     =         ABORTED
 
 error: abort not covered by any of the `aborts_if` clauses
-    ┌─ tests/sources/functional/signed_int/artithmetic.move:148:5
+    ┌─ tests/sources/functional/signed_int/artithmetic.move:253:5
     │
-146 │           x + y
+251 │           x + y
     │           ----- abort happened here with execution failure
-147 │       }
-148 │ ╭     spec overflow_i8_add_incorrect {
-149 │ │         aborts_if false;
-150 │ │     }
+252 │       }
+253 │ ╭     spec overflow_i8_add_incorrect {
+254 │ │         aborts_if false;
+255 │ │     }
     │ ╰─────^
     │
-    =     at tests/sources/functional/signed_int/artithmetic.move:145: overflow_i8_add_incorrect
+    =     at tests/sources/functional/signed_int/artithmetic.move:250: overflow_i8_add_incorrect
     =         x = <redacted>
     =         y = <redacted>
-    =     at tests/sources/functional/signed_int/artithmetic.move:146: overflow_i8_add_incorrect
+    =     at tests/sources/functional/signed_int/artithmetic.move:251: overflow_i8_add_incorrect
     =         ABORTED
 
 error: abort not covered by any of the `aborts_if` clauses
-    ┌─ tests/sources/functional/signed_int/artithmetic.move:164:5
+    ┌─ tests/sources/functional/signed_int/artithmetic.move:269:5
     │
-162 │           x + y
+267 │           x + y
     │           ----- abort happened here with execution failure
-163 │       }
-164 │ ╭     spec overflow_i16_add_incorrect {
-165 │ │         aborts_if false;
-166 │ │     }
+268 │       }
+269 │ ╭     spec overflow_i16_add_incorrect {
+270 │ │         aborts_if false;
+271 │ │     }
     │ ╰─────^
     │
-    =     at tests/sources/functional/signed_int/artithmetic.move:161: overflow_i16_add_incorrect
+    =     at tests/sources/functional/signed_int/artithmetic.move:266: overflow_i16_add_incorrect
     =         x = <redacted>
     =         y = <redacted>
-    =     at tests/sources/functional/signed_int/artithmetic.move:162: overflow_i16_add_incorrect
+    =     at tests/sources/functional/signed_int/artithmetic.move:267: overflow_i16_add_incorrect
     =         ABORTED
 
 error: abort not covered by any of the `aborts_if` clauses
-    ┌─ tests/sources/functional/signed_int/artithmetic.move:180:5
+    ┌─ tests/sources/functional/signed_int/artithmetic.move:285:5
     │
-178 │           x + y
+283 │           x + y
     │           ----- abort happened here with execution failure
-179 │       }
-180 │ ╭     spec overflow_i32_add_incorrect {
-181 │ │         aborts_if false;
-182 │ │     }
+284 │       }
+285 │ ╭     spec overflow_i32_add_incorrect {
+286 │ │         aborts_if false;
+287 │ │     }
     │ ╰─────^
     │
-    =     at tests/sources/functional/signed_int/artithmetic.move:177: overflow_i32_add_incorrect
+    =     at tests/sources/functional/signed_int/artithmetic.move:282: overflow_i32_add_incorrect
     =         x = <redacted>
     =         y = <redacted>
-    =     at tests/sources/functional/signed_int/artithmetic.move:178: overflow_i32_add_incorrect
+    =     at tests/sources/functional/signed_int/artithmetic.move:283: overflow_i32_add_incorrect
     =         ABORTED
 
 error: abort not covered by any of the `aborts_if` clauses
-    ┌─ tests/sources/functional/signed_int/artithmetic.move:196:5
+    ┌─ tests/sources/functional/signed_int/artithmetic.move:301:5
     │
-194 │           x + y
+299 │           x + y
     │           ----- abort happened here with execution failure
-195 │       }
-196 │ ╭     spec overflow_i64_add_incorrect {
-197 │ │         aborts_if false;
-198 │ │     }
+300 │       }
+301 │ ╭     spec overflow_i64_add_incorrect {
+302 │ │         aborts_if false;
+303 │ │     }
     │ ╰─────^
     │
-    =     at tests/sources/functional/signed_int/artithmetic.move:193: overflow_i64_add_incorrect
+    =     at tests/sources/functional/signed_int/artithmetic.move:298: overflow_i64_add_incorrect
     =         x = <redacted>
     =         y = <redacted>
-    =     at tests/sources/functional/signed_int/artithmetic.move:194: overflow_i64_add_incorrect
+    =     at tests/sources/functional/signed_int/artithmetic.move:299: overflow_i64_add_incorrect
     =         ABORTED
 
 error: abort not covered by any of the `aborts_if` clauses
-    ┌─ tests/sources/functional/signed_int/artithmetic.move:212:5
+    ┌─ tests/sources/functional/signed_int/artithmetic.move:317:5
     │
-210 │           x + y
+315 │           x + y
     │           ----- abort happened here with execution failure
-211 │       }
-212 │ ╭     spec overflow_i128_add_incorrect {
-213 │ │         aborts_if false;
-214 │ │     }
+316 │       }
+317 │ ╭     spec overflow_i128_add_incorrect {
+318 │ │         aborts_if false;
+319 │ │     }
     │ ╰─────^
     │
-    =     at tests/sources/functional/signed_int/artithmetic.move:209: overflow_i128_add_incorrect
+    =     at tests/sources/functional/signed_int/artithmetic.move:314: overflow_i128_add_incorrect
     =         x = <redacted>
     =         y = <redacted>
-    =     at tests/sources/functional/signed_int/artithmetic.move:210: overflow_i128_add_incorrect
+    =     at tests/sources/functional/signed_int/artithmetic.move:315: overflow_i128_add_incorrect
     =         ABORTED
 
 error: abort not covered by any of the `aborts_if` clauses
-    ┌─ tests/sources/functional/signed_int/artithmetic.move:228:5
+    ┌─ tests/sources/functional/signed_int/artithmetic.move:333:5
     │
-226 │           x + y
+331 │           x + y
     │           ----- abort happened here with execution failure
-227 │       }
-228 │ ╭     spec overflow_i256_add_incorrect {
-229 │ │         aborts_if false;
-230 │ │     }
+332 │       }
+333 │ ╭     spec overflow_i256_add_incorrect {
+334 │ │         aborts_if false;
+335 │ │     }
     │ ╰─────^
     │
-    =     at tests/sources/functional/signed_int/artithmetic.move:225: overflow_i256_add_incorrect
+    =     at tests/sources/functional/signed_int/artithmetic.move:330: overflow_i256_add_incorrect
     =         x = <redacted>
     =         y = <redacted>
-    =     at tests/sources/functional/signed_int/artithmetic.move:226: overflow_i256_add_incorrect
+    =     at tests/sources/functional/signed_int/artithmetic.move:331: overflow_i256_add_incorrect
     =         ABORTED
 
 error: abort not covered by any of the `aborts_if` clauses
-    ┌─ tests/sources/functional/signed_int/artithmetic.move:249:5
+    ┌─ tests/sources/functional/signed_int/artithmetic.move:354:5
     │
-247 │           x * y
+352 │           x * y
     │           ----- abort happened here with execution failure
-248 │       }
-249 │ ╭     spec overflow_i8_mul_incorrect {
-250 │ │         aborts_if false;
-251 │ │     }
+353 │       }
+354 │ ╭     spec overflow_i8_mul_incorrect {
+355 │ │         aborts_if false;
+356 │ │     }
     │ ╰─────^
     │
-    =     at tests/sources/functional/signed_int/artithmetic.move:246: overflow_i8_mul_incorrect
+    =     at tests/sources/functional/signed_int/artithmetic.move:351: overflow_i8_mul_incorrect
     =         x = <redacted>
     =         y = <redacted>
-    =     at tests/sources/functional/signed_int/artithmetic.move:247: overflow_i8_mul_incorrect
+    =     at tests/sources/functional/signed_int/artithmetic.move:352: overflow_i8_mul_incorrect
     =         ABORTED
 
 error: abort not covered by any of the `aborts_if` clauses
-    ┌─ tests/sources/functional/signed_int/artithmetic.move:265:5
+    ┌─ tests/sources/functional/signed_int/artithmetic.move:370:5
     │
-263 │           x * y
+368 │           x * y
     │           ----- abort happened here with execution failure
-264 │       }
-265 │ ╭     spec overflow_i16_mul_incorrect {
-266 │ │         aborts_if false;
-267 │ │     }
+369 │       }
+370 │ ╭     spec overflow_i16_mul_incorrect {
+371 │ │         aborts_if false;
+372 │ │     }
     │ ╰─────^
     │
-    =     at tests/sources/functional/signed_int/artithmetic.move:262: overflow_i16_mul_incorrect
+    =     at tests/sources/functional/signed_int/artithmetic.move:367: overflow_i16_mul_incorrect
     =         x = <redacted>
     =         y = <redacted>
-    =     at tests/sources/functional/signed_int/artithmetic.move:263: overflow_i16_mul_incorrect
+    =     at tests/sources/functional/signed_int/artithmetic.move:368: overflow_i16_mul_incorrect
     =         ABORTED
 
 error: abort not covered by any of the `aborts_if` clauses
-    ┌─ tests/sources/functional/signed_int/artithmetic.move:281:5
+    ┌─ tests/sources/functional/signed_int/artithmetic.move:386:5
     │
-279 │           x * y
+384 │           x * y
     │           ----- abort happened here with execution failure
-280 │       }
-281 │ ╭     spec overflow_i32_mul_incorrect {
-282 │ │         aborts_if false;
-283 │ │     }
+385 │       }
+386 │ ╭     spec overflow_i32_mul_incorrect {
+387 │ │         aborts_if false;
+388 │ │     }
     │ ╰─────^
     │
-    =     at tests/sources/functional/signed_int/artithmetic.move:278: overflow_i32_mul_incorrect
+    =     at tests/sources/functional/signed_int/artithmetic.move:383: overflow_i32_mul_incorrect
     =         x = <redacted>
     =         y = <redacted>
-    =     at tests/sources/functional/signed_int/artithmetic.move:279: overflow_i32_mul_incorrect
+    =     at tests/sources/functional/signed_int/artithmetic.move:384: overflow_i32_mul_incorrect
     =         ABORTED
 
 error: abort not covered by any of the `aborts_if` clauses
-    ┌─ tests/sources/functional/signed_int/artithmetic.move:297:5
+    ┌─ tests/sources/functional/signed_int/artithmetic.move:402:5
     │
-295 │           x * y
+400 │           x * y
     │           ----- abort happened here with execution failure
-296 │       }
-297 │ ╭     spec overflow_i64_mul_incorrect {
-298 │ │         aborts_if false;
-299 │ │     }
+401 │       }
+402 │ ╭     spec overflow_i64_mul_incorrect {
+403 │ │         aborts_if false;
+404 │ │     }
     │ ╰─────^
     │
-    =     at tests/sources/functional/signed_int/artithmetic.move:294: overflow_i64_mul_incorrect
+    =     at tests/sources/functional/signed_int/artithmetic.move:399: overflow_i64_mul_incorrect
     =         x = <redacted>
     =         y = <redacted>
-    =     at tests/sources/functional/signed_int/artithmetic.move:295: overflow_i64_mul_incorrect
+    =     at tests/sources/functional/signed_int/artithmetic.move:400: overflow_i64_mul_incorrect
     =         ABORTED
 
 error: abort not covered by any of the `aborts_if` clauses
-    ┌─ tests/sources/functional/signed_int/artithmetic.move:312:5
+    ┌─ tests/sources/functional/signed_int/artithmetic.move:417:5
     │
-310 │           x * y
+415 │           x * y
     │           ----- abort happened here with execution failure
-311 │       }
-312 │ ╭     spec overflow_i128_mul_incorrect {
-313 │ │         aborts_if false;
-314 │ │     }
+416 │       }
+417 │ ╭     spec overflow_i128_mul_incorrect {
+418 │ │         aborts_if false;
+419 │ │     }
     │ ╰─────^
     │
-    =     at tests/sources/functional/signed_int/artithmetic.move:309: overflow_i128_mul_incorrect
+    =     at tests/sources/functional/signed_int/artithmetic.move:414: overflow_i128_mul_incorrect
     =         x = <redacted>
     =         y = <redacted>
-    =     at tests/sources/functional/signed_int/artithmetic.move:310: overflow_i128_mul_incorrect
+    =     at tests/sources/functional/signed_int/artithmetic.move:415: overflow_i128_mul_incorrect
     =         ABORTED
 
 error: abort not covered by any of the `aborts_if` clauses
-    ┌─ tests/sources/functional/signed_int/artithmetic.move:327:5
+    ┌─ tests/sources/functional/signed_int/artithmetic.move:432:5
     │
-325 │           x * y
+430 │           x * y
     │           ----- abort happened here with execution failure
-326 │       }
-327 │ ╭     spec overflow_i256_mul_incorrect {
-328 │ │         aborts_if false;
-329 │ │     }
+431 │       }
+432 │ ╭     spec overflow_i256_mul_incorrect {
+433 │ │         aborts_if false;
+434 │ │     }
     │ ╰─────^
     │
-    =     at tests/sources/functional/signed_int/artithmetic.move:324: overflow_i256_mul_incorrect
+    =     at tests/sources/functional/signed_int/artithmetic.move:429: overflow_i256_mul_incorrect
     =         x = <redacted>
     =         y = <redacted>
-    =     at tests/sources/functional/signed_int/artithmetic.move:325: overflow_i256_mul_incorrect
+    =     at tests/sources/functional/signed_int/artithmetic.move:430: overflow_i256_mul_incorrect
     =         ABORTED

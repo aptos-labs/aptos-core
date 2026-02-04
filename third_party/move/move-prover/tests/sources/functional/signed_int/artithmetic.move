@@ -137,6 +137,111 @@ module 0x42::TestSintArithmetic {
     }
 
 
+    // ------------------------------------------------
+    // Truncation division with negative dividend/divisor
+    // ------------------------------------------------
+
+    // Division of two negative numbers: -7 / -2 = 3 (truncation toward zero)
+    // succeeds.
+    fun truncation_div_negative_negative(): i64 {
+        let dividend: i64 = -7;
+        let divisor: i64 = -2;
+        dividend / divisor
+    }
+    spec truncation_div_negative_negative {
+        aborts_if false;
+        ensures result == 3;
+    }
+
+    // Division of negative by positive: -7 / 2 = -3 (truncation toward zero)
+    // succeeds.
+    fun truncation_div_negative_positive(): i64 {
+        let dividend: i64 = -7;
+        let divisor: i64 = 2;
+        dividend / divisor
+    }
+    spec truncation_div_negative_positive {
+        aborts_if false;
+        ensures result == -3;
+    }
+
+    // Division of positive by negative: 7 / -2 = -3 (truncation toward zero)
+    // succeeds.
+    fun truncation_div_positive_negative(): i64 {
+        let dividend: i64 = 7;
+        let divisor: i64 = -2;
+        dividend / divisor
+    }
+    spec truncation_div_positive_negative {
+        aborts_if false;
+        ensures result == -3;
+    }
+
+    // Division of two positive numbers: 7 / 2 = 3
+    // succeeds.
+    fun truncation_div_positive_positive(): i64 {
+        let dividend: i64 = 7;
+        let divisor: i64 = 2;
+        dividend / divisor
+    }
+    spec truncation_div_positive_positive {
+        aborts_if false;
+        ensures result == 3;
+    }
+
+    // ------------------------------------------------
+    // Truncation modulo with negative dividend/divisor
+    // ------------------------------------------------
+
+    // Modulo of two negative numbers: -7 % -2 = -1 (sign follows dividend)
+    // succeeds.
+    fun truncation_mod_negative_negative(): i64 {
+        let dividend: i64 = -7;
+        let divisor: i64 = -2;
+        dividend % divisor
+    }
+    spec truncation_mod_negative_negative {
+        aborts_if false;
+        ensures result == -1;
+    }
+
+    // Modulo of negative by positive: -7 % 2 = -1 (sign follows dividend)
+    // succeeds.
+    fun truncation_mod_negative_positive(): i64 {
+        let dividend: i64 = -7;
+        let divisor: i64 = 2;
+        dividend % divisor
+    }
+    spec truncation_mod_negative_positive {
+        aborts_if false;
+        ensures result == -1;
+    }
+
+    // Modulo of positive by negative: 7 % -2 = 1 (sign follows dividend)
+    // succeeds.
+    fun truncation_mod_positive_negative(): i64 {
+        let dividend: i64 = 7;
+        let divisor: i64 = -2;
+        dividend % divisor
+    }
+    spec truncation_mod_positive_negative {
+        aborts_if false;
+        ensures result == 1;
+    }
+
+    // Modulo of two positive numbers: 7 % 2 = 1
+    // succeeds.
+    fun truncation_mod_positive_positive(): i64 {
+        let dividend: i64 = 7;
+        let divisor: i64 = 2;
+        dividend % divisor
+    }
+    spec truncation_mod_positive_positive {
+        aborts_if false;
+        ensures result == 1;
+    }
+
+
     // --------------------
     // Overflow by addition
     // --------------------
