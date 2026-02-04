@@ -1335,7 +1335,7 @@ impl SignedTransaction {
     pub fn committed_hash(&self) -> HashValue {
         *self
             .committed_hash
-            .get_or_init(|| Transaction::UserTransaction(self.clone()).hash())
+            .get_or_init(|| compute_transaction_hash(&Transaction::UserTransaction(self.clone())))
     }
 
     pub fn replay_protector(&self) -> ReplayProtector {
@@ -2314,7 +2314,7 @@ impl TransactionListWithProof {
             .par_iter()
             .zip_eq(self.proof.transaction_infos.par_iter())
             .map(|(txn, txn_info)| {
-                let txn_hash = CryptoHash::hash(txn);
+                let txn_hash = txn.committed_hash();
                 ensure!(
                     txn_hash == txn_info.transaction_hash(),
                     "The hash of transaction does not match the transaction info in proof. \
@@ -2930,6 +2930,16 @@ impl AccountOrderedTransactionsWithProof {
     }
 }
 
+/// Computes the hash of a Transaction using BCS serialization.
+/// This is the single source of truth for Transaction hash computation.
+fn compute_transaction_hash(txn: &Transaction) -> HashValue {
+    use aptos_crypto::hash::CryptoHasher;
+    let bytes = bcs::to_bytes(txn).expect("Transaction serialization should not fail");
+    let mut hasher = TransactionHasher::default();
+    hasher.update(&bytes);
+    hasher.finish()
+}
+
 /// `Transaction` will be the transaction type used internally in the aptos node to represent the
 /// transaction to be processed and persisted.
 ///
@@ -2937,7 +2947,7 @@ impl AccountOrderedTransactionsWithProof {
 /// transaction.
 #[allow(clippy::large_enum_variant)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher)]
 pub enum Transaction {
     /// Transaction submitted by the user. e.g: P2P payment transaction, publishing module
     /// transaction, etc.
@@ -3072,7 +3082,7 @@ impl Transaction {
     pub fn committed_hash(&self) -> HashValue {
         match self {
             Transaction::UserTransaction(txn) => txn.committed_hash(),
-            _ => self.hash(),
+            _ => compute_transaction_hash(self),
         }
     }
 }
