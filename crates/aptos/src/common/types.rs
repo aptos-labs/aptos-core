@@ -1813,6 +1813,11 @@ pub struct TransactionOptions {
     #[clap(long)]
     pub(crate) profile_gas: bool,
 
+    /// If set, fold the call graph by unique stack traces before generating the gas profile report.
+    /// This helps reduce the size of large reports by aggregating identical call paths.
+    #[clap(long, requires("profile_gas"))]
+    pub(crate) fold_unique_stack: bool,
+
     /// If this option is set, simulate the transaction using a local session.
     #[clap(long)]
     pub(crate) session: Option<PathBuf>,
@@ -2320,10 +2325,17 @@ impl TransactionOptions {
         println!();
         println!("Simulating transaction locally using the gas profiler...");
 
-        self.simulate_using_debugger(
-            payload,
-            local_simulation::profile_transaction_using_debugger,
-        )
+        let fold_unique_stack = self.fold_unique_stack;
+        self.simulate_using_debugger(payload, |debugger, version, txn, hash, aux_info| {
+            local_simulation::profile_transaction_using_debugger(
+                debugger,
+                version,
+                txn,
+                hash,
+                aux_info,
+                fold_unique_stack,
+            )
+        })
         .await
     }
 
