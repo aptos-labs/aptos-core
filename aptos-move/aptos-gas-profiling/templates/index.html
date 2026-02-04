@@ -9,32 +9,56 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{title}}</title>
     <style>
-        /* Add your custom CSS styles here */
         body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: white;
-            color: black;
+            color: #111;
+            line-height: 1.5;
+        }
+
+        table {
+            border-collapse: collapse;
+            margin: 2px 0;
         }
 
         table,
         th,
         td {
-            border: 1px solid black;
+            border: 1px solid #ccc;
         }
 
+        th,
         td {
-            padding: 2px;
+            padding: 2px 6px;
         }
 
-        table {
-            border-collapse: collapse;
+        th {
+            background: #f5f5f5;
+            font-weight: 600;
+        }
+
+        /* Summary table category labels */
+        .category-label {
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: #f0f7ff;
+        }
+
+        details>summary:hover {
+            opacity: 0.8;
         }
 
         h2 {
-            background: rgb(220, 220, 220);
+            background: #e8e8e8;
+            padding: 8px 12px;
+            margin-top: 30px;
         }
 
         h3 {
-            background: rgb(240, 240, 240);
+            background: #f2f2f2;
+            padding: 6px 10px;
         }
 
         .flamegraph {
@@ -42,7 +66,11 @@
         }
 
         details {
-            margin-bottom: 60px;
+            margin-bottom: 40px;
+        }
+
+        details > summary + * {
+            margin-top: 8px;
         }
 
         details>summary {
@@ -57,12 +85,17 @@
         details>summary>h2 {
             display: block;
             margin: 0;
-            padding: 5px 10px;
+        }
+
+        details>summary>h2 {
+            display: flex;
+            align-items: center;
         }
 
         details>summary>h2::before {
             content: "▶ ";
             font-size: 0.6em;
+            margin-right: 4px;
         }
 
         details[open]>summary>h2::before {
@@ -70,14 +103,15 @@
         }
 
         details>summary>h3 {
-            display: block;
+            display: flex;
+            align-items: center;
             margin: 0;
-            padding: 5px 10px;
         }
 
         details>summary>h3::before {
             content: "▶ ";
             font-size: 0.6em;
+            margin-right: 4px;
         }
 
         details[open]>summary>h3::before {
@@ -110,25 +144,25 @@
                 <th>Description</th>
             </tr>
             <tr>
-                <td><b>Execution Gas</b></td>
+                <td class="category-label">Execution Gas</td>
                 <td style="text-align: right">{{summary-execution-gas}}</td>
                 <td>gas units</td>
                 <td>Transient resources for execution, like CPU time or memory</td>
             </tr>
             <tr>
-                <td><b>IO Gas</b></td>
+                <td class="category-label">IO Gas</td>
                 <td style="text-align: right">{{summary-io-gas}}</td>
                 <td>gas units</td>
                 <td>Storage reads and writes</td>
             </tr>
             <tr>
-                <td><b>Storage Fee</b></td>
+                <td class="category-label">Storage Fee</td>
                 <td style="text-align: right">{{summary-storage-fee}}</td>
                 <td>APT</td>
                 <td>Cost for new or expanded storage slots</td>
             </tr>
             <tr>
-                <td><b>Storage Refund</b></td>
+                <td class="category-label">Storage Refund</td>
                 <td style="text-align: right">{{summary-storage-refund}}</td>
                 <td>APT</td>
                 <td>Refund for deleted storage slots</td>
@@ -187,10 +221,10 @@
             {{#if deps}}
             <table>
                 <tr>
-                    <th><b>Name</b></th>
-                    <th style="text-align: right"><b>Size in Bytes</b></th>
-                    <th style="text-align: right"><b>Cost in Gas Units</b></th>
-                    <th style="text-align: right"><b>Percentage</b></th>
+                    <th>Name</th>
+                    <th style="text-align: right">Size in Bytes</th>
+                    <th style="text-align: right">Cost in Gas Units</th>
+                    <th style="text-align: right">Percentage</th>
                 </tr>
                 {{#each deps}}
                 <tr>
@@ -209,10 +243,10 @@
             {{#if ops}}
             <table>
                 <tr>
-                    <th><b>Operation</b></th>
-                    <th style="text-align: right"><b>Number of Hits</b></th>
-                    <th style="text-align: right"><b>Cost in Gas Units</b></th>
-                    <th style="text-align: right"><b>Percentage</b></th>
+                    <th>Operation</th>
+                    <th style="text-align: right">Number of Hits</th>
+                    <th style="text-align: right">Cost in Gas Units</th>
+                    <th style="text-align: right">Percentage</th>
                 </tr>
                 {{#each ops}}
                 <tr>
@@ -230,10 +264,10 @@
             {{#if methods}}
             <table>
                 <tr>
-                    <th><b>Methods (gas including children)</b></th>
-                    <th style="text-align: right"><b>Number of Hits</b></th>
-                    <th style="text-align: right"><b>Cost in Gas Units</b></th>
-                    <th style="text-align: right"><b>Percentage</b></th>
+                    <th>Methods (gas including children)</th>
+                    <th style="text-align: right">Number of Hits</th>
+                    <th style="text-align: right">Cost in Gas Units</th>
+                    <th style="text-align: right">Percentage</th>
                 </tr>
                 {{#each methods}}
                 <tr>
@@ -251,10 +285,10 @@
             {{#if methods_self}}
             <table>
                 <tr>
-                    <th><b>Methods (only local gas)</b></th>
-                    <th style="text-align: right"><b>Number of Hits</b></th>
-                    <th style="text-align: right"><b>Cost in Gas Units</b></th>
-                    <th style="text-align: right"><b>Percentage</b></th>
+                    <th>Methods (only local gas)</th>
+                    <th style="text-align: right">Number of Hits</th>
+                    <th style="text-align: right">Cost in Gas Units</th>
+                    <th style="text-align: right">Percentage</th>
                 </tr>
                 {{#each methods_self}}
                 <tr>
@@ -280,10 +314,10 @@
             {{#if reads}}
             <table>
                 <tr>
-                    <td><b>Resource Name</b></td>
-                    <td style="text-align: right"><b>Number of Hits</b></td>
-                    <td style="text-align: right"><b>Cost in Gas Units</b></td>
-                    <td style="text-align: right"><b>Percentage</b></td>
+                    <th>Resource Name</th>
+                    <th style="text-align: right">Number of Hits</th>
+                    <th style="text-align: right">Cost in Gas Units</th>
+                    <th style="text-align: right">Percentage</th>
                 </tr>
                 {{#each reads}}
                 <tr>
@@ -298,11 +332,11 @@
             (No reads to show.)
             {{/if}}
             <h4>Ledger Writes</h4>
-            <h5>Transaction Itself</h5>
+            <p>Transaction Itself</p>
             <table>
                 <tr>
-                    <td style="text-align: right"><b>Cost in Gas Units</b></td>
-                    <td style="text-align: right"><b>Percentage</b></td>
+                    <th style="text-align: right">Cost in Gas Units</th>
+                    <th style="text-align: right">Percentage</th>
                 </tr>
                 {{#with transaction_write}}
                 <tr>
@@ -311,14 +345,14 @@
                 </tr>
                 {{/with}}
             </table>
-            <h5>Events</h5>
+            <p>Events</p>
             {{#if event_writes}}
             <table>
                 <tr>
-                    <td><b>Event Type</b></td>
-                    <td style="text-align: right"><b>Number of Hits</b></td>
-                    <td style="text-align: right"><b>Cost in Gas Units</b></td>
-                    <td style="text-align: right"><b>Percentage</b></td>
+                    <th>Event Type</th>
+                    <th style="text-align: right">Number of Hits</th>
+                    <th style="text-align: right">Cost in Gas Units</th>
+                    <th style="text-align: right">Percentage</th>
                 </tr>
                 {{#each event_writes}}
                 <tr>
@@ -332,14 +366,14 @@
             {{else}}
             (No writes to show.)
             {{/if}}
-            <h5>State Write Ops</h5>
+            <p>State Write Ops</p>
             {{#if writes}}
             <table>
                 <tr>
-                    <td><b>Resource Name</b></td>
-                    <td style="text-align: right"><b>Number of Hits</b></td>
-                    <td style="text-align: right"><b>Cost in Gas Units</b></td>
-                    <td style="text-align: right"><b>Percentage</b></td>
+                    <th>Resource Name</th>
+                    <th style="text-align: right">Number of Hits</th>
+                    <th style="text-align: right">Cost in Gas Units</th>
+                    <th style="text-align: right">Percentage</th>
                 </tr>
                 {{#each writes}}
                 <tr>
@@ -369,11 +403,11 @@
             {{#if storage-writes}}
             <table>
                 <tr>
-                    <td><b>Path</b></td>
-                    <td style="text-align: right"><b>Cost in APT</b></td>
-                    <td style="text-align: right"><b>Percentage</b></td>
-                    <td style="text-align: right"><b>Refund in APT</b></td>
-                    <td style="text-align: right"><b>Percentage</b></td>
+                    <th>Path</th>
+                    <th style="text-align: right">Cost in APT</th>
+                    <th style="text-align: right">Percentage</th>
+                    <th style="text-align: right">Refund in APT</th>
+                    <th style="text-align: right">Percentage</th>
                 </tr>
                 {{#each storage-writes}}
                 <tr>
@@ -392,9 +426,9 @@
             {{#if storage-events}}
             <table>
                 <tr>
-                    <td><b>Name</b></td>
-                    <td style="text-align: right"><b>Cost in APT</b></td>
-                    <td style="text-align: right"><b>Percentage</b></td>
+                    <th>Name</th>
+                    <th style="text-align: right">Cost in APT</th>
+                    <th style="text-align: right">Percentage</th>
                 </tr>
                 {{#each storage-events}}
                 <tr>

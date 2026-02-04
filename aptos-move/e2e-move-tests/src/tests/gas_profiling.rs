@@ -18,9 +18,9 @@ use move_core_types::{ident_str, language_storage::ModuleId};
 use std::path::Path;
 
 /// Extracts the numeric value from a summary table row in the HTML report.
-/// Looks for pattern: <td><b>{label}</b></td> followed by <td ...>{value}</td>
+/// Looks for pattern: <td class="category-label">{label}</td> followed by <td ...>{value}</td>
 fn extract_summary_value(html: &str, label: &str) -> Option<f64> {
-    let label_tag = format!("<td><b>{}</b></td>", label);
+    let label_tag = format!("<td class=\"category-label\">{}</td>", label);
     let label_pos = html.find(&label_tag)?;
     let after_label = &html[label_pos + label_tag.len()..];
     let td_start = after_label.find("<td")? + 3;
