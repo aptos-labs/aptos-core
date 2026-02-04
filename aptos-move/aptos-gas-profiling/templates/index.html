@@ -37,6 +37,31 @@
             font-weight: 600;
         }
 
+        th.sortable {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        th.sortable:hover {
+            background: #e8e8e8;
+        }
+
+        th.sortable::after {
+            content: ' ⇅';
+            font-size: 0.7em;
+            color: #999;
+        }
+
+        th.sort-asc::after {
+            content: ' ▲';
+            color: #333;
+        }
+
+        th.sort-desc::after {
+            content: ' ▼';
+            color: #333;
+        }
+
         /* Summary table category labels */
         .category-label {
             font-weight: 600;
@@ -48,6 +73,31 @@
 
         details>summary:hover {
             opacity: 0.8;
+        }
+
+        .table-wrapper {
+            display: inline-block;
+        }
+
+        .table-footer {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 1px;
+        }
+
+        .copy-btn {
+            padding: 0px 4px;
+            font-size: 0.7em;
+            background: #f5f5f5;
+            border: 1px solid #ccc;
+            border-radius: 2px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .copy-btn:hover {
+            background: #e8e8e8;
+            color: #333;
         }
 
         h2 {
@@ -69,7 +119,7 @@
             margin-bottom: 40px;
         }
 
-        details > summary + * {
+        details>summary+* {
             margin-top: 8px;
         }
 
@@ -122,9 +172,94 @@
             margin-bottom: 20px;
         }
     </style>
+    <script>
+        function copyTable(btn) {
+            const table = btn.closest('.table-wrapper').querySelector('table');
+            const rows = Array.from(table.rows);
+            const text = rows.map(row => 
+                Array.from(row.cells).map(cell => cell.textContent.trim()).join('\t')
+            ).join('\n');
+            navigator.clipboard.writeText(text).then(() => {
+                const orig = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(() => btn.textContent = orig, 1000);
+            });
+        }
+
+        function sortTable(th, colIndex) {
+            const table = th.closest('table');
+            const tbody = table.tBodies[0] || table;
+            const rows = Array.from(tbody.querySelectorAll('tr')).slice(1); // skip header
+            
+            const isAsc = th.classList.contains('sort-asc');
+            
+            // Clear other sort indicators
+            th.closest('tr').querySelectorAll('th').forEach(h => {
+                h.classList.remove('sort-asc', 'sort-desc');
+            });
+            
+            // Set new sort direction
+            th.classList.add(isAsc ? 'sort-desc' : 'sort-asc');
+            
+            rows.sort((a, b) => {
+                const aVal = a.cells[colIndex]?.textContent.trim() || '';
+                const bVal = b.cells[colIndex]?.textContent.trim() || '';
+                
+                // Try numeric comparison
+                const aNum = parseFloat(aVal.replace(/[,%]/g, ''));
+                const bNum = parseFloat(bVal.replace(/[,%]/g, ''));
+                
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    return isAsc ? bNum - aNum : aNum - bNum;
+                }
+                // String comparison
+                return isAsc ? bVal.localeCompare(aVal) : aVal.localeCompare(bVal);
+            });
+            
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+        function makeTablesSortable() {
+            const tables = document.querySelectorAll('table');
+            tables.forEach((table, index) => {
+                if (index === 0) return; // skip summary
+                const headerRow = table.querySelector('tr');
+                if (!headerRow) return;
+                headerRow.querySelectorAll('th').forEach((th, colIndex) => {
+                    th.classList.add('sortable');
+                    th.onclick = () => sortTable(th, colIndex);
+                });
+            });
+        }
+
+        function wrapTablesWithCopyButton() {
+            const tables = document.querySelectorAll('table');
+            tables.forEach((table, index) => {
+                // Skip summary table (first one)
+                if (index === 0) return;
+                if (table.parentElement.classList.contains('table-wrapper')) return;
+                
+                const wrapper = document.createElement('div');
+                wrapper.className = 'table-wrapper';
+                
+                const footer = document.createElement('div');
+                footer.className = 'table-footer';
+                
+                const btn = document.createElement('button');
+                btn.className = 'copy-btn';
+                btn.textContent = 'Copy Table';
+                btn.onclick = function() { copyTable(this); };
+                
+                footer.appendChild(btn);
+                table.parentNode.insertBefore(wrapper, table);
+                wrapper.appendChild(table);
+                wrapper.appendChild(footer);
+            });
+        }
+    </script>
 </head>
 
-<body onload="init();">
+<body onload="wrapTablesWithCopyButton(); makeTablesSortable();">
     <header>
         <h1>{{title}}</h1>
     </header>
@@ -332,7 +467,7 @@
             (No reads to show.)
             {{/if}}
             <h4>Ledger Writes</h4>
-            <p>Transaction Itself</p>
+            <p><b>Transaction Itself</b></p>
             <table>
                 <tr>
                     <th style="text-align: right">Cost in Gas Units</th>
@@ -345,7 +480,7 @@
                 </tr>
                 {{/with}}
             </table>
-            <p>Events</p>
+            <p><b>Events</b></p>
             {{#if event_writes}}
             <table>
                 <tr>
@@ -366,7 +501,7 @@
             {{else}}
             (No writes to show.)
             {{/if}}
-            <p>State Write Ops</p>
+            <p><b>State Write Ops</b></p>
             {{#if writes}}
             <table>
                 <tr>
