@@ -244,4 +244,10 @@ impl<NetworkClient: NetworkClientInterface<ConsensusMsg>> ConsensusNetworkClient
         self.network_client
             .sort_peers_by_latency(NetworkId::Validator, peers);
     }
+
+    /// Get reference to the underlying network client
+    /// This is used by the prefix consensus bridge adapter
+    pub fn network_client(&self) -> &NetworkClient {
+        &self.network_client
+    }
 }

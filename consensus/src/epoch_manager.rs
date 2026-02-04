@@ -77,7 +77,13 @@ use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
-use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
+use aptos_network::{
+    application::{interface::NetworkClient, storage::PeersAndMetadata},
+    peer::DisconnectReason,
+    protocols::network::Event,
+};
+use aptos_config::network_id::{NetworkId, PeerNetworkId};
+use aptos_types::network_address::NetworkAddress;
 use aptos_safety_rules::{
     safety_rules_manager, Error, PersistentSafetyStorage, SafetyRulesManager,
 };
@@ -101,7 +107,7 @@ use aptos_validator_transaction_pool::VTxnPoolState;
 use fail::fail_point;
 use futures::{
     channel::{mpsc, mpsc::Sender, oneshot},
-    SinkExt, StreamExt,
+    SinkExt, StreamExt, TryFutureExt,
 };
 use itertools::Itertools;
 use mini_moka::sync::Cache;
@@ -126,6 +132,128 @@ const PROPOSER_ROUND_BEHIND_STORAGE_BUFFER: usize = 30;
 pub enum LivenessStorageData {
     FullRecoveryData(RecoveryData),
     PartialRecoveryData(LedgerRecoveryData),
+}
+
+/// Bridge adapter that wraps ConsensusNetworkClient to implement NetworkClientInterface<PrefixConsensusMsg>
+///
+/// This allows prefix consensus to use the existing consensus network infrastructure
+/// by wrapping PrefixConsensusMsg in ConsensusMsg::PrefixConsensusMsg before sending.
+#[derive(Clone)]
+struct ConsensusNetworkBridge {
+    inner: ConsensusNetworkClient<aptos_network::application::interface::NetworkClient<ConsensusMsg>>,
+}
+
+impl ConsensusNetworkBridge {
+    fn new(inner: ConsensusNetworkClient<aptos_network::application::interface::NetworkClient<ConsensusMsg>>) -> Self {
+        Self { inner }
+    }
+}
+
+#[async_trait::async_trait]
+impl aptos_network::application::interface::NetworkClientInterface<aptos_prefix_consensus::PrefixConsensusMsg>
+    for ConsensusNetworkBridge
+{
+    async fn add_peers_to_discovery(
+        &self,
+        peers: &[(PeerNetworkId, NetworkAddress)],
+    ) -> Result<(), aptos_network::application::error::Error> {
+        // Delegate to underlying network client
+        self.inner.network_client().add_peers_to_discovery(peers).await
+    }
+
+    async fn disconnect_from_peer(
+        &self,
+        peer: PeerNetworkId,
+        disconnect_reason: DisconnectReason,
+    ) -> Result<(), aptos_network::application::error::Error> {
+        // Delegate to underlying network client
+        self.inner.network_client().disconnect_from_peer(peer, disconnect_reason).await
+    }
+
+    fn get_available_peers(&self) -> Result<Vec<PeerNetworkId>, aptos_network::application::error::Error> {
+        // Delegate to underlying network client
+        self.inner.network_client().get_available_peers()
+    }
+
+    fn get_peers_and_metadata(&self) -> Arc<PeersAndMetadata> {
+        // Delegate to underlying network client
+        self.inner.network_client().get_peers_and_metadata()
+    }
+
+    fn send_to_peer(
+        &self,
+        message: aptos_prefix_consensus::PrefixConsensusMsg,
+        peer: PeerNetworkId,
+    ) -> Result<(), aptos_network::application::error::Error> {
+        // Wrap PrefixConsensusMsg in ConsensusMsg and delegate
+        let wrapped = ConsensusMsg::PrefixConsensusMsg(Box::new(message));
+        self.inner.network_client().send_to_peer(wrapped, peer)
+    }
+
+    fn send_to_peer_raw(
+        &self,
+        message: bytes::Bytes,
+        peer: PeerNetworkId,
+    ) -> Result<(), aptos_network::application::error::Error> {
+        // Delegate raw send to underlying network client
+        self.inner.network_client().send_to_peer_raw(message, peer)
+    }
+
+    fn send_to_peers(
+        &self,
+        message: aptos_prefix_consensus::PrefixConsensusMsg,
+        peers: Vec<PeerNetworkId>,
+    ) -> Result<(), aptos_network::application::error::Error> {
+        // Wrap PrefixConsensusMsg in ConsensusMsg and delegate
+        let wrapped = ConsensusMsg::PrefixConsensusMsg(Box::new(message));
+        self.inner.network_client().send_to_peers(wrapped, peers)
+    }
+
+    async fn send_to_peer_rpc(
+        &self,
+        message: aptos_prefix_consensus::PrefixConsensusMsg,
+        rpc_timeout: Duration,
+        peer: PeerNetworkId,
+    ) -> Result<aptos_prefix_consensus::PrefixConsensusMsg, aptos_network::application::error::Error> {
+        // Prefix consensus doesn't use RPC, but implement for completeness
+        let wrapped = ConsensusMsg::PrefixConsensusMsg(Box::new(message));
+        let response = self.inner.network_client().send_to_peer_rpc(wrapped, rpc_timeout, peer).await?;
+
+        // Unwrap response
+        match response {
+            ConsensusMsg::PrefixConsensusMsg(msg) => Ok(*msg),
+            _ => Err(aptos_network::application::error::Error::RpcError(
+                "Unexpected message type in RPC response".to_string()
+            )),
+        }
+    }
+
+    async fn send_to_peer_rpc_raw(
+        &self,
+        _message: bytes::Bytes,
+        _rpc_timeout: Duration,
+        _peer: PeerNetworkId,
+    ) -> Result<aptos_prefix_consensus::PrefixConsensusMsg, aptos_network::application::error::Error> {
+        // Not used by prefix consensus
+        Err(aptos_network::application::error::Error::RpcError(
+            "Raw RPC not supported for prefix consensus".to_string()
+        ))
+    }
+
+    fn to_bytes_by_protocol(
+        &self,
+        peers: Vec<PeerNetworkId>,
+        message: aptos_prefix_consensus::PrefixConsensusMsg,
+    ) -> anyhow::Result<HashMap<PeerNetworkId, bytes::Bytes>> {
+        // Wrap and delegate
+        let wrapped = ConsensusMsg::PrefixConsensusMsg(Box::new(message));
+        self.inner.network_client().to_bytes_by_protocol(peers, wrapped)
+    }
+
+    fn sort_peers_by_latency(&self, network: NetworkId, peers: &mut [aptos_types::PeerId]) {
+        // Delegate to underlying network client
+        self.inner.network_client().sort_peers_by_latency(network, peers)
+    }
 }
 
 // Manager the components that shared across epoch and spawn per-epoch RoundManager with
@@ -1699,7 +1827,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     if let Some(tx) = &mut self.prefix_consensus_tx {
                         tx.send((peer_id, *msg)).map_err(|e| {
                             anyhow::anyhow!("Failed to send to prefix_consensus_tx: {:?}", e)
-                        })?;
+                        }).await?;
                     } else {
                         warn!(
                             remote_peer = peer_id,
@@ -1944,12 +2072,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         info!(
             epoch = self.epoch(),
-            party_id = %input.party_id(),
+            party_id = %input.party_id,
             "Starting prefix consensus"
         );
 
         // Create unbounded channel for messages
-        let (tx, rx) = aptos_channels::unbounded(
+        let (tx, rx) = aptos_channels::new_unbounded(
             &counters::OP_COUNTERS.gauge("prefix_consensus_channel_msgs"),
         );
         self.prefix_consensus_tx = Some(tx.clone());
@@ -1958,12 +2086,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let epoch_state = self.epoch_state().clone();
         let validators = epoch_state.verifier.clone();
 
-        // Create network sender adapter
+        // Create network bridge and sender adapter
+        let bridge = ConsensusNetworkBridge::new(self.network_sender.clone());
+        let network_client = aptos_prefix_consensus::PrefixConsensusNetworkClient::new(bridge);
         let network_sender = aptos_prefix_consensus::NetworkSenderAdapter::new(
-            input.party_id(),
-            aptos_prefix_consensus::PrefixConsensusNetworkClient::new(
-                self.network_sender.clone(),
-            ),
+            input.party_id,
+            network_client,
             tx.clone(),
             validators.clone(),
         );
@@ -1971,7 +2099,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         // Get validator signer
         let private_key = self.load_consensus_key(&validators)?;
         let validator_signer = aptos_types::validator_signer::ValidatorSigner::new(
-            input.party_id(),
+            input.party_id,
             std::sync::Arc::new(private_key),
         );
 
@@ -1982,10 +2110,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         // Create manager
         let manager = aptos_prefix_consensus::PrefixConsensusManager::new(
-            input.party_id(),
-            input.n(),
-            input.f(),
-            input.epoch(),
+            input.party_id,
+            input.n,
+            input.f,
+            input.epoch,
             protocol,
             network_sender,
             validator_signer,
@@ -2004,7 +2132,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         info!(
             epoch = self.epoch(),
-            party_id = %input.party_id(),
+            party_id = %input.party_id,
             "Prefix consensus manager spawned"
         );
 
@@ -2074,6 +2202,42 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) {
         // initial start of the processor
         self.await_reconfig_notification().await;
+
+        // Check for test-only prefix consensus trigger
+        if let Some(test_input_hex) = self.config.prefix_consensus_test_input.as_ref() {
+            info!("Test config detected: triggering prefix consensus with {} hashes", test_input_hex.len());
+
+            // Parse hex strings to HashValues
+            let mut input_vec = Vec::new();
+            for hex_str in test_input_hex {
+                match aptos_crypto::HashValue::from_hex(hex_str) {
+                    Ok(hash) => input_vec.push(hash),
+                    Err(e) => {
+                        error!("Failed to parse hash from hex string '{}': {}", hex_str, e);
+                        continue;
+                    }
+                }
+            }
+
+            if !input_vec.is_empty() {
+                let epoch_state = self.epoch_state();
+                let n = epoch_state.verifier.len();
+                let f = (n - 1) / 3;
+
+                let input = aptos_prefix_consensus::PrefixConsensusInput::new(
+                    input_vec,
+                    self.author,
+                    n,
+                    f,
+                    self.epoch(),
+                );
+
+                if let Err(e) = self.start_prefix_consensus(input).await {
+                    error!("Failed to start prefix consensus from test config: {}", e);
+                }
+            }
+        }
+
         loop {
             tokio::select! {
                 (peer, msg) = network_receivers.consensus_messages.select_next_some() => {

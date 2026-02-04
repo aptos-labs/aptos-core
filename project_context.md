@@ -2,1183 +2,355 @@
 
 ## Overview
 
-This document outlines the plan to implement a prototype of Prefix Consensus (from the research paper "Prefix Consensus For Censorship Resistant BFT") within the Aptos Core codebase. The goal is to start with the primitive 3-round asynchronous Prefix Consensus protocol described in the paper.
+Implementing a prototype of Prefix Consensus (from research paper "Prefix Consensus For Censorship Resistant BFT") within Aptos Core. Starting with the primitive 3-round asynchronous protocol.
+
+**Goal**: Leaderless, censorship-resistant consensus that works asynchronously.
 
 ---
 
-## Understanding of Current Aptos Consensus (AptosBFT)
-
-### Architecture
-
-AptosBFT is a Byzantine Fault Tolerant consensus protocol based on Jolteon, tolerating up to f Byzantine validators in a 3f+1 validator set.
-
-**Key Components:**
-
-1. **RoundManager** (`consensus/src/round_manager.rs`): Central event processor that coordinates consensus events (proposals, votes, timeouts)
-
-2. **BlockStore** (`consensus/src/block_storage/block_store.rs`): Thread-safe block tree management with:
-   - Hierarchical block structure with parent/child links
-   - Quorum certificates (QCs) storage
-   - Multiple roots: commit_root, ordered_root, window_root
-
-3. **SafetyRules** (`consensus/safety-rules/src/safety_rules.rs`): Enforces two critical voting rules:
-   - **Rule 1**: Never vote twice in same round (prevents equivocation)
-   - **Rule 2**: Only vote for blocks where parent_qc.round ≥ preferred_round (prevents forks)
-
-4. **RoundState** (`consensus/src/liveness/round_state.rs`): Manages liveness and round transitions with exponential timeout backoff
-
-5. **PendingVotes** (`consensus/src/pending_votes.rs`): Aggregates votes into quorum certificates
-
-### Consensus Flow
-
-```
-Leader proposes block
-  ↓
-Validators execute speculatively
-  ↓
-Validators vote with state hash
-  ↓
-Leader collects 2f+1 votes → Quorum Certificate
-  ↓
-3-chain commit rule (3 consecutive QCs)
-  ↓
-Block committed to storage
-```
-
-### Key Data Structures
-
-- **Block**: Contains BlockData with epoch, round, timestamp, author, parent_id, quorum_cert, payload
-- **QuorumCert**: Contains VoteData (proposed + parent BlockInfo) and LedgerInfoWithSignatures (2f+1 signatures)
-- **Vote**: Contains VoteData, author, LedgerInfo, and signature
-- **SafetyData**: Persisted state with last_voted_round, preferred_round, one_chain_round
-
-### Safety Guarantees
-
-- **3-chain rule**: Block at round k committed when it has QC, parent has QC (k-1), grandparent has QC (k-2)
-- **Preferred round mechanism**: After observing 2-chain, set preferred_round; future votes only for blocks extending this
-- **Persistent safety data**: last_voted_round persisted to disk prevents double voting after restart
-
-### Current Limitations (Relevant to Prefix Consensus)
-
-1. **Leader-based**: Designated leader per round - single point of failure and censorship
-2. **No censorship resistance**: Leader can selectively exclude transactions
-3. **Synchrony assumption**: Requires partial synchrony (GST + Δ) for liveness
-
----
-
-## Understanding of Prefix Consensus Paper
-
-### Core Primitive: Prefix Consensus
-
-**Definition**: A consensus primitive where parties propose vectors of values and output compatible vectors extending the maximum common prefix of honest inputs.
-
-**Properties:**
-- **Upper Bound**: v_low_i ⪯ v_high_j for any honest parties i,j
-- **Termination**: Every honest party eventually outputs
-- **Validity**: mcp({v_in_h}_{h∈H}) ⪯ v_low_i for any honest party i
-
-**Key Insight**: Unlike traditional consensus, Prefix Consensus:
-- Does NOT require agreement on single output value
-- CAN be solved deterministically in asynchronous setting
-- Outputs two values: v_low (safe to commit) and v_high (safe to extend)
-
-### 3-Round Asynchronous Prefix Consensus Protocol (Algorithm 1)
-
-**Round 1 (Voting on inputs)**:
-```
-1. Each party broadcasts signed input vector as vote-1
-2. Collect n-f vote-1 messages into QC1
-3. Extract longest prefix x that appears in at least f+1 votes
-   x := max{ mcp({v_i : i ∈ S}) : S ⊆ {votes in QC1}, |S|=f+1 }
-```
-
-**Round 2 (Voting on certified prefixes)**:
-```
-1. Broadcast x as vote-2 with QC1
-2. Collect n-f vote-2 messages into QC2
-3. Compute certified prefix: xp := mcp({x ∈ QC2})
-```
-
-**Round 3 (Deriving outputs)**:
-```
-1. Broadcast xp as vote-3 with QC2
-2. Collect n-f vote-3 messages into QC3
-3. Output:
-   v_low := mcp({xp ∈ QC3})  // maximum common prefix
-   v_high := mce({xp ∈ QC3}) // minimum common extension
-```
-
-**Key Mechanisms:**
-
-1. **QC1Certify**: Finds longest prefix shared by f+1 votes (can be computed in O(total input size) using trie)
-
-2. **Quorum Intersection**: Any two quorums of size n-f intersect in at least f+1 parties, including ≥1 honest party
-
-3. **Consistency Lemma**: QC2.xp ∼ QC2'.xp for any QC2, QC2' (all certified prefixes from round 2 are consistent)
-
-**Complexity:**
-- **Round complexity**: 3 rounds (optimal for n ≤ 4f)
-- **Message complexity**: O(n²)
-- **Communication complexity**: O((cL + κ_s)n⁴) for basic version, O(cn²L + cn³ + κ_s n²L) for optimized
-
-### Multi-slot Censorship-Resistant BFT (Algorithm 2)
-
-Built on top of Verifiable Prefix Consensus primitive:
-
-**Per-slot Protocol:**
-```
-1. All parties broadcast proposals
-2. Wait 2Δ to collect proposals, fill missing with ⊥
-3. Order proposals by local ranking: rank_{i,s} = (p_1, ..., p_n)
-4. Input vector to Prefix Consensus: v_in_{i,s} = [H(P_{i,s}[p_1]), ..., H(P_{i,s}[p_n])]
-5. Prefix Consensus outputs (v_low, v_high)
-6. Commit v_low, use v_high to authorize next slot
-```
-
-**Censorship Resistance via Reputation:**
-- Maintain ranking of parties per slot
-- When slot commits prefix of length ℓ < n, party p_{ℓ+1} is demoted to end
-- Byzantine party can censor ≤2 consecutive slots before demotion
-- Result: **2f-Censorship Resistance** (at most 2f censored slots after GST)
-
-**Leaderless Property:**
-- Allow ⊥ (placeholder) values in vectors
-- Progress doesn't depend on any single party
-- Satisfies Leaderless Termination: works even if adversary suspends 1 party per round
-
-### Comparison with AptosBFT
-
-| Feature | AptosBFT | Prefix Consensus |
-|---------|----------|------------------|
-| Leader-based | Yes (designated per round) | No (leaderless) |
-| Censorship resistance | None | 2f slots after GST |
-| Async solvability | No (requires partial sync) | Yes (3 rounds async) |
-| Commit rule | 3-chain (3 consecutive QCs) | Prefix agreement |
-| Safety mechanism | Preferred round | Prefix consistency |
-| Rounds per slot | ~3 message delays | 3-4 rounds |
-
----
-
-## Implementation Goal
-
-### Objective
-
-Implement a **working prototype** of the primitive 3-round asynchronous Prefix Consensus protocol (Algorithm 1 from the paper) within the Aptos Core codebase.
-
-### Scope (Phase 1: Primitive Implementation)
-
-**In Scope:**
-1. Core Prefix Consensus protocol (Algorithm 1) with 3 rounds
-2. Basic data structures: Vote messages, Quorum Certificates
-3. QC certification functions: QC1Certify, QC2Certify, QC3Certify
-4. Message verification and quorum collection logic
-5. Output computation: v_low and v_high
-6. Unit tests for correctness properties (Upper Bound, Validity, Termination)
-
-**Out of Scope (for Phase 1):**
-- Multi-slot consensus integration
-- Censorship resistance mechanisms
-- Reputation-based ranking
-- Communication optimization
-- Verifiable variant with proofs
-- Integration with Aptos execution/storage layers
-
-### Implementation Strategy
-
-**Phase 1A: Standalone Prefix Consensus Module**
-
-Create new module: `consensus/prefix-consensus/`
-
-```
-consensus/prefix-consensus/
-├── src/
-│   ├── lib.rs                 // Module exports
-│   ├── types.rs               // Vote, QC, PrefixConsensusInput/Output
-│   ├── protocol.rs            // Main protocol implementation
-│   ├── certify.rs             // QC1Certify, QC2Certify, QC3Certify functions
-│   ├── verification.rs        // Message and QC verification
-│   └── tests.rs               // Unit and integration tests
-└── Cargo.toml
-```
-
-**Key Design Decisions:**
-
-1. **Async/Await**: Use Tokio for asynchronous message handling (consistent with Aptos style)
-
-2. **Message Types**: Define clean types for Vote1, Vote2, Vote3, QC1, QC2, QC3
-
-3. **Quorum Collection**: Maintain pending vote sets, trigger QC formation on n-f threshold
-
-4. **Trie Optimization**: Implement trie-based O(input size) computation for QC1Certify
-
-5. **Testing Strategy**:
-   - Unit tests for each certify function
-   - Property-based tests for Upper Bound, Validity
-   - Simulation tests with Byzantine parties
-
-**Phase 1B: Integration Points (Future)**
-
-After primitive works:
-1. Network layer integration (consensus/src/network.rs)
-2. Create PrefixConsensusManager similar to RoundManager
-3. Hook into existing SafetyRules if applicable
-4. Integration tests with multiple nodes
-
-### Success Criteria (Phase 1)
-
-1. ✅ Prefix Consensus primitive passes all correctness tests
-2. ✅ Can handle n=3f+1 parties with f Byzantine
-3. ✅ Outputs satisfy Upper Bound: v_low_i ⪯ v_high_j
-4. ✅ Outputs satisfy Validity: mcp(honest inputs) ⪯ v_low_i
-5. ✅ All honest parties terminate and output
-6. ✅ Simulation with message delays works correctly
-
-### Non-Goals (Phase 1)
-
-- Production-ready implementation
-- Performance optimization
-- Full integration with Aptos state machine replication
-- Multi-slot consensus with censorship resistance
-- Communication-optimized variant
-
----
-
-## Technical Challenges & Considerations
-
-### 1. Vector Operations
-
-**Challenge**: Efficient implementation of mcp (max common prefix) and mce (min common extension)
-
-**Solution**:
-- Use trie for O(total input) QC1Certify computation
-- Vector comparison with early termination
-- Consider using existing Rust crates for prefix operations
-
-### 2. Quorum Certificate Structure
-
-**Challenge**: QCs in paper bundle n-f votes, but Aptos uses aggregated signatures
-
-**Solution**:
-- Phase 1: Store full votes in QC (simpler, matches paper)
-- Future: Optimize with BLS signature aggregation like Aptos
-
-### 3. Asynchronous Execution
-
-**Challenge**: Paper assumes asynchronous message delivery, Aptos assumes partial synchrony
-
-**Solution**:
-- Phase 1: Implement async without timeouts (pure async)
-- Add configurable timeouts for practical deployment
-- Use Tokio channels for message passing
-
-### 4. Byzantine Behavior Simulation
-
-**Challenge**: Need to test with Byzantine parties sending conflicting messages
-
-**Solution**:
-- Create MockParty trait with honest/byzantine implementations
-- Implement equivocation scenarios in tests
-- Test with parties sending different vectors to different recipients
-
-### 5. Consistency Verification
-
-**Challenge**: Verifying prefix consistency properties across quorums
-
-**Solution**:
-- Implement explicit consistency checks in verification.rs
-- Add invariant assertions throughout protocol
-- Use property-based testing (proptest crate)
-
----
-
-## Next Steps
-
-### Immediate (Week 1-2)
-
-1. ✅ Read and understand the paper thoroughly
-2. ✅ Document understanding in this file
-3. Create basic module structure in `consensus/prefix-consensus/`
-4. Define core types (Vote1/2/3, QC1/2/3, PrefixConsensusInput/Output)
-5. Implement prefix utility functions (mcp, mce, consistency checks)
-
-### Short-term (Week 3-4)
-
-1. Implement QC1Certify with trie optimization
-2. Implement QC2Certify and QC3Certify
-3. Build protocol state machine with 3 rounds
-4. Add message verification logic
-5. Write unit tests for certify functions
-
-### Medium-term (Week 5-8)
-
-1. Implement full protocol with async message handling
-2. Create multi-party simulation framework
-3. Add Byzantine party implementations for testing
-4. Comprehensive integration tests
-5. Document the implementation
-
-### Long-term (Future Phases)
-
-1. Communication-optimized variant (Section B from paper)
-2. Optimistic Prefix Consensus (2-round good case)
-3. Multi-slot consensus integration
-4. Censorship resistance mechanisms
-5. Production-ready hardening
-
----
-
-## Open Questions
-
-1. **Signature Scheme**: Use BLS (like Aptos) or Ed25519 for Phase 1?
-   - *Recommendation*: Start with Ed25519 for simplicity, migrate to BLS later
-
-2. **Network Simulation**: Build custom simulator or use existing Aptos network test framework?
-   - *Recommendation*: Start with simple in-process simulation, integrate later
-
-3. **Integration Strategy**: Replace AptosBFT or run alongside?
-   - *Recommendation*: Phase 1 is standalone, integration TBD
-
-4. **Vector Element Type**: What should vector elements be? Transactions, hashes, generic?
-   - *Recommendation*: Generic `Vec<T: Clone + Eq + Hash>` for Phase 1
-
-5. **Failure Injection**: How to test Byzantine behavior systematically?
-   - *Recommendation*: Create test harness with configurable Byzantine strategies
-
----
-
-## References
-
-### Paper
-- **Title**: Prefix Consensus For Censorship Resistant BFT
-- **Location**: `/Users/alexanderspiegelman/Downloads/Prefix_Consensus (4).pdf`
-- **Key Algorithms**: Algorithm 1 (3-round), Algorithm 2 (Multi-slot), Algorithm 4 (Optimistic)
-
-### Aptos Codebase
-- **Consensus**: `consensus/src/`
-- **Types**: `consensus/consensus-types/src/`
-- **Safety Rules**: `consensus/safety-rules/src/`
-- **Network**: `consensus/src/network.rs`
-
-### Related Work
-- AptosBFT: Based on Jolteon
-- Quorum Store: Transaction dissemination in Aptos
-- BlockSTM: Parallel execution (orthogonal to consensus)
-
----
-
-## Glossary
-
-- **Prefix Consensus**: Consensus primitive outputting compatible prefixes
-- **mcp**: Maximum common prefix
-- **mce**: Minimum common extension
-- **QC**: Quorum Certificate (n-f signed messages)
-- **f**: Maximum number of Byzantine parties
-- **n**: Total number of parties (n ≥ 3f+1 for optimal resilience)
-- **v_low**: Low output (safe to commit)
-- **v_high**: High output (safe to extend)
-- **GST**: Global Stabilization Time (partial synchrony)
-- **Δ**: Bounded message delay after GST
+## Background Summary
+
+### AptosBFT (Current Consensus)
+- Leader-based BFT protocol (Jolteon)
+- 3-chain commit rule, partial synchrony
+- Central components: RoundManager, BlockStore, SafetyRules
+- Limitations: Single leader per round (censorship risk, partial synchrony requirement)
+
+### Prefix Consensus Protocol
+- **Definition**: Parties propose vectors, output compatible vectors extending max common prefix
+- **Properties**: Upper Bound (v_low ⪯ v_high), Validity (mcp(inputs) ⪯ v_low), Termination
+- **Algorithm**: 3 rounds (Vote1→QC1, Vote2→QC2, Vote3→QC3)
+  - Round 1: Broadcast inputs, certify longest prefix with f+1 agreement
+  - Round 2: Broadcast certified prefixes, compute mcp
+  - Round 3: Output v_low (mcp), v_high (mce)
+- **Benefits**: Deterministically async, leaderless, censorship-resistant (2f slots after GST)
+
+**Key Difference**: No single agreed value, just compatible prefixes. Enables async solvability.
 
 ---
 
 ## Implementation Progress
 
-### Phase 1A: Standalone Prefix Consensus Module (COMPLETED)
+### Phase 1: Serialization and Signature Support (✅ COMPLETE)
 
-**Status**: ✅ Core implementation complete and compiling
+**Date**: 2026-01-28
 
-**What Was Implemented**:
+**Implementation**:
+- Added BCS serialization to all types (Vote1/2/3, QC1/2/3, Input/Output)
+- Changed signatures from Ed25519 to BLS12-381 (matches Aptos consensus)
+- Added epoch/slot fields to votes (future multi-slot support)
+- Created custom hashers (Vote1/2/3Hasher) for CryptoHash that exclude signatures
+- Created SignData helper structs (Vote1/2/3SignData) for proper BCS signing
+- Implemented sign_vote1/2/3() and verify_vote1/2/3_signature() functions
 
-#### 1. Module Structure Created
-- **Location**: `consensus/prefix-consensus/`
-- **Files**:
-  - `Cargo.toml` - Package definition with dependencies
-  - `src/lib.rs` - Module exports
-  - `src/types.rs` - Core data structures
-  - `src/utils.rs` - Prefix utility functions
-  - `src/certify.rs` - QC certification functions
-  - `src/verification.rs` - Message and QC verification
-  - `src/protocol.rs` - Main protocol state machine
+**Files**:
+- Modified: `consensus/prefix-consensus/Cargo.toml`, `src/types.rs`, `src/protocol.rs`
+- Created: `consensus/prefix-consensus/src/signing.rs` (184 lines)
 
-- Added to workspace in root `Cargo.toml`
+**Tests**: ✅ 54/54 passing (including signature round-trip tests)
 
-#### 2. Core Types Implemented (`types.rs`)
-
-**Vote Types**:
-- `Vote1` - Round 1 vote on input vector
-- `Vote2` - Round 2 vote on certified prefix (includes QC1)
-- `Vote3` - Round 3 vote on mcp prefix (includes QC2)
-
-**Quorum Certificate Types**:
-- `QC1` - Collection of n-f Vote1 messages
-- `QC2` - Collection of n-f Vote2 messages
-- `QC3` - Collection of n-f Vote3 messages
-
-**Protocol Input/Output**:
-- `PrefixConsensusInput` - Party's input vector, ID, and parameters (n, f)
-- `PrefixConsensusOutput` - Final output with v_low, v_high, and QC3
-
-**Pending Vote Collections**:
-- `PendingVotes1/2/3` - State management for vote collection in each round
-
-**Element Types**:
-- Using `HashValue` as vector elements (can represent transaction hashes, block hashes, etc.)
-
-#### 3. Prefix Utility Functions (`utils.rs`)
-
-Implemented with comprehensive unit tests:
-
-- `max_common_prefix(vectors)` - Computes longest common prefix of all vectors
-- `min_common_extension(vectors)` - Computes shortest extension containing all vectors
-- `is_prefix_of(prefix, vector)` - Check prefix relationship
-- `are_consistent(v1, v2)` - Check if two vectors are consistent (one extends the other)
-- `all_consistent(vectors)` - Check mutual consistency
-- `consistency_check(vectors)` - Detailed consistency verification with error reporting
-
-**Tests**: 11 unit tests covering edge cases (empty, single, identical, diverging vectors)
-
-#### 4. QC Certification Functions (`certify.rs`)
-
-**QC1Certify** - Extract longest prefix with f+1 agreement:
-- Uses trie data structure for O(total input size) complexity
-- Finds longest prefix appearing in at least f+1 votes
-- Implements both trie-based (optimized) and brute-force (for testing) versions
-
-**QC2Certify** - Compute maximum common prefix:
-- Takes all certified prefixes from QC2
-- Returns their maximum common prefix
-
-**QC3Certify** - Compute final outputs:
-- Returns (v_low, v_high) tuple
-- v_low = mcp of all round 3 prefixes
-- v_high = mce of all round 3 prefixes
-
-**Tests**: 8 unit tests including trie operations, certification correctness, and comparison with brute force
-
-#### 5. Verification Logic (`verification.rs`)
-
-**Vote Verification**:
-- `verify_vote1/2/3()` - Structural validation of votes
-- Note: Cryptographic signature verification skipped for prototype simplicity
-
-**QC Verification**:
-- `verify_qc1/2/3()` - Validate quorum certificates:
-  - Check quorum size (n-f votes)
-  - Detect duplicate authors
-  - Recursively verify embedded QCs
-
-**Helper Functions**:
-- `verify_no_duplicate_authors()` - Ensure no equivocation
-- `is_valid_quorum()` - Check vote count meets threshold
-
-**Tests**: 7 unit tests for vote and QC verification
-
-#### 6. Protocol State Machine (`protocol.rs`)
-
-**Main Structure**: `PrefixConsensusProtocol`
-- Manages protocol state through 3 rounds
-- Uses async/await with Tokio for asynchronous execution
-- Thread-safe with Arc<RwLock<>> for shared state
-
-**Protocol States**:
-- `NotStarted` → `Round1` → `Round1Complete` → `Round2` → `Round2Complete` → `Round3` → `Complete`
-
-**Core Methods**:
-
-*Round 1*:
-- `start_round1()` - Create and broadcast Vote1 with input vector
-- `process_vote1()` - Collect votes, form QC1 when quorum reached
-- Extracts certified prefix using QC1Certify
-
-*Round 2*:
-- `start_round2()` - Create and broadcast Vote2 with certified prefix
-- `process_vote2()` - Collect votes, form QC2 when quorum reached
-- Computes mcp using QC2Certify
-
-*Round 3*:
-- `start_round3()` - Create and broadcast Vote3 with mcp prefix
-- `process_vote3()` - Collect votes, form QC3 when quorum reached
-- Computes final output (v_low, v_high) using QC3Certify
-- Verifies upper bound property: v_low ⪯ v_high
-
-**Utility Methods**:
-- `get_state()` - Current protocol state
-- `get_output()` - Final output if complete
-- `get_vote_counts()` - Vote counts for all rounds
-- `is_complete()` - Check if protocol finished
-- `get_qc1/2/3()` - Retrieve quorum certificates
-
-**Tests**: 2 basic unit tests for state transitions and vote collection
-
-### Design Decisions Made
-
-1. **Signature Handling**: For the prototype, using dummy Ed25519 signatures. Production version would properly sign vote hashes with CryptoHash trait implementation.
-
-2. **Vector Elements**: Using `HashValue` type, which can represent hashes of transactions, blocks, or any content.
-
-3. **Asynchronous Design**: Tokio-based async/await consistent with Aptos architecture.
-
-4. **State Management**: Thread-safe using `Arc<RwLock<>>` for concurrent access.
-
-5. **No Network Layer**: Phase 1A is standalone. Network integration deferred to Phase 1B.
-
-6. **No Validator Verifier**: Removed dependency on ValidatorVerifier for prototype simplicity. Can be added later for production.
-
-### Build Status
-
-✅ **Compiles successfully**: `cargo build -p aptos-prefix-consensus`
-
-**Warnings** (non-critical):
-- Unused helper functions in verification.rs
-- Unused imports (will be cleaned up)
-
-### Test Coverage
-
-**Unit Tests Implemented**:
-- `utils.rs`: 11 tests for prefix operations
-- `certify.rs`: 8 tests for QC certification
-- `verification.rs`: 7 tests for vote/QC verification
-- `protocol.rs`: 2 tests for protocol state machine
-
-**Total**: 28 unit tests
-
-### What's Not Implemented (Out of Scope for Phase 1A)
-
-- ❌ Network layer integration
-- ❌ Multi-party simulation framework
-- ❌ Byzantine party testing
-- ❌ Proper cryptographic signatures
-- ❌ Integration with Aptos execution/storage
-- ❌ Multi-slot consensus
-- ❌ Censorship resistance mechanisms
-- ❌ Performance optimization
-
-### Next Steps (Phase 1B - Future Work)
-
-1. **Comprehensive Testing**:
-   - Integration tests with multiple protocol instances
-   - Property-based tests for Upper Bound and Validity
-   - Simulation with message delays
-   - Byzantine party behavior testing
-
-2. **Multi-Party Simulation**:
-   - Create test harness for running multiple parties
-   - Simulate network message passing
-   - Test with n=4, f=1 and n=7, f=2 configurations
-
-3. **Network Integration**:
-   - Connect to Aptos network layer (`consensus/src/network.rs`)
-   - Implement message broadcasting
-   - Handle asynchronous message delivery
-
-4. **Production Hardening**:
-   - Proper signature implementation with CryptoHash
-   - Add ValidatorVerifier integration
-   - Error handling improvements
-   - Logging and metrics
-
-5. **Documentation**:
-   - API documentation
-   - Usage examples
-   - Architecture diagrams
-
-### Files Changed
-
-1. **Created**:
-   - `consensus/prefix-consensus/Cargo.toml`
-   - `consensus/prefix-consensus/src/lib.rs`
-   - `consensus/prefix-consensus/src/types.rs`
-   - `consensus/prefix-consensus/src/utils.rs`
-   - `consensus/prefix-consensus/src/certify.rs`
-   - `consensus/prefix-consensus/src/verification.rs`
-   - `consensus/prefix-consensus/src/protocol.rs`
-
-2. **Modified**:
-   - `Cargo.toml` (root) - Added `consensus/prefix-consensus` to workspace members
-
-### Success Criteria Status
-
-From original goals:
-
-1. ✅ Prefix Consensus primitive implemented
-2. ✅ Can handle n=3f+1 parties with f Byzantine (structure in place, needs testing)
-3. ⏳ Outputs satisfy Upper Bound (verified in code, needs integration tests)
-4. ⏳ Outputs satisfy Validity (needs testing)
-5. ⏳ All honest parties terminate and output (needs multi-party testing)
-6. ❌ Simulation with message delays (not yet implemented)
-
-### Summary
-
-**Phase 1A is functionally complete**. The core primitive 3-round Prefix Consensus protocol is implemented, compiling, and has basic unit tests. The implementation faithfully follows Algorithm 1 from the paper with the three certification functions (QC1Certify, QC2Certify, QC3Certify) and the proper state machine flow.
-
-The next major milestone is comprehensive testing with multi-party simulations to validate the correctness properties (Upper Bound, Validity, Termination).
+**Technical Challenge Solved**: BCS serialization vs CryptoHash - ValidatorVerifier uses BCS of entire struct, not just hash. Solution: separate SignData structs without signature field.
 
 ---
 
-## Phase 1B: Network Integration Planning and Implementation (2026-01-28)
-
-### Status: Phase 1 Complete ✅ | Phases 2-11 Planned
-
-**Latest Update (2026-01-28 - Evening)**:
-- ✅ Phase 1 fully completed with all 54 tests passing
-- ✅ Resolved major technical challenge: BCS serialization vs CryptoHash for signatures
-- ✅ Implemented custom hashers and SignData helper structs
-- ✅ Fixed all test compilation errors (43+ fixes)
-- ✅ Zero warnings, zero errors in final build
-- 🎯 Ready to proceed with Phase 2: Network message types
-
-### Planning Session
+### Phase 2: Network Message Types (✅ COMPLETE)
 
 **Date**: 2026-01-28
 
-**Activities**:
-1. **Architecture Exploration** - Comprehensive exploration of Aptos consensus network integration:
-   - Explored `ConsensusMsg` enum structure and message routing via `NetworkTask`
-   - Analyzed `NetworkSender`/`NetworkReceiver` patterns and channel-based architecture
-   - Studied BLS12-381 signature scheme used by consensus (aggregation, ValidatorVerifier)
-   - Investigated smoke test framework (`LocalSwarm`, validator spawning, test coordination)
+**Implementation**:
+- Created `PrefixConsensusMsg` enum with Vote1/2/3Msg variants (boxed)
+- Helper methods: name(), epoch(), slot(), author(), as_vote*(), into_vote*()
+- Full BCS serialization support
 
-2. **Implementation Planning** - Created detailed 11-phase plan:
-   - **Location**: `.plans/network-integration.md` (project-local)
-   - **Approach**: Run Prefix Consensus alongside AptosBFT (parallel, not replacing)
-   - **Testing**: Use existing smoke-test framework with local validators
-   - **Estimated Timeline**: 8-11 days of focused development
+**Files**:
+- Created: `consensus/prefix-consensus/src/network_messages.rs` (443 lines)
 
-3. **Key Decisions** (User Confirmed):
-   - Hardcoded n=4, f=1 for initial testing
-   - Single epoch assumption (no epoch boundary handling yet)
-   - Use BLS12-381 signatures (same as current consensus)
-   - Run alongside AptosBFT (not replacing)
-   - Fake transactions as input vectors for testing
-   - Pure asynchrony (no timeouts in Phase 1)
-   - Use existing smoke-test framework
-   - Basic logging/metrics only
-   - Fail permanently on QC formation failure (single-shot)
-   - Test with dummy signatures first, add real signatures in Phase 10
+**Tests**: ✅ 70/70 passing (16 new tests for serialization, accessors)
 
-### Phase 1: Serialization and Signature Support (COMPLETED ✅)
+---
+
+### Phase 3: Network Interface Adapter (✅ COMPLETE)
 
 **Date**: 2026-01-28
-**Status**: ✅ Complete - All tests passing (54/54)
 
-**Changes Made**:
+**Implementation**:
+- Created `PrefixConsensusNetworkSender` trait (broadcast_vote1/2/3)
+- Implemented `NetworkSenderAdapter` wrapping Aptos NetworkClient
+- Self-send via UnboundedSender channel (network doesn't support self-send)
+- Broadcast to other validators via send_to_many()
+- Generic helper method for DRY code
 
-#### 1. Updated `consensus/prefix-consensus/Cargo.toml`
-- Added `aptos-crypto-derive` dependency for `CryptoHasher` and `BCSCryptoHash` derive macros
-- Enabled `fuzzing` feature on `aptos-crypto` for access to `dummy_signature()` method
-- Added `sha3` - For custom hasher implementation
-- Added `once_cell` - For lazy static initialization in custom hashers
+**Files**:
+- Created: `consensus/prefix-consensus/src/network_interface.rs` (224 lines)
+- Modified: `Cargo.toml` (added 7 network dependencies)
 
-#### 2. Updated `consensus/prefix-consensus/src/types.rs`
-- **Signature Change**: Replaced `Ed25519Signature` with `bls12381::Signature` (BLS12-381)
-- **Added Fields**:
-  - `epoch: u64` to Vote1, Vote2, Vote3, and PrefixConsensusInput (for future epoch awareness)
-  - `slot: u64` to Vote1, Vote2, Vote3 (for future multi-slot support, always 0 for single-shot)
-- **Custom Hasher Implementation**:
-  - Created custom hashers (Vote1Hasher, Vote2Hasher, Vote3Hasher) using macro
-  - Manual `CryptoHash` implementation that excludes signature field from hash
-  - This separation is crucial for signature verification (hash must not include signature itself)
-- **SignData Helper Structs** (NEW):
-  - `Vote1SignData`, `Vote2SignData`, `Vote3SignData`
-  - These exclude signature fields for proper BCS serialization during signing
-  - Derive `CryptoHasher` and `BCSCryptoHash` for use with `ValidatorSigner`
-- **Updated Constructors**: All Vote::new() methods now accept epoch and slot parameters
+**Tests**: ✅ 71/71 passing
 
-#### 3. Created `consensus/prefix-consensus/src/signing.rs` (NEW)
-- **Sign Functions**:
-  - `sign_vote1(vote: &Vote1, signer: &ValidatorSigner) -> Result<BlsSignature>`
-  - `sign_vote2(vote: &Vote2, signer: &ValidatorSigner) -> Result<BlsSignature>`
-  - `sign_vote3(vote: &Vote3, signer: &ValidatorSigner) -> Result<BlsSignature>`
-  - Uses SignData helper structs to create proper signable content
-- **Verify Functions**:
-  - `verify_vote1_signature(vote: &Vote1, author: &PartyId, verifier: &ValidatorVerifier) -> Result<()>`
-  - `verify_vote2_signature(...)` (similar)
-  - `verify_vote3_signature(...)` (similar)
-  - Uses SignData helper structs to match signing process
-- **Tests**: 4 unit tests for signature round-trip verification (all passing ✅)
+---
 
-#### 4. Updated `consensus/prefix-consensus/src/protocol.rs`
-- Fixed all `Vote::new()` calls to include `epoch` and `slot` parameters (3 locations):
-  - `start_round1()`: Pass `self.input.epoch` and `0` for slot
-  - `start_round2()`: Pass `self.input.epoch` and `0` for slot
-  - `start_round3()`: Pass `self.input.epoch` and `0` for slot
-- Updated `create_dummy_signature()` to return BLS signatures instead of Ed25519:
-  ```rust
-  fn create_dummy_signature(_private_key: &Ed25519PrivateKey) -> bls12381::Signature {
-      bls12381::Signature::dummy_signature()
-  }
-  ```
-- Fixed test helper: Updated `PrefixConsensusInput::new()` call to include epoch parameter
+### Phase 4: PrefixConsensusManager (✅ COMPLETE)
 
-#### 5. Fixed Test Files
-- **certify.rs**: Updated all Vote::new() calls and dummy_signature() to use BLS (43 fixes)
-- **verification.rs**: Updated all Vote::new() calls and dummy_signature() to use BLS
-- **signing.rs**: Fixed ValidatorSigner and ValidatorVerifier creation
-- Removed unused `Ed25519Signature` imports from all test modules
+**Date**: 2026-01-28
 
-#### 6. Updated `consensus/prefix-consensus/src/lib.rs`
-- Exported new `signing` module as public
-- Exported signing functions: `sign_vote1/2/3`, `verify_vote1/2/3_signature`
-- Exported additional types: `Element`, `PrefixVector`, SignData types (for external use)
+**Implementation**:
+- Event-driven manager with RoundManager pattern
+- Key methods: new(), init(), run() (consumes self), process_message(), process_vote1/2/3()
+- Duplicate detection per round (HashSet in RwLock)
+- Signature verification (currently dummy Ed25519, Phase 10 will add real BLS)
+- Auto-exits when QC3 forms or shutdown signaled
+- Structured logging with party_id, epoch, round, author fields
 
-**Technical Challenges Solved**:
-
-1. **BCS Serialization vs CryptoHash**:
-   - Discovery: `ValidatorVerifier::verify()` uses BCS serialization of the entire struct, NOT just CryptoHash
-   - Problem: Including signature field in serialization creates circular dependency
-   - Solution: Created separate SignData structs that exclude signature field
-
-2. **Custom Hasher Implementation**:
-   - Problem: Vote types need CryptoHash that excludes signature, but derive macro includes all fields
-   - Solution: Manual CryptoHash impl with custom hashers (Vote1Hasher, Vote2Hasher, Vote3Hasher)
-   - Implementation: SHA3-256 based, matches Aptos crypto patterns
-
-3. **Test Compilation Errors**:
-   - Fixed 43+ test compilation errors from signature type changes
-   - Updated all test helpers to use new Vote constructor signatures
-   - Fixed ValidatorSigner creation to use Arc<PrivateKey>
-   - Fixed ValidatorVerifier creation to use ValidatorConsensusInfo
-
-**Test Results**:
-```bash
-✅ cargo test -p aptos-prefix-consensus
-   Finished `test` profile [unoptimized + debuginfo] target(s) in 3.33s
-   Running unittests src/lib.rs
-
-   running 54 tests
-   test result: ok. 54 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+**Architecture**:
+```
+run() starts → Broadcast Vote1 → tokio::select! loop
+  ↓                                    ↓
+Message arrives → process_vote* → Protocol state machine
+  ↓                                    ↓
+QC formed → start_round* → Broadcast next vote
+  ↓
+QC3 complete → Exit loop
 ```
 
-**Test Coverage**:
-- Utils: 27 tests ✅
-- Certify: 8 tests ✅
-- Verification: 7 tests ✅
-- Protocol: 2 tests ✅
-- Signing: 4 tests ✅ (signature round-trip, invalid signature detection)
-- **Total**: 54 tests passing, 0 warnings, 0 errors
+**Files**:
+- Created: `consensus/prefix-consensus/src/manager.rs` (658 lines)
 
-### What's Working
-- ✅ Types are fully serializable (`Serialize` + `Deserialize`)
-- ✅ Types support cryptographic hashing (custom `CryptoHash` implementation)
-- ✅ BLS12-381 signature infrastructure fully functional
-- ✅ Epoch and slot fields added (ready for future multi-slot)
-- ✅ Protocol compiles and runs with BLS signatures
-- ✅ Signature creation and verification working correctly
-- ✅ All unit tests passing (54/54)
-- ✅ Test helpers updated for new signatures
+**Tests**: ✅ 74/74 passing (3 new manager tests)
 
-### Summary of Files Changed in Phase 1
-
-**New Files**:
-- `consensus/prefix-consensus/src/signing.rs` - BLS signature helpers (184 lines)
-
-**Modified Files**:
-- `consensus/prefix-consensus/Cargo.toml` - Added dependencies (sha3, once_cell, aptos-crypto-derive)
-- `consensus/prefix-consensus/src/types.rs` - Added SignData structs, custom hashers, epoch/slot fields (~120 lines added)
-- `consensus/prefix-consensus/src/protocol.rs` - Updated Vote constructors, BLS signatures (10 lines changed)
-- `consensus/prefix-consensus/src/lib.rs` - Exported signing module (5 lines added)
-- `consensus/prefix-consensus/src/certify.rs` - Fixed test helpers (43 vote constructor updates)
-- `consensus/prefix-consensus/src/verification.rs` - Fixed test helpers (15 vote constructor updates)
-
-**Lines of Code Added**: ~350 lines (including tests and helper structs)
-
-### What's Not Implemented (Per Plan)
-- ❌ Network message types (`PrefixConsensusMsg` enum) - Phase 2
-- ❌ Network interface adapter - Phase 3
-- ❌ PrefixConsensusManager - Phase 4
-- ❌ Integration with consensus layer - Phase 5-6
-- ❌ Smoke tests - Phase 7-9
-- ❌ Real BLS signature signing/verification in protocol - Phase 10
-- ❌ Documentation - Phase 11
-
-### Phase 2: Network Message Types (COMPLETED ✅)
-
-**Date**: 2026-01-28
-**Status**: ✅ Complete - All tests passing (70/70)
-
-**File Created**:
-- `consensus/prefix-consensus/src/network_messages.rs` (443 lines)
-
-**Changes Made**:
-1. **PrefixConsensusMsg Enum**:
-   - `Vote1Msg(Box<Vote1>)` - Round 1 vote envelope
-   - `Vote2Msg(Box<Vote2>)` - Round 2 vote envelope
-   - `Vote3Msg(Box<Vote3>)` - Round 3 vote envelope
-   - Used boxed variants to prevent large enum size (following Aptos `ConsensusMsg` pattern)
-
-2. **Helper Methods**:
-   - `name()` - Returns message type name for logging
-   - `epoch()` - Extracts epoch from inner vote
-   - `slot()` - Extracts slot from inner vote
-   - `author()` - Extracts author/sender address
-   - `as_vote1/2/3()` - Type-safe reference accessors
-   - `into_vote1/2/3()` - Type-safe consuming accessors
-
-3. **Convenience Traits**:
-   - `From<Vote1/2/3>` implementations for easy wrapping
-   - Full BCS serialization support via derived traits
-
-4. **Comprehensive Tests** (16 tests):
-   - Message name extraction
-   - Epoch/slot/author extraction from all variants
-   - Type-safe conversions (as_* and into_*)
-   - BCS serialization round-trips (critical for network)
-   - Serialization with embedded QCs (Vote2 with QC1, Vote3 with QC2)
-   - Message size verification
-
-**Test Results**: ✅ 70 tests passing (54 existing + 16 new), zero warnings
-
-**Key Design**: Network envelope types separated from protocol logic, ready for Phase 3 network integration
+**Race Condition Fixed**: Receiver now starts before Vote1 broadcast (commit e4376f5e9a)
 
 ---
 
-### Phase 3: Network Interface Adapter (COMPLETED ✅)
-
-**Date**: 2026-01-28
-**Status**: ✅ Complete - All tests passing (71/71)
-
-**File Created**:
-- `consensus/prefix-consensus/src/network_interface.rs` (224 lines)
-
-**Files Modified**:
-- `consensus/prefix-consensus/src/lib.rs` - Exported network_interface module
-- `consensus/prefix-consensus/Cargo.toml` - Added 7 network dependencies
-
-**Changes Made**:
-
-1. **PrefixConsensusNetworkSender Trait**:
-   ```rust
-   pub trait PrefixConsensusNetworkSender: Send + Sync + Clone {
-       async fn broadcast_vote1(&self, vote: Vote1);
-       async fn broadcast_vote2(&self, vote: Vote2);
-       async fn broadcast_vote3(&self, vote: Vote3);
-   }
-   ```
-   - Async broadcast methods for all vote types
-   - Clone bound for passing to async tasks
-   - Send + Sync for multi-threaded usage
-
-2. **PrefixConsensusNetworkClient Wrapper**:
-   - Wraps generic `NetworkClient<PrefixConsensusMsg>`
-   - Provides `send_to_many()` for broadcasting to multiple validators
-   - Handles PeerId → PeerNetworkId conversion
-   - Mirrors `ConsensusNetworkClient` pattern from AptosBFT
-
-3. **NetworkSenderAdapter Implementation**:
-   - Implements `PrefixConsensusNetworkSender` trait
-   - **Self-send**: Via `UnboundedSender` channel (network layer doesn't support self-send)
-   - **Broadcast**: Via `send_to_many()` to other validators
-   - **Generic helper**: Single `broadcast_vote<V>()` method eliminates code duplication
-   - Proper error logging with structured fields (`vote_type`)
-
-4. **Code Quality**:
-   - Reduced from 248 to 224 lines via generic helper
-   - Eliminated 3 nearly identical broadcast methods
-   - DRY principle: One broadcast implementation for all vote types
-   - Uses `Into<PrefixConsensusMsg>` trait bound for type safety
-
-**Dependencies Added**:
-- `aptos-channels` - UnboundedSender for self-messages
-- `aptos-config` - NetworkId, PeerNetworkId
-- `aptos-consensus-types` - Author type
-- `aptos-network` - NetworkClientInterface
-- `aptos-time-service` - Time service
-- `async-trait` - Async trait macro
-- `prometheus` (dev) - Test gauge creation
-
-**Test Results**: ✅ 71 tests passing, zero warnings
-
-**Architecture**: Fully mirrors Aptos network patterns, ready for Phase 4 manager implementation
-
----
-
-### Phase 4: PrefixConsensusManager (COMPLETED ✅)
-
-**Date**: 2026-01-28
-**Status**: ✅ Complete - All tests passing (74/74)
-
-**File Created**:
-- `consensus/prefix-consensus/src/manager.rs` (658 lines)
-
-**Files Modified**:
-- `consensus/prefix-consensus/src/lib.rs` - Exported manager module
-- `consensus/prefix-consensus/src/network_interface.rs` - Removed unused imports
-
-**Changes Made**:
-
-1. **Event-Driven Manager Structure**:
-   ```rust
-   pub struct PrefixConsensusManager<NetworkSender> {
-       party_id, n, f, epoch,
-       protocol: Arc<PrefixConsensusProtocol>,
-       network_sender: NetworkSender,
-       validator_signer, validator_verifier,
-       dummy_private_key: Ed25519PrivateKey,  // Temporary until Phase 10
-       seen_vote1/2/3: Arc<RwLock<HashSet<PartyId>>>,
-   }
-   ```
-   - Generic over `NetworkSender: PrefixConsensusNetworkSender` trait for testability
-   - Duplicate detection via `Arc<RwLock<HashSet<PartyId>>>` per round
-   - Dummy Ed25519 private key for protocol signatures (Phase 10 will add real BLS)
-   - validator_signer field unused until Phase 10
-
-2. **Key Methods**:
-   - `new()` - Create manager with protocol, network sender, and validators
-   - `init()` - Initialize manager (minimal setup, no broadcasting)
-   - `run()` - **Main event loop** (consumes self, follows RoundManager pattern):
-     - Broadcasts Vote1 FIRST before entering message loop
-     - `tokio::select!` over message_rx and close_rx channels
-     - Auto-exits when protocol completes (QC3 forms) or shutdown signaled
-   - `process_message()` - Routes incoming messages, validates epoch
-   - `process_vote1/2/3()` - Verifies signatures, checks duplicates, passes to protocol
-   - `start_round2/3()` - Triggered when QCs form, broadcasts next vote
-   - Public getters: `party_id()`, `epoch()`, `is_complete()`, `get_output()`
-
-3. **Architectural Pattern** (Matches AptosBFT RoundManager):
-   - `init()` called before spawning event loop (no broadcasting)
-   - `run()` consumes self and runs until completion or shutdown
-   - Broadcasts Vote1 FIRST in run() before processing messages
-   - Receives messages via `UnboundedReceiver` channel
-   - Graceful shutdown via oneshot close channel
-   - **Race condition fixed**: Receiver starts BEFORE Vote1 self-send
-
-4. **Error Handling**:
-   - **Soft failures**: Invalid votes logged with `warn!()`, don't crash manager
-   - Epoch mismatches rejected gracefully
-   - Duplicate votes silently ignored after logging
-   - Signature verification failures logged but don't propagate errors
-
-5. **Structured Logging**:
-   - All operations logged with party_id, epoch, round, author fields
-   - `info!` for major events (start, QC formation, completion)
-   - `debug!` for vote processing
-   - `warn!` for rejections and validation failures
-
-**Tests Added**:
-- `test_manager_creation` - Basic instantiation
-- `test_duplicate_vote_rejection` - Duplicate detection works
-- `test_epoch_mismatch_rejection` - Epoch validation rejects wrong-epoch votes
-
-**Test Results**: ✅ 74 tests passing (71 existing + 3 new)
-
-**Race Condition Fix**:
-- **Before**: `init()` broadcast Vote1 → self-send to channel → `run()` starts receiver
-- **After**: `run()` starts receiver → broadcast Vote1 → self-send arrives safely
-
-**Commits**:
-1. `8b7ad1b60e` - Initial manager implementation with event loop
-2. `e4376f5e9a` - Refactoring to match RoundManager pattern and fix race condition
-
----
-
-### Phase 5: EpochManager Integration (COMPLETED ✅)
+### Phase 5: EpochManager Integration (✅ COMPLETE)
 
 **Date**: 2026-01-29
-**Status**: ✅ Complete - All tests passing (74/74)
 
-**Files Modified**:
-- `Cargo.toml` - Added aptos-prefix-consensus to workspace dependencies
-- `consensus/Cargo.toml` - Added aptos-prefix-consensus dependency
-- `consensus/src/network_interface.rs` - Added PrefixConsensusMsg variant
-- `consensus/src/epoch_manager.rs` - Added integration (140+ lines)
-
-**Changes Implemented**:
-
-1. **ConsensusMsg Enum Extension**:
-   ```rust
-   pub enum ConsensusMsg {
-       // ... existing variants
-       PrefixConsensusMsg(Box<PrefixConsensusMsg>),
-   }
-   ```
-   - Added to `consensus/src/network_interface.rs`
-   - Added match arm in `name()` method for message identification
-
-2. **EpochManager Structure**:
-   - Added channel fields:
-     - `prefix_consensus_tx: Option<UnboundedSender<(Author, PrefixConsensusMsg)>>`
-     - `prefix_consensus_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>`
-   - Initialized both to `None` in `new()` method
-
-3. **Message Routing** (in `check_epoch()` method):
-   ```rust
-   ConsensusMsg::PrefixConsensusMsg(msg) => {
-       let msg_epoch = msg.epoch();
-       if msg_epoch == self.epoch() {
-           if let Some(tx) = &mut self.prefix_consensus_tx {
-               tx.send((peer_id, *msg))?;
-           } else {
-               warn!("Received PrefixConsensusMsg but prefix consensus not running");
-           }
-       } else {
-           warn!("PrefixConsensusMsg epoch mismatch");
-       }
-   }
-   ```
-   - Validates epoch matches before routing
-   - Forwards to `prefix_consensus_tx` if manager running
-   - Returns `Ok(None)` - bypasses UnverifiedEvent flow (see architectural discussion below)
-
-4. **On-Demand Start Method**:
-   ```rust
-   pub async fn start_prefix_consensus(&mut self, input: PrefixConsensusInput) -> Result<()>
-   ```
-   - Public method for smoke tests to trigger prefix consensus
-   - Checks if already running (prevents duplicate instances)
-   - Creates unbounded channel with counter metric
-   - Reuses existing `network_sender` and `validator_verifier`
-   - Creates `NetworkSenderAdapter` with self-send channel
-   - Loads consensus private key via `load_consensus_key()`
-   - Creates `ValidatorSigner` with `Arc<PrivateKey>`
-   - Creates `PrefixConsensusProtocol` and `PrefixConsensusManager`
-   - Calls `manager.init()` for initialization
-   - Spawns `tokio::spawn(manager.run(rx, close_rx))`
-   - Stores channels for later cleanup
-
-5. **Stop Method**:
-   ```rust
-   pub async fn stop_prefix_consensus(&mut self) -> Result<()>
-   ```
-   - Sends shutdown signal via `close_tx`
-   - Waits for acknowledgment with 5-second timeout
-   - Clears channel fields
-
-**Architectural Discussion: Why Not Use UnverifiedEvent Pattern?**
-
-**Decision**: PrefixConsensusMsg intentionally bypasses the `UnverifiedEvent` → `VerifiedEvent` → `forward_event()` pipeline.
-
-**Rationale**:
-1. **Future Replacement**: Prefix consensus will eventually REPLACE RoundManager with SlotManager for multi-slot protocol
-2. **Avoid Migration Debt**: Integrating with RoundManager's types now means extracting later during replacement
-3. **Independent Evolution**: Prefix consensus is the future consensus, not an add-on to current consensus
-4. **Cleaner Architecture**: When RoundManager is removed, prefix consensus infrastructure is already separate
-5. **Multi-Slot Ready**: SlotManager can directly reuse `PrefixConsensusManager` without refactoring
-
-**Trade-offs Accepted**:
-- Short-term: Different pattern than ProposalMsg, VoteMsg, etc.
-- Short-term: No proof cache integration, separate metrics
-- Long-term: Clean replacement path, no rework needed
-
-**Alternative Considered and Rejected**:
-- Adding `PrefixConsensusVote1/2/3` variants to `UnverifiedEvent` enum
-- This would create coupling to types that will be removed
-- Verification would happen in two places (UnverifiedEvent::verify() and PrefixConsensusManager)
-- Adds migration work when transitioning to SlotManager
-
-**Pattern Precedent**: Similar to `EpochRetrievalRequest` which also routes directly in `check_epoch()` without going through UnverifiedEvent.
-
-**Test Results**: ✅ All 74 aptos-prefix-consensus tests pass
-
-**Commit**: `349a557e6d` - Phase 5 implementation complete
-
----
-
-### Next Steps (Phase 6-11)
-
-**Immediate (Phase 6)**: Network Registration
-- Phase 5 already added PrefixConsensusMsg to ConsensusMsg enum
-- Network layer should automatically handle it via existing protocols
-- May need protocol ID if separate protocol needed (TBD in Phase 6)
-
-**Short-term (Phase 7-9)**: Smoke Tests
-- Create `smoke-test/src/prefix_consensus/` module
-- Basic tests (identical inputs, overlapping, divergent)
-- Byzantine tests (silent validator)
-- Call EpochManager::start_prefix_consensus() from smoke tests
-
-**Final (Phase 10-11)**: Real Signatures and Documentation
-- Replace dummy Ed25519 with real BLS signing
-- Update README and project_context.md
-
-### Implementation Plan Reference
-- **Full Plan**: `.plans/network-integration.md` (project-local)
-- **Estimated Total Time**: 8-11 days
-- **Current Progress**: Phase 5/11 complete (~45%)
-- **Time Spent**: Phase 1 (~4h), Phase 2 (~1h), Phase 3 (~2h), Phase 4 (~3h), Phase 5 (~2h)
-
----
-
-## Git History
-
-### Branch: `prefix-consensus-prototype`
-
-**Created**: 2026-01-22
-**Based on**: `main` (commit: 1b896ef2a9)
-
-### Commits
-
-#### Commit: 96a68780cd
-**Date**: 2026-01-22
-**Message**: `[consensus] Add Prefix Consensus primitive implementation`
-
-**Changes**:
-- Created `consensus/prefix-consensus/` module with 7 source files
-- Modified `Cargo.toml` to include new workspace member
-- Added `project_context.md` documentation
-- **Files changed**: 10 files, 2756 insertions(+)
-
-**Status**: ✅ Committed locally
-**Remote**: ⏳ Pending push (requires authentication)
-
-#### Commit: 8b7ad1b60e
-**Date**: 2026-01-28
-**Message**: `[consensus] Implement PrefixConsensusManager (Phase 4)`
-
-**Changes**:
-- Created `consensus/prefix-consensus/src/manager.rs` (580+ lines)
-- Modified `consensus/prefix-consensus/src/lib.rs` - Exported manager module
-- Modified `consensus/prefix-consensus/src/network_interface.rs` - Cleaned up imports
-- Event-driven manager with RoundManager pattern
-- Duplicate detection, signature verification, round progression
-- **Files changed**: 3 files, 587 insertions(+), 2 deletions(-)
-
-**Status**: ✅ Committed locally
-**Tests**: ✅ 74/74 passing
-
-#### Commit: e4376f5e9a
-**Date**: 2026-01-28
-**Message**: `[consensus] Refactor manager to match RoundManager pattern and fix race condition`
-
-**Changes**:
-- Refactored `init()` method - removed broadcasting logic
-- Refactored `run()` method - added Vote1 broadcast at start of event loop
-- Fixed race condition where Vote1 self-send could arrive before receiver started
-- Updated tests to remove unnecessary init() calls
-- **Files changed**: 1 file, 88 insertions(+), 17 deletions(-)
-
-**Status**: ✅ Committed locally
-**Tests**: ✅ 74/74 passing
-**Key Fix**: Receiver now starts before Vote1 broadcast, eliminating race condition
-
-#### Commit: 6c5eec0fe8
-**Date**: 2026-01-28
-**Message**: `[docs] Update project context with Phase 4 completion and Phase 5 plan`
-
-**Changes**:
-- Documented Phase 4 (PrefixConsensusManager) completion
-- Added detailed Phase 5 plan for EpochManager integration
-- Updated progress tracking (Phase 4/11 complete, ~36%)
-- Added time estimates for completed phases
-- **Files changed**: 1 file, 174 insertions(+), 15 deletions(-)
-
-**Status**: ✅ Committed locally
-
-#### Commit: 349a557e6d
-**Date**: 2026-01-29
-**Message**: `[consensus] Integrate PrefixConsensusManager into EpochManager (Phase 5)`
-
-**Changes**:
+**Implementation**:
 - Added `PrefixConsensusMsg` variant to `ConsensusMsg` enum
-- Added workspace dependency for `aptos-prefix-consensus`
-- Modified `EpochManager` struct with prefix consensus channels
-- Added message routing in `check_epoch()` method
-- Implemented `start_prefix_consensus()` public method (140+ lines)
-- Implemented `stop_prefix_consensus()` method
-- Bypasses UnverifiedEvent pattern (architectural decision documented)
-- **Files changed**: 5 files, 153 insertions(+)
+- Added message routing in `EpochManager::check_epoch()` (epoch validation, forward to manager)
+- Implemented `start_prefix_consensus(input)` method:
+  - Creates channels, NetworkSenderAdapter, ValidatorSigner
+  - Spawns PrefixConsensusManager on tokio runtime
+  - Returns after initialization
+- Implemented `stop_prefix_consensus()` method (graceful shutdown)
+- Stores channels: prefix_consensus_tx, prefix_consensus_close_tx
 
-**Status**: ✅ Committed locally
-**Tests**: ✅ 74/74 passing (aptos-prefix-consensus)
-**Rust Code**: ✅ Compiles successfully
-**Key Decision**: PrefixConsensusMsg intentionally separate from UnverifiedEvent pattern to enable future RoundManager replacement
+**Architectural Decision**: Bypasses UnverifiedEvent pattern
+- Rationale: Prefix consensus will eventually REPLACE RoundManager
+- Avoids coupling to types that will be removed
+- Clean replacement path for future SlotManager
+- Routes directly in check_epoch() like EpochRetrievalRequest
 
+**Files**:
+- Modified: `consensus/src/epoch_manager.rs` (~140 lines added)
+- Modified: `consensus/src/network_interface.rs` (added enum variant)
+- Modified: `Cargo.toml`, `consensus/Cargo.toml` (workspace dependency)
+
+**Tests**: ✅ 74/74 passing
+
+**Commit**: `349a557e6d` - Integration complete
+
+---
+
+### Phase 6: Smoke Test & Bug Fixes (🔄 IN PROGRESS)
+
+**Date**: 2026-02-03/04
+
+**Goal**: Create basic smoke test infrastructure and fix protocol bugs
+
+**Implementation**:
+
+1. **Smoke Test Infrastructure** (✅ Complete)
+   - Created `testsuite/smoke-test/src/consensus/prefix_consensus/` module
+   - Test helper functions: `generate_test_hashes()`, `wait_for_prefix_consensus_outputs()`, `cleanup_output_files()`
+   - Basic test: `test_prefix_consensus_identical_inputs` (4 validators, identical inputs)
+   - Test triggers protocol via config: `consensus.prefix_consensus_test_input`
+   - Validators write output to `/tmp/prefix_consensus_output_{party_id}.json`
+
+2. **Fixed Signature Verification** (✅ Complete)
+   - **Problem**: Protocol used dummy BLS signatures that failed verification
+   - **Root Cause**: `protocol.rs` called `create_dummy_signature()` instead of real BLS signing
+   - **Fix**: Changed `start_round1/2/3()` to accept `&ValidatorSigner`, use real BLS signatures
+   - **Changes**:
+     - `protocol.rs`: Accept `ValidatorSigner`, call `sign_vote1/2/3()` with real keys
+     - `manager.rs`: Removed `dummy_private_key`, pass `&self.validator_signer` to protocol
+
+3. **Fixed Network Message Routing** (✅ Complete)
+   - **Problem**: `PrefixConsensusMsg` rejected with "Unexpected direct send msg"
+   - **Root Cause**: DirectSend handler in `network.rs` didn't include `PrefixConsensusMsg`
+   - **Fix**: Added `ConsensusMsg::PrefixConsensusMsg(_)` to pattern match at line 871
+
+4. **Added Output File Writing** (✅ Complete)
+   - **Problem**: Protocol completed but no output files for test validation
+   - **Fix**: Added `write_output_file()` method in `manager.rs` that writes JSON to `/tmp/`
+   - Writes after QC3 formation with v_low, v_high, epoch, party_id
+
+**Files Modified**:
+- `consensus/prefix-consensus/src/protocol.rs` - Real BLS signatures
+- `consensus/prefix-consensus/src/manager.rs` - ValidatorSigner, output writing
+- `consensus/src/network.rs` - PrefixConsensusMsg routing
+- `testsuite/smoke-test/Cargo.toml` - Added prefix-consensus dependency
+- `testsuite/smoke-test/src/consensus/mod.rs` - Added prefix_consensus module
+- `testsuite/smoke-test/src/consensus/prefix_consensus/mod.rs` - Module structure
+- `testsuite/smoke-test/src/consensus/prefix_consensus/helpers.rs` - Test helpers
+- `testsuite/smoke-test/src/consensus/prefix_consensus/basic_test.rs` - Smoke test
+
+**Current Test Results**:
+- ✅ Protocol runs successfully through all 3 rounds
+- ✅ QC1, QC2, QC3 formation works
+- ✅ Output files written correctly (v_low and v_high match expectations)
+- ⚠️  **Intermittent Issue**: 3/4 validators complete (75% success rate)
+
+**Known Issue - Race Condition**:
+- **Symptom**: 1 validator gets stuck in Round 2, never forms QC2
+- **Root Cause**: Early message rejection - Vote2 arrives before validator enters Round 2
+- **Example Timeline**:
+  ```
+  T=50ms: Fast validators form QC1, broadcast Vote2
+  T=52ms: Slow validator receives Vote2 while still in Round1 → REJECTED "Not in Round 2"
+  T=55ms: Slow validator forms QC1, enters Round2
+  T=56ms: Slow validator only has 1 Vote2 (its own) → stuck at vote_count=1/3
+  ```
+- **Location**: `protocol.rs` lines 163, 289, 413 - strict state checks reject early votes
+- **Impact**: Test fails intermittently (need message buffering to fix)
+
+**Next Steps**:
+- Implement message buffering for early votes (allow Vote2 in Round1, process when ready)
+- OR: Remove strict state checks (process votes in any state)
+- Add retransmission mechanism (complex alternative)
+
+---
+
+## Current Status (February 4, 2026)
+
+### ✅ Completed Phases (5/11)
+1. **Phase 1**: Serialization & BLS signatures
+2. **Phase 2**: Network message types
+3. **Phase 3**: Network adapter
+4. **Phase 4**: PrefixConsensusManager
+5. **Phase 5**: EpochManager integration
+
+### 🔄 In Progress
+**Phase 6**: Smoke Test & Bug Fixes
+- ✅ Test infrastructure created
+- ✅ Signature verification fixed (real BLS)
+- ✅ Network routing fixed
+- ✅ Output file writing implemented
+- ⚠️  Race condition identified (early message rejection)
+
+### ⏳ Remaining Phases (7-11)
+7. **Message Buffering** (fix race condition - buffer early votes)
+8. **Complete Smoke Tests** (ensure 100% pass rate)
+9. **Fault Tolerance Tests** (silent validator, Byzantine behavior)
+10. **Additional Test Cases** (overlapping/divergent inputs)
+11. **Documentation** (README, API docs, examples)
+
+### Repository State
+- **Branch**: `prefix-consensus-prototype`
+- **HEAD**: `45dec59b91` (about to commit Phase 6 progress)
+- **Status**: Modified files (smoke test + bug fixes, ready to commit)
+- **Tests**: 74/74 unit tests passing, smoke test 75% success rate
+- **Build**: ✅ All build issues resolved
+
+### Progress
+- **Overall**: Phase 6/11 (~55%)
+- **Time Spent**: ~15 hours total (Phase 6: 3h debugging + fixes)
+
+### Next Action
+**Decision Point**: Choose approach to fix race condition:
+1. Add message buffering (store early votes, process when ready)
+2. Remove strict state checks (process votes anytime)
+3. Add retransmission mechanism
+
+---
+
+## Key Implementation Files
+
+```
+consensus/prefix-consensus/
+├── src/
+│   ├── types.rs              - Vote/QC types with BLS signatures (350+ lines)
+│   ├── utils.rs              - mcp/mce prefix operations (180 lines)
+│   ├── certify.rs            - QC1/2/3Certify functions with trie (220 lines)
+│   ├── verification.rs       - Vote/QC verification (150 lines)
+│   ├── protocol.rs           - 3-round state machine (380 lines)
+│   ├── signing.rs            - BLS sign/verify helpers (184 lines)
+│   ├── network_messages.rs   - PrefixConsensusMsg enum (443 lines)
+│   ├── network_interface.rs  - Network adapter (224 lines)
+│   └── manager.rs            - Event-driven manager (658 lines)
+└── Cargo.toml
+
+consensus/src/
+├── epoch_manager.rs          - Integration point (start_prefix_consensus)
+└── network_interface.rs      - ConsensusMsg enum (PrefixConsensusMsg variant)
+```
+
+**Total LOC**: ~2800 lines (implementation + tests)
+
+---
+
+## Implementation Plan Reference
+
+**Full Plan**: `.plans/network-integration.md` (11 phases, 8-11 days estimated)
+
+**Progress**: Phase 5/11 (~45%)
+
+**Time Spent**: ~12 hours (Phase 1: 4h, Phase 2: 1h, Phase 3: 2h, Phase 4: 3h, Phase 5: 2h)
+
+---
+
+## Git Commit History
+
+### Commits on `prefix-consensus-prototype` branch
+
+1. **96a68780cd** (2026-01-22): `[consensus] Add Prefix Consensus primitive implementation`
+   - Initial 7-file module creation (types, utils, certify, verification, protocol)
+
+2. **8b7ad1b60e** (2026-01-28): `[consensus] Implement PrefixConsensusManager (Phase 4)`
+   - Created manager.rs with event-driven architecture
+
+3. **e4376f5e9a** (2026-01-28): `[consensus] Refactor manager to match RoundManager pattern and fix race condition`
+   - Fixed Vote1 self-send race by starting receiver before broadcast
+
+4. **6c5eec0fe8** (2026-01-28): `[docs] Update project context with Phase 4 completion and Phase 5 plan`
+
+5. **349a557e6d** (2026-01-29): `[consensus] Integrate PrefixConsensusManager into EpochManager (Phase 5)`
+   - Added start_prefix_consensus(), message routing
+
+6. **45dec59b91** (2026-01-29): `[docs] Update project context with Phase 5 completion and architectural discussion` (HEAD)
+
+---
+
+## References
+
+**Paper**: "Prefix Consensus For Censorship Resistant BFT" - `/Users/alexanderspiegelman/Downloads/Prefix_Consensus (4).pdf`
+
+**Key Algorithms**:
+- Algorithm 1: 3-round async Prefix Consensus (implemented)
+- Algorithm 2: Multi-slot censorship-resistant BFT (future)
+- Algorithm 4: Optimistic 2-round variant (future)
+
+**Aptos Codebase**:
+- Consensus: `consensus/src/`
+- Types: `consensus/consensus-types/src/`
+- Safety Rules: `consensus/safety-rules/src/`
+- Network: `consensus/src/network_interface.rs`
+
+---
+
+## Notes
+
+### Build Environment
+✅ macOS build issues resolved (RocksDB C++, sandbox .pem access)
+
+### Testing Strategy
+- Unit tests: Per-module tests in each file (74 tests total)
+- Smoke tests: LocalSwarm with multiple validators (Phase 7-9)
+- Property tests: Upper Bound, Validity, Termination verification
+
+### Future Work
+- Multi-slot consensus (Algorithm 2)
+- Censorship resistance with reputation
+- Communication optimization (reduce from O(n²L) to O(n² + nL))
+- Optimistic 2-round variant (Algorithm 4)
+- Integration with Aptos execution/storage
+- Production hardening (metrics, error recovery, persistence)

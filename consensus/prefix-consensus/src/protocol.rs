@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
@@ -15,8 +18,8 @@ use crate::{
     verification::{verify_qc1, verify_qc2, verify_qc3, verify_vote1, verify_vote2, verify_vote3},
 };
 use anyhow::{bail, Result};
-use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_logger::{debug, error, info};
+use aptos_types::validator_signer::ValidatorSigner;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -116,7 +119,7 @@ impl PrefixConsensusProtocol {
     // ========================================================================
 
     /// Start Round 1: Broadcast Vote1 with input vector
-    pub async fn start_round1(&self, private_key: &Ed25519PrivateKey) -> Result<Vote1> {
+    pub async fn start_round1(&self, signer: &ValidatorSigner) -> Result<Vote1> {
         let mut state = self.state.write().await;
         if *state != ProtocolState::NotStarted {
             bail!("Cannot start Round 1: protocol already started");
@@ -131,15 +134,23 @@ impl PrefixConsensusProtocol {
         *state = ProtocolState::Round1;
         drop(state);
 
-        // Create Vote1
-        // For the prototype, we create a dummy signature
-        // In production, this would properly sign the vote hash with proper message types
-        let signature = create_dummy_signature(private_key);
+        // Create Vote1 with dummy signature first
+        let dummy_sig = aptos_crypto::bls12381::Signature::dummy_signature();
         let vote = Vote1::new(
             self.input.party_id,
             self.input.input_vector.clone(),
             self.input.epoch,
             0, // slot: always 0 for single-shot
+            dummy_sig,
+        );
+
+        // Sign it with real BLS signature
+        let signature = crate::signing::sign_vote1(&vote, signer)?;
+        let vote = Vote1::new(
+            self.input.party_id,
+            self.input.input_vector.clone(),
+            self.input.epoch,
+            0,
             signature,
         );
 
@@ -217,7 +228,7 @@ impl PrefixConsensusProtocol {
     // ========================================================================
 
     /// Start Round 2: Broadcast Vote2 with certified prefix from QC1
-    pub async fn start_round2(&self, private_key: &Ed25519PrivateKey) -> Result<Vote2> {
+    pub async fn start_round2(&self, signer: &ValidatorSigner) -> Result<Vote2> {
         let mut state = self.state.write().await;
         if *state != ProtocolState::Round1Complete {
             bail!("Cannot start Round 2: Round 1 not complete");
@@ -246,9 +257,19 @@ impl PrefixConsensusProtocol {
             "Starting Round 2"
         );
 
-        // Create Vote2
-        // For the prototype, we create a dummy signature
-        let signature = create_dummy_signature(private_key);
+        // Create Vote2 with dummy signature first
+        let dummy_sig = aptos_crypto::bls12381::Signature::dummy_signature();
+        let vote = Vote2::new(
+            self.input.party_id,
+            certified.clone(),
+            qc1.clone(),
+            self.input.epoch,
+            0,
+            dummy_sig,
+        );
+
+        // Sign it with real BLS signature
+        let signature = crate::signing::sign_vote2(&vote, signer)?;
         let vote = Vote2::new(
             self.input.party_id,
             certified.clone(),
@@ -331,7 +352,7 @@ impl PrefixConsensusProtocol {
     // ========================================================================
 
     /// Start Round 3: Broadcast Vote3 with mcp prefix from QC2
-    pub async fn start_round3(&self, private_key: &Ed25519PrivateKey) -> Result<Vote3> {
+    pub async fn start_round3(&self, signer: &ValidatorSigner) -> Result<Vote3> {
         let mut state = self.state.write().await;
         if *state != ProtocolState::Round2Complete {
             bail!("Cannot start Round 3: Round 2 not complete");
@@ -360,9 +381,19 @@ impl PrefixConsensusProtocol {
             "Starting Round 3"
         );
 
-        // Create Vote3
-        // For the prototype, we create a dummy signature
-        let signature = create_dummy_signature(private_key);
+        // Create Vote3 with dummy signature first
+        let dummy_sig = aptos_crypto::bls12381::Signature::dummy_signature();
+        let vote = Vote3::new(
+            self.input.party_id,
+            mcp.clone(),
+            qc2.clone(),
+            self.input.epoch,
+            0,
+            dummy_sig,
+        );
+
+        // Sign it with real BLS signature
+        let signature = crate::signing::sign_vote3(&vote, signer)?;
         let vote = Vote3::new(
             self.input.party_id,
             mcp.clone(),
@@ -490,16 +521,6 @@ impl PrefixConsensusProtocol {
 // ============================================================================
 // Helper Functions
 // ============================================================================
-
-/// Create a dummy signature for the prototype
-///
-/// Note: This is a placeholder for the prototype. In production, votes would be
-/// properly signed using the private key with the correct message format.
-fn create_dummy_signature(_private_key: &Ed25519PrivateKey) -> aptos_crypto::bls12381::Signature {
-    // Create a dummy BLS signature
-    // In a real implementation, this would properly sign the vote content
-    aptos_crypto::bls12381::Signature::dummy_signature()
-}
 
 #[cfg(test)]
 mod tests {

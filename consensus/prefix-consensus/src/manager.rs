@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
@@ -16,7 +19,6 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_consensus_types::common::Author;
-use aptos_crypto::{ed25519::Ed25519PrivateKey, Uniform};
 use aptos_logger::prelude::*;
 use aptos_types::{validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier};
 use futures::{FutureExt, StreamExt};
@@ -55,10 +57,6 @@ pub struct PrefixConsensusManager<NetworkSender> {
     /// Validator verifier for signature checking
     validator_verifier: Arc<ValidatorVerifier>,
 
-    /// Dummy private key for protocol (only used for dummy signature generation)
-    /// TODO: Replace with real BLS signing in Phase 10
-    dummy_private_key: Ed25519PrivateKey,
-
     /// Track seen Vote1 messages to prevent duplicates
     seen_vote1: Arc<RwLock<HashSet<PartyId>>>,
 
@@ -81,10 +79,6 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
         validator_signer: ValidatorSigner,
         validator_verifier: Arc<ValidatorVerifier>,
     ) -> Self {
-        // Generate a dummy private key for protocol signature generation
-        // This is only used for dummy signatures until Phase 10
-        let dummy_private_key = Ed25519PrivateKey::generate_for_testing();
-
         Self {
             party_id,
             n,
@@ -94,7 +88,6 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
             network_sender,
             validator_signer,
             validator_verifier,
-            dummy_private_key,
             seen_vote1: Arc::new(RwLock::new(HashSet::new())),
             seen_vote2: Arc::new(RwLock::new(HashSet::new())),
             seen_vote3: Arc::new(RwLock::new(HashSet::new())),
@@ -138,7 +131,7 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
 
         // Broadcast Vote1 FIRST before entering message loop
         // This ensures the receiver is ready before our own Vote1 arrives via self-send
-        match self.protocol.start_round1(&self.dummy_private_key).await {
+        match self.protocol.start_round1(&self.validator_signer).await {
             Ok(vote1) => {
                 info!(
                     party_id = %self.party_id,
@@ -305,7 +298,7 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
         );
 
         // Protocol creates Vote2 (QC1 is already stored in protocol)
-        let vote2 = self.protocol.start_round2(&self.dummy_private_key).await?;
+        let vote2 = self.protocol.start_round2(&self.validator_signer).await?;
 
         info!(
             party_id = %self.party_id,
@@ -390,7 +383,7 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
         );
 
         // Protocol creates Vote3 (QC2 is already stored in protocol)
-        let vote3 = self.protocol.start_round3(&self.dummy_private_key).await?;
+        let vote3 = self.protocol.start_round3(&self.validator_signer).await?;
 
         info!(
             party_id = %self.party_id,
@@ -446,6 +439,15 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
                     party_id = %self.party_id,
                     "QC3 formed, Prefix Consensus complete"
                 );
+
+                // Write output to file for smoke test validation
+                if let Err(e) = self.write_output_file().await {
+                    warn!(
+                        party_id = %self.party_id,
+                        error = ?e,
+                        "Failed to write output file"
+                    );
+                }
             },
             Ok(None) => {
                 debug!(
@@ -473,6 +475,41 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
     /// Get the protocol output if complete
     pub async fn get_output(&self) -> Option<PrefixConsensusOutput> {
         self.protocol.get_output().await
+    }
+
+    /// Write output to file for smoke test validation
+    async fn write_output_file(&self) -> anyhow::Result<()> {
+        use serde::{Serialize, Deserialize};
+
+        #[derive(Serialize, Deserialize)]
+        struct OutputFile {
+            party_id: String,
+            epoch: u64,
+            v_low: Vec<String>,
+            v_high: Vec<String>,
+        }
+
+        let output = self.get_output().await
+            .ok_or_else(|| anyhow::anyhow!("Protocol not complete"))?;
+
+        let output_file = OutputFile {
+            party_id: format!("{:x}", self.party_id),
+            epoch: self.epoch,
+            v_low: output.v_low.iter().map(|h| h.to_hex()).collect(),
+            v_high: output.v_high.iter().map(|h| h.to_hex()).collect(),
+        };
+
+        let file_path = format!("/tmp/prefix_consensus_output_{:x}.json", self.party_id);
+        let json = serde_json::to_string_pretty(&output_file)?;
+        std::fs::write(&file_path, json)?;
+
+        info!(
+            party_id = %self.party_id,
+            file_path = %file_path,
+            "Wrote prefix consensus output file"
+        );
+
+        Ok(())
     }
 
     /// Get the party ID

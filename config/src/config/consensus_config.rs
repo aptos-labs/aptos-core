@@ -101,6 +101,9 @@ pub struct ConsensusConfig {
     pub enable_round_timeout_msg: bool,
     pub enable_optimistic_proposal_rx: bool,
     pub enable_optimistic_proposal_tx: bool,
+    /// Test-only: Input vector for prefix consensus smoke tests (hex-encoded hashes)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prefix_consensus_test_input: Option<Vec<String>>,
 }
 
 /// Deprecated
@@ -383,6 +386,7 @@ impl Default for ConsensusConfig {
             enable_round_timeout_msg: true,
             enable_optimistic_proposal_rx: true,
             enable_optimistic_proposal_tx: true,
+            prefix_consensus_test_input: None,
         }
     }
 }
