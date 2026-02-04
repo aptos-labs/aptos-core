@@ -254,29 +254,46 @@
             const tbody = table.tBodies[0] || table;
             const rows = Array.from(tbody.querySelectorAll('tr')).slice(1); // skip header
 
-            const isAsc = th.classList.contains('sort-asc');
+            if (rows.length === 0) return;
+
+            const wasAsc = th.classList.contains('sort-asc');
+            const wasDesc = th.classList.contains('sort-desc');
+            const wasSorted = wasAsc || wasDesc;
+
+            // Check if column is marked to default to ascending (text columns)
+            const defaultAsc = th.hasAttribute('data-sort-asc');
 
             // Clear other sort indicators
             th.closest('tr').querySelectorAll('th').forEach(h => {
                 h.classList.remove('sort-asc', 'sort-desc');
             });
 
-            // Set new sort direction
-            th.classList.add(isAsc ? 'sort-desc' : 'sort-asc');
+            // Determine new sort direction
+            // - If already sorted, toggle direction
+            // - If not sorted: use data-sort-asc attribute to determine default
+            let sortDesc;
+            if (wasSorted) {
+                sortDesc = wasAsc; // toggle: was asc -> now desc
+            } else {
+                sortDesc = !defaultAsc; // default desc unless marked with data-sort-asc
+            }
+
+            th.classList.add(sortDesc ? 'sort-desc' : 'sort-asc');
+
+            // Check if column is marked as numeric
+            const isNumeric = th.hasAttribute('data-sort-num');
 
             rows.sort((a, b) => {
                 const aVal = a.cells[colIndex]?.textContent.trim() || '';
                 const bVal = b.cells[colIndex]?.textContent.trim() || '';
 
-                // Try numeric comparison
-                const aNum = parseFloat(aVal.replace(/[,%]/g, ''));
-                const bNum = parseFloat(bVal.replace(/[,%]/g, ''));
-
-                if (!isNaN(aNum) && !isNaN(bNum)) {
-                    return isAsc ? bNum - aNum : aNum - bNum;
+                if (isNumeric) {
+                    const aNum = parseFloat(aVal.replace(/[,%]/g, ''));
+                    const bNum = parseFloat(bVal.replace(/[,%]/g, ''));
+                    return sortDesc ? bNum - aNum : aNum - bNum;
                 }
                 // String comparison
-                return isAsc ? bVal.localeCompare(aVal) : aVal.localeCompare(bVal);
+                return sortDesc ? bVal.localeCompare(aVal) : aVal.localeCompare(bVal);
             });
 
             rows.forEach(row => tbody.appendChild(row));
@@ -419,10 +436,10 @@
             {{#if deps}}
             <table>
                 <tr>
-                    <th>Name</th>
-                    <th style="text-align: right">Size in Bytes</th>
-                    <th style="text-align: right">Cost in Gas Units</th>
-                    <th style="text-align: right">Percentage</th>
+                    <th data-sort-asc>Name</th>
+                    <th style="text-align: right" data-sort-num>Size in Bytes</th>
+                    <th style="text-align: right" data-sort-num>Cost in Gas Units</th>
+                    <th style="text-align: right" data-sort-num>Percentage</th>
                 </tr>
                 {{#each deps}}
                 <tr>
@@ -441,10 +458,10 @@
             {{#if ops}}
             <table>
                 <tr>
-                    <th>Operation</th>
-                    <th style="text-align: right">Number of Hits</th>
-                    <th style="text-align: right">Cost in Gas Units</th>
-                    <th style="text-align: right">Percentage</th>
+                    <th data-sort-asc>Operation</th>
+                    <th style="text-align: right" data-sort-num>Number of Hits</th>
+                    <th style="text-align: right" data-sort-num>Cost in Gas Units</th>
+                    <th style="text-align: right" data-sort-num>Percentage</th>
                 </tr>
                 {{#each ops}}
                 <tr>
@@ -462,10 +479,10 @@
             {{#if methods}}
             <table>
                 <tr>
-                    <th>Methods (gas including children)</th>
-                    <th style="text-align: right">Number of Hits</th>
-                    <th style="text-align: right">Cost in Gas Units</th>
-                    <th style="text-align: right">Percentage</th>
+                    <th data-sort-asc>Methods (gas including children)</th>
+                    <th style="text-align: right" data-sort-num>Number of Hits</th>
+                    <th style="text-align: right" data-sort-num>Cost in Gas Units</th>
+                    <th style="text-align: right" data-sort-num>Percentage</th>
                 </tr>
                 {{#each methods}}
                 <tr>
@@ -483,10 +500,10 @@
             {{#if methods_self}}
             <table>
                 <tr>
-                    <th>Methods (only local gas)</th>
-                    <th style="text-align: right">Number of Hits</th>
-                    <th style="text-align: right">Cost in Gas Units</th>
-                    <th style="text-align: right">Percentage</th>
+                    <th data-sort-asc>Methods (only local gas)</th>
+                    <th style="text-align: right" data-sort-num>Number of Hits</th>
+                    <th style="text-align: right" data-sort-num>Cost in Gas Units</th>
+                    <th style="text-align: right" data-sort-num>Percentage</th>
                 </tr>
                 {{#each methods_self}}
                 <tr>
@@ -512,10 +529,10 @@
             {{#if reads}}
             <table>
                 <tr>
-                    <th>Resource Name</th>
-                    <th style="text-align: right">Number of Hits</th>
-                    <th style="text-align: right">Cost in Gas Units</th>
-                    <th style="text-align: right">Percentage</th>
+                    <th data-sort-asc>Resource Name</th>
+                    <th style="text-align: right" data-sort-num>Number of Hits</th>
+                    <th style="text-align: right" data-sort-num>Cost in Gas Units</th>
+                    <th style="text-align: right" data-sort-num>Percentage</th>
                 </tr>
                 {{#each reads}}
                 <tr>
@@ -533,8 +550,8 @@
             <h5>Transaction Itself</h5>
             <table>
                 <tr>
-                    <th style="text-align: right">Cost in Gas Units</th>
-                    <th style="text-align: right">Percentage</th>
+                    <th style="text-align: right" data-sort-num>Cost in Gas Units</th>
+                    <th style="text-align: right" data-sort-num>Percentage</th>
                 </tr>
                 {{#with transaction_write}}
                 <tr>
@@ -547,10 +564,10 @@
             {{#if event_writes}}
             <table>
                 <tr>
-                    <th>Event Type</th>
-                    <th style="text-align: right">Number of Hits</th>
-                    <th style="text-align: right">Cost in Gas Units</th>
-                    <th style="text-align: right">Percentage</th>
+                    <th data-sort-asc>Event Type</th>
+                    <th style="text-align: right" data-sort-num>Number of Hits</th>
+                    <th style="text-align: right" data-sort-num>Cost in Gas Units</th>
+                    <th style="text-align: right" data-sort-num>Percentage</th>
                 </tr>
                 {{#each event_writes}}
                 <tr>
@@ -568,10 +585,10 @@
             {{#if writes}}
             <table>
                 <tr>
-                    <th>Resource Name</th>
-                    <th style="text-align: right">Number of Hits</th>
-                    <th style="text-align: right">Cost in Gas Units</th>
-                    <th style="text-align: right">Percentage</th>
+                    <th data-sort-asc>Resource Name</th>
+                    <th style="text-align: right" data-sort-num>Number of Hits</th>
+                    <th style="text-align: right" data-sort-num>Cost in Gas Units</th>
+                    <th style="text-align: right" data-sort-num>Percentage</th>
                 </tr>
                 {{#each writes}}
                 <tr>
@@ -601,11 +618,11 @@
             {{#if storage-writes}}
             <table>
                 <tr>
-                    <th>Path</th>
-                    <th style="text-align: right">Cost in APT</th>
-                    <th style="text-align: right">Percentage</th>
-                    <th style="text-align: right">Refund in APT</th>
-                    <th style="text-align: right">Percentage</th>
+                    <th data-sort-asc>Path</th>
+                    <th style="text-align: right" data-sort-num>Cost in APT</th>
+                    <th style="text-align: right" data-sort-num>Percentage</th>
+                    <th style="text-align: right" data-sort-num>Refund in APT</th>
+                    <th style="text-align: right" data-sort-num>Percentage</th>
                 </tr>
                 {{#each storage-writes}}
                 <tr>
@@ -624,9 +641,9 @@
             {{#if storage-events}}
             <table>
                 <tr>
-                    <th>Name</th>
-                    <th style="text-align: right">Cost in APT</th>
-                    <th style="text-align: right">Percentage</th>
+                    <th data-sort-asc>Name</th>
+                    <th style="text-align: right" data-sort-num>Cost in APT</th>
+                    <th style="text-align: right" data-sort-num>Percentage</th>
                 </tr>
                 {{#each storage-events}}
                 <tr>
@@ -710,7 +727,8 @@
         {{/if}}
     </details>
 
-    <footer style="display: flex; justify-content: space-between; color: var(--text-muted); font-size: 0.85em; border-top: 1px solid var(--border); padding-top: 8px; margin-top: 16px;">
+    <footer
+        style="display: flex; justify-content: space-between; color: var(--text-muted); font-size: 0.85em; border-top: 1px solid var(--border); padding-top: 8px; margin-top: 16px;">
         <span>Generated by the Aptos Gas Profiler{{#if git-rev}} ({{git-rev}}){{/if}}</span>
         <span>{{generated-at}}</span>
     </footer>
