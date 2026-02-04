@@ -51,12 +51,7 @@ pub async fn handle_log_ingest(
         claims.node_type,
         NodeType::Unknown | NodeType::UnknownValidator | NodeType::UnknownFullNode
     );
-    if is_unknown
-        && !context
-            .unknown_logs_rate_limiter()
-            .check_rate_limit()
-            .await
-    {
+    if is_unknown && !context.unknown_logs_rate_limiter().check_rate_limit().await {
         debug!(
             "rate limit exceeded for unknown node logs: peer_id={}",
             claims.peer_id

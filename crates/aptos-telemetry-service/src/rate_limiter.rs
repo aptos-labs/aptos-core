@@ -135,7 +135,11 @@ impl ContractRateLimiters {
     }
 
     /// Add a rate limiter for a specific contract.
-    pub async fn add_limiter(&self, contract_name: String, config: UnknownTelemetryRateLimitConfig) {
+    pub async fn add_limiter(
+        &self,
+        contract_name: String,
+        config: UnknownTelemetryRateLimitConfig,
+    ) {
         let mut limiters = self.limiters.write().await;
         limiters.insert(contract_name, GlobalRateLimiter::new(config));
     }

@@ -168,10 +168,7 @@ async fn handle_metrics_ingest(
             peer_id.to_hex_literal()
         )
     } else {
-        format!(
-            "kubernetes_pod_name=peer_id:{}",
-            peer_id.to_hex_literal()
-        )
+        format!("kubernetes_pod_name=peer_id:{}", peer_id.to_hex_literal())
     };
 
     let extra_labels = vec![
@@ -297,11 +294,8 @@ async fn handle_log_ingest(
             .contract_logs_rate_limiters()
             .has_limiter(&contract_name)
             .await;
-        let global_rate_limited = use_global
-            && !context
-                .unknown_logs_rate_limiter()
-                .check_rate_limit()
-                .await;
+        let global_rate_limited =
+            use_global && !context.unknown_logs_rate_limiter().check_rate_limit().await;
 
         if contract_rate_limited || global_rate_limited {
             debug!(
@@ -337,16 +331,18 @@ async fn handle_log_ingest(
         // Limit decompressed size to prevent decompression bomb attacks
         let mut limited_decoder = decoder.take(MAX_DECOMPRESSED_LENGTH as u64);
         let mut decompressed = Vec::new();
-        limited_decoder.read_to_end(&mut decompressed).map_err(|_| {
-            record_custom_contract_error(
-                &contract_name,
-                CustomContractEndpoint::LogsIngest,
-                CustomContractErrorType::InvalidPayload,
-            );
-            reject::custom(ServiceError::bad_request(
-                LogIngestError::UnexpectedContentEncoding.into(),
-            ))
-        })?;
+        limited_decoder
+            .read_to_end(&mut decompressed)
+            .map_err(|_| {
+                record_custom_contract_error(
+                    &contract_name,
+                    CustomContractEndpoint::LogsIngest,
+                    CustomContractErrorType::InvalidPayload,
+                );
+                reject::custom(ServiceError::bad_request(
+                    LogIngestError::UnexpectedContentEncoding.into(),
+                ))
+            })?;
         decompressed
     } else {
         body.to_vec()
@@ -521,11 +517,8 @@ async fn handle_custom_event_ingest(
             .contract_logs_rate_limiters()
             .has_limiter(&contract_name)
             .await;
-        let global_rate_limited = use_global
-            && !context
-                .unknown_logs_rate_limiter()
-                .check_rate_limit()
-                .await;
+        let global_rate_limited =
+            use_global && !context.unknown_logs_rate_limiter().check_rate_limit().await;
 
         if contract_rate_limited || global_rate_limited {
             debug!(

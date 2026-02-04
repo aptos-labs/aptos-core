@@ -77,12 +77,7 @@ pub(crate) async fn handle_custom_event(
         claims.node_type,
         NodeType::Unknown | NodeType::UnknownValidator | NodeType::UnknownFullNode
     );
-    if is_unknown
-        && !context
-            .unknown_logs_rate_limiter()
-            .check_rate_limit()
-            .await
-    {
+    if is_unknown && !context.unknown_logs_rate_limiter().check_rate_limit().await {
         debug!(
             "rate limit exceeded for unknown node events: peer_id={}",
             claims.peer_id

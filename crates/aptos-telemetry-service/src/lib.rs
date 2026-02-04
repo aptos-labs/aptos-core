@@ -123,19 +123,20 @@ impl AptosTelemetryServiceArgs {
             });
 
         // Standard metrics clients (optional - not needed for custom-contract-only mode)
-        let (metrics_clients, telemetry_metrics_client) =
-            if let Some(metrics_config) = config.metrics_endpoints_config.clone() {
-                let clients: GroupedMetricsClients = metrics_config.into();
-                let telemetry_client = clients
-                    .telemetry_service_metrics_clients
-                    .values()
-                    .next()
-                    .cloned();
-                (Some(clients), telemetry_client)
-            } else {
-                info!("Standard metrics endpoints not configured - standard node metrics ingestion disabled");
-                (None, None)
-            };
+        let (metrics_clients, telemetry_metrics_client) = if let Some(metrics_config) =
+            config.metrics_endpoints_config.clone()
+        {
+            let clients: GroupedMetricsClients = metrics_config.into();
+            let telemetry_client = clients
+                .telemetry_service_metrics_clients
+                .values()
+                .next()
+                .cloned();
+            (Some(clients), telemetry_client)
+        } else {
+            info!("Standard metrics endpoints not configured - standard node metrics ingestion disabled");
+            (None, None)
+        };
 
         // Standard log ingest clients (optional - not needed for custom-contract-only mode)
         let log_ingest_clients = config.humio_ingest_config.clone().map(|cfg| {
@@ -907,7 +908,6 @@ pub struct CustomContractConfig {
     // ========================================================================
     // Per-Peer Configuration (optional, for fine-grained control)
     // ========================================================================
-
     /// Per-peer identity mapping for metrics labeling (optional).
     /// Maps chain_id -> peer_id -> identity/common name.
     /// Used to add `kubernetes_pod_name=peer_id:{identity}//{peer_id}` labels to metrics,
@@ -1250,7 +1250,11 @@ pub struct TelemetryServiceConfig {
     /// Required for standard `/ingest/logs` endpoint. Can be omitted for custom-contract-only mode.
     /// Note: Field name preserved as `humio_ingest_config` for backward compatibility;
     /// use alias `log_ingest_config` in new configurations.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "log_ingest_config")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "log_ingest_config"
+    )]
     pub humio_ingest_config: Option<LogIngestConfig>,
 
     /// Map of chain_id -> peer_id -> environment name (for log routing).
