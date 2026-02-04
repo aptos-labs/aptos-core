@@ -15,10 +15,6 @@
             color: black;
         }
 
-        section {
-            margin-bottom: 60px;
-        }
-
         table,
         th,
         td {
@@ -44,6 +40,53 @@
         .flamegraph {
             width: 100%;
         }
+
+        details {
+            margin-bottom: 60px;
+        }
+
+        details>summary {
+            cursor: pointer;
+            list-style: none;
+        }
+
+        details>summary::-webkit-details-marker {
+            display: none;
+        }
+
+        details>summary>h2 {
+            display: block;
+            margin: 0;
+            padding: 5px 10px;
+        }
+
+        details>summary>h2::before {
+            content: "▶ ";
+            font-size: 0.6em;
+        }
+
+        details[open]>summary>h2::before {
+            content: "▼ ";
+        }
+
+        details>summary>h3 {
+            display: block;
+            margin: 0;
+            padding: 5px 10px;
+        }
+
+        details>summary>h3::before {
+            content: "▶ ";
+            font-size: 0.6em;
+        }
+
+        details[open]>summary>h3::before {
+            content: "▼ ";
+        }
+
+        details.subsection {
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 
@@ -52,8 +95,10 @@
         <h1>{{title}}</h1>
     </header>
 
-    <section>
-        <h2>Summary</h2>
+    <details open>
+        <summary>
+            <h2>Summary</h2>
+        </summary>
         <p>
             This summary corresponds to the <code>FeeStatement</code> event emitted by the transaction.
         </p>
@@ -92,10 +137,12 @@
         <p style="font-size: 0.9em; color: #666;">
             <b>Note:</b> Values may differ slightly from the <code>FeeStatement</code> due to rounding.
         </p>
-    </section>
+    </details>
 
-    <section>
-        <h2>Flamegraphs</h2>
+    <details open>
+        <summary>
+            <h2>Flamegraphs</h2>
+        </summary>
         {{#if graph-exec-io}}
         <object data="assets/exec_io.svg" type="image/svg+xml" class="flamegraph"></object>
         {{else}}
@@ -107,262 +154,312 @@
         {{else}}
         (No storage graph to show.)
         {{/if}}
-    </section>
+    </details>
 
-    <section>
-        <h2>Cost Break-down</h2>
-        The Aptos network charges a transaction in three parts: (1) execution, (2) IO, and (3) storage.
-        Execution and IO are measured in gas units; storage is measured in APT.
+    <details open>
+        <summary>
+            <h2>Cost Break-down</h2>
+        </summary>
+        <p>The Aptos network charges a transaction in three parts: (1) execution, (2) IO, and (3) storage.
+            Execution and IO are measured in gas units; storage is measured in APT.</p>
 
-        <h3>Execution</h3>
-        Execution costs cover transient resources used for executing the transaction,
-        such as CPU time or memory usage.
-        <p>Total: {{summary-execution-gas}} gas units</p>
+        <details class="subsection" open>
+            <summary>
+                <h3>Execution ({{summary-execution-gas}} gas units)</h3>
+            </summary>
+            <p>Execution costs cover transient resources used for executing the transaction,
+                such as CPU time or memory usage.</p>
 
-        <h4>Intrinsic Cost</h4>
-        {{intrinsic}} gas units{{#if intrinsic-percentage}}, {{intrinsic-percentage}} of execution gas.{{/if}}
+            <h4>Intrinsic Cost</h4>
+            {{intrinsic}} gas units{{#if intrinsic-percentage}}, {{intrinsic-percentage}} of execution gas.{{/if}}
 
-        {{#if keyless}}
-        <h4>Keyless Cost</h4>
-        {{keyless}} gas units, {{keyless-percentage}} of execution gas.
-        {{/if}}
+            {{#if keyless}}
+            <h4>Keyless Cost</h4>
+            {{keyless}} gas units, {{keyless-percentage}} of execution gas.
+            {{/if}}
 
-        {{#if slh_dsa_sha2_128s}}
-        <h4>SLH-DSA-SHA2-128s Cost</h4>
-        {{slh_dsa_sha2_128s}} gas units, {{slh_dsa_sha2_128s-percentage}} of execution gas.
-        {{/if}}
+            {{#if slh_dsa_sha2_128s}}
+            <h4>SLH-DSA-SHA2-128s Cost</h4>
+            {{slh_dsa_sha2_128s}} gas units, {{slh_dsa_sha2_128s-percentage}} of execution gas.
+            {{/if}}
 
-        <h4>Dependencies</h4>
-        {{#if deps}}
-        <table>
-            <tr>
-                <th><b>Name</b></th>
-                <th style="text-align: right"><b>Size in Bytes</b></th>
-                <th style="text-align: right"><b>Cost in Gas Units</b></th>
-                <th style="text-align: right"><b>Percentage</b></th>
-            </tr>
-            {{#each deps}}
-            <tr>
-                <td>{{name}}</td>
-                <td style="text-align: right">{{size}}</td>
-                <td style="text-align: right">{{cost}}</td>
-                <td style="text-align: right">{{percentage}}</td>
-            </tr>
-            {{/each}}
-        </table>
-        {{else}}
-        (No dependencies to show. System dependencies are excluded.)
-        {{/if}}
+            <h4>Dependencies</h4>
+            {{#if deps}}
+            <table>
+                <tr>
+                    <th><b>Name</b></th>
+                    <th style="text-align: right"><b>Size in Bytes</b></th>
+                    <th style="text-align: right"><b>Cost in Gas Units</b></th>
+                    <th style="text-align: right"><b>Percentage</b></th>
+                </tr>
+                {{#each deps}}
+                <tr>
+                    <td>{{name}}</td>
+                    <td style="text-align: right">{{size}}</td>
+                    <td style="text-align: right">{{cost}}</td>
+                    <td style="text-align: right">{{percentage}}</td>
+                </tr>
+                {{/each}}
+            </table>
+            {{else}}
+            (No dependencies to show. System dependencies are excluded.)
+            {{/if}}
 
-        <h4>Operations</h4>
-        {{#if ops}}
-        <table>
-            <tr>
-                <th><b>Operation</b></th>
-                <th style="text-align: right"><b>Number of Hits</b></th>
-                <th style="text-align: right"><b>Cost in Gas Units</b></th>
-                <th style="text-align: right"><b>Percentage</b></th>
-            </tr>
-            {{#each ops}}
-            <tr>
-                <td>{{name}}</td>
-                <td style="text-align: right">{{hits}}</td>
-                <td style="text-align: right">{{cost}}</td>
-                <td style="text-align: right">{{percentage}}</td>
-            </tr>
-            {{/each}}
-        </table>
-        {{else}}
-        (No operations to show.)
-        {{/if}}
-        <br />
-        {{#if methods}}
-        <table>
-            <tr>
-                <th><b>Methods (gas including children)</b></th>
-                <th style="text-align: right"><b>Number of Hits</b></th>
-                <th style="text-align: right"><b>Cost in Gas Units</b></th>
-                <th style="text-align: right"><b>Percentage</b></th>
-            </tr>
-            {{#each methods}}
-            <tr>
-                <td>{{name}}</td>
-                <td style="text-align: right">{{hits}}</td>
-                <td style="text-align: right">{{cost}}</td>
-                <td style="text-align: right">{{percentage}}</td>
-            </tr>
-            {{/each}}
-        </table>
-        {{else}}
-        (No methods to show.)
-        {{/if}}
-        <br />
-        {{#if methods_self}}
-        <table>
-            <tr>
-                <th><b>Methods (only local gas)</b></th>
-                <th style="text-align: right"><b>Number of Hits</b></th>
-                <th style="text-align: right"><b>Cost in Gas Units</b></th>
-                <th style="text-align: right"><b>Percentage</b></th>
-            </tr>
-            {{#each methods_self}}
-            <tr>
-                <td>{{name}}</td>
-                <td style="text-align: right">{{hits}}</td>
-                <td style="text-align: right">{{cost}}</td>
-                <td style="text-align: right">{{percentage}}</td>
-            </tr>
-            {{/each}}
-        </table>
-        {{else}}
-        (No methods to show.)
-        {{/if}}
+            <h4>Operations</h4>
+            {{#if ops}}
+            <table>
+                <tr>
+                    <th><b>Operation</b></th>
+                    <th style="text-align: right"><b>Number of Hits</b></th>
+                    <th style="text-align: right"><b>Cost in Gas Units</b></th>
+                    <th style="text-align: right"><b>Percentage</b></th>
+                </tr>
+                {{#each ops}}
+                <tr>
+                    <td>{{name}}</td>
+                    <td style="text-align: right">{{hits}}</td>
+                    <td style="text-align: right">{{cost}}</td>
+                    <td style="text-align: right">{{percentage}}</td>
+                </tr>
+                {{/each}}
+            </table>
+            {{else}}
+            (No operations to show.)
+            {{/if}}
+            <br />
+            {{#if methods}}
+            <table>
+                <tr>
+                    <th><b>Methods (gas including children)</b></th>
+                    <th style="text-align: right"><b>Number of Hits</b></th>
+                    <th style="text-align: right"><b>Cost in Gas Units</b></th>
+                    <th style="text-align: right"><b>Percentage</b></th>
+                </tr>
+                {{#each methods}}
+                <tr>
+                    <td>{{name}}</td>
+                    <td style="text-align: right">{{hits}}</td>
+                    <td style="text-align: right">{{cost}}</td>
+                    <td style="text-align: right">{{percentage}}</td>
+                </tr>
+                {{/each}}
+            </table>
+            {{else}}
+            (No methods to show.)
+            {{/if}}
+            <br />
+            {{#if methods_self}}
+            <table>
+                <tr>
+                    <th><b>Methods (only local gas)</b></th>
+                    <th style="text-align: right"><b>Number of Hits</b></th>
+                    <th style="text-align: right"><b>Cost in Gas Units</b></th>
+                    <th style="text-align: right"><b>Percentage</b></th>
+                </tr>
+                {{#each methods_self}}
+                <tr>
+                    <td>{{name}}</td>
+                    <td style="text-align: right">{{hits}}</td>
+                    <td style="text-align: right">{{cost}}</td>
+                    <td style="text-align: right">{{percentage}}</td>
+                </tr>
+                {{/each}}
+            </table>
+            {{else}}
+            (No methods to show.)
+            {{/if}}
+        </details>
 
-        <h3>IO</h3>
-        IO costs cover reading and writing data to storage.
-        <p>Total: {{summary-io-gas}} gas units</p>
+        <details class="subsection" open>
+            <summary>
+                <h3>IO ({{summary-io-gas}} gas units)</h3>
+            </summary>
+            <p>IO costs cover reading and writing data to storage.</p>
 
-        <h4>State Reads</h4>
-        {{#if reads}}
-        <table>
-            <tr>
-                <td><b>Resource Name</b></td>
-                <td style="text-align: right"><b>Number of Hits</b></td>
-                <td style="text-align: right"><b>Cost in Gas Units</b></td>
-                <td style="text-align: right"><b>Percentage</b></td>
-            </tr>
-            {{#each reads}}
-            <tr>
-                <td>{{name}}</td>
-                <td style="text-align: right">{{hits}}</td>
-                <td style="text-align: right">{{cost}}</td>
-                <td style="text-align: right">{{percentage}}</td>
-            </tr>
-            {{/each}}
-        </table>
-        {{else}}
-        (No reads to show.)
-        {{/if}}
-        <h4>Ledger Writes</h4>
-        <h5>Transaction Itself</h5>
-        <table>
-            <tr>
-                <td style="text-align: right"><b>Cost in Gas Units</b></td>
-                <td style="text-align: right"><b>Percentage</b></td>
-            </tr>
-            {{#with transaction_write}}
-            <tr>
-                <td style="text-align: right">{{cost}}</td>
-                <td style="text-align: right">{{percentage}}</td>
-            </tr>
-            {{/with}}
-        </table>
-        <h5>Events</h5>
-        {{#if event_writes}}
-        <table>
-            <tr>
-                <td><b>Event Type</b></td>
-                <td style="text-align: right"><b>Number of Hits</b></td>
-                <td style="text-align: right"><b>Cost in Gas Units</b></td>
-                <td style="text-align: right"><b>Percentage</b></td>
-            </tr>
-            {{#each event_writes}}
-            <tr>
-                <td>{{name}}</td>
-                <td style="text-align: right">{{hits}}</td>
-                <td style="text-align: right">{{cost}}</td>
-                <td style="text-align: right">{{percentage}}</td>
-            </tr>
-            {{/each}}
-        </table>
-        {{else}}
-        (No writes to show.)
-        {{/if}}
-        <h5>State Write Ops</h5>
-        {{#if writes}}
-        <table>
-            <tr>
-                <td><b>Resource Name</b></td>
-                <td style="text-align: right"><b>Number of Hits</b></td>
-                <td style="text-align: right"><b>Cost in Gas Units</b></td>
-                <td style="text-align: right"><b>Percentage</b></td>
-            </tr>
-            {{#each writes}}
-            <tr>
-                <td>{{name}}</td>
-                <td style="text-align: right">{{hits}}</td>
-                <td style="text-align: right">{{cost}}</td>
-                <td style="text-align: right">{{percentage}}</td>
-            </tr>
-            {{/each}}
-        </table>
-        {{else}}
-        (No writes to show.)
-        {{/if}}
-        <h3>Storage</h3>
-        The storage fees cover the extended-term storage of states and events and are assessed at a fixed price in APT.
+            <h4>State Reads</h4>
+            {{#if reads}}
+            <table>
+                <tr>
+                    <td><b>Resource Name</b></td>
+                    <td style="text-align: right"><b>Number of Hits</b></td>
+                    <td style="text-align: right"><b>Cost in Gas Units</b></td>
+                    <td style="text-align: right"><b>Percentage</b></td>
+                </tr>
+                {{#each reads}}
+                <tr>
+                    <td>{{name}}</td>
+                    <td style="text-align: right">{{hits}}</td>
+                    <td style="text-align: right">{{cost}}</td>
+                    <td style="text-align: right">{{percentage}}</td>
+                </tr>
+                {{/each}}
+            </table>
+            {{else}}
+            (No reads to show.)
+            {{/if}}
+            <h4>Ledger Writes</h4>
+            <h5>Transaction Itself</h5>
+            <table>
+                <tr>
+                    <td style="text-align: right"><b>Cost in Gas Units</b></td>
+                    <td style="text-align: right"><b>Percentage</b></td>
+                </tr>
+                {{#with transaction_write}}
+                <tr>
+                    <td style="text-align: right">{{cost}}</td>
+                    <td style="text-align: right">{{percentage}}</td>
+                </tr>
+                {{/with}}
+            </table>
+            <h5>Events</h5>
+            {{#if event_writes}}
+            <table>
+                <tr>
+                    <td><b>Event Type</b></td>
+                    <td style="text-align: right"><b>Number of Hits</b></td>
+                    <td style="text-align: right"><b>Cost in Gas Units</b></td>
+                    <td style="text-align: right"><b>Percentage</b></td>
+                </tr>
+                {{#each event_writes}}
+                <tr>
+                    <td>{{name}}</td>
+                    <td style="text-align: right">{{hits}}</td>
+                    <td style="text-align: right">{{cost}}</td>
+                    <td style="text-align: right">{{percentage}}</td>
+                </tr>
+                {{/each}}
+            </table>
+            {{else}}
+            (No writes to show.)
+            {{/if}}
+            <h5>State Write Ops</h5>
+            {{#if writes}}
+            <table>
+                <tr>
+                    <td><b>Resource Name</b></td>
+                    <td style="text-align: right"><b>Number of Hits</b></td>
+                    <td style="text-align: right"><b>Cost in Gas Units</b></td>
+                    <td style="text-align: right"><b>Percentage</b></td>
+                </tr>
+                {{#each writes}}
+                <tr>
+                    <td>{{name}}</td>
+                    <td style="text-align: right">{{hits}}</td>
+                    <td style="text-align: right">{{cost}}</td>
+                    <td style="text-align: right">{{percentage}}</td>
+                </tr>
+                {{/each}}
+            </table>
+            {{else}}
+            (No writes to show.)
+            {{/if}}
+        </details>
 
-        <h4>Transaction</h4>
-        {{storage-txn}} APT{{#if storage-txn-percentage}}, {{storage-txn-percentage}} of the total cost for
-        storage.{{/if}}
-        <h4>States</h4>
-        {{#if storage-writes}}
-        <table>
-            <tr>
-                <td><b>Path</b></td>
-                <td style="text-align: right"><b>Cost in APT</b></td>
-                <td style="text-align: right"><b>Percentage</b></td>
-                <td style="text-align: right"><b>Refund in APT</b></td>
-                <td style="text-align: right"><b>Percentage</b></td>
-            </tr>
-            {{#each storage-writes}}
-            <tr>
-                <td>{{name}}</td>
-                <td style="text-align: right">{{cost}}</td>
-                <td style="text-align: right">{{cost-percentage}}</td>
-                <td style="text-align: right">{{refund}}</td>
-                <td style="text-align: right">{{refund-percentage}}</td>
-            </tr>
-            {{/each}}
-        </table>
-        {{else}}
-        (No state changes to show.)
-        {{/if}}
-        <h4>Events</h4>
-        {{#if storage-events}}
-        <table>
-            <tr>
-                <td><b>Name</b></td>
-                <td style="text-align: right"><b>Cost in APT</b></td>
-                <td style="text-align: right"><b>Percentage</b></td>
-            </tr>
-            {{#each storage-events}}
-            <tr>
-                <td>{{name}}</td>
-                <td style="text-align: right">{{cost}}</td>
-                <td style="text-align: right">{{cost-percentage}}</td>
-            </tr>
-            {{/each}}
-        </table>
-        {{storage-event-discount}}
-        {{else}}
-        (No events to show.)
-        {{/if}}
-    </section>
+        <details class="subsection" open>
+            <summary>
+                <h3>Storage ({{summary-storage-fee}} APT)</h3>
+            </summary>
+            <p>The storage fees cover the extended-term storage of states and events and are assessed at a fixed price
+                in APT.</p>
 
-    <section>
-        <h2>Memory Usage</h2>
+            <h4>Transaction</h4>
+            {{storage-txn}} APT{{#if storage-txn-percentage}}, {{storage-txn-percentage}} of the total cost for
+            storage.{{/if}}
+            <h4>States</h4>
+            {{#if storage-writes}}
+            <table>
+                <tr>
+                    <td><b>Path</b></td>
+                    <td style="text-align: right"><b>Cost in APT</b></td>
+                    <td style="text-align: right"><b>Percentage</b></td>
+                    <td style="text-align: right"><b>Refund in APT</b></td>
+                    <td style="text-align: right"><b>Percentage</b></td>
+                </tr>
+                {{#each storage-writes}}
+                <tr>
+                    <td>{{name}}</td>
+                    <td style="text-align: right">{{cost}}</td>
+                    <td style="text-align: right">{{cost-percentage}}</td>
+                    <td style="text-align: right">{{refund}}</td>
+                    <td style="text-align: right">{{refund-percentage}}</td>
+                </tr>
+                {{/each}}
+            </table>
+            {{else}}
+            (No state changes to show.)
+            {{/if}}
+            <h4>Events</h4>
+            {{#if storage-events}}
+            <table>
+                <tr>
+                    <td><b>Name</b></td>
+                    <td style="text-align: right"><b>Cost in APT</b></td>
+                    <td style="text-align: right"><b>Percentage</b></td>
+                </tr>
+                {{#each storage-events}}
+                <tr>
+                    <td>{{name}}</td>
+                    <td style="text-align: right">{{cost}}</td>
+                    <td style="text-align: right">{{cost-percentage}}</td>
+                </tr>
+                {{/each}}
+            </table>
+            {{storage-event-discount}}
+            {{else}}
+            (No events to show.)
+            {{/if}}
+        </details>
+    </details>
+
+    <details open>
+        <summary>
+            <h2>Memory Usage</h2>
+        </summary>
         Peak memory usage during transaction execution: {{peak-memory-usage}}.<br><br>
 
         Note: This is measured in abstract value size, which does not map 1:1 to bytes.
-    </section>
+    </details>
 
-    <section>
-        <h2>Full Execution Trace</h2>
-        <div>
-            <pre style="display: inline-block; border:1px solid black; padding: 2px;"><code>{{trace}}</code></pre>
+    <details open>
+        <summary>
+            <h2>Full Execution Trace</h2>
+        </summary>
+        {{#if trace-is-large}}
+        <p>Large trace ({{trace-line-count}} lines)</p>
+        <div id="trace-buttons">
+            <button id="load-trace-btn" onclick="loadTrace()">Load Trace</button>
+            <button onclick="window.open('assets/trace.html', '_blank')" style="margin-left: 5px;">View Raw</button>
         </div>
-    </section>
+        <div id="trace-container" style="display: none;">
+            <p><button onclick="window.open('assets/trace.html', '_blank')">View Raw</button></p>
+            <iframe id="trace-frame" style="width: 100%; height: max(800px, 80vh); border: 1px solid black;"></iframe>
+        </div>
+        <script>
+            function loadTrace() {
+                const btn = document.getElementById('load-trace-btn');
+                const buttons = document.getElementById('trace-buttons');
+                const container = document.getElementById('trace-container');
+                const frame = document.getElementById('trace-frame');
+
+                btn.textContent = 'Loading...';
+                btn.disabled = true;
+
+                frame.src = 'assets/trace.html';
+                frame.onload = function () {
+                    container.style.display = 'block';
+                    buttons.style.display = 'none';
+                };
+                frame.onerror = function () {
+                    btn.textContent = 'Failed to load trace';
+                };
+            }
+        </script>
+        {{else}}
+        <p><button onclick="window.open('assets/trace.html', '_blank')">View Raw</button></p>
+        <iframe src="assets/trace.html"
+            style="width: 100%; height: max(800px, 80vh); border: 1px solid black;"></iframe>
+        {{/if}}
+    </details>
 
     <footer>
         <p>Generated by the Aptos Gas Profiler</p>
