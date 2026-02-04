@@ -1,6 +1,9 @@
 /// Reconfiguration with DKG helper functions.
 module aptos_framework::reconfiguration_with_dkg {
     use std::features;
+    use std::option;
+    use aptos_framework::chunky_dkg;
+    use aptos_framework::chunky_dkg_config;
     use aptos_framework::consensus_config;
     use aptos_framework::dkg;
     use aptos_framework::execution_config;
@@ -34,7 +37,21 @@ module aptos_framework::reconfiguration_with_dkg {
             cur_epoch,
             randomness_config::current(),
             stake::cur_validator_consensus_infos(),
-            stake::next_validator_consensus_infos(),
+            stake::next_validator_consensus_infos()
+        );
+    }
+
+    /// Trigger a reconfiguration with DKG and Chunky DKG.
+    /// Do nothing if one is already in progress.
+    public(friend) fun try_start_with_chunky_dkg() {
+        try_start();
+
+        let cur_epoch = reconfiguration::current_epoch();
+        chunky_dkg::start(
+            cur_epoch,
+            chunky_dkg_config::current(),
+            stake::cur_validator_consensus_infos(),
+            stake::next_validator_consensus_infos()
         );
     }
 
@@ -45,6 +62,7 @@ module aptos_framework::reconfiguration_with_dkg {
     public(friend) fun finish(framework: &signer) {
         system_addresses::assert_aptos_framework(framework);
         dkg::try_clear_incomplete_session(framework);
+        chunky_dkg::try_clear_incomplete_session(framework);
         consensus_config::on_new_epoch(framework);
         execution_config::on_new_epoch(framework);
         gas_schedule::on_new_epoch(framework);
@@ -59,10 +77,34 @@ module aptos_framework::reconfiguration_with_dkg {
         reconfiguration::reconfigure();
     }
 
+    /// Call finish(account) only when (1) reconfiguration is in progress, and
+    /// (2) both DKG and Chunky DKG have no in-progress session.
+    /// Guard (1) ensures we never run reconfiguration twice (after the first
+    /// finish(account), reconfig is no longer in progress).
+    fun maybe_finish_reconfig(account: &signer) {
+        if (!reconfiguration_state::is_in_progress()) { return };
+        let dkg_incomplete = dkg::incomplete_session();
+        let chunky_incomplete = chunky_dkg::incomplete_session();
+        if (option::is_none(&dkg_incomplete) && option::is_none(&chunky_incomplete)) {
+            finish(account);
+        }
+    }
+
     /// Complete the current reconfiguration with DKG.
     /// Abort if no DKG is in progress.
+    /// Calls finish(account) only after both DKG and Chunky DKG (if any) are complete.
     fun finish_with_dkg_result(account: &signer, dkg_result: vector<u8>) {
         dkg::finish(dkg_result);
-        finish(account);
+        maybe_finish_reconfig(account);
+    }
+
+    /// Complete the current reconfiguration with Chunky DKG result.
+    /// Abort if no Chunky DKG is in progress.
+    /// Calls finish(account) only after both DKG and Chunky DKG (if any) are complete.
+    fun finish_with_chunky_dkg_result(
+        account: &signer, chunky_dkg_result: vector<u8>
+    ) {
+        chunky_dkg::finish(chunky_dkg_result);
+        maybe_finish_reconfig(account);
     }
 }

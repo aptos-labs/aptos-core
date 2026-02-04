@@ -297,7 +297,7 @@ module aptos_framework::block {
         decryption::on_new_block(&vm, epoch, round, decryption_key);
 
         if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
-            reconfiguration_with_dkg::try_start();
+            reconfiguration_with_dkg::try_start_with_chunky_dkg();
         };
     }
 
