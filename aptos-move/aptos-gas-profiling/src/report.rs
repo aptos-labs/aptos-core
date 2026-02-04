@@ -16,6 +16,9 @@ use std::{
 const TEMPLATE: &str = include_str!("../templates/index.html");
 const TRACE_TEMPLATE: &str = include_str!("../templates/trace.html");
 
+/// Traces with more lines than this threshold will require a button click to load
+const TRACE_LAZY_LOAD_THRESHOLD: usize = 1000;
+
 fn ensure_dirs_exist(path: impl AsRef<Path>) -> Result<()> {
     if let Err(err) = fs::create_dir_all(&path) {
         match err.kind() {
@@ -435,7 +438,16 @@ impl TransactionGasLog {
 
         let mut trace = String::new();
         render_table(&mut trace, &table, 4)?;
-        data.insert("trace".to_string(), Value::String(trace));
+
+        // Check if trace is large enough to require lazy loading
+        let trace_line_count = trace.lines().count();
+        if trace_line_count > TRACE_LAZY_LOAD_THRESHOLD {
+            data.insert("trace-is-large".to_string(), Value::Bool(true));
+            data.insert(
+                "trace-line-count".to_string(),
+                Value::String(trace_line_count.to_string()),
+            );
+        }
 
         // Rendering the html doc
         let mut handlebars = Handlebars::new();

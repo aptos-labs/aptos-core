@@ -121,6 +121,12 @@
             background: #e2e8f0;
         }
 
+        .info-tip {
+            font-size: 1em;
+            color: var(--text-muted);
+            cursor: help;
+        }
+
         .copy-btn {
             padding: 1px 6px;
             font-size: 0.7em;
@@ -194,13 +200,9 @@
         }
 
         details>summary>h2 {
-            display: block;
-            margin: 0;
-        }
-
-        details>summary>h2 {
             display: flex;
             align-items: center;
+            margin: 0;
         }
 
         details>summary>h2::before {
@@ -249,6 +251,33 @@
             });
         }
 
+        function exportTableCsv(btn) {
+            const wrapper = btn.closest('.table-wrapper');
+            const table = wrapper.querySelector('table');
+            const rows = Array.from(table.rows);
+            const csv = rows.map(row =>
+                Array.from(row.cells).map(cell => {
+                    let val = cell.textContent.trim();
+                    // Escape quotes and wrap in quotes if contains comma or quote
+                    if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+                        val = '"' + val.replace(/"/g, '""') + '"';
+                    }
+                    return val;
+                }).join(',')
+            ).join('\n');
+
+            // Get table name from data-name attribute
+            const name = table.dataset.name || 'table';
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = name + '.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
         function sortTable(th, colIndex) {
             const table = th.closest('table');
             const tbody = table.tBodies[0] || table;
@@ -288,8 +317,13 @@
                 const bVal = b.cells[colIndex]?.textContent.trim() || '';
 
                 if (isNumeric) {
-                    const aNum = parseFloat(aVal.replace(/[,%]/g, ''));
-                    const bNum = parseFloat(bVal.replace(/[,%]/g, ''));
+                    // Handle "/" placeholder and other non-numeric values as 0
+                    const parseNum = (v) => {
+                        const n = parseFloat(v.replace(/[,%]/g, ''));
+                        return isNaN(n) ? 0 : n;
+                    };
+                    const aNum = parseNum(aVal);
+                    const bNum = parseNum(bVal);
                     return sortDesc ? bNum - aNum : aNum - bNum;
                 }
                 // String comparison
@@ -325,12 +359,19 @@
                 const footer = document.createElement('div');
                 footer.className = 'table-footer';
 
-                const btn = document.createElement('button');
-                btn.className = 'copy-btn';
-                btn.textContent = 'Copy Table';
-                btn.onclick = function () { copyTable(this); };
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'copy-btn';
+                copyBtn.textContent = 'Copy';
+                copyBtn.onclick = function () { copyTable(this); };
 
-                footer.appendChild(btn);
+                const csvBtn = document.createElement('button');
+                csvBtn.className = 'copy-btn';
+                csvBtn.textContent = 'CSV';
+                csvBtn.style.marginLeft = '4px';
+                csvBtn.onclick = function () { exportTableCsv(this); };
+
+                footer.appendChild(copyBtn);
+                footer.appendChild(csvBtn);
                 table.parentNode.insertBefore(wrapper, table);
                 wrapper.appendChild(table);
                 wrapper.appendChild(footer);
@@ -434,7 +475,7 @@
 
             <h4>Dependencies</h4>
             {{#if deps}}
-            <table>
+            <table data-name="exec_dependencies">
                 <tr>
                     <th data-sort-asc>Name</th>
                     <th style="text-align: right" data-sort-num>Size in Bytes</th>
@@ -456,7 +497,7 @@
 
             <h4>Operations</h4>
             {{#if ops}}
-            <table>
+            <table data-name="exec_operations">
                 <tr>
                     <th data-sort-asc>Operation</th>
                     <th style="text-align: right" data-sort-num>Number of Hits</th>
@@ -477,7 +518,7 @@
             {{/if}}
             <br />
             {{#if methods}}
-            <table>
+            <table data-name="exec_methods_total">
                 <tr>
                     <th data-sort-asc>Methods (gas including children)</th>
                     <th style="text-align: right" data-sort-num>Number of Hits</th>
@@ -498,7 +539,7 @@
             {{/if}}
             <br />
             {{#if methods_self}}
-            <table>
+            <table data-name="exec_methods_self">
                 <tr>
                     <th data-sort-asc>Methods (only local gas)</th>
                     <th style="text-align: right" data-sort-num>Number of Hits</th>
@@ -527,7 +568,7 @@
 
             <h4>State Reads</h4>
             {{#if reads}}
-            <table>
+            <table data-name="io_state_reads">
                 <tr>
                     <th data-sort-asc>Resource Name</th>
                     <th style="text-align: right" data-sort-num>Number of Hits</th>
@@ -546,9 +587,10 @@
             {{else}}
             (No reads to show.)
             {{/if}}
-            <h4>Ledger Writes</h4>
-            <h5>Transaction Itself</h5>
-            <table>
+            <h4>Transaction Write <span class="info-tip"
+                    title="Cost of writing the transaction itself (authentication header + payload) to the ledger history">ⓘ</span>
+            </h4>
+            <table data-name="io_transaction_write">
                 <tr>
                     <th style="text-align: right" data-sort-num>Cost in Gas Units</th>
                     <th style="text-align: right" data-sort-num>Percentage</th>
@@ -560,9 +602,10 @@
                 </tr>
                 {{/with}}
             </table>
-            <h5>Events</h5>
+
+            <h4>Event Writes</h4>
             {{#if event_writes}}
-            <table>
+            <table data-name="io_event_writes">
                 <tr>
                     <th data-sort-asc>Event Type</th>
                     <th style="text-align: right" data-sort-num>Number of Hits</th>
@@ -579,11 +622,12 @@
                 {{/each}}
             </table>
             {{else}}
-            (No writes to show.)
+            (No event writes to show.)
             {{/if}}
-            <h5>State Write Ops</h5>
+
+            <h4>State Writes</h4>
             {{#if writes}}
-            <table>
+            <table data-name="io_state_writes">
                 <tr>
                     <th data-sort-asc>Resource Name</th>
                     <th style="text-align: right" data-sort-num>Number of Hits</th>
@@ -600,7 +644,7 @@
                 {{/each}}
             </table>
             {{else}}
-            (No writes to show.)
+            (No state writes to show.)
             {{/if}}
         </details>
 
@@ -616,7 +660,7 @@
             storage.{{/if}}
             <h4>States</h4>
             {{#if storage-writes}}
-            <table>
+            <table data-name="storage_states">
                 <tr>
                     <th data-sort-asc>Path</th>
                     <th style="text-align: right" data-sort-num>Cost in APT</th>
@@ -639,7 +683,7 @@
             {{/if}}
             <h4>Events</h4>
             {{#if storage-events}}
-            <table>
+            <table data-name="storage_events">
                 <tr>
                     <th data-sort-asc>Name</th>
                     <th style="text-align: right" data-sort-num>Cost in APT</th>
