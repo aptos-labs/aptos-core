@@ -2123,11 +2123,13 @@ name = "aptos-gas-profiling"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-build-info",
  "aptos-gas-algebra",
  "aptos-gas-meter",
  "aptos-gas-schedule",
  "aptos-types",
  "aptos-vm-types",
+ "chrono",
  "handlebars",
  "inferno",
  "move-binary-format",

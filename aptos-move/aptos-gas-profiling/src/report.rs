@@ -4,6 +4,7 @@
 use crate::{log::TransactionGasLog, render::Render};
 use anyhow::Result;
 use aptos_gas_algebra::{Fee, InternalGas};
+use chrono::Local;
 use handlebars::Handlebars;
 use serde_json::{json, Map, Value};
 use std::{
@@ -90,6 +91,22 @@ impl TransactionGasLog {
                 },
             ),
         );
+
+        // Timestamp (local timezone)
+        let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S %Z").to_string();
+        data.insert("generated-at".to_string(), Value::String(timestamp));
+
+        // Git revision
+        let git_hash = aptos_build_info::get_git_hash();
+        if !git_hash.is_empty() {
+            // Show short hash (first 7 characters)
+            let short_hash = if git_hash.len() > 7 {
+                &git_hash[..7]
+            } else {
+                &git_hash
+            };
+            data.insert("git-rev".to_string(), Value::String(short_hash.to_string()));
+        }
 
         // Flamegraphs
         let graph_exec_io = self.exec_io.to_flamegraph("Execution & IO".to_string())?;
