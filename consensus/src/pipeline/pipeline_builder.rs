@@ -491,6 +491,7 @@ impl PipelineBuilder {
                 prepare_fut.clone(),
                 parent.execute_fut.clone(),
                 rand_check_fut.clone(),
+                order_proof_fut.clone(),
                 self.executor.clone(),
                 block.clone(),
                 self.validators.clone(),
@@ -782,12 +783,13 @@ impl PipelineBuilder {
         Ok((Some(maybe_rand), has_randomness))
     }
 
-    /// Precondition: 1. prepare finishes, 2. parent block's phase finishes 3. randomness is available
+    /// Precondition: 1. prepare finishes, 2. parent block's phase finishes 3. randomness is available 4. order proof is available
     /// What it does: Execute all transactions in block executor
     async fn execute(
         prepare_fut: TaskFuture<PrepareResult>,
         parent_block_execute_fut: TaskFuture<ExecuteResult>,
         rand_check: TaskFuture<RandResult>,
+        order_proof_fut: TaskFuture<WrappedLedgerInfo>,
         executor: Arc<dyn BlockExecutorTrait>,
         block: Arc<Block>,
         validator: Arc<[AccountAddress]>,
@@ -801,6 +803,7 @@ impl PipelineBuilder {
             onchain_execution_config.with_block_gas_limit_override(block_gas_limit);
 
         let (rand_result, _has_randomness) = rand_check.await?;
+        order_proof_fut.await?;
 
         tracker.start_working();
         // if randomness is disabled, the metadata skips DKG and triggers immediate reconfiguration
