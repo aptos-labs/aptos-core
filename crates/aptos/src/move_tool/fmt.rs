@@ -37,9 +37,9 @@ pub struct FmtCommand {
     emit_mode: Option<EmitMode>,
 
     /// Path to the move package (the folder with a Move.toml file) to be formatted.
-    /// If neither a package path nor a file path is provided, the current directory is formatted.
-    #[clap(long, value_parser)]
-    package_path: Option<PathBuf>,
+    /// If neither a package directory nor a file path is provided, the current directory is formatted.
+    #[clap(long, alias = "package-path", value_parser)]
+    package_dir: Option<PathBuf>,
 
     /// Path to specific Move source files to format. This cannot be called with a package path option.
     #[clap(long, value_parser, num_args = 1..)]
@@ -79,7 +79,7 @@ impl CliCommand<String> for Fmt {
 impl FmtCommand {
     async fn execute(self) -> CliTypedResult<String> {
         let exe = get_movefmt_path()?;
-        let package_opt = self.package_path;
+        let package_opt = self.package_dir;
         let config_path_opt = self.config_path;
         let files_opt = self.file_path;
         let config_map = self.config;
