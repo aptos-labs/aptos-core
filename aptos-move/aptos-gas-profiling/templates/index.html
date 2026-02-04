@@ -9,11 +9,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{title}}</title>
     <style>
+        :root {
+            --accent: #2563eb;
+            --accent-light: #dbeafe;
+            --border: #e2e8f0;
+            --text-muted: #64748b;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: white;
-            color: #111;
+            background-color: #fff;
+            color: #1e293b;
             line-height: 1.5;
+            font-size: 14px;
+        }
+
+        h1 {
+            border-bottom: 2px solid var(--accent);
+            padding-bottom: 8px;
         }
 
         table {
@@ -24,16 +37,16 @@
         table,
         th,
         td {
-            border: 1px solid #ccc;
+            border: 1px solid var(--border);
         }
 
         th,
         td {
-            padding: 2px 6px;
+            padding: 3px 8px;
         }
 
         th {
-            background: #f5f5f5;
+            background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
             font-weight: 600;
         }
 
@@ -43,23 +56,23 @@
         }
 
         th.sortable:hover {
-            background: #e8e8e8;
+            background: linear-gradient(to bottom, #f1f5f9, #e2e8f0);
         }
 
         th.sortable::after {
             content: ' ⇅';
             font-size: 0.7em;
-            color: #999;
+            color: var(--text-muted);
         }
 
         th.sort-asc::after {
             content: ' ▲';
-            color: #333;
+            color: var(--accent);
         }
 
         th.sort-desc::after {
             content: ' ▼';
-            color: #333;
+            color: var(--accent);
         }
 
         /* Summary table category labels */
@@ -68,47 +81,97 @@
         }
 
         tr:hover {
-            background: #f0f7ff;
+            background: var(--accent-light);
         }
 
         details>summary:hover {
-            opacity: 0.8;
+            opacity: 0.85;
         }
 
         .table-wrapper {
             display: inline-block;
+            margin-bottom: 12px;
         }
 
         .table-footer {
             display: flex;
             justify-content: flex-end;
-            margin-top: 1px;
+            margin-top: 2px;
+        }
+
+        h5 {
+            font-size: 0.95em;
+            font-weight: 600;
+            color: #475569;
+            margin: 12px 0 4px 0;
+        }
+
+        button {
+            font-family: inherit;
+            font-size: 0.85em;
+            padding: 4px 10px;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+            color: #475569;
+        }
+
+        button:hover {
+            background: #e2e8f0;
+            color: #1e293b;
         }
 
         .copy-btn {
-            padding: 0px 4px;
+            padding: 1px 6px;
             font-size: 0.7em;
-            background: #f5f5f5;
-            border: 1px solid #ccc;
-            border-radius: 2px;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 3px;
             cursor: pointer;
-            color: #666;
+            color: var(--text-muted);
         }
 
         .copy-btn:hover {
-            background: #e8e8e8;
-            color: #333;
+            background: #e2e8f0;
+            color: #334155;
         }
 
         h2 {
-            background: #e8e8e8;
+            background: linear-gradient(to right, #e0e7ff, #f8fafc);
+            border-left: 3px solid var(--accent);
             padding: 8px 12px;
             margin-top: 30px;
+            font-size: 1.1em;
         }
 
         h3 {
-            background: #f2f2f2;
+            background: #f8fafc;
+            border-left: 2px solid #94a3b8;
             padding: 6px 10px;
+            font-size: 1em;
+            color: #475569;
+        }
+
+        h4 {
+            color: #475569;
+            font-size: 0.95em;
+            margin: 16px 0 6px 0;
+        }
+
+        code {
+            background: #f1f5f9;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+
+        footer {
+            margin-top: 40px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+            color: var(--text-muted);
+            font-size: 0.85em;
         }
 
         .flamegraph {
@@ -145,7 +208,8 @@
         details>summary>h2::before {
             content: "▶ ";
             font-size: 0.6em;
-            margin-right: 4px;
+            margin-right: 6px;
+            color: var(--accent);
         }
 
         details[open]>summary>h2::before {
@@ -161,7 +225,8 @@
         details>summary>h3::before {
             content: "▶ ";
             font-size: 0.6em;
-            margin-right: 4px;
+            margin-right: 6px;
+            color: #94a3b8;
         }
 
         details[open]>summary>h3::before {
@@ -176,7 +241,7 @@
         function copyTable(btn) {
             const table = btn.closest('.table-wrapper').querySelector('table');
             const rows = Array.from(table.rows);
-            const text = rows.map(row => 
+            const text = rows.map(row =>
                 Array.from(row.cells).map(cell => cell.textContent.trim()).join('\t')
             ).join('\n');
             navigator.clipboard.writeText(text).then(() => {
@@ -190,32 +255,32 @@
             const table = th.closest('table');
             const tbody = table.tBodies[0] || table;
             const rows = Array.from(tbody.querySelectorAll('tr')).slice(1); // skip header
-            
+
             const isAsc = th.classList.contains('sort-asc');
-            
+
             // Clear other sort indicators
             th.closest('tr').querySelectorAll('th').forEach(h => {
                 h.classList.remove('sort-asc', 'sort-desc');
             });
-            
+
             // Set new sort direction
             th.classList.add(isAsc ? 'sort-desc' : 'sort-asc');
-            
+
             rows.sort((a, b) => {
                 const aVal = a.cells[colIndex]?.textContent.trim() || '';
                 const bVal = b.cells[colIndex]?.textContent.trim() || '';
-                
+
                 // Try numeric comparison
                 const aNum = parseFloat(aVal.replace(/[,%]/g, ''));
                 const bNum = parseFloat(bVal.replace(/[,%]/g, ''));
-                
+
                 if (!isNaN(aNum) && !isNaN(bNum)) {
                     return isAsc ? bNum - aNum : aNum - bNum;
                 }
                 // String comparison
                 return isAsc ? bVal.localeCompare(aVal) : aVal.localeCompare(bVal);
             });
-            
+
             rows.forEach(row => tbody.appendChild(row));
         }
 
@@ -238,18 +303,18 @@
                 // Skip summary table (first one)
                 if (index === 0) return;
                 if (table.parentElement.classList.contains('table-wrapper')) return;
-                
+
                 const wrapper = document.createElement('div');
                 wrapper.className = 'table-wrapper';
-                
+
                 const footer = document.createElement('div');
                 footer.className = 'table-footer';
-                
+
                 const btn = document.createElement('button');
                 btn.className = 'copy-btn';
                 btn.textContent = 'Copy Table';
-                btn.onclick = function() { copyTable(this); };
-                
+                btn.onclick = function () { copyTable(this); };
+
                 footer.appendChild(btn);
                 table.parentNode.insertBefore(wrapper, table);
                 wrapper.appendChild(table);
@@ -467,7 +532,7 @@
             (No reads to show.)
             {{/if}}
             <h4>Ledger Writes</h4>
-            <p><b>Transaction Itself</b></p>
+            <h5>Transaction Itself</h5>
             <table>
                 <tr>
                     <th style="text-align: right">Cost in Gas Units</th>
@@ -480,7 +545,7 @@
                 </tr>
                 {{/with}}
             </table>
-            <p><b>Events</b></p>
+            <h5>Events</h5>
             {{#if event_writes}}
             <table>
                 <tr>
@@ -501,7 +566,7 @@
             {{else}}
             (No writes to show.)
             {{/if}}
-            <p><b>State Write Ops</b></p>
+            <h5>State Write Ops</h5>
             {{#if writes}}
             <table>
                 <tr>
