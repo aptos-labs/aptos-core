@@ -325,7 +325,16 @@ test_prefix_consensus.sh      - Automated test script with formatted output
 5. **349a557e6d** (2026-01-29): `[consensus] Integrate PrefixConsensusManager into EpochManager (Phase 5)`
    - Added start_prefix_consensus(), message routing
 
-6. **45dec59b91** (2026-01-29): `[docs] Update project context with Phase 5 completion and architectural discussion` (HEAD)
+6. **45dec59b91** (2026-01-29): `[docs] Update project context with Phase 5 completion and architectural discussion`
+
+7. **6f12e09ceb** (2026-02-03): `[smoke-test] Add basic prefix consensus smoke test and fix protocol bugs (Phase 6)`
+   - Fixed BLS signatures, network routing, race condition
+   - Added output file writing, identical inputs test
+
+8. **f5e736d906** (2026-02-04): `[smoke-test] Add divergent inputs test for Prefix Consensus` (HEAD)
+   - Added test with partially overlapping inputs (divergent at position 2)
+   - Validates mcp computation correctness
+   - Added test_prefix_consensus.sh helper script
 
 ---
 
