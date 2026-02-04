@@ -204,15 +204,28 @@ QC3 complete → Exit loop
 - `testsuite/smoke-test/src/consensus/prefix_consensus/helpers.rs` - Test helpers with input field parsing
 - `testsuite/smoke-test/src/consensus/prefix_consensus/basic_test.rs` - Smoke test
 
+6. **Divergent Inputs Test** (✅ Complete)
+   - **Goal**: Test protocol with partially overlapping inputs to verify mcp computation
+   - **Test**: `test_prefix_consensus_divergent_inputs` (4 validators, divergent at position 2)
+   - **Setup**: All validators share positions 0, 1, 3 (hash values 1, 2, 4), differ at position 2 (hash values 10-13)
+   - **Expected**: v_low = [hash1, hash2] (maximum common prefix of length 2)
+   - **Result**: ✅ Protocol correctly computes mcp, all validators agree on 2-element prefix
+   - **Helper Script**: `test_prefix_consensus.sh` for automated testing with readable output
+
 **Test Results**:
 - ✅ Protocol runs successfully through all 3 rounds
 - ✅ QC1, QC2, QC3 formation works correctly
 - ✅ All 4 validators complete consistently (100% success rate)
 - ✅ Output files written correctly with input, v_low, v_high
 - ✅ Property verification: Upper Bound (v_low ⪯ v_high), Validity (mcp(inputs) ⪯ v_low), Consistency (all validators agree)
+- ✅ Divergent inputs test: Correctly computes mcp of length 2 when inputs diverge at position 2
 
 **Manual Verification**:
 ```bash
+# Use helper script for automated testing
+./test_prefix_consensus.sh
+
+# Or manually
 ls -la /tmp/prefix_consensus_output_*.json
 cat /tmp/prefix_consensus_output_*.json | jq '.'
 ```
@@ -238,17 +251,17 @@ cat /tmp/prefix_consensus_output_*.json | jq '.'
 
 ### Repository State
 - **Branch**: `prefix-consensus-prototype`
-- **HEAD**: About to commit Phase 6 completion
-- **Status**: Modified files (race condition fix + input field), ready to commit
-- **Tests**: 74/74 unit tests passing, smoke test 100% success rate
+- **HEAD**: About to commit Phase 6 completion (divergent inputs test)
+- **Status**: Modified files (basic_test.rs with divergent test, test script), ready to commit
+- **Tests**: 74/74 unit tests passing, 2 smoke tests (identical + divergent inputs), 100% success rate
 - **Build**: ✅ All build issues resolved
 
 ### Progress
 - **Overall**: Phase 6/11 (~55%)
-- **Time Spent**: ~16 hours total (Phase 6: 4h debugging + fixes + verification enhancements)
+- **Time Spent**: ~16 hours total (Phase 6: 4h debugging + fixes + verification + divergent test)
 
 ### Next Action
-**Phase 7**: Create additional smoke tests for edge cases and different input scenarios
+**Phase 7**: Implement Strong Prefix Consensus using Prefix Consensus as a building block
 
 ---
 
@@ -275,10 +288,12 @@ consensus/src/
 testsuite/smoke-test/src/consensus/prefix_consensus/
 ├── mod.rs                    - Module declarations
 ├── helpers.rs                - Test helpers (150 lines)
-└── basic_test.rs             - Identical inputs smoke test (162 lines)
+└── basic_test.rs             - Smoke tests: identical & divergent inputs (~350 lines)
+
+test_prefix_consensus.sh      - Automated test script with formatted output
 ```
 
-**Total LOC**: ~3100 lines (implementation + tests + smoke tests)
+**Total LOC**: ~3300 lines (implementation + tests + smoke tests + scripts)
 
 ---
 
