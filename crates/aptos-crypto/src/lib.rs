@@ -23,7 +23,8 @@ pub mod noise;
 pub mod player;
 pub mod secp256k1_ecdsa;
 pub mod secp256r1_ecdsa;
-pub mod slh_dsa_sha2_128s;
+// Commented out for rosetta v1.40.1 build - slh-dsa conflicts with rand_core 0.5.1
+// pub mod slh_dsa_sha2_128s;
 pub mod test_utils;
 pub mod traits;
 pub mod utils;

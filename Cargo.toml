@@ -708,7 +708,8 @@ p256 = { version = "0.13.2" }
 prettydiff = "0.6.2"
 primitive-types = { version = "0.12.2" }
 signature = "2.1.0"
-slh-dsa = "0.2.0-rc.1"
+# Commented out for rosetta v1.40.1 build - conflicts with rand_core 0.5.1
+# slh-dsa = "0.2.0-rc.1"
 pairing = "0.23"
 parking_lot = "0.12.0"
 paste = "1.0.7"
@@ -983,3 +984,10 @@ ark-serialize = { git = "https://github.com/aptos-labs/algebra", branch = "fix-f
 # so we cannot simply change the version and package for `jemalloc-sys` in one repo without running into conflicts.
 # We have to keep this shim until everything uses the same jemalloc dependency.
 jemalloc-sys = { git = "https://github.com/aptos-labs/jemalloc-sys-shim", rev = "e0920246dd74303fab9a14b990768c6ac990a59b" }
+
+# TEMPORARY WORKAROUND for v1.40.1 rosetta build:
+# slh-dsa 0.2.0-rc.1 requires rand_core 0.10.0-rc.2 which conflicts with our rand_core 0.5.1
+# To build rosetta client, you need to either:
+# 1. Comment out slh-dsa from the workspace dependencies and aptos-crypto dependencies
+# 2. Or update rand_core to 0.6.x and handle the breaking changes across the codebase
+# 3. Or use a fork of slh-dsa that's compatible with rand_core 0.5.1

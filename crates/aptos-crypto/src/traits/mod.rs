@@ -389,7 +389,8 @@ pub(crate) mod private {
     impl Sealed for crate::secp256k1_ecdsa::PublicKey {}
     impl Sealed for crate::secp256k1_ecdsa::Signature {}
 
-    impl Sealed for crate::slh_dsa_sha2_128s::PrivateKey {}
-    impl Sealed for crate::slh_dsa_sha2_128s::PublicKey {}
-    impl Sealed for crate::slh_dsa_sha2_128s::Signature {}
+    // Commented out for rosetta v1.40.1 build - slh-dsa conflicts with rand_core 0.5.1
+    // impl Sealed for crate::slh_dsa_sha2_128s::PrivateKey {}
+    // impl Sealed for crate::slh_dsa_sha2_128s::PublicKey {}
+    // impl Sealed for crate::slh_dsa_sha2_128s::Signature {}
 }
