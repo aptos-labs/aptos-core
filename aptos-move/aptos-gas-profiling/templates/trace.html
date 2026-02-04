@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <script>
+        // Only apply fancy styling when embedded in iframe
+        if (window.self !== window.top) {
+            const style = document.createElement('style');
+            style.textContent = `
+                body {
+                    margin: 0;
+                    padding: 4px 8px;
+                    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+                    font-size: 12px;
+                    line-height: 1;
+                    background: #f8f8f8;
+                    display: inline-block;
+                }
+                pre {
+                    margin: 0;
+                    white-space: normal;
+                    padding-top: 32px;
+                }
+                .line {
+                    display: block;
+                    white-space: pre;
+                }
+                .line:hover {
+                    background: #dbeafe;
+                }
+                #copy-btn {
+                    position: fixed;
+                    top: 4px;
+                    right: 4px;
+                    padding: 4px 8px;
+                    font-size: 11px;
+                    background: #e2e8f0;
+                    border: 1px solid #cbd5e1;
+                    border-radius: 3px;
+                    cursor: pointer;
+                }
+                #copy-btn:hover {
+                    background: #cbd5e1;
+                }
+            `;
+            document.head.appendChild(style);
+
+            // Create copy button
+            document.addEventListener('DOMContentLoaded', function () {
+                const btn = document.createElement('button');
+                btn.id = 'copy-btn';
+                btn.textContent = 'Copy Trace';
+                btn.onclick = copyTrace;
+                document.body.insertBefore(btn, document.body.firstChild);
+            });
+
+            // Send dimensions to parent after layout
+            window.addEventListener('load', function () {
+                requestAnimationFrame(function () {
+                    const body = document.body;
+                    window.parent.postMessage({
+                        type: 'trace-dimensions',
+                        width: body.scrollWidth,
+                        height: body.scrollHeight
+                    }, '*');
+                });
+            });
+        }
+
+        function copyTrace() {
+            const pre = document.querySelector('pre');
+            const text = pre.textContent;
+            navigator.clipboard.writeText(text).then(function () {
+                const btn = document.getElementById('copy-btn');
+                const orig = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(function () { btn.textContent = orig; }, 1000);
+            });
+        }
+    </script>
+</head>
+
+<body>
+    <pre>{{{trace-content}}}</pre>
+</body>
+
+</html>

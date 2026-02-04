@@ -13,6 +13,7 @@ use std::{
 };
 
 const TEMPLATE: &str = include_str!("../templates/index.html");
+const TRACE_TEMPLATE: &str = include_str!("../templates/trace.html");
 
 fn ensure_dirs_exist(path: impl AsRef<Path>) -> Result<()> {
     if let Err(err) = fs::create_dir_all(&path) {
@@ -437,6 +438,25 @@ impl TransactionGasLog {
         if let Some(graph_bytes) = graph_storage {
             fs::write(path_assets.join("storage.svg"), graph_bytes)?;
         }
+        // Write trace to a standalone HTML file for lazy loading via iframe
+        // When in iframe: styled with hover effects
+        // When opened directly: plain text appearance
+        let trace_content: String = trace
+            .lines()
+            .map(|line| {
+                let escaped = line
+                    .replace('&', "&amp;")
+                    .replace('<', "&lt;")
+                    .replace('>', "&gt;");
+                format!("<span class=\"line\">{}</span>", escaped)
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let mut trace_data = Map::new();
+        trace_data.insert("trace-content".to_string(), json!(trace_content));
+        let trace_html = handlebars.render_template(TRACE_TEMPLATE, &trace_data)?;
+        fs::write(path_assets.join("trace.html"), trace_html)?;
         fs::write(path_root.join("index.html"), html)?;
 
         Ok(())
