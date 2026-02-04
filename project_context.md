@@ -1,10 +1,11 @@
-# Project Context: Prefix Consensus Prototype Implementation
+# Project Context: Prefix Consensus Implementation
 
 ## Overview
 
-Implementing a prototype of Prefix Consensus (from research paper "Prefix Consensus For Censorship Resistant BFT") within Aptos Core. Starting with the primitive 3-round asynchronous protocol.
+Implementing Prefix Consensus protocols (from research paper "Prefix Consensus For Censorship Resistant BFT") within Aptos Core for leaderless, censorship-resistant consensus.
 
-**Goal**: Leaderless, censorship-resistant consensus that works asynchronously.
+**Current Phase**: Strong Prefix Consensus - Multi-view protocol for v_high agreement
+**Completed**: Basic Prefix Consensus primitive (3-round asynchronous protocol)
 
 ---
 
@@ -29,346 +30,211 @@ Implementing a prototype of Prefix Consensus (from research paper "Prefix Consen
 
 ---
 
-## Implementation Progress
+## Basic Prefix Consensus - Implementation Complete ✅
 
-### Phase 1: Serialization and Signature Support (✅ COMPLETE)
+**Status**: Production-ready 3-round asynchronous protocol
+**Completion Date**: February 4, 2026
+**Tests**: 74/74 unit tests passing, 2 smoke tests (100% success rate)
 
-**Date**: 2026-01-28
+### Key Components
 
-**Implementation**:
-- Added BCS serialization to all types (Vote1/2/3, QC1/2/3, Input/Output)
-- Changed signatures from Ed25519 to BLS12-381 (matches Aptos consensus)
-- Added epoch/slot fields to votes (future multi-slot support)
-- Created custom hashers (Vote1/2/3Hasher) for CryptoHash that exclude signatures
-- Created SignData helper structs (Vote1/2/3SignData) for proper BCS signing
-- Implemented sign_vote1/2/3() and verify_vote1/2/3_signature() functions
+**Core Implementation** (~3300 LOC):
+- `types.rs` - Vote1/2/3, QC1/2/3 with BLS signatures (350 lines)
+- `protocol.rs` - 3-round state machine (490 lines)
+- `manager.rs` - Event-driven orchestrator (658 lines)
+- `network_interface.rs` - Network adapter (224 lines)
+- `network_messages.rs` - PrefixConsensusMsg enum (443 lines)
+- `signing.rs` - BLS sign/verify helpers (184 lines)
+- `certify.rs` - QC formation with trie (220 lines)
+- `verification.rs` - Vote/QC verification (150 lines)
+- `utils.rs` - mcp/mce prefix operations (180 lines)
 
-**Files**:
-- Modified: `consensus/prefix-consensus/Cargo.toml`, `src/types.rs`, `src/protocol.rs`
-- Created: `consensus/prefix-consensus/src/signing.rs` (184 lines)
+**Integration**:
+- `consensus/src/epoch_manager.rs` - start_prefix_consensus() method
+- `consensus/src/network_interface.rs` - ConsensusMsg routing
+- Self-send channel pattern for local message delivery
+- Direct routing in check_epoch() (bypasses UnverifiedEvent)
 
-**Tests**: ✅ 54/54 passing (including signature round-trip tests)
+**Testing**:
+- Unit tests: All 74 tests passing
+- Smoke tests: Identical inputs, divergent inputs (both 100% success)
+- Property verification: Upper Bound, Validity, Consistency
+- Test script: `test_prefix_consensus.sh`
 
-**Technical Challenge Solved**: BCS serialization vs CryptoHash - ValidatorVerifier uses BCS of entire struct, not just hash. Solution: separate SignData structs without signature field.
+### Technical Achievements
 
----
-
-### Phase 2: Network Message Types (✅ COMPLETE)
-
-**Date**: 2026-01-28
-
-**Implementation**:
-- Created `PrefixConsensusMsg` enum with Vote1/2/3Msg variants (boxed)
-- Helper methods: name(), epoch(), slot(), author(), as_vote*(), into_vote*()
-- Full BCS serialization support
-
-**Files**:
-- Created: `consensus/prefix-consensus/src/network_messages.rs` (443 lines)
-
-**Tests**: ✅ 70/70 passing (16 new tests for serialization, accessors)
-
----
-
-### Phase 3: Network Interface Adapter (✅ COMPLETE)
-
-**Date**: 2026-01-28
-
-**Implementation**:
-- Created `PrefixConsensusNetworkSender` trait (broadcast_vote1/2/3)
-- Implemented `NetworkSenderAdapter` wrapping Aptos NetworkClient
-- Self-send via UnboundedSender channel (network doesn't support self-send)
-- Broadcast to other validators via send_to_many()
-- Generic helper method for DRY code
-
-**Files**:
-- Created: `consensus/prefix-consensus/src/network_interface.rs` (224 lines)
-- Modified: `Cargo.toml` (added 7 network dependencies)
-
-**Tests**: ✅ 71/71 passing
+**Signature System**: BLS12-381 with ValidatorSigner/ValidatorVerifier integration
+**Race Condition Fix**: Removed strict state checks (votes are self-contained)
+**Network Integration**: Generic trait-based sender with NetworkSenderAdapter
+**Architecture**: Arc<RwLock<>> state, tokio::select! event loop, structured logging
 
 ---
 
-### Phase 4: PrefixConsensusManager (✅ COMPLETE)
+## Strong Prefix Consensus - In Progress 🚧
 
-**Date**: 2026-01-28
+**Goal**: Multi-view protocol where all parties agree on identical v_high output
+**Status**: Planning complete, ready for implementation
+**Plan**: `.plans/strong-prefix-consensus.md` (10 phases, ~10-11 days estimated)
 
-**Implementation**:
-- Event-driven manager with RoundManager pattern
-- Key methods: new(), init(), run() (consumes self), process_message(), process_vote1/2/3()
-- Duplicate detection per round (HashSet in RwLock)
-- Signature verification (currently dummy Ed25519, Phase 10 will add real BLS)
-- Auto-exits when QC3 forms or shutdown signaled
-- Structured logging with party_id, epoch, round, author fields
+### What is Strong Prefix Consensus?
 
-**Architecture**:
+From paper Definition 2.5: Extends basic Prefix Consensus by adding **Agreement** property:
+- Basic Prefix Consensus: Parties output compatible v_high values (v_low ⪯ v_high)
+- Strong Prefix Consensus: ALL parties output IDENTICAL v_high value
+
+### Architecture Overview
+
 ```
-run() starts → Broadcast Vote1 → tokio::select! loop
-  ↓                                    ↓
-Message arrives → process_vote* → Protocol state machine
-  ↓                                    ↓
-QC formed → start_round* → Broadcast next vote
-  ↓
-QC3 complete → Exit loop
+StrongPrefixConsensusManager
+  │
+  ├─> View 1: Run Verifiable Prefix Consensus on input vector
+  │   - Output v_low immediately (becomes Strong PC low output)
+  │   - v_high becomes candidate for agreement
+  │
+  ├─> View 2+: Run Verifiable Prefix Consensus on certificate vectors
+  │   - Certificates create parent chains back to View 1
+  │   - Following parent pointers determines unique v_high
+  │   - Cyclic ranking shifts ensure leaderless progress
+  │
+  └─> Output: (v_low, v_high) where all parties agree on v_high
 ```
 
-**Files**:
-- Created: `consensus/prefix-consensus/src/manager.rs` (658 lines)
+### Key Concepts
 
-**Tests**: ✅ 74/74 passing (3 new manager tests)
+**Verifiable Prefix Consensus**: Basic Prefix Consensus + proofs (QC3 serves as π)
+**Direct Certificates**: Cert^dir(w-1, v_high, π) - advance view-by-view
+**Indirect Certificates**: Cert^ind(w-1, (w*, v_high*, π), Σ) - skip empty views with f+1 sigs
+**Parent Chain**: Following certificates back to View 1 uniquely determines v_high output
 
-**Race Condition Fixed**: Receiver now starts before Vote1 broadcast (commit e4376f5e9a)
+### Implementation Plan (10 Phases)
 
----
+1. **Verifiable Prefix Consensus** - Add proof outputs to basic protocol
+2. **Certificate Types** - Direct/Indirect certificate structures and validation
+3. **View State Management** - Per-view state tracking and cyclic ranking
+4. **Strong Protocol Core** - Multi-view state machine (~800 lines, most complex)
+5. **Network Messages** - Message types with view multiplexing
+6. **Strong Manager** - Event-driven orchestrator for multi-view protocol
+7. **Integration** - Wire into EpochManager
+8. **Smoke Tests** - 4 test cases validating agreement property
+9. **Performance** - Metrics and optimization
+10. **Documentation** - README and context updates
 
-### Phase 5: EpochManager Integration (✅ COMPLETE)
+**Estimated Effort**: 10-11 days of focused development
+**New Code**: ~3000 lines (certificates, view_state, strong_protocol, strong_manager, tests)
 
-**Date**: 2026-01-29
+### Future Architecture
 
-**Implementation**:
-- Added `PrefixConsensusMsg` variant to `ConsensusMsg` enum
-- Added message routing in `EpochManager::check_epoch()` (epoch validation, forward to manager)
-- Implemented `start_prefix_consensus(input)` method:
-  - Creates channels, NetworkSenderAdapter, ValidatorSigner
-  - Spawns PrefixConsensusManager on tokio runtime
-  - Returns after initialization
-- Implemented `stop_prefix_consensus()` method (graceful shutdown)
-- Stores channels: prefix_consensus_tx, prefix_consensus_close_tx
-
-**Architectural Decision**: Bypasses UnverifiedEvent pattern
-- Rationale: Prefix consensus will eventually REPLACE RoundManager
-- Avoids coupling to types that will be removed
-- Clean replacement path for future SlotManager
-- Routes directly in check_epoch() like EpochRetrievalRequest
-
-**Files**:
-- Modified: `consensus/src/epoch_manager.rs` (~140 lines added)
-- Modified: `consensus/src/network_interface.rs` (added enum variant)
-- Modified: `Cargo.toml`, `consensus/Cargo.toml` (workspace dependency)
-
-**Tests**: ✅ 74/74 passing
-
-**Commit**: `349a557e6d` - Integration complete
-
----
-
-### Phase 6: Smoke Test & Bug Fixes (✅ COMPLETE)
-
-**Date**: 2026-02-03/04
-
-**Goal**: Create basic smoke test infrastructure and fix protocol bugs
-
-**Implementation**:
-
-1. **Smoke Test Infrastructure** (✅ Complete)
-   - Created `testsuite/smoke-test/src/consensus/prefix_consensus/` module
-   - Test helper functions: `generate_test_hashes()`, `wait_for_prefix_consensus_outputs()`, `cleanup_output_files()`
-   - Basic test: `test_prefix_consensus_identical_inputs` (4 validators, identical inputs)
-   - Test triggers protocol via config: `consensus.prefix_consensus_test_input`
-   - Validators write output to `/tmp/prefix_consensus_output_{party_id}.json`
-   - Output format includes: party_id, epoch, input (validator's input vector), v_low, v_high
-
-2. **Fixed Signature Verification** (✅ Complete)
-   - **Problem**: Protocol used dummy BLS signatures that failed verification
-   - **Root Cause**: `protocol.rs` called `create_dummy_signature()` instead of real BLS signing
-   - **Fix**: Changed `start_round1/2/3()` to accept `&ValidatorSigner`, use real BLS signatures
-   - **Changes**:
-     - `protocol.rs`: Accept `ValidatorSigner`, call `sign_vote1/2/3()` with real keys
-     - `manager.rs`: Removed `dummy_private_key`, pass `&self.validator_signer` to protocol
-
-3. **Fixed Network Message Routing** (✅ Complete)
-   - **Problem**: `PrefixConsensusMsg` rejected with "Unexpected direct send msg"
-   - **Root Cause**: DirectSend handler in `network.rs` didn't include `PrefixConsensusMsg`
-   - **Fix**: Added `ConsensusMsg::PrefixConsensusMsg(_)` to pattern match at line 871
-
-4. **Added Output File Writing** (✅ Complete)
-   - **Problem**: Protocol completed but no output files for test validation
-   - **Fix**: Added `write_output_file()` method in `manager.rs` that writes JSON to `/tmp/`
-   - Writes after QC3 formation with input, v_low, v_high, epoch, party_id
-   - Added `get_input_vector()` method to `PrefixConsensusProtocol` for output file generation
-
-5. **Fixed Race Condition** (✅ Complete)
-   - **Problem**: 1/4 validators would get stuck due to early message rejection (75% success rate)
-   - **Root Cause**: Strict state checks in `process_vote1/2/3()` rejected votes received early
-   - **Example**: Vote2 arrives while validator still in Round1 → rejected → validator never forms QC2
-   - **Solution**: Removed strict state checks from `protocol.rs` lines 165-169, 290-294, 414-418
-   - **Rationale**: Votes are self-contained with embedded certificates (Vote2 has QC1, Vote3 has QC2), so validation logic already checks dependencies - no need for redundant state checks
-   - **Result**: ✅ 100% success rate (all 4 validators complete protocol consistently)
-
-**Files Modified**:
-- `consensus/prefix-consensus/src/protocol.rs` - Real BLS signatures, removed strict state checks, added get_input_vector()
-- `consensus/prefix-consensus/src/manager.rs` - ValidatorSigner, output writing with input field
-- `consensus/src/network.rs` - PrefixConsensusMsg routing
-- `testsuite/smoke-test/Cargo.toml` - Added prefix-consensus dependency
-- `testsuite/smoke-test/src/consensus/mod.rs` - Added prefix_consensus module
-- `testsuite/smoke-test/src/consensus/prefix_consensus/mod.rs` - Module structure
-- `testsuite/smoke-test/src/consensus/prefix_consensus/helpers.rs` - Test helpers with input field parsing
-- `testsuite/smoke-test/src/consensus/prefix_consensus/basic_test.rs` - Smoke test
-
-6. **Divergent Inputs Test** (✅ Complete)
-   - **Goal**: Test protocol with partially overlapping inputs to verify mcp computation
-   - **Test**: `test_prefix_consensus_divergent_inputs` (4 validators, divergent at position 2)
-   - **Setup**: All validators share positions 0, 1, 3 (hash values 1, 2, 4), differ at position 2 (hash values 10-13)
-   - **Expected**: v_low = [hash1, hash2] (maximum common prefix of length 2)
-   - **Result**: ✅ Protocol correctly computes mcp, all validators agree on 2-element prefix
-   - **Helper Script**: `test_prefix_consensus.sh` for automated testing with readable output
-
-**Test Results**:
-- ✅ Protocol runs successfully through all 3 rounds
-- ✅ QC1, QC2, QC3 formation works correctly
-- ✅ All 4 validators complete consistently (100% success rate)
-- ✅ Output files written correctly with input, v_low, v_high
-- ✅ Property verification: Upper Bound (v_low ⪯ v_high), Validity (mcp(inputs) ⪯ v_low), Consistency (all validators agree)
-- ✅ Divergent inputs test: Correctly computes mcp of length 2 when inputs diverge at position 2
-
-**Manual Verification**:
-```bash
-# Use helper script for automated testing
-./test_prefix_consensus.sh
-
-# Or manually
-ls -la /tmp/prefix_consensus_output_*.json
-cat /tmp/prefix_consensus_output_*.json | jq '.'
 ```
+SlotManager (Future)
+  │
+  └─> Per-Slot: StrongPrefixConsensusManager
+        │
+        └─> Per-View: VerifiablePrefixConsensusProtocol
+              │
+              └─> Basic PrefixConsensusProtocol (3 rounds)
+```
+
+This layered architecture enables multi-slot censorship-resistant consensus as described in paper Algorithm 2.
 
 ---
 
 ## Current Status (February 4, 2026)
 
-### ✅ Completed Phases (6/11)
-1. **Phase 1**: Serialization & BLS signatures
-2. **Phase 2**: Network message types
-3. **Phase 3**: Network adapter
-4. **Phase 4**: PrefixConsensusManager
-5. **Phase 5**: EpochManager integration
-6. **Phase 6**: Smoke Test & Bug Fixes
-
-### ⏳ Remaining Phases (7-11)
-7. **Additional Smoke Tests** (ensure robustness across scenarios)
-8. **Fault Tolerance Tests** (silent validator, Byzantine behavior)
-9. **Additional Test Cases** (overlapping/divergent inputs)
-10. **Performance & Optimization** (metrics, logging improvements)
-11. **Documentation** (README, API docs, examples)
-
 ### Repository State
 - **Branch**: `prefix-consensus-prototype`
-- **HEAD**: About to commit Phase 6 completion (divergent inputs test)
-- **Status**: Modified files (basic_test.rs with divergent test, test script), ready to commit
-- **Tests**: 74/74 unit tests passing, 2 smoke tests (identical + divergent inputs), 100% success rate
-- **Build**: ✅ All build issues resolved
+- **HEAD**: `537848ce43` - Divergent inputs test complete
+- **Status**: Clean working directory
+- **Tests**: 74/74 unit tests, 2 smoke tests (100% success rate)
+- **Build**: ✅ No warnings or errors
 
-### Progress
-- **Overall**: Phase 6/11 (~55%)
-- **Time Spent**: ~16 hours total (Phase 6: 4h debugging + fixes + verification + divergent test)
+### Progress Summary
+- ✅ **Basic Prefix Consensus**: Complete (Phase 1-6 of network-integration.md)
+- 🚧 **Strong Prefix Consensus**: Planning complete, ready to start Phase 1
+- ⏳ **Slot Manager**: Future work (after Strong PC complete)
 
 ### Next Action
-**Phase 7**: Implement Strong Prefix Consensus using Prefix Consensus as a building block
+Begin Strong Prefix Consensus Phase 1: Implement Verifiable Prefix Consensus (add proof outputs)
 
 ---
 
-## Key Implementation Files
+## Repository Structure
 
+### Basic Prefix Consensus (Complete)
 ```
-consensus/prefix-consensus/
-├── src/
-│   ├── types.rs              - Vote/QC types with BLS signatures (350+ lines)
-│   ├── utils.rs              - mcp/mce prefix operations (180 lines)
-│   ├── certify.rs            - QC1/2/3Certify functions with trie (220 lines)
-│   ├── verification.rs       - Vote/QC verification (150 lines)
-│   ├── protocol.rs           - 3-round state machine (490 lines)
-│   ├── signing.rs            - BLS sign/verify helpers (184 lines)
-│   ├── network_messages.rs   - PrefixConsensusMsg enum (443 lines)
-│   ├── network_interface.rs  - Network adapter (224 lines)
-│   └── manager.rs            - Event-driven manager (538 lines)
-└── Cargo.toml
-
-consensus/src/
-├── epoch_manager.rs          - Integration point (start_prefix_consensus)
-└── network_interface.rs      - ConsensusMsg enum (PrefixConsensusMsg variant)
+consensus/prefix-consensus/src/
+├── types.rs              - Vote/QC types with BLS (350 lines)
+├── protocol.rs           - 3-round state machine (490 lines)
+├── manager.rs            - Event-driven orchestrator (658 lines)
+├── network_interface.rs  - Network adapter (224 lines)
+├── network_messages.rs   - Message enum (443 lines)
+├── signing.rs            - BLS helpers (184 lines)
+├── certify.rs            - QC formation (220 lines)
+├── verification.rs       - Validation (150 lines)
+└── utils.rs              - Prefix operations (180 lines)
 
 testsuite/smoke-test/src/consensus/prefix_consensus/
-├── mod.rs                    - Module declarations
-├── helpers.rs                - Test helpers (150 lines)
-└── basic_test.rs             - Smoke tests: identical & divergent inputs (~350 lines)
-
-test_prefix_consensus.sh      - Automated test script with formatted output
+├── helpers.rs            - Test helpers
+└── basic_test.rs         - 2 smoke tests
 ```
 
-**Total LOC**: ~3300 lines (implementation + tests + smoke tests + scripts)
+### Strong Prefix Consensus (Planned)
+```
+consensus/prefix-consensus/src/
+├── certificates.rs       - Cert types (300 lines) - Phase 2
+├── view_state.rs         - View management (400 lines) - Phase 3
+├── strong_protocol.rs    - Multi-view protocol (800 lines) - Phase 4
+└── strong_manager.rs     - Event orchestrator (700 lines) - Phase 6
+
+testsuite/smoke-test/src/consensus/strong_prefix_consensus/
+├── helpers.rs            - Test helpers (200 lines) - Phase 8
+└── basic_test.rs         - 4 smoke tests (400 lines) - Phase 8
+```
+
+### Plans
+- `.plans/network-integration.md` - Basic Prefix Consensus plan (complete)
+- `.plans/strong-prefix-consensus.md` - Strong Prefix Consensus plan (current)
 
 ---
 
-## Implementation Plan Reference
+## Git Commit History (prefix-consensus-prototype branch)
 
-**Full Plan**: `.plans/network-integration.md` (11 phases, 8-11 days estimated)
-
-**Progress**: Phase 5/11 (~45%)
-
-**Time Spent**: ~12 hours (Phase 1: 4h, Phase 2: 1h, Phase 3: 2h, Phase 4: 3h, Phase 5: 2h)
-
----
-
-## Git Commit History
-
-### Commits on `prefix-consensus-prototype` branch
-
-1. **96a68780cd** (2026-01-22): `[consensus] Add Prefix Consensus primitive implementation`
-   - Initial 7-file module creation (types, utils, certify, verification, protocol)
-
-2. **8b7ad1b60e** (2026-01-28): `[consensus] Implement PrefixConsensusManager (Phase 4)`
-   - Created manager.rs with event-driven architecture
-
-3. **e4376f5e9a** (2026-01-28): `[consensus] Refactor manager to match RoundManager pattern and fix race condition`
-   - Fixed Vote1 self-send race by starting receiver before broadcast
-
-4. **6c5eec0fe8** (2026-01-28): `[docs] Update project context with Phase 4 completion and Phase 5 plan`
-
-5. **349a557e6d** (2026-01-29): `[consensus] Integrate PrefixConsensusManager into EpochManager (Phase 5)`
-   - Added start_prefix_consensus(), message routing
-
-6. **45dec59b91** (2026-01-29): `[docs] Update project context with Phase 5 completion and architectural discussion`
-
-7. **6f12e09ceb** (2026-02-03): `[smoke-test] Add basic prefix consensus smoke test and fix protocol bugs (Phase 6)`
-   - Fixed BLS signatures, network routing, race condition
-   - Added output file writing, identical inputs test
-
-8. **f5e736d906** (2026-02-04): `[smoke-test] Add divergent inputs test for Prefix Consensus` (HEAD)
-   - Added test with partially overlapping inputs (divergent at position 2)
-   - Validates mcp computation correctness
-   - Added test_prefix_consensus.sh helper script
+1. **96a68780cd** (Jan 22): Initial Prefix Consensus primitive implementation
+2. **8b7ad1b60e** (Jan 28): PrefixConsensusManager with event-driven architecture
+3. **e4376f5e9a** (Jan 28): Fix Vote1 self-send race condition
+4. **6c5eec0fe8** (Jan 28): Update docs (Phase 4 complete)
+5. **349a557e6d** (Jan 29): EpochManager integration
+6. **45dec59b91** (Jan 29): Update docs (Phase 5 complete)
+7. **9c96198f3f** (Feb 3): Smoke test infrastructure and bug fixes
+8. **6f12e09ceb** (Feb 3): Fix race condition, add output writing
+9. **f5e736d906** (Feb 4): Divergent inputs test
+10. **537848ce43** (Feb 4): Update docs (Phase 6 complete, Strong PC plan) ← HEAD
 
 ---
 
 ## References
 
-**Paper**: "Prefix Consensus For Censorship Resistant BFT" - `/Users/alexanderspiegelman/Downloads/Prefix_Consensus (4).pdf`
+**Paper**: "Prefix Consensus For Censorship Resistant BFT" (Feb 2024)
+- Location: `/Users/alexanderspiegelman/Downloads/Prefix_Consensus (5).pdf`
+- Algorithm 1: Basic Prefix Consensus (✅ implemented)
+- Algorithm 3: Strong Prefix Consensus (🚧 in progress)
+- Algorithm 2: Multi-slot BFT (⏳ future work)
 
-**Key Algorithms**:
-- Algorithm 1: 3-round async Prefix Consensus (implemented)
-- Algorithm 2: Multi-slot censorship-resistant BFT (future)
-- Algorithm 4: Optimistic 2-round variant (future)
-
-**Aptos Codebase**:
-- Consensus: `consensus/src/`
-- Types: `consensus/consensus-types/src/`
-- Safety Rules: `consensus/safety-rules/src/`
-- Network: `consensus/src/network_interface.rs`
+**Aptos Integration Points**:
+- `consensus/src/epoch_manager.rs` - Protocol lifecycle management
+- `consensus/src/network_interface.rs` - Message routing
+- `consensus/consensus-types/src/` - Common types (ValidatorVerifier, Author, etc.)
 
 ---
 
-## Notes
+## Future Work
 
-### Build Environment
-✅ macOS build issues resolved (RocksDB C++, sandbox .pem access)
+### Immediate (After Strong PC)
+1. **Slot Manager**: Run Strong PC per slot for multi-slot consensus (Algorithm 2)
+2. **Censorship Resistance**: Ranking updates based on exclusions
+3. **Smoke Tests**: Byzantine behavior, fault tolerance
 
-### Testing Strategy
-- Unit tests: Per-module tests in each file (74 tests total)
-- Smoke tests: LocalSwarm with multiple validators (Phase 7-9)
-- Property tests: Upper Bound, Validity, Termination verification
-
-### Future Work
-- Multi-slot consensus (Algorithm 2)
-- Censorship resistance with reputation
-- Communication optimization (reduce from O(n²L) to O(n² + nL))
-- Optimistic 2-round variant (Algorithm 4)
-- Integration with Aptos execution/storage
-- Production hardening (metrics, error recovery, persistence)
+### Long Term
+4. **Optimistic Variants**: 2-round good case (Appendix D)
+5. **Communication Optimization**: Reduce from O(n²L) to O(n² + nL)
+6. **Production Hardening**: Metrics, error recovery, persistence
+7. **Execution Integration**: Connect to Aptos execution and storage
