@@ -6,15 +6,25 @@ module aptos_experimental::market_test_utils {
     use std::string::String;
     use aptos_trading::order_book_types::{OrderId, TimeInForce};
     use aptos_experimental::clearinghouse_test;
-    use aptos_experimental::event_utils::{latest_emitted_events, EventStore, new_event_store};
+    use aptos_experimental::event_utils::{
+        latest_emitted_events,
+        EventStore,
+        new_event_store
+    };
     use aptos_experimental::market_types::{
         order_status_cancelled,
         order_status_filled,
         order_status_open,
-        MarketClearinghouseCallbacks, Market, BulkOrderFilledEvent,
+        MarketClearinghouseCallbacks,
+        Market,
+        BulkOrderFilledEvent,
         BulkOrderModifiedEvent
     };
-    use aptos_experimental::order_placement::{OrderMatchResult, place_limit_order, place_market_order};
+    use aptos_experimental::order_placement::{
+        OrderMatchResult,
+        place_limit_order,
+        place_market_order
+    };
     use aptos_experimental::market_types::{OrderEvent};
 
     const U64_MAX: u64 = 0xffffffffffffffff;
@@ -34,41 +44,42 @@ module aptos_experimental::market_test_utils {
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ): OrderId {
         let user_addr = signer::address_of(user);
-        let (limit_price, is_taker) = if (price.is_some()) {
-            place_limit_order(
-                market,
-                user,
-                price.destroy_some(),
-                size,
-                is_bid, // is_bid
-                time_in_force, // order_type
-                option::none(), // trigger_condition
-                metadata,
-                client_order_id,
-                1000,
-                true,
-                callbacks
-            );
-            (price.destroy_some(), is_taker)
-        } else {
-            // Market order
-            place_market_order(
-                market,
-                user,
-                size,
-                is_bid, // is_buy
-                metadata,
-                client_order_id, // client_order_id
-                1000,
-                true,
-                callbacks
-            );
-            if (is_bid) {
-                (U64_MAX, true) // Market buy order
+        let (limit_price, is_taker) =
+            if (price.is_some()) {
+                place_limit_order(
+                    market,
+                    user,
+                    price.destroy_some(),
+                    size,
+                    is_bid, // is_bid
+                    time_in_force, // order_type
+                    option::none(), // trigger_condition
+                    metadata,
+                    client_order_id,
+                    1000,
+                    true,
+                    callbacks
+                );
+                (price.destroy_some(), is_taker)
             } else {
-                (1, true) // Market sell order
-            }
-        };
+                // Market order
+                place_market_order(
+                    market,
+                    user,
+                    size,
+                    is_bid, // is_buy
+                    metadata,
+                    client_order_id, // client_order_id
+                    1000,
+                    true,
+                    callbacks
+                );
+                if (is_bid) {
+                    (U64_MAX, true) // Market buy order
+                } else {
+                    (1, true) // Market sell order
+                }
+            };
         let events = latest_emitted_events<OrderEvent>(event_store, option::none());
         if (!is_cancelled) {
             assert!(events.length() == 1);
@@ -169,11 +180,14 @@ module aptos_experimental::market_test_utils {
         let events = latest_emitted_events<OrderEvent>(event_store, option::some(1));
         let order_place_event = events[0];
         let order_id = order_place_event.get_order_id_from_event();
-        let limit_price = if (taker_price.is_some()) {
-            taker_price.destroy_some()
-        } else {
-            if (is_bid) { U64_MAX } else { 1 }
-        };
+        let limit_price =
+            if (taker_price.is_some()) {
+                taker_price.destroy_some()
+            } else {
+                if (is_bid) {
+                    U64_MAX
+                } else { 1 }
+            };
         // Taker order is opened
         order_place_event.verify_order_event(
             order_id,
@@ -260,7 +274,7 @@ module aptos_experimental::market_test_utils {
                 maker_orig_sizes,
                 maker_remaining_sizes,
                 event_store,
-                is_cancelled,
+                is_cancelled
             );
         };
 
@@ -279,12 +293,15 @@ module aptos_experimental::market_test_utils {
         size_delta: u64,
         is_bid: bool,
         event_store: &mut EventStore,
-        is_bulk: bool,
+        is_bulk: bool
     ) {
         let user_addr = signer::address_of(user);
         if (is_bulk) {
             let cancell_event_store = new_event_store();
-            let events = latest_emitted_events<BulkOrderModifiedEvent>(&mut cancell_event_store, option::some(1));
+            let events =
+                latest_emitted_events<BulkOrderModifiedEvent>(
+                    &mut cancell_event_store, option::some(1)
+                );
             assert!(events.length() == 1);
             // Note: For bulk order cancellation, we only verify that the event was emitted.
             // The detailed verification of cancelled order fields should be done in specific test cases
@@ -326,7 +343,7 @@ module aptos_experimental::market_test_utils {
         maker_orig_sizes: vector<u64>,
         maker_remaining_sizes: vector<u64>,
         event_store: &mut EventStore,
-        is_cancelled: bool,
+        is_cancelled: bool
     ) {
         let taker_addr = signer::address_of(taker);
         let total_fill_size = fill_sizes.fold(0, |acc, fill_size| acc + fill_size);
@@ -434,13 +451,16 @@ module aptos_experimental::market_test_utils {
         maker_addr: address,
         maker_order_ids: vector<OrderId>,
         event_store: &mut EventStore,
-        is_cancelled: bool,
+        is_cancelled: bool
     ) {
         let taker_addr = signer::address_of(taker);
         let total_fill_size = fill_sizes.fold(0, |acc, fill_size| acc + fill_size);
         let events = latest_emitted_events<OrderEvent>(event_store, option::none());
         let bulk_filled_event_store = new_event_store();
-        let bulk_filled_events = latest_emitted_events<BulkOrderFilledEvent>(&mut bulk_filled_event_store, option::none());
+        let bulk_filled_events =
+            latest_emitted_events<BulkOrderFilledEvent>(
+                &mut bulk_filled_event_store, option::none()
+            );
         assert!(fill_sizes.length() == maker_order_ids.length());
         assert!(fill_prices.length() == fill_sizes.length());
         assert!(size >= total_fill_size);

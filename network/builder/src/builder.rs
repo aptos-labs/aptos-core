@@ -11,9 +11,10 @@
 //! long as the latter is in its trusted peers set.
 use aptos_config::{
     config::{
-        DiscoveryMethod, NetworkConfig, Peer, PeerRole, PeerSet, RoleType, CONNECTION_BACKOFF_BASE,
-        CONNECTIVITY_CHECK_INTERVAL_MS, MAX_CONNECTION_DELAY_MS, MAX_FRAME_SIZE,
-        MAX_FULLNODE_OUTBOUND_CONNECTIONS, MAX_INBOUND_CONNECTIONS, NETWORK_CHANNEL_SIZE,
+        AccessControlPolicy, DiscoveryMethod, NetworkConfig, Peer, PeerRole, PeerSet, RoleType,
+        CONNECTION_BACKOFF_BASE, CONNECTIVITY_CHECK_INTERVAL_MS, MAX_CONNECTION_DELAY_MS,
+        MAX_FRAME_SIZE, MAX_FULLNODE_OUTBOUND_CONNECTIONS, MAX_INBOUND_CONNECTIONS,
+        NETWORK_CHANNEL_SIZE,
     },
     network_id::NetworkContext,
 };
@@ -84,6 +85,7 @@ impl NetworkBuilder {
         network_channel_size: usize,
         inbound_connection_limit: usize,
         tcp_buffer_cfg: TCPBufferCfg,
+        access_control_policy: Option<Arc<AccessControlPolicy>>,
     ) -> Self {
         // A network cannot exist without a PeerManager
         // TODO:  construct this in create and pass it to new() as a parameter. The complication is manual construction of NetworkBuilder in various tests.
@@ -100,6 +102,7 @@ impl NetworkBuilder {
             enable_proxy_protocol,
             inbound_connection_limit,
             tcp_buffer_cfg,
+            access_control_policy,
         );
 
         NetworkBuilder {
@@ -139,6 +142,7 @@ impl NetworkBuilder {
             NETWORK_CHANNEL_SIZE,
             MAX_INBOUND_CONNECTIONS,
             TCPBufferCfg::default(),
+            None, /* access_control_policy */
         );
 
         builder.add_connectivity_manager(
@@ -151,6 +155,7 @@ impl NetworkBuilder {
             NETWORK_CHANNEL_SIZE,
             mutual_authentication,
             true, /* enable_latency_aware_dialing */
+            None, /* access_control_policy */
         );
 
         builder
@@ -176,6 +181,9 @@ impl NetworkBuilder {
 
         let network_context = NetworkContext::new(role, config.network_id, peer_id);
 
+        // Wrap the access control policy in an Arc
+        let access_control_policy = config.access_control_policy.clone().map(Arc::new);
+
         let mut network_builder = NetworkBuilder::new(
             chain_id,
             peers_and_metadata.clone(),
@@ -194,6 +202,7 @@ impl NetworkBuilder {
                 config.outbound_rx_buffer_size_bytes,
                 config.outbound_tx_buffer_size_bytes,
             ),
+            access_control_policy.clone(),
         );
 
         network_builder.add_connection_monitoring(
@@ -216,6 +225,7 @@ impl NetworkBuilder {
             config.network_channel_size,
             config.mutual_authentication,
             config.enable_latency_aware_dialing,
+            access_control_policy,
         );
 
         network_builder.discovery_listeners = Some(Vec::new());
@@ -317,6 +327,7 @@ impl NetworkBuilder {
         channel_size: usize,
         mutual_authentication: bool,
         enable_latency_aware_dialing: bool,
+        access_control_policy: Option<Arc<AccessControlPolicy>>,
     ) -> &mut Self {
         let pm_conn_mgr_notifs_rx = self.peer_manager_builder.add_connection_event_listener();
         let outbound_connection_limit = if !self.network_context.network_id().is_validator_network()
@@ -340,6 +351,7 @@ impl NetworkBuilder {
             outbound_connection_limit,
             mutual_authentication,
             enable_latency_aware_dialing,
+            access_control_policy,
         ));
         self
     }

@@ -15,6 +15,7 @@ use aptos_transaction_simulation::{
 use aptos_types::{
     account_address::{create_derived_object_address, AccountAddress},
     fee_statement::FeeStatement,
+    randomness::PerBlockRandomness,
     state_store::{state_key::StateKey, TStateView},
     transaction::{
         AuxiliaryInfo, SignedTransaction, TransactionExecutable, TransactionOutput,
@@ -31,10 +32,11 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
 };
+use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -138,6 +140,11 @@ impl Session {
         let state_store = DeltaStateStore::new_with_base(EitherStateView::Left(EmptyStateView));
         state_store.apply_write_set(GENESIS_CHANGE_SET_HEAD.write_set())?;
 
+        // Patch randomness seed so that transactions using on-chain randomness can be simulated.
+        // In normal block execution, the block prologue sets the seed, but since we're simulating
+        // transactions directly without a block prologue, we need to provide a synthetic seed.
+        Self::patch_randomness_seed(&state_store)?;
+
         // Save delta to file
         let delta_path = session_path.join("delta.json");
         save_delta(&delta_path, &state_store.delta())?;
@@ -149,10 +156,30 @@ impl Session {
         })
     }
 
+    /// Patches the randomness seed in the state store.
+    ///
+    /// This is needed because in simulation mode, there's no block prologue to set the
+    /// `PerBlockRandomness` seed. Without a valid seed, transactions that use on-chain
+    /// randomness APIs will fail when trying to access the seed.
+    fn patch_randomness_seed(state_store: &impl SimulationStateStore) -> Result<()> {
+        let mut seed = vec![0u8; 32];
+        rand::thread_rng().fill_bytes(&mut seed);
+
+        state_store.set_on_chain_config(&PerBlockRandomness {
+            epoch: 0,
+            round: 0,
+            seed: Some(seed),
+        })
+    }
+
     /// Initializes a new session by forking from a remote network state. Data will be fetched
     /// from the remote network on-demand.
     ///
     /// It is strongly recommended that the caller provides an API key to avoid rate limiting.
+    ///
+    /// Note: Unlike local mode, this does NOT patch the randomness seed. If the remote network
+    /// hasn't enabled randomness or the seed is not set, transactions using on-chain randomness
+    /// will fail - which accurately reflects what would happen on the actual network.
     pub fn init_with_remote_state(
         session_path: impl AsRef<Path>,
         node_url: Url,
@@ -175,7 +202,7 @@ impl Session {
         config.save_to_file(&config_path)?;
 
         let delta_path = session_path.join("delta.json");
-        save_delta(&delta_path, &HashMap::new())?;
+        save_delta(&delta_path, &Default::default())?;
 
         let mut builder = Client::builder(AptosBaseUrl::Custom(node_url));
         if let Some(api_key) = api_key {
@@ -558,5 +585,29 @@ async fn test_init_then_load_session_remote() -> Result<()> {
         session_loaded.state_store.delta()
     );
 
+    Ok(())
+}
+
+#[test]
+fn test_local_session_has_randomness_seed() -> Result<()> {
+    let temp_dir = tempfile::tempdir()?;
+    let session_path = temp_dir.path();
+
+    let session = Session::init(session_path)?;
+
+    // Verify that the PerBlockRandomness seed is set (not None)
+    let randomness_config = session
+        .state_store
+        .get_on_chain_config::<PerBlockRandomness>()?;
+
+    assert!(
+        randomness_config.seed.is_some(),
+        "Local session should have randomness seed patched"
+    );
+    assert_eq!(
+        randomness_config.seed.as_ref().unwrap().len(),
+        32,
+        "Randomness seed should be 32 bytes"
+    );
     Ok(())
 }

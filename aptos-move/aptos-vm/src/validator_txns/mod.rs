@@ -32,6 +32,13 @@ impl AptosVM {
                 session_id,
                 jwk_update,
             ),
+            ValidatorTransaction::ChunkyDKGResult(_) => {
+                // TODO: Implement in a future PR
+                Err(VMStatus::error(
+                    move_core_types::vm_status::StatusCode::FEATURE_NOT_ENABLED,
+                    Some("ChunkyDKGResult processing not yet implemented".to_string()),
+                ))
+            },
         }
     }
 }

@@ -191,6 +191,14 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_ast: DumpLevel::EndStage,
             ..config().lang(LanguageVersion::V2_1)
         },
+        TestConfig {
+            name: "macros",
+            runner: |p| run_test(p, get_config_by_name("macros")),
+            include: vec!["/macros/"],
+            exclude: vec![],
+            dump_ast: DumpLevel::EndStage,
+            ..config()
+        },
         // Tests for checking v2 language features only supported if v2
         // language is selected
         TestConfig {

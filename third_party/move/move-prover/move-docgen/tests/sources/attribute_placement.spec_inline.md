@@ -143,7 +143,7 @@
 
 
 <pre><code>#[attr6]
-#[resource_group_member(#[group = 0x1::string::String])]
+#[resource_group_member(#[group = <a href="_String">0x1::string::String</a>])]
 <b>public</b> <b>fun</b> <a href="attribute_placement.md#0x42_M_foo">foo</a>()
 </code></pre>
 

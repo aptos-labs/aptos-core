@@ -17,7 +17,7 @@
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
-<b>use</b> <a href="order_book_types.md#0x7_order_book_types">0x7::order_book_types</a>;
+<b>use</b> <a href="">0x5::order_book_types</a>;
 </code></pre>
 
 
@@ -53,7 +53,7 @@
 
 </dd>
 <dt>
-<code>order_id: <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a></code>
+<code>order_id: <a href="_OrderId">order_book_types::OrderId</a></code>
 </dt>
 <dd>
 
@@ -77,19 +77,19 @@
 
 </dd>
 <dt>
-<code>time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a></code>
+<code>time_in_force: <a href="_TimeInForce">order_book_types::TimeInForce</a></code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>order_type: <a href="order_book_types.md#0x7_order_book_types_OrderType">order_book_types::OrderType</a></code>
+<code>order_type: <a href="_OrderType">order_book_types::OrderType</a></code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;</code>
+<code>trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="_TriggerCondition">order_book_types::TriggerCondition</a>&gt;</code>
 </dt>
 <dd>
 
@@ -115,7 +115,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_new_clearinghouse_order_info">new_clearinghouse_order_info</a>&lt;M: <b>copy</b>, drop&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, is_bid: bool, limit_price: u64, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, order_type: <a href="order_book_types.md#0x7_order_book_types_OrderType">order_book_types::OrderType</a>, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M): <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">market_clearinghouse_order_info::MarketClearinghouseOrderInfo</a>&lt;M&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_new_clearinghouse_order_info">new_clearinghouse_order_info</a>&lt;M: <b>copy</b>, drop&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: <a href="_OrderId">order_book_types::OrderId</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, is_bid: bool, limit_price: u64, time_in_force: <a href="_TimeInForce">order_book_types::TimeInForce</a>, order_type: <a href="_OrderType">order_book_types::OrderType</a>, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M): <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">market_clearinghouse_order_info::MarketClearinghouseOrderInfo</a>&lt;M&gt;
 </code></pre>
 
 
@@ -136,7 +136,15 @@
     metadata: M
 ): <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt; {
     MarketClearinghouseOrderInfo::V1 {
-        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, client_order_id, is_bid, limit_price, time_in_force, order_type, trigger_condition, metadata,
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        order_id,
+        client_order_id,
+        is_bid,
+        limit_price,
+        time_in_force,
+        order_type,
+        trigger_condition,
+        metadata
     }
 }
 </code></pre>
@@ -160,7 +168,9 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_get_account">get_account</a>&lt;M: <b>copy</b> + drop&gt;(self: &<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt;): <b>address</b> {
+<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_get_account">get_account</a>&lt;M: <b>copy</b> + drop&gt;(
+    self: &<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt;
+): <b>address</b> {
     self.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>
 }
 </code></pre>
@@ -175,7 +185,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_get_order_id">get_order_id</a>&lt;M: <b>copy</b>, drop&gt;(self: &<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">market_clearinghouse_order_info::MarketClearinghouseOrderInfo</a>&lt;M&gt;): <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>
+<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_get_order_id">get_order_id</a>&lt;M: <b>copy</b>, drop&gt;(self: &<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">market_clearinghouse_order_info::MarketClearinghouseOrderInfo</a>&lt;M&gt;): <a href="_OrderId">order_book_types::OrderId</a>
 </code></pre>
 
 
@@ -184,7 +194,9 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_get_order_id">get_order_id</a>&lt;M: <b>copy</b> + drop&gt;(self: &<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt;): OrderId {
+<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_get_order_id">get_order_id</a>&lt;M: <b>copy</b> + drop&gt;(
+    self: &<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt;
+): OrderId {
     self.order_id
 }
 </code></pre>
@@ -208,7 +220,9 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_is_bid">is_bid</a>&lt;M: <b>copy</b> + drop&gt;(self: &<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt;): bool {
+<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_is_bid">is_bid</a>&lt;M: <b>copy</b> + drop&gt;(
+    self: &<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt;
+): bool {
     self.is_bid
 }
 </code></pre>
@@ -232,7 +246,9 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_get_client_order_id">get_client_order_id</a>&lt;M: <b>copy</b> + drop&gt;(self: &<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt;): Option&lt;String&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_get_client_order_id">get_client_order_id</a>&lt;M: <b>copy</b> + drop&gt;(
+    self: &<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt;
+): Option&lt;String&gt; {
     self.client_order_id
 }
 </code></pre>
@@ -256,7 +272,9 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_get_metadata">get_metadata</a>&lt;M: <b>copy</b> + drop&gt;(self: &<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt;): &M {
+<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_get_metadata">get_metadata</a>&lt;M: <b>copy</b> + drop&gt;(
+    self: &<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt;
+): &M {
     &self.metadata
 }
 </code></pre>
@@ -271,7 +289,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_into_inner">into_inner</a>&lt;M: <b>copy</b>, drop&gt;(self: <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">market_clearinghouse_order_info::MarketClearinghouseOrderInfo</a>&lt;M&gt;): (<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, bool, u64, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, <a href="order_book_types.md#0x7_order_book_types_OrderType">order_book_types::OrderType</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, M)
+<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_into_inner">into_inner</a>&lt;M: <b>copy</b>, drop&gt;(self: <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">market_clearinghouse_order_info::MarketClearinghouseOrderInfo</a>&lt;M&gt;): (<b>address</b>, <a href="_OrderId">order_book_types::OrderId</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, bool, u64, <a href="_TimeInForce">order_book_types::TimeInForce</a>, <a href="_OrderType">order_book_types::OrderType</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, M)
 </code></pre>
 
 
@@ -280,7 +298,19 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_into_inner">into_inner</a>&lt;M: <b>copy</b> + drop&gt;(self: <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt;): (<b>address</b>, OrderId, Option&lt;String&gt;, bool, u64, TimeInForce, OrderType, Option&lt;TriggerCondition&gt;, M) {
+<pre><code><b>public</b> <b>fun</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_into_inner">into_inner</a>&lt;M: <b>copy</b> + drop&gt;(
+    self: <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">MarketClearinghouseOrderInfo</a>&lt;M&gt;
+): (
+    <b>address</b>,
+    OrderId,
+    Option&lt;String&gt;,
+    bool,
+    u64,
+    TimeInForce,
+    OrderType,
+    Option&lt;TriggerCondition&gt;,
+    M
+) {
     <b>let</b> MarketClearinghouseOrderInfo::V1 {
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
         order_id,
@@ -290,9 +320,19 @@
         time_in_force,
         order_type,
         trigger_condition,
-        metadata,
+        metadata
     } = self;
-    (<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, client_order_id, is_bid, limit_price, time_in_force, order_type, trigger_condition, metadata)
+    (
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        order_id,
+        client_order_id,
+        is_bid,
+        limit_price,
+        time_in_force,
+        order_type,
+        trigger_condition,
+        metadata
+    )
 }
 </code></pre>
 

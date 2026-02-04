@@ -311,6 +311,28 @@ BlockMetadataExt:
       V1:
         NEWTYPE:
           TYPENAME: BlockMetadataWithRandomness
+    2:
+      V2:
+        NEWTYPE:
+          TYPENAME: BlockMetadataWithRandAndDecKey
+BlockMetadataWithRandAndDecKey:
+  STRUCT:
+    - id:
+        TYPENAME: HashValue
+    - epoch: U64
+    - round: U64
+    - proposer:
+        TYPENAME: AccountAddress
+    - previous_block_votes_bitvec: BYTES
+    - failed_proposer_indices:
+        SEQ: U32
+    - timestamp_usecs: U64
+    - randomness:
+        OPTION:
+          TYPENAME: Randomness
+    - decryption_key:
+        OPTION:
+          TYPENAME: BlockTxnDecryptionKey
 BlockMetadataWithRandomness:
   STRUCT:
     - id:
@@ -367,6 +389,11 @@ BlockRetrievalStatus:
       NotEnoughBlocks: UNIT
     3:
       SucceededWithTarget: UNIT
+BlockTxnDecryptionKey:
+  STRUCT:
+    - metadata:
+        TYPENAME: DecKeyMetadata
+    - decryption_key: BYTES
 BlockType:
   ENUM:
     0:
@@ -399,6 +426,13 @@ BlockType:
       OptimisticProposal:
         NEWTYPE:
           TYPENAME: OptBlockBody
+CertifiedAggregatedChunkySubtranscript:
+  STRUCT:
+    - metadata:
+        TYPENAME: DKGTranscriptMetadata
+    - transcript_bytes: BYTES
+    - signature:
+        TYPENAME: AggregateSignature
 ChainId:
   NEWTYPESTRUCT: U8
 ChangeSet:
@@ -588,6 +622,10 @@ DKGTranscriptMetadata:
     - epoch: U64
     - author:
         TYPENAME: AccountAddress
+DecKeyMetadata:
+  STRUCT:
+    - epoch: U64
+    - round: U64
 DeprecatedPayload:
   STRUCT:
     - dummy_value: U64
@@ -1507,6 +1545,10 @@ ValidatorTransaction:
       ObservedJWKUpdate:
         NEWTYPE:
           TYPENAME: QuorumCertifiedUpdate
+    2:
+      ChunkyDKGResult:
+        NEWTYPE:
+          TYPENAME: CertifiedAggregatedChunkySubtranscript
 ValidatorVerifier:
   STRUCT:
     - validator_infos:

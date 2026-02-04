@@ -2,6 +2,11 @@
 ============ disassembled file-format ==================
 // Bytecode version v10
 module 0xc0ffee::m
+enum Option<T0> has drop
+  None
+  Some
+    value: T0
+
 struct Box has drop
   x: u64
 
@@ -33,11 +38,6 @@ enum Inner
     x: u64
     y: u64
 
-enum Option<T0> has drop
-  None
-  Some
-    value: T0
-
 enum Outer
   None
   One
@@ -47,6 +47,31 @@ enum Outer
     b: Box
 
 // Function definition at index 0
+#[persistent] public fun is_some<T0>(l0: &Option<T0>): bool
+    local l1: bool
+    copy_loc l0
+    test_variant Option<T0>, None
+    br_false l0
+    move_loc l0
+    pop
+    // @5
+    ld_false
+    st_loc l1
+    branch l1
+l0: move_loc l0
+    test_variant Option<T0>, Some
+    // @10
+    br_false l2
+    ld_true
+    st_loc l1
+    branch l1
+l2: ld_u64 14566554180833181697
+    // @15
+    abort
+l1: move_loc l1
+    ret
+
+// Function definition at index 1
 #[persistent] public fun inner_value(l0: Inner): u64
     local l1: &Inner
     local l2: u64
@@ -85,35 +110,10 @@ l2: ld_u64 14566554180833181697
 l1: move_loc l2
     ret
 
-// Function definition at index 1
+// Function definition at index 2
 #[persistent] public fun is_inner1(l0: &Inner): bool
     move_loc l0
     test_variant Inner, Inner1
-    ret
-
-// Function definition at index 2
-#[persistent] public fun is_some<T0>(l0: &Option<T0>): bool
-    local l1: bool
-    copy_loc l0
-    test_variant Option<T0>, None
-    br_false l0
-    move_loc l0
-    pop
-    // @5
-    ld_false
-    st_loc l1
-    branch l1
-l0: move_loc l0
-    test_variant Option<T0>, Some
-    // @10
-    br_false l2
-    ld_true
-    st_loc l1
-    branch l1
-l2: ld_u64 14566554180833181697
-    // @15
-    abort
-l1: move_loc l1
     ret
 
 // Function definition at index 3

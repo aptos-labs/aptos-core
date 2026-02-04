@@ -3,3 +3,4 @@
 pub mod fptx_smoke;
 pub mod fptx_succinct_smoke;
 pub mod fptx_weighted_smoke;
+pub mod typescript;

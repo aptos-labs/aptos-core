@@ -3,8 +3,8 @@
 
 use crate::{
     dkg::{
-        real_dkg::rounding::DKGRounding, DKGSessionMetadata, DKGTrait, MayHaveRoundingSummary,
-        RoundingSummary,
+        randomness_dkg::{DKGSessionMetadata, DKGTrait, MayHaveRoundingSummary, RoundingSummary},
+        real_dkg::rounding::DKGRounding,
     },
     on_chain_config::OnChainRandomnessConfig,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},

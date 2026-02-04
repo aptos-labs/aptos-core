@@ -906,6 +906,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.config.quorum_store.enable_opt_quorum_store,
             self.config.quorum_store.opt_qs_minimum_batch_age_usecs,
             failures_tracker.clone(),
+            self.config.quorum_store.enable_opt_qs_v2_payload_tx,
         ));
 
         info!(epoch = epoch, "Create ProposalGenerator");
@@ -1575,7 +1576,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .ok_or_else(|| anyhow::anyhow!("Epoch state is not available"))?;
             let proof_cache = self.proof_cache.clone();
             let quorum_store_enabled = self.quorum_store_enabled;
-            let opt_qs_v2_rx_enabled = self.config.quorum_store.enable_opt_qs_v2_rx;
+            let opt_qs_v2_rx_enabled = self.config.quorum_store.enable_opt_qs_v2_payload_rx;
             let quorum_store_msg_tx = self.quorum_store_msg_tx.clone();
             let buffered_proposal_tx = self.buffered_proposal_tx.clone();
             let round_manager_tx = self.round_manager_tx.clone();
@@ -1641,9 +1642,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             | ConsensusMsg::CommitVoteMsg(_)
             | ConsensusMsg::CommitDecisionMsg(_)
             | ConsensusMsg::BatchMsg(_)
+            | ConsensusMsg::BatchMsgV2(_)
             | ConsensusMsg::BatchRequestMsg(_)
             | ConsensusMsg::SignedBatchInfo(_)
-            | ConsensusMsg::ProofOfStoreMsg(_) => {
+            | ConsensusMsg::SignedBatchInfoMsgV2(_)
+            | ConsensusMsg::ProofOfStoreMsg(_)
+            | ConsensusMsg::ProofOfStoreMsgV2(_) => {
                 let event: UnverifiedEvent = msg.into();
                 if event.epoch()? == self.epoch() {
                     return Ok(Some(event));
@@ -1706,6 +1710,24 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     Ok(true) // This states that we shouldn't filter out the event
                 } else if self.recovery_mode {
                     Ok(false) // This states that we should filter out the event, but without an error
+                } else {
+                    Err(anyhow::anyhow!(
+                        "Quorum store is not enabled locally, but received msg from sender: {}",
+                        peer_id,
+                    ))
+                }
+            },
+            UnverifiedEvent::BatchMsgV2(_)
+            | UnverifiedEvent::SignedBatchInfoMsgV2(_)
+            | UnverifiedEvent::ProofOfStoreMsgV2(_) => {
+                if self.quorum_store_enabled {
+                    ensure!(
+                        self.config.quorum_store.enable_batch_v2_rx,
+                        "Handling Batch V2 is not enabled"
+                    );
+                    Ok(true)
+                } else if self.recovery_mode {
+                    Ok(false)
                 } else {
                     Err(anyhow::anyhow!(
                         "Quorum store is not enabled locally, but received msg from sender: {}",

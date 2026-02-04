@@ -187,7 +187,7 @@ impl ProofManager {
 
         let response = if let Some(ref params) = request.maybe_optqs_payload_pull_params {
             // Determine whether to use V2 payload based on the flag
-            if params.use_batch_v2 {
+            if params.enable_opt_qs_v2_payload {
                 // Keep BatchInfoExt for V2
                 Payload::OptQuorumStore(OptQuorumStorePayload::new_v2(
                     inline_block.into(),
@@ -207,9 +207,13 @@ impl ProofManager {
                     .collect();
                 let proof_block_v1: Vec<_> = proof_block
                     .into_iter()
-                    .map(|proof| {
-                        let (info, sig) = proof.unpack();
-                        ProofOfStore::new(info.info().clone(), sig)
+                    .filter_map(|proof| {
+                        if !proof.is_v2() {
+                            let (info, sig) = proof.unpack();
+                            Some(ProofOfStore::new(info.info().clone(), sig))
+                        } else {
+                            None
+                        }
                     })
                     .collect();
                 Payload::OptQuorumStore(OptQuorumStorePayload::new(
