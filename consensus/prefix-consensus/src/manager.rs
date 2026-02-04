@@ -480,11 +480,13 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
     /// Write output to file for smoke test validation
     async fn write_output_file(&self) -> anyhow::Result<()> {
         use serde::{Serialize, Deserialize};
+        use std::io::Write;
 
         #[derive(Serialize, Deserialize)]
         struct OutputFile {
             party_id: String,
             epoch: u64,
+            input: Vec<String>,
             v_low: Vec<String>,
             v_high: Vec<String>,
         }
@@ -492,13 +494,17 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
         let output = self.get_output().await
             .ok_or_else(|| anyhow::anyhow!("Protocol not complete"))?;
 
+        let input_vector = self.protocol.get_input_vector();
+
         let output_file = OutputFile {
             party_id: format!("{:x}", self.party_id),
             epoch: self.epoch,
+            input: input_vector.iter().map(|h| h.to_hex()).collect(),
             v_low: output.v_low.iter().map(|h| h.to_hex()).collect(),
             v_high: output.v_high.iter().map(|h| h.to_hex()).collect(),
         };
 
+        // Write to individual file per validator in /tmp/
         let file_path = format!("/tmp/prefix_consensus_output_{:x}.json", self.party_id);
         let json = serde_json::to_string_pretty(&output_file)?;
         std::fs::write(&file_path, json)?;

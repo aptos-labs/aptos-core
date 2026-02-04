@@ -114,6 +114,11 @@ impl PrefixConsensusProtocol {
         self.output.read().await.clone()
     }
 
+    /// Get the input vector
+    pub fn get_input_vector(&self) -> &PrefixVector {
+        &self.input.input_vector
+    }
+
     // ========================================================================
     // Round 1: Voting on inputs
     // ========================================================================
@@ -162,12 +167,6 @@ impl PrefixConsensusProtocol {
 
     /// Process an incoming Vote1
     pub async fn process_vote1(&self, vote: Vote1) -> Result<Option<QC1>> {
-        let state = self.state.read().await.clone();
-        if state != ProtocolState::Round1 {
-            bail!("Not in Round 1, ignoring Vote1");
-        }
-        drop(state);
-
         // Verify vote
         verify_vote1(&vote)?;
 
@@ -287,12 +286,6 @@ impl PrefixConsensusProtocol {
 
     /// Process an incoming Vote2
     pub async fn process_vote2(&self, vote: Vote2) -> Result<Option<QC2>> {
-        let state = self.state.read().await.clone();
-        if state != ProtocolState::Round2 {
-            bail!("Not in Round 2, ignoring Vote2");
-        }
-        drop(state);
-
         // Verify vote
         verify_vote2(&vote, self.input.f, self.input.n)?;
 
@@ -411,12 +404,6 @@ impl PrefixConsensusProtocol {
 
     /// Process an incoming Vote3
     pub async fn process_vote3(&self, vote: Vote3) -> Result<Option<PrefixConsensusOutput>> {
-        let state = self.state.read().await.clone();
-        if state != ProtocolState::Round3 {
-            bail!("Not in Round 3, ignoring Vote3");
-        }
-        drop(state);
-
         // Verify vote
         verify_vote3(&vote, self.input.f, self.input.n)?;
 
@@ -526,7 +513,8 @@ impl PrefixConsensusProtocol {
 mod tests {
     use super::*;
     use crate::types::PartyId;
-    use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, Uniform};
+    use aptos_crypto::HashValue;
+    use aptos_types::validator_signer::ValidatorSigner;
 
     fn hash(i: u64) -> HashValue {
         HashValue::sha3_256_of(&i.to_le_bytes())
@@ -548,8 +536,8 @@ mod tests {
 
         assert_eq!(protocol.get_state().await, ProtocolState::NotStarted);
 
-        let private_key = Ed25519PrivateKey::generate_for_testing();
-        protocol.start_round1(&private_key).await.unwrap();
+        let signer = ValidatorSigner::random(None);
+        protocol.start_round1(&signer).await.unwrap();
 
         assert_eq!(protocol.get_state().await, ProtocolState::Round1);
     }
@@ -559,8 +547,8 @@ mod tests {
         let input = create_test_input(0, vec![hash(1), hash(2)], 4, 1);
         let protocol = PrefixConsensusProtocol::new(input);
 
-        let private_key = Ed25519PrivateKey::generate_for_testing();
-        protocol.start_round1(&private_key).await.unwrap();
+        let signer = ValidatorSigner::random(None);
+        protocol.start_round1(&signer).await.unwrap();
 
         // Need 3 votes for quorum (n=4, f=1, quorum=3)
         let (count1, _, _) = protocol.get_vote_counts().await;

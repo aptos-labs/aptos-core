@@ -27,7 +27,7 @@ async fn test_prefix_consensus_identical_inputs() {
     println!("Test input ({} hashes): {:?}", test_input.len(), test_input_hex);
 
     // Build swarm with 4 validators, all configured with same input
-    let mut swarm = SwarmBuilder::new_local(4)
+    let swarm = SwarmBuilder::new_local(4)
         .with_init_config(Arc::new(move |_, config, _| {
             // Configure prefix consensus test input
             config.consensus.prefix_consensus_test_input = Some(test_input_hex.clone());
@@ -41,7 +41,7 @@ async fn test_prefix_consensus_identical_inputs() {
     println!("Validator peer IDs: {:?}", peer_ids);
 
     // Clean up any old output files
-    cleanup_output_files(&peer_ids);
+    cleanup_output_files(swarm.dir(), &peer_ids);
 
     // Swarm is already launched by build(). Prefix consensus will start on epoch startup.
     println!("Swarm launched successfully");
@@ -49,7 +49,7 @@ async fn test_prefix_consensus_identical_inputs() {
     // Wait for all validators to complete and write output files
     // Protocol should complete in ~5-10 seconds, using 30s timeout for safety
     println!("Waiting for prefix consensus to complete...");
-    let outputs = wait_for_prefix_consensus_outputs(&peer_ids, Duration::from_secs(30))
+    let outputs = wait_for_prefix_consensus_outputs(swarm.dir(), &peer_ids, Duration::from_secs(30))
         .await
         .expect("Failed to get prefix consensus outputs");
 
@@ -57,6 +57,7 @@ async fn test_prefix_consensus_identical_inputs() {
     for (i, output) in outputs.iter().enumerate() {
         println!("\nValidator {} (peer_id: {}):", i, output.party_id);
         println!("  Epoch: {}", output.epoch);
+        println!("  Input: {:?}", output.input);
         println!("  v_low: {:?}", output.v_low);
         println!("  v_high: {:?}", output.v_high);
     }
@@ -156,5 +157,5 @@ async fn test_prefix_consensus_identical_inputs() {
     println!("\n=== Test PASSED ===");
 
     // Cleanup
-    cleanup_output_files(&peer_ids);
+    cleanup_output_files(swarm.dir(), &peer_ids);
 }

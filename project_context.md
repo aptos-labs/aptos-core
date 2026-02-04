@@ -151,7 +151,7 @@ QC3 complete → Exit loop
 
 ---
 
-### Phase 6: Smoke Test & Bug Fixes (🔄 IN PROGRESS)
+### Phase 6: Smoke Test & Bug Fixes (✅ COMPLETE)
 
 **Date**: 2026-02-03/04
 
@@ -165,6 +165,7 @@ QC3 complete → Exit loop
    - Basic test: `test_prefix_consensus_identical_inputs` (4 validators, identical inputs)
    - Test triggers protocol via config: `consensus.prefix_consensus_test_input`
    - Validators write output to `/tmp/prefix_consensus_output_{party_id}.json`
+   - Output format includes: party_id, epoch, input (validator's input vector), v_low, v_high
 
 2. **Fixed Signature Verification** (✅ Complete)
    - **Problem**: Protocol used dummy BLS signatures that failed verification
@@ -182,84 +183,72 @@ QC3 complete → Exit loop
 4. **Added Output File Writing** (✅ Complete)
    - **Problem**: Protocol completed but no output files for test validation
    - **Fix**: Added `write_output_file()` method in `manager.rs` that writes JSON to `/tmp/`
-   - Writes after QC3 formation with v_low, v_high, epoch, party_id
+   - Writes after QC3 formation with input, v_low, v_high, epoch, party_id
+   - Added `get_input_vector()` method to `PrefixConsensusProtocol` for output file generation
+
+5. **Fixed Race Condition** (✅ Complete)
+   - **Problem**: 1/4 validators would get stuck due to early message rejection (75% success rate)
+   - **Root Cause**: Strict state checks in `process_vote1/2/3()` rejected votes received early
+   - **Example**: Vote2 arrives while validator still in Round1 → rejected → validator never forms QC2
+   - **Solution**: Removed strict state checks from `protocol.rs` lines 165-169, 290-294, 414-418
+   - **Rationale**: Votes are self-contained with embedded certificates (Vote2 has QC1, Vote3 has QC2), so validation logic already checks dependencies - no need for redundant state checks
+   - **Result**: ✅ 100% success rate (all 4 validators complete protocol consistently)
 
 **Files Modified**:
-- `consensus/prefix-consensus/src/protocol.rs` - Real BLS signatures
-- `consensus/prefix-consensus/src/manager.rs` - ValidatorSigner, output writing
+- `consensus/prefix-consensus/src/protocol.rs` - Real BLS signatures, removed strict state checks, added get_input_vector()
+- `consensus/prefix-consensus/src/manager.rs` - ValidatorSigner, output writing with input field
 - `consensus/src/network.rs` - PrefixConsensusMsg routing
 - `testsuite/smoke-test/Cargo.toml` - Added prefix-consensus dependency
 - `testsuite/smoke-test/src/consensus/mod.rs` - Added prefix_consensus module
 - `testsuite/smoke-test/src/consensus/prefix_consensus/mod.rs` - Module structure
-- `testsuite/smoke-test/src/consensus/prefix_consensus/helpers.rs` - Test helpers
+- `testsuite/smoke-test/src/consensus/prefix_consensus/helpers.rs` - Test helpers with input field parsing
 - `testsuite/smoke-test/src/consensus/prefix_consensus/basic_test.rs` - Smoke test
 
-**Current Test Results**:
+**Test Results**:
 - ✅ Protocol runs successfully through all 3 rounds
-- ✅ QC1, QC2, QC3 formation works
-- ✅ Output files written correctly (v_low and v_high match expectations)
-- ⚠️  **Intermittent Issue**: 3/4 validators complete (75% success rate)
+- ✅ QC1, QC2, QC3 formation works correctly
+- ✅ All 4 validators complete consistently (100% success rate)
+- ✅ Output files written correctly with input, v_low, v_high
+- ✅ Property verification: Upper Bound (v_low ⪯ v_high), Validity (mcp(inputs) ⪯ v_low), Consistency (all validators agree)
 
-**Known Issue - Race Condition**:
-- **Symptom**: 1 validator gets stuck in Round 2, never forms QC2
-- **Root Cause**: Early message rejection - Vote2 arrives before validator enters Round 2
-- **Example Timeline**:
-  ```
-  T=50ms: Fast validators form QC1, broadcast Vote2
-  T=52ms: Slow validator receives Vote2 while still in Round1 → REJECTED "Not in Round 2"
-  T=55ms: Slow validator forms QC1, enters Round2
-  T=56ms: Slow validator only has 1 Vote2 (its own) → stuck at vote_count=1/3
-  ```
-- **Location**: `protocol.rs` lines 163, 289, 413 - strict state checks reject early votes
-- **Impact**: Test fails intermittently (need message buffering to fix)
-
-**Next Steps**:
-- Implement message buffering for early votes (allow Vote2 in Round1, process when ready)
-- OR: Remove strict state checks (process votes in any state)
-- Add retransmission mechanism (complex alternative)
+**Manual Verification**:
+```bash
+ls -la /tmp/prefix_consensus_output_*.json
+cat /tmp/prefix_consensus_output_*.json | jq '.'
+```
 
 ---
 
 ## Current Status (February 4, 2026)
 
-### ✅ Completed Phases (5/11)
+### ✅ Completed Phases (6/11)
 1. **Phase 1**: Serialization & BLS signatures
 2. **Phase 2**: Network message types
 3. **Phase 3**: Network adapter
 4. **Phase 4**: PrefixConsensusManager
 5. **Phase 5**: EpochManager integration
-
-### 🔄 In Progress
-**Phase 6**: Smoke Test & Bug Fixes
-- ✅ Test infrastructure created
-- ✅ Signature verification fixed (real BLS)
-- ✅ Network routing fixed
-- ✅ Output file writing implemented
-- ⚠️  Race condition identified (early message rejection)
+6. **Phase 6**: Smoke Test & Bug Fixes
 
 ### ⏳ Remaining Phases (7-11)
-7. **Message Buffering** (fix race condition - buffer early votes)
-8. **Complete Smoke Tests** (ensure 100% pass rate)
-9. **Fault Tolerance Tests** (silent validator, Byzantine behavior)
-10. **Additional Test Cases** (overlapping/divergent inputs)
+7. **Additional Smoke Tests** (ensure robustness across scenarios)
+8. **Fault Tolerance Tests** (silent validator, Byzantine behavior)
+9. **Additional Test Cases** (overlapping/divergent inputs)
+10. **Performance & Optimization** (metrics, logging improvements)
 11. **Documentation** (README, API docs, examples)
 
 ### Repository State
 - **Branch**: `prefix-consensus-prototype`
-- **HEAD**: `45dec59b91` (about to commit Phase 6 progress)
-- **Status**: Modified files (smoke test + bug fixes, ready to commit)
-- **Tests**: 74/74 unit tests passing, smoke test 75% success rate
+- **HEAD**: About to commit Phase 6 completion
+- **Status**: Modified files (race condition fix + input field), ready to commit
+- **Tests**: 74/74 unit tests passing, smoke test 100% success rate
 - **Build**: ✅ All build issues resolved
 
 ### Progress
 - **Overall**: Phase 6/11 (~55%)
-- **Time Spent**: ~15 hours total (Phase 6: 3h debugging + fixes)
+- **Time Spent**: ~16 hours total (Phase 6: 4h debugging + fixes + verification enhancements)
 
 ### Next Action
-**Decision Point**: Choose approach to fix race condition:
-1. Add message buffering (store early votes, process when ready)
-2. Remove strict state checks (process votes anytime)
-3. Add retransmission mechanism
+**Phase 7**: Create additional smoke tests for edge cases and different input scenarios
 
 ---
 
@@ -272,19 +261,24 @@ consensus/prefix-consensus/
 │   ├── utils.rs              - mcp/mce prefix operations (180 lines)
 │   ├── certify.rs            - QC1/2/3Certify functions with trie (220 lines)
 │   ├── verification.rs       - Vote/QC verification (150 lines)
-│   ├── protocol.rs           - 3-round state machine (380 lines)
+│   ├── protocol.rs           - 3-round state machine (490 lines)
 │   ├── signing.rs            - BLS sign/verify helpers (184 lines)
 │   ├── network_messages.rs   - PrefixConsensusMsg enum (443 lines)
 │   ├── network_interface.rs  - Network adapter (224 lines)
-│   └── manager.rs            - Event-driven manager (658 lines)
+│   └── manager.rs            - Event-driven manager (538 lines)
 └── Cargo.toml
 
 consensus/src/
 ├── epoch_manager.rs          - Integration point (start_prefix_consensus)
 └── network_interface.rs      - ConsensusMsg enum (PrefixConsensusMsg variant)
+
+testsuite/smoke-test/src/consensus/prefix_consensus/
+├── mod.rs                    - Module declarations
+├── helpers.rs                - Test helpers (150 lines)
+└── basic_test.rs             - Identical inputs smoke test (162 lines)
 ```
 
-**Total LOC**: ~2800 lines (implementation + tests)
+**Total LOC**: ~3100 lines (implementation + tests + smoke tests)
 
 ---
 

@@ -10,7 +10,7 @@ use anyhow::{bail, Result};
 use aptos_crypto::HashValue;
 use aptos_sdk::types::PeerId;
 use serde::{Deserialize, Serialize};
-use std::{path::Path, time::Duration};
+use std::time::Duration;
 
 /// Generate deterministic test hashes
 ///
@@ -27,11 +27,20 @@ pub fn generate_test_hashes(count: usize) -> Vec<HashValue> {
 pub struct PrefixConsensusOutputFile {
     pub party_id: String,
     pub epoch: u64,
+    pub input: Vec<String>,  // Hex-encoded hashes (party's input vector)
     pub v_low: Vec<String>,  // Hex-encoded hashes
     pub v_high: Vec<String>, // Hex-encoded hashes
 }
 
 impl PrefixConsensusOutputFile {
+    /// Parse input hashes from hex strings
+    pub fn input_hashes(&self) -> Result<Vec<HashValue>> {
+        self.input
+            .iter()
+            .map(|hex| HashValue::from_hex(hex).map_err(|e| anyhow::anyhow!("Invalid hex: {}", e)))
+            .collect()
+    }
+
     /// Parse v_low hashes from hex strings
     pub fn v_low_hashes(&self) -> Result<Vec<HashValue>> {
         self.v_low
@@ -49,67 +58,61 @@ impl PrefixConsensusOutputFile {
     }
 }
 
-/// Wait for all validators to write their prefix consensus output files
+/// Wait for all validators to write to the shared prefix consensus output file
 ///
-/// Polls the filesystem for output files from all validators, returning when
-/// all files exist or timing out if they don't appear in time.
+/// Polls the filesystem for the shared output file in /tmp/, waiting until all expected
+/// validator outputs appear in the file or timing out.
 ///
 /// # Arguments
+/// * `_swarm_dir` - The swarm's root directory (unused, kept for API compatibility)
 /// * `peer_ids` - List of validator peer IDs to wait for
 /// * `timeout` - Maximum time to wait for all outputs
 ///
 /// # Returns
-/// Vector of parsed outputs in same order as peer_ids, or error if timeout
+/// Vector of parsed outputs, or error if timeout
 pub async fn wait_for_prefix_consensus_outputs(
+    _swarm_dir: &std::path::Path,
     peer_ids: &[PeerId],
     timeout: Duration,
 ) -> Result<Vec<PrefixConsensusOutputFile>> {
     let start_time = std::time::Instant::now();
+    let shared_file = "/tmp/prefix_consensus_results.jsonl";
 
     loop {
-        let mut all_outputs = Vec::new();
-        let mut all_exist = true;
-
-        for peer_id in peer_ids {
-            let output_file = format!("/tmp/prefix_consensus_output_{}.json", peer_id);
-
-            if let Ok(contents) = std::fs::read_to_string(&output_file) {
-                match serde_json::from_str::<PrefixConsensusOutputFile>(&contents) {
-                    Ok(output) => {
-                        all_outputs.push(output);
-                        continue;
-                    }
+        // Try to read the shared file
+        if let Ok(contents) = std::fs::read_to_string(shared_file) {
+            // Parse newline-delimited JSON
+            let mut outputs = Vec::new();
+            for line in contents.lines() {
+                if line.trim().is_empty() {
+                    continue;
+                }
+                match serde_json::from_str::<PrefixConsensusOutputFile>(line) {
+                    Ok(output) => outputs.push(output),
                     Err(e) => {
-                        // File exists but invalid JSON - might be mid-write, continue polling
-                        eprintln!("Output file {} has invalid JSON (might be incomplete): {}", output_file, e);
+                        eprintln!("Failed to parse line in {}: {}", shared_file, e);
                     }
                 }
             }
 
-            // File doesn't exist or has invalid JSON
-            all_exist = false;
-            break;
-        }
-
-        if all_exist && all_outputs.len() == peer_ids.len() {
-            return Ok(all_outputs);
+            // Check if we have all expected outputs
+            if outputs.len() >= peer_ids.len() {
+                return Ok(outputs);
+            }
         }
 
         // Check timeout
         if start_time.elapsed() >= timeout {
-            let missing: Vec<_> = peer_ids
-                .iter()
-                .filter(|peer_id| {
-                    let output_file = format!("/tmp/prefix_consensus_output_{}.json", peer_id);
-                    !Path::new(&output_file).exists()
-                })
-                .collect();
+            let count = std::fs::read_to_string(shared_file)
+                .ok()
+                .map(|c| c.lines().filter(|l| !l.trim().is_empty()).count())
+                .unwrap_or(0);
 
             bail!(
-                "Timeout waiting for prefix consensus outputs. Missing {} out of {} validators: {:?}",
-                missing.len(),
+                "Timeout waiting for prefix consensus outputs. Got {} out of {} validators in {}",
+                count,
                 peer_ids.len(),
-                missing
+                shared_file
             );
         }
 
@@ -118,12 +121,10 @@ pub async fn wait_for_prefix_consensus_outputs(
     }
 }
 
-/// Clean up output files from a previous test run
-pub fn cleanup_output_files(peer_ids: &[PeerId]) {
-    for peer_id in peer_ids {
-        let output_file = format!("/tmp/prefix_consensus_output_{}.json", peer_id);
-        let _ = std::fs::remove_file(&output_file);
-    }
+/// Clean up the shared output file from a previous test run
+pub fn cleanup_output_files(_swarm_dir: &std::path::Path, _peer_ids: &[PeerId]) {
+    let shared_file = "/tmp/prefix_consensus_results.jsonl";
+    let _ = std::fs::remove_file(shared_file);
 }
 
 #[cfg(test)]
