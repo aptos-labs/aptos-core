@@ -353,7 +353,10 @@ mod test {
     use super::*;
     use claims::{assert_err, assert_ok};
     use move_core_types::{account_address::AccountAddress, identifier::Identifier};
-    use move_vm_types::code::{mock_deserialized_code, mock_verified_code, MockExtension};
+    use move_vm_types::code::{
+        mock_deserialized_code, mock_verified_code, MockDeserializedCode, MockExtension,
+        MockVerifiedCode,
+    };
 
     #[test]
     fn test_entry_new() {
@@ -465,7 +468,7 @@ mod test {
     }
 
     fn module_id(name: &str) -> ModuleId {
-        ModuleId::new(AccountAddress::random(), Identifier::new(name).unwrap())
+        ModuleId::new(AccountAddress::ONE, Identifier::new(name).unwrap())
     }
 
     #[test]
@@ -479,7 +482,9 @@ mod test {
         let key3 = StructKey::struct_key_for_testing(3);
         let layout3 = LayoutCacheEntry::new_for_testing([module_id("a"), module_id("b")]);
 
-        let cache = GlobalModuleCache::empty();
+        let cache =
+            GlobalModuleCache::<u32, MockDeserializedCode, MockVerifiedCode, MockExtension>::empty(
+            );
         cache.store_struct_layout_entry(&key1, layout1).unwrap();
         cache.store_struct_layout_entry(&key2, layout2).unwrap();
         cache.store_struct_layout_entry(&key3, layout3).unwrap();
@@ -549,7 +554,9 @@ mod test {
         let key3 = StructKey::struct_key_for_testing(3);
         let layout3 = LayoutCacheEntry::new_for_testing([module_id("a"), module_id("b")]);
 
-        let cache = GlobalModuleCache::empty();
+        let cache =
+            GlobalModuleCache::<u32, MockDeserializedCode, MockVerifiedCode, MockExtension>::empty(
+            );
         cache.store_struct_layout_entry(&key1, layout1).unwrap();
         cache.store_struct_layout_entry(&key2, layout2).unwrap();
         cache.store_struct_layout_entry(&key3, layout3).unwrap();
