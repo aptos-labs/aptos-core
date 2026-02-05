@@ -1,0 +1,51 @@
+# Docker Compose configuration for local validator testing
+#
+# Usage:
+#   1. Copy genesis.blob, waypoint.txt, and validator.yaml to ./config/
+#   2. Run: docker compose up -d
+#   3. Access REST API at http://localhost:8080/v1
+#
+# Configuration:
+#   - CONFIG_DIR: Path to configuration directory (default: ./config)
+#   - RUST_LOG: Rust logging level (default: info)
+#
+# Example with Justfile:
+#   just start-local-validator
+#   just validator-logs
+#   just stop-local-validator
+
+services:
+  validator:
+    image: ${APTOS_IMAGE:-ghcr.io/movementlabsxyz/aptos-node:latest}
+    container_name: aptos-validator
+    restart: unless-stopped
+    ports:
+      - "8080:8080"   # REST API
+      - "6180:6180"   # Validator network
+      - "6181:6181"   # Full node network
+      - "9101:9101"   # Metrics
+    volumes:
+      - ${CONFIG_DIR:-./config}:/config:ro
+      - validator-data:/opt/data/aptos
+    environment:
+      - RUST_LOG=${RUST_LOG:-info}
+      - RUST_BACKTRACE=${RUST_BACKTRACE:-1}
+    command:
+      - --config
+      - /config/validator.yaml
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/v1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
+
+volumes:
+  validator-data:
+    name: aptos-validator-data

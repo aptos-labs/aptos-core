@@ -1,0 +1,58 @@
+# Example validator.yaml configuration for local testing
+#
+# Copy this file to your config directory and customize as needed:
+#   cp validator.yaml.example ../config/validator.yaml
+#
+# Required: Place genesis.blob and waypoint.txt in the same config directory
+
+base:
+  # Data directory inside container
+  data_dir: /opt/data/aptos
+
+  # Node role: full_node or validator
+  role: full_node
+
+  # Waypoint configuration
+  waypoint:
+    from_file: /config/waypoint.txt
+
+execution:
+  # Genesis file location
+  genesis_file_location: /config/genesis.blob
+
+api:
+  # REST API configuration
+  enabled: true
+  address: 0.0.0.0:8080
+
+full_node_networks:
+  - network_id: public
+    # Listen address for full node network
+    listen_address: /ip4/0.0.0.0/tcp/6181
+    # Maximum concurrent network connections
+    max_inbound_connections: 100
+    # Seed peers for initial network connectivity
+    # Add appropriate seed peers for your target network
+    seeds: {}
+
+storage:
+  # Storage configuration
+  enable_indexer: false
+
+  # RocksDB configuration for performance
+  rocksdb_configs:
+    ledger_db_config:
+      max_open_files: 5000
+    state_merkle_db_config:
+      max_open_files: 5000
+
+inspection_service:
+  # Metrics endpoint
+  address: 0.0.0.0
+  port: 9101
+
+logger:
+  # Logging configuration
+  level: INFO
+  # Console logging format
+  console_format: JSON
