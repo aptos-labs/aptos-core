@@ -67,6 +67,8 @@ pub(crate) enum CustomEventIngestError {
     BigQueryInsertError(DebugIgnore<TableDataInsertAllResponseInsertErrors>),
     #[error("{0}")]
     Other(DebugIgnore<anyhow::Error>),
+    #[error("rate limit exceeded for unknown telemetry")]
+    RateLimitExceeded,
 }
 
 impl From<BQError> for CustomEventIngestError {
@@ -99,12 +101,16 @@ pub(crate) enum LogIngestError {
     IngestionError,
     #[error("peer id forbidden from posting logs")]
     Forbidden(PeerId),
+    #[error("rate limit exceeded for unknown telemetry")]
+    RateLimitExceeded,
 }
 
 #[derive(Debug, ThisError)]
 pub(crate) enum MetricsIngestError {
     #[error("unable to ingest metrics")]
     IngestionError,
+    #[error("rate limit exceeded for unknown telemetry")]
+    RateLimitExceeded,
 }
 
 #[derive(Debug, ThisError)]
@@ -166,6 +172,10 @@ impl ServiceError {
 
     pub(crate) fn internal(error_code: ServiceErrorCode) -> Self {
         Self::new(StatusCode::INTERNAL_SERVER_ERROR, error_code)
+    }
+
+    pub(crate) fn too_many_requests(error_code: ServiceErrorCode) -> Self {
+        Self::new(StatusCode::TOO_MANY_REQUESTS, error_code)
     }
 
     pub(crate) fn http_status_code(&self) -> StatusCode {

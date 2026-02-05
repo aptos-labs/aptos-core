@@ -421,10 +421,12 @@ let tracker = new_dead_mans_switch_tracker(60); // 60 second minimum
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_new_dead_mans_switch_tracker">new_dead_mans_switch_tracker</a>(min_keep_alive_time_secs: u64): <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">DeadMansSwitchTracker</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_new_dead_mans_switch_tracker">new_dead_mans_switch_tracker</a>(
+    min_keep_alive_time_secs: u64
+): <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">DeadMansSwitchTracker</a> {
     <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">DeadMansSwitchTracker</a> {
         min_keep_alive_time_secs,
-        state: <a href="order_book_utils.md#0x7_order_book_utils_new_default_big_ordered_map">order_book_utils::new_default_big_ordered_map</a>(),
+        state: <a href="order_book_utils.md#0x7_order_book_utils_new_default_big_ordered_map">order_book_utils::new_default_big_ordered_map</a>()
     }
 }
 </code></pre>
@@ -452,7 +454,7 @@ let tracker = new_dead_mans_switch_tracker(60); // 60 second minimum
     tracker: &<b>mut</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">DeadMansSwitchTracker</a>,
     parent: <b>address</b>,
     market: <b>address</b>,
-    min_keep_alive_time_secs: u64,
+    min_keep_alive_time_secs: u64
 ) {
     <b>let</b> old_min_keep_alive_time_secs = tracker.min_keep_alive_time_secs;
     tracker.min_keep_alive_time_secs = min_keep_alive_time_secs;
@@ -461,8 +463,8 @@ let tracker = new_dead_mans_switch_tracker(60); // 60 second minimum
             parent,
             market,
             old_min_keep_alive_time_secs,
-            new_min_keep_alive_time_secs: min_keep_alive_time_secs,
-        },
+            new_min_keep_alive_time_secs: min_keep_alive_time_secs
+        }
     );
 }
 </code></pre>
@@ -538,7 +540,7 @@ if (!is_valid) {
 <pre><code><b>public</b> <b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_is_order_valid">is_order_valid</a>(
     tracker: &<a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">DeadMansSwitchTracker</a>,
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
-    order_creation_time_secs: Option&lt;u64&gt;,
+    order_creation_time_secs: Option&lt;u64&gt;
 ): bool {
     <b>let</b> itr = tracker.state.internal_find(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
     <b>if</b> (itr.iter_is_end(&tracker.state)) {
@@ -546,11 +548,12 @@ if (!is_valid) {
         <b>return</b> <b>true</b>;
     };
     <b>let</b> current_time = aptos_std::timestamp::now_seconds();
-    <b>let</b> order_creation_time_secs = <b>if</b> (order_creation_time_secs.is_some()) {
-        order_creation_time_secs.destroy_some()
-    } <b>else</b> {
-        current_time
-    };
+    <b>let</b> order_creation_time_secs =
+        <b>if</b> (order_creation_time_secs.is_some()) {
+            order_creation_time_secs.destroy_some()
+        } <b>else</b> {
+            current_time
+        };
     <b>let</b> state = itr.iter_borrow(&tracker.state);
     <b>if</b> (state.session_start_time_secs &gt; order_creation_time_secs) {
         // Order was placed before the session started, so it is invalid
@@ -583,22 +586,18 @@ if (!is_valid) {
     tracker: &<b>mut</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">DeadMansSwitchTracker</a>,
     parent: <b>address</b>,
     market: <b>address</b>,
-    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
+    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>
 ) {
     <b>let</b> removed = tracker.state.remove_or_none(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
     <b>let</b> was_registered = removed.is_some();
     <b>if</b> (was_registered) {
-        <b>let</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_KeepAliveState">KeepAliveState</a> { session_start_time_secs: _, expiration_time_secs: _ } = removed.destroy_some();
+        <b>let</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_KeepAliveState">KeepAliveState</a> { session_start_time_secs: _, expiration_time_secs: _ } =
+            removed.destroy_some();
     } <b>else</b> {
         removed.destroy_none();
     };
     <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-        KeepAliveDisabledEvent::V1 {
-            parent,
-            market,
-            <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
-            was_registered,
-        },
+        KeepAliveDisabledEvent::V1 { parent, market, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, was_registered }
     );
 }
 </code></pre>
@@ -691,7 +690,7 @@ update_keep_alive_state(&mut tracker, trader_addr, 0);
     parent: <b>address</b>,
     market: <b>address</b>,
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
-    timeout_seconds: u64,
+    timeout_seconds: u64
 ) {
     <b>if</b> (timeout_seconds == 0) {
         <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_disable_keep_alive">disable_keep_alive</a>(tracker, parent, market, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
@@ -699,13 +698,13 @@ update_keep_alive_state(&mut tracker, trader_addr, 0);
     };
     <b>assert</b>!(
         timeout_seconds &gt;= tracker.min_keep_alive_time_secs,
-        <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_E_KEEP_ALIVE_TIMEOUT_TOO_SHORT">E_KEEP_ALIVE_TIMEOUT_TOO_SHORT</a>, // ERROR_KEEP_ALIVE_TIMEOUT_TOO_SHORT
+        <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_E_KEEP_ALIVE_TIMEOUT_TOO_SHORT">E_KEEP_ALIVE_TIMEOUT_TOO_SHORT</a> // ERROR_KEEP_ALIVE_TIMEOUT_TOO_SHORT
     );
     <b>let</b> current_time = aptos_std::timestamp::now_seconds();
     <b>let</b> expiration_time = current_time + timeout_seconds;
     <b>let</b> itr = tracker.state.internal_find(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
     <b>if</b> (!itr.iter_is_end(&tracker.state)) {
-       <b>let</b> state = itr.iter_borrow_mut(&<b>mut</b> tracker.state);
+        <b>let</b> state = itr.iter_borrow_mut(&<b>mut</b> tracker.state);
         <b>if</b> (current_time &gt; state.expiration_time_secs) {
             // Start a new session - this means <a href="../../aptos-framework/../aptos-stdlib/doc/any.md#0x1_any">any</a> order placed before this time is invalidated
             state.session_start_time_secs = current_time;
@@ -718,13 +717,13 @@ update_keep_alive_state(&mut tracker, trader_addr, 0);
                 market,
                 <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
                 session_start_time_secs: state.session_start_time_secs,
-                expiration_time_secs: state.expiration_time_secs,
-            },
+                expiration_time_secs: state.expiration_time_secs
+            }
         );
     } <b>else</b> {
         <b>let</b> new_state = <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_KeepAliveState">KeepAliveState</a> {
             session_start_time_secs: 0, // this means that all existing orders are valid
-            expiration_time_secs: expiration_time,
+            expiration_time_secs: expiration_time
         };
         tracker.state.add(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, new_state);
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
@@ -733,8 +732,8 @@ update_keep_alive_state(&mut tracker, trader_addr, 0);
                 market,
                 <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
                 session_start_time_secs: 0,
-                expiration_time_secs: expiration_time,
-            },
+                expiration_time_secs: expiration_time
+            }
         );
     }
 }

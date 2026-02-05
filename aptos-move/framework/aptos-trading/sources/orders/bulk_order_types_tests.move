@@ -30,15 +30,16 @@ module aptos_trading::bulk_order_types_tests {
         let ask_prices = vector[ASK_PRICE_1, ASK_PRICE_2];
         let ask_sizes = vector[SIZE_1, SIZE_2];
 
-        let _response = new_bulk_order_request(
-            TEST_ACCOUNT_1,
-            1,
-            bid_prices,
-            bid_sizes,
-            ask_prices,
-            ask_sizes,
-            new_test_metadata()
-        );
+        let _response =
+            new_bulk_order_request(
+                TEST_ACCOUNT_1,
+                1,
+                bid_prices,
+                bid_sizes,
+                ask_prices,
+                ask_sizes,
+                new_test_metadata()
+            );
     }
 
     #[test]
@@ -51,15 +52,16 @@ module aptos_trading::bulk_order_types_tests {
         let ask_prices = vector[ASK_PRICE_2, ASK_PRICE_1]; // 102, 101 (descending)
         let ask_sizes = vector[SIZE_1, SIZE_2];
 
-        let _response = new_bulk_order_request(
-            TEST_ACCOUNT_1,
-            1,
-            bid_prices,
-            bid_sizes,
-            ask_prices,
-            ask_sizes,
-            new_test_metadata()
-        );
+        let _response =
+            new_bulk_order_request(
+                TEST_ACCOUNT_1,
+                1,
+                bid_prices,
+                bid_sizes,
+                ask_prices,
+                ask_sizes,
+                new_test_metadata()
+            );
     }
 
     #[test]
@@ -71,15 +73,16 @@ module aptos_trading::bulk_order_types_tests {
         let ask_prices = vector[ASK_PRICE_1, ASK_PRICE_2];
         let ask_sizes = vector[SIZE_1, SIZE_2];
 
-        let _response = new_bulk_order_request(
-            TEST_ACCOUNT_1,
-            1,
-            bid_prices,
-            bid_sizes,
-            ask_prices,
-            ask_sizes,
-            new_test_metadata()
-        );
+        let _response =
+            new_bulk_order_request(
+                TEST_ACCOUNT_1,
+                1,
+                bid_prices,
+                bid_sizes,
+                ask_prices,
+                ask_sizes,
+                new_test_metadata()
+            );
     }
 
     #[test]
@@ -91,15 +94,16 @@ module aptos_trading::bulk_order_types_tests {
         let ask_prices = vector[ASK_PRICE_1, ASK_PRICE_2];
         let ask_sizes = vector[SIZE_1, 0]; // Zero size in second ask level
 
-        let _response = new_bulk_order_request(
-            TEST_ACCOUNT_1,
-            1,
-            bid_prices,
-            bid_sizes,
-            ask_prices,
-            ask_sizes,
-            new_test_metadata()
-        );
+        let _response =
+            new_bulk_order_request(
+                TEST_ACCOUNT_1,
+                1,
+                bid_prices,
+                bid_sizes,
+                ask_prices,
+                ask_sizes,
+                new_test_metadata()
+            );
     }
 
     #[test]
@@ -111,19 +115,22 @@ module aptos_trading::bulk_order_types_tests {
         let ask_prices = vector[ASK_PRICE_1];
         let ask_sizes = vector[0]; // All zero ask sizes
 
-        let _response = new_bulk_order_request(
-            TEST_ACCOUNT_1,
-            1,
-            bid_prices,
-            bid_sizes,
-            ask_prices,
-            ask_sizes,
-            new_test_metadata()
-        );
+        let _response =
+            new_bulk_order_request(
+                TEST_ACCOUNT_1,
+                1,
+                bid_prices,
+                bid_sizes,
+                ask_prices,
+                ask_sizes,
+                new_test_metadata()
+            );
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_trading::bulk_order_types::E_BID_LENGTH_MISMATCH)]
+    #[expected_failure(
+        abort_code = aptos_trading::bulk_order_types::E_BID_LENGTH_MISMATCH
+    )]
     fun test_mismatched_bid_prices_and_sizes() {
         // Test placing an order with mismatched bid prices and sizes lengths - should return rejection
         let bid_prices = vector[BID_PRICE_1, BID_PRICE_2]; // 2 prices
@@ -131,19 +138,22 @@ module aptos_trading::bulk_order_types_tests {
         let ask_prices = vector[ASK_PRICE_1, ASK_PRICE_2];
         let ask_sizes = vector[SIZE_1, SIZE_2];
 
-        let _response = new_bulk_order_request(
-            TEST_ACCOUNT_1,
-            1,
-            bid_prices,
-            bid_sizes,
-            ask_prices,
-            ask_sizes,
-            new_test_metadata()
-        );
+        let _response =
+            new_bulk_order_request(
+                TEST_ACCOUNT_1,
+                1,
+                bid_prices,
+                bid_sizes,
+                ask_prices,
+                ask_sizes,
+                new_test_metadata()
+            );
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_trading::bulk_order_types::E_ASK_LENGTH_MISMATCH)]
+    #[expected_failure(
+        abort_code = aptos_trading::bulk_order_types::E_ASK_LENGTH_MISMATCH
+    )]
     fun test_mismatched_ask_prices_and_sizes() {
         // Test placing an order with mismatched ask prices and sizes lengths - should return rejection
         let bid_prices = vector[BID_PRICE_1, BID_PRICE_2];
@@ -151,16 +161,15 @@ module aptos_trading::bulk_order_types_tests {
         let ask_prices = vector[ASK_PRICE_1]; // Only 1 price
         let ask_sizes = vector[SIZE_1, SIZE_2]; // 2 sizes
 
-        let _response = new_bulk_order_request(
-            TEST_ACCOUNT_1,
-            1,
-            bid_prices,
-            bid_sizes,
-            ask_prices,
-            ask_sizes,
-            new_test_metadata()
-        );
+        let _response =
+            new_bulk_order_request(
+                TEST_ACCOUNT_1,
+                1,
+                bid_prices,
+                bid_sizes,
+                ask_prices,
+                ask_sizes,
+                new_test_metadata()
+            );
     }
-
-
 }

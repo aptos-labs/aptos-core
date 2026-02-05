@@ -3,7 +3,10 @@
 
 use crate::{
     context::{ClientTuple, Context, GroupedMetricsClients, JsonWebTokenService, PeerStoreTuple},
-    index, CustomEventConfig, LogIngestConfig, MetricsEndpointsConfig, TelemetryServiceConfig,
+    index,
+    rate_limiter::ContractRateLimiters,
+    CustomEventConfig, LogIngestConfig, MetricsEndpointsConfig, TelemetryServiceConfig,
+    UnknownTelemetryRateLimitConfig,
 };
 use aptos_crypto::{x25519, Uniform};
 use aptos_infallible::RwLock;
@@ -44,7 +47,9 @@ pub async fn new_test_context_with_multiple_contracts(
                 .into_iter()
                 .map(|(name, auth_config)| crate::CustomContractConfig {
                     name,
-                    on_chain_auth: auth_config,
+                    on_chain_auth: Some(auth_config),
+                    static_allowlist: HashMap::new(),
+                    node_type_name: Some("test_node_type".to_string()),
                     allow_unknown_nodes: false,
                     metrics_sink: None,
                     metrics_sinks: None,
@@ -52,6 +57,10 @@ pub async fn new_test_context_with_multiple_contracts(
                     events_sink: None,
                     untrusted_metrics_sinks: None,
                     untrusted_logs_sink: None,
+                    untrusted_metrics_rate_limit: None,
+                    untrusted_logs_rate_limit: None,
+                    peer_identities: HashMap::new(),
+                    blacklist_peers: None,
                 })
                 .collect()
         })
@@ -63,18 +72,20 @@ pub async fn new_test_context_with_multiple_contracts(
         tls_key_path: None,
         trusted_full_node_addresses: HashMap::new(),
         update_interval: 60,
-        custom_event_config: CustomEventConfig {
+        custom_event_config: Some(CustomEventConfig {
             project_id: String::from("1"),
             dataset_id: String::from("2"),
             table_id: String::from("3"),
-        },
+        }),
         pfn_allowlist: HashMap::new(),
         log_env_map: HashMap::new(),
         peer_identities: HashMap::new(),
-        metrics_endpoints_config: MetricsEndpointsConfig::default_for_test(),
-        humio_ingest_config: LogIngestConfig::default_for_test(),
+        metrics_endpoints_config: Some(MetricsEndpointsConfig::default_for_test()),
+        humio_ingest_config: Some(LogIngestConfig::default_for_test()),
         custom_contract_configs,
         allowlist_cache_ttl_secs: 10, // Short TTL for testing
+        unknown_metrics_rate_limit: UnknownTelemetryRateLimitConfig::default(),
+        unknown_logs_rate_limit: UnknownTelemetryRateLimitConfig::default(),
     };
 
     let peers = PeerStoreTuple::default();
@@ -88,18 +99,34 @@ pub async fn new_test_context_with_multiple_contracts(
                 cc_config.name.clone(),
                 crate::context::CustomContractInstance {
                     config: cc_config.on_chain_auth.clone(),
+                    static_allowlist: cc_config.static_allowlist.clone(),
+                    node_type_name: cc_config.effective_node_type_name(),
                     allow_unknown_nodes: cc_config.allow_unknown_nodes,
                     metrics_clients: HashMap::new(),
                     untrusted_metrics_clients: HashMap::new(),
                     logs_client: None,
                     untrusted_logs_client: None,
                     bigquery_client: None,
+                    peer_identities: cc_config.peer_identities.clone(),
+                    blacklist_peers: cc_config.blacklist_peers.clone(),
                 },
             );
         }
         Some(crate::context::CustomContractClients { instances })
     } else {
         None
+    };
+
+    // Create disabled rate limiters for tests (high burst capacity to avoid interfering with tests)
+    let metrics_rate_limit_config = UnknownTelemetryRateLimitConfig {
+        requests_per_second: 10000,
+        burst_capacity: 100000,
+        enabled: false, // Disabled for tests
+    };
+    let logs_rate_limit_config = UnknownTelemetryRateLimitConfig {
+        requests_per_second: 10000,
+        burst_capacity: 100000,
+        enabled: false, // Disabled for tests
     };
 
     TestContext::new(
@@ -117,6 +144,10 @@ pub async fn new_test_context_with_multiple_contracts(
             HashMap::new(),
             HashMap::new(),
             Arc::new(RwLock::new(HashMap::new())),
+            metrics_rate_limit_config,
+            logs_rate_limit_config,
+            Arc::new(ContractRateLimiters::new()),
+            Arc::new(ContractRateLimiters::new()),
         ),
     )
 }

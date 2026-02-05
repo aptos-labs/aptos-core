@@ -12087,17 +12087,26 @@ components:
       oneOf:
       - $ref: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionEmpty'
       - $ref: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomness'
+      - $ref: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomnessAndDecKey'
       discriminator:
         propertyName: type
         mapping:
           v0: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionEmpty'
           v1: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomness'
+          v2: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomnessAndDecKey'
     BlockMetadataExtensionEmpty:
       type: object
     BlockMetadataExtensionRandomness:
       type: object
       properties:
         randomness:
+          $ref: '#/components/schemas/HexEncodedBytes'
+    BlockMetadataExtensionRandomnessAndDecKey:
+      type: object
+      properties:
+        randomness:
+          $ref: '#/components/schemas/HexEncodedBytes'
+        decryption_key:
           $ref: '#/components/schemas/HexEncodedBytes'
     BlockMetadataExtension_BlockMetadataExtensionEmpty:
       allOf:
@@ -12123,6 +12132,18 @@ components:
             - v1
             example: v1
       - $ref: '#/components/schemas/BlockMetadataExtensionRandomness'
+    BlockMetadataExtension_BlockMetadataExtensionRandomnessAndDecKey:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - v2
+            example: v2
+      - $ref: '#/components/schemas/BlockMetadataExtensionRandomnessAndDecKey'
     BlockMetadataTransaction:
       type: object
       description: |-
@@ -12213,6 +12234,55 @@ components:
 
               NOTE: `oai` does not support `flatten` together with `skip_serializing_if`.
             default: null
+    ChunkyDKGResultTransaction:
+      type: object
+      required:
+      - version
+      - hash
+      - state_change_hash
+      - event_root_hash
+      - gas_used
+      - success
+      - vm_status
+      - accumulator_root_hash
+      - changes
+      - events
+      - timestamp
+      - certified_subtrx
+      properties:
+        version:
+          $ref: '#/components/schemas/U64'
+        hash:
+          $ref: '#/components/schemas/HashValue'
+        state_change_hash:
+          $ref: '#/components/schemas/HashValue'
+        event_root_hash:
+          $ref: '#/components/schemas/HashValue'
+        state_checkpoint_hash:
+          $ref: '#/components/schemas/HashValue'
+        gas_used:
+          $ref: '#/components/schemas/U64'
+        success:
+          type: boolean
+          description: Whether the transaction was successful
+        vm_status:
+          type: string
+          description: The VM status of the transaction, can tell useful information in a failure
+        accumulator_root_hash:
+          $ref: '#/components/schemas/HashValue'
+        changes:
+          type: array
+          description: Final state of resources changed by the transaction
+          items:
+            $ref: '#/components/schemas/WriteSetChange'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+        timestamp:
+          $ref: '#/components/schemas/U64'
+        certified_subtrx:
+          $ref: '#/components/schemas/ExportedCertifiedAggregatedChunkySubtranscript'
     DKGResultTransaction:
       type: object
       required:
@@ -12471,6 +12541,25 @@ components:
             format: uint64
         sig:
           $ref: '#/components/schemas/HexEncodedBytes'
+    ExportedCertifiedAggregatedChunkySubtranscript:
+      type: object
+      description: |-
+        A more API-friendly representation of the on-chain
+        `aptos_types::dkg::chunky_dkg::CertifiedAggregatedChunkySubtranscript`.
+      required:
+      - epoch
+      - author
+      - subtrx
+      - signature
+      properties:
+        epoch:
+          $ref: '#/components/schemas/U64'
+        author:
+          $ref: '#/components/schemas/Address'
+        subtrx:
+          $ref: '#/components/schemas/HexEncodedBytes'
+        signature:
+          $ref: '#/components/schemas/ExportedAggregateSignature'
     ExportedDKGTranscript:
       type: object
       required:
@@ -14070,11 +14159,25 @@ components:
       oneOf:
       - $ref: '#/components/schemas/ValidatorTransaction_JWKUpdateTransaction'
       - $ref: '#/components/schemas/ValidatorTransaction_DKGResultTransaction'
+      - $ref: '#/components/schemas/ValidatorTransaction_ChunkyDKGResultTransaction'
       discriminator:
         propertyName: validator_transaction_type
         mapping:
           observed_jwk_update: '#/components/schemas/ValidatorTransaction_JWKUpdateTransaction'
           dkg_result: '#/components/schemas/ValidatorTransaction_DKGResultTransaction'
+          chunky_d_k_g_result: '#/components/schemas/ValidatorTransaction_ChunkyDKGResultTransaction'
+    ValidatorTransaction_ChunkyDKGResultTransaction:
+      allOf:
+      - type: object
+        required:
+        - validator_transaction_type
+        properties:
+          validator_transaction_type:
+            type: string
+            enum:
+            - chunky_d_k_g_result
+            example: chunky_d_k_g_result
+      - $ref: '#/components/schemas/ChunkyDKGResultTransaction'
     ValidatorTransaction_DKGResultTransaction:
       allOf:
       - type: object

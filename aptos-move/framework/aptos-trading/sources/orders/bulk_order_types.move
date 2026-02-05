@@ -25,13 +25,10 @@
 /// ```move
 /// // Create a new bulk order
 /// let order = bulk_order_types::new_bulk_order(
+///     order_request,
 ///     order_id,
-///     @trader,
 ///     unique_priority_idx,
-///     bid_prices,
-///     bid_sizes,
-///     ask_prices,
-///     ask_sizes
+///     creation_time_micros
 /// );
 /// ```
 /// (work in progress)
@@ -39,11 +36,7 @@ module aptos_trading::bulk_order_types {
     use std::option;
     use std::option::Option;
     use std::vector;
-    use aptos_std::timestamp;
-    use aptos_trading::order_book_types::{
-        OrderId,
-        IncreasingIdx,
-    };
+    use aptos_trading::order_book_types::{OrderId, IncreasingIdx};
     use aptos_trading::order_match_types::{
         OrderMatch,
         new_bulk_order_match_details,
@@ -131,75 +124,27 @@ module aptos_trading::bulk_order_types {
         }
     }
 
-    fun trim_start<Element>(v: &mut vector<Element>, new_start: u64): vector<Element> {
-        let other = vector::empty();
-        vector::move_range(v, 0, new_start, &mut other, 0);
-        other
-    }
-
     /// Creates a new bulk order with the specified parameters.
     ///
     /// # Arguments:
+    /// - `order_request`: The bulk order request containing all order details
     /// - `order_id`: Unique identifier for the order
     /// - `unique_priority_idx`: Priority index for time-based ordering
-    /// - `order_req`: The bulk order request containing all order details
-    /// - `best_bid_price`: Current best bid price in the market
-    /// - `best_ask_price`: Current best ask price in the market
+    /// - `creation_time_micros`: Creation time of the order
     ///
-    /// # Returns:
-    /// A tuple containing:
-    /// - `BulkOrder<M>`: The created bulk order with non-crossing levels
-    /// - `vector<u64>`: Cancelled bid prices (levels that crossed the spread)
-    /// - `vector<u64>`: Cancelled bid sizes corresponding to cancelled prices
-    /// - `vector<u64>`: Cancelled ask prices (levels that crossed the spread)
-    /// - `vector<u64>`: Cancelled ask sizes corresponding to cancelled prices
+    /// Does no validation itself.
     public fun new_bulk_order<M: store + copy + drop>(
+        order_request: BulkOrderRequest<M>,
         order_id: OrderId,
         unique_priority_idx: IncreasingIdx,
-        order_req: BulkOrderRequest<M>,
-        best_bid_price: Option<u64>,
-        best_ask_price: Option<u64>
-    ): (BulkOrder<M>, vector<u64>, vector<u64>, vector<u64>, vector<u64>) {
-        let creation_time_micros = timestamp::now_microseconds();
-        let bid_price_crossing_idx =
-            discard_price_crossing_levels(&order_req.bid_prices, best_ask_price, true);
-        let ask_price_crossing_idx =
-            discard_price_crossing_levels(&order_req.ask_prices, best_bid_price, false);
-
-        // Extract cancelled levels (the ones that were discarded)
-        let (cancelled_bid_prices, cancelled_bid_sizes) =
-            if (bid_price_crossing_idx > 0) {
-                let cancelled_bid_prices =
-                    trim_start(&mut order_req.bid_prices, bid_price_crossing_idx);
-                let cancelled_bid_sizes =
-                    trim_start(&mut order_req.bid_sizes, bid_price_crossing_idx);
-                (cancelled_bid_prices, cancelled_bid_sizes)
-            } else {
-                (vector::empty<u64>(), vector::empty<u64>())
-            };
-        let (cancelled_ask_prices, cancelled_ask_sizes) =
-            if (ask_price_crossing_idx > 0) {
-                let cancelled_ask_prices =
-                    trim_start(&mut order_req.ask_prices, ask_price_crossing_idx);
-                let cancelled_ask_sizes =
-                    trim_start(&mut order_req.ask_sizes, ask_price_crossing_idx);
-                (cancelled_ask_prices, cancelled_ask_sizes)
-            } else {
-                (vector::empty<u64>(), vector::empty<u64>())
-            };
-        let bulk_order = BulkOrder::V1 {
-            order_request: order_req,
+        creation_time_micros: u64
+    ): BulkOrder<M> {
+        BulkOrder::V1 {
+            order_request,
             order_id,
             unique_priority_idx,
             creation_time_micros
-        };
-        (
-            bulk_order,
-            cancelled_bid_prices,
-            cancelled_bid_sizes,
-            cancelled_ask_prices,
-            cancelled_ask_sizes
-        )
+        }
     }
 
     /// Creates a new bulk order request with the specified price levels and sizes.
@@ -284,9 +229,7 @@ module aptos_trading::bulk_order_types {
     }
 
     public fun new_bulk_order_place_response_rejection<M: store + copy + drop>(
-        account: address,
-        sequence_number: u64,
-        existing_sequence_number: u64
+        account: address, sequence_number: u64, existing_sequence_number: u64
     ): BulkOrderPlaceResponse<M> {
         BulkOrderPlaceResponse::Rejection_V1 {
             account,
@@ -325,9 +268,8 @@ module aptos_trading::bulk_order_types {
         self.creation_time_micros
     }
 
-    public fun get_order_request<M: store + copy + drop>(
-        self: &BulkOrder<M>
-    ): &BulkOrderRequest<M> {
+    public fun get_order_request<M: store + copy + drop>(self: &BulkOrder<M>)
+        : &BulkOrderRequest<M> {
         &self.order_request
     }
 
@@ -391,6 +333,16 @@ module aptos_trading::bulk_order_types {
         }
     }
 
+    public fun get_all_prices_mut<M: store + copy + drop>(
+        self: &mut BulkOrderRequest<M>, is_bid: bool
+    ): &mut vector<u64> {
+        if (is_bid) {
+            &mut self.bid_prices
+        } else {
+            &mut self.ask_prices
+        }
+    }
+
     public fun get_all_sizes<M: store + copy + drop>(
         self: &BulkOrderRequest<M>, is_bid: bool
     ): vector<u64> {
@@ -398,6 +350,16 @@ module aptos_trading::bulk_order_types {
             self.bid_sizes
         } else {
             self.ask_sizes
+        }
+    }
+
+    public fun get_all_sizes_mut<M: store + copy + drop>(
+        self: &mut BulkOrderRequest<M>, is_bid: bool
+    ): &mut vector<u64> {
+        if (is_bid) {
+            &mut self.bid_sizes
+        } else {
+            &mut self.ask_sizes
         }
     }
 
@@ -528,25 +490,6 @@ module aptos_trading::bulk_order_types {
             i += 1;
         };
         true
-    }
-
-    fun discard_price_crossing_levels(
-        prices: &vector<u64>, best_price: Option<u64>, is_bid: bool
-    ): u64 {
-        // Discard bid levels that are >= best ask price
-        let i = 0;
-        if (best_price.is_some()) {
-            let best_price = best_price.destroy_some();
-            while (i < prices.length()) {
-                if (is_bid && prices[i] < best_price) {
-                    break;
-                } else if (!is_bid && prices[i] > best_price) {
-                    break;
-                };
-                i += 1;
-            };
-        };
-        i // Return the index of the first non-crossing level
     }
 
     // Creates a new single bulk order match result.

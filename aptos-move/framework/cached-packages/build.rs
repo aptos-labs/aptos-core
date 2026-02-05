@@ -15,6 +15,7 @@ use walkdir::WalkDir;
 /// Directories containing Move source files that affect the framework build.
 const FRAMEWORK_DIRS: &[&str] = &[
     "aptos-experimental",
+    "aptos-trading",
     "aptos-token-objects",
     "aptos-token",
     "aptos-framework",
