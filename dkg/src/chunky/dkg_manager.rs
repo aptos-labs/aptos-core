@@ -53,8 +53,9 @@ use std::{
 use tokio_retry::strategy::ExponentialBackoff;
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, Default)]
 enum InnerState {
+    #[default]
     Init,
     AwaitSubtranscriptAggregation {
         start_time: Duration,
@@ -75,12 +76,6 @@ enum InnerState {
         my_transcript: ChunkyDKGTranscript,
         proposed: bool,
     },
-}
-
-impl Default for InnerState {
-    fn default() -> Self {
-        Self::Init
-    }
 }
 
 impl InnerState {
