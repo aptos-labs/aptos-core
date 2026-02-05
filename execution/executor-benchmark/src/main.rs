@@ -56,7 +56,10 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 #[cfg(unix)]
 #[used]
 #[unsafe(no_mangle)]
-pub static mut malloc_conf: *const c_char = c"prof:true,lg_prof_sample:23".as_ptr().cast();
+pub static mut malloc_conf: *const c_char =
+    c"prof:true,lg_prof_sample:23,background_thread:true,metadata_thp:auto"
+        .as_ptr()
+        .cast();
 
 /// This is needed for filters on the Grafana dashboard working as its used to populate the filter
 /// variables.
