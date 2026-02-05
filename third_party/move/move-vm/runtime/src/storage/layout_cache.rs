@@ -74,12 +74,40 @@ impl LayoutCacheEntry {
     pub(crate) fn unpack(self) -> (LayoutWithDelayedFields, TriompheArc<DefiningModules>) {
         (self.layout, self.modules)
     }
+
+    pub fn defining_modules(&self) -> &DefiningModules {
+        &self.modules
+    }
+
+    /// Creates a new dummy entry for testing purposes only.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn new_for_testing(ids: impl IntoIterator<Item = ModuleId>) -> Self {
+        let mut modules = DefiningModules::default();
+        for id in ids.into_iter() {
+            modules.insert(&id);
+        }
+        Self {
+            layout: LayoutWithDelayedFields::u8_layout_for_testing(),
+            modules: TriompheArc::new(modules),
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct StructKey {
     pub idx: StructNameIndex,
     pub ty_args_id: TypeVecId,
+}
+
+impl StructKey {
+    /// Creates a new dummy entry for testing purposes only.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn struct_key_for_testing(idx: u32) -> Self {
+        StructKey {
+            idx: StructNameIndex::new(idx),
+            ty_args_id: TypeVecId::new(0),
+        }
+    }
 }
 
 /// Interface for fetching and storing layouts into the cache.

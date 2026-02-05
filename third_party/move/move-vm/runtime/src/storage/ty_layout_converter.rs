@@ -53,6 +53,16 @@ impl LayoutWithDelayedFields {
     pub fn unpack(self) -> (TriompheArc<MoveTypeLayout>, bool) {
         (self.layout, self.contains_delayed_fields)
     }
+
+    /// Creates a new dummy layout for testing purposes only.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn u8_layout_for_testing() -> Self {
+        Self {
+            // Actual layout is irrelevant.
+            layout: TriompheArc::new(MoveTypeLayout::U8),
+            contains_delayed_fields: false,
+        }
+    }
 }
 
 /// Converts runtime types to type layouts. The layout construction may load modules, and so, the

@@ -20,6 +20,15 @@ pub struct TypeId(u32);
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub struct TypeVecId(u32);
 
+impl TypeVecId {
+    /// Creates a new index for testing purposes only. For production, indices must always be
+    /// created by the data structure that uses them to intern type vectors.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn new(idx: u32) -> Self {
+        Self(idx)
+    }
+}
+
 /// Partially-interned representation containing top-level information.
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 enum TypeRepr {
