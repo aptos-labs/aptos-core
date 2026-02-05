@@ -337,7 +337,7 @@ impl PipelineBuilder {
         compute_result: StateComputeResult,
         commit_proof: LedgerInfoWithSignatures,
     ) -> PipelineFutures {
-        let prepare_fut = spawn_ready_fut((Arc::new(vec![]), None));
+        let prepare_fut = spawn_ready_fut((Arc::new(vec![]), None, None));
         let rand_check_fut = spawn_ready_fut((None, false));
         let execute_fut = spawn_ready_fut(Duration::from_millis(0));
         let ledger_update_fut =
@@ -653,7 +653,8 @@ impl PipelineBuilder {
         block: Arc<Block>,
     ) -> TaskResult<PrepareResult> {
         let mut tracker = Tracker::start_waiting("prepare", &block);
-        let (input_txns, max_txns_from_block_to_execute, block_gas_limit) = decryption_fut.await?;
+        let (input_txns, max_txns_from_block_to_execute, block_gas_limit, decryption_key) =
+            decryption_fut.await?;
 
         tracker.start_working();
 
@@ -677,7 +678,7 @@ impl PipelineBuilder {
         });
         counters::PREPARE_BLOCK_SIG_VERIFICATION_TIME
             .observe_duration(sig_verification_start.elapsed());
-        Ok((Arc::new(sig_verified_txns), block_gas_limit))
+        Ok((Arc::new(sig_verified_txns), block_gas_limit, decryption_key))
     }
 
     /// Precondition: 1. prepare finishes, 2. parent block's execution phase finishes
@@ -694,7 +695,7 @@ impl PipelineBuilder {
     ) -> TaskResult<RandResult> {
         let mut tracker = Tracker::start_waiting("rand_check", &block);
         parent_block_execute_fut.await?;
-        let (user_txns, _) = prepare_fut.await?;
+        let (user_txns, _, _) = prepare_fut.await?;
 
         tracker.start_working();
         if !is_randomness_enabled {
@@ -796,18 +797,25 @@ impl PipelineBuilder {
     ) -> TaskResult<ExecuteResult> {
         let mut tracker = Tracker::start_waiting("execute", &block);
         parent_block_execute_fut.await?;
-        let (user_txns, block_gas_limit) = prepare_fut.await?;
+        let (user_txns, block_gas_limit, decryption_result) = prepare_fut.await?;
         let onchain_execution_config =
             onchain_execution_config.with_block_gas_limit_override(block_gas_limit);
 
         let (rand_result, _has_randomness) = rand_check.await?;
 
         tracker.start_working();
-        // if randomness is disabled, the metadata skips DKG and triggers immediate reconfiguration
-        let metadata_txn = if let Some(maybe_rand) = rand_result {
-            block.new_metadata_with_randomness(&validator, maybe_rand)
-        } else {
-            block.new_block_metadata(&validator).into()
+        let metadata_txn = match (rand_result, decryption_result) {
+            (Some(maybe_rand), Some(maybe_dec_key)) => {
+                block.new_metadata_with_rand_and_dec_key(&validator, maybe_rand, maybe_dec_key)
+            },
+            (Some(maybe_rand), None) => block.new_metadata_with_randomness(&validator, maybe_rand),
+            (None, Some(_decryption_key)) => {
+                Err(anyhow!("Disabling only randomness is not supported yet"))?
+            },
+            (None, None) => {
+                // if randomness is disabled, the metadata skips DKG and triggers immediate reconfiguration
+                block.new_block_metadata(&validator).into()
+            },
         };
         let txns = [
             vec![SignatureVerifiedTransaction::from(Transaction::from(
@@ -930,7 +938,7 @@ impl PipelineBuilder {
         block: Arc<Block>,
     ) -> TaskResult<PostLedgerUpdateResult> {
         let mut tracker = Tracker::start_waiting("post_ledger_update", &block);
-        let (user_txns, _) = prepare_fut.await?;
+        let (user_txns, _, _) = prepare_fut.await?;
         let (compute_result, _, _) = ledger_update_fut.await?;
 
         tracker.start_working();

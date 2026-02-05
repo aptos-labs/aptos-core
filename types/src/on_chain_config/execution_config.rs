@@ -27,72 +27,65 @@ pub enum OnChainExecutionConfig {
 impl OnChainExecutionConfig {
     /// The type of the transaction shuffler being used.
     pub fn transaction_shuffler_type(&self) -> TransactionShufflerType {
-        match &self {
-            OnChainExecutionConfig::Missing => TransactionShufflerType::NoShuffling,
-            OnChainExecutionConfig::V1(config) => config.transaction_shuffler_type.clone(),
-            OnChainExecutionConfig::V2(config) => config.transaction_shuffler_type.clone(),
-            OnChainExecutionConfig::V3(config) => config.transaction_shuffler_type.clone(),
-            OnChainExecutionConfig::V4(config) => config.transaction_shuffler_type.clone(),
-            OnChainExecutionConfig::V5(config) => config.transaction_shuffler_type.clone(),
-            OnChainExecutionConfig::V6(config) => config.transaction_shuffler_type.clone(),
-            OnChainExecutionConfig::V7(config) => config.transaction_shuffler_type.clone(),
+        match self {
+            Self::Missing => TransactionShufflerType::NoShuffling,
+            Self::V1(config) => config.transaction_shuffler_type,
+            Self::V2(config) => config.transaction_shuffler_type,
+            Self::V3(config) => config.transaction_shuffler_type,
+            Self::V4(config) => config.transaction_shuffler_type,
+            Self::V5(config) => config.transaction_shuffler_type,
+            Self::V6(config) => config.transaction_shuffler_type,
+            Self::V7(config) => config.transaction_shuffler_type,
         }
     }
 
     /// The per-block gas limit being used.
     pub fn block_gas_limit_type(&self) -> BlockGasLimitType {
-        match &self {
-            OnChainExecutionConfig::Missing => BlockGasLimitType::NoLimit,
-            OnChainExecutionConfig::V1(_config) => BlockGasLimitType::NoLimit,
-            OnChainExecutionConfig::V2(config) => config
+        match self {
+            Self::Missing => BlockGasLimitType::NoLimit,
+            Self::V1(_config) => BlockGasLimitType::NoLimit,
+            Self::V2(config) => config
                 .block_gas_limit
                 .map_or(BlockGasLimitType::NoLimit, BlockGasLimitType::Limit),
-            OnChainExecutionConfig::V3(config) => config
+            Self::V3(config) => config
                 .block_gas_limit
                 .map_or(BlockGasLimitType::NoLimit, BlockGasLimitType::Limit),
-            OnChainExecutionConfig::V4(config) => config.block_gas_limit_type.clone(),
-            OnChainExecutionConfig::V5(config) => config.block_gas_limit_type.clone(),
-            OnChainExecutionConfig::V6(config) => config.block_gas_limit_type.clone(),
-            OnChainExecutionConfig::V7(config) => config.block_gas_limit_type.clone(),
+            Self::V4(config) => config.block_gas_limit_type,
+            Self::V5(config) => config.block_gas_limit_type,
+            Self::V6(config) => config.block_gas_limit_type,
+            Self::V7(config) => config.block_gas_limit_type,
         }
     }
 
     pub fn enable_per_block_gas_limit(&self) -> bool {
-        match &self {
-            OnChainExecutionConfig::Missing
-            | OnChainExecutionConfig::V1(_)
-            | OnChainExecutionConfig::V2(_)
-            | OnChainExecutionConfig::V3(_)
-            | OnChainExecutionConfig::V4(_) => false,
-            OnChainExecutionConfig::V5(config) => config.enable_per_block_gas_limit,
-            OnChainExecutionConfig::V6(config) => config.enable_per_block_gas_limit,
-            OnChainExecutionConfig::V7(config) => config.enable_per_block_gas_limit,
+        match self {
+            Self::Missing | Self::V1(_) | Self::V2(_) | Self::V3(_) | Self::V4(_) => false,
+            Self::V5(config) => config.enable_per_block_gas_limit,
+            Self::V6(config) => config.enable_per_block_gas_limit,
+            Self::V7(config) => config.enable_per_block_gas_limit,
         }
     }
 
     pub fn gas_price_to_burn(&self) -> Option<u64> {
         match self {
-            OnChainExecutionConfig::Missing
-            | OnChainExecutionConfig::V1(_)
-            | OnChainExecutionConfig::V2(_)
-            | OnChainExecutionConfig::V3(_)
-            | OnChainExecutionConfig::V4(_)
-            | OnChainExecutionConfig::V5(_) => None,
-            OnChainExecutionConfig::V6(config) => Some(config.gas_price_to_burn),
-            OnChainExecutionConfig::V7(config) => Some(config.gas_price_to_burn),
+            Self::Missing | Self::V1(_) | Self::V2(_) | Self::V3(_) | Self::V4(_) | Self::V5(_) => {
+                None
+            },
+            Self::V6(config) => Some(config.gas_price_to_burn),
+            Self::V7(config) => Some(config.gas_price_to_burn),
         }
     }
 
     pub fn persisted_auxiliary_info_version(&self) -> u8 {
         match self {
-            OnChainExecutionConfig::Missing
-            | OnChainExecutionConfig::V1(_)
-            | OnChainExecutionConfig::V2(_)
-            | OnChainExecutionConfig::V3(_)
-            | OnChainExecutionConfig::V4(_)
-            | OnChainExecutionConfig::V5(_)
-            | OnChainExecutionConfig::V6(_) => 0,
-            OnChainExecutionConfig::V7(config) => config.persisted_auxiliary_info_version,
+            Self::Missing
+            | Self::V1(_)
+            | Self::V2(_)
+            | Self::V3(_)
+            | Self::V4(_)
+            | Self::V5(_)
+            | Self::V6(_) => 0,
+            Self::V7(config) => config.persisted_auxiliary_info_version,
         }
     }
 
@@ -106,23 +99,23 @@ impl OnChainExecutionConfig {
 
     /// The type of the transaction deduper being used.
     pub fn transaction_deduper_type(&self) -> TransactionDeduperType {
-        match &self {
+        match self {
             // Note, this behavior was enabled before OnChainExecutionConfig was registered.
-            OnChainExecutionConfig::Missing => TransactionDeduperType::TxnHashAndAuthenticatorV1,
-            OnChainExecutionConfig::V1(_config) => TransactionDeduperType::NoDedup,
-            OnChainExecutionConfig::V2(_config) => TransactionDeduperType::NoDedup,
-            OnChainExecutionConfig::V3(config) => config.transaction_deduper_type.clone(),
-            OnChainExecutionConfig::V4(config) => config.transaction_deduper_type.clone(),
-            OnChainExecutionConfig::V5(config) => config.transaction_deduper_type.clone(),
-            OnChainExecutionConfig::V6(config) => config.transaction_deduper_type.clone(),
-            OnChainExecutionConfig::V7(config) => config.transaction_deduper_type.clone(),
+            Self::Missing => TransactionDeduperType::TxnHashAndAuthenticatorV1,
+            Self::V1(_config) => TransactionDeduperType::NoDedup,
+            Self::V2(_config) => TransactionDeduperType::NoDedup,
+            Self::V3(config) => config.transaction_deduper_type,
+            Self::V4(config) => config.transaction_deduper_type,
+            Self::V5(config) => config.transaction_deduper_type,
+            Self::V6(config) => config.transaction_deduper_type,
+            Self::V7(config) => config.transaction_deduper_type,
         }
     }
 
     /// The default values to use for new networks, e.g., devnet, forge.
     /// Features that are ready for deployment can be enabled here.
     pub fn default_for_genesis() -> Self {
-        OnChainExecutionConfig::V7(ExecutionConfigV7 {
+        Self::V7(ExecutionConfigV7 {
             transaction_shuffler_type: TransactionShufflerType::default_for_genesis(),
             block_gas_limit_type: BlockGasLimitType::default_for_genesis(),
             enable_per_block_gas_limit: false,
@@ -135,13 +128,13 @@ impl OnChainExecutionConfig {
     /// The default values to use when on-chain config is not initialized.
     /// This value should not be changed, for replay purposes.
     pub fn default_if_missing() -> Self {
-        OnChainExecutionConfig::Missing
+        Self::Missing
     }
 }
 
 impl BlockGasLimitType {
     pub fn default_for_genesis() -> Self {
-        BlockGasLimitType::ComplexLimitV1 {
+        Self::ComplexLimitV1 {
             effective_block_gas_limit: 20000,
             execution_gas_effective_multiplier: 1,
             io_gas_effective_multiplier: 1,
@@ -225,7 +218,7 @@ pub struct ExecutionConfigV7 {
     pub persisted_auxiliary_info_version: u8,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")] // cannot use tag = "type" as nested enums cannot work, and bcs doesn't support it
 pub enum TransactionShufflerType {
     NoShuffling,
@@ -241,7 +234,7 @@ pub enum TransactionShufflerType {
 
 impl TransactionShufflerType {
     pub fn default_for_genesis() -> Self {
-        TransactionShufflerType::UseCaseAware {
+        Self::UseCaseAware {
             sender_spread_factor: 32,
             platform_use_case_spread_factor: 0,
             user_use_case_spread_factor: 4,
@@ -250,11 +243,11 @@ impl TransactionShufflerType {
 
     pub fn user_use_case_spread_factor(&self) -> Option<usize> {
         match self {
-            TransactionShufflerType::NoShuffling
-            | TransactionShufflerType::DeprecatedSenderAwareV1(_)
-            | TransactionShufflerType::SenderAwareV2(_)
-            | TransactionShufflerType::DeprecatedFairness => None,
-            TransactionShufflerType::UseCaseAware {
+            Self::NoShuffling
+            | Self::DeprecatedSenderAwareV1(_)
+            | Self::SenderAwareV2(_)
+            | Self::DeprecatedFairness => None,
+            Self::UseCaseAware {
                 user_use_case_spread_factor,
                 ..
             } => Some(*user_use_case_spread_factor),
@@ -262,14 +255,14 @@ impl TransactionShufflerType {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")] // cannot use tag = "type" as nested enums cannot work, and bcs doesn't support it
 pub enum TransactionDeduperType {
     NoDedup,
     TxnHashAndAuthenticatorV1,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")] // cannot use tag = "type" as nested enums cannot work, and bcs doesn't support it
 pub enum BlockGasLimitType {
     NoLimit,
@@ -315,9 +308,9 @@ pub enum BlockGasLimitType {
 impl BlockGasLimitType {
     pub fn block_gas_limit(&self) -> Option<u64> {
         match self {
-            BlockGasLimitType::NoLimit => None,
-            BlockGasLimitType::Limit(limit) => Some(*limit),
-            BlockGasLimitType::ComplexLimitV1 {
+            Self::NoLimit => None,
+            Self::Limit(limit) => Some(*limit),
+            Self::ComplexLimitV1 {
                 effective_block_gas_limit,
                 ..
             } => Some(*effective_block_gas_limit),
@@ -326,9 +319,9 @@ impl BlockGasLimitType {
 
     pub fn execution_gas_effective_multiplier(&self) -> u64 {
         match self {
-            BlockGasLimitType::NoLimit => 1,
-            BlockGasLimitType::Limit(_) => 1,
-            BlockGasLimitType::ComplexLimitV1 {
+            Self::NoLimit => 1,
+            Self::Limit(_) => 1,
+            Self::ComplexLimitV1 {
                 execution_gas_effective_multiplier,
                 ..
             } => *execution_gas_effective_multiplier,
@@ -337,9 +330,9 @@ impl BlockGasLimitType {
 
     pub fn io_gas_effective_multiplier(&self) -> u64 {
         match self {
-            BlockGasLimitType::NoLimit => 1,
-            BlockGasLimitType::Limit(_) => 1,
-            BlockGasLimitType::ComplexLimitV1 {
+            Self::NoLimit => 1,
+            Self::Limit(_) => 1,
+            Self::ComplexLimitV1 {
                 io_gas_effective_multiplier,
                 ..
             } => *io_gas_effective_multiplier,
@@ -348,9 +341,9 @@ impl BlockGasLimitType {
 
     pub fn block_output_limit(&self) -> Option<u64> {
         match self {
-            BlockGasLimitType::NoLimit => None,
-            BlockGasLimitType::Limit(_) => None,
-            BlockGasLimitType::ComplexLimitV1 {
+            Self::NoLimit => None,
+            Self::Limit(_) => None,
+            Self::ComplexLimitV1 {
                 block_output_limit, ..
             } => *block_output_limit,
         }
@@ -358,9 +351,9 @@ impl BlockGasLimitType {
 
     pub fn conflict_penalty_window(&self) -> Option<u32> {
         match self {
-            BlockGasLimitType::NoLimit => None,
-            BlockGasLimitType::Limit(_) => None,
-            BlockGasLimitType::ComplexLimitV1 {
+            Self::NoLimit => None,
+            Self::Limit(_) => None,
+            Self::ComplexLimitV1 {
                 conflict_penalty_window,
                 ..
             } => {
@@ -375,9 +368,9 @@ impl BlockGasLimitType {
 
     pub fn use_module_publishing_block_conflict(&self) -> bool {
         match self {
-            BlockGasLimitType::NoLimit => false,
-            BlockGasLimitType::Limit(_) => false,
-            BlockGasLimitType::ComplexLimitV1 {
+            Self::NoLimit => false,
+            Self::Limit(_) => false,
+            Self::ComplexLimitV1 {
                 use_module_publishing_block_conflict,
                 ..
             } => *use_module_publishing_block_conflict,
@@ -386,9 +379,9 @@ impl BlockGasLimitType {
 
     pub fn include_user_txn_size_in_block_output(&self) -> bool {
         match self {
-            BlockGasLimitType::NoLimit => false,
-            BlockGasLimitType::Limit(_) => false,
-            BlockGasLimitType::ComplexLimitV1 {
+            Self::NoLimit => false,
+            Self::Limit(_) => false,
+            Self::ComplexLimitV1 {
                 include_user_txn_size_in_block_output,
                 ..
             } => *include_user_txn_size_in_block_output,
@@ -397,9 +390,9 @@ impl BlockGasLimitType {
 
     pub fn add_block_limit_outcome_onchain(&self) -> bool {
         match self {
-            BlockGasLimitType::NoLimit => false,
-            BlockGasLimitType::Limit(_) => false,
-            BlockGasLimitType::ComplexLimitV1 {
+            Self::NoLimit => false,
+            Self::Limit(_) => false,
+            Self::ComplexLimitV1 {
                 add_block_limit_outcome_onchain,
                 ..
             } => *add_block_limit_outcome_onchain,
@@ -408,9 +401,9 @@ impl BlockGasLimitType {
 
     pub fn use_granular_resource_group_conflicts(&self) -> bool {
         match self {
-            BlockGasLimitType::NoLimit => false,
-            BlockGasLimitType::Limit(_) => false,
-            BlockGasLimitType::ComplexLimitV1 {
+            Self::NoLimit => false,
+            Self::Limit(_) => false,
+            Self::ComplexLimitV1 {
                 use_granular_resource_group_conflicts,
                 ..
             } => *use_granular_resource_group_conflicts,

@@ -34,8 +34,8 @@ NAMESPACE = "replay-verify"
 ZONE = "us-central1-a"
 
 DEFAULT_PVC_ACCESS_MODE = "ReadOnlyMany"  # Default access mode for PVCs
-TESTNET_SNAPSHOT_DISK_SIZE = "12Ti"  # Default disk size for testnet snapshots
-MAINNET_SNAPSHOT_DISK_SIZE = "15Ti"  # Default disk size for mainnet snapshots
+TESTNET_SNAPSHOT_DISK_SIZE = "20Ti"  # Default disk size for testnet snapshots
+MAINNET_SNAPSHOT_DISK_SIZE = "20Ti"  # Default disk size for mainnet snapshots
 
 def get_disk_size_for_snapshot(snapshot_name: str) -> str:
     if TESTNET_SNAPSHOT_NAME in snapshot_name:

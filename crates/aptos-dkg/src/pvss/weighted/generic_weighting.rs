@@ -13,7 +13,7 @@ use crate::pvss::{
     Player, ThresholdConfigBlstrs, WeightedConfigBlstrs,
 };
 use aptos_crypto::{
-    traits::SecretSharingConfig as _, weighted_config::WeightedConfig, CryptoMaterialError,
+    traits::TSecretSharingConfig as _, weighted_config::WeightedConfig, CryptoMaterialError,
     ValidCryptoMaterial,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};

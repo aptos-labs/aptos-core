@@ -6,7 +6,12 @@ module aptos_experimental::pending_order_book_index {
     use aptos_std::math64;
     use aptos_framework::timestamp;
     use aptos_framework::big_ordered_map::BigOrderedMap;
-    use aptos_trading::order_book_types::{OrderId, IncreasingIdx, TriggerCondition, DecreasingIdx};
+    use aptos_trading::order_book_types::{
+        OrderId,
+        IncreasingIdx,
+        TriggerCondition,
+        DecreasingIdx
+    };
     use aptos_experimental::order_book_utils;
 
     struct PendingUpOrderKey has store, copy, drop {
@@ -46,7 +51,7 @@ module aptos_experimental::pending_order_book_index {
     public(friend) fun cancel_pending_order(
         self: &mut PendingOrderBookIndex,
         trigger_condition: TriggerCondition,
-        unique_priority_idx: IncreasingIdx,
+        unique_priority_idx: IncreasingIdx
     ) {
         let (price_move_down_index, price_move_up_index, time_based_index) =
             trigger_condition.get_trigger_condition_indices();
@@ -67,10 +72,12 @@ module aptos_experimental::pending_order_book_index {
             );
         };
         if (time_based_index.is_some()) {
-            self.time_based_index.remove(&PendingTimeKey {
-                time: time_based_index.destroy_some(),
-                tie_breaker: unique_priority_idx
-            });
+            self.time_based_index.remove(
+                &PendingTimeKey {
+                    time: time_based_index.destroy_some(),
+                    tie_breaker: unique_priority_idx
+                }
+            );
         };
     }
 
@@ -78,7 +85,7 @@ module aptos_experimental::pending_order_book_index {
         self: &mut PendingOrderBookIndex,
         order_id: OrderId,
         trigger_condition: TriggerCondition,
-        unique_priority_idx: IncreasingIdx,
+        unique_priority_idx: IncreasingIdx
     ) {
         // Add this order to the pending order book index
         let (price_move_down_index, price_move_up_index, time_based_index) =
@@ -107,7 +114,8 @@ module aptos_experimental::pending_order_book_index {
                     time: time_based_index.destroy_some(),
                     tie_breaker: unique_priority_idx
                 },
-                order_id);
+                order_id
+            );
         };
     }
 
@@ -117,7 +125,7 @@ module aptos_experimental::pending_order_book_index {
         orders: &mut vector<OrderId>,
         limit: u64
     ) {
-        while (!self.price_move_up_index.is_empty() && orders.length() < limit ) {
+        while (!self.price_move_up_index.is_empty() && orders.length() < limit) {
             let (key, order_id) = self.price_move_up_index.borrow_front();
             if (current_price >= key.price) {
                 orders.push_back(*order_id);
@@ -149,7 +157,11 @@ module aptos_experimental::pending_order_book_index {
         self: &mut PendingOrderBookIndex, current_price: u64, order_limit: u64
     ): vector<OrderId> {
         let orders = vector::empty();
-        self.take_ready_price_move_up_orders(current_price, &mut orders, math64::ceil_div(order_limit, 2));
+        self.take_ready_price_move_up_orders(
+            current_price,
+            &mut orders,
+            math64::ceil_div(order_limit, 2)
+        );
         self.take_ready_price_move_down_orders(current_price, &mut orders, order_limit);
         // Try to fill the rest of the space if available.
         self.take_ready_price_move_up_orders(current_price, &mut orders, order_limit);

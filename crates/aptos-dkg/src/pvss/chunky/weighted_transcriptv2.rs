@@ -46,7 +46,7 @@ use aptos_crypto::{
     },
     bls12381::{self},
     weighted_config::WeightedConfigArkworks,
-    CryptoMaterialError, SecretSharingConfig as _, ValidCryptoMaterial,
+    CryptoMaterialError, TSecretSharingConfig, ValidCryptoMaterial,
 };
 use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup};
 use ark_ff::{AdditiveGroup, Fp, FpConfig};

@@ -39,24 +39,29 @@ module aptos_experimental::market_bulk_order {
         metadata: M,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ): Option<OrderId> {
-        let validation_result = callbacks.validate_bulk_order_placement(
-            account,
-            &bid_prices,
-            &bid_sizes,
-            &ask_prices,
-            &ask_sizes,
-            &metadata,
+        let validation_result =
+            callbacks.validate_bulk_order_placement(
+                account,
+                &bid_prices,
+                &bid_sizes,
+                &ask_prices,
+                &ask_sizes,
+                &metadata
+            );
+        assert!(
+            validation_result.is_validation_result_valid(),
+            E_CLEARINGHOUSE_VALIDATION_FAILED
         );
-        assert!(validation_result.is_validation_result_valid(), E_CLEARINGHOUSE_VALIDATION_FAILED);
-        let request = new_bulk_order_request(
-            account,
-            sequence_number,
-            bid_prices,
-            bid_sizes,
-            ask_prices,
-            ask_sizes,
-            metadata,
-        );
+        let request =
+            new_bulk_order_request(
+                account,
+                sequence_number,
+                bid_prices,
+                bid_sizes,
+                ask_prices,
+                ask_sizes,
+                metadata
+            );
         let response = market.get_order_book_mut().place_bulk_order(request);
 
         // Check if the response is a rejection
@@ -74,14 +79,25 @@ module aptos_experimental::market_bulk_order {
         };
 
         // Handle success response
-        let (bulk_order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num_option) = response.destroy_bulk_order_place_response_success();
         let (
-            order_request,
-            order_id,
-            _unique_priority_idx,
-            _creation_time_micros,
-        ) = bulk_order.destroy_bulk_order();
-        let (account, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, _metadata) = order_request.destroy_bulk_order_request(); // We don't need to keep the bulk order struct after placement
+            bulk_order,
+            cancelled_bid_prices,
+            cancelled_bid_sizes,
+            cancelled_ask_prices,
+            cancelled_ask_sizes,
+            previous_seq_num_option
+        ) = response.destroy_bulk_order_place_response_success();
+        let (order_request, order_id, _unique_priority_idx, _creation_time_micros) =
+            bulk_order.destroy_bulk_order();
+        let (
+            account,
+            order_sequence_number,
+            bid_prices,
+            bid_sizes,
+            ask_prices,
+            ask_sizes,
+            order_metadata
+        ) = order_request.destroy_bulk_order_request();
 
         assert!(sequence_number == order_sequence_number, E_SEQUENCE_NUMBER_MISMATCH);
         // Extract previous_seq_num from option, defaulting to 0 if none
@@ -100,6 +116,20 @@ module aptos_experimental::market_bulk_order {
             cancelled_ask_prices,
             cancelled_ask_sizes,
             previous_seq_num
+        );
+        // Invoke the place_bulk_order callback after successful placement
+        callbacks.place_bulk_order(
+            account,
+            order_id,
+            &bid_prices,
+            &bid_sizes,
+            &ask_prices,
+            &ask_sizes,
+            &cancelled_bid_prices,
+            &cancelled_bid_sizes,
+            &cancelled_ask_prices,
+            &cancelled_ask_sizes,
+            &order_metadata
         );
         option::some(order_id)
     }
@@ -120,7 +150,12 @@ module aptos_experimental::market_bulk_order {
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
         let account = signer::address_of(user);
-        cancel_bulk_order_internal(market, account, cancellation_reason, callbacks);
+        cancel_bulk_order_internal(
+            market,
+            account,
+            cancellation_reason,
+            callbacks
+        );
     }
 
     public(friend) fun cancel_bulk_order_internal<M: store + copy + drop, R: store + copy + drop>(
@@ -130,16 +165,37 @@ module aptos_experimental::market_bulk_order {
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
         let cancelled_bulk_order = market.get_order_book_mut().cancel_bulk_order(user);
-        let (order_request, order_id, _unique_priority_idx, _creation_time_micros) = cancelled_bulk_order.destroy_bulk_order();
-        let (_account, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, _metadata) = order_request.destroy_bulk_order_request();
+        let (order_request, order_id, _unique_priority_idx, _creation_time_micros) =
+            cancelled_bulk_order.destroy_bulk_order();
+        let (
+            _account,
+            order_sequence_number,
+            bid_prices,
+            bid_sizes,
+            ask_prices,
+            ask_sizes,
+            _metadata
+        ) = order_request.destroy_bulk_order_request();
         let i = 0;
         while (i < bid_sizes.length()) {
-            callbacks.cleanup_bulk_order_at_price(user, order_id, true, bid_prices[i], bid_sizes[i]);
+            callbacks.cleanup_bulk_order_at_price(
+                user,
+                order_id,
+                true,
+                bid_prices[i],
+                bid_sizes[i]
+            );
             i += 1;
         };
         let j = 0;
         while (j < ask_sizes.length()) {
-            callbacks.cleanup_bulk_order_at_price(user, order_id, false, ask_prices[j], ask_sizes[j]);
+            callbacks.cleanup_bulk_order_at_price(
+                user,
+                order_id,
+                false,
+                ask_prices[j],
+                ask_sizes[j]
+            );
             j += 1;
         };
         market.emit_event_for_bulk_order_cancelled(

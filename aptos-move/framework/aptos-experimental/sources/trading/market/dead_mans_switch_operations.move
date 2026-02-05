@@ -61,13 +61,15 @@ module aptos_experimental::dead_mans_switch_operations {
                 let account = order.get_order_request().get_account();
 
                 // Get creation timestamp in microseconds and convert to seconds
-                let creation_time_micros = order.get_order_request().get_creation_time_micros();
+                let creation_time_micros =
+                    order.get_order_request().get_creation_time_micros();
                 let creation_time_secs = creation_time_micros / MICROS_PER_SECOND;
 
                 // Check if order is valid according to dead man's switch
                 // We get tracker each time to avoid borrowing conflicts
                 let tracker = market.get_dead_mans_switch_tracker();
-                let is_valid = is_order_valid(tracker, account, option::some(creation_time_secs));
+                let is_valid =
+                    is_order_valid(tracker, account, option::some(creation_time_secs));
 
                 if (!is_valid) {
                     // Cancel the order
@@ -116,7 +118,9 @@ module aptos_experimental::dead_mans_switch_operations {
 
         // Check if order is valid according to dead man's switch
         let tracker = market.get_dead_mans_switch_tracker();
-        let is_valid = is_order_valid(tracker, account, option::some(creation_time_secs));
+        let is_valid = is_order_valid(
+            tracker, account, option::some(creation_time_secs)
+        );
 
         if (!is_valid) {
             // Cancel the bulk order
@@ -153,9 +157,7 @@ module aptos_experimental::dead_mans_switch_operations {
     ///
     /// ```
     public fun keep_alive<M: store + copy + drop>(
-        market: &mut Market<M>,
-        account: address,
-        timeout_seconds: u64
+        market: &mut Market<M>, account: address, timeout_seconds: u64
     ) {
         // Check if dead man's switch is enabled
         assert!(market.is_dead_mans_switch_enabled(), E_DEAD_MANS_SWITCH_NOT_ENABLED);
@@ -163,6 +165,12 @@ module aptos_experimental::dead_mans_switch_operations {
         let parent = market.get_parent();
         let market_addr = market.get_market();
         let tracker = market.get_dead_mans_switch_tracker_mut();
-        dead_mans_switch_tracker::keep_alive(tracker, parent, market_addr, account, timeout_seconds);
+        dead_mans_switch_tracker::keep_alive(
+            tracker,
+            parent,
+            market_addr,
+            account,
+            timeout_seconds
+        );
     }
 }

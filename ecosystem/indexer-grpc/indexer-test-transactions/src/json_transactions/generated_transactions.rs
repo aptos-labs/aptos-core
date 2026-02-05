@@ -406,6 +406,7 @@ pub const IMPORTED_MAINNET_TXNS_685_USER_TXN_ED25519: &[u8] = include_bytes!(con
     env!("CARGO_MANIFEST_DIR"),
     "/src/json_transactions/imported_mainnet_txns/685_user_txn_ed25519.json"
 ));
+
 pub const ALL_IMPORTED_MAINNET_TXNS: &[&[u8]] = &[
     IMPORTED_MAINNET_TXNS_2386021136_TRADEPORT_V2_FILL_COLLECTION_OFFER,
     IMPORTED_MAINNET_TXNS_121508544_STAKE_DISTRIBUTE,
@@ -621,10 +622,16 @@ pub const IMPORTED_DEVNET_TXNS_19922017_TOKEN_V1_OFFER_CLAIM: &[u8] = include_by
 pub const IMPORTED_DEVNET_TXNS_78753832_TOKEN_V2_MINT_TRANSFER_WITH_V2_EVENTS: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/json_transactions/imported_devnet_txns/78753832_token_v2_mint_transfer_with_v2_events.json"));
 
 pub const IMPORTED_DEVNET_TXNS_78753831_TOKEN_V1_MINT_TRANSFER_WITH_V2_EVENTS: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/json_transactions/imported_devnet_txns/78753831_token_v1_mint_transfer_with_v2_events.json"));
+
+pub const IMPORTED_DEVNET_TXNS_133807428_SIGNED_INTEGERS: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/src/json_transactions/imported_devnet_txns/133807428_signed_integers.json"
+));
 pub const ALL_IMPORTED_DEVNET_TXNS: &[&[u8]] = &[
     IMPORTED_DEVNET_TXNS_19922017_TOKEN_V1_OFFER_CLAIM,
     IMPORTED_DEVNET_TXNS_78753832_TOKEN_V2_MINT_TRANSFER_WITH_V2_EVENTS,
     IMPORTED_DEVNET_TXNS_78753831_TOKEN_V1_MINT_TRANSFER_WITH_V2_EVENTS,
+    IMPORTED_DEVNET_TXNS_133807428_SIGNED_INTEGERS,
 ];
 
 pub const SCRIPTED_TRANSACTIONS_SIMPLE_USER_SCRIPT4: &[u8] = include_bytes!(concat!(

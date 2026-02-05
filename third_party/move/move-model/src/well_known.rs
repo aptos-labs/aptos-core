@@ -51,6 +51,12 @@ pub const VECTOR_FUNCS_WITH_BYTECODE_INSTRS: &[&str] = &[
 
 pub const CMP_MODULE: &str = "cmp";
 
+pub const STRING_MODULE: &str = "string";
+pub const STRING_UTILS_MODULE: &str = "string_utils";
+
+pub const UTF8_FUNCTION_NAME: &str = "utf8";
+pub const INTO_BYTES_FUNCTION_NAME: &str = "into_bytes";
+
 pub const TYPE_NAME_MOVE: &str = "type_info::type_name";
 pub const TYPE_NAME_SPEC: &str = "type_info::$type_name";
 pub const TYPE_INFO_MOVE: &str = "type_info::type_of";

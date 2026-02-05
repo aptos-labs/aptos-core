@@ -16,7 +16,7 @@ use crate::{
 };
 use anyhow::bail;
 use aptos_crypto::{
-    bls12381, traits::SecretSharingConfig as _, CryptoMaterialError, ValidCryptoMaterial,
+    bls12381, traits::TSecretSharingConfig as _, CryptoMaterialError, ValidCryptoMaterial,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use blstrs::{G2Projective, Scalar};

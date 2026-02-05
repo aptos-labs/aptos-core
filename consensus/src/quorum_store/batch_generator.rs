@@ -249,7 +249,7 @@ impl BatchGenerator {
         counters::CREATED_BATCHES_COUNT.inc();
         counters::num_txn_per_batch(bucket_start.to_string().as_str(), txns.len());
 
-        if self.config.enable_batch_v2 {
+        if self.config.enable_batch_v2_tx {
             Batch::new_v2(
                 batch_id,
                 txns,
@@ -336,7 +336,7 @@ impl BatchGenerator {
         let mut batches = vec![];
 
         // Only categorize and separate transactions when BatchV2 is enabled
-        if self.config.enable_batch_v2 {
+        if self.config.enable_batch_v2_tx {
             // Group transactions by their batch kind
             let mut txns_by_kind: HashMap<BatchKind, Vec<SignedTransaction>> = HashMap::new();
 
@@ -570,7 +570,7 @@ impl BatchGenerator {
                             self.batch_writer.persist(persist_requests);
                             counters::BATCH_CREATION_PERSIST_LATENCY.observe_duration(persist_start.elapsed());
 
-                            if self.config.enable_batch_v2 {
+                            if self.config.enable_batch_v2_tx {
                                 network_sender.broadcast_batch_msg_v2(batches).await;
                             } else {
                                 let batches = batches.into_iter().map(|batch| {

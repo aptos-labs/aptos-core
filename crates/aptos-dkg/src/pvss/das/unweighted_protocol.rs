@@ -26,7 +26,7 @@ use anyhow::bail;
 use aptos_crypto::{
     bls12381,
     blstrs::{multi_pairing, random_scalar},
-    traits::SecretSharingConfig as _,
+    traits::TSecretSharingConfig as _,
     CryptoMaterialError, Genesis, SigningKey, ValidCryptoMaterial,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -300,9 +300,9 @@ impl AggregatableTranscript for Transcript {
         let g_1_inverse = pp.get_encryption_public_params().pubkey_base().neg();
 
         // The vector of left-hand-side ($\mathbb{G}_1$) inputs to each pairing in the multi-pairing.
-        let lhs = vec![h_1, ek.add(g_1_inverse), self.C_0.add(c.neg())];
+        let lhs = [h_1, ek.add(g_1_inverse), self.C_0.add(c.neg())];
         // The vector of right-hand-side ($\mathbb{G}_2$) inputs to each pairing in the multi-pairing.
-        let rhs = vec![v, self.hat_w, g_2];
+        let rhs = [v, self.hat_w, g_2];
 
         let res = multi_pairing(lhs.iter(), rhs.iter());
         if res != Gt::identity() {

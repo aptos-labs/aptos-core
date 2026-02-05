@@ -13,7 +13,7 @@ use crate::{
         threshold_config::ThresholdConfigBlstrs,
     },
     player::Player,
-    traits::{self, SecretSharingConfig as _, ThresholdConfig},
+    traits::{self, TSecretSharingConfig as _, ThresholdConfig},
 };
 use anyhow::anyhow;
 use ark_ec::CurveGroup;
@@ -319,7 +319,7 @@ impl<TC: ThresholdConfig> Display for WeightedConfig<TC> {
     }
 }
 
-impl<TC: ThresholdConfig> traits::SecretSharingConfig for WeightedConfig<TC> {
+impl<TC: ThresholdConfig> traits::TSecretSharingConfig for WeightedConfig<TC> {
     /// For testing only.
     fn get_random_player<R>(&self, rng: &mut R) -> Player
     where

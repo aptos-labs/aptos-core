@@ -1,0 +1,19 @@
+name: Rust Batch Encryption Tests
+description: Runs aptos-batch-encryption tests with TypeScript/Node.js dependencies
+inputs:
+  GIT_CREDENTIALS:
+    description: "Optional credentials to pass to git. Useful if you need to pull private repos for dependencies"
+    required: false
+
+runs:
+  using: composite
+  steps:
+    # The source code must be checked out by the workflow that invokes this action.
+
+    # Run the aptos-batch-encryption tests
+    - name: Run aptos-batch-encryption tests
+      run: |
+        cargo nextest run -p aptos-batch-encryption --profile ci --cargo-profile ci --locked --no-fail-fast --retries 3
+      shell: bash
+      env:
+        RUST_MIN_STACK: "4297152"
