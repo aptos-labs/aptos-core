@@ -1,10 +1,17 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! Message and QC verification for Prefix Consensus
 
-use crate::types::{PartyId, Vote1, Vote2, Vote3, QC1, QC2, QC3};
+use crate::{
+    signing::{verify_vote1_signature, verify_vote2_signature, verify_vote3_signature},
+    types::{PartyId, Vote1, Vote2, Vote3, QC1, QC2, QC3},
+};
 use anyhow::{bail, ensure, Result};
+use aptos_types::validator_verifier::ValidatorVerifier;
 use std::collections::HashSet;
 
 // ============================================================================
@@ -14,29 +21,23 @@ use std::collections::HashSet;
 /// Verify a Vote1 message
 ///
 /// Checks:
-/// 1. Vote has required fields
-///
-/// Note: For the prototype, we skip cryptographic signature verification.
-/// In production, this would verify the signature against the author's public key.
-pub fn verify_vote1(vote: &Vote1) -> Result<()> {
-    // Basic structural validation
-    if vote.input_vector.is_empty() {
-        // Empty vector is allowed
-    }
-
+/// 1. Signature is valid
+pub fn verify_vote1(vote: &Vote1, verifier: &ValidatorVerifier) -> Result<()> {
+    verify_vote1_signature(vote, &vote.author, verifier)?;
     Ok(())
 }
 
 /// Verify a Vote2 message
 ///
 /// Checks:
-/// 1. QC1 is valid
-/// 2. Certified prefix is consistent with QC1
-///
-/// Note: For the prototype, we skip cryptographic signature verification.
-pub fn verify_vote2(vote: &Vote2, f: usize, n: usize) -> Result<()> {
+/// 1. Embedded QC1 is valid (including all signatures)
+/// 2. Signature is valid
+pub fn verify_vote2(vote: &Vote2, f: usize, n: usize, verifier: &ValidatorVerifier) -> Result<()> {
     // Verify the embedded QC1
-    verify_qc1(&vote.qc1, f, n)?;
+    verify_qc1(&vote.qc1, f, n, verifier)?;
+
+    // Verify cryptographic signature
+    verify_vote2_signature(vote, &vote.author, verifier)?;
 
     Ok(())
 }
@@ -44,13 +45,14 @@ pub fn verify_vote2(vote: &Vote2, f: usize, n: usize) -> Result<()> {
 /// Verify a Vote3 message
 ///
 /// Checks:
-/// 1. QC2 is valid
-/// 2. MCP prefix is consistent with QC2
-///
-/// Note: For the prototype, we skip cryptographic signature verification.
-pub fn verify_vote3(vote: &Vote3, f: usize, n: usize) -> Result<()> {
+/// 1. Embedded QC2 is valid (including all signatures)
+/// 2. Signature is valid
+pub fn verify_vote3(vote: &Vote3, f: usize, n: usize, verifier: &ValidatorVerifier) -> Result<()> {
     // Verify the embedded QC2
-    verify_qc2(&vote.qc2, f, n)?;
+    verify_qc2(&vote.qc2, f, n, verifier)?;
+
+    // Verify cryptographic signature
+    verify_vote3_signature(vote, &vote.author, verifier)?;
 
     Ok(())
 }
@@ -64,8 +66,8 @@ pub fn verify_vote3(vote: &Vote3, f: usize, n: usize) -> Result<()> {
 /// Checks:
 /// 1. Has at least n-f votes
 /// 2. No duplicate authors
-/// 3. All votes are valid
-pub fn verify_qc1(qc1: &QC1, f: usize, n: usize) -> Result<()> {
+/// 3. All votes are valid (including signatures)
+pub fn verify_qc1(qc1: &QC1, f: usize, n: usize, verifier: &ValidatorVerifier) -> Result<()> {
     // Check quorum size
     ensure!(
         is_valid_quorum(qc1.vote_count(), n, f),
@@ -78,9 +80,9 @@ pub fn verify_qc1(qc1: &QC1, f: usize, n: usize) -> Result<()> {
     let authors: Vec<PartyId> = qc1.votes.iter().map(|v| v.author).collect();
     verify_no_duplicate_authors(&authors)?;
 
-    // Verify each vote
+    // Verify each vote (including signature)
     for vote in &qc1.votes {
-        verify_vote1(vote)?;
+        verify_vote1(vote, verifier)?;
     }
 
     Ok(())
@@ -91,9 +93,9 @@ pub fn verify_qc1(qc1: &QC1, f: usize, n: usize) -> Result<()> {
 /// Checks:
 /// 1. Has at least n-f votes
 /// 2. No duplicate authors
-/// 3. All votes are valid
-/// 4. All embedded QC1s are valid
-pub fn verify_qc2(qc2: &QC2, f: usize, n: usize) -> Result<()> {
+/// 3. All votes are valid (including signatures)
+/// 4. All embedded QC1s are valid (including signatures)
+pub fn verify_qc2(qc2: &QC2, f: usize, n: usize, verifier: &ValidatorVerifier) -> Result<()> {
     // Check quorum size
     ensure!(
         is_valid_quorum(qc2.vote_count(), n, f),
@@ -106,9 +108,9 @@ pub fn verify_qc2(qc2: &QC2, f: usize, n: usize) -> Result<()> {
     let authors: Vec<PartyId> = qc2.votes.iter().map(|v| v.author).collect();
     verify_no_duplicate_authors(&authors)?;
 
-    // Verify each vote (which includes verifying embedded QC1)
+    // Verify each vote (which includes verifying embedded QC1 with signatures)
     for vote in &qc2.votes {
-        verify_vote2(vote, f, n)?;
+        verify_vote2(vote, f, n, verifier)?;
     }
 
     Ok(())
@@ -119,9 +121,9 @@ pub fn verify_qc2(qc2: &QC2, f: usize, n: usize) -> Result<()> {
 /// Checks:
 /// 1. Has at least n-f votes
 /// 2. No duplicate authors
-/// 3. All votes are valid
-/// 4. All embedded QC2s are valid
-pub fn verify_qc3(qc3: &QC3, f: usize, n: usize) -> Result<()> {
+/// 3. All votes are valid (including signatures)
+/// 4. All embedded QC2s are valid (including all nested signatures)
+pub fn verify_qc3(qc3: &QC3, f: usize, n: usize, verifier: &ValidatorVerifier) -> Result<()> {
     // Check quorum size
     ensure!(
         is_valid_quorum(qc3.vote_count(), n, f),
@@ -134,9 +136,9 @@ pub fn verify_qc3(qc3: &QC3, f: usize, n: usize) -> Result<()> {
     let authors: Vec<PartyId> = qc3.votes.iter().map(|v| v.author).collect();
     verify_no_duplicate_authors(&authors)?;
 
-    // Verify each vote (which includes verifying embedded QC2)
+    // Verify each vote (which includes verifying embedded QC2 with all nested signatures)
     for vote in &qc3.votes {
-        verify_vote3(vote, f, n)?;
+        verify_vote3(vote, f, n, verifier)?;
     }
 
     Ok(())
@@ -162,11 +164,87 @@ pub fn is_valid_quorum(author_count: usize, n: usize, f: usize) -> bool {
     author_count >= (n - f)
 }
 
+// ============================================================================
+// Proof Verification (for Verifiable Prefix Consensus)
+// ============================================================================
+
+/// Verify that a v_low output is correctly derived from a QC3 proof
+///
+/// This is a standalone helper for verifying individual outputs when you don't
+/// have the full PrefixConsensusOutput struct (e.g., verifying certificates in
+/// Strong Prefix Consensus).
+///
+/// **WARNING**: This function does NOT verify the QC3 structure itself. You must
+/// call `verify_qc3()` separately to validate quorum size, signatures, etc.
+///
+/// # Arguments
+/// * `v_low` - The claimed low output
+/// * `qc3` - The QC3 certificate serving as proof
+///
+/// # Returns
+/// True if v_low equals mcp of all mcp_prefix values in QC3
+#[allow(dead_code)] // Part of public API for Strong Prefix Consensus
+pub fn verify_low_proof(v_low: &crate::types::PrefixVector, qc3: &QC3) -> bool {
+    use crate::certify::qc3_certify;
+    let (computed_v_low, _) = qc3_certify(qc3);
+    v_low == &computed_v_low
+}
+
+/// Verify that a v_high output is correctly derived from a QC3 proof
+///
+/// This is a standalone helper for verifying individual outputs when you don't
+/// have the full PrefixConsensusOutput struct (e.g., verifying certificates in
+/// Strong Prefix Consensus).
+///
+/// **WARNING**: This function does NOT verify the QC3 structure itself. You must
+/// call `verify_qc3()` separately to validate quorum size, signatures, etc.
+///
+/// # Arguments
+/// * `v_high` - The claimed high output
+/// * `qc3` - The QC3 certificate serving as proof
+///
+/// # Returns
+/// True if v_high equals mce of all mcp_prefix values in QC3
+#[allow(dead_code)] // Part of public API for Strong Prefix Consensus
+pub fn verify_high_proof(v_high: &crate::types::PrefixVector, qc3: &QC3) -> bool {
+    use crate::certify::qc3_certify;
+    let (_, computed_v_high) = qc3_certify(qc3);
+    v_high == &computed_v_high
+}
+
+/// Verify both v_low and v_high outputs against a QC3 proof
+///
+/// This is a standalone helper for verifying outputs when you don't have the
+/// full PrefixConsensusOutput struct.
+///
+/// **WARNING**: This function does NOT verify the QC3 structure itself. You must
+/// call `verify_qc3()` separately to validate quorum size, signatures, etc.
+///
+/// # Arguments
+/// * `v_low` - The claimed low output
+/// * `v_high` - The claimed high output
+/// * `qc3` - The QC3 certificate serving as proof
+///
+/// # Returns
+/// True if BOTH v_low and v_high are correctly derived from QC3
+#[allow(dead_code)] // Part of public API for Strong Prefix Consensus
+pub fn verify_output_proofs(
+    v_low: &crate::types::PrefixVector,
+    v_high: &crate::types::PrefixVector,
+    qc3: &QC3,
+) -> bool {
+    use crate::certify::qc3_certify;
+    let (computed_v_low, computed_v_high) = qc3_certify(qc3);
+    v_low == &computed_v_low && v_high == &computed_v_high
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::types::PrefixVector;
     use aptos_crypto::HashValue;
+    use aptos_types::validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier};
+    use std::sync::Arc;
 
     fn hash(i: u64) -> HashValue {
         HashValue::sha3_256_of(&i.to_le_bytes())
@@ -180,18 +258,31 @@ mod tests {
         aptos_crypto::bls12381::Signature::dummy_signature()
     }
 
+    fn create_test_verifier(count: usize) -> ValidatorVerifier {
+        let validator_infos: Vec<_> = (0..count)
+            .map(|i| {
+                let signer = aptos_types::validator_signer::ValidatorSigner::random(None);
+                ValidatorConsensusInfo::new(dummy_party_id(i as u8), signer.public_key(), 1)
+            })
+            .collect();
+        ValidatorVerifier::new(validator_infos)
+    }
+
     fn create_vote1(author_id: u8, vector: PrefixVector) -> Vote1 {
         Vote1::new(dummy_party_id(author_id), vector, 0, 0, dummy_signature())
     }
 
     #[test]
     fn test_verify_vote1_basic() {
+        let verifier = create_test_verifier(4);
         let vote = create_vote1(0, vec![hash(1), hash(2)]);
-        assert!(verify_vote1(&vote).is_ok());
+        // Will fail due to dummy signature not matching verifier's keys
+        assert!(verify_vote1(&vote, &verifier).is_err());
     }
 
     #[test]
     fn test_verify_qc1_sufficient_votes() {
+        let verifier = create_test_verifier(4);
         let votes = vec![
             create_vote1(0, vec![hash(1)]),
             create_vote1(1, vec![hash(1)]),
@@ -200,12 +291,13 @@ mod tests {
 
         let qc1 = QC1::new(votes);
 
-        // n=4, f=1, quorum=3
-        assert!(verify_qc1(&qc1, 1, 4).is_ok());
+        // n=4, f=1, quorum=3 - but will fail due to dummy signatures
+        assert!(verify_qc1(&qc1, 1, 4, &verifier).is_err());
     }
 
     #[test]
     fn test_verify_qc1_insufficient_votes() {
+        let verifier = create_test_verifier(4);
         let votes = vec![
             create_vote1(0, vec![hash(1)]),
             create_vote1(1, vec![hash(1)]),
@@ -213,12 +305,13 @@ mod tests {
 
         let qc1 = QC1::new(votes);
 
-        // n=4, f=1, quorum=3, but only 2 votes
-        assert!(verify_qc1(&qc1, 1, 4).is_err());
+        // n=4, f=1, quorum=3, but only 2 votes - will fail before signature check
+        assert!(verify_qc1(&qc1, 1, 4, &verifier).is_err());
     }
 
     #[test]
     fn test_verify_qc1_duplicate_authors() {
+        let verifier = create_test_verifier(4);
         let votes = vec![
             create_vote1(0, vec![hash(1)]),
             create_vote1(0, vec![hash(2)]), // Duplicate author
@@ -227,7 +320,8 @@ mod tests {
 
         let qc1 = QC1::new(votes);
 
-        assert!(verify_qc1(&qc1, 1, 4).is_err());
+        // Will fail due to duplicate authors (before signature check)
+        assert!(verify_qc1(&qc1, 1, 4, &verifier).is_err());
     }
 
     #[test]
@@ -284,8 +378,9 @@ mod tests {
 
         let qc2 = QC2::new(votes);
 
-        // n=4, f=1
-        assert!(verify_qc2(&qc2, 1, 4).is_ok());
+        // n=4, f=1 - but will fail due to dummy signatures
+        let verifier = create_test_verifier(4);
+        assert!(verify_qc2(&qc2, 1, 4, &verifier).is_err());
     }
 
     #[test]
@@ -334,7 +429,170 @@ mod tests {
 
         let qc3 = QC3::new(votes);
 
-        // n=4, f=1
-        assert!(verify_qc3(&qc3, 1, 4).is_ok());
+        // n=4, f=1 - but will fail due to dummy signatures
+        let verifier = create_test_verifier(4);
+        assert!(verify_qc3(&qc3, 1, 4, &verifier).is_err());
+    }
+
+    fn create_dummy_qc2() -> QC2 {
+        let qc1 = QC1::new(vec![
+            create_vote1(0, vec![hash(1)]),
+            create_vote1(1, vec![hash(1)]),
+            create_vote1(2, vec![hash(1)]),
+        ]);
+
+        QC2::new(vec![
+            Vote2::new(
+                dummy_party_id(0),
+                vec![hash(1)],
+                qc1.clone(),
+                0,
+                0,
+                dummy_signature(),
+            ),
+            Vote2::new(
+                dummy_party_id(1),
+                vec![hash(1)],
+                qc1.clone(),
+                0,
+                0,
+                dummy_signature(),
+            ),
+            Vote2::new(dummy_party_id(2), vec![hash(1)], qc1, 0, 0, dummy_signature()),
+        ])
+    }
+
+    #[test]
+    fn test_verify_low_proof_standalone() {
+        let hash1 = hash(1);
+        let hash2 = hash(2);
+
+        let qc2 = create_dummy_qc2();
+        let votes = vec![
+            Vote3::new(
+                dummy_party_id(0),
+                vec![hash1, hash2],
+                qc2.clone(),
+                0,
+                0,
+                dummy_signature(),
+            ),
+            Vote3::new(
+                dummy_party_id(1),
+                vec![hash1, hash2],
+                qc2.clone(),
+                0,
+                0,
+                dummy_signature(),
+            ),
+            Vote3::new(
+                dummy_party_id(2),
+                vec![hash1, hash2],
+                qc2,
+                0,
+                0,
+                dummy_signature(),
+            ),
+        ];
+
+        let qc3 = QC3::new(votes);
+
+        // Correct v_low
+        assert!(verify_low_proof(&vec![hash1, hash2], &qc3));
+
+        // Incorrect v_low
+        assert!(!verify_low_proof(&vec![hash1], &qc3));
+        assert!(!verify_low_proof(&vec![hash1, hash2, hash(3)], &qc3));
+    }
+
+    #[test]
+    fn test_verify_high_proof_standalone() {
+        let hash1 = hash(1);
+        let hash2 = hash(2);
+        let hash3 = hash(3);
+
+        let qc2 = create_dummy_qc2();
+        let votes = vec![
+            Vote3::new(
+                dummy_party_id(0),
+                vec![hash1, hash2, hash3],
+                qc2.clone(),
+                0,
+                0,
+                dummy_signature(),
+            ),
+            Vote3::new(
+                dummy_party_id(1),
+                vec![hash1, hash2],
+                qc2.clone(),
+                0,
+                0,
+                dummy_signature(),
+            ),
+            Vote3::new(dummy_party_id(2), vec![hash1], qc2, 0, 0, dummy_signature()),
+        ];
+
+        let qc3 = QC3::new(votes);
+
+        // mce = longest vector = [hash1, hash2, hash3]
+        assert!(verify_high_proof(&vec![hash1, hash2, hash3], &qc3));
+
+        // Incorrect v_high
+        assert!(!verify_high_proof(&vec![hash1, hash2], &qc3));
+        assert!(!verify_high_proof(&vec![hash1, hash2, hash3, hash(4)], &qc3));
+    }
+
+    #[test]
+    fn test_verify_output_proofs_standalone() {
+        let hash1 = hash(1);
+        let hash2 = hash(2);
+
+        let qc2 = create_dummy_qc2();
+        let votes = vec![
+            Vote3::new(
+                dummy_party_id(0),
+                vec![hash1, hash2],
+                qc2.clone(),
+                0,
+                0,
+                dummy_signature(),
+            ),
+            Vote3::new(
+                dummy_party_id(1),
+                vec![hash1, hash2],
+                qc2.clone(),
+                0,
+                0,
+                dummy_signature(),
+            ),
+            Vote3::new(
+                dummy_party_id(2),
+                vec![hash1, hash2],
+                qc2,
+                0,
+                0,
+                dummy_signature(),
+            ),
+        ];
+
+        let qc3 = QC3::new(votes);
+
+        // Both correct
+        assert!(verify_output_proofs(
+            &vec![hash1, hash2],
+            &vec![hash1, hash2],
+            &qc3
+        ));
+
+        // One incorrect
+        assert!(!verify_output_proofs(&vec![hash1], &vec![hash1, hash2], &qc3));
+        assert!(!verify_output_proofs(
+            &vec![hash1, hash2],
+            &vec![hash1],
+            &qc3
+        ));
+
+        // Both incorrect
+        assert!(!verify_output_proofs(&vec![hash1], &vec![hash1], &qc3));
     }
 }

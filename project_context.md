@@ -5,7 +5,7 @@
 Implementing Prefix Consensus protocols (from research paper "Prefix Consensus For Censorship Resistant BFT") within Aptos Core for leaderless, censorship-resistant consensus.
 
 **Current Phase**: Strong Prefix Consensus - Multi-view protocol for v_high agreement
-**Completed**: Basic Prefix Consensus primitive (3-round asynchronous protocol)
+**Completed**: Basic Prefix Consensus primitive with Verifiable Prefix Consensus (Phase 1)
 
 ---
 
@@ -32,9 +32,9 @@ Implementing Prefix Consensus protocols (from research paper "Prefix Consensus F
 
 ## Basic Prefix Consensus - Implementation Complete ✅
 
-**Status**: Production-ready 3-round asynchronous protocol
+**Status**: Production-ready 3-round asynchronous protocol with full signature verification
 **Completion Date**: February 4, 2026
-**Tests**: 74/74 unit tests passing, 2 smoke tests (100% success rate)
+**Tests**: 83/83 unit tests passing, 2 smoke tests (100% success rate)
 
 ### Key Components
 
@@ -56,7 +56,7 @@ Implementing Prefix Consensus protocols (from research paper "Prefix Consensus F
 - Direct routing in check_epoch() (bypasses UnverifiedEvent)
 
 **Testing**:
-- Unit tests: All 74 tests passing
+- Unit tests: All 83 tests passing
 - Smoke tests: Identical inputs, divergent inputs (both 100% success)
 - Property verification: Upper Bound, Validity, Consistency
 - Test script: `test_prefix_consensus.sh`
@@ -67,6 +67,25 @@ Implementing Prefix Consensus protocols (from research paper "Prefix Consensus F
 **Race Condition Fix**: Removed strict state checks (votes are self-contained)
 **Network Integration**: Generic trait-based sender with NetworkSenderAdapter
 **Architecture**: Arc<RwLock<>> state, tokio::select! event loop, structured logging
+
+### Security Enhancements (Phase 1 - Verifiable Prefix Consensus)
+
+**Author Mismatch Check**: Added to manager.rs process_vote1/2/3()
+- Prevents impersonation attacks where Byzantine party claims to be someone else
+- Check: vote.author must equal network sender
+- Signature alone is insufficient (sender can sign data claiming to be another party)
+
+**Full Signature Verification**: Added to verification.rs
+- All verify_vote*() functions now verify BLS signatures via ValidatorVerifier
+- All verify_qc*() functions recursively verify all embedded vote signatures
+- QC3 → Vote3 → QC2 → Vote2 → QC1 → Vote1: Signatures verified at every level
+- PrefixConsensusOutput::verify() now requires ValidatorVerifier parameter
+- Protocol stores ValidatorVerifier for internal verification
+
+**Proof Verification Functions**: Added to verification.rs and types.rs
+- verify_low_proof(): Verifies v_low derivation from QC3
+- verify_high_proof(): Verifies v_high derivation from QC3
+- PrefixConsensusOutput::verify(): Complete verification including QC3 structure and signatures
 
 ---
 
@@ -138,22 +157,23 @@ This layered architecture enables multi-slot censorship-resistant consensus as d
 
 ---
 
-## Current Status (February 4, 2026)
+## Current Status (February 5, 2026)
 
 ### Repository State
 - **Branch**: `prefix-consensus-prototype`
-- **HEAD**: `537848ce43` - Divergent inputs test complete
+- **HEAD**: Security enhancements for Verifiable Prefix Consensus
 - **Status**: Clean working directory
-- **Tests**: 74/74 unit tests, 2 smoke tests (100% success rate)
+- **Tests**: 83/83 unit tests, 2 smoke tests (100% success rate)
 - **Build**: ✅ No warnings or errors
 
 ### Progress Summary
 - ✅ **Basic Prefix Consensus**: Complete (Phase 1-6 of network-integration.md)
-- 🚧 **Strong Prefix Consensus**: Planning complete, ready to start Phase 1
+- ✅ **Strong PC Phase 1**: Verifiable Prefix Consensus complete (security fixes + proof verification)
+- 🚧 **Strong PC Phase 2+**: Certificate types and multi-view protocol pending
 - ⏳ **Slot Manager**: Future work (after Strong PC complete)
 
 ### Next Action
-Begin Strong Prefix Consensus Phase 1: Implement Verifiable Prefix Consensus (add proof outputs)
+Begin Strong Prefix Consensus Phase 2: Implement Certificate Types (Direct/Indirect certificates)
 
 ---
 
@@ -207,7 +227,8 @@ testsuite/smoke-test/src/consensus/strong_prefix_consensus/
 7. **9c96198f3f** (Feb 3): Smoke test infrastructure and bug fixes
 8. **6f12e09ceb** (Feb 3): Fix race condition, add output writing
 9. **f5e736d906** (Feb 4): Divergent inputs test
-10. **537848ce43** (Feb 4): Update docs (Phase 6 complete, Strong PC plan) ← HEAD
+10. **537848ce43** (Feb 4): Update docs (Phase 6 complete, Strong PC plan)
+11. **(pending)** (Feb 5): Security enhancements for Verifiable Prefix Consensus ← HEAD
 
 ---
 

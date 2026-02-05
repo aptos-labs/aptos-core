@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
@@ -483,6 +486,60 @@ impl PrefixConsensusOutput {
             .zip(self.v_high.iter())
             .all(|(a, b)| a == b)
     }
+
+    /// Verify that v_low and v_high are correctly derived from the QC3 proof
+    ///
+    /// This function checks that:
+    /// - v_low equals the maximum common prefix (mcp) of all mcp_prefix values in QC3
+    /// - v_high equals the minimum common extension (mce) of all mcp_prefix values in QC3
+    ///
+    /// **WARNING**: This method does NOT verify the QC3 structure itself (quorum size,
+    /// signatures, etc.). For complete verification, use `verify()` instead.
+    ///
+    /// Returns true only if BOTH proofs are valid.
+    pub fn verify_proofs(&self) -> bool {
+        use crate::certify::qc3_certify;
+        let (computed_v_low, computed_v_high) = qc3_certify(&self.qc3);
+        self.v_low == computed_v_low && self.v_high == computed_v_high
+    }
+
+    /// Verify the complete output including QC3 validity
+    ///
+    /// This performs complete verification suitable for external parties:
+    /// 1. Verifies QC3 structure (quorum size, no duplicate authors, all signatures)
+    /// 2. Verifies v_low and v_high are correctly derived from QC3
+    /// 3. Verifies upper bound property (v_low ⪯ v_high)
+    ///
+    /// # Arguments
+    /// * `f` - Maximum number of Byzantine faults tolerated
+    /// * `n` - Total number of validators
+    /// * `verifier` - Validator verifier for signature checks
+    pub fn verify(
+        &self,
+        f: usize,
+        n: usize,
+        verifier: &aptos_types::validator_verifier::ValidatorVerifier,
+    ) -> anyhow::Result<()> {
+        use crate::verification::verify_qc3;
+        use anyhow::ensure;
+
+        // 1. Verify QC3 structure is valid (including all signatures)
+        verify_qc3(&self.qc3, f, n, verifier)?;
+
+        // 2. Verify proofs (v_low/v_high match QC3)
+        ensure!(
+            self.verify_proofs(),
+            "Output proofs invalid: v_low or v_high don't match QC3 derivation"
+        );
+
+        // 3. Verify upper bound property
+        ensure!(
+            self.verify_upper_bound(),
+            "Upper bound property violated: v_low is not a prefix of v_high"
+        );
+
+        Ok(())
+    }
 }
 
 // ============================================================================
@@ -595,5 +652,271 @@ impl PendingVotes3 {
     pub fn into_qc3(self) -> QC3 {
         let votes: Vec<Vote3> = self.votes.into_values().collect();
         QC3::new(votes)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn hash(i: u64) -> HashValue {
+        HashValue::sha3_256_of(&i.to_le_bytes())
+    }
+
+    fn dummy_party(i: u8) -> PartyId {
+        PartyId::new([i; 32])
+    }
+
+    fn dummy_sig() -> BlsSignature {
+        BlsSignature::dummy_signature()
+    }
+
+    fn create_dummy_qc1() -> QC1 {
+        let votes = vec![
+            Vote1::new(dummy_party(0), vec![hash(1)], 0, 0, dummy_sig()),
+            Vote1::new(dummy_party(1), vec![hash(1)], 0, 0, dummy_sig()),
+            Vote1::new(dummy_party(2), vec![hash(1)], 0, 0, dummy_sig()),
+        ];
+        QC1::new(votes)
+    }
+
+    fn create_dummy_qc2() -> QC2 {
+        let qc1 = create_dummy_qc1();
+        let votes = vec![
+            Vote2::new(dummy_party(0), vec![hash(1)], qc1.clone(), 0, 0, dummy_sig()),
+            Vote2::new(dummy_party(1), vec![hash(1)], qc1.clone(), 0, 0, dummy_sig()),
+            Vote2::new(dummy_party(2), vec![hash(1)], qc1, 0, 0, dummy_sig()),
+        ];
+        QC2::new(votes)
+    }
+
+    #[test]
+    fn test_verify_proofs_valid() {
+        // Create QC3 with consistent mcp prefixes
+        let hash1 = hash(1);
+        let hash2 = hash(2);
+
+        let qc2 = create_dummy_qc2();
+
+        // All Vote3s have same mcp_prefix [hash1, hash2]
+        let votes = vec![
+            Vote3::new(
+                dummy_party(0),
+                vec![hash1, hash2],
+                qc2.clone(),
+                0,
+                0,
+                dummy_sig(),
+            ),
+            Vote3::new(
+                dummy_party(1),
+                vec![hash1, hash2],
+                qc2.clone(),
+                0,
+                0,
+                dummy_sig(),
+            ),
+            Vote3::new(dummy_party(2), vec![hash1, hash2], qc2, 0, 0, dummy_sig()),
+        ];
+
+        let qc3 = QC3::new(votes);
+        let v_low = vec![hash1, hash2]; // mcp of prefixes
+        let v_high = vec![hash1, hash2]; // mce of prefixes
+
+        let output = PrefixConsensusOutput::new(v_low, v_high, qc3);
+
+        // Proofs should be valid
+        assert!(output.verify_proofs());
+    }
+
+    #[test]
+    fn test_verify_proofs_invalid_v_low() {
+        // Create QC3 with mcp = [hash1]
+        let hash1 = hash(1);
+        let hash2 = hash(2);
+
+        let qc2 = create_dummy_qc2();
+        let votes = vec![
+            Vote3::new(dummy_party(0), vec![hash1], qc2.clone(), 0, 0, dummy_sig()),
+            Vote3::new(dummy_party(1), vec![hash1], qc2.clone(), 0, 0, dummy_sig()),
+            Vote3::new(dummy_party(2), vec![hash1], qc2, 0, 0, dummy_sig()),
+        ];
+
+        let qc3 = QC3::new(votes);
+
+        // Claim v_low = [hash1, hash2] (WRONG - should be [hash1])
+        let v_low = vec![hash1, hash2];
+        let v_high = vec![hash1];
+
+        let output = PrefixConsensusOutput::new(v_low, v_high, qc3);
+
+        // Proof should be invalid
+        assert!(!output.verify_proofs());
+    }
+
+    #[test]
+    fn test_verify_proofs_invalid_v_high() {
+        // Create QC3 with mce = [hash1, hash2, hash3]
+        let hash1 = hash(1);
+        let hash2 = hash(2);
+        let hash3 = hash(3);
+        let hash4 = hash(4);
+
+        let qc2 = create_dummy_qc2();
+        let votes = vec![
+            Vote3::new(
+                dummy_party(0),
+                vec![hash1, hash2],
+                qc2.clone(),
+                0,
+                0,
+                dummy_sig(),
+            ),
+            Vote3::new(
+                dummy_party(1),
+                vec![hash1, hash2, hash3],
+                qc2.clone(),
+                0,
+                0,
+                dummy_sig(),
+            ),
+            Vote3::new(dummy_party(2), vec![hash1], qc2, 0, 0, dummy_sig()),
+        ];
+
+        let qc3 = QC3::new(votes);
+        let v_low = vec![hash1]; // Correct mcp
+
+        // Claim v_high = [hash1, hash2, hash3, hash4] (WRONG - should be [hash1, hash2, hash3])
+        let v_high = vec![hash1, hash2, hash3, hash4];
+
+        let output = PrefixConsensusOutput::new(v_low, v_high, qc3);
+
+        // Proof should be invalid
+        assert!(!output.verify_proofs());
+    }
+
+    #[test]
+    fn test_verify_proofs_consistent_prefixes() {
+        // Test with consistent prefixes (one is prefix of another)
+        let hash1 = hash(1);
+        let hash2 = hash(2);
+        let hash3 = hash(3);
+
+        let qc2 = create_dummy_qc2();
+
+        // Prefixes: [hash1, hash2, hash3], [hash1, hash2], [hash1]
+        // All are consistent (each is prefix of the longest)
+        // mcp = [hash1] (shortest common prefix)
+        // mce = [hash1, hash2, hash3] (longest vector)
+        let votes = vec![
+            Vote3::new(
+                dummy_party(0),
+                vec![hash1, hash2, hash3],
+                qc2.clone(),
+                0,
+                0,
+                dummy_sig(),
+            ),
+            Vote3::new(
+                dummy_party(1),
+                vec![hash1, hash2],
+                qc2.clone(),
+                0,
+                0,
+                dummy_sig(),
+            ),
+            Vote3::new(dummy_party(2), vec![hash1], qc2, 0, 0, dummy_sig()),
+        ];
+
+        let qc3 = QC3::new(votes);
+        let v_low = vec![hash1];
+        let v_high = vec![hash1, hash2, hash3];
+
+        let output = PrefixConsensusOutput::new(v_low, v_high, qc3);
+
+        // Proofs should be valid
+        assert!(output.verify_proofs());
+    }
+
+    #[test]
+    fn test_verify_complete() {
+        // Test complete verification including QC3
+        let hash1 = hash(1);
+        let hash2 = hash(2);
+
+        let qc2 = create_dummy_qc2();
+
+        // All Vote3s have same mcp_prefix [hash1, hash2]
+        let votes = vec![
+            Vote3::new(
+                dummy_party(0),
+                vec![hash1, hash2],
+                qc2.clone(),
+                0,
+                0,
+                dummy_sig(),
+            ),
+            Vote3::new(
+                dummy_party(1),
+                vec![hash1, hash2],
+                qc2.clone(),
+                0,
+                0,
+                dummy_sig(),
+            ),
+            Vote3::new(dummy_party(2), vec![hash1, hash2], qc2, 0, 0, dummy_sig()),
+        ];
+
+        let qc3 = QC3::new(votes);
+        let v_low = vec![hash1, hash2];
+        let v_high = vec![hash1, hash2];
+
+        let output = PrefixConsensusOutput::new(v_low, v_high, qc3);
+
+        // Create validator verifier with dummy keys (won't match dummy signatures)
+        use aptos_types::validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier};
+        let validator_infos: Vec<_> = (0..4)
+            .map(|i| {
+                let signer = aptos_types::validator_signer::ValidatorSigner::random(None);
+                ValidatorConsensusInfo::new(dummy_party(i), signer.public_key(), 1)
+            })
+            .collect();
+        let verifier = ValidatorVerifier::new(validator_infos);
+
+        // Complete verification will fail due to invalid dummy signatures
+        assert!(output.verify(1, 4, &verifier).is_err());
+    }
+
+    #[test]
+    fn test_verify_complete_insufficient_votes() {
+        // Test that verify() catches insufficient quorum
+        let hash1 = hash(1);
+
+        let qc2 = create_dummy_qc2();
+
+        // Only 2 votes (insufficient for n=4, f=1 which requires 3)
+        let votes = vec![
+            Vote3::new(dummy_party(0), vec![hash1], qc2.clone(), 0, 0, dummy_sig()),
+            Vote3::new(dummy_party(1), vec![hash1], qc2, 0, 0, dummy_sig()),
+        ];
+
+        let qc3 = QC3::new(votes);
+        let v_low = vec![hash1];
+        let v_high = vec![hash1];
+
+        let output = PrefixConsensusOutput::new(v_low, v_high, qc3);
+
+        // Create validator verifier
+        use aptos_types::validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier};
+        let validator_infos: Vec<_> = (0..4)
+            .map(|i| {
+                let signer = aptos_types::validator_signer::ValidatorSigner::random(None);
+                ValidatorConsensusInfo::new(dummy_party(i), signer.public_key(), 1)
+            })
+            .collect();
+        let verifier = ValidatorVerifier::new(validator_infos);
+
+        // Complete verification should fail due to insufficient votes
+        assert!(output.verify(1, 4, &verifier).is_err());
     }
 }

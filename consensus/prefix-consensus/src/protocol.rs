@@ -84,11 +84,17 @@ pub struct PrefixConsensusProtocol {
 
     /// Final output
     output: Arc<RwLock<Option<PrefixConsensusOutput>>>,
+
+    /// Validator verifier for signature checking
+    validator_verifier: Arc<aptos_types::validator_verifier::ValidatorVerifier>,
 }
 
 impl PrefixConsensusProtocol {
     /// Create a new protocol instance
-    pub fn new(input: PrefixConsensusInput) -> Self {
+    pub fn new(
+        input: PrefixConsensusInput,
+        validator_verifier: Arc<aptos_types::validator_verifier::ValidatorVerifier>,
+    ) -> Self {
         Self {
             input,
             state: Arc::new(RwLock::new(ProtocolState::NotStarted)),
@@ -101,6 +107,7 @@ impl PrefixConsensusProtocol {
             mcp_prefix: Arc::new(RwLock::new(None)),
             qc3: Arc::new(RwLock::new(None)),
             output: Arc::new(RwLock::new(None)),
+            validator_verifier,
         }
     }
 
@@ -168,7 +175,7 @@ impl PrefixConsensusProtocol {
     /// Process an incoming Vote1
     pub async fn process_vote1(&self, vote: Vote1) -> Result<Option<QC1>> {
         // Verify vote
-        verify_vote1(&vote)?;
+        verify_vote1(&vote, &self.validator_verifier)?;
 
         debug!(
             author = %vote.author,
@@ -202,7 +209,7 @@ impl PrefixConsensusProtocol {
             let qc1 = consumed_pending.into_qc1();
 
             // Verify QC1
-            verify_qc1(&qc1, self.input.f, self.input.n)?;
+            verify_qc1(&qc1, self.input.f, self.input.n, &self.validator_verifier)?;
 
             // Store QC1
             *self.qc1.write().await = Some(qc1.clone());
@@ -287,7 +294,7 @@ impl PrefixConsensusProtocol {
     /// Process an incoming Vote2
     pub async fn process_vote2(&self, vote: Vote2) -> Result<Option<QC2>> {
         // Verify vote
-        verify_vote2(&vote, self.input.f, self.input.n)?;
+        verify_vote2(&vote, self.input.f, self.input.n, &self.validator_verifier)?;
 
         debug!(
             author = %vote.author,
@@ -320,7 +327,7 @@ impl PrefixConsensusProtocol {
             let qc2 = consumed_pending.into_qc2();
 
             // Verify QC2
-            verify_qc2(&qc2, self.input.f, self.input.n)?;
+            verify_qc2(&qc2, self.input.f, self.input.n, &self.validator_verifier)?;
 
             // Store QC2
             *self.qc2.write().await = Some(qc2.clone());
@@ -405,7 +412,7 @@ impl PrefixConsensusProtocol {
     /// Process an incoming Vote3
     pub async fn process_vote3(&self, vote: Vote3) -> Result<Option<PrefixConsensusOutput>> {
         // Verify vote
-        verify_vote3(&vote, self.input.f, self.input.n)?;
+        verify_vote3(&vote, self.input.f, self.input.n, &self.validator_verifier)?;
 
         debug!(
             author = %vote.author,
@@ -438,7 +445,7 @@ impl PrefixConsensusProtocol {
             let qc3 = consumed_pending.into_qc3();
 
             // Verify QC3
-            verify_qc3(&qc3, self.input.f, self.input.n)?;
+            verify_qc3(&qc3, self.input.f, self.input.n, &self.validator_verifier)?;
 
             // Store QC3
             *self.qc3.write().await = Some(qc3.clone());
@@ -458,6 +465,12 @@ impl PrefixConsensusProtocol {
             if !output.verify_upper_bound() {
                 error!("Output violates upper bound property!");
                 bail!("Output violates upper bound: v_low is not a prefix of v_high");
+            }
+
+            // Verify proofs (sanity check - should always pass if implementation is correct)
+            if !output.verify_proofs() {
+                error!("CRITICAL: Output proofs are invalid! This indicates an implementation bug.");
+                bail!("Output proofs invalid: v_low or v_high don't match QC3 derivation");
             }
 
             // Store output
@@ -531,12 +544,23 @@ mod tests {
 
     #[tokio::test]
     async fn test_protocol_state_transitions() {
-        let input = create_test_input(0, vec![hash(1), hash(2)], 4, 1);
-        let protocol = PrefixConsensusProtocol::new(input);
+        use aptos_types::validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier};
+        use std::sync::Arc;
+
+        let signer = ValidatorSigner::random(None);
+        let party_id = signer.author();
+
+        // Create input with matching party_id
+        let input = PrefixConsensusInput::new(vec![hash(1), hash(2)], party_id, 4, 1, 0);
+
+        // Create verifier with this signer's public key
+        let validator_info = ValidatorConsensusInfo::new(party_id, signer.public_key(), 1);
+        let verifier = Arc::new(ValidatorVerifier::new(vec![validator_info]));
+
+        let protocol = PrefixConsensusProtocol::new(input, verifier);
 
         assert_eq!(protocol.get_state().await, ProtocolState::NotStarted);
 
-        let signer = ValidatorSigner::random(None);
         protocol.start_round1(&signer).await.unwrap();
 
         assert_eq!(protocol.get_state().await, ProtocolState::Round1);
@@ -544,10 +568,21 @@ mod tests {
 
     #[tokio::test]
     async fn test_round1_vote_collection() {
-        let input = create_test_input(0, vec![hash(1), hash(2)], 4, 1);
-        let protocol = PrefixConsensusProtocol::new(input);
+        use aptos_types::validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier};
+        use std::sync::Arc;
 
         let signer = ValidatorSigner::random(None);
+        let party_id = signer.author();
+
+        // Create input with matching party_id
+        let input = PrefixConsensusInput::new(vec![hash(1), hash(2)], party_id, 4, 1, 0);
+
+        // Create verifier with this signer's public key
+        let validator_info = ValidatorConsensusInfo::new(party_id, signer.public_key(), 1);
+        let verifier = Arc::new(ValidatorVerifier::new(vec![validator_info]));
+
+        let protocol = PrefixConsensusProtocol::new(input, verifier);
+
         protocol.start_round1(&signer).await.unwrap();
 
         // Need 3 votes for quorum (n=4, f=1, quorum=3)

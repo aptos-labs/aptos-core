@@ -236,6 +236,17 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
             "Processing Vote1"
         );
 
+        // Check that claimed author matches network sender
+        if vote.author != author {
+            warn!(
+                party_id = %self.party_id,
+                claimed_author = %vote.author,
+                actual_sender = %author,
+                "Vote1 author mismatch - rejecting potential impersonation attack"
+            );
+            return Ok(());
+        }
+
         // Check for duplicate
         {
             let mut seen = self.seen_vote1.write().await;
@@ -336,6 +347,17 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
             seen.insert(vote.author);
         }
 
+        // Check that claimed author matches network sender
+        if vote.author != author {
+            warn!(
+                party_id = %self.party_id,
+                claimed_author = %vote.author,
+                actual_sender = %author,
+                "Vote2 author mismatch - rejecting potential impersonation attack"
+            );
+            return Ok(());
+        }
+
         // Verify signature
         if let Err(e) = verify_vote2_signature(&vote, &author, &self.validator_verifier) {
             warn!(
@@ -421,6 +443,17 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
             seen.insert(vote.author);
         }
 
+        // Check that claimed author matches network sender
+        if vote.author != author {
+            warn!(
+                party_id = %self.party_id,
+                claimed_author = %vote.author,
+                actual_sender = %author,
+                "Vote3 author mismatch - rejecting potential impersonation attack"
+            );
+            return Ok(());
+        }
+
         // Verify signature
         if let Err(e) = verify_vote3_signature(&vote, &author, &self.validator_verifier) {
             warn!(
@@ -480,7 +513,6 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
     /// Write output to file for smoke test validation
     async fn write_output_file(&self) -> anyhow::Result<()> {
         use serde::{Serialize, Deserialize};
-        use std::io::Write;
 
         #[derive(Serialize, Deserialize)]
         struct OutputFile {
@@ -586,7 +618,7 @@ mod tests {
             1,                          // epoch
         );
 
-        let protocol = Arc::new(PrefixConsensusProtocol::new(input));
+        let protocol = Arc::new(PrefixConsensusProtocol::new(input, verifier.clone()));
         let network_sender = MockNetworkSender;
 
         let manager = PrefixConsensusManager::new(
@@ -618,7 +650,7 @@ mod tests {
             1,                          // epoch
         );
 
-        let protocol = Arc::new(PrefixConsensusProtocol::new(input));
+        let protocol = Arc::new(PrefixConsensusProtocol::new(input, verifier.clone()));
         let network_sender = MockNetworkSender;
 
         let manager = PrefixConsensusManager::new(
@@ -665,7 +697,7 @@ mod tests {
             1,                          // epoch 1
         );
 
-        let protocol = Arc::new(PrefixConsensusProtocol::new(input));
+        let protocol = Arc::new(PrefixConsensusProtocol::new(input, verifier.clone()));
         let network_sender = MockNetworkSender;
 
         let manager = PrefixConsensusManager::new(
