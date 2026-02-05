@@ -122,7 +122,7 @@ function {:inline} $truncDiv(src1: int, src2: int): int {
     // They are equal when src1 >= 0 or when exact.
     // When src1 < 0 and src2 > 0 and not exact: trunc = euc + 1
     // When src1 < 0 and src2 < 0 and not exact: trunc = euc - 1
-    if ( src1 >= 0 && src2 != 0 ) then
+    if ( src1 >= 0 ) then
         src1 div src2
     else if (src1 mod src2 == 0) then
         src1 div src2
