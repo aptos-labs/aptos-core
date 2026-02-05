@@ -155,7 +155,7 @@ impl Default for ExecutionBackpressureTxnLimitConfig {
                 min_block_time_ms_to_activate: 50,
                 min_blocks_to_activate: 4,
                 metric: ExecutionBackpressureMetric::Percentile(0.5),
-                target_block_time_ms: 90,
+                target_block_time_ms: 150,
             },
             min_calibrated_txns_per_block: 30,
         }
