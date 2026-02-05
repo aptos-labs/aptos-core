@@ -246,46 +246,37 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare);
 }
 
-/// Trait for types that can be aggregated.
-/// Supports efficient intermediate aggregation in a separate associated type.
 pub trait Aggregatable: Sized {
-    /// Config type for secret-sharing aggregation
+    // Rename this?
     type SecretSharingConfig;
 
-    /// The intermediate/projective aggregation type
-    type Aggregated: Aggregated<Self>;
+    // Sized was needed for `Vec<Self>`
+    /// Aggregates two transcripts using a generic config type.
+    fn aggregate_with(
+        &mut self,
+        sc: &Self::SecretSharingConfig,
+        other: &Self,
+    ) -> anyhow::Result<()>;
 
-    /// Convert into the intermediate/projective type for aggregation
-    fn to_aggregated(&self) -> Self::Aggregated;
-
-    /// Aggregate a vector of items into a single affine value
-    fn aggregate(sc: &Self::SecretSharingConfig, items: Vec<Self>) -> anyhow::Result<Self> {
-        if items.is_empty() {
-            bail!("Cannot aggregate empty vector");
+    /// Helper function for aggregating a vector of transcripts.
+    /// Used primarily for benchmarks and tests.
+    fn aggregate(sc: &Self::SecretSharingConfig, mut trxs: Vec<Self>) -> anyhow::Result<Self> {
+        if trxs.is_empty() {
+            bail!("Cannot aggregate empty vector of transcripts");
         }
 
-        // Convert the first item into the intermediate type
-        let mut iter = items.into_iter();
-        let first = iter.next().unwrap();
-        let mut acc = first.to_aggregated();
+        let (first, rest) = trxs.split_at_mut(1);
 
-        // Aggregate the rest
-        for item in iter {
-            acc.aggregate_with(&sc, &item)?;
+        for other in rest {
+            first[0].aggregate_with(sc, other)?;
         }
 
-        // Convert back to affine/final type
-        Ok(acc.normalize())
+        // `first[0]` has accumulated everything, return it
+        trxs.truncate(1);
+        let trx = trxs.pop().unwrap();
+
+        Ok(trx)
     }
-}
-
-/// Trait for the intermediate aggregation type
-pub trait Aggregated<T: Aggregatable>: Sized {
-    /// Aggregate another item into this intermediate aggregation
-    fn aggregate_with(&mut self, sc: &T::SecretSharingConfig, other: &T) -> anyhow::Result<()>;
-
-    /// Convert the intermediate/projective aggregation back into the final affine type
-    fn normalize(self) -> T;
 }
 
 pub trait AggregatableTranscript:

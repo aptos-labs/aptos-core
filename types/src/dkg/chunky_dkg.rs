@@ -20,7 +20,9 @@ use aptos_dkg::pvss::{
         EncryptPubKey, InputSecret, PublicParameters, SignedWeightedTranscript,
         WeightedSubtranscript,
     },
-    traits::transcript::{Aggregated, HasAggregatableSubtranscript, Transcript, WithMaxNumShares},
+    traits::transcript::{
+        Aggregatable, HasAggregatableSubtranscript, Transcript, WithMaxNumShares,
+    },
     Player,
 };
 use move_core_types::{

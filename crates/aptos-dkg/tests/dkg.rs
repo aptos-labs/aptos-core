@@ -25,7 +25,7 @@ fn test_dkg_all_unweighted() {
 #[test]
 fn test_dkg_all_weighted() {
     let mut rng = thread_rng();
-    let wcs: Vec<_> = test_utils::get_weighted_configs_for_testing();
+    let wcs = test_utils::get_weighted_configs_for_testing();
     let seed = random_scalar(&mut rng);
 
     aggregatable_dkg::<GenericWeighting<unweighted_protocol::Transcript>>(

@@ -8,7 +8,7 @@ use crate::{
         traits::{self, transcript::MalleableTranscript, AggregatableTranscript, Convert},
         Player, ThresholdConfigBlstrs,
     },
-    traits::transcript::{Aggregatable, Aggregated},
+    traits::transcript::Aggregatable,
     utils::{
         random::{insecure_random_g2_points, random_scalars},
         HasMultiExp,
@@ -199,15 +199,8 @@ impl AggregatableTranscript for Transcript {
 }
 
 impl Aggregatable for Transcript {
-    type Aggregated = Self;
     type SecretSharingConfig = ThresholdConfigBlstrs;
 
-    fn to_aggregated(&self) -> Self::Aggregated {
-        self.clone()
-    }
-}
-
-impl Aggregated<Transcript> for Transcript {
     fn aggregate_with(
         &mut self,
         sc: &ThresholdConfigBlstrs,
@@ -227,10 +220,6 @@ impl Aggregated<Transcript> for Transcript {
         debug_assert_eq!(self.V.len(), other.V.len());
 
         Ok(())
-    }
-
-    fn normalize(self) -> Transcript {
-        self
     }
 }
 
