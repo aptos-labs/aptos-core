@@ -23,6 +23,7 @@ pub enum OnChainConfig {
     ObservedJWKs,
     Features,
     DKGState,
+    OracleState,
 }
 
 impl FromStr for OnChainConfig {
@@ -47,6 +48,7 @@ impl FromStr for OnChainConfig {
             "ObservedJWKs" => Ok(OnChainConfig::ObservedJWKs),
             "Features" => Ok(OnChainConfig::Features),
             "DKGState" => Ok(OnChainConfig::DKGState),
+            "OracleState" => Ok(OnChainConfig::OracleState),
             _ => Err(format!("Unknown OnChainConfig variant: {}", s)),
         }
     }
