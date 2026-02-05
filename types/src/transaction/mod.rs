@@ -156,6 +156,8 @@ impl ReplayProtector {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aptos_crypto::hash::CryptoHash;
+
     #[test]
     fn test_replay_protector_order() {
         let nonce = ReplayProtector::Nonce(1);
@@ -169,6 +171,94 @@ mod tests {
         let sequence_number1 = ReplayProtector::SequenceNumber(3);
         let sequence_number2 = ReplayProtector::SequenceNumber(4);
         assert!(sequence_number1 < sequence_number2);
+    }
+
+    #[test]
+    fn test_committed_hash_matches_crypto_hash() {
+        // In test mode, Transaction derives BCSCryptoHash, so we can compare
+        // committed_hash() against CryptoHash::hash() to ensure they match.
+        // This test will fail if the manual implementation in compute_transaction_hash()
+        // ever diverges from the CryptoHash trait implementation.
+
+        // Test StateCheckpoint variant
+        let state_checkpoint = Transaction::StateCheckpoint(HashValue::random());
+        assert_eq!(
+            state_checkpoint.committed_hash(),
+            state_checkpoint.hash(),
+            "StateCheckpoint committed_hash should match CryptoHash::hash()"
+        );
+
+        // Test BlockMetadata variant
+        let block_metadata = Transaction::BlockMetadata(BlockMetadata::new(
+            HashValue::random(),
+            1,                           // epoch
+            1,                           // round
+            AccountAddress::random(),    // proposer
+            vec![0],                     // previous_block_votes_bitvec
+            vec![],                      // failed_proposer_indices
+            12345,                       // timestamp_usecs
+        ));
+        assert_eq!(
+            block_metadata.committed_hash(),
+            block_metadata.hash(),
+            "BlockMetadata committed_hash should match CryptoHash::hash()"
+        );
+
+        // Test UserTransaction variant - this also tests the caching in SignedTransaction
+        let sender = AccountAddress::random();
+        let raw_txn = RawTransaction::new_script(
+            sender,
+            0,
+            Script::new(vec![0u8], vec![], vec![]),
+            100,
+            1,
+            u64::MAX,
+            ChainId::test(),
+        );
+        let signed_txn = SignedTransaction::new_single_sender(
+            raw_txn,
+            AccountAuthenticator::NoAccountAuthenticator,
+        );
+        let user_txn = Transaction::UserTransaction(signed_txn);
+        assert_eq!(
+            user_txn.committed_hash(),
+            user_txn.hash(),
+            "UserTransaction committed_hash should match CryptoHash::hash()"
+        );
+    }
+
+    #[test]
+    fn test_user_transaction_committed_hash_is_cached() {
+        // Verify that SignedTransaction caches the committed_hash
+        let sender = AccountAddress::random();
+        let raw_txn = RawTransaction::new_script(
+            sender,
+            0,
+            Script::new(vec![0u8], vec![], vec![]),
+            100,
+            1,
+            u64::MAX,
+            ChainId::test(),
+        );
+        let signed_txn = SignedTransaction::new_single_sender(
+            raw_txn,
+            AccountAuthenticator::NoAccountAuthenticator,
+        );
+
+        // First call computes and caches the hash
+        let hash1 = signed_txn.committed_hash();
+        // Second call should return the cached value
+        let hash2 = signed_txn.committed_hash();
+
+        assert_eq!(hash1, hash2, "Cached hash should be consistent");
+
+        // Verify it matches the CryptoHash::hash() (available in test mode via BCSCryptoHash derive)
+        let user_txn = Transaction::UserTransaction(signed_txn.clone());
+        assert_eq!(
+            hash1,
+            user_txn.hash(),
+            "Cached hash should match CryptoHash::hash()"
+        );
     }
 }
 
@@ -2947,6 +3037,7 @@ fn compute_transaction_hash(txn: &Transaction) -> HashValue {
 /// transaction.
 #[allow(clippy::large_enum_variant)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(BCSCryptoHash))]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher)]
 pub enum Transaction {
     /// Transaction submitted by the user. e.g: P2P payment transaction, publishing module
