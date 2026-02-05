@@ -71,4 +71,5 @@ pub enum Topic {
         issuer: jwks::Issuer,
         kid: jwks::KID,
     },
+    ChunkyDKG,
 }

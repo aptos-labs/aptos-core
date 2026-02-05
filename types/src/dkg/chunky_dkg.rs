@@ -26,8 +26,10 @@ use aptos_dkg::pvss::{
     Player,
 };
 use move_core_types::{
-    account_address::AccountAddress, ident_str, identifier::IdentStr, move_resource::MoveStructType,
+    account_address::AccountAddress, ident_str, identifier::IdentStr, language_storage::TypeTag,
+    move_resource::MoveStructType,
 };
+use once_cell::sync::Lazy;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
@@ -128,6 +130,9 @@ impl MoveStructType for ChunkyDKGStartEvent {
     const MODULE_NAME: &'static IdentStr = ident_str!("chunky_dkg");
     const STRUCT_NAME: &'static IdentStr = ident_str!("ChunkyDKGStartEvent");
 }
+
+pub static CHUNKY_DKG_START_EVENT_MOVE_TYPE_TAG: Lazy<TypeTag> =
+    Lazy::new(|| TypeTag::Struct(Box::new(ChunkyDKGStartEvent::struct_tag())));
 
 pub struct ChunkyDKG {
     threshold_config: ChunkyDKGThresholdConfig,

@@ -7,6 +7,7 @@ use crate::{
     types::DKGMessage,
 };
 use anyhow::{anyhow, ensure, Context};
+use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
 use aptos_dkg::pvss::{
     traits::{
@@ -30,7 +31,6 @@ use aptos_types::{
     validator_verifier::VerifyError,
 };
 use futures::future::AbortHandle;
-use futures_channel::oneshot;
 use futures_util::future::Abortable;
 use move_core_types::account_address::AccountAddress;
 use std::{
@@ -51,7 +51,7 @@ pub fn start_subtranscript_aggregation(
     dkg_config: ChunkyDKGConfig,
     spks: Vec<DealerPublicKey>,
     start_time: Duration,
-    agg_subtrx_tx: Option<oneshot::Sender<AggregatedSubtranscript>>,
+    agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscript>>,
     received_transcripts: Arc<Mutex<HashMap<AccountAddress, ChunkyTranscript>>>,
 ) -> AbortHandle {
     let epoch = dkg_config.session_metadata.dealer_epoch;
@@ -86,11 +86,11 @@ struct InnerState {
     valid_peer_transcript_seen: bool,
     contributors: HashSet<AccountAddress>,
     subtrx: Option<ChunkySubtranscript>,
-    agg_subtrx_tx: Option<oneshot::Sender<AggregatedSubtranscript>>,
+    agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscript>>,
 }
 
 impl InnerState {
-    fn new(agg_subtrx_tx: Option<oneshot::Sender<AggregatedSubtranscript>>) -> Self {
+    fn new(agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscript>>) -> Self {
         Self {
             valid_peer_transcript_seen: false,
             contributors: HashSet::new(),
@@ -117,7 +117,7 @@ impl ChunkyTranscriptAggregationState {
         dkg_config: ChunkyDKGConfig,
         signing_pubkeys: Vec<DealerPublicKey>,
         start_time: Duration,
-        agg_subtrx_tx: Option<oneshot::Sender<AggregatedSubtranscript>>,
+        agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscript>>,
         received_transcripts: Arc<Mutex<HashMap<AccountAddress, ChunkyTranscript>>>,
     ) -> Self {
         Self {
@@ -294,7 +294,7 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
                     subtranscript: agg_trx,
                     dealers,
                 };
-                if let Err(e) = tx.send(agg_subtrx) {
+                if let Err(e) = tx.push((), agg_subtrx) {
                     info!(
                         epoch = epoch,
                         "[ChunkyDKG] Failed to send aggregated chunky transcript to ChunkyDKGManager when quorum met: {:?}", e

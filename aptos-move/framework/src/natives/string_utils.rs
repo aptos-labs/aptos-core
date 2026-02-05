@@ -650,12 +650,18 @@ fn native_format_list(
                 native_format_impl(&mut format_context, &ty, car, 0, &mut out)?;
                 continue;
             } else if c != '{' {
-                return Err(SafeNativeError::abort(EINVALID_FORMAT));
+                return Err(SafeNativeError::abort_with_message(
+                    EINVALID_FORMAT,
+                    "Invalid format string: unmatched '{{' bracket",
+                ));
             }
         } else if in_braces == -1 {
             in_braces = 0;
             if c != '}' {
-                return Err(SafeNativeError::abort(EINVALID_FORMAT));
+                return Err(SafeNativeError::abort_with_message(
+                    EINVALID_FORMAT,
+                    "Invalid format string: unmatched '}}' bracket",
+                ));
             }
         } else if c == '{' {
             in_braces = 1;
@@ -667,7 +673,10 @@ fn native_format_list(
         out.push(c);
     }
     if in_braces != 0 {
-        return Err(SafeNativeError::abort(EINVALID_FORMAT));
+        return Err(SafeNativeError::abort_with_message(
+            EINVALID_FORMAT,
+            "Invalid format string: unclosed brackets",
+        ));
     }
     match_list_ty(context, list_ty, "NIL")?;
 

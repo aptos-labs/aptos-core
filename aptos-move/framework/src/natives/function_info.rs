@@ -19,6 +19,13 @@ use move_vm_types::{
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
+mod abort_codes {
+    /// String is not a valid Move identifier
+    pub const EINVALID_IDENTIFIER: u64 = 1;
+    /// Function specified in the FunctionInfo doesn't exist on chain
+    pub const EINVALID_FUNCTION: u64 = 2;
+}
+
 // Extract Identifier from a move value of type &String
 fn identifier_from_ref(v: Value) -> SafeNativeResult<Identifier> {
     let bytes = v
@@ -28,7 +35,12 @@ fn identifier_from_ref(v: Value) -> SafeNativeResult<Identifier> {
         .map_err(SafeNativeError::InvariantViolation)?
         .as_bytes_ref()
         .to_vec();
-    Identifier::from_utf8(bytes).map_err(|_| SafeNativeError::abort(1))
+    Identifier::from_utf8(bytes).map_err(|_| {
+        SafeNativeError::abort_with_message(
+            abort_codes::EINVALID_IDENTIFIER,
+            "String is not a valid Move identifier",
+        )
+    })
 }
 
 pub(crate) fn extract_function_info(
@@ -99,27 +111,61 @@ fn native_check_dispatch_type_compatibility_impl(
                 context.traversal_context().legacy_check_visited(a, n)
             }
         };
-        check_visited(module.address(), module.name()).map_err(|_| SafeNativeError::abort(2))?;
 
-        (
-            context
-                .load_function(&module, &func)
-                .map_err(|_| SafeNativeError::abort(2))?,
-            module,
-        )
+        check_visited(module.address(), module.name()).map_err(|_| {
+            SafeNativeError::abort_with_message(
+                abort_codes::EINVALID_FUNCTION,
+                format!(
+                    "Module {}::{} is not loaded prior to native dispatch",
+                    module.address(),
+                    module.name()
+                ),
+            )
+        })?;
+
+        let function = context.load_function(&module, &func).map_err(|_| {
+            SafeNativeError::abort_with_message(
+                abort_codes::EINVALID_FUNCTION,
+                format!(
+                    "Cannot load RHS function: {}::{}::{}",
+                    module.address(),
+                    module.name(),
+                    func
+                ),
+            )
+        })?;
+
+        (function, module)
     };
-    let (lhs, lhs_id) = {
+
+    let (lhs, lhs_id, lhs_func_name) = {
         let (module, func) = extract_function_info(&mut arguments)?;
-        (
-            context
-                .load_function(&module, &func)
-                .map_err(|_| SafeNativeError::abort(2))?,
-            module,
-        )
+
+        let function = context.load_function(&module, &func).map_err(|_| {
+            SafeNativeError::abort_with_message(
+                abort_codes::EINVALID_FUNCTION,
+                format!(
+                    "Cannot load LHS function: {}::{}::{}",
+                    module.address(),
+                    module.name(),
+                    func
+                ),
+            )
+        })?;
+
+        (function, module, func)
     };
 
     if lhs.param_tys().is_empty() {
-        return Err(SafeNativeError::abort(2));
+        return Err(SafeNativeError::abort_with_message(
+            abort_codes::EINVALID_FUNCTION,
+            format!(
+                "Expected LHS function {}::{}::{} to have 1 or more parameters",
+                lhs_id.address(),
+                lhs_id.name(),
+                lhs_func_name
+            ),
+        ));
     }
 
     Ok(smallvec![Value::bool(
