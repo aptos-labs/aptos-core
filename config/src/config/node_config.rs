@@ -13,6 +13,7 @@ use crate::{
         ApiConfig, BaseConfig, ConsensusConfig, Error, ExecutionConfig, IndexerConfig,
         IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig, NetworkConfig,
         PeerMonitoringServiceConfig, SafetyRulesTestConfig, StateSyncConfig, StorageConfig,
+        TelemetryServiceConfig,
     },
     network_id::NetworkId,
 };
@@ -83,6 +84,8 @@ pub struct NodeConfig {
     pub state_sync: StateSyncConfig,
     #[serde(default)]
     pub storage: StorageConfig,
+    #[serde(default)]
+    pub telemetry_service: TelemetryServiceConfig,
     #[serde(default)]
     pub transaction_filters: TransactionFiltersConfig,
     #[serde(default)]
