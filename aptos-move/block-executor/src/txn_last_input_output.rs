@@ -568,10 +568,11 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
                 global_module_cache,
                 versioned_cache.module_cache(),
             )?;
+            // Flush layouts that depend on this specific module
+            global_module_cache.flush_layouts_for_module(write.module_id());
         }
         if published {
             // Record validation requirements after the modules are published.
-            global_module_cache.flush_layout_cache();
             scheduler.record_validation_requirements(txn_idx, module_ids_for_v2)?;
         }
         Ok(published)

@@ -9,7 +9,7 @@ use aptos_types::{
 };
 use aptos_vm_types::module_write_set::ModuleWrite;
 use dashmap::DashMap;
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use move_binary_format::{errors::PartialVMResult, CompiledModule};
 use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::{LayoutCacheEntry, Module, RuntimeEnvironment, StructKey};
@@ -94,6 +94,10 @@ pub struct GlobalModuleCache<K, D, V, E> {
     /// Cached layouts of structs or enums. This cache stores roots only and is invalidated when
     /// modules are published.
     struct_layouts: DashMap<StructKey, LayoutCacheEntry>,
+    /// Maps module IDs to the set of layout keys whose layouts depend on that module (i.e., depend
+    /// on struct or enum definitions from this module).
+    /// Used for selective cache invalidation on module upgrades.
+    module_to_layouts: DashMap<ModuleId, HashSet<StructKey>>,
 }
 
 impl<K, D, V, E> GlobalModuleCache<K, D, V, E>
@@ -108,6 +112,7 @@ where
             module_cache: HashMap::new(),
             size: 0,
             struct_layouts: DashMap::new(),
+            module_to_layouts: DashMap::new(),
         }
     }
 
@@ -157,6 +162,7 @@ where
         self.module_cache.clear();
         self.size = 0;
         self.struct_layouts.clear();
+        self.module_to_layouts.clear();
     }
 
     /// Flushes only layout caches.
@@ -165,6 +171,22 @@ where
         //   Flushing is only needed because of enums. Once we refactor layouts to store a single
         //   variant instead, this can be removed.
         self.struct_layouts.clear();
+        self.module_to_layouts.clear();
+    }
+
+    /// Flushes only the layouts that depend on the specified module.
+    pub fn flush_layouts_for_module(&self, module_id: &ModuleId) {
+        if let Some((_, layout_keys)) = self.module_to_layouts.remove(module_id) {
+            for key in layout_keys.iter() {
+                // Note that removing this key, we can have other revers mappings storing "dead"
+                // keys. For example, if we have modules A and B that are both used by layout L,
+                // on flush for A, B still points to L's key.
+                // This is fine because keys are small, and we do not need to do GC here. It is
+                // also safe because layouts are compatible and so new upgraded layout will still
+                // depend on the same module.
+                self.struct_layouts.remove(key);
+            }
+        }
     }
 
     /// Returns layout entry if it exists in global cache.
@@ -184,6 +206,13 @@ where
         entry: LayoutCacheEntry,
     ) -> PartialVMResult<()> {
         if let dashmap::Entry::Vacant(e) = self.struct_layouts.entry(*key) {
+            // Populate reverse index before inserting the layout.
+            for module_id in entry.defining_modules().iter() {
+                self.module_to_layouts
+                    .entry(module_id.clone())
+                    .or_insert_with(HashSet::new)
+                    .insert(*key);
+            }
             e.insert(entry);
         }
         Ok(())
@@ -264,6 +293,7 @@ where
             module_cache,
             size: self.size,
             struct_layouts: self.struct_layouts.clone(),
+            module_to_layouts: self.module_to_layouts.clone(),
         }
     }
 }
@@ -322,6 +352,7 @@ pub(crate) fn add_module_write_to_module_cache<T: BlockExecutableTransaction>(
 mod test {
     use super::*;
     use claims::{assert_err, assert_ok};
+    use move_core_types::{account_address::AccountAddress, identifier::Identifier};
     use move_vm_types::code::{mock_deserialized_code, mock_verified_code, MockExtension};
 
     #[test]
@@ -431,5 +462,105 @@ mod test {
 
         assert_eq!(cache.num_modules(), 1);
         assert_eq!(cache.size_in_bytes(), 32);
+    }
+
+    fn module_id(name: &str) -> ModuleId {
+        ModuleId::new(AccountAddress::random(), Identifier::new(name).unwrap())
+    }
+
+    #[test]
+    fn test_layout_cache() {
+        let key1 = StructKey::struct_key_for_testing(1);
+        let layout1 = LayoutCacheEntry::new_for_testing([module_id("a")]);
+
+        let key2 = StructKey::struct_key_for_testing(2);
+        let layout2 = LayoutCacheEntry::new_for_testing([module_id("a"), module_id("b")]);
+
+        let key3 = StructKey::struct_key_for_testing(3);
+        let layout3 = LayoutCacheEntry::new_for_testing([module_id("a"), module_id("b")]);
+
+        let cache = GlobalModuleCache::empty();
+        cache.store_struct_layout_entry(&key1, layout1).unwrap();
+        cache.store_struct_layout_entry(&key2, layout2).unwrap();
+        cache.store_struct_layout_entry(&key3, layout3).unwrap();
+
+        // In total: 3 layouts and 2 modules
+        assert_eq!(cache.num_cached_layouts(), 3);
+        assert_eq!(cache.module_to_layouts.len(), 2);
+
+        let a_layout_keys = cache
+            .module_to_layouts
+            .get(&module_id("a"))
+            .unwrap()
+            .value()
+            .clone();
+        let b_layout_keys = cache
+            .module_to_layouts
+            .get(&module_id("b"))
+            .unwrap()
+            .value()
+            .clone();
+
+        assert_eq!(a_layout_keys.len(), 3);
+        assert!(a_layout_keys.contains(&key1));
+        assert!(a_layout_keys.contains(&key2));
+        assert!(a_layout_keys.contains(&key3));
+
+        assert_eq!(b_layout_keys.len(), 2);
+        assert!(b_layout_keys.contains(&key2));
+        assert!(b_layout_keys.contains(&key3));
+
+        // Now flush for module B. Only 1 layout should be left (for A). Only 1 module entry is
+        // left (for A).
+        cache.flush_layouts_for_module(&module_id("b"));
+        assert_eq!(cache.num_cached_layouts(), 1);
+        assert_eq!(cache.module_to_layouts.len(), 1);
+
+        // Keys for A may still be stale!
+        let a_layout_keys = cache
+            .module_to_layouts
+            .get(&module_id("a"))
+            .unwrap()
+            .value()
+            .clone();
+        assert_eq!(a_layout_keys.len(), 3);
+        assert!(a_layout_keys.contains(&key1));
+        assert!(a_layout_keys.contains(&key2));
+        assert!(a_layout_keys.contains(&key3));
+
+        // But layouts do not exist.
+        assert!(cache.struct_layouts.get(&key1).is_some());
+        assert!(cache.struct_layouts.get(&key2).is_none());
+        assert!(cache.struct_layouts.get(&key3).is_none());
+
+        cache.flush_layouts_for_module(&module_id("a"));
+        assert_eq!(cache.num_cached_layouts(), 0);
+        assert_eq!(cache.module_to_layouts.len(), 0);
+    }
+
+    #[test]
+    fn test_layout_cache_full_flush_clears_reverse_index() {
+        let key1 = StructKey::struct_key_for_testing(1);
+        let layout1 = LayoutCacheEntry::new_for_testing([module_id("a")]);
+
+        let key2 = StructKey::struct_key_for_testing(2);
+        let layout2 = LayoutCacheEntry::new_for_testing([module_id("a"), module_id("b")]);
+
+        let key3 = StructKey::struct_key_for_testing(3);
+        let layout3 = LayoutCacheEntry::new_for_testing([module_id("a"), module_id("b")]);
+
+        let cache = GlobalModuleCache::empty();
+        cache.store_struct_layout_entry(&key1, layout1).unwrap();
+        cache.store_struct_layout_entry(&key2, layout2).unwrap();
+        cache.store_struct_layout_entry(&key3, layout3).unwrap();
+
+        // In total: 3 layouts and 2 modules
+        assert_eq!(cache.num_cached_layouts(), 3);
+        assert_eq!(cache.module_to_layouts.len(), 2);
+
+        // Full flush - both caches are empty.
+        cache.flush_layout_cache();
+        assert_eq!(cache.num_cached_layouts(), 0);
+        assert!(cache.module_to_layouts.is_empty());
     }
 }
