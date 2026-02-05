@@ -48,6 +48,7 @@ fn native_public_key_validate(
 
     context.charge(ED25519_BASE + ED25519_PER_PUBKEY_DESERIALIZE * NumArgs::one())?;
 
+    let key_len = key_bytes.len();
     let key_bytes_slice = match <[u8; ED25519_PUBLIC_KEY_LENGTH]>::try_from(key_bytes) {
         Ok(slice) => slice,
         Err(_) => {
@@ -57,7 +58,13 @@ fn native_public_key_validate(
             {
                 return Ok(smallvec![Value::bool(false)]);
             } else {
-                return Err(SafeNativeError::abort(abort_codes::E_WRONG_PUBKEY_SIZE));
+                return Err(SafeNativeError::abort_with_message(
+                    abort_codes::E_WRONG_PUBKEY_SIZE,
+                    format!(
+                        "Invalid public key length: expected {}, got {}",
+                        ED25519_PUBLIC_KEY_LENGTH, key_len,
+                    ),
+                ));
             }
         },
     };
