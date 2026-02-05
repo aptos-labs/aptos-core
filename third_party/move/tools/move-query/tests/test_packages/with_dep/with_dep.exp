@@ -1,0 +1,2031 @@
+// === Package ===
+{
+  "name": "with_dep",
+  "path": "tests/test_packages/with_dep",
+  "manifest_path": "tests/test_packages/with_dep/Move.toml",
+  "dependencies": [
+    {
+      "name": "MoveStdlib",
+      "path": "../../../../../move-stdlib",
+      "modules": [
+        "0x1::vector",
+        "0x1::option",
+        "0x1::string"
+      ]
+    }
+  ],
+  "modules": [
+    "0x42::collection"
+  ]
+}
+
+// === Module: 0x42::collection ===
+{
+  "address": "0x42",
+  "name": "collection",
+  "doc": " Collection module demonstrating stdlib usage.",
+  "location": {
+    "file": "tests/test_packages/with_dep/sources/collection.move",
+    "start_line": 5,
+    "start_column": 1,
+    "end_line": 84,
+    "end_column": 1
+  },
+  "is_target": true,
+  "friends": [],
+  "uses": [
+    "0x1::vector",
+    "0x1::option"
+  ],
+  "used_by": [],
+  "functions": [
+    "borrow",
+    "borrow_mut",
+    "is_empty",
+    "length",
+    "add",
+    "get_name",
+    "has_name",
+    "new",
+    "new_named",
+    "pop",
+    "set_name"
+  ],
+  "structs": [
+    "Collection"
+  ],
+  "constants": [
+    "E_EMPTY_COLLECTION",
+    "E_INDEX_OUT_OF_BOUNDS"
+  ]
+}
+
+// === Struct: 0x42::collection::Collection ===
+{
+  "module": "0x42::collection",
+  "name": "Collection",
+  "doc": " A collection of items with optional metadata.",
+  "location": {
+    "file": "tests/test_packages/with_dep/sources/collection.move",
+    "start_line": 10,
+    "start_column": 5,
+    "end_line": 13,
+    "end_column": 5
+  },
+  "abilities": [
+    "store",
+    "key"
+  ],
+  "is_resource": true,
+  "is_native": false,
+  "is_enum": false,
+  "attributes": [],
+  "type_parameters": [
+    "T: store"
+  ],
+  "fields": [
+    {
+      "name": "items",
+      "type": "vector<T>"
+    },
+    {
+      "name": "name",
+      "type": "option::Option<vector<u8>>"
+    }
+  ],
+  "variants": null
+}
+
+// === Constant: 0x42::collection::E_EMPTY_COLLECTION ===
+{
+  "module": "0x42::collection",
+  "name": "E_EMPTY_COLLECTION",
+  "doc": " Error code for empty collection.",
+  "location": {
+    "file": "tests/test_packages/with_dep/sources/collection.move",
+    "start_line": 16,
+    "start_column": 5,
+    "end_line": 16,
+    "end_column": 38
+  },
+  "type": "u64",
+  "value": "1"
+}
+
+// === Constant: 0x42::collection::E_INDEX_OUT_OF_BOUNDS ===
+{
+  "module": "0x42::collection",
+  "name": "E_INDEX_OUT_OF_BOUNDS",
+  "doc": " Error code for index out of bounds.",
+  "location": {
+    "file": "tests/test_packages/with_dep/sources/collection.move",
+    "start_line": 19,
+    "start_column": 5,
+    "end_line": 19,
+    "end_column": 41
+  },
+  "type": "u64",
+  "value": "2"
+}
+
+// === Function: 0x42::collection::borrow ===
+{
+  "module": "0x42::collection",
+  "name": "borrow",
+  "signature": "public fun borrow<T>(collection: &Collection<T>,index: u64): &T",
+  "doc": " Borrow an item at index.",
+  "location": {
+    "file": "tests/test_packages/with_dep/sources/collection.move",
+    "start_line": 74,
+    "start_column": 5,
+    "end_line": 77,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::collection::borrow_mut ===
+{
+  "module": "0x42::collection",
+  "name": "borrow_mut",
+  "signature": "public fun borrow_mut<T>(collection: &mut Collection<T>,index: u64): &mut T",
+  "doc": " Borrow a mutable reference to an item at index.",
+  "location": {
+    "file": "tests/test_packages/with_dep/sources/collection.move",
+    "start_line": 80,
+    "start_column": 5,
+    "end_line": 83,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::collection::is_empty ===
+{
+  "module": "0x42::collection",
+  "name": "is_empty",
+  "signature": "public fun is_empty<T>(collection: &Collection<T>): bool",
+  "doc": " Check if collection is empty.",
+  "location": {
+    "file": "tests/test_packages/with_dep/sources/collection.move",
+    "start_line": 54,
+    "start_column": 5,
+    "end_line": 56,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::collection::length ===
+{
+  "module": "0x42::collection",
+  "name": "length",
+  "signature": "public fun length<T>(collection: &Collection<T>): u64",
+  "doc": " Get the length of the collection.",
+  "location": {
+    "file": "tests/test_packages/with_dep/sources/collection.move",
+    "start_line": 49,
+    "start_column": 5,
+    "end_line": 51,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::collection::add ===
+{
+  "module": "0x42::collection",
+  "name": "add",
+  "signature": "public fun add<T>(collection: &mut Collection<T>,item: T)",
+  "doc": " Add an item to the collection.",
+  "location": {
+    "file": "tests/test_packages/with_dep/sources/collection.move",
+    "start_line": 38,
+    "start_column": 5,
+    "end_line": 40,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::collection::get_name ===
+{
+  "module": "0x42::collection",
+  "name": "get_name",
+  "signature": "public fun get_name<T>(collection: &Collection<T>): option::Option<vector<u8>>",
+  "doc": " Get the name if set.",
+  "location": {
+    "file": "tests/test_packages/with_dep/sources/collection.move",
+    "start_line": 59,
+    "start_column": 5,
+    "end_line": 61,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::collection::has_name ===
+{
+  "module": "0x42::collection",
+  "name": "has_name",
+  "signature": "public fun has_name<T>(collection: &Collection<T>): bool",
+  "doc": " Check if collection has a name.",
+  "location": {
+    "file": "tests/test_packages/with_dep/sources/collection.move",
+    "start_line": 69,
+    "start_column": 5,
+    "end_line": 71,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::collection::new ===
+{
+  "module": "0x42::collection",
+  "name": "new",
+  "signature": "public fun new<T>(): Collection<T>",
+  "doc": " Create a new empty collection.",
+  "location": {
+    "file": "tests/test_packages/with_dep/sources/collection.move",
+    "start_line": 22,
+    "start_column": 5,
+    "end_line": 27,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::collection::new_named ===
+{
+  "module": "0x42::collection",
+  "name": "new_named",
+  "signature": "public fun new_named<T>(name: vector<u8>): Collection<T>",
+  "doc": " Create a new collection with a name.",
+  "location": {
+    "file": "tests/test_packages/with_dep/sources/collection.move",
+    "start_line": 30,
+    "start_column": 5,
+    "end_line": 35,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::collection::pop ===
+{
+  "module": "0x42::collection",
+  "name": "pop",
+  "signature": "public fun pop<T>(collection: &mut Collection<T>): T",
+  "doc": " Remove and return the last item.",
+  "location": {
+    "file": "tests/test_packages/with_dep/sources/collection.move",
+    "start_line": 43,
+    "start_column": 5,
+    "end_line": 46,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::collection::set_name ===
+{
+  "module": "0x42::collection",
+  "name": "set_name",
+  "signature": "public fun set_name<T>(collection: &mut Collection<T>,name: vector<u8>)",
+  "doc": " Set the collection name.",
+  "location": {
+    "file": "tests/test_packages/with_dep/sources/collection.move",
+    "start_line": 64,
+    "start_column": 5,
+    "end_line": 66,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Source: 0x42::collection::borrow ===
+    public fun borrow<T: store>(collection: &Collection<T>, index: u64): &T {
+        assert!(index < vector::length(&collection.items), E_INDEX_OUT_OF_BOUNDS);
+        vector::borrow(&collection.items, index)
+    }
+
+// === Module: 0x1::vector (dependency) ===
+{
+  "address": "0x1",
+  "name": "vector",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 11,
+    "start_column": 1,
+    "end_line": 283,
+    "end_column": 1
+  },
+  "is_target": false,
+  "friends": [],
+  "uses": [],
+  "used_by": [
+    "0x1::option",
+    "0x1::string",
+    "0x42::collection"
+  ],
+  "functions": [
+    "contains",
+    "index_of",
+    "append",
+    "borrow",
+    "borrow_mut",
+    "destroy_empty",
+    "empty",
+    "filter",
+    "find",
+    "fold",
+    "for_each",
+    "for_each_mut",
+    "for_each_ref",
+    "is_empty",
+    "length",
+    "map",
+    "pop_back",
+    "push_back",
+    "remove",
+    "reverse",
+    "singleton",
+    "swap",
+    "swap_remove"
+  ],
+  "structs": [],
+  "constants": [
+    "EINDEX_OUT_OF_BOUNDS"
+  ]
+}
+
+// === Constant: 0x1::vector (dependency)::EINDEX_OUT_OF_BOUNDS ===
+{
+  "module": "0x1::vector",
+  "name": "EINDEX_OUT_OF_BOUNDS",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 14,
+    "start_column": 5,
+    "end_line": 14,
+    "end_column": 46
+  },
+  "type": "u64",
+  "value": "131072"
+}
+
+// === Function: 0x1::vector (dependency)::contains ===
+{
+  "module": "0x1::vector",
+  "name": "contains",
+  "signature": "public fun contains<Element>(v: &vector<Element>,e: &Element): bool",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 129,
+    "start_column": 5,
+    "end_line": 137,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::vector (dependency)::index_of ===
+{
+  "module": "0x1::vector",
+  "name": "index_of",
+  "signature": "public fun index_of<Element>(v: &vector<Element>,e: &Element): (bool, u64)",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 144,
+    "start_column": 5,
+    "end_line": 152,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::vector (dependency)::append ===
+{
+  "module": "0x1::vector",
+  "name": "append",
+  "signature": "public fun append<Element>(lhs: &mut vector<Element>,other: vector<Element>)",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 109,
+    "start_column": 5,
+    "end_line": 113,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::vector (dependency)::borrow ===
+{
+  "module": "0x1::vector",
+  "name": "borrow",
+  "signature": "public native fun borrow<Element>(v: &vector<Element>,i: u64): &Element",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 27,
+    "start_column": 5,
+    "end_line": 27,
+    "end_column": 77
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": true,
+  "attributes": [
+    "bytecode_instruction"
+  ],
+  "acquires": []
+}
+
+// === Function: 0x1::vector (dependency)::borrow_mut ===
+{
+  "module": "0x1::vector",
+  "name": "borrow_mut",
+  "signature": "public native fun borrow_mut<Element>(v: &mut vector<Element>,i: u64): &mut Element",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 36,
+    "start_column": 5,
+    "end_line": 36,
+    "end_column": 89
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": true,
+  "attributes": [
+    "bytecode_instruction"
+  ],
+  "acquires": []
+}
+
+// === Function: 0x1::vector (dependency)::destroy_empty ===
+{
+  "module": "0x1::vector",
+  "name": "destroy_empty",
+  "signature": "public native fun destroy_empty<Element>(v: vector<Element>)",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 46,
+    "start_column": 5,
+    "end_line": 46,
+    "end_column": 65
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": true,
+  "attributes": [
+    "bytecode_instruction"
+  ],
+  "acquires": []
+}
+
+// === Function: 0x1::vector (dependency)::empty ===
+{
+  "module": "0x1::vector",
+  "name": "empty",
+  "signature": "public native fun empty<Element>(): vector<Element>",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 18,
+    "start_column": 5,
+    "end_line": 18,
+    "end_column": 56
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": true,
+  "attributes": [
+    "bytecode_instruction"
+  ],
+  "acquires": []
+}
+
+// === Function: 0x1::vector (dependency)::filter ===
+{
+  "module": "0x1::vector",
+  "name": "filter",
+  "signature": "public inline fun filter<Element>(v: vector<Element>,p: |&Element|bool): vector<Element>",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 236,
+    "start_column": 5,
+    "end_line": 245,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": true,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::vector (dependency)::find ===
+{
+  "module": "0x1::vector",
+  "name": "find",
+  "signature": "public inline fun find<Element>(v: &vector<Element>,f: |&Element|bool): (bool, u64)",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 81,
+    "start_column": 5,
+    "end_line": 106,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": true,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::vector (dependency)::fold ===
+{
+  "module": "0x1::vector",
+  "name": "fold",
+  "signature": "public inline fun fold<Accumulator,Element>(v: vector<Element>,init: Accumulator,f: |Accumulator, Element|Accumulator): Accumulator",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 215,
+    "start_column": 5,
+    "end_line": 223,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": true,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::vector (dependency)::for_each ===
+{
+  "module": "0x1::vector",
+  "name": "for_each",
+  "signature": "public inline fun for_each<Element>(v: vector<Element>,f: |Element|)",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 187,
+    "start_column": 5,
+    "end_line": 193,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": true,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::vector (dependency)::for_each_mut ===
+{
+  "module": "0x1::vector",
+  "name": "for_each_mut",
+  "signature": "public inline fun for_each_mut<Element>(v: &mut vector<Element>,f: |&mut Element|)",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 205,
+    "start_column": 5,
+    "end_line": 211,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": true,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::vector (dependency)::for_each_ref ===
+{
+  "module": "0x1::vector",
+  "name": "for_each_ref",
+  "signature": "public inline fun for_each_ref<Element>(v: &vector<Element>,f: |&Element|)",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 196,
+    "start_column": 5,
+    "end_line": 202,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": true,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::vector (dependency)::is_empty ===
+{
+  "module": "0x1::vector",
+  "name": "is_empty",
+  "signature": "public fun is_empty<Element>(v: &vector<Element>): bool",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 123,
+    "start_column": 5,
+    "end_line": 125,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::vector (dependency)::length ===
+{
+  "module": "0x1::vector",
+  "name": "length",
+  "signature": "public native fun length<Element>(v: &vector<Element>): u64",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 22,
+    "start_column": 5,
+    "end_line": 22,
+    "end_column": 64
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": true,
+  "attributes": [
+    "bytecode_instruction"
+  ],
+  "acquires": []
+}
+
+// === Function: 0x1::vector (dependency)::map ===
+{
+  "module": "0x1::vector",
+  "name": "map",
+  "signature": "public inline fun map<Element,NewElement>(v: vector<Element>,f: |Element|NewElement): vector<NewElement>",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 226,
+    "start_column": 5,
+    "end_line": 233,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": true,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::vector (dependency)::pop_back ===
+{
+  "module": "0x1::vector",
+  "name": "pop_back",
+  "signature": "public native fun pop_back<Element>(v: &mut vector<Element>): Element",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 41,
+    "start_column": 5,
+    "end_line": 41,
+    "end_column": 74
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": true,
+  "attributes": [
+    "bytecode_instruction"
+  ],
+  "acquires": []
+}
+
+// === Function: 0x1::vector (dependency)::push_back ===
+{
+  "module": "0x1::vector",
+  "name": "push_back",
+  "signature": "public native fun push_back<Element>(v: &mut vector<Element>,e: Element)",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 31,
+    "start_column": 5,
+    "end_line": 31,
+    "end_column": 78
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": true,
+  "attributes": [
+    "bytecode_instruction"
+  ],
+  "acquires": []
+}
+
+// === Function: 0x1::vector (dependency)::remove ===
+{
+  "module": "0x1::vector",
+  "name": "remove",
+  "signature": "public fun remove<Element>(v: &mut vector<Element>,i: u64): Element",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 160,
+    "start_column": 5,
+    "end_line": 168,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::vector (dependency)::reverse ===
+{
+  "module": "0x1::vector",
+  "name": "reverse",
+  "signature": "public fun reverse<Element>(v: &mut vector<Element>)",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 65,
+    "start_column": 5,
+    "end_line": 76,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::vector (dependency)::singleton ===
+{
+  "module": "0x1::vector",
+  "name": "singleton",
+  "signature": "public fun singleton<Element>(e: Element): vector<Element>",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 54,
+    "start_column": 5,
+    "end_line": 58,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::vector (dependency)::swap ===
+{
+  "module": "0x1::vector",
+  "name": "swap",
+  "signature": "public native fun swap<Element>(v: &mut vector<Element>,i: u64,j: u64)",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 51,
+    "start_column": 5,
+    "end_line": 51,
+    "end_column": 77
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": true,
+  "attributes": [
+    "bytecode_instruction"
+  ],
+  "acquires": []
+}
+
+// === Function: 0x1::vector (dependency)::swap_remove ===
+{
+  "module": "0x1::vector",
+  "name": "swap_remove",
+  "signature": "public fun swap_remove<Element>(v: &mut vector<Element>,i: u64): Element",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/vector.move",
+    "start_line": 176,
+    "start_column": 5,
+    "end_line": 181,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Module: 0x1::option (dependency) ===
+{
+  "address": "0x1",
+  "name": "option",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 2,
+    "start_column": 1,
+    "end_line": 316,
+    "end_column": 1
+  },
+  "is_target": false,
+  "friends": [],
+  "uses": [
+    "0x1::vector"
+  ],
+  "used_by": [
+    "0x1::string",
+    "0x42::collection"
+  ],
+  "functions": [
+    "contains",
+    "borrow",
+    "borrow_mut",
+    "filter",
+    "fold",
+    "for_each",
+    "for_each_mut",
+    "for_each_ref",
+    "map",
+    "swap",
+    "borrow_with_default",
+    "destroy_none",
+    "destroy_some",
+    "destroy_with_default",
+    "extract",
+    "fill",
+    "get_with_default",
+    "is_none",
+    "is_some",
+    "none",
+    "some",
+    "swap_or_fill",
+    "to_vec"
+  ],
+  "structs": [
+    "Option"
+  ],
+  "constants": [
+    "EOPTION_IS_SET",
+    "EOPTION_NOT_SET"
+  ]
+}
+
+// === Struct: 0x1::option (dependency)::Option ===
+{
+  "module": "0x1::option",
+  "name": "Option",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 7,
+    "start_column": 5,
+    "end_line": 9,
+    "end_column": 5
+  },
+  "abilities": [
+    "copy",
+    "drop",
+    "store"
+  ],
+  "is_resource": false,
+  "is_native": false,
+  "is_enum": false,
+  "attributes": [],
+  "type_parameters": [
+    "Element"
+  ],
+  "fields": [
+    {
+      "name": "vec",
+      "type": "vector<Element>"
+    }
+  ],
+  "variants": null
+}
+
+// === Constant: 0x1::option (dependency)::EOPTION_IS_SET ===
+{
+  "module": "0x1::option",
+  "name": "EOPTION_IS_SET",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 18,
+    "start_column": 5,
+    "end_line": 18,
+    "end_column": 40
+  },
+  "type": "u64",
+  "value": "262144"
+}
+
+// === Constant: 0x1::option (dependency)::EOPTION_NOT_SET ===
+{
+  "module": "0x1::option",
+  "name": "EOPTION_NOT_SET",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 21,
+    "start_column": 5,
+    "end_line": 21,
+    "end_column": 41
+  },
+  "type": "u64",
+  "value": "262145"
+}
+
+// === Function: 0x1::option (dependency)::contains ===
+{
+  "module": "0x1::option",
+  "name": "contains",
+  "signature": "public fun contains<Element>(t: &Option<Element>,e_ref: &Element): bool",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 71,
+    "start_column": 5,
+    "end_line": 73,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::option (dependency)::borrow ===
+{
+  "module": "0x1::option",
+  "name": "borrow",
+  "signature": "public fun borrow<Element>(t: &Option<Element>): &Element",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 85,
+    "start_column": 5,
+    "end_line": 88,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::option (dependency)::borrow_mut ===
+{
+  "module": "0x1::option",
+  "name": "borrow_mut",
+  "signature": "public fun borrow_mut<Element>(t: &mut Option<Element>): &mut Element",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 153,
+    "start_column": 5,
+    "end_line": 156,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::option (dependency)::filter ===
+{
+  "module": "0x1::option",
+  "name": "filter",
+  "signature": "public inline fun filter<Element>(o: Option<Element>,f: |&Element|bool): Option<Element>",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 296,
+    "start_column": 5,
+    "end_line": 302,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": true,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::option (dependency)::fold ===
+{
+  "module": "0x1::option",
+  "name": "fold",
+  "signature": "public inline fun fold<Accumulator,Element>(o: Option<Element>,init: Accumulator,f: |Accumulator, Element|Accumulator): Accumulator",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 272,
+    "start_column": 5,
+    "end_line": 283,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": true,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::option (dependency)::for_each ===
+{
+  "module": "0x1::option",
+  "name": "for_each",
+  "signature": "public inline fun for_each<Element>(o: Option<Element>,f: |Element|)",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 249,
+    "start_column": 5,
+    "end_line": 255,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": true,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::option (dependency)::for_each_mut ===
+{
+  "module": "0x1::option",
+  "name": "for_each_mut",
+  "signature": "public inline fun for_each_mut<Element>(o: &mut Option<Element>,f: |&mut Element|)",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 265,
+    "start_column": 5,
+    "end_line": 269,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": true,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::option (dependency)::for_each_ref ===
+{
+  "module": "0x1::option",
+  "name": "for_each_ref",
+  "signature": "public inline fun for_each_ref<Element>(o: &Option<Element>,f: |&Element|)",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 258,
+    "start_column": 5,
+    "end_line": 262,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": true,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::option (dependency)::map ===
+{
+  "module": "0x1::option",
+  "name": "map",
+  "signature": "public inline fun map<Element,OtherElement>(o: Option<Element>,f: |Element|OtherElement): Option<OtherElement>",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 286,
+    "start_column": 5,
+    "end_line": 293,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": true,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::option (dependency)::swap ===
+{
+  "module": "0x1::option",
+  "name": "swap",
+  "signature": "public fun swap<Element>(t: &mut Option<Element>,e: Element): Element",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 166,
+    "start_column": 5,
+    "end_line": 172,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::option (dependency)::borrow_with_default ===
+{
+  "module": "0x1::option",
+  "name": "borrow_with_default",
+  "signature": "public fun borrow_with_default<Element>(t: &Option<Element>,default_ref: &Element): &Element",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 97,
+    "start_column": 5,
+    "end_line": 101,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::option (dependency)::destroy_none ===
+{
+  "module": "0x1::option",
+  "name": "destroy_none",
+  "signature": "public fun destroy_none<Element>(t: Option<Element>)",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 226,
+    "start_column": 5,
+    "end_line": 230,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::option (dependency)::destroy_some ===
+{
+  "module": "0x1::option",
+  "name": "destroy_some",
+  "signature": "public fun destroy_some<Element>(t: Option<Element>): Element",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 211,
+    "start_column": 5,
+    "end_line": 217,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::option (dependency)::destroy_with_default ===
+{
+  "module": "0x1::option",
+  "name": "destroy_with_default",
+  "signature": "public fun destroy_with_default<Element>(t: Option<Element>,default: Element): Element",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 198,
+    "start_column": 5,
+    "end_line": 202,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::option (dependency)::extract ===
+{
+  "module": "0x1::option",
+  "name": "extract",
+  "signature": "public fun extract<Element>(t: &mut Option<Element>): Element",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 140,
+    "start_column": 5,
+    "end_line": 143,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::option (dependency)::fill ===
+{
+  "module": "0x1::option",
+  "name": "fill",
+  "signature": "public fun fill<Element>(t: &mut Option<Element>,e: Element)",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 126,
+    "start_column": 5,
+    "end_line": 130,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::option (dependency)::get_with_default ===
+{
+  "module": "0x1::option",
+  "name": "get_with_default",
+  "signature": "public fun get_with_default<Element>(t: &Option<Element>,default: Element): Element",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 110,
+    "start_column": 5,
+    "end_line": 117,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::option (dependency)::is_none ===
+{
+  "module": "0x1::option",
+  "name": "is_none",
+  "signature": "public fun is_none<Element>(t: &Option<Element>): bool",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 50,
+    "start_column": 5,
+    "end_line": 52,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::option (dependency)::is_some ===
+{
+  "module": "0x1::option",
+  "name": "is_some",
+  "signature": "public fun is_some<Element>(t: &Option<Element>): bool",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 60,
+    "start_column": 5,
+    "end_line": 62,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::option (dependency)::none ===
+{
+  "module": "0x1::option",
+  "name": "none",
+  "signature": "public fun none<Element>(): Option<Element>",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 24,
+    "start_column": 5,
+    "end_line": 26,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::option (dependency)::some ===
+{
+  "module": "0x1::option",
+  "name": "some",
+  "signature": "public fun some<Element>(e: Element): Option<Element>",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 37,
+    "start_column": 5,
+    "end_line": 39,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::option (dependency)::swap_or_fill ===
+{
+  "module": "0x1::option",
+  "name": "swap_or_fill",
+  "signature": "public fun swap_or_fill<Element>(t: &mut Option<Element>,e: Element): Option<Element>",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 184,
+    "start_column": 5,
+    "end_line": 190,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::option (dependency)::to_vec ===
+{
+  "module": "0x1::option",
+  "name": "to_vec",
+  "signature": "public fun to_vec<Element>(t: Option<Element>): vector<Element>",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/option.move",
+    "start_line": 238,
+    "start_column": 5,
+    "end_line": 241,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Module: 0x1::string (dependency) ===
+{
+  "address": "0x1",
+  "name": "string",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/string.move",
+    "start_line": 2,
+    "start_column": 1,
+    "end_line": 99,
+    "end_column": 1
+  },
+  "is_target": false,
+  "friends": [],
+  "uses": [
+    "0x1::vector",
+    "0x1::option"
+  ],
+  "used_by": [],
+  "functions": [
+    "index_of",
+    "append",
+    "is_empty",
+    "length",
+    "append_utf8",
+    "bytes",
+    "insert",
+    "internal_check_utf8",
+    "internal_index_of",
+    "internal_is_char_boundary",
+    "internal_sub_string",
+    "into_bytes",
+    "sub_string",
+    "try_utf8",
+    "utf8"
+  ],
+  "structs": [
+    "String"
+  ],
+  "constants": [
+    "EINVALID_INDEX",
+    "EINVALID_UTF8"
+  ]
+}
+
+// === Struct: 0x1::string (dependency)::String ===
+{
+  "module": "0x1::string",
+  "name": "String",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/string.move",
+    "start_line": 13,
+    "start_column": 5,
+    "end_line": 15,
+    "end_column": 5
+  },
+  "abilities": [
+    "copy",
+    "drop",
+    "store"
+  ],
+  "is_resource": false,
+  "is_native": false,
+  "is_enum": false,
+  "attributes": [],
+  "type_parameters": [],
+  "fields": [
+    {
+      "name": "bytes",
+      "type": "vector<u8>"
+    }
+  ],
+  "variants": null
+}
+
+// === Constant: 0x1::string (dependency)::EINVALID_INDEX ===
+{
+  "module": "0x1::string",
+  "name": "EINVALID_INDEX",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/string.move",
+    "start_line": 10,
+    "start_column": 5,
+    "end_line": 10,
+    "end_column": 34
+  },
+  "type": "u64",
+  "value": "2"
+}
+
+// === Constant: 0x1::string (dependency)::EINVALID_UTF8 ===
+{
+  "module": "0x1::string",
+  "name": "EINVALID_UTF8",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/string.move",
+    "start_line": 7,
+    "start_column": 5,
+    "end_line": 7,
+    "end_column": 33
+  },
+  "type": "u64",
+  "value": "1"
+}
+
+// === Function: 0x1::string (dependency)::index_of ===
+{
+  "module": "0x1::string",
+  "name": "index_of",
+  "signature": "public fun index_of(s: &String,r: &String): u64",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/string.move",
+    "start_line": 90,
+    "start_column": 5,
+    "end_line": 92,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::string (dependency)::append ===
+{
+  "module": "0x1::string",
+  "name": "append",
+  "signature": "public fun append(s: &mut String,r: String)",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/string.move",
+    "start_line": 54,
+    "start_column": 5,
+    "end_line": 56,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::string (dependency)::is_empty ===
+{
+  "module": "0x1::string",
+  "name": "is_empty",
+  "signature": "public fun is_empty(s: &String): bool",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/string.move",
+    "start_line": 44,
+    "start_column": 5,
+    "end_line": 46,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::string (dependency)::length ===
+{
+  "module": "0x1::string",
+  "name": "length",
+  "signature": "public fun length(s: &String): u64",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/string.move",
+    "start_line": 49,
+    "start_column": 5,
+    "end_line": 51,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::string (dependency)::append_utf8 ===
+{
+  "module": "0x1::string",
+  "name": "append_utf8",
+  "signature": "public fun append_utf8(s: &mut String,bytes: vector<u8>)",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/string.move",
+    "start_line": 59,
+    "start_column": 5,
+    "end_line": 61,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::string (dependency)::bytes ===
+{
+  "module": "0x1::string",
+  "name": "bytes",
+  "signature": "public fun bytes(s: &String): &vector<u8>",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/string.move",
+    "start_line": 33,
+    "start_column": 5,
+    "end_line": 35,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::string (dependency)::insert ===
+{
+  "module": "0x1::string",
+  "name": "insert",
+  "signature": "public fun insert(s: &mut String,at: u64,o: String)",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/string.move",
+    "start_line": 65,
+    "start_column": 5,
+    "end_line": 74,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::string (dependency)::internal_check_utf8 ===
+{
+  "module": "0x1::string",
+  "name": "internal_check_utf8",
+  "signature": "private native fun internal_check_utf8(v: &vector<u8>): bool",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/string.move",
+    "start_line": 95,
+    "start_column": 5,
+    "end_line": 95,
+    "end_column": 57
+  },
+  "visibility": "",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": true,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::string (dependency)::internal_index_of ===
+{
+  "module": "0x1::string",
+  "name": "internal_index_of",
+  "signature": "private native fun internal_index_of(v: &vector<u8>,r: &vector<u8>): u64",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/string.move",
+    "start_line": 98,
+    "start_column": 5,
+    "end_line": 98,
+    "end_column": 70
+  },
+  "visibility": "",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": true,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::string (dependency)::internal_is_char_boundary ===
+{
+  "module": "0x1::string",
+  "name": "internal_is_char_boundary",
+  "signature": "private native fun internal_is_char_boundary(v: &vector<u8>,i: u64): bool",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/string.move",
+    "start_line": 96,
+    "start_column": 5,
+    "end_line": 96,
+    "end_column": 71
+  },
+  "visibility": "",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": true,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::string (dependency)::internal_sub_string ===
+{
+  "module": "0x1::string",
+  "name": "internal_sub_string",
+  "signature": "private native fun internal_sub_string(v: &vector<u8>,i: u64,j: u64): vector<u8>",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/string.move",
+    "start_line": 97,
+    "start_column": 5,
+    "end_line": 97,
+    "end_column": 79
+  },
+  "visibility": "",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": true,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::string (dependency)::into_bytes ===
+{
+  "module": "0x1::string",
+  "name": "into_bytes",
+  "signature": "public fun into_bytes(s: String): vector<u8>",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/string.move",
+    "start_line": 38,
+    "start_column": 5,
+    "end_line": 41,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::string (dependency)::sub_string ===
+{
+  "module": "0x1::string",
+  "name": "sub_string",
+  "signature": "public fun sub_string(s: &String,i: u64,j: u64): String",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/string.move",
+    "start_line": 79,
+    "start_column": 5,
+    "end_line": 87,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::string (dependency)::try_utf8 ===
+{
+  "module": "0x1::string",
+  "name": "try_utf8",
+  "signature": "public fun try_utf8(bytes: vector<u8>): option::Option<String>",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/string.move",
+    "start_line": 24,
+    "start_column": 5,
+    "end_line": 30,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x1::string (dependency)::utf8 ===
+{
+  "module": "0x1::string",
+  "name": "utf8",
+  "signature": "public fun utf8(bytes: vector<u8>): String",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/with_dep/../../../../../move-stdlib/sources/string.move",
+    "start_line": 18,
+    "start_column": 5,
+    "end_line": 21,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+

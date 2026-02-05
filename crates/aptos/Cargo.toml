@@ -86,6 +86,7 @@ move-linter = { workspace = true }
 move-model = { workspace = true }
 move-package = { workspace = true }
 move-prover-boogie-backend = { workspace = true }
+move-query = { workspace = true }
 move-symbol-pool = { workspace = true }
 move-unit-test = { workspace = true }
 move-vm-runtime = { workspace = true, features = ["testing"] }

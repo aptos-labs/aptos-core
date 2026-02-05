@@ -256,6 +256,7 @@ members = [
     "third_party/move/tools/move-package-cache",
     "third_party/move/tools/move-package-manifest",
     "third_party/move/tools/move-package-resolver",
+    "third_party/move/tools/move-query",
     "third_party/move/tools/move-resource-viewer",
     "third_party/move/tools/move-unit-test",
     "tools/calc-dep-sizes",
@@ -773,6 +774,7 @@ rstest = "0.15.0"
 rusty-fork = "0.3.0"
 rustversion = "1.0.14"
 scopeguard = "1.2.0"
+schemars = "0.8"
 sha2 = "0.9.3"
 sha256 = "1.4.0"
 sha2_0_10_6 = { package = "sha2", version = "0.10.6" }
@@ -889,6 +891,7 @@ move-linter = { path = "third_party/move/tools/move-linter" }
 move-model = { path = "third_party/move/move-model" }
 move-package = { path = "third_party/move/tools/move-package" }
 move-package-cache = { path = "third_party/move/tools/move-package-cache" }
+move-query = { path = "third_party/move/tools/move-query" }
 move-package-manifest = { path = "third_party/move/tools/move-package-manifest" }
 move-prover = { path = "third_party/move/move-prover" }
 move-prover-boogie-backend = { path = "third_party/move/move-prover/boogie-backend" }

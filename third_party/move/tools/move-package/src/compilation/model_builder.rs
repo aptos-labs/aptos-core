@@ -130,7 +130,8 @@ impl ModelBuilder {
                 options.compiler_version = Some(self.model_config.compiler_version);
                 options.known_attributes.clone_from(known_attributes);
                 options.skip_attribute_checks = skip_attribute_checks;
-                options.compile_verify_code = true;
+                options.compile_test_code = self.resolution_graph.build_options.test_mode;
+                options.compile_verify_code = self.resolution_graph.build_options.verify_mode;
                 options.experiments.clone_from(
                     &self
                         .resolution_graph

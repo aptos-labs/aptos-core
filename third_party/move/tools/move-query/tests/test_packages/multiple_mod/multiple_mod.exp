@@ -1,0 +1,492 @@
+// === Package ===
+{
+  "name": "multiple_mod",
+  "path": "tests/test_packages/multiple_mod",
+  "manifest_path": "tests/test_packages/multiple_mod/Move.toml",
+  "dependencies": [],
+  "modules": [
+    "0x42::math",
+    "0x42::core",
+    "0x42::admin"
+  ]
+}
+
+// === Module: 0x42::math ===
+{
+  "address": "0x42",
+  "name": "math",
+  "doc": " Math utilities module.",
+  "location": {
+    "file": "tests/test_packages/multiple_mod/sources/math.move",
+    "start_line": 5,
+    "start_column": 1,
+    "end_line": 25,
+    "end_column": 1
+  },
+  "is_target": true,
+  "friends": [],
+  "uses": [],
+  "used_by": [
+    "0x42::core",
+    "0x42::admin"
+  ],
+  "functions": [
+    "add",
+    "max",
+    "min",
+    "multiply"
+  ],
+  "structs": [],
+  "constants": []
+}
+
+// === Function: 0x42::math::add ===
+{
+  "module": "0x42::math",
+  "name": "add",
+  "signature": "public fun add(a: u64,b: u64): u64",
+  "doc": " Adds two numbers.",
+  "location": {
+    "file": "tests/test_packages/multiple_mod/sources/math.move",
+    "start_line": 7,
+    "start_column": 5,
+    "end_line": 9,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::math::max ===
+{
+  "module": "0x42::math",
+  "name": "max",
+  "signature": "public fun max(a: u64,b: u64): u64",
+  "doc": " Returns the larger of two numbers.",
+  "location": {
+    "file": "tests/test_packages/multiple_mod/sources/math.move",
+    "start_line": 17,
+    "start_column": 5,
+    "end_line": 19,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::math::min ===
+{
+  "module": "0x42::math",
+  "name": "min",
+  "signature": "public fun min(a: u64,b: u64): u64",
+  "doc": " Returns the smaller of two numbers.",
+  "location": {
+    "file": "tests/test_packages/multiple_mod/sources/math.move",
+    "start_line": 22,
+    "start_column": 5,
+    "end_line": 24,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::math::multiply ===
+{
+  "module": "0x42::math",
+  "name": "multiply",
+  "signature": "public fun multiply(a: u64,b: u64): u64",
+  "doc": " Multiplies two numbers.",
+  "location": {
+    "file": "tests/test_packages/multiple_mod/sources/math.move",
+    "start_line": 12,
+    "start_column": 5,
+    "end_line": 14,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Source: 0x42::math::add ===
+    public fun add(a: u64, b: u64): u64 {
+        a + b
+    }
+
+// === Module: 0x42::core ===
+{
+  "address": "0x42",
+  "name": "core",
+  "doc": " Core module with friend-restricted functions.",
+  "location": {
+    "file": "tests/test_packages/multiple_mod/sources/core.move",
+    "start_line": 5,
+    "start_column": 1,
+    "end_line": 44,
+    "end_column": 1
+  },
+  "is_target": true,
+  "friends": [
+    "0x42::admin"
+  ],
+  "uses": [
+    "0x42::math"
+  ],
+  "used_by": [
+    "0x42::admin"
+  ],
+  "functions": [
+    "add_to_value",
+    "get_value",
+    "initialize",
+    "set_value",
+    "validate"
+  ],
+  "structs": [
+    "State"
+  ],
+  "constants": [
+    "E_NOT_INITIALIZED"
+  ]
+}
+
+// === Struct: 0x42::core::State ===
+{
+  "module": "0x42::core",
+  "name": "State",
+  "doc": " Internal state struct.",
+  "location": {
+    "file": "tests/test_packages/multiple_mod/sources/core.move",
+    "start_line": 11,
+    "start_column": 5,
+    "end_line": 14,
+    "end_column": 5
+  },
+  "abilities": [
+    "key"
+  ],
+  "is_resource": true,
+  "is_native": false,
+  "is_enum": false,
+  "attributes": [],
+  "type_parameters": [],
+  "fields": [
+    {
+      "name": "value",
+      "type": "u64"
+    },
+    {
+      "name": "initialized",
+      "type": "bool"
+    }
+  ],
+  "variants": null
+}
+
+// === Constant: 0x42::core::E_NOT_INITIALIZED ===
+{
+  "module": "0x42::core",
+  "name": "E_NOT_INITIALIZED",
+  "doc": " Error code for uninitialized state.",
+  "location": {
+    "file": "tests/test_packages/multiple_mod/sources/core.move",
+    "start_line": 17,
+    "start_column": 5,
+    "end_line": 17,
+    "end_column": 37
+  },
+  "type": "u64",
+  "value": "1"
+}
+
+// === Function: 0x42::core::add_to_value ===
+{
+  "module": "0x42::core",
+  "name": "add_to_value",
+  "signature": "public fun add_to_value(state: &State,amount: u64): u64",
+  "doc": " Public function using math module.",
+  "location": {
+    "file": "tests/test_packages/multiple_mod/sources/core.move",
+    "start_line": 25,
+    "start_column": 5,
+    "end_line": 27,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::core::get_value ===
+{
+  "module": "0x42::core",
+  "name": "get_value",
+  "signature": "public fun get_value(state: &State): u64",
+  "doc": " Public function anyone can call.",
+  "location": {
+    "file": "tests/test_packages/multiple_mod/sources/core.move",
+    "start_line": 20,
+    "start_column": 5,
+    "end_line": 22,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::core::initialize ===
+{
+  "module": "0x42::core",
+  "name": "initialize",
+  "signature": "friend fun initialize(account: &signer): State",
+  "doc": " Friend-only function for initialization.",
+  "location": {
+    "file": "tests/test_packages/multiple_mod/sources/core.move",
+    "start_line": 35,
+    "start_column": 5,
+    "end_line": 38,
+    "end_column": 5
+  },
+  "visibility": "public(friend)",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::core::set_value ===
+{
+  "module": "0x42::core",
+  "name": "set_value",
+  "signature": "friend fun set_value(state: &mut State,new_value: u64)",
+  "doc": " Friend-only function for setting value.",
+  "location": {
+    "file": "tests/test_packages/multiple_mod/sources/core.move",
+    "start_line": 30,
+    "start_column": 5,
+    "end_line": 32,
+    "end_column": 5
+  },
+  "visibility": "public(friend)",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::core::validate ===
+{
+  "module": "0x42::core",
+  "name": "validate",
+  "signature": "private fun validate(state: &State): bool",
+  "doc": " Private internal helper.",
+  "location": {
+    "file": "tests/test_packages/multiple_mod/sources/core.move",
+    "start_line": 41,
+    "start_column": 5,
+    "end_line": 43,
+    "end_column": 5
+  },
+  "visibility": "",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Source: 0x42::core::add_to_value ===
+    public fun add_to_value(state: &State, amount: u64): u64 {
+        math::add(state.value, amount)
+    }
+
+// === Module: 0x42::admin ===
+{
+  "address": "0x42",
+  "name": "admin",
+  "doc": " Admin module that is a friend of core.",
+  "location": {
+    "file": "tests/test_packages/multiple_mod/sources/admin.move",
+    "start_line": 5,
+    "start_column": 1,
+    "end_line": 35,
+    "end_column": 1
+  },
+  "is_target": true,
+  "friends": [],
+  "uses": [
+    "0x42::math",
+    "0x42::core"
+  ],
+  "used_by": [],
+  "functions": [
+    "admin_increment",
+    "admin_init",
+    "admin_update",
+    "create_admin_cap"
+  ],
+  "structs": [
+    "AdminCap"
+  ],
+  "constants": []
+}
+
+// === Struct: 0x42::admin::AdminCap ===
+{
+  "module": "0x42::admin",
+  "name": "AdminCap",
+  "doc": " Admin capability struct.",
+  "location": {
+    "file": "tests/test_packages/multiple_mod/sources/admin.move",
+    "start_line": 10,
+    "start_column": 5,
+    "end_line": 12,
+    "end_column": 5
+  },
+  "abilities": [
+    "store",
+    "key"
+  ],
+  "is_resource": true,
+  "is_native": false,
+  "is_enum": false,
+  "attributes": [],
+  "type_parameters": [],
+  "fields": [
+    {
+      "name": "admin_address",
+      "type": "address"
+    }
+  ],
+  "variants": null
+}
+
+// === Function: 0x42::admin::admin_increment ===
+{
+  "module": "0x42::admin",
+  "name": "admin_increment",
+  "signature": "public fun admin_increment(state: &mut core::State,amount: u64,_cap: &AdminCap)",
+  "doc": " Admin function to increment state value.",
+  "location": {
+    "file": "tests/test_packages/multiple_mod/sources/admin.move",
+    "start_line": 25,
+    "start_column": 5,
+    "end_line": 29,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::admin::admin_init ===
+{
+  "module": "0x42::admin",
+  "name": "admin_init",
+  "signature": "public fun admin_init(account: &signer,_cap: &AdminCap): core::State",
+  "doc": " Admin function to initialize state (uses friend access).",
+  "location": {
+    "file": "tests/test_packages/multiple_mod/sources/admin.move",
+    "start_line": 32,
+    "start_column": 5,
+    "end_line": 34,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::admin::admin_update ===
+{
+  "module": "0x42::admin",
+  "name": "admin_update",
+  "signature": "public fun admin_update(state: &mut core::State,new_value: u64,_cap: &AdminCap)",
+  "doc": " Admin function to update state (uses friend access).",
+  "location": {
+    "file": "tests/test_packages/multiple_mod/sources/admin.move",
+    "start_line": 20,
+    "start_column": 5,
+    "end_line": 22,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::admin::create_admin_cap ===
+{
+  "module": "0x42::admin",
+  "name": "create_admin_cap",
+  "signature": "public fun create_admin_cap(admin: address): AdminCap",
+  "doc": " Creates admin capability.",
+  "location": {
+    "file": "tests/test_packages/multiple_mod/sources/admin.move",
+    "start_line": 15,
+    "start_column": 5,
+    "end_line": 17,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Source: 0x42::admin::admin_increment ===
+    public fun admin_increment(state: &mut State, amount: u64, _cap: &AdminCap) {
+        let current = core::get_value(state);
+        let new_value = math::add(current, amount);
+        core::set_value(state, new_value);
+    }
+

@@ -96,6 +96,7 @@ mod fmt;
 mod lint;
 mod manifest;
 pub mod package_hooks;
+pub mod query;
 mod show;
 mod sim;
 pub mod stored_package;
@@ -148,6 +149,9 @@ pub enum MoveTool {
     Fmt(Fmt),
     #[clap(subcommand)]
     Sim(Sim),
+    /// Query Move package information (functions, structs, modules, etc.)
+    #[clap(subcommand, hide = true)]
+    Query(query::QueryTool),
 }
 
 impl MoveTool {
@@ -187,6 +191,7 @@ impl MoveTool {
             MoveTool::Fmt(tool) => tool.execute_serialized().await,
             MoveTool::Lint(tool) => tool.execute_serialized().await,
             MoveTool::Sim(tool) => tool.execute().await,
+            MoveTool::Query(tool) => tool.execute().await,
         }
     }
 }

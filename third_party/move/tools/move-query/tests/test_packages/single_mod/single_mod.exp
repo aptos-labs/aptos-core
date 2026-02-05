@@ -1,0 +1,808 @@
+// === Package ===
+{
+  "name": "single_mod",
+  "path": "tests/test_packages/single_mod",
+  "manifest_path": "tests/test_packages/single_mod/Move.toml",
+  "dependencies": [],
+  "modules": [
+    "0x42::comprehensive"
+  ]
+}
+
+// === Module: 0x42::comprehensive ===
+{
+  "address": "0x42",
+  "name": "comprehensive",
+  "doc": " A comprehensive module demonstrating various Move features:\n structs, abilities, generics, entry functions, and visibility.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 6,
+    "start_column": 1,
+    "end_line": 189,
+    "end_column": 1
+  },
+  "is_target": true,
+  "friends": [],
+  "uses": [],
+  "used_by": [],
+  "functions": [
+    "address_of",
+    "balance_of",
+    "deposit",
+    "double",
+    "first",
+    "get_counter_value",
+    "has_balance",
+    "increment",
+    "initialize",
+    "new_box",
+    "new_counter",
+    "new_pair",
+    "new_wrapper",
+    "reset",
+    "swap",
+    "test_abort",
+    "test_abort_literal",
+    "test_helper",
+    "transfer",
+    "unbox",
+    "validate_amount"
+  ],
+  "structs": [
+    "Balance",
+    "Box",
+    "Counter",
+    "Pair",
+    "Status",
+    "Wrapper"
+  ],
+  "constants": [
+    "E_ZERO",
+    "E_INSUFFICIENT_BALANCE",
+    "MAX_VALUE"
+  ]
+}
+
+// === Struct: 0x42::comprehensive::Balance ===
+{
+  "module": "0x42::comprehensive",
+  "name": "Balance",
+  "doc": " A resource stored under an account.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 17,
+    "start_column": 5,
+    "end_line": 19,
+    "end_column": 5
+  },
+  "abilities": [
+    "key"
+  ],
+  "is_resource": true,
+  "is_native": false,
+  "is_enum": false,
+  "attributes": [],
+  "type_parameters": [],
+  "fields": [
+    {
+      "name": "amount",
+      "type": "u64"
+    }
+  ],
+  "variants": null
+}
+
+// === Struct: 0x42::comprehensive::Box ===
+{
+  "module": "0x42::comprehensive",
+  "name": "Box",
+  "doc": " A generic container with store ability.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 22,
+    "start_column": 5,
+    "end_line": 24,
+    "end_column": 5
+  },
+  "abilities": [
+    "store",
+    "key"
+  ],
+  "is_resource": true,
+  "is_native": false,
+  "is_enum": false,
+  "attributes": [],
+  "type_parameters": [
+    "T: store"
+  ],
+  "fields": [
+    {
+      "name": "value",
+      "type": "T"
+    }
+  ],
+  "variants": null
+}
+
+// === Struct: 0x42::comprehensive::Counter ===
+{
+  "module": "0x42::comprehensive",
+  "name": "Counter",
+  "doc": " A simple counter with copy and drop.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 12,
+    "start_column": 5,
+    "end_line": 14,
+    "end_column": 5
+  },
+  "abilities": [
+    "copy",
+    "drop"
+  ],
+  "is_resource": false,
+  "is_native": false,
+  "is_enum": false,
+  "attributes": [],
+  "type_parameters": [],
+  "fields": [
+    {
+      "name": "value",
+      "type": "u64"
+    }
+  ],
+  "variants": null
+}
+
+// === Struct: 0x42::comprehensive::Pair ===
+{
+  "module": "0x42::comprehensive",
+  "name": "Pair",
+  "doc": " A generic pair of two types.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 32,
+    "start_column": 5,
+    "end_line": 35,
+    "end_column": 5
+  },
+  "abilities": [
+    "copy",
+    "drop"
+  ],
+  "is_resource": false,
+  "is_native": false,
+  "is_enum": false,
+  "attributes": [],
+  "type_parameters": [
+    "T1: copy + drop",
+    "T2: copy + drop"
+  ],
+  "fields": [
+    {
+      "name": "first",
+      "type": "T1"
+    },
+    {
+      "name": "second",
+      "type": "T2"
+    }
+  ],
+  "variants": null
+}
+
+// === Struct: 0x42::comprehensive::Status ===
+{
+  "module": "0x42::comprehensive",
+  "name": "Status",
+  "doc": " An enum representing different states.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 38,
+    "start_column": 5,
+    "end_line": 42,
+    "end_column": 5
+  },
+  "abilities": [
+    "copy",
+    "drop"
+  ],
+  "is_resource": false,
+  "is_native": false,
+  "is_enum": true,
+  "attributes": [],
+  "type_parameters": [],
+  "fields": null,
+  "variants": [
+    {
+      "name": "Pending",
+      "fields": []
+    },
+    {
+      "name": "Active",
+      "fields": [
+        {
+          "name": "since",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "Completed",
+      "fields": [
+        {
+          "name": "result",
+          "type": "u64"
+        },
+        {
+          "name": "timestamp",
+          "type": "u64"
+        }
+      ]
+    }
+  ]
+}
+
+// === Struct: 0x42::comprehensive::Wrapper ===
+{
+  "module": "0x42::comprehensive",
+  "name": "Wrapper",
+  "doc": " A wrapper with phantom type parameter.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 27,
+    "start_column": 5,
+    "end_line": 29,
+    "end_column": 5
+  },
+  "abilities": [
+    "copy",
+    "drop"
+  ],
+  "is_resource": false,
+  "is_native": false,
+  "is_enum": false,
+  "attributes": [],
+  "type_parameters": [
+    "phantom T"
+  ],
+  "fields": [
+    {
+      "name": "id",
+      "type": "u64"
+    }
+  ],
+  "variants": null
+}
+
+// === Constant: 0x42::comprehensive::E_ZERO ===
+{
+  "module": "0x42::comprehensive",
+  "name": "E_ZERO",
+  "doc": " Error code for zero value.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 52,
+    "start_column": 5,
+    "end_line": 52,
+    "end_column": 26
+  },
+  "type": "u64",
+  "value": "2"
+}
+
+// === Constant: 0x42::comprehensive::E_INSUFFICIENT_BALANCE ===
+{
+  "module": "0x42::comprehensive",
+  "name": "E_INSUFFICIENT_BALANCE",
+  "doc": " Error code for insufficient balance.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 49,
+    "start_column": 5,
+    "end_line": 49,
+    "end_column": 42
+  },
+  "type": "u64",
+  "value": "1"
+}
+
+// === Constant: 0x42::comprehensive::MAX_VALUE ===
+{
+  "module": "0x42::comprehensive",
+  "name": "MAX_VALUE",
+  "doc": " Maximum allowed value.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 55,
+    "start_column": 5,
+    "end_line": 55,
+    "end_column": 35
+  },
+  "type": "u64",
+  "value": "1000000"
+}
+
+// === Function: 0x42::comprehensive::address_of ===
+{
+  "module": "0x42::comprehensive",
+  "name": "address_of",
+  "signature": "private native fun address_of(s: &signer): address",
+  "doc": " Native function to get address from signer.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 120,
+    "start_column": 5,
+    "end_line": 120,
+    "end_column": 47
+  },
+  "visibility": "",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": true,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::comprehensive::balance_of ===
+{
+  "module": "0x42::comprehensive",
+  "name": "balance_of",
+  "signature": "public fun balance_of(addr: address): u64",
+  "doc": " Get balance of an address.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 105,
+    "start_column": 5,
+    "end_line": 107,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": true,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [
+    "view"
+  ],
+  "acquires": [
+    "Balance"
+  ]
+}
+
+// === Function: 0x42::comprehensive::deposit ===
+{
+  "module": "0x42::comprehensive",
+  "name": "deposit",
+  "signature": "public entry fun deposit(account: &signer,amount: u64)",
+  "doc": " Deposit to balance.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 67,
+    "start_column": 5,
+    "end_line": 71,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": true,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": [
+    "Balance"
+  ]
+}
+
+// === Function: 0x42::comprehensive::double ===
+{
+  "module": "0x42::comprehensive",
+  "name": "double",
+  "signature": "public inline fun double(x: u64): u64",
+  "doc": " Inline helper for doubling.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 115,
+    "start_column": 5,
+    "end_line": 117,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": true,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::comprehensive::first ===
+{
+  "module": "0x42::comprehensive",
+  "name": "first",
+  "signature": "public fun first<T1,T2>(pair: &Pair<T1, T2>): T1",
+  "doc": " Get first element.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 153,
+    "start_column": 5,
+    "end_line": 155,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::comprehensive::get_counter_value ===
+{
+  "module": "0x42::comprehensive",
+  "name": "get_counter_value",
+  "signature": "public fun get_counter_value(counter: &Counter): u64",
+  "doc": " Get counter value.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 99,
+    "start_column": 5,
+    "end_line": 101,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::comprehensive::has_balance ===
+{
+  "module": "0x42::comprehensive",
+  "name": "has_balance",
+  "signature": "public fun has_balance(addr: address): bool",
+  "doc": " Check if account has balance.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 110,
+    "start_column": 5,
+    "end_line": 112,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::comprehensive::increment ===
+{
+  "module": "0x42::comprehensive",
+  "name": "increment",
+  "signature": "public fun increment(counter: &mut Counter)",
+  "doc": " Increment counter.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 94,
+    "start_column": 5,
+    "end_line": 96,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::comprehensive::initialize ===
+{
+  "module": "0x42::comprehensive",
+  "name": "initialize",
+  "signature": "public entry fun initialize(account: &signer,initial: u64)",
+  "doc": " Initialize balance for an account.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 62,
+    "start_column": 5,
+    "end_line": 64,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": true,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::comprehensive::new_box ===
+{
+  "module": "0x42::comprehensive",
+  "name": "new_box",
+  "signature": "public fun new_box<T>(value: T): Box<T>",
+  "doc": " Create a new box.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 127,
+    "start_column": 5,
+    "end_line": 129,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::comprehensive::new_counter ===
+{
+  "module": "0x42::comprehensive",
+  "name": "new_counter",
+  "signature": "public fun new_counter(initial: u64): Counter",
+  "doc": " Create a new counter.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 89,
+    "start_column": 5,
+    "end_line": 91,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::comprehensive::new_pair ===
+{
+  "module": "0x42::comprehensive",
+  "name": "new_pair",
+  "signature": "public fun new_pair<T1,T2>(first: T1,second: T2): Pair<T1, T2>",
+  "doc": " Create a new pair.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 143,
+    "start_column": 5,
+    "end_line": 145,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::comprehensive::new_wrapper ===
+{
+  "module": "0x42::comprehensive",
+  "name": "new_wrapper",
+  "signature": "public fun new_wrapper<T>(id: u64): Wrapper<T>",
+  "doc": " Create a new wrapper.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 138,
+    "start_column": 5,
+    "end_line": 140,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::comprehensive::reset ===
+{
+  "module": "0x42::comprehensive",
+  "name": "reset",
+  "signature": "private fun reset(counter: &mut Counter)",
+  "doc": " Reset counter to zero.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 168,
+    "start_column": 5,
+    "end_line": 170,
+    "end_column": 5
+  },
+  "visibility": "",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [
+    "deprecated"
+  ],
+  "acquires": []
+}
+
+// === Function: 0x42::comprehensive::swap ===
+{
+  "module": "0x42::comprehensive",
+  "name": "swap",
+  "signature": "public fun swap<T>(pair: Pair<T, T>): Pair<T, T>",
+  "doc": " Swap elements of a pair.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 148,
+    "start_column": 5,
+    "end_line": 150,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::comprehensive::test_abort ===
+{
+  "module": "0x42::comprehensive",
+  "name": "test_abort",
+  "signature": "private fun test_abort()",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 180,
+    "start_column": 5,
+    "end_line": 182,
+    "end_column": 5
+  },
+  "visibility": "",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [
+    "test",
+    "expected_failure(abort_code = 0x42::comprehensive::E_ZERO)"
+  ],
+  "acquires": []
+}
+
+// === Function: 0x42::comprehensive::test_abort_literal ===
+{
+  "module": "0x42::comprehensive",
+  "name": "test_abort_literal",
+  "signature": "private fun test_abort_literal()",
+  "doc": "",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 186,
+    "start_column": 5,
+    "end_line": 188,
+    "end_column": 5
+  },
+  "visibility": "",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [
+    "test",
+    "expected_failure(abort_code = 42)"
+  ],
+  "acquires": []
+}
+
+// === Function: 0x42::comprehensive::test_helper ===
+{
+  "module": "0x42::comprehensive",
+  "name": "test_helper",
+  "signature": "private fun test_helper(): u64",
+  "doc": " Test helper function.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 174,
+    "start_column": 5,
+    "end_line": 176,
+    "end_column": 5
+  },
+  "visibility": "",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [
+    "test_only"
+  ],
+  "acquires": []
+}
+
+// === Function: 0x42::comprehensive::transfer ===
+{
+  "module": "0x42::comprehensive",
+  "name": "transfer",
+  "signature": "public entry fun transfer(from: &signer,to: address,amount: u64)",
+  "doc": " Transfer between accounts.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 74,
+    "start_column": 5,
+    "end_line": 82,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": true,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": [
+    "Balance"
+  ]
+}
+
+// === Function: 0x42::comprehensive::unbox ===
+{
+  "module": "0x42::comprehensive",
+  "name": "unbox",
+  "signature": "public fun unbox<T>(box: Box<T>): T",
+  "doc": " Unpack a box.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 132,
+    "start_column": 5,
+    "end_line": 135,
+    "end_column": 5
+  },
+  "visibility": "public",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Function: 0x42::comprehensive::validate_amount ===
+{
+  "module": "0x42::comprehensive",
+  "name": "validate_amount",
+  "signature": "private fun validate_amount(amount: u64): bool",
+  "doc": " Internal validation.",
+  "location": {
+    "file": "tests/test_packages/single_mod/sources/comprehensive.move",
+    "start_line": 162,
+    "start_column": 5,
+    "end_line": 164,
+    "end_column": 5
+  },
+  "visibility": "",
+  "is_entry": false,
+  "is_view": false,
+  "is_inline": false,
+  "is_native": false,
+  "attributes": [],
+  "acquires": []
+}
+
+// === Source: 0x42::comprehensive::address_of ===
+    native fun address_of(s: &signer): address;
+

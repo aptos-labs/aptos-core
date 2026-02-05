@@ -1,0 +1,10 @@
+[package]
+name = "with_dep"
+version = "0.0.0"
+
+[addresses]
+test_addr = "0x42"
+std = "0x1"
+
+[dependencies]
+MoveStdlib = { local = "../../../../../move-stdlib" }
