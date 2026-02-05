@@ -87,7 +87,7 @@ impl AdminService {
             .unwrap();
 
         // Create a runtime for the admin service
-        let runtime = aptos_runtimes::spawn_named_runtime("admin".into(), None);
+        let runtime = aptos_runtimes::spawn_named_runtime("admin".into(), config.num_threads);
 
         // TODO(grao): Consider support enabling the service through an authenticated request.
         let enabled = config.enabled.unwrap_or(false);

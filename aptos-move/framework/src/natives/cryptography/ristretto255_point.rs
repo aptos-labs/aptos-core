@@ -157,7 +157,13 @@ impl PointStore {
     fn safe_add_point(&mut self, point: RistrettoPoint) -> SafeNativeResult<u64> {
         let id = self.points.len();
         if id >= NUM_POINTS_LIMIT {
-            Err(SafeNativeError::abort(E_TOO_MANY_POINTS_CREATED))
+            Err(SafeNativeError::abort_with_message(
+                E_TOO_MANY_POINTS_CREATED,
+                format!(
+                    "Too many points created: {}, limit is {}",
+                    id, NUM_POINTS_LIMIT
+                ),
+            ))
         } else {
             self.points.push(point);
             Ok(id as u64)

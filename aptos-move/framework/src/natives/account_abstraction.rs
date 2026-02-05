@@ -11,6 +11,11 @@ use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::SmallVec;
 use std::collections::VecDeque;
 
+mod abort_codes {
+    /// Signer passed in is not the master signer
+    pub const ENOT_MASTER_SIGNER: u64 = 4;
+}
+
 /***************************************************************************************************
  * native fun dispatchable_authenticate
  *
@@ -30,7 +35,17 @@ pub(crate) fn native_dispatch(
     context
         .traversal_context()
         .check_is_special_or_visited(module_name.address(), module_name.name())
-        .map_err(|_| SafeNativeError::abort(4))?;
+        .map_err(|_| {
+            // Note: this is a legacy abort code, but this is really a loading error.
+            SafeNativeError::abort_with_message(
+                abort_codes::ENOT_MASTER_SIGNER,
+                format!(
+                    "Module {}::{} is not loaded prior to native dispatch",
+                    module_name.address(),
+                    module_name.name()
+                ),
+            )
+        })?;
 
     context.charge(DISPATCHABLE_AUTHENTICATE_DISPATCH_BASE)?;
 
