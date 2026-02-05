@@ -16,6 +16,7 @@ use std::{collections::BTreeMap, fs, path::PathBuf, process::Command};
 
 /// Format the Move source code.
 #[derive(Debug, Parser)]
+#[command(disable_version_flag = true)]
 pub struct Fmt {
     #[clap(flatten)]
     pub command: FmtCommand,
@@ -37,9 +38,9 @@ pub struct FmtCommand {
     emit_mode: Option<EmitMode>,
 
     /// Path to the move package (the folder with a Move.toml file) to be formatted.
-    /// If neither a package path nor a file path is provided, the current directory is formatted.
-    #[clap(long, value_parser)]
-    package_path: Option<PathBuf>,
+    /// If neither a package directory nor a file path is provided, the current directory is formatted.
+    #[clap(long, alias = "package-path", value_parser)]
+    package_dir: Option<PathBuf>,
 
     /// Path to specific Move source files to format. This cannot be called with a package path option.
     #[clap(long, value_parser, num_args = 1..)]
@@ -63,6 +64,10 @@ pub struct FmtCommand {
     #[clap(long, short)]
     /// Print less output
     pub quiet: bool,
+
+    #[clap(long, short = 'V')]
+    /// Print version information for the movefmt binary
+    pub version: bool,
 }
 
 #[async_trait]
@@ -76,10 +81,33 @@ impl CliCommand<String> for Fmt {
     }
 }
 
+/// Get the version of the movefmt binary
+fn get_movefmt_binary_version() -> CliTypedResult<String> {
+    let exe = get_movefmt_path()?;
+    let output = Command::new(&exe)
+        .arg("--version")
+        .output()
+        .map_err(|e| CliError::UnexpectedError(format!("Failed to execute movefmt: {}", e)))?;
+
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    } else {
+        Err(CliError::UnexpectedError(format!(
+            "movefmt --version failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )))
+    }
+}
+
 impl FmtCommand {
     async fn execute(self) -> CliTypedResult<String> {
+        // Handle --version flag to show movefmt binary version
+        if self.version {
+            return get_movefmt_binary_version();
+        }
+
         let exe = get_movefmt_path()?;
-        let package_opt = self.package_path;
+        let package_opt = self.package_dir;
         let config_path_opt = self.config_path;
         let files_opt = self.file_path;
         let config_map = self.config;
