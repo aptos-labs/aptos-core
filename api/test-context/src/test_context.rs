@@ -627,7 +627,7 @@ impl TestContext {
                 ),
         );
         let txn2 = self.account_transfer_to(account, multisig_address, initial_balance);
-        self.commit_block(&vec![create_multisig_txn, txn2]).await;
+        self.commit_block(&[create_multisig_txn, txn2]).await;
         multisig_address
     }
 
@@ -651,7 +651,7 @@ impl TestContext {
         );
         let txn2 = self.account_transfer_to(account, account.address(), initial_balance);
 
-        self.commit_block(&vec![txn1, txn2]).await;
+        self.commit_block(&[txn1, txn2]).await;
     }
 
     pub async fn create_multisig_transaction(
@@ -671,7 +671,7 @@ impl TestContext {
                     self.use_orderless_transactions,
                 ),
         );
-        self.commit_block(&vec![txn]).await;
+        self.commit_block(&[txn]).await;
     }
 
     pub async fn approve_multisig_transaction(
@@ -691,7 +691,7 @@ impl TestContext {
                     self.use_orderless_transactions,
                 ),
         );
-        self.commit_block(&vec![txn]).await;
+        self.commit_block(&[txn]).await;
     }
 
     pub async fn reject_multisig_transaction(
@@ -711,7 +711,7 @@ impl TestContext {
                     self.use_orderless_transactions,
                 ),
         );
-        self.commit_block(&vec![txn]).await;
+        self.commit_block(&[txn]).await;
     }
 
     pub async fn create_multisig_transaction_with_payload_hash(
@@ -731,7 +731,7 @@ impl TestContext {
                     self.use_orderless_transactions,
                 ),
         );
-        self.commit_block(&vec![txn]).await;
+        self.commit_block(&[txn]).await;
     }
 
     pub fn account_transfer(
