@@ -10,6 +10,7 @@ echo "Building aptos-node"
 echo "PROFILE: $PROFILE"
 echo "FEATURES: $FEATURES"
 echo "CARGO_TARGET_DIR: $CARGO_TARGET_DIR"
+echo "CARGO_HOME: $CARGO_HOME"
 
 PACKAGES=(
     aptos-node

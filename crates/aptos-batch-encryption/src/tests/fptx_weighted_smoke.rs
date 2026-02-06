@@ -7,6 +7,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_crypto::{weighted_config::WeightedConfigArkworks, TSecretSharingConfig as _};
+use aptos_dkg::pvss::traits::transcript::Aggregated;
 use ark_ec::AffineRepr as _;
 use ark_std::rand::{seq::SliceRandom, thread_rng, CryptoRng, Rng as _, RngCore};
 
@@ -80,8 +81,7 @@ use aptos_crypto::{SigningKey, Uniform};
 use aptos_dkg::pvss::{
     test_utils::NoAux,
     traits::{
-        transcript::{Aggregatable, HasAggregatableSubtranscript},
-        Convert, HasEncryptionPublicParams, Transcript,
+        transcript::HasAggregatableSubtranscript, Convert, HasEncryptionPublicParams, Transcript,
     },
 };
 

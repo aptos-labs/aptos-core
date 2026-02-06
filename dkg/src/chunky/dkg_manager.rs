@@ -20,7 +20,7 @@ use anyhow::{anyhow, bail, ensure, Context, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_crypto::{hash::CryptoHash, SigningKey, Uniform};
 use aptos_dkg::pvss::{
-    traits::{transcript::HasAggregatableSubtranscript, Aggregatable},
+    traits::transcript::{Aggregated, HasAggregatableSubtranscript},
     Player,
 };
 use aptos_infallible::{duration_since_epoch, Mutex};
