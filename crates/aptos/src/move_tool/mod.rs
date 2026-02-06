@@ -2352,6 +2352,12 @@ pub struct Replay {
     #[clap(long)]
     pub(crate) profile_gas: bool,
 
+    /// If set, fold the call graph by unique stack traces before generating the gas profile report.
+    /// This helps reduce the size of large reports by aggregating identical call paths.
+    /// Only effective when --profile-gas is set.
+    #[clap(long)]
+    pub(crate) fold_unique_stack: bool,
+
     /// If present, skip the comparison against the expected transaction output.
     #[clap(long)]
     pub(crate) skip_comparison: bool,
@@ -2426,6 +2432,7 @@ impl CliCommand<TransactionSummary> for Replay {
                 txn.clone(),
                 hash,
                 aux_info,
+                self.fold_unique_stack,
             )?
         } else if self.benchmark {
             println!("Benchmarking transaction...");

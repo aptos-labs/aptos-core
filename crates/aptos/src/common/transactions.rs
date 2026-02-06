@@ -366,10 +366,11 @@ impl TxnOptions {
         println!();
         println!("Simulating transaction locally using the gas profiler...");
 
-        self.simulate_using_debugger(
-            payload,
-            local_simulation::profile_transaction_using_debugger,
-        )
+        self.simulate_using_debugger(payload, |debugger, version, txn, hash, aux_info| {
+            local_simulation::profile_transaction_using_debugger(
+                debugger, version, txn, hash, aux_info, false,
+            )
+        })
         .await
     }
 

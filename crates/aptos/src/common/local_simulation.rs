@@ -130,8 +130,9 @@ pub fn profile_transaction_using_debugger(
     transaction: SignedTransaction,
     hash: HashValue,
     persisted_auxiliary_info: PersistedAuxiliaryInfo,
+    fold_unique_stack: bool,
 ) -> CliTypedResult<(VMStatus, VMOutput)> {
-    let (vm_status, vm_output, gas_log) = debugger
+    let (vm_status, vm_output, mut gas_log) = debugger
         .execute_transaction_at_version_with_gas_profiler(
             version,
             transaction,
@@ -140,6 +141,11 @@ pub fn profile_transaction_using_debugger(
         .map_err(|err| {
             CliError::UnexpectedError(format!("failed to simulate txn with gas profiler: {}", err))
         })?;
+
+    // Optionally fold the call graph by unique stack traces
+    if fold_unique_stack {
+        gas_log.exec_io.call_graph = gas_log.exec_io.call_graph.fold_unique_stack();
+    }
 
     // Generate a human-readable name for the report
     let entry_point = gas_log.entry_point();

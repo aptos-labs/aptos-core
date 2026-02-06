@@ -133,29 +133,25 @@ impl ExecutionGasEvent {
         use ExecutionGasEvent::*;
 
         match self {
-            Loc(offset) => Node::new(format!("@{}", offset), 0),
-            Bytecode { op, cost } => Node::new(format!("{:?}", op).to_ascii_lowercase(), *cost),
+            Loc(offset) => Node::new(format!("@{offset}"), 0),
+            Bytecode { op, cost } => Node::new(format!("{op:?}").to_ascii_lowercase(), *cost),
             Call(frame) => frame.to_erased(keep_generic_types),
             CallNative {
                 module_id,
                 fn_name,
                 ty_args,
                 cost,
-            } => Node::new(
-                format!(
-                    "{}",
-                    Render(&(
-                        module_id,
-                        fn_name.as_ident_str(),
-                        if keep_generic_types {
-                            ty_args.as_slice()
-                        } else {
-                            &[]
-                        }
-                    ))
-                ),
-                *cost,
-            ),
+            } => {
+                let ty_args = if keep_generic_types {
+                    ty_args.as_slice()
+                } else {
+                    &[]
+                };
+                Node::new(
+                    Render(&(module_id, fn_name.as_ident_str(), ty_args)).to_string(),
+                    *cost,
+                )
+            },
             LoadResource { addr, ty, cost } => Node::new(
                 format!("load<{}::{}>", Render(addr), ty.to_canonical_string()),
                 *cost,
@@ -175,26 +171,19 @@ impl CallFrame {
                 name,
                 ty_args,
             } => {
-                format!(
-                    "{}",
-                    Render(&(
-                        module_id,
-                        name.as_ident_str(),
-                        if keep_generic_types {
-                            ty_args.as_slice()
-                        } else {
-                            &[]
-                        }
-                    ))
-                )
+                let ty_args = if keep_generic_types {
+                    ty_args.as_slice()
+                } else {
+                    &[]
+                };
+                Render(&(module_id, name.as_ident_str(), ty_args)).to_string()
             },
         };
 
         let children = self
             .events
             .iter()
-            .map(|event| event.to_erased(keep_generic_types))
-            .collect::<Vec<_>>();
+            .map(|event| event.to_erased(keep_generic_types));
 
         Node::new_with_children(name, 0, children)
     }
@@ -247,7 +236,7 @@ impl ExecutionAndIOCosts {
 
         TypeErasedExecutionAndIoCosts {
             gas_scaling_factor: self.gas_scaling_factor,
-            total: self.total,
+            total: self.total(),
             tree: Node::new_with_children("execution & IO (gas unit, full trace)", 0, nodes),
         }
     }

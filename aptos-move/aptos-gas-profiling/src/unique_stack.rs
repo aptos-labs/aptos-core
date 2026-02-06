@@ -79,7 +79,8 @@ impl ExecutionAndIOCosts {
 
         ExecutionAndIOCosts {
             gas_scaling_factor: self.gas_scaling_factor,
-            total: self.total + other.total,
+            execution_gas: self.execution_gas + other.execution_gas,
+            io_gas: self.io_gas + other.io_gas,
             intrinsic_cost: self.intrinsic_cost + other.intrinsic_cost,
             keyless_cost: self.keyless_cost + other.keyless_cost,
             slh_dsa_sha2_128s_cost: self.slh_dsa_sha2_128s_cost + other.slh_dsa_sha2_128s_cost,
