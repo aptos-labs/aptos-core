@@ -156,6 +156,8 @@ impl ReplayProtector {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aptos_crypto::hash::CryptoHash;
+
     #[test]
     fn test_replay_protector_order() {
         let nonce = ReplayProtector::Nonce(1);
@@ -169,6 +171,94 @@ mod tests {
         let sequence_number1 = ReplayProtector::SequenceNumber(3);
         let sequence_number2 = ReplayProtector::SequenceNumber(4);
         assert!(sequence_number1 < sequence_number2);
+    }
+
+    #[test]
+    fn test_committed_hash_matches_crypto_hash() {
+        // In test mode, Transaction derives BCSCryptoHash, so we can compare
+        // committed_hash() against CryptoHash::hash() to ensure they match.
+        // This test will fail if the manual implementation in compute_transaction_hash()
+        // ever diverges from the CryptoHash trait implementation.
+
+        // Test StateCheckpoint variant
+        let state_checkpoint = Transaction::StateCheckpoint(HashValue::random());
+        assert_eq!(
+            state_checkpoint.committed_hash(),
+            state_checkpoint.hash(),
+            "StateCheckpoint committed_hash should match CryptoHash::hash()"
+        );
+
+        // Test BlockMetadata variant
+        let block_metadata = Transaction::BlockMetadata(BlockMetadata::new(
+            HashValue::random(),
+            1,                        // epoch
+            1,                        // round
+            AccountAddress::random(), // proposer
+            vec![0],                  // previous_block_votes_bitvec
+            vec![],                   // failed_proposer_indices
+            12345,                    // timestamp_usecs
+        ));
+        assert_eq!(
+            block_metadata.committed_hash(),
+            block_metadata.hash(),
+            "BlockMetadata committed_hash should match CryptoHash::hash()"
+        );
+
+        // Test UserTransaction variant - this also tests the caching in SignedTransaction
+        let sender = AccountAddress::random();
+        let raw_txn = RawTransaction::new_script(
+            sender,
+            0,
+            Script::new(vec![0u8], vec![], vec![]),
+            100,
+            1,
+            u64::MAX,
+            ChainId::test(),
+        );
+        let signed_txn = SignedTransaction::new_single_sender(
+            raw_txn,
+            AccountAuthenticator::NoAccountAuthenticator,
+        );
+        let user_txn = Transaction::UserTransaction(signed_txn);
+        assert_eq!(
+            user_txn.committed_hash(),
+            user_txn.hash(),
+            "UserTransaction committed_hash should match CryptoHash::hash()"
+        );
+    }
+
+    #[test]
+    fn test_user_transaction_committed_hash_is_cached() {
+        // Verify that SignedTransaction caches the committed_hash
+        let sender = AccountAddress::random();
+        let raw_txn = RawTransaction::new_script(
+            sender,
+            0,
+            Script::new(vec![0u8], vec![], vec![]),
+            100,
+            1,
+            u64::MAX,
+            ChainId::test(),
+        );
+        let signed_txn = SignedTransaction::new_single_sender(
+            raw_txn,
+            AccountAuthenticator::NoAccountAuthenticator,
+        );
+
+        // First call computes and caches the hash
+        let hash1 = signed_txn.committed_hash();
+        // Second call should return the cached value
+        let hash2 = signed_txn.committed_hash();
+
+        assert_eq!(hash1, hash2, "Cached hash should be consistent");
+
+        // Verify it matches the CryptoHash::hash() (available in test mode via BCSCryptoHash derive)
+        let user_txn = Transaction::UserTransaction(signed_txn.clone());
+        assert_eq!(
+            hash1,
+            user_txn.hash(),
+            "Cached hash should match CryptoHash::hash()"
+        );
     }
 }
 
@@ -1335,7 +1425,7 @@ impl SignedTransaction {
     pub fn committed_hash(&self) -> HashValue {
         *self
             .committed_hash
-            .get_or_init(|| Transaction::UserTransaction(self.clone()).hash())
+            .get_or_init(|| compute_transaction_hash(&Transaction::UserTransaction(self.clone())))
     }
 
     pub fn replay_protector(&self) -> ReplayProtector {
@@ -1415,7 +1505,7 @@ impl TransactionWithProof {
     }
 
     pub fn verify(&self, ledger_info: &LedgerInfo) -> Result<()> {
-        let txn_hash = self.transaction.hash();
+        let txn_hash = self.transaction.committed_hash();
         ensure!(
             txn_hash == self.proof.transaction_info().transaction_hash(),
             "Transaction hash ({}) not expected ({}).",
@@ -2314,7 +2404,7 @@ impl TransactionListWithProof {
             .par_iter()
             .zip_eq(self.proof.transaction_infos.par_iter())
             .map(|(txn, txn_info)| {
-                let txn_hash = CryptoHash::hash(txn);
+                let txn_hash = txn.committed_hash();
                 ensure!(
                     txn_hash == txn_info.transaction_hash(),
                     "The hash of transaction does not match the transaction info in proof. \
@@ -2599,7 +2689,7 @@ impl TransactionOutputListWithProof {
             );
 
             // Verify the transaction hashes match those of the transaction infos
-            let txn_hash = txn.hash();
+            let txn_hash = txn.committed_hash();
             ensure!(
                 txn_hash == txn_info.transaction_hash(),
                 "The transaction hash does not match the hash in transaction info. \
@@ -2930,6 +3020,16 @@ impl AccountOrderedTransactionsWithProof {
     }
 }
 
+/// Computes the hash of a Transaction using BCS serialization.
+/// This is the single source of truth for Transaction hash computation.
+fn compute_transaction_hash(txn: &Transaction) -> HashValue {
+    use aptos_crypto::hash::CryptoHasher;
+    let bytes = bcs::to_bytes(txn).expect("Transaction serialization should not fail");
+    let mut hasher = TransactionHasher::default();
+    hasher.update(&bytes);
+    hasher.finish()
+}
+
 /// `Transaction` will be the transaction type used internally in the aptos node to represent the
 /// transaction to be processed and persisted.
 ///
@@ -2937,7 +3037,8 @@ impl AccountOrderedTransactionsWithProof {
 /// transaction.
 #[allow(clippy::large_enum_variant)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(BCSCryptoHash))]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher)]
 pub enum Transaction {
     /// Transaction submitted by the user. e.g: P2P payment transaction, publishing module
     /// transaction, etc.
@@ -3064,6 +3165,15 @@ impl Transaction {
             | Transaction::UserTransaction(_)
             | Transaction::GenesisTransaction(_)
             | Transaction::ValidatorTransaction(_) => false,
+        }
+    }
+
+    /// Returns the hash used when the transaction is committed to the ledger.
+    /// For user transactions, this leverages the cached hash in SignedTransaction.
+    pub fn committed_hash(&self) -> HashValue {
+        match self {
+            Transaction::UserTransaction(txn) => txn.committed_hash(),
+            _ => compute_transaction_hash(self),
         }
     }
 }

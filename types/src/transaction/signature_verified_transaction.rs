@@ -10,7 +10,7 @@ use crate::{
     },
     write_set::WriteOp,
 };
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::HashValue;
 use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -74,8 +74,8 @@ impl SignatureVerifiedTransaction {
 
     pub fn hash(&self) -> HashValue {
         match self {
-            SignatureVerifiedTransaction::Valid(txn) => txn.hash(),
-            SignatureVerifiedTransaction::Invalid(txn) => txn.hash(),
+            SignatureVerifiedTransaction::Valid(txn) => txn.committed_hash(),
+            SignatureVerifiedTransaction::Invalid(txn) => txn.committed_hash(),
         }
     }
 
