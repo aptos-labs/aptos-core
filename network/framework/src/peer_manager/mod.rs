@@ -732,12 +732,13 @@ where
         )?;
         // Send NewPeer notification to connection event handlers before consuming conn_meta.
         if send_new_peer_notification {
-            let notif =
-                ConnectionNotification::NewPeer(conn_meta.clone(), self.network_context.network_id());
+            let notif = ConnectionNotification::NewPeer(
+                conn_meta.clone(),
+                self.network_context.network_id(),
+            );
             self.send_conn_notification(peer_id, notif);
         }
-        self.active_peers
-            .insert(peer_id, (conn_meta, peer_reqs_tx));
+        self.active_peers.insert(peer_id, (conn_meta, peer_reqs_tx));
 
         Ok(())
     }
