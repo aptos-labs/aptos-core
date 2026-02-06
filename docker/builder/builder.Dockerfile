@@ -5,16 +5,6 @@ WORKDIR /aptos
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 
-# Configure APT sources to use cloudfront mirror (DEB822 format for Trixie+)
-RUN rm -f /etc/apt/sources.list
-COPY <<EOF /etc/apt/sources.list.d/debian.sources
-Types: deb
-URIs: https://cloudfront.debian.net/debian
-Suites: trixie trixie-updates
-Components: main
-Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
-EOF
-
 # Workaround: LLVM apt repo uses SHA1 signatures, but Trixie disabled SHA1 by default
 # See https://github.com/llvm/llvm-project/issues/179148
 RUN <<EOF
