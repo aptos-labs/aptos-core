@@ -12,11 +12,13 @@ Types: deb
 URIs: https://cloudfront.debian.net/debian
 Suites: trixie trixie-updates
 Components: main
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
 
 Types: deb
 URIs: https://security.debian.org/debian-security
 Suites: trixie-security
 Components: main
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
 EOF
 
 # Workaround: LLVM apt repo uses SHA1 signatures, but Trixie disabled SHA1 by default

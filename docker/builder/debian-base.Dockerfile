@@ -13,11 +13,13 @@ Types: deb
 URIs: https://cloudfront.debian.net/debian
 Suites: trixie trixie-updates
 Components: main
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
 
 Types: deb
 URIs: https://security.debian.org/debian-security
 Suites: trixie-security
 Components: main
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
 EOF
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
