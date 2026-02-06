@@ -756,21 +756,24 @@ where
                     NetworkSchema::new(&self.network_context)
                         .remote_peer(&peer_id),
                     error = ?e,
-                    "{} Failed to send notification to handler for peer: {}. Error: {:?}",
+                    connection_notification = notification,
+                    "{} Failed to send notification {} to handler for peer: {}. Error: {:?}",
                     self.network_context,
+                    notification,
                     peer_id.short_str(),
                     e
                 );
             }
         }
-        // Move the notification into the last handler to avoid a final clone
+        // Move the notification into the last handler to avoid a final clone.
+        // On error the notification is returned inside the Err, so we log it from there.
         if let Some(last_handler) = self.connection_event_handlers.last_mut() {
             if let Err(e) = last_handler.push(peer_id, notification) {
                 warn!(
                     NetworkSchema::new(&self.network_context)
                         .remote_peer(&peer_id),
                     error = ?e,
-                    "{} Failed to send notification to handler for peer: {}. Error: {:?}",
+                    "{} Failed to send notification to last handler for peer: {}. Error: {:?}",
                     self.network_context,
                     peer_id.short_str(),
                     e
