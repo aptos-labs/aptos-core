@@ -14,7 +14,7 @@ Suites: trixie trixie-updates
 Components: main
 
 Types: deb
-URIs: https://cloudfront.debian.net/debian-security
+URIs: http://security.debian.org/debian-security
 Suites: trixie-security
 Components: main
 EOF
