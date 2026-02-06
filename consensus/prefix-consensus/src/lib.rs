@@ -22,9 +22,13 @@
 //! ## Protocol
 //!
 //! The protocol runs in 3 rounds:
-//! 1. **Round 1**: Vote on input vectors, certify longest prefix in f+1 votes
+//! 1. **Round 1**: Vote on input vectors, certify longest prefix with >1/3 stake
 //! 2. **Round 2**: Vote on certified prefixes, compute maximum common prefix
 //! 3. **Round 3**: Vote on round-2 prefixes, output (v_low, v_high)
+//!
+//! Quorum thresholds use proof-of-stake weighted voting:
+//! - QC formation requires >2/3 of total stake
+//! - Certified prefix requires >1/3 of total stake (minority threshold)
 //!
 //! ## Properties
 //!

@@ -14,9 +14,9 @@
 //! - **DirectCertificate**: Created when a view produces non-empty v_high.
 //!   Contains the view number and QC3 proof. v_high is derived from the proof.
 //!
-//! - **IndirectCertificate**: Created by aggregating f+1 EmptyViewMessages when
-//!   a view produces empty v_high. Points to the MAX highest_known_view among
-//!   all messages, allowing skipping of empty views.
+//! - **IndirectCertificate**: Created by aggregating EmptyViewMessages from validators
+//!   with >1/3 of total stake when a view produces empty v_high. Points to the MAX
+//!   highest_known_view among all messages, allowing skipping of empty views.
 //!
 //! ## Protocol Flow
 //!
@@ -72,9 +72,9 @@ impl DirectCertificate {
     }
 
     /// Validate this certificate
-    pub fn validate(&self, f: usize, n: usize, verifier: &ValidatorVerifier) -> Result<()> {
+    pub fn validate(&self, verifier: &ValidatorVerifier) -> Result<()> {
         // Verify QC3 structure and all signatures
-        verify_qc3(&self.proof, f, n, verifier)?;
+        verify_qc3(&self.proof, verifier)?;
 
         // Verify view matches QC3 (replay protection)
         let proof_view = qc3_view(&self.proof);
@@ -166,12 +166,12 @@ impl EmptyViewMessage {
     }
 
     /// Verify this message
-    pub fn verify(&self, f: usize, n: usize, verifier: &ValidatorVerifier) -> Result<()> {
+    pub fn verify(&self, verifier: &ValidatorVerifier) -> Result<()> {
         // Verify signature on statement
         verifier.verify(self.author, &self.statement, &self.signature)?;
 
         // Verify the highest_known_proof is valid
-        verify_qc3(&self.highest_known_proof, f, n, verifier)?;
+        verify_qc3(&self.highest_known_proof, verifier)?;
 
         // Verify highest_known_view matches the proof's view (replay protection)
         let proof_view = qc3_view(&self.highest_known_proof);
@@ -208,9 +208,9 @@ impl EmptyViewMessage {
 
 /// Indirect certificate for skipping empty views
 ///
-/// Created by aggregating f+1 EmptyViewMessages. Points to the MAX
-/// highest_known_view among all messages, allowing us to skip
-/// multiple empty views at once.
+/// Created by aggregating EmptyViewMessages from validators with >1/3 of total
+/// stake (minority quorum). Points to the MAX highest_known_view among all
+/// messages, allowing us to skip multiple empty views at once.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct IndirectCertificate {
     /// The view that was empty
@@ -219,22 +219,27 @@ pub struct IndirectCertificate {
     pub parent_view: u64,
     /// Proof for parent_view (from the message with max highest_known_view)
     pub parent_proof: QC3,
-    /// The f+1 empty-view messages that form this certificate
+    /// The empty-view messages from validators with >1/3 stake
     pub messages: Vec<EmptyViewMessage>,
 }
 
 impl IndirectCertificate {
-    /// Create an indirect certificate from f+1 empty-view messages
+    /// Create an indirect certificate from empty-view messages
     ///
     /// Automatically selects the MAX highest_known_view as parent.
-    /// Requires at least f+1 messages to construct a valid certificate.
-    pub fn from_messages(empty_view: u64, messages: Vec<EmptyViewMessage>, f: usize) -> Result<Self> {
-        ensure!(
-            messages.len() >= f + 1,
-            "Need at least {} messages, got {}",
-            f + 1,
-            messages.len()
-        );
+    /// Requires messages from validators with >1/3 stake (minority quorum).
+    pub fn from_messages(
+        empty_view: u64,
+        messages: Vec<EmptyViewMessage>,
+        verifier: &ValidatorVerifier,
+    ) -> Result<Self> {
+        ensure!(!messages.is_empty(), "Need at least one message");
+
+        // Check that message authors have sufficient voting power (>1/3 stake)
+        let authors: Vec<_> = messages.iter().map(|m| m.author).collect();
+        verifier
+            .check_voting_power(authors.iter(), false)
+            .map_err(|e| anyhow::anyhow!("Insufficient voting power for indirect certificate: {}", e))?;
 
         // Find message with max highest_known_view
         let best_message = messages
@@ -267,15 +272,7 @@ impl IndirectCertificate {
     }
 
     /// Validate this certificate
-    pub fn validate(&self, f: usize, n: usize, verifier: &ValidatorVerifier) -> Result<()> {
-        // Need at least f+1 messages
-        ensure!(
-            self.messages.len() >= f + 1,
-            "Need {} messages, got {}",
-            f + 1,
-            self.messages.len()
-        );
-
+    pub fn validate(&self, verifier: &ValidatorVerifier) -> Result<()> {
         // Verify parent_view < empty_view
         ensure!(
             self.parent_view < self.empty_view,
@@ -285,7 +282,7 @@ impl IndirectCertificate {
         );
 
         // Verify parent_proof
-        verify_qc3(&self.parent_proof, f, n, verifier)?;
+        verify_qc3(&self.parent_proof, verifier)?;
 
         // Verify parent_view matches parent_proof's view (replay protection)
         let proof_view = qc3_view(&self.parent_proof);
@@ -323,13 +320,19 @@ impl IndirectCertificate {
             );
 
             // Verify the message itself
-            msg.verify(f, n, verifier)?;
+            msg.verify(verifier)?;
 
             // Track max view
             if msg.highest_known_view() > max_view_found {
                 max_view_found = msg.highest_known_view();
             }
         }
+
+        // Verify messages have sufficient voting power (>1/3 stake = minority quorum)
+        let authors: Vec<_> = self.messages.iter().map(|m| m.author).collect();
+        verifier
+            .check_voting_power(authors.iter(), false)
+            .map_err(|e| anyhow::anyhow!("Indirect certificate insufficient voting power: {}", e))?;
 
         // Verify parent_view matches the max from messages
         ensure!(
@@ -386,10 +389,10 @@ impl Certificate {
     }
 
     /// Validate this certificate
-    pub fn validate(&self, f: usize, n: usize, verifier: &ValidatorVerifier) -> Result<()> {
+    pub fn validate(&self, verifier: &ValidatorVerifier) -> Result<()> {
         match self {
-            Certificate::Direct(c) => c.validate(f, n, verifier),
-            Certificate::Indirect(c) => c.validate(f, n, verifier),
+            Certificate::Direct(c) => c.validate(verifier),
+            Certificate::Indirect(c) => c.validate(verifier),
         }
     }
 
@@ -471,6 +474,7 @@ impl HighestKnownView {
 mod tests {
     use super::*;
     use crate::types::{Vote1, Vote2, Vote3, QC1, QC2};
+    use aptos_types::validator_verifier::ValidatorConsensusInfo;
 
     fn hash(i: u64) -> HashValue {
         HashValue::sha3_256_of(&i.to_le_bytes())
@@ -482,6 +486,17 @@ mod tests {
 
     fn dummy_signature() -> BlsSignature {
         BlsSignature::dummy_signature()
+    }
+
+    /// Create a test validator verifier with equal voting power for each validator
+    fn create_test_verifier(count: usize) -> ValidatorVerifier {
+        let validator_infos: Vec<_> = (0..count)
+            .map(|i| {
+                let signer = aptos_types::validator_signer::ValidatorSigner::random(None);
+                ValidatorConsensusInfo::new(dummy_party_id(i as u8), signer.public_key(), 1)
+            })
+            .collect();
+        ValidatorVerifier::new(validator_infos)
     }
 
     // Helper to create a QC3 with the given mcp_prefixes and view number
@@ -626,6 +641,9 @@ mod tests {
 
     #[test]
     fn test_indirect_certificate_from_messages() {
+        // 4 validators, each with weight 1, quorum = 3, minority (>1/3) = 2
+        let verifier = create_test_verifier(4);
+
         let qc3_view3 = create_qc3_with_prefixes(vec![
             vec![hash(1)],
             vec![hash(1)],
@@ -638,15 +656,14 @@ mod tests {
             vec![hash(1)],
         ]);
 
-        // Messages with different highest_known_views
+        // Messages with different highest_known_views (3 messages = >1/3 of 4)
         let messages = vec![
             EmptyViewMessage::new(5, dummy_party_id(0), 2, qc3_view2.clone(), dummy_signature()),
             EmptyViewMessage::new(5, dummy_party_id(1), 3, qc3_view3.clone(), dummy_signature()),
             EmptyViewMessage::new(5, dummy_party_id(2), 2, qc3_view2, dummy_signature()),
         ];
 
-        // f=2 requires 3 messages (f+1=3)
-        let cert = IndirectCertificate::from_messages(5, messages, 2).unwrap();
+        let cert = IndirectCertificate::from_messages(5, messages, &verifier).unwrap();
 
         assert_eq!(cert.view(), 5);
         // Should select MAX = 3
@@ -655,13 +672,16 @@ mod tests {
 
     #[test]
     fn test_indirect_certificate_empty_messages_error() {
-        // Even with f=0, we need f+1=1 message
-        let result = IndirectCertificate::from_messages(5, vec![], 0);
+        let verifier = create_test_verifier(4);
+        let result = IndirectCertificate::from_messages(5, vec![], &verifier);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_indirect_certificate_hash_determinism() {
+        // 3 validators, each with weight 1, minority (>1/3) = 2
+        let verifier = create_test_verifier(3);
+
         let qc3 = create_qc3_with_prefixes(vec![
             vec![hash(1)],
             vec![hash(1)],
@@ -673,9 +693,8 @@ mod tests {
             EmptyViewMessage::new(5, dummy_party_id(1), 3, qc3.clone(), dummy_signature()),
         ];
 
-        // f=1 requires 2 messages (f+1=2)
-        let cert1 = IndirectCertificate::from_messages(5, messages.clone(), 1).unwrap();
-        let cert2 = IndirectCertificate::from_messages(5, messages, 1).unwrap();
+        let cert1 = IndirectCertificate::from_messages(5, messages.clone(), &verifier).unwrap();
+        let cert2 = IndirectCertificate::from_messages(5, messages, &verifier).unwrap();
 
         assert_eq!(cert1.hash(), cert2.hash());
     }
@@ -702,6 +721,9 @@ mod tests {
 
     #[test]
     fn test_certificate_indirect_variant() {
+        // 3 validators, minority (>1/3) = 2
+        let verifier = create_test_verifier(3);
+
         let qc3 = create_qc3_with_prefixes(vec![
             vec![hash(1)],
             vec![hash(1)],
@@ -713,8 +735,7 @@ mod tests {
             EmptyViewMessage::new(5, dummy_party_id(1), 3, qc3, dummy_signature()),
         ];
 
-        // f=1 requires 2 messages (f+1=2)
-        let indirect = IndirectCertificate::from_messages(5, messages, 1).unwrap();
+        let indirect = IndirectCertificate::from_messages(5, messages, &verifier).unwrap();
         let cert = Certificate::Indirect(indirect);
 
         assert!(!cert.is_direct());
@@ -725,6 +746,9 @@ mod tests {
 
     #[test]
     fn test_certificate_unified_interface() {
+        // 3 validators, minority (>1/3) = 2
+        let verifier = create_test_verifier(3);
+
         // Create direct and indirect certificates
         let qc3 = create_qc3_with_prefixes(vec![
             vec![hash(1), hash(2)],
@@ -738,9 +762,8 @@ mod tests {
             EmptyViewMessage::new(5, dummy_party_id(0), 3, qc3.clone(), dummy_signature()),
             EmptyViewMessage::new(5, dummy_party_id(1), 3, qc3, dummy_signature()),
         ];
-        // f=1 requires 2 messages (f+1=2)
         let indirect = Certificate::Indirect(
-            IndirectCertificate::from_messages(5, messages, 1).unwrap()
+            IndirectCertificate::from_messages(5, messages, &verifier).unwrap()
         );
 
         // Both should provide same interface
@@ -881,6 +904,9 @@ mod tests {
 
     #[test]
     fn test_indirect_certificate_serialization_roundtrip() {
+        // 3 validators, minority (>1/3) = 2
+        let verifier = create_test_verifier(3);
+
         let qc3 = create_qc3_with_prefixes(vec![
             vec![hash(1)],
             vec![hash(1)],
@@ -892,8 +918,7 @@ mod tests {
             EmptyViewMessage::new(5, dummy_party_id(1), 3, qc3, dummy_signature()),
         ];
 
-        // f=1 requires 2 messages (f+1=2)
-        let cert = IndirectCertificate::from_messages(5, messages, 1).unwrap();
+        let cert = IndirectCertificate::from_messages(5, messages, &verifier).unwrap();
         let bytes = bcs::to_bytes(&cert).unwrap();
         let recovered: IndirectCertificate = bcs::from_bytes(&bytes).unwrap();
 

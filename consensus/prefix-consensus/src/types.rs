@@ -13,6 +13,7 @@ use aptos_crypto::{
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use serde::{Deserialize, Serialize};
+use aptos_types::validator_verifier::ValidatorVerifier;
 use std::collections::HashMap;
 
 // Define custom hashers for Vote types using the same pattern as aptos-crypto
@@ -328,10 +329,10 @@ impl CryptoHash for Vote3 {
 // Quorum Certificate Types
 // ============================================================================
 
-/// Quorum Certificate from Round 1: Collection of n-f Vote1 messages
+/// Quorum Certificate from Round 1: Collection of votes with >2/3 total stake
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct QC1 {
-    /// The votes included in this QC (at least n-f votes)
+    /// The votes included in this QC (>2/3 of total stake)
     pub votes: Vec<Vote1>,
 
     /// Set of authors who contributed votes (for quick lookup)
@@ -362,10 +363,10 @@ impl QC1 {
     }
 }
 
-/// Quorum Certificate from Round 2: Collection of n-f Vote2 messages
+/// Quorum Certificate from Round 2: Collection of votes with >2/3 total stake
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct QC2 {
-    /// The votes included in this QC (at least n-f votes)
+    /// The votes included in this QC (>2/3 of total stake)
     pub votes: Vec<Vote2>,
 
     /// Set of authors who contributed votes
@@ -396,10 +397,10 @@ impl QC2 {
     }
 }
 
-/// Quorum Certificate from Round 3: Collection of n-f Vote3 messages
+/// Quorum Certificate from Round 3: Collection of votes with >2/3 total stake
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct QC3 {
-    /// The votes included in this QC (at least n-f votes)
+    /// The votes included in this QC (>2/3 of total stake)
     pub votes: Vec<Vote3>,
 
     /// Set of authors who contributed votes
@@ -443,12 +444,6 @@ pub struct PrefixConsensusInput {
     /// The party's identity
     pub party_id: PartyId,
 
-    /// Total number of parties
-    pub n: usize,
-
-    /// Maximum number of Byzantine parties
-    pub f: usize,
-
     /// Epoch number (for future use)
     pub epoch: u64,
 
@@ -461,24 +456,15 @@ impl PrefixConsensusInput {
     pub fn new(
         input_vector: PrefixVector,
         party_id: PartyId,
-        n: usize,
-        f: usize,
         epoch: u64,
         view: u64,
     ) -> Self {
         Self {
             input_vector,
             party_id,
-            n,
-            f,
             epoch,
             view,
         }
-    }
-
-    /// Get the quorum size (n-f)
-    pub fn quorum_size(&self) -> usize {
-        self.n - self.f
     }
 }
 
@@ -532,25 +518,21 @@ impl PrefixConsensusOutput {
     /// Verify the complete output including QC3 validity
     ///
     /// This performs complete verification suitable for external parties:
-    /// 1. Verifies QC3 structure (quorum size, no duplicate authors, all signatures)
+    /// 1. Verifies QC3 structure (voting power, no duplicate authors, all signatures)
     /// 2. Verifies v_low and v_high are correctly derived from QC3
     /// 3. Verifies upper bound property (v_low ⪯ v_high)
     ///
     /// # Arguments
-    /// * `f` - Maximum number of Byzantine faults tolerated
-    /// * `n` - Total number of validators
-    /// * `verifier` - Validator verifier for signature checks
+    /// * `verifier` - Validator verifier for signature and voting power checks
     pub fn verify(
         &self,
-        f: usize,
-        n: usize,
         verifier: &aptos_types::validator_verifier::ValidatorVerifier,
     ) -> anyhow::Result<()> {
         use crate::verification::verify_qc3;
         use anyhow::ensure;
 
         // 1. Verify QC3 structure is valid (including all signatures)
-        verify_qc3(&self.qc3, f, n, verifier)?;
+        verify_qc3(&self.qc3, verifier)?;
 
         // 2. Verify proofs (v_low/v_high match QC3)
         ensure!(
@@ -599,9 +581,10 @@ impl PendingVotes1 {
         self.votes.len()
     }
 
-    /// Check if we have a quorum (n-f votes)
-    pub fn has_quorum(&self, quorum_size: usize) -> bool {
-        self.vote_count() >= quorum_size
+    /// Check if we have a quorum (>2/3 of total stake)
+    pub fn has_quorum(&self, verifier: &ValidatorVerifier) -> bool {
+        let authors: Vec<_> = self.votes.keys().cloned().collect();
+        verifier.check_voting_power(authors.iter(), true).is_ok()
     }
 
     /// Extract all votes as a QC1
@@ -636,8 +619,10 @@ impl PendingVotes2 {
         self.votes.len()
     }
 
-    pub fn has_quorum(&self, quorum_size: usize) -> bool {
-        self.vote_count() >= quorum_size
+    /// Check if we have a quorum (>2/3 of total stake)
+    pub fn has_quorum(&self, verifier: &ValidatorVerifier) -> bool {
+        let authors: Vec<_> = self.votes.keys().cloned().collect();
+        verifier.check_voting_power(authors.iter(), true).is_ok()
     }
 
     pub fn into_qc2(self) -> QC2 {
@@ -671,8 +656,10 @@ impl PendingVotes3 {
         self.votes.len()
     }
 
-    pub fn has_quorum(&self, quorum_size: usize) -> bool {
-        self.vote_count() >= quorum_size
+    /// Check if we have a quorum (>2/3 of total stake)
+    pub fn has_quorum(&self, verifier: &ValidatorVerifier) -> bool {
+        let authors: Vec<_> = self.votes.keys().cloned().collect();
+        verifier.check_voting_power(authors.iter(), true).is_ok()
     }
 
     pub fn into_qc3(self) -> QC3 {
@@ -918,17 +905,17 @@ mod tests {
         let verifier = ValidatorVerifier::new(validator_infos);
 
         // Complete verification will fail due to invalid dummy signatures
-        assert!(output.verify(1, 4, &verifier).is_err());
+        assert!(output.verify(&verifier).is_err());
     }
 
     #[test]
     fn test_verify_complete_insufficient_votes() {
-        // Test that verify() catches insufficient quorum
+        // Test that verify() catches insufficient voting power
         let hash1 = hash(1);
 
         let qc2 = create_dummy_qc2();
 
-        // Only 2 votes (insufficient for n=4, f=1 which requires 3)
+        // Only 2 votes (2/4 = 50% stake, insufficient for >2/3 quorum)
         let votes = vec![
             Vote3::new(dummy_party(0), vec![hash1], qc2.clone(), 0, 0, 1, dummy_sig()),
             Vote3::new(dummy_party(1), vec![hash1], qc2, 0, 0, 1, dummy_sig()),
@@ -940,7 +927,7 @@ mod tests {
 
         let output = PrefixConsensusOutput::new(v_low, v_high, qc3);
 
-        // Create validator verifier
+        // Create validator verifier (4 validators with equal weight)
         use aptos_types::validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier};
         let validator_infos: Vec<_> = (0..4)
             .map(|i| {
@@ -950,7 +937,7 @@ mod tests {
             .collect();
         let verifier = ValidatorVerifier::new(validator_infos);
 
-        // Complete verification should fail due to insufficient votes
-        assert!(output.verify(1, 4, &verifier).is_err());
+        // Complete verification should fail due to insufficient voting power
+        assert!(output.verify(&verifier).is_err());
     }
 }

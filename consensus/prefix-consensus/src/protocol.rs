@@ -193,16 +193,14 @@ impl PrefixConsensusProtocol {
         }
 
         let vote_count = pending.vote_count();
-        let quorum_size = self.input.quorum_size();
 
         info!(
             vote_count = vote_count,
-            quorum_size = quorum_size,
             "Vote1 count updated"
         );
 
-        // Check if we have quorum
-        if pending.has_quorum(quorum_size) {
+        // Check if we have quorum (>2/3 stake)
+        if pending.has_quorum(&self.validator_verifier) {
             info!("Quorum reached for Round 1, forming QC1");
 
             // Form QC1 by consuming pending votes
@@ -211,13 +209,13 @@ impl PrefixConsensusProtocol {
             let qc1 = consumed_pending.into_qc1();
 
             // Verify QC1
-            verify_qc1(&qc1, self.input.f, self.input.n, &self.validator_verifier)?;
+            verify_qc1(&qc1, &self.validator_verifier)?;
 
             // Store QC1
             *self.qc1.write().await = Some(qc1.clone());
 
             // Extract certified prefix
-            let certified = qc1_certify(&qc1, self.input.f);
+            let certified = qc1_certify(&qc1, &self.validator_verifier);
             info!(certified_len = certified.len(), "Extracted certified prefix");
 
             *self.certified_prefix.write().await = Some(certified);
@@ -298,7 +296,7 @@ impl PrefixConsensusProtocol {
     /// Process an incoming Vote2
     pub async fn process_vote2(&self, vote: Vote2) -> Result<Option<QC2>> {
         // Verify vote
-        verify_vote2(&vote, self.input.f, self.input.n, &self.validator_verifier)?;
+        verify_vote2(&vote, &self.validator_verifier)?;
 
         debug!(
             author = %vote.author,
@@ -313,16 +311,14 @@ impl PrefixConsensusProtocol {
         }
 
         let vote_count = pending.vote_count();
-        let quorum_size = self.input.quorum_size();
 
         info!(
             vote_count = vote_count,
-            quorum_size = quorum_size,
             "Vote2 count updated"
         );
 
-        // Check if we have quorum
-        if pending.has_quorum(quorum_size) {
+        // Check if we have quorum (>2/3 stake)
+        if pending.has_quorum(&self.validator_verifier) {
             info!("Quorum reached for Round 2, forming QC2");
 
             // Form QC2 by consuming pending votes
@@ -331,7 +327,7 @@ impl PrefixConsensusProtocol {
             let qc2 = consumed_pending.into_qc2();
 
             // Verify QC2
-            verify_qc2(&qc2, self.input.f, self.input.n, &self.validator_verifier)?;
+            verify_qc2(&qc2, &self.validator_verifier)?;
 
             // Store QC2
             *self.qc2.write().await = Some(qc2.clone());
@@ -418,7 +414,7 @@ impl PrefixConsensusProtocol {
     /// Process an incoming Vote3
     pub async fn process_vote3(&self, vote: Vote3) -> Result<Option<PrefixConsensusOutput>> {
         // Verify vote
-        verify_vote3(&vote, self.input.f, self.input.n, &self.validator_verifier)?;
+        verify_vote3(&vote, &self.validator_verifier)?;
 
         debug!(
             author = %vote.author,
@@ -433,16 +429,14 @@ impl PrefixConsensusProtocol {
         }
 
         let vote_count = pending.vote_count();
-        let quorum_size = self.input.quorum_size();
 
         info!(
             vote_count = vote_count,
-            quorum_size = quorum_size,
             "Vote3 count updated"
         );
 
-        // Check if we have quorum
-        if pending.has_quorum(quorum_size) {
+        // Check if we have quorum (>2/3 stake)
+        if pending.has_quorum(&self.validator_verifier) {
             info!("Quorum reached for Round 3, forming QC3 and computing output");
 
             // Form QC3 by consuming pending votes
@@ -451,7 +445,7 @@ impl PrefixConsensusProtocol {
             let qc3 = consumed_pending.into_qc3();
 
             // Verify QC3
-            verify_qc3(&qc3, self.input.f, self.input.n, &self.validator_verifier)?;
+            verify_qc3(&qc3, &self.validator_verifier)?;
 
             // Store QC3
             *self.qc3.write().await = Some(qc3.clone());
@@ -540,13 +534,8 @@ mod tests {
     }
 
     #[allow(dead_code)]
-    fn create_test_input(
-        party_id: u8,
-        vector: PrefixVector,
-        n: usize,
-        f: usize,
-    ) -> PrefixConsensusInput {
-        PrefixConsensusInput::new(vector, PartyId::new([party_id; 32]), n, f, 0, 1)
+    fn create_test_input(party_id: u8, vector: PrefixVector) -> PrefixConsensusInput {
+        PrefixConsensusInput::new(vector, PartyId::new([party_id; 32]), 0, 1)
     }
 
     #[tokio::test]
@@ -554,22 +543,27 @@ mod tests {
         use aptos_types::validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier};
         use std::sync::Arc;
 
-        let signer = ValidatorSigner::random(None);
-        let party_id = signer.author();
+        // Use 4 validators so a single vote doesn't reach quorum
+        let signers: Vec<_> = (0..4).map(|_| ValidatorSigner::random(None)).collect();
+        let party_id = signers[0].author();
 
         // Create input with matching party_id (view=1 for standalone basic PC)
-        let input = PrefixConsensusInput::new(vec![hash(1), hash(2)], party_id, 4, 1, 0, 1);
+        let input = PrefixConsensusInput::new(vec![hash(1), hash(2)], party_id, 0, 1);
 
-        // Create verifier with this signer's public key
-        let validator_info = ValidatorConsensusInfo::new(party_id, signer.public_key(), 1);
-        let verifier = Arc::new(ValidatorVerifier::new(vec![validator_info]));
+        // Create verifier with all 4 validators (equal stake = 1 each)
+        let validator_infos: Vec<_> = signers
+            .iter()
+            .map(|s| ValidatorConsensusInfo::new(s.author(), s.public_key(), 1))
+            .collect();
+        let verifier = Arc::new(ValidatorVerifier::new(validator_infos));
 
         let protocol = PrefixConsensusProtocol::new(input, verifier);
 
         assert_eq!(protocol.get_state().await, ProtocolState::NotStarted);
 
-        protocol.start_round1(&signer).await.unwrap();
+        protocol.start_round1(&signers[0]).await.unwrap();
 
+        // With 4 validators, 1 vote (25% stake) doesn't reach >2/3 quorum
         assert_eq!(protocol.get_state().await, ProtocolState::Round1);
     }
 
@@ -578,21 +572,25 @@ mod tests {
         use aptos_types::validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier};
         use std::sync::Arc;
 
-        let signer = ValidatorSigner::random(None);
-        let party_id = signer.author();
+        // Use 4 validators so a single vote doesn't reach quorum
+        let signers: Vec<_> = (0..4).map(|_| ValidatorSigner::random(None)).collect();
+        let party_id = signers[0].author();
 
         // Create input with matching party_id (view=1 for standalone basic PC)
-        let input = PrefixConsensusInput::new(vec![hash(1), hash(2)], party_id, 4, 1, 0, 1);
+        let input = PrefixConsensusInput::new(vec![hash(1), hash(2)], party_id, 0, 1);
 
-        // Create verifier with this signer's public key
-        let validator_info = ValidatorConsensusInfo::new(party_id, signer.public_key(), 1);
-        let verifier = Arc::new(ValidatorVerifier::new(vec![validator_info]));
+        // Create verifier with all 4 validators (equal stake = 1 each)
+        let validator_infos: Vec<_> = signers
+            .iter()
+            .map(|s| ValidatorConsensusInfo::new(s.author(), s.public_key(), 1))
+            .collect();
+        let verifier = Arc::new(ValidatorVerifier::new(validator_infos));
 
         let protocol = PrefixConsensusProtocol::new(input, verifier);
 
-        protocol.start_round1(&signer).await.unwrap();
+        protocol.start_round1(&signers[0]).await.unwrap();
 
-        // Need 3 votes for quorum (n=4, f=1, quorum=3)
+        // With 4 validators, 1 vote (25% stake) stays in pending
         let (count1, _, _) = protocol.get_vote_counts().await;
         assert_eq!(count1, 1); // Own vote added
     }

@@ -21,10 +21,11 @@ Implementing Prefix Consensus protocols (from research paper "Prefix Consensus F
 - **Definition**: Parties propose vectors, output compatible vectors extending max common prefix
 - **Properties**: Upper Bound (v_low ⪯ v_high), Validity (mcp(inputs) ⪯ v_low), Termination
 - **Algorithm**: 3 rounds (Vote1→QC1, Vote2→QC2, Vote3→QC3)
-  - Round 1: Broadcast inputs, certify longest prefix with f+1 agreement
+  - Round 1: Broadcast inputs, certify longest prefix with >1/3 stake agreement
   - Round 2: Broadcast certified prefixes, compute mcp
   - Round 3: Output v_low (mcp), v_high (mce)
-- **Benefits**: Deterministically async, leaderless, censorship-resistant (2f slots after GST)
+- **Quorum**: Proof-of-stake weighted voting (>2/3 stake for QCs, >1/3 for certification)
+- **Benefits**: Deterministically async, leaderless, censorship-resistant
 
 **Key Difference**: No single agreed value, just compatible prefixes. Enables async solvability.
 
@@ -100,7 +101,7 @@ Implementing Prefix Consensus protocols (from research paper "Prefix Consensus F
 - Contains: (empty_view, author, highest_known_view, highest_known_proof, signature)
 - Enables indirect certificate construction
 
-**IndirectCertificate**: Aggregates f+1 EmptyViewMessages
+**IndirectCertificate**: Aggregates EmptyViewMessages from validators with >1/3 stake
 - Takes MAX parent_view from all messages
 - Allows skipping empty views when tracing back to View 1
 
@@ -117,7 +118,7 @@ Implementing Prefix Consensus protocols (from research paper "Prefix Consensus F
 - HighestKnownView::update_if_higher() accepts empty v_high only if view == 1
 - EmptyViewMessage::verify() allows empty v_high only if highest_known_view == 1
 - DirectCertificate::validate() allows empty v_high only if view == 1
-- IndirectCertificate::from_messages() requires f+1 messages (checked at construction)
+- IndirectCertificate::from_messages() requires >1/3 stake (checked via ValidatorVerifier)
 
 **View Field for Replay Protection** (Phase 2 security fix):
 - Added `view: u64` to Vote1, Vote2, Vote3 structs and their SignData types
@@ -167,7 +168,7 @@ StrongPrefixConsensusManager
 
 **Verifiable Prefix Consensus**: Basic Prefix Consensus + proofs (QC3 serves as π)
 **Direct Certificates**: Cert^dir(w-1, v_high, π) - advance view-by-view
-**Indirect Certificates**: Cert^ind(w-1, (w*, v_high*, π), Σ) - skip empty views with f+1 sigs
+**Indirect Certificates**: Cert^ind(w-1, (w*, v_high*, π), Σ) - skip empty views with >1/3 stake sigs
 **Parent Chain**: Following certificates back to View 1 uniquely determines v_high output
 
 ### Implementation Plan (10 Phases)
@@ -202,20 +203,56 @@ This layered architecture enables multi-slot censorship-resistant consensus as d
 
 ---
 
-## Current Status (February 5, 2026)
+## Stake-Weighted Quorum Refactoring - Complete ✅
+
+**Completed**: February 6, 2026
+**Purpose**: Replace count-based quorum (f+1, n-f) with proof-of-stake weighted voting
+
+### Key Changes
+
+**Before** (count-based):
+- `f+1` validators for minority quorum (certification)
+- `n-f` (2f+1) validators for super majority (QC formation)
+- `PrefixConsensusInput::new(vec, party, n, f, epoch, view)`
+- `PrefixConsensusManager::new(party, n, f, epoch, ...)`
+
+**After** (stake-based):
+- `>1/3` of total stake for minority quorum (certification)
+- `>2/3` of total stake for super majority (QC formation)
+- `PrefixConsensusInput::new(vec, party, epoch, view)`
+- `PrefixConsensusManager::new(party, epoch, ...)`
+
+### Files Modified
+
+1. **verification.rs**: Removed f, n from all verify functions; use `ValidatorVerifier::check_voting_power()`
+2. **certify.rs**: Updated trie to track cumulative stake; minority threshold = `total - quorum + 1`
+3. **types.rs**: Removed f, n from `PrefixConsensusInput`; `PendingVotes*::has_quorum()` takes `&ValidatorVerifier`
+4. **protocol.rs**: Uses stake-based `has_quorum(&validator_verifier)`
+5. **manager.rs**: Removed n, f fields; logging shows validator_count and total_stake
+6. **epoch_manager.rs**: Updated integration to use new constructor signatures
+7. **certificates.rs**: Updated validation to use ValidatorVerifier for >1/3 stake checks
+
+### Tests
+- All 102 unit tests pass
+- Build compiles cleanly
+
+---
+
+## Current Status (February 6, 2026)
 
 ### Repository State
 - **Branch**: `prefix-consensus-prototype`
-- **HEAD**: Certificate types with view field for replay protection
+- **HEAD**: Stake-weighted quorum refactoring complete
 - **Status**: Clean working directory
-- **Tests**: 103/103 unit tests passing
-- **Smoke Tests**: Compile but do NOT pass automatically - verify 4 output files manually
+- **Tests**: 102/102 unit tests passing
+- **Smoke Tests**: Compile but require manual verification (check 4 output files)
 - **Build**: ✅ No warnings or errors
 
 ### Progress Summary
 - ✅ **Basic Prefix Consensus**: Complete (Phase 1-6 of network-integration.md)
 - ✅ **Strong PC Phase 1**: Verifiable Prefix Consensus complete (security fixes + proof verification)
 - ✅ **Strong PC Phase 2**: Certificate types complete (Direct/Indirect certificates + view field)
+- ✅ **Stake-Weighted Quorum**: Refactored from count-based to proof-of-stake weighted voting
 - 🚧 **Strong PC Phase 3+**: View state management and multi-view protocol pending
 - ⏳ **Slot Manager**: Future work (after Strong PC complete)
 

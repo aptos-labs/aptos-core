@@ -36,12 +36,6 @@ pub struct PrefixConsensusManager<NetworkSender> {
     /// This party's ID
     party_id: PartyId,
 
-    /// Total number of parties
-    n: usize,
-
-    /// Maximum number of Byzantine parties
-    f: usize,
-
     /// Current epoch
     epoch: u64,
 
@@ -71,8 +65,6 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
     /// Create a new Prefix Consensus manager
     pub fn new(
         party_id: PartyId,
-        n: usize,
-        f: usize,
         epoch: u64,
         protocol: Arc<PrefixConsensusProtocol>,
         network_sender: NetworkSender,
@@ -81,8 +73,6 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
     ) -> Self {
         Self {
             party_id,
-            n,
-            f,
             epoch,
             protocol,
             network_sender,
@@ -103,8 +93,8 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
         info!(
             party_id = %self.party_id,
             epoch = self.epoch,
-            n = self.n,
-            f = self.f,
+            validator_count = self.validator_verifier.len(),
+            total_stake = self.validator_verifier.total_voting_power(),
             "Initializing Prefix Consensus"
         );
 
@@ -612,11 +602,9 @@ mod tests {
 
         let input = PrefixConsensusInput::new(
             vec![HashValue::random()], // input_vector
-            party_id,                   // party_id
-            4,                          // n
-            1,                          // f
-            1,                          // epoch
-            1,                          // view (default for standalone)
+            party_id,                  // party_id
+            1,                         // epoch
+            1,                         // view (default for standalone)
         );
 
         let protocol = Arc::new(PrefixConsensusProtocol::new(input, verifier.clone()));
@@ -624,9 +612,7 @@ mod tests {
 
         let manager = PrefixConsensusManager::new(
             party_id,
-            4,
-            1,
-            1,
+            1, // epoch
             protocol,
             network_sender,
             signers.remove(0),
@@ -645,11 +631,9 @@ mod tests {
 
         let input = PrefixConsensusInput::new(
             vec![HashValue::random()], // input_vector
-            party_id,                   // party_id
-            4,                          // n
-            1,                          // f
-            1,                          // epoch
-            1,                          // view (default for standalone)
+            party_id,                  // party_id
+            1,                         // epoch
+            1,                         // view (default for standalone)
         );
 
         let protocol = Arc::new(PrefixConsensusProtocol::new(input, verifier.clone()));
@@ -657,9 +641,7 @@ mod tests {
 
         let manager = PrefixConsensusManager::new(
             party_id,
-            4,
-            1,
-            1,
+            1, // epoch
             protocol,
             network_sender,
             signers.remove(0),
@@ -694,11 +676,9 @@ mod tests {
 
         let input = PrefixConsensusInput::new(
             vec![HashValue::random()], // input_vector
-            party_id,                   // party_id
-            4,                          // n
-            1,                          // f
-            1,                          // epoch 1
-            1,                          // view (default for standalone)
+            party_id,                  // party_id
+            1,                         // epoch 1
+            1,                         // view (default for standalone)
         );
 
         let protocol = Arc::new(PrefixConsensusProtocol::new(input, verifier.clone()));
@@ -706,9 +686,7 @@ mod tests {
 
         let manager = PrefixConsensusManager::new(
             party_id,
-            4,
-            1,
-            1, // manager in epoch 1
+            1, // epoch (manager in epoch 1)
             protocol,
             network_sender,
             signers.remove(0),

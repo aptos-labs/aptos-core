@@ -2111,8 +2111,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         // Create manager
         let manager = aptos_prefix_consensus::PrefixConsensusManager::new(
             input.party_id,
-            input.n,
-            input.f,
             input.epoch,
             protocol,
             network_sender,
@@ -2220,15 +2218,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             }
 
             if !input_vec.is_empty() {
-                let epoch_state = self.epoch_state();
-                let n = epoch_state.verifier.len();
-                let f = (n - 1) / 3;
-
                 let input = aptos_prefix_consensus::PrefixConsensusInput::new(
                     input_vec,
                     self.author,
-                    n,
-                    f,
                     self.epoch(),
                     1, // view = 1 for standalone basic Prefix Consensus
                 );

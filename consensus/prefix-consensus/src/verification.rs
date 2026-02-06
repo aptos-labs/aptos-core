@@ -10,7 +10,7 @@ use crate::{
     signing::{verify_vote1_signature, verify_vote2_signature, verify_vote3_signature},
     types::{PartyId, Vote1, Vote2, Vote3, QC1, QC2, QC3},
 };
-use anyhow::{bail, ensure, Result};
+use anyhow::{bail, Result};
 use aptos_types::validator_verifier::ValidatorVerifier;
 use std::collections::HashSet;
 
@@ -32,9 +32,9 @@ pub fn verify_vote1(vote: &Vote1, verifier: &ValidatorVerifier) -> Result<()> {
 /// Checks:
 /// 1. Embedded QC1 is valid (including all signatures)
 /// 2. Signature is valid
-pub fn verify_vote2(vote: &Vote2, f: usize, n: usize, verifier: &ValidatorVerifier) -> Result<()> {
+pub fn verify_vote2(vote: &Vote2, verifier: &ValidatorVerifier) -> Result<()> {
     // Verify the embedded QC1
-    verify_qc1(&vote.qc1, f, n, verifier)?;
+    verify_qc1(&vote.qc1, verifier)?;
 
     // Verify cryptographic signature
     verify_vote2_signature(vote, &vote.author, verifier)?;
@@ -47,9 +47,9 @@ pub fn verify_vote2(vote: &Vote2, f: usize, n: usize, verifier: &ValidatorVerifi
 /// Checks:
 /// 1. Embedded QC2 is valid (including all signatures)
 /// 2. Signature is valid
-pub fn verify_vote3(vote: &Vote3, f: usize, n: usize, verifier: &ValidatorVerifier) -> Result<()> {
+pub fn verify_vote3(vote: &Vote3, verifier: &ValidatorVerifier) -> Result<()> {
     // Verify the embedded QC2
-    verify_qc2(&vote.qc2, f, n, verifier)?;
+    verify_qc2(&vote.qc2, verifier)?;
 
     // Verify cryptographic signature
     verify_vote3_signature(vote, &vote.author, verifier)?;
@@ -64,21 +64,18 @@ pub fn verify_vote3(vote: &Vote3, f: usize, n: usize, verifier: &ValidatorVerifi
 /// Verify a QC1 (Quorum Certificate from Round 1)
 ///
 /// Checks:
-/// 1. Has at least n-f votes
+/// 1. Has sufficient voting power (>2/3 stake)
 /// 2. No duplicate authors
 /// 3. All votes are valid (including signatures)
-pub fn verify_qc1(qc1: &QC1, f: usize, n: usize, verifier: &ValidatorVerifier) -> Result<()> {
-    // Check quorum size
-    ensure!(
-        is_valid_quorum(qc1.vote_count(), n, f),
-        "QC1 has {} votes, but quorum size is {}",
-        qc1.vote_count(),
-        n - f
-    );
-
-    // Check for duplicate authors
+pub fn verify_qc1(qc1: &QC1, verifier: &ValidatorVerifier) -> Result<()> {
+    // Check for duplicate authors first (before stake check)
     let authors: Vec<PartyId> = qc1.votes.iter().map(|v| v.author).collect();
     verify_no_duplicate_authors(&authors)?;
+
+    // Check voting power (super majority = >2/3 stake)
+    verifier
+        .check_voting_power(authors.iter(), true)
+        .map_err(|e| anyhow::anyhow!("QC1 insufficient voting power: {}", e))?;
 
     // Verify each vote (including signature)
     for vote in &qc1.votes {
@@ -91,26 +88,23 @@ pub fn verify_qc1(qc1: &QC1, f: usize, n: usize, verifier: &ValidatorVerifier) -
 /// Verify a QC2 (Quorum Certificate from Round 2)
 ///
 /// Checks:
-/// 1. Has at least n-f votes
+/// 1. Has sufficient voting power (>2/3 stake)
 /// 2. No duplicate authors
 /// 3. All votes are valid (including signatures)
 /// 4. All embedded QC1s are valid (including signatures)
-pub fn verify_qc2(qc2: &QC2, f: usize, n: usize, verifier: &ValidatorVerifier) -> Result<()> {
-    // Check quorum size
-    ensure!(
-        is_valid_quorum(qc2.vote_count(), n, f),
-        "QC2 has {} votes, but quorum size is {}",
-        qc2.vote_count(),
-        n - f
-    );
-
-    // Check for duplicate authors
+pub fn verify_qc2(qc2: &QC2, verifier: &ValidatorVerifier) -> Result<()> {
+    // Check for duplicate authors first (before stake check)
     let authors: Vec<PartyId> = qc2.votes.iter().map(|v| v.author).collect();
     verify_no_duplicate_authors(&authors)?;
 
+    // Check voting power (super majority = >2/3 stake)
+    verifier
+        .check_voting_power(authors.iter(), true)
+        .map_err(|e| anyhow::anyhow!("QC2 insufficient voting power: {}", e))?;
+
     // Verify each vote (which includes verifying embedded QC1 with signatures)
     for vote in &qc2.votes {
-        verify_vote2(vote, f, n, verifier)?;
+        verify_vote2(vote, verifier)?;
     }
 
     Ok(())
@@ -119,26 +113,23 @@ pub fn verify_qc2(qc2: &QC2, f: usize, n: usize, verifier: &ValidatorVerifier) -
 /// Verify a QC3 (Quorum Certificate from Round 3)
 ///
 /// Checks:
-/// 1. Has at least n-f votes
+/// 1. Has sufficient voting power (>2/3 stake)
 /// 2. No duplicate authors
 /// 3. All votes are valid (including signatures)
 /// 4. All embedded QC2s are valid (including all nested signatures)
-pub fn verify_qc3(qc3: &QC3, f: usize, n: usize, verifier: &ValidatorVerifier) -> Result<()> {
-    // Check quorum size
-    ensure!(
-        is_valid_quorum(qc3.vote_count(), n, f),
-        "QC3 has {} votes, but quorum size is {}",
-        qc3.vote_count(),
-        n - f
-    );
-
-    // Check for duplicate authors
+pub fn verify_qc3(qc3: &QC3, verifier: &ValidatorVerifier) -> Result<()> {
+    // Check for duplicate authors first (before stake check)
     let authors: Vec<PartyId> = qc3.votes.iter().map(|v| v.author).collect();
     verify_no_duplicate_authors(&authors)?;
 
+    // Check voting power (super majority = >2/3 stake)
+    verifier
+        .check_voting_power(authors.iter(), true)
+        .map_err(|e| anyhow::anyhow!("QC3 insufficient voting power: {}", e))?;
+
     // Verify each vote (which includes verifying embedded QC2 with all nested signatures)
     for vote in &qc3.votes {
-        verify_vote3(vote, f, n, verifier)?;
+        verify_vote3(vote, verifier)?;
     }
 
     Ok(())
@@ -157,11 +148,6 @@ pub fn verify_no_duplicate_authors(authors: &[PartyId]) -> Result<()> {
         }
     }
     Ok(())
-}
-
-/// Check if a collection of authors forms a valid quorum
-pub fn is_valid_quorum(author_count: usize, n: usize, f: usize) -> bool {
-    author_count >= (n - f)
 }
 
 // ============================================================================
@@ -358,8 +344,8 @@ mod tests {
 
         let qc1 = QC1::new(votes);
 
-        // n=4, f=1, quorum=3 - but will fail due to dummy signatures
-        assert!(verify_qc1(&qc1, 1, 4, &verifier).is_err());
+        // 3 of 4 validators = 75% stake, but will fail due to dummy signatures
+        assert!(verify_qc1(&qc1, &verifier).is_err());
     }
 
     #[test]
@@ -372,8 +358,8 @@ mod tests {
 
         let qc1 = QC1::new(votes);
 
-        // n=4, f=1, quorum=3, but only 2 votes - will fail before signature check
-        assert!(verify_qc1(&qc1, 1, 4, &verifier).is_err());
+        // 2 of 4 validators = 50% stake, insufficient for >2/3 quorum
+        assert!(verify_qc1(&qc1, &verifier).is_err());
     }
 
     #[test]
@@ -387,8 +373,8 @@ mod tests {
 
         let qc1 = QC1::new(votes);
 
-        // Will fail due to duplicate authors (before signature check)
-        assert!(verify_qc1(&qc1, 1, 4, &verifier).is_err());
+        // Will fail due to duplicate authors (before stake check)
+        assert!(verify_qc1(&qc1, &verifier).is_err());
     }
 
     #[test]
@@ -402,19 +388,6 @@ mod tests {
             dummy_party_id(0), // Duplicate
         ];
         assert!(verify_no_duplicate_authors(&authors_dup).is_err());
-    }
-
-    #[test]
-    fn test_is_valid_quorum() {
-        // n=4, f=1, quorum=3
-        assert!(is_valid_quorum(3, 4, 1));
-        assert!(is_valid_quorum(4, 4, 1));
-        assert!(!is_valid_quorum(2, 4, 1));
-
-        // n=7, f=2, quorum=5
-        assert!(is_valid_quorum(5, 7, 2));
-        assert!(is_valid_quorum(7, 7, 2));
-        assert!(!is_valid_quorum(4, 7, 2));
     }
 
     #[test]
@@ -445,9 +418,9 @@ mod tests {
 
         let qc2 = QC2::new(votes);
 
-        // n=4, f=1 - but will fail due to dummy signatures
+        // 3 of 4 validators, but will fail due to dummy signatures
         let verifier = create_test_verifier(4);
-        assert!(verify_qc2(&qc2, 1, 4, &verifier).is_err());
+        assert!(verify_qc2(&qc2, &verifier).is_err());
     }
 
     #[test]
@@ -496,9 +469,9 @@ mod tests {
 
         let qc3 = QC3::new(votes);
 
-        // n=4, f=1 - but will fail due to dummy signatures
+        // 3 of 4 validators, but will fail due to dummy signatures
         let verifier = create_test_verifier(4);
-        assert!(verify_qc3(&qc3, 1, 4, &verifier).is_err());
+        assert!(verify_qc3(&qc3, &verifier).is_err());
     }
 
     fn create_dummy_qc2() -> QC2 {
