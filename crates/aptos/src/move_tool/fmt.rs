@@ -42,7 +42,7 @@ pub struct FmtCommand {
     #[clap(long, alias = "package-path", value_parser)]
     package_dir: Option<PathBuf>,
 
-    /// Path to specific Move source files to format. This cannot be called with a package path option.
+    /// Path to specific Move source files to format. This cannot be called with a package dir option.
     #[clap(long, value_parser, num_args = 1..)]
     file_path: Option<Vec<PathBuf>>,
 
