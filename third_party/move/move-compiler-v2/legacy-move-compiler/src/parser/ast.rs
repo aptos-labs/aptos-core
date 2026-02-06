@@ -651,6 +651,8 @@ pub enum BehaviorKind {
     EnsuresOf,
     /// `modifies_of<f>(x)` - the modify clauses of function `f`
     ModifiesOf,
+    /// `result_of<f>(x)` - deterministic result selector based on `ensures_of`
+    ResultOf,
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -2105,6 +2107,7 @@ impl AstDebug for Exp_ {
                     BehaviorKind::AbortsOf => "aborts_of",
                     BehaviorKind::EnsuresOf => "ensures_of",
                     BehaviorKind::ModifiesOf => "modifies_of",
+                    BehaviorKind::ResultOf => "result_of",
                 };
                 w.write(kind_str);
                 w.write("<");

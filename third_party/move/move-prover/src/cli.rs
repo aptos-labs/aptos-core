@@ -703,12 +703,15 @@ impl Options {
 
         if matches.contains_id("verify-only") {
             options.prover.verify_scope = VerificationScope::Only(
-                matches.get_one::<&str>("verify-only").unwrap().to_string(),
+                matches
+                    .get_one::<String>("verify-only")
+                    .unwrap()
+                    .to_string(),
             );
         }
 
         if matches.contains_id("z3-trace") {
-            let mut fun_name = matches.get_one::<&str>("z3-trace").copied().unwrap();
+            let mut fun_name = matches.get_one::<String>("z3-trace").unwrap().as_str();
             options.prover.verify_scope = VerificationScope::Only(fun_name.to_string());
             if let Some(i) = fun_name.find("::") {
                 fun_name = &fun_name[i + 2..];

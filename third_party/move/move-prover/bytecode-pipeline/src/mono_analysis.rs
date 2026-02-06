@@ -15,6 +15,7 @@ use move_model::{
         StructEnv, StructId,
     },
     pragmas::INTRINSIC_TYPE_MAP,
+    symbol::Symbol,
     ty::{NoUnificationContext, Type, TypeDisplayContext, Variance},
     ty_invariant_analysis::{TypeInstantiationDerivation, TypeUnificationAdapter},
     well_known::{
@@ -51,6 +52,9 @@ pub struct MonoInfo {
     /// A map from function types used in the program to the closures appearing in
     /// code constructing values of this function type.
     pub fun_infos: BTreeMap<Type, BTreeSet<ClosureInfo>>,
+    /// A map from function types to function-typed parameters of verification target functions.
+    /// This enables the Boogie backend to generate parameter variants in the function type datatype.
+    pub fun_param_infos: BTreeMap<Type, BTreeSet<FunParamInfo>>,
 }
 
 #[derive(Clone, Debug, PartialOrd, PartialEq, Ord, Eq)]
@@ -59,6 +63,17 @@ pub struct ClosureInfo {
     pub fun: QualifiedInstId<FunId>,
     /// Closure mask used by the function.
     pub mask: ClosureMask,
+}
+
+/// Information about a function parameter that has function type.
+/// This is used to track function-typed parameters in verification targets
+/// so that the Boogie backend can generate appropriate variants.
+#[derive(Clone, Debug, PartialOrd, PartialEq, Ord, Eq)]
+pub struct FunParamInfo {
+    /// The function containing this parameter.
+    pub fun: QualifiedInstId<FunId>,
+    /// The parameter name/symbol.
+    pub param_sym: Symbol,
 }
 
 /// Get the information computed by this analysis.
@@ -327,6 +342,54 @@ impl Analyzer<'_> {
         }
         // Analyze instantiations (when this function is a verification target)
         if self.inst_opt.is_none() {
+            // Collect function-typed parameters for behavioral predicate support.
+            // This enables the Boogie backend to generate parameter variants.
+            for param in target.func_env.get_parameters() {
+                let param_ty = self.instantiate(&param.1);
+                if let Type::Fun(fn_params, fn_results, _) = &param_ty {
+                    let normalized_ty = self.normalize_fun_ty(param_ty.clone());
+                    let fun_id = target.func_env.get_qualified_id().instantiate(vec![]);
+                    let info = FunParamInfo {
+                        fun: fun_id,
+                        param_sym: param.0,
+                    };
+                    self.info
+                        .fun_param_infos
+                        .entry(normalized_ty.clone())
+                        .or_default()
+                        .insert(info);
+                    // Ensure the function type is also registered in fun_infos
+                    self.info.fun_infos.entry(normalized_ty).or_default();
+                    // Add the param and result types to done_types
+                    self.add_type(fn_params.as_ref());
+                    self.add_type(fn_results.as_ref());
+                    // Register tuple type for results + mut ref outputs (for behavioral spec functions)
+                    // This is needed when the ensures_of_results function returns a tuple.
+                    // All types are dereferenced because behavioral specs work with values, not mutations.
+                    let results_flat = fn_results.clone().flatten();
+                    let mut_ref_outputs: Vec<Type> = fn_params
+                        .clone()
+                        .flatten()
+                        .into_iter()
+                        .filter(|ty| ty.is_mutable_reference())
+                        .map(|ty| ty.skip_reference().clone())
+                        .collect();
+                    let all_outputs: Vec<Type> = results_flat
+                        .into_iter()
+                        .chain(mut_ref_outputs)
+                        .map(|ty| {
+                            if ty.is_mutable_reference() {
+                                ty.skip_reference().clone()
+                            } else {
+                                ty
+                            }
+                        })
+                        .collect();
+                    if all_outputs.len() >= 2 {
+                        self.info.tuple_inst.insert(all_outputs);
+                    }
+                }
+            }
             // collect information
             let fun_type_params_arity = target.get_type_parameter_count();
             let usage_state = UsageProcessor::analyze(self.targets, target.func_env, target.data);
@@ -518,6 +581,18 @@ impl Analyzer<'_> {
             self.add_type_root(&self.env.get_node_type(node_id));
             for ref ty in self.env.get_node_instantiation(node_id) {
                 self.add_type_root(ty);
+            }
+            // Handle Closure operations in spec expressions
+            if let ExpData::Call(node_id, ast::Operation::Closure(mid, fid, mask), _) = e {
+                let inst = self.instantiate_vec(&self.env.get_node_instantiation(*node_id));
+                let fun = mid.qualified_inst(*fid, inst);
+                let fun_type =
+                    self.normalize_fun_ty(self.instantiate(&self.env.get_node_type(*node_id)));
+                self.info
+                    .fun_infos
+                    .entry(fun_type)
+                    .or_default()
+                    .insert(ClosureInfo { fun, mask: *mask });
             }
             if let ExpData::Call(node_id, ast::Operation::SpecFunction(mid, fid, _), _) = e {
                 let actuals = self.instantiate_vec(&self.env.get_node_instantiation(*node_id));
