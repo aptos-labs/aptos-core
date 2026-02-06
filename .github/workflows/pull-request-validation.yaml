@@ -218,7 +218,7 @@ jobs:
         include:
           - os: macos-latest
             platform: "macOS"
-          - os: macos-13
+          - os: macos-15-intel
             platform: "macOS"
           - os: ubuntu-22.04
             platform: "Linux"
