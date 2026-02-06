@@ -3,6 +3,10 @@
 
 extern crate core;
 
+#[cfg(unix)]
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
 #[cfg(test)]
 mod account_abstraction;
 #[cfg(test)]
