@@ -1390,11 +1390,11 @@ dependencies = [
  "anyhow",
  "aptos-consensus",
  "aptos-db-tool",
+ "aptos-jemalloc",
  "aptos-logger",
  "aptos-move-debugger",
  "aptos-push-metrics",
  "clap 4.5.21",
- "tikv-jemallocator",
  "tokio",
 ]
 
@@ -1605,6 +1605,7 @@ dependencies = [
  "aptos-indexer-grpc-table-info",
  "aptos-infallible",
  "aptos-jellyfish-merkle",
+ "aptos-jemalloc",
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-mvhashmap",
@@ -1641,7 +1642,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thread_local",
- "tikv-jemallocator",
  "tokio",
  "toml 0.7.8",
  "tonic 0.12.3",
@@ -2790,6 +2790,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-jemalloc"
+version = "0.1.0"
+dependencies = [
+ "tikv-jemallocator",
+]
+
+[[package]]
 name = "aptos-jwk-consensus"
 version = "0.1.0"
 dependencies = [
@@ -3502,6 +3509,7 @@ dependencies = [
  "aptos-indexer-grpc-table-info",
  "aptos-infallible",
  "aptos-inspection-service",
+ "aptos-jemalloc",
  "aptos-jwk-consensus",
  "aptos-logger",
  "aptos-mempool",
@@ -3541,7 +3549,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
- "tikv-jemallocator",
  "tokio",
  "ureq",
  "url",
