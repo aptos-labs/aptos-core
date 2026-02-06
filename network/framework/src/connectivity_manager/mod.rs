@@ -1291,10 +1291,15 @@ impl Addresses {
         self.0.iter().flatten().nth(idx)
     }
 
-    /// The Union isn't stable, and order is completely disregarded
+    /// Returns the deduplicated union of addresses across all discovery sources.
+    /// Order is not guaranteed to be stable.
     fn union(&self) -> Vec<NetworkAddress> {
-        let set: HashSet<_> = self.0.iter().flatten().cloned().collect();
-        set.into_iter().collect()
+        let mut all: Vec<NetworkAddress> = self.0.iter().flatten().cloned().collect();
+        // Deduplicate in place using a HashSet, avoiding a second allocation
+        // for collecting from the HashSet back into a Vec.
+        let mut seen = HashSet::with_capacity(all.len());
+        all.retain(|addr| seen.insert(addr.clone()));
+        all
     }
 }
 
