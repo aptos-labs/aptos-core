@@ -67,9 +67,14 @@ aptos-netcore = { workspace = true, features = ["testing"] }
 aptos-proptest-helpers = { workspace = true }
 aptos-time-service = { workspace = true, features = ["testing"] }
 aptos-types = { workspace = true, features = ["fuzzing"] }
+criterion = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rand_core = { workspace = true }
+
+[[bench]]
+name = "network_cloning"
+harness = false
 
 [features]
 default = []
