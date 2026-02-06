@@ -26,7 +26,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         ca-certificates \
         curl \
         iproute2 \
-        libpq-dev \
+        libpq5 \
         libssl3 \
         netcat-openbsd \
         net-tools \
