@@ -1610,6 +1610,7 @@ dependencies = [
  "aptos-indexer-grpc-table-info",
  "aptos-infallible",
  "aptos-jellyfish-merkle",
+ "aptos-jemalloc",
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-mvhashmap",
@@ -2795,6 +2796,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-jemalloc"
+version = "0.0.0-main"
+dependencies = [
+ "tikv-jemallocator",
+]
+
+[[package]]
 name = "aptos-jwk-consensus"
 version = "0.1.0"
 dependencies = [
@@ -3507,6 +3515,7 @@ dependencies = [
  "aptos-indexer-grpc-table-info",
  "aptos-infallible",
  "aptos-inspection-service",
+ "aptos-jemalloc",
  "aptos-jwk-consensus",
  "aptos-logger",
  "aptos-mempool",
