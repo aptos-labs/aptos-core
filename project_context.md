@@ -34,7 +34,7 @@ Implementing Prefix Consensus protocols (from research paper "Prefix Consensus F
 
 **Status**: Production-ready 3-round asynchronous protocol with full signature verification
 **Completion Date**: February 4, 2026
-**Tests**: 83/83 unit tests passing, 2 smoke tests (100% success rate)
+**Tests**: 103/103 unit tests passing (smoke tests require manual output file verification)
 
 ### Key Components
 
@@ -56,9 +56,11 @@ Implementing Prefix Consensus protocols (from research paper "Prefix Consensus F
 - Direct routing in check_epoch() (bypasses UnverifiedEvent)
 
 **Testing**:
-- Unit tests: All 83 tests passing
-- Smoke tests: Identical inputs, divergent inputs (both 100% success)
-- Property verification: Upper Bound, Validity, Consistency
+- Unit tests: All 103 tests passing
+- Smoke tests: Do NOT pass automatically (timeout issues)
+  - Manual verification required: Check that 4 output files are created
+  - Output files: `/tmp/prefix_consensus_output_{party_id}.json`
+  - Property verification: Upper Bound, Validity, Consistency checked manually
 - Test script: `test_prefix_consensus.sh`
 
 ### Technical Achievements
@@ -86,6 +88,49 @@ Implementing Prefix Consensus protocols (from research paper "Prefix Consensus F
 - verify_low_proof(): Verifies v_low derivation from QC3
 - verify_high_proof(): Verifies v_high derivation from QC3
 - PrefixConsensusOutput::verify(): Complete verification including QC3 structure and signatures
+
+### Certificate Types (Phase 2 - Complete)
+
+**DirectCertificate**: Created when a view produces non-empty v_high
+- Contains: (view, proof: QC3)
+- v_high derived from QC3 via qc3_certify() - not stored
+- Parent view = this view (direct link)
+
+**EmptyViewMessage**: Broadcast when view produces empty v_high
+- Contains: (empty_view, author, highest_known_view, highest_known_proof, signature)
+- Enables indirect certificate construction
+
+**IndirectCertificate**: Aggregates f+1 EmptyViewMessages
+- Takes MAX parent_view from all messages
+- Allows skipping empty views when tracing back to View 1
+
+**Certificate Enum**: Unified interface for both certificate types
+- view(), parent_view(), v_high(), validate(), hash()
+
+**HighestKnownView Tracker**: Helper for creating EmptyViewMessages
+- Tracks highest non-empty view with proof
+- update_if_higher() for efficient tracking
+
+**Empty v_high Corner Case** (View 1 special handling):
+- View 1 can have empty v_high (e.g., inputs conflict at first entry)
+- Views 2+ must have non-empty v_high; empty means use EmptyViewMessage instead
+- HighestKnownView::update_if_higher() accepts empty v_high only if view == 1
+- EmptyViewMessage::verify() allows empty v_high only if highest_known_view == 1
+- DirectCertificate::validate() allows empty v_high only if view == 1
+- IndirectCertificate::from_messages() requires f+1 messages (checked at construction)
+
+**View Field for Replay Protection** (Phase 2 security fix):
+- Added `view: u64` to Vote1, Vote2, Vote3 structs and their SignData types
+- Added `view: u64` to PrefixConsensusInput (default 1 for standalone basic PC)
+- View is included in signed data to prevent replay attacks across views
+- Added qc1_view(), qc2_view(), qc3_view() helpers to extract view from QCs
+- Certificate validation checks: qc3_view(proof) must match certificate's view
+- **Note**: QC1/2/3 do NOT have explicit view field - view is derived from votes to avoid redundancy
+
+**TODO - Slot Number for Replay Protection**:
+- When implementing multi-slot consensus (Slot Manager), add `slot: u64` to signed vote data
+- This prevents replay attacks across slots (same view number in different slots)
+- Similar pattern to view field: include in SignData, verify during QC validation
 
 ---
 
@@ -161,19 +206,21 @@ This layered architecture enables multi-slot censorship-resistant consensus as d
 
 ### Repository State
 - **Branch**: `prefix-consensus-prototype`
-- **HEAD**: Security enhancements for Verifiable Prefix Consensus
+- **HEAD**: Certificate types with view field for replay protection
 - **Status**: Clean working directory
-- **Tests**: 83/83 unit tests, 2 smoke tests (100% success rate)
+- **Tests**: 103/103 unit tests passing
+- **Smoke Tests**: Compile but do NOT pass automatically - verify 4 output files manually
 - **Build**: ✅ No warnings or errors
 
 ### Progress Summary
 - ✅ **Basic Prefix Consensus**: Complete (Phase 1-6 of network-integration.md)
 - ✅ **Strong PC Phase 1**: Verifiable Prefix Consensus complete (security fixes + proof verification)
-- 🚧 **Strong PC Phase 2+**: Certificate types and multi-view protocol pending
+- ✅ **Strong PC Phase 2**: Certificate types complete (Direct/Indirect certificates + view field)
+- 🚧 **Strong PC Phase 3+**: View state management and multi-view protocol pending
 - ⏳ **Slot Manager**: Future work (after Strong PC complete)
 
 ### Next Action
-Begin Strong Prefix Consensus Phase 2: Implement Certificate Types (Direct/Indirect certificates)
+Begin Strong Prefix Consensus Phase 3: Implement View State and Ranking Management
 
 ---
 
@@ -190,7 +237,8 @@ consensus/prefix-consensus/src/
 ├── signing.rs            - BLS helpers (184 lines)
 ├── certify.rs            - QC formation (220 lines)
 ├── verification.rs       - Validation (150 lines)
-└── utils.rs              - Prefix operations (180 lines)
+├── utils.rs              - Prefix operations (180 lines)
+└── certificates.rs       - Strong PC certificates (500 lines) ← NEW Phase 2
 
 testsuite/smoke-test/src/consensus/prefix_consensus/
 ├── helpers.rs            - Test helpers

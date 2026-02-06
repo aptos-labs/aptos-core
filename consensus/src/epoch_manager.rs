@@ -2105,7 +2105,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         // Create protocol
         let protocol = std::sync::Arc::new(
-            aptos_prefix_consensus::PrefixConsensusProtocol::new(input.clone())
+            aptos_prefix_consensus::PrefixConsensusProtocol::new(input.clone(), validators.clone())
         );
 
         // Create manager
@@ -2230,6 +2230,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     n,
                     f,
                     self.epoch(),
+                    1, // view = 1 for standalone basic Prefix Consensus
                 );
 
                 if let Err(e) = self.start_prefix_consensus(input).await {

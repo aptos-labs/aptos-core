@@ -238,13 +238,80 @@ pub fn verify_output_proofs(
     v_low == &computed_v_low && v_high == &computed_v_high
 }
 
+// ============================================================================
+// View Extraction (for Strong Prefix Consensus replay protection)
+// ============================================================================
+
+/// Extract the view number from a QC3
+///
+/// Returns Some(view) if all votes in the QC3 have the same view number.
+/// Returns None if the QC3 is empty or votes have inconsistent views.
+///
+/// This is used by certificate validation to verify that the proof
+/// matches the claimed view number, preventing replay attacks.
+pub fn qc3_view(qc3: &QC3) -> Option<u64> {
+    if qc3.votes.is_empty() {
+        return None;
+    }
+
+    let first_view = qc3.votes[0].view;
+
+    // Verify all votes have the same view
+    for vote in &qc3.votes {
+        if vote.view != first_view {
+            return None;
+        }
+    }
+
+    Some(first_view)
+}
+
+/// Extract the view number from a QC2
+///
+/// Returns Some(view) if all votes in the QC2 have the same view number.
+/// Returns None if the QC2 is empty or votes have inconsistent views.
+pub fn qc2_view(qc2: &QC2) -> Option<u64> {
+    if qc2.votes.is_empty() {
+        return None;
+    }
+
+    let first_view = qc2.votes[0].view;
+
+    for vote in &qc2.votes {
+        if vote.view != first_view {
+            return None;
+        }
+    }
+
+    Some(first_view)
+}
+
+/// Extract the view number from a QC1
+///
+/// Returns Some(view) if all votes in the QC1 have the same view number.
+/// Returns None if the QC1 is empty or votes have inconsistent views.
+pub fn qc1_view(qc1: &QC1) -> Option<u64> {
+    if qc1.votes.is_empty() {
+        return None;
+    }
+
+    let first_view = qc1.votes[0].view;
+
+    for vote in &qc1.votes {
+        if vote.view != first_view {
+            return None;
+        }
+    }
+
+    Some(first_view)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::types::PrefixVector;
     use aptos_crypto::HashValue;
     use aptos_types::validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier};
-    use std::sync::Arc;
 
     fn hash(i: u64) -> HashValue {
         HashValue::sha3_256_of(&i.to_le_bytes())
@@ -269,7 +336,7 @@ mod tests {
     }
 
     fn create_vote1(author_id: u8, vector: PrefixVector) -> Vote1 {
-        Vote1::new(dummy_party_id(author_id), vector, 0, 0, dummy_signature())
+        Vote1::new(dummy_party_id(author_id), vector, 0, 0, 1, dummy_signature())
     }
 
     #[test]
@@ -363,17 +430,17 @@ mod tests {
                 dummy_party_id(0),
                 vec![hash(1)],
                 qc1.clone(),
-                0, 0,
+                0, 0, 1,
                 dummy_signature(),
             ),
             Vote2::new(
                 dummy_party_id(1),
                 vec![hash(1)],
                 qc1.clone(),
-                0, 0,
+                0, 0, 1,
                 dummy_signature(),
             ),
-            Vote2::new(dummy_party_id(2), vec![hash(1)], qc1, 0, 0, dummy_signature()),
+            Vote2::new(dummy_party_id(2), vec![hash(1)], qc1, 0, 0, 1, dummy_signature()),
         ];
 
         let qc2 = QC2::new(votes);
@@ -396,17 +463,17 @@ mod tests {
                 dummy_party_id(0),
                 vec![hash(1)],
                 qc1.clone(),
-                0, 0,
+                0, 0, 1,
                 dummy_signature(),
             ),
             Vote2::new(
                 dummy_party_id(1),
                 vec![hash(1)],
                 qc1.clone(),
-                0, 0,
+                0, 0, 1,
                 dummy_signature(),
             ),
-            Vote2::new(dummy_party_id(2), vec![hash(1)], qc1, 0, 0, dummy_signature()),
+            Vote2::new(dummy_party_id(2), vec![hash(1)], qc1, 0, 0, 1, dummy_signature()),
         ]);
 
         let votes = vec![
@@ -414,17 +481,17 @@ mod tests {
                 dummy_party_id(0),
                 vec![hash(1)],
                 qc2.clone(),
-                0, 0,
+                0, 0, 1,
                 dummy_signature(),
             ),
             Vote3::new(
                 dummy_party_id(1),
                 vec![hash(1)],
                 qc2.clone(),
-                0, 0,
+                0, 0, 1,
                 dummy_signature(),
             ),
-            Vote3::new(dummy_party_id(2), vec![hash(1)], qc2, 0, 0, dummy_signature()),
+            Vote3::new(dummy_party_id(2), vec![hash(1)], qc2, 0, 0, 1, dummy_signature()),
         ];
 
         let qc3 = QC3::new(votes);
@@ -448,6 +515,7 @@ mod tests {
                 qc1.clone(),
                 0,
                 0,
+                1,
                 dummy_signature(),
             ),
             Vote2::new(
@@ -456,9 +524,10 @@ mod tests {
                 qc1.clone(),
                 0,
                 0,
+                1,
                 dummy_signature(),
             ),
-            Vote2::new(dummy_party_id(2), vec![hash(1)], qc1, 0, 0, dummy_signature()),
+            Vote2::new(dummy_party_id(2), vec![hash(1)], qc1, 0, 0, 1, dummy_signature()),
         ])
     }
 
@@ -475,6 +544,7 @@ mod tests {
                 qc2.clone(),
                 0,
                 0,
+                1,
                 dummy_signature(),
             ),
             Vote3::new(
@@ -483,6 +553,7 @@ mod tests {
                 qc2.clone(),
                 0,
                 0,
+                1,
                 dummy_signature(),
             ),
             Vote3::new(
@@ -491,6 +562,7 @@ mod tests {
                 qc2,
                 0,
                 0,
+                1,
                 dummy_signature(),
             ),
         ];
@@ -519,6 +591,7 @@ mod tests {
                 qc2.clone(),
                 0,
                 0,
+                1,
                 dummy_signature(),
             ),
             Vote3::new(
@@ -527,9 +600,10 @@ mod tests {
                 qc2.clone(),
                 0,
                 0,
+                1,
                 dummy_signature(),
             ),
-            Vote3::new(dummy_party_id(2), vec![hash1], qc2, 0, 0, dummy_signature()),
+            Vote3::new(dummy_party_id(2), vec![hash1], qc2, 0, 0, 1, dummy_signature()),
         ];
 
         let qc3 = QC3::new(votes);
@@ -555,6 +629,7 @@ mod tests {
                 qc2.clone(),
                 0,
                 0,
+                1,
                 dummy_signature(),
             ),
             Vote3::new(
@@ -563,6 +638,7 @@ mod tests {
                 qc2.clone(),
                 0,
                 0,
+                1,
                 dummy_signature(),
             ),
             Vote3::new(
@@ -571,6 +647,7 @@ mod tests {
                 qc2,
                 0,
                 0,
+                1,
                 dummy_signature(),
             ),
         ];

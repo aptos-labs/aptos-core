@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
@@ -10,12 +13,13 @@ use aptos_types::{validator_signer::ValidatorSigner, validator_verifier::Validat
 
 /// Sign a Vote1 message
 pub fn sign_vote1(vote: &Vote1, signer: &ValidatorSigner) -> Result<BlsSignature> {
-    // Sign only the non-signature fields
+    // Sign only the non-signature fields (including view for replay protection)
     let sign_data = Vote1SignData {
         author: vote.author,
         input_vector: vote.input_vector.clone(),
         epoch: vote.epoch,
         slot: vote.slot,
+        view: vote.view,
     };
     let signature = signer.sign(&sign_data)?;
     Ok(signature)
@@ -23,13 +27,14 @@ pub fn sign_vote1(vote: &Vote1, signer: &ValidatorSigner) -> Result<BlsSignature
 
 /// Sign a Vote2 message
 pub fn sign_vote2(vote: &Vote2, signer: &ValidatorSigner) -> Result<BlsSignature> {
-    // Sign only the non-signature fields
+    // Sign only the non-signature fields (including view for replay protection)
     let sign_data = Vote2SignData {
         author: vote.author,
         certified_prefix: vote.certified_prefix.clone(),
         qc1: vote.qc1.clone(),
         epoch: vote.epoch,
         slot: vote.slot,
+        view: vote.view,
     };
     let signature = signer.sign(&sign_data)?;
     Ok(signature)
@@ -37,13 +42,14 @@ pub fn sign_vote2(vote: &Vote2, signer: &ValidatorSigner) -> Result<BlsSignature
 
 /// Sign a Vote3 message
 pub fn sign_vote3(vote: &Vote3, signer: &ValidatorSigner) -> Result<BlsSignature> {
-    // Sign only the non-signature fields
+    // Sign only the non-signature fields (including view for replay protection)
     let sign_data = Vote3SignData {
         author: vote.author,
         mcp_prefix: vote.mcp_prefix.clone(),
         qc2: vote.qc2.clone(),
         epoch: vote.epoch,
         slot: vote.slot,
+        view: vote.view,
     };
     let signature = signer.sign(&sign_data)?;
     Ok(signature)
@@ -55,12 +61,13 @@ pub fn verify_vote1_signature(
     author: &PartyId,
     verifier: &ValidatorVerifier,
 ) -> Result<()> {
-    // Verify only the non-signature fields
+    // Verify only the non-signature fields (including view for replay protection)
     let sign_data = Vote1SignData {
         author: vote.author,
         input_vector: vote.input_vector.clone(),
         epoch: vote.epoch,
         slot: vote.slot,
+        view: vote.view,
     };
     match verifier.verify(*author, &sign_data, &vote.signature) {
         Ok(()) => Ok(()),
@@ -74,13 +81,14 @@ pub fn verify_vote2_signature(
     author: &PartyId,
     verifier: &ValidatorVerifier,
 ) -> Result<()> {
-    // Verify only the non-signature fields
+    // Verify only the non-signature fields (including view for replay protection)
     let sign_data = Vote2SignData {
         author: vote.author,
         certified_prefix: vote.certified_prefix.clone(),
         qc1: vote.qc1.clone(),
         epoch: vote.epoch,
         slot: vote.slot,
+        view: vote.view,
     };
     match verifier.verify(*author, &sign_data, &vote.signature) {
         Ok(()) => Ok(()),
@@ -94,13 +102,14 @@ pub fn verify_vote3_signature(
     author: &PartyId,
     verifier: &ValidatorVerifier,
 ) -> Result<()> {
-    // Verify only the non-signature fields
+    // Verify only the non-signature fields (including view for replay protection)
     let sign_data = Vote3SignData {
         author: vote.author,
         mcp_prefix: vote.mcp_prefix.clone(),
         qc2: vote.qc2.clone(),
         epoch: vote.epoch,
         slot: vote.slot,
+        view: vote.view,
     };
     match verifier.verify(*author, &sign_data, &vote.signature) {
         Ok(()) => Ok(()),
@@ -141,10 +150,10 @@ mod tests {
         let (signer, verifier) = create_test_signer_and_verifier();
         let author = signer.author();
 
-        // Create a Vote1 with dummy signature first
+        // Create a Vote1 with dummy signature first (view = 1 for standalone)
         let input_vector = vec![HashValue::random(), HashValue::random()];
         let dummy_sig = bls12381::Signature::dummy_signature();
-        let mut vote = Vote1::new(author, input_vector, 0, 0, dummy_sig.clone());
+        let mut vote = Vote1::new(author, input_vector, 0, 0, 1, dummy_sig.clone());
 
         // Compute hash before signing
         let hash_before = aptos_crypto::hash::CryptoHash::hash(&vote);
@@ -173,13 +182,13 @@ mod tests {
         let (signer, verifier) = create_test_signer_and_verifier();
         let author = signer.author();
 
-        // Create a Vote2 with dummy QC1 and signature
+        // Create a Vote2 with dummy QC1 and signature (view = 1 for standalone)
         let certified_prefix = vec![HashValue::random()];
         let dummy_sig = bls12381::Signature::dummy_signature();
-        let qc1_vote = Vote1::new(author, vec![], 0, 0, dummy_sig.clone());
+        let qc1_vote = Vote1::new(author, vec![], 0, 0, 1, dummy_sig.clone());
         let qc1 = crate::types::QC1::new(vec![qc1_vote]);
 
-        let mut vote = Vote2::new(author, certified_prefix, qc1, 0, 0, dummy_sig);
+        let mut vote = Vote2::new(author, certified_prefix, qc1, 0, 0, 1, dummy_sig);
 
         // Sign it
         let signature = sign_vote2(&vote, &signer).unwrap();
@@ -195,17 +204,17 @@ mod tests {
         let (signer, verifier) = create_test_signer_and_verifier();
         let author = signer.author();
 
-        // Create a Vote3 with dummy QC2 and signature
+        // Create a Vote3 with dummy QC2 and signature (view = 1 for standalone)
         let mcp_prefix = vec![HashValue::random()];
         let dummy_sig = bls12381::Signature::dummy_signature();
 
         // Create nested QCs
-        let qc1_vote = Vote1::new(author, vec![], 0, 0, dummy_sig.clone());
+        let qc1_vote = Vote1::new(author, vec![], 0, 0, 1, dummy_sig.clone());
         let qc1 = crate::types::QC1::new(vec![qc1_vote]);
-        let qc2_vote = Vote2::new(author, vec![], qc1, 0, 0, dummy_sig.clone());
+        let qc2_vote = Vote2::new(author, vec![], qc1, 0, 0, 1, dummy_sig.clone());
         let qc2 = crate::types::QC2::new(vec![qc2_vote]);
 
-        let mut vote = Vote3::new(author, mcp_prefix, qc2, 0, 0, dummy_sig);
+        let mut vote = Vote3::new(author, mcp_prefix, qc2, 0, 0, 1, dummy_sig);
 
         // Sign it
         let signature = sign_vote3(&vote, &signer).unwrap();
@@ -221,10 +230,10 @@ mod tests {
         let (signer, verifier) = create_test_signer_and_verifier();
         let author = signer.author();
 
-        // Create a Vote1 with wrong signature
+        // Create a Vote1 with wrong signature (view = 1 for standalone)
         let input_vector = vec![HashValue::random()];
         let wrong_sig = bls12381::Signature::dummy_signature();
-        let vote = Vote1::new(author, input_vector, 0, 0, wrong_sig);
+        let vote = Vote1::new(author, input_vector, 0, 0, 1, wrong_sig);
 
         // Verification should fail
         let result = verify_vote1_signature(&vote, &author, &verifier);

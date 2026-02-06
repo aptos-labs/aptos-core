@@ -99,6 +99,7 @@ pub struct Vote1SignData {
     pub input_vector: PrefixVector,
     pub epoch: u64,
     pub slot: u64,
+    pub view: u64,
 }
 
 /// Signable data for Vote2 (excludes signature)
@@ -109,6 +110,7 @@ pub struct Vote2SignData {
     pub qc1: QC1,
     pub epoch: u64,
     pub slot: u64,
+    pub view: u64,
 }
 
 /// Signable data for Vote3 (excludes signature)
@@ -119,6 +121,7 @@ pub struct Vote3SignData {
     pub qc2: QC2,
     pub epoch: u64,
     pub slot: u64,
+    pub view: u64,
 }
 
 /// Generic vector element type for prefix consensus
@@ -147,6 +150,9 @@ pub struct Vote1 {
     /// Slot number (for future multi-slot, always 0 for single-shot)
     pub slot: u64,
 
+    /// View number (for Strong Prefix Consensus multi-view protocol)
+    pub view: u64,
+
     /// Signature over the vote data (not included in hash)
     pub signature: BlsSignature,
 }
@@ -158,6 +164,7 @@ impl Vote1 {
         input_vector: PrefixVector,
         epoch: u64,
         slot: u64,
+        view: u64,
         signature: BlsSignature,
     ) -> Self {
         Self {
@@ -165,6 +172,7 @@ impl Vote1 {
             input_vector,
             epoch,
             slot,
+            view,
             signature,
         }
     }
@@ -180,6 +188,7 @@ impl CryptoHash for Vote1 {
         state.update(&bcs::to_bytes(&self.input_vector).expect("Serialization should not fail"));
         state.update(&bcs::to_bytes(&self.epoch).expect("Serialization should not fail"));
         state.update(&bcs::to_bytes(&self.slot).expect("Serialization should not fail"));
+        state.update(&bcs::to_bytes(&self.view).expect("Serialization should not fail"));
         // Note: signature is intentionally NOT included in the hash
         state.finish()
     }
@@ -203,6 +212,9 @@ pub struct Vote2 {
     /// Slot number (for future multi-slot, always 0 for single-shot)
     pub slot: u64,
 
+    /// View number (for Strong Prefix Consensus multi-view protocol)
+    pub view: u64,
+
     /// Signature over the vote data (not included in hash)
     pub signature: BlsSignature,
 }
@@ -215,6 +227,7 @@ impl Vote2 {
         qc1: QC1,
         epoch: u64,
         slot: u64,
+        view: u64,
         signature: BlsSignature,
     ) -> Self {
         Self {
@@ -223,6 +236,7 @@ impl Vote2 {
             qc1,
             epoch,
             slot,
+            view,
             signature,
         }
     }
@@ -239,6 +253,7 @@ impl CryptoHash for Vote2 {
         state.update(&bcs::to_bytes(&self.qc1).expect("Serialization should not fail"));
         state.update(&bcs::to_bytes(&self.epoch).expect("Serialization should not fail"));
         state.update(&bcs::to_bytes(&self.slot).expect("Serialization should not fail"));
+        state.update(&bcs::to_bytes(&self.view).expect("Serialization should not fail"));
         // Note: signature is intentionally NOT included in the hash
         state.finish()
     }
@@ -262,6 +277,9 @@ pub struct Vote3 {
     /// Slot number (for future multi-slot, always 0 for single-shot)
     pub slot: u64,
 
+    /// View number (for Strong Prefix Consensus multi-view protocol)
+    pub view: u64,
+
     /// Signature over the vote data (not included in hash)
     pub signature: BlsSignature,
 }
@@ -274,6 +292,7 @@ impl Vote3 {
         qc2: QC2,
         epoch: u64,
         slot: u64,
+        view: u64,
         signature: BlsSignature,
     ) -> Self {
         Self {
@@ -282,6 +301,7 @@ impl Vote3 {
             qc2,
             epoch,
             slot,
+            view,
             signature,
         }
     }
@@ -298,6 +318,7 @@ impl CryptoHash for Vote3 {
         state.update(&bcs::to_bytes(&self.qc2).expect("Serialization should not fail"));
         state.update(&bcs::to_bytes(&self.epoch).expect("Serialization should not fail"));
         state.update(&bcs::to_bytes(&self.slot).expect("Serialization should not fail"));
+        state.update(&bcs::to_bytes(&self.view).expect("Serialization should not fail"));
         // Note: signature is intentionally NOT included in the hash
         state.finish()
     }
@@ -430,6 +451,9 @@ pub struct PrefixConsensusInput {
 
     /// Epoch number (for future use)
     pub epoch: u64,
+
+    /// View number (for Strong Prefix Consensus, default 1 for standalone)
+    pub view: u64,
 }
 
 impl PrefixConsensusInput {
@@ -440,6 +464,7 @@ impl PrefixConsensusInput {
         n: usize,
         f: usize,
         epoch: u64,
+        view: u64,
     ) -> Self {
         Self {
             input_vector,
@@ -447,6 +472,7 @@ impl PrefixConsensusInput {
             n,
             f,
             epoch,
+            view,
         }
     }
 
@@ -673,9 +699,9 @@ mod tests {
 
     fn create_dummy_qc1() -> QC1 {
         let votes = vec![
-            Vote1::new(dummy_party(0), vec![hash(1)], 0, 0, dummy_sig()),
-            Vote1::new(dummy_party(1), vec![hash(1)], 0, 0, dummy_sig()),
-            Vote1::new(dummy_party(2), vec![hash(1)], 0, 0, dummy_sig()),
+            Vote1::new(dummy_party(0), vec![hash(1)], 0, 0, 1, dummy_sig()),
+            Vote1::new(dummy_party(1), vec![hash(1)], 0, 0, 1, dummy_sig()),
+            Vote1::new(dummy_party(2), vec![hash(1)], 0, 0, 1, dummy_sig()),
         ];
         QC1::new(votes)
     }
@@ -683,9 +709,9 @@ mod tests {
     fn create_dummy_qc2() -> QC2 {
         let qc1 = create_dummy_qc1();
         let votes = vec![
-            Vote2::new(dummy_party(0), vec![hash(1)], qc1.clone(), 0, 0, dummy_sig()),
-            Vote2::new(dummy_party(1), vec![hash(1)], qc1.clone(), 0, 0, dummy_sig()),
-            Vote2::new(dummy_party(2), vec![hash(1)], qc1, 0, 0, dummy_sig()),
+            Vote2::new(dummy_party(0), vec![hash(1)], qc1.clone(), 0, 0, 1, dummy_sig()),
+            Vote2::new(dummy_party(1), vec![hash(1)], qc1.clone(), 0, 0, 1, dummy_sig()),
+            Vote2::new(dummy_party(2), vec![hash(1)], qc1, 0, 0, 1, dummy_sig()),
         ];
         QC2::new(votes)
     }
@@ -706,6 +732,7 @@ mod tests {
                 qc2.clone(),
                 0,
                 0,
+                1,
                 dummy_sig(),
             ),
             Vote3::new(
@@ -714,9 +741,10 @@ mod tests {
                 qc2.clone(),
                 0,
                 0,
+                1,
                 dummy_sig(),
             ),
-            Vote3::new(dummy_party(2), vec![hash1, hash2], qc2, 0, 0, dummy_sig()),
+            Vote3::new(dummy_party(2), vec![hash1, hash2], qc2, 0, 0, 1, dummy_sig()),
         ];
 
         let qc3 = QC3::new(votes);
@@ -737,9 +765,9 @@ mod tests {
 
         let qc2 = create_dummy_qc2();
         let votes = vec![
-            Vote3::new(dummy_party(0), vec![hash1], qc2.clone(), 0, 0, dummy_sig()),
-            Vote3::new(dummy_party(1), vec![hash1], qc2.clone(), 0, 0, dummy_sig()),
-            Vote3::new(dummy_party(2), vec![hash1], qc2, 0, 0, dummy_sig()),
+            Vote3::new(dummy_party(0), vec![hash1], qc2.clone(), 0, 0, 1, dummy_sig()),
+            Vote3::new(dummy_party(1), vec![hash1], qc2.clone(), 0, 0, 1, dummy_sig()),
+            Vote3::new(dummy_party(2), vec![hash1], qc2, 0, 0, 1, dummy_sig()),
         ];
 
         let qc3 = QC3::new(votes);
@@ -770,6 +798,7 @@ mod tests {
                 qc2.clone(),
                 0,
                 0,
+                1,
                 dummy_sig(),
             ),
             Vote3::new(
@@ -778,9 +807,10 @@ mod tests {
                 qc2.clone(),
                 0,
                 0,
+                1,
                 dummy_sig(),
             ),
-            Vote3::new(dummy_party(2), vec![hash1], qc2, 0, 0, dummy_sig()),
+            Vote3::new(dummy_party(2), vec![hash1], qc2, 0, 0, 1, dummy_sig()),
         ];
 
         let qc3 = QC3::new(votes);
@@ -815,6 +845,7 @@ mod tests {
                 qc2.clone(),
                 0,
                 0,
+                1,
                 dummy_sig(),
             ),
             Vote3::new(
@@ -823,9 +854,10 @@ mod tests {
                 qc2.clone(),
                 0,
                 0,
+                1,
                 dummy_sig(),
             ),
-            Vote3::new(dummy_party(2), vec![hash1], qc2, 0, 0, dummy_sig()),
+            Vote3::new(dummy_party(2), vec![hash1], qc2, 0, 0, 1, dummy_sig()),
         ];
 
         let qc3 = QC3::new(votes);
@@ -854,6 +886,7 @@ mod tests {
                 qc2.clone(),
                 0,
                 0,
+                1,
                 dummy_sig(),
             ),
             Vote3::new(
@@ -862,9 +895,10 @@ mod tests {
                 qc2.clone(),
                 0,
                 0,
+                1,
                 dummy_sig(),
             ),
-            Vote3::new(dummy_party(2), vec![hash1, hash2], qc2, 0, 0, dummy_sig()),
+            Vote3::new(dummy_party(2), vec![hash1, hash2], qc2, 0, 0, 1, dummy_sig()),
         ];
 
         let qc3 = QC3::new(votes);
@@ -896,8 +930,8 @@ mod tests {
 
         // Only 2 votes (insufficient for n=4, f=1 which requires 3)
         let votes = vec![
-            Vote3::new(dummy_party(0), vec![hash1], qc2.clone(), 0, 0, dummy_sig()),
-            Vote3::new(dummy_party(1), vec![hash1], qc2, 0, 0, dummy_sig()),
+            Vote3::new(dummy_party(0), vec![hash1], qc2.clone(), 0, 0, 1, dummy_sig()),
+            Vote3::new(dummy_party(1), vec![hash1], qc2, 0, 0, 1, dummy_sig()),
         ];
 
         let qc3 = QC3::new(votes);

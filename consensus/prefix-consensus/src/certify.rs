@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
@@ -324,17 +327,17 @@ mod tests {
             Vote1::new(
                 dummy_party_id(0),
                 vec![hash(1), hash(2), hash(3)],
-                0, 0,
+                0, 0, 1,
                 dummy_signature(),
             ),
             Vote1::new(
                 dummy_party_id(1),
                 vec![hash(1), hash(2), hash(4)],
-                0, 0,
+                0, 0, 1,
                 dummy_signature(),
             ),
-            Vote1::new(dummy_party_id(2), vec![hash(1), hash(5)], 0, 0, dummy_signature()),
-            Vote1::new(dummy_party_id(3), vec![hash(2), hash(3)], 0, 0, dummy_signature()),
+            Vote1::new(dummy_party_id(2), vec![hash(1), hash(5)], 0, 0, 1, dummy_signature()),
+            Vote1::new(dummy_party_id(3), vec![hash(2), hash(3)], 0, 0, 1, dummy_signature()),
         ];
 
         let qc1 = QC1::new(votes);
@@ -350,9 +353,9 @@ mod tests {
     fn test_qc1_certify_all_same() {
         let common_vec = vec![hash(1), hash(2), hash(3)];
         let votes = vec![
-            Vote1::new(dummy_party_id(0), common_vec.clone(), 0, 0, dummy_signature()),
-            Vote1::new(dummy_party_id(1), common_vec.clone(), 0, 0, dummy_signature()),
-            Vote1::new(dummy_party_id(2), common_vec.clone(), 0, 0, dummy_signature()),
+            Vote1::new(dummy_party_id(0), common_vec.clone(), 0, 0, 1, dummy_signature()),
+            Vote1::new(dummy_party_id(1), common_vec.clone(), 0, 0, 1, dummy_signature()),
+            Vote1::new(dummy_party_id(2), common_vec.clone(), 0, 0, 1, dummy_signature()),
         ];
 
         let qc1 = QC1::new(votes);
@@ -369,17 +372,17 @@ mod tests {
             Vote1::new(
                 dummy_party_id(0),
                 vec![hash(1), hash(2), hash(3)],
-                0, 0,
+                0, 0, 1,
                 dummy_signature(),
             ),
             Vote1::new(
                 dummy_party_id(1),
                 vec![hash(1), hash(2), hash(4)],
-                0, 0,
+                0, 0, 1,
                 dummy_signature(),
             ),
-            Vote1::new(dummy_party_id(2), vec![hash(1), hash(5)], 0, 0, dummy_signature()),
-            Vote1::new(dummy_party_id(3), vec![hash(2), hash(3)], 0, 0, dummy_signature()),
+            Vote1::new(dummy_party_id(2), vec![hash(1), hash(5)], 0, 0, 1, dummy_signature()),
+            Vote1::new(dummy_party_id(3), vec![hash(2), hash(3)], 0, 0, 1, dummy_signature()),
         ];
 
         let qc1 = QC1::new(votes);
@@ -396,21 +399,21 @@ mod tests {
                 dummy_party_id(0),
                 vec![hash(1), hash(2), hash(3)],
                 QC1::new(vec![]),
-                0, 0,
+                0, 0, 1,
                 dummy_signature(),
             ),
             Vote2::new(
                 dummy_party_id(1),
                 vec![hash(1), hash(2)],
                 QC1::new(vec![]),
-                0, 0,
+                0, 0, 1,
                 dummy_signature(),
             ),
             Vote2::new(
                 dummy_party_id(2),
                 vec![hash(1), hash(2), hash(3), hash(4)],
                 QC1::new(vec![]),
-                0, 0,
+                0, 0, 1,
                 dummy_signature(),
             ),
         ];
@@ -429,21 +432,21 @@ mod tests {
                 dummy_party_id(0),
                 vec![hash(1), hash(2)],
                 QC2::new(vec![]),
-                0, 0,
+                0, 0, 1,
                 dummy_signature(),
             ),
             Vote3::new(
                 dummy_party_id(1),
                 vec![hash(1), hash(2), hash(3)],
                 QC2::new(vec![]),
-                0, 0,
+                0, 0, 1,
                 dummy_signature(),
             ),
             Vote3::new(
                 dummy_party_id(2),
                 vec![hash(1), hash(2), hash(3), hash(4)],
                 QC2::new(vec![]),
-                0, 0,
+                0, 0, 1,
                 dummy_signature(),
             ),
         ];
@@ -479,9 +482,9 @@ mod tests {
     #[test]
     fn test_qc1_certify_edge_case_all_empty_vectors() {
         let votes = vec![
-            Vote1::new(dummy_party_id(1), vec![], 0, 0, dummy_signature()),
-            Vote1::new(dummy_party_id(2), vec![], 0, 0, dummy_signature()),
-            Vote1::new(dummy_party_id(3), vec![], 0, 0, dummy_signature()),
+            Vote1::new(dummy_party_id(1), vec![], 0, 0, 1, dummy_signature()),
+            Vote1::new(dummy_party_id(2), vec![], 0, 0, 1, dummy_signature()),
+            Vote1::new(dummy_party_id(3), vec![], 0, 0, 1, dummy_signature()),
         ];
         let qc1 = QC1::new(votes);
         let result = qc1_certify(&qc1, 1);
@@ -491,10 +494,10 @@ mod tests {
     #[test]
     fn test_qc1_certify_edge_case_all_different_prefixes() {
         let votes = vec![
-            Vote1::new(dummy_party_id(1), vec![hash(1), hash(2)], 0, 0, dummy_signature()),
-            Vote1::new(dummy_party_id(2), vec![hash(10), hash(20)], 0, 0, dummy_signature()),
-            Vote1::new(dummy_party_id(3), vec![hash(100), hash(200)], 0, 0, dummy_signature()),
-            Vote1::new(dummy_party_id(4), vec![hash(1000), hash(2000)], 0, 0, dummy_signature()),
+            Vote1::new(dummy_party_id(1), vec![hash(1), hash(2)], 0, 0, 1, dummy_signature()),
+            Vote1::new(dummy_party_id(2), vec![hash(10), hash(20)], 0, 0, 1, dummy_signature()),
+            Vote1::new(dummy_party_id(3), vec![hash(100), hash(200)], 0, 0, 1, dummy_signature()),
+            Vote1::new(dummy_party_id(4), vec![hash(1000), hash(2000)], 0, 0, 1, dummy_signature()),
         ];
         let qc1 = QC1::new(votes);
         let result = qc1_certify(&qc1, 1);
@@ -504,9 +507,9 @@ mod tests {
     #[test]
     fn test_qc3_certify_edge_case_long_prefix_chain() {
         let votes = vec![
-            Vote3::new(dummy_party_id(1), vec![hash(1)], QC2::new(vec![]), 0, 0, dummy_signature()),
-            Vote3::new(dummy_party_id(2), vec![hash(1), hash(2)], QC2::new(vec![]), 0, 0, dummy_signature()),
-            Vote3::new(dummy_party_id(3), vec![hash(1), hash(2), hash(3)], QC2::new(vec![]), 0, 0, dummy_signature()),
+            Vote3::new(dummy_party_id(1), vec![hash(1)], QC2::new(vec![]), 0, 0, 1, dummy_signature()),
+            Vote3::new(dummy_party_id(2), vec![hash(1), hash(2)], QC2::new(vec![]), 0, 0, 1, dummy_signature()),
+            Vote3::new(dummy_party_id(3), vec![hash(1), hash(2), hash(3)], QC2::new(vec![]), 0, 0, 1, dummy_signature()),
         ];
         let qc3 = QC3::new(votes);
         let (v_low, v_high) = qc3_certify(&qc3);
@@ -518,8 +521,8 @@ mod tests {
     #[should_panic(expected = "IMPLEMENTATION BUG")]
     fn test_qc3_certify_edge_case_inconsistent_prefixes_panics() {
         let votes = vec![
-            Vote3::new(dummy_party_id(1), vec![hash(1), hash(2), hash(3)], QC2::new(vec![]), 0, 0, dummy_signature()),
-            Vote3::new(dummy_party_id(2), vec![hash(1), hash(2), hash(99)], QC2::new(vec![]), 0, 0, dummy_signature()),
+            Vote3::new(dummy_party_id(1), vec![hash(1), hash(2), hash(3)], QC2::new(vec![]), 0, 0, 1, dummy_signature()),
+            Vote3::new(dummy_party_id(2), vec![hash(1), hash(2), hash(99)], QC2::new(vec![]), 0, 0, 1, dummy_signature()),
         ];
         let qc3 = QC3::new(votes);
         qc3_certify(&qc3);

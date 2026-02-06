@@ -616,6 +616,7 @@ mod tests {
             4,                          // n
             1,                          // f
             1,                          // epoch
+            1,                          // view (default for standalone)
         );
 
         let protocol = Arc::new(PrefixConsensusProtocol::new(input, verifier.clone()));
@@ -648,6 +649,7 @@ mod tests {
             4,                          // n
             1,                          // f
             1,                          // epoch
+            1,                          // view (default for standalone)
         );
 
         let protocol = Arc::new(PrefixConsensusProtocol::new(input, verifier.clone()));
@@ -670,6 +672,7 @@ mod tests {
             vec![HashValue::random()],
             1,
             0,
+            1, // view (default for standalone)
             aptos_crypto::bls12381::Signature::dummy_signature(),
         );
 
@@ -695,6 +698,7 @@ mod tests {
             4,                          // n
             1,                          // f
             1,                          // epoch 1
+            1,                          // view (default for standalone)
         );
 
         let protocol = Arc::new(PrefixConsensusProtocol::new(input, verifier.clone()));
@@ -717,6 +721,7 @@ mod tests {
             vec![HashValue::random()],
             2, // epoch 2 (wrong!)
             0,
+            1, // view (default for standalone)
             aptos_crypto::bls12381::Signature::dummy_signature(),
         );
 

@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
@@ -29,6 +32,7 @@
 //! - **Termination**: Every honest party eventually outputs
 //! - **Validity**: mcp({v_in_h}_{h∈H}) ⪯ v_low_i for any honest party i
 
+pub mod certificates;
 mod certify;
 pub mod manager;
 pub mod network_interface;
@@ -55,4 +59,11 @@ pub use types::{
     Vote2, Vote3, QC1, QC2, QC3,
 };
 pub use utils::{consistency_check, max_common_prefix, min_common_extension};
-pub use verification::{verify_qc1, verify_qc2, verify_qc3, verify_vote1, verify_vote2, verify_vote3};
+pub use verification::{
+    qc1_view, qc2_view, qc3_view, verify_qc1, verify_qc2, verify_qc3, verify_vote1, verify_vote2,
+    verify_vote3,
+};
+pub use certificates::{
+    Certificate, DirectCertificate, EmptyViewMessage, EmptyViewStatement, HighestKnownView,
+    IndirectCertificate,
+};

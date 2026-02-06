@@ -153,6 +153,7 @@ impl PrefixConsensusProtocol {
             self.input.input_vector.clone(),
             self.input.epoch,
             0, // slot: always 0 for single-shot
+            self.input.view,
             dummy_sig,
         );
 
@@ -163,6 +164,7 @@ impl PrefixConsensusProtocol {
             self.input.input_vector.clone(),
             self.input.epoch,
             0,
+            self.input.view,
             signature,
         );
 
@@ -271,6 +273,7 @@ impl PrefixConsensusProtocol {
             qc1.clone(),
             self.input.epoch,
             0,
+            self.input.view,
             dummy_sig,
         );
 
@@ -282,6 +285,7 @@ impl PrefixConsensusProtocol {
             qc1,
             self.input.epoch,
             0, // slot: always 0 for single-shot
+            self.input.view,
             signature,
         );
 
@@ -389,6 +393,7 @@ impl PrefixConsensusProtocol {
             qc2.clone(),
             self.input.epoch,
             0,
+            self.input.view,
             dummy_sig,
         );
 
@@ -400,6 +405,7 @@ impl PrefixConsensusProtocol {
             qc2,
             self.input.epoch,
             0, // slot: always 0 for single-shot
+            self.input.view,
             signature,
         );
 
@@ -533,13 +539,14 @@ mod tests {
         HashValue::sha3_256_of(&i.to_le_bytes())
     }
 
+    #[allow(dead_code)]
     fn create_test_input(
         party_id: u8,
         vector: PrefixVector,
         n: usize,
         f: usize,
     ) -> PrefixConsensusInput {
-        PrefixConsensusInput::new(vector, PartyId::new([party_id; 32]), n, f, 0)
+        PrefixConsensusInput::new(vector, PartyId::new([party_id; 32]), n, f, 0, 1)
     }
 
     #[tokio::test]
@@ -550,8 +557,8 @@ mod tests {
         let signer = ValidatorSigner::random(None);
         let party_id = signer.author();
 
-        // Create input with matching party_id
-        let input = PrefixConsensusInput::new(vec![hash(1), hash(2)], party_id, 4, 1, 0);
+        // Create input with matching party_id (view=1 for standalone basic PC)
+        let input = PrefixConsensusInput::new(vec![hash(1), hash(2)], party_id, 4, 1, 0, 1);
 
         // Create verifier with this signer's public key
         let validator_info = ValidatorConsensusInfo::new(party_id, signer.public_key(), 1);
@@ -574,8 +581,8 @@ mod tests {
         let signer = ValidatorSigner::random(None);
         let party_id = signer.author();
 
-        // Create input with matching party_id
-        let input = PrefixConsensusInput::new(vec![hash(1), hash(2)], party_id, 4, 1, 0);
+        // Create input with matching party_id (view=1 for standalone basic PC)
+        let input = PrefixConsensusInput::new(vec![hash(1), hash(2)], party_id, 4, 1, 0, 1);
 
         // Create verifier with this signer's public key
         let validator_info = ValidatorConsensusInfo::new(party_id, signer.public_key(), 1);

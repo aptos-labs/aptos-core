@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
@@ -144,6 +147,7 @@ mod tests {
             vec![HashValue::random(), HashValue::random()],
             1, // epoch
             0, // slot
+            1, // view (default for standalone)
             BlsSignature::dummy_signature(),
         )
     }
@@ -157,8 +161,9 @@ mod tests {
                 votes: vec![],
                 authors: vec![],
             }, // Empty QC for testing
-            1,                               // epoch
-            0,                               // slot
+            1, // epoch
+            0, // slot
+            1, // view (default for standalone)
             BlsSignature::dummy_signature(),
         )
     }
@@ -172,8 +177,9 @@ mod tests {
                 votes: vec![],
                 authors: vec![],
             }, // Empty QC for testing
-            1,                               // epoch
-            0,                               // slot
+            1, // epoch
+            0, // slot
+            1, // view (default for standalone)
             BlsSignature::dummy_signature(),
         )
     }
@@ -361,6 +367,7 @@ mod tests {
             qc1,
             1, // epoch
             0, // slot
+            1, // view (default for standalone)
             BlsSignature::dummy_signature(),
         );
 
@@ -398,6 +405,7 @@ mod tests {
             qc2,
             1, // epoch
             0, // slot
+            1, // view (default for standalone)
             BlsSignature::dummy_signature(),
         );
 
