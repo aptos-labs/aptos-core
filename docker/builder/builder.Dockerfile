@@ -9,12 +9,12 @@ RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloa
 RUN rm -f /etc/apt/sources.list
 COPY <<EOF /etc/apt/sources.list.d/debian.sources
 Types: deb
-URIs: http://cloudfront.debian.net/debian
+URIs: https://cloudfront.debian.net/debian
 Suites: trixie trixie-updates
 Components: main
 
 Types: deb
-URIs: http://security.debian.org/debian-security
+URIs: https://security.debian.org/debian-security
 Suites: trixie-security
 Components: main
 EOF

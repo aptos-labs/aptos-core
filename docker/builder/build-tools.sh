@@ -7,9 +7,6 @@ echo "Building tools and services docker images"
 echo "PROFILE: $PROFILE"
 echo "CARGO_TARGET_DIR: $CARGO_TARGET_DIR"
 
-# Force rebuild of openssl crates to pick up OpenSSL 3.x headers
-cargo clean -p openssl-sys -p openssl 2>/dev/null || true
-
 # Build all the rust binaries
 CLI_PROFILE=cli
 cargo build --locked --profile=$CLI_PROFILE \
