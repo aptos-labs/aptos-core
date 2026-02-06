@@ -17634,6 +17634,7 @@ dependencies = [
  "serde_json",
  "serde_yaml 0.8.26",
  "tempfile",
+ "tikv-jemallocator",
  "tokio",
  "url",
  "walkdir",
