@@ -1,0 +1,16 @@
+[package]
+name = "aptos-jemalloc"
+description = "Common jemalloc configuration for Aptos binaries"
+version = "0.0.0-main"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+jemallocator = { workspace = true }
