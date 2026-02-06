@@ -24,19 +24,16 @@ module 0x42::M {
         modifies modifies_of<f>(x);
     }
 
-    // Another function to test with state labels
+    // Another function to test with state labels (valid chains)
     fun apply2(f: |u64| u64, x: u64): u64 {
         f(x)
     }
 
     spec apply2 {
-        // Test with pre-state label
-        ensures old@ensures_of<f>(x, result);
+        // First predicate defines post-state "s1"
+        ensures ensures_of<f>(x, result)@s1;
 
-        // Test with post-state label
-        ensures ensures_of<f>(x, result)@post;
-
-        // Test with both pre and post state labels
-        ensures pre@ensures_of<f>(x, result)@post;
+        // Second predicate reads from "s1" (completes the chain)
+        ensures s1@ensures_of<f>(x, result);
     }
 }

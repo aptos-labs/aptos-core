@@ -2030,8 +2030,9 @@ pub enum Operation {
     /// args[0] is the function expression (Closure for global functions, Temporary for
     /// function parameters, LocalVar for spec function parameters).
     /// args[1..] are the predicate arguments.
-    /// The optional MemoryLabel is reserved for future state-binding functionality.
-    Behavior(BehaviorKind, Option<MemoryLabel>),
+    /// The BehaviorState contains optional pre/post state labels for reasoning about
+    /// state at different program points.
+    Behavior(BehaviorKind, BehaviorState),
     Result(usize),
     Index,
     Slice,
@@ -2127,6 +2128,42 @@ pub enum Operation {
 
 /// A label used for referring to a specific memory in Global and Exists expressions.
 pub type MemoryLabel = GlobalId;
+
+/// State labels for behavior predicates.
+/// Pre-label refers to state before an operation, post-label refers to state after.
+/// The label names (Symbols) are used for validation - pre-labels must reference
+/// post-labels defined elsewhere, and there cannot be cycles.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct BehaviorState {
+    /// Pre-state label - references another predicate's post-state
+    pub pre: Option<MemoryLabel>,
+    /// Post-state label - defines this predicate's post-state
+    pub post: Option<MemoryLabel>,
+    /// Name of the pre-state label (for validation)
+    pub pre_name: Option<Symbol>,
+    /// Name of the post-state label (for validation)
+    pub post_name: Option<Symbol>,
+}
+
+impl BehaviorState {
+    pub fn new(
+        pre: Option<MemoryLabel>,
+        post: Option<MemoryLabel>,
+        pre_name: Option<Symbol>,
+        post_name: Option<Symbol>,
+    ) -> Self {
+        Self {
+            pre,
+            post,
+            pre_name,
+            post_name,
+        }
+    }
+
+    pub fn has_labels(&self) -> bool {
+        self.pre.is_some() || self.post.is_some()
+    }
+}
 
 /// A pattern, either a variable, a tuple, or a struct instantiation applied to a sequence of patterns.
 /// Carries a node_id which has (at least) a type and location.
@@ -3808,10 +3845,13 @@ impl fmt::Display for OperationDisplay<'_> {
                 write!(f, "update {}", self.field_str(mid, sid, fid))
             },
             Result(t) => write!(f, "result{}", t),
-            Behavior(kind, mem_label) => {
+            Behavior(kind, state) => {
+                if let Some(pre) = &state.pre {
+                    write!(f, "{}@", pre.as_usize())?;
+                }
                 write!(f, "{}", kind)?;
-                if let Some(label) = mem_label {
-                    write!(f, "@{}", label)?;
+                if let Some(post) = &state.post {
+                    write!(f, "@{}", post.as_usize())?;
                 }
                 Ok(())
             },
