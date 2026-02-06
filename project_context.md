@@ -57,11 +57,9 @@ Implementing Prefix Consensus protocols (from research paper "Prefix Consensus F
 - Direct routing in check_epoch() (bypasses UnverifiedEvent)
 
 **Testing**:
-- Unit tests: All 103 tests passing
-- Smoke tests: Do NOT pass automatically (timeout issues)
-  - Manual verification required: Check that 4 output files are created
+- Unit tests: All 102 tests passing
+- Smoke tests: Run manually by user (not in Claude sessions)
   - Output files: `/tmp/prefix_consensus_output_{party_id}.json`
-  - Property verification: Upper Bound, Validity, Consistency checked manually
 - Test script: `test_prefix_consensus.sh`
 
 ### Technical Achievements
@@ -245,7 +243,7 @@ This layered architecture enables multi-slot censorship-resistant consensus as d
 - **HEAD**: Stake-weighted quorum refactoring complete
 - **Status**: Clean working directory
 - **Tests**: 102/102 unit tests passing
-- **Smoke Tests**: Compile but require manual verification (check 4 output files)
+- **Smoke Tests**: Run manually by user (no need to run in Claude sessions)
 - **Build**: ✅ No warnings or errors
 
 ### Progress Summary
