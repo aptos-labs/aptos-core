@@ -50,7 +50,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         lld \
         lsb-release \
         pkg-config \
-        unzip \
         wget \
     && bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" llvm.sh ${CLANG_VERSION} \
     && update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${CLANG_VERSION} 100 \
