@@ -120,8 +120,7 @@ impl PeersAndMetadata {
             for (peer_id, peer_metadata) in peers_and_metadata.iter() {
                 if peer_metadata.is_connected() {
                     let peer_network_id = PeerNetworkId::new(*network_id, *peer_id);
-                    connected_peers_and_metadata
-                        .insert(peer_network_id, (**peer_metadata).clone());
+                    connected_peers_and_metadata.insert(peer_network_id, (**peer_metadata).clone());
                 }
             }
         }

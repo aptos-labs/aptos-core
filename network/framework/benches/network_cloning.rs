@@ -16,22 +16,24 @@
 //!   6. direct_send_msg_clone            - Vec<u8> vs Bytes payload cloning
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use std::collections::{BTreeMap, HashMap, HashSet};
-use std::sync::Arc;
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    sync::Arc,
+};
 
 // ─── Benchmark 1: PeerMetadata cache update (HashMap clone) ───────────────────
 
 /// Simulates the current pattern: cloning the entire HashMap<NetworkId, HashMap<PeerId, PeerMetadata>>
 /// to update the ArcSwap cache after every mutation.
 fn bench_cache_update_full_clone(c: &mut Criterion) {
-    use aptos_config::config::PeerRole;
-    use aptos_config::network_id::NetworkId;
+    use aptos_config::{config::PeerRole, network_id::NetworkId};
     use aptos_netcore::transport::ConnectionOrigin;
-    use aptos_network::application::metadata::PeerMetadata;
-    use aptos_network::protocols::wire::handshake::v1::{MessagingProtocolVersion, ProtocolIdSet};
-    use aptos_network::transport::{ConnectionId, ConnectionMetadata};
-    use aptos_types::network_address::NetworkAddress;
-    use aptos_types::PeerId;
+    use aptos_network::{
+        application::metadata::PeerMetadata,
+        protocols::wire::handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
+        transport::{ConnectionId, ConnectionMetadata},
+    };
+    use aptos_types::{network_address::NetworkAddress, PeerId};
 
     let mut group = c.benchmark_group("peers_and_metadata_cache_update");
 
@@ -71,9 +73,7 @@ fn bench_cache_update_full_clone(c: &mut Criterion) {
 // ─── Benchmark 2: HandshakeMsg supported_protocols clone ──────────────────────
 
 fn bench_handshake_msg_protocols(c: &mut Criterion) {
-    use aptos_network::protocols::wire::handshake::v1::{
-        MessagingProtocolVersion, ProtocolIdSet,
-    };
+    use aptos_network::protocols::wire::handshake::v1::{MessagingProtocolVersion, ProtocolIdSet};
 
     let mut group = c.benchmark_group("handshake_msg_construction");
 
@@ -104,12 +104,10 @@ fn bench_handshake_msg_protocols(c: &mut Criterion) {
 // ─── Benchmark 3: Discovered peer lookup and clone ────────────────────────────
 
 fn bench_discovered_peer_clone(c: &mut Criterion) {
-    use aptos_types::PeerId;
-
     // We cannot easily import DiscoveredPeer from the private module,
     // so we measure the cost of cloning a Vec<NetworkAddress> which is the
     // dominant cost inside DiscoveredPeer::clone().
-    use aptos_types::network_address::NetworkAddress;
+    use aptos_types::{network_address::NetworkAddress, PeerId};
 
     let mut group = c.benchmark_group("discovered_peer_lookup");
 
@@ -120,7 +118,11 @@ fn bench_discovered_peer_clone(c: &mut Criterion) {
             let peer_id = PeerId::random();
             // Each peer has 2-3 addresses
             let addrs: Vec<NetworkAddress> = (0..3)
-                .map(|i| format!("/ip4/10.0.0.{}/tcp/{}", i, 6180 + i).parse().unwrap())
+                .map(|i| {
+                    format!("/ip4/10.0.0.{}/tcp/{}", i, 6180 + i)
+                        .parse()
+                        .unwrap()
+                })
                 .collect();
             peer_addrs.insert(peer_id, addrs);
         }
@@ -136,9 +138,7 @@ fn bench_discovered_peer_clone(c: &mut Criterion) {
                 b.iter(|| {
                     let result: Vec<(PeerId, Vec<NetworkAddress>)> = selected
                         .iter()
-                        .filter_map(|pid| {
-                            peer_addrs.get(pid).map(|addrs| (*pid, addrs.clone()))
-                        })
+                        .filter_map(|pid| peer_addrs.get(pid).map(|addrs| (*pid, addrs.clone())))
                         .collect();
                     black_box(result);
                 })
@@ -178,7 +178,12 @@ fn bench_addresses_union(c: &mut Criterion) {
     let bucket4: Vec<NetworkAddress> = (0..2)
         .map(|i| format!("/ip4/10.0.0.{}/tcp/6180", i).parse().unwrap())
         .collect();
-    let buckets = [bucket1.clone(), bucket2.clone(), bucket3.clone(), bucket4.clone()];
+    let buckets = [
+        bucket1.clone(),
+        bucket2.clone(),
+        bucket3.clone(),
+        bucket4.clone(),
+    ];
 
     // Current approach: HashSet -> Vec
     group.bench_function("hashset_then_collect", |b| {
@@ -205,14 +210,14 @@ fn bench_addresses_union(c: &mut Criterion) {
 // ─── Benchmark 5: ConnectionNotification broadcast clone cost ─────────────────
 
 fn bench_notification_broadcast(c: &mut Criterion) {
-    use aptos_config::config::PeerRole;
-    use aptos_config::network_id::NetworkId;
+    use aptos_config::{config::PeerRole, network_id::NetworkId};
     use aptos_netcore::transport::ConnectionOrigin;
-    use aptos_network::peer_manager::ConnectionNotification;
-    use aptos_network::protocols::wire::handshake::v1::{MessagingProtocolVersion, ProtocolIdSet};
-    use aptos_network::transport::{ConnectionId, ConnectionMetadata};
-    use aptos_types::network_address::NetworkAddress;
-    use aptos_types::PeerId;
+    use aptos_network::{
+        peer_manager::ConnectionNotification,
+        protocols::wire::handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
+        transport::{ConnectionId, ConnectionMetadata},
+    };
+    use aptos_types::{network_address::NetworkAddress, PeerId};
 
     let mut group = c.benchmark_group("connection_notification_broadcast");
 
