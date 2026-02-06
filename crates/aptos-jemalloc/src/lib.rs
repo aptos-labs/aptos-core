@@ -17,6 +17,7 @@ macro_rules! setup_jemalloc {
         #[used]
         #[unsafe(no_mangle)]
         pub static mut malloc_conf: *const ::std::ffi::c_char = c"abort_conf:true,\
+              dirty_decay_ms:30000,muzzy_decay_ms:120000,\
               background_thread:true,max_background_threads:4,\
               thp:always,metadata_thp:always,\
               lg_tcache_max:16,tcache_nslots_large:32,\
