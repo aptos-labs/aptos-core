@@ -54,11 +54,11 @@ module 0xc0ffee::m {
     }
     fun test_self(orders: vector<TestOrder>) {
         {
-            let (v) = (&orders);
+            let v = &orders;
             let i = 0;
             while (i < 0x1::vector::length<TestOrder>(v)) {
                 {
-                    let (order) = (0x1::vector::borrow<TestOrder>(v, i));
+                    let order = 0x1::vector::borrow<TestOrder>(v, i);
                     let _price = price(order);
                     let _size = size(order);
                 };

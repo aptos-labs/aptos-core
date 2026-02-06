@@ -18,9 +18,9 @@
 use crate::{
     ast::{
         AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Attribute, ConditionKind,
-        Exp, ExpData, FriendDecl, GlobalInvariant, ModuleName, PropertyBag, PropertyValue,
-        ResourceSpecifier, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, UseDecl,
-        Value,
+        Exp, ExpData, FriendDecl, GlobalInvariant, MemoryLabel, ModuleName, PropertyBag,
+        PropertyValue, ResourceSpecifier, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl,
+        SpecVarDecl, UseDecl, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -602,6 +602,8 @@ pub struct GlobalEnv {
     pub cmp_types: RefCell<BTreeSet<Type>>,
     /// An estimate of each target Move function's size.
     pub function_size_estimate: RefCell<BTreeMap<QualifiedId<FunId>, FunctionSize>>,
+    /// Names associated with memory labels (state labels for behavior predicates).
+    pub(crate) memory_label_names: RefCell<BTreeMap<MemoryLabel, Symbol>>,
 }
 
 /// A helper type for implementing fmt::Display depending on GlobalEnv
@@ -665,6 +667,7 @@ impl GlobalEnv {
             generated_by_v2: false,
             cmp_types: RefCell::new(Default::default()),
             function_size_estimate: RefCell::new(Default::default()),
+            memory_label_names: RefCell::new(BTreeMap::new()),
         }
     }
 
@@ -797,6 +800,16 @@ impl GlobalEnv {
         let id = GlobalId::new(*counter);
         *counter += 1;
         id
+    }
+
+    /// Set the name for a memory label.
+    pub fn set_memory_label_name(&self, label: MemoryLabel, name: Symbol) {
+        self.memory_label_names.borrow_mut().insert(label, name);
+    }
+
+    /// Get the name for a memory label, if one exists.
+    pub fn get_memory_label_name(&self, label: MemoryLabel) -> Option<Symbol> {
+        self.memory_label_names.borrow().get(&label).copied()
     }
 
     /// Returns a reference to the symbol pool owned by this environment.

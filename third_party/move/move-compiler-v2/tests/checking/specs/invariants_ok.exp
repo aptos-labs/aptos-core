@@ -32,20 +32,18 @@ module 0x42::M {
     struct R {
         s: S,
     }
-    /*
-     spec {
-      invariant M::less10(true, select M::S.x<0x42::M::S>(select M::R.s()));
+
+    spec R {
+        invariant less10(true, s.x);
     }
 
-    */
     struct S {
         x: u64,
         y: bool,
     }
-    /*
-     spec {
-      invariant Eq<bool>(Gt(select M::S.x(), 0), select M::S.y());
+
+    spec S {
+        invariant x > 0 == y;
     }
 
-    */
 }

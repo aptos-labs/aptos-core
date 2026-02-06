@@ -11,7 +11,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = 1i64 + 9223372036854775807i64;
+        let _v0 = 1i64 + MAX_I64;
     }
 }
 
@@ -19,7 +19,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = -1i64 + -9223372036854775808i64;
+        let _v0 = -1i64 + MIN_I64;
     }
 }
 
@@ -35,7 +35,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = -2i64 - 9223372036854775807i64;
+        let _v0 = -2i64 - MAX_I64;
     }
 }
 
@@ -75,7 +75,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = 9223372036854775807i64 * 2i64;
+        let _v0 = MAX_I64 * 2i64;
     }
 }
 
@@ -83,7 +83,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = -9223372036854775808i64 * -1i64;
+        let _v0 = MIN_I64 * -1i64;
     }
 }
 
@@ -115,7 +115,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = -9223372036854775808i64 / -1i64;
+        let _v0 = MIN_I64 / -1i64;
     }
 }
 
@@ -155,7 +155,7 @@ module 0xff::negate_i64 {
         assert!(_v0 == _v1, 14566554180833181696);
     }
     public fun test2() {
-        let _v0 = negate(-9223372036854775808i64);
+        let _v0 = negate(MIN_I64);
     }
 }
 

@@ -186,7 +186,7 @@ module 0xcafe::vectors {
     use std::vector;
     public entry fun guess_flips(flips: vector<u8>) {
         {
-            let (flips) = (&flips);
+            let flips = &flips;
             let i = 0;
             while (i < 0x1::vector::length<u8>(flips)) {
                 if (*0x1::vector::borrow<u8>(flips, i) != 0u8) break;
@@ -212,7 +212,7 @@ module 0xcafe::vectors {
     }
     public entry fun guess_without_break_with_inline(flips: vector<u8>) {
         {
-            let (flips) = (&flips);
+            let flips = &flips;
             let i = 0;
             while (i < 0x1::vector::length<u8>(flips)) {
                 if (*0x1::vector::borrow<u8>(flips, i) == 0u8) () else abort 3;

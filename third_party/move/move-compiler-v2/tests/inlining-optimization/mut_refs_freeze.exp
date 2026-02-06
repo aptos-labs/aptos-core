@@ -18,7 +18,7 @@ module 0xc0ffee::m {
         *r
     }
     fun read_then_write(r: &mut u64) {
-        let v = read(/*freeze*/r);
+        let v = read(r);
         *r = v + 1;
     }
 }

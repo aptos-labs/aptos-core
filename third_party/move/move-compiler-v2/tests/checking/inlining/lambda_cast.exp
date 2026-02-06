@@ -79,12 +79,12 @@ module 0x12391283::M {
         let (v,init) = (gas_schedule_blob, 0 as u64);
         let accu = init;
         {
-            let (v) = (v);
+            let v = v;
             0x1::vector::reverse<u8>(&mut v);
             while (!0x1::vector::is_empty<u8>(&v)) {
                 let e = 0x1::vector::pop_back<u8>(&mut v);
                 {
-                    let (elem) = (e);
+                    let elem = e;
                     accu = {
                         let (sum,addend) = (accu, elem);
                         sum + (addend as u64)
@@ -99,12 +99,12 @@ module 0x12391283::M {
         let (v,init) = (gas_schedule_blob, 0 as u64);
         let accu = init;
         {
-            let (v) = (v);
+            let v = v;
             0x1::vector::reverse<u8>(&mut v);
             while (!0x1::vector::is_empty<u8>(&v)) {
                 let e = 0x1::vector::pop_back<u8>(&mut v);
                 {
-                    let (elem) = (e);
+                    let elem = e;
                     accu = {
                         let (sum,addend) = (accu, elem);
                         sum + (addend as u64)

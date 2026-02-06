@@ -85,7 +85,7 @@ module 0x42::m {
     fun test(s: &mut S, issuer: vector<u8>) {
         let x = 0x1::vector::length<T>(&s.entries);
         let (_found,_index) = {
-            let (v) = (&s.entries);
+            let v = &s.entries;
             let find = false;
             let found_index = 0;
             let i = 0;
@@ -99,22 +99,16 @@ module 0x42::m {
                 };
                 i = i + x';
             };
-
-            /* spec {
-              assert Implies(find, m::$inline___lambda__1_inline_1_956__test($t1, x, Index(v, found_index)));
-            }
-             */
-            ;
+            spec {
+                assert find ==> inline___lambda__1_inline_1_956__test(issuer, x, v[found_index]);
+            };
             (find, found_index)
         };
     }
     fun lambda__1_inline_1_956__test(issuer: vector<u8>, x: u64, obj: &T): bool {
-
-        /* spec {
-          assume Gt(Len<u8>($t0), 0);
-        }
-         */
-        ;
+        spec {
+            assume len(issuer) > 0;
+        };
         obj.issuer == issuer && x > 0
     }
 }

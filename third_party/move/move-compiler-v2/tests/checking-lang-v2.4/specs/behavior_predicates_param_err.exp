@@ -20,6 +20,11 @@ module 0x42::M {
     fun apply_modifies(f: |address|, addr: address) {
         f(addr)
     }
+
+    spec apply_modifies(f: |address|, addr: address) {
+        ensures modifies_of<f>(global<Counter>(addr));
+    }
+
 }
 
 ============ bytecode before first stackless bytecode pipeline ================

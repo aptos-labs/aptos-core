@@ -83,7 +83,7 @@ script {
 //# run
 script {
     fun main() {
-        let _v0 = 18446744073709551615 as u8;
+        let _v0 = MAX_U64 as u8;
     }
 }
 
@@ -91,7 +91,7 @@ script {
 //# run
 script {
     fun main() {
-        let _v0 = 340282366920938463463374607431768211455u128 as u8;
+        let _v0 = MAX_U128 as u8;
     }
 }
 
@@ -163,7 +163,7 @@ script {
 //# run
 script {
     fun main() {
-        let _v0 = 18446744073709551615 as u16;
+        let _v0 = MAX_U64 as u16;
     }
 }
 
@@ -171,7 +171,7 @@ script {
 //# run
 script {
     fun main() {
-        let _v0 = 340282366920938463463374607431768211455u128 as u16;
+        let _v0 = MAX_U128 as u16;
     }
 }
 
@@ -235,7 +235,7 @@ script {
 //# run
 script {
     fun main() {
-        let _v0 = 18446744073709551615 as u32;
+        let _v0 = MAX_U64 as u32;
     }
 }
 
@@ -243,7 +243,7 @@ script {
 //# run
 script {
     fun main() {
-        let _v0 = 340282366920938463463374607431768211455u128 as u32;
+        let _v0 = MAX_U128 as u32;
     }
 }
 
@@ -275,6 +275,6 @@ script {
 //# run
 script {
     fun main() {
-        let _v0 = 340282366920938463463374607431768211455u128 as u64;
+        let _v0 = MAX_U128 as u64;
     }
 }

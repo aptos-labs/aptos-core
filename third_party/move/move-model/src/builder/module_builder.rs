@@ -1538,25 +1538,26 @@ impl ModuleBuilder<'_, '_> {
     /// 1. Every pre-state label references a post-state label defined in the same spec
     /// 2. There are no cycles in state label references
     fn validate_behavior_state_labels(&mut self, context: &SpecBlockContext, loc: &Loc) {
+        use crate::ast::MemoryLabel;
         use std::collections::{BTreeMap, BTreeSet};
 
         // Each behavior predicate with state labels can have:
         // - A pre-label: reads from this state (must be defined by another predicate's post-label)
         // - A post-label: defines this state (other predicates can reference it as pre-label)
 
-        // Collect: (pre_name, post_name, loc) for each predicate
-        // pre_name is what state it reads from, post_name is what state it defines
-        let mut behavior_predicates: Vec<(Option<Symbol>, Option<Symbol>, NodeId)> = Vec::new();
+        // Collect: (pre_label, post_label, node_id) for each predicate with state labels
+        let mut behavior_predicates: Vec<(Option<MemoryLabel>, Option<MemoryLabel>, NodeId)> =
+            Vec::new();
 
         self.update_spec(context, |spec| {
             fn collect_behavior_predicates(
                 exp: &Exp,
-                predicates: &mut Vec<(Option<Symbol>, Option<Symbol>, NodeId)>,
+                predicates: &mut Vec<(Option<MemoryLabel>, Option<MemoryLabel>, NodeId)>,
             ) {
                 exp.visit_pre_order(&mut |e| {
                     if let ExpData::Call(id, Operation::Behavior(_, state), _) = e {
-                        if state.pre_name.is_some() || state.post_name.is_some() {
-                            predicates.push((state.pre_name, state.post_name, *id));
+                        if state.pre.is_some() || state.post.is_some() {
+                            predicates.push((state.pre, state.post, *id));
                         }
                     }
                     true
@@ -1571,32 +1572,36 @@ impl ModuleBuilder<'_, '_> {
             }
         });
 
+        // Helper to get symbol name for a memory label
+        let get_label_name =
+            |label: MemoryLabel| -> Option<Symbol> { self.parent.env.get_memory_label_name(label) };
+
         // Build set of defined post-labels and used pre-labels
         let mut defined_post_labels: BTreeMap<Symbol, Loc> = BTreeMap::new();
         let mut used_pre_labels: BTreeSet<Symbol> = BTreeSet::new();
-        for (pre_name, post_name, node_id) in &behavior_predicates {
-            if let Some(post) = post_name {
+        for (pre_label, post_label, node_id) in &behavior_predicates {
+            if let Some(post_name) = post_label.and_then(&get_label_name) {
                 let exp_loc = self.parent.env.get_node_loc(*node_id);
-                defined_post_labels.insert(*post, exp_loc);
+                defined_post_labels.insert(post_name, exp_loc);
             }
-            if let Some(pre) = pre_name {
-                used_pre_labels.insert(*pre);
+            if let Some(pre_name) = pre_label.and_then(&get_label_name) {
+                used_pre_labels.insert(pre_name);
             }
         }
 
         let symbol_pool = self.symbol_pool();
 
         // Validate that all pre-labels reference defined post-labels
-        for (pre_name, _, node_id) in &behavior_predicates {
-            if let Some(pre) = pre_name {
-                if !defined_post_labels.contains_key(pre) {
+        for (pre_label, _, node_id) in &behavior_predicates {
+            if let Some(pre_name) = pre_label.and_then(&get_label_name) {
+                if !defined_post_labels.contains_key(&pre_name) {
                     let exp_loc = self.parent.env.get_node_loc(*node_id);
                     self.parent.env.error(
                         &exp_loc,
                         &format!(
                             "state label `{}` is not defined; \
                              pre-state labels must reference a post-state label defined by another behavior predicate in the same spec",
-                            pre.display(symbol_pool)
+                            pre_name.display(symbol_pool)
                         ),
                     );
                 }
@@ -1622,11 +1627,13 @@ impl ModuleBuilder<'_, '_> {
         // post_label_defined -> pre_label_used
         // This means: to get the state of `post_label_defined`, we need the state of `pre_label_used`
         let mut edges: BTreeMap<Symbol, BTreeSet<Symbol>> = BTreeMap::new();
-        for (pre_name, post_name, _) in &behavior_predicates {
+        for (pre_label, post_label, _) in &behavior_predicates {
+            let pre_name = pre_label.and_then(&get_label_name);
+            let post_name = post_label.and_then(&get_label_name);
             if let (Some(pre), Some(post)) = (pre_name, post_name) {
                 // The predicate defines `post` and reads from `pre`
                 // So `post` depends on `pre`
-                edges.entry(*post).or_default().insert(*pre);
+                edges.entry(post).or_default().insert(pre);
             }
         }
 

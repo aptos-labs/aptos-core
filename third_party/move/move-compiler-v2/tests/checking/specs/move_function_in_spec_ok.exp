@@ -47,13 +47,10 @@ module 0x42::move_function_in_spec {
     fun foo<T>() {
         let type_info = type_of<T>();
         let account_address = type_info.account_address;
-
-        /* spec {
-          assert move_function_in_spec::$no_change(account_address, account_address);
-          assert Eq<address>(account_address, select move_function_in_spec::TypeInfo.account_address<0x42::move_function_in_spec::TypeInfo>(move_function_in_spec::$type_of<#0>()));
-        }
-         */
-        ;
+        spec {
+            assert no_change(account_address, account_address);
+            assert account_address == type_of<T>().account_address;
+        };
     }
     public fun no_change(target: address, new_addr: address): bool
         acquires TypeInfo

@@ -32,12 +32,31 @@ module 0x42::M {
     fun apply_longer_chain(f: |u64|u64, x: u64): u64 {
         f(x)
     }
+
+    spec apply_longer_chain(f: |u64|u64, x: u64): u64 {
+        ensures ensures_of<f>(x, result)@s1;
+        ensures s1@ensures_of<f>(x, result)@s2;
+        ensures s2@ensures_of<f>(x, result);
+    }
+
     fun apply_result_chain(f: |u64|u64, x: u64): u64 {
         f(x)
     }
+
+    spec apply_result_chain(f: |u64|u64, x: u64): u64 {
+        ensures result_of<f>(x)@r1 == result;
+        ensures r1@result_of<f>(x) == result;
+    }
+
     fun apply_simple_chain(f: |u64|u64, x: u64): u64 {
         f(x)
     }
+
+    spec apply_simple_chain(f: |u64|u64, x: u64): u64 {
+        ensures ensures_of<f>(x, result)@s1;
+        ensures s1@ensures_of<f>(x, result);
+    }
+
 }
 
 ============ bytecode before first stackless bytecode pipeline ================

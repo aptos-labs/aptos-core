@@ -458,7 +458,7 @@ module 0x42::test {
     fun test_lambda_param(): bool {
         let ();
         let x = S2(true, S0{});
-        let (S2(x, _)) = (x);
+        let S2(x, _) = x;
         x
     }
 }

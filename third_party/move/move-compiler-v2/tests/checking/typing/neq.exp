@@ -56,16 +56,16 @@ module 0x8675309::M {
         true != false;
         0 != 1;
         &s != s_ref;
-        /*freeze*/&mut s != s_ref;
-        /*freeze*/&mut s != /*freeze*/s_mut;
-        &s != /*freeze*/s_mut;
-        s_ref != /*freeze*/s_mut;
-        /*freeze*/s_mut != /*freeze*/s_mut;
+        &mut s != s_ref;
+        &mut s != s_mut;
+        &s != s_mut;
+        s_ref != s_mut;
+        s_mut != s_mut;
         S{u: 0} != s;
         r != r;
-        /*freeze*/r_mut != /*freeze*/r_mut;
-        r != /*freeze*/r_mut;
-        /*freeze*/r_mut != r;
+        r_mut != r_mut;
+        r != r_mut;
+        r_mut != r;
         G<u64>{f: 1} != G<u64>{f: 2};
         G<u64>{f: 1} != G<u64>{f: 2};
     }

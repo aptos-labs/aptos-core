@@ -11,7 +11,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = 1i32 + 2147483647i32;
+        let _v0 = 1i32 + MAX_I32;
     }
 }
 
@@ -19,7 +19,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = -1i32 + -2147483648i32;
+        let _v0 = -1i32 + MIN_I32;
     }
 }
 
@@ -35,7 +35,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = -2i32 - 2147483647i32;
+        let _v0 = -2i32 - MAX_I32;
     }
 }
 
@@ -75,7 +75,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = 2147483647i32 * 2i32;
+        let _v0 = MAX_I32 * 2i32;
     }
 }
 
@@ -83,7 +83,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = -2147483648i32 * -1i32;
+        let _v0 = MIN_I32 * -1i32;
     }
 }
 
@@ -115,7 +115,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = -2147483648i32 / -1i32;
+        let _v0 = MIN_I32 / -1i32;
     }
 }
 
@@ -155,7 +155,7 @@ module 0xff::negate_i32 {
         assert!(_v0 == _v1, 14566554180833181696);
     }
     public fun test2() {
-        let _v0 = negate(-2147483648i32);
+        let _v0 = negate(MIN_I32);
     }
 }
 

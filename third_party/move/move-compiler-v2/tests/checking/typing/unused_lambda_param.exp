@@ -42,22 +42,22 @@ module 0xc0ffee::m {
     }
     fun unused_lambda() {
         {
-            let (p) = (0);
-            let (x) = (p);
+            let p = 0;
+            let x = p;
             1
         };
     }
     fun unused_lambda_suppressed1() {
         {
-            let (p) = (0);
-            let (_x) = (p);
+            let p = 0;
+            let _x = p;
             1
         };
     }
     fun unused_lambda_suppressed2() {
         {
-            let (p) = (0);
-            let (_) = (p);
+            let p = 0;
+            let _ = p;
             1
         };
     }
