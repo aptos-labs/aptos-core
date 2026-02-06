@@ -4,8 +4,8 @@
 use aptos_crypto::{ed25519::Ed25519PublicKey, HashValue};
 use aptos_types::transaction::{
     authenticator::{AccountAuthenticator, AnyPublicKey, TransactionAuthenticator},
-    EntryFunction, MultisigTransactionPayload, Script, SignedTransaction, TransactionExecutableRef,
-    TransactionExtraConfig, TransactionPayload, TransactionPayloadInner,
+    EntryFunction, MultisigTransactionPayload, Script, SignedTransaction, TransactionExecutable,
+    TransactionExecutableRef, TransactionExtraConfig, TransactionPayload, TransactionPayloadInner,
 };
 use move_core_types::{account_address::AccountAddress, transaction_argument::TransactionArgument};
 use serde::{Deserialize, Serialize};
@@ -360,10 +360,10 @@ fn matches_entry_function(
             }
         },
         TransactionPayload::EncryptedPayload(payload) => {
-            if let Ok(executable) = payload.executable_ref() {
-                match executable {
-                    TransactionExecutableRef::Script(_) | TransactionExecutableRef::Empty => false,
-                    TransactionExecutableRef::EntryFunction(entry_function) => {
+            if let Ok(executable) = payload.executable() {
+                match &executable {
+                    TransactionExecutable::Script(_) | TransactionExecutable::Empty => false,
+                    TransactionExecutable::EntryFunction(entry_function) => {
                         compare_entry_function(entry_function, address, module_name, function)
                     },
                 }
@@ -403,10 +403,10 @@ fn matches_entry_function_module_address(
             }
         },
         TransactionPayload::EncryptedPayload(payload) => {
-            if let Ok(executable) = payload.executable_ref() {
-                match executable {
-                    TransactionExecutableRef::Script(_) | TransactionExecutableRef::Empty => false,
-                    TransactionExecutableRef::EntryFunction(entry_function) => {
+            if let Ok(executable) = payload.executable() {
+                match &executable {
+                    TransactionExecutable::Script(_) | TransactionExecutable::Empty => false,
+                    TransactionExecutable::EntryFunction(entry_function) => {
                         compare_entry_function_module_address(entry_function, module_address)
                     },
                 }
@@ -469,11 +469,10 @@ fn matches_script_argument_address(
             }
         },
         TransactionPayload::EncryptedPayload(payload) => {
-            if let Ok(executable) = payload.executable_ref() {
-                match executable {
-                    TransactionExecutableRef::EntryFunction(_)
-                    | TransactionExecutableRef::Empty => false,
-                    TransactionExecutableRef::Script(script) => {
+            if let Ok(executable) = payload.executable() {
+                match &executable {
+                    TransactionExecutable::EntryFunction(_) | TransactionExecutable::Empty => false,
+                    TransactionExecutable::Script(script) => {
                         compare_script_argument_address(script, address)
                     },
                 }

@@ -25,8 +25,8 @@ use aptos_types::{
     quorum_store::BatchId,
     secret_sharing::Ciphertext,
     transaction::{
-        encrypted_payload::EncryptedPayload, RawTransaction, SignedTransaction,
-        TransactionExtraConfig, TransactionPayload,
+        encrypted_payload::{EncryptedPayload, SyncEncryptedPayload},
+        RawTransaction, SignedTransaction, TransactionExtraConfig, TransactionPayload,
     },
 };
 use futures::{
@@ -815,7 +815,8 @@ fn create_encrypted_transaction(gas_unit_price: u64) -> SignedTransaction {
         payload_hash: HashValue::random(),
     };
 
-    let transaction_payload = TransactionPayload::EncryptedPayload(encrypted_payload);
+    let transaction_payload =
+        TransactionPayload::EncryptedPayload(SyncEncryptedPayload::new(encrypted_payload));
     let raw_transaction = RawTransaction::new(
         AccountAddress::random(),
         0,

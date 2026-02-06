@@ -86,12 +86,10 @@ impl PipelineBuilder {
         let txn_ciphertexts: Vec<Ciphertext> = encrypted_txns
             .iter()
             .map(|txn| {
-                // TODO(ibalajiarun): Avoid clone and use reference instead
                 txn.payload()
                     .as_encrypted_payload()
                     .expect("must be a encrypted txn")
                     .ciphertext()
-                    .clone()
             })
             .collect();
 
@@ -129,7 +127,7 @@ impl PipelineBuilder {
         let decrypted_txns = encrypted_txns
             .into_par_iter()
             .zip(txn_ciphertexts)
-            .map(|(mut txn, ciphertext)| {
+            .map(|(txn, ciphertext)| {
                 let eval_proof = proofs.get(&ciphertext.id()).expect("must exist");
                 if let Ok(payload) = FPTXWeighted::decrypt_individual::<DecryptedPayload>(
                     &decryption_key.key,
@@ -138,18 +136,16 @@ impl PipelineBuilder {
                     &eval_proof,
                 ) {
                     let (executable, nonce) = payload.unwrap();
-                    txn.payload_mut()
-                        .as_encrypted_payload_mut()
-                        .map(|p| {
-                            p.into_decrypted(eval_proof, executable, nonce)
-                                .expect("must happen")
-                        })
-                        .expect("must exist");
+                    txn.with_encrypted_payload_mut(|ep| {
+                        ep.into_decrypted(eval_proof, executable, nonce)
+                            .expect("must happen")
+                    })
+                    .expect("must be encrypted payload");
                 } else {
-                    txn.payload_mut()
-                        .as_encrypted_payload_mut()
-                        .map(|p| p.into_failed_decryption(eval_proof).expect("must happen"))
-                        .expect("must exist");
+                    txn.with_encrypted_payload_mut(|ep| {
+                        ep.into_failed_decryption(eval_proof).expect("must happen")
+                    })
+                    .expect("must be encrypted payload");
                 }
                 txn
             })
