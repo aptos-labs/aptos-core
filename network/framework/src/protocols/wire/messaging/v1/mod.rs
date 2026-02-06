@@ -104,7 +104,10 @@ pub type Priority = u8;
 
 pub trait IncomingRequest {
     fn protocol_id(&self) -> crate::ProtocolId;
-    fn data(&self) -> &Vec<u8>;
+    /// Returns a reference to the raw payload bytes.
+    /// Note: returns `&[u8]` (slice) instead of `&Vec<u8>` for flexibility.
+    /// This allows future migration to `bytes::Bytes` without changing the trait.
+    fn data(&self) -> &[u8];
 
     /// Converts the `SerializedMessage` into its deserialized version of `TMessage` based on the
     /// `ProtocolId`.  See: [`crate::ProtocolId::from_bytes`]
@@ -132,7 +135,7 @@ impl IncomingRequest for RpcRequest {
         self.protocol_id
     }
 
-    fn data(&self) -> &Vec<u8> {
+    fn data(&self) -> &[u8] {
         &self.raw_request
     }
 }
@@ -167,7 +170,7 @@ impl IncomingRequest for DirectSendMsg {
         self.protocol_id
     }
 
-    fn data(&self) -> &Vec<u8> {
+    fn data(&self) -> &[u8] {
         &self.raw_msg
     }
 }
