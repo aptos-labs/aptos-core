@@ -7,8 +7,8 @@ ARG TARGETARCH
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 
 # Configure APT sources to use cloudfront mirror (DEB822 format for Trixie+)
-RUN rm -f /etc/apt/sources.list && \
-    cat > /etc/apt/sources.list.d/debian.sources << 'EOF'
+RUN rm -f /etc/apt/sources.list
+COPY <<EOF /etc/apt/sources.list.d/debian.sources
 Types: deb
 URIs: http://cloudfront.debian.net/debian
 Suites: trixie trixie-updates
