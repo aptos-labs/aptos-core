@@ -12,8 +12,8 @@ echo "FEATURES: $FEATURES"
 echo "CARGO_TARGET_DIR: $CARGO_TARGET_DIR"
 echo "CARGO_HOME: $CARGO_HOME"
 
-# Force rebuild of openssl-sys to pick up OpenSSL 3.x headers
-cargo clean -p openssl-sys 2>/dev/null || true
+# Force rebuild of openssl crates to pick up OpenSSL 3.x headers
+cargo clean -p openssl-sys -p openssl 2>/dev/null || true
 
 PACKAGES=(
     aptos-node
