@@ -830,7 +830,6 @@ dependencies = [
 name = "aptos-cached-packages"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "aptos-framework",
  "aptos-package-builder",
  "aptos-types",
@@ -839,8 +838,6 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "sha2 0.9.9",
- "walkdir",
 ]
 
 [[package]]
