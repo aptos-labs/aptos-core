@@ -3,16 +3,28 @@
 FROM rust as rust-base
 WORKDIR /aptos
 
-
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
+
+# Configure APT sources to use cloudfront mirror (DEB822 format for Trixie+)
+RUN rm -f /etc/apt/sources.list && \
+    cat > /etc/apt/sources.list.d/debian.sources << 'EOF'
+Types: deb
+URIs: http://cloudfront.debian.net/debian
+Suites: trixie trixie-updates
+Components: main
+
+Types: deb
+URIs: https://cloudfront.debian.net/debian-security
+Suites: trixie-security
+Components: main
+EOF
+
 # NOTE: the version of LLVM installed here MUST match the version of LLVM rustc
 # uses internally, so we may need to upgrade this when upgrading Rust versions.
 ARG CLANG_VERSION=21
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    sed -i 's|http://deb.debian.org/debian|http://cloudfront.debian.net/debian|g' /etc/apt/sources.list \
-    && apt update \
-    && apt-get --no-install-recommends install -y \
+    apt-get update && apt-get --no-install-recommends install -y \
         binutils \
         cmake \
         curl \
@@ -25,7 +37,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         lld \
         lsb-release \
         pkg-config \
-        software-properties-common \
+        unzip \
         wget \
     && bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" llvm.sh ${CLANG_VERSION} \
     && update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${CLANG_VERSION} 100 \

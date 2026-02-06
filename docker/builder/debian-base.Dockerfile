@@ -6,16 +6,29 @@ ARG TARGETARCH
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 
+# Configure APT sources to use cloudfront mirror (DEB822 format for Trixie+)
+RUN rm -f /etc/apt/sources.list && \
+    cat > /etc/apt/sources.list.d/debian.sources << 'EOF'
+Types: deb
+URIs: http://cloudfront.debian.net/debian
+Suites: trixie trixie-updates
+Components: main
+
+Types: deb
+URIs: https://cloudfront.debian.net/debian-security
+Suites: trixie-security
+Components: main
+EOF
+
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    sed -i 's|http://deb.debian.org/debian|http://cloudfront.debian.net/debian|g' /etc/apt/sources.list &&  \
     apt-get update && apt-get --no-install-recommends --allow-downgrades -y install \
         ca-certificates \
         curl \
         iproute2 \
         libpq-dev \
-        libssl1.1 \
-        netcat \
+        libssl3 \
+        netcat-openbsd \
         net-tools \
         tcpdump
 
