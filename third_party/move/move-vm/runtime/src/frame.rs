@@ -457,7 +457,8 @@ impl Frame {
             .collect::<PartialVMResult<Vec<_>>>()
     }
 
-    fn single_type_at(&self, idx: SignatureIndex) -> &Type {
+    /// Returns possibly non-instantiated signature type.
+    pub(crate) fn single_type_at(&self, idx: SignatureIndex) -> &Type {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
             Module(module) => module.single_type_at(idx),

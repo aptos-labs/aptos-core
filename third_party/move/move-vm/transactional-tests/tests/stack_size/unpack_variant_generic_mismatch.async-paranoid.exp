@@ -1,0 +1,57 @@
+processed 9 tasks
+task 0 lines 1-37:  publish [module 0x3::trusted]
+task 1 lines 39-39:  run --verbose 0x3::trusted::pack_v2_unpack_v2
+return values: 20
+task 2 lines 41-41:  run --verbose 0x3::trusted::pack_v2_unpack_v1
+Error: Function execution failed with VMError: {
+    message: expected enum variant V1, found V2,
+    major_status: STRUCT_VARIANT_MISMATCH,
+    sub_status: None,
+    location: 0x3::trusted,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 3)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 3 lines 43-43:  run --verbose 0x3::trusted::pack_v2_unpack_v3
+Error: Function execution failed with VMError: {
+    message: expected enum variant V3, found V2,
+    major_status: STRUCT_VARIANT_MISMATCH,
+    sub_status: None,
+    location: 0x3::trusted,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(2), 3)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 4 lines 45-102:  publish [module 0x4::trusted]
+task 5 lines 104-104:  run --verbose 0x4::trusted::pack_a_v1_unpack_b_v1
+Error: Function execution failed with VMError: {
+    message: Stack size mismatch: expected 2 fields to be unpacked, got 1,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(1),
+    location: 0x4::trusted,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 6 lines 106-106:  run --verbose 0x4::trusted::pack_a_v2_unpack_b_v2
+return values: 20
+task 7 lines 108-108:  run --verbose 0x4::trusted::pack_a_v3_unpack_b_v3
+Error: Function execution failed with VMError: {
+    message: Stack size mismatch: expected 2 fields to be unpacked, got 3,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(1),
+    location: 0x4::trusted,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(2), 4)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 8 lines 110-110:  run --verbose 0x4::trusted::pack_a_v3_unpack_b_v2
+Error: Function execution failed with VMError: {
+    message: expected enum variant V2, found V3,
+    major_status: STRUCT_VARIANT_MISMATCH,
+    sub_status: None,
+    location: 0x4::trusted,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(3), 4)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
