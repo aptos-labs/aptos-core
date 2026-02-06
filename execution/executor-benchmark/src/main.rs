@@ -561,7 +561,7 @@ where
                 main_signer_accounts,
                 additional_dst_pool_accounts,
                 data_dir,
-                checkpoint_dir,
+                Some(checkpoint_dir),
                 opt.verify_sequence_numbers,
                 opt.storage_opt.storage_test_config(),
                 opt.pipeline_opt

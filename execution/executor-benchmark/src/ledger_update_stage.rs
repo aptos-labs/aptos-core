@@ -108,6 +108,7 @@ where
                     block_id,
                     output.root_hash(),
                     output.expect_last_version(),
+                    &self.executor.db,
                 );
                 self.executor.pre_commit_block(block_id).unwrap();
                 self.executor.commit_ledger(ledger_info_with_sigs).unwrap();
