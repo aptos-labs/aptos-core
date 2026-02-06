@@ -83,8 +83,7 @@ fn bench_handshake_msg_protocols(c: &mut Criterion) {
     // Benchmark: clone BTreeMap (current)
     group.bench_function("btreemap_clone", |b| {
         b.iter(|| {
-            let cloned = black_box(supported.clone());
-            drop(cloned);
+            black_box(supported.clone());
         })
     });
 
@@ -92,8 +91,7 @@ fn bench_handshake_msg_protocols(c: &mut Criterion) {
     let arc_supported = Arc::new(supported.clone());
     group.bench_function("arc_clone", |b| {
         b.iter(|| {
-            let cloned = black_box(Arc::clone(&arc_supported));
-            drop(cloned);
+            black_box(Arc::clone(&arc_supported));
         })
     });
 
@@ -239,8 +237,7 @@ fn bench_notification_broadcast(c: &mut Criterion) {
             |b, &n| {
                 b.iter(|| {
                     for _ in 0..n {
-                        let cloned = black_box(notif.clone());
-                        drop(cloned);
+                        black_box(notif.clone());
                     }
                 })
             },
@@ -253,8 +250,7 @@ fn bench_notification_broadcast(c: &mut Criterion) {
                 b.iter(|| {
                     let notif_local = notif.clone(); // one clone to get owned
                     for _ in 0..n.saturating_sub(1) {
-                        let cloned = black_box(notif_local.clone());
-                        drop(cloned);
+                        black_box(notif_local.clone());
                     }
                     black_box(notif_local); // move the last
                 })
@@ -280,8 +276,7 @@ fn bench_payload_clone(c: &mut Criterion) {
             &payload_size,
             |b, _| {
                 b.iter(|| {
-                    let cloned = black_box(vec_payload.clone());
-                    drop(cloned);
+                    black_box(vec_payload.clone());
                 })
             },
         );
@@ -291,8 +286,7 @@ fn bench_payload_clone(c: &mut Criterion) {
             &payload_size,
             |b, _| {
                 b.iter(|| {
-                    let cloned = black_box(bytes_payload.clone());
-                    drop(cloned);
+                    black_box(bytes_payload.clone());
                 })
             },
         );
@@ -315,16 +309,14 @@ fn bench_tcp_transport_clone(c: &mut Criterion) {
 
     group.bench_function("struct_clone", |b| {
         b.iter(|| {
-            let cloned = black_box(transport.clone());
-            drop(cloned);
+            black_box(transport.clone());
         })
     });
 
     let arc_transport = Arc::new(transport.clone());
     group.bench_function("arc_clone", |b| {
         b.iter(|| {
-            let cloned = black_box(Arc::clone(&arc_transport));
-            drop(cloned);
+            black_box(Arc::clone(&arc_transport));
         })
     });
 
