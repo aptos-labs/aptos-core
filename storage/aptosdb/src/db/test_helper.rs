@@ -629,7 +629,10 @@ fn verify_account_txn_summaries(
         for (expected_txn, actual_txn_summary) in
             expected_txns.iter().zip(actual_txn_summaries.unwrap())
         {
-            assert_eq!(actual_txn_summary.transaction_hash(), expected_txn.committed_hash());
+            assert_eq!(
+                actual_txn_summary.transaction_hash(),
+                expected_txn.committed_hash()
+            );
             assert_eq!(
                 actual_txn_summary.replay_protector(),
                 expected_txn
@@ -844,7 +847,11 @@ pub fn verify_committed_transactions(
                 .try_as_signed_user_txn()
                 .unwrap();
             let txn_with_proof = db
-                .get_transaction_by_hash(txn_to_commit.transaction().committed_hash(), ledger_version, true)
+                .get_transaction_by_hash(
+                    txn_to_commit.transaction().committed_hash(),
+                    ledger_version,
+                    true,
+                )
                 .unwrap()
                 .unwrap();
             assert_eq!(

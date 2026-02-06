@@ -3,7 +3,7 @@
 
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
-use aptos_crypto::{hash::CryptoHash, SigningKey};
+use aptos_crypto::SigningKey;
 use aptos_framework::BuiltPackage;
 use aptos_language_e2e_tests::account::{Account, AccountPublicKey, TransactionBuilder};
 use aptos_types::{

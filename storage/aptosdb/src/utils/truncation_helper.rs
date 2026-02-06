@@ -378,7 +378,10 @@ fn delete_transaction_index_data(
         );
         ledger_db
             .transaction_db()
-            .prune_transaction_by_hash_indices(transactions.iter().map(|txn| txn.committed_hash()), batch)?;
+            .prune_transaction_by_hash_indices(
+                transactions.iter().map(|txn| txn.committed_hash()),
+                batch,
+            )?;
 
         let transactions = (start_version..=start_version + transactions.len() as u64 - 1)
             .zip(transactions)

@@ -191,12 +191,12 @@ mod tests {
         // Test BlockMetadata variant
         let block_metadata = Transaction::BlockMetadata(BlockMetadata::new(
             HashValue::random(),
-            1,                           // epoch
-            1,                           // round
-            AccountAddress::random(),    // proposer
-            vec![0],                     // previous_block_votes_bitvec
-            vec![],                      // failed_proposer_indices
-            12345,                       // timestamp_usecs
+            1,                        // epoch
+            1,                        // round
+            AccountAddress::random(), // proposer
+            vec![0],                  // previous_block_votes_bitvec
+            vec![],                   // failed_proposer_indices
+            12345,                    // timestamp_usecs
         ));
         assert_eq!(
             block_metadata.committed_hash(),

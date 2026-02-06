@@ -40,7 +40,9 @@ impl DBSubPruner for TransactionPruner {
         self.ledger_db
             .transaction_db()
             .prune_transaction_by_hash_indices(
-                candidate_transactions.iter().map(|(_, txn)| txn.committed_hash()),
+                candidate_transactions
+                    .iter()
+                    .map(|(_, txn)| txn.committed_hash()),
                 &mut batch,
             )?;
         self.ledger_db.transaction_db().prune_transactions(
