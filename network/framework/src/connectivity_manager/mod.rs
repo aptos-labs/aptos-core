@@ -446,7 +446,7 @@ where
                     // shuts down.
                     match maybe_notif {
                         Some(notif) => {
-                            self.handle_control_notification(notif.clone());
+                            self.handle_control_notification(notif);
                         },
                         None => break,
                     }
@@ -554,7 +554,7 @@ where
                 .dial_queue
                 .keys()
                 .filter(|peer_id| !trusted_peers.contains_key(peer_id))
-                .cloned()
+                .copied()
                 .collect();
 
             // Remove the stale dials from the dial queue
@@ -586,17 +586,23 @@ where
         let network_id = self.network_context.network_id();
         let role = self.network_context.role();
         let roles_to_dial = network_id.upstream_roles(&role);
-        let discovered_peers = self.discovered_peers.read().peer_set.clone();
-        let eligible_peers: Vec<_> = discovered_peers
-            .into_iter()
-            .filter(|(peer_id, peer)| {
-                peer.is_eligible_to_be_dialed() // The node is eligible to dial
-                    && !self.connected.contains_key(peer_id) // The node is not already connected
-                    && !self.dial_queue.contains_key(peer_id) // There is no pending dial to this node
-                    && roles_to_dial.contains(&peer.role) // We can dial this role
-                    && self.is_peer_allowed(peer_id) // Check allow/block lists
-            })
-            .collect();
+        // Filter eligible peers while holding the read lock to avoid cloning
+        // the entire discovered peer set. Only eligible peers are cloned.
+        let eligible_peers: Vec<_> = {
+            let discovered_peers = self.discovered_peers.read();
+            discovered_peers
+                .peer_set
+                .iter()
+                .filter(|(peer_id, peer)| {
+                    peer.is_eligible_to_be_dialed() // The node is eligible to dial
+                        && !self.connected.contains_key(peer_id) // The node is not already connected
+                        && !self.dial_queue.contains_key(peer_id) // There is no pending dial to this node
+                        && roles_to_dial.contains(&peer.role) // We can dial this role
+                        && self.is_peer_allowed(peer_id) // Check allow/block lists
+                })
+                .map(|(peer_id, peer)| (*peer_id, peer.clone()))
+                .collect()
+        };
 
         // Initialize the dial state for any new peers
         for (peer_id, _) in &eligible_peers {
@@ -643,7 +649,7 @@ where
             self.enable_latency_aware_dialing,
         ) {
             // Ping the eligible peers (so that we can fetch missing ping latency information)
-            self.ping_eligible_peers(eligible_peers.clone()).await;
+            self.ping_eligible_peers(&eligible_peers).await;
 
             // Choose the peers to dial (weighted by ping latency)
             selection::choose_random_peers_by_ping_latency(
@@ -660,10 +666,10 @@ where
 
     /// Pings the eligible peers to calculate their ping latencies
     /// and updates the discovered peer state accordingly.
-    async fn ping_eligible_peers(&mut self, eligible_peers: Vec<(PeerId, DiscoveredPeer)>) {
+    async fn ping_eligible_peers(&mut self, eligible_peers: &[(PeerId, DiscoveredPeer)]) {
         // Identify the eligible peers that don't already have latency information
         let peers_to_ping = eligible_peers
-            .into_iter()
+            .iter()
             .filter(|(_, peer)| peer.ping_latency_secs.is_none())
             .collect::<Vec<_>>();
 
@@ -676,10 +682,10 @@ where
         // Spawn a task that pings each peer concurrently
         let ping_start_time = Instant::now();
         let mut ping_tasks = vec![];
-        for (peer_id, peer) in peers_to_ping.into_iter() {
+        for &(peer_id, peer) in peers_to_ping.iter() {
             // Get the network address for the peer
             let network_context = self.network_context;
-            let network_address = match self.dial_states.get(&peer_id) {
+            let network_address = match self.dial_states.get(peer_id) {
                 Some(dial_state) => match dial_state.random_addr(&peer.addrs) {
                     Some(network_address) => network_address.clone(),
                     None => {
@@ -704,7 +710,7 @@ where
             // Ping the peer
             let ping_task = spawn_latency_ping_task(
                 network_context,
-                peer_id,
+                *peer_id,
                 network_address,
                 self.discovered_peers.clone(),
             );
@@ -1145,11 +1151,14 @@ fn log_peer_ping_latencies(
     );
 
     // Log the ping latencies for the eligible peers (sorted by latency)
-    let eligible_peers = discovered_peers.read().peer_set.clone();
-    let eligible_peers_and_latencies = eligible_peers
-        .into_iter()
-        .map(|(peer_id, peer)| (peer_id, peer.ping_latency_secs))
-        .collect::<Vec<_>>();
+    let eligible_peers_and_latencies = {
+        let peers = discovered_peers.read();
+        peers
+            .peer_set
+            .iter()
+            .map(|(peer_id, peer)| (*peer_id, peer.ping_latency_secs))
+            .collect::<Vec<_>>()
+    };
     let sorted_eligible_peers_and_latencies = eligible_peers_and_latencies
         .iter()
         .sorted_by_key(|(_, ping_latency_secs)| ping_latency_secs.map(OrderedFloat))

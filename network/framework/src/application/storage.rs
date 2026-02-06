@@ -22,7 +22,6 @@ use aptos_types::{account_address::AccountAddress, PeerId};
 use arc_swap::ArcSwap;
 use std::{
     collections::{hash_map::Entry, HashMap},
-    ops::Deref,
     sync::{Arc, RwLockWriteGuard},
     time::Duration,
 };
@@ -328,7 +327,8 @@ impl PeersAndMetadata {
     /// Returns a clone of the trusted peer set for the given network ID
     pub fn get_trusted_peers(&self, network_id: &NetworkId) -> Result<PeerSet, Error> {
         let trusted_peers = self.get_trusted_peer_set_for_network(network_id)?;
-        Ok(trusted_peers.load().clone().deref().clone())
+        // load() returns an Arc<Arc<PeerSet>>; use deref to reach PeerSet and clone once
+        Ok((**trusted_peers.load()).clone())
     }
 
     /// Returns the trusted peer set for the given network ID
@@ -370,14 +370,17 @@ impl PeersAndMetadata {
 
     fn broadcast(&self, event: ConnectionNotification) {
         let mut listeners = self.subscribers.lock();
+        let num_listeners = listeners.len();
+        if num_listeners == 0 {
+            return;
+        }
         let mut to_del = vec![];
-        for i in 0..listeners.len() {
+        // Clone the event for all listeners except the last one
+        for i in 0..num_listeners - 1 {
             let dest = listeners.get_mut(i).unwrap();
             if let Err(err) = dest.try_send(event.clone()) {
                 match err {
                     TrySendError::Full(_) => {
-                        // Tried to send to an app, but the app isn't handling its messages fast enough.
-                        // Drop message. Maybe increment a metrics counter?
                         sample!(
                             SampleRate::Duration(Duration::from_secs(1)),
                             warn!("PeersAndMetadata.broadcast() failed, some app is slow"),
@@ -387,6 +390,21 @@ impl PeersAndMetadata {
                         to_del.push(i);
                     },
                 }
+            }
+        }
+        // Move the event into the last listener to avoid a final clone
+        let dest = listeners.get_mut(num_listeners - 1).unwrap();
+        if let Err(err) = dest.try_send(event) {
+            match err {
+                TrySendError::Full(_) => {
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(1)),
+                        warn!("PeersAndMetadata.broadcast() failed, some app is slow"),
+                    );
+                },
+                TrySendError::Closed(_) => {
+                    to_del.push(num_listeners - 1);
+                },
             }
         }
         for evict in to_del.into_iter() {

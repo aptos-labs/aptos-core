@@ -723,35 +723,54 @@ where
         );
         self.executor.spawn(peer.start());
 
-        // Save PeerRequest sender to `active_peers`.
-        self.active_peers
-            .insert(peer_id, (conn_meta.clone(), peer_reqs_tx));
+        // Save connection metadata to peers_and_metadata and active_peers.
+        // We insert into peers_and_metadata first (requires a clone), then
+        // move conn_meta into active_peers to avoid an extra clone.
         self.peers_and_metadata.insert_connection_metadata(
             PeerNetworkId::new(self.network_context.network_id(), peer_id),
             conn_meta.clone(),
         )?;
-        // Send NewPeer notification to connection event handlers.
+        // Send NewPeer notification to connection event handlers before consuming conn_meta.
         if send_new_peer_notification {
             let notif =
-                ConnectionNotification::NewPeer(conn_meta, self.network_context.network_id());
+                ConnectionNotification::NewPeer(conn_meta.clone(), self.network_context.network_id());
             self.send_conn_notification(peer_id, notif);
         }
+        self.active_peers
+            .insert(peer_id, (conn_meta, peer_reqs_tx));
 
         Ok(())
     }
 
     /// Sends a `ConnectionNotification` to all event handlers, warns on failures
     fn send_conn_notification(&mut self, peer_id: PeerId, notification: ConnectionNotification) {
-        for handler in self.connection_event_handlers.iter_mut() {
+        let num_handlers = self.connection_event_handlers.len();
+        if num_handlers == 0 {
+            return;
+        }
+        // Send cloned notifications to all handlers except the last
+        for handler in self.connection_event_handlers[..num_handlers - 1].iter_mut() {
             if let Err(e) = handler.push(peer_id, notification.clone()) {
                 warn!(
                     NetworkSchema::new(&self.network_context)
                         .remote_peer(&peer_id),
                     error = ?e,
-                    connection_notification = notification,
-                    "{} Failed to send notification {} to handler for peer: {}. Error: {:?}",
+                    "{} Failed to send notification to handler for peer: {}. Error: {:?}",
                     self.network_context,
-                    notification,
+                    peer_id.short_str(),
+                    e
+                );
+            }
+        }
+        // Move the notification into the last handler to avoid a final clone
+        if let Some(last_handler) = self.connection_event_handlers.last_mut() {
+            if let Err(e) = last_handler.push(peer_id, notification) {
+                warn!(
+                    NetworkSchema::new(&self.network_context)
+                        .remote_peer(&peer_id),
+                    error = ?e,
+                    "{} Failed to send notification to handler for peer: {}. Error: {:?}",
+                    self.network_context,
                     peer_id.short_str(),
                     e
                 );
