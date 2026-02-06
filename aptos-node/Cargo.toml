@@ -82,6 +82,7 @@ ureq = { workspace = true }
 url = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
+aptos-jemalloc-config = { workspace = true }
 jemallocator = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]

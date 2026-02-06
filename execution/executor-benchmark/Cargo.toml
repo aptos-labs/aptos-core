@@ -71,6 +71,7 @@ toml = { workspace = true }
 tonic = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
+aptos-jemalloc-config = { workspace = true }
 aptos-profiler = { workspace = true }
 jemallocator = { workspace = true }
 
