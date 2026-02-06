@@ -355,8 +355,8 @@ where
         )
         .observe(elapsed_time);
 
-        // Clone metadata only for the error path (rare), so the happy path
-        // avoids the clone entirely.
+        // Clone metadata before moving the connection, so we can log it on error.
+        // The clone cost is justified to preserve diagnostic context.
         let metadata_for_error = connection.metadata.clone();
         let event = TransportNotification::NewConnection(connection);
         if let Err(err) = self.transport_notifs_tx.send(event).await {

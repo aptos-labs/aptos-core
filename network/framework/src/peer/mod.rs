@@ -707,33 +707,31 @@ where
         }
 
         let remote_peer_id = self.remote_peer_id();
-        let network_context = self.network_context;
-        // Move connection_metadata into the notification to avoid cloning.
-        // We save the fields we need for subsequent logging.
-        let connection_metadata = self.connection_metadata;
-        let send_result = self
+        // Send a PeerDisconnected event to PeerManager.
+        if let Err(e) = self
             .connection_notifs_tx
             .send(TransportNotification::Disconnected(
-                connection_metadata,
+                self.connection_metadata.clone(),
                 reason,
             ))
-            .await;
-
-        if let Err(e) = send_result {
+            .await
+        {
             warn!(
-                NetworkSchema::new(&network_context),
+                NetworkSchema::new(&self.network_context)
+                    .connection_metadata(&self.connection_metadata),
                 error = ?e,
                 "{} Failed to notify upstream about disconnection of peer: {}; error: {:?}",
-                network_context,
+                self.network_context,
                 remote_peer_id.short_str(),
                 e
             );
         }
 
         trace!(
-            NetworkSchema::new(&network_context),
+            NetworkSchema::new(&self.network_context)
+                .connection_metadata(&self.connection_metadata),
             "{} Peer actor for '{}' terminated",
-            network_context,
+            self.network_context,
             remote_peer_id.short_str()
         );
     }
