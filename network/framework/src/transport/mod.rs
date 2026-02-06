@@ -206,7 +206,9 @@ where
 pub struct UpgradeContext {
     noise: NoiseUpgrader,
     handshake_version: u8,
-    supported_protocols: BTreeMap<MessagingProtocolVersion, ProtocolIdSet>,
+    /// Wrapped in Arc so that constructing HandshakeMsg for each connection is a
+    /// cheap Arc clone instead of a deep BTreeMap clone.
+    supported_protocols: Arc<BTreeMap<MessagingProtocolVersion, ProtocolIdSet>>,
     chain_id: ChainId,
     network_id: NetworkId,
 }
@@ -222,7 +224,7 @@ impl UpgradeContext {
         UpgradeContext {
             noise,
             handshake_version,
-            supported_protocols,
+            supported_protocols: Arc::new(supported_protocols),
             chain_id,
             network_id,
         }
