@@ -206,7 +206,11 @@ members = [
     "testsuite/smoke-test",
     "testsuite/testcases",
     "third_party/move/extensions/move-table-extension",
+<<<<<<< HEAD
     "third_party/move/mono-move/micro-ops",
+=======
+    "third_party/move/mono-move/global-context",
+>>>>>>> 465ee13b83 ([execution] Add global context placeholder with guards)
     "third_party/move/move-binary-format",
     "third_party/move/move-binary-format/serializer-tests",
     "third_party/move/move-borrow-graph",
@@ -865,7 +869,12 @@ x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", rev = "b9cd
 z3tracer = "0.8.0"
 
 # MOVE DEPENDENCIES
+<<<<<<< HEAD
 move-abigen = { path = "third_party/move/tools/move-abigen" }
+=======
+mono-move-global-context = { path = "third_party/move/mono-move/global-context" }
+move-abigen = { path = "third_party/move/move-prover/move-abigen" }
+>>>>>>> 465ee13b83 ([execution] Add global context placeholder with guards)
 move-asm = { path = "third_party/move/tools/move-asm" }
 move-binary-format = { path = "third_party/move/move-binary-format" }
 move-borrow-graph = { path = "third_party/move/move-borrow-graph" }
