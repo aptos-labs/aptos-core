@@ -19,6 +19,19 @@ Suites: trixie-security
 Components: main
 EOF
 
+# Workaround: LLVM apt repo uses SHA1 signatures, but Trixie disabled SHA1 by default
+# See https://github.com/llvm/llvm-project/issues/179148
+RUN <<EOF
+mkdir -p /etc/crypto-policies/back-ends/
+cat > /etc/crypto-policies/back-ends/sequoia.config << 'CONFIGEOF'
+[hash_algorithms]
+sha1 = "always"
+
+[asymmetric_algorithms]
+rsa1024 = "always"
+CONFIGEOF
+EOF
+
 # NOTE: the version of LLVM installed here MUST match the version of LLVM rustc
 # uses internally, so we may need to upgrade this when upgrading Rust versions.
 ARG CLANG_VERSION=21
