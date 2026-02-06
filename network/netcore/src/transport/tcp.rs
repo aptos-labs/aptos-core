@@ -19,6 +19,7 @@ use std::{
     io,
     net::SocketAddr,
     pin::Pin,
+    sync::Arc,
     task::{Context, Poll},
 };
 use tokio::{
@@ -61,7 +62,11 @@ impl TCPBufferCfg {
     }
 }
 
-/// Transport to build TCP connections
+/// Transport to build TCP connections.
+///
+/// Configuration is stored in an `Arc` so that cloning the transport (which
+/// happens for each listener stream and outbound dial) is a cheap
+/// reference-count bump rather than a struct copy.
 #[derive(Debug, Clone, Default)]
 pub struct TcpTransport {
     /// TTL to set for opened sockets, or `None` to keep default.
@@ -70,6 +75,26 @@ pub struct TcpTransport {
     pub nodelay: Option<bool>,
 
     pub tcp_buff_cfg: TCPBufferCfg,
+}
+
+/// A shareable wrapper around `TcpTransport` that makes cloning zero-cost
+/// via `Arc`. Used by `TcpListenerStream` and `TcpOutbound` to share the
+/// transport configuration without copying.
+#[derive(Debug, Clone)]
+pub struct SharedTcpTransport {
+    inner: Arc<TcpTransport>,
+}
+
+impl SharedTcpTransport {
+    pub fn new(transport: TcpTransport) -> Self {
+        Self {
+            inner: Arc::new(transport),
+        }
+    }
+
+    fn apply_config(&self, stream: &TcpStream) -> ::std::io::Result<()> {
+        self.inner.apply_config(stream)
+    }
 }
 
 impl TcpTransport {
@@ -130,7 +155,7 @@ impl Transport for TcpTransport {
         Ok((
             TcpListenerStream {
                 inner: listener,
-                config: self.clone(),
+                config: SharedTcpTransport::new(self.clone()),
             },
             listen_addr,
         ))
@@ -180,7 +205,7 @@ impl Transport for TcpTransport {
 
         Ok(TcpOutbound {
             inner: f,
-            config: self.clone(),
+            config: SharedTcpTransport::new(self.clone()),
         })
     }
 }
@@ -310,7 +335,7 @@ fn invalid_addr_error(addr: &NetworkAddress) -> io::Error {
 #[must_use = "streams do nothing unless polled"]
 pub struct TcpListenerStream {
     inner: TcpListener,
-    config: TcpTransport,
+    config: SharedTcpTransport,
 }
 
 impl Stream for TcpListenerStream {
@@ -337,7 +362,7 @@ impl Stream for TcpListenerStream {
 #[must_use = "futures do nothing unless polled"]
 pub struct TcpOutbound {
     inner: Pin<Box<dyn Future<Output = io::Result<TcpStream>> + Send + 'static>>,
-    config: TcpTransport,
+    config: SharedTcpTransport,
 }
 
 impl Future for TcpOutbound {
