@@ -355,12 +355,14 @@ where
         )
         .observe(elapsed_time);
 
-        // Save a reference to metadata for potential error logging, then send connection
-        let network_context = self.network_context;
+        // Clone metadata only for the error path (rare), so the happy path
+        // avoids the clone entirely.
+        let metadata_for_error = connection.metadata.clone();
         let event = TransportNotification::NewConnection(connection);
         if let Err(err) = self.transport_notifs_tx.send(event).await {
             error!(
-                NetworkSchema::new(&network_context),
+                NetworkSchema::new(&self.network_context)
+                    .connection_metadata_with_address(&metadata_for_error),
                 error = %err,
                 "Failed to notify PeerManager of new connection"
             );
