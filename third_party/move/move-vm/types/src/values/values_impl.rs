@@ -4857,7 +4857,7 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Va
             (L::Struct(struct_layout), Value::Container(Container::Struct(r))) => {
                 (SerializationReadyValue {
                     ctx: self.ctx,
-                    layout: struct_layout,
+                    layout: struct_layout.as_ref(),
                     value: &*r.borrow(),
                     // Note: for struct, we increment depth for fields in the corresponding
                     // serializer.
@@ -5132,7 +5132,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveTypeLay
             L::Struct(struct_layout) => {
                 let seed = DeserializationSeed {
                     ctx: self.ctx,
-                    layout: struct_layout,
+                    layout: struct_layout.as_ref(),
                 };
                 Ok(Value::struct_(seed.deserialize(deserializer)?))
             },
@@ -5909,7 +5909,13 @@ pub mod prop {
                     .prop_map(|vals| Value::Container(Container::Vec(Rc::new(RefCell::new(vals)))))
                     .boxed(),
             },
-            L::Struct(_struct_layout @ MoveStructLayout::RuntimeVariants(variants)) => {
+            L::Struct(struct_layout)
+                if matches!(struct_layout.as_ref(), MoveStructLayout::RuntimeVariants(_)) =>
+            {
+                let variants = match struct_layout.as_ref() {
+                    MoveStructLayout::RuntimeVariants(v) => v,
+                    _ => unreachable!(),
+                };
                 // Randomly choose a variant index
                 let variant_count = variants.len();
                 let variants = variants.clone();
@@ -6008,9 +6014,9 @@ pub mod prop {
                 prop_oneof![
                     1 => inner.clone().prop_map(|layout| L::Vector(Box::new(layout))),
                     1 => vec(inner.clone(), 0..=5).prop_map(|f_layouts| {
-                            L::Struct(MoveStructLayout::new(f_layouts))}),
+                            L::new_struct(MoveStructLayout::new(f_layouts))}),
                     1 => vec(vec(inner, 0..=3), 1..=4).prop_map(|variant_layouts| {
-                            L::Struct(MoveStructLayout::new_variants(variant_layouts))}),
+                            L::new_struct(MoveStructLayout::new_variants(variant_layouts))}),
                 ]
             }),
             2 => Just(L::Function),
@@ -6059,7 +6065,7 @@ impl Value {
                 let values_ref = r.borrow();
                 let values = values_ref.as_slice();
                 if let Some((tag, variant_layouts)) =
-                    try_get_variant_field_layouts(struct_layout, values)
+                    try_get_variant_field_layouts(struct_layout.as_ref(), values)
                 {
                     MoveValue::Struct(MoveStruct::new_variant(
                         tag,

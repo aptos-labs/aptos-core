@@ -66,7 +66,7 @@ use triomphe::Arc as TriompheArc;
 /// It's used when performing reads for resources that might contain delayed fields
 /// to ensure consistent behavior across all test cases.
 pub(crate) static MOCK_LAYOUT: once_cell::sync::Lazy<MoveTypeLayout> =
-    once_cell::sync::Lazy::new(|| MoveTypeLayout::Struct(MoveStructLayout::new(vec![])));
+    once_cell::sync::Lazy::new(|| MoveTypeLayout::new_struct(MoveStructLayout::new(vec![])));
 
 /// Macro for returning an error directly when Result is an error
 ///

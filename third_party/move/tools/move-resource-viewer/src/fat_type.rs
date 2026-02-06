@@ -488,14 +488,17 @@ impl FatType {
             Address => FatType::Address,
             Signer => FatType::Signer,
             Vector(ty) => FatType::Vector(Box::new(Self::from_runtime_layout(ty, limit)?)),
-            Struct(MoveStructLayout::Runtime(tys)) => {
-                FatType::Runtime(Self::from_layout_slice(tys, limit)?)
+            Struct(struct_layout) => match struct_layout.as_ref() {
+                MoveStructLayout::Runtime(tys) => {
+                    FatType::Runtime(Self::from_layout_slice(tys, limit)?)
+                },
+                MoveStructLayout::RuntimeVariants(vars) => FatType::RuntimeVariants(
+                    vars.iter()
+                        .map(|tys| Self::from_layout_slice(tys, limit))
+                        .collect::<PartialVMResult<Vec<Vec<_>>>>()?,
+                ),
+                _ => return Err(PartialVMError::new(StatusCode::ABORT_TYPE_MISMATCH_ERROR)),
             },
-            Struct(MoveStructLayout::RuntimeVariants(vars)) => FatType::RuntimeVariants(
-                vars.iter()
-                    .map(|tys| Self::from_layout_slice(tys, limit))
-                    .collect::<PartialVMResult<Vec<Vec<_>>>>()?,
-            ),
             Function => {
                 // We cannot derive the actual type from layout, however, a dummy
                 // function type will do since annotation of closures is not depending
@@ -508,7 +511,7 @@ impl FatType {
                     abilities: AbilitySet::EMPTY,
                 }))
             },
-            Native(..) | Struct(_) => {
+            Native(..) => {
                 return Err(PartialVMError::new_invariant_violation(format!(
                     "cannot derive fat type for {:?}",
                     layout
@@ -605,13 +608,13 @@ impl TryInto<MoveTypeLayout> for &FatType {
             FatType::I256 => MoveTypeLayout::I256,
             FatType::Bool => MoveTypeLayout::Bool,
             FatType::Vector(v) => MoveTypeLayout::Vector(Box::new(v.as_ref().try_into()?)),
-            FatType::Struct(s) => MoveTypeLayout::Struct(s.as_ref().try_into()?),
+            FatType::Struct(s) => MoveTypeLayout::new_struct(s.as_ref().try_into()?),
             FatType::Function(_) => MoveTypeLayout::Function,
             FatType::Runtime(tys) => {
-                MoveTypeLayout::Struct(MoveStructLayout::Runtime(slice_into(tys)?))
+                MoveTypeLayout::new_struct(MoveStructLayout::Runtime(slice_into(tys)?))
             },
             FatType::RuntimeVariants(vars) => {
-                MoveTypeLayout::Struct(MoveStructLayout::RuntimeVariants(
+                MoveTypeLayout::new_struct(MoveStructLayout::RuntimeVariants(
                     vars.iter()
                         .map(|tys| slice_into(tys))
                         .collect::<Result<Vec<_>, _>>()?,
