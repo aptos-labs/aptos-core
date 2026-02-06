@@ -138,10 +138,10 @@ module 0xc0ffee::m {
         x
     }
     public fun test1(x: u8) {
-        if (x + 1u8 > 255u8) bar();
+        if (x + 1u8 > MAX_U8) bar();
     }
     public fun test2(x: &u8, y: &u8) {
-        if (*x + *y > 255u8 == true) bar();
+        if (*x + *y > MAX_U8 == true) bar();
     }
     public fun test3(x: u8) {
         if (x < 0u8 || 0u8 > x) bar();
@@ -153,23 +153,23 @@ module 0xc0ffee::m {
         if (0u8 <= foo<u8>(x)) bar();
     }
     public fun test4(a: u8, b: u16, c: u32, d: u64, e: u128, f: u256) {
-        if (a > 255u8 || f > (255u8 as u256)) bar();
-        if (b >= 65535u16) bar();
-        if (4294967295u32 < c) bar();
-        if (18446744073709551615 <= d) bar();
-        if (e < 340282366920938463463374607431768211455u128) bar();
-        if (f <= 115792089237316195423570985008687907853269984665640564039457584007913129639935u256) bar();
-        if (115792089237316195423570985008687907853269984665640564039457584007913129639935u256 >= f) bar();
-        if (340282366920938463463374607431768211455u128 > e) bar();
+        if (a > MAX_U8 || f > (MAX_U8 as u256)) bar();
+        if (b >= MAX_U16) bar();
+        if (MAX_U32 < c) bar();
+        if (MAX_U64 <= d) bar();
+        if (e < MAX_U128) bar();
+        if (f <= MAX_U256) bar();
+        if (MAX_U256 >= f) bar();
+        if (MAX_U128 > e) bar();
         spec {
-            assert a <= 255;
+            assert a <= MAX_U8;
         }
     }
     public fun test5(x: u8): bool {
         apply(|arg0| lambda__1__test5(arg0), x)
     }
     fun lambda__1__test5(x: u8): bool {
-        x > 255u8
+        x > MAX_U8
     }
 }
 module 0xc0ffee::no_warn {

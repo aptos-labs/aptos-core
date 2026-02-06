@@ -21,6 +21,7 @@ use crate::{
 };
 use itertools::Itertools;
 use move_core_types::ability::AbilitySet;
+use num::BigInt;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet},
@@ -310,6 +311,13 @@ impl<'a> Sourcifier<'a> {
         match value {
             Value::Address(address) => emit!(self.writer, "@{}", self.env().display(address)),
             Value::Number(int) => {
+                // Try to fold back into named MIN/MAX constants
+                if let Some(Type::Primitive(prim)) = ty {
+                    if let Some(name) = self.min_max_const_name(prim, int) {
+                        emit!(self.writer, "{}", name);
+                        return;
+                    }
+                }
                 emit!(self.writer, "{}", int);
                 // Only print type suffix when not in spec context (specs use arbitrary precision)
                 if !for_spec {
@@ -366,6 +374,49 @@ impl<'a> Sourcifier<'a> {
                 })
             },
         }
+    }
+
+    /// Returns the name of a MIN/MAX constant if the given value matches the
+    /// boundary of the given primitive type (e.g., `u8::MAX` -> `"MAX_U8"`).
+    fn min_max_const_name(&self, prim: &PrimitiveType, value: &BigInt) -> Option<&'static str> {
+        use PrimitiveType::*;
+        // For `Num` (the spec-only abstract numeric type), try all concrete int types
+        if *prim == Num {
+            return PrimitiveType::all_int_types()
+                .iter()
+                .find_map(|t| self.min_max_const_name(t, value));
+        }
+        let max = prim.get_max_value()?;
+        if *value == max {
+            return Some(match prim {
+                U8 => "MAX_U8",
+                U16 => "MAX_U16",
+                U32 => "MAX_U32",
+                U64 => "MAX_U64",
+                U128 => "MAX_U128",
+                U256 => "MAX_U256",
+                I8 => "MAX_I8",
+                I16 => "MAX_I16",
+                I32 => "MAX_I32",
+                I64 => "MAX_I64",
+                I128 => "MAX_I128",
+                I256 => "MAX_I256",
+                _ => return None,
+            });
+        }
+        let min = prim.get_min_value()?;
+        if *value == min && min != BigInt::from(0u64) {
+            return Some(match prim {
+                I8 => "MIN_I8",
+                I16 => "MIN_I16",
+                I32 => "MIN_I32",
+                I64 => "MIN_I64",
+                I128 => "MIN_I128",
+                I256 => "MIN_I256",
+                _ => return None,
+            });
+        }
+        None
     }
 
     /// Prints a struct (or enum) declaration.
