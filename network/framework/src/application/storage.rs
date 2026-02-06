@@ -20,7 +20,6 @@ use aptos_types::{account_address::AccountAddress, PeerId};
 use arc_swap::ArcSwap;
 use std::{
     collections::{hash_map::Entry, HashMap},
-    ops::Deref,
     sync::{Arc, RwLockWriteGuard},
 };
 
@@ -305,7 +304,8 @@ impl PeersAndMetadata {
     /// Returns a clone of the trusted peer set for the given network ID
     pub fn get_trusted_peers(&self, network_id: &NetworkId) -> Result<PeerSet, Error> {
         let trusted_peers = self.get_trusted_peer_set_for_network(network_id)?;
-        Ok(trusted_peers.load().clone().deref().clone())
+        // load() returns an Arc<Arc<PeerSet>>; use deref to reach PeerSet and clone once
+        Ok((**trusted_peers.load()).clone())
     }
 
     /// Returns the trusted peer set for the given network ID

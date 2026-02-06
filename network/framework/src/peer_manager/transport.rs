@@ -335,28 +335,32 @@ where
         addr: &NetworkAddress,
         elapsed_time: f64,
     ) {
-        let metadata = connection.metadata.clone();
+        // Log and record metrics using references before moving the connection
         debug!(
             NetworkSchema::new(&self.network_context)
-                .connection_metadata_with_address(&metadata)
+                .connection_metadata_with_address(&connection.metadata)
                 .network_address(addr),
             "{} {} connection from {} at {} successfully upgraded after {:.3} secs",
             self.network_context,
-            metadata.origin,
-            metadata.remote_peer_id.short_str(),
-            metadata.addr,
+            connection.metadata.origin,
+            connection.metadata.remote_peer_id.short_str(),
+            connection.metadata.addr,
             elapsed_time,
         );
 
-        counters::connection_upgrade_time(&self.network_context, metadata.origin, SUCCEEDED_LABEL)
-            .observe(elapsed_time);
+        counters::connection_upgrade_time(
+            &self.network_context,
+            connection.metadata.origin,
+            SUCCEEDED_LABEL,
+        )
+        .observe(elapsed_time);
 
-        // Send the new connection to PeerManager
+        // Save a reference to metadata for potential error logging, then send connection
+        let network_context = self.network_context;
         let event = TransportNotification::NewConnection(connection);
         if let Err(err) = self.transport_notifs_tx.send(event).await {
             error!(
-                NetworkSchema::new(&self.network_context)
-                    .connection_metadata_with_address(&metadata),
+                NetworkSchema::new(&network_context),
                 error = %err,
                 "Failed to notify PeerManager of new connection"
             );
