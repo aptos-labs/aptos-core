@@ -124,7 +124,11 @@ where
         async move {
             let message: Req = message.into();
 
-            let peers = receivers.clone();
+            let peers = receivers
+                .iter()
+                .filter(|&author| author != &self_author)
+                .cloned()
+                .collect();
             let sender = network_sender.clone();
             let message_clone = message.clone();
             let protocols = Arc::new(
