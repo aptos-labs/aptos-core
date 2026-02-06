@@ -257,7 +257,7 @@ impl Default for ConsensusConfig {
             vote_back_pressure_limit: 12,
             min_max_txns_in_block_after_filtering_from_backpressure: MIN_BLOCK_TXNS_AFTER_FILTERING,
             execution_backpressure: Some(ExecutionBackpressureConfig {
-                txn_limit: Some(ExecutionBackpressureTxnLimitConfig::default()),
+                txn_limit: None,
                 gas_limit: Some(ExecutionBackpressureGasLimitConfig::default()),
             }),
             pipeline_backpressure: vec![
