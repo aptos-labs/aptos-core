@@ -21,7 +21,6 @@ macro_rules! setup_jemalloc {
               background_thread:true,max_background_threads:4,\
               thp:always,metadata_thp:always,\
               lg_tcache_max:16,tcache_nslots_large:32,\
-              percpu_arena:percpu,\
               prof:true,\
               lg_prof_sample:23"
             .as_ptr()
