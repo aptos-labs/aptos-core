@@ -43,6 +43,22 @@ jobs:
           name: cli-builds-linux-x86_64
           path: movement-cli-*.zip
 
+  build-macos-x86_64:
+    name: "Build macOS x86_64"
+    runs-on: macos-14-large
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.source_git_ref_override }}
+      - uses: ./.github/actions/cli-rust-setup
+      - name: Build CLI
+        run: scripts/cli/build_cli_release.sh "macOS" "${{ inputs.release_version }}" "${{ inputs.skip_checks }}" "false"
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-builds-macos-x86_64
+          path: movement-cli-*.zip
+
   build-macos-arm64:
     name: "Build macOS ARM64"
     runs-on: macos-latest
@@ -63,6 +79,7 @@ jobs:
     name: "Create GitHub Release"
     needs:
       - build-linux-x86_64
+      - build-macos-x86_64
       - build-macos-arm64
     runs-on: ubuntu-latest
     permissions:
