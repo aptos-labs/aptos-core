@@ -44,19 +44,19 @@ pub trait Trait<C: CurveGroup>:
         statement: &Self::Codomain,
         cntxt: &Ct, // for SoK purposes
         rng: &mut R,
-    ) -> ProofProjective<<Self as fixed_base_msms::Trait>::Scalar, Self> { // or C::ScalarField
+    ) -> Proof<<Self as fixed_base_msms::Trait>::Scalar, Self> { // or C::ScalarField
         prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
     }
 
     #[allow(non_snake_case)]
     fn verify<Ct: Serialize, H>(
         &self,
-        public_statement: &Self::Codomain,
-        proof: &ProofProjective<C::ScalarField, H>, // Would like to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
+        public_statement: &Self::CodomainNormalized,
+        proof: &Proof<C::ScalarField, H>, // Would like to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
         cntxt: &Ct,
     ) -> anyhow::Result<()>
     where
-        H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>, // need this because `H` is technically different from `Self` due to lifetime changes
+        H: homomorphism::Trait<Domain = Self::Domain, CodomainNormalized = Self::CodomainNormalized>, // need this because `H` is technically different from `Self` due to lifetime changes
     {
         let msm_terms = self.msm_terms_for_verify::<_, H>(
             public_statement,
@@ -73,8 +73,8 @@ pub trait Trait<C: CurveGroup>:
     #[allow(non_snake_case)]
     fn compute_verifier_challenges<Ct>(
         &self,
-        public_statement: &Self::Codomain,
-        prover_first_message: &Self::Codomain, // TODO: this input will have to be modified for `compact` proofs; we just need something serializable, could pass `FirstProofItem<F, H>` instead
+        public_statement: &Self::CodomainNormalized,
+        prover_first_message: &Self::CodomainNormalized, // TODO: this input will have to be modified for `compact` proofs; we just need something serializable, could pass `FirstProofItem<F, H>` instead
         cntxt: &Ct,
         number_of_beta_powers: usize,
     ) -> (C::ScalarField, Vec<C::ScalarField>)
@@ -86,7 +86,7 @@ pub trait Trait<C: CurveGroup>:
         let c = fiat_shamir_challenge_for_sigma_protocol::<_, C::ScalarField, _>(
             cntxt,
             self,
-            public_statement,
+            &public_statement,
             prover_first_message,
             &self.dst(),
         );
@@ -103,16 +103,16 @@ pub trait Trait<C: CurveGroup>:
     #[allow(non_snake_case)]
     fn msm_terms_for_verify<Ct: Serialize, H>(
         &self,
-        public_statement: &Self::Codomain,
-        proof: &ProofProjective<C::ScalarField, H>,
+        public_statement: &Self::CodomainNormalized,
+        proof: &Proof<C::ScalarField, H>,
         cntxt: &Ct,
     ) -> Self::MsmInput
     where
-        H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>, // Need this because the lifetime was changed
+        H: homomorphism::Trait<Domain = Self::Domain, CodomainNormalized = Self::CodomainNormalized>, // Need this because the lifetime was changed
     {
         let prover_first_message = match &proof.first_proof_item {
-            FirstProofItemProjective::Commitment(A) => A,
-            FirstProofItemProjective::Challenge(_) => {
+            FirstProofItem::Commitment(A) => A,
+            FirstProofItem::Challenge(_) => {
                 panic!("Missing implementation - expected commitment, not challenge")
             },
         };
@@ -138,8 +138,8 @@ pub trait Trait<C: CurveGroup>:
     #[allow(non_snake_case)]
     fn merge_msm_terms(
         msm_terms: Vec<Self::MsmInput>,
-        prover_first_message: &Self::Codomain,
-        statement: &Self::Codomain,
+        prover_first_message: &Self::CodomainNormalized,
+        statement: &Self::CodomainNormalized,
         powers_of_beta: &[C::ScalarField],
         c: C::ScalarField,
     ) -> Self::MsmInput
@@ -147,20 +147,13 @@ pub trait Trait<C: CurveGroup>:
         let mut final_basis = Vec::new();
         let mut final_scalars = Vec::new();
 
-        // Collect all projective points to batch normalize
-        // TODO: remove this stuff... we may assume things are deserialised and hence essentially affine, so into_affine() should do
-        let mut all_points_to_normalize = Vec::new();
-        for (A, P) in prover_first_message.clone().into_iter()
-            .zip(statement.clone().into_iter())
-        {
-            all_points_to_normalize.push(A);
-            all_points_to_normalize.push(P);
-        }
 
-        let affine_points = C::normalize_batch(&all_points_to_normalize);
-        let mut affine_iter = affine_points.into_iter();
-
-        for (term, beta_power) in msm_terms.into_iter().zip(powers_of_beta) {
+    for (((term, A), P), beta_power) in msm_terms
+        .into_iter()
+        .zip(prover_first_message.clone().into_iter())
+        .zip(statement.clone().into_iter())
+        .zip(powers_of_beta)
+    {
             let mut bases = term.bases().to_vec();
             let mut scalars = term.scalars().to_vec();
 
@@ -170,8 +163,8 @@ pub trait Trait<C: CurveGroup>:
             }
 
             // Add prover + statement contributions
-            bases.push(affine_iter.next().unwrap()); // this is the element `A` from the prover's first message
-            bases.push(affine_iter.next().unwrap()); // this is the element `P` from the statement, but we'll need `P^c`
+            bases.push(A); // this is the element `A` from the prover's first message
+            bases.push(P); // this is the element `P` from the statement, but we'll need `P^c`
 
             scalars.push(- (*beta_power));
             scalars.push(-c * beta_power);
@@ -442,6 +435,7 @@ where
     }
 }
 
+// TODO: this shouldn't be in traits.rs
 #[derive(CanonicalSerialize, Debug, CanonicalDeserialize, Clone)]
 pub struct ProofProjective<F: PrimeField, H: homomorphism::Trait>
 where
@@ -456,6 +450,7 @@ where
     pub z: H::Domain,
 }
 
+// TODO: this shouldn't be in traits.rs
 #[derive(CanonicalSerialize, Debug, CanonicalDeserialize, Clone)]
 pub struct Proof<F: PrimeField, H: homomorphism::Trait>
 where
@@ -468,6 +463,29 @@ where
     pub first_proof_item: FirstProofItem<F, H>,
     /// Prover's second message (response)
     pub z: H::Domain,
+}
+
+impl<F: PrimeField, H: homomorphism::Trait> Proof<F, H>
+where
+    H::Domain: Witness<F>,
+    H::CodomainNormalized: Statement,
+{
+    /// No-op (semantically): circumvents the fact that proofs inherit the homomorphism’s lifetime. This method should do nothing at runtime.
+    #[allow(non_snake_case)]
+    pub fn change_lifetime<H2>(self) -> Proof<F, H2>
+    where
+        H2: homomorphism::Trait<Domain = H::Domain, CodomainNormalized = H::CodomainNormalized>,
+    {
+        let first = match self.first_proof_item {
+            FirstProofItem::Commitment(A) => FirstProofItem::Commitment(A),
+            FirstProofItem::Challenge(c) => FirstProofItem::Challenge(c),
+        };
+
+        Proof {
+            first_proof_item: first,
+            z: self.z,
+        }
+    }
 }
 
 impl<F: PrimeField, H: homomorphism::Trait> ProofProjective<F, H>
@@ -556,13 +574,13 @@ pub fn fiat_shamir_challenge_for_sigma_protocol<
 >(
     cntxt: &Ct,
     hom: &H,
-    statement: &H::Codomain,
-    prover_first_message: &H::Codomain,
+    statement: &H::CodomainNormalized,
+    prover_first_message: &H::CodomainNormalized,
     dst: &[u8],
 ) -> F
 where
     H::Domain: Witness<F>,
-    H::Codomain: Statement,
+    H::CodomainNormalized: Statement,
 {
     // Initialise the transcript
     let mut fs_t = merlin::Transcript::new(dst);
@@ -580,7 +598,7 @@ where
     // Append the public statement (the image of the witness) to the transcript
     <merlin::Transcript as fiat_shamir::SigmaProtocol<F, H>>::append_sigma_protocol_public_statement(
         &mut fs_t,
-        statement,
+        &statement,
     );
 
     // Add the first prover message (the commitment) to the transcript
@@ -606,23 +624,24 @@ pub fn prove_homomorphism<Ct: Serialize, F: PrimeField, H: homomorphism::Trait, 
     store_prover_commitment: bool, // true = store prover's commitment, false = store Fiat-Shamir challenge
     rng: &mut R,
     dst: &[u8],
-) -> ProofProjective<F, H>
+) -> Proof<F, H>
 where
     H::Domain: Witness<F>,
-    H::Codomain: Statement,
+    H::CodomainNormalized: Statement,
     R: RngCore + CryptoRng,
 {
     // Step 1: Sample randomness. Here the `witness` is only used to make sure that `r` has the right dimensions
     let r = witness.rand(rng);
 
     // Step 2: Compute commitment A = Ψ(r)
-    let A = homomorphism.apply(&r);
+    let A_proj = homomorphism.apply(&r); // A_proj = ...
+    let A = homomorphism.normalize(&A_proj);
 
     // Step 3: Obtain Fiat-Shamir challenge
     let c = fiat_shamir_challenge_for_sigma_protocol::<_, F, H>(
         cntxt,
         homomorphism,
-        statement,
+        &homomorphism.normalize(&statement),
         &A,
         dst,
     );
@@ -632,12 +651,12 @@ where
 
     // Step 5: Pick first **recorded** item
     let first_proof_item = if store_prover_commitment {
-        FirstProofItemProjective::Commitment(A)
+        FirstProofItem::Commitment(A)
     } else {
-        FirstProofItemProjective::Challenge(c)
+        FirstProofItem::Challenge(c)
     };
 
-    ProofProjective {
+    Proof {
         first_proof_item,
         z,
     }

@@ -12,11 +12,11 @@ use crate::{
             tuple::{PairingTupleHomomorphism, TupleCodomainShape},
             LiftHomomorphism,
         },
-        traits::FirstProofItemProjective,
+        traits::FirstProofItem,
     },
 };
 use aptos_crypto::{
-    arkworks::random::unsafe_random_points_group, weighted_config::WeightedConfigArkworks,
+    arkworks::random::unsafe_random_points, weighted_config::WeightedConfigArkworks,
 };
 use ark_ec::{pairing::Pairing, scalar_mul::BatchMulPreprocessing, AffineRepr, CurveGroup};
 
@@ -32,7 +32,7 @@ pub type Homomorphism<'a, E> = PairingTupleHomomorphism<
     LiftedCommitHomomorphism<'a, <E as Pairing>::G2>,
 >;
 pub type Proof<'a, E> =
-    sigma_protocol::ProofProjective<<E as Pairing>::ScalarField, Homomorphism<'a, E>>;
+    sigma_protocol::traits::Proof<<E as Pairing>::ScalarField, Homomorphism<'a, E>>;
 
 impl<'a, E: Pairing> Proof<'a, E> {
     /// Generates a random looking proof (but not a valid one).
@@ -48,17 +48,17 @@ impl<'a, E: Pairing> Proof<'a, E> {
             z,
         } = hkzg_chunked_elgamal::WeightedProof::generate(sc, number_of_chunks_per_share, rng);
         match first_proof_item {
-            FirstProofItemProjective::Commitment(first_proof_item_inner) => Self {
-                first_proof_item: FirstProofItemProjective::Commitment(TupleCodomainShape(
+            FirstProofItem::Commitment(first_proof_item_inner) => Self {
+                first_proof_item: FirstProofItem::Commitment(TupleCodomainShape(
                     first_proof_item_inner,
-                    chunked_scalar_mul::CodomainShape::<E::G2>(unsafe_random_points_group(
+                    chunked_scalar_mul::CodomainShape(unsafe_random_points::<E::G2, _>(
                         sc.get_total_weight(),
                         rng,
                     )),
                 )),
                 z,
             },
-            FirstProofItemProjective::Challenge(_) => {
+            FirstProofItem::Challenge(_) => {
                 panic!("Unexpected Challenge variant!");
             },
         }

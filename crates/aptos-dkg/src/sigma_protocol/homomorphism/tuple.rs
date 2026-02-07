@@ -7,9 +7,8 @@ use crate::{
         homomorphism,
         homomorphism::{fixed_base_msms, EntrywiseMap},
         traits::{
-            fiat_shamir_challenge_for_sigma_protocol, prove_homomorphism, FirstProofItemProjective,
+            fiat_shamir_challenge_for_sigma_protocol, prove_homomorphism, FirstProofItem, Proof,
         },
-        ProofProjective,
     },
 };
 use anyhow::ensure;
@@ -313,21 +312,21 @@ where
         statement: &<Self as homomorphism::Trait>::Codomain,
         cntxt: &Ct, // for SoK purposes
         rng: &mut R,
-    ) -> ProofProjective<H1::Scalar, Self> {
+    ) -> Proof<H1::Scalar, Self> {
         prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
     }
 
     #[allow(non_snake_case)]
     pub fn verify<Ct: Serialize, H>(
         &self,
-        public_statement: &<Self as homomorphism::Trait>::Codomain,
-        proof: &ProofProjective<H1::Scalar, H>, // Would like to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
+        public_statement: &<Self as homomorphism::Trait>::CodomainNormalized,
+        proof: &Proof<H1::Scalar, H>, // Would like to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
         cntxt: &Ct,
     ) -> anyhow::Result<()>
     where
         H: homomorphism::Trait<
             Domain = <Self as homomorphism::Trait>::Domain,
-            Codomain = <Self as homomorphism::Trait>::Codomain,
+            CodomainNormalized = <Self as homomorphism::Trait>::CodomainNormalized,
         >,
     {
         let (first_msm_terms, second_msm_terms) =
@@ -345,26 +344,26 @@ where
     #[allow(non_snake_case)]
     fn msm_terms_for_verify<Ct: Serialize, H>(
         &self,
-        public_statement: &<Self as homomorphism::Trait>::Codomain,
-        proof: &ProofProjective<H1::Scalar, H>,
+        public_statement: &<Self as homomorphism::Trait>::CodomainNormalized,
+        proof: &Proof<H1::Scalar, H>,
         cntxt: &Ct,
     ) -> (H1::MsmInput, H2::MsmInput)
     where
         H: homomorphism::Trait<
             Domain = <Self as homomorphism::Trait>::Domain,
-            Codomain = <Self as homomorphism::Trait>::Codomain,
+            CodomainNormalized = <Self as homomorphism::Trait>::CodomainNormalized,
         >, // need this?
     {
         let prover_first_message = match &proof.first_proof_item {
-            FirstProofItemProjective::Commitment(A) => A,
-            FirstProofItemProjective::Challenge(_) => {
+            FirstProofItem::Commitment(A) => A,
+            FirstProofItem::Challenge(_) => {
                 panic!("Missing implementation - expected commitment, not challenge")
             },
         };
         let c = fiat_shamir_challenge_for_sigma_protocol::<_, H1::Scalar, _>(
             cntxt,
             self,
-            public_statement,
+            &public_statement, // &self.normalize(public_statement),
             &prover_first_message,
             &self.dst(),
         );

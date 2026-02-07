@@ -179,7 +179,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             );
             if let Err(err) = hom.verify(
                 &TupleCodomainShape(
-                    self.sharing_proof.range_proof_commitment.clone(),
+                    sigma_protocol::homomorphism::TrivialShape(
+                        self.sharing_proof.range_proof_commitment.0.into_affine(),
+                    ),
                     chunked_elgamal::WeightedCodomainShape {
                         chunks: self
                             .subtrs
@@ -466,12 +468,12 @@ impl<E: Pairing> Aggregated<Subtranscript<E>> for Subtranscript<E> {
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct SharingProof<E: Pairing> {
     /// SoK: the SK is knowledge of `witnesses` s_{i,j} yielding the commitment and the C and the R, their image is the PK, and the signed message is a certain context `cntxt`
-    pub SoK: sigma_protocol::ProofProjective<
+    pub SoK: sigma_protocol::traits::Proof<
         E::ScalarField,
         hkzg_chunked_elgamal::WeightedHomomorphism<'static, E>,
     >, // static because we don't want the lifetime of the Proof to depend on the Homomorphism TODO: try removing it?
     /// A batched range proof showing that all committed values s_{i,j} lie in some range
-    pub range_proof: dekart_univariate_v2::Proof<E>,
+    pub range_proof: dekart_univariate_v2::Proof<E>, // TODO: make an affine version of this
     /// A KZG-style commitment to the values s_{i,j} going into the range proof
     pub range_proof_commitment:
         <dekart_univariate_v2::Proof<E> as BatchedRangeProof<E>>::Commitment,

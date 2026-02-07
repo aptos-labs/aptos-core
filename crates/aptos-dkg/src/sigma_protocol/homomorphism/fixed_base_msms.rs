@@ -96,6 +96,8 @@ pub trait Trait:
         msms.map(|msm_input| Self::msm_eval(msm_input))
     }
 
+    // Depending on the elliptic curve library, the implementatation will be
+    // called e.g. `C::batch_normalize()` or `C::normalize_batch()`
     fn batch_normalize(
         msm_output: Vec<Self::MsmOutput>,
     ) -> Vec<<Self::MsmInput as IsMsmInput>::Base>;

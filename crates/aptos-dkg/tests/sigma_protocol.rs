@@ -40,7 +40,7 @@ where
 
     let proof = hom.prove(&witness, &statement, CNTXT, &mut rng);
 
-    hom.verify(&statement, &proof, CNTXT)
+    hom.verify(&hom.normalize(&statement), &proof, CNTXT)
         .expect("Sigma protocol proof failed verification");
 }
 
@@ -59,7 +59,7 @@ fn test_imhomog_chaum_pedersen<
 
     let proof = hom.prove(&witness, &statement, CNTXT, &mut rng);
 
-    hom.verify(&statement, &proof, CNTXT)
+    hom.verify(&hom.normalize(&statement), &proof, CNTXT)
         .expect("Inhomogeneous Chaum Pederson sigma proof failed verification");
 }
 
@@ -75,7 +75,7 @@ fn test_imhomog_scalar_mul<'a, E>(
 
     let proof = hom.prove(&witness, &statement, CNTXT, &mut rng);
 
-    hom.verify(&statement, &proof, CNTXT)
+    hom.verify(&hom.normalize(&statement), &proof, CNTXT)
         .expect("Inhomogeneous Chaum Pederson sigma proof failed verification");
 }
 
