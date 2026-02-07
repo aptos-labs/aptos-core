@@ -282,10 +282,11 @@ fn get_entry_function_payload_from_transaction_payload(
                 .transaction_payload
                 .as_ref()
                 .and_then(|tp| tp.payload.as_ref())
-                .map(|payload| match payload {
+                .and_then(|payload| match payload {
                     multisig_transaction_payload::Payload::EntryFunctionPayload(ef_payload) => {
-                        ef_payload
+                        Some(ef_payload)
                     },
+                    multisig_transaction_payload::Payload::ScriptPayload(_) => None,
                 }),
             _ => None,
         }

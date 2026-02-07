@@ -2603,6 +2603,18 @@ impl ScriptFunctionArguments {
             script_function_args.arg_vec.try_into()?,
         )))
     }
+
+    pub fn create_multisig_script_payload(
+        self,
+        bytecode: Vec<u8>,
+    ) -> CliTypedResult<MultisigTransactionPayload> {
+        let script_function_args = self.check_input_style()?;
+        Ok(MultisigTransactionPayload::Script(Script::new(
+            bytecode,
+            script_function_args.type_arg_vec.try_into()?,
+            script_function_args.arg_vec.try_into()?,
+        )))
+    }
 }
 
 #[derive(Deserialize, Serialize)]

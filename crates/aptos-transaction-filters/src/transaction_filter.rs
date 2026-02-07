@@ -346,6 +346,7 @@ fn matches_entry_function(
                 MultisigTransactionPayload::EntryFunction(entry_function) => {
                     compare_entry_function(entry_function, address, module_name, function)
                 },
+                _ => false,
             })
             .unwrap_or(false),
         TransactionPayload::EntryFunction(entry_function) => {
@@ -389,6 +390,7 @@ fn matches_entry_function_module_address(
                 MultisigTransactionPayload::EntryFunction(entry_function) => {
                     compare_entry_function_module_address(entry_function, module_address)
                 },
+                _ => false,
             })
             .unwrap_or(false),
         TransactionPayload::EntryFunction(entry_function) => {
