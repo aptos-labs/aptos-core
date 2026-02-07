@@ -3,6 +3,7 @@
 
 //! v2 endpoint handlers.
 
+pub mod account_transactions;
 pub mod blocks;
 pub mod events;
 pub mod health;

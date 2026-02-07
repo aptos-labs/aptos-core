@@ -7,11 +7,13 @@
 //! It wraps the existing v1 Context for shared DB/mempool access while
 //! providing a cleaner, framework-agnostic interface via Axum.
 
+pub mod batch;
 pub mod context;
 pub mod cursor;
 pub mod endpoints;
 pub mod error;
 pub mod extractors;
+pub mod middleware;
 pub mod router;
 pub mod types;
 

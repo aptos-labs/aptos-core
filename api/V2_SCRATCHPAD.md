@@ -57,21 +57,29 @@ Working notes, decisions log, and progress tracker for the API v2 implementation
 
 - [x] Design documents written
 - [x] Design docs updated: body-only metadata, cursor pagination, new endpoints (modules, events, account txns)
-- [ ] ApiV2Config struct added
-- [ ] Axum/Tower/utoipa dependencies added
-- [ ] v2 module structure created
-- [ ] V2Context implemented
-- [ ] V2Error implemented
-- [ ] Health/info endpoints
-- [ ] Resource endpoints
-- [ ] View function endpoint
-- [ ] Transaction endpoints
-- [ ] Block endpoints
-- [ ] Batch endpoint
+- [x] ApiV2Config struct added to NodeConfig
+- [x] Axum/Tower/tower-http/utoipa/base64/uuid dependencies added
+- [x] v2 module structure created (api/src/v2/)
+- [x] V2Context implemented (wraps v1 Context, adds pagination helpers)
+- [x] V2Error + ErrorCode implemented (40+ error codes, IntoResponse)
+- [x] Opaque cursor-based pagination (StateKey, Version, SequenceNumber variants)
+- [x] Health/info endpoints (GET /v2/health, GET /v2/info)
+- [x] Resource endpoints (paginated list + single get)
+- [x] Module endpoints (paginated list + single get)
+- [x] View function endpoint (POST /v2/view, JSON input)
+- [x] Transaction endpoints (paginated list, get by hash, BCS submit, wait by hash)
+- [x] Account transaction summaries endpoint (paginated)
+- [x] Events endpoint (paginated by creation number)
+- [x] Block endpoints (by height, latest)
+- [x] JSON-RPC 2.0 batch endpoint (POST /v2/batch, 8 methods supported)
+- [x] Middleware (request-id, logging, CORS, compression, size limit)
+- [x] Router integration (separate port via axum::serve in runtime.rs)
+- [x] JsonOrBcs + BcsOnly content negotiation extractors
+- [x] V2Response envelope with LedgerMetadata in body
+- [x] Cursor unit tests (4 passing)
 - [ ] WebSocket support
-- [ ] Middleware (logging, size limit, CORS)
-- [ ] Router integration (same-port dispatcher)
-- [ ] HTTP/2 (h2c)
-- [ ] OpenAPI spec generation
-- [ ] Unit tests
+- [ ] HTTP/2 (h2c) via hyper-util
+- [ ] Same-port Poem+Axum co-hosting (currently requires separate port)
+- [ ] OpenAPI spec generation (utoipa-axum not yet compatible with axum 0.7)
 - [ ] Integration tests
+- [ ] Performance benchmarks

@@ -15,6 +15,10 @@ use crate::{
     spec::{spec_endpoint_json, spec_endpoint_yaml},
     state::StateApi,
     transactions::TransactionsApi,
+    v2::{
+        build_v2_router,
+        context::{V2Config, V2Context},
+    },
     view_function::ViewFunctionApi,
 };
 use anyhow::{anyhow, Context as AnyhowContext};
@@ -54,6 +58,36 @@ pub fn bootstrap(
 
     attach_poem_to_runtime(runtime.handle(), context.clone(), config, false, port_tx)
         .context("Failed to attach poem to runtime")?;
+
+    // Start v2 API if enabled.
+    if config.api_v2.enabled {
+        let v2_config = V2Config::from_configs(&config.api_v2, &config.api);
+        let v2_ctx = V2Context::new(context.clone(), v2_config);
+        let v2_router = build_v2_router(v2_ctx);
+
+        // Determine the address for the v2 API server.
+        // If a separate address is configured, use it. Otherwise, use v1 port + 1
+        // as a default separate port (same-port Poem+Axum cohosting is not yet supported).
+        let v2_address = config.api_v2.address.unwrap_or_else(|| {
+            let mut addr = config.api.address;
+            addr.set_port(addr.port() + 1);
+            info!(
+                "v2 API: no separate address configured, defaulting to {}",
+                addr
+            );
+            addr
+        });
+
+        info!("Starting v2 API on {}", v2_address);
+        runtime.spawn(async move {
+            let listener = tokio::net::TcpListener::bind(v2_address)
+                .await
+                .expect("Failed to bind v2 API listener");
+            axum::serve(listener, v2_router)
+                .await
+                .expect("v2 API server failed");
+        });
+    }
 
     let context_cloned = context.clone();
     if let Some(period_ms) = config.api.periodic_gas_estimation_ms {

@@ -5,14 +5,18 @@ use crate::v2::{
     context::{spawn_blocking, V2Context},
     cursor::Cursor,
     error::{ErrorCode, V2Error},
+    extractors::BcsOnly,
     types::{CursorOnlyParams, V2Response},
 };
 use aptos_api_types::{AsConverter, Transaction, TransactionOnChainData};
 use aptos_crypto::HashValue;
+use aptos_types::transaction::SignedTransaction;
 use axum::{
     extract::{Path, Query, State},
     Json,
 };
+use serde::Serialize;
+use std::time::Duration;
 
 /// GET /v2/transactions -- paginated list of committed transactions.
 pub async fn list_transactions_handler(
@@ -112,6 +116,92 @@ fn render_single_transaction(
     converter
         .try_into_onchain_transaction(timestamp, txn_data)
         .map_err(V2Error::internal)
+}
+
+/// POST /v2/transactions -- submit a signed transaction (BCS only).
+pub async fn submit_transaction_handler(
+    State(ctx): State<V2Context>,
+    BcsOnly(versioned): BcsOnly<SignedTransaction>,
+) -> Result<Json<V2Response<SubmitResult>>, V2Error> {
+    let txn = versioned.into_inner();
+    let hash = txn.committed_hash();
+
+    let (mempool_status, vm_status_opt) = ctx
+        .inner()
+        .submit_transaction(txn)
+        .await
+        .map_err(V2Error::internal)?;
+
+    use aptos_types::mempool_status::MempoolStatusCode;
+    if mempool_status.code == MempoolStatusCode::Accepted {
+        let ledger_info = ctx.ledger_info()?;
+        Ok(Json(V2Response::new(
+            SubmitResult {
+                hash: format!("0x{}", hash),
+                status: "accepted".to_string(),
+            },
+            &ledger_info,
+        )))
+    } else {
+        let msg = vm_status_opt
+            .map(|s| format!("{:?}: {:?}", mempool_status.code, s))
+            .unwrap_or_else(|| format!("{:?}", mempool_status.code));
+        Err(V2Error::bad_request(ErrorCode::MempoolRejected, msg))
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct SubmitResult {
+    pub hash: String,
+    pub status: String,
+}
+
+/// GET /v2/transactions/:hash/wait -- poll until the transaction is committed or timeout.
+pub async fn wait_transaction_handler(
+    State(ctx): State<V2Context>,
+    Path(hash): Path<String>,
+) -> Result<Json<V2Response<Transaction>>, V2Error> {
+    let hash_value = parse_hash(&hash)?;
+    let timeout_ms = ctx.v2_config.wait_by_hash_timeout_ms;
+    let poll_interval_ms = ctx.v2_config.wait_by_hash_poll_interval_ms;
+
+    let start_time = std::time::Instant::now();
+
+    loop {
+        let ledger_info = ctx.ledger_info()?;
+        let version = ledger_info.version();
+
+        let ctx_clone = ctx.clone();
+        let result = spawn_blocking(move || {
+            ctx_clone
+                .inner()
+                .get_transaction_by_hash(hash_value, version)
+                .map_err(V2Error::internal)
+        })
+        .await?;
+
+        match result {
+            Some(txn_data) => {
+                let ctx_clone = ctx.clone();
+                let txn = spawn_blocking(move || render_single_transaction(&ctx_clone, txn_data))
+                    .await?;
+                let ledger_info = ctx.ledger_info()?;
+                return Ok(Json(V2Response::new(txn, &ledger_info)));
+            },
+            None => {
+                if (start_time.elapsed().as_millis() as u64) >= timeout_ms {
+                    return Err(V2Error::not_found(
+                        ErrorCode::TransactionNotFound,
+                        format!(
+                            "Transaction {} not found within {}ms timeout",
+                            hash, timeout_ms
+                        ),
+                    ));
+                }
+                tokio::time::sleep(Duration::from_millis(poll_interval_ms)).await;
+            },
+        }
+    }
 }
 
 fn parse_hash(s: &str) -> Result<HashValue, V2Error> {
