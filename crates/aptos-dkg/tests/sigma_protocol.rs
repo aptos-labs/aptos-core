@@ -1,12 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_dkg::pvss::chunky::chunked_scalar_mul::Witness;
 use aptos_crypto::arkworks::{
     msm::{IsMsmInput, MsmInput},
     random::{sample_field_element, sample_field_elements},
 };
 use aptos_dkg::{
+    pvss::chunky::chunked_scalar_mul::Witness,
     sigma_protocol::{
         self, homomorphism,
         homomorphism::{
@@ -139,8 +139,8 @@ mod schnorr {
         }
 
         fn batch_normalize(
-                msm_output: Vec<Self::MsmOutput>
-            ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
+            msm_output: Vec<Self::MsmOutput>,
+        ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
             C::normalize_batch(&msm_output)
         }
     }
@@ -281,13 +281,12 @@ fn test_chaum_pedersen() {
     // TODO: move this to a separate test?
     use crate::chunked_scalar_mul::make_inhomogeneous_scalar_mul;
     use aptos_dkg::pvss::chunky::{chunked_scalar_mul::Witness, chunks};
-    use ark_ec::scalar_mul::BatchMulPreprocessing;
     use ark_bn254::Fr;
+    use ark_ec::scalar_mul::BatchMulPreprocessing;
 
     let ell = 16u8;
 
     let scalars = sample_field_elements(1, &mut rng);
-
 
     let chunked_values: Vec<Vec<Scalar<Fr>>> = scalars
         .iter()

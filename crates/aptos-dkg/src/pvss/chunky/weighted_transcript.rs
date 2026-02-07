@@ -181,7 +181,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
                 &TupleCodomainShape(
                     self.sharing_proof.range_proof_commitment.clone(),
                     chunked_elgamal::WeightedCodomainShape {
-                        chunks: self.subtrs.Cs
+                        chunks: self
+                            .subtrs
+                            .Cs
                             .iter()
                             .map(|mat| {
                                 mat.iter()
@@ -189,7 +191,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
                                     .collect()
                             })
                             .collect(),
-                        randomness: self.subtrs.Rs
+                        randomness: self
+                            .subtrs
+                            .Rs
                             .iter()
                             .map(|row| row.iter().map(|&r| r.into()).collect())
                             .collect(),
@@ -274,8 +278,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             }
         }
 
-        let weighted_Cs = E::G1::msm(&base_vec, &exp_vec)
-            .expect("Failed to compute MSM of Cs in chunky");
+        let weighted_Cs =
+            E::G1::msm(&base_vec, &exp_vec).expect("Failed to compute MSM of Cs in chunky");
 
         // Convert affine to projective for normalize_batch, then back to affine for MSM
         let Vs_slice_proj: Vec<E::G2> = Vs_flat[..sc.get_total_weight()]
@@ -651,9 +655,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     ) -> Self::DealtPubKeyShare {
         self.subtrs.Vs[player.id]
             .iter()
-            .map(|&V_i| {
-                keys::DealtPubKeyShare::<E>::new(keys::DealtPubKey::new(V_i))
-            })
+            .map(|&V_i| keys::DealtPubKeyShare::<E>::new(keys::DealtPubKey::new(V_i)))
             .collect()
     }
 

@@ -16,7 +16,7 @@ pub mod tuple;
 ///
 /// In the context of sigma protocols, homomorphisms are the key building blocks:
 /// they capture the algebraic relations that proofs are designed to demonstrate.
-/// 
+///
 /// The `Codomain` type represents the output of the homomorphism, which may admit
 /// multiple equivalent representations (e.g. projective vs. affine group elements).
 ///

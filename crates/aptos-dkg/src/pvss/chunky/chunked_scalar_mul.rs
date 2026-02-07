@@ -176,8 +176,8 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for Homomorphism<'a, C> {
     }
 
     fn batch_normalize(
-            msm_output: Vec<Self::MsmOutput>
-        ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
+        msm_output: Vec<Self::MsmOutput>,
+    ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
         C::normalize_batch(&msm_output)
     }
 }

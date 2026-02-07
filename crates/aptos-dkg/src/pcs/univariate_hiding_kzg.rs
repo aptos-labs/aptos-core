@@ -378,8 +378,8 @@ impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
     }
 
     fn batch_normalize(
-            msm_output: Vec<Self::MsmOutput>
-        ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
+        msm_output: Vec<Self::MsmOutput>,
+    ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
         E::G1::normalize_batch(&msm_output)
     }
 }

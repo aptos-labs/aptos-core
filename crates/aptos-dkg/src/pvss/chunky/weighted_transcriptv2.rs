@@ -1,13 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::pvss::chunky::chunked_elgamal::decrypt_chunked_scalars;
 use crate::{
     dlog::bsgs,
     pcs::univariate_hiding_kzg,
     pvss::{
         chunky::{
-            chunked_elgamal::{self, num_chunks_per_scalar},
+            chunked_elgamal::{self, decrypt_chunked_scalars, num_chunks_per_scalar},
             chunked_scalar_mul, chunks,
             hkzg_chunked_elgamal::HkzgWeightedElgamalWitness,
             hkzg_chunked_elgamal_commit,

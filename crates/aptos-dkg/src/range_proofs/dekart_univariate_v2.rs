@@ -945,7 +945,6 @@ pub mod two_term_msm {
         pub hiding_kzg_randomness: Scalar<F>,
     }
 
-
     impl<C: CurveGroup> homomorphism::Trait for Homomorphism<C> {
         type Codomain = CodomainShape<C>;
         type CodomainNormalized = CodomainShape<C::Affine>;
@@ -991,8 +990,8 @@ pub mod two_term_msm {
         }
 
         fn batch_normalize(
-                msm_output: Vec<Self::MsmOutput>
-            ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
+            msm_output: Vec<Self::MsmOutput>,
+        ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
             C::normalize_batch(&msm_output)
         }
     }

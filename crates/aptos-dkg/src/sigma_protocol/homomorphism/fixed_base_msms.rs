@@ -25,7 +25,12 @@ use std::fmt::Debug;
 /// - Methods for computing the MSM representations of a homomorphism input.
 /// - A uniform “shape” abstraction for collecting and flattening MSM outputs
 ///   for batch verification in Σ-protocols.
-pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOutput>, CodomainNormalized = Self::CodomainShape<<Self::MsmInput as IsMsmInput>::Base>> {
+pub trait Trait:
+    homomorphism::Trait<
+    Codomain = Self::CodomainShape<Self::MsmOutput>,
+    CodomainNormalized = Self::CodomainShape<<Self::MsmInput as IsMsmInput>::Base>,
+>
+{
     // Type representing the scalar used in the `MsmInput`s. Convenient to repeat here, and currently used in `prove_homomorphism()` where it could be replaced by e.g. `C::ScalarField`... (or maybe by going inside of MsmInput)
     type Scalar: ark_ff::PrimeField; // Probably need less here but this what it'll be in practice
 
@@ -92,31 +97,29 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
     }
 
     fn batch_normalize(
-        msm_output: Vec<Self::MsmOutput>
+        msm_output: Vec<Self::MsmOutput>,
     ) -> Vec<<Self::MsmInput as IsMsmInput>::Base>;
 
-    fn normalize_output(
-        projective_output: &Self::Codomain
-    ) -> Self::CodomainNormalized 
+    fn normalize_output(projective_output: &Self::Codomain) -> Self::CodomainNormalized
     where
         Self::Codomain: EntrywiseMap<
             Self::MsmOutput,
             Output<<Self::MsmInput as IsMsmInput>::Base> = Self::CodomainNormalized,
-        >,    
+        >,
     {
-    // 1. Collect all elements into a Vec
-    let msm_vec: Vec<Self::MsmOutput> = projective_output.clone().into_iter().collect();
+        // 1. Collect all elements into a Vec
+        let msm_vec: Vec<Self::MsmOutput> = projective_output.clone().into_iter().collect();
 
-    // 2. Apply batch_normalize
-    let normalized_vec: Vec<<Self::MsmInput as IsMsmInput>::Base> = Self::batch_normalize(msm_vec);
+        // 2. Apply batch_normalize
+        let normalized_vec: Vec<<Self::MsmInput as IsMsmInput>::Base> =
+            Self::batch_normalize(msm_vec);
 
-    // 3. Replace elements in projective_output with normalized values
-    let mut iter = normalized_vec.into_iter();
+        // 3. Replace elements in projective_output with normalized values
+        let mut iter = normalized_vec.into_iter();
 
-    projective_output.clone().map(|_t| {
-        iter.next().expect("Not enough elements, somehow")
-    })
-
+        projective_output
+            .clone()
+            .map(|_t| iter.next().expect("Not enough elements, somehow"))
     }
 }
 
@@ -146,7 +149,7 @@ where
     }
 
     fn batch_normalize(
-        msm_output: Vec<Self::MsmOutput>
+        msm_output: Vec<Self::MsmOutput>,
     ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
         H::batch_normalize(msm_output)
     }

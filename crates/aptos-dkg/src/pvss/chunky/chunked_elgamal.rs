@@ -21,8 +21,7 @@ use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
 };
 use ark_std::fmt::Debug;
-use std::collections::HashMap;
-use std::ops::Sub;
+use std::{collections::HashMap, ops::Sub};
 
 pub const DST: &[u8; 31] = b"APTOS_CHUNKED_ELGAMAL_SIGMA_DST"; // This is used for the sigma protocol Fiat-Shamir challenges
 
@@ -311,8 +310,8 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for WeightedHomomorphism<'a, C> {
     }
 
     fn batch_normalize(
-            msm_output: Vec<Self::MsmOutput>
-        ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
+        msm_output: Vec<Self::MsmOutput>,
+    ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
         C::normalize_batch(&msm_output)
     }
 }

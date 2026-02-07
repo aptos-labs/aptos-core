@@ -1,7 +1,6 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_crypto::arkworks::msm::IsMsmInput;
 use crate::{
     sigma_protocol,
     sigma_protocol::{
@@ -14,7 +13,7 @@ use crate::{
     },
 };
 use anyhow::ensure;
-use aptos_crypto::utils;
+use aptos_crypto::{arkworks::msm::IsMsmInput, utils};
 use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_ff::{UniformRand, Zero};
 use ark_serialize::{
@@ -81,7 +80,10 @@ where
     }
 
     fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
-        TupleCodomainShape(H1::normalize(&self.hom1, &value.0), H2::normalize(&self.hom2, &value.1))
+        TupleCodomainShape(
+            H1::normalize(&self.hom1, &value.0),
+            H2::normalize(&self.hom2, &value.1),
+        )
     }
 }
 
@@ -102,7 +104,10 @@ where
     }
 
     fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
-        TupleCodomainShape(H1::normalize(&self.hom1, &value.0), H2::normalize(&self.hom2, &value.1))
+        TupleCodomainShape(
+            H1::normalize(&self.hom1, &value.0),
+            H2::normalize(&self.hom2, &value.1),
+        )
     }
 }
 
@@ -229,8 +234,8 @@ where
     }
 
     fn batch_normalize(
-            msm_output: Vec<Self::MsmOutput>
-        ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
+        msm_output: Vec<Self::MsmOutput>,
+    ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
         H1::batch_normalize(msm_output)
     }
 }
