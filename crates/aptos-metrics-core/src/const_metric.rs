@@ -1,6 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+// Allow useless conversion lint - these conversions are needed for some prometheus versions
+#![allow(clippy::useless_conversion)]
+
 use anyhow::{anyhow, Result};
 use prometheus::{
     core::{Collector, Desc},
