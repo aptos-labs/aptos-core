@@ -15,6 +15,7 @@ pub struct PeerMonitoringServiceConfig {
     pub metadata_update_interval_ms: u64, // The interval (ms) between metadata updates
     pub network_monitoring: NetworkMonitoringConfig,
     pub node_monitoring: NodeMonitoringConfig,
+    pub num_threads: Option<usize>, // Number of tokio runtime worker threads
     pub peer_monitor_interval_usec: u64, // The interval (usec) between peer monitor executions
 }
 
@@ -30,6 +31,7 @@ impl Default for PeerMonitoringServiceConfig {
             metadata_update_interval_ms: 5000,  // 5 seconds
             network_monitoring: NetworkMonitoringConfig::default(),
             node_monitoring: NodeMonitoringConfig::default(),
+            num_threads: Some(4),
             peer_monitor_interval_usec: 1_000_000, // 1 second
         }
     }
