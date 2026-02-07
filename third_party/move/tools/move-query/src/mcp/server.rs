@@ -220,26 +220,6 @@ struct FullName {
     name: String,
 }
 
-#[derive(Debug, Default, Deserialize, JsonSchema)]
-struct SourceSpan {
-    /// File path
-    file: String,
-    /// Start line (1-indexed)
-    start_line: u32,
-    /// Start column (1-indexed, optional, defaults to 1)
-    #[serde(default = "default_column")]
-    start_column: u32,
-    /// End line (1-indexed)
-    end_line: u32,
-    /// End column (1-indexed, optional, defaults to end of line)
-    #[serde(default)]
-    end_column: u32,
-}
-
-fn default_column() -> u32 {
-    1
-}
-
 // ----------------------------------------
 // Tool Enum
 // ----------------------------------------
@@ -255,7 +235,7 @@ enum Tool {
     GetFunction(FullName),
     GetStruct(FullName),
     GetConstant(FullName),
-    GetSource(SourceSpan),
+    GetSource(Location),
     Shutdown(NoArgs),
 }
 
@@ -303,7 +283,7 @@ impl Tool {
                 let build_config = BuildConfig {
                     dev_mode: req.dev,
                     test_mode: req.test_mode,
-                    verify_mode: req.verify_mode,
+                    verify_mode: Some(req.verify_mode),
                     additional_named_addresses: named_addresses,
                     skip_fetch_latest_git_deps: true,
                     compiler_config: CompilerConfig {
@@ -347,14 +327,7 @@ impl Tool {
             Tool::GetConstant(arg) => Ok(serde_json::to_value(
                 state.get_engine()?.get_constant(&arg.name)?,
             )?),
-            Tool::GetSource(args) => {
-                let loc = Location {
-                    file: args.file,
-                    start_line: args.start_line,
-                    start_column: args.start_column,
-                    end_line: args.end_line,
-                    end_column: args.end_column,
-                };
+            Tool::GetSource(loc) => {
                 Ok(serde_json::to_value(state.get_engine()?.get_source(&loc)?)?)
             },
             Tool::Shutdown(_) => {
@@ -402,7 +375,7 @@ impl Tool {
             | Tool::GetFunction(_)
             | Tool::GetStruct(_)
             | Tool::GetConstant(_) => json_schema::<FullName>(),
-            Tool::GetSource(_) => json_schema::<SourceSpan>(),
+            Tool::GetSource(_) => json_schema::<Location>(),
         }
     }
 

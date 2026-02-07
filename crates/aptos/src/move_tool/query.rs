@@ -46,7 +46,7 @@ impl CliCommand<String> for Serve {
 /// future extensions without breaking changes.
 #[derive(Subcommand)]
 pub enum QueryTool {
-    /// Start MCP server
+    /// Start MCP server (JSON-RPC over stdio)
     Serve(Serve),
 }
 

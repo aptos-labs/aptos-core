@@ -147,7 +147,12 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::borrow",
+    "0x1::vector::length"
+  ],
+  "callers": []
 }
 
 // === Function: 0x42::collection::borrow_mut ===
@@ -169,7 +174,12 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::borrow_mut",
+    "0x1::vector::length"
+  ],
+  "callers": []
 }
 
 // === Function: 0x42::collection::is_empty ===
@@ -191,7 +201,11 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::is_empty"
+  ],
+  "callers": []
 }
 
 // === Function: 0x42::collection::length ===
@@ -213,7 +227,11 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::length"
+  ],
+  "callers": []
 }
 
 // === Function: 0x42::collection::add ===
@@ -235,7 +253,11 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::push_back"
+  ],
+  "callers": []
 }
 
 // === Function: 0x42::collection::get_name ===
@@ -257,7 +279,9 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Function: 0x42::collection::has_name ===
@@ -279,7 +303,11 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::option::is_some"
+  ],
+  "callers": []
 }
 
 // === Function: 0x42::collection::new ===
@@ -301,7 +329,12 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::empty",
+    "0x1::option::none"
+  ],
+  "callers": []
 }
 
 // === Function: 0x42::collection::new_named ===
@@ -323,7 +356,12 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::empty",
+    "0x1::option::some"
+  ],
+  "callers": []
 }
 
 // === Function: 0x42::collection::pop ===
@@ -345,7 +383,12 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::is_empty",
+    "0x1::vector::pop_back"
+  ],
+  "callers": []
 }
 
 // === Function: 0x42::collection::set_name ===
@@ -367,7 +410,11 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::option::some"
+  ],
+  "callers": []
 }
 
 // === Source: 0x42::collection::borrow ===
@@ -462,7 +509,14 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::borrow",
+    "0x1::vector::length"
+  ],
+  "callers": [
+    "0x1::option::contains"
+  ]
 }
 
 // === Function: 0x1::vector (dependency)::index_of ===
@@ -484,7 +538,12 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::borrow",
+    "0x1::vector::length"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::vector (dependency)::append ===
@@ -506,7 +565,17 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::destroy_empty",
+    "0x1::vector::is_empty",
+    "0x1::vector::pop_back",
+    "0x1::vector::push_back",
+    "0x1::vector::reverse"
+  ],
+  "callers": [
+    "0x1::string::append"
+  ]
 }
 
 // === Function: 0x1::vector (dependency)::borrow ===
@@ -530,7 +599,18 @@
   "attributes": [
     "bytecode_instruction"
   ],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": [
+    "0x1::vector::contains",
+    "0x1::vector::index_of",
+    "0x1::vector::find",
+    "0x1::vector::for_each_ref",
+    "0x1::option::borrow",
+    "0x1::option::borrow_with_default",
+    "0x1::option::get_with_default",
+    "0x42::collection::borrow"
+  ]
 }
 
 // === Function: 0x1::vector (dependency)::borrow_mut ===
@@ -554,7 +634,13 @@
   "attributes": [
     "bytecode_instruction"
   ],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": [
+    "0x1::vector::for_each_mut",
+    "0x1::option::borrow_mut",
+    "0x42::collection::borrow_mut"
+  ]
 }
 
 // === Function: 0x1::vector (dependency)::destroy_empty ===
@@ -578,7 +664,13 @@
   "attributes": [
     "bytecode_instruction"
   ],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": [
+    "0x1::vector::append",
+    "0x1::option::destroy_none",
+    "0x1::option::destroy_some"
+  ]
 }
 
 // === Function: 0x1::vector (dependency)::empty ===
@@ -602,7 +694,14 @@
   "attributes": [
     "bytecode_instruction"
   ],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": [
+    "0x1::vector::singleton",
+    "0x1::option::none",
+    "0x42::collection::new",
+    "0x42::collection::new_named"
+  ]
 }
 
 // === Function: 0x1::vector (dependency)::filter ===
@@ -624,7 +723,14 @@
   "is_inline": true,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::is_empty",
+    "0x1::vector::pop_back",
+    "0x1::vector::push_back",
+    "0x1::vector::reverse"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::vector (dependency)::find ===
@@ -646,7 +752,12 @@
   "is_inline": true,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::borrow",
+    "0x1::vector::length"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::vector (dependency)::fold ===
@@ -668,7 +779,13 @@
   "is_inline": true,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::is_empty",
+    "0x1::vector::pop_back",
+    "0x1::vector::reverse"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::vector (dependency)::for_each ===
@@ -690,7 +807,13 @@
   "is_inline": true,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::is_empty",
+    "0x1::vector::pop_back",
+    "0x1::vector::reverse"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::vector (dependency)::for_each_mut ===
@@ -712,7 +835,12 @@
   "is_inline": true,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::borrow_mut",
+    "0x1::vector::length"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::vector (dependency)::for_each_ref ===
@@ -734,7 +862,12 @@
   "is_inline": true,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::borrow",
+    "0x1::vector::length"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::vector (dependency)::is_empty ===
@@ -756,7 +889,28 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::length"
+  ],
+  "callers": [
+    "0x1::vector::append",
+    "0x1::vector::filter",
+    "0x1::vector::fold",
+    "0x1::vector::for_each",
+    "0x1::vector::map",
+    "0x1::vector::swap_remove",
+    "0x1::option::borrow_with_default",
+    "0x1::option::destroy_with_default",
+    "0x1::option::fill",
+    "0x1::option::get_with_default",
+    "0x1::option::is_none",
+    "0x1::option::is_some",
+    "0x1::option::swap_or_fill",
+    "0x1::string::is_empty",
+    "0x42::collection::is_empty",
+    "0x42::collection::pop"
+  ]
 }
 
 // === Function: 0x1::vector (dependency)::length ===
@@ -780,7 +934,25 @@
   "attributes": [
     "bytecode_instruction"
   ],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": [
+    "0x1::vector::contains",
+    "0x1::vector::index_of",
+    "0x1::vector::find",
+    "0x1::vector::for_each_mut",
+    "0x1::vector::for_each_ref",
+    "0x1::vector::is_empty",
+    "0x1::vector::remove",
+    "0x1::vector::reverse",
+    "0x1::vector::swap_remove",
+    "0x1::string::length",
+    "0x1::string::insert",
+    "0x1::string::sub_string",
+    "0x42::collection::borrow",
+    "0x42::collection::borrow_mut",
+    "0x42::collection::length"
+  ]
 }
 
 // === Function: 0x1::vector (dependency)::map ===
@@ -802,7 +974,14 @@
   "is_inline": true,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::is_empty",
+    "0x1::vector::pop_back",
+    "0x1::vector::push_back",
+    "0x1::vector::reverse"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::vector (dependency)::pop_back ===
@@ -826,7 +1005,23 @@
   "attributes": [
     "bytecode_instruction"
   ],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": [
+    "0x1::vector::append",
+    "0x1::vector::filter",
+    "0x1::vector::fold",
+    "0x1::vector::for_each",
+    "0x1::vector::map",
+    "0x1::vector::remove",
+    "0x1::vector::swap_remove",
+    "0x1::option::swap",
+    "0x1::option::destroy_some",
+    "0x1::option::destroy_with_default",
+    "0x1::option::extract",
+    "0x1::option::swap_or_fill",
+    "0x42::collection::pop"
+  ]
 }
 
 // === Function: 0x1::vector (dependency)::push_back ===
@@ -850,7 +1045,18 @@
   "attributes": [
     "bytecode_instruction"
   ],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": [
+    "0x1::vector::append",
+    "0x1::vector::filter",
+    "0x1::vector::map",
+    "0x1::vector::singleton",
+    "0x1::option::swap",
+    "0x1::option::fill",
+    "0x1::option::swap_or_fill",
+    "0x42::collection::add"
+  ]
 }
 
 // === Function: 0x1::vector (dependency)::remove ===
@@ -872,7 +1078,13 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::length",
+    "0x1::vector::pop_back",
+    "0x1::vector::swap"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::vector (dependency)::reverse ===
@@ -894,7 +1106,18 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::length",
+    "0x1::vector::swap"
+  ],
+  "callers": [
+    "0x1::vector::append",
+    "0x1::vector::filter",
+    "0x1::vector::fold",
+    "0x1::vector::for_each",
+    "0x1::vector::map"
+  ]
 }
 
 // === Function: 0x1::vector (dependency)::singleton ===
@@ -916,7 +1139,14 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::empty",
+    "0x1::vector::push_back"
+  ],
+  "callers": [
+    "0x1::option::some"
+  ]
 }
 
 // === Function: 0x1::vector (dependency)::swap ===
@@ -940,7 +1170,13 @@
   "attributes": [
     "bytecode_instruction"
   ],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": [
+    "0x1::vector::remove",
+    "0x1::vector::reverse",
+    "0x1::vector::swap_remove"
+  ]
 }
 
 // === Function: 0x1::vector (dependency)::swap_remove ===
@@ -962,7 +1198,14 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::is_empty",
+    "0x1::vector::length",
+    "0x1::vector::pop_back",
+    "0x1::vector::swap"
+  ],
+  "callers": []
 }
 
 // === Module: 0x1::option (dependency) ===
@@ -1104,7 +1347,11 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::contains"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::option (dependency)::borrow ===
@@ -1126,7 +1373,15 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::borrow",
+    "0x1::option::is_some"
+  ],
+  "callers": [
+    "0x1::option::filter",
+    "0x1::option::for_each_ref"
+  ]
 }
 
 // === Function: 0x1::option (dependency)::borrow_mut ===
@@ -1148,7 +1403,14 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::borrow_mut",
+    "0x1::option::is_some"
+  ],
+  "callers": [
+    "0x1::option::for_each_mut"
+  ]
 }
 
 // === Function: 0x1::option (dependency)::filter ===
@@ -1170,7 +1432,13 @@
   "is_inline": true,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::option::borrow",
+    "0x1::option::is_some",
+    "0x1::option::none"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::option (dependency)::fold ===
@@ -1192,7 +1460,13 @@
   "is_inline": true,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::option::destroy_none",
+    "0x1::option::destroy_some",
+    "0x1::option::is_some"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::option (dependency)::for_each ===
@@ -1214,7 +1488,13 @@
   "is_inline": true,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::option::destroy_none",
+    "0x1::option::destroy_some",
+    "0x1::option::is_some"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::option (dependency)::for_each_mut ===
@@ -1236,7 +1516,12 @@
   "is_inline": true,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::option::borrow_mut",
+    "0x1::option::is_some"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::option (dependency)::for_each_ref ===
@@ -1258,7 +1543,12 @@
   "is_inline": true,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::option::borrow",
+    "0x1::option::is_some"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::option (dependency)::map ===
@@ -1280,7 +1570,15 @@
   "is_inline": true,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::option::destroy_none",
+    "0x1::option::destroy_some",
+    "0x1::option::is_some",
+    "0x1::option::none",
+    "0x1::option::some"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::option (dependency)::swap ===
@@ -1302,7 +1600,13 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::pop_back",
+    "0x1::vector::push_back",
+    "0x1::option::is_some"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::option (dependency)::borrow_with_default ===
@@ -1324,7 +1628,12 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::borrow",
+    "0x1::vector::is_empty"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::option (dependency)::destroy_none ===
@@ -1346,7 +1655,16 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::destroy_empty",
+    "0x1::option::is_none"
+  ],
+  "callers": [
+    "0x1::option::fold",
+    "0x1::option::for_each",
+    "0x1::option::map"
+  ]
 }
 
 // === Function: 0x1::option (dependency)::destroy_some ===
@@ -1368,7 +1686,17 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::destroy_empty",
+    "0x1::vector::pop_back",
+    "0x1::option::is_some"
+  ],
+  "callers": [
+    "0x1::option::fold",
+    "0x1::option::for_each",
+    "0x1::option::map"
+  ]
 }
 
 // === Function: 0x1::option (dependency)::destroy_with_default ===
@@ -1390,7 +1718,12 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::is_empty",
+    "0x1::vector::pop_back"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::option (dependency)::extract ===
@@ -1412,7 +1745,12 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::pop_back",
+    "0x1::option::is_some"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::option (dependency)::fill ===
@@ -1434,7 +1772,12 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::is_empty",
+    "0x1::vector::push_back"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::option (dependency)::get_with_default ===
@@ -1456,7 +1799,12 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::borrow",
+    "0x1::vector::is_empty"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::option (dependency)::is_none ===
@@ -1478,7 +1826,13 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::is_empty"
+  ],
+  "callers": [
+    "0x1::option::destroy_none"
+  ]
 }
 
 // === Function: 0x1::option (dependency)::is_some ===
@@ -1500,7 +1854,24 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::is_empty"
+  ],
+  "callers": [
+    "0x1::option::borrow",
+    "0x1::option::borrow_mut",
+    "0x1::option::filter",
+    "0x1::option::fold",
+    "0x1::option::for_each",
+    "0x1::option::for_each_mut",
+    "0x1::option::for_each_ref",
+    "0x1::option::map",
+    "0x1::option::swap",
+    "0x1::option::destroy_some",
+    "0x1::option::extract",
+    "0x42::collection::has_name"
+  ]
 }
 
 // === Function: 0x1::option (dependency)::none ===
@@ -1522,7 +1893,17 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::empty"
+  ],
+  "callers": [
+    "0x1::option::filter",
+    "0x1::option::map",
+    "0x1::option::swap_or_fill",
+    "0x1::string::try_utf8",
+    "0x42::collection::new"
+  ]
 }
 
 // === Function: 0x1::option (dependency)::some ===
@@ -1544,7 +1925,17 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::singleton"
+  ],
+  "callers": [
+    "0x1::option::map",
+    "0x1::option::swap_or_fill",
+    "0x1::string::try_utf8",
+    "0x42::collection::new_named",
+    "0x42::collection::set_name"
+  ]
 }
 
 // === Function: 0x1::option (dependency)::swap_or_fill ===
@@ -1566,7 +1957,15 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::is_empty",
+    "0x1::vector::pop_back",
+    "0x1::vector::push_back",
+    "0x1::option::none",
+    "0x1::option::some"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::option (dependency)::to_vec ===
@@ -1588,7 +1987,9 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Module: 0x1::string (dependency) ===
@@ -1718,7 +2119,11 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::string::internal_index_of"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::string (dependency)::append ===
@@ -1740,7 +2145,14 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::append"
+  ],
+  "callers": [
+    "0x1::string::append_utf8",
+    "0x1::string::insert"
+  ]
 }
 
 // === Function: 0x1::string (dependency)::is_empty ===
@@ -1762,7 +2174,11 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::is_empty"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::string (dependency)::length ===
@@ -1784,7 +2200,13 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::length"
+  ],
+  "callers": [
+    "0x1::string::insert"
+  ]
 }
 
 // === Function: 0x1::string (dependency)::append_utf8 ===
@@ -1806,7 +2228,12 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::string::append",
+    "0x1::string::utf8"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::string (dependency)::bytes ===
@@ -1828,7 +2255,9 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Function: 0x1::string (dependency)::insert ===
@@ -1850,7 +2279,15 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::length",
+    "0x1::string::append",
+    "0x1::string::length",
+    "0x1::string::internal_is_char_boundary",
+    "0x1::string::sub_string"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::string (dependency)::internal_check_utf8 ===
@@ -1872,7 +2309,12 @@
   "is_inline": false,
   "is_native": true,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": [
+    "0x1::string::try_utf8",
+    "0x1::string::utf8"
+  ]
 }
 
 // === Function: 0x1::string (dependency)::internal_index_of ===
@@ -1894,7 +2336,11 @@
   "is_inline": false,
   "is_native": true,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": [
+    "0x1::string::index_of"
+  ]
 }
 
 // === Function: 0x1::string (dependency)::internal_is_char_boundary ===
@@ -1916,7 +2362,12 @@
   "is_inline": false,
   "is_native": true,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": [
+    "0x1::string::insert",
+    "0x1::string::sub_string"
+  ]
 }
 
 // === Function: 0x1::string (dependency)::internal_sub_string ===
@@ -1938,7 +2389,11 @@
   "is_inline": false,
   "is_native": true,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": [
+    "0x1::string::sub_string"
+  ]
 }
 
 // === Function: 0x1::string (dependency)::into_bytes ===
@@ -1960,7 +2415,9 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Function: 0x1::string (dependency)::sub_string ===
@@ -1982,7 +2439,15 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::vector::length",
+    "0x1::string::internal_is_char_boundary",
+    "0x1::string::internal_sub_string"
+  ],
+  "callers": [
+    "0x1::string::insert"
+  ]
 }
 
 // === Function: 0x1::string (dependency)::try_utf8 ===
@@ -2004,7 +2469,13 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::option::none",
+    "0x1::option::some",
+    "0x1::string::internal_check_utf8"
+  ],
+  "callers": []
 }
 
 // === Function: 0x1::string (dependency)::utf8 ===
@@ -2026,6 +2497,12 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x1::string::internal_check_utf8"
+  ],
+  "callers": [
+    "0x1::string::append_utf8"
+  ]
 }
 

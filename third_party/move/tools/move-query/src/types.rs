@@ -12,6 +12,7 @@
 //!          └─ Constant*
 //! ```
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 // ========================================
@@ -78,6 +79,10 @@ pub struct Function {
     pub is_native: bool,
     pub attributes: Vec<String>,
     pub acquires: Vec<String>,
+    /// Functions that this function calls (full names, e.g., "0x1::coin::transfer").
+    pub callees: Vec<String>,
+    /// Functions that call this function (full names, e.g., "0x1::coin::transfer").
+    pub callers: Vec<String>,
 }
 
 /// Move struct or enum.
@@ -132,12 +137,23 @@ pub struct Field {
     pub type_: String,
 }
 
+fn default_column() -> u32 {
+    1
+}
+
 /// Source location.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, JsonSchema)]
 pub struct Location {
+    /// File path
     pub file: String,
+    /// Start line (1-indexed)
     pub start_line: u32,
+    /// Start column (1-indexed, optional, defaults to 1)
+    #[serde(default = "default_column")]
     pub start_column: u32,
+    /// End line (1-indexed)
     pub end_line: u32,
+    /// End column (1-indexed, optional, defaults to end of line)
+    #[serde(default)]
     pub end_column: u32,
 }

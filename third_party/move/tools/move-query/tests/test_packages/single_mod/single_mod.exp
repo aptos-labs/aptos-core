@@ -342,7 +342,12 @@
   "is_inline": false,
   "is_native": true,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": [
+    "0x42::comprehensive::deposit",
+    "0x42::comprehensive::transfer"
+  ]
 }
 
 // === Function: 0x42::comprehensive::balance_of ===
@@ -368,7 +373,9 @@
   ],
   "acquires": [
     "Balance"
-  ]
+  ],
+  "callees": [],
+  "callers": []
 }
 
 // === Function: 0x42::comprehensive::deposit ===
@@ -392,7 +399,11 @@
   "attributes": [],
   "acquires": [
     "Balance"
-  ]
+  ],
+  "callees": [
+    "0x42::comprehensive::address_of"
+  ],
+  "callers": []
 }
 
 // === Function: 0x42::comprehensive::double ===
@@ -414,7 +425,9 @@
   "is_inline": true,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Function: 0x42::comprehensive::first ===
@@ -436,7 +449,9 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Function: 0x42::comprehensive::get_counter_value ===
@@ -458,7 +473,9 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Function: 0x42::comprehensive::has_balance ===
@@ -480,7 +497,9 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Function: 0x42::comprehensive::increment ===
@@ -502,7 +521,9 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Function: 0x42::comprehensive::initialize ===
@@ -524,7 +545,9 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Function: 0x42::comprehensive::new_box ===
@@ -546,7 +569,9 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Function: 0x42::comprehensive::new_counter ===
@@ -568,7 +593,9 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Function: 0x42::comprehensive::new_pair ===
@@ -590,7 +617,9 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Function: 0x42::comprehensive::new_wrapper ===
@@ -612,7 +641,9 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Function: 0x42::comprehensive::reset ===
@@ -636,7 +667,9 @@
   "attributes": [
     "deprecated"
   ],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Function: 0x42::comprehensive::swap ===
@@ -658,7 +691,9 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Function: 0x42::comprehensive::test_abort ===
@@ -683,7 +718,9 @@
     "test",
     "expected_failure(abort_code = 0x42::comprehensive::E_ZERO)"
   ],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Function: 0x42::comprehensive::test_abort_literal ===
@@ -708,7 +745,9 @@
     "test",
     "expected_failure(abort_code = 42)"
   ],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Function: 0x42::comprehensive::test_helper ===
@@ -732,7 +771,9 @@
   "attributes": [
     "test_only"
   ],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Function: 0x42::comprehensive::transfer ===
@@ -756,7 +797,11 @@
   "attributes": [],
   "acquires": [
     "Balance"
-  ]
+  ],
+  "callees": [
+    "0x42::comprehensive::address_of"
+  ],
+  "callers": []
 }
 
 // === Function: 0x42::comprehensive::unbox ===
@@ -778,7 +823,9 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Function: 0x42::comprehensive::validate_amount ===
@@ -800,7 +847,9 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Source: 0x42::comprehensive::address_of ===

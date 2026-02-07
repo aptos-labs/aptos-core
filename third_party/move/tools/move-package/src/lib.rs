@@ -52,8 +52,11 @@ pub struct BuildConfig {
     pub test_mode: bool,
 
     /// Compile in 'verify' mode. When building a model, include #[verify_only] code.
+    /// Defaults to `None`, which is interpreted as `true` to maintain backward compatibility
+    /// (historically, #[verify_only] code was always compiled when building a model).
+    /// Use `Some(false)` to explicitly disable verification code compilation.
     #[clap(skip)]
-    pub verify_mode: bool,
+    pub verify_mode: Option<bool>,
 
     /// Whether to override the standard library with the given version.
     #[clap(long = "override-std", global = true, value_parser)]

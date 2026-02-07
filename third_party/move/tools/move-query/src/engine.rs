@@ -20,7 +20,8 @@ use move_model::{
 };
 use move_package::{
     source_package::{
-        manifest_parser::parse_move_manifest_from_file, parsed_manifest::Dependencies,
+        layout::SourcePackageLayout, manifest_parser::parse_move_manifest_from_file,
+        parsed_manifest::Dependencies,
     },
     BuildConfig, ModelConfig,
 };
@@ -61,6 +62,9 @@ impl QueryEngine {
         build_config: BuildConfig,
         model_config: ModelConfig,
     ) -> QueryResult<Self> {
+        // Resolve package root to ensure consistent path for manifest/dependency lookups
+        let package_path = SourcePackageLayout::try_find_root(&package_path)
+            .map_err(|e| QueryError::BuildFailed(format!("{:#}", e)))?;
         let env = build_config
             .clone()
             .move_model_for_package(&package_path, model_config.clone())
@@ -184,6 +188,9 @@ impl QueryEngine {
                 location.end_line
             )
             .into());
+        }
+        if !self.is_valid_source_file(&location.file) {
+            return Err(anyhow::anyhow!("file not part of loaded model: {}", location.file).into());
         }
         let content = std::fs::read_to_string(&location.file)
             .map_err(|e| anyhow::anyhow!("failed to read file {}: {}", location.file, e))?;
@@ -312,6 +319,24 @@ impl QueryEngine {
             .map(|attr| self.format_attribute(attr))
             .collect();
 
+        let callees: Vec<String> = func
+            .get_called_functions()
+            .map(|funs| {
+                funs.iter()
+                    .map(|qfid| self.env.get_function(*qfid).get_full_name_with_address())
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let callers: Vec<String> = func
+            .get_calling_functions()
+            .map(|funs| {
+                funs.iter()
+                    .map(|qfid| self.env.get_function(*qfid).get_full_name_with_address())
+                    .collect()
+            })
+            .unwrap_or_default();
+
         Function {
             module: func.module_env.get_full_name_str(),
             name: func.get_name_str().to_string(),
@@ -325,6 +350,8 @@ impl QueryEngine {
             is_native: func.is_native(),
             attributes,
             acquires,
+            callees,
+            callers,
         }
     }
 
@@ -549,6 +576,18 @@ impl QueryEngine {
             QueryError::ConstantNotFound(module.get_full_name_str(), name.to_string())
         })
     }
+
+    /// Check if a file path was loaded into the model (security: prevent arbitrary file access)
+    fn is_valid_source_file(&self, path: &str) -> bool {
+        let Ok(requested) = PathBuf::from(path).canonicalize() else {
+            return false;
+        };
+        self.env.get_source_file_names().iter().any(|f| {
+            PathBuf::from(f)
+                .canonicalize()
+                .map_or(false, |p| p == requested)
+        })
+    }
 }
 
 #[cfg(test)]
@@ -653,7 +692,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_source_file_not_found() {
+    fn test_get_source_file_not_in_model() {
         let engine = create_engine();
         let loc = Location {
             file: "/nonexistent/path.move".to_string(),
@@ -663,6 +702,6 @@ mod tests {
             end_column: 1,
         };
         let err = engine.get_source(&loc).unwrap_err();
-        assert!(err.to_string().contains("failed to read file"));
+        assert!(err.to_string().contains("file not part of loaded model"));
     }
 }

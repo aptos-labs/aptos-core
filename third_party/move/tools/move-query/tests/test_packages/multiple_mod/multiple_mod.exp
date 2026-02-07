@@ -59,7 +59,12 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": [
+    "0x42::core::add_to_value",
+    "0x42::admin::admin_increment"
+  ]
 }
 
 // === Function: 0x42::math::max ===
@@ -81,7 +86,9 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Function: 0x42::math::min ===
@@ -103,7 +110,9 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Function: 0x42::math::multiply ===
@@ -125,7 +134,9 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Source: 0x42::math::add ===
@@ -238,7 +249,11 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x42::math::add"
+  ],
+  "callers": []
 }
 
 // === Function: 0x42::core::get_value ===
@@ -260,7 +275,11 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": [
+    "0x42::admin::admin_increment"
+  ]
 }
 
 // === Function: 0x42::core::initialize ===
@@ -282,7 +301,11 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": [
+    "0x42::admin::admin_init"
+  ]
 }
 
 // === Function: 0x42::core::set_value ===
@@ -304,7 +327,12 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": [
+    "0x42::admin::admin_increment",
+    "0x42::admin::admin_update"
+  ]
 }
 
 // === Function: 0x42::core::validate ===
@@ -326,7 +354,9 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Source: 0x42::core::add_to_value ===
@@ -414,7 +444,13 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x42::math::add",
+    "0x42::core::get_value",
+    "0x42::core::set_value"
+  ],
+  "callers": []
 }
 
 // === Function: 0x42::admin::admin_init ===
@@ -436,7 +472,11 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x42::core::initialize"
+  ],
+  "callers": []
 }
 
 // === Function: 0x42::admin::admin_update ===
@@ -458,7 +498,11 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [
+    "0x42::core::set_value"
+  ],
+  "callers": []
 }
 
 // === Function: 0x42::admin::create_admin_cap ===
@@ -480,7 +524,9 @@
   "is_inline": false,
   "is_native": false,
   "attributes": [],
-  "acquires": []
+  "acquires": [],
+  "callees": [],
+  "callers": []
 }
 
 // === Source: 0x42::admin::admin_increment ===
