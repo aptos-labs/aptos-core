@@ -243,7 +243,7 @@ This layered architecture enables multi-slot censorship-resistant consensus as d
 7. **certificates.rs**: Updated validation to use ValidatorVerifier for >1/3 stake checks
 
 ### Tests
-- All 121 unit tests pass
+- All 128 unit tests pass
 - Build compiles cleanly
 
 ---
@@ -254,7 +254,7 @@ This layered architecture enables multi-slot censorship-resistant consensus as d
 - **Branch**: `prefix-consensus-prototype`
 - **HEAD**: Phase 3 View State and Ranking Management complete
 - **Status**: Working directory has uncommitted changes
-- **Tests**: 121/121 unit tests passing
+- **Tests**: 128/128 unit tests passing
 - **Smoke Tests**: Run manually by user (no need to run in Claude sessions)
 - **Build**: ✅ No warnings or errors
 
@@ -305,9 +305,10 @@ c) Else (both v_low and v_high are all-⊥):
 
 **Key insight**: A vector like `[⊥, ⊥, ⊥]` is NOT meaningful in views > 1 (no certificate to trace). But in View 1, even all-⊥ outputs are valid (raw inputs, not certificates).
 
-**Helper methods needed**:
-- `has_committable_low(v_low)`: True if v_low has at least one non-⊥ entry
-- `has_certifiable_high(v_high)`: True if v_high has at least one non-⊥ entry
+**Helper methods (implemented in view_state.rs)**:
+- `has_non_bot_entry(vector)`: Core check - true if any entry is not `HashValue::zero()`
+- `has_committable_low(v_low)`: Semantic alias for commit decision
+- `has_certifiable_high(v_high)`: Semantic alias for certificate creation
 
 ### Next Action
 Begin Strong Prefix Consensus Phase 4: Strong Protocol Core (multi-view state machine)

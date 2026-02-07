@@ -72,4 +72,7 @@ pub use certificates::{
     Certificate, DirectCertificate, EmptyViewMessage, EmptyViewStatement, HighestKnownView,
     IndirectCertificate,
 };
-pub use view_state::{RankingManager, ViewOutput, ViewState};
+pub use view_state::{
+    has_certifiable_high, has_committable_low, has_non_bot_entry, RankingManager, ViewOutput,
+    ViewState,
+};

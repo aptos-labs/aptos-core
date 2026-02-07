@@ -21,6 +21,46 @@ use crate::{
 use aptos_crypto::HashValue;
 use std::collections::HashMap;
 
+// ============================================================================
+// Helper functions for three-way decision in views > 1
+// ============================================================================
+
+/// Check if a vector has at least one non-⊥ entry (for views > 1)
+///
+/// Returns true if any entry is not `HashValue::zero()` (the ⊥ marker).
+///
+/// **Important**: In views > 1, a vector like `[⊥, ⊥, ⊥]` is NOT meaningful
+/// (no certificate to trace back to View 1). This function distinguishes
+/// between vectors with actual content and all-⊥ vectors.
+///
+/// **Note**: View 1 is special - even all-⊥ outputs are valid there
+/// (raw inputs, not certificates). Do NOT use this for View 1 decision logic.
+pub fn has_non_bot_entry(vector: &PrefixVector) -> bool {
+    vector.iter().any(|h| *h != HashValue::zero())
+}
+
+/// Check if v_low has at least one non-⊥ entry (can commit)
+///
+/// Semantic alias for `has_non_bot_entry` used in commit decision logic.
+/// If true, the view's v_low contains a certificate that can be traced
+/// back to View 1 for commitment.
+pub fn has_committable_low(v_low: &PrefixVector) -> bool {
+    has_non_bot_entry(v_low)
+}
+
+/// Check if v_high has at least one non-⊥ entry (can create DirectCertificate)
+///
+/// Semantic alias for `has_non_bot_entry` used in certificate creation logic.
+/// If true, the view's v_high contains a certificate that can be used to
+/// create a DirectCertificate for the next view.
+pub fn has_certifiable_high(v_high: &PrefixVector) -> bool {
+    has_non_bot_entry(v_high)
+}
+
+// ============================================================================
+// RankingManager
+// ============================================================================
+
 /// Manages validator rankings across views
 ///
 /// Rankings shift cyclically each view to ensure leaderless progress.
@@ -125,10 +165,16 @@ impl ViewOutput {
         }
     }
 
-    /// Check if v_high is non-empty (can create DirectCertificate)
+    /// Check if v_high vector has length > 0
     ///
-    /// Note: View 1 can have empty v_high (e.g., inputs conflict at first entry).
-    /// Views 2+ must have non-empty v_high; empty means use EmptyViewMessage instead.
+    /// **Warning**: This only checks vector length, NOT content. A vector like
+    /// `[⊥, ⊥, ⊥]` will return `true` but has no traceable certificate.
+    ///
+    /// For views > 1, use `has_certifiable_high(&output.v_high)` instead to
+    /// check if the vector contains at least one actual certificate (non-⊥).
+    ///
+    /// For View 1, this check is appropriate since even all-⊥ outputs are
+    /// meaningful (raw inputs conflict at position 0).
     pub fn has_non_empty_high(&self) -> bool {
         !self.v_high.is_empty()
     }
@@ -310,6 +356,62 @@ mod tests {
 
     fn party(id: u8) -> PartyId {
         PartyId::new([id; 32])
+    }
+
+    // ==================== Helper Function Tests ====================
+
+    #[test]
+    fn test_has_non_bot_entry_with_content() {
+        let v = vec![HashValue::zero(), HashValue::random(), HashValue::zero()];
+        assert!(has_non_bot_entry(&v));
+    }
+
+    #[test]
+    fn test_has_non_bot_entry_all_bots() {
+        let v = vec![HashValue::zero(), HashValue::zero(), HashValue::zero()];
+        assert!(!has_non_bot_entry(&v));
+    }
+
+    #[test]
+    fn test_has_non_bot_entry_empty_vector() {
+        let v: PrefixVector = vec![];
+        assert!(!has_non_bot_entry(&v));
+    }
+
+    #[test]
+    fn test_has_non_bot_entry_single_non_bot() {
+        let v = vec![HashValue::random()];
+        assert!(has_non_bot_entry(&v));
+    }
+
+    #[test]
+    fn test_has_non_bot_entry_single_bot() {
+        let v = vec![HashValue::zero()];
+        assert!(!has_non_bot_entry(&v));
+    }
+
+    #[test]
+    fn test_has_committable_low_alias() {
+        let v_with_content = vec![HashValue::zero(), HashValue::random()];
+        let v_all_bots = vec![HashValue::zero(), HashValue::zero()];
+
+        assert!(has_committable_low(&v_with_content));
+        assert!(!has_committable_low(&v_all_bots));
+        // Verify it's the same as has_non_bot_entry
+        assert_eq!(has_committable_low(&v_with_content), has_non_bot_entry(&v_with_content));
+        assert_eq!(has_committable_low(&v_all_bots), has_non_bot_entry(&v_all_bots));
+    }
+
+    #[test]
+    fn test_has_certifiable_high_alias() {
+        let v_with_content = vec![HashValue::random(), HashValue::zero()];
+        let v_all_bots = vec![HashValue::zero(), HashValue::zero()];
+
+        assert!(has_certifiable_high(&v_with_content));
+        assert!(!has_certifiable_high(&v_all_bots));
+        // Verify it's the same as has_non_bot_entry
+        assert_eq!(has_certifiable_high(&v_with_content), has_non_bot_entry(&v_with_content));
+        assert_eq!(has_certifiable_high(&v_all_bots), has_non_bot_entry(&v_all_bots));
     }
 
     // ==================== RankingManager Tests ====================
