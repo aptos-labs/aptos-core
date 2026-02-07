@@ -497,7 +497,12 @@ impl FatType {
                         .map(|tys| Self::from_layout_slice(tys, limit))
                         .collect::<PartialVMResult<Vec<Vec<_>>>>()?,
                 ),
-                _ => return Err(PartialVMError::new(StatusCode::ABORT_TYPE_MISMATCH_ERROR)),
+                _ => {
+                    return Err(PartialVMError::new_invariant_violation(format!(
+                        "cannot derive fat type for {:?}",
+                        layout
+                    )))
+                },
             },
             Function => {
                 // We cannot derive the actual type from layout, however, a dummy
