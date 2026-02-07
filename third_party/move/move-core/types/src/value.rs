@@ -26,7 +26,7 @@ use std::{
     collections::{btree_map::Entry, BTreeMap},
     convert::TryInto,
     fmt::{self, Debug},
-    sync::Mutex,
+    sync::{Arc, Mutex},
 };
 
 /// The maximal number of enum variants which are supported in values. This must align with
@@ -234,8 +234,7 @@ impl IdentifierMappingKind {
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(
     any(test, feature = "fuzzing"),
-    derive(arbitrary::Arbitrary),
-    derive(dearbitrary::Dearbitrary)
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
 )]
 pub enum MoveTypeLayout {
     #[serde(rename(serialize = "bool", deserialize = "bool"))]
@@ -251,7 +250,7 @@ pub enum MoveTypeLayout {
     #[serde(rename(serialize = "vector", deserialize = "vector"))]
     Vector(Box<MoveTypeLayout>),
     #[serde(rename(serialize = "struct", deserialize = "struct"))]
-    Struct(MoveStructLayout),
+    Struct(Arc<MoveStructLayout>),
     #[serde(rename(serialize = "signer", deserialize = "signer"))]
     Signer,
 
@@ -288,6 +287,13 @@ pub enum MoveTypeLayout {
     I128,
     #[serde(rename(serialize = "i256", deserialize = "i256"))]
     I256,
+}
+
+impl MoveTypeLayout {
+    /// Creates a `MoveTypeLayout::Struct` wrapping the given layout in an `Arc`.
+    pub fn new_struct(layout: MoveStructLayout) -> Self {
+        Self::Struct(Arc::new(layout))
+    }
 }
 
 impl MoveValue {
@@ -590,7 +596,9 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
                 AccountAddress::deserialize(deserializer).map(MoveValue::Address)
             },
             MoveTypeLayout::Signer => Err(D::Error::custom("cannot deserialize signer")),
-            MoveTypeLayout::Struct(ty) => Ok(MoveValue::Struct(ty.deserialize(deserializer)?)),
+            MoveTypeLayout::Struct(ty) => {
+                Ok(MoveValue::Struct(ty.as_ref().deserialize(deserializer)?))
+            },
             MoveTypeLayout::Function => Ok(MoveValue::Closure(Box::new(
                 deserializer.deserialize_seq(ClosureVisitor)?,
             ))),
@@ -931,7 +939,7 @@ impl fmt::Display for MoveTypeLayout {
             I256 => write!(f, "i256"),
             Address => write!(f, "address"),
             Vector(typ) => write!(f, "vector<{}>", typ),
-            Struct(s) => fmt::Display::fmt(s, f),
+            Struct(s) => fmt::Display::fmt(s.as_ref(), f),
             Function => write!(f, "function"),
             Signer => write!(f, "signer"),
             // TODO[agg_v2](cleanup): consider printing the tag as well.
@@ -1005,7 +1013,7 @@ impl TryInto<TypeTag> for &MoveTypeLayout {
             MoveTypeLayout::I256 => TypeTag::I256,
             MoveTypeLayout::Signer => TypeTag::Signer,
             MoveTypeLayout::Vector(v) => TypeTag::Vector(Box::new(v.as_ref().try_into()?)),
-            MoveTypeLayout::Struct(v) => TypeTag::Struct(Box::new(v.try_into()?)),
+            MoveTypeLayout::Struct(v) => TypeTag::Struct(Box::new(v.as_ref().try_into()?)),
 
             // For function values, we cannot reconstruct the tag because we do not know the
             // argument and return types.

@@ -220,36 +220,36 @@ fn constant_serialized_size(ty_layout: &MoveTypeLayout) -> (u64, PartialVMResult
         // vectors have no constant size
         MoveTypeLayout::Vector(_) => Ok(None),
         // enums and functions have no constant size
-        MoveTypeLayout::Struct(
-            MoveStructLayout::RuntimeVariants(_) | MoveStructLayout::WithVariants(_),
-        )
-        | MoveTypeLayout::Function => Ok(None),
-        MoveTypeLayout::Struct(MoveStructLayout::Runtime(fields)) => {
-            let mut total = Some(0);
-            for field in fields {
-                let (cur_visited_count, cur) = constant_serialized_size(field);
-                visited_count += cur_visited_count;
-                match cur {
-                    Err(e) => return (visited_count, Err(e)),
-                    Ok(Some(cur_value)) => total = total.map(|v| v + cur_value),
-                    Ok(None) => {
-                        total = None;
-                        break;
-                    },
+        MoveTypeLayout::Function => Ok(None),
+        MoveTypeLayout::Struct(struct_layout) => match struct_layout.as_ref() {
+            MoveStructLayout::RuntimeVariants(_) | MoveStructLayout::WithVariants(_) => Ok(None),
+            MoveStructLayout::Runtime(fields) => {
+                let mut total = Some(0);
+                for field in fields {
+                    let (cur_visited_count, cur) = constant_serialized_size(field);
+                    visited_count += cur_visited_count;
+                    match cur {
+                        Err(e) => return (visited_count, Err(e)),
+                        Ok(Some(cur_value)) => total = total.map(|v| v + cur_value),
+                        Ok(None) => {
+                            total = None;
+                            break;
+                        },
+                    }
                 }
-            }
-            Ok(total)
-        },
-        MoveTypeLayout::Struct(MoveStructLayout::WithFields(_))
-        | MoveTypeLayout::Struct(MoveStructLayout::WithTypes { .. }) => {
-            return (
-                visited_count,
-                Err(
-                    PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR).with_message(
-                        "Only runtime types expected, but found WithFields/WithTypes".to_string(),
+                Ok(total)
+            },
+            MoveStructLayout::WithFields(_) | MoveStructLayout::WithTypes { .. } => {
+                return (
+                    visited_count,
+                    Err(
+                        PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR).with_message(
+                            "Only runtime types expected, but found WithFields/WithTypes"
+                                .to_string(),
+                        ),
                     ),
-                ),
-            )
+                )
+            },
         },
         MoveTypeLayout::Native(_, inner) => {
             let (cur_visited_count, cur) = constant_serialized_size(inner);

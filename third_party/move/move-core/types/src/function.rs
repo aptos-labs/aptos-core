@@ -367,7 +367,7 @@ mod serialization_tests {
                     MoveValue::Vector(vec![MoveValue::Bool(false)]),
                 ),
                 (
-                    MoveTypeLayout::Struct(MoveStructLayout::Runtime(vec![
+                    MoveTypeLayout::new_struct(MoveStructLayout::Runtime(vec![
                         MoveTypeLayout::Bool,
                         MoveTypeLayout::U8,
                     ])),
