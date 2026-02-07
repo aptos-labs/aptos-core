@@ -103,9 +103,11 @@ impl TestHarness {
             FixedInterval::new(CONNECTION_DELAY),
             MAX_CONNECTION_DELAY,
             Some(MAX_TEST_CONNECTIONS),
-            true, /* mutual_authentication */
-            true, /* enable_latency_aware_dialing */
-            None, /* access_control_policy */
+            true,  /* mutual_authentication */
+            true,  /* enable_latency_aware_dialing */
+            None,  /* access_control_policy */
+            1,     /* max_connections_per_peer */
+            true,  /* enable_active_multi_connection_dialing */
         );
         let mock = Self {
             network_context,
@@ -1024,9 +1026,11 @@ fn create_connectivity_manager_with_policy(
         FixedInterval::new(CONNECTION_DELAY),
         MAX_CONNECTION_DELAY,
         Some(MAX_TEST_CONNECTIONS),
-        true, /* mutual_authentication */
-        true, /* enable_latency_aware_dialing */
+        true,  /* mutual_authentication */
+        true,  /* enable_latency_aware_dialing */
         access_control_policy,
+        1,     /* max_connections_per_peer */
+        true,  /* enable_active_multi_connection_dialing */
     )
 }
 

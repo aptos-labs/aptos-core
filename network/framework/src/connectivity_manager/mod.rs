@@ -99,8 +99,10 @@ pub struct ConnectivityManager<TBackoff> {
     time_service: TimeService,
     /// Peers and metadata
     peers_and_metadata: Arc<PeersAndMetadata>,
-    /// PeerId and address of remote peers to which this peer is connected.
-    connected: HashMap<PeerId, ConnectionMetadata>,
+    /// PeerId to (first connection metadata, total connection count).
+    /// Multiple connections per peer are supported when max_connections_per_peer > 1.
+    /// The metadata is from the first connection; count tracks total connections.
+    connected: HashMap<PeerId, (ConnectionMetadata, usize)>,
     /// All information about peers from discovery sources.
     discovered_peers: Arc<RwLock<DiscoveredPeerSet>>,
     /// Channel to send connection requests to PeerManager.
@@ -132,6 +134,10 @@ pub struct ConnectivityManager<TBackoff> {
     enable_latency_aware_dialing: bool,
     /// Access control policy for peer connections
     access_control_policy: Option<Arc<AccessControlPolicy>>,
+    /// Maximum number of connections to maintain per peer
+    max_connections_per_peer: usize,
+    /// Whether to actively dial peers to establish additional connections
+    enable_active_multi_connection_dialing: bool,
 }
 
 /// Different sources for peer addresses, ordered by priority (Onchain=highest,
@@ -347,6 +353,7 @@ where
     TBackoff: Iterator<Item = Duration> + Clone,
 {
     /// Creates a new instance of the [`ConnectivityManager`] actor.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         network_context: NetworkContext,
         time_service: TimeService,
@@ -362,6 +369,8 @@ where
         mutual_authentication: bool,
         enable_latency_aware_dialing: bool,
         access_control_policy: Option<Arc<AccessControlPolicy>>,
+        max_connections_per_peer: usize,
+        enable_active_multi_connection_dialing: bool,
     ) -> Self {
         // Verify that the trusted peers set exists and that it is empty
         let trusted_peers = peers_and_metadata
@@ -377,7 +386,10 @@ where
 
         info!(
             NetworkSchema::new(&network_context),
-            "{} Initialized connectivity manager", network_context
+            "{} Initialized connectivity manager with max_connections_per_peer={}, enable_active_multi_connection_dialing={}",
+            network_context,
+            max_connections_per_peer,
+            enable_active_multi_connection_dialing
         );
 
         let mut connmgr = Self {
@@ -399,6 +411,8 @@ where
             mutual_authentication,
             enable_latency_aware_dialing,
             access_control_policy,
+            max_connections_per_peer,
+            enable_active_multi_connection_dialing,
         };
 
         // Set the initial seed config addresses and public keys
@@ -414,6 +428,54 @@ where
         }
     }
 
+    /// Returns the number of connections to a peer
+    fn connection_count(&self, peer_id: &PeerId) -> usize {
+        self.connected
+            .get(peer_id)
+            .map(|(_, count)| *count)
+            .unwrap_or(0)
+    }
+
+    /// Returns true if we need more connections to this peer.
+    /// When `enable_active_multi_connection_dialing` is false, only dials for the first connection.
+    /// When true, dials until we reach `max_connections_per_peer`.
+    fn needs_more_connections(&self, peer_id: &PeerId) -> bool {
+        let current_count = self.connection_count(peer_id);
+        if self.enable_active_multi_connection_dialing {
+            // Active multi-connection dialing enabled: dial until we reach the limit
+            current_count < self.max_connections_per_peer
+        } else {
+            // Active multi-connection dialing disabled: only dial for the first connection
+            current_count == 0
+        }
+    }
+
+    /// Handles the result of a dial attempt
+    fn handle_dial_result(&mut self, peer_id: PeerId, dial_success: bool) {
+        if dial_success {
+            // On successful dial, we need to track this connection.
+            // Note: NewPeer notification is only sent for the first connection.
+            // For subsequent connections, we increment our count here.
+            if let Some((_, count)) = self.connected.get_mut(&peer_id) {
+                // This is an additional connection (not the first one).
+                // Increment the count.
+                *count += 1;
+                info!(
+                    NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
+                    "{} Additional connection established to peer {} (now {} connections)",
+                    self.network_context,
+                    peer_id.short_str(),
+                    *count
+                );
+            }
+            // Check if we've reached max connections and clean up dial_states if so
+            if !self.needs_more_connections(&peer_id) {
+                self.dial_states.remove(&peer_id);
+            }
+        }
+        // For failed/cancelled dials, nothing to do (will retry on next connectivity check)
+    }
+
     /// Starts the [`ConnectivityManager`] actor.
     pub async fn start(mut self) {
         // The ConnectivityManager actor is interested in 3 kinds of events:
@@ -422,7 +484,8 @@ where
         // 2. Incoming requests to connect or disconnect with a peer.
         // 3. Notifications from PeerManager when we establish a new connection or lose an existing
         //    connection with a peer.
-        let mut pending_dials = FuturesUnordered::new();
+        let mut pending_dials: FuturesUnordered<BoxFuture<'static, (PeerId, bool)>> =
+            FuturesUnordered::new();
 
         let ticker = self.time_service.interval(self.connectivity_check_interval);
         tokio::pin!(ticker);
@@ -451,15 +514,17 @@ where
                         None => break,
                     }
                 },
-                peer_id = pending_dials.select_next_some() => {
+                (peer_id, dial_success) = pending_dials.select_next_some() => {
                     trace!(
                         NetworkSchema::new(&self.network_context)
                             .remote_peer(&peer_id),
-                        "{} Dial complete to {}",
+                        "{} Dial complete to {}, success={}",
                         self.network_context,
                         peer_id.short_str(),
+                        dial_success
                     );
                     self.dial_queue.remove(&peer_id);
+                    self.handle_dial_result(peer_id, dial_success);
                 },
             }
         }
@@ -500,7 +565,8 @@ where
                 .connected
                 .iter()
                 .filter(|(peer_id, _)| !trusted_peers.contains_key(peer_id))
-                .filter_map(|(peer_id, metadata)| {
+                .filter_map(|(peer_id, (metadata, _))| {
+                    // Check the connection's metadata for role/origin
                     // If we're using server only auth, we need to not evict unknown peers
                     // TODO: We should prevent `Unknown` from discovery sources
                     if !self.mutual_authentication
@@ -573,7 +639,7 @@ where
     /// Identifies a set of peers to dial and queues them for dialing
     async fn dial_eligible_peers<'a>(
         &'a mut self,
-        pending_dials: &'a mut FuturesUnordered<BoxFuture<'static, PeerId>>,
+        pending_dials: &'a mut FuturesUnordered<BoxFuture<'static, (PeerId, bool)>>,
     ) {
         for (peer_id, peer) in self.choose_peers_to_dial().await {
             self.queue_dial_peer(peer_id, peer, pending_dials);
@@ -591,7 +657,7 @@ where
             .into_iter()
             .filter(|(peer_id, peer)| {
                 peer.is_eligible_to_be_dialed() // The node is eligible to dial
-                    && !self.connected.contains_key(peer_id) // The node is not already connected
+                    && self.needs_more_connections(peer_id) // We need more connections to this peer
                     && !self.dial_queue.contains_key(peer_id) // There is no pending dial to this node
                     && roles_to_dial.contains(&peer.role) // We can dial this role
                     && self.is_peer_allowed(peer_id) // Check allow/block lists
@@ -612,11 +678,15 @@ where
         let num_peers_to_dial =
             if let Some(outbound_connection_limit) = self.outbound_connection_limit {
                 // Get the number of outbound connections
+                // Note: We track connections where the first connection was outbound.
+                // This is an approximation - with multi-connection, some subsequent
+                // connections might be inbound even if the first was outbound.
                 let num_outbound_connections = self
                     .connected
-                    .iter()
-                    .filter(|(_, metadata)| metadata.origin == ConnectionOrigin::Outbound)
-                    .count();
+                    .values()
+                    .filter(|(metadata, _)| metadata.origin == ConnectionOrigin::Outbound)
+                    .map(|(_, count)| count)
+                    .sum::<usize>();
 
                 // Add any pending dials to the count
                 let total_outbound_connections =
@@ -732,7 +802,7 @@ where
         &'a mut self,
         peer_id: PeerId,
         peer: DiscoveredPeer,
-        pending_dials: &'a mut FuturesUnordered<BoxFuture<'static, PeerId>>,
+        pending_dials: &'a mut FuturesUnordered<BoxFuture<'static, (PeerId, bool)>>,
     ) {
         // If we're attempting to dial a Peer we must not be connected to it. This ensures that
         // newly eligible, but not connected to peers, have their counter initialized properly.
@@ -801,9 +871,10 @@ where
                 },
                 _ = cancel_rx.fuse() => DialResult::Cancelled,
             };
+            let dial_success = matches!(dial_result, DialResult::Success);
             log_dial_result(network_context, peer_id, addr, dial_result);
-            // Send peer_id as future result so it can be removed from dial queue.
-            peer_id
+            // Return (peer_id, dial_success) so we can track connection count on success.
+            (peer_id, dial_success)
         };
         pending_dials.push(f.boxed());
 
@@ -819,7 +890,7 @@ where
     // incarnations.
     async fn check_connectivity<'a>(
         &'a mut self,
-        pending_dials: &'a mut FuturesUnordered<BoxFuture<'static, PeerId>>,
+        pending_dials: &'a mut FuturesUnordered<BoxFuture<'static, (PeerId, bool)>>,
     ) {
         trace!(
             NetworkSchema::new(&self.network_context),
@@ -1022,30 +1093,38 @@ where
         );
         match notif {
             peer_manager::ConnectionNotification::NewPeer(metadata, _network_id) => {
+                // NewPeer is sent for the first connection to a peer.
+                // We track it with the metadata and count=1.
                 let peer_id = metadata.remote_peer_id;
                 counters::peer_connected(&self.network_context, &peer_id, 1);
-                self.connected.insert(peer_id, metadata);
+                self.connected.insert(peer_id, (metadata, 1));
 
-                // Cancel possible queued dial to this peer.
-                self.dial_states.remove(&peer_id);
+                // Don't remove dial_states if we want more connections to this peer.
+                // Only cancel the current pending dial.
                 self.dial_queue.remove(&peer_id);
+
+                // Clean up dial state if we've reached max connections
+                if !self.needs_more_connections(&peer_id) {
+                    self.dial_states.remove(&peer_id);
+                }
             },
             peer_manager::ConnectionNotification::LostPeer(metadata, _network_id) => {
+                // LostPeer is sent when the last connection to a peer is lost.
+                // Remove the peer entirely from our tracking.
                 let peer_id = metadata.remote_peer_id;
-                if let Some(stored_metadata) = self.connected.get(&peer_id) {
+                if let Some((_, count)) = self.connected.get(&peer_id) {
                     // Remove node from connected peers list.
-
                     counters::peer_connected(&self.network_context, &peer_id, 0);
 
                     info!(
                         NetworkSchema::new(&self.network_context)
                             .remote_peer(&peer_id)
                             .connection_metadata(&metadata),
-                        stored_metadata = stored_metadata,
-                        "{} Removing peer '{}' metadata: {}, vs event metadata: {}",
+                        num_stored_connections = count,
+                        "{} Removing peer '{}' (had {} connections tracked), event metadata: {}",
                         self.network_context,
                         peer_id.short_str(),
-                        stored_metadata,
+                        count,
                         metadata
                     );
                     self.connected.remove(&peer_id);
@@ -1066,7 +1145,7 @@ where
 
     #[cfg(test)]
     /// Returns the set of connected peers (for test purposes)
-    fn get_connected_peers(&self) -> HashMap<PeerId, ConnectionMetadata> {
+    fn get_connected_peers(&self) -> HashMap<PeerId, (ConnectionMetadata, usize)> {
         self.connected.clone()
     }
 }

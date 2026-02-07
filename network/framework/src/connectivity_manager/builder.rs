@@ -24,6 +24,7 @@ pub struct ConnectivityManagerBuilder {
 }
 
 impl ConnectivityManagerBuilder {
+    #[allow(clippy::too_many_arguments)]
     pub fn create(
         network_context: NetworkContext,
         time_service: TimeService,
@@ -39,6 +40,8 @@ impl ConnectivityManagerBuilder {
         mutual_authentication: bool,
         enable_latency_aware_dialing: bool,
         access_control_policy: Option<Arc<AccessControlPolicy>>,
+        max_connections_per_peer: usize,
+        enable_active_multi_connection_dialing: bool,
     ) -> Self {
         let (conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new(
             channel_size,
@@ -62,6 +65,8 @@ impl ConnectivityManagerBuilder {
                 mutual_authentication,
                 enable_latency_aware_dialing,
                 access_control_policy,
+                max_connections_per_peer,
+                enable_active_multi_connection_dialing,
             )),
         }
     }
