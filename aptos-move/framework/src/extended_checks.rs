@@ -240,33 +240,42 @@ impl ExtendedChecker<'_> {
     /// Note: this should be kept up in sync with `is_valid_txn_arg` in
     /// aptos-move/aptos-vm/src/verifier/transaction_arg_validation.rs
     fn check_transaction_input_type(&self, loc: &Loc, ty: &Type) {
+        if !self.is_valid_txn_arg_type(ty) {
+            self.env.error(
+                loc,
+                &format!(
+                    "type `{}` is not supported as a transaction parameter type",
+                    ty.display(&self.env.get_type_display_ctx())
+                ),
+            );
+        }
+    }
+
+    /// Recursively checks if a type is valid as a transaction argument.
+    /// Allowed types:
+    /// - Primitives and type parameters
+    /// - Immutable reference to signer (&signer)
+    /// - Vectors of valid types
+    /// - Whitelisted structs (String, Object, Option, FixedPoint32, FixedPoint64)
+    /// - Public structs/enums with copy ability where all fields are valid types
+    /// Note that we don't check ability on type parameters, which means Option<T> can
+    /// be a parameter to an entry function even when generic typeT is not declared with copy ability.
+    /// VM will reject it during argument validation.
+    fn is_valid_txn_arg_type(&self, ty: &Type) -> bool {
         use Type::*;
         match ty {
-            Primitive(_) | TypeParameter(_) => {
-                // Any primitive type allowed, any parameter expected to instantiate with primitive
-            },
+            Primitive(_) | TypeParameter(_) => true,
             Reference(ReferenceKind::Immutable, bt)
                 if matches!(bt.as_ref(), Primitive(PrimitiveType::Signer)) =>
             {
-                // Immutable reference to signer allowed
+                true
             },
-            Vector(ety) => {
-                // Vectors are allowed if element type is allowed
-                self.check_transaction_input_type(loc, ety)
+            Vector(ety) => self.is_valid_txn_arg_type(ety),
+            Struct(mid, sid, inst) => {
+                let qid = mid.qualified(*sid);
+                self.is_allowed_input_struct(qid) || self.is_public_copy_struct(qid, inst)
             },
-            Struct(mid, sid, _) if self.is_allowed_input_struct(mid.qualified(*sid)) => {
-                // Specific struct types are allowed
-            },
-            _ => {
-                // Everything else is disallowed.
-                self.env.error(
-                    loc,
-                    &format!(
-                        "type `{}` is not supported as a transaction parameter type",
-                        ty.display(&self.env.get_type_display_ctx())
-                    ),
-                );
-            },
+            _ => false,
         }
     }
 
@@ -281,6 +290,41 @@ impl ExtendedChecker<'_> {
                 | "0x1::fixed_point32::FixedPoint32"
                 | "0x1::fixed_point64::FixedPoint64"
         )
+    }
+
+    /// Checks if a struct is a public struct/enum with the copy ability, and all its
+    /// field types are valid transaction argument types.
+    fn is_public_copy_struct(&self, qid: QualifiedId<StructId>, inst: &[Type]) -> bool {
+        if !self
+            .env
+            .language_version()
+            .language_version_for_public_struct()
+        {
+            // when compiling for language version before 2.4, public structs are not allowed as transaction arguments
+            return false;
+        }
+        let struct_env = self.env.get_struct(qid);
+
+        // Check if the struct is public
+        if struct_env.get_visibility() != Visibility::Public {
+            return false;
+        }
+
+        // Check if the struct has the copy ability
+        if !struct_env.get_abilities().has_copy() {
+            return false;
+        }
+
+        // Get all fields (for enums, this includes fields from all variants)
+        // and recursively check that all field types are valid
+        for field in struct_env.get_fields() {
+            let field_ty = field.get_type().instantiate(inst);
+            if !self.is_valid_txn_arg_type(&field_ty) {
+                return false;
+            }
+        }
+
+        true
     }
 }
 

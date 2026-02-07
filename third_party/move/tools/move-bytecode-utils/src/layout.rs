@@ -14,7 +14,7 @@ use move_binary_format::{
 use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag, LEGACY_OPTION_VEC},
-    value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
+    value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout, MoveVariantLayout},
 };
 use std::{borrow::Borrow, convert::TryInto, fmt::Debug};
 
@@ -238,6 +238,8 @@ impl StructLayoutBuilder {
                     ),
                     LayoutType::WithTypes => {
                         let mid = m.self_id();
+                        // All type_arguments layouts can now be converted to TypeTags
+                        // (including enums, since WithVariants now has the type_ field)
                         let type_args = type_arguments
                             .iter()
                             .map(|t| t.try_into())
@@ -263,6 +265,7 @@ impl StructLayoutBuilder {
                     match layout_type {
                         LayoutType::WithTypes => {
                             let mid = m.self_id();
+                            // All type_arguments layouts can now be converted to TypeTags
                             let type_args = type_arguments
                                 .iter()
                                 .map(|t| t.try_into())
@@ -302,7 +305,74 @@ impl StructLayoutBuilder {
                         },
                     }
                 }
-                bail!("enum variants not yet supported by layouts")
+                // Handle general enums
+                let variant_layouts = variant_definitions
+                    .iter()
+                    .map(|variant| {
+                        let field_layouts = variant
+                            .fields
+                            .iter()
+                            .map(|f| {
+                                TypeLayoutBuilder::build_from_signature_token(
+                                    m,
+                                    &f.signature.0,
+                                    &type_arguments,
+                                    compiled_module_view,
+                                    layout_type,
+                                )
+                            })
+                            .collect::<anyhow::Result<Vec<MoveTypeLayout>>>()?;
+                        Ok((variant, field_layouts))
+                    })
+                    .collect::<anyhow::Result<Vec<_>>>()?;
+
+                Ok(match layout_type {
+                    LayoutType::Runtime => MoveStructLayout::RuntimeVariants(
+                        variant_layouts
+                            .into_iter()
+                            .map(|(_, layouts)| layouts)
+                            .collect(),
+                    ),
+                    LayoutType::WithFields => {
+                        bail!("WithFields layout not supported for enum variants")
+                    },
+                    LayoutType::WithTypes => {
+                        // Build the StructTag for the enum type
+                        let mid = m.self_id();
+                        // All type_arguments layouts can now be converted to TypeTags
+                        let type_args = type_arguments
+                            .iter()
+                            .map(|t| t.try_into())
+                            .collect::<anyhow::Result<Vec<TypeTag>>>()?;
+                        let type_ = StructTag {
+                            address: *mid.address(),
+                            module: mid.name().to_owned(),
+                            name: m.identifier_at(s_handle.name).to_owned(),
+                            type_args,
+                        };
+
+                        MoveStructLayout::WithVariants {
+                            type_,
+                            variants: variant_layouts
+                                .into_iter()
+                                .map(|(variant, layouts)| {
+                                    let variant_name = m.identifier_at(variant.name).to_owned();
+                                    let fields = variant
+                                        .fields
+                                        .iter()
+                                        .map(|f| m.identifier_at(f.name).to_owned())
+                                        .zip(layouts)
+                                        .map(|(name, layout)| MoveFieldLayout::new(name, layout))
+                                        .collect();
+                                    MoveVariantLayout {
+                                        name: variant_name,
+                                        fields,
+                                    }
+                                })
+                                .collect(),
+                        }
+                    },
+                })
             },
         }
     }

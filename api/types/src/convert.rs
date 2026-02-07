@@ -59,6 +59,53 @@ use std::{
 const OBJECT_MODULE: &IdentStr = ident_str!("object");
 const OBJECT_STRUCT: &IdentStr = ident_str!("Object");
 
+/// Recursively substitute generic type parameters in a MoveType with actual type arguments.
+fn substitute_type_in_move_type(
+    move_type: &crate::move_types::MoveType,
+    type_args: &[TypeTag],
+) -> Result<crate::move_types::MoveType> {
+    use crate::move_types::MoveType;
+
+    match move_type {
+        MoveType::GenericTypeParam { index } => {
+            let idx = *index as usize;
+            ensure!(
+                idx < type_args.len(),
+                "Generic type parameter index {} out of bounds (have {} type args)",
+                idx,
+                type_args.len()
+            );
+            Ok(MoveType::from(&type_args[idx]))
+        },
+        MoveType::Reference { mutable, to } => Ok(MoveType::Reference {
+            mutable: *mutable,
+            to: Box::new(substitute_type_in_move_type(to, type_args)?),
+        }),
+        MoveType::Vector { items } => Ok(MoveType::Vector {
+            items: Box::new(substitute_type_in_move_type(items, type_args)?),
+        }),
+        MoveType::Struct(struct_tag) => {
+            // Recursively substitute in struct generic_type_params
+            if struct_tag.generic_type_params.is_empty() {
+                Ok(move_type.clone())
+            } else {
+                let mut new_struct_tag = struct_tag.clone();
+                new_struct_tag.generic_type_params = struct_tag
+                    .generic_type_params
+                    .iter()
+                    .map(|ty| {
+                        // Recursively substitute in this MoveType
+                        substitute_type_in_move_type(ty, type_args)
+                    })
+                    .collect::<Result<_>>()?;
+                Ok(MoveType::Struct(new_struct_tag))
+            }
+        },
+        // For non-generic types, return as is
+        _ => Ok(move_type.clone()),
+    }
+}
+
 /// The Move converter for converting Move types to JSON
 ///
 /// This reads the underlying BCS types and ABIs to convert them into
@@ -708,8 +755,24 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     function,
                     type_arguments.len()
                 );
-                let args = self
-                    .try_into_vm_values(&func, arguments.as_slice())?
+
+                // For generic entry functions, substitute type parameters before parsing arguments
+                let args = if !type_arguments.is_empty() {
+                    // Convert type_arguments to TypeTags for substitution
+                    let type_tags: Vec<TypeTag> = type_arguments
+                        .iter()
+                        .map(|v| v.try_into())
+                        .collect::<Result<_>>()?;
+
+                    // Create instantiated function with generic parameters substituted
+                    let instantiated_func = self.instantiate_function_params(&func, &type_tags)?;
+                    self.try_into_vm_values(&instantiated_func, arguments.as_slice())?
+                } else {
+                    // No type arguments, use function as-is
+                    self.try_into_vm_values(&func, arguments.as_slice())?
+                };
+
+                let args = args
                     .iter()
                     .map(bcs::to_bytes)
                     .collect::<Result<_, bcs::Error>>()?;
@@ -833,6 +896,34 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             },
         };
         Ok(ret)
+    }
+
+    /// Substitute generic type parameters in function parameters with actual type arguments.
+    /// This is necessary when parsing arguments for generic entry functions.
+    fn instantiate_function_params(
+        &self,
+        func: &MoveFunction,
+        type_args: &[TypeTag],
+    ) -> Result<MoveFunction> {
+        // Substitute in all parameters
+        let new_params = func
+            .params
+            .iter()
+            .map(|param| substitute_type_in_move_type(param, type_args))
+            .collect::<Result<Vec<_>>>()?;
+
+        // Create new function with substituted parameters
+        // After instantiation with concrete type arguments, the function is no longer generic,
+        // so generic_type_params should be empty
+        Ok(MoveFunction {
+            name: func.name.clone(),
+            visibility: func.visibility.clone(),
+            is_entry: func.is_entry,
+            is_view: func.is_view,
+            generic_type_params: vec![],
+            params: new_params,
+            return_: func.return_.clone(),
+        })
     }
 
     pub fn try_into_vm_values(
@@ -970,12 +1061,64 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         layout: &MoveStructLayout,
         val: Value,
     ) -> Result<move_core_types::value::MoveValue> {
+        // Handle enums with variants
+        if let MoveStructLayout::WithVariants { variants, .. } = layout {
+            // Expecting JSON format: { "variant_name": { "field1": value1, ... } }
+            let obj = if let Value::Object(obj_fields) = val {
+                obj_fields
+            } else {
+                bail!("Expecting a JSON Map for enum.");
+            };
+
+            if obj.len() != 1 {
+                bail!("Enum value must have exactly one variant specified.");
+            }
+
+            let (variant_name, variant_value) = obj
+                .into_iter()
+                .next()
+                .ok_or_else(|| format_err!("Empty enum value."))?;
+
+            // Find the matching variant
+            let (variant_index, variant_layout) = variants
+                .iter()
+                .enumerate()
+                .find(|(_, v)| v.name.as_str() == variant_name)
+                .ok_or_else(|| format_err!("Variant {} not found.", variant_name))?;
+
+            // Parse variant fields
+            let mut field_values = if let Value::Object(variant_fields) = variant_value {
+                variant_fields
+            } else {
+                bail!("Expecting a JSON Map for variant fields.");
+            };
+
+            let field_results = variant_layout
+                .fields
+                .iter()
+                .map(|field_layout| {
+                    let name = field_layout.name.as_str();
+                    let value = field_values.remove(name).ok_or_else(|| {
+                        format_err!("field {} not found in variant {}.", name, variant_name)
+                    })?;
+                    self.try_into_vm_value_from_layout(&field_layout.layout, value)
+                })
+                .collect::<Result<_>>()?;
+
+            return Ok(move_core_types::value::MoveValue::Struct(
+                move_core_types::value::MoveStruct::RuntimeVariant(
+                    variant_index as u16,
+                    field_results,
+                ),
+            ));
+        }
+
         let (struct_tag, field_layouts) =
             if let MoveStructLayout::WithTypes { type_, fields } = layout {
                 (type_, fields)
             } else {
                 bail!(
-                    "Expecting `MoveStructLayout::WithTypes`, getting {:?}",
+                    "Expecting `MoveStructLayout::WithTypes` or `WithVariants`, getting {:?}",
                     layout
                 );
             };

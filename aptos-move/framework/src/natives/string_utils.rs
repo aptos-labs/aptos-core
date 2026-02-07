@@ -463,7 +463,7 @@ fn native_format_impl(
             )?;
             out.push('}');
         },
-        MoveTypeLayout::Struct(MoveStructLayout::WithVariants(variants)) => {
+        MoveTypeLayout::Struct(MoveStructLayout::WithVariants { variants, .. }) => {
             let struct_value = val.value_as::<Struct>()?;
             let (tag, elems) = struct_value.unpack_with_tag()?;
             if (tag as usize) >= variants.len() {

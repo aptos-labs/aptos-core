@@ -5252,7 +5252,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveStructL
             },
             MoveStructLayout::WithFields(_)
             | MoveStructLayout::WithTypes { .. }
-            | MoveStructLayout::WithVariants(_) => {
+            | MoveStructLayout::WithVariants { .. } => {
                 Err(D::Error::custom("cannot deserialize from decorated type"))
             },
         }

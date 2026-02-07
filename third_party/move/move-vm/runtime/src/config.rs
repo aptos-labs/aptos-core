@@ -56,6 +56,10 @@ pub struct VMConfig {
     /// Whether this VM should support debugging. If set, environment variables
     /// `MOVE_VM_TRACE` and `MOVE_VM_STEP` will be recognized.
     pub enable_debugging: bool,
+    /// Whether this VM should support public copy structs/enums as transaction arguments.
+    /// When enabled, non-private structs and enums with the copy ability can be used as
+    /// transaction arguments if they have public pack functions with the Pack attribute.
+    pub enable_public_struct_args: bool,
 }
 
 impl Default for VMConfig {
@@ -85,6 +89,7 @@ impl Default for VMConfig {
             enable_framework_for_option: true,
             enable_function_caches_for_native_dynamic_dispatch: true,
             enable_debugging: false,
+            enable_public_struct_args: true,
         }
     }
 }

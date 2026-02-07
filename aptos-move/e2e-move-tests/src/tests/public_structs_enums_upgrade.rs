@@ -7,7 +7,9 @@ use crate::{assert_abort, assert_success, assert_vm_status, tests::common, MoveH
 use aptos_framework::BuildOptions;
 use aptos_language_e2e_tests::account::Account;
 use aptos_package_builder::PackageBuilder;
-use aptos_types::{account_address::AccountAddress, transaction::TransactionStatus};
+use aptos_types::{
+    account_address::AccountAddress, on_chain_config::FeatureFlag, transaction::TransactionStatus,
+};
 use move_core_types::{parser::parse_struct_tag, vm_status::StatusCode};
 use move_model::well_known::INCOMPLETE_MATCH_ABORT_CODE;
 use serde::{Deserialize, Serialize};
@@ -830,4 +832,127 @@ fn execute_cross_module_enum_new_variant_handling() {
         vec![bcs::to_bytes(&2u8).unwrap(), bcs::to_bytes(&2u64).unwrap()],
     );
     assert_abort!(result, INCOMPLETE_MATCH_ABORT_CODE);
+}
+
+#[test]
+fn test_public_struct_args_feature_disabled_then_enabled() {
+    let mut h = MoveHarness::new();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap());
+
+    // Publish two modules: types (defines struct) and test (uses struct)
+    let result = publish(
+        &mut h,
+        &acc,
+        r#"
+        // Module 1: Define public struct
+        module 0x815::types {
+            public struct Point has copy, drop {
+                x: u64,
+                y: u64,
+            }
+        }
+
+        // Module 2: Use public struct from another module
+        module 0x815::test {
+            use 0x815::types::Point;
+
+            public entry fun test_point(_p: Point) {
+                // This should not execute when feature is disabled
+            }
+
+            #[view]
+            public fun view_point(p: Point): u64 {
+                p.x + p.y
+            }
+        }
+        "#,
+    );
+    assert_success!(result);
+
+    // Now disable VM_BINARY_FORMAT_V10 feature flag, which disables public struct/enum args
+    h.enable_features(vec![], vec![FeatureFlag::VM_BINARY_FORMAT_V10]);
+
+    // Try to call entry function with public struct as argument
+    // This should fail because the feature is now disabled
+    let result = h.run_entry_function(
+        &acc,
+        str::parse("0x815::test::test_point").unwrap(),
+        vec![],
+        vec![
+            // BCS-encoded Point { x: 10, y: 20 }
+            bcs::to_bytes(&(10u64, 20u64)).unwrap(),
+        ],
+    );
+
+    // Expect deserialization error when feature is disabled
+    assert_vm_status!(result, StatusCode::CODE_DESERIALIZATION_ERROR);
+
+    // Test view function - should also fail with the same error
+    let view_result = h.execute_view_function(
+        str::parse("0x815::test::view_point").unwrap(),
+        vec![],
+        vec![
+            // BCS-encoded Point { x: 10, y: 20 }
+            bcs::to_bytes(&(10u64, 20u64)).unwrap(),
+        ],
+    );
+
+    // Verify view function returns deserialization error as ErrorMessage
+    // (not MoveAbort, since CODE_DESERIALIZATION_ERROR is not an abort)
+    match view_result.values {
+        Err(aptos_types::transaction::ViewFunctionError::ErrorMessage(_, Some(status))) => {
+            assert_eq!(
+                status,
+                StatusCode::CODE_DESERIALIZATION_ERROR,
+                "Expected CODE_DESERIALIZATION_ERROR for view function, got: {:?}",
+                status
+            );
+        },
+        Err(err) => panic!(
+            "Expected ViewFunctionError::ErrorMessage with CODE_DESERIALIZATION_ERROR, got: {:?}",
+            err
+        ),
+        Ok(_) => panic!("Expected view function to fail when feature is disabled"),
+    }
+
+    // Now re-enable VM_BINARY_FORMAT_V10 feature flag
+    h.enable_features(vec![FeatureFlag::VM_BINARY_FORMAT_V10], vec![]);
+
+    // Test entry function - should succeed now
+    let result = h.run_entry_function(
+        &acc,
+        str::parse("0x815::test::test_point").unwrap(),
+        vec![],
+        vec![
+            // BCS-encoded Point { x: 10, y: 20 }
+            bcs::to_bytes(&(10u64, 20u64)).unwrap(),
+        ],
+    );
+    assert_success!(result);
+
+    // Test view function - should also succeed now and return correct value
+    let view_result = h.execute_view_function(
+        str::parse("0x815::test::view_point").unwrap(),
+        vec![],
+        vec![
+            // BCS-encoded Point { x: 10, y: 20 }
+            bcs::to_bytes(&(10u64, 20u64)).unwrap(),
+        ],
+    );
+
+    // Verify view function succeeds and returns the expected value
+    match view_result.values {
+        Ok(values) => {
+            assert_eq!(values.len(), 1, "Expected exactly one return value");
+            let result_value: u64 = bcs::from_bytes(&values[0]).unwrap();
+            assert_eq!(
+                result_value, 30,
+                "Expected view function to return 10 + 20 = 30"
+            );
+        },
+        Err(err) => panic!(
+            "Expected view function to succeed when feature is enabled, got error: {:?}",
+            err
+        ),
+    }
 }
