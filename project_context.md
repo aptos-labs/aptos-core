@@ -310,6 +310,26 @@ c) Else (both v_low and v_high are all-⊥):
 - `has_committable_low(v_low)`: Semantic alias for commit decision
 - `has_certifiable_high(v_high)`: Semantic alias for certificate creation
 
+### Termination Mechanism: StrongPCCommit
+
+**Problem**: When one party commits (traces back to View 1), it might stop participating. Other parties might not have committed yet and could lose quorum for progress.
+
+**Solution**: When a party commits, it broadcasts a `StrongPCCommit` message containing:
+- `v_high`: The final Strong PC output (from View 1)
+- `certificate_chain`: Full chain of certificates from committing view back to View 1
+- `epoch`: For validation
+
+**Verification by receiver**:
+1. Verify each certificate in the chain is valid (signatures, QC3)
+2. Verify parent pointers form a valid chain back to View 1
+3. Verify the claimed v_high matches View 1's output
+4. Output v_high and terminate
+
+**Design choices**:
+- Include full certificate chain (no fetching) - chain is typically short (2-5 certs)
+- Committing party stops participating immediately after broadcast
+- Network guarantees message delivery
+
 ### Next Action
 Begin Strong Prefix Consensus Phase 4: Strong Protocol Core (multi-view state machine)
 
