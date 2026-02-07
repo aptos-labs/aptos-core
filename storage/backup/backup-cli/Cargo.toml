@@ -71,3 +71,4 @@ warp = { workspace = true }
 [features]
 testing = []
 fuzzing = ["aptos-db/fuzzing"]
+consensus-only-perf-test = []

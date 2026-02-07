@@ -63,9 +63,8 @@ impl PersistedAuxiliaryInfoDb {
         let mut iter = self.db.iter::<PersistedAuxiliaryInfoSchema>()?;
         iter.seek(&start_version)?;
         let mut iter = iter.peekable();
-        let item = iter.peek();
-        let version = if item.is_some() {
-            item.unwrap().as_ref().map_err(|e| e.clone())?.0
+        let version = if let Some(item) = iter.peek() {
+            item.as_ref().map_err(|e| e.clone())?.0
         } else {
             let mut iter = self.db.iter::<PersistedAuxiliaryInfoSchema>()?;
             iter.seek_to_last();

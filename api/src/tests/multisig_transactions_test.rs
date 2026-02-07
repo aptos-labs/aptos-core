@@ -895,7 +895,6 @@ async fn assert_owners(
         .as_array()
         .unwrap()
         .iter()
-        .cloned()
         .map(|address| AccountAddress::from_hex_literal(address.as_str().unwrap()).unwrap())
         .collect::<Vec<_>>();
     owners.sort();

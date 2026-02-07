@@ -367,10 +367,10 @@ impl InternalNode {
     }
 
     pub fn serialize(&self, binary: &mut Vec<u8>) -> Result<()> {
-        let (mut existence_bitmap, leaf_bitmap) = self.generate_bitmaps();
+        let (existence_bitmap, leaf_bitmap) = self.generate_bitmaps();
         binary.write_u16::<LittleEndian>(existence_bitmap)?;
         binary.write_u16::<LittleEndian>(leaf_bitmap)?;
-        for (next_child, child) in self.children.iter() {
+        for (_, child) in self.children.iter() {
             serialize_u64_varint(child.version, binary);
             binary.extend(child.hash.to_vec());
             match child.node_type {
@@ -380,7 +380,6 @@ impl InternalNode {
                 },
                 NodeType::Null => unreachable!("Child cannot be Null"),
             };
-            existence_bitmap &= !(1 << next_child.as_usize());
         }
         Ok(())
     }

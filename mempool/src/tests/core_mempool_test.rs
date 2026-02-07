@@ -574,7 +574,6 @@ fn test_reset_sequence_number_on_failure() {
     ];
     let hashes: Vec<_> = txns
         .iter()
-        .cloned()
         .map(|txn| txn.make_signed_transaction().committed_hash())
         .collect();
     // Add two transactions for account.

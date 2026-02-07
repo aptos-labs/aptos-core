@@ -927,7 +927,7 @@ fn initialize_keyless_accounts(
         ]),
     );
 
-    if vk.is_some() {
+    if let Some(vk_value) = vk {
         exec_function(
             session,
             module_storage,
@@ -937,7 +937,7 @@ fn initialize_keyless_accounts(
             vec![],
             serialize_values(&vec![
                 MoveValue::Signer(CORE_CODE_ADDRESS),
-                vk.unwrap().as_move_value(),
+                vk_value.as_move_value(),
             ]),
         );
     }

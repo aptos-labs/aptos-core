@@ -20,7 +20,6 @@ use aptos_types::{
     vm::modules::AptosModuleExtension,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
-use aptos_vm_logging::alert;
 use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
 use cfg_if::cfg_if;
 use move_binary_format::{

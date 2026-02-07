@@ -248,10 +248,7 @@ pub fn start_and_report_ports(
         config.storage.assert_rlimit_nofile,
     );
 
-    assert!(
-        !cfg!(feature = "testing") && !cfg!(feature = "fuzzing"),
-        "Testing features shouldn't be compiled"
-    );
+    const { assert!(!cfg!(feature = "testing") && !cfg!(feature = "fuzzing")) };
 
     // Ensure failpoints are configured correctly
     if fail::has_failpoints() {

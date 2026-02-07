@@ -91,12 +91,12 @@ impl TransactionStore {
         // Question[Orderless]: When start version is specified, we are current scanning forward from start version.
         // When start version is not specified we are scanning backward, so as to return the most recent transactions.
         // This doesn't seem to be a good design. Should we instead let the API take scan direction as input?
-        if start_version.is_some() {
+        if let Some(sv) = start_version {
             let mut iter = self
                 .ledger_db
                 .transaction_db_raw()
                 .iter::<TransactionSummariesByAccountSchema>()?;
-            iter.seek(&(address, start_version.unwrap()))?;
+            iter.seek(&(address, sv))?;
             Ok(AccountTransactionSummariesIter::new(
                 iter,
                 address,
@@ -106,12 +106,12 @@ impl TransactionStore {
                 ScanDirection::Forward,
                 ledger_version,
             ))
-        } else if end_version.is_some() {
+        } else if let Some(ev) = end_version {
             let mut iter = self
                 .ledger_db
                 .transaction_db_raw()
                 .rev_iter::<TransactionSummariesByAccountSchema>()?;
-            iter.seek_for_prev(&(address, end_version.unwrap()))?;
+            iter.seek_for_prev(&(address, ev))?;
             Ok(AccountTransactionSummariesIter::new(
                 iter,
                 address,
