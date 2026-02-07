@@ -19,6 +19,8 @@ Working notes, decisions log, and progress tracker for the API v2 implementation
 | 2026-02-07 | Port: Configurable same or separate | Maximum deployment flexibility |
 | 2026-02-07 | Context: V2Context wraps v1 Context | Shared DB/mempool/caches, decoupled from Poem error traits |
 | 2026-02-07 | v1 deprecation: 3-6 month coexistence | Give ecosystem time to migrate |
+| 2026-02-07 | Response metadata: body-only, no headers | v1's `X-Aptos-*` headers are awkward for many clients; putting ledger metadata in the JSON body alongside the data simplifies parsing and makes the API self-contained. Errors do NOT include ledger metadata (use `/v2/info` if needed). The only custom header is `X-Request-Id`. |
+| 2026-02-07 | Pagination: unified opaque cursor on all list endpoints | v1 uses mixed styles (cursor for resources, offset for txns/events). v2 uses a single opaque cursor pattern everywhere. Server controls page size (no client `limit` param). Cursor is in the response body, not a header. Internal encoding is versioned (`version_byte + bcs(CursorInner)`) so format can evolve. |
 
 ## Open Questions
 
@@ -54,6 +56,7 @@ Working notes, decisions log, and progress tracker for the API v2 implementation
 ## Progress
 
 - [x] Design documents written
+- [x] Design docs updated: body-only metadata, cursor pagination, new endpoints (modules, events, account txns)
 - [ ] ApiV2Config struct added
 - [ ] Axum/Tower/utoipa dependencies added
 - [ ] v2 module structure created

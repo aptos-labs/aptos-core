@@ -3,9 +3,9 @@
 ## Overview
 
 This document details the v2 endpoint handler patterns, the request/response serialization
-model, the BCS versioned envelope, and the JSON-only output default. It covers how each
-v1 endpoint maps to its v2 equivalent, what changes in the API contract, and the concrete
-Rust types involved.
+model, the BCS versioned envelope, the cursor-based pagination system, and the JSON-only
+output default. It covers how each v1 endpoint maps to its v2 equivalent, what changes in
+the API contract, and the concrete Rust types involved.
 
 ---
 
@@ -17,7 +17,9 @@ Rust types involved.
 | Input format (reads) | JSON or BCS | JSON or BCS (versioned envelope) |
 | Input format (tx submit) | JSON or BCS | BCS only (versioned envelope) |
 | Error format | `AptosError` with Poem macros | `V2Error` (typed ErrorCode enum) |
-| Response headers | `X-Aptos-*` ledger info headers | JSON body includes ledger info |
+| Ledger metadata | `X-Aptos-*` response headers | In JSON response body (`ledger` field) |
+| Pagination | Mixed (cursor for resources, offset for txns/events) | Unified opaque cursor on all list endpoints |
+| Pagination cursor | `X-Aptos-Cursor` response header | `cursor` field in JSON response body |
 | OpenAPI generation | `poem-openapi` macros | `utoipa` derive macros |
 | Handler pattern | `#[OpenApi] impl XxxApi { ... }` | Free functions with `State` extractor |
 | Blocking DB reads | `api_spawn_blocking(closure)` | `spawn_blocking(closure)` |
@@ -26,8 +28,21 @@ Rust types involved.
 
 ## Response Envelope
 
-v1 embeds ledger info in HTTP headers (`X-Aptos-Chain-Id`, `X-Aptos-Ledger-Version`, etc.).
-v2 includes it in the JSON body for better client ergonomics:
+### No Custom Response Headers
+
+v1 returns ledger metadata in HTTP headers (`X-Aptos-Chain-Id`, `X-Aptos-Ledger-Version`,
+`X-Aptos-Epoch`, `X-Aptos-Block-Height`, `X-Aptos-Ledger-TimestampUsec`,
+`X-Aptos-Ledger-Oldest-Version`, `X-Aptos-Oldest-Block-Height`, `X-Aptos-Cursor`,
+`X-Aptos-Gas-Used`).
+
+**v2 does NOT set any `X-Aptos-*` response headers.** All metadata is in the JSON body.
+
+The only custom header v2 uses is `X-Request-Id` (echoed from client or server-generated),
+which is handled by middleware and is not endpoint-specific.
+
+### JSON Body Envelope
+
+All successful v2 responses use this envelope:
 
 ```rust
 // api/src/v2/types/mod.rs
@@ -36,9 +51,14 @@ v2 includes it in the JSON body for better client ergonomics:
 pub struct V2Response<T: Serialize> {
     /// The actual response data.
     pub data: T,
+
     /// Ledger metadata at the time of the request.
     pub ledger: LedgerMetadata,
-    /// Optional cursor for paginated responses.
+
+    /// Opaque pagination cursor. Present on list endpoints when more data
+    /// is available. Absent or null when there are no more pages.
+    /// Clients must pass this value back via the `?cursor=` query parameter
+    /// to fetch the next page. Clients must NEVER construct cursors manually.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cursor: Option<String>,
 }
@@ -69,7 +89,13 @@ impl From<&LedgerInfo> for LedgerMetadata {
 }
 ```
 
-Helper to build responses:
+### Error Responses Do NOT Include Ledger Metadata
+
+`V2Error` responses contain only error information (`code`, `message`, `request_id`,
+`details`, `vm_status_code`). They do NOT include a `ledger` field. If a client needs
+current chain state after an error, it can call `GET /v2/info`.
+
+### Helper Methods
 
 ```rust
 impl<T: Serialize> V2Response<T> {
@@ -87,6 +113,167 @@ impl<T: Serialize> V2Response<T> {
     }
 }
 ```
+
+---
+
+## Cursor-Based Pagination
+
+All v2 list endpoints use unified, opaque cursor-based pagination.
+
+### Design Principles
+
+1. **Opaque cursors**: Clients treat cursors as opaque strings. They NEVER construct
+   or parse them. The internal encoding may change between server versions.
+2. **Server-controlled page size**: The server chooses page size based on config.
+   There is no client-facing `limit` parameter.
+3. **Cursor in body**: The cursor is returned in the `cursor` field of `V2Response`,
+   not in a response header.
+4. **Null means done**: `"cursor": null` (or absent) means there are no more pages.
+
+### Cursor Module
+
+```rust
+// api/src/v2/cursor.rs
+
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use serde::{Deserialize, Serialize};
+
+/// Opaque cursor type. Internally encodes pagination state as base64.
+/// Clients treat this as an opaque string -- never parse or construct it.
+///
+/// Internal format: version_byte + bcs(CursorInner)
+/// The version byte allows us to change the cursor format in the future.
+#[derive(Debug, Clone)]
+pub struct Cursor(Vec<u8>);
+
+const CURSOR_VERSION: u8 = 1;
+
+#[derive(Serialize, Deserialize)]
+enum CursorInner {
+    /// Cursor for state-prefix iteration (resources, modules).
+    StateKey(Vec<u8>),  // BCS-encoded StateKey
+    /// Cursor for version-ordered data (transactions).
+    Version(u64),
+    /// Cursor for sequence-ordered data (events).
+    SequenceNumber(u64),
+}
+
+impl Cursor {
+    /// Encode cursor to an opaque string for the client.
+    pub fn encode(&self) -> String {
+        URL_SAFE_NO_PAD.encode(&self.0)
+    }
+
+    /// Decode a client-provided cursor string.
+    pub fn decode(s: &str) -> Result<Self, V2Error> {
+        let bytes = URL_SAFE_NO_PAD.decode(s)
+            .map_err(|_| V2Error::bad_request(ErrorCode::InvalidInput, "Invalid cursor"))?;
+        if bytes.is_empty() || bytes[0] != CURSOR_VERSION {
+            return Err(V2Error::bad_request(
+                ErrorCode::InvalidInput,
+                "Invalid cursor version",
+            ));
+        }
+        Ok(Cursor(bytes))
+    }
+
+    // --- Constructors ---
+
+    pub fn from_state_key(key: &StateKey) -> Self {
+        let inner = CursorInner::StateKey(bcs::to_bytes(key).unwrap());
+        let mut bytes = vec![CURSOR_VERSION];
+        bytes.extend(bcs::to_bytes(&inner).unwrap());
+        Cursor(bytes)
+    }
+
+    pub fn from_version(v: u64) -> Self {
+        let inner = CursorInner::Version(v);
+        let mut bytes = vec![CURSOR_VERSION];
+        bytes.extend(bcs::to_bytes(&inner).unwrap());
+        Cursor(bytes)
+    }
+
+    pub fn from_sequence_number(n: u64) -> Self {
+        let inner = CursorInner::SequenceNumber(n);
+        let mut bytes = vec![CURSOR_VERSION];
+        bytes.extend(bcs::to_bytes(&inner).unwrap());
+        Cursor(bytes)
+    }
+
+    // --- Accessors ---
+
+    fn inner(&self) -> Result<CursorInner, V2Error> {
+        bcs::from_bytes(&self.0[1..])
+            .map_err(|_| V2Error::bad_request(ErrorCode::InvalidInput, "Corrupt cursor"))
+    }
+
+    pub fn as_state_key(&self) -> Result<StateKey, V2Error> {
+        match self.inner()? {
+            CursorInner::StateKey(bytes) => bcs::from_bytes(&bytes)
+                .map_err(|_| V2Error::bad_request(ErrorCode::InvalidInput, "Invalid state key cursor")),
+            _ => Err(V2Error::bad_request(ErrorCode::InvalidInput, "Wrong cursor type")),
+        }
+    }
+
+    pub fn as_version(&self) -> Result<u64, V2Error> {
+        match self.inner()? {
+            CursorInner::Version(v) => Ok(v),
+            _ => Err(V2Error::bad_request(ErrorCode::InvalidInput, "Wrong cursor type")),
+        }
+    }
+
+    pub fn as_sequence_number(&self) -> Result<u64, V2Error> {
+        match self.inner()? {
+            CursorInner::SequenceNumber(n) => Ok(n),
+            _ => Err(V2Error::bad_request(ErrorCode::InvalidInput, "Wrong cursor type")),
+        }
+    }
+}
+```
+
+### Paginated Endpoints Summary
+
+| Endpoint | Internal Cursor Encoding | Phase |
+|---|---|---|
+| `GET /v2/accounts/:addr/resources` | `Cursor::from_state_key(next_key)` | Phase 1 |
+| `GET /v2/accounts/:addr/modules` | `Cursor::from_state_key(next_key)` | Phase 1 |
+| `GET /v2/transactions` | `Cursor::from_version(next_version)` | Phase 1 |
+| `GET /v2/accounts/:addr/transactions` | `Cursor::from_version(next_version)` | Phase 1 |
+| `GET /v2/accounts/:addr/events/:creation_number` | `Cursor::from_sequence_number(next_seq)` | Phase 1 |
+
+Blocks (`/v2/blocks/:height`) are NOT paginated -- they return the block with up to
+`max_block_transactions_page_size` transactions. If the block has more transactions,
+clients use `GET /v2/transactions?cursor=...` to paginate through the rest.
+
+### Example Pagination Flow
+
+First page:
+
+```
+GET /v2/accounts/0x1/resources
+
+200 OK
+{
+  "data": [ ... 100 resources ... ],
+  "ledger": { "chain_id": 1, "ledger_version": 50000, ... },
+  "cursor": "AQAAAAEAAAAAAAAAAQhj..."
+}
+```
+
+Next page:
+
+```
+GET /v2/accounts/0x1/resources?cursor=AQAAAAEAAAAAAAAAAQhj...
+
+200 OK
+{
+  "data": [ ... 42 resources ... ],
+  "ledger": { "chain_id": 1, "ledger_version": 50005, ... },
+  "cursor": null
+}
+```
+
+`cursor: null` (or absent) means no more pages.
 
 ---
 
@@ -220,6 +407,31 @@ where
 
 ---
 
+## Complete Endpoint List
+
+| Endpoint | Method | Input | Output | Paginated | Phase |
+|---|---|---|---|---|---|
+| `/v2/health` | GET | - | JSON | No | Phase 1 |
+| `/v2/info` | GET | - | JSON | No | Phase 1 |
+| `/v2/accounts/:addr/resources` | GET | query params | JSON | Yes (StateKey cursor) | Phase 1 |
+| `/v2/accounts/:addr/resource/:type` | GET | query params | JSON | No | Phase 1 |
+| `/v2/accounts/:addr/modules` | GET | query params | JSON | Yes (StateKey cursor) | Phase 1 |
+| `/v2/accounts/:addr/module/:name` | GET | query params | JSON | No | Phase 1 |
+| `/v2/transactions` | GET | query params | JSON | Yes (version cursor) | Phase 1 |
+| `/v2/transactions` | POST | BCS only | JSON | No | Phase 1 |
+| `/v2/transactions/:hash` | GET | - | JSON | No | Phase 1 |
+| `/v2/transactions/:hash/wait` | GET | - | JSON | No | Phase 1 |
+| `/v2/accounts/:addr/transactions` | GET | query params | JSON | Yes (version cursor) | Phase 1 |
+| `/v2/accounts/:addr/events/:creation_number` | GET | query params | JSON | Yes (seq number cursor) | Phase 1 |
+| `/v2/view` | POST | JSON or BCS | JSON | No | Phase 1 |
+| `/v2/blocks/:height` | GET | query params | JSON | No | Phase 1 |
+| `/v2/blocks/latest` | GET | - | JSON | No | Phase 1 |
+| `/v2/batch` | POST | JSON-RPC 2.0 | JSON | N/A | Phase 1 |
+| `/v2/ws` | GET | WebSocket upgrade | JSON frames | N/A | Phase 1 |
+| `/v2/spec.json` | GET | - | JSON | No | Phase 1 |
+
+---
+
 ## Endpoint Implementations
 
 ### Health Check
@@ -259,18 +471,21 @@ pub async fn info_handler(
 }
 ```
 
-### Resources
+### Resources (Paginated)
 
 ```rust
 // api/src/v2/endpoints/resources.rs
 
 /// GET /v2/accounts/:address/resources
+///
+/// Returns a paginated list of resources for the given account.
+/// Use the `cursor` query parameter to fetch subsequent pages.
+/// The server controls page size via V2Config.
 #[utoipa::path(get, path = "/v2/accounts/{address}/resources",
     params(
         ("address" = String, Path, description = "Account address"),
         ("ledger_version" = Option<u64>, Query, description = "Ledger version"),
-        ("cursor" = Option<String>, Query, description = "Pagination cursor"),
-        ("limit" = Option<u16>, Query, description = "Page size limit"),
+        ("cursor" = Option<String>, Query, description = "Opaque pagination cursor from a previous response"),
     ),
     responses(
         (status = 200, description = "Account resources"),
@@ -280,24 +495,22 @@ pub async fn info_handler(
 pub async fn get_resources_handler(
     State(ctx): State<V2Context>,
     Path(address): Path<String>,
-    Query(params): Query<ResourcesParams>,
+    Query(params): Query<PaginatedLedgerParams>,
 ) -> Result<Json<V2Response<Vec<MoveResource>>>, V2Error> {
     let ctx = ctx.clone();
     spawn_blocking(move || {
         let address = parse_address(&address)?;
         let (ledger_info, version, state_view) = ctx.state_view_at(params.ledger_version)?;
 
-        let limit = params.limit
-            .unwrap_or(ctx.v2_config.max_account_resources_page_size)
-            .min(ctx.v2_config.max_account_resources_page_size);
+        let page_size = ctx.v2_config.max_account_resources_page_size;
 
         let prev_key = params.cursor
             .as_ref()
-            .map(|c| decode_cursor(c))
+            .map(|c| Cursor::decode(c)?.as_state_key())
             .transpose()?;
 
         let (resources, next_key) = ctx.inner()
-            .get_resources_by_pagination(address, prev_key.as_ref(), version, limit as u64)
+            .get_resources_by_pagination(address, prev_key.as_ref(), version, page_size as u64)
             .map_err(V2Error::internal)?;
 
         // Convert to MoveResource JSON representation
@@ -312,7 +525,7 @@ pub async fn get_resources_handler(
             .collect::<anyhow::Result<Vec<_>>>()
             .map_err(V2Error::internal)?;
 
-        let cursor = next_key.map(|k| encode_cursor(&k));
+        let cursor = next_key.map(|k| Cursor::from_state_key(&k).encode());
         Ok(Json(V2Response::new(move_resources, &ledger_info).with_cursor(cursor)))
     }).await
 }
@@ -347,6 +560,100 @@ pub async fn get_resource_handler(
             .map_err(V2Error::internal)?;
 
         Ok(Json(V2Response::new(resource, &ledger_info)))
+    }).await
+}
+```
+
+### Modules (Paginated)
+
+```rust
+// api/src/v2/endpoints/modules.rs
+
+/// GET /v2/accounts/:address/modules
+///
+/// Returns a paginated list of Move modules deployed at the given account.
+/// Uses the same cursor-based pagination as resources.
+#[utoipa::path(get, path = "/v2/accounts/{address}/modules",
+    params(
+        ("address" = String, Path, description = "Account address"),
+        ("ledger_version" = Option<u64>, Query, description = "Ledger version"),
+        ("cursor" = Option<String>, Query, description = "Opaque pagination cursor"),
+    ),
+    responses(
+        (status = 200, description = "Account modules"),
+        (status = 404, description = "Account not found"),
+    ),
+)]
+pub async fn get_modules_handler(
+    State(ctx): State<V2Context>,
+    Path(address): Path<String>,
+    Query(params): Query<PaginatedLedgerParams>,
+) -> Result<Json<V2Response<Vec<MoveModuleBytecode>>>, V2Error> {
+    let ctx = ctx.clone();
+    spawn_blocking(move || {
+        let address = parse_address(&address)?;
+        let (ledger_info, version, state_view) = ctx.state_view_at(params.ledger_version)?;
+
+        let page_size = ctx.v2_config.max_account_modules_page_size;
+
+        let prev_key = params.cursor
+            .as_ref()
+            .map(|c| Cursor::decode(c)?.as_state_key())
+            .transpose()?;
+
+        let (modules, next_key) = ctx.inner()
+            .get_modules_by_pagination(address, prev_key.as_ref(), version, page_size as u64)
+            .map_err(V2Error::internal)?;
+
+        // Convert to MoveModuleBytecode JSON representation
+        let converter = state_view.as_converter(
+            ctx.inner().db.clone(),
+            ctx.inner().indexer_reader.clone(),
+        );
+
+        let move_modules: Vec<MoveModuleBytecode> = modules
+            .into_iter()
+            .map(|m| converter.try_into_move_module_bytecode(&m))
+            .collect::<anyhow::Result<Vec<_>>>()
+            .map_err(V2Error::internal)?;
+
+        let cursor = next_key.map(|k| Cursor::from_state_key(&k).encode());
+        Ok(Json(V2Response::new(move_modules, &ledger_info).with_cursor(cursor)))
+    }).await
+}
+
+/// GET /v2/accounts/:address/module/:module_name
+pub async fn get_module_handler(
+    State(ctx): State<V2Context>,
+    Path((address, module_name)): Path<(String, String)>,
+    Query(params): Query<LedgerVersionParam>,
+) -> Result<Json<V2Response<MoveModuleBytecode>>, V2Error> {
+    let ctx = ctx.clone();
+    spawn_blocking(move || {
+        let address = parse_address(&address)?;
+        let (ledger_info, version, state_view) = ctx.state_view_at(params.ledger_version)?;
+
+        let module_id = ModuleId::new(address, ident_str!(&module_name).to_owned());
+        let state_key = StateKey::module_id(&module_id);
+
+        let module_bytes = state_view
+            .get_state_value_bytes(&state_key)
+            .map_err(V2Error::internal)?
+            .ok_or_else(|| V2Error::not_found(
+                ErrorCode::ModuleNotFound,
+                format!("Module {} not found at {}", module_name, address),
+            ))?;
+
+        let converter = state_view.as_converter(
+            ctx.inner().db.clone(),
+            ctx.inner().indexer_reader.clone(),
+        );
+
+        let module = converter
+            .try_into_move_module_bytecode(&module_bytes)
+            .map_err(V2Error::internal)?;
+
+        Ok(Json(V2Response::new(module, &ledger_info)))
     }).await
 }
 ```
@@ -453,10 +760,67 @@ pub async fn view_handler(
 }
 ```
 
-### Transaction Submission
+### Transactions (Paginated List + Submission)
 
 ```rust
 // api/src/v2/endpoints/transactions.rs
+
+/// GET /v2/transactions
+///
+/// Returns a paginated list of committed transactions, ordered by version.
+/// The cursor encodes the last-seen version; the server returns the next page
+/// of transactions after that version.
+#[utoipa::path(get, path = "/v2/transactions",
+    params(
+        ("cursor" = Option<String>, Query, description = "Opaque pagination cursor"),
+    ),
+    responses(
+        (status = 200, description = "List of transactions"),
+    ),
+)]
+pub async fn list_transactions_handler(
+    State(ctx): State<V2Context>,
+    Query(params): Query<CursorOnlyParams>,
+) -> Result<Json<V2Response<Vec<Transaction>>>, V2Error> {
+    let ctx = ctx.clone();
+    spawn_blocking(move || {
+        let ledger_info = ctx.ledger_info()?;
+        let ledger_version = ledger_info.version();
+
+        let page_size = ctx.v2_config.max_transactions_page_size as u64;
+
+        let start_version = match &params.cursor {
+            Some(c) => Cursor::decode(c)?.as_version()? + 1, // Start after the cursor
+            None => 0,
+        };
+
+        if start_version > ledger_version {
+            return Ok(Json(V2Response::new(vec![], &ledger_info)));
+        }
+
+        let txns = ctx.inner()
+            .get_transactions(start_version, page_size as u16, ledger_version)
+            .map_err(V2Error::internal)?;
+
+        let state_view = ctx.inner().latest_state_view().map_err(V2Error::internal)?;
+        let converter = state_view.as_converter(
+            ctx.inner().db.clone(),
+            ctx.inner().indexer_reader.clone(),
+        );
+
+        let rendered = ctx.render_transactions(&converter, &ledger_info, txns)?;
+
+        // Build cursor: if we got a full page, there may be more
+        let cursor = if rendered.len() as u64 == page_size {
+            let last_version = start_version + rendered.len() as u64 - 1;
+            Some(Cursor::from_version(last_version).encode())
+        } else {
+            None
+        };
+
+        Ok(Json(V2Response::new(rendered, &ledger_info).with_cursor(cursor)))
+    }).await
+}
 
 /// POST /v2/transactions
 ///
@@ -473,9 +837,6 @@ pub async fn submit_transaction_handler(
     body: BcsOnly<SignedTransaction>,
 ) -> Result<(StatusCode, Json<V2Response<PendingTransactionSummary>>), V2Error> {
     let signed_txn: SignedTransaction = body.0.into_inner();
-
-    // Validate transaction
-    // (signature verification happens in mempool, but we can do basic checks here)
 
     let submission_status = ctx.inner()
         .submit_transaction(signed_txn.clone())
@@ -581,6 +942,136 @@ pub async fn wait_transaction_handler(
 }
 ```
 
+### Account Transactions (Paginated)
+
+```rust
+// api/src/v2/endpoints/account_transactions.rs
+
+/// GET /v2/accounts/:address/transactions
+///
+/// Returns a paginated list of transactions sent by the given account,
+/// ordered by version. Uses a version-based cursor.
+#[utoipa::path(get, path = "/v2/accounts/{address}/transactions",
+    params(
+        ("address" = String, Path, description = "Account address"),
+        ("cursor" = Option<String>, Query, description = "Opaque pagination cursor"),
+    ),
+    responses(
+        (status = 200, description = "Account transactions"),
+        (status = 404, description = "Account not found"),
+    ),
+)]
+pub async fn get_account_transactions_handler(
+    State(ctx): State<V2Context>,
+    Path(address): Path<String>,
+    Query(params): Query<CursorOnlyParams>,
+) -> Result<Json<V2Response<Vec<Transaction>>>, V2Error> {
+    let ctx = ctx.clone();
+    spawn_blocking(move || {
+        let address = parse_address(&address)?;
+        let ledger_info = ctx.ledger_info()?;
+        let ledger_version = ledger_info.version();
+
+        let page_size = ctx.v2_config.max_transactions_page_size as u64;
+
+        let start_version = match &params.cursor {
+            Some(c) => Some(Cursor::decode(c)?.as_version()? + 1),
+            None => None,
+        };
+
+        let txns = ctx.inner()
+            .get_account_transactions(address, start_version, page_size, ledger_version)
+            .map_err(V2Error::internal)?;
+
+        let state_view = ctx.inner().latest_state_view().map_err(V2Error::internal)?;
+        let converter = state_view.as_converter(
+            ctx.inner().db.clone(),
+            ctx.inner().indexer_reader.clone(),
+        );
+
+        let rendered = ctx.render_transactions(&converter, &ledger_info, txns)?;
+
+        let cursor = if rendered.len() as u64 == page_size {
+            // Use the version from the last transaction as cursor
+            rendered.last()
+                .and_then(|t| t.version())
+                .map(|v| Cursor::from_version(v).encode())
+        } else {
+            None
+        };
+
+        Ok(Json(V2Response::new(rendered, &ledger_info).with_cursor(cursor)))
+    }).await
+}
+```
+
+### Events (Paginated)
+
+```rust
+// api/src/v2/endpoints/events.rs
+
+/// GET /v2/accounts/:address/events/:creation_number
+///
+/// Returns a paginated list of events emitted by the given event handle,
+/// ordered by sequence number. Uses a sequence-number-based cursor.
+#[utoipa::path(get, path = "/v2/accounts/{address}/events/{creation_number}",
+    params(
+        ("address" = String, Path, description = "Account address"),
+        ("creation_number" = u64, Path, description = "Event handle creation number"),
+        ("cursor" = Option<String>, Query, description = "Opaque pagination cursor"),
+    ),
+    responses(
+        (status = 200, description = "Events"),
+        (status = 404, description = "Event handle not found"),
+    ),
+)]
+pub async fn get_events_handler(
+    State(ctx): State<V2Context>,
+    Path((address, creation_number)): Path<(String, u64)>,
+    Query(params): Query<CursorOnlyParams>,
+) -> Result<Json<V2Response<Vec<VersionedEvent>>>, V2Error> {
+    let ctx = ctx.clone();
+    spawn_blocking(move || {
+        let address = parse_address(&address)?;
+        let ledger_info = ctx.ledger_info()?;
+        let ledger_version = ledger_info.version();
+
+        let page_size = ctx.v2_config.max_events_page_size as u64;
+
+        let start_seq = match &params.cursor {
+            Some(c) => Cursor::decode(c)?.as_sequence_number()? + 1,
+            None => 0,
+        };
+
+        let event_key = EventKey::new(creation_number, address);
+        let events = ctx.inner()
+            .get_events(&event_key, start_seq, page_size as u16, ledger_version)
+            .map_err(V2Error::internal)?;
+
+        let state_view = ctx.inner().latest_state_view().map_err(V2Error::internal)?;
+        let converter = state_view.as_converter(
+            ctx.inner().db.clone(),
+            ctx.inner().indexer_reader.clone(),
+        );
+
+        let rendered: Vec<VersionedEvent> = events
+            .into_iter()
+            .map(|e| converter.try_into_versioned_event(&e))
+            .collect::<anyhow::Result<Vec<_>>>()
+            .map_err(V2Error::internal)?;
+
+        let cursor = if rendered.len() as u64 == page_size {
+            rendered.last()
+                .map(|e| Cursor::from_sequence_number(e.sequence_number).encode())
+        } else {
+            None
+        };
+
+        Ok(Json(V2Response::new(rendered, &ledger_info).with_cursor(cursor)))
+    }).await
+}
+```
+
 ### Blocks
 
 ```rust
@@ -628,18 +1119,27 @@ pub async fn get_latest_block_handler(
 ## Query Parameter Types
 
 ```rust
+/// For single-item endpoints that accept an optional ledger version.
 #[derive(Deserialize, utoipa::IntoParams)]
 pub struct LedgerVersionParam {
     pub ledger_version: Option<u64>,
 }
 
+/// For paginated endpoints that accept a cursor and optional ledger version.
+/// Note: there is no `limit` parameter. The server controls page size.
 #[derive(Deserialize, utoipa::IntoParams)]
-pub struct ResourcesParams {
+pub struct PaginatedLedgerParams {
     pub ledger_version: Option<u64>,
     pub cursor: Option<String>,
-    pub limit: Option<u16>,
 }
 
+/// For paginated endpoints that only need a cursor (no ledger version pinning).
+#[derive(Deserialize, utoipa::IntoParams)]
+pub struct CursorOnlyParams {
+    pub cursor: Option<String>,
+}
+
+/// For block endpoints.
 #[derive(Deserialize, utoipa::IntoParams)]
 pub struct BlockParams {
     pub with_transactions: Option<bool>,

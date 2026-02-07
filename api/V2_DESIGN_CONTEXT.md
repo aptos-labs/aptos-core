@@ -82,6 +82,9 @@ Every v1 endpoint struct holds `pub context: Arc<Context>` and follows this patt
 **Events**:
 - `get_events(event_key, start, limit, version)` -> `Vec<EventWithVersion>`
 
+**Account Transactions**:
+- `get_account_transactions(address, start, limit, ledger_version)` -> `Vec<TransactionOnChainData>`
+
 **Transaction Rendering** (JSON conversion):
 - `render_transactions_sequential(ledger_info, data, timestamp)` -> JSON txns
 - `render_transactions_non_sequential(ledger_info, data)` -> JSON txns
@@ -303,6 +306,153 @@ impl V2Context {
 }
 ```
 
+#### Pagination Helpers
+
+V2Context provides convenience methods for cursor-based paginated access. These
+wrap the underlying Context methods and handle cursor decoding/encoding:
+
+```rust
+impl V2Context {
+    /// Get paginated resources for an account, with cursor-based pagination.
+    pub fn get_resources_paginated(
+        &self,
+        address: AccountAddress,
+        cursor: Option<&Cursor>,
+        version: u64,
+    ) -> Result<(Vec<(StructTag, Vec<u8>)>, Option<Cursor>), V2Error> {
+        let prev_key = cursor.map(|c| c.as_state_key()).transpose()?;
+        let page_size = self.v2_config.max_account_resources_page_size as u64;
+
+        let (resources, next_key) = self.inner
+            .get_resources_by_pagination(address, prev_key.as_ref(), version, page_size)
+            .map_err(V2Error::internal)?;
+
+        let next_cursor = next_key.map(|k| Cursor::from_state_key(&k));
+        Ok((resources, next_cursor))
+    }
+
+    /// Get paginated modules for an account, with cursor-based pagination.
+    pub fn get_modules_paginated(
+        &self,
+        address: AccountAddress,
+        cursor: Option<&Cursor>,
+        version: u64,
+    ) -> Result<(Vec<Vec<u8>>, Option<Cursor>), V2Error> {
+        let prev_key = cursor.map(|c| c.as_state_key()).transpose()?;
+        let page_size = self.v2_config.max_account_modules_page_size as u64;
+
+        let (modules, next_key) = self.inner
+            .get_modules_by_pagination(address, prev_key.as_ref(), version, page_size)
+            .map_err(V2Error::internal)?;
+
+        let next_cursor = next_key.map(|k| Cursor::from_state_key(&k));
+        Ok((modules, next_cursor))
+    }
+
+    /// Get paginated transactions, with cursor-based pagination.
+    /// The cursor encodes the last-seen version; returns the next page after that.
+    pub fn get_transactions_paginated(
+        &self,
+        cursor: Option<&Cursor>,
+        ledger_version: u64,
+    ) -> Result<(Vec<TransactionOnChainData>, Option<Cursor>), V2Error> {
+        let page_size = self.v2_config.max_transactions_page_size;
+        let start_version = match cursor {
+            Some(c) => c.as_version()? + 1,
+            None => 0,
+        };
+
+        if start_version > ledger_version {
+            return Ok((vec![], None));
+        }
+
+        let txns = self.inner
+            .get_transactions(start_version, page_size, ledger_version)
+            .map_err(V2Error::internal)?;
+
+        let next_cursor = if txns.len() as u16 == page_size {
+            txns.last().map(|t| Cursor::from_version(t.version))
+        } else {
+            None
+        };
+
+        Ok((txns, next_cursor))
+    }
+
+    /// Get paginated account transactions, with cursor-based pagination.
+    pub fn get_account_transactions_paginated(
+        &self,
+        address: AccountAddress,
+        cursor: Option<&Cursor>,
+        ledger_version: u64,
+    ) -> Result<(Vec<TransactionOnChainData>, Option<Cursor>), V2Error> {
+        let page_size = self.v2_config.max_transactions_page_size as u64;
+        let start_version = match cursor {
+            Some(c) => Some(c.as_version()? + 1),
+            None => None,
+        };
+
+        let txns = self.inner
+            .get_account_transactions(address, start_version, page_size, ledger_version)
+            .map_err(V2Error::internal)?;
+
+        let next_cursor = if txns.len() as u64 == page_size {
+            txns.last().map(|t| Cursor::from_version(t.version))
+        } else {
+            None
+        };
+
+        Ok((txns, next_cursor))
+    }
+
+    /// Get paginated events by event key, with cursor-based pagination.
+    /// The cursor encodes the last-seen sequence number.
+    pub fn get_events_paginated(
+        &self,
+        event_key: &EventKey,
+        cursor: Option<&Cursor>,
+        ledger_version: u64,
+    ) -> Result<(Vec<EventWithVersion>, Option<Cursor>), V2Error> {
+        let page_size = self.v2_config.max_events_page_size;
+        let start_seq = match cursor {
+            Some(c) => c.as_sequence_number()? + 1,
+            None => 0,
+        };
+
+        let events = self.inner
+            .get_events(event_key, start_seq, page_size, ledger_version)
+            .map_err(V2Error::internal)?;
+
+        let next_cursor = if events.len() as u16 == page_size {
+            events.last().map(|e| Cursor::from_sequence_number(e.event.sequence_number()))
+        } else {
+            None
+        };
+
+        Ok((events, next_cursor))
+    }
+
+    /// Render a list of transactions into JSON format.
+    /// Shared by transaction list and account transaction list endpoints.
+    pub fn render_transactions(
+        &self,
+        converter: &impl AptosConverter,
+        ledger_info: &LedgerInfo,
+        txns: Vec<TransactionOnChainData>,
+    ) -> Result<Vec<Transaction>, V2Error> {
+        txns.into_iter()
+            .map(|txn_data| {
+                let timestamp = self.inner.db
+                    .get_block_timestamp(txn_data.version)
+                    .map_err(V2Error::internal)?;
+                converter.try_into_onchain_transaction(timestamp, txn_data)
+                    .map_err(V2Error::internal)
+            })
+            .collect()
+    }
+}
+```
+
 #### Category 2: Methods that use Poem error traits
 
 These methods on `Context` have generic error types (`E: ServiceUnavailableError`, etc.)
@@ -383,9 +533,12 @@ impl V2Context {
 | `submit_transaction(txn)` | Direct + map_err | `submit_transaction(txn)` |
 | `estimate_gas_price::<E>(info)` | Use BasicError concrete type | `estimate_gas_price()` |
 | `get_gas_schedule::<E>(info)` | Use BasicError concrete type | `gas_schedule()` |
-| `get_events(key, start, limit, v)` | Direct + map_err | `get_events(...)` |
+| `get_events(key, start, limit, v)` | Direct + map_err | `get_events_paginated(...)` |
+| `get_account_transactions(addr, start, limit, v)` | Direct + map_err | `get_account_transactions_paginated(...)` |
+| `get_resources_by_pagination(...)` | Direct + map_err | `get_resources_paginated(...)` |
+| `get_modules_by_pagination(...)` | Direct + map_err | `get_modules_paginated(...)` |
 | `check_api_output_enabled::<E>(...)` | Re-implement for v2 config | `check_output_enabled(...)` |
-| `render_transactions_sequential::<E>(...)` | Re-implement or use BasicError | `render_transactions(...)` |
+| `render_transactions_sequential::<E>(...)` | Re-implement with V2Error | `render_transactions(...)` |
 
 ### Axum State Integration
 
@@ -545,8 +698,12 @@ pub struct V2Config {
     pub content_length_limit: u64,
     pub max_gas_view_function: u64,
     pub max_account_resources_page_size: u16,
+    pub max_account_modules_page_size: u16,
     pub max_transactions_page_size: u16,
+    pub max_events_page_size: u16,
     pub view_filter: ViewFilter,  // Reuse v1's ViewFilter type
+    pub wait_by_hash_timeout_ms: u64,
+    pub wait_by_hash_poll_interval_ms: u64,
 }
 
 impl From<&NodeConfig> for V2Config {
@@ -566,8 +723,13 @@ impl From<&NodeConfig> for V2Config {
                 .unwrap_or_else(|| config.api.content_length_limit()),
             max_gas_view_function: config.api.max_gas_view_function,
             max_account_resources_page_size: config.api.max_account_resources_page_size,
+            max_account_modules_page_size: config.api.max_account_modules_page_size,
             max_transactions_page_size: config.api.max_transactions_page_size,
+            max_events_page_size: config.api.max_events_page_size
+                .unwrap_or(100),  // default 100 events per page
             view_filter: config.api.view_filter.clone(),
+            wait_by_hash_timeout_ms: v2.wait_by_hash_timeout_ms.unwrap_or(30_000),
+            wait_by_hash_poll_interval_ms: v2.wait_by_hash_poll_interval_ms.unwrap_or(200),
         }
     }
 }

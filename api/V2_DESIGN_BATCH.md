@@ -101,16 +101,25 @@ batch format. This is a widely adopted standard with excellent client library su
 
 ## Supported Methods
 
-| Method | Params | Equivalent REST Endpoint |
-|---|---|---|
-| `get_resource` | `{address, resource_type, ledger_version?}` | `GET /v2/accounts/:addr/resource/:type` |
-| `get_resources` | `{address, cursor?, limit?, ledger_version?}` | `GET /v2/accounts/:addr/resources` |
-| `view` | `{function, type_arguments, arguments, ledger_version?}` | `POST /v2/view` |
-| `get_block` | `{height, with_transactions?}` | `GET /v2/blocks/:height` |
-| `get_block_latest` | `{}` | `GET /v2/blocks/latest` |
-| `get_transaction` | `{hash}` | `GET /v2/transactions/:hash` |
-| `get_info` | `{}` | `GET /v2/info` |
-| `estimate_gas_price` | `{}` | (new in v2) |
+| Method | Params | Equivalent REST Endpoint | Paginated |
+|---|---|---|---|
+| `get_resource` | `{address, resource_type, ledger_version?}` | `GET /v2/accounts/:addr/resource/:type` | No |
+| `get_resources` | `{address, cursor?, ledger_version?}` | `GET /v2/accounts/:addr/resources` | Yes |
+| `get_module` | `{address, module_name, ledger_version?}` | `GET /v2/accounts/:addr/module/:name` | No |
+| `get_modules` | `{address, cursor?, ledger_version?}` | `GET /v2/accounts/:addr/modules` | Yes |
+| `view` | `{function, type_arguments, arguments, ledger_version?}` | `POST /v2/view` | No |
+| `get_block` | `{height, with_transactions?}` | `GET /v2/blocks/:height` | No |
+| `get_block_latest` | `{}` | `GET /v2/blocks/latest` | No |
+| `get_transaction` | `{hash}` | `GET /v2/transactions/:hash` | No |
+| `get_transactions` | `{cursor?}` | `GET /v2/transactions` | Yes |
+| `get_account_transactions` | `{address, cursor?}` | `GET /v2/accounts/:addr/transactions` | Yes |
+| `get_events` | `{address, creation_number, cursor?}` | `GET /v2/accounts/:addr/events/:creation_number` | Yes |
+| `get_info` | `{}` | `GET /v2/info` | No |
+| `estimate_gas_price` | `{}` | (new in v2) | No |
+
+**Paginated methods**: For methods marked "Yes" in the Paginated column, the `cursor` param
+is an opaque string from a previous response, and the result includes a `cursor` field for
+fetching the next page. The server controls page size -- there is no `limit` param.
 
 **Not supported in batch** (by design):
 - `submit_transaction` -- transactions must be submitted individually for proper error handling
@@ -168,6 +177,7 @@ pub struct JsonRpcError {
 }
 
 /// Method-specific parameter types
+
 #[derive(Debug, Deserialize)]
 pub struct GetResourceParams {
     pub address: String,
@@ -179,7 +189,20 @@ pub struct GetResourceParams {
 pub struct GetResourcesParams {
     pub address: String,
     pub cursor: Option<String>,
-    pub limit: Option<u16>,
+    pub ledger_version: Option<u64>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GetModuleParams {
+    pub address: String,
+    pub module_name: String,
+    pub ledger_version: Option<u64>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GetModulesParams {
+    pub address: String,
+    pub cursor: Option<String>,
     pub ledger_version: Option<u64>,
 }
 
@@ -200,6 +223,24 @@ pub struct GetBlockParams {
 #[derive(Debug, Deserialize)]
 pub struct GetTransactionParams {
     pub hash: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GetTransactionsParams {
+    pub cursor: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GetAccountTransactionsParams {
+    pub address: String,
+    pub cursor: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GetEventsParams {
+    pub address: String,
+    pub creation_number: u64,
+    pub cursor: Option<String>,
 }
 ```
 
@@ -343,10 +384,15 @@ async fn dispatch_rpc_request(
     let result = match req.method.as_str() {
         "get_resource" => dispatch_get_resource(ctx, req.params).await,
         "get_resources" => dispatch_get_resources(ctx, req.params).await,
+        "get_module" => dispatch_get_module(ctx, req.params).await,
+        "get_modules" => dispatch_get_modules(ctx, req.params).await,
         "view" => dispatch_view(ctx, req.params).await,
         "get_block" => dispatch_get_block(ctx, req.params).await,
         "get_block_latest" => dispatch_get_block_latest(ctx).await,
         "get_transaction" => dispatch_get_transaction(ctx, req.params).await,
+        "get_transactions" => dispatch_get_transactions(ctx, req.params).await,
+        "get_account_transactions" => dispatch_get_account_transactions(ctx, req.params).await,
+        "get_events" => dispatch_get_events(ctx, req.params).await,
         "get_info" => dispatch_get_info(ctx).await,
         "estimate_gas_price" => dispatch_estimate_gas(ctx).await,
         _ => Err(V2Error::bad_request(
@@ -403,13 +449,116 @@ async fn dispatch_get_resource(
     }).await
 }
 
+/// Dispatch get_resources -- returns paginated results with cursor.
+/// For paginated batch methods, the result is a JSON object with `items` and `cursor` fields.
+async fn dispatch_get_resources(
+    ctx: V2Context,
+    params: serde_json::Value,
+) -> Result<serde_json::Value, V2Error> {
+    let params: GetResourcesParams = serde_json::from_value(params)
+        .map_err(|e| V2Error::bad_request(ErrorCode::InvalidInput, e.to_string()))?;
+
+    let ctx = ctx.clone();
+    spawn_blocking(move || {
+        let address = parse_address(&params.address)?;
+        let cursor = params.cursor.as_ref()
+            .map(|c| Cursor::decode(c))
+            .transpose()?;
+        let (ledger_info, version, state_view) = ctx.state_view_at(params.ledger_version)?;
+
+        let (resources, next_cursor) = ctx.get_resources_paginated(
+            address, cursor.as_ref(), version,
+        )?;
+
+        let converter = state_view.as_converter(
+            ctx.inner().db.clone(),
+            ctx.inner().indexer_reader.clone(),
+        );
+        let items: Vec<MoveResource> = resources.into_iter()
+            .map(|(tag, bytes)| converter.try_into_resource(&tag, &bytes))
+            .collect::<anyhow::Result<Vec<_>>>()
+            .map_err(V2Error::internal)?;
+
+        serde_json::to_value(&PaginatedResult {
+            items,
+            cursor: next_cursor.map(|c| c.encode()),
+        }).map_err(|e| V2Error::internal(e.into()))
+    }).await
+}
+
+/// Paginated result type used by batch list methods.
+#[derive(Serialize)]
+struct PaginatedResult<T: Serialize> {
+    items: Vec<T>,
+    cursor: Option<String>,
+}
+
 // Similar dispatch functions for each method...
+async fn dispatch_get_module(ctx: V2Context, params: serde_json::Value) -> Result<serde_json::Value, V2Error> { ... }
+async fn dispatch_get_modules(ctx: V2Context, params: serde_json::Value) -> Result<serde_json::Value, V2Error> { ... }
 async fn dispatch_view(ctx: V2Context, params: serde_json::Value) -> Result<serde_json::Value, V2Error> { ... }
 async fn dispatch_get_block(ctx: V2Context, params: serde_json::Value) -> Result<serde_json::Value, V2Error> { ... }
 async fn dispatch_get_block_latest(ctx: V2Context) -> Result<serde_json::Value, V2Error> { ... }
 async fn dispatch_get_transaction(ctx: V2Context, params: serde_json::Value) -> Result<serde_json::Value, V2Error> { ... }
+async fn dispatch_get_transactions(ctx: V2Context, params: serde_json::Value) -> Result<serde_json::Value, V2Error> { ... }
+async fn dispatch_get_account_transactions(ctx: V2Context, params: serde_json::Value) -> Result<serde_json::Value, V2Error> { ... }
+async fn dispatch_get_events(ctx: V2Context, params: serde_json::Value) -> Result<serde_json::Value, V2Error> { ... }
 async fn dispatch_get_info(ctx: V2Context) -> Result<serde_json::Value, V2Error> { ... }
 async fn dispatch_estimate_gas(ctx: V2Context) -> Result<serde_json::Value, V2Error> { ... }
+```
+
+---
+
+## Paginated Batch Request/Response Examples
+
+### Paginated List Request (get_resources)
+
+```json
+{
+    "jsonrpc": "2.0",
+    "method": "get_resources",
+    "params": { "address": "0x1", "cursor": "AQAAAAEAAAAAAAAAAQhj..." },
+    "id": 1
+}
+```
+
+```json
+{
+    "jsonrpc": "2.0",
+    "result": {
+        "items": [ ... resources ... ],
+        "cursor": "AQAAAAEBBBBBBBBBBBBBBBhj..."
+    },
+    "id": 1
+}
+```
+
+When no more pages exist, `cursor` is `null`:
+
+```json
+{
+    "jsonrpc": "2.0",
+    "result": {
+        "items": [ ... last batch of resources ... ],
+        "cursor": null
+    },
+    "id": 1
+}
+```
+
+### Non-paginated Batch Result
+
+Non-paginated methods return the data directly (not wrapped in `items`/`cursor`):
+
+```json
+{
+    "jsonrpc": "2.0",
+    "result": {
+        "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+        "data": { "coin": { "value": "100000000" } }
+    },
+    "id": 2
+}
 ```
 
 ---
@@ -438,19 +587,40 @@ pub fn lookup_resource(
     Ok((resource, ledger_info))
 }
 
+/// Core paginated resources logic, used by both REST handler and batch dispatch.
+pub fn list_resources(
+    ctx: &V2Context,
+    address: AccountAddress,
+    cursor: Option<&Cursor>,
+    ledger_version: Option<u64>,
+) -> Result<(Vec<MoveResource>, Option<Cursor>, LedgerInfo), V2Error> {
+    let (ledger_info, version, state_view) = ctx.state_view_at(ledger_version)?;
+    let (resources, next_cursor) = ctx.get_resources_paginated(address, cursor, version)?;
+    let converter = state_view.as_converter(ctx.inner().db.clone(), ctx.inner().indexer_reader.clone());
+    let items = resources.into_iter()
+        .map(|(tag, bytes)| converter.try_into_resource(&tag, &bytes))
+        .collect::<anyhow::Result<Vec<_>>>()
+        .map_err(V2Error::internal)?;
+    Ok((items, next_cursor, ledger_info))
+}
+
 // REST handler calls:
-pub async fn get_resource_handler(...) -> ... {
+pub async fn get_resources_handler(...) -> ... {
     spawn_blocking(move || {
-        let (resource, ledger_info) = lookup_resource(&ctx, address, &tag, version)?;
-        Ok(Json(V2Response::new(resource, &ledger_info)))
+        let (items, next_cursor, ledger_info) = list_resources(&ctx, address, cursor.as_ref(), version)?;
+        let cursor_str = next_cursor.map(|c| c.encode());
+        Ok(Json(V2Response::new(items, &ledger_info).with_cursor(cursor_str)))
     }).await
 }
 
 // Batch dispatch calls:
-async fn dispatch_get_resource(...) -> Result<serde_json::Value, V2Error> {
+async fn dispatch_get_resources(...) -> Result<serde_json::Value, V2Error> {
     spawn_blocking(move || {
-        let (resource, _ledger_info) = lookup_resource(&ctx, address, &tag, version)?;
-        serde_json::to_value(&resource).map_err(...)
+        let (items, next_cursor, _) = list_resources(&ctx, address, cursor.as_ref(), version)?;
+        serde_json::to_value(&PaginatedResult {
+            items,
+            cursor: next_cursor.map(|c| c.encode()),
+        }).map_err(...)
     }).await
 }
 ```

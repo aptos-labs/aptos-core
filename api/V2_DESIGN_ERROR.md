@@ -36,7 +36,7 @@ This generates a Poem `ApiResponse` enum with variants for each status code, eac
 
 1. **Framework lock-in**: Error traits depend on `poem_openapi::ApiResponse` derive
 2. **Generic proliferation**: Every function is generic over `E: InternalError + NotFoundError + ...`
-3. **Header-based metadata**: Ledger info in headers is awkward for many clients
+3. **Header-based metadata**: v1 errors embed ledger info in `X-Aptos-*` headers, which is awkward for clients and mixes concerns (an error about a missing resource shouldn't also report ledger state)
 4. **Flat error codes**: `AptosErrorCode` is a flat enum without hierarchy
 5. **No request ID**: Errors don't carry a request ID for correlation
 6. **Macro complexity**: The `generate_error_response!` macro is ~300 lines of complex code
@@ -44,6 +44,20 @@ This generates a Poem `ApiResponse` enum with variants for each status code, eac
 ---
 
 ## v2 Error Design
+
+### Key Principle: No Ledger Metadata in Errors
+
+v2 error responses contain **only error-related information**. They do NOT include:
+
+- `X-Aptos-*` response headers (v2 never sets these on any response, success or error)
+- A `ledger` field in the error JSON body
+- Any chain state metadata (version, epoch, block height, etc.)
+
+If a client needs current ledger state after encountering an error, it should call
+`GET /v2/info`. This separation of concerns keeps error responses focused and lightweight.
+
+The only custom header on v2 error responses is `X-Request-Id`, which is set by
+middleware on ALL responses (success and error) for request correlation.
 
 ### V2Error Struct
 

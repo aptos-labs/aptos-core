@@ -45,12 +45,16 @@ flowchart TB
 - [ ] Implement `V2Context` wrapping existing `Context` with broadcast channel for WebSocket
 - [ ] Implement `V2Error` and `ErrorCode` enum with utoipa schema derivations
 - [ ] Implement `VersionedBcsRequest` envelope with ULEB128 enum tag
+- [ ] Implement cursor module (`api/src/v2/cursor.rs`) for opaque cursor-based pagination
 - [ ] Implement `/v2/health` and `/v2/info` endpoints
-- [ ] Implement `/v2/accounts/:addr/resources` and `/v2/accounts/:addr/resource/:type`
+- [ ] Implement `/v2/accounts/:addr/resources` and `/v2/accounts/:addr/resource/:type` (paginated)
+- [ ] Implement `/v2/accounts/:addr/modules` and `/v2/accounts/:addr/module/:name` (paginated)
 - [ ] Implement `/v2/view` (POST, JSON + BCS input, JSON output)
-- [ ] Implement `/v2/transactions` (POST BCS-only submit, GET by hash, GET wait)
+- [ ] Implement `/v2/transactions` (GET paginated list, POST BCS-only submit, GET by hash, GET wait)
+- [ ] Implement `/v2/accounts/:addr/transactions` (paginated)
+- [ ] Implement `/v2/accounts/:addr/events/:creation_number` (paginated)
 - [ ] Implement `/v2/blocks/:height` and `/v2/blocks/latest`
-- [ ] Implement `/v2/batch` JSON-RPC 2.0 batch handler
+- [ ] Implement `/v2/batch` JSON-RPC 2.0 batch handler (with cursor support for list methods)
 - [ ] Implement `/v2/ws` WebSocket upgrade + subscription manager (tx_status, blocks, events)
 - [ ] Implement Tower middleware (logging/metrics, size limit, CORS, compression)
 - [ ] Integrate Axum v2 router alongside Poem v1 in `runtime.rs` with path-prefix dispatch
@@ -113,6 +117,7 @@ api/src/
     context.rs          -- V2Context wrapping v1 Context with v2-specific caches
     router.rs           -- Route definitions and OpenAPI setup
     error.rs            -- Structured error types (ErrorCode enum, V2Error)
+    cursor.rs           -- Opaque cursor-based pagination (encode/decode/type-safe accessors)
     middleware/
       mod.rs
       logging.rs        -- Request/response logging + metrics
@@ -120,21 +125,25 @@ api/src/
     endpoints/
       mod.rs
       health.rs         -- GET /v2/health, GET /v2/info
-      resources.rs      -- GET /v2/accounts/:addr/resources, GET /v2/accounts/:addr/resource/:type
+      resources.rs      -- GET /v2/accounts/:addr/resources (paginated), GET /v2/accounts/:addr/resource/:type
+      modules.rs        -- GET /v2/accounts/:addr/modules (paginated), GET /v2/accounts/:addr/module/:name
       view.rs           -- POST /v2/view
-      transactions.rs   -- POST /v2/transactions (BCS only), GET /v2/transactions/:hash
+      transactions.rs   -- GET /v2/transactions (paginated), POST /v2/transactions (BCS only), GET /v2/transactions/:hash
+      account_transactions.rs -- GET /v2/accounts/:addr/transactions (paginated)
+      events.rs         -- GET /v2/accounts/:addr/events/:creation_number (paginated)
       blocks.rs         -- GET /v2/blocks/:height, GET /v2/blocks/latest
-    batch.rs            -- POST /v2/batch (JSON-RPC 2.0 handler)
+    batch.rs            -- POST /v2/batch (JSON-RPC 2.0 handler with cursor support for list methods)
     websocket/
       mod.rs            -- WebSocket upgrade handler
       subscriptions.rs  -- Subscription management (tx status, blocks, events)
       broadcaster.rs    -- Background task broadcasting new blocks/events
     types/
-      mod.rs            -- v2-specific request/response types
+      mod.rs            -- v2-specific request/response types (V2Response, LedgerMetadata)
       error.rs          -- V2Error, ErrorCode enum
-      batch.rs          -- JSON-RPC request/response types
+      batch.rs          -- JSON-RPC request/response types, PaginatedResult
       ws.rs             -- WebSocket message types
     bcs_versioned.rs    -- Versioned BCS envelope (enum tag + payload)
+    extractors.rs       -- JsonOrBcs, BcsOnly Axum extractors
 ```
 
 ### 5. V2 Context
@@ -274,20 +283,31 @@ This gives us HTTP/2 cleartext by default, with optional TLS via rustls (using t
 
 ### 12. Initial Core Endpoints (Phase 1)
 
-| Endpoint                            | Method | Input             | Output      | Notes                          |
-| ----------------------------------- | ------ | ----------------- | ----------- | ------------------------------ |
-| `/v2/health`                        | GET    | -                 | JSON        | Health check                   |
-| `/v2/info`                          | GET    | -                 | JSON        | Ledger info, chain ID, version |
-| `/v2/accounts/:addr/resources`      | GET    | query params      | JSON        | Paginated resources            |
-| `/v2/accounts/:addr/resource/:type` | GET    | query params      | JSON        | Single resource                |
-| `/v2/view`                          | POST   | JSON or BCS       | JSON        | Execute view function          |
-| `/v2/transactions`                  | POST   | BCS only          | JSON        | Submit transaction             |
-| `/v2/transactions/:hash`            | GET    | -                 | JSON        | Get transaction by hash        |
-| `/v2/transactions/:hash/wait`       | GET    | -                 | JSON/SSE    | Wait for tx (could use SSE)    |
-| `/v2/blocks/:height`                | GET    | query params      | JSON        | Get block                      |
-| `/v2/blocks/latest`                 | GET    | -                 | JSON        | Latest block                   |
-| `/v2/batch`                         | POST   | JSON-RPC 2.0      | JSON        | Batch requests                 |
-| `/v2/ws`                            | GET    | WebSocket upgrade | JSON frames | Subscriptions                  |
+| Endpoint | Method | Input | Output | Paginated | Notes |
+|---|---|---|---|---|---|
+| `/v2/health` | GET | - | JSON | No | Health check |
+| `/v2/info` | GET | - | JSON | No | Ledger info, chain ID, version |
+| `/v2/accounts/:addr/resources` | GET | query params | JSON | Yes (cursor) | Paginated resources |
+| `/v2/accounts/:addr/resource/:type` | GET | query params | JSON | No | Single resource |
+| `/v2/accounts/:addr/modules` | GET | query params | JSON | Yes (cursor) | Paginated modules |
+| `/v2/accounts/:addr/module/:name` | GET | query params | JSON | No | Single module |
+| `/v2/transactions` | GET | query params | JSON | Yes (cursor) | List transactions |
+| `/v2/transactions` | POST | BCS only | JSON | No | Submit transaction |
+| `/v2/transactions/:hash` | GET | - | JSON | No | Get transaction by hash |
+| `/v2/transactions/:hash/wait` | GET | - | JSON | No | Wait for tx |
+| `/v2/accounts/:addr/transactions` | GET | query params | JSON | Yes (cursor) | Account transactions |
+| `/v2/accounts/:addr/events/:num` | GET | query params | JSON | Yes (cursor) | Events by handle |
+| `/v2/view` | POST | JSON or BCS | JSON | No | Execute view function |
+| `/v2/blocks/:height` | GET | query params | JSON | No | Get block |
+| `/v2/blocks/latest` | GET | - | JSON | No | Latest block |
+| `/v2/batch` | POST | JSON-RPC 2.0 | JSON | N/A | Batch requests |
+| `/v2/ws` | GET | WebSocket upgrade | JSON frames | N/A | Subscriptions |
+| `/v2/spec.json` | GET | - | JSON | No | OpenAPI spec |
+
+All paginated endpoints use **opaque cursor-based pagination**: the server returns a
+`cursor` field in the response body; clients pass it back via `?cursor=...` to get the
+next page. There is no client-facing `limit` parameter -- the server controls page size.
+Ledger metadata is returned in the response body (`ledger` field), not in headers.
 
 ### 13. Key Design Decisions Summary
 
@@ -296,9 +316,11 @@ This gives us HTTP/2 cleartext by default, with optional TLS via rustls (using t
 - **WebSocket**: tx status, blocks, events (configurable on/off)
 - **Batching**: JSON-RPC 2.0
 - **BCS**: Versioned envelope with ULEB128 enum discriminant; tx submission BCS-only
-- **Errors**: New structured `V2Error` with machine-readable `ErrorCode` enum
+- **Errors**: New structured `V2Error` with machine-readable `ErrorCode` enum; NO ledger metadata in errors
 - **OpenAPI**: utoipa + utoipa-axum
 - **HTTP/2**: h2c default via hyper-util auto-detection
 - **Port**: Configurable same-port or separate-port
 - **Context**: V2Context wraps existing Context
+- **Response metadata**: All ledger metadata in JSON body (`ledger` field), no `X-Aptos-*` response headers
+- **Pagination**: Unified opaque cursor-based pagination on all list endpoints; server-controlled page size; cursor in body (not headers)
 - **v1 deprecation**: 3-6 month coexistence once v2 stabilizes
