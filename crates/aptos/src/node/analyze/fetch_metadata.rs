@@ -227,11 +227,10 @@ impl FetchMetadata {
                 .get_new_block_events_bcs(Some(cursor), Some(MAX_FETCH_BATCH_SIZE))
                 .await;
 
-            if response.is_err() {
+            if let Err(e) = &response {
                 println!(
                     "Failed to read new_block_events beyond {}, stopping. {:?}",
-                    cursor,
-                    response.unwrap_err()
+                    cursor, e
                 );
                 assert!(!validators.is_empty());
                 result.push(EpochInfo {
