@@ -2,9 +2,14 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_native_interface::SafeNativeBuilder;
-use move_core_types::language_storage::CORE_CODE_ADDRESS;
+use move_core_types::{account_address::AccountAddress, language_storage::CORE_CODE_ADDRESS};
 use move_vm_runtime::native_functions::NativeFunctionTable;
 use std::collections::HashSet;
+
+/// Address for aptos-experimental (0x7)
+const EXPERIMENTAL_ADDRESS: AccountAddress = AccountAddress::new([
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7,
+]);
 
 /// Builds and returns all Aptos native functions.
 pub fn aptos_natives_with_builder(
@@ -37,6 +42,10 @@ pub fn aptos_natives_with_builder(
             CORE_CODE_ADDRESS,
             builder,
             inject_create_signer_for_gov_sim,
+        ))
+        .chain(aptos_framework::natives::experimental_natives(
+            EXPERIMENTAL_ADDRESS,
+            builder,
         ))
         .chain(aptos_table_natives::table_natives(
             CORE_CODE_ADDRESS,

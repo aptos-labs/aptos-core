@@ -361,5 +361,8 @@ crate::gas_schedule::macros::define_gas_parameters!(
 
         // Reflection
         [reflect_resolve_base: InternalGas, { RELEASE_V1_39.. => "reflect.resolve_base" }, 4096],
+
+        // Fast native computations for perpetual trading
+        [fast_native_computations_compute_position_contribution_base: InternalGas, { RELEASE_V1_39.. => "fast_native_computations.compute_position_contribution.base" }, 2000],
     ]
 );
