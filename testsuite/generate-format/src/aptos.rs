@@ -118,6 +118,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::BlockEpiloguePayload>(&samples)?;
     tracer.trace_type::<StateKey>(&samples)?;
     tracer.trace_type::<PersistedStateValueMetadata>(&samples)?;
+    tracer.trace_type::<transaction::MultisigTransactionPayload>(&samples)?;
 
     tracer.trace_type::<transaction::authenticator::AccountAuthenticator>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AbstractAuthenticator>(&samples)?;
