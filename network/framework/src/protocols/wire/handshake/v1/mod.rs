@@ -25,6 +25,7 @@ use std::{
     fmt,
     iter::{FromIterator, Iterator},
     ops::{BitAnd, BitOr},
+    sync::Arc,
 };
 use thiserror::Error;
 
@@ -400,9 +401,14 @@ pub enum HandshakeError {
 /// The HandshakeMsg contains a mapping from [`MessagingProtocolVersion`]
 /// suppported by the node to a bit-vector specifying application-level protocols
 /// supported over that version.
+///
+/// `supported_protocols` is wrapped in `Arc` so that constructing a `HandshakeMsg`
+/// from the shared `UpgradeContext` is a cheap reference-count bump rather than a
+/// deep `BTreeMap` clone. Serde transparently serializes/deserializes through the
+/// `Arc`, so the wire format is unchanged.
 #[derive(Clone, Deserialize, Serialize, Default)]
 pub struct HandshakeMsg {
-    pub supported_protocols: BTreeMap<MessagingProtocolVersion, ProtocolIdSet>,
+    pub supported_protocols: Arc<BTreeMap<MessagingProtocolVersion, ProtocolIdSet>>,
     pub chain_id: ChainId,
     pub network_id: NetworkId,
 }
@@ -421,7 +427,7 @@ impl HandshakeMsg {
         Self {
             chain_id: ChainId::test(),
             network_id: NetworkId::Validator,
-            supported_protocols,
+            supported_protocols: Arc::new(supported_protocols),
         }
     }
 

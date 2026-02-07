@@ -65,7 +65,7 @@ prop_compose! {
     ),
   ) -> HandshakeMsg {
     HandshakeMsg {
-      supported_protocols,
+      supported_protocols: std::sync::Arc::new(supported_protocols),
       chain_id: ChainId::new(1), // doesn't matter for handshake protocol
       network_id: NetworkId::Validator, // doesn't matter for handshake protocol
     }

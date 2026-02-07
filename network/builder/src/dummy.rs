@@ -121,7 +121,7 @@ pub fn setup_network() -> DummyNetwork {
     );
 
     // Add the listener address with port
-    let listener_addr = network_builder.listen_address();
+    let listener_addr = network_builder.listen_address().clone();
     seeds.insert(
         listener_peer.peer_id(),
         Peer::from_addrs(PeerRole::Validator, vec![listener_addr]),

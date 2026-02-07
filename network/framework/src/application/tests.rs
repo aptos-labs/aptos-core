@@ -38,7 +38,6 @@ use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
     hash::Hash,
-    ops::Deref,
     sync::Arc,
     time::Duration,
 };
@@ -1149,24 +1148,36 @@ fn verify_internal_map_states(
     let (peers_and_metadata, trusted_peers, cached_peers_and_metadata) =
         peers_and_metadata.get_all_internal_maps();
 
+    // Convert expected maps to Arc-wrapped versions for comparison
+    let expected_arc_peers: HashMap<PeerId, std::sync::Arc<PeerMetadata>> =
+        expected_peers_and_metadata
+            .into_iter()
+            .map(|(k, v)| (k, std::sync::Arc::new(v)))
+            .collect();
+    let expected_arc_cached: HashMap<PeerId, std::sync::Arc<PeerMetadata>> =
+        expected_cached_peers_and_metadata
+            .into_iter()
+            .map(|(k, v)| (k, std::sync::Arc::new(v)))
+            .collect();
+
     // Verify the states of the internal maps
     for network_id in network_ids {
         // Verify the peers and metadata
         assert_eq!(
             peers_and_metadata.get(network_id).unwrap(),
-            &expected_peers_and_metadata
+            &expected_arc_peers
         );
 
         // Verify the trusted peers
         let trusted_peers_for_network = trusted_peers.get(network_id).unwrap();
-        let trusted_peers = trusted_peers_for_network.load().clone().deref().clone();
+        let trusted_peers = (**trusted_peers_for_network.load()).clone();
         assert_eq!(trusted_peers, expected_trusted_peers.clone());
 
         // Verify the cached peers and metadata
-        let cached_peers_and_metadata = cached_peers_and_metadata.load().clone().deref().clone();
+        let cached_peers_and_metadata = (**cached_peers_and_metadata.load()).clone();
         assert_eq!(
             cached_peers_and_metadata.get(network_id).unwrap(),
-            &expected_cached_peers_and_metadata,
+            &expected_arc_cached,
         );
     }
 }

@@ -3344,6 +3344,7 @@ dependencies = [
  "async-trait",
  "bcs 0.1.4",
  "bytes",
+ "criterion",
  "futures",
  "futures-util",
  "hex",

@@ -76,7 +76,7 @@ mod tests {
         let server_handshake = HandshakeMsg {
             chain_id,
             network_id,
-            supported_protocols,
+            supported_protocols: std::sync::Arc::new(supported_protocols),
         };
         let mut supported_protocols = BTreeMap::new();
         supported_protocols.insert(
@@ -87,7 +87,7 @@ mod tests {
             ]),
         );
         let client_handshake = HandshakeMsg {
-            supported_protocols,
+            supported_protocols: std::sync::Arc::new(supported_protocols),
             chain_id,
             network_id,
         };
