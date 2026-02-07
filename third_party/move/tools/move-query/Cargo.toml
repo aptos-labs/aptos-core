@@ -1,0 +1,38 @@
+[package]
+name = "move-query"
+description = "Move Query Tool - Programmatic access to Move model (GlobalEnv)"
+version = "0.1.0"
+license = "Apache-2.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[lib]
+doctest = false
+
+[features]
+default = []
+
+[dependencies]
+anyhow = { workspace = true }
+move-command-line-common = { workspace = true }
+move-model = { workspace = true }
+move-package = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+datatest-stable = { workspace = true }
+
+[[test]]
+name = "testsuite"
+harness = false

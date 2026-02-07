@@ -94,6 +94,7 @@ MOVE_CRATES="\
   -p move-linter\
   -p move-prover-boogie-backend\
   -p move-prover\
+  -p move-query\
   -p move-transactional-test-runner\
   -p move-vm-runtime\
   -p move-vm-types\
@@ -111,6 +112,7 @@ MOVE_CRATES_INTEGRATION_TEST="\
   -p move-decompiler \
   -p move-model \
   -p move-package \
+  -p move-query \
   -p move-prover-bytecode-pipeline \
   -p move-stackless-bytecode \
   -p move-transactional-test-runner \

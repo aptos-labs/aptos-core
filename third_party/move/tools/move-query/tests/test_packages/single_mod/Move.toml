@@ -1,0 +1,6 @@
+[package]
+name = "single_mod"
+version = "0.0.0"
+
+[addresses]
+test_addr = "0x42"
