@@ -272,7 +272,7 @@ pub struct ProfileConfig {
     /// Name of network being used, if setup from aptos init
     #[serde(skip_serializing_if = "Option::is_none")]
     pub network: Option<Network>,
-    /// Private key for commands.
+    /// Private key for commands (plaintext - used for backward compatibility or when encryption is disabled).
     #[serde(
         skip_serializing_if = "Option::is_none",
         default,
@@ -280,6 +280,15 @@ pub struct ProfileConfig {
         deserialize_with = "deserialize_material_with_prefix"
     )]
     pub private_key: Option<Ed25519PrivateKey>,
+    /// Encrypted private key for commands (used when credential encryption is enabled).
+    /// When this field is present, `private_key` should be None.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub encrypted_private_key: Option<crate::common::encryption::EncryptedPrivateKey>,
+    /// Indicates that the private key is stored in the system keychain.
+    /// When this is true, the private key will be retrieved from the OS keychain
+    /// (macOS Keychain, Windows Credential Manager, or Linux Secret Service).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub keychain_entry: Option<String>,
     /// Public key for commands
     #[serde(
         skip_serializing_if = "Option::is_none",
@@ -304,12 +313,220 @@ pub struct ProfileConfig {
     pub derivation_path: Option<String>,
 }
 
+impl ProfileConfig {
+    /// Get the private key, retrieving from keychain or decrypting if necessary.
+    ///
+    /// This method checks storage locations in the following order:
+    /// 1. System keychain (if `keychain_entry` is set)
+    /// 2. Encrypted private key (prompts for passphrase or uses APTOS_CLI_PASSPHRASE env var)
+    /// 3. Plaintext private key (for backward compatibility)
+    pub fn get_private_key(&self) -> CliTypedResult<Option<Ed25519PrivateKey>> {
+        use crate::common::{encryption::get_passphrase_from_env, utils::read_passphrase};
+        use aptos_crypto::ValidCryptoMaterialStringExt;
+
+        // First, check if the private key is stored in the system keychain
+        if let Some(ref keychain_entry) = self.keychain_entry {
+            let key_bytes = crate::common::keychain::retrieve_private_key(keychain_entry)?;
+            let key_hex = hex::encode(&key_bytes);
+
+            let private_key = Ed25519PrivateKey::from_encoded_string(&key_hex).map_err(|e| {
+                CliError::UnexpectedError(format!(
+                    "Failed to parse private key from keychain: {}",
+                    e
+                ))
+            })?;
+
+            return Ok(Some(private_key));
+        }
+
+        // If we have a plaintext private key, return it directly
+        if self.private_key.is_some() {
+            return Ok(self.private_key.clone());
+        }
+
+        // If we have an encrypted private key, decrypt it
+        if let Some(ref encrypted) = self.encrypted_private_key {
+            let passphrase = if let Some(passphrase) = get_passphrase_from_env() {
+                passphrase
+            } else {
+                read_passphrase("Enter passphrase to decrypt private key: ")?
+            };
+
+            let decrypted_bytes = encrypted.decrypt(&passphrase)?;
+            let decrypted_hex = hex::encode(&decrypted_bytes);
+
+            let private_key =
+                Ed25519PrivateKey::from_encoded_string(&decrypted_hex).map_err(|e| {
+                    CliError::UnexpectedError(format!(
+                        "Failed to parse decrypted private key: {}",
+                        e
+                    ))
+                })?;
+
+            return Ok(Some(private_key));
+        }
+
+        // No private key available
+        Ok(None)
+    }
+
+    /// Check if this profile has any form of private key (keychain, encrypted, or plaintext)
+    pub fn has_private_key(&self) -> bool {
+        self.private_key.is_some()
+            || self.encrypted_private_key.is_some()
+            || self.keychain_entry.is_some()
+    }
+
+    /// Check if this profile's private key is stored in the system keychain
+    pub fn is_keychain_stored(&self) -> bool {
+        self.keychain_entry.is_some()
+    }
+
+    /// Encrypt the private key in this profile.
+    /// Returns an error if no plaintext private key is present.
+    pub fn encrypt_private_key(&mut self, passphrase: &str) -> CliTypedResult<()> {
+        use crate::common::encryption::EncryptedPrivateKey;
+
+        if let Some(ref private_key) = self.private_key {
+            let private_key_bytes = private_key.to_bytes();
+            let encrypted = EncryptedPrivateKey::encrypt(&private_key_bytes, passphrase)?;
+
+            self.encrypted_private_key = Some(encrypted);
+            self.private_key = None;
+
+            Ok(())
+        } else if self.encrypted_private_key.is_some() {
+            Err(CliError::CommandArgumentError(
+                "Private key is already encrypted".to_string(),
+            ))
+        } else {
+            Err(CliError::CommandArgumentError(
+                "No private key to encrypt".to_string(),
+            ))
+        }
+    }
+
+    /// Decrypt the private key in this profile.
+    /// Returns an error if no encrypted private key is present.
+    pub fn decrypt_private_key(&mut self, passphrase: &str) -> CliTypedResult<()> {
+        use aptos_crypto::ValidCryptoMaterialStringExt;
+
+        if let Some(ref encrypted) = self.encrypted_private_key {
+            let decrypted_bytes = encrypted.decrypt(passphrase)?;
+            let decrypted_hex = hex::encode(&decrypted_bytes);
+
+            let private_key =
+                Ed25519PrivateKey::from_encoded_string(&decrypted_hex).map_err(|e| {
+                    CliError::UnexpectedError(format!(
+                        "Failed to parse decrypted private key: {}",
+                        e
+                    ))
+                })?;
+
+            self.private_key = Some(private_key);
+            self.encrypted_private_key = None;
+
+            Ok(())
+        } else if self.private_key.is_some() {
+            Err(CliError::CommandArgumentError(
+                "Private key is not encrypted".to_string(),
+            ))
+        } else {
+            Err(CliError::CommandArgumentError(
+                "No private key to decrypt".to_string(),
+            ))
+        }
+    }
+
+    /// Store the private key in the system keychain.
+    ///
+    /// This moves the private key from file storage (plaintext or encrypted)
+    /// to the OS keychain (macOS Keychain, Windows Credential Manager, or Linux Secret Service).
+    pub fn store_in_keychain(&mut self, profile_name: &str) -> CliTypedResult<()> {
+        use crate::common::{encryption::get_passphrase_from_env, utils::read_passphrase};
+
+        // Check if already in keychain
+        if self.keychain_entry.is_some() {
+            return Err(CliError::CommandArgumentError(
+                "Private key is already stored in keychain".to_string(),
+            ));
+        }
+
+        // Get the private key bytes
+        let private_key_bytes = if let Some(ref private_key) = self.private_key {
+            private_key.to_bytes().to_vec()
+        } else if let Some(ref encrypted) = self.encrypted_private_key {
+            // Need to decrypt first
+            let passphrase = if let Some(passphrase) = get_passphrase_from_env() {
+                passphrase
+            } else {
+                read_passphrase("Enter passphrase to decrypt private key: ")?
+            };
+            encrypted.decrypt(&passphrase)?
+        } else {
+            return Err(CliError::CommandArgumentError(
+                "No private key to store in keychain".to_string(),
+            ));
+        };
+
+        // Store in keychain
+        crate::common::keychain::store_private_key(profile_name, &private_key_bytes)?;
+
+        // Clear the file-based storage and set keychain flag
+        self.private_key = None;
+        self.encrypted_private_key = None;
+        self.keychain_entry = Some(profile_name.to_string());
+
+        Ok(())
+    }
+
+    /// Remove the private key from the system keychain and optionally store it back in the config.
+    ///
+    /// If `keep_plaintext` is true, the key is stored as plaintext in the config.
+    /// If false, the key is discarded (you may want to encrypt it instead).
+    pub fn remove_from_keychain(&mut self, keep_plaintext: bool) -> CliTypedResult<()> {
+        use aptos_crypto::ValidCryptoMaterialStringExt;
+
+        let keychain_entry = self.keychain_entry.as_ref().ok_or_else(|| {
+            CliError::CommandArgumentError("Private key is not stored in keychain".to_string())
+        })?;
+
+        // Retrieve from keychain
+        let key_bytes = crate::common::keychain::retrieve_private_key(keychain_entry)?;
+
+        // Delete from keychain
+        crate::common::keychain::delete_private_key(keychain_entry)?;
+
+        // Optionally store as plaintext
+        if keep_plaintext {
+            let key_hex = hex::encode(&key_bytes);
+            let private_key = Ed25519PrivateKey::from_encoded_string(&key_hex).map_err(|e| {
+                CliError::UnexpectedError(format!(
+                    "Failed to parse private key from keychain: {}",
+                    e
+                ))
+            })?;
+            self.private_key = Some(private_key);
+        }
+
+        self.keychain_entry = None;
+
+        Ok(())
+    }
+}
+
 /// ProfileConfig but without the private parts
 #[derive(Debug, Serialize)]
 pub struct ProfileSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub network: Option<Network>,
     pub has_private_key: bool,
+    /// Whether the private key is encrypted at rest
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub private_key_encrypted: bool,
+    /// Whether the private key is stored in the system keychain
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub private_key_in_keychain: bool,
     #[serde(
         skip_serializing_if = "Option::is_none",
         serialize_with = "serialize_material_with_prefix",
@@ -331,7 +548,9 @@ impl From<&ProfileConfig> for ProfileSummary {
     fn from(config: &ProfileConfig) -> Self {
         ProfileSummary {
             network: config.network,
-            has_private_key: config.private_key.is_some(),
+            has_private_key: config.has_private_key(),
+            private_key_encrypted: config.encrypted_private_key.is_some(),
+            private_key_in_keychain: config.keychain_entry.is_some(),
             public_key: config.public_key.clone(),
             account: config.account,
             rest_url: config.rest_url.clone(),
@@ -920,7 +1139,7 @@ impl PrivateKeyInputOptions {
     ) -> CliTypedResult<(Ed25519PrivateKey, AccountAddress)> {
         // Order of operations
         // 1. CLI inputs
-        // 2. Profile
+        // 2. Profile (handles both plaintext and encrypted keys)
         // 3. Derived
         if let Some(key) = self.extract_private_key_cli(encoding)? {
             // If we use the CLI inputs, then we should derive or use the address from the input
@@ -930,19 +1149,25 @@ impl PrivateKeyInputOptions {
                 let address = account_address_from_public_key(&key.public_key());
                 Ok((key, address))
             }
-        } else if let Some((Some(key), maybe_config_address)) = CliConfig::load_profile(
+        } else if let Some(profile_config) = CliConfig::load_profile(
             profile.profile_name(),
             ConfigSearchMode::CurrentDirAndParents,
-        )?
-        .map(|p| (p.private_key, p.account))
-        {
-            match (maybe_address, maybe_config_address) {
-                (Some(address), _) => Ok((key, address)),
-                (_, Some(address)) => Ok((key, address)),
-                (None, None) => {
-                    let address = account_address_from_public_key(&key.public_key());
-                    Ok((key, address))
-                },
+        )? {
+            // Use get_private_key() which handles encrypted keys
+            if let Some(key) = profile_config.get_private_key()? {
+                let maybe_config_address = profile_config.account;
+                match (maybe_address, maybe_config_address) {
+                    (Some(address), _) => Ok((key, address)),
+                    (_, Some(address)) => Ok((key, address)),
+                    (None, None) => {
+                        let address = account_address_from_public_key(&key.public_key());
+                        Ok((key, address))
+                    },
+                }
+            } else {
+                Err(CliError::CommandArgumentError(
+                    "One of ['--private-key', '--private-key-file'] must be used".to_string(),
+                ))
             }
         } else {
             Err(CliError::CommandArgumentError(
@@ -959,13 +1184,18 @@ impl PrivateKeyInputOptions {
     ) -> CliTypedResult<Ed25519PrivateKey> {
         if let Some(key) = self.extract_private_key_cli(encoding)? {
             Ok(key)
-        } else if let Some(Some(private_key)) = CliConfig::load_profile(
+        } else if let Some(profile_config) = CliConfig::load_profile(
             profile.profile_name(),
             ConfigSearchMode::CurrentDirAndParents,
-        )?
-        .map(|p| p.private_key)
-        {
-            Ok(private_key)
+        )? {
+            // Use get_private_key() which handles encrypted keys
+            if let Some(private_key) = profile_config.get_private_key()? {
+                Ok(private_key)
+            } else {
+                Err(CliError::CommandArgumentError(
+                    "One of ['--private-key', '--private-key-file'] must be used".to_string(),
+                ))
+            }
         } else {
             Err(CliError::CommandArgumentError(
                 "One of ['--private-key', '--private-key-file'] must be used".to_string(),
@@ -1012,13 +1242,12 @@ impl ExtractEd25519PublicKey for PrivateKeyInputOptions {
         // 1. Get the private key, and derive the public key
         let private_key = if let Some(key) = self.extract_private_key_cli(encoding)? {
             Some(key)
-        } else if let Some(Some(private_key)) = CliConfig::load_profile(
+        } else if let Some(profile_config) = CliConfig::load_profile(
             profile.profile_name(),
             ConfigSearchMode::CurrentDirAndParents,
-        )?
-        .map(|p| p.private_key)
-        {
-            Some(private_key)
+        )? {
+            // Use get_private_key() which handles encrypted keys
+            profile_config.get_private_key()?
         } else {
             None
         };
@@ -1364,17 +1593,19 @@ impl FromStr for AccountAddressWrapper {
 pub fn load_account_arg(str: &str) -> Result<AccountAddress, CliError> {
     if let Ok(account_address) = AccountAddress::from_str(str) {
         Ok(account_address)
-    } else if let Some(Some(account_address)) =
+    } else if let Some(profile_config) =
         CliConfig::load_profile(Some(str), ConfigSearchMode::CurrentDirAndParents)?
-            .map(|p| p.account)
     {
-        Ok(account_address)
-    } else if let Some(Some(private_key)) =
-        CliConfig::load_profile(Some(str), ConfigSearchMode::CurrentDirAndParents)?
-            .map(|p| p.private_key)
-    {
-        let public_key = private_key.public_key();
-        Ok(account_address_from_public_key(&public_key))
+        if let Some(account_address) = profile_config.account {
+            Ok(account_address)
+        } else if let Some(private_key) = profile_config.get_private_key()? {
+            let public_key = private_key.public_key();
+            Ok(account_address_from_public_key(&public_key))
+        } else {
+            Err(CliError::CommandArgumentError(
+                "'--account' or '--profile' after using aptos init must be provided".to_string(),
+            ))
+        }
     } else {
         Err(CliError::CommandArgumentError(
             "'--account' or '--profile' after using aptos init must be provided".to_string(),
@@ -1404,12 +1635,17 @@ pub fn load_manifest_account_arg(str: &str) -> Result<Option<AccountAddress>, Cl
         Ok(None)
     } else if let Ok(account_address) = AccountAddress::from_str(str) {
         Ok(Some(account_address))
-    } else if let Some(Some(private_key)) =
+    } else if let Some(profile_config) =
         CliConfig::load_profile(Some(str), ConfigSearchMode::CurrentDirAndParents)?
-            .map(|p| p.private_key)
     {
-        let public_key = private_key.public_key();
-        Ok(Some(account_address_from_public_key(&public_key)))
+        if let Some(private_key) = profile_config.get_private_key()? {
+            let public_key = private_key.public_key();
+            Ok(Some(account_address_from_public_key(&public_key)))
+        } else {
+            Err(CliError::CommandArgumentError(
+                "Invalid Move manifest account address".to_string(),
+            ))
+        }
     } else {
         Err(CliError::CommandArgumentError(
             "Invalid Move manifest account address".to_string(),
