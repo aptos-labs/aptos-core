@@ -16,7 +16,7 @@ use crate::{
     state::StateApi,
     transactions::TransactionsApi,
     v2::{
-        build_v2_router,
+        build_combined_router, build_v2_router,
         context::{V2Config, V2Context},
     },
     view_function::ViewFunctionApi,
@@ -56,37 +56,71 @@ pub fn bootstrap(
 
     let context = Context::new(chain_id, db, mp_sender, config.clone(), indexer_reader);
 
-    attach_poem_to_runtime(runtime.handle(), context.clone(), config, false, port_tx)
-        .context("Failed to attach poem to runtime")?;
-
-    // Start v2 API if enabled.
     if config.api_v2.enabled {
         let v2_config = V2Config::from_configs(&config.api_v2, &config.api);
         let v2_ctx = V2Context::new(context.clone(), v2_config);
-        let v2_router = build_v2_router(v2_ctx);
 
-        // Determine the address for the v2 API server.
-        // If a separate address is configured, use it. Otherwise, use v1 port + 1
-        // as a default separate port (same-port Poem+Axum cohosting is not yet supported).
-        let v2_address = config.api_v2.address.unwrap_or_else(|| {
-            let mut addr = config.api.address;
-            addr.set_port(addr.port() + 1);
+        if let Some(v2_address) = config.api_v2.address {
+            // ---- Separate port mode ----
+            // Poem serves v1 on the main port; Axum serves v2 on a separate port.
+            attach_poem_to_runtime(runtime.handle(), context.clone(), config, false, port_tx)
+                .context("Failed to attach poem to runtime")?;
+
+            let v2_router = build_v2_router(v2_ctx);
+            info!("Starting v2 API on separate port {}", v2_address);
+            runtime.spawn(async move {
+                let listener = tokio::net::TcpListener::bind(v2_address)
+                    .await
+                    .expect("Failed to bind v2 API listener");
+                // axum::serve uses hyper_util::server::conn::auto::Builder internally,
+                // which auto-negotiates HTTP/1.1 and HTTP/2 (h2c).
+                axum::serve(listener, v2_router)
+                    .await
+                    .expect("v2 API server failed");
+            });
+        } else {
+            // ---- Same-port co-hosting mode ----
+            // Start Poem on an internal-only random port, then serve a combined
+            // Axum router on the external port that handles v2 routes directly
+            // and reverse-proxies everything else to the internal Poem server.
+            let poem_address = attach_poem_to_runtime(
+                runtime.handle(),
+                context.clone(),
+                config,
+                true, // random_port = true (internal only)
+                None, // port_tx not forwarded; we'll send it from the combined server
+            )
+            .context("Failed to attach internal poem to runtime")?;
+
             info!(
-                "v2 API: no separate address configured, defaulting to {}",
-                addr
+                "v2 API co-hosting: Poem v1 internal on {}, combined server on {}",
+                poem_address, config.api.address
             );
-            addr
-        });
 
-        info!("Starting v2 API on {}", v2_address);
-        runtime.spawn(async move {
-            let listener = tokio::net::TcpListener::bind(v2_address)
-                .await
-                .expect("Failed to bind v2 API listener");
-            axum::serve(listener, v2_router)
-                .await
-                .expect("v2 API server failed");
-        });
+            let combined = build_combined_router(v2_ctx, poem_address);
+            let external_addr = config.api.address;
+
+            runtime.spawn(async move {
+                let listener = tokio::net::TcpListener::bind(external_addr)
+                    .await
+                    .expect("Failed to bind combined API listener");
+
+                // Send the actual port back to the caller (for tests).
+                if let Some(port_tx) = port_tx {
+                    let _ = port_tx.send(listener.local_addr().unwrap().port());
+                }
+
+                // axum::serve auto-negotiates HTTP/1.1 and HTTP/2 (h2c).
+                axum::serve(listener, combined)
+                    .await
+                    .expect("Combined API server failed");
+            });
+        }
+    } else {
+        // ---- v2 disabled ----
+        // Just run Poem v1 on the main port (unchanged from existing behavior).
+        attach_poem_to_runtime(runtime.handle(), context.clone(), config, false, port_tx)
+            .context("Failed to attach poem to runtime")?;
     }
 
     let context_cloned = context.clone();

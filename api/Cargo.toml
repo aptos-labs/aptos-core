@@ -52,6 +52,8 @@ tokio = { workspace = true }
 # v2 API dependencies
 axum = { workspace = true, features = ["ws"] }
 base64 = { workspace = true }
+http-body-util = { workspace = true }
+hyper-util = { workspace = true }
 tower = { workspace = true }
 tower-http = { workspace = true }
 utoipa = { workspace = true }

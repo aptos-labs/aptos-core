@@ -8,12 +8,14 @@ use super::{
     context::V2Context,
     endpoints::{account_transactions, blocks, events, health, modules, resources, transactions, view},
     middleware,
+    proxy::{self, V1Proxy},
 };
 use axum::{
     middleware as axum_middleware,
     routing::{get, post},
     Router,
 };
+use std::net::SocketAddr;
 
 /// Build the v2 Axum router with all endpoints and middleware.
 pub fn build_v2_router(ctx: V2Context) -> Router {
@@ -82,4 +84,18 @@ pub fn build_v2_router(ctx: V2Context) -> Router {
         .layer(middleware::compression_layer())
         .layer(middleware::size_limit_layer(content_length_limit))
         .with_state(ctx)
+}
+
+/// Build a combined router that serves v2 routes and proxies everything
+/// else to the internal Poem v1 server. Used for same-port co-hosting.
+pub fn build_combined_router(ctx: V2Context, poem_address: SocketAddr) -> Router {
+    let v2 = build_v2_router(ctx);
+    let v1_proxy = V1Proxy::new(poem_address);
+
+    // v2 routes take priority; anything unmatched falls through to the v1 proxy.
+    v2.fallback_service(
+        Router::new()
+            .fallback(proxy::v1_proxy_fallback)
+            .with_state(v1_proxy),
+    )
 }

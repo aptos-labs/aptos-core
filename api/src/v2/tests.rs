@@ -7,7 +7,7 @@
 //! and mempool, then make HTTP requests using reqwest.
 
 use super::context::{V2Config, V2Context};
-use super::router::build_v2_router;
+use super::router::{build_combined_router, build_v2_router};
 use crate::context::Context;
 use aptos_api_test_context::new_test_context as create_test_context;
 use aptos_config::config::NodeConfig;
@@ -568,4 +568,150 @@ async fn test_v2_resources_at_version() {
 
     let body: serde_json::Value = resp.json().await.unwrap();
     assert!(body["data"].is_array());
+}
+
+// ==== Same-port co-hosting tests ====
+
+/// Helper: start a combined server (v2 + v1 proxy) for co-hosting tests.
+///
+/// Starts a Poem v1 server on an internal random port, then starts a combined
+/// Axum server that serves v2 directly and proxies everything else to Poem.
+async fn start_combined_server() -> (SocketAddr, tokio::task::JoinHandle<()>) {
+    let mut node_config = NodeConfig::default();
+    node_config.storage.rocksdb_configs.enable_storage_sharding = false;
+
+    let test_ctx = create_test_context("v2_cohost_test".to_string(), node_config.clone(), false);
+
+    let context = Context::new(
+        ChainId::test(),
+        test_ctx.db.clone(),
+        test_ctx.mempool.ac_client.clone(),
+        node_config.clone(),
+        None,
+    );
+
+    // Start Poem v1 on internal port (simulates what runtime.rs does).
+    let poem_context = context.clone();
+    let poem_config = node_config.clone();
+    let poem_addr = crate::runtime::attach_poem_to_runtime(
+        &tokio::runtime::Handle::current(),
+        poem_context,
+        &poem_config,
+        true, // random_port
+        None,
+    )
+    .expect("Failed to start internal Poem");
+
+    // Build combined router (v2 + v1 proxy).
+    let v2_config = V2Config::from_configs(&node_config.api_v2, &node_config.api);
+    let v2_ctx = V2Context::new(context, v2_config);
+    let combined = build_combined_router(v2_ctx, poem_addr);
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("Failed to bind combined server");
+    let addr = listener.local_addr().unwrap();
+
+    let handle = tokio::spawn(async move {
+        axum::serve(listener, combined).await.unwrap();
+    });
+
+    // Give the server a moment to start.
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+    (addr, handle)
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_cohost_v2_health() {
+    let (addr, _handle) = start_combined_server().await;
+
+    let resp = reqwest::get(format!("{}/v2/health", base_url(addr)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+
+    let body: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(body["status"], "ok");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_cohost_v1_proxy_index() {
+    let (addr, _handle) = start_combined_server().await;
+
+    // Request to root "/" should be proxied to Poem v1
+    let resp = reqwest::get(format!("{}/", base_url(addr)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+
+    let body = resp.text().await.unwrap();
+    assert!(body.contains("Aptos Node API"), "Root page should contain 'Aptos Node API'");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_cohost_v1_proxy_ledger_info() {
+    let (addr, _handle) = start_combined_server().await;
+
+    // GET /v1/ (ledger info) should be proxied to Poem
+    let resp = reqwest::get(format!("{}/v1", base_url(addr)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+
+    let body: serde_json::Value = resp.json().await.unwrap();
+    assert!(body["chain_id"].is_number(), "v1 ledger info should have chain_id");
+    assert!(body["ledger_version"].is_string(), "v1 ledger info should have ledger_version");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_cohost_v1_proxy_resources() {
+    let (addr, _handle) = start_combined_server().await;
+
+    // GET /v1/accounts/0x1/resources should be proxied to Poem
+    let resp = reqwest::get(format!("{}/v1/accounts/0x1/resources", base_url(addr)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+
+    let body: serde_json::Value = resp.json().await.unwrap();
+    assert!(body.is_array(), "v1 resources should return an array");
+    assert!(!body.as_array().unwrap().is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_cohost_v1_proxy_health() {
+    let (addr, _handle) = start_combined_server().await;
+
+    // GET /v1/-/healthy should be proxied to Poem
+    let resp = reqwest::get(format!("{}/v1/-/healthy", base_url(addr)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_cohost_both_versions_on_same_port() {
+    let (addr, _handle) = start_combined_server().await;
+
+    // v2 health endpoint (served by Axum directly)
+    let v2_resp = reqwest::get(format!("{}/v2/health", base_url(addr)))
+        .await
+        .unwrap();
+    assert_eq!(v2_resp.status(), 200);
+    let v2_body: serde_json::Value = v2_resp.json().await.unwrap();
+    assert_eq!(v2_body["status"], "ok");
+
+    // v1 ledger info (proxied to Poem)
+    let v1_resp = reqwest::get(format!("{}/v1", base_url(addr)))
+        .await
+        .unwrap();
+    assert_eq!(v1_resp.status(), 200);
+    let v1_body: serde_json::Value = v1_resp.json().await.unwrap();
+    assert!(v1_body["chain_id"].is_number());
+
+    // Both should report the same chain ID
+    let v2_chain_id = v2_body["ledger"]["chain_id"].as_u64().unwrap();
+    let v1_chain_id = v1_body["chain_id"].as_u64().unwrap();
+    assert_eq!(v2_chain_id, v1_chain_id, "Both APIs should report the same chain_id");
 }

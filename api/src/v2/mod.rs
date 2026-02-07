@@ -16,10 +16,12 @@ pub mod endpoints;
 pub mod error;
 pub mod extractors;
 pub mod middleware;
+pub mod proxy;
 pub mod router;
 pub mod types;
 
 pub use context::V2Context;
 pub use error::{ErrorCode, V2Error};
-pub use router::build_v2_router;
+pub use proxy::V1Proxy;
+pub use router::{build_combined_router, build_v2_router};
 pub use types::{LedgerMetadata, V2Response};

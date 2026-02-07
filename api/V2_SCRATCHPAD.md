@@ -21,6 +21,8 @@ Working notes, decisions log, and progress tracker for the API v2 implementation
 | 2026-02-07 | v1 deprecation: 3-6 month coexistence | Give ecosystem time to migrate |
 | 2026-02-07 | Response metadata: body-only, no headers | v1's `X-Aptos-*` headers are awkward for many clients; putting ledger metadata in the JSON body alongside the data simplifies parsing and makes the API self-contained. Errors do NOT include ledger metadata (use `/v2/info` if needed). The only custom header is `X-Request-Id`. |
 | 2026-02-07 | Pagination: unified opaque cursor on all list endpoints | v1 uses mixed styles (cursor for resources, offset for txns/events). v2 uses a single opaque cursor pattern everywhere. Server controls page size (no client `limit` param). Cursor is in the response body, not a header. Internal encoding is versioned (`version_byte + bcs(CursorInner)`) so format can evolve. |
+| 2026-02-07 | HTTP/2 (h2c): already supported by axum::serve | `axum::serve` uses `hyper_util::server::conn::auto::Builder` internally, which auto-negotiates HTTP/1.1 and HTTP/2 (h2c prior knowledge). No additional configuration needed. |
+| 2026-02-07 | Same-port co-hosting: Axum external + Poem internal proxy | Poem v1 starts on internal random port; Axum serves as the external-facing server with v2 routes and a reverse proxy fallback for v1. Both Poem 3.x and Axum 0.7 use hyper 1.x / http 1.x so types are compatible. Config: `api_v2.address = None` = same port, `api_v2.address = Some(addr)` = separate port. |
 
 ## Open Questions
 
@@ -77,9 +79,11 @@ Working notes, decisions log, and progress tracker for the API v2 implementation
 - [x] JsonOrBcs + BcsOnly content negotiation extractors
 - [x] V2Response envelope with LedgerMetadata in body
 - [x] Cursor unit tests (4 passing)
+- [x] Integration tests (30 tests: 24 v2 endpoint tests + 6 co-hosting tests)
+- [x] Performance benchmarks (9 criterion benchmarks incl. parameterized batch)
+- [x] HTTP/2 (h2c) — already supported by axum::serve (uses hyper_util auto::Builder)
+- [x] Same-port Poem+Axum co-hosting via reverse proxy (api_v2.address=None → same port)
+- [x] V1Proxy module for reverse-proxying v1 requests to internal Poem server
 - [ ] WebSocket support
-- [ ] HTTP/2 (h2c) via hyper-util
-- [ ] Same-port Poem+Axum co-hosting (currently requires separate port)
 - [ ] OpenAPI spec generation (utoipa-axum not yet compatible with axum 0.7)
-- [ ] Integration tests
-- [ ] Performance benchmarks
+- [ ] TLS support for v2 server (currently h2c only, TLS would enable full h2)

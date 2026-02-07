@@ -503,6 +503,8 @@ dependencies = [
  "fail",
  "futures",
  "hex",
+ "http-body-util",
+ "hyper-util",
  "itertools 0.13.0",
  "mime",
  "mini-moka",
