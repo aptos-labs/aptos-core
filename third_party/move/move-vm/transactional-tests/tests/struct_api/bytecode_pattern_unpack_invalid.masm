@@ -1,0 +1,14 @@
+//# publish --print-bytecode
+module 0x66::test_bytecode_pattern_unpack
+
+struct S
+    x: u64
+    y: u64
+
+// Invalid: unpack function has extra instruction (not exactly 3 instructions)
+#[unpack] public fun unpack$S(l0: S): (u64, u64)
+    move_loc l0
+    ld_u64 1
+    pop
+    unpack S
+    ret

@@ -1,0 +1,45 @@
+processed 1 task
+task 0 lines 1-39:  publish --print-bytecode [module 0x66::test_borrow_field_valid]
+
+== BEGIN Bytecode ==
+// Bytecode version v9
+module 0x66::test_borrow_field_valid
+struct S
+  x: u64
+  y: u64
+
+struct T<T0>
+  a: T0
+
+// Function definition at index 0
+#[borrow=0] public fun borrow$S$0(l0: &S): &u64
+    move_loc l0
+    borrow_field S, x
+    ret
+
+// Function definition at index 1
+#[borrow=1] public fun borrow$S$1(l0: &S): &u64
+    move_loc l0
+    borrow_field S, y
+    ret
+
+// Function definition at index 2
+#[borrow_mut=0] public fun borrow_mut$S$0(l0: &mut S): &mut u64
+    move_loc l0
+    mut_borrow_field S, x
+    ret
+
+// Function definition at index 3
+#[borrow_mut=1] public fun borrow_mut$S$1(l0: &mut S): &mut u64
+    move_loc l0
+    mut_borrow_field S, y
+    ret
+
+// Function definition at index 4
+#[borrow=0] public fun borrow$T$0<T0>(l0: &T<T0>): &T0
+    move_loc l0
+    borrow_field T<T0>, a
+    ret
+
+
+== END Bytecode ==

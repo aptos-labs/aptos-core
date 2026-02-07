@@ -1,0 +1,39 @@
+//# publish --print-bytecode
+module 0x66::test_borrow_field_valid
+
+struct S
+    x: u64
+    y: u64
+
+struct T<T0>
+    a: T0
+
+// Valid: borrow$S$0 takes &S and returns &u64
+#[borrow=0] public fun borrow$S$0(l0: &S): &u64
+    move_loc l0
+    borrow_field S, x
+    ret
+
+// Valid: borrow$S$1 takes &S and returns &u64
+#[borrow=1] public fun borrow$S$1(l0: &S): &u64
+    move_loc l0
+    borrow_field S, y
+    ret
+
+// Valid: borrow_mut$S$0 takes &mut S and returns &mut u64
+#[borrow_mut=0] public fun borrow_mut$S$0(l0: &mut S): &mut u64
+    move_loc l0
+    mut_borrow_field S, x
+    ret
+
+// Valid: borrow_mut$S$1 takes &mut S and returns &mut u64
+#[borrow_mut=1] public fun borrow_mut$S$1(l0: &mut S): &mut u64
+    move_loc l0
+    mut_borrow_field S, y
+    ret
+
+// Valid: borrow$T$0 with generic type
+#[borrow=0] public fun borrow$T$0<T0>(l0: &T<T0>): &T0
+    move_loc l0
+    borrow_field T<T0>, a
+    ret

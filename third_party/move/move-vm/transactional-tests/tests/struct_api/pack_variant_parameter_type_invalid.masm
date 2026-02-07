@@ -1,0 +1,19 @@
+//# publish --print-bytecode
+module 0x66::test_pack_variant_parameter_type_invalid
+
+enum Color has drop
+  Red
+  Green
+    intensity: u64
+  Blue
+    hue: u8
+    saturation: u64
+
+// Test: pack$Color$Green with wrong parameter type
+// Green variant has field (u64), but function takes (u8)
+// Expected: INVALID_STRUCT_API_CODE error
+#[pack_variant=1] public fun pack$Color$Green(l0: u8): Color
+    move_loc l0
+    cast_u64
+    pack_variant Color, Green
+    ret

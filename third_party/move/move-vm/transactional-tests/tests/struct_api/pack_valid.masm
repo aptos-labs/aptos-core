@@ -1,0 +1,22 @@
+//# publish --print-bytecode
+module 0x66::test_pack_valid
+
+struct S
+    x: u64
+    y: u64
+
+struct T
+    a: bool
+
+// Valid: pack$S takes two u64 parameters and returns S
+#[pack] public fun pack$S(l0: u64, l1: u64): S
+    move_loc l0
+    move_loc l1
+    pack S
+    ret
+
+// Valid: pack$T takes one bool parameter and returns T
+#[pack] public fun pack$T(l0: bool): T
+    move_loc l0
+    pack T
+    ret

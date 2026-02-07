@@ -21,14 +21,14 @@ struct S<T0: copy>
     ret
 
 // Function definition at index 2
-#[borrow] friend fun borrow$S$0<T0: copy>(l0: &S<T0>): &T0
+#[borrow=0] friend fun borrow$S$0<T0: copy>(l0: &S<T0>): &T0
     local l1: &S<T0>
     move_loc l0
     borrow_field S<T0>, f
     ret
 
 // Function definition at index 3
-#[borrow_mut] friend fun borrow_mut$S$0<T0: copy>(l0: &mut S<T0>): &mut T0
+#[borrow_mut=0] friend fun borrow_mut$S$0<T0: copy>(l0: &mut S<T0>): &mut T0
     local l1: &mut S<T0>
     move_loc l0
     mut_borrow_field S<T0>, f
@@ -55,14 +55,14 @@ struct S<T0: copy>
     ret
 
 // Function definition at index 2
-#[borrow] friend fun borrow$S$0<T0: copy>(l0: &S<T0>): &T0
+#[borrow=0] friend fun borrow$S$0<T0: copy>(l0: &S<T0>): &T0
     local l1: &S<T0>
     move_loc l0
     borrow_field S<T0>, f
     ret
 
 // Function definition at index 3
-#[borrow_mut] friend fun borrow_mut$S$0<T0: copy>(l0: &mut S<T0>): &mut T0
+#[borrow_mut=0] friend fun borrow_mut$S$0<T0: copy>(l0: &mut S<T0>): &mut T0
     local l1: &mut S<T0>
     move_loc l0
     mut_borrow_field S<T0>, f

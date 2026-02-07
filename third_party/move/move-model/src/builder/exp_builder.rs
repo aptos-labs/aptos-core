@@ -28,10 +28,7 @@ use crate::{
         ReceiverFunctionInstance, ReferenceKind, Substitution, Type, TypeDisplayContext,
         TypeUnificationError, UnificationContext, Variance, WideningOrder, BOOL_TYPE,
     },
-    well_known::{
-        BORROW_MUT_NAME, BORROW_NAME, UNSPECIFIED_ABORT_CODE, VECTOR_FUNCS_WITH_BYTECODE_INSTRS,
-        VECTOR_MODULE,
-    },
+    well_known::{UNSPECIFIED_ABORT_CODE, VECTOR_FUNCS_WITH_BYTECODE_INSTRS, VECTOR_MODULE},
     FunId,
 };
 use codespan_reporting::diagnostic::Severity;
@@ -45,6 +42,7 @@ use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
     function::ClosureMask,
+    language_storage::{BORROW, BORROW_MUT},
 };
 use move_ir_types::{
     location::{sp, Spanned},
@@ -4159,11 +4157,7 @@ impl ExpTranslator<'_, '_, '_> {
             return call;
         } else {
             // To use index notation in vector module
-            let borrow_fun_name = if mutable {
-                BORROW_MUT_NAME
-            } else {
-                BORROW_NAME
-            };
+            let borrow_fun_name = if mutable { BORROW_MUT } else { BORROW };
             if let Some(borrow_symbol) = self
                 .parent
                 .parent

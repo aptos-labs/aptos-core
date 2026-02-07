@@ -1,0 +1,58 @@
+processed 1 task
+task 0 lines 1-52:  publish --print-bytecode [module 0x66::test_generics_valid]
+
+== BEGIN Bytecode ==
+// Bytecode version v9
+module 0x66::test_generics_valid
+struct Box<T0>
+  value: T0
+
+enum Option<T0> has drop
+  Some
+    value: T0
+  None
+
+// Function definition at index 0
+#[pack] public fun pack$Box<T0>(l0: T0): Box<T0>
+    move_loc l0
+    pack Box<T0>
+    ret
+
+// Function definition at index 1
+#[unpack] public fun unpack$Box<T0>(l0: Box<T0>): T0
+    move_loc l0
+    unpack Box<T0>
+    ret
+
+// Function definition at index 2
+#[borrow=0] public fun borrow$Box$0<T0>(l0: &Box<T0>): &T0
+    move_loc l0
+    borrow_field Box<T0>, value
+    ret
+
+// Function definition at index 3
+#[borrow_mut=0] public fun borrow_mut$Box$0<T0>(l0: &mut Box<T0>): &mut T0
+    move_loc l0
+    mut_borrow_field Box<T0>, value
+    ret
+
+// Function definition at index 4
+#[pack_variant=0] public fun pack$Option$Some<T0>(l0: T0): Option<T0>
+    move_loc l0
+    pack_variant Option<T0>, Some
+    ret
+
+// Function definition at index 5
+#[unpack_variant=0] public fun unpack$Option$Some<T0>(l0: Option<T0>): T0
+    move_loc l0
+    unpack_variant Option<T0>, Some
+    ret
+
+// Function definition at index 6
+#[test_variant=0] public fun test_variant$Option$Some<T0>(l0: &Option<T0>): bool
+    move_loc l0
+    test_variant Option<T0>, Some
+    ret
+
+
+== END Bytecode ==

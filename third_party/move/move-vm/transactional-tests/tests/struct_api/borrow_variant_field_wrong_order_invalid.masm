@@ -1,0 +1,18 @@
+//# publish --print-bytecode
+module 0x66::test_borrow_variant_field_wrong_order
+
+enum Color has drop
+  Red
+    r: u8
+  Green
+    g: u16
+  Blue
+    b: u8
+
+// Invalid: variants must be in ascending order by index
+// Red has index 0, Blue has index 2
+// But this lists them as Blue::b (2), Red::r (0) which is wrong order
+#[borrow=0] public fun borrow$Color$0$0(l0: &Color): &u8
+    move_loc l0
+    borrow_variant_field Color, Blue::b, Red::r
+    ret

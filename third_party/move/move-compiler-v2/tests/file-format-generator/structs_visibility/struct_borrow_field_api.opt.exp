@@ -24,14 +24,14 @@ struct S<T0: drop + store> has drop
     ret
 
 // Function definition at index 2
-#[borrow] public fun borrow$T$0<T0: drop + store>(l0: &T<T0>): &T0
+#[borrow=0] public fun borrow$T$0<T0: drop + store>(l0: &T<T0>): &T0
     local l1: &T<T0>
     move_loc l0
     borrow_field T<T0>, h
     ret
 
 // Function definition at index 3
-#[borrow_mut] public fun borrow_mut$T$0<T0: drop + store>(l0: &mut T<T0>): &mut T0
+#[borrow_mut=0] public fun borrow_mut$T$0<T0: drop + store>(l0: &mut T<T0>): &mut T0
     local l1: &mut T<T0>
     move_loc l0
     mut_borrow_field T<T0>, h
@@ -54,28 +54,28 @@ struct S<T0: drop + store> has drop
     ret
 
 // Function definition at index 6
-#[borrow] public fun borrow$S$0<T0: drop + store>(l0: &S<T0>): &u64
+#[borrow=0] public fun borrow$S$0<T0: drop + store>(l0: &S<T0>): &u64
     local l1: &S<T0>
     move_loc l0
     borrow_field S<T0>, f
     ret
 
 // Function definition at index 7
-#[borrow] public fun borrow$S$1<T0: drop + store>(l0: &S<T0>): &T<T0>
+#[borrow=1] public fun borrow$S$1<T0: drop + store>(l0: &S<T0>): &T<T0>
     local l1: &S<T0>
     move_loc l0
     borrow_field S<T0>, g
     ret
 
 // Function definition at index 8
-#[borrow_mut] public fun borrow_mut$S$0<T0: drop + store>(l0: &mut S<T0>): &mut u64
+#[borrow_mut=0] public fun borrow_mut$S$0<T0: drop + store>(l0: &mut S<T0>): &mut u64
     local l1: &mut S<T0>
     move_loc l0
     mut_borrow_field S<T0>, f
     ret
 
 // Function definition at index 9
-#[borrow_mut] public fun borrow_mut$S$1<T0: drop + store>(l0: &mut S<T0>): &mut T<T0>
+#[borrow_mut=1] public fun borrow_mut$S$1<T0: drop + store>(l0: &mut S<T0>): &mut T<T0>
     local l1: &mut S<T0>
     move_loc l0
     mut_borrow_field S<T0>, g

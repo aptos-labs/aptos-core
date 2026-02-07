@@ -1988,7 +1988,7 @@ impl GlobalEnv {
             is_native: false,
             visibility: Visibility::Private,
             has_package_visibility: false,
-            is_empty_struct: Some(false),
+            is_empty_struct: false,
         }
     }
 
@@ -3830,9 +3830,8 @@ pub struct StructData {
     /// Invariant: when true, visibility is always friend.
     pub(crate) has_package_visibility: bool,
 
-    /// Whether this struct is originally empty
-    /// None if the data is constructed from compiled module
-    pub is_empty_struct: Option<bool>,
+    /// Whether this struct is empty (has no fields) when defined by the user
+    pub is_empty_struct: bool,
 }
 
 impl StructData {
@@ -3851,7 +3850,7 @@ impl StructData {
             is_native: false,
             visibility: Visibility::Private,
             has_package_visibility: false,
-            is_empty_struct: Some(false),
+            is_empty_struct: false,
         }
     }
 }
@@ -3878,8 +3877,8 @@ impl<'env> StructEnv<'env> {
         self.module_env.env
     }
 
-    /// Returns true if struct is empty when defined by the user
-    pub fn is_empty_struct(&self) -> Option<bool> {
+    /// Returns whether the struct is empty (has no fields)
+    pub fn is_empty_struct(&self) -> bool {
         self.data.is_empty_struct
     }
 

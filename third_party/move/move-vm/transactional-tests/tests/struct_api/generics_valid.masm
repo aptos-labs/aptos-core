@@ -1,0 +1,52 @@
+//# publish --print-bytecode
+module 0x66::test_generics_valid
+
+struct Box<T>
+    value: T
+
+enum Option<T> has drop
+  Some
+    value: T
+  None
+
+// Valid: pack$Box with generic type parameter
+#[pack] public fun pack$Box<T>(l0: T): Box<T>
+    move_loc l0
+    pack Box<T>
+    ret
+
+// Valid: unpack$Box with generic type parameter
+#[unpack] public fun unpack$Box<T>(l0: Box<T>): T
+    move_loc l0
+    unpack Box<T>
+    ret
+
+// Valid: borrow$Box$0 with generic type
+#[borrow=0] public fun borrow$Box$0<T>(l0: &Box<T>): &T
+    move_loc l0
+    borrow_field Box<T>, value
+    ret
+
+// Valid: borrow_mut$Box$0 with generic type
+#[borrow_mut=0] public fun borrow_mut$Box$0<T>(l0: &mut Box<T>): &mut T
+    move_loc l0
+    mut_borrow_field Box<T>, value
+    ret
+
+// Valid: pack_variant$Option$Some with generic type
+#[pack_variant=0] public fun pack$Option$Some<T>(l0: T): Option<T>
+    move_loc l0
+    pack_variant Option<T>, Some
+    ret
+
+// Valid: unpack_variant$Option$Some with generic type
+#[unpack_variant=0] public fun unpack$Option$Some<T>(l0: Option<T>): T
+    move_loc l0
+    unpack_variant Option<T>, Some
+    ret
+
+// Valid: test_variant$Option$Some with generic type
+#[test_variant=0] public fun test_variant$Option$Some<T>(l0: &Option<T>): bool
+    move_loc l0
+    test_variant Option<T>, Some
+    ret
