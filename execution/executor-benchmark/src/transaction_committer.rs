@@ -29,9 +29,18 @@ pub(crate) fn gen_li_with_sigs(
     block_id: HashValue,
     root_hash: HashValue,
     version: Version,
+    db: &aptos_storage_interface::DbReaderWriter,
 ) -> LedgerInfoWithSignatures {
+    // Use next_block_epoch() to get the correct epoch for this block
+    // This handles the case where the previous block was a reconfiguration
+    let epoch = db.reader
+        .get_latest_ledger_info()
+        .ok()
+        .map(|li| li.ledger_info().next_block_epoch())
+        .unwrap_or(0);
+
     let block_info = BlockInfo::new(
-        1,        /* epoch */
+        epoch,    /* epoch - read from database */
         0,        /* round, doesn't matter */
         block_id, /* id, doesn't matter */
         root_hash, version, 0,    /* timestamp_usecs, doesn't matter */
@@ -92,7 +101,7 @@ where
             let version = output.expect_last_version();
             last_version = version;
             let commit_start = Instant::now();
-            let ledger_info_with_sigs = gen_li_with_sigs(block_id, root_hash, version);
+            let ledger_info_with_sigs = gen_li_with_sigs(block_id, root_hash, version, &self.executor.db);
             self.executor.pre_commit_block(block_id).unwrap();
             self.executor.commit_ledger(ledger_info_with_sigs).unwrap();
 

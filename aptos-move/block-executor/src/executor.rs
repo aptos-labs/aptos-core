@@ -2569,7 +2569,7 @@ where
     ) -> BlockExecutionResult<BlockOutput<T, E::Output>, E::Error> {
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
-        if self.config.local.concurrency_level > 1 {
+        if self.config.local.concurrency_level > 1 && signature_verified_block.num_txns() > 1 {
             let parallel_result = if self.config.local.blockstm_v2 {
                 BLOCKSTM_VERSION_NUMBER.set(2);
                 self.execute_transactions_parallel_v2(

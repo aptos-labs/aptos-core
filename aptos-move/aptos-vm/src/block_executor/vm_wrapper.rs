@@ -118,11 +118,17 @@ impl ExecutorTask for AptosExecutorTask {
 
     fn is_transaction_dynamic_change_set_capable(txn: &Self::Txn) -> bool {
         if txn.is_valid() {
-            if let Transaction::GenesisTransaction(WriteSetPayload::Direct(_)) = txn.expect_valid()
-            {
-                // WriteSetPayload::Direct cannot be handled in mode where delayed_field_optimization or
-                // resource_groups_split_in_change_set is enabled.
-                return false;
+            match txn.expect_valid() {
+                Transaction::GenesisTransaction(WriteSetPayload::Direct(_)) => {
+                    // WriteSetPayload::Direct cannot be handled in mode where delayed_field_optimization or
+                    // resource_groups_split_in_change_set is enabled.
+                    return false;
+                }
+                Transaction::GenesisTransaction(WriteSetPayload::Script { .. }) => {
+                    // WriteSetPayload::Script also cannot properly track delayed fields
+                    return false;
+                }
+                _ => {}
             }
         }
         true

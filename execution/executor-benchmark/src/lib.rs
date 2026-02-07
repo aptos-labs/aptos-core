@@ -227,7 +227,7 @@ fn init_indexer_wrapper(
     Some((table_info_service, grpc_version, abort_handle_clone))
 }
 
-fn create_checkpoint(
+pub fn create_checkpoint(
     source_dir: impl AsRef<Path>,
     checkpoint_dir: impl AsRef<Path>,
     enable_storage_sharding: bool,
@@ -287,28 +287,48 @@ pub fn run_benchmark<V>(
     num_main_signer_accounts: usize,
     num_additional_dst_pool_accounts: usize,
     source_dir: impl AsRef<Path>,
-    checkpoint_dir: impl AsRef<Path>,
+    checkpoint_dir: Option<impl AsRef<Path>>,
     verify_sequence_numbers: bool,
     storage_test_config: StorageTestConfig,
     pipeline_config: PipelineConfig,
     init_features: Features,
     is_keyless: bool,
+    custom_root_account: Option<LocalAccount>,
 ) -> SingleRunResults
 where
     V: VMBlockExecutor + 'static,
 {
-    create_checkpoint(
-        source_dir.as_ref(),
-        checkpoint_dir.as_ref(),
-        storage_test_config.enable_storage_sharding,
-        storage_test_config.enable_indexer_grpc,
-    );
+    // Create checkpoint if checkpoint_dir is provided
+    let working_dir = if let Some(ref checkpoint_path) = checkpoint_dir {
+        create_checkpoint(
+            source_dir.as_ref(),
+            checkpoint_path.as_ref(),
+            storage_test_config.enable_storage_sharding,
+            storage_test_config.enable_indexer_grpc,
+        );
+        checkpoint_path.as_ref().to_path_buf()
+    } else {
+        source_dir.as_ref().to_path_buf()
+    };
+
     let (mut config, genesis_key) =
         aptos_genesis::test_utils::test_config_with_custom_features(init_features);
-    config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
+    config.storage.dir = working_dir;
     storage_test_config.init_storage_config(&mut config);
     let db = init_db(&config);
-    let root_account = TransactionGenerator::read_root_account(genesis_key, &db);
+    let mut root_account = custom_root_account
+        .unwrap_or_else(|| TransactionGenerator::read_root_account(genesis_key, &db));
+    // Resync sequence number from DB (important for existing DB where root account
+    // was used during account creation and has a non-zero sequence number)
+    let current_seq = {
+        use aptos_types::state_store::MoveResourceExt;
+        let db_state_view = db.reader.latest_state_checkpoint_view().unwrap();
+        aptos_types::account_config::AccountResource::fetch_move_resource(&db_state_view, &root_account.address())
+            .unwrap()
+            .map(|r| r.sequence_number())
+            .unwrap_or(0)
+    };
+    root_account.set_sequence_number(current_seq);
     let root_account = Arc::new(root_account);
 
     let mut num_accounts_to_load = num_main_signer_accounts;
@@ -558,19 +578,18 @@ pub fn add_accounts<V>(
 ) where
     V: VMBlockExecutor + 'static,
 {
+    use crate::db_generator::prepare_checkpoint_from_existing_db;
+
     assert!(source_dir.as_ref() != checkpoint_dir.as_ref());
-    create_checkpoint(
-        source_dir.as_ref(),
-        checkpoint_dir.as_ref(),
-        storage_test_config.enable_storage_sharding,
-        storage_test_config.enable_indexer_grpc,
-    );
-    add_accounts_impl::<V>(
+
+    // Use prepare_checkpoint_from_existing_db which creates checkpoint,
+    // generates root account, and adds accounts
+    prepare_checkpoint_from_existing_db::<V>(
+        source_dir,
+        checkpoint_dir,
         num_new_accounts,
         init_account_balance,
         block_size,
-        source_dir,
-        checkpoint_dir,
         storage_test_config,
         verify_sequence_numbers,
         pipeline_config,
@@ -590,6 +609,7 @@ fn add_accounts_impl<V>(
     pipeline_config: PipelineConfig,
     init_features: Features,
     is_keyless: bool,
+    custom_root_account: Option<LocalAccount>,
 ) where
     V: VMBlockExecutor + 'static,
 {
@@ -629,6 +649,7 @@ fn add_accounts_impl<V>(
 
     // Now create the main pipeline for account creation
     let current_version = db.reader.get_latest_ledger_info_version().unwrap();
+    info!("*** Pipeline will start from version (current_version from DB): {}", current_version);
     let (pipeline, block_sender) = Pipeline::new(
         executor,
         current_version,
@@ -637,9 +658,13 @@ fn add_accounts_impl<V>(
         indexer_wrapper,
     );
 
+    // Use custom root account if provided, otherwise read from genesis
+    let root_account = custom_root_account
+        .unwrap_or_else(|| TransactionGenerator::read_root_account(genesis_key, &db));
+
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
-        TransactionGenerator::read_root_account(genesis_key, &db),
+        root_account,
         block_sender,
         &source_dir,
         None,
@@ -861,8 +886,6 @@ pub fn run_single_with_default_params(
     let storage_dir = test_folder.as_ref().join("db");
     let checkpoint_dir = test_folder.as_ref().join("cp");
 
-    println!("db_generator::create_db_with_accounts");
-
     let mut features = default_benchmark_features();
     features.enable(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
     features.enable(FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE);
@@ -880,17 +903,42 @@ pub fn run_single_with_default_params(
         enable_indexer_grpc,
     };
 
-    create_db_with_accounts::<AptosVMBlockExecutor>(
-        num_accounts,       /* num_accounts */
-        100000 * 100000000, /* init_account_balance */
-        10000,              /* block_size */
-        &storage_dir,
-        storage_test_config,
-        verify_sequence_numbers,
-        init_pipeline_config,
-        features.clone(),
-        is_keyless,
-    );
+    // Determine working directory and whether we need checkpoint in run_benchmark
+    let (working_dir, run_benchmark_checkpoint_dir, custom_root_account) = if storage_dir.exists() {
+        println!("Existing database detected, preparing checkpoint...");
+        // Existing database: create checkpoint with accounts, then use it directly
+        use crate::db_generator::prepare_checkpoint_from_existing_db;
+        let root_account = prepare_checkpoint_from_existing_db::<AptosVMBlockExecutor>(
+            &storage_dir,
+            &checkpoint_dir,
+            num_accounts,       /* num_accounts */
+            100_000_000_000,    /* init_account_balance: 100 billion (10^11), seed accounts get 10^15 each, total for 100 seeds = 10^17 << u64::MAX */
+            10000,              /* block_size */
+            storage_test_config,
+            verify_sequence_numbers,
+            init_pipeline_config,
+            features.clone(),
+            is_keyless,
+        );
+        // Use checkpoint as working dir, no need for another checkpoint in run_benchmark
+        (checkpoint_dir.clone(), None, Some(root_account))
+    } else {
+        println!("No existing database, creating new database...");
+        // New database: create fresh db, then checkpoint it in run_benchmark
+        create_db_with_accounts::<AptosVMBlockExecutor>(
+            num_accounts,       /* num_accounts */
+            100000 * 100000000, /* init_account_balance */
+            10000,              /* block_size */
+            &storage_dir,
+            storage_test_config,
+            verify_sequence_numbers,
+            init_pipeline_config,
+            features.clone(),
+            is_keyless,
+        );
+        // Use storage_dir as working dir, create checkpoint in run_benchmark
+        (storage_dir.clone(), Some(checkpoint_dir.clone()), None)
+    };
 
     println!("run_benchmark");
 
@@ -911,13 +959,14 @@ pub fn run_single_with_default_params(
         1, /* transactions per sender */
         num_main_signer_accounts,
         num_dst_pool_accounts,
-        &storage_dir,
-        checkpoint_dir,
+        &working_dir,
+        run_benchmark_checkpoint_dir,
         verify_sequence_numbers,
         storage_test_config,
         execute_pipeline_config,
         features,
         is_keyless,
+        custom_root_account,
     )
 }
 
@@ -1229,7 +1278,7 @@ mod tests {
             25, /* num_main_signer_accounts */
             30, /* num_dst_pool_accounts */
             storage_dir.as_ref(),
-            checkpoint_dir,
+            Some(checkpoint_dir),
             verify_sequence_numbers,
             storage_test_config,
             PipelineConfig {
@@ -1238,6 +1287,7 @@ mod tests {
             },
             features,
             false,
+            None, // Use genesis root account for tests
         );
     }
 

@@ -101,6 +101,16 @@ fn get_genesis_validator_address(db: &DbReaderWriter) -> AccountAddress {
     validator_address()
 }
 
+fn get_current_epoch_from_db(db: &DbReaderWriter) -> u64 {
+    // Use next_block_epoch() to get the epoch for the next block
+    // This correctly handles the case where the last block was a reconfiguration
+    db.reader
+        .get_latest_ledger_info()
+        .ok()
+        .map(|li| li.ledger_info().next_block_epoch())
+        .unwrap_or(0)
+}
+
 pub(crate) fn create_block_metadata_transaction(epoch: u64, db: &DbReaderWriter) -> Transaction {
     // Use incremental timestamps to avoid triggering epoch reconfigurations
     // Large real timestamps cause immediate epoch changes since last_reconfiguration_time is small
@@ -320,11 +330,13 @@ impl TransactionGenerator {
     }
 
     pub fn create_transaction_factory() -> TransactionFactory {
-        TransactionFactory::new(ChainId::test())
+        TransactionFactory::new(ChainId::mainnet())
             // Use relative expiration: current time + 60 seconds
             // This ensures transactions have reasonable expiration window regardless of blockchain time
             .with_transaction_expiration_time(60)
             .with_gas_unit_price(100)
+            // Set max gas to 2M to match on-chain limit (default in test mode is 100M)
+            .with_max_gas_amount(2_000_000)
     }
 
     // Write metadata
@@ -481,6 +493,136 @@ impl TransactionGenerator {
             num_seed_accounts,
             seed_account_balance,
         );
+
+        // Debug: verify root account balance via view function before sending seed txns
+        {
+            let root_addr = self.root_account.address();
+            eprintln!("DEBUG: Checking root account {:x} balance via view function before seed account creation...", root_addr);
+
+            let state_view = self.db.reader.latest_state_checkpoint_view().expect("Failed to get state view");
+
+            let module_id = move_core_types::language_storage::ModuleId::new(
+                move_core_types::account_address::AccountAddress::from_hex_literal("0x1").unwrap(),
+                move_core_types::identifier::Identifier::new("coin").unwrap(),
+            );
+            let func_name = move_core_types::identifier::Identifier::new("balance").unwrap();
+            let type_args = vec![move_core_types::language_storage::TypeTag::Struct(Box::new(
+                move_core_types::language_storage::StructTag {
+                    address: move_core_types::account_address::AccountAddress::from_hex_literal("0x1").unwrap(),
+                    module: move_core_types::identifier::Identifier::new("aptos_coin").unwrap(),
+                    name: move_core_types::identifier::Identifier::new("AptosCoin").unwrap(),
+                    type_args: vec![],
+                },
+            ))];
+            let arguments = vec![bcs::to_bytes(&root_addr).unwrap()];
+
+            let view_output = aptos_vm::AptosVM::execute_view_function(
+                &state_view,
+                module_id,
+                func_name,
+                type_args,
+                arguments,
+                10_000_000,
+            );
+
+            match view_output.values {
+                Ok(values) => {
+                    if !values.is_empty() {
+                        if let Ok(balance) = bcs::from_bytes::<u64>(&values[0]) {
+                            eprintln!("DEBUG: Root account CoinStore balance = {}", balance);
+                        } else {
+                            eprintln!("DEBUG: Failed to deserialize balance from view function");
+                        }
+                    } else {
+                        eprintln!("DEBUG: View function returned empty result (no CoinStore?)");
+                    }
+                },
+                Err(e) => {
+                    eprintln!("DEBUG: View function failed: {:?}", e);
+                }
+            }
+
+            // Check features resource directly from state
+            use aptos_types::state_store::state_key::StateKey;
+            use aptos_types::state_store::TStateView;
+            let features_tag = move_core_types::language_storage::StructTag {
+                address: move_core_types::account_address::AccountAddress::from_hex_literal("0x1").unwrap(),
+                module: move_core_types::identifier::Identifier::new("features").unwrap(),
+                name: move_core_types::identifier::Identifier::new("Features").unwrap(),
+                type_args: vec![],
+            };
+            let features_key = StateKey::resource(
+                &move_core_types::account_address::AccountAddress::from_hex_literal("0x1").unwrap().into(),
+                &features_tag,
+            ).unwrap();
+            if let Ok(Some(features_bytes)) = state_view.get_state_value(&features_key) {
+                // Features is a struct { features: vector<u8> }
+                // In BCS: length-prefixed vector of bytes
+                let bytes = features_bytes.bytes();
+                eprintln!("DEBUG: Features resource found ({} bytes)", bytes.len());
+                // Feature flag OPERATIONS_DEFAULT_TO_FA_APT_STORE is feature index 78
+                // (from aptos-core features.move)
+                // Bit index 78 = byte index 78/8 = 9, bit offset 78%8 = 6
+                // But first we need to skip the BCS vector length prefix
+                if let Ok(feature_vec) = bcs::from_bytes::<Vec<u8>>(bytes) {
+                    let feature_idx = 78u64; // OPERATIONS_DEFAULT_TO_FA_APT_STORE
+                    let byte_idx = (feature_idx / 8) as usize;
+                    let bit_idx = feature_idx % 8;
+                    if byte_idx < feature_vec.len() {
+                        let enabled = (feature_vec[byte_idx] >> bit_idx) & 1 == 1;
+                        eprintln!("DEBUG: OPERATIONS_DEFAULT_TO_FA_APT_STORE (feature 78) enabled = {}", enabled);
+                    } else {
+                        eprintln!("DEBUG: Feature 78 byte_idx {} >= feature_vec.len() {}, so DISABLED", byte_idx, feature_vec.len());
+                    }
+                }
+            } else {
+                eprintln!("DEBUG: Features resource NOT found");
+            }
+
+            // Check primary fungible store balance for root account
+            // The primary fungible store address is derived from the account address
+            // Try calling primary_fungible_store::balance (which IS a view function)
+            let pfs_module_id = move_core_types::language_storage::ModuleId::new(
+                move_core_types::account_address::AccountAddress::from_hex_literal("0x1").unwrap(),
+                move_core_types::identifier::Identifier::new("primary_fungible_store").unwrap(),
+            );
+            let pfs_func_name = move_core_types::identifier::Identifier::new("balance").unwrap();
+            // APT metadata object address (well-known: 0xa)
+            let apt_metadata_addr = AccountAddress::from_hex_literal("0xa").unwrap();
+            let pfs_type_args = vec![move_core_types::language_storage::TypeTag::Struct(Box::new(
+                move_core_types::language_storage::StructTag {
+                    address: move_core_types::account_address::AccountAddress::from_hex_literal("0x1").unwrap(),
+                    module: move_core_types::identifier::Identifier::new("fungible_asset").unwrap(),
+                    name: move_core_types::identifier::Identifier::new("Metadata").unwrap(),
+                    type_args: vec![],
+                },
+            ))];
+            let pfs_arguments = vec![
+                bcs::to_bytes(&root_addr).unwrap(),
+                bcs::to_bytes(&apt_metadata_addr).unwrap(),
+            ];
+            let pfs_view_output = aptos_vm::AptosVM::execute_view_function(
+                &state_view,
+                pfs_module_id,
+                pfs_func_name,
+                pfs_type_args,
+                pfs_arguments,
+                10_000_000,
+            );
+            match pfs_view_output.values {
+                Ok(values) => {
+                    if !values.is_empty() {
+                        if let Ok(balance) = bcs::from_bytes::<u64>(&values[0]) {
+                            eprintln!("DEBUG: Primary FungibleStore balance = {}", balance);
+                        }
+                    }
+                },
+                Err(e) => {
+                    eprintln!("DEBUG: Primary FungibleStore balance check failed: {:?}", e);
+                }
+            }
+        }
+
         let bar = get_progress_bar(num_seed_accounts);
 
         for chunk in seed_accounts_cache
@@ -509,7 +651,8 @@ impl TransactionGenerator {
             bar.inc(transactions.len() as u64 - 1);
             if let Some(sender) = &self.block_sender {
                 // Add BlockMetadata transaction at the beginning of the block
-                let mut block_transactions = vec![create_block_metadata_transaction(1, &self.db)];
+                let current_epoch = get_current_epoch_from_db(&self.db);
+                let mut block_transactions = vec![create_block_metadata_transaction(current_epoch, &self.db)];
                 block_transactions.extend(transactions);
                 sender.send(block_transactions).unwrap();
             }
@@ -558,20 +701,13 @@ impl TransactionGenerator {
                 Arc::new(AtomicUsize::new(0)),
                 |(sender_idx, new_account), account_cache| {
                     let sender = &account_cache.accounts[sender_idx];
-                    // Use special function to both transfer, and create account resource.
-                    let payload = TransactionPayload::EntryFunction(EntryFunction::new(
-                        ModuleId::new(
-                            AccountAddress::SEVEN,
-                            ident_str!("benchmark_utils").to_owned(),
-                        ),
-                        ident_str!("transfer_and_create_account").to_owned(),
-                        vec![],
-                        vec![
-                            bcs::to_bytes(&new_account.authentication_key().account_address())
-                                .unwrap(),
-                            bcs::to_bytes(&init_account_balance).unwrap(),
-                        ],
-                    ));
+                    // Use aptos_account::transfer which creates the account if it doesn't exist.
+                    // This works on both fresh genesis DBs and existing mainnet DBs (unlike
+                    // benchmark_utils::transfer_and_create_account which may not be deployed).
+                    let payload = aptos_stdlib::aptos_account_transfer(
+                        new_account.authentication_key().account_address(),
+                        init_account_balance,
+                    );
                     let txn = sender
                         .sign_with_transaction_builder(self.transaction_factory.payload(payload));
                     Some(Transaction::UserTransaction(txn))
@@ -819,7 +955,8 @@ impl TransactionGenerator {
         }
 
         let mut transactions = Vec::new();
-        transactions.push(create_block_metadata_transaction(1, &self.db));
+        let current_epoch = get_current_epoch_from_db(&self.db);
+        transactions.push(create_block_metadata_transaction(current_epoch, &self.db));
 
         let init_size = transactions.len();
         for i in 0..block_size {
