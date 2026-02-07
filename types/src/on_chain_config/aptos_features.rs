@@ -165,6 +165,10 @@ pub enum FeatureFlag {
     VM_BINARY_FORMAT_V10 = 106,
     /// Whether SLH-DSA-SHA2-128s signature scheme is enabled for transaction authentication.
     SLH_DSA_SHA2_128S_SIGNATURE = 107,
+    /// Whether native functions include abort messages in their abort errors.
+    /// When disabled, abort messages from natives are stripped to maintain backward compatibility
+    /// with historical transaction outputs during replay-verify.
+    NATIVE_ABORT_MESSAGES = 108,
 }
 
 impl FeatureFlag {
@@ -309,6 +313,9 @@ impl Features {
         let mut features = Self::default();
         // Do not trust any code during testing, but verify it at runtime.
         features.disable(FeatureFlag::ENABLE_TRUSTED_CODE);
+        // Enable native abort messages for testing, but keep disabled in production
+        // to maintain backward compatibility with historical transaction outputs.
+        features.enable(FeatureFlag::NATIVE_ABORT_MESSAGES);
         features
     }
 
