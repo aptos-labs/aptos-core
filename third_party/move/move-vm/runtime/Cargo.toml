@@ -37,6 +37,10 @@ triomphe = { workspace = true }
 typed-arena = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
+hex = { workspace = true }
+legacy-move-compiler = { workspace = true }
+mockall = { workspace = true }
 move-binary-format = { workspace = true, features = ["fuzzing"] }
 move-vm-types = { workspace = true, features = ["testing"] }
 smallbitvec = { workspace = true }
