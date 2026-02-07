@@ -684,46 +684,13 @@ impl BlockTransactionPayload {
                     "Direct mempool payloads are not supported for consensus observer!".into(),
                 ));
             },
-            Payload::InQuorumStore(proof_with_data) => {
-                // Verify the batches in the requested block
-                self.verify_batches(&proof_with_data.proofs)?;
-            },
-            Payload::InQuorumStoreWithLimit(proof_with_data) => {
-                // Verify the batches in the requested block
-                self.verify_batches(&proof_with_data.proof_with_data.proofs)?;
-
-                // Verify the transaction limit
-                self.verify_transaction_limit(proof_with_data.max_txns_to_execute)?;
-            },
-            Payload::QuorumStoreInlineHybrid(
-                inline_batches,
-                proof_with_data,
-                max_txns_to_execute,
-            ) => {
-                // Verify the batches in the requested block
-                self.verify_batches(&proof_with_data.proofs)?;
-
-                // Verify the inline batches
-                self.verify_inline_batches(inline_batches)?;
-
-                // Verify the transaction limit
-                self.verify_transaction_limit(*max_txns_to_execute)?;
-            },
-            Payload::QuorumStoreInlineHybridV2(
-                inline_batches,
-                proof_with_data,
-                execution_limits,
-            ) => {
-                // Verify the batches in the requested block
-                self.verify_batches(&proof_with_data.proofs)?;
-
-                // Verify the inline batches
-                self.verify_inline_batches(inline_batches)?;
-
-                // Verify the transaction limit
-                self.verify_transaction_limit(execution_limits.max_txns_to_execute())?;
-
-                // TODO: verify the block gas limit?
+            Payload::DeprecatedInQuorumStore(_)
+            | Payload::DeprecatedInQuorumStoreWithLimit(_)
+            | Payload::DeprecatedQuorumStoreInlineHybrid(..)
+            | Payload::DeprecatedQuorumStoreInlineHybridV2(..) => {
+                return Err(Error::InvalidMessageError(
+                    "Deprecated payload variants are not supported!".into(),
+                ));
             },
             Payload::OptQuorumStore(OptQuorumStorePayload::V1(p)) => {
                 // Verify the batches in the requested block
@@ -1213,28 +1180,15 @@ mod test {
         let transaction_payload =
             BlockTransactionPayload::new_in_quorum_store(vec![], proofs.clone());
 
-        // Create a quorum store payload with a single proof
-        let batch_info = create_batch_info();
-        let proof_with_data = ProofWithData::new(vec![ProofOfStore::new(
-            batch_info,
-            AggregateSignature::empty(),
-        )]);
-        let ordered_payload = Payload::InQuorumStore(proof_with_data);
+        // Create a deprecated quorum store payload
+        let ordered_payload =
+            Payload::DeprecatedInQuorumStore(ProofWithData { proofs: vec![] });
 
-        // Verify the transaction payload and ensure it fails (the batch infos don't match)
+        // Verify the transaction payload and ensure it fails (deprecated payloads are not supported)
         let error = transaction_payload
             .verify_against_ordered_payload(&ordered_payload)
             .unwrap_err();
         assert_matches!(error, Error::InvalidMessageError(_));
-
-        // Create a quorum store payload with no proofs
-        let proof_with_data = ProofWithData::new(proofs);
-        let ordered_payload = Payload::InQuorumStore(proof_with_data);
-
-        // Verify the transaction payload and ensure it passes
-        transaction_payload
-            .verify_against_ordered_payload(&ordered_payload)
-            .unwrap();
     }
 
     #[test]
@@ -1248,43 +1202,18 @@ mod test {
             transaction_limit,
         );
 
-        // Create a quorum store payload with a single proof
-        let batch_info = create_batch_info();
-        let proof_with_data = ProofWithDataWithTxnLimit::new(
-            ProofWithData::new(vec![ProofOfStore::new(
-                batch_info,
-                AggregateSignature::empty(),
-            )]),
-            transaction_limit,
-        );
-        let ordered_payload = Payload::InQuorumStoreWithLimit(proof_with_data);
+        // Create a deprecated quorum store payload
+        let ordered_payload =
+            Payload::DeprecatedInQuorumStoreWithLimit(ProofWithDataWithTxnLimit {
+                proof_with_data: ProofWithData { proofs: vec![] },
+                max_txns_to_execute: None,
+            });
 
-        // Verify the transaction payload and ensure it fails (the batch infos don't match)
+        // Verify the transaction payload and ensure it fails (deprecated payloads are not supported)
         let error = transaction_payload
             .verify_against_ordered_payload(&ordered_payload)
             .unwrap_err();
         assert_matches!(error, Error::InvalidMessageError(_));
-
-        // Create a quorum store payload with no proofs and no transaction limit
-        let proof_with_data =
-            ProofWithDataWithTxnLimit::new(ProofWithData::new(proofs.clone()), None);
-        let ordered_payload = Payload::InQuorumStoreWithLimit(proof_with_data);
-
-        // Verify the transaction payload and ensure it fails (the transaction limit doesn't match)
-        let error = transaction_payload
-            .verify_against_ordered_payload(&ordered_payload)
-            .unwrap_err();
-        assert_matches!(error, Error::InvalidMessageError(_));
-
-        // Create a quorum store payload with no proofs and the correct limit
-        let proof_with_data =
-            ProofWithDataWithTxnLimit::new(ProofWithData::new(proofs), transaction_limit);
-        let ordered_payload = Payload::InQuorumStoreWithLimit(proof_with_data);
-
-        // Verify the transaction payload and ensure it passes
-        transaction_payload
-            .verify_against_ordered_payload(&ordered_payload)
-            .unwrap();
     }
 
     #[test]
@@ -1303,59 +1232,18 @@ mod test {
             true,
         );
 
-        // Create a quorum store payload with a single proof
-        let inline_batches = vec![];
-        let batch_info = create_batch_info();
-        let proof_with_data = ProofWithData::new(vec![ProofOfStore::new(
-            batch_info,
-            AggregateSignature::empty(),
-        )]);
-        let ordered_payload = Payload::QuorumStoreInlineHybrid(
-            inline_batches.clone(),
-            proof_with_data,
-            transaction_limit,
+        // Create a deprecated quorum store payload
+        let ordered_payload = Payload::DeprecatedQuorumStoreInlineHybrid(
+            vec![],
+            ProofWithData { proofs: vec![] },
+            None,
         );
 
-        // Verify the transaction payload and ensure it fails (the batch infos don't match)
+        // Verify the transaction payload and ensure it fails (deprecated payloads are not supported)
         let error = transaction_payload
             .verify_against_ordered_payload(&ordered_payload)
             .unwrap_err();
         assert_matches!(error, Error::InvalidMessageError(_));
-
-        // Create a quorum store payload with no transaction limit
-        let proof_with_data = ProofWithData::new(vec![]);
-        let ordered_payload =
-            Payload::QuorumStoreInlineHybrid(inline_batches.clone(), proof_with_data, None);
-
-        // Verify the transaction payload and ensure it fails (the transaction limit doesn't match)
-        let error = transaction_payload
-            .verify_against_ordered_payload(&ordered_payload)
-            .unwrap_err();
-        assert_matches!(error, Error::InvalidMessageError(_));
-
-        // Create a quorum store payload with a single inline batch
-        let proof_with_data = ProofWithData::new(vec![]);
-        let ordered_payload = Payload::QuorumStoreInlineHybrid(
-            vec![(create_batch_info(), vec![])],
-            proof_with_data,
-            transaction_limit,
-        );
-
-        // Verify the transaction payload and ensure it fails (the inline batches don't match)
-        let error = transaction_payload
-            .verify_against_ordered_payload(&ordered_payload)
-            .unwrap_err();
-        assert_matches!(error, Error::InvalidMessageError(_));
-
-        // Create an empty quorum store payload
-        let proof_with_data = ProofWithData::new(vec![]);
-        let ordered_payload =
-            Payload::QuorumStoreInlineHybrid(vec![], proof_with_data, transaction_limit);
-
-        // Verify the transaction payload and ensure it passes
-        transaction_payload
-            .verify_against_ordered_payload(&ordered_payload)
-            .unwrap();
     }
 
     #[test]

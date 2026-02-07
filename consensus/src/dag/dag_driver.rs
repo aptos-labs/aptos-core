@@ -281,13 +281,7 @@ impl DagDriver {
             Ok(payload) => payload,
             Err(e) => {
                 error!("error pulling payload: {}", e);
-                (
-                    vec![],
-                    Payload::empty(
-                        self.quorum_store_enabled,
-                        self.allow_batches_without_pos_in_proposal,
-                    ),
-                )
+                (vec![], Payload::empty(self.quorum_store_enabled))
             },
         };
 

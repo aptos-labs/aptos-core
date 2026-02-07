@@ -148,10 +148,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         let timestamp = anchor.metadata().timestamp();
         let author = *anchor.author();
         let mut validator_txns = vec![];
-        let mut payload = Payload::empty(
-            !anchor.payload().is_direct(),
-            self.allow_batches_without_pos_in_proposal,
-        );
+        let mut payload = Payload::empty(!anchor.payload().is_direct());
         let mut node_digests = vec![];
         for node in &ordered_nodes {
             validator_txns.extend(node.validator_txns().clone());

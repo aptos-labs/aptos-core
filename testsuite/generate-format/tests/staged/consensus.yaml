@@ -989,15 +989,15 @@ Payload:
           SEQ:
             TYPENAME: SignedTransaction
     1:
-      InQuorumStore:
+      DeprecatedInQuorumStore:
         NEWTYPE:
           TYPENAME: ProofWithData
     2:
-      InQuorumStoreWithLimit:
+      DeprecatedInQuorumStoreWithLimit:
         NEWTYPE:
           TYPENAME: ProofWithDataWithTxnLimit
     3:
-      QuorumStoreInlineHybrid:
+      DeprecatedQuorumStoreInlineHybrid:
         TUPLE:
           - SEQ:
               TUPLE:
@@ -1011,7 +1011,7 @@ Payload:
         NEWTYPE:
           TYPENAME: OptQuorumStorePayload
     5:
-      QuorumStoreInlineHybridV2:
+      DeprecatedQuorumStoreInlineHybridV2:
         TUPLE:
           - SEQ:
               TUPLE:

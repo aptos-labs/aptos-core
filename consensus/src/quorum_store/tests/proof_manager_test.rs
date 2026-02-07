@@ -6,6 +6,7 @@ use crate::quorum_store::{
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter},
+    payload::OptQuorumStorePayload,
     proof_of_store::{BatchInfo, BatchInfoExt, ProofOfStore},
     request_response::{GetPayloadCommand, GetPayloadRequest, GetPayloadResponse},
     utils::PayloadTxnsSize,
@@ -82,36 +83,30 @@ fn assert_payload_response(
     expected_block_gas_limit: Option<u64>,
 ) {
     match payload {
-        Payload::InQuorumStore(proofs) => {
-            assert_eq!(proofs.proofs.len(), expected.len());
-            for proof in proofs.proofs {
-                assert!(expected.contains(&proof.into()));
+        Payload::OptQuorumStore(OptQuorumStorePayload::V1(p)) => {
+            let proofs = p.proof_with_data();
+            assert_eq!(proofs.batch_summary.len(), expected.len());
+            for proof in &proofs.batch_summary {
+                let proof: ProofOfStore<BatchInfoExt> = proof.clone().into();
+                assert!(expected.contains(&proof));
             }
+            assert_eq!(p.max_txns_to_execute(), max_txns_from_block_to_execute);
+            assert_eq!(p.block_gas_limit(), expected_block_gas_limit);
         },
-        Payload::InQuorumStoreWithLimit(proofs) => {
-            assert_eq!(proofs.proof_with_data.proofs.len(), expected.len());
-            for proof in proofs.proof_with_data.proofs {
-                assert!(expected.contains(&proof.into()));
+        Payload::OptQuorumStore(OptQuorumStorePayload::V2(p)) => {
+            let proofs = p.proof_with_data();
+            assert_eq!(proofs.batch_summary.len(), expected.len());
+            for proof in &proofs.batch_summary {
+                assert!(expected.contains(proof));
             }
-            assert_eq!(proofs.max_txns_to_execute, max_txns_from_block_to_execute);
+            assert_eq!(p.max_txns_to_execute(), max_txns_from_block_to_execute);
+            assert_eq!(p.block_gas_limit(), expected_block_gas_limit);
         },
-        Payload::QuorumStoreInlineHybrid(_inline_batches, proofs, max_txns_to_execute) => {
-            assert_eq!(proofs.proofs.len(), expected.len());
-            for proof in proofs.proofs {
-                assert!(expected.contains(&proof.into()));
-            }
-            assert_eq!(max_txns_to_execute, max_txns_from_block_to_execute);
-        },
-        Payload::QuorumStoreInlineHybridV2(_inline_batches, proofs, execution_limits) => {
-            assert_eq!(proofs.proofs.len(), expected.len());
-            for proof in proofs.proofs {
-                assert!(expected.contains(&proof.into()));
-            }
-            assert_eq!(
-                execution_limits.max_txns_to_execute(),
-                max_txns_from_block_to_execute
-            );
-            assert_eq!(execution_limits.block_gas_limit(), expected_block_gas_limit);
+        Payload::DeprecatedInQuorumStore(_)
+        | Payload::DeprecatedInQuorumStoreWithLimit(_)
+        | Payload::DeprecatedQuorumStoreInlineHybrid(..)
+        | Payload::DeprecatedQuorumStoreInlineHybridV2(..) => {
+            panic!("Deprecated payload variants should not be used")
         },
         _ => panic!("Unexpected variant"),
     }

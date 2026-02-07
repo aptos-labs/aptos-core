@@ -507,10 +507,7 @@ impl ProposalGenerator {
             // after reconfiguration until it's committed
             (
                 vec![],
-                Payload::empty(
-                    self.quorum_store_enabled,
-                    self.allow_batches_without_pos_in_proposal,
-                ),
+                Payload::empty(self.quorum_store_enabled),
                 hqc.certified_block().timestamp_usecs(),
             )
         } else {
