@@ -604,6 +604,7 @@ mod tests {
             vec![HashValue::random()], // input_vector
             party_id,                  // party_id
             1,                         // epoch
+            0,                         // slot (default for standalone)
             1,                         // view (default for standalone)
         );
 
@@ -633,6 +634,7 @@ mod tests {
             vec![HashValue::random()], // input_vector
             party_id,                  // party_id
             1,                         // epoch
+            0,                         // slot (default for standalone)
             1,                         // view (default for standalone)
         );
 
@@ -678,6 +680,7 @@ mod tests {
             vec![HashValue::random()], // input_vector
             party_id,                  // party_id
             1,                         // epoch 1
+            0,                         // slot (default for standalone)
             1,                         // view (default for standalone)
         );
 

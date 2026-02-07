@@ -444,8 +444,11 @@ pub struct PrefixConsensusInput {
     /// The party's identity
     pub party_id: PartyId,
 
-    /// Epoch number (for future use)
+    /// Epoch number
     pub epoch: u64,
+
+    /// Slot number (for future multi-slot consensus, default 0 for standalone)
+    pub slot: u64,
 
     /// View number (for Strong Prefix Consensus, default 1 for standalone)
     pub view: u64,
@@ -457,12 +460,14 @@ impl PrefixConsensusInput {
         input_vector: PrefixVector,
         party_id: PartyId,
         epoch: u64,
+        slot: u64,
         view: u64,
     ) -> Self {
         Self {
             input_vector,
             party_id,
             epoch,
+            slot,
             view,
         }
     }

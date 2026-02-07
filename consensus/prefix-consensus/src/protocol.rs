@@ -535,7 +535,7 @@ mod tests {
 
     #[allow(dead_code)]
     fn create_test_input(party_id: u8, vector: PrefixVector) -> PrefixConsensusInput {
-        PrefixConsensusInput::new(vector, PartyId::new([party_id; 32]), 0, 1)
+        PrefixConsensusInput::new(vector, PartyId::new([party_id; 32]), 0, 0, 1)
     }
 
     #[tokio::test]
@@ -547,8 +547,8 @@ mod tests {
         let signers: Vec<_> = (0..4).map(|_| ValidatorSigner::random(None)).collect();
         let party_id = signers[0].author();
 
-        // Create input with matching party_id (view=1 for standalone basic PC)
-        let input = PrefixConsensusInput::new(vec![hash(1), hash(2)], party_id, 0, 1);
+        // Create input with matching party_id (slot=0, view=1 for standalone basic PC)
+        let input = PrefixConsensusInput::new(vec![hash(1), hash(2)], party_id, 0, 0, 1);
 
         // Create verifier with all 4 validators (equal stake = 1 each)
         let validator_infos: Vec<_> = signers
@@ -576,8 +576,8 @@ mod tests {
         let signers: Vec<_> = (0..4).map(|_| ValidatorSigner::random(None)).collect();
         let party_id = signers[0].author();
 
-        // Create input with matching party_id (view=1 for standalone basic PC)
-        let input = PrefixConsensusInput::new(vec![hash(1), hash(2)], party_id, 0, 1);
+        // Create input with matching party_id (slot=0, view=1 for standalone basic PC)
+        let input = PrefixConsensusInput::new(vec![hash(1), hash(2)], party_id, 0, 0, 1);
 
         // Create verifier with all 4 validators (equal stake = 1 each)
         let validator_infos: Vec<_> = signers

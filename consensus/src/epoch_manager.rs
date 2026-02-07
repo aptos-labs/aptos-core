@@ -2222,6 +2222,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     input_vec,
                     self.author,
                     self.epoch(),
+                    0, // slot = 0 for standalone basic Prefix Consensus
                     1, // view = 1 for standalone basic Prefix Consensus
                 );
 

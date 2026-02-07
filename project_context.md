@@ -243,7 +243,7 @@ This layered architecture enables multi-slot censorship-resistant consensus as d
 7. **certificates.rs**: Updated validation to use ValidatorVerifier for >1/3 stake checks
 
 ### Tests
-- All 102 unit tests pass
+- All 121 unit tests pass
 - Build compiles cleanly
 
 ---
@@ -252,9 +252,9 @@ This layered architecture enables multi-slot censorship-resistant consensus as d
 
 ### Repository State
 - **Branch**: `prefix-consensus-prototype`
-- **HEAD**: Stake-weighted quorum refactoring complete
-- **Status**: Clean working directory
-- **Tests**: 102/102 unit tests passing
+- **HEAD**: Phase 3 View State and Ranking Management complete
+- **Status**: Working directory has uncommitted changes
+- **Tests**: 121/121 unit tests passing
 - **Smoke Tests**: Run manually by user (no need to run in Claude sessions)
 - **Build**: ✅ No warnings or errors
 
@@ -263,11 +263,54 @@ This layered architecture enables multi-slot censorship-resistant consensus as d
 - ✅ **Strong PC Phase 1**: Verifiable Prefix Consensus complete (security fixes + proof verification)
 - ✅ **Strong PC Phase 2**: Certificate types complete (Direct/Indirect certificates + view field)
 - ✅ **Stake-Weighted Quorum**: Refactored from count-based to proof-of-stake weighted voting
-- 🚧 **Strong PC Phase 3+**: View state management and multi-view protocol pending
+- ✅ **Strong PC Phase 3**: View State and Ranking Management complete (RankingManager, ViewState, ViewOutput)
+- 🚧 **Strong PC Phase 4+**: Multi-view protocol and manager pending
 - ⏳ **Slot Manager**: Future work (after Strong PC complete)
 
+### Phase 3 Implementation Details
+
+**New file**: `consensus/prefix-consensus/src/view_state.rs` (~360 lines)
+
+**RankingManager**: Cyclic ranking shifts for leaderless progress
+- View 1: [p1, p2, p3, p4]
+- View 2: [p2, p3, p4, p1] (rotate left by 1)
+- Formula: rotate left by (v - 1) % n positions
+
+**ViewState**: Per-view state tracking for views > 1 only
+- Stores received certificates per party
+- `build_truncated_input_vector()`: Truncates after first non-⊥ (optimization not in paper)
+- `get_first_certificate()`: Returns certificate at first non-⊥ position for trace-back
+
+**ViewOutput**: Output from completing a view's Prefix Consensus
+- Contains (view, slot, v_low, v_high, proof: QC3)
+
+**Slot field**: Added `slot: u64` to `PrefixConsensusInput` for future multi-slot integration (default 0)
+
+### Critical Edge Case: Three-Way Decision for Views > 1
+
+When a view > 1 completes, the protocol must make a **three-way decision** based on the output:
+
+```
+a) If v_low has non-⊥ entry (has_committable_low):
+   → Commit! Trace back to View 1, output Strong PC v_high, DONE
+
+b) Else if v_high has non-⊥ entry (has_certifiable_high):
+   → Create DirectCertificate from v_high
+   → Broadcast for next view (progress made, no commit yet)
+
+c) Else (both v_low and v_high are all-⊥):
+   → Empty view, no progress
+   → Broadcast EmptyViewMessage, collect >1/3 stake, create IndirectCertificate
+```
+
+**Key insight**: A vector like `[⊥, ⊥, ⊥]` is NOT meaningful in views > 1 (no certificate to trace). But in View 1, even all-⊥ outputs are valid (raw inputs, not certificates).
+
+**Helper methods needed**:
+- `has_committable_low(v_low)`: True if v_low has at least one non-⊥ entry
+- `has_certifiable_high(v_high)`: True if v_high has at least one non-⊥ entry
+
 ### Next Action
-Begin Strong Prefix Consensus Phase 3: Implement View State and Ranking Management
+Begin Strong Prefix Consensus Phase 4: Strong Protocol Core (multi-view state machine)
 
 ---
 
@@ -285,7 +328,8 @@ consensus/prefix-consensus/src/
 ├── certify.rs            - QC formation (220 lines)
 ├── verification.rs       - Validation (150 lines)
 ├── utils.rs              - Prefix operations (180 lines)
-└── certificates.rs       - Strong PC certificates (500 lines) ← NEW Phase 2
+├── certificates.rs       - Strong PC certificates (500 lines) - Phase 2
+└── view_state.rs         - RankingManager, ViewState, ViewOutput (360 lines) - Phase 3
 
 testsuite/smoke-test/src/consensus/prefix_consensus/
 ├── helpers.rs            - Test helpers
