@@ -1278,9 +1278,7 @@ impl TransactionsApi {
                             )?;
                         },
                         MultisigTransactionPayload::Script(script) => {
-                            TransactionsApi::validate_script_payload_format(
-                                ledger_info, script,
-                            )?;
+                            TransactionsApi::validate_script_payload_format(ledger_info, script)?;
                         },
                     }
                 }
