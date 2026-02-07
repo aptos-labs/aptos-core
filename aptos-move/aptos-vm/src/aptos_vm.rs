@@ -2943,13 +2943,6 @@ impl AptosVM {
             ));
         }
 
-        if executable.is_script() && extra_config.is_multisig() {
-            return Err(VMStatus::error(
-                StatusCode::FEATURE_UNDER_GATING,
-                Some("Script payload not yet supported for multisig transactions".to_string()),
-            ));
-        }
-
         // Runs script prologue for all transaction types including multisig
         transaction_validation::run_script_prologue(
             session,
