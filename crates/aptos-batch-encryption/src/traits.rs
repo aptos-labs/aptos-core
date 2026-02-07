@@ -69,6 +69,11 @@ pub trait BatchThresholdEncryption {
         Self::MasterSecretKeyShare,
     )>;
 
+    fn extract_encryption_key(
+        digest_key: &Self::DigestKey,
+        subtranscript: &Self::SubTranscript,
+    ) -> Result<Self::EncryptionKey>;
+
     /// Generates an (insecure) setup for the batch threshold encryption scheme. Consists of
     /// a [`PublicKey`] which can be used to encrypt messages and to compute a digest from a list
     /// of ciphertexts, along with a vector of shares of type [`MasterSecretKeyShare`], which share

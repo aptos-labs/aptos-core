@@ -61,6 +61,14 @@ impl BatchThresholdEncryption for FPTX {
         unimplemented!()
     }
 
+    fn extract_encryption_key(
+        _digest_key: &Self::DigestKey,
+        _subtranscript: &Self::SubTranscript,
+    ) -> Result<Self::EncryptionKey> {
+        // B/c unweighted chunky is being removed
+        unimplemented!()
+    }
+
     fn setup_for_testing(
         seed: u64,
         max_batch_size: usize,
@@ -200,4 +208,5 @@ impl BatchThresholdEncryption for FPTX {
     ) -> Result<P> {
         decryption_key.decrypt(&ct.prepare_individual(digest, eval_proof)?)
     }
+
 }
