@@ -17,7 +17,7 @@ use std::{cmp::max, collections::HashSet};
 
 fn create_proof_manager() -> ProofManager {
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    ProofManager::new(PeerId::random(), 10, 10, batch_store, true, true, 1)
+    ProofManager::new(PeerId::random(), 10, 10, batch_store, true, 1)
 }
 
 fn create_proof(

@@ -288,7 +288,7 @@ fn test_process_either_optimistic_or_normal_proposal() {
 
         let opt_block_data = OptBlockData::new(
             Vec::new(),
-            Payload::empty(false, false),
+            Payload::empty(false),
             proposal_msg.proposer(),
             proposal_msg.proposal().epoch(),
             proposal_msg.proposal().round(),

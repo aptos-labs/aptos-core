@@ -403,8 +403,6 @@ pub struct ProposalGenerator {
     last_round_generated: Mutex<Round>,
     quorum_store_enabled: bool,
     vtxn_config: ValidatorTxnConfig,
-
-    allow_batches_without_pos_in_proposal: bool,
     opt_qs_payload_param_provider: Arc<dyn TOptQSPullParamsProvider>,
 
     proposal_under_backpressure: Mutex<bool>,
@@ -428,7 +426,6 @@ impl ProposalGenerator {
         chain_health_backoff_config: ChainHealthBackoffConfig,
         quorum_store_enabled: bool,
         vtxn_config: ValidatorTxnConfig,
-        allow_batches_without_pos_in_proposal: bool,
         opt_qs_payload_param_provider: Arc<dyn TOptQSPullParamsProvider>,
     ) -> Self {
         Self {
@@ -448,7 +445,6 @@ impl ProposalGenerator {
             last_round_generated: Mutex::new(0),
             quorum_store_enabled,
             vtxn_config,
-            allow_batches_without_pos_in_proposal,
             opt_qs_payload_param_provider,
             proposal_under_backpressure: Mutex::new(false),
         }
@@ -507,10 +503,7 @@ impl ProposalGenerator {
             // after reconfiguration until it's committed
             (
                 vec![],
-                Payload::empty(
-                    self.quorum_store_enabled,
-                    self.allow_batches_without_pos_in_proposal,
-                ),
+                Payload::empty(self.quorum_store_enabled),
                 hqc.certified_block().timestamp_usecs(),
             )
         } else {
