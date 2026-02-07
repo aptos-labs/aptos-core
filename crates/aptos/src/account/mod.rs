@@ -69,15 +69,11 @@ impl MultisigAccountTool {
             MultisigAccountTool::Approve(tool) => tool.execute_serialized().await,
             MultisigAccountTool::Create(tool) => tool.execute_serialized().await,
             MultisigAccountTool::CreateTransaction(tool) => tool.execute_serialized().await,
-            MultisigAccountTool::CreateScriptTransaction(tool) => {
-                tool.execute_serialized().await
-            },
+            MultisigAccountTool::CreateScriptTransaction(tool) => tool.execute_serialized().await,
             MultisigAccountTool::Execute(tool) => tool.execute_serialized().await,
             MultisigAccountTool::ExecuteReject(tool) => tool.execute_serialized().await,
             MultisigAccountTool::ExecuteWithPayload(tool) => tool.execute_serialized().await,
-            MultisigAccountTool::ExecuteWithScriptPayload(tool) => {
-                tool.execute_serialized().await
-            },
+            MultisigAccountTool::ExecuteWithScriptPayload(tool) => tool.execute_serialized().await,
             MultisigAccountTool::Reject(tool) => tool.execute_serialized().await,
             MultisigAccountTool::VerifyProposal(tool) => tool.execute_serialized().await,
             MultisigAccountTool::VerifyScriptProposal(tool) => tool.execute_serialized().await,
