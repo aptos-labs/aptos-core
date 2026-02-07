@@ -320,3 +320,45 @@ fn deprecated_script_visibility_checks_invalid() {
         StatusCode::CALLED_SCRIPT_VISIBLE_FROM_NON_SCRIPT_VISIBLE,
     );
 }
+
+#[test]
+fn use_unpublished_module() {
+    // Create a script that imports module 0x42::M (which is not published)
+    // but does not call any functions from it
+    let script = CompiledScript {
+        version: move_binary_format::file_format_common::VERSION_MAX,
+        module_handles: vec![ModuleHandle {
+            address: AddressIdentifierIndex(0),
+            name: IdentifierIndex(0),
+        }],
+        identifiers: vec![
+            Identifier::new("M").unwrap(), // Module name
+        ],
+        address_identifiers: vec![
+            AccountAddress::from_hex_literal("0x42").unwrap(), // Module address
+        ],
+        function_handles: vec![],
+        function_instantiations: vec![],
+        type_parameters: vec![],
+        parameters: SignatureIndex(0),
+        access_specifiers: None,
+        code: CodeUnit {
+            locals: SignatureIndex(0),
+            code: vec![Bytecode::Ret],
+        },
+        signatures: vec![Signature(vec![])],
+        struct_handles: vec![],
+        constant_pool: vec![],
+        metadata: vec![],
+    };
+
+    // Verify the script passes basic verification
+    move_bytecode_verifier::verify_script(&script).unwrap();
+
+    // Verify dependency check fails with MISSING_DEPENDENCY when module is not provided
+    let result = dependencies::verify_script(&VerifierConfig::default(), &script, &[]);
+    assert_eq!(
+        result.unwrap_err().major_status(),
+        StatusCode::MISSING_DEPENDENCY,
+    );
+}

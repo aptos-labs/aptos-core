@@ -1,0 +1,4 @@
+//# run --type-args u64
+script
+entry public fun main()
+    ret

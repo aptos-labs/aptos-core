@@ -1,0 +1,55 @@
+//# publish
+module 0x42::M
+struct S has drop
+  f: u64
+
+public fun t1(l0: &u64)
+    ret
+
+public fun t2(l0: &mut bool)
+    ret
+
+public fun t3(l0: &u64, l1: &mut bool, l2: &S, l3: &mut S)
+    ret
+
+public fun tgen<T0, T1, T2, T3>(l0: &T0, l1: &mut T1, l2: &T2, l3: &mut T3)
+    ret
+
+
+
+//# run --args 0
+script
+entry public fun main(l0: &u64)
+    ret
+
+
+
+//# run --args false
+script
+entry public fun main(l0: &mut bool)
+    ret
+
+
+
+//# run --args 0 false 0 0
+script
+use 0x42::M
+entry public fun main(l0: &u64, l1: &mut bool, l2: &M::S, l3: &mut M::S)
+    ret
+
+
+
+//# run --type-args u64 bool 0x42::M::S 0x42::M::S --args 0 false 0 0
+script
+entry public fun main<T0, T1, T2, T3>(l0: &T0, l1: &mut T1, l2: &T2, l3: &mut T3)
+    ret
+
+
+
+//# run 0x42::M::t1 --args 0
+
+//# run 0x42::M::t2 --args false
+
+//# run 0x42::M::t3 --args 0 false 0 0
+
+//# run 0x42::M::tgen --type-args u64 bool 0x42::M::S 0x42::M::S --args 0 false 0 0

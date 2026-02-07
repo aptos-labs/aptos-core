@@ -1,5 +1,5 @@
 processed 5 tasks
-task 0 lines 1-20:  publish [module 0x1.M {]
+task 0 lines 1-27:  publish [module 0x1::M]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M'. Got VMError: {
     major_status: MOVELOC_UNAVAILABLE_ERROR,
     sub_status: None,
@@ -7,7 +7,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(FunctionDefinition, 0)],
     offsets: [(FunctionDefinitionIndex(0), 15)],
 }
-task 1 lines 22-40:  publish [module 0x1.M {]
+task 1 lines 31-54:  publish [module 0x1::M]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M'. Got VMError: {
     major_status: UNSAFE_RET_UNUSED_VALUES_WITHOUT_DROP,
     sub_status: None,
@@ -15,7 +15,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(FunctionDefinition, 0)],
     offsets: [(FunctionDefinitionIndex(0), 15)],
 }
-task 2 lines 42-61:  publish [module 0x1.M {]
+task 2 lines 58-84:  publish [module 0x1::M]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M'. Got VMError: {
     major_status: STLOC_UNSAFE_TO_DESTROY_ERROR,
     sub_status: None,
@@ -23,7 +23,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(FunctionDefinition, 0)],
     offsets: [(FunctionDefinitionIndex(0), 17)],
 }
-task 3 lines 63-82:  publish [module 0x1.M {]
+task 3 lines 88-114:  publish [module 0x1::M]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M'. Got VMError: {
     major_status: COPYLOC_UNAVAILABLE_ERROR,
     sub_status: None,
@@ -31,7 +31,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(FunctionDefinition, 0)],
     offsets: [(FunctionDefinitionIndex(0), 15)],
 }
-task 4 lines 84-104:  publish [module 0x1.M {]
+task 4 lines 118-144:  publish [module 0x1::M]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M'. Got VMError: {
     major_status: BORROWLOC_UNAVAILABLE_ERROR,
     sub_status: None,

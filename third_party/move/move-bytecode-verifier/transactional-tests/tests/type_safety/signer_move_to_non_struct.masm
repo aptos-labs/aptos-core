@@ -1,0 +1,10 @@
+//# publish
+module 0x42::N
+struct R<T0> has key
+  f: T0
+
+fun t0(l0: &signer)
+    copy_loc l0
+    ld_u64 0
+    move_to R<u64>
+    ret

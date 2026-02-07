@@ -1,0 +1,33 @@
+//# publish
+module 0x1::Coin
+struct Coin
+  value: u64
+
+public fun value(l0: &Coin): u64
+    move_loc l0
+    borrow_field Coin, value
+    read_ref
+    ret
+
+public fun zero(): Coin
+    ld_u64 0
+    pack Coin
+    ret
+
+public fun destroy_zero(l0: Coin)
+    move_loc l0
+    unpack Coin
+    ld_u64 0
+    eq
+    not
+    br_false l0
+    ld_u64 42
+    abort
+l0: ret
+
+
+
+//# run --type-args 0x1::Coin::Coin
+script
+entry public fun main<T0: copy + drop>()
+    ret

@@ -1,0 +1,657 @@
+//# publish
+module 0x1::M
+use 0x1::signer
+struct Some<T0> has key
+  v: T0
+
+struct Value has store
+  val: u64
+
+struct Container<T0> has copy + drop + store
+  elem: T0
+
+public fun new_container<T0>(l0: T0): Container<T0>
+    move_loc l0
+    pack Container<T0>
+    ret
+
+public fun change_container<T0: copy + drop>(l0: &mut Container<T0>, l1: T0)
+    move_loc l1
+    move_loc l0
+    mut_borrow_field Container<T0>, elem
+    write_ref
+    ret
+
+public fun destroy_container<T0>(l0: Container<T0>): T0
+    local l1: T0
+    move_loc l0
+    unpack Container<T0>
+    st_loc l1
+    move_loc l1
+    ret
+
+public fun new_value(l0: u64): Value
+    move_loc l0
+    pack Value
+    ret
+
+public fun change_value(l0: &mut Value, l1: u64)
+    move_loc l1
+    move_loc l0
+    mut_borrow_field Value, val
+    write_ref
+    ret
+
+public fun destroy_value(l0: Value): u64
+    local l1: u64
+    move_loc l0
+    unpack Value
+    st_loc l1
+    move_loc l1
+    ret
+
+public fun publish_some_value(l0: &signer)
+    local l1: Value
+    local l2: Some<Value>
+    ld_u64 100
+    pack Value
+    st_loc l1
+    move_loc l1
+    pack Some<Value>
+    st_loc l2
+    copy_loc l0
+    move_loc l2
+    move_to Some<Value>
+    ret
+
+public fun unpublish_some_value(l0: &signer) acquires Some
+    local l1: address
+    local l2: Some<Value>
+    local l3: Value
+    local l4: u64
+    move_loc l0
+    call signer::address_of
+    st_loc l1
+    move_loc l1
+    move_from Some<Value>
+    st_loc l2
+    move_loc l2
+    unpack Some<Value>
+    st_loc l3
+    move_loc l3
+    unpack Value
+    st_loc l4
+    move_loc l4
+    ld_u64 100
+    eq
+    not
+    br_false l0
+    ld_u64 100
+    abort
+l0: ret
+
+public fun publish_some<T0: store>(l0: &signer, l1: T0)
+    local l2: Some<T0>
+    move_loc l1
+    pack Some<T0>
+    st_loc l2
+    move_loc l0
+    move_loc l2
+    move_to Some<T0>
+    ret
+
+public fun unpublish_some<T0: store>(l0: &signer): T0 acquires Some
+    local l1: address
+    local l2: Some<T0>
+    local l3: T0
+    move_loc l0
+    call signer::address_of
+    st_loc l1
+    move_loc l1
+    move_from Some<T0>
+    st_loc l2
+    move_loc l2
+    unpack Some<T0>
+    st_loc l3
+    move_loc l3
+    ret
+
+public fun some_exists<T0: store>(l0: &signer): bool
+    local l1: address
+    move_loc l0
+    call signer::address_of
+    st_loc l1
+    move_loc l1
+    exists Some<T0>
+    ret
+
+public fun check_some<T0: store>(l0: &signer, l1: T0): (T0, bool) acquires Some
+    local l2: address
+    local l3: &Some<T0>
+    local l4: &T0
+    local l5: &T0
+    local l6: bool
+    move_loc l0
+    call signer::address_of
+    st_loc l2
+    move_loc l2
+    borrow_global Some<T0>
+    st_loc l3
+    move_loc l3
+    borrow_field Some<T0>, v
+    st_loc l4
+    borrow_loc l1
+    st_loc l5
+    move_loc l4
+    move_loc l5
+    eq
+    st_loc l6
+    move_loc l1
+    move_loc l6
+    ret
+
+public fun change_some<T0: drop + store>(l0: &signer, l1: T0) acquires Some
+    local l2: address
+    local l3: &mut Some<T0>
+    move_loc l0
+    call signer::address_of
+    st_loc l2
+    move_loc l2
+    mut_borrow_global Some<T0>
+    st_loc l3
+    move_loc l1
+    move_loc l3
+    mut_borrow_field Some<T0>, v
+    write_ref
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x1::M
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call M::some_exists<M::Value>
+    ld_false
+    eq
+    not
+    br_false l0
+    ld_u64 1010
+    abort
+l0: borrow_loc l0
+    call M::some_exists<address>
+    ld_false
+    eq
+    not
+    br_false l1
+    ld_u64 1011
+    abort
+l1: borrow_loc l0
+    call M::publish_some_value
+    borrow_loc l0
+    call M::some_exists<M::Value>
+    ld_true
+    eq
+    not
+    br_false l2
+    ld_u64 1012
+    abort
+l2: ret
+
+
+
+//# run --signers 0x1
+script
+use 0x1::M
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call M::some_exists<M::Value>
+    ld_true
+    eq
+    not
+    br_false l0
+    ld_u64 1020
+    abort
+l0: borrow_loc l0
+    call M::some_exists<u64>
+    ld_false
+    eq
+    not
+    br_false l1
+    ld_u64 1021
+    abort
+l1: borrow_loc l0
+    ld_u64 100
+    call M::publish_some<u64>
+    borrow_loc l0
+    ld_true
+    call M::publish_some<bool>
+    borrow_loc l0
+    call M::some_exists<u64>
+    ld_true
+    eq
+    not
+    br_false l2
+    ld_u64 1022
+    abort
+l2: borrow_loc l0
+    call M::some_exists<bool>
+    ld_true
+    eq
+    not
+    br_false l3
+    ld_u64 1023
+    abort
+l3: borrow_loc l0
+    call M::some_exists<address>
+    ld_false
+    eq
+    not
+    br_false l4
+    ld_u64 1024
+    abort
+l4: ret
+
+
+
+//# run --signers 0x1
+script
+use 0x1::M
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call M::some_exists<M::Value>
+    ld_true
+    eq
+    not
+    br_false l0
+    ld_u64 1030
+    abort
+l0: borrow_loc l0
+    call M::some_exists<bool>
+    ld_true
+    eq
+    not
+    br_false l1
+    ld_u64 1031
+    abort
+l1: borrow_loc l0
+    call M::some_exists<address>
+    ld_false
+    eq
+    not
+    br_false l2
+    ld_u64 1032
+    abort
+l2: borrow_loc l0
+    call M::some_exists<M::Container<u64>>
+    ld_false
+    eq
+    not
+    br_false l3
+    ld_u64 1033
+    abort
+l3: borrow_loc l0
+    ld_const<address> 0
+    call M::publish_some<address>
+    borrow_loc l0
+    ld_u64 7
+    call M::new_container<u64>
+    call M::publish_some<M::Container<u64>>
+    borrow_loc l0
+    call M::some_exists<address>
+    ld_true
+    eq
+    not
+    br_false l4
+    ld_u64 1034
+    abort
+l4: borrow_loc l0
+    call M::some_exists<M::Container<u64>>
+    ld_true
+    eq
+    not
+    br_false l5
+    ld_u64 1035
+    abort
+l5: borrow_loc l0
+    call M::some_exists<M::Container<u8>>
+    ld_false
+    eq
+    not
+    br_false l6
+    ld_u64 1036
+    abort
+l6: borrow_loc l0
+    call M::some_exists<M::Value>
+    ld_true
+    eq
+    not
+    br_false l7
+    ld_u64 1037
+    abort
+l7: borrow_loc l0
+    ld_u64 5
+    call M::new_value
+    call M::new_container<M::Value>
+    call M::publish_some<M::Container<M::Value>>
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x1::M
+entry public fun main(l0: signer)
+    local l1: bool
+    local l2: M::Value
+    borrow_loc l0
+    ld_true
+    call M::check_some<bool>
+    st_loc l1
+    pop
+    move_loc l1
+    not
+    br_false l0
+    ld_u64 2010
+    abort
+l0: borrow_loc l0
+    ld_u64 100
+    call M::check_some<u64>
+    st_loc l1
+    pop
+    move_loc l1
+    not
+    br_false l1
+    ld_u64 2011
+    abort
+l1: borrow_loc l0
+    ld_const<address> 0
+    call M::check_some<address>
+    st_loc l1
+    pop
+    move_loc l1
+    not
+    br_false l2
+    ld_u64 2012
+    abort
+l2: borrow_loc l0
+    ld_u64 7
+    call M::new_container<u64>
+    call M::check_some<M::Container<u64>>
+    st_loc l1
+    pop
+    move_loc l1
+    not
+    br_false l3
+    ld_u64 2013
+    abort
+l3: borrow_loc l0
+    ld_u64 10
+    call M::new_container<u64>
+    call M::check_some<M::Container<u64>>
+    st_loc l1
+    pop
+    move_loc l1
+    not
+    not
+    br_false l4
+    ld_u64 2014
+    abort
+l4: ld_u64 5
+    call M::new_value
+    st_loc l2
+    borrow_loc l0
+    move_loc l2
+    call M::check_some<M::Value>
+    st_loc l1
+    st_loc l2
+    move_loc l1
+    not
+    not
+    br_false l5
+    ld_u64 2015
+    abort
+l5: move_loc l2
+    call M::destroy_value
+    pop
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x1::M
+entry public fun main(l0: signer)
+    local l1: bool
+    borrow_loc l0
+    ld_false
+    call M::change_some<bool>
+    borrow_loc l0
+    ld_u64 1
+    call M::change_some<u64>
+    borrow_loc l0
+    ld_const<address> 1
+    call M::change_some<address>
+    borrow_loc l0
+    ld_u64 20
+    call M::new_container<u64>
+    call M::change_some<M::Container<u64>>
+    borrow_loc l0
+    ld_u64 20
+    call M::new_container<u64>
+    call M::check_some<M::Container<u64>>
+    st_loc l1
+    pop
+    move_loc l1
+    not
+    br_false l0
+    ld_u64 2020
+    abort
+l0: borrow_loc l0
+    ld_const<address> 1
+    call M::check_some<address>
+    st_loc l1
+    pop
+    move_loc l1
+    not
+    br_false l1
+    ld_u64 2021
+    abort
+l1: ret
+
+
+
+//# run --signers 0x1
+script
+use 0x1::M
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call M::unpublish_some_value
+    borrow_loc l0
+    call M::some_exists<M::Value>
+    ld_false
+    eq
+    not
+    br_false l0
+    ld_u64 3010
+    abort
+l0: borrow_loc l0
+    call M::some_exists<address>
+    ld_true
+    eq
+    not
+    br_false l1
+    ld_u64 3011
+    abort
+l1: borrow_loc l0
+    call M::some_exists<M::Container<u64>>
+    ld_true
+    eq
+    not
+    br_false l2
+    ld_u64 3012
+    abort
+l2: borrow_loc l0
+    call M::some_exists<M::Container<u8>>
+    ld_false
+    eq
+    not
+    br_false l3
+    ld_u64 3013
+    abort
+l3: ret
+
+
+
+//# run --signers 0x1
+script
+use 0x1::M
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call M::some_exists<M::Container<M::Value>>
+    ld_true
+    eq
+    not
+    br_false l0
+    ld_u64 3020
+    abort
+l0: borrow_loc l0
+    call M::some_exists<M::Value>
+    ld_false
+    eq
+    not
+    br_false l1
+    ld_u64 3021
+    abort
+l1: borrow_loc l0
+    call M::some_exists<address>
+    ld_true
+    eq
+    not
+    br_false l2
+    ld_u64 3022
+    abort
+l2: borrow_loc l0
+    call M::unpublish_some<u64>
+    ld_u64 1
+    eq
+    not
+    br_false l3
+    ld_u64 3023
+    abort
+l3: borrow_loc l0
+    call M::unpublish_some<bool>
+    not
+    not
+    br_false l4
+    ld_u64 3024
+    abort
+l4: borrow_loc l0
+    call M::unpublish_some<M::Container<u64>>
+    call M::destroy_container<u64>
+    ld_u64 20
+    eq
+    not
+    br_false l5
+    ld_u64 3025
+    abort
+l5: borrow_loc l0
+    call M::unpublish_some<address>
+    ld_const<address> 1
+    eq
+    not
+    br_false l6
+    ld_u64 3026
+    abort
+l6: borrow_loc l0
+    call M::some_exists<u64>
+    ld_false
+    eq
+    not
+    br_false l7
+    ld_u64 3027
+    abort
+l7: borrow_loc l0
+    call M::some_exists<address>
+    ld_false
+    eq
+    not
+    br_false l8
+    ld_u64 3028
+    abort
+l8: borrow_loc l0
+    call M::some_exists<M::Container<u64>>
+    ld_false
+    eq
+    not
+    br_false l9
+    ld_u64 3029
+    abort
+l9: ret
+
+
+
+//# run --signers 0x1
+script
+use 0x1::M
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call M::unpublish_some<M::Container<M::Value>>
+    call M::destroy_container<M::Value>
+    call M::destroy_value
+    ld_u64 5
+    eq
+    not
+    br_false l0
+    ld_u64 3030
+    abort
+l0: borrow_loc l0
+    call M::some_exists<u64>
+    ld_false
+    eq
+    not
+    br_false l1
+    ld_u64 3031
+    abort
+l1: borrow_loc l0
+    call M::some_exists<address>
+    ld_false
+    eq
+    not
+    br_false l2
+    ld_u64 3032
+    abort
+l2: borrow_loc l0
+    call M::some_exists<bool>
+    ld_false
+    eq
+    not
+    br_false l3
+    ld_u64 3033
+    abort
+l3: borrow_loc l0
+    call M::some_exists<M::Container<u64>>
+    ld_false
+    eq
+    not
+    br_false l4
+    ld_u64 3034
+    abort
+l4: borrow_loc l0
+    call M::some_exists<M::Container<M::Value>>
+    ld_false
+    eq
+    not
+    br_false l5
+    ld_u64 3035
+    abort
+l5: borrow_loc l0
+    call M::some_exists<M::Value>
+    ld_false
+    eq
+    not
+    br_false l6
+    ld_u64 3036
+    abort
+l6: ret

@@ -1,0 +1,95 @@
+//# publish
+module 0x42::M
+use 0x1::signer
+struct Item has store
+  _dummy: bool
+
+struct Cup<T0> has store
+  _dummy: bool
+
+struct Box<T0> has key
+  _dummy: bool
+
+public fun type_eq<T0: store, T1: store>(l0: &signer): bool acquires Box
+    local l1: address
+    local l2: bool
+    local l3: bool
+    copy_loc l0
+    call signer::address_of
+    st_loc l1
+    move_loc l0
+    ld_false
+    pack Box<T0>
+    move_to Box<T0>
+    copy_loc l1
+    exists Box<T1>
+    st_loc l2
+    move_loc l1
+    move_from Box<T0>
+    unpack Box<T0>
+    st_loc l3
+    move_loc l2
+    ret
+
+
+
+//# run --type-args u64 --signers 0x1
+script
+use 0x42::M
+entry public fun main<T0: store>(l0: signer)
+    borrow_loc l0
+    call M::type_eq<T0, u64>
+    not
+    br_false l0
+    ld_u64 100
+    abort
+l0: borrow_loc l0
+    call M::type_eq<T0, u8>
+    not
+    not
+    br_false l1
+    ld_u64 101
+    abort
+l1: ret
+
+
+
+//# run --type-args 0x42::M::Item --signers 0x2
+script
+use 0x42::M
+entry public fun main<T0: store>(l0: signer)
+    borrow_loc l0
+    call M::type_eq<T0, M::Item>
+    not
+    br_false l0
+    ld_u64 100
+    abort
+l0: borrow_loc l0
+    call M::type_eq<T0, u8>
+    not
+    not
+    br_false l1
+    ld_u64 101
+    abort
+l1: ret
+
+
+
+//# run --type-args 0x42::M::Cup<0x42::M::Cup<vector<u64>>> --signers 0x3
+script
+use 0x42::M
+entry public fun main<T0: store>(l0: signer)
+    borrow_loc l0
+    call M::type_eq<T0, M::Cup<M::Cup<vector<u64>>>>
+    not
+    br_false l0
+    ld_u64 100
+    abort
+l0: borrow_loc l0
+    call M::type_eq<T0, M::Cup<M::Cup<vector<u8>>>>
+    not
+    not
+    br_false l1
+    ld_u64 101
+    abort
+l1: ret

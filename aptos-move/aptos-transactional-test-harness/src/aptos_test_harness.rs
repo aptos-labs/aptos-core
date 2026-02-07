@@ -694,7 +694,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         let (data, named_addr_opt, module, opt_model, warnings_opt) =
             self.compile_module_default(syntax, data, start_line, command_lines_stop)?;
         let warnings_opt = match (syntax, opt_model) {
-            (SyntaxChoice::IR, _) => warnings_opt,
+            (SyntaxChoice::ASM, _) => warnings_opt,
             (_, Some(model)) => {
                 let _runtime_metadata =
                     aptos_framework::extended_checks::run_extended_checks(&model);
@@ -735,7 +735,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         let (compiled_script, opt_model, warnings_opt) =
             self.compile_script_default(syntax, data, start_line, command_lines_stop)?;
         let warnings_opt = match (syntax, opt_model) {
-            (SyntaxChoice::IR, _) => warnings_opt,
+            (SyntaxChoice::ASM, _) => warnings_opt,
             (_, Some(model)) => {
                 let _runtime_metadata =
                     aptos_framework::extended_checks::run_extended_checks(&model);

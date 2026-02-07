@@ -1,0 +1,281 @@
+//# publish
+module 0x42::M
+struct Foo<T0>
+  x: bool
+
+public fun f0<T0>()
+    ret
+
+public fun f3<T0>()
+    call f0<Foo<Foo<Foo<T0>>>>
+    ret
+
+public fun f7<T0>()
+    call f3<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f11<T0>()
+    call f7<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f15<T0>()
+    call f11<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f19<T0>()
+    call f15<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f23<T0>()
+    call f19<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f27<T0>()
+    call f23<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f31<T0>()
+    call f27<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f35<T0>()
+    call f31<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f39<T0>()
+    call f35<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f43<T0>()
+    call f39<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f47<T0>()
+    call f43<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f51<T0>()
+    call f47<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f55<T0>()
+    call f51<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f59<T0>()
+    call f55<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f63<T0>()
+    call f59<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f67<T0>()
+    call f63<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f71<T0>()
+    call f67<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f75<T0>()
+    call f71<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f79<T0>()
+    call f75<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f83<T0>()
+    call f79<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f87<T0>()
+    call f83<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f91<T0>()
+    call f87<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f95<T0>()
+    call f91<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f99<T0>()
+    call f95<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f103<T0>()
+    call f99<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f107<T0>()
+    call f103<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f111<T0>()
+    call f107<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f115<T0>()
+    call f111<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f119<T0>()
+    call f115<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f123<T0>()
+    call f119<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f127<T0>()
+    call f123<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f131<T0>()
+    call f127<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f135<T0>()
+    call f131<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f139<T0>()
+    call f135<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f143<T0>()
+    call f139<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f147<T0>()
+    call f143<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f151<T0>()
+    call f147<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f155<T0>()
+    call f151<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f159<T0>()
+    call f155<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f163<T0>()
+    call f159<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f167<T0>()
+    call f163<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f171<T0>()
+    call f167<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f175<T0>()
+    call f171<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f179<T0>()
+    call f175<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f183<T0>()
+    call f179<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f187<T0>()
+    call f183<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f191<T0>()
+    call f187<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f195<T0>()
+    call f191<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f199<T0>()
+    call f195<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f203<T0>()
+    call f199<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f207<T0>()
+    call f203<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f211<T0>()
+    call f207<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f215<T0>()
+    call f211<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f219<T0>()
+    call f215<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f223<T0>()
+    call f219<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f227<T0>()
+    call f223<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f231<T0>()
+    call f227<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f235<T0>()
+    call f231<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f239<T0>()
+    call f235<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f243<T0>()
+    call f239<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f247<T0>()
+    call f243<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f251<T0>()
+    call f247<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+public fun f255<T0>()
+    call f251<Foo<Foo<Foo<Foo<T0>>>>>
+    ret
+
+
+
+//# run
+script
+use 0x42::M
+entry public fun main()
+    call M::f255<u8>
+    ret
+
+
+
+//# run
+script
+use 0x42::M
+entry public fun main()
+    call M::f255<M::Foo<u8>>
+    ret

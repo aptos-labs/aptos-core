@@ -19,4 +19,4 @@ fn run(path: &Path) -> anyhow::Result<(), Box<dyn Error>> {
     )
 }
 
-datatest_stable::harness!(run, TEST_DIR, r".*\.(mvir|move)$");
+datatest_stable::harness!(run, TEST_DIR, r".*\.(move|masm)$");

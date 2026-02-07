@@ -1,0 +1,2231 @@
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u64 0
+    add
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u128 0
+    add
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u8 0
+    add
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u128 0
+    add
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u8 0
+    add
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u64 0
+    add
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_true
+    add
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_u64 0
+    add
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_true
+    add
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_const<address> 0
+    add
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    ld_u64 0
+    add
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    ld_const<address> 0
+    add
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun f()
+    ld_u64 0
+    ld_true
+    pack R
+    add
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun g()
+    ld_true
+    pack R
+    ld_u64 0
+    add
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun h()
+    ld_true
+    pack R
+    ld_true
+    pack R
+    add
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u64 0
+    sub
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u128 0
+    sub
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u8 0
+    sub
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u128 0
+    sub
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u8 0
+    sub
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u64 0
+    sub
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_true
+    sub
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_u64 0
+    sub
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_true
+    sub
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_const<address> 0
+    sub
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    ld_u64 0
+    sub
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    ld_const<address> 0
+    sub
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun f()
+    ld_u64 0
+    ld_true
+    pack R
+    sub
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun g()
+    ld_true
+    pack R
+    ld_u64 0
+    sub
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun h()
+    ld_true
+    pack R
+    ld_true
+    pack R
+    sub
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u64 0
+    mul
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u128 0
+    mul
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u8 0
+    mul
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u128 0
+    mul
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u8 0
+    mul
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u64 0
+    mul
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_true
+    mul
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_u64 0
+    mul
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_true
+    mul
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_const<address> 0
+    mul
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    ld_u64 0
+    mul
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    ld_const<address> 0
+    mul
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun f()
+    ld_u64 0
+    ld_true
+    pack R
+    mul
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun g()
+    ld_true
+    pack R
+    ld_u64 0
+    mul
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun h()
+    ld_true
+    pack R
+    ld_true
+    pack R
+    mul
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u64 0
+    div
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u128 0
+    div
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u8 0
+    div
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u128 0
+    div
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u8 0
+    div
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u64 0
+    div
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_true
+    div
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_u64 0
+    div
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_true
+    div
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_const<address> 0
+    div
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    ld_u64 0
+    div
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    ld_const<address> 0
+    div
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun f()
+    ld_u64 0
+    ld_true
+    pack R
+    div
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun g()
+    ld_true
+    pack R
+    ld_u64 0
+    div
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun h()
+    ld_true
+    pack R
+    ld_true
+    pack R
+    div
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u64 0
+    bit_and
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u128 0
+    bit_and
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u8 0
+    bit_and
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u128 0
+    bit_and
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u8 0
+    bit_and
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u64 0
+    bit_and
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_true
+    bit_and
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_u64 0
+    bit_and
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_true
+    bit_and
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_const<address> 0
+    bit_and
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    ld_u64 0
+    bit_and
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    ld_const<address> 0
+    bit_and
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun f()
+    ld_u64 0
+    ld_true
+    pack R
+    bit_and
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun g()
+    ld_true
+    pack R
+    ld_u64 0
+    bit_and
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun h()
+    ld_true
+    pack R
+    ld_true
+    pack R
+    bit_and
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u64 0
+    bit_or
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u128 0
+    bit_or
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u8 0
+    bit_or
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u128 0
+    bit_or
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u8 0
+    bit_or
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u64 0
+    bit_or
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_true
+    bit_or
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_u64 0
+    bit_or
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_true
+    bit_or
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_const<address> 0
+    bit_or
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    ld_u64 0
+    bit_or
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    ld_const<address> 0
+    bit_or
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun f()
+    ld_u64 0
+    ld_true
+    pack R
+    bit_or
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun g()
+    ld_true
+    pack R
+    ld_u64 0
+    bit_or
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun h()
+    ld_true
+    pack R
+    ld_true
+    pack R
+    bit_or
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u64 0
+    xor
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u128 0
+    xor
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u8 0
+    xor
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u128 0
+    xor
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u8 0
+    xor
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u64 0
+    xor
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_true
+    xor
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_u64 0
+    xor
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_true
+    xor
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_const<address> 0
+    xor
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    ld_u64 0
+    xor
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    ld_const<address> 0
+    xor
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun f()
+    ld_u64 0
+    ld_true
+    pack R
+    xor
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun g()
+    ld_true
+    pack R
+    ld_u64 0
+    xor
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun h()
+    ld_true
+    pack R
+    ld_true
+    pack R
+    xor
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u64 0
+    eq
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u128 0
+    eq
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u8 0
+    eq
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u128 0
+    eq
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u8 0
+    eq
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u64 0
+    eq
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_true
+    eq
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_u64 0
+    eq
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_const<address> 0
+    eq
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    ld_u64 0
+    eq
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun f()
+    ld_u64 0
+    ld_true
+    pack R
+    eq
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun g()
+    ld_true
+    pack R
+    ld_u64 0
+    eq
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u64 0
+    neq
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u128 0
+    neq
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u8 0
+    neq
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u128 0
+    neq
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u8 0
+    neq
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u64 0
+    neq
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_true
+    neq
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_u64 0
+    neq
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_const<address> 0
+    neq
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    ld_u64 0
+    neq
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun f()
+    ld_u64 0
+    ld_true
+    pack R
+    neq
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun g()
+    ld_true
+    pack R
+    ld_u64 0
+    neq
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u64 0
+    lt
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u128 0
+    lt
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u8 0
+    lt
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u128 0
+    lt
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u8 0
+    lt
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u64 0
+    lt
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_true
+    lt
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_u64 0
+    lt
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_const<address> 0
+    lt
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    ld_u64 0
+    lt
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u64 0
+    gt
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u128 0
+    gt
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u8 0
+    gt
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u128 0
+    gt
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u8 0
+    gt
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u64 0
+    gt
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_true
+    gt
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_u64 0
+    gt
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_const<address> 0
+    gt
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    ld_u64 0
+    gt
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u64 0
+    le
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u128 0
+    le
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u8 0
+    le
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u128 0
+    le
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u8 0
+    le
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u64 0
+    le
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_true
+    le
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_u64 0
+    le
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_const<address> 0
+    le
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    ld_u64 0
+    le
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u64 0
+    ge
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u128 0
+    ge
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u8 0
+    ge
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u128 0
+    ge
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u8 0
+    ge
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u128 0
+    ld_u64 0
+    ge
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_true
+    ge
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_u64 0
+    ge
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_const<address> 0
+    ge
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    ld_u64 0
+    ge
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_true
+    shl
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_const<address> 0
+    shl
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u64 0
+    shl
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u128 0
+    shl
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_u8 0
+    shl
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_true
+    shl
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    ld_u8 0
+    shl
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    ld_const<address> 0
+    shl
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun f()
+    ld_u64 0
+    ld_true
+    pack R
+    shl
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun g()
+    ld_true
+    pack R
+    ld_u64 0
+    shl
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun h()
+    ld_true
+    pack R
+    ld_true
+    pack R
+    shl
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_true
+    shr
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_const<address> 0
+    shr
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u64 0
+    shr
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    ld_u128 0
+    shr
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_u8 0
+    shr
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_true
+    shr
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    ld_u8 0
+    shr
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    ld_const<address> 0
+    shr
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun f()
+    ld_u64 0
+    ld_true
+    pack R
+    shr
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun g()
+    ld_true
+    pack R
+    ld_u64 0
+    shr
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct R
+  x: bool
+
+fun h()
+    ld_true
+    pack R
+    ld_true
+    pack R
+    shr
+    pop
+    ret

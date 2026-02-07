@@ -382,6 +382,35 @@ fn invalid_type_param_for_vector_operation() {
     }
 }
 
+#[test]
+fn branch_offset_out_of_bounds() {
+    use Bytecode::*;
+
+    // Test Branch instruction with offset > code size
+    let mut s = basic_test_script();
+    s.code.code = vec![Branch(10), Ret]; // Branch to offset 10, but code size is only 2
+    assert_eq!(
+        BoundsChecker::verify_script(&s).unwrap_err().major_status(),
+        StatusCode::INDEX_OUT_OF_BOUNDS
+    );
+
+    // Test BrTrue instruction with offset > code size
+    let mut s = basic_test_script();
+    s.code.code = vec![LdTrue, BrTrue(100), Ret]; // Branch to offset 100, but code size is only 3
+    assert_eq!(
+        BoundsChecker::verify_script(&s).unwrap_err().major_status(),
+        StatusCode::INDEX_OUT_OF_BOUNDS
+    );
+
+    // Test BrFalse instruction with offset > code size
+    let mut s = basic_test_script();
+    s.code.code = vec![LdFalse, BrFalse(50), Ret]; // Branch to offset 50, but code size is only 3
+    assert_eq!(
+        BoundsChecker::verify_script(&s).unwrap_err().major_status(),
+        StatusCode::INDEX_OUT_OF_BOUNDS
+    );
+}
+
 proptest! {
     #[test]
     fn valid_bounds(_module in CompiledModule::valid_strategy(20)) {

@@ -1,0 +1,55 @@
+//# publish
+module 0x1::A
+public fun div_by_two(l0: u64): bool
+    move_loc l0
+    ld_u64 2
+    mod
+    ld_u64 0
+    eq
+    br_true l0
+    ld_false
+    ret
+l0: ld_true
+    ret
+
+public fun div_by_three(l0: u64): bool
+    move_loc l0
+    ld_u64 3
+    mod
+    ld_u64 0
+    eq
+    br_true l0
+    ld_false
+    ret
+l0: ld_true
+    ret
+
+public fun div_by_six(l0: bool): bool
+    move_loc l0
+    ret
+
+
+
+//# run
+script
+use 0x1::A
+entry public fun main()
+    local l0: u64
+    local l1: bool
+    ld_u64 42
+    st_loc l0
+    copy_loc l0
+    call A::div_by_two
+    move_loc l0
+    call A::div_by_three
+    and
+    call A::div_by_six
+    st_loc l1
+    move_loc l1
+    ld_true
+    eq
+    not
+    br_false l0
+    ld_u64 42
+    abort
+l0: ret

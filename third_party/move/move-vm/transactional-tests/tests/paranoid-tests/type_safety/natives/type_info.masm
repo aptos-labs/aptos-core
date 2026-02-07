@@ -1,0 +1,21 @@
+//# publish
+module 0x22::A
+struct A has drop
+  x: u64
+
+
+
+//# run --signers 0x1
+script
+use 0x1::type_name
+use 0x1::ascii
+use 0x22::A
+entry public fun main(l0: signer)
+    local l1: type_name::TypeName
+    local l2: ascii::String
+    call type_name::get<A::A>
+    st_loc l1
+    move_loc l1
+    call type_name::into_string
+    st_loc l2
+    ret
