@@ -23,5 +23,8 @@ move-ir-types = { workspace = true }
 petgraph = { workspace = true }
 serde = { workspace = true }
 
+[dev-dependencies]
+tempfile = { workspace = true }
+
 [features]
 default = []
