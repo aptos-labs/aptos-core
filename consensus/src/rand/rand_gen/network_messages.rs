@@ -43,7 +43,7 @@ impl<S: TShare, D: TAugmentedData> RandMessage<S, D> {
         ensure!(self.epoch() == epoch_state.epoch);
         match self {
             RandMessage::RequestShare(_) => Ok(()),
-            RandMessage::Share(share) => share.verify(rand_config),
+            RandMessage::Share(share) => share.optimistic_verify(rand_config),
             RandMessage::AugData(aug_data) => {
                 aug_data.verify(rand_config, fast_rand_config, sender)
             },
@@ -51,7 +51,7 @@ impl<S: TShare, D: TAugmentedData> RandMessage<S, D> {
                 certified_aug_data.verify(&epoch_state.verifier)
             },
             RandMessage::FastShare(share) => {
-                share.share.verify(fast_rand_config.as_ref().ok_or_else(|| {
+                share.optimistic_verify(fast_rand_config.as_ref().ok_or_else(|| {
                     anyhow::anyhow!("[RandMessage] rand config for fast path not found")
                 })?)
             },

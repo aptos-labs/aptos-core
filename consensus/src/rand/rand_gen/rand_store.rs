@@ -440,6 +440,7 @@ mod tests {
                 .collect::<Vec<_>>();
             let vuf_pub_params = WvufPP::from(&dkg_pub_params.pvss_config.pp);
 
+            let aggregate_pk = transcript.main.get_dealt_public_key();
             let (ask, apk) = WVUF::augment_key_pair(&vuf_pub_params, sk.main, pk.main, &mut rng);
 
             let rand_keys = RandKeys::new(ask, apk, pk_shares, num_validators);
@@ -453,6 +454,8 @@ mod tests {
                 vuf_pub_params,
                 rand_keys,
                 weighted_config,
+                aggregate_pk,
+                false,
             );
 
             Self {

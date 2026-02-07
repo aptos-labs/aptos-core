@@ -136,7 +136,7 @@ impl<S: TShare, D: TAugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessag
             self.rand_metadata,
             share.metadata()
         );
-        share.verify(&self.rand_config)?;
+        share.optimistic_verify(&self.rand_config)?;
         info!(LogSchema::new(LogEvent::ReceiveReactiveRandShare)
             .epoch(share.epoch())
             .round(share.metadata().round)

@@ -162,7 +162,8 @@ fn wvuf_randomly_aggregate_verify_and_derive_eval<
     let proof = WVUF::aggregate_shares(&wc, &apks_and_proofs);
 
     // Make sure the aggregated proof is valid
-    WVUF::verify_proof(&vuf_pp, pk, &apks[..], msg, &proof)
+    let verify_pool = spawn_rayon_thread_pool("t-wvuf-vfy".to_string(), Some(4));
+    WVUF::verify_proof(&vuf_pp, pk, &apks[..], msg, &proof, &verify_pool)
         .expect("WVUF aggregated proof should verify");
 
     // Derive the VUF evaluation
