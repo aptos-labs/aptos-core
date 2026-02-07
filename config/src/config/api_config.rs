@@ -199,6 +199,55 @@ impl ConfigSanitizer for ApiConfig {
     }
 }
 
+/// Configuration for the v2 REST API (Axum-based).
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ApiV2Config {
+    /// Enables the v2 REST API.
+    #[serde(default = "default_disabled")]
+    pub enabled: bool,
+    /// Optional separate address for the v2 API. If None, shares the v1 port.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub address: Option<SocketAddr>,
+    /// Enables WebSocket support on v2.
+    #[serde(default = "default_enabled")]
+    pub websocket_enabled: bool,
+    /// Maximum number of concurrent WebSocket connections.
+    pub websocket_max_connections: usize,
+    /// Maximum subscriptions per WebSocket connection.
+    pub websocket_max_subscriptions_per_conn: usize,
+    /// Enables HTTP/2 (h2c) support.
+    #[serde(default = "default_enabled")]
+    pub http2_enabled: bool,
+    /// Maximum number of requests in a JSON-RPC batch.
+    pub json_rpc_batch_max_size: usize,
+    /// Optional content length limit override. If None, inherits from v1 config.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_length_limit: Option<u64>,
+    /// Optional maximum number of worker threads for the v2 API runtime.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_runtime_workers: Option<usize>,
+    /// Worker thread multiplier (used if max_runtime_workers is None).
+    pub runtime_worker_multiplier: usize,
+}
+
+impl Default for ApiV2Config {
+    fn default() -> Self {
+        Self {
+            enabled: default_disabled(),
+            address: None,
+            websocket_enabled: default_enabled(),
+            websocket_max_connections: 1000,
+            websocket_max_subscriptions_per_conn: 10,
+            http2_enabled: default_enabled(),
+            json_rpc_batch_max_size: 20,
+            content_length_limit: None,
+            max_runtime_workers: None,
+            runtime_worker_multiplier: 2,
+        }
+    }
+}
+
 // This is necessary because we can't import the EntryFunctionId type from the API types.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]

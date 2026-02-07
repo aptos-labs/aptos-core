@@ -40,6 +40,8 @@ pub struct NodeConfig {
     #[serde(default)]
     pub api: ApiConfig,
     #[serde(default)]
+    pub api_v2: super::ApiV2Config,
+    #[serde(default)]
     pub base: BaseConfig,
     #[serde(default)]
     pub consensus: ConsensusConfig,

@@ -49,6 +49,14 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 
+# v2 API dependencies
+axum = { workspace = true, features = ["ws"] }
+base64 = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+utoipa = { workspace = true }
+uuid = { workspace = true }
+
 [dev-dependencies]
 aptos-api-test-context = { workspace = true }
 aptos-cached-packages = { workspace = true }
