@@ -4,6 +4,9 @@ cloud: EKS
 # -- Default image tag to use for all aptos images
 imageTag: devnet
 
+# -- Arbitrary value to force a helm upgrade, in case we run genesis multiple times on the same chain ID, era pair
+arbitraryValue: 0
+
 genesis:
   # -- Validator username prefix, used to get genesis secrets. This should be the fullname for the aptos-node helm release
   username_prefix: aptos-node
@@ -12,12 +15,17 @@ genesis:
   # -- Aptos Chain ID
   chain_id:
 
+tools:
+  image:
+    repo: aptoslabs/tools
+    tag:
+
 waypoint:
   image:
     # -- Image repo to use for serving waypoint and genesis
     repo: joseluisq/static-web-server
     # -- Image tag to use for serving waypoint and genesis
-    tag: 2.12@sha256:a3b147754be4c38ce96189c4dbaa708c36f39dfcc043c470812c33dd53fea7d0
+    tag: 2.39.0@sha256:97e580189199439560f2e89980fea6c5243518ca53f96898026e835526371d49
     # -- Image pull policy to use for waypoint image
     pullPolicy: IfNotPresent
   nodeSelector: {}
@@ -25,8 +33,11 @@ waypoint:
   affinity: {}
   resources:
     requests:
-      cpu: 200m
-      memory: 512Mi
+      cpu: 5m
+      memory: 20M
+    limits:
+      cpu: 100m
+      memory: 200M
 
 serviceAccount:
   # -- Specifies whether a service account should be created
@@ -55,3 +66,5 @@ ingress:
   enableStickyness: true
   # -- If stickiness is enabled, how long the session cookie should last
   cookieDurationSeconds: 86400
+  # -- Whether to route to the Node API as a fallback
+  routeToNodeApi: false
