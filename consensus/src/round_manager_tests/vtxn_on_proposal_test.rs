@@ -54,7 +54,7 @@ fn no_vote_on_proposal_ext_when_feature_disabled() {
 
     let invalid_block = Block::new_proposal_ext(
         vec![ValidatorTransaction::dummy(vec![0xFF]); 5],
-        Payload::empty(false, true),
+        Payload::empty(false),
         1,
         1,
         genesis_qc.clone(),
@@ -64,7 +64,7 @@ fn no_vote_on_proposal_ext_when_feature_disabled() {
     .unwrap();
 
     let valid_block = Block::new_proposal(
-        Payload::empty(false, true),
+        Payload::empty(false),
         1,
         1,
         genesis_qc,
@@ -242,7 +242,7 @@ fn assert_process_proposal_result(
     let genesis_qc = certificate_for_genesis();
     let block = Block::new_proposal_ext(
         vtxns,
-        Payload::empty(false, true),
+        Payload::empty(false),
         1,
         1,
         genesis_qc.clone(),
@@ -344,7 +344,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
 
     let block_vtxns_too_large = Block::new_proposal_ext(
         vec![ValidatorTransaction::dummy(vec![0xFF; 200]); 5], // total_bytes >= 200 * 5 = 1000
-        Payload::empty(false, true),
+        Payload::empty(false),
         1,
         1,
         genesis_qc.clone(),
