@@ -169,6 +169,18 @@ StrongPrefixConsensusManager
 **Indirect Certificates**: Cert^ind(w-1, (w*, v_high*, π), Σ) - skip empty views with >1/3 stake sigs
 **Parent Chain**: Following certificates back to View 1 uniquely determines v_high output
 
+### Truncated Vector Optimization (Not in Paper)
+
+**Key insight**: In views > 1, only the first non-⊥ entry in v_low/v_high is used for tracing back.
+
+**Optimization**: Instead of full certificate vectors `[cert_p1, cert_p2, cert_p3, cert_p4]`, truncate after the first non-⊥ entry. Example: `[⊥, ⊥, cert_A, cert_B]` becomes `[⊥, ⊥, cert_A]`.
+
+**Benefits**:
+- Vectors are small (typically length 1-3 instead of n)
+- No need for certificate fetching mechanism (each party broadcasts full cert, not hash)
+- Simpler implementation, same correctness guarantees
+- Entries after first non-⊥ are provably unused in trace-back logic
+
 ### Implementation Plan (10 Phases)
 
 1. **Verifiable Prefix Consensus** - Add proof outputs to basic protocol
