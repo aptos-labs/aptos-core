@@ -1112,8 +1112,8 @@ impl SpecTranslator<'_> {
             Operation::Add => self.translate_op("+", "Add", args),
             Operation::Sub => self.translate_op("-", "Sub", args),
             Operation::Mul => self.translate_op("*", "Mul", args),
-            Operation::Mod => self.translate_op("mod", "Mod", args),
-            Operation::Div => self.translate_op("div", "Div", args),
+            Operation::Mod => self.translate_trunc_div_mod_op("$truncMod", "Mod", args),
+            Operation::Div => self.translate_trunc_div_mod_op("$truncDiv", "Div", args),
             Operation::BitOr => self.translate_bit_op("$Or", args),
             Operation::BitAnd => self.translate_bit_op("$And", args),
             Operation::Xor => self.translate_bit_op("$Xor", args),
@@ -2083,6 +2083,30 @@ impl SpecTranslator<'_> {
             emit!(self.writer, "(");
             self.translate_exp(&args[0]);
             emit!(self.writer, " {} ", boogie_op);
+            self.translate_exp(&args[1]);
+            emit!(self.writer, ")");
+        }
+    }
+
+    fn translate_trunc_div_mod_op(&self, trunc_fun: &str, bv_op: &str, args: &[Exp]) {
+        let global_state = &self
+            .env
+            .get_extension::<GlobalNumberOperationState>()
+            .expect("global number operation state");
+        let num_oper = global_state.get_node_num_oper(args[0].node_id());
+        if num_oper == Bitwise {
+            let oper_base = boogie_num_type_base_bv(
+                self.env,
+                Some(self.env.get_node_loc(args[0].node_id())),
+                &self.env.get_node_type(args[0].node_id()),
+            );
+            emit!(self.writer, "${}'{}'(", bv_op, oper_base);
+            self.translate_seq(args.iter(), ", ", |e| self.translate_exp(e));
+            emit!(self.writer, ")");
+        } else {
+            emit!(self.writer, "{}(", trunc_fun);
+            self.translate_exp(&args[0]);
+            emit!(self.writer, ", ");
             self.translate_exp(&args[1]);
             emit!(self.writer, ")");
         }

@@ -116,13 +116,40 @@ procedure {:inline 1} $Mul{{name}}(src1: int, src2: int) returns (dst: int)
 // uninterpreted function to return an undefined value.
 function $undefined_int(): int;
 
+function {:inline} $truncDiv(src1: int, src2: int): int {
+    // Euclidean div: a = q*b + r where 0 <= r < |b|
+    // Truncation div: rounds toward zero
+    // They are equal when src1 >= 0 or when exact.
+    // When src1 < 0 and src2 > 0 and not exact: trunc = euc + 1
+    // When src1 < 0 and src2 < 0 and not exact: trunc = euc - 1
+    if ( src1 >= 0 ) then
+        src1 div src2
+    else if (src1 mod src2 == 0) then
+        src1 div src2
+    else if (src2 > 0) then
+        (src1 div src2) + 1
+    else
+        (src1 div src2) - 1
+}
+
+function {:inline} $truncMod(src1: int, src2: int): int {
+    if (src1 >= 0) then
+        src1 mod src2
+    else if (src1 mod src2 == 0) then
+        src1 mod src2
+    else if (src2 > 0) then
+        (src1 mod src2) - src2
+    else
+        (src1 mod src2) + src2
+}
+
 procedure {:inline 1} $Div(src1: int, src2: int) returns (dst: int)
 {
     if (src2 == 0) {
         call $ExecFailureAbort();
         return;
     }
-    dst := src1 div src2;
+    dst := $truncDiv(src1, src2);
 }
 
 procedure {:inline 1} $Mod(src1: int, src2: int) returns (dst: int)
@@ -131,7 +158,7 @@ procedure {:inline 1} $Mod(src1: int, src2: int) returns (dst: int)
         call $ExecFailureAbort();
         return;
     }
-    dst := src1 mod src2;
+    dst := $truncMod(src1, src2);
 }
 
 // Unimplemented binary arithmetic operations; return the dst
