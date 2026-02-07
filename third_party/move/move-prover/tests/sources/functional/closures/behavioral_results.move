@@ -68,4 +68,35 @@ module 0x42::behavioral_results {
         ensures ensures_of<f>(old(x), result, x);
     }
 
+    // Test 9: result_of with function returning value AND modifying &mut param
+    // result_of returns (explicit_result, modified_x) tuple, compared via tuple equality
+    fun apply_mut_result(f: |&mut u64| u64, x: &mut u64): u64 { f(x) }
+    spec apply_mut_result {
+        ensures (result, x) == result_of<f>(old(x));
+    }
+
+    // Test 10: result_of tuple with component extraction via let expression
+    fun apply_mut_extract(f: |&mut u64| u64, x: &mut u64): u64 { f(x) }
+    spec apply_mut_extract {
+        // Extract explicit return from the result tuple using expression-level let
+        ensures result == {let (r, p) = result_of<f>(old(x)); r};
+        // Extract &mut post-value from the result tuple
+        ensures x == {let (r, p) = result_of<f>(old(x)); p};
+    }
+
+    // Test 11: result_of with mixed return + &mut, using let to extract and use in expression
+    fun apply_mut_arith(f: |&mut u64| u64, x: &mut u64): u64 { f(x) }
+    spec apply_mut_arith {
+        // Use let expression to extract components and combine in arithmetic
+        ensures result + x == {let (r, p) = result_of<f>(old(x)); r + p};
+    }
+
+    // Test 12: result_of &mut value used in chained expression
+    // Closure f: |&mut u64| with void return, result_of returns single value
+    fun apply_twice(f: |&mut u64| has copy, x: &mut u64) { f(x); f(x) }
+    spec apply_twice {
+        // Second call uses result of first as input
+        ensures x == result_of<f>(result_of<f>(old(x)));
+    }
+
 }
