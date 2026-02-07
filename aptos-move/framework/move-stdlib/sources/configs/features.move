@@ -172,6 +172,17 @@ module std::features {
         is_enabled(BLS12_381_STRUCTURES)
     }
 
+    /// Whether the generic algebra implementation for BLS12377 operations are enabled.
+    ///
+    /// Lifetime: transient
+    const BLS12_377_STRUCTURES: u64 = 108;
+
+    public fun get_bls12_377_strutures_feature(): u64 { BLS12_377_STRUCTURES }
+
+    public fun bls12_377_structures_enabled(): bool acquires Features {
+        is_enabled(BLS12_377_STRUCTURES)
+    }
+
 
     /// Whether native_public_key_validate aborts when a public key of the wrong length is given
     /// Lifetime: ephemeral

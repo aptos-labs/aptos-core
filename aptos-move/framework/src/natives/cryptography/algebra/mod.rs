@@ -23,6 +23,7 @@ use arithmetics::{
     inv::inv_internal,
     scalar_mul::{multi_scalar_mul_internal, scalar_mul_internal},
 };
+use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_ff::{BigInteger, PrimeField};
 use ark_serialize::CanonicalDeserialize;
 use better_any::{Tid, TidAble};
@@ -61,6 +62,13 @@ pub enum Structure {
     BLS12381Gt,
     BLS12381Fr,
 
+    // BLS12-377 structures
+    BLS12377Fq12,
+    BLS12377G1,
+    BLS12377G2,
+    BLS12377Gt,
+    BLS12377Fr,
+
     BN254Fr,
     BN254Fq,
     BN254Fq12,
@@ -79,6 +87,12 @@ impl TryFrom<TypeTag> for Structure {
             "0x1::bls12381_algebra::G1" => Ok(Structure::BLS12381G1),
             "0x1::bls12381_algebra::G2" => Ok(Structure::BLS12381G2),
             "0x1::bls12381_algebra::Gt" => Ok(Structure::BLS12381Gt),
+
+            "0x1::bls12377_algebra::Fr" => Ok(Structure::BLS12377Fr),
+            "0x1::bls12377_algebra::Fq12" => Ok(Structure::BLS12377Fq12),
+            "0x1::bls12377_algebra::G1" => Ok(Structure::BLS12377G1),
+            "0x1::bls12377_algebra::G2" => Ok(Structure::BLS12377G2),
+            "0x1::bls12377_algebra::Gt" => Ok(Structure::BLS12377Gt),
 
             "0x1::bn254_algebra::Fr" => Ok(Self::BN254Fr),
             "0x1::bn254_algebra::Fq" => Ok(Self::BN254Fq),
@@ -111,6 +125,16 @@ pub enum SerializationFormat {
     BLS12381FrLsb,
     BLS12381FrMsb,
 
+    // BLS12-377 formats
+    BLS12377Fq12LscLsb,
+    BLS12377G1Compressed,
+    BLS12377G1Uncompressed,
+    BLS12377G2Compressed,
+    BLS12377G2Uncompressed,
+    BLS12377Gt,
+    BLS12377FrLsb,
+    BLS12377FrMsb,
+
     BN254G1Compressed,
     BN254G1Uncompressed,
     BN254G2Compressed,
@@ -142,6 +166,21 @@ impl TryFrom<TypeTag> for SerializationFormat {
             "0x1::bls12381_algebra::FormatGt" => Ok(SerializationFormat::BLS12381Gt),
             "0x1::bls12381_algebra::FormatFrLsb" => Ok(SerializationFormat::BLS12381FrLsb),
             "0x1::bls12381_algebra::FormatFrMsb" => Ok(SerializationFormat::BLS12381FrMsb),
+
+            "0x1::bls12377_algebra::FormatFq12LscLsb" => {
+                Ok(SerializationFormat::BLS12377Fq12LscLsb)
+            },
+            "0x1::bls12377_algebra::FormatG1Uncompr" => {
+                Ok(SerializationFormat::BLS12377G1Uncompressed)
+            },
+            "0x1::bls12377_algebra::FormatG1Compr" => Ok(SerializationFormat::BLS12377G1Compressed),
+            "0x1::bls12377_algebra::FormatG2Uncompr" => {
+                Ok(SerializationFormat::BLS12377G2Uncompressed)
+            },
+            "0x1::bls12377_algebra::FormatG2Compr" => Ok(SerializationFormat::BLS12377G2Compressed),
+            "0x1::bls12377_algebra::FormatGt" => Ok(SerializationFormat::BLS12377Gt),
+            "0x1::bls12377_algebra::FormatFrLsb" => Ok(SerializationFormat::BLS12377FrLsb),
+            "0x1::bls12377_algebra::FormatFrMsb" => Ok(SerializationFormat::BLS12377FrMsb),
 
             "0x1::bn254_algebra::FormatG1Uncompr" => Ok(Self::BN254G1Uncompressed),
             "0x1::bn254_algebra::FormatG1Compr" => Ok(Self::BN254G1Compressed),
@@ -270,6 +309,11 @@ fn feature_flag_from_structure(structure_opt: Option<Structure>) -> Option<Featu
         | Some(Structure::BLS12381G1)
         | Some(Structure::BLS12381G2)
         | Some(Structure::BLS12381Gt) => Some(FeatureFlag::BLS12_381_STRUCTURES),
+        Some(Structure::BLS12377Fr)
+        | Some(Structure::BLS12377Fq12)
+        | Some(Structure::BLS12377G1)
+        | Some(Structure::BLS12377G2)
+        | Some(Structure::BLS12377Gt) => Some(FeatureFlag::BLS12_377_STRUCTURES),
         Some(Structure::BN254Fr)
         | Some(Structure::BN254Fq)
         | Some(Structure::BN254Fq12)
@@ -323,6 +367,17 @@ static BLS12381_R_SCALAR: Lazy<ark_ff::BigInteger256> = Lazy::new(|| {
 static BLS12381_Q12_LENDIAN: Lazy<Vec<u8>> = Lazy::new(|| {
     hex::decode("1175f55da544c7625f8ccb1360e2b1d3ca40747811c8f5ed04440afe232b476c0215676aec05f2a44ac2da6b6d1b7cff075e7b2a587e0aab601a8d3db4f0d29906e5e4d0d78119f396d5a59f0f8d1ca8bca62540be6ab9c12d0ca00de1f311f106278d000e55a393c9766a74e0d08a298450f60d7e666575e3354bf14b8731f4e721c0c180a5ed55c2f8f51f815baecbf96b5fc717eb58ac161a27d1d5f2bdc1a079609b9d6449165b2466b32a01eac7992a1ea0cac2f223cde1d56f9bbccc67afe44621daf858df3fc0eb837818f3e42ab3e131ce4e492efa63c108e6ef91c29ed63b3045baebcb0ab8d203c7f558beaffccba31b12aca7f54b58d0c28340e4fdb3c7c94fe9c4fef9d640ff2fcff02f1748416cbed0981fbff49f0e39eaf8a30273e67ed851944d33d6a593ef5ddcd62da84568822a6045b633bf6a513b3cfe8f9de13e76f8dcbd915980dec205eab6a5c0c72dcebd9afff1d25509ddbf33f8e24131fbd74cda93336514340cf8036b66b09ed9e6a6ac37e22fb3ac407e321beae8cd9fe74c8aaeb4edaa9a7272848fc623f6fe835a2e647379f547fc5ec6371318a85bfa60009cb20ccbb8a467492988a87633c14c0324ba0d0c3e1798ed29c8494cea35023746da05e35d184b4a301d5b2238d665495c6318b5af8653758008952d06cb9e62487b196d64383c73c06d6e1cccdf9b3ce8f95679e7050d949004a55f4ccf95b2552880ae36d1f7e09504d2338316d87d14a064511a295d768113e301bdf9d4383a8be32192d3f2f3b2de14181c73839a7cb4af5301").unwrap()
 });
+
+// BLS12-377 constants
+static BLS12377_GT_GENERATOR: Lazy<ark_bls12_377::Fq12> = Lazy::new(|| {
+    // Compute e(G1::generator(), G2::generator())
+    let g1 = <ark_bls12_377::G1Projective as ark_ec::PrimeGroup>::generator().into_affine();
+    let g2 = <ark_bls12_377::G2Projective as ark_ec::PrimeGroup>::generator().into_affine();
+    ark_bls12_377::Bls12_377::pairing(g1, g2).0
+});
+static BLS12377_R_LENDIAN: Lazy<Vec<u8>> =
+    Lazy::new(|| <ark_bls12_377::Fr as ark_ff::PrimeField>::MODULUS.to_bytes_le());
+static BLS12377_R_SCALAR: ark_ff::BigInteger256 = ark_bls12_377::Fr::MODULUS;
 
 static BN254_GT_GENERATOR: Lazy<ark_bn254::Fq12> = Lazy::new(|| {
     // Gt generator is defined as the `e(g1_generator, g2_generator)`.
