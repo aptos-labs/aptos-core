@@ -48,4 +48,8 @@ module 0x42::M {
     fun foo7<T0: drop, T1: drop, T2: drop, T3: drop>(cond: bool, a: T0, b: T1, c: T2, d: T3) {
         assert!(cond, b"a = {}, b = {}, c = {}, d = {}", a, b, c, d)
     }
+
+    fun bar<T0: drop>(cond: bool, a: T0) {
+        assert!(cond, b"a = {{{}}}", a)
+    }
 }

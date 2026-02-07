@@ -23,3 +23,57 @@ error: invalid argument to `abort`: unsupported type `T`
    │
 37 │         assert!(cond, x)
    │                       ^
+
+error: Unmatched '{' in format string
+   ┌─ tests/macros/assert_invalid.move:41:23
+   │
+41 │         assert!(cond, b"a = {", a);
+   │                       ^^^^^^^^
+
+error: Unmatched '}' in format string
+   ┌─ tests/macros/assert_invalid.move:45:23
+   │
+45 │         assert!(cond, b"a = }", a);
+   │                       ^^^^^^^^
+
+error: Invalid placeholder in format string
+   ┌─ tests/macros/assert_invalid.move:49:23
+   │
+49 │         assert!(cond, b"a = {a}", a);
+   │                       ^^^^^^^^^^
+
+error: Format string has 1 placeholders, but 2 arguments were provided
+   ┌─ tests/macros/assert_invalid.move:53:23
+   │
+53 │         assert!(cond, b"a = {}", a, b);
+   │                       ^^^^^^^^^
+
+error: Format string has 2 placeholders, but 1 arguments were provided
+   ┌─ tests/macros/assert_invalid.move:57:23
+   │
+57 │         assert!(cond, b"a = {}, b = {}", a);
+   │                       ^^^^^^^^^^^^^^^^^
+
+error: Format string has 1 placeholders, but 0 arguments were provided
+   ┌─ tests/macros/assert_invalid.move:61:23
+   │
+61 │         assert!(cond, b"{}");
+   │                       ^^^^^
+
+error: Unmatched '}' in format string
+   ┌─ tests/macros/assert_invalid.move:65:23
+   │
+65 │         assert!(cond, b"a = {{}", a);
+   │                       ^^^^^^^^^^
+
+error: Unmatched '}' in format string
+   ┌─ tests/macros/assert_invalid.move:69:23
+   │
+69 │         assert!(cond, b"a = {}}", a);
+   │                       ^^^^^^^^^^
+
+error: Format string has 0 placeholders, but 1 arguments were provided
+   ┌─ tests/macros/assert_invalid.move:73:23
+   │
+73 │         assert!(cond, b"a = {{}}", a);
+   │                       ^^^^^^^^^^^

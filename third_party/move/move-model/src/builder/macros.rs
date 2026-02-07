@@ -159,6 +159,9 @@ impl ExpTranslator<'_, '_, '_> {
             },
             1 => {
                 // assert!(cond, exp)
+                if check_string_literal(&rest[0]).is_some() {
+                    self.check_format_string(&rest[0], 0);
+                }
                 rest[0].clone()
             },
             n if n <= MAX_FORMAT_ARGS => {
@@ -168,7 +171,7 @@ impl ExpTranslator<'_, '_, '_> {
                     "`assert!` macro with string formatting",
                     LanguageVersion::V2_4,
                 );
-                self.check_string_literal(&rest[0]);
+                self.check_format_string(&rest[0], n - 1);
                 self.call_into_bytes(
                     loc,
                     self.call_format(loc, rest[0].clone(), rest[1..].to_vec()),
@@ -298,7 +301,7 @@ impl ExpTranslator<'_, '_, '_> {
             n if n <= MAX_FORMAT_ARGS => {
                 // assert_eq!(left, right, fmt, arg1, ..., argN)
                 let assertion_failed_message = Self::assertion_failed_message(loc, kind, true);
-                self.check_string_literal(&rest[0]);
+                self.check_format_string(&rest[0], n - 1);
                 let message = self.call_format(loc, rest[0].clone(), rest[1..].to_vec());
                 self.call_into_bytes(
                     loc,
@@ -447,16 +450,107 @@ impl ExpTranslator<'_, '_, '_> {
         )
     }
 
-    /// Checks that the expression is a string literal.
-    /// If so, returns the byte array. Otherwise, reports an error and returns `None`.
-    fn check_string_literal<'a>(&self, exp: &'a Exp) -> Option<&'a Vec<u8>> {
-        if let Exp_::Value(val) = &exp.value
-            && let Value_::Bytearray(bytes) = &val.value
-        {
-            Some(bytes)
-        } else {
+    fn check_format_string(&self, exp: &Exp, args: usize) {
+        let Some(bytes) = check_string_literal(exp) else {
             self.error(&self.to_loc(&exp.loc), "Expected a string literal");
-            None
+            return;
+        };
+
+        // Check that the format string is valid and count the number of placeholders.
+        let placeholders = match count_placeholders(bytes) {
+            Ok(n) => n,
+            Err(err) => {
+                self.error(&self.to_loc(&exp.loc), &err.to_string());
+                return;
+            },
+        };
+
+        // Check that the number of placeholders matches the number of arguments.
+        if placeholders != args {
+            self.error(
+                &self.to_loc(&exp.loc),
+                &format!(
+                    "Format string has {} placeholders, but {} arguments were provided",
+                    placeholders, args
+                ),
+            );
         }
     }
+}
+
+/// Checks that the expression is a string literal.
+/// If so, returns the byte array. Otherwise, returns `None`.
+fn check_string_literal(exp: &Exp) -> Option<&Vec<u8>> {
+    if let Exp_::Value(val) = &exp.value
+        && let Value_::Bytearray(bytes) = &val.value
+    {
+        Some(bytes)
+    } else {
+        None
+    }
+}
+
+enum BraceError {
+    UnmatchedOpening,
+    UnmatchedClosing,
+    InvalidPlaceholder,
+}
+
+impl Display for BraceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BraceError::UnmatchedOpening => write!(f, "Unmatched '{{' in format string"),
+            BraceError::UnmatchedClosing => write!(f, "Unmatched '}}' in format string"),
+            BraceError::InvalidPlaceholder => write!(f, "Invalid placeholder in format string"),
+        }
+    }
+}
+
+/// Counts the number of valid `{}` placeholders in a format string.
+///
+/// Literal braces must be escaped: `{{` becomes `{` and `}}` becomes `}`.
+/// Any other brace sequence is invalid (e.g., `{foo}`, unmatched braces).
+///
+/// Returns an error if the format string contains unmatched or invalid braces.
+fn count_placeholders(bytes: &[u8]) -> Result<usize, BraceError> {
+    let mut i = 0;
+    let mut count = 0;
+
+    while i < bytes.len() {
+        match bytes[i] {
+            b'{' => {
+                if i + 1 >= bytes.len() {
+                    return Err(BraceError::UnmatchedOpening);
+                }
+
+                match bytes[i + 1] {
+                    b'{' => {
+                        // Escaped '{'
+                        i += 2;
+                    },
+                    b'}' => {
+                        // Valid "{}" placeholder
+                        count += 1;
+                        i += 2;
+                    },
+                    _ => {
+                        return Err(BraceError::InvalidPlaceholder);
+                    },
+                }
+            },
+            b'}' => {
+                if i + 1 < bytes.len() && bytes[i + 1] == b'}' {
+                    // Escaped '}'
+                    i += 2;
+                } else {
+                    return Err(BraceError::UnmatchedClosing);
+                }
+            },
+            _ => {
+                i += 1;
+            },
+        }
+    }
+
+    Ok(count)
 }

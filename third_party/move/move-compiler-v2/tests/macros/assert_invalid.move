@@ -36,4 +36,40 @@ module 0x42::M {
     fun wrong_type_argument<T>(cond: bool, x: T) {
         assert!(cond, x)
     }
+
+    fun unmatched_opening_brace<T0: drop>(cond: bool, a: T0) {
+        assert!(cond, b"a = {", a);
+    }
+
+    fun unmatched_closing_brace<T0: drop>(cond: bool, a: T0) {
+        assert!(cond, b"a = }", a);
+    }
+
+    fun invalid_placeholder<T0: drop>(cond: bool, a: T0) {
+        assert!(cond, b"a = {a}", a);
+    }
+
+    fun too_many_format_arguments<T0: drop, T1: drop>(cond: bool, a: T0, b: T1) {
+        assert!(cond, b"a = {}", a, b);
+    }
+
+    fun too_few_format_arguments<T0: drop>(cond: bool, a: T0) {
+        assert!(cond, b"a = {}, b = {}", a);
+    }
+
+    fun placeholder_with_no_arguments(cond: bool) {
+        assert!(cond, b"{}");
+    }
+
+    fun extra_opening_brace<T0: drop>(cond: bool, a: T0) {
+        assert!(cond, b"a = {{}", a);
+    }
+
+    fun extra_closing_brace<T0: drop>(cond: bool, a: T0) {
+        assert!(cond, b"a = {}}", a);
+    }
+
+    fun escaped_braces_args_mismatch<T0: drop>(cond: bool, a: T0) {
+        assert!(cond, b"a = {{}}", a);
+    }
 }
