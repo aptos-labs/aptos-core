@@ -67,6 +67,10 @@ pub struct SpecTranslator<'env> {
     /// instantiation, it will have a different node id, but again the same instantiations
     /// map to the same node id, which is the desired semantics.
     lifted_choice_infos: Rc<RefCell<HashMap<(ExpData, Vec<Type>), LiftedChoiceInfo>>>,
+    /// Set of (node_id, type, bool) pairs for arbitrary value expressions that need uninterpreted
+    /// function declarations. Each arbitrary value at a unique source location gets its own
+    /// uninterpreted function to ensure soundness. The bool indicates whether the arbitrary value is of bv type.
+    arbitrary_values: Rc<RefCell<BTreeSet<(NodeId, Type, bool)>>>,
 }
 
 /// A struct which contains information about a lifted choice expression (like `some x:int: p(x)`).
@@ -99,6 +103,7 @@ impl<'env> SpecTranslator<'env> {
             type_inst: vec![],
             fresh_var_count: Default::default(),
             lifted_choice_infos: Default::default(),
+            arbitrary_values: Default::default(),
         }
     }
 
@@ -561,6 +566,7 @@ impl SpecTranslator<'_> {
 impl SpecTranslator<'_> {
     pub(crate) fn finalize(&self) {
         self.translate_choice_functions();
+        self.translate_arbitrary_value_functions();
     }
 
     /// Translate lifted functions for choice expressions.
@@ -768,6 +774,45 @@ impl SpecTranslator<'_> {
                 emit!(new_spec_trans.writer, ")");
             }
             emitln!(new_spec_trans.writer, ");\n");
+        }
+    }
+
+    /// Translate uninterpreted functions for arbitrary value expressions.
+    /// Each distinct source location gets its own uninterpreted function to ensure
+    /// that different arbitrary values can have different values in verification.
+    fn translate_arbitrary_value_functions(&self) {
+        let env = self.env;
+        let arbitrary_values = self.arbitrary_values.borrow();
+
+        if arbitrary_values.is_empty() {
+            return;
+        }
+
+        emitln!(self.writer);
+        emitln!(self.writer, "// ** arbitrary value functions");
+        emitln!(self.writer);
+
+        for (node_id, ty, bv_flag) in arbitrary_values.iter() {
+            let loc = env.get_node_loc(*node_id);
+            let (type_suffix, boogie_ty) = if *bv_flag {
+                (
+                    boogie_type_suffix_bv(env, ty, *bv_flag),
+                    boogie_bv_type(env, ty),
+                )
+            } else {
+                (boogie_type_suffix(env, ty), boogie_type(env, ty))
+            };
+
+            self.writer.set_location(&loc);
+            emitln!(self.writer, "// arbitrary value at {}", loc.display(env));
+            emitln!(
+                self.writer,
+                "function $Arbitrary_value_of'{}'_{}(): {};",
+                type_suffix,
+                node_id.as_usize(),
+                boogie_ty
+            );
+            emitln!(self.writer);
         }
     }
 }
@@ -1236,11 +1281,19 @@ impl SpecTranslator<'_> {
             },
             Operation::Abort(_) => {
                 let exp_bv_flag = global_state.get_node_num_oper(node_id) == Bitwise;
+                let ty = self.get_node_type(node_id);
+                let type_suffix = boogie_type_suffix_bv(self.env, &ty, exp_bv_flag);
+                // Track this arbitrary value for later function declaration
+                self.arbitrary_values
+                    .borrow_mut()
+                    .insert((node_id, ty.clone(), exp_bv_flag));
+                // Emit call to unique uninterpreted function for this abort location
                 emit!(
                     self.writer,
                     &format!(
-                        "$Arbitrary_value_of'{}'()",
-                        boogie_type_suffix_bv(self.env, &self.get_node_type(node_id), exp_bv_flag)
+                        "$Arbitrary_value_of'{}'_{}()",
+                        type_suffix,
+                        node_id.as_usize()
                     )
                 );
             },
@@ -1536,11 +1589,19 @@ impl SpecTranslator<'_> {
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
         let exp_bv_flag = global_state.get_node_num_oper(node_id) == Bitwise;
+        let ty = self.get_node_type(node_id);
+        let type_suffix = boogie_type_suffix_bv(self.env, &ty, exp_bv_flag);
+        // Track this arbitrary value for later function declaration
+        self.arbitrary_values
+            .borrow_mut()
+            .insert((node_id, ty.clone(), exp_bv_flag));
+        // Emit call to unique uninterpreted function for this test_variant location
         emit!(
             self.writer,
             &format!(
-                "$Arbitrary_value_of'{}'()",
-                boogie_type_suffix_bv(self.env, &self.get_node_type(node_id), exp_bv_flag)
+                "$Arbitrary_value_of'{}'_{}()",
+                type_suffix,
+                node_id.as_usize()
             )
         );
         emit!(self.writer, ")");
@@ -2188,9 +2249,50 @@ impl SpecTranslator<'_> {
                 Some(self.env.get_node_loc(arg.node_id())),
                 &source_type,
             );
-            emit!(self.writer, "$castBv{}to{}(", source_base, target_base);
-            self.translate_exp(&arg);
-            emit!(self.writer, ")");
+
+            // Get bit widths to determine cast direction
+            let target_bits: u16 = target_base.parse().unwrap();
+            let source_bits: u16 = source_base.parse().unwrap();
+
+            if source_bits > target_bits {
+                // Downcast: check for overflow and use unique arbitrary value per location
+                // Compute max value for target type (e.g., for u8: 255)
+                use num::{bigint::BigUint, One};
+                let max_val_target = if target_bits < 128 {
+                    ((1u128 << target_bits) - 1).to_string()
+                } else {
+                    // For u128 and u256, use BigUint to avoid overflow
+                    let max = (BigUint::one() << target_bits) - BigUint::one();
+                    max.to_string()
+                };
+
+                emit!(self.writer, "(if ($Gt'Bv{}'(", source_base);
+                self.translate_exp(&arg);
+                emit!(self.writer, ", {}bv{})) then ", max_val_target, source_base);
+
+                // Track and emit unique arbitrary function for this cast overflow
+                self.arbitrary_values
+                    .borrow_mut()
+                    .insert((node_id, target_type.clone(), true));
+                emit!(
+                    self.writer,
+                    "$Arbitrary_value_of'bv{}'_{}() else ",
+                    target_base,
+                    node_id.as_usize()
+                );
+
+                // Extract lower bits
+                self.translate_exp(&arg);
+                emit!(self.writer, "[{}:0])", target_bits);
+            } else if source_bits == target_bits {
+                // Same size: just pass through
+                self.translate_exp(&arg);
+            } else {
+                // Upcast: zero-extend
+                let extend_bits = target_bits - source_bits;
+                emit!(self.writer, "0bv{} ++ ", extend_bits);
+                self.translate_exp(&arg);
+            }
         } else {
             self.translate_exp(&arg);
         }

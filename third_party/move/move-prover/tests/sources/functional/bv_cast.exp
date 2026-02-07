@@ -1,0 +1,12 @@
+Move prover returns: exiting with verification errors
+error: unknown assertion failed
+   ┌─ tests/sources/functional/bv_cast.move:57:13
+   │
+57 │             assert (v as u8) == (v as u8);
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/bv_cast.move:53: cast_eq
+   =     at tests/sources/functional/bv_cast.move:64: cast_eq (spec)
+   =     at tests/sources/functional/bv_cast.move:53: cast_eq
+   =         v = <redacted>
+   =     at tests/sources/functional/bv_cast.move:57: cast_eq
