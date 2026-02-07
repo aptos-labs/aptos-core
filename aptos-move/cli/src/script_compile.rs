@@ -21,7 +21,7 @@ use std::{
 use tempfile::TempDir;
 
 /// Compile a specified script.
-#[derive(Parser, Default)]
+#[derive(Debug, Parser, Default)]
 pub struct CompileScriptFunction {
     /// Path to the Move script for the proposal
     #[clap(long, group = "script", value_parser)]
