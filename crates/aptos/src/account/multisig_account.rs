@@ -1,12 +1,16 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::common::{
-    types::{
-        CliCommand, CliError, CliTypedResult, EntryFunctionArguments, MultisigAccount,
-        MultisigAccountWithSequenceNumber, TransactionOptions, TransactionSummary,
+use crate::{
+    common::{
+        types::{
+            CliCommand, CliError, CliTypedResult, EntryFunctionArguments, MultisigAccount,
+            MultisigAccountWithSequenceNumber, ScriptFunctionArguments, TransactionOptions,
+            TransactionSummary,
+        },
+        utils::view_json_option_str,
     },
-    utils::view_json_option_str,
+    governance::CompileScriptFunction,
 };
 use aptos_api_types::ViewFunction;
 use aptos_cached_packages::aptos_stdlib;
@@ -335,6 +339,193 @@ impl CliCommand<TransactionSummary> for ExecuteWithPayload {
             .submit_transaction(TransactionPayload::Multisig(Multisig {
                 multisig_address: self.execute.multisig_account.multisig_address,
                 transaction_payload: Some(self.entry_function_args.try_into()?),
+            }))
+            .await
+            .map(|inner| inner.into())
+    }
+}
+
+/// Propose a new multisig transaction with a Move script payload.
+///
+/// As one of the owners of the multisig, propose a new script-based transaction. This also
+/// implicitly approves the created transaction so it has one approval initially. The script can
+/// be provided as either a source file (--script-path) or pre-compiled bytecode
+/// (--compiled-script-path). In order for the transaction to be executed, it needs as many
+/// approvals as the number of signatures required.
+#[derive(Debug, Parser)]
+pub struct CreateScriptTransaction {
+    #[clap(flatten)]
+    pub(crate) multisig_account: MultisigAccount,
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+    #[clap(flatten)]
+    pub(crate) compile_proposal_args: CompileScriptFunction,
+    #[clap(flatten)]
+    pub(crate) script_function_args: ScriptFunctionArguments,
+    /// Pass this flag if only storing transaction hash on-chain. Else full payload is stored.
+    #[clap(long)]
+    pub(crate) store_hash_only: bool,
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for CreateScriptTransaction {
+    fn command_name(&self) -> &'static str {
+        "CreateScriptTransactionMultisig"
+    }
+
+    async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        let (bytecode, _script_hash) = self
+            .compile_proposal_args
+            .compile("MultisigScript", self.txn_options.prompt_options)?;
+        let multisig_payload = self
+            .script_function_args
+            .create_multisig_script_payload(bytecode)?;
+        let multisig_transaction_payload_bytes =
+            to_bytes::<MultisigTransactionPayload>(&multisig_payload)?;
+        let transaction_payload = if self.store_hash_only {
+            aptos_stdlib::multisig_account_create_transaction_with_hash(
+                self.multisig_account.multisig_address,
+                HashValue::sha3_256_of(&multisig_transaction_payload_bytes).to_vec(),
+            )
+        } else {
+            aptos_stdlib::multisig_account_create_transaction(
+                self.multisig_account.multisig_address,
+                multisig_transaction_payload_bytes,
+            )
+        };
+        self.txn_options
+            .submit_transaction(transaction_payload)
+            .await
+            .map(|inner| inner.into())
+    }
+}
+
+/// Verify a script proposal matches on-chain transaction proposal.
+///
+/// This compiles the provided script and verifies that the resulting payload hash matches the
+/// on-chain proposal's payload hash. Works for proposals stored with either full payload or hash
+/// only.
+#[derive(Debug, Parser)]
+pub struct VerifyScriptProposal {
+    #[clap(flatten)]
+    pub(crate) multisig_account_with_sequence_number: MultisigAccountWithSequenceNumber,
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+    #[clap(flatten)]
+    pub(crate) compile_proposal_args: CompileScriptFunction,
+    #[clap(flatten)]
+    pub(crate) script_function_args: ScriptFunctionArguments,
+}
+
+#[async_trait]
+impl CliCommand<serde_json::Value> for VerifyScriptProposal {
+    fn command_name(&self) -> &'static str {
+        "VerifyScriptProposalMultisig"
+    }
+
+    async fn execute(self) -> CliTypedResult<serde_json::Value> {
+        // Compile the script and create the multisig payload.
+        let (bytecode, _script_hash) = self
+            .compile_proposal_args
+            .compile("VerifyScript", self.txn_options.prompt_options)?;
+        let multisig_payload = self
+            .script_function_args
+            .create_multisig_script_payload(bytecode)?;
+
+        // Get expected multisig transaction payload hash hex from provided script.
+        let expected_payload_hash =
+            HashValue::sha3_256_of(&to_bytes::<MultisigTransactionPayload>(&multisig_payload)?)
+                .to_hex_literal();
+
+        // Get multisig transaction via view function.
+        let multisig_transaction = &self
+            .txn_options
+            .view(ViewFunction {
+                module: ModuleId::new(
+                    AccountAddress::ONE,
+                    ident_str!("multisig_account").to_owned(),
+                ),
+                function: ident_str!("get_transaction").to_owned(),
+                ty_args: vec![],
+                args: vec![
+                    bcs::to_bytes(
+                        &self
+                            .multisig_account_with_sequence_number
+                            .multisig_account
+                            .multisig_address,
+                    )
+                    .unwrap(),
+                    bcs::to_bytes(&self.multisig_account_with_sequence_number.sequence_number)
+                        .unwrap(),
+                ],
+            })
+            .await?[0];
+
+        // Get on-chain payload hash. If full payload provided on-chain:
+        let actual_payload_hash =
+            if let Some(actual_payload) = view_json_option_str(&multisig_transaction["payload"])? {
+                // Actual payload hash is the hash of the on-chain payload.
+                HashValue::sha3_256_of(actual_payload.parse::<HexEncodedBytes>()?.inner())
+                    .to_hex_literal()
+            // If full payload not provided, get payload hash directly from transaction proposal:
+            } else {
+                view_json_option_str(&multisig_transaction["payload_hash"])?.ok_or_else(|| {
+                    CliError::UnexpectedError(
+                        "Neither payload nor payload hash provided on-chain".to_string(),
+                    )
+                })?
+            };
+
+        // Get verification result based on if expected and actual payload hashes match.
+        if expected_payload_hash.eq(&actual_payload_hash) {
+            Ok(json!({
+                "Status": "Transaction match",
+                "Multisig transaction": multisig_transaction
+            }))
+        } else {
+            Err(CliError::UnexpectedError(format!(
+                "Transaction mismatch: The transaction you provided has a payload hash of \
+                {expected_payload_hash}, but the on-chain transaction proposal you specified has \
+                a payload hash of {actual_payload_hash}. For more info, see \
+                https://aptos.dev/move/move-on-aptos/cli#multisig-governance"
+            )))
+        }
+    }
+}
+
+/// Execute a proposed multisig transaction with a script payload that has only a payload hash
+/// stored on-chain.
+///
+/// The provided script is compiled and sent as the execution payload. The payload hash must
+/// match what was stored on-chain when the transaction was created.
+#[derive(Debug, Parser)]
+pub struct ExecuteWithScriptPayload {
+    #[clap(flatten)]
+    pub(crate) execute: Execute,
+    #[clap(flatten)]
+    pub(crate) compile_proposal_args: CompileScriptFunction,
+    #[clap(flatten)]
+    pub(crate) script_function_args: ScriptFunctionArguments,
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for ExecuteWithScriptPayload {
+    fn command_name(&self) -> &'static str {
+        "ExecuteWithScriptPayloadMultisig"
+    }
+
+    async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        let (bytecode, _script_hash) = self
+            .compile_proposal_args
+            .compile("MultisigScript", self.execute.txn_options.prompt_options)?;
+        let multisig_payload = self
+            .script_function_args
+            .create_multisig_script_payload(bytecode)?;
+        self.execute
+            .txn_options
+            .submit_transaction(TransactionPayload::Multisig(Multisig {
+                multisig_address: self.execute.multisig_account.multisig_address,
+                transaction_payload: Some(multisig_payload),
             }))
             .await
             .map(|inner| inner.into())
