@@ -61,7 +61,9 @@ use hex::FromHexError;
 use indoc::indoc;
 use move_compiler_v2::Experiment;
 use move_core_types::{
-    account_address::AccountAddress, language_storage::TypeTag, vm_status::VMStatus,
+    account_address::AccountAddress,
+    language_storage::{TypeTag, MODULE_SEPARATOR},
+    vm_status::VMStatus,
 };
 use move_model::metadata::{
     CompilerVersion, LanguageVersion, LATEST_STABLE_COMPILER_VERSION,
@@ -152,6 +154,8 @@ pub enum CliError {
     SimulationError(String),
     #[error("Coverage failed with status: {0}")]
     CoverageError(String),
+    #[error("Type {0} is a struct, not an enum. Use struct syntax instead.")]
+    StructNotEnumError(String),
 }
 
 impl CliError {
@@ -173,6 +177,7 @@ impl CliError {
             CliError::UnexpectedError(_) => "UnexpectedError",
             CliError::SimulationError(_) => "SimulationError",
             CliError::CoverageError(_) => "CoverageError",
+            CliError::StructNotEnumError(_) => "StructNotEnumError",
         }
     }
 }
@@ -2429,6 +2434,17 @@ impl TryFrom<&Vec<ArgWithTypeJSON>> for ArgWithTypeVec {
     fn try_from(value: &Vec<ArgWithTypeJSON>) -> Result<Self, Self::Error> {
         let mut args = vec![];
         for arg_json_ref in value {
+            // Detect struct/enum types by checking if arg_type contains MODULE_SEPARATOR
+            if arg_json_ref.arg_type.contains(MODULE_SEPARATOR) {
+                // Struct/enum types require REST API calls to fetch on-chain module bytecode
+                // for type validation and field parsing. This cannot be done in synchronous
+                // TryFrom implementation. Use the async method instead.
+                return Err(CliError::CommandArgumentError(
+                    "Struct and enum arguments require REST API access to fetch module bytecode. \
+                     Use the async method check_input_style_async() or try_into_with_client() instead."
+                        .to_string(),
+                ));
+            }
             let function_arg_type = FunctionArgType::from_str(&arg_json_ref.arg_type)?;
             args.push(function_arg_type.parse_arg_json(&arg_json_ref.value)?);
         }
@@ -2503,6 +2519,88 @@ impl EntryFunctionArguments {
             Ok(parse_json_file::<EntryFunctionArgumentsJSON>(&json_path)?.try_into()?)
         } else {
             Ok(self)
+        }
+    }
+
+    /// Extended version of check_input_style that supports struct/enum arguments.
+    ///
+    /// This method is async because it may need to query the blockchain via REST API to:
+    /// - Fetch module bytecode for struct/enum type validation
+    /// - Verify that struct/enum types exist and are accessible
+    /// - Parse field definitions for proper BCS encoding
+    ///
+    /// Use this method when the JSON file might contain struct/enum arguments (types
+    /// containing `::` separator). For simple primitive arguments, the synchronous
+    /// `check_input_style()` method can be used instead.
+    pub async fn check_input_style_async(
+        self,
+        rest_client: &aptos_rest_client::Client,
+    ) -> CliTypedResult<EntryFunctionArguments> {
+        if let Some(json_path) = self.json_file {
+            let json_args = parse_json_file::<EntryFunctionArgumentsJSON>(&json_path)?;
+
+            // Check if there are struct/enum arguments
+            if json_args.has_struct_or_enum_args() {
+                // Parse with REST client for module bytecode access
+                Ok(json_args.try_into_with_client(rest_client).await?)
+            } else {
+                // Use synchronous parsing for backward compatibility with primitive types
+                Ok(json_args.try_into()?)
+            }
+        } else {
+            Ok(self)
+        }
+    }
+
+    /// Convert to EntryFunction with async support for struct/enum arguments.
+    pub async fn try_into_entry_function_async(
+        self,
+        rest_client: &aptos_rest_client::Client,
+    ) -> CliTypedResult<aptos_types::transaction::EntryFunction> {
+        let parsed_arguments = self.check_input_style_async(rest_client).await?;
+        let function_id: MemberId = (&parsed_arguments).try_into()?;
+        Ok(aptos_types::transaction::EntryFunction::new(
+            function_id.module_id,
+            function_id.member_id,
+            parsed_arguments.type_arg_vec.try_into()?,
+            parsed_arguments.arg_vec.try_into()?,
+        ))
+    }
+
+    /// Convert to ViewFunction with async support for struct/enum arguments.
+    pub async fn try_into_view_function_async(
+        self,
+        rest_client: &aptos_rest_client::Client,
+    ) -> CliTypedResult<ViewFunction> {
+        let view_function_args = self.check_input_style_async(rest_client).await?;
+        let function_id: MemberId = (&view_function_args).try_into()?;
+        Ok(ViewFunction {
+            module: function_id.module_id,
+            function: function_id.member_id,
+            ty_args: view_function_args.type_arg_vec.try_into()?,
+            args: view_function_args.arg_vec.try_into()?,
+        })
+    }
+
+    /// Parse entry function arguments, using async parsing if json_file is present.
+    ///
+    /// This consolidates the common pattern of checking if json_file is present and
+    /// conditionally using async or sync parsing. The get_client closure is only
+    /// called if async parsing is needed (when json_file is present).
+    pub async fn parse_with_optional_client<F>(
+        self,
+        get_client: F,
+    ) -> CliTypedResult<aptos_types::transaction::EntryFunction>
+    where
+        F: FnOnce() -> CliTypedResult<aptos_rest_client::Client>,
+    {
+        if self.json_file.is_some() {
+            // Use async parsing that supports struct/enum arguments
+            let rest_client = get_client()?;
+            self.try_into_entry_function_async(&rest_client).await
+        } else {
+            // Use synchronous parsing for command-line arguments
+            self.try_into()
         }
     }
 }
@@ -2621,10 +2719,305 @@ pub struct EntryFunctionArgumentsJSON {
     pub(crate) args: Vec<ArgWithTypeJSON>,
 }
 
+impl EntryFunctionArgumentsJSON {
+    /// Check if any arguments are struct/enum types (contain MODULE_SEPARATOR)
+    pub fn has_struct_or_enum_args(&self) -> bool {
+        self.args
+            .iter()
+            .any(|arg| arg.arg_type.contains(MODULE_SEPARATOR))
+    }
+
+    /// Parse Option<T> in legacy vector format: [] for None, [value] for Some.
+    async fn parse_option_vector_format(
+        parser: &crate::move_tool::struct_arg_parser::StructArgParser,
+        struct_tag: &move_core_types::language_storage::StructTag,
+        array: &[serde_json::Value],
+    ) -> Result<crate::move_tool::ArgWithType, CliError> {
+        use crate::move_tool::FunctionArgType;
+
+        let (variant, fields) = if array.is_empty() {
+            ("None", serde_json::Map::new())
+        } else if array.len() == 1 {
+            let mut map = serde_json::Map::new();
+            map.insert("0".to_string(), array[0].clone());
+            ("Some", map)
+        } else {
+            return Err(CliError::CommandArgumentError(format!(
+                "Option<T> as vector must have 0 or 1 elements, got {}",
+                array.len()
+            )));
+        };
+
+        let bcs_bytes = parser
+            .construct_enum_argument(struct_tag, variant, &fields, 0)
+            .await?;
+
+        Ok(crate::move_tool::ArgWithType {
+            _ty: FunctionArgType::Enum {
+                type_tag: struct_tag.clone(),
+                variant: variant.to_string(),
+            },
+            _vector_depth: 0,
+            arg: bcs_bytes,
+        })
+    }
+
+    /// Parse struct or enum from object format.
+    /// Tries to detect enum format first (single key with object value), falls back to struct.
+    async fn parse_struct_or_enum_object(
+        parser: &crate::move_tool::struct_arg_parser::StructArgParser,
+        struct_tag: &move_core_types::language_storage::StructTag,
+        obj: &serde_json::Map<String, serde_json::Value>,
+        _arg_type_str: &str,
+    ) -> Result<crate::move_tool::ArgWithType, CliError> {
+        use crate::move_tool::FunctionArgType;
+
+        // Check if it's an enum variant (single key with variant name)
+        // or a struct (multiple keys or special struct detection)
+        if obj.len() == 1 {
+            // Single key - could be enum variant
+            let (potential_variant_name, variant_fields_value) =
+                obj.iter().next().ok_or_else(|| {
+                    CliError::CommandArgumentError(
+                        "Object unexpectedly empty after len() check".to_string(),
+                    )
+                })?;
+
+            // Check if the value is an object (enum fields) or something else.
+            // For enums, the variant value must be an object containing the variant's fields.
+            // This can be an empty object {} for variants with no fields, or a map of
+            // field names to values for variants with fields.
+            // Example: {"Red": {}} or {"Circle": {"radius": "5"}}
+            if let Some(fields_obj) = variant_fields_value.as_object() {
+                // Looks like enum format: { "VariantName": { ...fields... } }
+                // Try to parse as enum first
+                let bcs_bytes = parser
+                    .construct_enum_argument(struct_tag, potential_variant_name, fields_obj, 0)
+                    .await;
+
+                match bcs_bytes {
+                    Ok(bytes) => {
+                        // Successfully parsed as enum
+                        return Ok(crate::move_tool::ArgWithType {
+                            _ty: FunctionArgType::Enum {
+                                type_tag: struct_tag.clone(),
+                                variant: potential_variant_name.to_string(),
+                            },
+                            _vector_depth: 0,
+                            arg: bytes,
+                        });
+                    },
+                    Err(e) => {
+                        // If it failed because it's a struct not an enum, fall through to struct parsing
+                        match e {
+                            CliError::StructNotEnumError(_) => {
+                                // Fall through to struct parsing below
+                            },
+                            _ => {
+                                // Other error - propagate it
+                                return Err(e);
+                            },
+                        }
+                    },
+                }
+            }
+        }
+
+        // Parse as struct (either multi-key object or single-key that failed enum parsing)
+        let bcs_bytes = parser.construct_struct_argument(struct_tag, obj, 0).await?;
+
+        Ok(crate::move_tool::ArgWithType {
+            _ty: FunctionArgType::Struct {
+                type_tag: struct_tag.clone(),
+            },
+            _vector_depth: 0,
+            arg: bcs_bytes,
+        })
+    }
+
+    /// Parse a single argument from JSON to ArgWithType.
+    ///
+    /// Handles both primitive types and complex struct/enum types with async module lookups.
+    async fn parse_single_argument(
+        parser: &crate::move_tool::struct_arg_parser::StructArgParser,
+        arg_json: &ArgWithTypeJSON,
+    ) -> Result<crate::move_tool::ArgWithType, CliError> {
+        use crate::move_tool::FunctionArgType;
+        use std::str::FromStr;
+
+        // Detect struct/enum types by checking if arg_type contains MODULE_SEPARATOR
+        if arg_json.arg_type.contains(MODULE_SEPARATOR) {
+            // Parse as struct/enum type
+            let struct_tag = parser.parse_type_string(&arg_json.arg_type)?;
+
+            // Check if this is Option<T> with vector format (array value)
+            let is_option = struct_tag.is_option();
+
+            if is_option && arg_json.value.is_array() {
+                // Option<T> with legacy vector format: [] for None, [value] for Some
+                let array = arg_json.value.as_array().ok_or_else(|| {
+                    CliError::CommandArgumentError(format!(
+                        "Expected array value for Option type, got: {}",
+                        arg_json.value
+                    ))
+                })?;
+                Self::parse_option_vector_format(parser, &struct_tag, array).await
+            } else if arg_json.value.is_object() {
+                // Value is an object - could be struct or enum
+                let obj = arg_json.value.as_object().ok_or_else(|| {
+                    CliError::CommandArgumentError(format!(
+                        "Expected object value for type {}, got: {}",
+                        arg_json.arg_type, arg_json.value
+                    ))
+                })?;
+                Self::parse_struct_or_enum_object(parser, &struct_tag, obj, &arg_json.arg_type)
+                    .await
+            } else {
+                Err(CliError::CommandArgumentError(format!(
+                    "Invalid value for type {}. Expected object or option, got: {}",
+                    arg_json.arg_type, arg_json.value
+                )))
+            }
+        } else {
+            // Parse as primitive type
+            let function_arg_type = FunctionArgType::from_str(&arg_json.arg_type)?;
+            function_arg_type.parse_arg_json(&arg_json.value)
+        }
+    }
+
+    /// Convert to EntryFunctionArguments with async support for struct/enum types.
+    ///
+    /// This method handles parsing of complex arguments from JSON format. Each argument
+    /// in `self.args` contains an `arg_type` and `value`. The parsing logic depends on
+    /// the type:
+    ///
+    /// # JSON Format for arg_json
+    ///
+    /// ## Primitive types (u8, u64, bool, address, etc.):
+    /// ```json
+    /// {"arg_type": "u64", "value": "12345"}
+    /// ```
+    ///
+    /// ## Struct types:
+    /// ```json
+    /// {
+    ///   "arg_type": "0xADDR::module::Point",
+    ///   "value": {"x": "10", "y": "20"}
+    /// }
+    /// ```
+    ///
+    /// ## Enum types (variant format):
+    /// ```json
+    /// {
+    ///   "arg_type": "0xADDR::module::Color",
+    ///   "value": {"Red": {}}
+    /// }
+    /// ```
+    /// Or with fields:
+    /// ```json
+    /// {
+    ///   "arg_type": "0xADDR::module::Shape",
+    ///   "value": {"Circle": {"radius": "5"}}
+    /// }
+    /// ```
+    ///
+    /// ## Option<T> types (two formats supported):
+    ///
+    /// Legacy vector format:
+    /// ```json
+    /// {"arg_type": "0x1::option::Option<u64>", "value": []}           // None
+    /// {"arg_type": "0x1::option::Option<u64>", "value": ["42"]}       // Some(42)
+    /// ```
+    ///
+    /// Variant format:
+    /// ```json
+    /// {"arg_type": "0x1::option::Option<u64>", "value": {"None": {}}}
+    /// {"arg_type": "0x1::option::Option<u64>", "value": {"Some": {"0": "42"}}}
+    /// ```
+    ///
+    /// # Parsing Process
+    ///
+    /// For each `arg_json` in `self.args`:
+    ///
+    /// 1. **Type Detection**: Check if `arg_type` contains MODULE_SEPARATOR (`::`):
+    ///    - If yes → struct/enum type (requires on-chain lookup)
+    ///    - If no → primitive type (parsed directly)
+    ///
+    /// 2. **Struct/Enum Parsing** (via `parse_single_argument`):
+    ///    a. Parse `arg_type` string into `StructTag` (e.g., "0xADDR::module::Type<T>")
+    ///    b. Fetch module bytecode via REST API (with caching to avoid duplicate calls)
+    ///    c. Check if type is `Option<T>`:
+    ///       - If `value` is array `[]` or `[x]` → parse as legacy Option format
+    ///       - If `value` is object with "None"/"Some" → parse as variant format
+    ///    d. Determine if type is struct or enum:
+    ///       - Single-key object with object value → try enum first, fallback to struct
+    ///       - Multi-key object → parse as struct
+    ///    e. Recursively parse nested fields:
+    ///       - Respects `MAX_NESTING_DEPTH` to prevent stack overflow
+    ///       - Nested structs/enums trigger additional module lookups
+    ///    f. Encode to BCS bytes and wrap in `ArgWithType`
+    ///
+    /// 3. **Primitive Parsing**: Use `FunctionArgType::from_str()` and `parse_arg_json()`
+    ///
+    /// 4. **Assembly**: Collect all parsed arguments into `ArgWithTypeVec`
+    ///
+    /// # Async Requirement
+    ///
+    /// This method is async because struct/enum parsing requires querying the blockchain
+    /// via REST API to fetch module bytecode and verify types. The parser maintains an
+    /// internal cache (RwLock<HashMap>) to avoid redundant API calls for the same module.
+    pub async fn try_into_with_client(
+        self,
+        rest_client: &aptos_rest_client::Client,
+    ) -> Result<EntryFunctionArguments, CliError> {
+        use std::str::FromStr;
+
+        let args = self.parse_arguments(rest_client).await?;
+
+        Ok(EntryFunctionArguments {
+            function_id: Some(MemberId::from_str(&self.function_id)?),
+            type_arg_vec: TypeArgVec::try_from(&self.type_args)?,
+            arg_vec: ArgWithTypeVec { args },
+            json_file: None,
+        })
+    }
+
+    /// Parse all arguments from JSON to ArgWithType.
+    ///
+    /// This helper method handles the iteration over all arguments and their parsing.
+    /// It creates a parser instance and processes each argument sequentially,
+    /// leveraging the parser's internal cache to avoid redundant module fetches.
+    async fn parse_arguments(
+        &self,
+        rest_client: &aptos_rest_client::Client,
+    ) -> Result<Vec<crate::move_tool::ArgWithType>, CliError> {
+        use crate::move_tool::struct_arg_parser::StructArgParser;
+
+        let parser = StructArgParser::new(rest_client.clone());
+        let mut args = vec![];
+
+        for arg_json in &self.args {
+            let parsed_arg = Self::parse_single_argument(&parser, arg_json).await?;
+            args.push(parsed_arg);
+        }
+
+        Ok(args)
+    }
+}
+
 impl TryInto<EntryFunctionArguments> for EntryFunctionArgumentsJSON {
     type Error = CliError;
 
     fn try_into(self) -> Result<EntryFunctionArguments, Self::Error> {
+        // Check if there are any struct/enum arguments
+        if self.has_struct_or_enum_args() {
+            return Err(CliError::CommandArgumentError(
+                "Struct and enum arguments require async processing with REST client. \
+                 This should not happen if the CLI is properly configured."
+                    .to_string(),
+            ));
+        }
+
         Ok(EntryFunctionArguments {
             function_id: Some(MemberId::from_str(&self.function_id)?),
             type_arg_vec: TypeArgVec::try_from(&self.type_args)?,

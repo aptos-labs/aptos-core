@@ -37,6 +37,15 @@ pub const LEGACY_OPTION_VEC: &str = "vec";
 pub const OPTION_MODULE_NAME_STR: &str = "option";
 pub const OPTION_STRUCT_NAME_STR: &str = "Option";
 
+// Module path separator used in fully-qualified type names
+pub const MODULE_SEPARATOR: &str = "::";
+
+// Commonly used fully-qualified type names for standard library types
+pub const STRING_TYPE_STR: &str = "0x1::string::String";
+pub const OBJECT_TYPE_STR: &str = "0x1::object::Object";
+pub const FIXED_POINT32_TYPE_STR: &str = "0x1::fixed_point32::FixedPoint32";
+pub const FIXED_POINT64_TYPE_STR: &str = "0x1::fixed_point64::FixedPoint64";
+
 // Struct API constants for public struct/enum APIs
 pub const PUBLIC_STRUCT_DELIMITER: &str = "$";
 pub const PACK: &str = "pack";

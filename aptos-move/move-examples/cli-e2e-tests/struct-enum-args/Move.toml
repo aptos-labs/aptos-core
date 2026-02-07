@@ -1,0 +1,16 @@
+[package]
+name = "StructEnumArgsTests"
+version = "1.0.0"
+authors = []
+
+[addresses]
+struct_enum_tests = "_"
+
+[dev-addresses]
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-core.git"
+rev = "mainnet"
+subdir = "aptos-move/framework/aptos-framework"
+
+[dev-dependencies]

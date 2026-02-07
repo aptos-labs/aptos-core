@@ -4,10 +4,14 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-This script is how we orchestrate running a localnet and then running CLI tests against it. There are two different CLIs used for this:
+This script orchestrates running a localnet and then running CLI tests against it.
 
-1. Base: For running the localnet. This is what the --base-network flag and all other flags starting with --base are for.
-2. Test: The CLI that we're testing. This is what the --test-cli-tag / --test-cli-path and all other flags starting with --test are for.
+There are two modes for running tests:
+
+## Docker Mode (Default)
+Uses Docker containers for both the localnet and CLI testing. Requires two CLIs:
+1. Base: For running the localnet (--base-network flag)
+2. Test: The CLI being tested (--test-cli-tag or --test-cli-path)
 
 Example (testing CLI in image):
   python3 main.py --base-network testnet --test-cli-tag mainnet_0431e2251d0b42920d89a52c63439f7b9eda6ac3
@@ -15,12 +19,50 @@ Example (testing CLI in image):
 Example (testing locally built CLI binary):
   python3 main.py --base-network devnet --test-cli-path ~/aptos-core/target/release/aptos
 
-This means, run the CLI test suite using a CLI built from mainnet_0431e2251d0b42920d89a52c63439f7b9eda6ac3 against a localnet built from the testnet branch of aptos-core.
-
 Example (using a different image repo):
   See ~/.github/workflows/cli-e2e-tests.yaml
 
-When the test suite is complete, it will tell you which tests passed and which failed. To further debug a failed test, you can check the output in --working-directory, there will be files for each test containing the command run, stdout, stderr, and any exception.
+## Local Testnet Mode (--use-local-testnet)
+Skips Docker and uses a locally built CLI with a local testnet. This mode is recommended for:
+- ARM Macs (avoids Docker x86 emulation issues)
+- Fast iteration during development
+- Testing CLI changes immediately without building Docker images
+
+### Auto-start Mode (Default)
+The framework automatically starts and stops the localnet with fresh state on each run:
+
+Example (auto-start with local CLI):
+  python3 main.py --use-local-testnet --test-cli-path ~/aptos-core/target/release/aptos
+
+### Manual Mode (--no-auto-start)
+For advanced users who want to manually manage the localnet (e.g., for debugging):
+
+Example (manual mode):
+  # Terminal 1: Start localnet
+  ./target/release/aptos node run-local-testnet --with-faucet --assume-yes
+
+  # Terminal 2: Run tests
+  python3 main.py --use-local-testnet --no-auto-start --test-cli-path ~/aptos-core/target/release/aptos
+
+Use manual mode when:
+- You want to inspect localnet logs directly
+- You're running many test iterations and want to keep localnet running
+- You need to debug specific localnet behavior
+
+Note: Manual mode requires cleanup between full test runs to avoid stale state errors.
+Run `./reset_tests.sh` if tests fail with "Account has balance X, expected 0" errors.
+
+## Debugging Failed Tests
+When tests complete, the script shows which tests passed and which failed.
+To debug failures, check the output files in --working-directory (default: /tmp/aptos-cli-tests/out):
+- <test>.command - The command that was run
+- <test>.stdout - Standard output from the command
+- <test>.stderr - Standard error from the command
+- <test>.exception - Any exception that was raised (if applicable)
+
+Example:
+  cat /tmp/aptos-cli-tests/out/001_test_init.stderr
+  cat /tmp/aptos-cli-tests/out/001_test_init.stdout
 """
 
 import argparse
@@ -29,7 +71,9 @@ import logging
 import os
 import pathlib
 import platform
+import requests
 import shutil
+import subprocess
 import sys
 import time
 
@@ -49,6 +93,16 @@ from cases.move import (
     test_move_publish,
     test_move_run,
     test_move_view,
+)
+from cases.struct_enum_args import (
+    test_enum_simple_variant,
+    test_enum_variant_with_fields,
+    test_enum_with_nested_struct,
+    test_option_legacy_format,
+    test_option_variant_format,
+    test_publish_struct_enum_module,
+    test_struct_argument_nested,
+    test_struct_argument_simple,
 )
 from cases.node import (
     test_node_show_validator_set,
@@ -82,6 +136,40 @@ logging.basicConfig(
 
 LOG = logging.getLogger(__name__)
 
+# Local testnet configuration
+LOCALHOST = "127.0.0.1"
+API_PORT = 8080
+FAUCET_PORT = 8081
+
+
+def wait_for_service(url, check_fn, timeout, service_name):
+    """
+    Wait for a service to be ready with custom check function.
+
+    Args:
+        url: Service URL to check
+        check_fn: Function that takes response and returns True if ready
+        timeout: Maximum seconds to wait
+        service_name: Name for logging
+
+    Returns:
+        True if service became ready, False if timeout
+    """
+    LOG.info(f"Waiting for {service_name} to start...")
+    for i in range(timeout):
+        try:
+            response = requests.get(url, timeout=1)
+            if check_fn(response):
+                LOG.info(f"{service_name} is ready!")
+                return True
+        except (requests.RequestException, requests.Timeout):
+            pass
+
+        if i == timeout - 1:
+            LOG.error(f"{service_name} failed to start within {timeout} seconds")
+            return False
+        time.sleep(1)
+
 
 def parse_args():
     # You'll notice there are two argument "prefixes", base and test. These refer to
@@ -91,6 +179,23 @@ def parse_args():
         description=__doc__,
     )
     parser.add_argument("-d", "--debug", action="store_true")
+    parser.add_argument(
+        "--use-local-testnet",
+        action="store_true",
+        help=(
+            "Skip Docker and use local CLI testnet instead. "
+            "By default, will auto-start/stop the testnet. "
+            "Use --no-auto-start to manually manage the testnet."
+        ),
+    )
+    parser.add_argument(
+        "--no-auto-start",
+        action="store_true",
+        help=(
+            "When using --use-local-testnet, don't auto-start/stop the localnet. "
+            "You must manually start it with: aptos node run-local-testnet --with-faucet"
+        ),
+    )
     parser.add_argument(
         "--image-repo-with-project",
         default="aptoslabs",
@@ -104,10 +209,13 @@ def parse_args():
     )
     parser.add_argument(
         "--base-network",
-        required=True,
         type=Network,
         choices=list(Network),
-        help="What branch the Aptos CLI used for the localnet should be built from",
+        default=Network.DEVNET,
+        help=(
+            "What branch the Aptos CLI used for the localnet should be built from. "
+            "Not used with --use-local-testnet. Default: %(default)s"
+        ),
     )
     parser.add_argument(
         "--base-startup-timeout",
@@ -165,6 +273,17 @@ async def run_tests(run_helper):
     test_move_run(run_helper)
     test_move_view(run_helper)
 
+    # Run struct/enum transaction argument tests.
+    # First publish the struct-enum-args module
+    test_publish_struct_enum_module(run_helper)
+    test_struct_argument_simple(run_helper)
+    test_struct_argument_nested(run_helper)
+    test_option_variant_format(run_helper)
+    test_option_legacy_format(run_helper)
+    test_enum_simple_variant(run_helper)
+    test_enum_variant_with_fields(run_helper)
+    test_enum_with_nested_struct(run_helper)
+
     # Run stake subcommand group tests.
     """
     test_stake_initialize_stake_owner(run_helper)
@@ -216,15 +335,86 @@ async def main():
             )
 
     # Run a node + faucet and wait for them to start up.
-    container_name = run_node(
-        args.base_network, args.image_repo_with_project, not args.no_pull_always
-    )
+    localnet_process = None
+    if args.use_local_testnet:
+        # Skip Docker - use local CLI testnet
+        container_name = None
+
+        if not args.no_auto_start:
+            # Auto-start the localnet with force-restart
+            LOG.info("Auto-starting local testnet with --force-restart")
+
+            # Determine CLI path
+            if args.test_cli_path:
+                cli_path = os.path.abspath(args.test_cli_path)
+            else:
+                # If testing a CLI from image, we can't use it for localnet
+                LOG.error("Cannot auto-start localnet when using --test-cli-tag")
+                LOG.error("Either use --test-cli-path or use --no-auto-start")
+                return False
+
+            # Start localnet in background
+            localnet_process = subprocess.Popen(
+                [cli_path, "node", "run-local-testnet", "--with-faucet", "--force-restart", "--assume-yes"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                universal_newlines=True,
+            )
+            LOG.info(f"Started localnet process (PID: {localnet_process.pid})")
+
+            # Wait for services to start
+            # First wait for API to respond
+            if not wait_for_service(
+                f"http://{LOCALHOST}:{API_PORT}/v1",
+                lambda r: r.status_code == 200,
+                60,
+                "Local testnet API"
+            ):
+                if localnet_process.poll() is not None:
+                    stdout, stderr = localnet_process.communicate()
+                    LOG.error(f"Localnet stdout: {stdout}")
+                    LOG.error(f"Localnet stderr: {stderr}")
+                return False
+
+            # Then wait for DB to finish bootstrapping
+            if not wait_for_service(
+                f"http://{LOCALHOST}:{API_PORT}/v1",
+                lambda r: r.status_code == 200 and "Error" not in str(r.json()),
+                60,
+                "Database"
+            ):
+                return False
+
+            # Finally, wait for faucet to be ready
+            if not wait_for_service(
+                f"http://{LOCALHOST}:{FAUCET_PORT}/",
+                lambda r: r.status_code in [200, 404],
+                30,
+                "Faucet"
+            ):
+                return False
+        else:
+            # Manual mode - verify it's already running
+            LOG.info("Using manually-started local testnet")
+            try:
+                requests.get(f"http://{LOCALHOST}:{API_PORT}/v1", timeout=5)
+                LOG.info(f"Local testnet is running on port {API_PORT}")
+            except Exception as e:
+                LOG.error(f"Local testnet not running on port {API_PORT}: {e}")
+                LOG.error("Please start it first with: aptos node run-local-testnet --with-faucet")
+                return False
+    else:
+        # Use Docker
+        container_name = run_node(
+            args.base_network, args.image_repo_with_project, not args.no_pull_always
+        )
 
     # We run these in a try finally so that if something goes wrong, such as the
     # localnet not starting up correctly or some unexpected error in the
     # test framework, we still stop the node + faucet.
     try:
-        wait_for_startup(container_name, args.base_startup_timeout)
+        if not args.use_local_testnet:
+            wait_for_startup(container_name, args.base_startup_timeout)
 
         # Build the RunHelper object.
         run_helper = RunHelper(
@@ -241,8 +431,21 @@ async def main():
         # Run tests.
         await run_tests(run_helper)
     finally:
-        # Stop the node + faucet.
-        stop_node(container_name)
+        # Stop the node + faucet (only if we started it).
+        if container_name:
+            stop_node(container_name)
+
+        # Stop the localnet process if we started it
+        if localnet_process:
+            LOG.info("Stopping localnet process...")
+            localnet_process.terminate()
+            try:
+                localnet_process.wait(timeout=10)
+                LOG.info("Localnet stopped successfully")
+            except subprocess.TimeoutExpired:
+                LOG.warning("Localnet didn't stop gracefully, killing it...")
+                localnet_process.kill()
+                localnet_process.wait()
 
     # Print out the results.
     if test_results.passed:

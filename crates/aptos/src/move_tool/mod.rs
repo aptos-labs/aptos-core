@@ -70,7 +70,7 @@ use move_command_line_common::{address::NumericalAddress, env::MOVE_HOME};
 use move_core_types::{
     identifier::Identifier,
     int256::{I256, U256},
-    language_storage::{ModuleId, StructTag},
+    language_storage::{ModuleId, StructTag, MODULE_SEPARATOR},
 };
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig};
@@ -99,6 +99,7 @@ pub mod package_hooks;
 mod show;
 mod sim;
 pub mod stored_package;
+pub(crate) mod struct_arg_parser;
 
 const HELLO_BLOCKCHAIN_EXAMPLE: &str = include_str!(
     "../../../../aptos-move/move-examples/hello_blockchain/sources/hello_blockchain.move"
@@ -2209,8 +2210,13 @@ impl CliCommand<TransactionSummary> for RunFunction {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        let entry_function = self
+            .entry_function_args
+            .parse_with_optional_client(|| self.txn_options.rest_client())
+            .await?;
+
         dispatch_transaction(
-            TransactionPayload::EntryFunction(self.entry_function_args.try_into()?),
+            TransactionPayload::EntryFunction(entry_function),
             &self.txn_options,
         )
         .await
@@ -2244,7 +2250,12 @@ impl CliCommand<TransactionSummary> for Simulate {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        let payload = TransactionPayload::EntryFunction(self.entry_function_args.try_into()?);
+        let entry_function = self
+            .entry_function_args
+            .parse_with_optional_client(|| self.txn_options.rest_client())
+            .await?;
+
+        let payload = TransactionPayload::EntryFunction(entry_function);
 
         if self.local {
             self.txn_options.simulate_locally(payload).await
@@ -2271,9 +2282,18 @@ impl CliCommand<Vec<serde_json::Value>> for ViewFunction {
     }
 
     async fn execute(self) -> CliTypedResult<Vec<serde_json::Value>> {
-        self.txn_options
-            .view(self.entry_function_args.try_into()?)
-            .await
+        let view_function = if self.entry_function_args.json_file.is_some() {
+            // Use async parsing that supports struct/enum arguments
+            let rest_client = self.txn_options.rest_client()?;
+            self.entry_function_args
+                .try_into_view_function_async(&rest_client)
+                .await?
+        } else {
+            // Use synchronous parsing for command-line arguments
+            self.entry_function_args.try_into()?
+        };
+
+        self.txn_options.view(view_function).await
     }
 }
 
@@ -2513,6 +2533,13 @@ pub(crate) enum FunctionArgType {
     I128,
     I256,
     Raw,
+    Struct {
+        type_tag: move_core_types::language_storage::StructTag,
+    },
+    Enum {
+        type_tag: move_core_types::language_storage::StructTag,
+        variant: String,
+    },
 }
 
 impl Display for FunctionArgType {
@@ -2535,6 +2562,8 @@ impl Display for FunctionArgType {
             FunctionArgType::I128 => write!(f, "i128"),
             FunctionArgType::I256 => write!(f, "i256"),
             FunctionArgType::Raw => write!(f, "raw"),
+            FunctionArgType::Struct { type_tag } => write!(f, "{:?}", type_tag),
+            FunctionArgType::Enum { type_tag, variant } => write!(f, "{:?}::{}", type_tag, variant),
         }
     }
 }
@@ -2622,6 +2651,14 @@ impl FunctionArgType {
                 .map_err(|err| CliError::UnableToParse("raw", err.to_string()))?
                 .inner()
                 .to_vec()),
+            FunctionArgType::Struct { .. } => Err(CliError::CommandArgumentError(
+                "Struct arguments must be parsed via JSON format with async module queries"
+                    .to_string(),
+            )),
+            FunctionArgType::Enum { .. } => Err(CliError::CommandArgumentError(
+                "Enum arguments must be parsed via JSON format with async module queries"
+                    .to_string(),
+            )),
         }
     }
 
@@ -2684,7 +2721,7 @@ impl FunctionArgType {
 }
 
 // TODO use from move_binary_format::file_format_common if it is made public.
-fn write_u64_as_uleb128(binary: &mut Vec<u8>, mut val: usize) {
+pub(crate) fn write_u64_as_uleb128(binary: &mut Vec<u8>, mut val: usize) {
     loop {
         let cur = val & 0x7F;
         if cur != val {
@@ -2916,6 +2953,11 @@ impl ArgWithType {
             FunctionArgType::I256 => self.bcs_value_to_json::<I256>(),
             FunctionArgType::Raw => serde_json::to_value(&self.arg)
                 .map_err(|err| CliError::UnexpectedError(err.to_string())),
+            FunctionArgType::Struct { .. } | FunctionArgType::Enum { .. } => {
+                // Struct/enum arguments are already BCS encoded, return as hex
+                serde_json::to_value(hex::encode(&self.arg))
+                    .map_err(|err| CliError::UnexpectedError(err.to_string()))
+            },
         }
         .map_err(|err| {
             CliError::UnexpectedError(format!("Failed to parse argument to JSON {}", err))
@@ -2962,7 +3004,7 @@ impl TryInto<TransactionArgument> for &ArgWithType {
     type Error = CliError;
 
     fn try_into(self) -> Result<TransactionArgument, Self::Error> {
-        if self._vector_depth > 0 && self._ty != FunctionArgType::U8 {
+        if self._vector_depth > 0 && !matches!(self._ty, FunctionArgType::U8) {
             return Err(CliError::UnexpectedError(
                 "Unable to parse non-u8 vector to transaction argument".to_string(),
             ));
@@ -3013,6 +3055,12 @@ impl TryInto<TransactionArgument> for &ArgWithType {
             FunctionArgType::I256 => Ok(TransactionArgument::I256(txn_arg_parser(
                 &self.arg, "i256",
             )?)),
+            FunctionArgType::Struct { .. } | FunctionArgType::Enum { .. } => {
+                Err(CliError::UnexpectedError(
+                    "Struct and enum arguments are not supported for script transactions"
+                        .to_string(),
+                ))
+            },
         }
     }
 }
@@ -3033,7 +3081,7 @@ pub struct MemberId {
 }
 
 fn parse_member_id(function_id: &str) -> CliTypedResult<MemberId> {
-    let ids: Vec<&str> = function_id.split_terminator("::").collect();
+    let ids: Vec<&str> = function_id.split_terminator(MODULE_SEPARATOR).collect();
     if ids.len() != 3 {
         return Err(CliError::CommandArgumentError(
             "FunctionId is not well formed.  Must be of the form <address>::<module>::<function>"
