@@ -375,10 +375,19 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                                     ),
                                 ),
                             }),
-                            aptos_types::transaction::TransactionExecutable::Script(_)
-                            | aptos_types::transaction::TransactionExecutable::Encrypted => {
+                            aptos_types::transaction::TransactionExecutable::Script(script) => {
+                                TransactionPayload::MultisigPayload(MultisigPayload {
+                                    multisig_address: multisig_address.into(),
+                                    transaction_payload: Some(
+                                        MultisigTransactionPayload::ScriptPayload(
+                                            try_into_script_payload(script)?,
+                                        ),
+                                    ),
+                                })
+                            },
+                            aptos_types::transaction::TransactionExecutable::Encrypted => {
                                 bail!(
-                                    "Script/encrypted executable is not supported for multisig transactions"
+                                    "Encrypted executable is not supported for multisig transactions"
                                 )
                             },
                             aptos_types::transaction::TransactionExecutable::Empty => {

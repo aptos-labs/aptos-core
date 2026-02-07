@@ -13,7 +13,6 @@ use move_core_types::{
     transaction_argument::TransactionArgument,
     value::{serialize_values, MoveValue},
 };
-use proptest::num::usize;
 use rstest::rstest;
 
 const SCRIPT_HEX: &str = "a11ceb0b0700000a06010002030206050806070e20082e40106e1f010200010001000103060c050300083c53454c463e5f30087472616e736665720d6170746f735f6163636f756e74ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000114636f6d70696c6174696f6e5f6d65746164617461090003322e3003322e31000001050b000b010b02110002";
@@ -1066,6 +1065,520 @@ async fn test_simulate_multisig_transaction_should_charge_gas_against_sender(
             owner_account,
             multisig_account,
             "0x1::aptos_account::transfer",
+            &[],
+            &[&owner_account.address().to_hex_literal(), "10"],
+            200,
+        )
+        .await;
+    let simulation_resp = &simulation_resp.as_array().unwrap()[0];
+    assert!(simulation_resp["success"].as_bool().unwrap());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_script_transaction_with_payload_hash(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let owner_account = &mut context.create_account().await;
+    let multisig_account = context
+        .create_multisig_account(owner_account, vec![], 1, 1000)
+        .await;
+    assert_eq!(1000, context.get_apt_balance(multisig_account).await);
+    let multisig_payload = construct_multisig_txn_script_payload(owner_account.address(), 1000);
+    context
+        .create_multisig_transaction_with_payload_hash(
+            owner_account,
+            multisig_account,
+            multisig_payload.clone(),
+        )
+        .await;
+    context
+        .execute_multisig_transaction_with_script_payload(
+            owner_account,
+            multisig_account,
+            SCRIPT_HEX,
+            &[],
+            &[&owner_account.address().to_hex_literal(), "1000"],
+            202,
+        )
+        .await;
+
+    // The multisig tx that transfers away 1000 APT should have succeeded.
+    assert_eq!(0, context.get_apt_balance(multisig_account).await);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_script_transaction_with_payload_hash_and_failing_execution(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let owner_account = &mut context.create_account().await;
+    let multisig_account = context
+        .create_multisig_account(owner_account, vec![], 1, 1000)
+        .await;
+    assert_eq!(1000, context.get_apt_balance(multisig_account).await);
+    let multisig_payload = construct_multisig_txn_script_payload(owner_account.address(), 2000);
+    context
+        .create_multisig_transaction_with_payload_hash(
+            owner_account,
+            multisig_account,
+            multisig_payload.clone(),
+        )
+        .await;
+
+    // Target transaction execution should fail because the multisig account only has 1000 APT but
+    // is requested to send 2000.
+    // The transaction should still succeed with the failure tracked on chain.
+    context
+        .execute_multisig_transaction_with_script_payload(
+            owner_account,
+            multisig_account,
+            SCRIPT_HEX,
+            &[],
+            &[&owner_account.address().to_hex_literal(), "2000"],
+            202,
+        )
+        .await;
+    // Balance didn't change since the target transaction failed.
+    assert_eq!(1000, context.get_apt_balance(multisig_account).await);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_script_transaction_with_matching_payload(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let owner_account = &mut context.create_account().await;
+    let multisig_account = context
+        .create_multisig_account(owner_account, vec![], 1, 1000)
+        .await;
+    assert_eq!(1000, context.get_apt_balance(multisig_account).await);
+    let multisig_payload = construct_multisig_txn_script_payload(owner_account.address(), 1000);
+    context
+        .create_multisig_transaction(owner_account, multisig_account, multisig_payload.clone())
+        .await;
+    // Execute with the same script payload - should succeed since it matches.
+    context
+        .execute_multisig_transaction_with_script_payload(
+            owner_account,
+            multisig_account,
+            SCRIPT_HEX,
+            &[],
+            &[&owner_account.address().to_hex_literal(), "1000"],
+            202,
+        )
+        .await;
+
+    // The multisig tx that transfers away 1000 APT should have succeeded.
+    assert_eq!(0, context.get_apt_balance(multisig_account).await);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_script_transaction_with_mismatching_payload(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let owner_account = &mut context.create_account().await;
+    let multisig_account = context
+        .create_multisig_account(owner_account, vec![], 1, 1000)
+        .await;
+    let multisig_payload = construct_multisig_txn_script_payload(owner_account.address(), 1000);
+    context
+        .create_multisig_transaction(owner_account, multisig_account, multisig_payload.clone())
+        .await;
+
+    // The multisig transaction execution should fail due to the payload mismatch
+    // (amount is different: 1000 vs 2000).
+    context
+        .execute_multisig_transaction_with_script_payload(
+            owner_account,
+            multisig_account,
+            SCRIPT_HEX,
+            &[],
+            &[&owner_account.address().to_hex_literal(), "2000"],
+            400,
+        )
+        .await;
+    // Balance didn't change since the target transaction failed.
+    assert_eq!(1000, context.get_apt_balance(multisig_account).await);
+
+    // Executing the transaction with the correct payload should succeed.
+    context
+        .execute_multisig_transaction_with_script_payload(
+            owner_account,
+            multisig_account,
+            SCRIPT_HEX,
+            &[],
+            &[&owner_account.address().to_hex_literal(), "1000"],
+            202,
+        )
+        .await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_script_transaction_with_payload_not_matching_hash(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let owner_account = &mut context.create_account().await;
+    let multisig_account = context
+        .create_multisig_account(owner_account, vec![], 1, 1000)
+        .await;
+    let multisig_payload = construct_multisig_txn_script_payload(owner_account.address(), 500);
+    context
+        .create_multisig_transaction_with_payload_hash(
+            owner_account,
+            multisig_account,
+            multisig_payload,
+        )
+        .await;
+
+    // The multisig transaction execution should fail due to the amount being different
+    // (1000 vs 500).
+    context
+        .execute_multisig_transaction_with_script_payload(
+            owner_account,
+            multisig_account,
+            SCRIPT_HEX,
+            &[],
+            &[&owner_account.address().to_hex_literal(), "1000"],
+            400,
+        )
+        .await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_script_transaction_simulation(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let owner_account_1 = &mut context.create_account().await;
+    let owner_account_2 = &mut context.create_account().await;
+    let owner_account_3 = &mut context.create_account().await;
+    let multisig_account = context
+        .create_multisig_account(
+            owner_account_1,
+            vec![owner_account_2.address(), owner_account_3.address()],
+            1,    /* 1-of-3 */
+            1000, /* initial balance */
+        )
+        .await;
+
+    let multisig_payload = construct_multisig_txn_script_payload(owner_account_1.address(), 1000);
+    context
+        .create_multisig_transaction(owner_account_1, multisig_account, multisig_payload.clone())
+        .await;
+
+    // Simulate the multisig script tx
+    let simulation_resp = context
+        .simulate_multisig_script_transaction(
+            owner_account_1,
+            multisig_account,
+            SCRIPT_HEX,
+            &[],
+            &[&owner_account_1.address().to_hex_literal(), "1000"],
+            200,
+        )
+        .await;
+    // Validate that the simulation did successfully execute a transfer of 1000 coins from the
+    // multisig account.
+    let simulation_resp = &simulation_resp.as_array().unwrap()[0];
+    assert!(simulation_resp["success"].as_bool().unwrap());
+    let withdraw_event = &simulation_resp["events"].as_array().unwrap()[0];
+    assert_eq!(
+        withdraw_event["type"].as_str().unwrap(),
+        "0x1::fungible_asset::Withdraw"
+    );
+    let withdrawn_amount = withdraw_event["data"]["amount"].as_str().unwrap();
+    assert_eq!(withdrawn_amount, "1000");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_script_transaction_simulation_2_of_3(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let owner_account_1 = &mut context.create_account().await;
+    let owner_account_2 = &mut context.create_account().await;
+    let owner_account_3 = &mut context.create_account().await;
+    let multisig_account = context
+        .create_multisig_account(
+            owner_account_1,
+            vec![owner_account_2.address(), owner_account_3.address()],
+            2,    /* 2-of-3 */
+            1000, /* initial balance */
+        )
+        .await;
+
+    let multisig_payload = construct_multisig_txn_script_payload(owner_account_1.address(), 1000);
+    context
+        .create_multisig_transaction(owner_account_1, multisig_account, multisig_payload.clone())
+        .await;
+
+    context
+        .approve_multisig_transaction(owner_account_2, multisig_account, 1)
+        .await;
+
+    // Simulate the multisig script transaction
+    let simulation_resp = context
+        .simulate_multisig_script_transaction(
+            owner_account_1,
+            multisig_account,
+            SCRIPT_HEX,
+            &[],
+            &[&owner_account_1.address().to_hex_literal(), "1000"],
+            200,
+        )
+        .await;
+    // Validate that the simulation did successfully execute a transfer of 1000 coins from the
+    // multisig account.
+    let simulation_resp = &simulation_resp.as_array().unwrap()[0];
+    assert!(simulation_resp["success"].as_bool().unwrap());
+    let withdraw_event = &simulation_resp["events"].as_array().unwrap()[0];
+    assert_eq!(
+        withdraw_event["type"].as_str().unwrap(),
+        "0x1::fungible_asset::Withdraw"
+    );
+    let withdrawn_amount = withdraw_event["data"]["amount"].as_str().unwrap();
+    assert_eq!(withdrawn_amount, "1000");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_script_transaction_simulation_fail(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let owner_account_1 = &mut context.create_account().await;
+    let owner_account_2 = &mut context.create_account().await;
+    let owner_account_3 = &mut context.create_account().await;
+    let multisig_account = context
+        .create_multisig_account(
+            owner_account_1,
+            vec![owner_account_2.address(), owner_account_3.address()],
+            1,    /* 1-of-3 */
+            1000, /* initial balance */
+        )
+        .await;
+
+    let multisig_payload = construct_multisig_txn_script_payload(owner_account_1.address(), 2000);
+    context
+        .create_multisig_transaction(owner_account_1, multisig_account, multisig_payload.clone())
+        .await;
+
+    // Simulating transferring more than what the multisig account has should fail.
+    let simulation_resp = context
+        .simulate_multisig_script_transaction(
+            owner_account_1,
+            multisig_account,
+            SCRIPT_HEX,
+            &[],
+            &[&owner_account_1.address().to_hex_literal(), "2000"],
+            200,
+        )
+        .await;
+    let simulation_resp = &simulation_resp.as_array().unwrap()[0];
+    let transaction_failed = &simulation_resp["events"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|event| {
+            event["type"]
+                .as_str()
+                .unwrap()
+                .contains("TransactionExecutionFailed")
+        });
+    assert!(transaction_failed);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_script_transaction_simulation_fail_2_of_3_insufficient_approvals(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let owner_account_1 = &mut context.create_account().await;
+    let owner_account_2 = &mut context.create_account().await;
+    let owner_account_3 = &mut context.create_account().await;
+    let multisig_account = context
+        .create_multisig_account(
+            owner_account_1,
+            vec![owner_account_2.address(), owner_account_3.address()],
+            2,    /* 2-of-3 */
+            1000, /* initial balance */
+        )
+        .await;
+
+    let multisig_payload = construct_multisig_txn_script_payload(owner_account_1.address(), 2000);
+    context
+        .create_multisig_transaction(owner_account_1, multisig_account, multisig_payload.clone())
+        .await;
+
+    // Simulating without sufficient approvals should fail.
+    let simulation_resp = context
+        .simulate_multisig_script_transaction(
+            owner_account_1,
+            multisig_account,
+            SCRIPT_HEX,
+            &[],
+            &[&owner_account_1.address().to_hex_literal(), "1000"],
+            200,
+        )
+        .await;
+    let simulation_resp = &simulation_resp.as_array().unwrap()[0];
+    assert!(!simulation_resp["success"].as_bool().unwrap());
+    assert!(simulation_resp["vm_status"]
+        .as_str()
+        .unwrap()
+        .contains("MULTISIG_TRANSACTION_INSUFFICIENT_APPROVALS"));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_simulate_multisig_script_transaction_should_charge_gas_against_sender(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let owner_account = &mut context.create_account().await;
+    let multisig_account = context
+        .create_multisig_account(
+            owner_account,
+            vec![],
+            1,  /* 1-of-1 */
+            10, /* initial balance */
+        )
+        .await;
+    assert_eq!(10, context.get_apt_balance(multisig_account).await);
+
+    let multisig_payload = construct_multisig_txn_script_payload(owner_account.address(), 10);
+    context
+        .create_multisig_transaction(owner_account, multisig_account, multisig_payload.clone())
+        .await;
+
+    // This simulation should succeed because gas should be paid out of the sender account (owner),
+    // not the multisig account itself.
+    let simulation_resp = context
+        .simulate_multisig_script_transaction(
+            owner_account,
+            multisig_account,
+            SCRIPT_HEX,
             &[],
             &[&owner_account.address().to_hex_literal(), "10"],
             200,
