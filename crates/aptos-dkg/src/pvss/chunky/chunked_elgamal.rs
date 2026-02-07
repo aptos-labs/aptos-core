@@ -501,7 +501,7 @@ mod tests {
             let Cs_player_affine: Vec<Vec<C::Affine>> = Cs[player_id]
                 .iter()
                 .map(|row| {
-                    let proj_vec: Vec<C> = row.iter().copied().collect();
+                    let proj_vec: Vec<C> = row.to_vec();
                     C::normalize_batch(&proj_vec)
                 })
                 .collect();
@@ -510,7 +510,7 @@ mod tests {
             let Rs_affine: Vec<Vec<C::Affine>> = Rs
                 .iter()
                 .map(|row| {
-                    let proj_vec: Vec<C> = row.iter().copied().collect();
+                    let proj_vec: Vec<C> = row.to_vec();
                     C::normalize_batch(&proj_vec)
                 })
                 .collect();
