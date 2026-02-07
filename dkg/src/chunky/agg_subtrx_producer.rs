@@ -10,10 +10,7 @@ use anyhow::{anyhow, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
 use aptos_dkg::pvss::{
-    traits::{
-        transcript::{HasAggregatableSubtranscript, Transcript},
-        Aggregatable,
-    },
+    traits::transcript::{Aggregated, HasAggregatableSubtranscript, Transcript},
     Player,
 };
 use aptos_infallible::{Mutex, RwLock};

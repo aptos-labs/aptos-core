@@ -55,13 +55,13 @@ pub fn batch_mul<P: CurveGroup + ark_ec::ScalarMul>(
     scalars.iter().map(|e| windowed_mul(table, e)).collect()
 }
 
-// we're copy-pasting some arkworks code here because its version of `batch_mul()` insists
+// We're copy-pasting some `arkworks` code here because its version of `batch_mul()` insists
 // on doing a batch normalisation, which we want to postpone until more elements are computed
 fn windowed_mul<T: CurveGroup + ark_ec::ScalarMul>(
     table: &BatchMulPreprocessing<T>,
     scalar: &T::ScalarField,
 ) -> T {
-    let outerc = (table.max_scalar_size + table.window - 1) / table.window;
+    let outerc = table.max_scalar_size.div_ceil(table.window);
     let modulus_size = T::ScalarField::MODULUS_BIT_SIZE as usize;
     let scalar_val = scalar.into_bigint().to_bits_le();
 

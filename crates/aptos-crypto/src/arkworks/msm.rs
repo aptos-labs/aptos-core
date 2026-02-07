@@ -41,11 +41,11 @@ pub struct MsmInput<
 pub trait IsMsmInput: Sized {
     // maybe make B and S associated types instead
     /// The scalar type used in the MSMs.
-    type Scalar: Clone + CanonicalSerialize + CanonicalDeserialize + Eq + Debug; // scrap and make associated type of MsmInput
+    type Scalar: Clone + CanonicalSerialize + CanonicalDeserialize + Eq + Debug;
 
     /// The group/base type used in the MSMs. Current instantiations always use E::G1Affine but as explained
     /// in the TODO of doc comment of `fn verify_msm_hom`, we might want to be working with enums here in the future.
-    type Base: Clone + CanonicalSerialize + CanonicalDeserialize + Eq + Debug; // scrap and make associated type of MsmInput
+    type Base: Clone + CanonicalSerialize + CanonicalDeserialize + Eq + Debug;
 
     /// Returns a reference to the slice of base elements in this MSM input.
     fn bases(&self) -> &[Self::Base];
