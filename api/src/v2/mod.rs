@@ -9,6 +9,8 @@
 
 pub mod batch;
 pub mod context;
+#[cfg(test)]
+mod tests;
 pub mod cursor;
 pub mod endpoints;
 pub mod error;

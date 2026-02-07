@@ -59,6 +59,7 @@ uuid = { workspace = true }
 
 [dev-dependencies]
 aptos-api-test-context = { workspace = true }
+criterion = { workspace = true, features = ["async_tokio"] }
 aptos-cached-packages = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas-meter = { workspace = true }
@@ -77,6 +78,10 @@ warp = { workspace = true }
 
 [features]
 failpoints = ["fail/failpoints"]
+
+[[bench]]
+name = "v2_api_bench"
+harness = false
 
 [package.metadata.cargo-machete]
 ignored = ["mime"]
