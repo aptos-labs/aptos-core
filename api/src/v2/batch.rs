@@ -6,6 +6,10 @@
 //! POST /v2/batch accepts an array of JSON-RPC 2.0 requests, executes them
 //! concurrently (up to the configured max batch size), and returns an array
 //! of JSON-RPC 2.0 responses.
+//!
+//! **Phase 3 optimization**: all requests within a single batch share a pinned
+//! ledger version. This guarantees consistency (every request sees the same
+//! snapshot) and avoids repeated ledger-info lookups.
 
 use crate::v2::{
     context::{spawn_blocking, V2Context},
@@ -13,10 +17,11 @@ use crate::v2::{
     error::{ErrorCode, V2Error},
     types::LedgerMetadata,
 };
-use aptos_api_types::{AsConverter, MoveModuleBytecode, MoveResource};
+use aptos_api_types::{AsConverter, LedgerInfo, MoveModuleBytecode, MoveResource};
 use aptos_types::account_address::AccountAddress;
 use axum::{extract::State, Json};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 const JSONRPC_VERSION: &str = "2.0";
 
@@ -73,6 +78,14 @@ impl JsonRpcResponse {
     }
 }
 
+/// Snapshot of ledger state pinned at the start of a batch.
+/// All requests in the batch use this same version for consistency.
+#[derive(Clone)]
+struct BatchSnapshot {
+    ledger_info: Arc<LedgerInfo>,
+    version: u64,
+}
+
 /// POST /v2/batch
 pub async fn batch_handler(
     State(ctx): State<V2Context>,
@@ -107,11 +120,26 @@ pub async fn batch_handler(
         }
     }
 
-    // Execute requests concurrently
+    // Record batch size metric.
+    crate::v2::metrics::BATCH_SIZE
+        .with_label_values(&[])
+        .observe(requests.len() as f64);
+
+    // Pin the ledger version once for the entire batch.
+    let ledger_info = ctx.ledger_info()?;
+    let snapshot = BatchSnapshot {
+        version: ledger_info.version(),
+        ledger_info: Arc::new(ledger_info),
+    };
+
+    // Execute requests concurrently, all sharing the same snapshot.
     let mut handles = Vec::with_capacity(requests.len());
     for req in requests {
         let ctx = ctx.clone();
-        handles.push(tokio::spawn(async move { dispatch_request(&ctx, req).await }));
+        let snap = snapshot.clone();
+        handles.push(tokio::spawn(async move {
+            dispatch_request(&ctx, &snap, req).await
+        }));
     }
 
     let mut responses = Vec::with_capacity(handles.len());
@@ -129,9 +157,13 @@ pub async fn batch_handler(
     Ok(Json(responses))
 }
 
-async fn dispatch_request(ctx: &V2Context, req: JsonRpcRequest) -> JsonRpcResponse {
+async fn dispatch_request(
+    ctx: &V2Context,
+    snapshot: &BatchSnapshot,
+    req: JsonRpcRequest,
+) -> JsonRpcResponse {
     let id = req.id.clone();
-    match dispatch_inner(ctx, &req).await {
+    match dispatch_inner(ctx, snapshot, &req).await {
         Ok(result) => JsonRpcResponse::success(id, result),
         Err(e) => {
             let code = match e.http_status().as_u16() {
@@ -146,16 +178,17 @@ async fn dispatch_request(ctx: &V2Context, req: JsonRpcRequest) -> JsonRpcRespon
 
 async fn dispatch_inner(
     ctx: &V2Context,
+    snapshot: &BatchSnapshot,
     req: &JsonRpcRequest,
 ) -> Result<serde_json::Value, V2Error> {
     match req.method.as_str() {
-        "get_ledger_info" => get_ledger_info(ctx).await,
-        "get_resources" => get_resources(ctx, &req.params).await,
-        "get_resource" => get_resource(ctx, &req.params).await,
-        "get_modules" => get_modules(ctx, &req.params).await,
-        "get_module" => get_module(ctx, &req.params).await,
-        "get_transaction" => get_transaction(ctx, &req.params).await,
-        "get_transactions" => get_transactions(ctx, &req.params).await,
+        "get_ledger_info" => get_ledger_info(snapshot),
+        "get_resources" => get_resources(ctx, snapshot, &req.params).await,
+        "get_resource" => get_resource(ctx, snapshot, &req.params).await,
+        "get_modules" => get_modules(ctx, snapshot, &req.params).await,
+        "get_module" => get_module(ctx, snapshot, &req.params).await,
+        "get_transaction" => get_transaction(ctx, snapshot, &req.params).await,
+        "get_transactions" => get_transactions(ctx, snapshot, &req.params).await,
         "get_block" => get_block(ctx, &req.params).await,
         _ => Err(V2Error::bad_request(
             ErrorCode::MethodNotFound,
@@ -166,10 +199,9 @@ async fn dispatch_inner(
 
 // --- Individual method implementations ---
 
-async fn get_ledger_info(ctx: &V2Context) -> Result<serde_json::Value, V2Error> {
-    let ledger_info = ctx.ledger_info()?;
-    let metadata = LedgerMetadata::from(&ledger_info);
-    serde_json::to_value(&metadata).map_err(|e| V2Error::internal(e))
+fn get_ledger_info(snapshot: &BatchSnapshot) -> Result<serde_json::Value, V2Error> {
+    let metadata = LedgerMetadata::from(snapshot.ledger_info.as_ref());
+    serde_json::to_value(&metadata).map_err(V2Error::internal)
 }
 
 #[derive(Deserialize)]
@@ -177,21 +209,33 @@ struct ResourcesParams {
     address: String,
     #[serde(default)]
     cursor: Option<String>,
+    /// Per-request version override. If absent, uses the batch-pinned version.
     #[serde(default)]
     ledger_version: Option<u64>,
 }
 
 async fn get_resources(
     ctx: &V2Context,
+    snapshot: &BatchSnapshot,
     params: &serde_json::Value,
 ) -> Result<serde_json::Value, V2Error> {
     let p: ResourcesParams = serde_json::from_value(params.clone())
         .map_err(|e| V2Error::bad_request(ErrorCode::InvalidInput, e.to_string()))?;
 
     let ctx = ctx.clone();
+    let snap = snapshot.clone();
     spawn_blocking(move || {
         let address = parse_address(&p.address)?;
-        let (ledger_info, version, state_view) = ctx.state_view_at(p.ledger_version)?;
+        let version = p.ledger_version.unwrap_or(snap.version);
+
+        // Validate version is within range.
+        validate_version(version, &snap.ledger_info)?;
+
+        let state_view = ctx
+            .inner()
+            .state_view_at_version(version)
+            .map_err(V2Error::internal)?;
+
         let cursor = p.cursor.as_ref().map(|c| Cursor::decode(c)).transpose()?;
 
         let (resources, next_cursor) =
@@ -208,11 +252,11 @@ async fn get_resources(
 
         let result = PaginatedResult {
             data: move_resources,
-            ledger: LedgerMetadata::from(&ledger_info),
+            ledger: LedgerMetadata::from(snap.ledger_info.as_ref()),
             cursor: next_cursor.map(|c| c.encode()),
         };
 
-        serde_json::to_value(&result).map_err(|e| V2Error::internal(e))
+        serde_json::to_value(&result).map_err(V2Error::internal)
     })
     .await
 }
@@ -227,12 +271,14 @@ struct SingleResourceParams {
 
 async fn get_resource(
     ctx: &V2Context,
+    snapshot: &BatchSnapshot,
     params: &serde_json::Value,
 ) -> Result<serde_json::Value, V2Error> {
     let p: SingleResourceParams = serde_json::from_value(params.clone())
         .map_err(|e| V2Error::bad_request(ErrorCode::InvalidInput, e.to_string()))?;
 
     let ctx = ctx.clone();
+    let snap = snapshot.clone();
     spawn_blocking(move || {
         let address = parse_address(&p.address)?;
         let tag: move_core_types::language_storage::StructTag =
@@ -240,7 +286,14 @@ async fn get_resource(
                 V2Error::bad_request(ErrorCode::InvalidInput, format!("Invalid struct tag: {}", e))
             })?;
 
-        let (_ledger_info, _version, state_view) = ctx.state_view_at(p.ledger_version)?;
+        let version = p.ledger_version.unwrap_or(snap.version);
+        validate_version(version, &snap.ledger_info)?;
+
+        let state_view = ctx
+            .inner()
+            .state_view_at_version(version)
+            .map_err(V2Error::internal)?;
+
         let converter =
             state_view.as_converter(ctx.inner().db.clone(), ctx.inner().indexer_reader.clone());
         let api_address: aptos_api_types::Address = address.into();
@@ -259,7 +312,7 @@ async fn get_resource(
             .try_into_resource(&tag, &bytes)
             .map_err(V2Error::internal)?;
 
-        serde_json::to_value(&resource).map_err(|e| V2Error::internal(e))
+        serde_json::to_value(&resource).map_err(V2Error::internal)
     })
     .await
 }
@@ -275,15 +328,19 @@ struct ModulesParams {
 
 async fn get_modules(
     ctx: &V2Context,
+    snapshot: &BatchSnapshot,
     params: &serde_json::Value,
 ) -> Result<serde_json::Value, V2Error> {
     let p: ModulesParams = serde_json::from_value(params.clone())
         .map_err(|e| V2Error::bad_request(ErrorCode::InvalidInput, e.to_string()))?;
 
     let ctx = ctx.clone();
+    let snap = snapshot.clone();
     spawn_blocking(move || {
         let address = parse_address(&p.address)?;
-        let (ledger_info, version, _state_view) = ctx.state_view_at(p.ledger_version)?;
+        let version = p.ledger_version.unwrap_or(snap.version);
+        validate_version(version, &snap.ledger_info)?;
+
         let cursor = p.cursor.as_ref().map(|c| Cursor::decode(c)).transpose()?;
 
         let (modules, next_cursor) =
@@ -293,17 +350,17 @@ async fn get_modules(
         for (_id, bytes) in modules {
             let m = MoveModuleBytecode::new(bytes)
                 .try_parse_abi()
-                .map_err(|e| V2Error::internal(e))?;
+                .map_err(V2Error::internal)?;
             move_modules.push(m);
         }
 
         let result = PaginatedResult {
             data: move_modules,
-            ledger: LedgerMetadata::from(&ledger_info),
+            ledger: LedgerMetadata::from(snap.ledger_info.as_ref()),
             cursor: next_cursor.map(|c| c.encode()),
         };
 
-        serde_json::to_value(&result).map_err(|e| V2Error::internal(e))
+        serde_json::to_value(&result).map_err(V2Error::internal)
     })
     .await
 }
@@ -318,15 +375,23 @@ struct SingleModuleParams {
 
 async fn get_module(
     ctx: &V2Context,
+    snapshot: &BatchSnapshot,
     params: &serde_json::Value,
 ) -> Result<serde_json::Value, V2Error> {
     let p: SingleModuleParams = serde_json::from_value(params.clone())
         .map_err(|e| V2Error::bad_request(ErrorCode::InvalidInput, e.to_string()))?;
 
     let ctx = ctx.clone();
+    let snap = snapshot.clone();
     spawn_blocking(move || {
         let address = parse_address(&p.address)?;
-        let (_ledger_info, _version, state_view) = ctx.state_view_at(p.ledger_version)?;
+        let version = p.ledger_version.unwrap_or(snap.version);
+        validate_version(version, &snap.ledger_info)?;
+
+        let state_view = ctx
+            .inner()
+            .state_view_at_version(version)
+            .map_err(V2Error::internal)?;
 
         let module_id = move_core_types::language_storage::ModuleId::new(
             address,
@@ -350,9 +415,9 @@ async fn get_module(
 
         let module = MoveModuleBytecode::new(module_bytes.to_vec())
             .try_parse_abi()
-            .map_err(|e| V2Error::internal(e))?;
+            .map_err(V2Error::internal)?;
 
-        serde_json::to_value(&module).map_err(|e| V2Error::internal(e))
+        serde_json::to_value(&module).map_err(V2Error::internal)
     })
     .await
 }
@@ -364,6 +429,7 @@ struct TransactionParams {
 
 async fn get_transaction(
     ctx: &V2Context,
+    snapshot: &BatchSnapshot,
     params: &serde_json::Value,
 ) -> Result<serde_json::Value, V2Error> {
     let p: TransactionParams = serde_json::from_value(params.clone())
@@ -372,13 +438,11 @@ async fn get_transaction(
     let hash = parse_hash_str(&p.hash)?;
 
     let ctx = ctx.clone();
+    let snap = snapshot.clone();
     spawn_blocking(move || {
-        let ledger_info = ctx.ledger_info()?;
-        let version = ledger_info.version();
-
         let txn_data = ctx
             .inner()
-            .get_transaction_by_hash(hash, version)
+            .get_transaction_by_hash(hash, snap.version)
             .map_err(V2Error::internal)?
             .ok_or_else(|| {
                 V2Error::not_found(
@@ -392,14 +456,17 @@ async fn get_transaction(
             .db
             .get_block_timestamp(txn_data.version)
             .map_err(V2Error::internal)?;
-        let state_view = ctx.inner().latest_state_view().map_err(V2Error::internal)?;
+        let state_view = ctx
+            .inner()
+            .state_view_at_version(snap.version)
+            .map_err(V2Error::internal)?;
         let converter =
             state_view.as_converter(ctx.inner().db.clone(), ctx.inner().indexer_reader.clone());
         let txn = converter
             .try_into_onchain_transaction(timestamp, txn_data)
             .map_err(V2Error::internal)?;
 
-        serde_json::to_value(&txn).map_err(|e| V2Error::internal(e))
+        serde_json::to_value(&txn).map_err(V2Error::internal)
     })
     .await
 }
@@ -412,21 +479,24 @@ struct TransactionsListParams {
 
 async fn get_transactions(
     ctx: &V2Context,
+    snapshot: &BatchSnapshot,
     params: &serde_json::Value,
 ) -> Result<serde_json::Value, V2Error> {
     let p: TransactionsListParams = serde_json::from_value(params.clone())
         .map_err(|e| V2Error::bad_request(ErrorCode::InvalidInput, e.to_string()))?;
 
     let ctx = ctx.clone();
+    let snap = snapshot.clone();
     spawn_blocking(move || {
-        let ledger_info = ctx.ledger_info()?;
-        let ledger_version = ledger_info.version();
         let cursor = p.cursor.as_ref().map(|c| Cursor::decode(c)).transpose()?;
 
         let (txns, next_cursor) =
-            ctx.get_transactions_paginated(cursor.as_ref(), ledger_version)?;
+            ctx.get_transactions_paginated(cursor.as_ref(), snap.version)?;
 
-        let state_view = ctx.inner().latest_state_view().map_err(V2Error::internal)?;
+        let state_view = ctx
+            .inner()
+            .state_view_at_version(snap.version)
+            .map_err(V2Error::internal)?;
         let converter =
             state_view.as_converter(ctx.inner().db.clone(), ctx.inner().indexer_reader.clone());
 
@@ -446,11 +516,11 @@ async fn get_transactions(
 
         let result = PaginatedResult {
             data: rendered,
-            ledger: LedgerMetadata::from(&ledger_info),
+            ledger: LedgerMetadata::from(snap.ledger_info.as_ref()),
             cursor: next_cursor.map(|c| c.encode()),
         };
 
-        serde_json::to_value(&result).map_err(|e| V2Error::internal(e))
+        serde_json::to_value(&result).map_err(V2Error::internal)
     })
     .await
 }
@@ -484,7 +554,7 @@ async fn get_block(
             transactions: None, // Simplified for batch
         };
 
-        serde_json::to_value(&block).map_err(|e| V2Error::internal(e))
+        serde_json::to_value(&block).map_err(V2Error::internal)
     })
     .await
 }
@@ -517,4 +587,29 @@ fn parse_hash_str(s: &str) -> Result<aptos_crypto::HashValue, V2Error> {
             format!("Invalid hash: {}", e),
         )
     })
+}
+
+/// Validate that a version is within the range visible to the batch snapshot.
+fn validate_version(version: u64, ledger_info: &LedgerInfo) -> Result<(), V2Error> {
+    if version > ledger_info.version() {
+        return Err(V2Error::not_found(
+            ErrorCode::VersionNotFound,
+            format!(
+                "Version {} is in the future (latest: {})",
+                version,
+                ledger_info.version()
+            ),
+        ));
+    }
+    if version < ledger_info.oldest_version() {
+        return Err(V2Error::gone(
+            ErrorCode::VersionPruned,
+            format!(
+                "Version {} has been pruned (oldest: {})",
+                version,
+                ledger_info.oldest_version()
+            ),
+        ));
+    }
+    Ok(())
 }

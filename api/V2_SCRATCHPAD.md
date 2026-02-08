@@ -30,6 +30,11 @@ Working notes, decisions log, and progress tracker for the API v2 implementation
 
 || 2026-02-08 | WebSocket event filtering: compiled EventFilter | Events subscriptions support: exact match, module wildcard (`0x1::coin::*`), address wildcard (`0x1::*`), multiple types (OR logic via `event_types[]`), sender address filtering, and start_version floor. Filters are compiled on subscribe for zero-alloc per-event matching. Backward compat: `event_type` + `event_types` are merged. All matching events are delivered (not just the first). Broadcaster now includes sender address from user txns and converts BCS event data to JSON via MoveConverter. |
 
+|| 2026-02-08 | Batch: shared snapshot | All requests in a JSON-RPC batch share a pinned `LedgerInfo` + version (`BatchSnapshot`). Guarantees read consistency and eliminates N redundant `ledger_info()` calls per batch. Per-request `ledger_version` override still supported for explicit version pinning. |
+|| 2026-02-08 | Ledger info: 50ms TTL cache | `V2Context::ledger_info()` caches the result for 50ms using `tokio::sync::RwLock` with `try_read`/`try_write` (non-blocking). Under high QPS, hundreds of requests share a single DB read. `ledger_info_uncached()` available for cases needing absolute freshness (e.g., WS broadcaster). Cache hit/miss tracked via Prometheus counters. |
+|| 2026-02-08 | WS broadcaster: adaptive poll | Poll interval auto-adjusts: starts at 100ms, shrinks by 1.5x to floor 20ms when new blocks arrive, grows by 1.5x to ceiling 500ms when idle. Resets to max when no WS clients connected. Reduces CPU usage on slow/idle chains. |
+|| 2026-02-08 | Prometheus metrics | New `v2/metrics.rs` with `aptos_api_v2_` prefix. Tracks: request duration histogram (method/path/status), request count, in-flight gauge, WS connections, WS messages, batch sizes, ledger cache hit/miss. Path normalization in middleware prevents cardinality explosion (dynamic segments → `:address`, `:hash`, etc.). |
+
 ## Open Questions
 
 - [ ] Should v2 response envelope include gas_used for view functions?
@@ -55,11 +60,12 @@ Working notes, decisions log, and progress tracker for the API v2 implementation
 - gRPC streaming (alternative to WebSocket for server-to-server)
 - ~~Advanced event filtering in WebSocket~~ (done in Phase 1)
 
-### Phase 3: Optimization
-- Shared state views for batch requests
-- Connection-level caching
-- Adaptive polling for WebSocket broadcaster
-- Performance benchmarking vs v1
+### Phase 3: Optimization (current)
+- ~~Shared state views for batch requests~~ (done)
+- ~~TTL-cached ledger info~~ (done)
+- ~~Adaptive polling for WebSocket broadcaster~~ (done)
+- ~~Prometheus metrics~~ (done)
+- ~~Performance benchmarking vs v1~~ (done)
 
 ## Progress
 
@@ -128,3 +134,14 @@ Working notes, decisions log, and progress tracker for the API v2 implementation
   - [x] Routes: `/v2/spec.json` and `/v2/spec.yaml`
   - [x] Tags: Health, Accounts, Transactions, Events, View, Blocks
   - [x] 4 integration tests (JSON spec, YAML spec, schemas, tags)
+- [x] Phase 3: Optimization
+  - [x] Batch shared snapshot: all requests in a batch share pinned `LedgerInfo` + version
+  - [x] Ledger info 50ms TTL cache: `tokio::sync::RwLock` with `try_read`/`try_write`
+  - [x] `ledger_info_uncached()` for absolute freshness (WS broadcaster, tx wait loops)
+  - [x] Adaptive WS broadcaster polling: 20ms–500ms range, 1.5x factor, idle backoff
+  - [x] Prometheus metrics module (`v2/metrics.rs`): 7 metric families with `aptos_api_v2_` prefix
+  - [x] Path normalization in middleware: dynamic segments → `:address`, `:hash`, etc.
+  - [x] Metrics instrumentation in middleware, context (cache), and batch handler
+  - [x] Head-to-head v1 vs v2 benchmarks: health, ledger_info, resources, single_resource, transactions
+  - [x] 8 unit tests for path normalization
+  - [x] Total: 74 tests passing (55 integration + 11 EventFilter + 8 path normalization)

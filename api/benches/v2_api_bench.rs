@@ -1,12 +1,14 @@
 // Copyright (c) Aptos Foundation
-// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-core/aptos-core/blob/main/LICENSE
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Performance benchmarks for the v2 API.
 //!
-//! Measures request latency and throughput for key v2 endpoints.
+//! Measures request latency and throughput for key v2 endpoints, and
+//! includes head-to-head comparisons against v1.
 //! Run with: `cargo bench -p aptos-api`
 
 use aptos_api::{
+    attach_poem_to_runtime,
     context::Context,
     v2::{
         build_v2_router,
@@ -52,6 +54,47 @@ fn setup_v2_server(rt: &tokio::runtime::Runtime) -> String {
         format!("http://{}", addr)
     })
 }
+
+/// Spin up a v1 Poem server on a random port. Returns the base URL.
+fn setup_v1_server(rt: &tokio::runtime::Runtime) -> String {
+    rt.block_on(async {
+        let mut node_config = NodeConfig::default();
+        node_config.storage.rocksdb_configs.enable_storage_sharding = false;
+
+        let test_ctx = new_test_context("bench_v1".to_string(), node_config.clone(), false);
+
+        let context = Context::new(
+            ChainId::test(),
+            test_ctx.db.clone(),
+            test_ctx.mempool.ac_client.clone(),
+            node_config.clone(),
+            None,
+        );
+
+        let poem_addr = attach_poem_to_runtime(
+            &tokio::runtime::Handle::current(),
+            context,
+            &node_config,
+            true, // random_port
+            None,
+        )
+        .expect("Failed to start v1 Poem server");
+
+        // Give Poem a moment to bind.
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        format!("http://{}", poem_addr)
+    })
+}
+
+/// Setup both servers and return (v2_url, v1_url).
+fn setup_both_servers(rt: &tokio::runtime::Runtime) -> (String, String) {
+    (setup_v2_server(rt), setup_v1_server(rt))
+}
+
+// ============================================================================
+// v2-only benchmarks
+// ============================================================================
 
 fn bench_health(c: &mut Criterion) {
     let rt = tokio::runtime::Builder::new_multi_thread()
@@ -284,6 +327,206 @@ fn bench_batch_request(c: &mut Criterion) {
     group.finish();
 }
 
+// ============================================================================
+// Head-to-head v1 vs v2 benchmarks
+// ============================================================================
+
+fn bench_v1_vs_v2_health(c: &mut Criterion) {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .enable_all()
+        .build()
+        .unwrap();
+    let (v2_url, v1_url) = setup_both_servers(&rt);
+    let client = reqwest::Client::new();
+
+    let mut group = c.benchmark_group("health");
+
+    group.bench_function("v1", |b| {
+        b.to_async(&rt).iter(|| {
+            let client = client.clone();
+            let url = format!("{}/v1/-/healthy", v1_url);
+            async move {
+                let resp = client.get(&url).send().await.unwrap();
+                assert_eq!(resp.status(), 200);
+                let _body = resp.bytes().await.unwrap();
+            }
+        })
+    });
+
+    group.bench_function("v2", |b| {
+        b.to_async(&rt).iter(|| {
+            let client = client.clone();
+            let url = format!("{}/v2/health", v2_url);
+            async move {
+                let resp = client.get(&url).send().await.unwrap();
+                assert_eq!(resp.status(), 200);
+                let _body = resp.bytes().await.unwrap();
+            }
+        })
+    });
+
+    group.finish();
+}
+
+fn bench_v1_vs_v2_ledger_info(c: &mut Criterion) {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .enable_all()
+        .build()
+        .unwrap();
+    let (v2_url, v1_url) = setup_both_servers(&rt);
+    let client = reqwest::Client::new();
+
+    let mut group = c.benchmark_group("ledger_info");
+
+    group.bench_function("v1", |b| {
+        b.to_async(&rt).iter(|| {
+            let client = client.clone();
+            let url = format!("{}/v1", v1_url);
+            async move {
+                let resp = client.get(&url).send().await.unwrap();
+                assert_eq!(resp.status(), 200);
+                let _body = resp.bytes().await.unwrap();
+            }
+        })
+    });
+
+    group.bench_function("v2", |b| {
+        b.to_async(&rt).iter(|| {
+            let client = client.clone();
+            let url = format!("{}/v2/info", v2_url);
+            async move {
+                let resp = client.get(&url).send().await.unwrap();
+                assert_eq!(resp.status(), 200);
+                let _body = resp.bytes().await.unwrap();
+            }
+        })
+    });
+
+    group.finish();
+}
+
+fn bench_v1_vs_v2_resources(c: &mut Criterion) {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .enable_all()
+        .build()
+        .unwrap();
+    let (v2_url, v1_url) = setup_both_servers(&rt);
+    let client = reqwest::Client::new();
+
+    let mut group = c.benchmark_group("get_resources_0x1");
+
+    group.bench_function("v1", |b| {
+        b.to_async(&rt).iter(|| {
+            let client = client.clone();
+            let url = format!("{}/v1/accounts/0x1/resources", v1_url);
+            async move {
+                let resp = client.get(&url).send().await.unwrap();
+                assert_eq!(resp.status(), 200);
+                let _body = resp.bytes().await.unwrap();
+            }
+        })
+    });
+
+    group.bench_function("v2", |b| {
+        b.to_async(&rt).iter(|| {
+            let client = client.clone();
+            let url = format!("{}/v2/accounts/0x1/resources", v2_url);
+            async move {
+                let resp = client.get(&url).send().await.unwrap();
+                assert_eq!(resp.status(), 200);
+                let _body = resp.bytes().await.unwrap();
+            }
+        })
+    });
+
+    group.finish();
+}
+
+fn bench_v1_vs_v2_single_resource(c: &mut Criterion) {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .enable_all()
+        .build()
+        .unwrap();
+    let (v2_url, v1_url) = setup_both_servers(&rt);
+    let client = reqwest::Client::new();
+
+    let mut group = c.benchmark_group("get_single_resource");
+
+    group.bench_function("v1", |b| {
+        b.to_async(&rt).iter(|| {
+            let client = client.clone();
+            let url = format!(
+                "{}/v1/accounts/0x1/resource/0x1::account::Account",
+                v1_url
+            );
+            async move {
+                let resp = client.get(&url).send().await.unwrap();
+                assert_eq!(resp.status(), 200);
+                let _body = resp.bytes().await.unwrap();
+            }
+        })
+    });
+
+    group.bench_function("v2", |b| {
+        b.to_async(&rt).iter(|| {
+            let client = client.clone();
+            let url = format!(
+                "{}/v2/accounts/0x1/resource/0x1::account::Account",
+                v2_url
+            );
+            async move {
+                let resp = client.get(&url).send().await.unwrap();
+                assert_eq!(resp.status(), 200);
+                let _body = resp.bytes().await.unwrap();
+            }
+        })
+    });
+
+    group.finish();
+}
+
+fn bench_v1_vs_v2_transactions(c: &mut Criterion) {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .enable_all()
+        .build()
+        .unwrap();
+    let (v2_url, v1_url) = setup_both_servers(&rt);
+    let client = reqwest::Client::new();
+
+    let mut group = c.benchmark_group("list_transactions");
+
+    group.bench_function("v1", |b| {
+        b.to_async(&rt).iter(|| {
+            let client = client.clone();
+            let url = format!("{}/v1/transactions", v1_url);
+            async move {
+                let resp = client.get(&url).send().await.unwrap();
+                assert_eq!(resp.status(), 200);
+                let _body = resp.bytes().await.unwrap();
+            }
+        })
+    });
+
+    group.bench_function("v2", |b| {
+        b.to_async(&rt).iter(|| {
+            let client = client.clone();
+            let url = format!("{}/v2/transactions", v2_url);
+            async move {
+                let resp = client.get(&url).send().await.unwrap();
+                assert_eq!(resp.status(), 200);
+                let _body = resp.bytes().await.unwrap();
+            }
+        })
+    });
+
+    group.finish();
+}
+
 criterion_group!(
     name = v2_benches;
     config = Criterion::default().sample_size(50);
@@ -298,4 +541,16 @@ criterion_group!(
         bench_view_function,
         bench_batch_request,
 );
-criterion_main!(v2_benches);
+
+criterion_group!(
+    name = v1_vs_v2_benches;
+    config = Criterion::default().sample_size(30);
+    targets =
+        bench_v1_vs_v2_health,
+        bench_v1_vs_v2_ledger_info,
+        bench_v1_vs_v2_resources,
+        bench_v1_vs_v2_single_resource,
+        bench_v1_vs_v2_transactions,
+);
+
+criterion_main!(v2_benches, v1_vs_v2_benches);

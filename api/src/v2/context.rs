@@ -24,7 +24,19 @@ use std::sync::{
     atomic::AtomicUsize,
     Arc,
 };
-use tokio::sync::broadcast;
+use std::time::Instant;
+use tokio::sync::{broadcast, RwLock};
+
+/// Default TTL for cached ledger info (in milliseconds).
+/// Ledger info changes every block (~250ms on mainnet), so 50ms TTL
+/// is a good balance between freshness and avoiding redundant DB reads.
+const LEDGER_INFO_CACHE_TTL_MS: u64 = 50;
+
+/// Cached ledger info with a timestamp for TTL expiration.
+struct CachedLedgerInfo {
+    info: LedgerInfo,
+    fetched_at: Instant,
+}
 
 /// V2 API context. Wraps the existing v1 Context and adds v2-specific state.
 ///
@@ -41,6 +53,9 @@ pub struct V2Context {
     ws_broadcaster: broadcast::Sender<WsEvent>,
     /// Count of active WebSocket connections (for connection limiting).
     ws_active_connections: Arc<AtomicUsize>,
+    /// TTL-cached ledger info. Under high QPS, many concurrent requests
+    /// within the same ~50ms window share a single DB read.
+    ledger_info_cache: Arc<RwLock<Option<CachedLedgerInfo>>>,
 }
 
 /// v2-specific configuration parsed at startup.
@@ -93,6 +108,7 @@ impl V2Context {
             v2_config: Arc::new(v2_config),
             ws_broadcaster,
             ws_active_connections: Arc::new(AtomicUsize::new(0)),
+            ledger_info_cache: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -118,8 +134,49 @@ impl V2Context {
 
     // --- Core accessors (v2 error conversion) ---
 
-    /// Get the latest ledger info, returning V2Error on failure.
+    /// Get the latest ledger info with TTL caching.
+    ///
+    /// Under high QPS, many concurrent requests within the same ~50ms window
+    /// will share a single DB read instead of each hitting the DB independently.
+    /// The cache is invalidated after `LEDGER_INFO_CACHE_TTL_MS` milliseconds.
     pub fn ledger_info(&self) -> Result<LedgerInfo, V2Error> {
+        // Fast path: try read lock first.
+        // We can't use async RwLock in a synchronous context, so we use try_read.
+        if let Ok(guard) = self.ledger_info_cache.try_read() {
+            if let Some(ref cached) = *guard {
+                if cached.fetched_at.elapsed().as_millis() < LEDGER_INFO_CACHE_TTL_MS as u128 {
+                    super::metrics::LEDGER_INFO_CACHE
+                        .with_label_values(&["hit"])
+                        .inc();
+                    return Ok(cached.info.clone());
+                }
+            }
+        }
+
+        super::metrics::LEDGER_INFO_CACHE
+            .with_label_values(&["miss"])
+            .inc();
+
+        // Cache miss or expired: fetch from DB and update cache.
+        let info = self
+            .inner
+            .get_latest_ledger_info_wrapped()
+            .map_err(V2Error::internal)?;
+
+        // Best-effort cache update (don't block if another writer is updating).
+        if let Ok(mut guard) = self.ledger_info_cache.try_write() {
+            *guard = Some(CachedLedgerInfo {
+                info: info.clone(),
+                fetched_at: Instant::now(),
+            });
+        }
+
+        Ok(info)
+    }
+
+    /// Get the latest ledger info, bypassing the cache.
+    /// Use this when you absolutely need the freshest data (e.g., tx wait loops).
+    pub fn ledger_info_uncached(&self) -> Result<LedgerInfo, V2Error> {
         self.inner
             .get_latest_ledger_info_wrapped()
             .map_err(V2Error::internal)

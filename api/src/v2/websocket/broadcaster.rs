@@ -3,6 +3,13 @@
 
 //! Background block poller that broadcasts new blocks and events to
 //! all connected WebSocket clients via a `tokio::sync::broadcast` channel.
+//!
+//! **Phase 3 optimization**: Adaptive polling. The poll interval starts at a
+//! baseline (100ms) and adjusts based on observed block production rate:
+//! - When new blocks arrive, the interval shrinks toward a floor (20ms)
+//! - When no new blocks are found, the interval grows toward a ceiling (500ms)
+//! This reduces idle CPU usage on slow chains while keeping latency low on
+//! fast chains.
 
 use super::types::WsEvent;
 use crate::v2::context::V2Context;
@@ -16,6 +23,15 @@ use tokio::sync::broadcast;
 /// this many messages will receive a `RecvError::Lagged`.
 pub const BROADCAST_CHANNEL_CAPACITY: usize = 4096;
 
+/// Adaptive polling parameters.
+const POLL_INTERVAL_MIN_MS: u64 = 20;
+const POLL_INTERVAL_MAX_MS: u64 = 500;
+const POLL_INTERVAL_INITIAL_MS: u64 = 100;
+
+/// Factor to multiply/divide interval on miss/hit.
+/// A hit divides interval by this factor; a miss multiplies.
+const POLL_ADAPT_FACTOR: f64 = 1.5;
+
 /// Create the broadcast channel for WebSocket events.
 pub fn create_broadcast_channel() -> (broadcast::Sender<WsEvent>, broadcast::Receiver<WsEvent>) {
     broadcast::channel(BROADCAST_CHANNEL_CAPACITY)
@@ -27,17 +43,19 @@ pub fn create_broadcast_channel() -> (broadcast::Sender<WsEvent>, broadcast::Rec
 /// This task runs for the lifetime of the v2 API server.
 pub async fn run_block_poller(ctx: V2Context, ws_tx: broadcast::Sender<WsEvent>) {
     let mut last_known_height: Option<u64> = None;
-    let mut interval = tokio::time::interval(Duration::from_millis(100));
+    let mut poll_interval_ms = POLL_INTERVAL_INITIAL_MS;
 
     loop {
-        interval.tick().await;
+        tokio::time::sleep(Duration::from_millis(poll_interval_ms)).await;
 
-        // Skip if nobody is listening.
+        // Skip if nobody is listening (also back off to max interval).
         if ws_tx.receiver_count() == 0 {
+            poll_interval_ms = POLL_INTERVAL_MAX_MS;
             continue;
         }
 
-        let ledger_info = match ctx.ledger_info() {
+        // Use uncached ledger info for the poller — we want the freshest state.
+        let ledger_info = match ctx.ledger_info_uncached() {
             Ok(info) => info,
             Err(_) => continue,
         };
@@ -45,10 +63,19 @@ pub async fn run_block_poller(ctx: V2Context, ws_tx: broadcast::Sender<WsEvent>)
         let current_height: u64 = ledger_info.block_height.into();
 
         let start_height = match last_known_height {
-            Some(h) if h >= current_height => continue,
+            Some(h) if h >= current_height => {
+                // No new blocks: increase poll interval (back off).
+                poll_interval_ms =
+                    ((poll_interval_ms as f64 * POLL_ADAPT_FACTOR) as u64).min(POLL_INTERVAL_MAX_MS);
+                continue;
+            },
             Some(h) => h + 1,
             None => current_height, // First iteration: only emit current block
         };
+
+        // New blocks found: decrease poll interval (speed up).
+        poll_interval_ms =
+            ((poll_interval_ms as f64 / POLL_ADAPT_FACTOR) as u64).max(POLL_INTERVAL_MIN_MS);
 
         // Emit block events for each new block since we last checked.
         for height in start_height..=current_height {
