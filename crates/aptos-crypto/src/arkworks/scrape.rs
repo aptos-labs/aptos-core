@@ -137,7 +137,7 @@ impl<'a, F: PrimeField> LowDegreeTest<'a, F> {
         ))
     }
 
-    /// Constructs the MSM input used by the LDT: the normalized group elements and
+    /// Constructs the MSM input used by the LDT: the affine group elements and
     /// the corresponding dual-codeword scalars.
     pub fn ldt_msm_input<C: CurveGroup<ScalarField = F>>(
         &self,

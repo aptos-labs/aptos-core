@@ -463,12 +463,14 @@ fn pvss_decrypt_own_share<T: Transcript, M: Measurement>(
         &mut rng,
     );
 
+    // TODO: the following code is obviously messy. Easiest fix is to extend `get_player_weight()`
+    // to `SecretSharingConfig`
     g.bench_function(format!("decrypt-share/{}", sc), move |b| {
         // Pre-compute valid player indices by checking if get_public_key_share
         // returns non-empty results. For weighted transcripts, DealtPubKeyShare is Vec,
         // for unweighted it's a single value. We can't check weight generically since
-        // get_player_weight is not part of the SecretSharingConfig trait, so we check
-        // if the share is non-empty by attempting to use it.
+        // get_player_weight is not (yet!) part of the SecretSharingConfig trait, so we
+        // check if the share is non-empty by attempting to use it.
         let valid_players: Vec<usize> = (0..sc.get_total_num_players())
             .filter(|&i| {
                 // Ensure player has a decryption key
