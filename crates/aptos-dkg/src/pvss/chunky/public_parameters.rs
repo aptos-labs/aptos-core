@@ -80,7 +80,7 @@ impl<E: Pairing> Clone for PublicParameters<E> {
             ell: self.ell,
             max_aggregation: self.max_aggregation,
             dlog_table: Self::build_dlog_table(g, self.ell, self.max_aggregation),
-            G2_table: BatchMulPreprocessing::new(self.G_2.into(), self.pk_range_proof.max_n), // Recreate table
+            G2_table: BatchMulPreprocessing::new(self.G_2.into(), self.max_num_shares as usize), // Recreate table
             powers_of_radix: compute_powers_of_radix::<E>(self.ell),
         }
     }
@@ -92,6 +92,7 @@ impl<E: Pairing> PartialEq for PublicParameters<E> {
             && self.pk_range_proof == other.pk_range_proof
             && self.G_2 == other.G_2
             && self.ell == other.ell
+            && self.max_num_shares == other.max_num_shares
             && self.max_aggregation == other.max_aggregation
         // table, G2_table, and powers_of_radix are ignored
     }
@@ -120,10 +121,17 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
     where
         D: Deserializer<'de>,
     {
-        // Deserialize the serializable fields directly
+        // Deserialize the serializable fields directly (pp_elgamal tables are skipped in wire format; we rebuild them from G, H and max_num_shares)
+        #[derive(Deserialize)]
+        struct PpElgamalBases<C: CurveGroup> {
+            #[serde(deserialize_with = "ark_de")]
+            G: C::Affine,
+            #[serde(deserialize_with = "ark_de")]
+            H: C::Affine,
+        }
         #[derive(Deserialize)]
         struct SerializedFields<E: Pairing> {
-            pp_elgamal: chunked_elgamal_pp::PublicParameters<E::G1>,
+            pp_elgamal: PpElgamalBases<E::G1>,
             #[serde(deserialize_with = "ark_de")]
             pk_range_proof: dekart_univariate_v2::ProverKey<E>,
             #[serde(deserialize_with = "ark_de")]
@@ -135,10 +143,15 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
 
         let serialized = SerializedFields::<E>::deserialize(deserializer)?;
         let G: E::G1 = serialized.pp_elgamal.G.into();
+        let pp_elgamal = chunked_elgamal_pp::PublicParameters::from_bases(
+            serialized.pp_elgamal.G,
+            serialized.pp_elgamal.H,
+            serialized.max_num_shares,
+        );
 
         Ok(Self {
             max_num_shares: serialized.max_num_shares,
-            pp_elgamal: serialized.pp_elgamal,
+            pp_elgamal,
             pk_range_proof: serialized.pk_range_proof,
             G_2: serialized.G_2,
             ell: serialized.ell,
@@ -213,10 +226,12 @@ impl<E: Pairing> TryFrom<&[u8]> for PublicParameters<E> {
 #[allow(non_snake_case)]
 impl<E: Pairing> PublicParameters<E> {
     /// Verifiably creates Aptos-specific public parameters.
+    /// If `g2` is `Some(base)`, that value is used as the commitment base (G₂); otherwise it is derived via hashing.
     pub fn new<R: RngCore + CryptoRng>(
         max_num_shares: u32,
         ell: u8,
         max_aggregation: usize,
+        g2: Option<E::G2Affine>,
         rng: &mut R,
     ) -> Self {
         assert!(ell > 0, "ell must be greater than zero");
@@ -231,7 +246,7 @@ impl<E: Pairing> PublicParameters<E> {
         let group_generators = GroupGenerators::default(); // TODO: At least one of these should come from a powers of tau ceremony?
         let pp_elgamal = chunked_elgamal_pp::PublicParameters::new(max_num_shares);
         let G = *pp_elgamal.message_base();
-        let G_2 = hashing::unsafe_hash_to_affine(b"G_2", DST);
+        let G_2 = g2.unwrap_or_else(|| hashing::unsafe_hash_to_affine(b"G_2", DST));
         let pp = Self {
             max_num_shares,
             pp_elgamal,
@@ -261,9 +276,13 @@ impl<E: Pairing> PublicParameters<E> {
         commitment_base: E::G2Affine,
         rng: &mut R,
     ) -> Self {
-        let mut pp = Self::new(n.try_into().unwrap(), ell, max_aggregation, rng);
-        pp.G_2 = commitment_base;
-        pp
+        Self::new(
+            n.try_into().unwrap(),
+            ell,
+            max_aggregation,
+            Some(commitment_base),
+            rng,
+        )
     }
 }
 
@@ -281,24 +300,24 @@ impl<E: Pairing> Default for PublicParameters<E> {
     // This is only used for testing and benchmarking
     fn default() -> Self {
         let mut rng = thread_rng();
-        Self::new(1, DEFAULT_ELL_FOR_TESTING, 1, &mut rng)
+        Self::new(1, DEFAULT_ELL_FOR_TESTING, 1, None, &mut rng)
     }
 }
 
 impl<E: Pairing> WithMaxNumShares for PublicParameters<E> {
     fn with_max_num_shares(n: u32) -> Self {
         let mut rng = thread_rng();
-        Self::new(n, DEFAULT_ELL_FOR_TESTING, 1, &mut rng)
+        Self::new(n, DEFAULT_ELL_FOR_TESTING, 1, None, &mut rng)
     }
 
     fn with_max_num_shares_and_bit_size(n: u32, ell: u8) -> Self {
         let mut rng = thread_rng();
-        Self::new(n, ell, 1, &mut rng)
+        Self::new(n, ell, 1, None, &mut rng)
     }
 
     // The only thing from `pp` that `generate()` uses is `pp.ell`, so make the rest as small as possible.
     fn with_max_num_shares_for_generate(_n: u32) -> Self {
         let mut rng = thread_rng();
-        Self::new(1, DEFAULT_ELL_FOR_TESTING, 1, &mut rng)
+        Self::new(1, DEFAULT_ELL_FOR_TESTING, 1, None, &mut rng)
     }
 }

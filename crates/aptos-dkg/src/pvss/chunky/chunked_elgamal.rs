@@ -100,16 +100,8 @@ impl<C: CurveGroup> homomorphism::Trait for WeightedHomomorphism<'_, C> {
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
         // Get the batch multiplication tables
-        let G_table = self
-            .pp
-            .G_table
-            .as_ref()
-            .expect("G_table must be initialized");
-        let H_table = self
-            .pp
-            .H_table
-            .as_ref()
-            .expect("H_table must be initialized");
+        let G_table = &*self.pp.G_table;
+        let H_table = &*self.pp.H_table;
 
         // 1. Compute C_{i,j,k} = z_{i,j,k} * G + r_{j,k} * ek_i
         //    where i is player, j is share index (which corresponds to weight level), k is chunk

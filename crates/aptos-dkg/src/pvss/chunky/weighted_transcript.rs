@@ -298,14 +298,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         let weighted_Cs =
             E::G1::msm(&base_vec, &exp_vec).expect("Failed to compute MSM of Cs in chunky");
 
-        // Convert affine to projective for normalize_batch, then back to affine for MSM
-        let Vs_slice_proj: Vec<E::G2> = Vs_flat[..sc.get_total_weight()]
-            .iter()
-            .map(|&v| v.into())
-            .collect();
-        let Vs_slice_affine = E::G2::normalize_batch(&Vs_slice_proj);
         let weighted_Vs = E::G2::msm(
-            &Vs_slice_affine, // Don't use the last entry of `Vs_flat`
+            &Vs_flat[..sc.get_total_weight()], // Don't use the last entry of `Vs_flat`
             &powers_of_beta[..sc.get_total_weight()],
         )
         .expect("Failed to compute MSM of Vs in chunky");
