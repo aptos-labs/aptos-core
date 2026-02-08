@@ -92,6 +92,23 @@ pub struct Subtranscript<E: Pairing> {
     pub Rs: Vec<Vec<E::G1Affine>>,
 }
 
+#[allow(non_snake_case)]
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct SubtranscriptProjective<E: Pairing> {
+    // The dealt public key
+    #[serde(deserialize_with = "ark_de")]
+    pub V0: E::G2,
+    // The dealt public key shares
+    #[serde(deserialize_with = "ark_de")]
+    pub Vs: Vec<Vec<E::G2>>,
+    /// First chunked ElGamal component: C[i][j] = s_{i,j} * G + r_j * ek_i. Here s_i = \sum_j s_{i,j} * B^j // TODO: change notation because B is not a group element?
+    #[serde(deserialize_with = "ark_de")]
+    pub Cs: Vec<Vec<Vec<E::G1>>>,
+    /// Second chunked ElGamal component: R[j] = r_j * H
+    #[serde(deserialize_with = "ark_de")]
+    pub Rs: Vec<Vec<E::G1>>,
+}
+
 impl<E: Pairing> ValidCryptoMaterial for Subtranscript<E> {
     const AIP_80_PREFIX: &'static str = "";
 
@@ -406,19 +423,40 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 }
 
 impl<E: Pairing> Aggregatable for Subtranscript<E> {
-    type Aggregated = Self;
+    type Aggregated = SubtranscriptProjective<E>;
     type SecretSharingConfig = SecretSharingConfig<E>;
 
     fn to_aggregated(&self) -> Self::Aggregated {
-        self.clone()
+        SubtranscriptProjective {
+            V0: self.V0.into(),
+            Vs: self
+                .Vs
+                .iter()
+                .map(|row| row.iter().map(|x| (*x).into()).collect())
+                .collect(),
+            Cs: self
+                .Cs
+                .iter()
+                .map(|i| {
+                    i.iter()
+                        .map(|j| j.iter().map(|x| (*x).into()).collect())
+                        .collect()
+                })
+                .collect(),
+            Rs: self
+                .Rs
+                .iter()
+                .map(|row| row.iter().map(|x| (*x).into()).collect())
+                .collect(),
+        }
     }
 }
 
-impl<E: Pairing> Aggregated<Subtranscript<E>> for Subtranscript<E> {
+impl<E: Pairing> Aggregated<Subtranscript<E>> for SubtranscriptProjective<E> {
     #[allow(non_snake_case)]
     fn aggregate_with(
         &mut self,
-        sc: &<Subtranscript<E> as Aggregatable>::SecretSharingConfig,
+        sc: &SecretSharingConfig<E>,
         other: &Subtranscript<E>,
     ) -> anyhow::Result<()> {
         debug_assert_eq!(self.Cs.len(), sc.get_total_num_players());
@@ -428,31 +466,30 @@ impl<E: Pairing> Aggregated<Subtranscript<E>> for Subtranscript<E> {
         debug_assert_eq!(self.Vs.len(), other.Vs.len());
 
         // Aggregate the V0s (convert to projective, add, then normalize)
-        let mut V0_proj: E::G2 = self.V0.into();
-        V0_proj += other.V0;
-        self.V0 = V0_proj.into_affine();
+        self.V0 += other.V0;
+
+        // Aggregate Vs (nested) element-wise
+        for i in 0..self.Vs.len() {
+            debug_assert_eq!(self.Vs[i].len(), other.Vs[i].len());
+            for j in 0..self.Vs[i].len() {
+                // Aggregate the V_{i,j}s
+                self.Vs[i][j] += other.Vs[i][j];
+            }
+        }
 
         for i in 0..sc.get_total_num_players() {
-            for j in 0..self.Vs[i].len() {
-                // Aggregate the V_{i,j}s (convert to projective, add, then normalize)
-                let mut v_proj: E::G2 = self.Vs[i][j].into();
-                v_proj += other.Vs[i][j];
-                self.Vs[i][j] = v_proj.into_affine();
+            for j in 0..self.Cs[i].len() {
                 for k in 0..self.Cs[i][j].len() {
-                    // Aggregate the C_{i,j,k}s (convert to projective, add, then normalize)
-                    let mut c_proj: E::G1 = self.Cs[i][j][k].into();
-                    c_proj += other.Cs[i][j][k];
-                    self.Cs[i][j][k] = c_proj.into_affine();
+                    // Aggregate the C_{i,j,k}s
+                    self.Cs[i][j][k] += other.Cs[i][j][k];
                 }
             }
         }
 
         for j in 0..self.Rs.len() {
             for (R_jk, other_R_jk) in self.Rs[j].iter_mut().zip(&other.Rs[j]) {
-                // Aggregate the R_{j,k}s (convert to projective, add, then normalize)
-                let mut r_proj: E::G1 = (*R_jk).into();
-                r_proj += *other_R_jk;
-                *R_jk = r_proj.into_affine();
+                // Aggregate the R_{j,k}s
+                *R_jk += *other_R_jk;
             }
         }
 
@@ -460,7 +497,56 @@ impl<E: Pairing> Aggregated<Subtranscript<E>> for Subtranscript<E> {
     }
 
     fn normalize(self) -> Subtranscript<E> {
-        self
+        // Collect all G1 elements (from Cs and Rs)
+        let mut g1_elems = Vec::new();
+        for player_cs in &self.Cs {
+            for chunks in player_cs {
+                g1_elems.extend(chunks.iter().copied());
+            }
+        }
+        for weight_rs in &self.Rs {
+            g1_elems.extend(weight_rs.iter().copied());
+        }
+
+        // Collect all G2 elements (from V0 and Vs)
+        let mut g2_elems = vec![self.V0];
+        for row in &self.Vs {
+            g2_elems.extend(row.iter().copied());
+        }
+
+        // Batch normalize
+        let g1_affine = E::G1::normalize_batch(&g1_elems);
+        let g2_affine = E::G2::normalize_batch(&g2_elems);
+
+        // Reconstruct nested structures in affine form
+        let mut g1_iter = g1_affine.into_iter();
+        let mut g2_iter = g2_affine.into_iter();
+
+        let result = Subtranscript {
+            V0: g2_iter.next().unwrap(),
+            Vs: self
+                .Vs
+                .iter()
+                .map(|row| row.iter().map(|_| g2_iter.next().unwrap()).collect())
+                .collect(),
+            Cs: self
+                .Cs
+                .iter()
+                .map(|mat| {
+                    mat.iter()
+                        .map(|row| row.iter().map(|_| g1_iter.next().unwrap()).collect())
+                        .collect()
+                })
+                .collect(),
+            Rs: self
+                .Rs
+                .iter()
+                .map(|row| row.iter().map(|_| g1_iter.next().unwrap()).collect())
+                .collect(),
+        };
+        debug_assert!(g1_iter.next().is_none());
+        debug_assert!(g2_iter.next().is_none());
+        result
     }
 }
 
