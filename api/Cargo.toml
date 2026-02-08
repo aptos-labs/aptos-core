@@ -76,6 +76,7 @@ proptest = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
+tokio-tungstenite = { workspace = true }
 warp = { workspace = true }
 
 [features]

@@ -24,6 +24,8 @@ Working notes, decisions log, and progress tracker for the API v2 implementation
 | 2026-02-07 | HTTP/2 (h2c): already supported by axum::serve | `axum::serve` uses `hyper_util::server::conn::auto::Builder` internally, which auto-negotiates HTTP/1.1 and HTTP/2 (h2c prior knowledge). No additional configuration needed. |
 | 2026-02-07 | Same-port co-hosting: Axum external + Poem internal proxy | Poem v1 starts on internal random port; Axum serves as the external-facing server with v2 routes and a reverse proxy fallback for v1. Both Poem 3.x and Axum 0.7 use hyper 1.x / http 1.x so types are compatible. Config: `api_v2.address = None` = same port, `api_v2.address = Some(addr)` = separate port. |
 
+| 2026-02-08 | WebSocket: broadcast + per-connection filter | Background block poller writes to `broadcast::Sender<WsEvent>` (capacity 4096); each connection subscribes and filters events against its active subscriptions. tx_status uses dedicated per-subscription poller task. `tokio-tungstenite 0.21.0` (matches axum's internal tungstenite) for test client. |
+
 ## Open Questions
 
 - [ ] Should v2 response envelope include gas_used for view functions?
@@ -79,11 +81,20 @@ Working notes, decisions log, and progress tracker for the API v2 implementation
 - [x] JsonOrBcs + BcsOnly content negotiation extractors
 - [x] V2Response envelope with LedgerMetadata in body
 - [x] Cursor unit tests (4 passing)
-- [x] Integration tests (30 tests: 24 v2 endpoint tests + 6 co-hosting tests)
+- [x] Integration tests (39 tests: 24 endpoint + 6 co-hosting + 9 WebSocket)
 - [x] Performance benchmarks (9 criterion benchmarks incl. parameterized batch)
 - [x] HTTP/2 (h2c) — already supported by axum::serve (uses hyper_util auto::Builder)
 - [x] Same-port Poem+Axum co-hosting via reverse proxy (api_v2.address=None → same port)
 - [x] V1Proxy module for reverse-proxying v1 requests to internal Poem server
-- [ ] WebSocket support
+- [x] WebSocket support (`/v2/ws` with subscribe/unsubscribe/ping protocol)
+  - [x] `websocket/types.rs`: WsClientMessage, WsServerMessage, SubscriptionType, WsEvent
+  - [x] `websocket/broadcaster.rs`: background block poller with broadcast channel (capacity 4096)
+  - [x] `websocket/mod.rs`: ws_handler, per-connection read/write/broadcast loops, match_event, tx_status_tracker
+  - [x] V2Context extended with broadcast::Sender<WsEvent> and AtomicUsize active connection counter
+  - [x] Route `/v2/ws` added to router
+  - [x] Block poller started in runtime.rs when websocket_enabled=true
+  - [x] Subscription types: new_blocks, transaction_status (hash-specific poller), events (type filter)
+  - [x] Guards: max_connections, max_subscriptions_per_conn, configurable via ApiV2Config
+  - [x] 9 integration tests (ping/pong, subscribe, unsubscribe, error cases, tx status lifecycle)
 - [ ] OpenAPI spec generation (utoipa-axum not yet compatible with axum 0.7)
 - [ ] TLS support for v2 server (currently h2c only, TLS would enable full h2)

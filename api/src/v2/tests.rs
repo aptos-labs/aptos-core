@@ -715,3 +715,258 @@ async fn test_cohost_both_versions_on_same_port() {
     let v1_chain_id = v1_body["chain_id"].as_u64().unwrap();
     assert_eq!(v2_chain_id, v1_chain_id, "Both APIs should report the same chain_id");
 }
+
+// ======================================================================
+// WebSocket tests
+// ======================================================================
+
+use tokio_tungstenite::tungstenite;
+
+/// Helper: connect to the v2 WebSocket endpoint.
+async fn ws_connect(
+    addr: SocketAddr,
+) -> tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>> {
+    let url = format!("ws://127.0.0.1:{}/v2/ws", addr.port());
+    let (ws_stream, _) = tokio_tungstenite::connect_async(&url)
+        .await
+        .expect("Failed to connect WebSocket");
+    ws_stream
+}
+
+/// Helper: send a JSON message and receive a JSON response.
+async fn ws_send_recv(
+    ws: &mut tokio_tungstenite::WebSocketStream<
+        tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+    >,
+    msg: serde_json::Value,
+) -> serde_json::Value {
+    use futures::{SinkExt, StreamExt};
+    ws.send(tungstenite::Message::Text(msg.to_string()))
+        .await
+        .expect("Failed to send WS message");
+
+    // Read with timeout.
+    let resp = tokio::time::timeout(std::time::Duration::from_secs(5), ws.next())
+        .await
+        .expect("Timed out waiting for WS response")
+        .expect("WS stream ended")
+        .expect("WS read error");
+
+    match resp {
+        tungstenite::Message::Text(text) => {
+            serde_json::from_str(&text).expect("Invalid JSON from server")
+        },
+        other => panic!("Expected text message, got: {:?}", other),
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_ws_ping_pong() {
+    let (addr, _handle) = start_v2_server().await;
+    let mut ws = ws_connect(addr).await;
+
+    let resp = ws_send_recv(
+        &mut ws,
+        serde_json::json!({
+            "action": "ping",
+            "nonce": 42
+        }),
+    )
+    .await;
+
+    assert_eq!(resp["type"], "pong");
+    assert_eq!(resp["nonce"], 42);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_ws_subscribe_new_blocks() {
+    let (addr, _handle) = start_v2_server().await;
+    let mut ws = ws_connect(addr).await;
+
+    let resp = ws_send_recv(
+        &mut ws,
+        serde_json::json!({
+            "action": "subscribe",
+            "type": "new_blocks"
+        }),
+    )
+    .await;
+
+    assert_eq!(resp["type"], "subscribed");
+    assert!(resp["id"].is_string(), "Should return a subscription ID");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_ws_subscribe_with_custom_id() {
+    let (addr, _handle) = start_v2_server().await;
+    let mut ws = ws_connect(addr).await;
+
+    let resp = ws_send_recv(
+        &mut ws,
+        serde_json::json!({
+            "action": "subscribe",
+            "id": "my_blocks",
+            "type": "new_blocks"
+        }),
+    )
+    .await;
+
+    assert_eq!(resp["type"], "subscribed");
+    assert_eq!(resp["id"], "my_blocks");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_ws_unsubscribe() {
+    let (addr, _handle) = start_v2_server().await;
+    let mut ws = ws_connect(addr).await;
+
+    // Subscribe first.
+    let sub_resp = ws_send_recv(
+        &mut ws,
+        serde_json::json!({
+            "action": "subscribe",
+            "id": "to_remove",
+            "type": "new_blocks"
+        }),
+    )
+    .await;
+    assert_eq!(sub_resp["type"], "subscribed");
+
+    // Unsubscribe.
+    let unsub_resp = ws_send_recv(
+        &mut ws,
+        serde_json::json!({
+            "action": "unsubscribe",
+            "id": "to_remove"
+        }),
+    )
+    .await;
+    assert_eq!(unsub_resp["type"], "unsubscribed");
+    assert_eq!(unsub_resp["id"], "to_remove");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_ws_unsubscribe_unknown() {
+    let (addr, _handle) = start_v2_server().await;
+    let mut ws = ws_connect(addr).await;
+
+    let resp = ws_send_recv(
+        &mut ws,
+        serde_json::json!({
+            "action": "unsubscribe",
+            "id": "nonexistent"
+        }),
+    )
+    .await;
+
+    assert_eq!(resp["type"], "error");
+    assert_eq!(resp["code"], "UNKNOWN_SUBSCRIPTION");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_ws_invalid_message() {
+    let (addr, _handle) = start_v2_server().await;
+    let mut ws = ws_connect(addr).await;
+
+    // Send something that doesn't parse as WsClientMessage.
+    let resp = ws_send_recv(&mut ws, serde_json::json!({"bogus": true})).await;
+
+    assert_eq!(resp["type"], "error");
+    assert_eq!(resp["code"], "INVALID_MESSAGE");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_ws_subscribe_events_with_filter() {
+    let (addr, _handle) = start_v2_server().await;
+    let mut ws = ws_connect(addr).await;
+
+    let resp = ws_send_recv(
+        &mut ws,
+        serde_json::json!({
+            "action": "subscribe",
+            "type": "events",
+            "event_type": "0x1::coin::DepositEvent"
+        }),
+    )
+    .await;
+
+    assert_eq!(resp["type"], "subscribed");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_ws_subscribe_tx_status_invalid_hash() {
+    let (addr, _handle) = start_v2_server().await;
+    let mut ws = ws_connect(addr).await;
+
+    let resp = ws_send_recv(
+        &mut ws,
+        serde_json::json!({
+            "action": "subscribe",
+            "type": "transaction_status",
+            "hash": "not_a_valid_hash"
+        }),
+    )
+    .await;
+
+    assert_eq!(resp["type"], "error");
+    assert_eq!(resp["code"], "INVALID_HASH");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_ws_subscribe_tx_status_sends_pending_then_not_found() {
+    let (addr, _handle) = start_v2_server().await;
+    let mut ws = ws_connect(addr).await;
+
+    // Subscribe to a fake tx hash that won't be found.
+    // Use a very short timeout so the test finishes quickly.
+    let fake_hash = "0x0000000000000000000000000000000000000000000000000000000000000001";
+
+    use futures::{SinkExt, StreamExt};
+    ws.send(tungstenite::Message::Text(
+        serde_json::json!({
+            "action": "subscribe",
+            "id": "tx_track",
+            "type": "transaction_status",
+            "hash": fake_hash
+        })
+        .to_string(),
+    ))
+    .await
+    .unwrap();
+
+    // Should get "subscribed" ack, then "pending" status, then eventually "not_found".
+    let mut got_subscribed = false;
+    let mut got_pending = false;
+    let mut got_not_found = false;
+
+    let deadline = std::time::Duration::from_secs(35);
+    let start = std::time::Instant::now();
+
+    while start.elapsed() < deadline {
+        let msg = tokio::time::timeout(std::time::Duration::from_secs(32), ws.next()).await;
+        match msg {
+            Ok(Some(Ok(tungstenite::Message::Text(text)))) => {
+                let val: serde_json::Value = serde_json::from_str(&text).unwrap();
+                match val["type"].as_str() {
+                    Some("subscribed") => got_subscribed = true,
+                    Some("transaction_status_update") => {
+                        match val["data"]["status"].as_str() {
+                            Some("pending") => got_pending = true,
+                            Some("not_found") => {
+                                got_not_found = true;
+                                break;
+                            },
+                            _ => {},
+                        }
+                    },
+                    _ => {},
+                }
+            },
+            _ => break,
+        }
+    }
+
+    assert!(got_subscribed, "Should have received 'subscribed' ack");
+    assert!(got_pending, "Should have received 'pending' status");
+    assert!(got_not_found, "Should have received 'not_found' status");
+}

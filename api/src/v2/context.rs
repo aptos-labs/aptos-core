@@ -7,6 +7,7 @@
 use super::{
     cursor::Cursor,
     error::{ErrorCode, V2Error},
+    websocket::{broadcaster, types::WsEvent},
 };
 use crate::context::Context;
 use aptos_api_types::LedgerInfo;
@@ -19,7 +20,11 @@ use aptos_types::{
     transaction::Version,
 };
 use move_core_types::language_storage::{ModuleId, StructTag};
-use std::sync::Arc;
+use std::sync::{
+    atomic::AtomicUsize,
+    Arc,
+};
+use tokio::sync::broadcast;
 
 /// V2 API context. Wraps the existing v1 Context and adds v2-specific state.
 ///
@@ -31,6 +36,11 @@ pub struct V2Context {
     inner: Arc<Context>,
     /// v2-specific configuration.
     pub v2_config: Arc<V2Config>,
+    /// WebSocket broadcast channel sender. All connected WS clients subscribe
+    /// to this channel to receive block/event notifications.
+    ws_broadcaster: broadcast::Sender<WsEvent>,
+    /// Count of active WebSocket connections (for connection limiting).
+    ws_active_connections: Arc<AtomicUsize>,
 }
 
 /// v2-specific configuration parsed at startup.
@@ -77,15 +87,33 @@ impl V2Config {
 
 impl V2Context {
     pub fn new(inner: Context, v2_config: V2Config) -> Self {
+        let (ws_broadcaster, _) = broadcaster::create_broadcast_channel();
         Self {
             inner: Arc::new(inner),
             v2_config: Arc::new(v2_config),
+            ws_broadcaster,
+            ws_active_connections: Arc::new(AtomicUsize::new(0)),
         }
     }
 
     /// Access the underlying v1 context.
     pub fn inner(&self) -> &Context {
         &self.inner
+    }
+
+    /// Get a new broadcast receiver for WebSocket events.
+    pub fn ws_subscribe(&self) -> broadcast::Receiver<WsEvent> {
+        self.ws_broadcaster.subscribe()
+    }
+
+    /// Get a clone of the broadcast sender (for the block poller).
+    pub fn ws_broadcaster(&self) -> broadcast::Sender<WsEvent> {
+        self.ws_broadcaster.clone()
+    }
+
+    /// Get the active WebSocket connection counter.
+    pub fn ws_active_connections(&self) -> &AtomicUsize {
+        &self.ws_active_connections
     }
 
     // --- Core accessors (v2 error conversion) ---

@@ -525,6 +525,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "tokio-tungstenite 0.21.0",
  "tower 0.5.3",
  "tower-http 0.6.8",
  "utoipa",

@@ -9,6 +9,7 @@ use super::{
     endpoints::{account_transactions, blocks, events, health, modules, resources, transactions, view},
     middleware,
     proxy::{self, V1Proxy},
+    websocket,
 };
 use axum::{
     middleware as axum_middleware,
@@ -77,6 +78,8 @@ pub fn build_v2_router(ctx: V2Context) -> Router {
         )
         // Batch (JSON-RPC 2.0)
         .route("/v2/batch", post(batch::batch_handler))
+        // WebSocket
+        .route("/v2/ws", get(websocket::ws_handler))
         // Middleware stack (applied bottom-up: first listed = outermost)
         .layer(axum_middleware::from_fn(middleware::request_id_layer))
         .layer(axum_middleware::from_fn(middleware::logging_layer))

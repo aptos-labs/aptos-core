@@ -19,6 +19,7 @@ pub mod middleware;
 pub mod proxy;
 pub mod router;
 pub mod types;
+pub mod websocket;
 
 pub use context::V2Context;
 pub use error::{ErrorCode, V2Error};

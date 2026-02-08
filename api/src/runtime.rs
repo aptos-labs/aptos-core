@@ -60,6 +60,16 @@ pub fn bootstrap(
         let v2_config = V2Config::from_configs(&config.api_v2, &config.api);
         let v2_ctx = V2Context::new(context.clone(), v2_config);
 
+        // Start the WebSocket block poller if WebSocket is enabled.
+        if config.api_v2.websocket_enabled {
+            let poller_ctx = v2_ctx.clone();
+            let ws_tx = v2_ctx.ws_broadcaster();
+            runtime.spawn(async move {
+                crate::v2::websocket::broadcaster::run_block_poller(poller_ctx, ws_tx).await;
+            });
+            info!("v2 API WebSocket block poller started");
+        }
+
         if let Some(v2_address) = config.api_v2.address {
             // ---- Separate port mode ----
             // Poem serves v1 on the main port; Axum serves v2 on a separate port.
