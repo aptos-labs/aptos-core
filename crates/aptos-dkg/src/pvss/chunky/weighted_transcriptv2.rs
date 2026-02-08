@@ -6,19 +6,18 @@ use crate::{
     pcs::univariate_hiding_kzg,
     pvss::{
         chunky::{
-            chunked_elgamal::{self, decrypt_chunked_scalars, num_chunks_per_scalar},
+            chunked_elgamal::{self, num_chunks_per_scalar},
             chunked_scalar_mul, chunks,
             hkzg_chunked_elgamal::HkzgWeightedElgamalWitness,
             hkzg_chunked_elgamal_commit,
             input_secret::InputSecret,
             keys,
             public_parameters::PublicParameters,
+            weighted_transcript,
         },
         traits::{
             self,
-            transcript::{
-                Aggregatable, Aggregated, HasAggregatableSubtranscript, MalleableTranscript,
-            },
+            transcript::{HasAggregatableSubtranscript, MalleableTranscript},
         },
         Player,
     },
@@ -50,10 +49,7 @@ use aptos_crypto::{
 use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup};
 use ark_ff::{AdditiveGroup, Fp, FpConfig};
 use ark_poly::EvaluationDomain;
-use ark_serialize::{
-    CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid, Validate,
-    Write,
-};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use serde::{Deserialize, Serialize};
 use std::ops::{Mul, Sub};
 
@@ -67,105 +63,10 @@ pub struct Transcript<E: Pairing> {
     dealer: Player,
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     /// This is the aggregatable subtranscript
-    pub subtrs: Subtranscript<E>,
+    pub subtrs: weighted_transcript::Subtranscript<E>,
     /// Proof (of knowledge) showing that the s_{i,j}'s in C are base-B representations (of the s_i's in V, but this is not part of the proof), and that the r_j's in R are used in C
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub sharing_proof: SharingProof<E>,
-}
-
-#[allow(non_snake_case)]
-#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct Subtranscript<E: Pairing> {
-    // The dealt public key
-    #[serde(deserialize_with = "ark_de")]
-    pub V0: E::G2Affine,
-    // The dealt public key shares
-    #[serde(deserialize_with = "ark_de")]
-    pub Vs: Vec<Vec<E::G2Affine>>,
-    /// First chunked ElGamal component: C[i][j] = s_{i,j} * G + r_j * ek_i. Here s_i = \sum_j s_{i,j} * B^j // TODO: change notation because B is not a group element?
-    #[serde(deserialize_with = "ark_de")]
-    pub Cs: Vec<Vec<Vec<E::G1Affine>>>,
-    /// Second chunked ElGamal component: R[j] = r_j * H
-    #[serde(deserialize_with = "ark_de")]
-    pub Rs: Vec<Vec<E::G1Affine>>,
-}
-
-#[allow(non_snake_case)]
-#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct SubtranscriptProjective<E: Pairing> {
-    // The dealt public key
-    #[serde(deserialize_with = "ark_de")]
-    pub V0: E::G2,
-    // The dealt public key shares
-    #[serde(deserialize_with = "ark_de")]
-    pub Vs: Vec<Vec<E::G2>>,
-    /// First chunked ElGamal component: C[i][j] = s_{i,j} * G + r_j * ek_i. Here s_i = \sum_j s_{i,j} * B^j // TODO: change notation because B is not a group element?
-    #[serde(deserialize_with = "ark_de")]
-    pub Cs: Vec<Vec<Vec<E::G1>>>,
-    /// Second chunked ElGamal component: R[j] = r_j * H
-    #[serde(deserialize_with = "ark_de")]
-    pub Rs: Vec<Vec<E::G1>>,
-}
-
-impl<E: Pairing> CanonicalSerialize for Subtranscript<E> {
-    fn serialize_with_mode<W: Write>(
-        &self,
-        mut writer: W,
-        compress: Compress,
-    ) -> Result<(), SerializationError> {
-        // Serialize directly since we already store affine elements
-        self.V0.serialize_with_mode(&mut writer, compress)?;
-        self.Vs.serialize_with_mode(&mut writer, compress)?;
-        self.Cs.serialize_with_mode(&mut writer, compress)?;
-        self.Rs.serialize_with_mode(&mut writer, compress)?;
-        Ok(())
-    }
-
-    fn serialized_size(&self, compress: Compress) -> usize {
-        // 1. V0
-        let mut size = self.V0.serialized_size(compress);
-
-        // 2. Vs (Vec<Vec<E::G2Affine>>>)
-        size += 4; // outer length
-        for row in &self.Vs {
-            size += 4; // inner row length
-            size += row.len() * <E::G2 as CurveGroup>::Affine::zero().serialized_size(compress);
-        }
-
-        // 3. Cs (Vec<Vec<Vec<E::G1Affine>>>)
-        size += 4; // outer length
-        for mat in &self.Cs {
-            size += 4; // inner matrix length
-            for row in mat {
-                size += 4; // row length
-                size += row.len() * <E::G1 as CurveGroup>::Affine::zero().serialized_size(compress);
-                // this can be done simpler
-            }
-        }
-
-        // 4. Rs (Vec<Vec<E::G1Affine>>)
-        size += 4; // outer length
-        for row in &self.Rs {
-            size += 4; // row length
-            size += row.len() * <E::G1 as CurveGroup>::Affine::zero().serialized_size(compress);
-            // same, something like 4 + Rs.len() * (4 + Rs[0].len() * zero().serialized_size(compress))
-        }
-
-        size
-    }
-}
-
-impl<E: Pairing> Serialize for Subtranscript<E> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let mut bytes = Vec::with_capacity(self.serialized_size(Compress::Yes));
-        self.serialize_with_mode(&mut bytes, Compress::Yes)
-            .map_err(serde::ser::Error::custom)?;
-
-        serializer.serialize_bytes(&bytes)
-    }
 }
 
 // #[allow(non_snake_case)]
@@ -294,69 +195,6 @@ impl<E: Pairing> Serialize for Subtranscript<E> {
 //     }
 // }
 
-// `CanonicalDeserialize` needs `Valid`
-impl<E: Pairing> Valid for Subtranscript<E> {
-    fn check(&self) -> Result<(), SerializationError> {
-        Ok(())
-    }
-}
-
-#[allow(non_snake_case)]
-impl<E: Pairing> CanonicalDeserialize for Subtranscript<E> {
-    fn deserialize_with_mode<R: Read>(
-        mut reader: R,
-        compress: Compress,
-        validate: Validate,
-    ) -> Result<Self, SerializationError> {
-        //
-        // 1. Deserialize V0 (G2Affine)
-        //
-        let V0 =
-            <E::G2 as CurveGroup>::Affine::deserialize_with_mode(&mut reader, compress, validate)?;
-
-        //
-        // 2. Deserialize Vs (Vec<Vec<E::G2Affine>>)
-        //
-        let Vs: Vec<Vec<<E::G2 as CurveGroup>::Affine>> =
-            CanonicalDeserialize::deserialize_with_mode(&mut reader, compress, validate)?;
-
-        //
-        // 3. Deserialize Cs (Vec<Vec<Vec<E::G1Affine>>>)
-        //
-        let Cs: Vec<Vec<Vec<<E::G1 as CurveGroup>::Affine>>> =
-            CanonicalDeserialize::deserialize_with_mode(&mut reader, compress, validate)?;
-
-        //
-        // 4. Deserialize Rs (Vec<Vec<E::G1Affine>>)
-        //
-        let Rs: Vec<Vec<<E::G1 as CurveGroup>::Affine>> =
-            CanonicalDeserialize::deserialize_with_mode(&mut reader, compress, validate)?;
-
-        //
-        // 5. Construct the Subtranscript
-        //
-        Ok(Subtranscript { V0, Vs, Cs, Rs })
-    }
-}
-
-impl<E: Pairing> ValidCryptoMaterial for Subtranscript<E> {
-    const AIP_80_PREFIX: &'static str = "";
-
-    fn to_bytes(&self) -> Vec<u8> {
-        // TODO: using `Result<Vec<u8>>` and `.map_err(|_| CryptoMaterialError::DeserializationError)` would be more consistent here?
-        bcs::to_bytes(&self).expect("Unexpected error during PVSS transcript serialization")
-    }
-}
-
-impl<E: Pairing> TryFrom<&[u8]> for Subtranscript<E> {
-    type Error = CryptoMaterialError;
-
-    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        bcs::from_bytes::<Subtranscript<E>>(bytes)
-            .map_err(|_| CryptoMaterialError::DeserializationError)
-    }
-}
-
 /// This is the secret sharing config that will be used for weighted `chunky`
 #[allow(type_alias_bounds)]
 type SecretSharingConfig<E: Pairing> = WeightedConfigArkworks<E::ScalarField>;
@@ -364,7 +202,7 @@ type SecretSharingConfig<E: Pairing> = WeightedConfigArkworks<E::ScalarField>;
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
     HasAggregatableSubtranscript for Transcript<E>
 {
-    type Subtranscript = Subtranscript<E>;
+    type Subtranscript = weighted_transcript::Subtranscript<E>;
 
     fn get_subtranscript(&self) -> Self::Subtranscript {
         self.subtrs.clone()
@@ -512,201 +350,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         // verify_msm_terms_with_start(ldt_msm_terms, sigma_bases, sigma_scalars, beta_powers);
 
         Ok(())
-    }
-}
-
-impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Subtranscript
-    for Subtranscript<E>
-{
-    type DealtPubKey = keys::DealtPubKey<E>;
-    type DealtPubKeyShare = Vec<keys::DealtPubKeyShare<E>>;
-    type DealtSecretKey = keys::DealtSecretKey<E::ScalarField>;
-    type DealtSecretKeyShare = Vec<keys::DealtSecretKeyShare<E::ScalarField>>;
-    type DecryptPrivKey = keys::DecryptPrivKey<E>;
-    type EncryptPubKey = keys::EncryptPubKey<E>;
-    type PublicParameters = PublicParameters<E>;
-    type SecretSharingConfig = SecretSharingConfig<E>;
-
-    #[allow(non_snake_case)]
-    fn get_public_key_share(
-        &self,
-        _sc: &Self::SecretSharingConfig,
-        player: &Player,
-    ) -> Self::DealtPubKeyShare {
-        self.Vs[player.id]
-            .iter()
-            .map(|&V_i| keys::DealtPubKeyShare::<E>::new(keys::DealtPubKey::new(V_i)))
-            .collect()
-    }
-
-    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
-        Self::DealtPubKey::new(self.V0)
-    }
-
-    #[allow(non_snake_case)]
-    fn decrypt_own_share(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        player: &Player,
-        dk: &Self::DecryptPrivKey,
-        pp: &Self::PublicParameters,
-    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        let Cs = &self.Cs[player.id];
-        debug_assert_eq!(Cs.len(), sc.get_player_weight(player));
-
-        if !Cs.is_empty() {
-            if let Some(first_key) = self.Rs.first() {
-                debug_assert_eq!(
-                    first_key.len(),
-                    Cs[0].len(),
-                    "Number of ephemeral keys does not match the number of ciphertext chunks"
-                );
-            }
-        }
-
-        let pk_shares = self.get_public_key_share(sc, player);
-
-        let sk_shares: Vec<_> = decrypt_chunked_scalars(
-            &Cs,
-            &self.Rs,
-            &dk.dk,
-            &pp.pp_elgamal,
-            &pp.dlog_table,
-            pp.ell,
-        );
-
-        (
-            Scalar::vec_from_inner(sk_shares),
-            pk_shares, // TODO: review this formalism... why do we need this here?
-        )
-    }
-}
-
-impl<E: Pairing> Aggregatable for Subtranscript<E> {
-    type Aggregated = SubtranscriptProjective<E>;
-    type SecretSharingConfig = SecretSharingConfig<E>;
-
-    fn to_aggregated(&self) -> Self::Aggregated {
-        SubtranscriptProjective {
-            V0: self.V0.into(),
-            Vs: self
-                .Vs
-                .iter()
-                .map(|row| row.iter().map(|x| (*x).into()).collect())
-                .collect(),
-            Cs: self
-                .Cs
-                .iter()
-                .map(|i| {
-                    i.iter()
-                        .map(|j| j.iter().map(|x| (*x).into()).collect())
-                        .collect()
-                })
-                .collect(),
-            Rs: self
-                .Rs
-                .iter()
-                .map(|row| row.iter().map(|x| (*x).into()).collect())
-                .collect(),
-        }
-    }
-}
-
-impl<E: Pairing> Aggregated<Subtranscript<E>> for SubtranscriptProjective<E> {
-    #[allow(non_snake_case)]
-    fn aggregate_with(
-        &mut self,
-        sc: &SecretSharingConfig<E>,
-        other: &Subtranscript<E>,
-    ) -> anyhow::Result<()> {
-        debug_assert_eq!(self.Cs.len(), sc.get_total_num_players());
-        debug_assert_eq!(self.Vs.len(), sc.get_total_num_players());
-        debug_assert_eq!(self.Cs.len(), other.Cs.len());
-        debug_assert_eq!(self.Rs.len(), other.Rs.len());
-        debug_assert_eq!(self.Vs.len(), other.Vs.len());
-
-        // Aggregate the V0s (convert to projective, add, then normalize)
-        self.V0 += other.V0;
-
-        // Aggregate Vs (nested) element-wise
-        for i in 0..self.Vs.len() {
-            debug_assert_eq!(self.Vs[i].len(), other.Vs[i].len());
-            for j in 0..self.Vs[i].len() {
-                // Aggregate the V_{i,j}s
-                self.Vs[i][j] += other.Vs[i][j];
-            }
-        }
-
-        for i in 0..sc.get_total_num_players() {
-            for j in 0..self.Cs[i].len() {
-                for k in 0..self.Cs[i][j].len() {
-                    // Aggregate the C_{i,j,k}s
-                    self.Cs[i][j][k] += other.Cs[i][j][k];
-                }
-            }
-        }
-
-        for j in 0..self.Rs.len() {
-            for (R_jk, other_R_jk) in self.Rs[j].iter_mut().zip(&other.Rs[j]) {
-                // Aggregate the R_{j,k}s
-                *R_jk += *other_R_jk;
-            }
-        }
-
-        Ok(())
-    }
-
-    fn normalize(self) -> Subtranscript<E> {
-        // Collect all G1 elements (from Cs and Rs)
-        let mut g1_elems = Vec::new();
-        for player_cs in &self.Cs {
-            for chunks in player_cs {
-                g1_elems.extend(chunks.iter().copied());
-            }
-        }
-        for weight_rs in &self.Rs {
-            g1_elems.extend(weight_rs.iter().copied());
-        }
-
-        // Collect all G2 elements (from V0 and Vs)
-        let mut g2_elems = vec![self.V0];
-        for row in &self.Vs {
-            g2_elems.extend(row.iter().copied());
-        }
-
-        // Batch normalize
-        let g1_affine = E::G1::normalize_batch(&g1_elems);
-        let g2_affine = E::G2::normalize_batch(&g2_elems);
-
-        // Reconstruct nested structures in affine form
-        let mut g1_iter = g1_affine.into_iter();
-        let mut g2_iter = g2_affine.into_iter();
-
-        let result = Subtranscript {
-            V0: g2_iter.next().unwrap(),
-            Vs: self
-                .Vs
-                .iter()
-                .map(|row| row.iter().map(|_| g2_iter.next().unwrap()).collect())
-                .collect(),
-            Cs: self
-                .Cs
-                .iter()
-                .map(|mat| {
-                    mat.iter()
-                        .map(|row| row.iter().map(|_| g1_iter.next().unwrap()).collect())
-                        .collect()
-                })
-                .collect(),
-            Rs: self
-                .Rs
-                .iter()
-                .map(|row| row.iter().map(|_| g1_iter.next().unwrap()).collect())
-                .collect(),
-        };
-        debug_assert!(g1_iter.next().is_none());
-        debug_assert!(g2_iter.next().is_none());
-        result
     }
 }
 
@@ -869,7 +512,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         Transcript {
             dealer: *dealer,
-            subtrs: Subtranscript { V0, Vs, Cs, Rs },
+            subtrs: weighted_transcript::Subtranscript { V0, Vs, Cs, Rs },
             sharing_proof,
         }
     }
@@ -1029,7 +672,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         Transcript {
             dealer: sc.get_player(0),
-            subtrs: Subtranscript { V0, Vs, Cs, Rs },
+            subtrs: weighted_transcript::Subtranscript { V0, Vs, Cs, Rs },
             sharing_proof: SharingProof {
                 range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
                     unsafe_random_point_group(rng),

@@ -22,9 +22,7 @@ pub use public_parameters::{PublicParameters, DEFAULT_ELL_FOR_TESTING};
 pub use weighted_transcript::{
     Subtranscript as WeightedSubtranscript, Transcript as UnsignedWeightedTranscript,
 };
-pub use weighted_transcriptv2::{
-    Subtranscript as WeightedSubtranscriptv2, Transcript as UnsignedWeightedTranscriptv2,
-};
+pub use weighted_transcriptv2::Transcript as UnsignedWeightedTranscriptv2;
 #[allow(type_alias_bounds)]
 pub type SignedWeightedTranscript<E: Pairing> = GenericSigning<UnsignedWeightedTranscript<E>>;
 #[allow(type_alias_bounds)]
