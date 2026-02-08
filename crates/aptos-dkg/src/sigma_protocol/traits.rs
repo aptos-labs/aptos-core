@@ -230,15 +230,6 @@ impl<T> Statement for T where T: CanonicalSerialize + CanonicalDeserialize + Clo
 /// - The second message of the protocol, which is the challenge from the verifier. This leads to a proof which is amenable to batch verification.
 /// TODO: Better name? In https://github.com/sigma-rs/sigma-proofs these would be called "compact" and "batchable" proofs
 #[derive(Clone, Debug, Eq)]
-pub enum FirstProofItemProjective<F: PrimeField, H: homomorphism::Trait>
-where
-    H::Codomain: Statement,
-{
-    Commitment(H::Codomain),
-    Challenge(F), // In more generality, this should be H::Domain::Scalar
-}
-
-#[derive(Clone, Debug, Eq)]
 pub enum FirstProofItem<F: PrimeField, H: homomorphism::Trait>
 where
     H::CodomainNormalized: Statement,
@@ -249,23 +240,6 @@ where
 
 // Manual implementation of PartialEq is required here because deriving PartialEq would
 // automatically require `H` itself to implement PartialEq, which is undesirable.
-impl<F: PrimeField, H: homomorphism::Trait> PartialEq for FirstProofItemProjective<F, H>
-where
-    H::Codomain: Statement,
-{
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (FirstProofItemProjective::Commitment(a), FirstProofItemProjective::Commitment(b)) => {
-                a == b
-            },
-            (FirstProofItemProjective::Challenge(a), FirstProofItemProjective::Challenge(b)) => {
-                a == b
-            },
-            _ => false,
-        }
-    }
-}
-
 impl<F: PrimeField, H: homomorphism::Trait> PartialEq for FirstProofItem<F, H>
 where
     H::CodomainNormalized: Statement,
@@ -281,19 +255,6 @@ where
 
 // The natural CanonicalSerialize/Deserialize implementations for `FirstProofItem`; we follow the usual approach for enums.
 // CanonicalDeserialize needs Valid.
-impl<F: PrimeField, H: homomorphism::Trait> Valid for FirstProofItemProjective<F, H>
-where
-    H::Domain: Witness<F>,
-    H::Codomain: Statement + Valid,
-{
-    fn check(&self) -> Result<(), SerializationError> {
-        match self {
-            FirstProofItemProjective::Commitment(c) => c.check(),
-            FirstProofItemProjective::Challenge(f) => f.check(),
-        }
-    }
-}
-
 impl<F: PrimeField, H: homomorphism::Trait> Valid for FirstProofItem<F, H>
 where
     H::Domain: Witness<F>,
@@ -303,36 +264,6 @@ where
         match self {
             FirstProofItem::Commitment(c) => c.check(),
             FirstProofItem::Challenge(f) => f.check(),
-        }
-    }
-}
-
-impl<F: PrimeField, H: homomorphism::Trait> CanonicalSerialize for FirstProofItemProjective<F, H>
-where
-    H::Domain: Witness<F>,
-    H::Codomain: Statement + CanonicalSerialize,
-{
-    fn serialize_with_mode<W: Write>(
-        &self,
-        mut writer: W,
-        compress: Compress,
-    ) -> Result<(), SerializationError> {
-        match self {
-            FirstProofItemProjective::Commitment(c) => {
-                0u8.serialize_with_mode(writer.by_ref(), compress)?;
-                c.serialize_with_mode(writer, compress)
-            },
-            FirstProofItemProjective::Challenge(f) => {
-                1u8.serialize_with_mode(writer.by_ref(), compress)?;
-                f.serialize_with_mode(writer, compress)
-            },
-        }
-    }
-
-    fn serialized_size(&self, compress: Compress) -> usize {
-        1 + match self {
-            FirstProofItemProjective::Commitment(c) => c.serialized_size(compress),
-            FirstProofItemProjective::Challenge(f) => f.serialized_size(compress),
         }
     }
 }
@@ -364,40 +295,6 @@ where
             FirstProofItem::Commitment(c) => c.serialized_size(compress),
             FirstProofItem::Challenge(f) => f.serialized_size(compress),
         }
-    }
-}
-
-impl<F: PrimeField, H: homomorphism::Trait> CanonicalDeserialize for FirstProofItemProjective<F, H>
-where
-    H::Domain: Witness<F>,
-    H::Codomain: Statement + CanonicalDeserialize + Valid,
-{
-    fn deserialize_with_mode<R: Read>(
-        mut reader: R,
-        compress: Compress,
-        validate: Validate,
-    ) -> Result<Self, SerializationError> {
-        // Read the discriminant tag
-        let tag = u8::deserialize_with_mode(&mut reader, compress, validate)?;
-
-        let item = match tag {
-            0 => {
-                let c = H::Codomain::deserialize_with_mode(reader, compress, validate)?;
-                FirstProofItemProjective::Commitment(c)
-            },
-            1 => {
-                let f = F::deserialize_with_mode(reader, compress, validate)?;
-                FirstProofItemProjective::Challenge(f)
-            },
-            _ => return Err(SerializationError::InvalidData),
-        };
-
-        // Run validity check if requested
-        if validate == Validate::Yes {
-            item.check()?;
-        }
-
-        Ok(item)
     }
 }
 
@@ -433,21 +330,6 @@ where
 
         Ok(item)
     }
-}
-
-// TODO: this shouldn't be in traits.rs
-#[derive(CanonicalSerialize, Debug, CanonicalDeserialize, Clone)]
-pub struct ProofProjective<F: PrimeField, H: homomorphism::Trait>
-where
-    H::Domain: Witness<F>,
-    H::Codomain: Statement,
-{
-    /// The “first item” recorded in the proof, which can be either:
-    /// - the prover's commitment (H::Codomain)
-    /// - the verifier's challenge (E::ScalarField)
-    pub first_proof_item: FirstProofItemProjective<F, H>,
-    /// Prover's second message (response)
-    pub z: H::Domain,
 }
 
 // TODO: this shouldn't be in traits.rs
@@ -488,42 +370,9 @@ where
     }
 }
 
-impl<F: PrimeField, H: homomorphism::Trait> ProofProjective<F, H>
-where
-    H::Domain: Witness<F>,
-    H::Codomain: Statement,
-{
-    /// No-op (semantically): circumvents the fact that proofs inherit the homomorphism’s lifetime. This method should do nothing at runtime.
-    #[allow(non_snake_case)]
-    pub fn change_lifetime<H2>(self) -> ProofProjective<F, H2>
-    where
-        H2: homomorphism::Trait<Domain = H::Domain, Codomain = H::Codomain>,
-    {
-        let first = match self.first_proof_item {
-            FirstProofItemProjective::Commitment(A) => FirstProofItemProjective::Commitment(A),
-            FirstProofItemProjective::Challenge(c) => FirstProofItemProjective::Challenge(c),
-        };
-
-        ProofProjective {
-            first_proof_item: first,
-            z: self.z,
-        }
-    }
-}
-
 // Manual implementation of PartialEq and Eq is required here because deriving PartialEq/Eq would
 // automatically require `H` itself to implement PartialEq and Eq, which is undesirable.
 // Workaround would be to make `Proof` generic over `H::Domain` and `H::Codomain` instead of `H`
-impl<F: PrimeField, H: homomorphism::Trait> PartialEq for ProofProjective<F, H>
-where
-    H::Domain: Witness<F>,
-    H::Codomain: Statement,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.first_proof_item == other.first_proof_item && self.z == other.z
-    }
-}
-
 impl<F: PrimeField, H: homomorphism::Trait> PartialEq for Proof<F, H>
 where
     H::Domain: Witness<F>,
@@ -535,13 +384,6 @@ where
 }
 
 // Empty because it simply asserts reflexivity
-impl<F: PrimeField, H: homomorphism::Trait> Eq for ProofProjective<F, H>
-where
-    H::Domain: Witness<F>,
-    H::Codomain: Statement,
-{
-}
-
 impl<F: PrimeField, H: homomorphism::Trait> Eq for Proof<F, H>
 where
     H::Domain: Witness<F>,
