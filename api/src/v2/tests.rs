@@ -972,6 +972,113 @@ async fn test_ws_subscribe_tx_status_sends_pending_then_not_found() {
 }
 
 // ======================================================================
+// OpenAPI spec tests
+// ======================================================================
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_openapi_spec_json() {
+    let (addr, _handle) = start_v2_server().await;
+
+    let resp = reqwest::get(format!("{}/v2/spec.json", base_url(addr)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+
+    let body: serde_json::Value = resp.json().await.unwrap();
+    // Must be a valid OpenAPI 3.1.x doc.
+    assert!(
+        body["openapi"].as_str().unwrap().starts_with("3."),
+        "Expected OpenAPI 3.x, got: {}",
+        body["openapi"]
+    );
+    assert_eq!(body["info"]["title"], "Aptos Node API v2");
+    assert_eq!(body["info"]["version"], "2.0.0");
+
+    // Check that paths are populated.
+    let paths = body["paths"].as_object().expect("paths should be an object");
+    assert!(paths.len() >= 10, "Expected at least 10 paths, got {}", paths.len());
+
+    // Verify some specific paths exist.
+    assert!(paths.contains_key("/v2/health"), "Missing /v2/health");
+    assert!(paths.contains_key("/v2/info"), "Missing /v2/info");
+    assert!(paths.contains_key("/v2/transactions"), "Missing /v2/transactions");
+    assert!(paths.contains_key("/v2/blocks/latest"), "Missing /v2/blocks/latest");
+    assert!(paths.contains_key("/v2/view"), "Missing /v2/view");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_openapi_spec_yaml() {
+    let (addr, _handle) = start_v2_server().await;
+
+    let resp = reqwest::get(format!("{}/v2/spec.yaml", base_url(addr)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+
+    let content_type = resp
+        .headers()
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(
+        content_type.contains("yaml"),
+        "Expected YAML content type, got: {}",
+        content_type
+    );
+
+    let body = resp.text().await.unwrap();
+    assert!(body.contains("openapi:"), "YAML should contain openapi field");
+    assert!(body.contains("Aptos Node API v2"), "YAML should contain API title");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_openapi_spec_schemas() {
+    let (addr, _handle) = start_v2_server().await;
+
+    let resp = reqwest::get(format!("{}/v2/spec.json", base_url(addr)))
+        .await
+        .unwrap();
+    let body: serde_json::Value = resp.json().await.unwrap();
+
+    let schemas = body["components"]["schemas"]
+        .as_object()
+        .expect("schemas should be an object");
+
+    // Check that our custom schemas are present.
+    assert!(schemas.contains_key("LedgerMetadata"), "Missing LedgerMetadata schema");
+    assert!(schemas.contains_key("V2Error"), "Missing V2Error schema");
+    assert!(schemas.contains_key("ErrorCode"), "Missing ErrorCode schema");
+    assert!(schemas.contains_key("HealthResponse"), "Missing HealthResponse schema");
+    assert!(schemas.contains_key("NodeInfo"), "Missing NodeInfo schema");
+    assert!(schemas.contains_key("SubmitResult"), "Missing SubmitResult schema");
+    assert!(schemas.contains_key("TransactionSummary"), "Missing TransactionSummary schema");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_openapi_spec_tags() {
+    let (addr, _handle) = start_v2_server().await;
+
+    let resp = reqwest::get(format!("{}/v2/spec.json", base_url(addr)))
+        .await
+        .unwrap();
+    let body: serde_json::Value = resp.json().await.unwrap();
+
+    let tags = body["tags"].as_array().expect("tags should be an array");
+    let tag_names: Vec<&str> = tags
+        .iter()
+        .filter_map(|t| t["name"].as_str())
+        .collect();
+
+    assert!(tag_names.contains(&"Health"), "Missing Health tag");
+    assert!(tag_names.contains(&"Accounts"), "Missing Accounts tag");
+    assert!(tag_names.contains(&"Transactions"), "Missing Transactions tag");
+    assert!(tag_names.contains(&"Blocks"), "Missing Blocks tag");
+    assert!(tag_names.contains(&"View"), "Missing View tag");
+    assert!(tag_names.contains(&"Events"), "Missing Events tag");
+}
+
+// ======================================================================
 // TLS tests
 // ======================================================================
 

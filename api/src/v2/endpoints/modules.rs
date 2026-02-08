@@ -15,6 +15,19 @@ use axum::{
 };
 
 /// GET /v2/accounts/:address/modules
+#[utoipa::path(
+    get,
+    path = "/v2/accounts/{address}/modules",
+    tag = "Accounts",
+    params(
+        ("address" = String, Path, description = "Account address (hex)"),
+        PaginatedLedgerParams,
+    ),
+    responses(
+        (status = 200, description = "Paginated list of account modules", body = Object),
+        (status = 404, description = "Account not found", body = V2Error),
+    )
+)]
 pub async fn get_modules_handler(
     State(ctx): State<V2Context>,
     Path(address): Path<String>,
@@ -51,6 +64,20 @@ pub async fn get_modules_handler(
 }
 
 /// GET /v2/accounts/:address/module/:module_name
+#[utoipa::path(
+    get,
+    path = "/v2/accounts/{address}/module/{module_name}",
+    tag = "Accounts",
+    params(
+        ("address" = String, Path, description = "Account address (hex)"),
+        ("module_name" = String, Path, description = "Module name"),
+        LedgerVersionParam,
+    ),
+    responses(
+        (status = 200, description = "Single module bytecode with ABI", body = Object),
+        (status = 404, description = "Module not found", body = V2Error),
+    )
+)]
 pub async fn get_module_handler(
     State(ctx): State<V2Context>,
     Path((address, module_name)): Path<(String, String)>,

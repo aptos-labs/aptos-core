@@ -16,6 +16,7 @@ pub mod endpoints;
 pub mod error;
 pub mod extractors;
 pub mod middleware;
+pub mod openapi;
 pub mod proxy;
 pub mod router;
 pub mod tls;

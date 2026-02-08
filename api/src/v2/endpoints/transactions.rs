@@ -19,6 +19,16 @@ use serde::Serialize;
 use std::time::Duration;
 
 /// GET /v2/transactions -- paginated list of committed transactions.
+#[utoipa::path(
+    get,
+    path = "/v2/transactions",
+    tag = "Transactions",
+    params(CursorOnlyParams),
+    responses(
+        (status = 200, description = "Paginated list of transactions", body = Object),
+        (status = 500, description = "Internal error", body = V2Error),
+    )
+)]
 pub async fn list_transactions_handler(
     State(ctx): State<V2Context>,
     Query(params): Query<CursorOnlyParams>,
@@ -48,6 +58,16 @@ pub async fn list_transactions_handler(
 }
 
 /// GET /v2/transactions/:hash
+#[utoipa::path(
+    get,
+    path = "/v2/transactions/{hash}",
+    tag = "Transactions",
+    params(("hash" = String, Path, description = "Transaction hash (0x-prefixed hex)")),
+    responses(
+        (status = 200, description = "Transaction details", body = Object),
+        (status = 404, description = "Transaction not found", body = V2Error),
+    )
+)]
 pub async fn get_transaction_handler(
     State(ctx): State<V2Context>,
     Path(hash): Path<String>,
@@ -119,6 +139,17 @@ fn render_single_transaction(
 }
 
 /// POST /v2/transactions -- submit a signed transaction (BCS only).
+#[utoipa::path(
+    post,
+    path = "/v2/transactions",
+    tag = "Transactions",
+    request_body(content = Vec<u8>, content_type = "application/x-bcs",
+        description = "BCS-encoded signed transaction with version envelope"),
+    responses(
+        (status = 200, description = "Transaction accepted", body = V2Response<SubmitResult>),
+        (status = 422, description = "Rejected by mempool", body = V2Error),
+    )
+)]
 pub async fn submit_transaction_handler(
     State(ctx): State<V2Context>,
     BcsOnly(versioned): BcsOnly<SignedTransaction>,
@@ -150,13 +181,23 @@ pub async fn submit_transaction_handler(
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct SubmitResult {
     pub hash: String,
     pub status: String,
 }
 
 /// GET /v2/transactions/:hash/wait -- poll until the transaction is committed or timeout.
+#[utoipa::path(
+    get,
+    path = "/v2/transactions/{hash}/wait",
+    tag = "Transactions",
+    params(("hash" = String, Path, description = "Transaction hash (0x-prefixed hex)")),
+    responses(
+        (status = 200, description = "Transaction committed", body = Object),
+        (status = 404, description = "Transaction not found within timeout", body = V2Error),
+    )
+)]
 pub async fn wait_transaction_handler(
     State(ctx): State<V2Context>,
     Path(hash): Path<String>,

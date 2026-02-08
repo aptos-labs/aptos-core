@@ -26,6 +26,7 @@ Working notes, decisions log, and progress tracker for the API v2 implementation
 
 | 2026-02-08 | WebSocket: broadcast + per-connection filter | Background block poller writes to `broadcast::Sender<WsEvent>` (capacity 4096); each connection subscribes and filters events against its active subscriptions. tx_status uses dedicated per-subscription poller task. `tokio-tungstenite 0.21.0` (matches axum's internal tungstenite) for test client. |
 | 2026-02-08 | TLS: rustls 0.21 + tokio-rustls 0.24 + hyper-util auto-builder | Manual accept loop with `TlsAcceptor` → `hyper_util::server::conn::auto::Builder` for ALPN-based h2/http1.1 negotiation. Uses `hyper1` (renamed hyper 1.x) for `service_fn`. Config: `api_v2.tls_cert_path` + `api_v2.tls_key_path`. PEM support for PKCS8, RSA, and EC keys. |
+| 2026-02-08 | OpenAPI: utoipa 5.x + utoipa-axum 0.1.0 | `utoipa-axum 0.1.0` is compatible with axum 0.7 (0.2.0 requires axum 0.8). Manual `#[utoipa::path]` macros on handlers, `#[derive(ToSchema)]` on types, `Object` placeholder for external aptos_api_types. Spec served at `/v2/spec.json` and `/v2/spec.yaml`. |
 
 ## Open Questions
 
@@ -82,7 +83,7 @@ Working notes, decisions log, and progress tracker for the API v2 implementation
 - [x] JsonOrBcs + BcsOnly content negotiation extractors
 - [x] V2Response envelope with LedgerMetadata in body
 - [x] Cursor unit tests (4 passing)
-- [x] Integration tests (43 tests: 24 endpoint + 6 co-hosting + 9 WebSocket + 4 TLS)
+- [x] Integration tests (47 tests: 24 endpoint + 6 co-hosting + 9 WebSocket + 4 TLS + 4 OpenAPI)
 - [x] Performance benchmarks (9 criterion benchmarks incl. parameterized batch)
 - [x] HTTP/2 (h2c) — already supported by axum::serve (uses hyper_util auto::Builder)
 - [x] Same-port Poem+Axum co-hosting via reverse proxy (api_v2.address=None → same port)
@@ -103,4 +104,11 @@ Working notes, decisions log, and progress tracker for the API v2 implementation
   - [x] `runtime.rs` updated to use TLS when configured (both separate-port and co-hosting modes)
   - [x] Dependencies: `rustls 0.21`, `tokio-rustls 0.24`, `rustls-pemfile 1.0`, `hyper1` (renamed hyper 1.x)
   - [x] 4 integration tests (health, info, resources over TLS; invalid cert error)
-- [ ] OpenAPI spec generation (utoipa-axum not yet compatible with axum 0.7)
+- [x] OpenAPI spec generation (utoipa 5.x + utoipa-axum 0.1.0)
+  - [x] `openapi.rs`: `V2ApiDoc` struct with `#[derive(OpenApi)]`, spec JSON/YAML handlers
+  - [x] `#[utoipa::path]` macros on all 15 endpoint handlers
+  - [x] `#[derive(ToSchema)]` on V2Error, ErrorCode, LedgerMetadata, HealthResponse, NodeInfo, SubmitResult, TransactionSummary
+  - [x] `#[derive(IntoParams)]` on PaginatedLedgerParams, CursorOnlyParams, LedgerVersionParam, BlockParams
+  - [x] Routes: `/v2/spec.json` and `/v2/spec.yaml`
+  - [x] Tags: Health, Accounts, Transactions, Events, View, Blocks
+  - [x] 4 integration tests (JSON spec, YAML spec, schemas, tags)

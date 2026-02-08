@@ -8,6 +8,7 @@ use super::{
     context::V2Context,
     endpoints::{account_transactions, blocks, events, health, modules, resources, transactions, view},
     middleware,
+    openapi,
     proxy::{self, V1Proxy},
     websocket,
 };
@@ -80,6 +81,9 @@ pub fn build_v2_router(ctx: V2Context) -> Router {
         .route("/v2/batch", post(batch::batch_handler))
         // WebSocket
         .route("/v2/ws", get(websocket::ws_handler))
+        // OpenAPI spec
+        .route("/v2/spec.json", get(openapi::spec_json_handler))
+        .route("/v2/spec.yaml", get(openapi::spec_yaml_handler))
         // Middleware stack (applied bottom-up: first listed = outermost)
         .layer(axum_middleware::from_fn(middleware::request_id_layer))
         .layer(axum_middleware::from_fn(middleware::logging_layer))

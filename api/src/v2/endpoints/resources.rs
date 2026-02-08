@@ -15,6 +15,19 @@ use axum::{
 };
 
 /// GET /v2/accounts/:address/resources
+#[utoipa::path(
+    get,
+    path = "/v2/accounts/{address}/resources",
+    tag = "Accounts",
+    params(
+        ("address" = String, Path, description = "Account address (hex)"),
+        PaginatedLedgerParams,
+    ),
+    responses(
+        (status = 200, description = "Paginated list of account resources", body = Object),
+        (status = 404, description = "Account not found", body = V2Error),
+    )
+)]
 pub async fn get_resources_handler(
     State(ctx): State<V2Context>,
     Path(address): Path<String>,
@@ -51,6 +64,20 @@ pub async fn get_resources_handler(
 }
 
 /// GET /v2/accounts/:address/resource/:resource_type
+#[utoipa::path(
+    get,
+    path = "/v2/accounts/{address}/resource/{resource_type}",
+    tag = "Accounts",
+    params(
+        ("address" = String, Path, description = "Account address (hex)"),
+        ("resource_type" = String, Path, description = "Move struct tag (e.g. 0x1::account::Account)"),
+        LedgerVersionParam,
+    ),
+    responses(
+        (status = 200, description = "Single account resource", body = Object),
+        (status = 404, description = "Resource not found", body = V2Error),
+    )
+)]
 pub async fn get_resource_handler(
     State(ctx): State<V2Context>,
     Path((address, resource_type)): Path<(String, String)>,

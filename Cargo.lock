@@ -534,6 +534,7 @@ dependencies = [
  "tower 0.5.3",
  "tower-http 0.6.8",
  "utoipa",
+ "utoipa-axum",
  "uuid 1.11.0",
  "warp",
 ]
@@ -17076,6 +17077,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_norway"
+version = "0.9.42"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e408f29489b5fd500fab51ff1484fc859bb655f32c671f307dcd733b72e8168c"
+dependencies = [
+ "indexmap 2.7.0",
+ "itoa",
+ "ryu",
+ "serde",
+ "unsafe-libyaml-norway",
+]
+
+[[package]]
 name = "serde_path_to_error"
 version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -19539,6 +19553,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab4c90930b95a82d00dc9e9ac071b4991924390d46cbd0dfe566148667605e4b"
 
 [[package]]
+name = "unsafe-libyaml-norway"
+version = "0.2.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b39abd59bf32521c7f2301b52d05a6a2c975b6003521cbd0c6dc1582f0a22104"
+
+[[package]]
 name = "untrusted"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -19685,7 +19705,21 @@ dependencies = [
  "indexmap 2.7.0",
  "serde",
  "serde_json",
+ "serde_norway",
  "utoipa-gen",
+]
+
+[[package]]
+name = "utoipa-axum"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06e6cee799402b054e6cb75294d86a4ccdd1227bb4ce87e2a732a68f2aa9f934"
+dependencies = [
+ "axum 0.7.5",
+ "paste",
+ "tower-layer",
+ "tower-service",
+ "utoipa",
 ]
 
 [[package]]

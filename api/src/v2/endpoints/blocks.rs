@@ -13,6 +13,19 @@ use axum::{
 };
 
 /// GET /v2/blocks/:height
+#[utoipa::path(
+    get,
+    path = "/v2/blocks/{height}",
+    tag = "Blocks",
+    params(
+        ("height" = u64, Path, description = "Block height"),
+        BlockParams,
+    ),
+    responses(
+        (status = 200, description = "Block details", body = Object),
+        (status = 404, description = "Block not found", body = V2Error),
+    )
+)]
 pub async fn get_block_by_height_handler(
     State(ctx): State<V2Context>,
     Path(height): Path<u64>,
@@ -29,6 +42,15 @@ pub async fn get_block_by_height_handler(
 }
 
 /// GET /v2/blocks/latest
+#[utoipa::path(
+    get,
+    path = "/v2/blocks/latest",
+    tag = "Blocks",
+    responses(
+        (status = 200, description = "Latest block details", body = Object),
+        (status = 500, description = "Internal error", body = V2Error),
+    )
+)]
 pub async fn get_latest_block_handler(
     State(ctx): State<V2Context>,
 ) -> Result<Json<V2Response<Block>>, V2Error> {

@@ -8,12 +8,13 @@
 
 use aptos_api_types::LedgerInfo;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// Standard envelope for all successful v2 API responses.
 ///
 /// Ledger metadata is included in the body -- v2 does NOT set `X-Aptos-*` headers.
 /// For paginated endpoints, `cursor` contains an opaque token for the next page.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct V2Response<T: Serialize> {
     /// The actual response data.
     pub data: T,
@@ -25,7 +26,7 @@ pub struct V2Response<T: Serialize> {
 }
 
 /// Ledger metadata included in every successful v2 response.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct LedgerMetadata {
     pub chain_id: u8,
     pub ledger_version: u64,
@@ -66,39 +67,44 @@ impl<T: Serialize> V2Response<T> {
 }
 
 /// Query parameters for paginated endpoints with optional ledger version.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
 pub struct PaginatedLedgerParams {
+    /// Optional ledger version to query at.
     pub ledger_version: Option<u64>,
+    /// Opaque cursor from a previous page response.
     pub cursor: Option<String>,
 }
 
 /// Query parameters for paginated endpoints that only need a cursor.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
 pub struct CursorOnlyParams {
+    /// Opaque cursor from a previous page response.
     pub cursor: Option<String>,
 }
 
 /// Query parameters for single-item endpoints with optional ledger version.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
 pub struct LedgerVersionParam {
+    /// Optional ledger version to query at.
     pub ledger_version: Option<u64>,
 }
 
 /// Query parameters for block endpoints.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
 pub struct BlockParams {
+    /// Whether to include transactions in the block response.
     pub with_transactions: Option<bool>,
 }
 
 /// Health check response (not wrapped in V2Response since it's a special endpoint).
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct HealthResponse {
     pub status: String,
     pub ledger: LedgerMetadata,
 }
 
 /// Node info returned by /v2/info.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct NodeInfo {
     pub chain_id: u8,
     pub role: String,

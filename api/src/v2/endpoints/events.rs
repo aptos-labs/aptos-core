@@ -15,6 +15,20 @@ use axum::{
 };
 
 /// GET /v2/accounts/:address/events/:creation_number
+#[utoipa::path(
+    get,
+    path = "/v2/accounts/{address}/events/{creation_number}",
+    tag = "Events",
+    params(
+        ("address" = String, Path, description = "Account address (hex)"),
+        ("creation_number" = u64, Path, description = "Event handle creation number"),
+        CursorOnlyParams,
+    ),
+    responses(
+        (status = 200, description = "Paginated list of events", body = Object),
+        (status = 404, description = "Account not found", body = V2Error),
+    )
+)]
 pub async fn get_events_handler(
     State(ctx): State<V2Context>,
     Path((address, creation_number)): Path<(String, u64)>,

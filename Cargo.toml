@@ -849,7 +849,8 @@ ureq = { version = "1.5.4", features = [
 ], default-features = false }
 url = { version = "2.4.0", features = ["serde"] }
 usdt = "0.6.0"
-utoipa = { version = "5.3.1", features = [] }
+utoipa = { version = "5.3.1", features = ["yaml"] }
+utoipa-axum = { version = "=0.1.0" }
 tokio-rustls = "0.24"
 tokio-tungstenite = "0.21.0"
 uuid = { version = "1.0.0", features = ["v4", "serde"] }

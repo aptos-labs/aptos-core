@@ -16,6 +16,17 @@ use move_core_types::language_storage::TypeTag;
 /// POST /v2/view
 ///
 /// Accepts a JSON ViewRequest and returns the view function result as JSON values.
+#[utoipa::path(
+    post,
+    path = "/v2/view",
+    tag = "View",
+    params(LedgerVersionParam),
+    request_body(content = Object, description = "View function request (function, type_arguments, arguments)"),
+    responses(
+        (status = 200, description = "View function result values", body = Object),
+        (status = 400, description = "Invalid input or view function failed", body = V2Error),
+    )
+)]
 pub async fn view_handler(
     State(ctx): State<V2Context>,
     Query(params): Query<LedgerVersionParam>,

@@ -9,6 +9,15 @@ use crate::v2::{
 use axum::{extract::State, Json};
 
 /// GET /v2/health
+#[utoipa::path(
+    get,
+    path = "/v2/health",
+    tag = "Health",
+    responses(
+        (status = 200, description = "Node is healthy", body = HealthResponse),
+        (status = 500, description = "Node is unhealthy", body = V2Error),
+    )
+)]
 pub async fn health_handler(
     State(ctx): State<V2Context>,
 ) -> Result<Json<HealthResponse>, V2Error> {
@@ -20,6 +29,15 @@ pub async fn health_handler(
 }
 
 /// GET /v2/info
+#[utoipa::path(
+    get,
+    path = "/v2/info",
+    tag = "Health",
+    responses(
+        (status = 200, description = "Node info with ledger metadata", body = V2Response<NodeInfo>),
+        (status = 500, description = "Internal error", body = V2Error),
+    )
+)]
 pub async fn info_handler(
     State(ctx): State<V2Context>,
 ) -> Result<Json<V2Response<NodeInfo>>, V2Error> {

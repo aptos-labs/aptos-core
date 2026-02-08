@@ -15,7 +15,7 @@ use axum::{
 use serde::Serialize;
 
 /// Lightweight transaction summary for account transaction listings.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct TransactionSummary {
     pub version: u64,
     pub hash: String,
@@ -23,6 +23,20 @@ pub struct TransactionSummary {
 }
 
 /// GET /v2/accounts/:address/transactions
+#[utoipa::path(
+    get,
+    path = "/v2/accounts/{address}/transactions",
+    tag = "Accounts",
+    params(
+        ("address" = String, Path, description = "Account address (hex)"),
+        CursorOnlyParams,
+    ),
+    responses(
+        (status = 200, description = "Paginated account transaction summaries",
+            body = V2Response<Vec<TransactionSummary>>),
+        (status = 404, description = "Account not found", body = V2Error),
+    )
+)]
 pub async fn get_account_transactions_handler(
     State(ctx): State<V2Context>,
     Path(address): Path<String>,
