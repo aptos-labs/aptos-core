@@ -331,11 +331,16 @@ pub struct Witness<F: PrimeField> {
 
 impl<E: Pairing> homomorphism::Trait for CommitmentHomomorphism<'_, E> {
     type Codomain = CodomainShape<E::G1>;
+    type CodomainNormalized = CodomainShape<E::G1Affine>;
     type Domain = Witness<E::ScalarField>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
         // CommitmentHomomorphism::<'_, E>::normalize_output(self.apply_msm(self.msm_terms(input)))
         self.apply_msm(self.msm_terms(input))
+    }
+
+    fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
+        <CommitmentHomomorphism<E> as fixed_base_msms::Trait>::normalize_output(value)
     }
 }
 
@@ -370,6 +375,12 @@ impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
     fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
         E::G1::msm(input.bases(), &input.scalars())
             .expect("MSM computation failed in univariate KZG")
+    }
+
+    fn batch_normalize(
+        msm_output: Vec<Self::MsmOutput>,
+    ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
+        E::G1::normalize_batch(&msm_output)
     }
 }
 

@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_crypto::{weighted_config::WeightedConfigArkworks, TSecretSharingConfig as _};
-use aptos_dkg::pvss::traits::transcript::Aggregated;
+use aptos_dkg::pvss::traits::transcript::Aggregatable;
 use ark_ec::AffineRepr as _;
 use ark_std::rand::{seq::SliceRandom, thread_rng, CryptoRng, Rng as _, RngCore};
 
@@ -139,10 +139,9 @@ fn weighted_smoke_with_pvss() {
         })
         .collect();
 
-    let mut subtranscript = subtrx_paths[0].clone();
-    for acc in &subtrx_paths[1..] {
-        subtranscript.aggregate_with(&tc, acc).unwrap();
-    }
+    // Do all aggregations in projective form, then normalize to affine
+    let subtranscript =
+        <T as HasAggregatableSubtranscript>::Subtranscript::aggregate(&tc, subtrx_paths).unwrap();
 
     let dk = DigestKey::new(&mut rng, 8, 1).unwrap();
 

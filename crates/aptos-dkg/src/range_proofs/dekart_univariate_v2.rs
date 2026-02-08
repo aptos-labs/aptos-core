@@ -34,11 +34,12 @@ use num_integer::Roots;
 use rand::{CryptoRng, RngCore};
 use std::{fmt::Debug, io::Write};
 
+// TODO: make an affine version of this
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, Debug, PartialEq, Eq, Clone, CanonicalDeserialize)]
 pub struct Proof<E: Pairing> {
     hatC: E::G1,
-    pi_PoK: sigma_protocol::Proof<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
+    pi_PoK: sigma_protocol::traits::Proof<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
     Cs: Vec<E::G1>, // has length ell
     D: E::G1,
     a: E::ScalarField,
@@ -693,12 +694,12 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         fiat_shamir::append_hat_f_commitment::<E>(&mut fs_t, &hatC);
 
         // Step 3
-        two_term_msm::Homomorphism {
+        two_term_msm::Homomorphism::<E::G1> {
             base_1: *lagr_0,
             base_2: *xi_1,
         }
         .verify(
-            &(two_term_msm::CodomainShape(*hatC - comm.0)),
+            &(two_term_msm::CodomainShape((*hatC - comm.0).into_affine())),
             pi_PoK,
             &Self::DST,
         )?;
@@ -828,7 +829,7 @@ mod fiat_shamir {
     #[allow(non_snake_case)]
     pub(crate) fn append_sigma_proof<E: Pairing>(
         fs_transcript: &mut Transcript,
-        pi_PoK: &sigma_protocol::Proof<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
+        pi_PoK: &sigma_protocol::traits::Proof<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
     ) {
         <Transcript as RangeProof<E, Proof<E>>>::append_sigma_proof(fs_transcript, pi_PoK);
     }
@@ -906,7 +907,7 @@ pub mod two_term_msm {
     use aptos_crypto_derive::SigmaProtocolWitness;
     use ark_ec::AffineRepr;
     pub use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
-    pub type Proof<C> = sigma_protocol::Proof<
+    pub type Proof<C> = sigma_protocol::traits::Proof<
         <<C as CurveGroup>::Affine as AffineRepr>::ScalarField,
         Homomorphism<C>,
     >;
@@ -916,9 +917,10 @@ pub mod two_term_msm {
         /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
         pub fn generate<R: rand::Rng + rand::CryptoRng>(rng: &mut R) -> Self {
             Self {
-                first_proof_item: FirstProofItem::Commitment(CodomainShape(
-                    unsafe_random_point::<C, _>(rng).into(),
-                )),
+                first_proof_item: FirstProofItem::Commitment(CodomainShape(unsafe_random_point::<
+                    C,
+                    _,
+                >(rng))),
                 z: Witness {
                     poly_randomness: Scalar::rand(rng),
                     hiding_kzg_randomness: Scalar::rand(rng),
@@ -947,6 +949,7 @@ pub mod two_term_msm {
 
     impl<C: CurveGroup> homomorphism::Trait for Homomorphism<C> {
         type Codomain = CodomainShape<C>;
+        type CodomainNormalized = CodomainShape<C::Affine>;
         type Domain = Witness<C::ScalarField>;
 
         fn apply(&self, input: &Self::Domain) -> Self::Codomain {
@@ -956,6 +959,10 @@ pub mod two_term_msm {
             CodomainShape(
                 self.base_1 * input.poly_randomness.0 + self.base_2 * input.hiding_kzg_randomness.0,
             )
+        }
+
+        fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
+            <Homomorphism<C> as fixed_base_msms::Trait>::normalize_output(value)
         }
     }
 
@@ -982,6 +989,12 @@ pub mod two_term_msm {
 
         fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
             C::msm(input.bases(), input.scalars()).expect("MSM failed in TwoTermMSM")
+        }
+
+        fn batch_normalize(
+            msm_output: Vec<Self::MsmOutput>,
+        ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
+            C::normalize_batch(&msm_output)
         }
     }
 

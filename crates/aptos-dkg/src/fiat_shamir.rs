@@ -87,10 +87,13 @@ pub trait SigmaProtocol<F: PrimeField, H: homomorphism::Trait>: ScalarProtocol<F
     fn append_sigma_protocol_msm_bases(&mut self, hom: &H);
 
     /// Append the claim of a sigma protocol.
-    fn append_sigma_protocol_public_statement(&mut self, public_statement: &H::Codomain);
+    fn append_sigma_protocol_public_statement(&mut self, public_statement: &H::CodomainNormalized);
 
     /// Append the first message (the commitment) in a sigma protocol.
-    fn append_sigma_protocol_first_prover_message(&mut self, prover_first_message: &H::Codomain);
+    fn append_sigma_protocol_first_prover_message(
+        &mut self,
+        prover_first_message: &H::CodomainNormalized,
+    );
 
     // Returns a single scalar `r` for use in a Sigma protocol
     fn challenge_for_sigma_protocol(&mut self) -> F;
@@ -185,7 +188,7 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for Transcript {
 impl<F: PrimeField, H: homomorphism::Trait + CanonicalSerialize> SigmaProtocol<F, H> for Transcript
 where
     H::Domain: sigma_protocol::Witness<F>,
-    H::Codomain: sigma_protocol::Statement,
+    H::CodomainNormalized: sigma_protocol::Statement,
 {
     fn append_sigma_protocol_ctxt<C: Serialize>(&mut self, ctxt: &C) {
         let ctxt_bytes = bcs::to_bytes(ctxt).expect("ctxt data serialization should succeed");
@@ -199,7 +202,7 @@ where
         self.append_message(b"hom-msm-bases", hom_bytes.as_slice());
     }
 
-    fn append_sigma_protocol_public_statement(&mut self, public_statement: &H::Codomain) {
+    fn append_sigma_protocol_public_statement(&mut self, public_statement: &H::CodomainNormalized) {
         let mut public_statement_bytes = Vec::new();
         public_statement
             .serialize_compressed(&mut public_statement_bytes)
@@ -207,7 +210,10 @@ where
         self.append_message(b"sigma-protocol-claim", public_statement_bytes.as_slice());
     }
 
-    fn append_sigma_protocol_first_prover_message(&mut self, prover_first_message: &H::Codomain) {
+    fn append_sigma_protocol_first_prover_message(
+        &mut self,
+        prover_first_message: &H::CodomainNormalized,
+    ) {
         let mut prover_first_message_bytes = Vec::new();
         prover_first_message
             .serialize_compressed(&mut prover_first_message_bytes)
