@@ -25,9 +25,9 @@ use aptos_crypto::{
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
-    AdditiveGroup, CurveGroup, VariableBaseMSM,
+    AdditiveGroup, AffineRepr, CurveGroup, VariableBaseMSM,
 };
-use ark_ff::{Field, PrimeField};
+use ark_ff::{Field, PrimeField, Zero};
 use ark_poly::{
     polynomial::univariate::DensePolynomial, univariate::DenseOrSparsePolynomial, EvaluationDomain,
 };
@@ -240,6 +240,52 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
         OpeningProof { pi_1, pi_2 }
     }
 
+    /// Open with offset: commit to quotient q using basis [τ^offset, τ^{offset+1}, ...].
+    /// Used by Zeromorph so the opening proof aligns with the batched commitment at offset.
+    pub fn open_with_offset(
+        ck: &CommitmentKey<E>,
+        f_vals: Vec<E::ScalarField>,
+        rho: E::ScalarField,
+        x: E::ScalarField,
+        y: E::ScalarField,
+        s: &CommitmentRandomness<E::ScalarField>,
+        offset: usize,
+    ) -> OpeningProof<E> {
+        let q_vals = match &ck.msm_basis {
+            SrsBasis::Lagrange { .. } => {
+                if ck.roots_of_unity_in_eval_dom.contains(&x) {
+                    panic!("x is not allowed to be a root of unity");
+                }
+                polynomials::quotient_evaluations_batch(
+                    &f_vals,
+                    &ck.roots_of_unity_in_eval_dom,
+                    x,
+                    y,
+                )
+            },
+            SrsBasis::PowersOfTau { .. } => {
+                let f_dense = DensePolynomial { coeffs: f_vals };
+                let f = DenseOrSparsePolynomial::DPolynomial(Cow::Owned(f_dense));
+                let divisor_dense = DensePolynomial {
+                    coeffs: vec![-x, E::ScalarField::ONE],
+                };
+                let divisor = DenseOrSparsePolynomial::DPolynomial(Cow::Owned(divisor_dense));
+                let (q, _) = f
+                    .divide_with_q_and_r(&divisor)
+                    .expect("division by (X - x) is nonzero");
+                q.coeffs
+            },
+        };
+        // Commit to q with offset: pad with leading zeros so values[offset..] = q_vals
+        let mut padded = vec![E::ScalarField::zero(); offset];
+        padded.extend(q_vals);
+        let pi_1 = commit_with_randomness_and_offset(ck, &padded, s, offset);
+
+        let pi_2 = (ck.g1 * rho) - (ck.tau_1 - ck.g1 * x) * s.0;
+
+        OpeningProof { pi_1, pi_2 }
+    }
+
     #[allow(non_snake_case)]
     pub fn verify(
         vk: VerificationKey<E>,
@@ -259,11 +305,14 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
         } = vk;
         let OpeningProof { pi_1, pi_2 } = pi;
 
-        let check = E::multi_pairing(vec![C.0 - one_1 * y, -pi_1.0, -pi_2], vec![
-            one_2,
-            (tau_2 - one_2 * x).into_affine(),
-            xi_2,
-        ]);
+        // Normalize to affine so multi_pairing is consistent (projective can differ by scale).
+        let g1_terms = [
+            (C.0 - one_1 * y).into_affine(),
+            (-pi_1.0).into_affine(),
+            (-pi_2).into_affine(),
+        ];
+        let g2_terms = [one_2, (tau_2 - one_2 * x).into_affine(), xi_2];
+        let check = E::multi_pairing(g1_terms, g2_terms);
         ensure!(
             PairingOutput::<E>::ZERO == check,
             "Hiding KZG verification failed"

@@ -11,6 +11,7 @@ use crate::{
         traits::PolynomialCommitmentScheme,
         univariate_hiding_kzg::{self, CommitmentRandomness},
     },
+    sigma_protocol::homomorphism::TrivialShape,
     Scalar,
 };
 use aptos_crypto::{
@@ -38,8 +39,9 @@ use std::{iter, marker::PhantomData};
 
 #[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
 pub struct ZeromorphProverKey<P: Pairing> {
-    pub commit_pp: univariate_hiding_kzg::CommitmentKey<P>,
-    pub open_pp: univariate_hiding_kzg::CommitmentKey<P>, // get rid of this?
+    pub hiding_kzg_pp: univariate_hiding_kzg::CommitmentKey<P>,
+    /// Offset for opening the batched polynomial f (match original: open_pp uses basis at offset).
+    pub open_offset: usize,
 }
 
 #[allow(non_snake_case)]
@@ -61,7 +63,7 @@ impl<P: Pairing> Default for ZeromorphCommitment<P> {
 #[derive(Clone, CanonicalSerialize, CanonicalDeserialize, Debug)]
 pub struct ZeromorphProof<P: Pairing> {
     pub pi: univariate_hiding_kzg::OpeningProof<P>,
-    pub q_hat_com: univariate_hiding_kzg::Commitment<P>, // KZG commitment to the batched, lifted-degree poly constructed out of the q_k
+    pub q_hat_com: univariate_hiding_kzg::Commitment<P>, // KZG commitment to the batched, lifted-degree poly constructed out of the q_k // TODO: need this?
     pub q_k_com: Vec<univariate_hiding_kzg::Commitment<P>>, // Vec<P::G1>, // vector of KZG commitments for the q_k
 }
 
@@ -83,8 +85,17 @@ fn compute_multilinear_quotients<P: Pairing>(
     let num_vars = poly.num_vars;
     assert_eq!(num_vars, point.len());
 
+    // The algorithm processes variables from MSB to LSB (i=0 processes first variable with largest split).
+    // DenseMultilinearExtension::to_evaluations() returns evaluations with variable 0 as LSB.
+    // The original DensePolynomial.Z likely had variable 0 as MSB.
+    // We need to reverse the point to match the variable processing order (MSB to LSB).
     let mut remainder = poly.to_evaluations();
-    let mut quotients: Vec<_> = point
+
+    // Reverse the point so that point[0] corresponds to the MSB (last variable in original order)
+    let mut point_reversed = point.to_vec();
+    point_reversed.reverse();
+
+    let mut quotients: Vec<_> = point_reversed
         .iter()
         .enumerate()
         .map(|(i, x_i)| {
@@ -254,7 +265,7 @@ where
         // }
         ZeromorphCommitment(
             univariate_hiding_kzg::commit_with_randomness(
-                &pp.commit_pp,
+                &pp.hiding_kzg_pp,
                 &poly.to_evaluations(),
                 &Scalar(r),
             )
@@ -262,6 +273,8 @@ where
         )
     }
 
+    /// If `comm` is `Some` (e.g. in tests), verifies that the verifier would compute the same
+    /// batched commitment as the commitment to f with s_combined.
     pub fn open<R: RngCore + CryptoRng>(
         pp: &ZeromorphProverKey<P>,
         poly: &DenseMultilinearExtension<P::ScalarField>,
@@ -270,6 +283,7 @@ where
         s: CommitmentRandomness<P::ScalarField>,
         rng: &mut R,
         transcript: &mut merlin::Transcript,
+        comm: Option<&ZeromorphCommitment<P>>,
     ) -> ZeromorphProof<P> {
         transcript.append_sep(Self::protocol_name());
 
@@ -290,16 +304,21 @@ where
 
         // Step 1: commit to all of the q_k
         let rs: Vec<Scalar<P::ScalarField>> =
-            sample_field_elements::<P::ScalarField, _>(quotients.len(), rng)
-                .into_iter()
-                .map(Scalar)
-                .collect();
+            Scalar::vec_from_inner(sample_field_elements::<P::ScalarField, _>(
+                quotients.len(),
+                rng,
+            ));
+
         //let r = Scalar(sample_field_element::<P::ScalarField>(rng));
         let q_k_com: Vec<univariate_hiding_kzg::Commitment<P>> = quotients
             .iter()
             .zip(rs.iter())
             .map(|(quotient, r)| {
-                univariate_hiding_kzg::commit_with_randomness(&pp.commit_pp, &quotient.coeffs, r)
+                univariate_hiding_kzg::commit_with_randomness(
+                    &pp.hiding_kzg_pp,
+                    &quotient.coeffs,
+                    r,
+                )
             })
             .collect();
 
@@ -316,8 +335,8 @@ where
         // Compute and absorb the commitment C_q = [\hat{q}]
         let r = Scalar(sample_field_element::<P::ScalarField, _>(rng));
         let q_hat_com = univariate_hiding_kzg::commit_with_randomness_and_offset(
-            &pp.commit_pp,
-            &q_hat,
+            &pp.hiding_kzg_pp,
+            &q_hat.coeffs,
             &r,
             offset,
         );
@@ -329,16 +348,36 @@ where
 
         // Step 5/7: Compute this batched poly
 
-        // Compute batched degree and ZM-identity quotient polynomial pi
+        // eval_and_quotient_scalars uses challenges.iter().rev(), so with challenges = point we get
+        // q_scalars[k] for variable n-1-k. Pass point in reversed order so we get q_scalars[k] for variable k, matching quotients[k].
+        let point_reversed_for_scalars: Vec<P::ScalarField> = point.iter().rev().cloned().collect();
         let (eval_scalar, (degree_check_q_scalars, zmpoly_q_scalars)): (
             P::ScalarField,
             (Vec<P::ScalarField>, Vec<P::ScalarField>),
-        ) = eval_and_quotient_scalars::<P>(y_challenge, x_challenge, z_challenge, point);
-        // f = z * poly.Z + q_hat + (-z * Φ_n(x) * e) + ∑_k (q_scalars_k * q_k)   hmm why no sign for the q_hat????
+        ) = eval_and_quotient_scalars::<P>(
+            y_challenge,
+            x_challenge,
+            z_challenge,
+            &point_reversed_for_scalars,
+        );
+        // f = z * poly.Z + q_hat + (-z * Φ_n(x) * e) + ∑_k (q_scalars_k * q_k)
         let mut f = UniPoly::from_coefficients_vec(poly.to_evaluations());
-        f = f * z_challenge; // TODO: add MulAssign to arkworks so you can write f *= z_challenge?
+        f = f * z_challenge;
         f += &q_hat;
         f[0] += eval_scalar * eval;
+        let q_scalars_for_s: Vec<P::ScalarField> = degree_check_q_scalars
+            .iter()
+            .zip(zmpoly_q_scalars.iter())
+            .map(|(a, b)| *a + *b)
+            .collect();
+        let s_combined = r.0
+            + z_challenge * s.0
+            + q_scalars_for_s
+                .iter()
+                .zip(rs.iter())
+                .map(|(scalar, rk)| *scalar * rk.0)
+                .sum::<P::ScalarField>();
+
         quotients
             .into_iter()
             .zip(degree_check_q_scalars)
@@ -347,19 +386,63 @@ where
                 q = q * (degree_check_scalar + zm_poly_scalar);
                 f += &q;
             });
-        //debug_assert_eq!(f.evaluate(&x_challenge), P::ScalarField::zero());
-
-        // Compute and send proof commitment pi
-        let rho = sample_field_element::<P::ScalarField, _>(rng);
-
-        let pi = univariate_hiding_kzg::CommitmentHomomorphism::open(
-            &pp.open_pp,
-            f.coeffs,
-            rho,
-            x_challenge,
+        assert_eq!(
+            f.evaluate(&x_challenge),
             P::ScalarField::zero(),
-            &s,
+            "batched polynomial f must vanish at x_challenge"
         );
+
+        // Test-only: if comm is provided, assert that zeta_z_com (as verifier would compute it)
+        // equals the commitment to f with s_combined, so the HKZG verify should pass.
+        #[cfg(test)]
+        if let Some(comm_ref) = comm {
+            let scalars: Vec<P::ScalarField> = [
+                vec![P::ScalarField::one(), z_challenge, eval_scalar * eval],
+                q_scalars_for_s.clone(),
+            ]
+            .concat();
+            let mut bases_proj = vec![q_hat_com.0, comm_ref.0, pp.hiding_kzg_pp.g1.into_group()];
+            bases_proj.extend(q_k_com.iter().map(|c| c.0));
+            let bases = P::G1::normalize_batch(&bases_proj);
+            let zeta_z_com = <P::G1 as VariableBaseMSM>::msm(&bases, &scalars)
+                .expect("MSM in prover sanity check")
+                .into_affine();
+            let comm_f = univariate_hiding_kzg::commit_with_randomness(
+                &pp.hiding_kzg_pp,
+                &f.coeffs,
+                &Scalar(s_combined),
+            );
+            assert_eq!(
+                comm_f.0.into_affine(),
+                zeta_z_com,
+                "zeta_z_com must match commitment to f (HKZG verify would fail otherwise)"
+            );
+        }
+
+        // Compute and send proof commitment pi. Use s_combined so the opening proof's blinding matches zeta_z_com's blinding.
+        // HKZG verify requires rho = s for the blinding terms to cancel, so set rho = s_combined.
+        let s_combined_scalar = Scalar(s_combined);
+
+        let pi = if pp.open_offset == 0 {
+            univariate_hiding_kzg::CommitmentHomomorphism::open(
+                &pp.hiding_kzg_pp,
+                f.coeffs,
+                s_combined,
+                x_challenge,
+                P::ScalarField::zero(),
+                &s_combined_scalar,
+            )
+        } else {
+            univariate_hiding_kzg::CommitmentHomomorphism::open_with_offset(
+                &pp.hiding_kzg_pp,
+                f.coeffs,
+                s_combined,
+                x_challenge,
+                P::ScalarField::zero(),
+                &s_combined_scalar,
+                pp.open_offset,
+            )
+        };
 
         ZeromorphProof {
             pi,
@@ -394,11 +477,17 @@ where
         let x_challenge = transcript.challenge_scalar();
         let z_challenge = transcript.challenge_scalar();
 
-        // Compute batched degree and ZM-identity quotient polynomial pi
+        // Must match prover: use point in reversed order so q_scalars[k] aligns with quotients[k].
+        let point_reversed_for_scalars: Vec<P::ScalarField> = point.iter().rev().cloned().collect();
         let (eval_scalar, (mut q_scalars, zmpoly_q_scalars)): (
             P::ScalarField,
             (Vec<P::ScalarField>, Vec<P::ScalarField>),
-        ) = eval_and_quotient_scalars::<P>(y_challenge, x_challenge, z_challenge, point);
+        ) = eval_and_quotient_scalars::<P>(
+            y_challenge,
+            x_challenge,
+            z_challenge,
+            &point_reversed_for_scalars,
+        );
         q_scalars
             .iter_mut()
             .zip(zmpoly_q_scalars)
@@ -415,7 +504,7 @@ where
 
         bases_proj.push(proof.q_hat_com.0);
         bases_proj.push(comm.0);
-        bases_proj.push(vk.kzg_vk.group_generators.g1.into_group()); // Not so ideal to include this in `normalize_batch` but the effect should be negligible
+        bases_proj.push(vk.kzg_vk.group_generators.g1.into_group());
         bases_proj.extend(proof.q_k_com.iter().map(|w| w.0));
 
         let bases = P::G1::normalize_batch(&bases_proj);
@@ -424,23 +513,16 @@ where
             .expect("MSM failed in ZeroMorph")
             .into_affine();
 
-        // e(pi, [tau]_2 - x * [1]_2) == e(C_{\zeta,Z}, -[X^(N_max - 2^n - 1)]_2) <==> e(C_{\zeta,Z} - x * pi, [X^{N_max - 2^n - 1}]_2) * e(-pi, [tau_2]) == 1
-        let pairing = P::multi_pairing(
-            [
-                zeta_z_com,
-                proof.pi.pi_1.0.into_affine(),
-                proof.pi.pi_2.into_affine(),
-            ],
-            [
-                (-vk.tau_N_max_sub_2_N.into_group()).into_affine(),
-                (vk.kzg_vk.tau_2.into_group() - (vk.kzg_vk.group_generators.g2 * x_challenge))
-                    .into(),
-                vk.kzg_vk.xi_2,
-            ],
-        );
-        if !pairing.is_zero() {
-            return Err(anyhow::anyhow!("Expected zero during multi-pairing check"));
-        }
+        // Delegate to standard hiding KZG verify: e(C - y*[1]_1, [1]_2) + e(-pi_1, [τ-x]_2) + e(-pi_2, ξ_2) = 0.
+        // Commitment type is TrivialShape<P::G1>; y = 0 since the batched polynomial vanishes at x.
+        let zeta_z_commitment = TrivialShape(zeta_z_com.into_group());
+        univariate_hiding_kzg::CommitmentHomomorphism::verify(
+            vk.kzg_vk,
+            zeta_z_commitment,
+            x_challenge,
+            P::ScalarField::zero(),
+            proof.pi.clone(),
+        )?;
 
         Ok(())
     }
@@ -484,23 +566,25 @@ where
             .next_power_of_two();
 
         let trapdoor = univariate_hiding_kzg::Trapdoor::<P>::rand(rng);
+        // setup_extra requires m to be a power of 2. number_of_coefficients is already a power of 2.
+        // Use m = N so that offset = 0 and tau_N_max_sub_2_N = g2_powers[0] = [1]_2, giving the
+        // standard hiding KZG check: e(zeta_z_com, [1]_2) = e(pi_1, [τ-x]_2) * e(pi_2, xi_2).
+        let m = number_of_coefficients;
         let (kzg_vk_pp, kzg_commit_pp) = univariate_hiding_kzg::setup_extra(
-            number_of_coefficients + 1,
+            m,
             SrsType::PowersOfTau,
             GroupGenerators::default(),
             trapdoor,
         );
-        //let open_pp = commit_pp;
 
+        let offset = m - number_of_coefficients; // 0 when m = N
         let prover_key = ZeromorphProverKey {
-            commit_pp: kzg_commit_pp.clone(),
-            open_pp: kzg_commit_pp,
+            hiding_kzg_pp: kzg_commit_pp,
+            open_offset: offset,
         };
-
-        // Derive verification key
         let vk = ZeromorphVerifierKey {
             kzg_vk: kzg_vk_pp.vk,
-            tau_N_max_sub_2_N: kzg_vk_pp.g2_powers[number_of_coefficients],
+            tau_N_max_sub_2_N: kzg_vk_pp.g2_powers[offset],
         };
 
         (prover_key, vk)
@@ -526,7 +610,7 @@ where
         let s = Scalar(r.expect("open(): expected randomness r, got None"));
 
         let eval = Self::evaluate_point(&poly, &challenge);
-        Zeromorph::open(&ck, &poly, &challenge, eval, s, rng, trs)
+        Zeromorph::open(&ck, &poly, &challenge, eval, s, rng, trs, None)
     }
 
     // TODO: also implement this in dekart_univariate_v2... hmm or defer to hiding KZG?
@@ -559,7 +643,16 @@ where
                 acc + (*r * gamma_i)
             });
 
-        Zeromorph::open(&ck, &combined_poly, &challenge, eval, Scalar(s), rng, trs)
+        Zeromorph::open(
+            &ck,
+            &combined_poly,
+            &challenge,
+            eval,
+            Scalar(s),
+            rng,
+            trs,
+            None,
+        )
     }
 
     fn verify(
@@ -586,5 +679,371 @@ where
 
     fn scheme_name() -> &'static [u8] {
         b"Zeromorph"
+    }
+}
+
+#[allow(non_snake_case)]
+#[cfg(test)]
+mod test {
+    use super::*;
+    use ark_bn254::{Bn254, Fr};
+    use ark_ff::{BigInt, Field, Zero};
+    use ark_std::{test_rng, UniformRand};
+    use rand::{rngs::StdRng, SeedableRng};
+
+    // Evaluate Phi_k(x) = \sum_{i=0}^k x^i using the direct inefficient formula
+    fn phi<P: Pairing>(challenge: &P::ScalarField, subscript: usize) -> P::ScalarField {
+        let len = (1 << subscript) as u64;
+        (0..len).fold(P::ScalarField::zero(), |mut acc, i| {
+            //Note this is ridiculous DevX
+            acc += challenge.pow(BigInt::<1>::from(i));
+            acc
+        })
+    }
+
+    /// Test for computing qk given multilinear f
+    /// Given 𝑓(𝑋₀, …, 𝑋ₙ₋₁), and `(𝑢, 𝑣)` such that \f(\u) = \v, compute `qₖ(𝑋₀, …, 𝑋ₖ₋₁)`
+    /// such that the following identity holds:
+    ///
+    /// `𝑓(𝑋₀, …, 𝑋ₙ₋₁) − 𝑣 = ∑ₖ₌₀ⁿ⁻¹ (𝑋ₖ − 𝑢ₖ) qₖ(𝑋₀, …, 𝑋ₖ₋₁)`
+    #[test]
+    fn quotient_construction() {
+        // Define size params
+        let num_vars = 4;
+        let n: u64 = 1 << num_vars;
+
+        // Construct a random multilinear polynomial f, and (u,v) such that f(u) = v
+        let mut rng = test_rng();
+        let evals: Vec<_> = (0..n).map(|_| Fr::rand(&mut rng)).collect();
+        // Use polynomial_from_vec which is the standard way to create polynomials in this codebase
+        let multilinear_f = Zeromorph::<Bn254>::polynomial_from_vec(evals.clone());
+        let u_challenge = (0..num_vars)
+            .map(|_| Fr::rand(&mut rng))
+            .collect::<Vec<_>>();
+        let v_evaluation = multilinear_f.evaluate(&u_challenge);
+
+        // Verify the polynomial was created correctly - check hypercube evaluations
+        // The evaluations should be in order: f(0,0,...,0), f(1,0,...,0), f(0,1,...,0), ..., f(1,1,...,1)
+        // For index i, the binary representation gives the hypercube point
+        // Bit j (LSB = 0) corresponds to variable j
+        let poly_evals = multilinear_f.to_evaluations();
+        assert_eq!(poly_evals.len(), evals.len(), "Evaluation count mismatch");
+        for (i, &expected_eval) in evals.iter().enumerate() {
+            // Reconstruct the hypercube point for index i
+            // LSB (bit 0) is variable 0, bit 1 is variable 1, etc.
+            let mut point = Vec::new();
+            for j in 0..num_vars {
+                point.push(
+                    if (i >> j) & 1 == 1 {
+                        Fr::one()
+                    } else {
+                        Fr::zero()
+                    },
+                );
+            }
+            let computed_eval = multilinear_f.evaluate(&point);
+            // Check both that evaluate() works and that to_evaluations() returns the right order
+            if expected_eval != computed_eval || poly_evals[i] != expected_eval {
+                panic!(
+                    "Evaluation mismatch at index {}: expected={:?}, computed={:?}, to_evals={:?}, point={:?}",
+                    i, expected_eval, computed_eval, poly_evals[i], point
+                );
+            }
+        }
+
+        // Compute multilinear quotients `qₖ(𝑋₀, …, 𝑋ₖ₋₁)`
+        // The function now handles the variable ordering internally
+        let (quotients, constant_term) =
+            compute_multilinear_quotients::<Bn254>(&multilinear_f, &u_challenge);
+
+        // The constant term should equal the evaluation at u_challenge
+        assert_eq!(
+            constant_term, v_evaluation,
+            "The constant term equal to the evaluation of the polynomial at challenge point. \
+             constant_term={:?}, v_evaluation={:?}",
+            constant_term, v_evaluation
+        );
+
+        //To demonstrate that q_k was properly constructed we show that the identity holds at a random multilinear challenge
+        // i.e. 𝑓(𝑧) − 𝑣 − ∑ₖ₌₀ᵈ⁻¹ (𝑧ₖ − 𝑢ₖ)𝑞ₖ(𝑧) = 0
+        let z_challenge = (0..num_vars)
+            .map(|_| Fr::rand(&mut rng))
+            .collect::<Vec<_>>();
+
+        let mut res = multilinear_f.evaluate(&z_challenge);
+        res -= v_evaluation;
+
+        // After the fix in compute_multilinear_quotients, quotients[k] corresponds to variable k
+        // and depends on variables 0..k-1 (first k variables)
+        for (k, q_k_uni) in quotients.iter().enumerate() {
+            // q_k depends on the first k variables: X_0, ..., X_{k-1}
+            let z_partial = if k > 0 {
+                &z_challenge[0..k]
+            } else {
+                // k=0: q_0 is a constant, no variables to evaluate
+                &[]
+            };
+            //This is a weird consequence of how things are done.. the univariate polys are of the multilinear commitment in lagrange basis. Therefore we evaluate as multilinear
+            // q_k_uni has 2^k coefficients representing evaluations on a k-variable hypercube
+            let q_k_ml = DenseMultilinearExtension::from_evaluations_vec(k, q_k_uni.coeffs.clone());
+            let q_k_eval = if k > 0 {
+                q_k_ml.evaluate(&z_partial.to_vec())
+            } else {
+                // k=0: q_0 is constant, just use the coefficient
+                q_k_uni.coeffs[0]
+            };
+
+            // Multiply by (z_k - u_k) where k is the variable index
+            res -= (z_challenge[k] - u_challenge[k]) * q_k_eval;
+        }
+        assert!(res.is_zero());
+    }
+
+    /// Test for construction of batched lifted degree quotient:
+    ///  ̂q = ∑ₖ₌₀ⁿ⁻¹ yᵏ Xᵐ⁻ᵈᵏ⁻¹ ̂qₖ, 𝑑ₖ = deg(̂q), 𝑚 = 𝑁
+    #[test]
+    fn batched_lifted_degree_quotient() {
+        let num_vars = 3;
+        let n = 1 << num_vars;
+
+        // Define mock qₖ with deg(qₖ) = 2ᵏ⁻¹
+        let q_0 = UniPoly::from_coefficients_vec(vec![Fr::one()]);
+        let q_1 = UniPoly::from_coefficients_vec(vec![Fr::from(2u64), Fr::from(3u64)]);
+        let q_2 = UniPoly::from_coefficients_vec(vec![
+            Fr::from(4u64),
+            Fr::from(5u64),
+            Fr::from(6u64),
+            Fr::from(7u64),
+        ]);
+        let quotients = vec![q_0, q_1, q_2];
+
+        let mut rng = test_rng();
+        let y_challenge = Fr::rand(&mut rng);
+
+        //Compute batched quptient  ̂q
+        let (batched_quotient, _) =
+            compute_batched_lifted_degree_quotient::<Bn254>(&quotients, &y_challenge);
+
+        //Explicitly define q_k_lifted = X^{N-2^k} * q_k and compute the expected batched result
+        let q_0_lifted = UniPoly::from_coefficients_vec(vec![
+            Fr::zero(),
+            Fr::zero(),
+            Fr::zero(),
+            Fr::zero(),
+            Fr::zero(),
+            Fr::zero(),
+            Fr::zero(),
+            Fr::one(),
+        ]);
+        let q_1_lifted = UniPoly::from_coefficients_vec(vec![
+            Fr::zero(),
+            Fr::zero(),
+            Fr::zero(),
+            Fr::zero(),
+            Fr::zero(),
+            Fr::zero(),
+            Fr::from(2u64),
+            Fr::from(3u64),
+        ]);
+        let q_2_lifted = UniPoly::from_coefficients_vec(vec![
+            Fr::zero(),
+            Fr::zero(),
+            Fr::zero(),
+            Fr::zero(),
+            Fr::from(4u64),
+            Fr::from(5u64),
+            Fr::from(6u64),
+            Fr::from(7u64),
+        ]);
+
+        //Explicitly compute  ̂q i.e. RLC of lifted polys
+        let mut batched_quotient_expected = UniPoly::from_coefficients_vec(vec![Fr::zero(); n]);
+
+        batched_quotient_expected += &q_0_lifted;
+        batched_quotient_expected += &(q_1_lifted * y_challenge);
+        batched_quotient_expected += &(q_2_lifted * (y_challenge * y_challenge));
+        assert_eq!(batched_quotient, batched_quotient_expected);
+    }
+
+    /// evaluated quotient \zeta_x
+    ///
+    /// 𝜁 = 𝑓 − ∑ₖ₌₀ⁿ⁻¹𝑦ᵏ𝑥ʷˢ⁻ʷ⁺¹𝑓ₖ  = 𝑓 − ∑_{d ∈ {d₀, ..., dₙ₋₁}} X^{d* - d + 1}  − ∑{k∶ dₖ=d} yᵏ fₖ , where d* = lifted degree
+    ///
+    /// 𝜁 =  ̂q - ∑ₖ₌₀ⁿ⁻¹ yᵏ Xᵐ⁻ᵈᵏ⁻¹ ̂qₖ, m = N
+    #[test]
+    fn partially_evaluated_quotient_zeta() {
+        let num_vars = 3;
+        let n: u64 = 1 << num_vars;
+
+        let mut rng = test_rng();
+        let x_challenge = Fr::rand(&mut rng);
+        let y_challenge = Fr::rand(&mut rng);
+
+        let challenges: Vec<_> = (0..num_vars).map(|_| Fr::rand(&mut rng)).collect();
+        let z_challenge = Fr::rand(&mut rng);
+
+        let (_, (zeta_x_scalars, _)) =
+            eval_and_quotient_scalars::<Bn254>(y_challenge, x_challenge, z_challenge, &challenges);
+
+        // To verify we manually compute zeta using the computed powers and expected
+        // 𝜁 =  ̂q - ∑ₖ₌₀ⁿ⁻¹ yᵏ Xᵐ⁻ᵈᵏ⁻¹ ̂qₖ, m = N
+        assert_eq!(
+            zeta_x_scalars[0],
+            -x_challenge.pow(BigInt::<1>::from(n - 1))
+        );
+
+        assert_eq!(
+            zeta_x_scalars[1],
+            -y_challenge * x_challenge.pow(BigInt::<1>::from(n - 1 - 1))
+        );
+
+        assert_eq!(
+            zeta_x_scalars[2],
+            -y_challenge * y_challenge * x_challenge.pow(BigInt::<1>::from(n - 3 - 1))
+        );
+    }
+
+    /// Test efficiently computing 𝛷ₖ(x) = ∑ᵢ₌₀ᵏ⁻¹xⁱ
+    /// 𝛷ₖ(𝑥) = ∑ᵢ₌₀ᵏ⁻¹𝑥ⁱ = (𝑥²^ᵏ − 1) / (𝑥 − 1)
+    #[test]
+    fn phi_n_x_evaluation() {
+        const N: u64 = 8u64;
+        let log_N = (N as usize).ilog2() as usize;
+
+        // 𝛷ₖ(𝑥)
+        let mut rng = test_rng();
+        let x_challenge = Fr::rand(&mut rng);
+
+        let efficient = (x_challenge.pow(BigInt::<1>::from((1 << log_N) as u64)) - Fr::one())
+            / (x_challenge - Fr::one());
+        let expected: Fr = phi::<Bn254>(&x_challenge, log_N);
+        assert_eq!(efficient, expected);
+    }
+
+    /// Test efficiently computing 𝛷ₖ(x) = ∑ᵢ₌₀ᵏ⁻¹xⁱ
+    /// 𝛷ₙ₋ₖ₋₁(𝑥²^ᵏ⁺¹) = (𝑥²^ⁿ − 1) / (𝑥²^ᵏ⁺¹ − 1)
+    #[test]
+    fn phi_n_k_1_x_evaluation() {
+        const N: u64 = 8u64;
+        let log_N = (N as usize).ilog2() as usize;
+
+        // 𝛷ₖ(𝑥)
+        let mut rng = test_rng();
+        let x_challenge = Fr::rand(&mut rng);
+        let k = 2;
+
+        //𝑥²^ᵏ⁺¹
+        let x_pow = x_challenge.pow(BigInt::<1>::from((1 << (k + 1)) as u64));
+
+        //(𝑥²^ⁿ − 1) / (𝑥²^ᵏ⁺¹ − 1)
+        let efficient = (x_challenge.pow(BigInt::<1>::from((1 << log_N) as u64)) - Fr::one())
+            / (x_pow - Fr::one());
+        let expected: Fr = phi::<Bn254>(&x_challenge, log_N - k - 1);
+        assert_eq!(efficient, expected);
+    }
+
+    /// Test construction of 𝑍ₓ
+    /// 𝑍ₓ =  ̂𝑓 − 𝑣 ∑ₖ₌₀ⁿ⁻¹(𝑥²^ᵏ𝛷ₙ₋ₖ₋₁(𝑥ᵏ⁺¹)− 𝑢ₖ𝛷ₙ₋ₖ(𝑥²^ᵏ)) ̂qₖ
+    #[test]
+    fn partially_evaluated_quotient_z_x() {
+        let num_vars = 3;
+
+        // Construct a random multilinear polynomial f, and (u,v) such that f(u) = v.
+        let mut rng = test_rng();
+        let challenges: Vec<_> = (0..num_vars).map(|_| Fr::rand(&mut rng)).collect();
+
+        let u_rev = {
+            let mut res = challenges.clone();
+            res.reverse();
+            res
+        };
+
+        let x_challenge = Fr::rand(&mut rng);
+        let y_challenge = Fr::rand(&mut rng);
+        let z_challenge = Fr::rand(&mut rng);
+
+        // Construct Z_x scalars
+        let (_, (_, z_x_scalars)) =
+            eval_and_quotient_scalars::<Bn254>(y_challenge, x_challenge, z_challenge, &challenges);
+
+        for k in 0..num_vars {
+            let x_pow_2k = x_challenge.pow(BigInt::<1>::from((1 << k) as u64)); // x^{2^k}
+            let x_pow_2kp1 = x_challenge.pow(BigInt::<1>::from((1 << (k + 1)) as u64)); // x^{2^{k+1}}
+                                                                                        // x^{2^k} * \Phi_{n-k-1}(x^{2^{k+1}}) - u_k *  \Phi_{n-k}(x^{2^k})
+            let mut scalar = x_pow_2k * phi::<Bn254>(&x_pow_2kp1, num_vars - k - 1)
+                - u_rev[k] * phi::<Bn254>(&x_pow_2k, num_vars - k);
+            scalar *= z_challenge;
+            scalar *= Fr::from(-1);
+            assert_eq!(z_x_scalars[k], scalar);
+        }
+    }
+
+    #[test]
+    fn zeromorph_commit_prove_verify() {
+        for num_vars in [4, 5, 6] {
+            let mut rng = StdRng::seed_from_u64(num_vars as u64);
+            let mut ark_rng = test_rng();
+
+            let poly = DenseMultilinearExtension::rand(num_vars, &mut ark_rng);
+            let point: Vec<<Bn254 as Pairing>::ScalarField> = (0..num_vars)
+                .map(|_| <Bn254 as Pairing>::ScalarField::rand(&mut ark_rng))
+                .collect();
+            let eval = poly.evaluate(&point);
+
+            // degree_bounds should be the degree, not the number of coefficients
+            // For a multilinear polynomial with num_vars variables, the degree is (1 << num_vars) - 1
+            let degree = (1 << num_vars) - 1;
+            let (pk, vk) = Zeromorph::<Bn254>::setup(vec![degree], &mut rng);
+            let r = <Bn254 as Pairing>::ScalarField::rand(&mut ark_rng);
+            let commitment = Zeromorph::<Bn254>::commit(&pk, &poly, r);
+
+            let mut prover_transcript = merlin::Transcript::new(b"TestEval");
+            let s = Scalar(r);
+            let proof = Zeromorph::<Bn254>::open(
+                &pk,
+                &poly,
+                &point,
+                eval,
+                s,
+                &mut rng,
+                &mut prover_transcript,
+                Some(&commitment),
+            );
+            let p_transcript_squeeze: <Bn254 as Pairing>::ScalarField =
+                prover_transcript.challenge_scalar();
+
+            // Verify proof.
+            let mut verifier_transcript = merlin::Transcript::new(b"TestEval");
+            Zeromorph::<Bn254>::verify(
+                &vk,
+                &commitment,
+                &point,
+                &eval,
+                &proof,
+                &mut verifier_transcript,
+            )
+            .unwrap();
+            let v_transcript_squeeze: <Bn254 as Pairing>::ScalarField =
+                verifier_transcript.challenge_scalar();
+
+            assert_eq!(p_transcript_squeeze, v_transcript_squeeze);
+
+            // evaluate bad proof for soundness
+            let altered_verifier_point = point
+                .iter()
+                .map(|s| *s + <Bn254 as Pairing>::ScalarField::one())
+                .collect::<Vec<_>>();
+            let altered_verifier_eval = poly.evaluate(&altered_verifier_point);
+            let mut verifier_transcript = merlin::Transcript::new(b"TestEval");
+            assert!(Zeromorph::<Bn254>::verify(
+                &vk,
+                &commitment,
+                &altered_verifier_point,
+                &altered_verifier_eval,
+                &proof,
+                &mut verifier_transcript,
+            )
+            .is_err())
+        }
     }
 }
