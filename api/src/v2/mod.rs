@@ -18,6 +18,7 @@ pub mod extractors;
 pub mod middleware;
 pub mod proxy;
 pub mod router;
+pub mod tls;
 pub mod types;
 pub mod websocket;
 

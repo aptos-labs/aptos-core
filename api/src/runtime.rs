@@ -70,6 +70,18 @@ pub fn bootstrap(
             info!("v2 API WebSocket block poller started");
         }
 
+        // Build optional TLS acceptor if configured.
+        let tls_acceptor = if config.api_v2.tls_enabled() {
+            let cert_path = config.api_v2.tls_cert_path.as_ref().unwrap();
+            let key_path = config.api_v2.tls_key_path.as_ref().unwrap();
+            Some(
+                crate::v2::tls::build_tls_acceptor(cert_path, key_path)
+                    .context("Failed to build v2 TLS acceptor")?,
+            )
+        } else {
+            None
+        };
+
         if let Some(v2_address) = config.api_v2.address {
             // ---- Separate port mode ----
             // Poem serves v1 on the main port; Axum serves v2 on a separate port.
@@ -82,11 +94,15 @@ pub fn bootstrap(
                 let listener = tokio::net::TcpListener::bind(v2_address)
                     .await
                     .expect("Failed to bind v2 API listener");
-                // axum::serve uses hyper_util::server::conn::auto::Builder internally,
-                // which auto-negotiates HTTP/1.1 and HTTP/2 (h2c).
-                axum::serve(listener, v2_router)
-                    .await
-                    .expect("v2 API server failed");
+                if let Some(tls_acceptor) = tls_acceptor {
+                    // TLS mode: ALPN negotiation for h2 + http/1.1.
+                    crate::v2::tls::serve_tls(listener, tls_acceptor, v2_router, None).await;
+                } else {
+                    // Plain mode: h2c + HTTP/1.1 via axum::serve.
+                    axum::serve(listener, v2_router)
+                        .await
+                        .expect("v2 API server failed");
+                }
             });
         } else {
             // ---- Same-port co-hosting mode ----
@@ -114,16 +130,18 @@ pub fn bootstrap(
                 let listener = tokio::net::TcpListener::bind(external_addr)
                     .await
                     .expect("Failed to bind combined API listener");
-
-                // Send the actual port back to the caller (for tests).
-                if let Some(port_tx) = port_tx {
-                    let _ = port_tx.send(listener.local_addr().unwrap().port());
+                if let Some(tls_acceptor) = tls_acceptor {
+                    // TLS mode: ALPN negotiation for h2 + http/1.1.
+                    crate::v2::tls::serve_tls(listener, tls_acceptor, combined, port_tx).await;
+                } else {
+                    // Plain mode: send port, then serve h2c + HTTP/1.1.
+                    if let Some(port_tx) = port_tx {
+                        let _ = port_tx.send(listener.local_addr().unwrap().port());
+                    }
+                    axum::serve(listener, combined)
+                        .await
+                        .expect("Combined API server failed");
                 }
-
-                // axum::serve auto-negotiates HTTP/1.1 and HTTP/2 (h2c).
-                axum::serve(listener, combined)
-                    .await
-                    .expect("Combined API server failed");
             });
         }
     } else {

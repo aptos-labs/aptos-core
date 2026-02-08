@@ -970,3 +970,171 @@ async fn test_ws_subscribe_tx_status_sends_pending_then_not_found() {
     assert!(got_pending, "Should have received 'pending' status");
     assert!(got_not_found, "Should have received 'not_found' status");
 }
+
+// ======================================================================
+// TLS tests
+// ======================================================================
+
+/// Self-signed EC test certificate (CN=localhost, valid 1 year).
+const TEST_TLS_CERT: &str = r#"-----BEGIN CERTIFICATE-----
+MIIBfTCCASOgAwIBAgIUcOjGtWC925LfCcMdCIl+3UOKdg4wCgYIKoZIzj0EAwIw
+FDESMBAGA1UEAwwJbG9jYWxob3N0MB4XDTI2MDIwODAzMzYzNVoXDTI3MDIwODAz
+MzYzNVowFDESMBAGA1UEAwwJbG9jYWxob3N0MFkwEwYHKoZIzj0CAQYIKoZIzj0D
+AQcDQgAEiJdKi1sKI8Qi5xwlhsV0gTPN5TdJl/9DC/qjNOFwdh9kvjl3bEqJ6MKO
+xdBJ88gx5TSXmkmEQXTK6KurvfYBS6NTMFEwHQYDVR0OBBYEFE9tQ7FIQkqr3ju/
+5nLutCmVZpruMB8GA1UdIwQYMBaAFE9tQ7FIQkqr3ju/5nLutCmVZpruMA8GA1Ud
+EwEB/wQFMAMBAf8wCgYIKoZIzj0EAwIDSAAwRQIhAJAVqDQ7/jlwHsGEhU5tCn4L
++8PM9+QL2N0anMERrfrtAiAKHwclC6A9qWIIG0ITy/i989VGOxZtx/CWAytxu6TE
+7g==
+-----END CERTIFICATE-----"#;
+
+/// PKCS8 private key for the test certificate.
+const TEST_TLS_KEY: &str = r#"-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgFlINaDZ+BWjxSOw/
+yRRqNdN9kPFVz4VWyn4nAZFDmdGhRANCAASIl0qLWwojxCLnHCWGxXSBM83lN0mX
+/0ML+qM04XB2H2S+OXdsSonowo7F0EnzyDHlNJeaSYRBdMroq6u99gFL
+-----END PRIVATE KEY-----"#;
+
+/// Write test cert and key to temp files, return their paths.
+fn write_test_tls_files() -> (tempfile::NamedTempFile, tempfile::NamedTempFile) {
+    use std::io::Write;
+    let mut cert_file = tempfile::NamedTempFile::new().expect("Failed to create temp cert file");
+    cert_file
+        .write_all(TEST_TLS_CERT.as_bytes())
+        .expect("Failed to write cert");
+    cert_file.flush().unwrap();
+
+    let mut key_file = tempfile::NamedTempFile::new().expect("Failed to create temp key file");
+    key_file
+        .write_all(TEST_TLS_KEY.as_bytes())
+        .expect("Failed to write key");
+    key_file.flush().unwrap();
+
+    (cert_file, key_file)
+}
+
+/// Helper: start a v2 server with TLS enabled.
+async fn start_tls_v2_server() -> (SocketAddr, tokio::task::JoinHandle<()>) {
+    let (cert_file, key_file) = write_test_tls_files();
+
+    let mut node_config = NodeConfig::default();
+    node_config.storage.rocksdb_configs.enable_storage_sharding = false;
+
+    let test_ctx = create_test_context("v2_tls_test".to_string(), node_config.clone(), false);
+
+    let context = Context::new(
+        ChainId::test(),
+        test_ctx.db.clone(),
+        test_ctx.mempool.ac_client.clone(),
+        node_config.clone(),
+        None,
+    );
+
+    let v2_config = V2Config::from_configs(&node_config.api_v2, &node_config.api);
+    let v2_ctx = V2Context::new(context, v2_config);
+    let router = build_v2_router(v2_ctx);
+
+    let tls_acceptor = crate::v2::tls::build_tls_acceptor(
+        cert_file.path().to_str().unwrap(),
+        key_file.path().to_str().unwrap(),
+    )
+    .expect("Failed to build TLS acceptor");
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("Failed to bind");
+    let addr = listener.local_addr().unwrap();
+
+    let handle = tokio::spawn(async move {
+        // Keep temp files alive for the duration of the server (not strictly
+        // needed since we already built the acceptor, but avoids confusion).
+        let _cert = cert_file;
+        let _key = key_file;
+        crate::v2::tls::serve_tls(listener, tls_acceptor, router, None).await;
+    });
+
+    // Give the server a moment to start.
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+    (addr, handle)
+}
+
+/// Build a reqwest client that accepts the test self-signed certificate.
+/// We use `danger_accept_invalid_certs` because the self-signed cert is
+/// not in the system trust store. This is safe for test purposes only.
+fn tls_test_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .expect("Failed to build TLS client")
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_tls_health_endpoint() {
+    let (addr, _handle) = start_tls_v2_server().await;
+    let client = tls_test_client();
+
+    let resp = client
+        .get(format!("https://localhost:{}/v2/health", addr.port()))
+        .send()
+        .await
+        .expect("TLS request failed");
+
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(body["status"], "ok");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_tls_info_endpoint() {
+    let (addr, _handle) = start_tls_v2_server().await;
+    let client = tls_test_client();
+
+    let resp = client
+        .get(format!("https://localhost:{}/v2/info", addr.port()))
+        .send()
+        .await
+        .expect("TLS request failed");
+
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = resp.json().await.unwrap();
+    // The info endpoint returns a V2Response envelope.
+    assert!(
+        body["data"].is_object() || body["ledger"].is_object(),
+        "Expected a structured info response, got: {}",
+        body
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_tls_resources_endpoint() {
+    let (addr, _handle) = start_tls_v2_server().await;
+    let client = tls_test_client();
+
+    let resp = client
+        .get(format!(
+            "https://localhost:{}/v2/accounts/0x1/resources",
+            addr.port()
+        ))
+        .send()
+        .await
+        .expect("TLS request failed");
+
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = resp.json().await.unwrap();
+    assert!(body["data"].is_array());
+    assert!(!body["data"].as_array().unwrap().is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_tls_build_acceptor_invalid_cert() {
+    // Should fail with a descriptive error.
+    let result = crate::v2::tls::build_tls_acceptor("/nonexistent/cert.pem", "/nonexistent/key.pem");
+    assert!(result.is_err());
+    let err_msg = format!("{}", result.err().unwrap());
+    assert!(
+        err_msg.contains("Failed to open TLS cert file"),
+        "Error should mention cert file: {}",
+        err_msg
+    );
+}

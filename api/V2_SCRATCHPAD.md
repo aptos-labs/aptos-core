@@ -25,6 +25,7 @@ Working notes, decisions log, and progress tracker for the API v2 implementation
 | 2026-02-07 | Same-port co-hosting: Axum external + Poem internal proxy | Poem v1 starts on internal random port; Axum serves as the external-facing server with v2 routes and a reverse proxy fallback for v1. Both Poem 3.x and Axum 0.7 use hyper 1.x / http 1.x so types are compatible. Config: `api_v2.address = None` = same port, `api_v2.address = Some(addr)` = separate port. |
 
 | 2026-02-08 | WebSocket: broadcast + per-connection filter | Background block poller writes to `broadcast::Sender<WsEvent>` (capacity 4096); each connection subscribes and filters events against its active subscriptions. tx_status uses dedicated per-subscription poller task. `tokio-tungstenite 0.21.0` (matches axum's internal tungstenite) for test client. |
+| 2026-02-08 | TLS: rustls 0.21 + tokio-rustls 0.24 + hyper-util auto-builder | Manual accept loop with `TlsAcceptor` → `hyper_util::server::conn::auto::Builder` for ALPN-based h2/http1.1 negotiation. Uses `hyper1` (renamed hyper 1.x) for `service_fn`. Config: `api_v2.tls_cert_path` + `api_v2.tls_key_path`. PEM support for PKCS8, RSA, and EC keys. |
 
 ## Open Questions
 
@@ -81,7 +82,7 @@ Working notes, decisions log, and progress tracker for the API v2 implementation
 - [x] JsonOrBcs + BcsOnly content negotiation extractors
 - [x] V2Response envelope with LedgerMetadata in body
 - [x] Cursor unit tests (4 passing)
-- [x] Integration tests (39 tests: 24 endpoint + 6 co-hosting + 9 WebSocket)
+- [x] Integration tests (43 tests: 24 endpoint + 6 co-hosting + 9 WebSocket + 4 TLS)
 - [x] Performance benchmarks (9 criterion benchmarks incl. parameterized batch)
 - [x] HTTP/2 (h2c) — already supported by axum::serve (uses hyper_util auto::Builder)
 - [x] Same-port Poem+Axum co-hosting via reverse proxy (api_v2.address=None → same port)
@@ -96,5 +97,10 @@ Working notes, decisions log, and progress tracker for the API v2 implementation
   - [x] Subscription types: new_blocks, transaction_status (hash-specific poller), events (type filter)
   - [x] Guards: max_connections, max_subscriptions_per_conn, configurable via ApiV2Config
   - [x] 9 integration tests (ping/pong, subscribe, unsubscribe, error cases, tx status lifecycle)
+- [x] TLS support for v2 server (rustls + ALPN h2/http1.1 negotiation)
+  - [x] `tls.rs`: `build_tls_acceptor` (PEM cert/key loader, PKCS8+RSA+EC), `serve_tls` (manual accept loop with hyper_util auto-builder)
+  - [x] `ApiV2Config` extended with `tls_cert_path` and `tls_key_path`
+  - [x] `runtime.rs` updated to use TLS when configured (both separate-port and co-hosting modes)
+  - [x] Dependencies: `rustls 0.21`, `tokio-rustls 0.24`, `rustls-pemfile 1.0`, `hyper1` (renamed hyper 1.x)
+  - [x] 4 integration tests (health, info, resources over TLS; invalid cert error)
 - [ ] OpenAPI spec generation (utoipa-axum not yet compatible with axum 0.7)
-- [ ] TLS support for v2 server (currently h2c only, TLS would enable full h2)

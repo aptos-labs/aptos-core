@@ -229,6 +229,14 @@ pub struct ApiV2Config {
     pub max_runtime_workers: Option<usize>,
     /// Worker thread multiplier (used if max_runtime_workers is None).
     pub runtime_worker_multiplier: usize,
+    /// Path to PEM-encoded TLS certificate for HTTPS. Both `tls_cert_path` and
+    /// `tls_key_path` must be set to enable TLS. When TLS is enabled, ALPN
+    /// negotiation supports both `h2` and `http/1.1`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tls_cert_path: Option<String>,
+    /// Path to PEM-encoded TLS private key for HTTPS.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tls_key_path: Option<String>,
 }
 
 impl Default for ApiV2Config {
@@ -244,7 +252,16 @@ impl Default for ApiV2Config {
             content_length_limit: None,
             max_runtime_workers: None,
             runtime_worker_multiplier: 2,
+            tls_cert_path: None,
+            tls_key_path: None,
         }
+    }
+}
+
+impl ApiV2Config {
+    /// Returns true if TLS is configured (both cert and key paths are set).
+    pub fn tls_enabled(&self) -> bool {
+        self.tls_cert_path.is_some() && self.tls_key_path.is_some()
     }
 }
 
