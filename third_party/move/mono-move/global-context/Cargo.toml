@@ -11,3 +11,18 @@ rust-version = { workspace = true }
 
 [dependencies]
 parking_lot = { workspace = true }
+dashmap = "6.1"
+arc-swap = "1.7"
+num_cpus = "1.16"
+crossbeam-utils = "0.8.19"
+ahash = "0.8"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+rayon = "1.10"
+rand = "0.8"
+core_affinity = "0.8"
+
+[[bench]]
+name = "interner_bench"
+harness = false

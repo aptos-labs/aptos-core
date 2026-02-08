@@ -1,0 +1,16 @@
+# Python dependencies for interner benchmark analysis suite
+
+# Data analysis
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Statistical analysis
+scipy>=1.10.0
+
+# Visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Optional: Jupyter for interactive analysis
+# jupyter>=1.0.0
+# ipython>=8.0.0
