@@ -10,7 +10,7 @@ use crate::{
             tuple::{TupleCodomainShape, TupleHomomorphism},
             LiftHomomorphism, TrivialShape,
         },
-        traits::FirstProofItem,
+        FirstProofItem,
     },
     Scalar,
 };
@@ -127,7 +127,7 @@ pub type WeightedHomomorphism<'a, E> = TupleHomomorphism<
 >;
 
 pub type WeightedProof<'a, E> =
-    sigma_protocol::traits::Proof<<E as Pairing>::ScalarField, WeightedHomomorphism<'a, E>>;
+    sigma_protocol::Proof<<E as Pairing>::ScalarField, WeightedHomomorphism<'a, E>>;
 
 impl<'a, E: Pairing> WeightedProof<'a, E> {
     /// Generates a random looking proof (but not a valid one).

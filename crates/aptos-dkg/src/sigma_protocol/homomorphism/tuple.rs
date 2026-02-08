@@ -6,9 +6,8 @@ use crate::{
     sigma_protocol::{
         homomorphism,
         homomorphism::{fixed_base_msms, EntrywiseMap},
-        traits::{
-            fiat_shamir_challenge_for_sigma_protocol, prove_homomorphism, FirstProofItem, Proof,
-        },
+        traits::{fiat_shamir_challenge_for_sigma_protocol, prove_homomorphism},
+        FirstProofItem, Proof,
     },
 };
 use anyhow::ensure;

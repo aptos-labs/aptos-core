@@ -12,7 +12,7 @@ use crate::{
             tuple::{PairingTupleHomomorphism, TupleCodomainShape},
             LiftHomomorphism,
         },
-        traits::FirstProofItem,
+        FirstProofItem,
     },
 };
 use aptos_crypto::{
@@ -31,8 +31,7 @@ pub type Homomorphism<'a, E> = PairingTupleHomomorphism<
     HkzgElgamalHomomorphism<'a, E>,
     LiftedCommitHomomorphism<'a, <E as Pairing>::G2>,
 >;
-pub type Proof<'a, E> =
-    sigma_protocol::traits::Proof<<E as Pairing>::ScalarField, Homomorphism<'a, E>>;
+pub type Proof<'a, E> = sigma_protocol::Proof<<E as Pairing>::ScalarField, Homomorphism<'a, E>>;
 
 impl<'a, E: Pairing> Proof<'a, E> {
     /// Generates a random looking proof (but not a valid one).

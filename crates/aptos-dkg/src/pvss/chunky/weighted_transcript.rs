@@ -61,53 +61,53 @@ pub const DST: &[u8; 39] = b"APTOS_WEIGHTED_CHUNKY_FIELD_PVSS_FS_DST";
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct Transcript<E: Pairing> {
+pub struct Transcript<P: Pairing> {
     dealer: Player,
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     /// This is the aggregatable subtranscript
-    pub subtrs: Subtranscript<E>,
+    pub subtrs: Subtranscript<P>,
     /// Proof (of knowledge) showing that the s_{i,j}'s in C are base-B representations (of the s_i's in V, but this is not part of the proof), and that the r_j's in R are used in C
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub sharing_proof: SharingProof<E>,
+    pub sharing_proof: SharingProof<P>,
 }
 
 #[allow(non_snake_case)]
 #[derive(
     CanonicalSerialize, CanonicalDeserialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq,
 )]
-pub struct Subtranscript<E: Pairing> {
+pub struct Subtranscript<P: Pairing> {
     // The dealt public key
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub V0: E::G2Affine,
+    pub V0: P::G2Affine,
     // The dealt public key shares
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub Vs: Vec<Vec<E::G2Affine>>,
+    pub Vs: Vec<Vec<P::G2Affine>>,
     /// First chunked ElGamal component: C[i][j] = s_{i,j} * G + r_j * ek_i. Here s_i = \sum_j s_{i,j} * B^j // TODO: change notation because B is not a group element?
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub Cs: Vec<Vec<Vec<E::G1Affine>>>,
+    pub Cs: Vec<Vec<Vec<P::G1Affine>>>,
     /// Second chunked ElGamal component: R[j] = r_j * H
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub Rs: Vec<Vec<E::G1Affine>>,
+    pub Rs: Vec<Vec<P::G1Affine>>,
 }
 
 #[allow(non_snake_case)]
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct SubtranscriptProjective<E: Pairing> {
+pub struct SubtranscriptProjective<P: Pairing> {
     // The dealt public key
     #[serde(deserialize_with = "ark_de")]
-    pub V0: E::G2,
+    pub V0: P::G2,
     // The dealt public key shares
     #[serde(deserialize_with = "ark_de")]
-    pub Vs: Vec<Vec<E::G2>>,
+    pub Vs: Vec<Vec<P::G2>>,
     /// First chunked ElGamal component: C[i][j] = s_{i,j} * G + r_j * ek_i. Here s_i = \sum_j s_{i,j} * B^j // TODO: change notation because B is not a group element?
     #[serde(deserialize_with = "ark_de")]
-    pub Cs: Vec<Vec<Vec<E::G1>>>,
+    pub Cs: Vec<Vec<Vec<P::G1>>>,
     /// Second chunked ElGamal component: R[j] = r_j * H
     #[serde(deserialize_with = "ark_de")]
-    pub Rs: Vec<Vec<E::G1>>,
+    pub Rs: Vec<Vec<P::G1>>,
 }
 
-impl<E: Pairing> ValidCryptoMaterial for Subtranscript<E> {
+impl<P: Pairing> ValidCryptoMaterial for Subtranscript<P> {
     const AIP_80_PREFIX: &'static str = "";
 
     fn to_bytes(&self) -> Vec<u8> {
@@ -116,18 +116,18 @@ impl<E: Pairing> ValidCryptoMaterial for Subtranscript<E> {
     }
 }
 
-impl<E: Pairing> TryFrom<&[u8]> for Subtranscript<E> {
+impl<P: Pairing> TryFrom<&[u8]> for Subtranscript<P> {
     type Error = CryptoMaterialError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        bcs::from_bytes::<Subtranscript<E>>(bytes)
+        bcs::from_bytes::<Subtranscript<P>>(bytes)
             .map_err(|_| CryptoMaterialError::DeserializationError)
     }
 }
 
 /// This is the secret sharing config that will be used for weighted `chunky`
 #[allow(type_alias_bounds)]
-type SecretSharingConfig<E: Pairing> = WeightedConfigArkworks<E::ScalarField>;
+type SecretSharingConfig<P: Pairing> = WeightedConfigArkworks<P::ScalarField>;
 
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
     HasAggregatableSubtranscript for Transcript<E>
@@ -523,17 +523,17 @@ impl<E: Pairing> Aggregated<Subtranscript<E>> for SubtranscriptProjective<E> {
 
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
-pub struct SharingProof<E: Pairing> {
+pub struct SharingProof<P: Pairing> {
     /// SoK: the SK is knowledge of `witnesses` s_{i,j} yielding the commitment and the C and the R, their image is the PK, and the signed message is a certain context `cntxt`
-    pub SoK: sigma_protocol::traits::Proof<
-        E::ScalarField,
-        hkzg_chunked_elgamal::WeightedHomomorphism<'static, E>,
+    pub SoK: sigma_protocol::Proof<
+        P::ScalarField,
+        hkzg_chunked_elgamal::WeightedHomomorphism<'static, P>,
     >, // static because we don't want the lifetime of the Proof to depend on the Homomorphism TODO: try removing it?
     /// A batched range proof showing that all committed values s_{i,j} lie in some range
-    pub range_proof: dekart_univariate_v2::Proof<E>, // TODO: make an affine version of this
+    pub range_proof: dekart_univariate_v2::Proof<P>, // TODO: make an affine version of this
     /// A KZG-style commitment to the values s_{i,j} going into the range proof
     pub range_proof_commitment:
-        <dekart_univariate_v2::Proof<E> as BatchedRangeProof<E>>::Commitment,
+        <dekart_univariate_v2::Proof<P> as BatchedRangeProof<P>>::Commitment,
 }
 
 impl<E: Pairing> ValidCryptoMaterial for Transcript<E> {

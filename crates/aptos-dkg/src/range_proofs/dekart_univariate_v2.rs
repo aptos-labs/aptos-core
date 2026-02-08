@@ -39,7 +39,7 @@ use std::{fmt::Debug, io::Write};
 #[derive(CanonicalSerialize, Debug, PartialEq, Eq, Clone, CanonicalDeserialize)]
 pub struct Proof<E: Pairing> {
     hatC: E::G1,
-    pi_PoK: sigma_protocol::traits::Proof<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
+    pi_PoK: sigma_protocol::Proof<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
     Cs: Vec<E::G1>, // has length ell
     D: E::G1,
     a: E::ScalarField,
@@ -829,7 +829,7 @@ mod fiat_shamir {
     #[allow(non_snake_case)]
     pub(crate) fn append_sigma_proof<E: Pairing>(
         fs_transcript: &mut Transcript,
-        pi_PoK: &sigma_protocol::traits::Proof<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
+        pi_PoK: &sigma_protocol::Proof<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
     ) {
         <Transcript as RangeProof<E, Proof<E>>>::append_sigma_proof(fs_transcript, pi_PoK);
     }
@@ -902,12 +902,12 @@ mod fiat_shamir {
 pub mod two_term_msm {
     // TODO: maybe fixed_base_msms should become a folder and put its code inside mod.rs? Then put this mod inside of that folder?
     use super::*;
-    use crate::sigma_protocol::{homomorphism::fixed_base_msms, traits::FirstProofItem};
+    use crate::sigma_protocol::{homomorphism::fixed_base_msms, FirstProofItem};
     use aptos_crypto::arkworks::{msm::IsMsmInput, random::UniformRand};
     use aptos_crypto_derive::SigmaProtocolWitness;
     use ark_ec::AffineRepr;
     pub use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
-    pub type Proof<C> = sigma_protocol::traits::Proof<
+    pub type Proof<C> = sigma_protocol::Proof<
         <<C as CurveGroup>::Affine as AffineRepr>::ScalarField,
         Homomorphism<C>,
     >;
