@@ -273,8 +273,6 @@ where
         )
     }
 
-    /// If `comm` is `Some` (e.g. in tests), verifies that the verifier would compute the same
-    /// batched commitment as the commitment to f with s_combined.
     pub fn open<R: RngCore + CryptoRng>(
         pp: &ZeromorphProverKey<P>,
         poly: &DenseMultilinearExtension<P::ScalarField>,
@@ -283,7 +281,6 @@ where
         s: CommitmentRandomness<P::ScalarField>,
         rng: &mut R,
         transcript: &mut merlin::Transcript,
-        comm: Option<&ZeromorphCommitment<P>>,
     ) -> ZeromorphProof<P> {
         transcript.append_sep(Self::protocol_name());
 
@@ -391,33 +388,6 @@ where
             P::ScalarField::zero(),
             "batched polynomial f must vanish at x_challenge"
         );
-
-        // Test-only: if comm is provided, assert that zeta_z_com (as verifier would compute it)
-        // equals the commitment to f with s_combined, so the HKZG verify should pass.
-        #[cfg(test)]
-        if let Some(comm_ref) = comm {
-            let scalars: Vec<P::ScalarField> = [
-                vec![P::ScalarField::one(), z_challenge, eval_scalar * eval],
-                q_scalars_for_s.clone(),
-            ]
-            .concat();
-            let mut bases_proj = vec![q_hat_com.0, comm_ref.0, pp.hiding_kzg_pp.g1.into_group()];
-            bases_proj.extend(q_k_com.iter().map(|c| c.0));
-            let bases = P::G1::normalize_batch(&bases_proj);
-            let zeta_z_com = <P::G1 as VariableBaseMSM>::msm(&bases, &scalars)
-                .expect("MSM in prover sanity check")
-                .into_affine();
-            let comm_f = univariate_hiding_kzg::commit_with_randomness(
-                &pp.hiding_kzg_pp,
-                &f.coeffs,
-                &Scalar(s_combined),
-            );
-            assert_eq!(
-                comm_f.0.into_affine(),
-                zeta_z_com,
-                "zeta_z_com must match commitment to f (HKZG verify would fail otherwise)"
-            );
-        }
 
         // Compute and send proof commitment pi. Use s_combined so the opening proof's blinding matches zeta_z_com's blinding.
         // HKZG verify requires rho = s for the blinding terms to cancel, so set rho = s_combined.
@@ -610,7 +580,7 @@ where
         let s = Scalar(r.expect("open(): expected randomness r, got None"));
 
         let eval = Self::evaluate_point(&poly, &challenge);
-        Zeromorph::open(&ck, &poly, &challenge, eval, s, rng, trs, None)
+        Zeromorph::open(&ck, &poly, &challenge, eval, s, rng, trs)
     }
 
     // TODO: also implement this in dekart_univariate_v2... hmm or defer to hiding KZG?
@@ -643,16 +613,7 @@ where
                 acc + (*r * gamma_i)
             });
 
-        Zeromorph::open(
-            &ck,
-            &combined_poly,
-            &challenge,
-            eval,
-            Scalar(s),
-            rng,
-            trs,
-            None,
-        )
+        Zeromorph::open(&ck, &combined_poly, &challenge, eval, Scalar(s), rng, trs)
     }
 
     fn verify(
@@ -1007,7 +968,6 @@ mod test {
                 s,
                 &mut rng,
                 &mut prover_transcript,
-                Some(&commitment),
             );
             let p_transcript_squeeze: <Bn254 as Pairing>::ScalarField =
                 prover_transcript.challenge_scalar();
