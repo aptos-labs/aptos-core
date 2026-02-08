@@ -10,7 +10,7 @@ use anyhow::{anyhow, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
 use aptos_dkg::pvss::{
-    traits::transcript::{Aggregatable, HasAggregatableSubtranscript, Transcript},
+    traits::transcript::{Aggregatable, Aggregated, HasAggregatableSubtranscript, Transcript},
     Player,
 };
 use aptos_infallible::{Mutex, RwLock};
@@ -79,11 +79,14 @@ pub fn start_subtranscript_aggregation(
     abort_handle
 }
 
+/// Projective accumulator type for ChunkySubtranscript (aggregate_with in projective form, normalize when quorum met).
+type ChunkySubtranscriptProjective = <ChunkySubtranscript as Aggregatable>::Aggregated;
+
 struct InnerState {
     valid_peer_transcript_seen: bool,
     contributors: HashSet<AccountAddress>,
-    /// Subtranscripts collected so far; aggregated (in projective form then normalized) when quorum is met.
-    subtranscripts: Vec<ChunkySubtranscript>,
+    /// Accumulator in projective form; use aggregate_with for each transcript, then normalize when quorum is met.
+    subtrx: Option<ChunkySubtranscriptProjective>,
     agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscript>>,
 }
 
@@ -92,7 +95,7 @@ impl InnerState {
         Self {
             valid_peer_transcript_seen: false,
             contributors: HashSet::new(),
-            subtranscripts: Vec::new(),
+            subtrx: None,
             agg_subtrx_tx,
         }
     }
@@ -241,12 +244,19 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
             received_transcripts.insert(metadata.author, transcript.clone());
         }
 
-        // Collect the subtranscript; aggregate all (projective then normalize) when quorum is met
+        // Aggregate the transcript (projective accumulator; normalize when quorum is met)
         // TODO(ibalajiarun): Should the transcript be aggregated if quorum is already met?
         inner_state.contributors.insert(metadata.author);
-        inner_state
-            .subtranscripts
-            .push(transcript.get_subtranscript());
+        if let Some(agg_subtrx) = inner_state.subtrx.as_mut() {
+            agg_subtrx
+                .aggregate_with(
+                    &self.dkg_config.threshold_config,
+                    &transcript.get_subtranscript(),
+                )
+                .context("chunky transcript aggregation failed")?;
+        } else {
+            inner_state.subtrx = Some(transcript.get_subtranscript().to_aggregated());
+        }
 
         // Check quorum and send if needed
         let threshold = self.epoch_state.verifier.quorum_voting_power();
@@ -264,11 +274,7 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
         // Send to agg_subtrx_tx when quorum is met (only once)
         if quorum_met {
             if let Some(tx) = inner_state.agg_subtrx_tx.take() {
-                let agg_trx = ChunkySubtranscript::aggregate(
-                    &self.dkg_config.threshold_config,
-                    inner_state.subtranscripts.clone(),
-                )
-                .context("chunky transcript aggregation failed")?;
+                let agg_trx = inner_state.subtrx.take().unwrap().normalize();
                 // Convert AccountAddress contributors to Player by getting their validator indices.
                 // Sort by AccountAddress so dealers order is deterministic (HashSet iteration is
                 // non-deterministic); AggregatedSubtranscript is BCSCryptoHash'd for certification.
