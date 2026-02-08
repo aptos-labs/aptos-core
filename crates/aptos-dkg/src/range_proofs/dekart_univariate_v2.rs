@@ -633,6 +633,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             gamma,
             u_val,
             &Scalar(s),
+            0,
         );
 
         Proof {

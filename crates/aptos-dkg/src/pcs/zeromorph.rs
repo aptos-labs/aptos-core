@@ -393,26 +393,15 @@ where
         // HKZG verify requires rho = s for the blinding terms to cancel, so set rho = s_combined.
         let s_combined_scalar = Scalar(s_combined);
 
-        let pi = if pp.open_offset == 0 {
-            univariate_hiding_kzg::CommitmentHomomorphism::open(
-                &pp.hiding_kzg_pp,
-                f.coeffs,
-                s_combined,
-                x_challenge,
-                P::ScalarField::zero(),
-                &s_combined_scalar,
-            )
-        } else {
-            univariate_hiding_kzg::CommitmentHomomorphism::open_with_offset(
-                &pp.hiding_kzg_pp,
-                f.coeffs,
-                s_combined,
-                x_challenge,
-                P::ScalarField::zero(),
-                &s_combined_scalar,
-                pp.open_offset,
-            )
-        };
+        let pi = univariate_hiding_kzg::CommitmentHomomorphism::open(
+            &pp.hiding_kzg_pp,
+            f.coeffs,
+            s_combined,
+            x_challenge,
+            P::ScalarField::zero(),
+            &s_combined_scalar,
+            pp.open_offset,
+        );
 
         ZeromorphProof {
             pi,
