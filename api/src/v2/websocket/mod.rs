@@ -6,7 +6,11 @@
 //! Provides real-time push notifications via `/v2/ws`. Clients can subscribe to:
 //! - **new_blocks**: Notifications when new blocks are committed
 //! - **transaction_status**: Track a specific transaction by hash until committed or timeout
-//! - **events**: On-chain event notifications with optional type/account filters
+//! - **events**: On-chain event notifications with powerful filtering:
+//!   - Filter by event type (exact match or wildcard patterns)
+//!   - Filter by multiple event types (OR logic)
+//!   - Filter by transaction sender address
+//!   - Filter by minimum ledger version
 
 pub mod broadcaster;
 pub mod types;
@@ -35,9 +39,16 @@ use std::{
 };
 use tokio::sync::{broadcast, mpsc, RwLock};
 use types::{
-    BlockSummary, EventData, SubscriptionType, TransactionStatusData, WsClientMessage, WsEvent,
-    WsServerMessage,
+    BlockSummary, EventData, EventFilter, SubscriptionType, TransactionStatusData,
+    WsClientMessage, WsEvent, WsServerMessage,
 };
+
+/// Subscription entry: the original type and a compiled filter (for events).
+struct SubscriptionEntry {
+    sub_type: SubscriptionType,
+    /// Compiled event filter (only populated for `Events` subscriptions).
+    event_filter: Option<EventFilter>,
+}
 
 /// GET /v2/ws -- WebSocket upgrade endpoint.
 pub async fn ws_handler(
@@ -69,7 +80,7 @@ async fn handle_ws_connection(ctx: V2Context, socket: WebSocket) {
     let (ws_sender, mut ws_receiver) = socket.split();
 
     // Per-connection subscription state (shared between read loop and broadcast filter).
-    let subscriptions: Arc<RwLock<HashMap<String, SubscriptionType>>> =
+    let subscriptions: Arc<RwLock<HashMap<String, SubscriptionEntry>>> =
         Arc::new(RwLock::new(HashMap::new()));
     let sub_counter = Arc::new(AtomicUsize::new(0));
 
@@ -137,7 +148,7 @@ async fn handle_ws_connection(ctx: V2Context, socket: WebSocket) {
 async fn handle_text_message(
     ctx: &V2Context,
     text: &str,
-    subscriptions: &Arc<RwLock<HashMap<String, SubscriptionType>>>,
+    subscriptions: &Arc<RwLock<HashMap<String, SubscriptionEntry>>>,
     sub_counter: &Arc<AtomicUsize>,
     max_subs: usize,
     out_tx: &mpsc::Sender<WsServerMessage>,
@@ -187,7 +198,31 @@ async fn handle_text_message(
                 }
             }
 
-            subs.insert(sub_id.clone(), subscription);
+            // Build compiled event filter for Events subscriptions.
+            let event_filter = if let SubscriptionType::Events {
+                ref event_type,
+                ref event_types,
+                ref sender,
+                ref start_version,
+            } = subscription
+            {
+                Some(EventFilter::from_subscription(
+                    event_type,
+                    event_types,
+                    sender,
+                    start_version,
+                ))
+            } else {
+                None
+            };
+
+            subs.insert(
+                sub_id.clone(),
+                SubscriptionEntry {
+                    sub_type: subscription,
+                    event_filter,
+                },
+            );
             let _ = out_tx
                 .send(WsServerMessage::Subscribed { id: sub_id })
                 .await;
@@ -226,15 +261,16 @@ async fn handle_text_message(
 /// Receive broadcast events, filter by active subscriptions, forward matches.
 async fn run_broadcast_filter(
     mut rx: broadcast::Receiver<WsEvent>,
-    subscriptions: Arc<RwLock<HashMap<String, SubscriptionType>>>,
+    subscriptions: Arc<RwLock<HashMap<String, SubscriptionEntry>>>,
     out_tx: mpsc::Sender<WsServerMessage>,
 ) {
     loop {
         match rx.recv().await {
             Ok(event) => {
                 let subs = subscriptions.read().await;
-                for (id, sub_type) in subs.iter() {
-                    if let Some(msg) = match_event(&event, id, sub_type) {
+                for (id, entry) in subs.iter() {
+                    let messages = match_event(&event, id, entry);
+                    for msg in messages {
                         if out_tx.send(msg).await.is_err() {
                             return; // Connection closed
                         }
@@ -255,13 +291,14 @@ async fn run_broadcast_filter(
     }
 }
 
-/// Determine if a broadcast event matches a subscription.
+/// Determine if a broadcast event matches a subscription. Returns zero or more
+/// messages (one per matching event within a single `WsEvent::Events` broadcast).
 fn match_event(
     event: &WsEvent,
     subscription_id: &str,
-    subscription: &SubscriptionType,
-) -> Option<WsServerMessage> {
-    match (event, subscription) {
+    entry: &SubscriptionEntry,
+) -> Vec<WsServerMessage> {
+    match (event, &entry.sub_type) {
         (
             WsEvent::NewBlock {
                 height,
@@ -272,7 +309,7 @@ fn match_event(
                 num_transactions,
             },
             SubscriptionType::NewBlocks,
-        ) => Some(WsServerMessage::NewBlock {
+        ) => vec![WsServerMessage::NewBlock {
             subscription_id: subscription_id.to_string(),
             data: BlockSummary {
                 height: *height,
@@ -282,45 +319,49 @@ fn match_event(
                 last_version: *last_version,
                 num_transactions: *num_transactions,
             },
-        }),
+        }],
 
         (
-            WsEvent::Events { version, events },
-            SubscriptionType::Events {
-                event_type,
-                account: _,
+            WsEvent::Events {
+                version,
+                sender,
+                events,
             },
+            SubscriptionType::Events { .. },
         ) => {
-            // Filter events by type if specified.
-            let matching: Vec<_> = events
-                .iter()
-                .filter(|(_, etype, _)| {
-                    event_type
-                        .as_ref()
-                        .map_or(true, |filter| etype.contains(filter))
-                })
-                .collect();
+            let filter = entry
+                .event_filter
+                .as_ref()
+                .expect("EventFilter must be set for Events subscription");
 
-            if matching.is_empty() {
-                return None;
+            // Apply version and sender filters first (they apply to the whole txn).
+            if !filter.matches_version(*version) {
+                return vec![];
+            }
+            if !filter.matches_sender(sender) {
+                return vec![];
             }
 
-            // Send one message per matching event.
-            let (index, etype, data) = &matching[0];
-            Some(WsServerMessage::Event {
-                subscription_id: subscription_id.to_string(),
-                data: EventData {
-                    version: *version,
-                    event_index: *index,
-                    event_type: etype.clone(),
-                    data: data.clone(),
-                },
-            })
+            // Filter individual events by type and emit one message per match.
+            events
+                .iter()
+                .filter(|(_, etype, _)| filter.matches_type(etype))
+                .map(|(index, etype, data)| WsServerMessage::Event {
+                    subscription_id: subscription_id.to_string(),
+                    data: EventData {
+                        version: *version,
+                        event_index: *index,
+                        event_type: etype.clone(),
+                        data: data.clone(),
+                        sender: sender.clone(),
+                    },
+                })
+                .collect()
         },
 
         // TransactionStatus subscriptions are handled by dedicated poller tasks,
         // not through the broadcast channel.
-        _ => None,
+        _ => vec![],
     }
 }
 

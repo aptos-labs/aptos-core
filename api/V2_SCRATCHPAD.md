@@ -28,6 +28,8 @@ Working notes, decisions log, and progress tracker for the API v2 implementation
 | 2026-02-08 | TLS: rustls 0.21 + tokio-rustls 0.24 + hyper-util auto-builder | Manual accept loop with `TlsAcceptor` → `hyper_util::server::conn::auto::Builder` for ALPN-based h2/http1.1 negotiation. Uses `hyper1` (renamed hyper 1.x) for `service_fn`. Config: `api_v2.tls_cert_path` + `api_v2.tls_key_path`. PEM support for PKCS8, RSA, and EC keys. |
 | 2026-02-08 | OpenAPI: utoipa 5.x + utoipa-axum 0.1.0 | `utoipa-axum 0.1.0` is compatible with axum 0.7 (0.2.0 requires axum 0.8). Manual `#[utoipa::path]` macros on handlers, `#[derive(ToSchema)]` on types, `Object` placeholder for external aptos_api_types. Spec served at `/v2/spec.json` and `/v2/spec.yaml`. |
 
+|| 2026-02-08 | WebSocket event filtering: compiled EventFilter | Events subscriptions support: exact match, module wildcard (`0x1::coin::*`), address wildcard (`0x1::*`), multiple types (OR logic via `event_types[]`), sender address filtering, and start_version floor. Filters are compiled on subscribe for zero-alloc per-event matching. Backward compat: `event_type` + `event_types` are merged. All matching events are delivered (not just the first). Broadcaster now includes sender address from user txns and converts BCS event data to JSON via MoveConverter. |
+
 ## Open Questions
 
 - [ ] Should v2 response envelope include gas_used for view functions?
@@ -51,7 +53,7 @@ Working notes, decisions log, and progress tracker for the API v2 implementation
 - Tonic gRPC service alongside REST
 - Protobuf definitions for core types
 - gRPC streaming (alternative to WebSocket for server-to-server)
-- Advanced event filtering in WebSocket
+- ~~Advanced event filtering in WebSocket~~ (done in Phase 1)
 
 ### Phase 3: Optimization
 - Shared state views for batch requests
@@ -83,7 +85,7 @@ Working notes, decisions log, and progress tracker for the API v2 implementation
 - [x] JsonOrBcs + BcsOnly content negotiation extractors
 - [x] V2Response envelope with LedgerMetadata in body
 - [x] Cursor unit tests (4 passing)
-- [x] Integration tests (47 tests: 24 endpoint + 6 co-hosting + 9 WebSocket + 4 TLS + 4 OpenAPI)
+- [x] Integration tests (55 tests: 24 endpoint + 6 co-hosting + 17 WebSocket + 4 TLS + 4 OpenAPI)
 - [x] Performance benchmarks (9 criterion benchmarks incl. parameterized batch)
 - [x] HTTP/2 (h2c) — already supported by axum::serve (uses hyper_util auto::Builder)
 - [x] Same-port Poem+Axum co-hosting via reverse proxy (api_v2.address=None → same port)
@@ -95,9 +97,23 @@ Working notes, decisions log, and progress tracker for the API v2 implementation
   - [x] V2Context extended with broadcast::Sender<WsEvent> and AtomicUsize active connection counter
   - [x] Route `/v2/ws` added to router
   - [x] Block poller started in runtime.rs when websocket_enabled=true
-  - [x] Subscription types: new_blocks, transaction_status (hash-specific poller), events (type filter)
+  - [x] Subscription types: new_blocks, transaction_status (hash-specific poller), events (advanced filtering)
   - [x] Guards: max_connections, max_subscriptions_per_conn, configurable via ApiV2Config
   - [x] 9 integration tests (ping/pong, subscribe, unsubscribe, error cases, tx status lifecycle)
+- [x] Advanced WebSocket event filtering
+  - [x] `EventFilter` compiled filter struct with zero-alloc per-event matching
+  - [x] Exact match: `"0x1::coin::DepositEvent"`
+  - [x] Module wildcard: `"0x1::coin::*"` (matches all events from module)
+  - [x] Address wildcard: `"0x1::*"` (matches all events from address)
+  - [x] Multiple type filters: `event_types: [...]` with OR logic
+  - [x] Backward compat: `event_type` and `event_types` merged
+  - [x] Sender address filtering: `sender` field (hex, case-insensitive)
+  - [x] Version floor filtering: `start_version` field
+  - [x] All matching events delivered (not just first match)
+  - [x] Broadcaster includes sender address from user transactions
+  - [x] Broadcaster converts BCS event data to JSON via MoveConverter
+  - [x] 11 unit tests for EventFilter (exact, wildcard, sender, version, combined)
+  - [x] 8 integration tests (multiple types, wildcards, sender, version, combined, merged, no-filter)
 - [x] TLS support for v2 server (rustls + ALPN h2/http1.1 negotiation)
   - [x] `tls.rs`: `build_tls_acceptor` (PEM cert/key loader, PKCS8+RSA+EC), `serve_tls` (manual accept loop with hyper_util auto-builder)
   - [x] `ApiV2Config` extended with `tls_cert_path` and `tls_key_path`

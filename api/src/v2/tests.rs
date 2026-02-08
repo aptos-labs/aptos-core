@@ -893,6 +893,158 @@ async fn test_ws_subscribe_events_with_filter() {
     assert_eq!(resp["type"], "subscribed");
 }
 
+// ---- Advanced event filter subscription tests ----
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_ws_subscribe_events_with_multiple_types() {
+    let (addr, _handle) = start_v2_server().await;
+    let mut ws = ws_connect(addr).await;
+
+    let resp = ws_send_recv(
+        &mut ws,
+        serde_json::json!({
+            "action": "subscribe",
+            "type": "events",
+            "event_types": ["0x1::coin::DepositEvent", "0x1::coin::WithdrawEvent"]
+        }),
+    )
+    .await;
+
+    assert_eq!(resp["type"], "subscribed");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_ws_subscribe_events_with_wildcard() {
+    let (addr, _handle) = start_v2_server().await;
+    let mut ws = ws_connect(addr).await;
+
+    // Module wildcard
+    let resp = ws_send_recv(
+        &mut ws,
+        serde_json::json!({
+            "action": "subscribe",
+            "type": "events",
+            "event_type": "0x1::coin::*"
+        }),
+    )
+    .await;
+
+    assert_eq!(resp["type"], "subscribed");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_ws_subscribe_events_with_address_wildcard() {
+    let (addr, _handle) = start_v2_server().await;
+    let mut ws = ws_connect(addr).await;
+
+    let resp = ws_send_recv(
+        &mut ws,
+        serde_json::json!({
+            "action": "subscribe",
+            "type": "events",
+            "event_type": "0x1::*"
+        }),
+    )
+    .await;
+
+    assert_eq!(resp["type"], "subscribed");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_ws_subscribe_events_with_sender_filter() {
+    let (addr, _handle) = start_v2_server().await;
+    let mut ws = ws_connect(addr).await;
+
+    let resp = ws_send_recv(
+        &mut ws,
+        serde_json::json!({
+            "action": "subscribe",
+            "type": "events",
+            "sender": "0x1"
+        }),
+    )
+    .await;
+
+    assert_eq!(resp["type"], "subscribed");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_ws_subscribe_events_with_start_version() {
+    let (addr, _handle) = start_v2_server().await;
+    let mut ws = ws_connect(addr).await;
+
+    let resp = ws_send_recv(
+        &mut ws,
+        serde_json::json!({
+            "action": "subscribe",
+            "type": "events",
+            "start_version": 100
+        }),
+    )
+    .await;
+
+    assert_eq!(resp["type"], "subscribed");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_ws_subscribe_events_with_combined_filters() {
+    let (addr, _handle) = start_v2_server().await;
+    let mut ws = ws_connect(addr).await;
+
+    // Combine: multiple types + sender + start_version
+    let resp = ws_send_recv(
+        &mut ws,
+        serde_json::json!({
+            "action": "subscribe",
+            "type": "events",
+            "event_types": ["0x1::coin::DepositEvent", "0x1::coin::WithdrawEvent"],
+            "sender": "0xABCD",
+            "start_version": 50
+        }),
+    )
+    .await;
+
+    assert_eq!(resp["type"], "subscribed");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_ws_subscribe_events_merged_type_and_types() {
+    let (addr, _handle) = start_v2_server().await;
+    let mut ws = ws_connect(addr).await;
+
+    // Both event_type and event_types should be merged (backward compat).
+    let resp = ws_send_recv(
+        &mut ws,
+        serde_json::json!({
+            "action": "subscribe",
+            "type": "events",
+            "event_type": "0x1::coin::DepositEvent",
+            "event_types": ["0x2::nft::TransferEvent"]
+        }),
+    )
+    .await;
+
+    assert_eq!(resp["type"], "subscribed");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_ws_subscribe_events_no_filter_matches_all() {
+    let (addr, _handle) = start_v2_server().await;
+    let mut ws = ws_connect(addr).await;
+
+    // No type, sender, or version filters — should match all events.
+    let resp = ws_send_recv(
+        &mut ws,
+        serde_json::json!({
+            "action": "subscribe",
+            "type": "events"
+        }),
+    )
+    .await;
+
+    assert_eq!(resp["type"], "subscribed");
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn test_ws_subscribe_tx_status_invalid_hash() {
     let (addr, _handle) = start_v2_server().await;

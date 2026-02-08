@@ -6,6 +6,7 @@
 
 use super::types::WsEvent;
 use crate::v2::context::V2Context;
+use aptos_api_types::AsConverter;
 use aptos_logger::{debug, warn};
 use aptos_types::contract_event::ContractEvent;
 use std::time::Duration;
@@ -104,7 +105,20 @@ fn emit_block_events(
         },
     };
 
+    // Try to get a MoveConverter for JSON event data conversion.
+    // If this fails, we'll fall back to null data.
+    let state_view = ctx.inner().latest_state_view().ok();
+    let converter = state_view.as_ref().map(|sv| {
+        sv.as_converter(ctx.inner().db.clone(), ctx.inner().indexer_reader.clone())
+    });
+
     for txn in txns {
+        // Extract sender address from user transactions.
+        let sender = txn
+            .transaction
+            .try_as_signed_user_txn()
+            .map(|user_txn| format!("0x{}", user_txn.sender()));
+
         let events: Vec<(u64, String, serde_json::Value)> = txn
             .events
             .iter()
@@ -114,16 +128,25 @@ fn emit_block_events(
                     ContractEvent::V1(v1) => v1.type_tag().to_canonical_string(),
                     ContractEvent::V2(v2) => v2.type_tag().to_canonical_string(),
                 };
-                // Event data is BCS-encoded; for now we send the type string and null data.
-                // Full JSON conversion requires the MoveConverter which needs a state view.
-                // TODO: Optionally convert event data to JSON using MoveConverter.
-                (idx as u64, event_type, serde_json::Value::Null)
+
+                // Attempt to convert BCS event data to JSON using MoveConverter.
+                let data = converter
+                    .as_ref()
+                    .and_then(|conv| {
+                        conv.try_into_move_value(event.type_tag(), event.event_data())
+                            .ok()
+                    })
+                    .and_then(|mv| mv.json().ok())
+                    .unwrap_or(serde_json::Value::Null);
+
+                (idx as u64, event_type, data)
             })
             .collect();
 
         if !events.is_empty() {
             let _ = ws_tx.send(WsEvent::Events {
                 version: txn.version,
+                sender,
                 events,
             });
         }
