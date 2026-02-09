@@ -13,7 +13,7 @@ use crate::{
         exp_builder::ExpTranslator,
         model_builder::{
             ConstEntry, EntryVisibility, FunEntry, LocalVarEntry, ModelBuilder,
-            SpecOrBuiltinFunEntry, StructLayout, StructVariant,
+            SpecOrBuiltinFunEntry, StructLayout, StructVariant, UserId,
         },
     },
     constant_folder::ConstantFolder,
@@ -509,7 +509,7 @@ impl ModuleBuilder<'_, '_> {
             ty,
             value: Value::Bool(false), // dummy value, actual will be assigned in def_ana
             visibility: EntryVisibility::SpecAndImpl,
-            using_functions: BTreeSet::new(),
+            users: BTreeSet::new(),
         });
     }
 
@@ -1370,6 +1370,50 @@ impl ModuleBuilder<'_, '_> {
             .expect("struct invalid");
         entry.layout = layout;
         entry.is_empty_struct = is_empty_struct;
+
+        // Track structs used as field types
+        let struct_qid = QualifiedId {
+            module_id: self.module_id,
+            id: entry.struct_id,
+        };
+        let mut field_structs = BTreeSet::new();
+        match &entry.layout {
+            StructLayout::Singleton(fields, _) => {
+                for field_data in fields.values() {
+                    field_data.ty.visit(&mut |ty| {
+                        if let Type::Struct(mid, sid, _) = ty {
+                            field_structs.insert(mid.qualified(*sid));
+                        }
+                    });
+                }
+            }
+            StructLayout::Variants(variants) => {
+                for variant in variants {
+                    for field_data in variant.fields.values() {
+                        field_data.ty.visit(&mut |ty| {
+                            if let Type::Struct(mid, sid, _) = ty {
+                                field_structs.insert(mid.qualified(*sid));
+                            }
+                        });
+                    }
+                }
+            }
+            StructLayout::None => {}
+        }
+
+        // Mark each field struct as being used by this struct
+        for field_struct_id in field_structs {
+            if let Some(qualified_symbol) = self
+                .parent
+                .reverse_struct_table
+                .get(&(field_struct_id.module_id, field_struct_id.id))
+            {
+                if let Some(field_struct_entry) = self.parent.struct_table.get_mut(qualified_symbol)
+                {
+                    field_struct_entry.users.insert(UserId::Struct(struct_qid));
+                }
+            }
+        }
     }
 
     fn build_field_map(
@@ -1516,7 +1560,7 @@ impl ModuleBuilder<'_, '_> {
                     .get(&(struct_id.module_id, struct_id.id))
                 {
                     if let Some(struct_entry) = self.parent.struct_table.get_mut(qualified_symbol) {
-                        struct_entry.using_functions.insert(fun_qid);
+                        struct_entry.users.insert(UserId::Function(fun_qid));
                     }
                 }
             }
@@ -3727,7 +3771,16 @@ impl ModuleBuilder<'_, '_> {
                 visibility: entry.visibility,
                 has_package_visibility: self.package_structs.contains(&entry.struct_id),
                 is_empty_struct: entry.is_empty_struct,
-                using_funs: RefCell::new(Some(entry.using_functions.clone())),
+                using_funs: RefCell::new(Some(
+                    entry
+                        .users
+                        .iter()
+                        .filter_map(|user| match user {
+                            UserId::Function(fun_id) => Some(*fun_id),
+                            _ => None,
+                        })
+                        .collect(),
+                )),
             };
             struct_data.insert(StructId::new(name.symbol), data);
             if entry.visibility != Visibility::Private
@@ -3807,14 +3860,21 @@ impl ModuleBuilder<'_, '_> {
                 value,
                 ty,
                 visibility: _,
-                using_functions,
+                users,
             } = const_entry.clone();
+            let using_funs = users
+                .iter()
+                .filter_map(|user| match user {
+                    UserId::Function(fun_id) => Some(*fun_id),
+                    _ => None,
+                })
+                .collect();
             let data = NamedConstantData {
                 name: name.symbol,
                 loc,
                 type_: ty,
                 value,
-                using_funs: using_functions,
+                using_funs,
             };
             named_constants.insert(NamedConstantId::new(name.symbol), data);
         }

@@ -11,7 +11,7 @@ use move_model::{
     metadata::LanguageVersion,
     model::{
         FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, NodeId, Parameter, QualifiedId,
-        StructEnv,
+        StructEnv, StructId,
     },
     ty::Type,
 };
@@ -524,7 +524,7 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
     // Record all private and friendless public(friend) functions to check for uses.
     let mut private_funcs: BTreeSet<QualifiedFunId> = BTreeSet::new();
 
-    // Get options and check if unused warnings are enabled (used for all unused checks)
+    // Get options and check if unused warnings are enabled
     let options = env
         .get_extension::<Options>()
         .expect("Options is available");
@@ -669,17 +669,51 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
             }
 
             // Check for unused private structs (consolidated into main loop)
-            if unused_warnings_enabled && caller_module.is_target() {
+            if unused_warnings_enabled {
+                // Compute transitive closure of used structs
+                let mut used_structs: BTreeSet<QualifiedId<StructId>> = BTreeSet::new();
+                let mut worklist: Vec<QualifiedId<StructId>> = Vec::new();
+
+                // Initialize with structs directly used by functions
                 for struct_env in caller_module.get_structs() {
-                    if struct_env.get_visibility() == Visibility::Private
-                        && struct_env.get_using_functions().is_empty()
-                    {
-                        let loc = struct_env.get_loc();
-                        let msg = format!(
-                            "Struct `{}` is unused: it has no current users and is private to its module.",
-                            struct_env.get_full_name_with_address(),
-                        );
-                        env.diag(Severity::Warning, &loc, &msg);
+                    if !struct_env.get_using_functions().is_empty() {
+                        let struct_id = struct_env.get_qualified_id();
+                        used_structs.insert(struct_id);
+                        worklist.push(struct_id);
+                    }
+                }
+
+                // Propagate usage through field dependencies
+                while let Some(used_struct_id) = worklist.pop() {
+                    let used_struct_env = env
+                        .get_module(used_struct_id.module_id)
+                        .into_struct(used_struct_id.id);
+
+                    // Mark all structs in fields of used_struct as used
+                    for field in used_struct_env.get_fields() {
+                        field.get_type().visit(&mut |ty| {
+                            if let Type::Struct(mid, sid, _) = ty {
+                                let field_struct_id = mid.qualified(*sid);
+                                if used_structs.insert(field_struct_id) {
+                                    worklist.push(field_struct_id);
+                                }
+                            }
+                        });
+                    }
+                }
+
+                // Check for unused private structs
+                for struct_env in caller_module.get_structs() {
+                    if struct_env.get_visibility() == Visibility::Private {
+                        let struct_id = struct_env.get_qualified_id();
+                        if !used_structs.contains(&struct_id) {
+                            let loc = struct_env.get_loc();
+                            let msg = format!(
+                                "Struct `{}` is unused: it has no current users and is private to its module.",
+                                struct_env.get_full_name_with_address(),
+                            );
+                            env.diag(Severity::Warning, &loc, &msg);
+                        }
                     }
                 }
 

@@ -1,19 +1,5 @@
 
 Diagnostics:
-warning: structs/enums with visibility modifier are only supported at version 2.4-unstable or later
-   ┌─ tests/checking/unused/unused_struct.move:1:1
-   │
- 1 │ ╭ module 0x42::m {
- 2 │ │     // This struct is private and unused - should warn
- 3 │ │     struct UnusedStruct {
- 4 │ │         x: u64
-   · │
-19 │ │     }
-20 │ │ }
-   │ ╰─^
-
-
-Diagnostics:
 warning: Struct `0x42::m::UnusedStruct` is unused: it has no current users and is private to its module.
   ┌─ tests/checking/unused/unused_struct.move:3:5
   │

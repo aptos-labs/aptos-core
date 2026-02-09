@@ -55,7 +55,7 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
         ty: ty.clone(),
         value: Value::Number(value),
         visibility,
-        using_functions: BTreeSet::new(),
+        users: BTreeSet::new(),
     };
 
     let mk_num_const =
@@ -66,7 +66,7 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
         ty: bool_t.clone(),
         value: Value::Bool(value),
         visibility,
-        using_functions: BTreeSet::new(),
+        users: BTreeSet::new(),
     };
 
     {

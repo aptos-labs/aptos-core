@@ -11,6 +11,7 @@ use crate::{
     builder::{
         model_builder::{
             AnyFunEntry, ConstEntry, EntryVisibility, LocalVarEntry, StructEntry, StructLayout,
+            UserId,
         },
         module_builder::{ModuleBuilder, SpecBlockContext},
     },
@@ -4011,7 +4012,7 @@ impl ExpTranslator<'_, '_, '_> {
                     id: FunId::new(fun_name.symbol),
                 };
                 if let Some(const_entry) = self.parent.parent.const_table.get_mut(sym) {
-                    const_entry.using_functions.insert(fun_qid);
+                    const_entry.users.insert(UserId::Function(fun_qid));
                 }
             }
             let ConstEntry { ty, value, .. } = entry;

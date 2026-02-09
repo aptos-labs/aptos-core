@@ -109,7 +109,7 @@ pub struct Options {
            default_value=bool_to_str(warn_of_deprecation_use_in_aptos_libs_env_var()))]
     pub warn_of_deprecation_use_in_aptos_libs: bool,
 
-    /// Warning flags in the style of `-W<name>` in GCC.
+    /// Warning flags in the style of `--W<name>`.
     /// Multiple flags can be specified, e.g., `--Wunused --Wshadowing`.
     /// Use `--Wall` to enable all warnings.
     #[clap(long = "W", number_of_values = 1)]

@@ -1,19 +1,5 @@
 
 Diagnostics:
-warning: structs/enums with visibility modifier are only supported at version 2.4-unstable or later
-   ┌─ tests/checking/unused/struct_usage_cross_module.move:1:1
-   │
- 1 │ ╭ module 0x42::types {
- 2 │ │     // These structs should not be marked as unused because they're public
- 3 │ │     // and could be used by other modules
- 4 │ │     public struct PublicType1 has drop {
-   · │
-28 │ │     }
-29 │ │ }
-   │ ╰─^
-
-
-Diagnostics:
 warning: Struct `0x42::types::PrivateUnused` is unused: it has no current users and is private to its module.
    ┌─ tests/checking/unused/struct_usage_cross_module.move:13:5
    │
