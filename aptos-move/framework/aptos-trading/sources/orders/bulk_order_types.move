@@ -16,11 +16,6 @@
 /// - **Order Reinsertion**: Support for reinserting matched portions back into the order book
 /// - **Order Management**: Helper functions for order state management and cleanup
 ///
-/// ## Error Codes:
-/// - `EUNEXPECTED_MATCH_PRICE`: Unexpected price during order matching
-/// - `EUNEXPECTED_MATCH_SIZE`: Unexpected size during order matching
-/// - `E_REINSERT_ORDER_MISMATCH`: Order mismatch during reinsertion validation
-///
 /// ## Usage Example:
 /// ```move
 /// // Create a new bulk order
@@ -44,20 +39,16 @@ module aptos_trading::bulk_order_types {
     };
 
     // Error codes for various failure scenarios
-
-    const EUNEXPECTED_MATCH_PRICE: u64 = 1;
-    const E_REINSERT_ORDER_MISMATCH: u64 = 3;
-    const EINVLID_MM_ORDER_REQUEST: u64 = 4;
-    const EPRICE_CROSSING: u64 = 5;
-    const E_BID_LENGTH_MISMATCH: u64 = 6;
-    const E_ASK_LENGTH_MISMATCH: u64 = 7;
-    const E_EMPTY_ORDER: u64 = 9;
-    const E_BID_SIZE_ZERO: u64 = 10;
-    const E_ASK_SIZE_ZERO: u64 = 11;
-    const E_BID_ORDER_INVALID: u64 = 12;
-    const E_ASK_ORDER_INVALID: u64 = 13;
-    const E_BULK_ORDER_DEPTH_EXCEEDED: u64 = 14;
-    const E_INVALID_SEQUENCE_NUMBER: u64 = 15;
+    const EPRICE_CROSSING: u64 = 1;
+    const E_BID_LENGTH_MISMATCH: u64 = 2;
+    const E_ASK_LENGTH_MISMATCH: u64 = 3;
+    const E_EMPTY_ORDER: u64 = 4;
+    const E_BID_SIZE_ZERO: u64 = 5;
+    const E_ASK_SIZE_ZERO: u64 = 6;
+    const E_BID_ORDER_INVALID: u64 = 7;
+    const E_ASK_ORDER_INVALID: u64 = 8;
+    const E_BULK_ORDER_DEPTH_EXCEEDED: u64 = 9;
+    const E_INVALID_SEQUENCE_NUMBER: u64 = 10;
 
     /// Maximum number of price levels per side (bid or ask) in a bulk order.
     /// This limit prevents gas DoS scenarios when cancelling bulk orders.
