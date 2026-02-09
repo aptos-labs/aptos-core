@@ -195,11 +195,11 @@ pub fn commit_with_randomness_and_offset<E: Pairing>(
 }
 
 impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
-    /// Open the commitment at (x, y). When `offset > 0`, the quotient is committed using
-    /// basis [τ^offset, τ^{offset+1}, ...] (for Zeromorph batched openings).
+    /// Open the commitment at `(x, y)`. When `offset > 0`, the quotient is committed using
+    /// basis `[τ^offset, τ^{offset+1}, ...]` (for Zeromorph batched openings).
     pub fn open(
         ck: &CommitmentKey<E>,
-        f_vals: Vec<E::ScalarField>, // evaluations or coefficients depending on `ck.msm_basis`
+        f_vals: Vec<E::ScalarField>, // evaluations or coefficients, depending on `ck.msm_basis`
         rho: E::ScalarField,
         x: E::ScalarField,
         y: E::ScalarField,
@@ -208,6 +208,8 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
     ) -> OpeningProof<E> {
         let q_vals = match &ck.msm_basis {
             SrsBasis::Lagrange { .. } => {
+                // Lagrange basis expects `f_vals` to be evaluations, and we return `q_vals` with evaluations
+                // The `quotient_evaluations_batch()` function divides over `(theta_i - x)` for `theta_i` an m-th root of unity, hence:
                 if ck.roots_of_unity_in_eval_dom.contains(&x) {
                     panic!("x is not allowed to be a root of unity");
                 }
@@ -219,6 +221,8 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
                 )
             },
             SrsBasis::PowersOfTau { .. } => {
+                // Powers-of-Tau expects `f_vals` to be coefficients, and we return `q_vals` with coefficients
+                // For some reason arkworks only implemented `divide_with_q_and_r()` for `DenseOrSparsePolynomial`
                 let f_dense = DensePolynomial { coeffs: f_vals };
                 let f = DenseOrSparsePolynomial::DPolynomial(Cow::Owned(f_dense));
                 let divisor_dense = DensePolynomial {
@@ -240,6 +244,7 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
             commit_with_randomness_and_offset(ck, &padded, s, offset)
         };
 
+        // For this small MSM, the direct approach seems to be faster than using `E::G1::msm()`
         let pi_2 = (ck.g1 * rho) - (ck.tau_1 - ck.g1 * x) * s.0;
 
         OpeningProof { pi_1, pi_2 }
@@ -405,6 +410,7 @@ mod tests {
     use rand::thread_rng;
 
     // TODO: Should set up a PCS trait, then make these tests generic?
+    // This test does not involve the `offset` parameter, but this is probably tested as part of Zeromorph
     fn assert_kzg_opening_correctness<E: Pairing>() {
         let mut rng = thread_rng();
         let group_data = GroupGenerators::default();
