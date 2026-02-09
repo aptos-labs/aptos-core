@@ -241,6 +241,8 @@ where
         let _timer = VM_TIMER.timer_with_label("type_to_type_layout_with_delayed_fields");
 
         let mut count = 0;
+        // Keep the cache scoped to this single traversal; do not hoist it
+        // beyond this call (see invariant above).
         let mut struct_layout_cache = StructLayoutCache::new();
         let (layout, contains_delayed_fields) = self.type_to_type_layout_impl::<ANNOTATED>(
             gas_meter,
@@ -393,11 +395,11 @@ where
         check_option_type: bool,
         struct_layout_cache: &mut StructLayoutCache,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
+        let use_local_cache = self.vm_config().enable_struct_layout_local_cache;
         // Check the per-construction-pass cache. On hit, return the shared Arc without
         // re-constructing or re-counting nodes.
-        let cache_key = (*idx, ty_args.to_vec());
-        let use_local_cache = self.vm_config().enable_struct_layout_local_cache;
-        if use_local_cache {
+        let cache_key = if use_local_cache {
+            let cache_key = (*idx, ty_args.to_vec());
             if let Some((cached_layout, contains_delayed_fields)) =
                 struct_layout_cache.get(&cache_key)
             {
@@ -406,7 +408,10 @@ where
                     *contains_delayed_fields,
                 ));
             }
-        }
+            Some(cache_key)
+        } else {
+            None
+        };
         let struct_definition = self.struct_definition_loader.load_struct_definition(
             gas_meter,
             traversal_context,
@@ -602,7 +607,9 @@ where
 
         // Cache the constructed struct layout for reuse within this construction pass.
         if use_local_cache {
-            if let MoveTypeLayout::Struct(arc_layout) = &result.0 {
+            if let (Some(cache_key), MoveTypeLayout::Struct(arc_layout)) =
+                (cache_key, &result.0)
+            {
                 struct_layout_cache.insert(cache_key, (arc_layout.clone(), result.1));
             }
         }
