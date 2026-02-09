@@ -43,6 +43,8 @@ on a proposal multiple times as long as the total voting power of these votes do
 -  [Function `has_entirely_voted`](#0x1_aptos_governance_has_entirely_voted)
 -  [Function `get_remaining_voting_power`](#0x1_aptos_governance_get_remaining_voting_power)
 -  [Function `assert_proposal_expiration`](#0x1_aptos_governance_assert_proposal_expiration)
+-  [Function `stake_pool_is_eligible_to_vote`](#0x1_aptos_governance_stake_pool_is_eligible_to_vote)
+-  [Function `is_proposal_expired`](#0x1_aptos_governance_is_proposal_expired)
 -  [Function `create_proposal`](#0x1_aptos_governance_create_proposal)
 -  [Function `create_proposal_v2`](#0x1_aptos_governance_create_proposal_v2)
 -  [Function `create_proposal_v2_impl`](#0x1_aptos_governance_create_proposal_v2_impl)
@@ -1241,7 +1243,8 @@ Note: a stake pool's voting power on a proposal could increase over time(e.g. re
     <b>let</b> lockup_until = <a href="stake.md#0x1_stake_get_lockup_secs">stake::get_lockup_secs</a>(stake_pool);
     // The voter's <a href="stake.md#0x1_stake">stake</a> needs <b>to</b> be locked up at least <b>as</b> long <b>as</b> the proposal's expiration.
     // Also no one can vote on a expired proposal.
-    <b>if</b> (proposal_expiration &gt; lockup_until || <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt; proposal_expiration) {
+    <b>if</b> (!<a href="aptos_governance.md#0x1_aptos_governance_stake_pool_is_eligible_to_vote">stake_pool_is_eligible_to_vote</a>(stake_pool, proposal_expiration)
+        || <a href="aptos_governance.md#0x1_aptos_governance_is_proposal_expired">is_proposal_expired</a>(proposal_expiration)) {
         <b>return</b> 0
     };
 
@@ -1286,13 +1289,68 @@ Note: a stake pool's voting power on a proposal could increase over time(e.g. re
     );
     // The voter's <a href="stake.md#0x1_stake">stake</a> needs <b>to</b> be locked up at least <b>as</b> long <b>as</b> the proposal's expiration.
     <b>assert</b>!(
-        proposal_expiration &lt;= <a href="stake.md#0x1_stake_get_lockup_secs">stake::get_lockup_secs</a>(stake_pool),
+        <a href="aptos_governance.md#0x1_aptos_governance_stake_pool_is_eligible_to_vote">stake_pool_is_eligible_to_vote</a>(stake_pool, proposal_expiration),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="aptos_governance.md#0x1_aptos_governance_EINSUFFICIENT_STAKE_LOCKUP">EINSUFFICIENT_STAKE_LOCKUP</a>),
     );
     <b>assert</b>!(
-        <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &lt;= proposal_expiration,
+        !<a href="aptos_governance.md#0x1_aptos_governance_is_proposal_expired">is_proposal_expired</a>(proposal_expiration),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="aptos_governance.md#0x1_aptos_governance_EPROPOSAL_EXPIRED">EPROPOSAL_EXPIRED</a>),
     );
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aptos_governance_stake_pool_is_eligible_to_vote"></a>
+
+## Function `stake_pool_is_eligible_to_vote`
+
+
+
+<pre><code><b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_stake_pool_is_eligible_to_vote">stake_pool_is_eligible_to_vote</a>(stake_pool: <b>address</b>, proposal_expiration: u64): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_stake_pool_is_eligible_to_vote">stake_pool_is_eligible_to_vote</a>(
+    stake_pool: <b>address</b>, proposal_expiration: u64
+): bool {
+    // The voter's <a href="stake.md#0x1_stake">stake</a> needs <b>to</b> be locked up at least <b>as</b> long <b>as</b> the proposal's expiration.
+    // Also no one can vote on a expired proposal.
+    // Note the boundary condition must be strictly less than <b>to</b> avoid the edge case <b>where</b> the
+    // proposal expiration is equal <b>to</b> the lockup until.
+    proposal_expiration &lt; <a href="stake.md#0x1_stake_get_lockup_secs">stake::get_lockup_secs</a>(stake_pool)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aptos_governance_is_proposal_expired"></a>
+
+## Function `is_proposal_expired`
+
+
+
+<pre><code><b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_is_proposal_expired">is_proposal_expired</a>(proposal_expiration: u64): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_is_proposal_expired">is_proposal_expired</a>(proposal_expiration: u64): bool {
+    // Expiration time is defined <b>as</b> the time since when the proposal is no longer eligible <b>to</b> be voted on.
+    <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt;= proposal_expiration
 }
 </code></pre>
 
