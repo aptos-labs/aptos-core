@@ -111,6 +111,11 @@ impl DbWriter for AptosDB {
         })
     }
 
+    fn advance_hot_state_fence(&self, version: Version) -> Result<()> {
+        self.state_store.advance_hot_state_fence(version);
+        Ok(())
+    }
+
     fn get_state_snapshot_receiver(
         &self,
         version: Version,

@@ -172,6 +172,8 @@ where
 {
     pub fn new(db: DbReaderWriter) -> Result<Self> {
         let block_tree = BlockTree::new(&db.reader)?;
+        let committed_version = db.reader.get_latest_ledger_info_version()?;
+        db.writer.advance_hot_state_fence(committed_version)?;
         Ok(Self {
             db,
             block_tree,
@@ -390,6 +392,8 @@ where
             .commit_ledger(target_version, Some(&ledger_info_with_sigs), None)?;
 
         self.block_tree.prune(ledger_info_with_sigs.ledger_info())?;
+
+        self.db.writer.advance_hot_state_fence(target_version)?;
 
         Ok(())
     }

@@ -10,12 +10,22 @@ use aptos_storage_interface::state_store::{
     state::State, state_summary::StateSummary, state_view::hot_state_view::HotStateView,
     state_with_summary::StateWithSummary,
 };
+use aptos_types::transaction::Version;
 use std::sync::Arc;
+
+struct FenceState {
+    /// `None` = no fence (state sync mode, all commits pass through).
+    /// `Some(v)` = hot state commits for versions > v are buffered.
+    fence_version: Option<Version>,
+    /// At most one pending hot state commit awaiting fence advancement.
+    pending: Option<State>,
+}
 
 #[derive(Clone)]
 pub struct PersistedState {
     hot_state: Arc<HotState>,
     summary: Arc<Mutex<StateSummary>>,
+    fence: Arc<Mutex<FenceState>>,
 }
 
 impl PersistedState {
@@ -25,7 +35,15 @@ impl PersistedState {
         let state = State::new_empty(config);
         let hot_state = Arc::new(HotState::new(state, config));
         let summary = Arc::new(Mutex::new(StateSummary::new_empty(config)));
-        Self { hot_state, summary }
+        let fence = Arc::new(Mutex::new(FenceState {
+            fence_version: None,
+            pending: None,
+        }));
+        Self {
+            hot_state,
+            summary,
+            fence,
+        }
     }
 
     pub fn get_state_summary(&self) -> StateSummary {
@@ -58,13 +76,51 @@ impl PersistedState {
         // to as far as v2 (code will panic)
         *self.summary.lock() = summary;
 
-        self.hot_state.enqueue_commit(state);
+        // Gate the hot state commit behind the fence. If the state version is beyond the fence,
+        // buffer it instead of sending to the Committer thread. This prevents a race where the
+        // Committer modifies the DashMap along one fork while a speculative block on a different
+        // fork reads from it.
+        let state_to_commit = {
+            let mut fence = self.fence.lock();
+            match fence.fence_version {
+                Some(fence_ver) if state.version().is_some_and(|v| v > fence_ver) => {
+                    fence.pending = Some(state);
+                    None
+                },
+                _ => Some(state),
+            }
+        };
+
+        if let Some(state) = state_to_commit {
+            self.hot_state.enqueue_commit(state);
+        }
+    }
+
+    /// Advance the hot state fence. If there is a pending state at or below the new fence,
+    /// flush it to the Committer.
+    pub fn advance_hot_state_fence(&self, version: Version) {
+        let state_to_commit = {
+            let mut fence = self.fence.lock();
+            fence.fence_version = Some(version);
+            match fence.pending.take() {
+                Some(pending) if pending.version().is_some_and(|v| v <= version) => Some(pending),
+                other => {
+                    fence.pending = other;
+                    None
+                },
+            }
+        };
+
+        if let Some(state) = state_to_commit {
+            self.hot_state.enqueue_commit(state);
+        }
     }
 
     // n.b. Can only be used when no on the fly commit is in the queue.
     pub fn hack_reset(&self, state_with_summary: StateWithSummary) {
         let (state, summary) = state_with_summary.into_inner();
         *self.summary.lock() = summary;
+        self.fence.lock().pending = None;
         self.hot_state.set_commited(state);
     }
 }
