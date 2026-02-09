@@ -34,8 +34,8 @@ use aptos_crypto::{
     arkworks::{
         self,
         random::{
-            sample_field_element, sample_field_elements, unsafe_random_point_group,
-            unsafe_random_points_group, UniformRand,
+            sample_field_element, sample_field_elements, unsafe_random_point,
+            unsafe_random_point_group, unsafe_random_points, UniformRand,
         },
         scrape::LowDegreeTest,
         serialization::{ark_de, ark_se},
@@ -195,25 +195,11 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             if let Err(err) = hom.verify(
                 &TupleCodomainShape(
                     sigma_protocol::homomorphism::TrivialShape(
-                        self.sharing_proof.range_proof_commitment.0.into_affine(),
+                        self.sharing_proof.range_proof_commitment.0.into_affine(), // Because it's not affine by default. Should probably change that
                     ),
                     chunked_elgamal::WeightedCodomainShape {
-                        chunks: self
-                            .subtrs
-                            .Cs
-                            .iter()
-                            .map(|mat| {
-                                mat.iter()
-                                    .map(|row| row.iter().map(|&c| c.into()).collect())
-                                    .collect()
-                            })
-                            .collect(),
-                        randomness: self
-                            .subtrs
-                            .Rs
-                            .iter()
-                            .map(|row| row.iter().map(|&r| r.into()).collect())
-                            .collect(),
+                        chunks: self.subtrs.Cs.clone(),
+                        randomness: self.subtrs.Rs.clone(),
                     },
                 ),
                 &self.sharing_proof.SoK,
@@ -431,7 +417,7 @@ impl<E: Pairing> Aggregated<Subtranscript<E>> for SubtranscriptProjective<E> {
         debug_assert_eq!(self.Rs.len(), other.Rs.len());
         debug_assert_eq!(self.Vs.len(), other.Vs.len());
 
-        // Aggregate the V0s (convert to projective, add, then normalize)
+        // Aggregate the V0s
         self.V0 += other.V0;
 
         // Aggregate Vs (nested) element-wise
@@ -763,62 +749,19 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     {
         let num_chunks_per_share = num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize;
 
-        // Generate projective elements and convert to affine
-        let V0_proj = unsafe_random_point_group::<E::G2, _>(rng);
-        let Vs_proj: Vec<Vec<E::G2>> = sc.group_by_player(&unsafe_random_points_group::<E::G2, _>(
-            sc.get_total_weight(),
-            rng,
-        ));
-        let Cs_proj: Vec<Vec<Vec<E::G1>>> = (0..sc.get_total_num_players())
+        let V0 = unsafe_random_point::<E::G2, _>(rng);
+        let Vs_flat = unsafe_random_points::<E::G2, _>(sc.get_total_weight(), rng);
+        let Vs = sc.group_by_player(&Vs_flat);
+        let Cs: Vec<Vec<Vec<E::G1Affine>>> = (0..sc.get_total_num_players())
             .map(|i| {
-                let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
+                let w = sc.get_player_weight(&sc.get_player(i));
                 (0..w)
-                    .map(|_| unsafe_random_points_group(num_chunks_per_share, rng))
-                    .collect() // todo: use vec![vec![]]... like in the generate functions
-            })
-            .collect();
-        let Rs_proj: Vec<Vec<E::G1>> = (0..sc.get_max_weight())
-            .map(|_| unsafe_random_points_group(num_chunks_per_share, rng))
-            .collect();
-
-        // Batch normalize to affine
-        let mut g1_elems = Vec::new();
-        for player_Cs in &Cs_proj {
-            for chunks in player_Cs {
-                g1_elems.extend(chunks.iter().copied());
-            }
-        }
-        for weight_Rs in &Rs_proj {
-            g1_elems.extend(weight_Rs.iter().copied());
-        }
-
-        let mut g2_elems = vec![V0_proj];
-        for row in &Vs_proj {
-            g2_elems.extend(row.iter().copied());
-        }
-
-        let g1_affine = E::G1::normalize_batch(&g1_elems);
-        let g2_affine = E::G2::normalize_batch(&g2_elems);
-
-        let mut g1_iter = g1_affine.into_iter();
-        let mut g2_iter = g2_affine.into_iter();
-
-        let V0 = g2_iter.next().unwrap();
-        let Vs: Vec<Vec<E::G2Affine>> = Vs_proj
-            .iter()
-            .map(|row| row.iter().map(|_| g2_iter.next().unwrap()).collect())
-            .collect();
-        let Cs: Vec<Vec<Vec<E::G1Affine>>> = Cs_proj
-            .iter()
-            .map(|mat| {
-                mat.iter()
-                    .map(|row| row.iter().map(|_| g1_iter.next().unwrap()).collect())
+                    .map(|_| unsafe_random_points::<E::G1, _>(num_chunks_per_share, rng))
                     .collect()
             })
             .collect();
-        let Rs: Vec<Vec<E::G1Affine>> = Rs_proj
-            .iter()
-            .map(|row| row.iter().map(|_| g1_iter.next().unwrap()).collect())
+        let Rs: Vec<Vec<E::G1Affine>> = (0..sc.get_max_weight())
+            .map(|_| unsafe_random_points::<E::G1, _>(num_chunks_per_share, rng))
             .collect();
 
         Transcript {
@@ -826,7 +769,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             subtrs: Subtranscript { V0, Vs, Cs, Rs },
             sharing_proof: SharingProof {
                 range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
-                    unsafe_random_point_group(rng),
+                    unsafe_random_point_group::<E::G1, _>(rng),
                 ),
                 SoK: hkzg_chunked_elgamal::WeightedProof::generate(sc, num_chunks_per_share, rng),
                 range_proof: dekart_univariate_v2::Proof::generate(pp.ell, rng),

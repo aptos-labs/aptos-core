@@ -25,13 +25,18 @@ use std::fmt::{Debug, Formatter, Result as FmtResult};
 pub const DST: &[u8; 34] = b"APTOS_CHUNKED_COMMIT_HOM_SIGMA_DST";
 
 /// In this file we set up the following "commitment" homomorphism:
-/// Commit to chunked scalars by unchunking them and multiplying a base group element (in affine representation)
+/// Commit to scalars, which are input as chunks, by unchunking them
+/// and multiplying a base group element (in affine representation)
 /// with each unchunked scalar.
 ///
-/// Equivalent to `[base * unchunk(chunk) for chunks in chunked_scalars]`.
+/// Equivalent to `[base * unchunk(chunks) for chunks in chunked_scalars]`.
+///
+/// This is the only file where we decided against organising things by player, but
+/// went with a more flat approach. (Older player version is in the repo.) Doesn't make
+/// much of a difference, just slightly less nesting...
 pub struct Homomorphism<'a, C: CurveGroup> {
     pub base: C::Affine,
-    pub table: &'a BatchMulPreprocessing<C>,
+    pub table: &'a BatchMulPreprocessing<C>, // TODO: use Arc instead?
     pub ell: u8,
 }
 
@@ -114,7 +119,7 @@ where
     }
 }
 
-// A vector over the list of weights, and for each weight a vector of chunks
+// A vector over the list of scalars, and for each scalar a vector of chunks
 #[derive(
     SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq,
 )]
@@ -192,14 +197,11 @@ impl<'a, C: CurveGroup> sigma_protocol::Trait<C> for Homomorphism<'a, C> {
 mod tests {
     use super::*;
     use crate::{
-        pvss::chunky::{
-            chunked_elgamal::num_chunks_per_scalar,
-            chunks::{le_chunks_to_scalar, scalar_to_le_chunks},
-        },
+        pvss::chunky::chunks::{le_chunks_to_scalar, scalar_to_le_chunks},
         sigma_protocol::homomorphism::Trait as _,
     };
     use aptos_crypto::arkworks::random::{sample_field_elements, unsafe_random_point};
-    use ark_bls12_381::{Fr, G1Projective};
+    use ark_bls12_381::G1Projective;
     use rand::thread_rng;
 
     #[test]
@@ -233,10 +235,7 @@ mod tests {
         };
 
         // Create table from projective base (same pattern as chunked_elgamal_pp.rs)
-        let table = BatchMulPreprocessing::new(
-            base.into(),
-            num_scalars * num_chunks_per_scalar::<Fr>(ell) as usize,
-        );
+        let table = BatchMulPreprocessing::new(base.into(), num_scalars);
         let hom = Homomorphism::<G1Projective> {
             base,
             table: &table,

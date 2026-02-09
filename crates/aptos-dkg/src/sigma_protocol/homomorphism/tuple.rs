@@ -362,7 +362,7 @@ where
         let c = fiat_shamir_challenge_for_sigma_protocol::<_, H1::Scalar, _>(
             cntxt,
             self,
-            &public_statement, // &self.normalize(public_statement),
+            &public_statement,
             &prover_first_message,
             &self.dst(),
         );

@@ -89,7 +89,7 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
             // The projection map simply unchunks the chunks
             projection: |dom: &HkzgWeightedElgamalWitness<E::ScalarField>| {
                 chunked_scalar_mul::Witness {
-                    chunked_values: dom.chunked_plaintexts.iter().flatten().cloned().collect(), // TODO: this iter stuff can go
+                    chunked_values: dom.chunked_plaintexts.iter().flatten().cloned().collect(),
                 }
             },
         };

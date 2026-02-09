@@ -80,7 +80,7 @@ impl<E: Pairing> Clone for PublicParameters<E> {
             ell: self.ell,
             max_aggregation: self.max_aggregation,
             dlog_table: Self::build_dlog_table(g, self.ell, self.max_aggregation),
-            G2_table: BatchMulPreprocessing::new(self.G_2.into(), self.max_num_shares as usize), // Recreate table
+            G2_table: BatchMulPreprocessing::new(self.G_2.into(), self.max_num_shares as usize), // Recreate table because it doesn't allow for Copy/Clone? TODO: Fix this
             powers_of_radix: compute_powers_of_radix::<E>(self.ell),
         }
     }

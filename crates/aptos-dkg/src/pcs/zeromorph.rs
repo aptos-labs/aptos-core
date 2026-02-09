@@ -40,14 +40,15 @@ use std::{iter, marker::PhantomData};
 #[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
 pub struct ZeromorphProverKey<P: Pairing> {
     pub hiding_kzg_pp: univariate_hiding_kzg::CommitmentKey<P>,
-    /// Offset for opening the batched polynomial f (match original: open_pp uses basis at offset).
+    /// Offset for opening the batched polynomial f (original `jolt-core` code
+    /// has a copy of the pp called `open_pp` but with basis at offset).
     pub open_offset: usize,
 }
 
 #[allow(non_snake_case)]
 #[derive(Copy, Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
 pub struct ZeromorphVerifierKey<P: Pairing> {
-    pub kzg_vk: univariate_hiding_kzg::VerificationKey<P>,
+    pub hkzg_vk: univariate_hiding_kzg::VerificationKey<P>,
     pub tau_N_max_sub_2_N: P::G2Affine,
 }
 
@@ -63,8 +64,8 @@ impl<P: Pairing> Default for ZeromorphCommitment<P> {
 #[derive(Clone, CanonicalSerialize, CanonicalDeserialize, Debug)]
 pub struct ZeromorphProof<P: Pairing> {
     pub pi: univariate_hiding_kzg::OpeningProof<P>,
-    pub q_hat_com: univariate_hiding_kzg::Commitment<P>, // KZG commitment to the batched, lifted-degree poly constructed out of the q_k // TODO: need this?
-    pub q_k_com: Vec<univariate_hiding_kzg::Commitment<P>>, // Vec<P::G1>, // vector of KZG commitments for the q_k
+    pub q_hat_com: univariate_hiding_kzg::Commitment<P>, // KZG commitment to the batched, lifted-degree poly constructed out of the q_k
+    pub q_k_com: Vec<univariate_hiding_kzg::Commitment<P>>, // has type Vec<P::G1>, this is a vector of KZG commitments for the q_k
 }
 
 /// Computes the multilinear quotient polynomials for a given polynomial and evaluation point.
@@ -383,7 +384,7 @@ where
                 q = q * (degree_check_scalar + zm_poly_scalar);
                 f += &q;
             });
-        assert_eq!(
+        debug_assert_eq!(
             f.evaluate(&x_challenge),
             P::ScalarField::zero(),
             "batched polynomial f must vanish at x_challenge"
@@ -463,7 +464,7 @@ where
 
         bases_proj.push(proof.q_hat_com.0);
         bases_proj.push(comm.0);
-        bases_proj.push(vk.kzg_vk.group_generators.g1.into_group());
+        bases_proj.push(vk.hkzg_vk.group_generators.g1.into_group()); // Not so ideal to include this in `normalize_batch` but the effect should be negligible
         bases_proj.extend(proof.q_k_com.iter().map(|w| w.0));
 
         let bases = P::G1::normalize_batch(&bases_proj);
@@ -476,7 +477,7 @@ where
         // Commitment type is TrivialShape<P::G1>; y = 0 since the batched polynomial vanishes at x.
         let zeta_z_commitment = TrivialShape(zeta_z_com.into_group());
         univariate_hiding_kzg::CommitmentHomomorphism::verify(
-            vk.kzg_vk,
+            vk.hkzg_vk,
             zeta_z_commitment,
             x_challenge,
             P::ScalarField::zero(),
@@ -529,7 +530,7 @@ where
         // Use m = N so that offset = 0 and tau_N_max_sub_2_N = g2_powers[0] = [1]_2, giving the
         // standard hiding KZG check: e(zeta_z_com, [1]_2) = e(pi_1, [τ-x]_2) * e(pi_2, xi_2).
         let m = number_of_coefficients;
-        let (kzg_vk_pp, kzg_commit_pp) = univariate_hiding_kzg::setup_extra(
+        let (hkzg_vk_pp, hkzg_commit_pp) = univariate_hiding_kzg::setup_extra(
             m,
             SrsType::PowersOfTau,
             GroupGenerators::default(),
@@ -538,12 +539,12 @@ where
 
         let offset = m - number_of_coefficients; // 0 when m = N
         let prover_key = ZeromorphProverKey {
-            hiding_kzg_pp: kzg_commit_pp,
+            hiding_kzg_pp: hkzg_commit_pp,
             open_offset: offset,
         };
         let vk = ZeromorphVerifierKey {
-            kzg_vk: kzg_vk_pp.vk,
-            tau_N_max_sub_2_N: kzg_vk_pp.g2_powers[offset],
+            hkzg_vk: hkzg_vk_pp.vk,
+            tau_N_max_sub_2_N: hkzg_vk_pp.g2_powers[offset],
         };
 
         (prover_key, vk)

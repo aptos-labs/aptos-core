@@ -116,20 +116,20 @@ impl<C: CurveGroup> homomorphism::Trait for WeightedHomomorphism<'_, C> {
             .collect();
         let G_mults = arkworks::batch_mul(G_table, &all_z_chunks);
 
-        // 1b. For each player i and share j, compute r_{j,k} * ek_i for all chunks k
+        // 1b. For each player i and share j, compute r_{j,k} * ek_i for all chunks k // TODO: might be worthwhile to have tables for each ek_i as well
         //     Share index j directly corresponds to the weight level index in plaintext_randomness
         let mut chunks_result = Vec::new();
         let mut G_idx = 0;
 
         for (player_idx, player_chunks) in input.plaintext_chunks.iter().enumerate() {
             let mut player_Cs = Vec::new();
+            let ek: C = self.eks[player_idx].into();
             for (share_idx, share_chunks) in player_chunks.iter().enumerate() {
                 // share_idx corresponds to weight level index in plaintext_randomness
                 let r_chunks = &input.plaintext_randomness[share_idx];
 
                 // Compute r_{j,k} * ek_i for each chunk k
                 // Since we have one base (ek_i) with multiple scalars, we compute each separately
-                let ek: C = self.eks[player_idx].into();
 
                 // Combine: C_{i,j,k} = z_{i,j,k} * G + r_{j,k} * ek_i
                 let mut share_Cs = Vec::new();
@@ -518,7 +518,7 @@ mod tests {
                 &dks[player_id],
                 &pp,
                 &table,
-                1 << (radix_exponent + 1),
+                1 << radix_exponent, // we're not aggregating anything in this test. TODO: aggregating-and-decrypting should happen somewhere in this crate, though currently it's happening in some fptx_smoke test I think
                 radix_exponent,
             );
 

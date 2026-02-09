@@ -311,7 +311,7 @@ where
     let r = witness.rand(rng);
 
     // Step 2: Compute commitment A = Ψ(r)
-    let A_proj = homomorphism.apply(&r); // A_proj = ...
+    let A_proj = homomorphism.apply(&r);
     let A = homomorphism.normalize(&A_proj);
 
     // Step 3: Obtain Fiat-Shamir challenge
