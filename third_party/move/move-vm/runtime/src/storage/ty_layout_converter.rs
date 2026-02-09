@@ -607,9 +607,7 @@ where
 
         // Cache the constructed struct layout for reuse within this construction pass.
         if use_local_cache {
-            if let (Some(cache_key), MoveTypeLayout::Struct(arc_layout)) =
-                (cache_key, &result.0)
-            {
+            if let (Some(cache_key), MoveTypeLayout::Struct(arc_layout)) = (cache_key, &result.0) {
                 struct_layout_cache.insert(cache_key, (arc_layout.clone(), result.1));
             }
         }
