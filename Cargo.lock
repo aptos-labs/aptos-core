@@ -6650,9 +6650,9 @@ dependencies = [
 
 [[package]]
 name = "bumpalo"
-version = "3.14.0"
+version = "3.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f30e7476521f6f8af1a1c4c0b8cc94f0bee37d91763d0ca2665f299b6cd8aec"
+checksum = "5dd9dc738b7a8311c7ade152424974d8115f2cdad61e8dab8dac9f2362298510"
 
 [[package]]
 name = "byte-slice-cast"
@@ -10130,7 +10130,15 @@ checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
 name = "global-context"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.11",
+ "bumpalo",
+ "crossbeam",
+ "dashmap 7.0.0-rc2",
+ "move-binary-format",
+ "move-core-types",
+ "once_cell",
  "parking_lot 0.12.1",
+ "prometheus",
 ]
 
 [[package]]

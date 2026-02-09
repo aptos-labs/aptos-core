@@ -1,6 +1,8 @@
 [package]
 name = "global-context"
 version = "0.1.0"
+
+# Workspace inherited keys
 authors = { workspace = true }
 edition = { workspace = true }
 homepage = { workspace = true }
@@ -10,4 +12,12 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+ahash = { workspace = true }
+bumpalo = { workspace = true }
+crossbeam = { workspace = true }
+dashmap = { workspace = true }
+once_cell = { workspace = true }
 parking_lot = { workspace = true }
+prometheus = { workspace = true }
+move-core-types = { workspace = true }
+move-binary-format = { workspace = true }

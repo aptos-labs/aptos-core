@@ -9,5 +9,10 @@
 //! - **Maintenance phase**: A single exclusive [`MaintenanceContext`] guard for inter-block
 //!   maintenance operations.
 
+pub mod arena;
 mod context;
-pub use context::{ExecutionContext, GlobalContext, MaintenanceContext};
+pub use context::{ExecutionContext, GlobalContext, GlobalContextConfig, MaintenanceContext};
+pub(crate) mod counters;
+mod interner;
+mod types;
+pub use types::{ExecutableId, FunctionId, StructId, Type, TypeList};

@@ -545,6 +545,7 @@ blstrs = { version = "0.7.1", features = ["serde", "__private_bench"] }
 bollard = "0.15"
 build_html = "2.5.0"
 bulletproofs = { version = "4.0.0" }
+bumpalo = "3.19.1"
 byteorder = "1.4.3"
 bytes = { version = "1.4.0", features = ["serde"] }
 bytesize = { version = "1.3.0" }
