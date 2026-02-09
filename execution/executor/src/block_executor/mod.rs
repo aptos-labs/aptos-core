@@ -27,7 +27,8 @@ use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::{
     state_store::{
-        state_summary::ProvableStateSummary, state_view::cached_state_view::CachedStateView,
+        state::State, state_summary::ProvableStateSummary,
+        state_view::cached_state_view::CachedStateView,
     },
     DbReaderWriter,
 };
@@ -42,7 +43,10 @@ use aptos_types::{
 use aptos_vm::VMBlockExecutor;
 use block_tree::BlockTree;
 use fail::fail_point;
-use std::sync::Arc;
+use std::sync::{
+    mpsc::{Receiver, SyncSender},
+    Arc,
+};
 
 pub mod block_tree;
 
@@ -164,6 +168,9 @@ struct BlockExecutorInner<V> {
     db: DbReaderWriter,
     block_tree: BlockTree,
     block_executor: V,
+    /// Sends `(drop_receiver, state)` to a dedicated worker thread that waits for old blocks
+    /// to be dropped before advancing the hot state progress.
+    hot_state_progress_tx: SyncSender<(Receiver<()>, State)>,
 }
 
 impl<V> BlockExecutorInner<V>
@@ -172,11 +179,32 @@ where
 {
     pub fn new(db: DbReaderWriter) -> Result<Self> {
         let block_tree = BlockTree::new(&db.reader)?;
+        let hot_state_progress_tx = Self::spawn_hot_state_progress_worker(db.writer.clone());
         Ok(Self {
             db,
             block_tree,
             block_executor: V::new(),
+            hot_state_progress_tx,
         })
+    }
+
+    fn spawn_hot_state_progress_worker(
+        writer: Arc<dyn aptos_storage_interface::DbWriter>,
+    ) -> SyncSender<(Receiver<()>, State)> {
+        let (tx, rx) = std::sync::mpsc::sync_channel::<(Receiver<()>, State)>(1);
+
+        std::thread::Builder::new()
+            .name("hot_state_prog".to_string())
+            .spawn(move || {
+                while let Ok((drop_rx, state)) = rx.recv() {
+                    // Wait for old blocks to be truly dropped so no in-flight speculative
+                    // execution can still reference them.
+                    let _ = drop_rx.recv();
+                    writer.set_hot_state_progress(state);
+                }
+            })
+            .expect("Failed to spawn hot-state-progress thread.");
+        tx
     }
 }
 
@@ -389,7 +417,21 @@ where
             .writer
             .commit_ledger(target_version, Some(&ledger_info_with_sigs), None)?;
 
-        self.block_tree.prune(ledger_info_with_sigs.ledger_info())?;
+        let drop_rx = self.block_tree.prune(ledger_info_with_sigs.ledger_info())?;
+
+        // After pruning, the new root's state is safe to expose through the hot state once
+        // all in-flight blocks (that may reference the old root) are truly dropped. Send to
+        // the dedicated worker thread which waits for the drop and advances the hot state.
+        let state = self
+            .block_tree
+            .root_block()
+            .output
+            .result_state()
+            .latest()
+            .clone();
+        self.hot_state_progress_tx
+            .send((drop_rx, state))
+            .expect("Hot state progress worker thread exited unexpectedly.");
 
         Ok(())
     }
