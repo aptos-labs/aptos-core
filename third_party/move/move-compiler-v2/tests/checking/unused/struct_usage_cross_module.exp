@@ -1,0 +1,90 @@
+
+Diagnostics:
+warning: structs/enums with visibility modifier are only supported at version 2.4-unstable or later
+   ┌─ tests/checking/unused/struct_usage_cross_module.move:1:1
+   │
+ 1 │ ╭ module 0x42::types {
+ 2 │ │     // These structs should not be marked as unused because they're public
+ 3 │ │     // and could be used by other modules
+ 4 │ │     public struct PublicType1 has drop {
+   · │
+28 │ │     }
+29 │ │ }
+   │ ╰─^
+
+
+Diagnostics:
+warning: Struct `0x42::types::PrivateUnused` is unused: it has no current users and is private to its module.
+   ┌─ tests/checking/unused/struct_usage_cross_module.move:13:5
+   │
+13 │ ╭     struct PrivateUnused {
+14 │ │         z: u64
+15 │ │     }
+   │ ╰─────^
+
+// -- Model dump before first bytecode pipeline
+module 0x42::types {
+    struct PrivateUnused {
+        z: u64,
+    }
+    struct PrivateUsed {
+        w: u64,
+    }
+    struct PublicType1 {
+        x: u64,
+    }
+    struct PublicType2 {
+        y: u64,
+    }
+    public fun make_public_type1(x: u64): PublicType1 {
+        pack types::PublicType1(x)
+    }
+    public fun use_private(): PrivateUsed {
+        pack types::PrivateUsed(1)
+    }
+} // end 0x42::types
+module 0x42::consumer {
+    use 0x42::types; // resolved as: 0x42::types
+    struct UsesImportedType {
+        field: types::PublicType1,
+    }
+    public fun consume_type2(_x: types::PublicType2) {
+        Tuple()
+    }
+    public fun test(): UsesImportedType {
+        pack consumer::UsesImportedType(types::make_public_type1(1))
+    }
+} // end 0x42::consumer
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::types {
+    struct PrivateUnused {
+        z: u64,
+    }
+    struct PrivateUsed {
+        w: u64,
+    }
+    struct PublicType1 has drop {
+        x: u64,
+    }
+    struct PublicType2 has drop {
+        y: u64,
+    }
+    public fun make_public_type1(x: u64): PublicType1 {
+        PublicType1{x: x}
+    }
+    public fun use_private(): PrivateUsed {
+        PrivateUsed{w: 1}
+    }
+}
+module 0x42::consumer {
+    use 0x42::types;
+    struct UsesImportedType has drop {
+        field: types::PublicType1,
+    }
+    public fun consume_type2(_x: types::PublicType2) {
+    }
+    public fun test(): UsesImportedType {
+        UsesImportedType{field: types::make_public_type1(1)}
+    }
+}

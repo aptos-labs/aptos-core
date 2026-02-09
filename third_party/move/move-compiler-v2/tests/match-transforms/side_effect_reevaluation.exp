@@ -1,0 +1,87 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    private fun increment(counter: &mut u64): bool {
+        counter = Add<u64>(Deref(counter), 1);
+        Eq<u64>(Mod<u64>(Deref(counter), 2), 0)
+    }
+    public fun test_side_effect(counter: &mut u64,q: bool): u8 {
+        if {
+          let ($tuple_elem_0: bool, $tuple_elem_1: bool): (bool, bool) = Tuple(m::increment(counter), q);
+          And(Eq($tuple_elem_0, true), Eq($tuple_elem_1, true))
+        } {
+          0
+        } else {
+          if {
+            let ($tuple_elem_0: bool, $tuple_elem_1: bool): (bool, bool) = Tuple(m::increment(counter), q);
+            And(Eq($tuple_elem_0, true), Eq($tuple_elem_1, false))
+          } {
+            1
+          } else {
+            if {
+              let ($tuple_elem_0: bool, $tuple_elem_1: bool): (bool, bool) = Tuple(m::increment(counter), q);
+              And(Eq($tuple_elem_0, false), Eq($tuple_elem_1, true))
+            } {
+              2
+            } else {
+              if {
+                let ($tuple_elem_0: bool, $tuple_elem_1: bool): (bool, bool) = Tuple(m::increment(counter), q);
+                And(Eq($tuple_elem_0, false), Eq($tuple_elem_1, false))
+              } {
+                3
+              } else {
+                Abort(14566554180833181697)
+              }
+            }
+          }
+        }
+    }
+    public fun test_side_effect_wildcard(counter: &mut u64,q: bool): u8 {
+        if {
+          let ($tuple_elem_0: bool, $tuple_elem_1: bool): (bool, bool) = Tuple(m::increment(counter), q);
+          And(Eq($tuple_elem_0, true), Eq($tuple_elem_1, true))
+        } {
+          0
+        } else {
+          if {
+            let ($tuple_elem_0: bool, $tuple_elem_1: bool): (bool, bool) = Tuple(m::increment(counter), q);
+            And(Eq($tuple_elem_0, true), Eq($tuple_elem_1, false))
+          } {
+            1
+          } else {
+            2
+          }
+        }
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    fun increment(counter: &mut u64): bool {
+        *counter = *counter + 1;
+        *counter % 2 == 0
+    }
+    public fun test_side_effect(counter: &mut u64, q: bool): u8 {
+        if ({
+            let (_tuple_elem_0,_tuple_elem_1) = (increment(counter), q);
+            _tuple_elem_0 == true && _tuple_elem_1 == true
+        }) 0u8 else if ({
+            let (_tuple_elem_0,_tuple_elem_1) = (increment(counter), q);
+            _tuple_elem_0 == true && _tuple_elem_1 == false
+        }) 1u8 else if ({
+            let (_tuple_elem_0,_tuple_elem_1) = (increment(counter), q);
+            _tuple_elem_0 == false && _tuple_elem_1 == true
+        }) 2u8 else if ({
+            let (_tuple_elem_0,_tuple_elem_1) = (increment(counter), q);
+            _tuple_elem_0 == false && _tuple_elem_1 == false
+        }) 3u8 else abort 14566554180833181697
+    }
+    public fun test_side_effect_wildcard(counter: &mut u64, q: bool): u8 {
+        if ({
+            let (_tuple_elem_0,_tuple_elem_1) = (increment(counter), q);
+            _tuple_elem_0 == true && _tuple_elem_1 == true
+        }) 0u8 else if ({
+            let (_tuple_elem_0,_tuple_elem_1) = (increment(counter), q);
+            _tuple_elem_0 == true && _tuple_elem_1 == false
+        }) 1u8 else 2u8
+    }
+}

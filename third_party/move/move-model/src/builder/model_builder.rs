@@ -130,6 +130,8 @@ pub(crate) struct StructEntry {
     pub is_empty_struct: bool,
     pub is_native: bool,
     pub visibility: Visibility,
+    /// Functions that use this struct
+    pub using_functions: BTreeSet<QualifiedId<FunId>>,
 }
 
 #[derive(Debug, Clone)]
@@ -217,6 +219,7 @@ pub(crate) struct ConstEntry {
     pub ty: Type,
     pub value: Value,
     pub visibility: EntryVisibility,
+    pub using_functions: BTreeSet<QualifiedId<FunId>>,
 }
 
 impl<'env> ModelBuilder<'env> {
@@ -391,6 +394,7 @@ impl<'env> ModelBuilder<'env> {
             is_empty_struct: false,
             is_native,
             visibility,
+            using_functions: BTreeSet::new(),
         };
         self.struct_table.insert(name.clone(), entry);
         self.reverse_struct_table

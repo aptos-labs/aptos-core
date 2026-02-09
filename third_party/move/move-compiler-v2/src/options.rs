@@ -109,10 +109,11 @@ pub struct Options {
            default_value=bool_to_str(warn_of_deprecation_use_in_aptos_libs_env_var()))]
     pub warn_of_deprecation_use_in_aptos_libs: bool,
 
-    /// Show warnings about unused functions, fields, constants, etc.
-    /// Note that the current value of this constant is "Wunused"
-    #[clap(long = cli::WARN_UNUSED_FLAG, default_value="false")]
-    pub warn_unused: bool,
+    /// Warning flags in the style of `-W<name>` in GCC.
+    /// Multiple flags can be specified, e.g., `--Wunused --Wshadowing`.
+    /// Use `--Wall` to enable all warnings.
+    #[clap(long = "W", number_of_values = 1)]
+    pub warnings: Vec<String>,
 
     /// Whether to compile everything, including dependencies.
     #[clap(long)]
@@ -243,11 +244,10 @@ impl Options {
         }
     }
 
-    pub fn set_warn_unused(self, value: bool) -> Self {
-        Self {
-            warn_unused: value,
-            ..self
-        }
+    /// Checks if a warning is enabled. Returns true if the specific warning name
+    /// is in the warnings list, or if "all" is in the list.
+    pub fn warning_enabled(&self, name: &str) -> bool {
+        self.warnings.iter().any(|w| w == name || w == "all")
     }
 
     pub fn set_external_checks(self, value: Vec<Arc<dyn ExternalChecks>>) -> Self {

@@ -126,6 +126,12 @@ pub struct CompilerConfig {
     /// Whether to print errors to stderr as they are reported.
     #[clap(long, default_value = "true")]
     pub print_errors: bool,
+
+    /// Warning flags in the style of `--W<name>`.
+    /// Multiple flags can be specified, e.g., `--Wunused --Wshadowing`.
+    /// Use `--Wall` to enable all warnings.
+    #[clap(long = "W", number_of_values = 1, global = true)]
+    pub warnings: Vec<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]

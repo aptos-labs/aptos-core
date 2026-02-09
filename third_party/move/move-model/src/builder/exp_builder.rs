@@ -4004,6 +4004,16 @@ impl ExpTranslator<'_, '_, '_> {
             );
             self.new_error_exp()
         } else {
+            // Record constant usage for tracking unused constants
+            if let Some(fun_name) = &self.fun_name {
+                let fun_qid = QualifiedId {
+                    module_id: self.parent.module_id,
+                    id: FunId::new(fun_name.symbol),
+                };
+                if let Some(const_entry) = self.parent.parent.const_table.get_mut(sym) {
+                    const_entry.using_functions.insert(fun_qid);
+                }
+            }
             let ConstEntry { ty, value, .. } = entry;
             let ty = self.check_type(loc, &ty, expected_type, context);
             let id = self.new_node_id_with_type_loc(&ty, loc);

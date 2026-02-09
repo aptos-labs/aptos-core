@@ -210,6 +210,7 @@ fn compile_coverage(
                 .or_else(|| Some(LanguageVersion::latest_stable())),
             experiments: move_options.compute_experiments(),
             print_errors: true,
+            warnings: move_options.warnings.clone(),
         },
         ..Default::default()
     };

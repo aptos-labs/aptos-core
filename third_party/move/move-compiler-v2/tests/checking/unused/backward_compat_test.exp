@@ -1,0 +1,47 @@
+
+Diagnostics:
+warning: structs/enums with visibility modifier are only supported at version 2.4-unstable or later
+   ┌─ tests/checking/unused/backward_compat_test.move:4:1
+   │
+ 4 │ ╭ module 0x42::provider {
+ 5 │ │     public struct Resource has key {
+ 6 │ │         value: u64
+ 7 │ │     }
+   · │
+11 │ │     }
+12 │ │ }
+   │ ╰─^
+
+
+Diagnostics:
+error: Invalid operation: storage operation on type `provider::Resource` can only be done within the defining module `0x42::provider`
+   ┌─ tests/checking/unused/backward_compat_test.move:19:16
+   │
+19 │     public fun check_exists(addr: address): bool {
+   │                ^^^^^^^^^^^^
+20 │         exists<provider::Resource>(addr)
+   │         -------------------------------- called here
+
+error: Invalid operation: storage operation on type `provider::Resource` can only be done within the defining module `0x42::provider`
+   ┌─ tests/checking/unused/backward_compat_test.move:24:16
+   │
+24 │     public fun read_value(addr: address): u64 acquires provider::Resource {
+   │                ^^^^^^^^^^
+25 │         borrow_global<provider::Resource>(addr).value
+   │         --------------------------------------- called here
+
+error: Invalid operation: access of the field `value` on type `provider::Resource` can only be done within the defining module `0x42::provider`
+   ┌─ tests/checking/unused/backward_compat_test.move:24:16
+   │
+24 │     public fun read_value(addr: address): u64 acquires provider::Resource {
+   │                ^^^^^^^^^^
+25 │         borrow_global<provider::Resource>(addr).value
+   │         --------------------------------------------- accessed here
+
+error: Invalid operation: storage operation on type `provider::Resource` can only be done within the defining module `0x42::provider`
+   ┌─ tests/checking/unused/backward_compat_test.move:29:16
+   │
+29 │     public fun take_resource(addr: address): provider::Resource acquires provider::Resource {
+   │                ^^^^^^^^^^^^^
+30 │         move_from<provider::Resource>(addr)
+   │         ----------------------------------- called here

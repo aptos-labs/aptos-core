@@ -2002,6 +2002,8 @@ impl GlobalEnv {
             visibility: Visibility::Private,
             has_package_visibility: false,
             is_empty_struct: false,
+            // Ghost memory structs are synthetic and not directly used by function bodies
+            using_funs: RefCell::new(Some(BTreeSet::new())),
         }
     }
 
@@ -3845,6 +3847,9 @@ pub struct StructData {
 
     /// Whether this struct is empty (has no fields) when defined by the user
     pub is_empty_struct: bool,
+
+    /// Functions that use this struct (computed lazily)
+    pub(crate) using_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
 }
 
 impl StructData {
@@ -3864,6 +3869,7 @@ impl StructData {
             visibility: Visibility::Private,
             has_package_visibility: false,
             is_empty_struct: false,
+            using_funs: RefCell::new(None),
         }
     }
 }
@@ -4239,6 +4245,23 @@ impl<'env> StructEnv<'env> {
     pub fn has_package_visibility(&self) -> bool {
         self.data.has_package_visibility
     }
+
+    /// Returns the functions that use this struct.
+    ///
+    /// This information is pre-computed during the build phase by tracking struct usage in
+    /// function bodies (see module_builder.rs def_ana_fun). This method is only called on
+    /// target modules (checked via is_target()), so the data should always be available.
+    pub fn get_using_functions(&self) -> BTreeSet<QualifiedId<FunId>> {
+        self.data
+            .using_funs
+            .borrow()
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| {
+                // This should never happen for target modules, but return empty set as safety net
+                BTreeSet::new()
+            })
+    }
 }
 
 // =================================================================================================
@@ -4366,6 +4389,9 @@ pub struct NamedConstantData {
 
     /// The value of this constant, if known.
     pub(crate) value: Value,
+
+    /// Functions that reference this constant (populated at build time)
+    pub(crate) using_funs: BTreeSet<QualifiedId<FunId>>,
 }
 
 #[derive(Debug)]
@@ -4414,6 +4440,11 @@ impl NamedConstantEnv<'_> {
             used_modules: self.module_env.get_used_modules(false),
             ..TypeDisplayContext::new(self.module_env.env)
         }
+    }
+
+    /// Returns the functions that reference this constant.
+    pub fn get_using_functions(&self) -> &BTreeSet<QualifiedId<FunId>> {
+        &self.data.using_funs
     }
 }
 

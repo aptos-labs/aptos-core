@@ -1,0 +1,121 @@
+
+Diagnostics:
+warning: Struct `0x42::m::UsedInExists` is unused: it has no current users and is private to its module.
+   ┌─ tests/checking/unused/struct_global_storage.move:23:5
+   │
+23 │ ╭     struct UsedInExists has key {
+24 │ │         a: u64
+25 │ │     }
+   │ ╰─────^
+
+warning: Struct `0x42::m::TrulyUnused` is unused: it has no current users and is private to its module.
+   ┌─ tests/checking/unused/struct_global_storage.move:33:5
+   │
+33 │ ╭     struct TrulyUnused has key {
+34 │ │         c: u64
+35 │ │     }
+   │ ╰─────^
+
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    struct TrulyUnused {
+        c: u64,
+    }
+    struct UsedInAcquires {
+        b: u64,
+    }
+    struct UsedInBorrowGlobal {
+        y: u64,
+    }
+    struct UsedInBorrowGlobalMut {
+        z: u64,
+    }
+    struct UsedInExists {
+        a: u64,
+    }
+    struct UsedInMoveFrom {
+        w: u64,
+    }
+    struct UsedInMoveTo {
+        x: u64,
+    }
+    public fun test_acquires(addr: address): u64
+        acquires UsedInAcquires(*)
+     {
+        select m::UsedInAcquires.b<&UsedInAcquires>(BorrowGlobal(Immutable)<UsedInAcquires>(addr))
+    }
+    public fun test_borrow_global(addr: address): u64
+        acquires UsedInBorrowGlobal(*)
+     {
+        select m::UsedInBorrowGlobal.y<&UsedInBorrowGlobal>(BorrowGlobal(Immutable)<UsedInBorrowGlobal>(addr))
+    }
+    public fun test_borrow_global_mut(addr: address)
+        acquires UsedInBorrowGlobalMut(*)
+     {
+        select m::UsedInBorrowGlobalMut.z<&mut UsedInBorrowGlobalMut>(BorrowGlobal(Mutable)<UsedInBorrowGlobalMut>(addr)) = 2;
+        Tuple()
+    }
+    public fun test_exists(addr: address): bool {
+        exists<UsedInExists>(addr)
+    }
+    public fun test_move_from(addr: address): UsedInMoveFrom
+        acquires UsedInMoveFrom(*)
+     {
+        MoveFrom<UsedInMoveFrom>(addr)
+    }
+    public fun test_move_to(s: &signer) {
+        MoveTo<UsedInMoveTo>(s, pack m::UsedInMoveTo(1));
+        Tuple()
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    struct TrulyUnused has key {
+        c: u64,
+    }
+    struct UsedInAcquires has key {
+        b: u64,
+    }
+    struct UsedInBorrowGlobal has key {
+        y: u64,
+    }
+    struct UsedInBorrowGlobalMut has key {
+        z: u64,
+    }
+    struct UsedInExists has key {
+        a: u64,
+    }
+    struct UsedInMoveFrom has key {
+        w: u64,
+    }
+    struct UsedInMoveTo has key {
+        x: u64,
+    }
+    public fun test_acquires(addr: address): u64
+        acquires UsedInAcquires
+    {
+        borrow_global<UsedInAcquires>(addr).b
+    }
+    public fun test_borrow_global(addr: address): u64
+        acquires UsedInBorrowGlobal
+    {
+        borrow_global<UsedInBorrowGlobal>(addr).y
+    }
+    public fun test_borrow_global_mut(addr: address)
+        acquires UsedInBorrowGlobalMut
+    {
+        borrow_global_mut<UsedInBorrowGlobalMut>(addr).z = 2;
+    }
+    public fun test_exists(addr: address): bool {
+        exists<UsedInExists>(addr)
+    }
+    public fun test_move_from(addr: address): UsedInMoveFrom
+        acquires UsedInMoveFrom
+    {
+        move_from<UsedInMoveFrom>(addr)
+    }
+    public fun test_move_to(s: &signer) {
+        move_to<UsedInMoveTo>(s, UsedInMoveTo{x: 1});
+    }
+}

@@ -524,6 +524,12 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
     // Record all private and friendless public(friend) functions to check for uses.
     let mut private_funcs: BTreeSet<QualifiedFunId> = BTreeSet::new();
 
+    // Get options and check if unused warnings are enabled (used for all unused checks)
+    let options = env
+        .get_extension::<Options>()
+        .expect("Options is available");
+    let unused_warnings_enabled = before_inlining && options.warning_enabled("unused");
+
     for caller_module in env.get_modules() {
         // TODO(#13745): fix when we can tell in general if two modules are in the same package
         if caller_module.is_primary_target() {
@@ -661,44 +667,66 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
                     }
                 }
             }
+
+            // Check for unused private structs (consolidated into main loop)
+            if unused_warnings_enabled && caller_module.is_target() {
+                for struct_env in caller_module.get_structs() {
+                    if struct_env.get_visibility() == Visibility::Private
+                        && struct_env.get_using_functions().is_empty()
+                    {
+                        let loc = struct_env.get_loc();
+                        let msg = format!(
+                            "Struct `{}` is unused: it has no current users and is private to its module.",
+                            struct_env.get_full_name_with_address(),
+                        );
+                        env.diag(Severity::Warning, &loc, &msg);
+                    }
+                }
+
+                // Check for unused constants (all constants are module-private)
+                for const_env in caller_module.get_named_constants() {
+                    if const_env.get_using_functions().is_empty() {
+                        let loc = const_env.get_loc();
+                        let msg = format!(
+                            "Constant `{}` is unused.",
+                            const_env.get_name().display(env.symbol_pool()),
+                        );
+                        env.diag(Severity::Warning, &loc, &msg);
+                    }
+                }
+            }
         }
     }
 
-    if before_inlining {
-        // Check for Unused functions: private (or friendless public(friend)) funs with no callers.
-        let options = env
-            .get_extension::<Options>()
-            .expect("Options is available");
-        if options.warn_unused {
-            for callee in private_funcs {
-                if !functions_with_callers.contains(&callee) {
-                    // We saw no uses of private/friendless function `callee`.
-                    let callee_func = env.get_function(callee);
-                    let callee_loc = callee_func.get_id_loc();
-                    let callee_is_script = callee_func.module_env.get_name().is_script();
+    if unused_warnings_enabled {
+        for callee in private_funcs {
+            if !functions_with_callers.contains(&callee) {
+                // We saw no uses of private/friendless function `callee`.
+                let callee_func = env.get_function(callee);
+                let callee_loc = callee_func.get_id_loc();
+                let callee_is_script = callee_func.module_env.get_name().is_script();
 
-                    // Entry functions in a script don't need any uses.
-                    // Check others which are private.
-                    if !callee_is_script {
-                        let is_private = matches!(callee_func.visibility(), Visibility::Private);
-                        if functions_with_inaccessible_callers.contains(&callee) {
-                            let msg = format!(
-                                "Function `{}` may be unused: it has callers, but none with access.",
-                                callee_func.get_full_name_with_address(),
-                            );
-                            env.diag(Severity::Warning, &callee_loc, &msg);
-                        } else {
-                            let msg = format!(
-                                "Function `{}` is unused: it has no current callers and {}.",
-                                callee_func.get_full_name_with_address(),
-                                if is_private {
-                                    "is private to its module"
-                                } else {
-                                    "is `public(friend)` but its module has no friends"
-                                }
-                            );
-                            env.diag(Severity::Warning, &callee_loc, &msg);
-                        }
+                // Entry functions in a script don't need any uses.
+                // Check others which are private.
+                if !callee_is_script {
+                    let is_private = matches!(callee_func.visibility(), Visibility::Private);
+                    if functions_with_inaccessible_callers.contains(&callee) {
+                        let msg = format!(
+                            "Function `{}` may be unused: it has callers, but none with access.",
+                            callee_func.get_full_name_with_address(),
+                        );
+                        env.diag(Severity::Warning, &callee_loc, &msg);
+                    } else {
+                        let msg = format!(
+                            "Function `{}` is unused: it has no current callers and {}.",
+                            callee_func.get_full_name_with_address(),
+                            if is_private {
+                                "is private to its module"
+                            } else {
+                                "is `public(friend)` but its module has no friends"
+                            }
+                        );
+                        env.diag(Severity::Warning, &callee_loc, &msg);
                     }
                 }
             }
