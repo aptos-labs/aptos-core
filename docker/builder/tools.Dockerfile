@@ -1,4 +1,6 @@
 ### Tools Image ###
+FROM node-builder
+
 FROM debian-base AS tools
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -28,7 +30,7 @@ RUN wget https://storage.googleapis.com/pub/gsutil.tar.gz -O- | tar --gzip --dir
 RUN ARCH=$(dpkg --print-architecture) && \
     cd /usr/local/bin && wget "https://dl.k8s.io/release/v1.35.0/bin/linux/${ARCH}/kubectl" -O kubectl && chmod +x kubectl
 
-COPY --link --from=tools-builder /aptos/dist/aptos-debugger /usr/local/bin/aptos-debugger
+COPY --link --from=node-builder /aptos/dist/aptos-debugger /usr/local/bin/aptos-debugger
 COPY --link --from=tools-builder /aptos/dist/aptos /usr/local/bin/aptos
 COPY --link --from=tools-builder /aptos/dist/aptos-openapi-spec-generator /usr/local/bin/aptos-openapi-spec-generator
 COPY --link --from=tools-builder /aptos/dist/aptos-transaction-emitter /usr/local/bin/aptos-transaction-emitter
