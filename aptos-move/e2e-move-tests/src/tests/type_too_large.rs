@@ -2,13 +2,13 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{assert_abort, assert_success, tests::common, MoveHarness};
+use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_40;
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{ExecutionStatus, TransactionStatus},
 };
 use move_core_types::vm_status::StatusCode;
 use test_case::test_case;
-use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_40;
 
 #[test_case(true, false)]
 #[test_case(true, true)]
