@@ -126,6 +126,7 @@ sophisticated order matching, cancellation, and reinsertion capabilities.
 <b>use</b> <a href="">0x5::order_book_types</a>;
 <b>use</b> <a href="">0x5::order_match_types</a>;
 <b>use</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils">0x7::bulk_order_utils</a>;
+<b>use</b> <a href="order_id_generation.md#0x7_order_id_generation">0x7::order_id_generation</a>;
 <b>use</b> <a href="price_time_index.md#0x7_price_time_index">0x7::price_time_index</a>;
 </code></pre>
 
@@ -199,15 +200,6 @@ Main bulk order book container that manages all orders and their matching.
 
 
 
-<a id="0x7_bulk_order_book_EINVLID_MM_ORDER_REQUEST"></a>
-
-
-
-<pre><code><b>const</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EINVLID_MM_ORDER_REQUEST">EINVLID_MM_ORDER_REQUEST</a>: u64 = 10;
-</code></pre>
-
-
-
 <a id="0x7_bulk_order_book_EPRICE_CROSSING"></a>
 
 
@@ -222,15 +214,6 @@ Main bulk order book container that manages all orders and their matching.
 
 
 <pre><code><b>const</b> <a href="bulk_order_book.md#0x7_bulk_order_book_E_INVALID_SEQUENCE_NUMBER">E_INVALID_SEQUENCE_NUMBER</a>: u64 = 13;
-</code></pre>
-
-
-
-<a id="0x7_bulk_order_book_EORDER_ALREADY_EXISTS"></a>
-
-
-
-<pre><code><b>const</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_ALREADY_EXISTS">EORDER_ALREADY_EXISTS</a>: u64 = 1;
 </code></pre>
 
 
@@ -253,11 +236,29 @@ Main bulk order book container that manages all orders and their matching.
 
 
 
+<a id="0x7_bulk_order_book_EINVLID_MM_ORDER_REQUEST"></a>
+
+
+
+<pre><code><b>const</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EINVLID_MM_ORDER_REQUEST">EINVLID_MM_ORDER_REQUEST</a>: u64 = 10;
+</code></pre>
+
+
+
 <a id="0x7_bulk_order_book_ENOT_BULK_ORDER"></a>
 
 
 
 <pre><code><b>const</b> <a href="bulk_order_book.md#0x7_bulk_order_book_ENOT_BULK_ORDER">ENOT_BULK_ORDER</a>: u64 = 12;
+</code></pre>
+
+
+
+<a id="0x7_bulk_order_book_EORDER_ALREADY_EXISTS"></a>
+
+
+
+<pre><code><b>const</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_ALREADY_EXISTS">EORDER_ALREADY_EXISTS</a>: u64 = 1;
 </code></pre>
 
 

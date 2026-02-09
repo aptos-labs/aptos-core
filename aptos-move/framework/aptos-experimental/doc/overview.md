@@ -27,6 +27,7 @@ This is the reference documentation of the Aptos experimental framework.
 -  [`0x7::market_types`](market_types.md#0x7_market_types)
 -  [`0x7::order_book`](order_book.md#0x7_order_book)
 -  [`0x7::order_book_utils`](order_book_utils.md#0x7_order_book_utils)
+-  [`0x7::order_id_generation`](order_id_generation.md#0x7_order_id_generation)
 -  [`0x7::order_operations`](order_operations.md#0x7_order_operations)
 -  [`0x7::order_placement`](order_placement.md#0x7_order_placement)
 -  [`0x7::pending_order_book_index`](pending_order_book_index.md#0x7_pending_order_book_index)
