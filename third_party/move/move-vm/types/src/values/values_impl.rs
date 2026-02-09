@@ -5909,37 +5909,32 @@ pub mod prop {
                     .prop_map(|vals| Value::Container(Container::Vec(Rc::new(RefCell::new(vals)))))
                     .boxed(),
             },
-            L::Struct(struct_layout)
-                if matches!(struct_layout.as_ref(), MoveStructLayout::RuntimeVariants(_)) =>
-            {
-                let variants = match struct_layout.as_ref() {
-                    MoveStructLayout::RuntimeVariants(v) => v,
-                    _ => unreachable!(),
-                };
-                // Randomly choose a variant index
-                let variant_count = variants.len();
-                let variants = variants.clone();
-                (0..variant_count as u16)
-                    .prop_flat_map(move |variant_tag| {
-                        let variant_layouts = variants[variant_tag as usize].clone();
-                        variant_layouts
-                            .iter()
-                            .map(value_strategy_with_layout)
-                            .collect::<Vec<_>>()
-                            .prop_map(move |vals| {
-                                Value::struct_(Struct::pack_variant(variant_tag, vals))
-                            })
-                    })
-                    .boxed()
+            L::Struct(struct_layout) => match struct_layout.as_ref() {
+                MoveStructLayout::RuntimeVariants(variants) => {
+                    // Randomly choose a variant index
+                    let variant_count = variants.len();
+                    let variants = variants.clone();
+                    (0..variant_count as u16)
+                        .prop_flat_map(move |variant_tag| {
+                            let variant_layouts = variants[variant_tag as usize].clone();
+                            variant_layouts
+                                .iter()
+                                .map(value_strategy_with_layout)
+                                .collect::<Vec<_>>()
+                                .prop_map(move |vals| {
+                                    Value::struct_(Struct::pack_variant(variant_tag, vals))
+                                })
+                        })
+                        .boxed()
+                },
+                _ => struct_layout
+                    .fields(None)
+                    .iter()
+                    .map(value_strategy_with_layout)
+                    .collect::<Vec<_>>()
+                    .prop_map(move |vals| Value::struct_(Struct::pack(vals)))
+                    .boxed(),
             },
-
-            L::Struct(struct_layout) => struct_layout
-                .fields(None)
-                .iter()
-                .map(value_strategy_with_layout)
-                .collect::<Vec<_>>()
-                .prop_map(move |vals| Value::struct_(Struct::pack(vals)))
-                .boxed(),
 
             L::Function => {
                 (
