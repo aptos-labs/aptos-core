@@ -19,6 +19,9 @@ pub struct QueueItem {
     offsets_by_round: HashMap<Round, usize>,
     num_undecided_blocks: usize,
     broadcast_handle: Option<Vec<DropGuard>>,
+    /// Per-block tracking of whether randomness is needed.
+    /// When a block doesn't need randomness, it is immediately considered decided.
+    needs_randomness: Vec<bool>,
 }
 
 impl QueueItem {
@@ -36,6 +39,7 @@ impl QueueItem {
             offsets_by_round,
             num_undecided_blocks: len,
             broadcast_handle,
+            needs_randomness: vec![true; len],
         }
     }
 
@@ -81,8 +85,28 @@ impl QueueItem {
         }
     }
 
-    fn blocks(&self) -> &[Arc<PipelinedBlock>] {
+    /// Add a broadcast handle for a block's share aggregation task.
+    pub fn add_broadcast_handle(&mut self, handle: DropGuard) {
+        self.broadcast_handle
+            .get_or_insert_with(Vec::new)
+            .push(handle);
+    }
+
+    pub fn blocks(&self) -> &[Arc<PipelinedBlock>] {
         &self.ordered_blocks.ordered_blocks
+    }
+
+    /// Mark a block as not needing randomness, immediately decrementing the undecided count.
+    pub fn skip_randomness(&mut self, round: Round) {
+        let offset = self.offset(round);
+        if self.needs_randomness[offset] {
+            self.needs_randomness[offset] = false;
+            observe_block(
+                self.blocks()[offset].timestamp_usecs(),
+                BlockStage::RAND_ADD_DECISION,
+            );
+            self.num_undecided_blocks -= 1;
+        }
     }
 
     fn blocks_mut(&mut self) -> &mut [Arc<PipelinedBlock>] {
@@ -123,11 +147,16 @@ impl BlockQueue {
                 for block in item.blocks() {
                     observe_block(block.timestamp_usecs(), BlockStage::RAND_READY);
                 }
-                let QueueItem { ordered_blocks, .. } = item;
+                let QueueItem {
+                    ordered_blocks,
+                    needs_randomness,
+                    ..
+                } = item;
                 debug_assert!(ordered_blocks
                     .ordered_blocks
                     .iter()
-                    .all(|block| block.has_randomness()));
+                    .zip(needs_randomness.iter())
+                    .all(|(block, &needs_rand)| !needs_rand || block.has_randomness()));
                 rand_ready_prefix.push(ordered_blocks);
             } else {
                 break;
@@ -151,6 +180,13 @@ impl BlockQueue {
             item.set_randomness(round, randomness)
         } else {
             false
+        }
+    }
+
+    /// Mark a block as not needing randomness
+    pub fn skip_randomness(&mut self, round: Round) {
+        if let Some(item) = self.item_mut(round) {
+            item.skip_randomness(round);
         }
     }
 }

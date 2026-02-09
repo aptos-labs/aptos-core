@@ -21,7 +21,10 @@ use crate::{
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::aptos_channel;
 use aptos_config::config::ReliableBroadcastConfig;
-use aptos_consensus_types::common::{Author, Round};
+use aptos_consensus_types::{
+    common::{Author, Round},
+    pipelined_block::PipelinedBlock,
+};
 use aptos_infallible::Mutex;
 use aptos_logger::{error, info, spawn_named, trace, warn};
 use aptos_network::{protocols::network::RpcError, ProtocolId};
@@ -42,7 +45,7 @@ use futures_channel::{
     mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     oneshot,
 };
-use std::{sync::Arc, time::Duration};
+use std::{collections::VecDeque, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub type Sender<T> = UnboundedSender<T>;
@@ -67,6 +70,15 @@ pub struct RandManager<S: TShare, D: TAugmentedData> {
 
     // for randomness fast path
     fast_config: Option<RandConfig>,
+
+    // for skipping randomness generation
+    rand_check_enabled: bool,
+    /// Blocks waiting to be checked for randomness need, processed sequentially.
+    pending_checks: VecDeque<Arc<PipelinedBlock>>,
+    /// The receiver for the currently-awaited has_randomness check.
+    current_has_rand_rx: Option<tokio::sync::oneshot::Receiver<bool>>,
+    /// The round of the block currently being checked.
+    current_check_round: Option<Round>,
 }
 
 impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
@@ -81,6 +93,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         db: Arc<dyn RandStorage<D>>,
         bounded_executor: BoundedExecutor,
         rb_config: &ReliableBroadcastConfig,
+        rand_check_enabled: bool,
     ) -> Self {
         let rb_backoff_policy = ExponentialBackoff::from_millis(rb_config.backoff_policy_base_ms)
             .factor(rb_config.backoff_policy_factor)
@@ -126,20 +139,94 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             block_queue: BlockQueue::new(),
 
             fast_config,
+
+            rand_check_enabled,
+            pending_checks: VecDeque::new(),
+            current_has_rand_rx: None,
+            current_check_round: None,
         }
     }
 
     fn process_incoming_blocks(&mut self, blocks: OrderedBlocks) {
         let rounds: Vec<u64> = blocks.ordered_blocks.iter().map(|b| b.round()).collect();
         info!(rounds = rounds, "Processing incoming blocks.");
-        let broadcast_handles: Vec<_> = blocks
-            .ordered_blocks
-            .iter()
-            .map(|block| FullRandMetadata::from(block.block()))
-            .map(|metadata| self.process_incoming_metadata(metadata))
-            .collect();
-        let queue_item = QueueItem::new(blocks, Some(broadcast_handles));
-        self.block_queue.push_back(queue_item);
+        if self.rand_check_enabled {
+            // Queue blocks for sequential has_randomness checking.
+            // Randomness generation is deferred until the check completes.
+            for block in &blocks.ordered_blocks {
+                self.pending_checks.push_back(block.clone());
+            }
+            let queue_item = QueueItem::new(blocks, None);
+            self.block_queue.push_back(queue_item);
+            self.try_start_next_check();
+        } else {
+            // Original path: generate randomness for all blocks immediately.
+            let broadcast_handles: Vec<_> = blocks
+                .ordered_blocks
+                .iter()
+                .map(|block| FullRandMetadata::from(block.block()))
+                .map(|metadata| self.process_incoming_metadata(metadata))
+                .collect();
+            let queue_item = QueueItem::new(blocks, Some(broadcast_handles));
+            self.block_queue.push_back(queue_item);
+        }
+    }
+
+    /// Start checking the next pending block's has_randomness channel.
+    fn try_start_next_check(&mut self) {
+        if self.current_has_rand_rx.is_some() {
+            return; // already checking a block
+        }
+        if let Some(block) = self.pending_checks.pop_front() {
+            let round = block.round();
+            let has_rand_rx = block
+                .pipeline_tx()
+                .lock()
+                .as_mut()
+                .and_then(|tx| tx.has_randomness_rx.take());
+            match has_rand_rx {
+                Some(rx) => {
+                    self.current_has_rand_rx = Some(rx);
+                    self.current_check_round = Some(round);
+                },
+                None => {
+                    // No channel available (e.g., pipeline not set up); fall back to generating.
+                    self.process_block_randomness_decision(round, true);
+                    self.try_start_next_check();
+                },
+            }
+        }
+    }
+
+    /// Process the result of a has_randomness check for a block.
+    fn process_block_randomness_decision(&mut self, round: Round, needs_randomness: bool) {
+        if needs_randomness {
+            info!(round = round, "Block needs randomness, generating share.");
+            // Extract metadata first to avoid holding a borrow on self.block_queue
+            // while calling self.process_incoming_metadata().
+            let metadata = self.block_queue.item_mut(round).map(|item| {
+                let offset = item.offset(round);
+                FullRandMetadata::from(item.blocks()[offset].block())
+            });
+            if let Some(metadata) = metadata {
+                let broadcast_handle = self.process_incoming_metadata(metadata);
+                if let Some(item) = self.block_queue.item_mut(round) {
+                    item.add_broadcast_handle(broadcast_handle);
+                }
+            }
+        } else {
+            info!(round = round, "Block does not need randomness, skipping generation.");
+            // Skip randomness for this block and send None via rand_tx to unblock
+            // the pipeline execution immediately (without waiting for downstream).
+            self.block_queue.skip_randomness(round);
+            if let Some(item) = self.block_queue.item_mut(round) {
+                let offset = item.offset(round);
+                let block = &item.blocks()[offset];
+                if let Some(tx) = block.pipeline_tx().lock().as_mut() {
+                    tx.rand_tx.take().map(|tx| tx.send(None));
+                }
+            }
+        }
     }
 
     fn process_incoming_metadata(&self, metadata: FullRandMetadata) -> DropGuard {
@@ -189,6 +276,9 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         };
         self.block_queue = BlockQueue::new();
         self.rand_store.lock().reset(target_round);
+        self.pending_checks.clear();
+        self.current_has_rand_rx = None;
+        self.current_check_round = None;
         self.stop = matches!(signal, ResetSignal::Stop);
         let _ = tx.send(ResetAck::default());
     }
@@ -200,8 +290,18 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             rand = rand,
             "Processing decisioned randomness."
         );
-        if let Some(block) = self.block_queue.item_mut(randomness.round()) {
-            block.set_randomness(randomness.round(), randomness);
+        let round = randomness.round();
+        if let Some(item) = self.block_queue.item_mut(round) {
+            item.set_randomness(round, randomness.clone());
+            // Also send via rand_tx to unblock pipeline execution for intra-batch blocks
+            // that haven't been sent downstream yet.
+            if self.rand_check_enabled {
+                let offset = item.offset(round);
+                let block = &item.blocks()[offset];
+                if let Some(tx) = block.pipeline_tx().lock().as_mut() {
+                    tx.rand_tx.take().map(|tx| tx.send(Some(randomness)));
+                }
+            }
         }
     }
 
@@ -376,16 +476,33 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         let _guard = self.broadcast_aug_data().await;
         let mut interval = tokio::time::interval(Duration::from_millis(5000));
         while !self.stop {
+            // Take out the has_rand_rx before select! to avoid conflicting
+            // mutable borrows of self in multiple select! branches.
+            let mut has_rand_rx = self.current_has_rand_rx.take();
             tokio::select! {
                 Some(blocks) = incoming_blocks.next(), if self.aug_data_store.my_certified_aug_data_exists() => {
                     self.process_incoming_blocks(blocks);
                 }
                 Some(reset) = reset_rx.next() => {
                     while matches!(incoming_blocks.try_next(), Ok(Some(_))) {}
+                    has_rand_rx = None; // Discard pending check on reset
                     self.process_reset(reset);
                 }
                 Some(randomness) = self.decision_rx.next()  => {
                     self.process_randomness(randomness);
+                }
+                Some(result) = async {
+                    match has_rand_rx.as_mut() {
+                        Some(rx) => Some(rx.await),
+                        None => futures::future::pending().await,
+                    }
+                } => {
+                    has_rand_rx = None; // Consumed
+                    let round = self.current_check_round.take()
+                        .expect("current_check_round should be set when has_rand_rx fires");
+                    let needs_randomness = result.unwrap_or(true); // On channel error, fall back to generating
+                    self.process_block_randomness_decision(round, needs_randomness);
+                    self.try_start_next_check();
                 }
                 Some(request) = verified_msg_rx.next() => {
                     let RpcRequest {
@@ -465,6 +582,10 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                 _ = interval.tick().fuse() => {
                     self.observe_queue();
                 },
+            }
+            // If has_rand_rx wasn't consumed, put it back for the next iteration
+            if has_rand_rx.is_some() {
+                self.current_has_rand_rx = has_rand_rx;
             }
             let maybe_ready_blocks = self.block_queue.dequeue_rand_ready_prefix();
             if !maybe_ready_blocks.is_empty() {

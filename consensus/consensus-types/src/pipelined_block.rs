@@ -126,6 +126,7 @@ impl PipelineFutures {
 pub struct PipelineInputTx {
     pub qc_tx: Option<oneshot::Sender<Arc<QuorumCert>>>,
     pub rand_tx: Option<oneshot::Sender<Option<Randomness>>>,
+    pub has_randomness_rx: Option<oneshot::Receiver<bool>>,
     pub order_vote_tx: Option<oneshot::Sender<()>>,
     pub order_proof_tx: Option<oneshot::Sender<WrappedLedgerInfo>>,
     pub commit_proof_tx: Option<oneshot::Sender<LedgerInfoWithSignatures>>,

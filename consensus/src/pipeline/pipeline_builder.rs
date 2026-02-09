@@ -289,7 +289,9 @@ impl PipelineBuilder {
         self.pre_commit_status.clone()
     }
 
-    fn channel(abort_handles: &mut Vec<AbortHandle>) -> (PipelineInputTx, PipelineInputRx) {
+    fn channel(
+        abort_handles: &mut Vec<AbortHandle>,
+    ) -> (PipelineInputTx, PipelineInputRx, oneshot::Sender<bool>) {
         let (qc_tx, qc_rx) = oneshot::channel();
         let (rand_tx, rand_rx) = oneshot::channel();
         let (order_vote_tx, order_vote_rx) = oneshot::channel();
@@ -312,10 +314,12 @@ impl PipelineBuilder {
             Some(abort_handles),
         );
         let (secret_shared_key_tx, secret_shared_key_rx) = oneshot::channel();
+        let (has_randomness_tx, has_randomness_rx) = oneshot::channel();
         (
             PipelineInputTx {
                 qc_tx: Some(qc_tx),
                 rand_tx: Some(rand_tx),
+                has_randomness_rx: Some(has_randomness_rx),
                 order_vote_tx: Some(order_vote_tx),
                 order_proof_tx: Some(order_proof_tx),
                 commit_proof_tx: Some(commit_proof_tx),
@@ -329,6 +333,7 @@ impl PipelineBuilder {
                 commit_proof_fut,
                 secret_shared_key_rx,
             },
+            has_randomness_tx,
         )
     }
 
@@ -434,7 +439,7 @@ impl PipelineBuilder {
         observer_enabled: bool,
     ) -> (PipelineFutures, PipelineInputTx, Vec<AbortHandle>) {
         let mut abort_handles = vec![];
-        let (tx, rx) = Self::channel(&mut abort_handles);
+        let (tx, rx, has_randomness_tx) = Self::channel(&mut abort_handles);
         let PipelineInputRx {
             qc_rx,
             rand_rx,
@@ -483,6 +488,7 @@ impl PipelineBuilder {
                 self.is_randomness_enabled,
                 self.rand_check_enabled,
                 self.module_cache.clone(),
+                has_randomness_tx,
             ),
             Some(&mut abort_handles),
         );
@@ -692,6 +698,7 @@ impl PipelineBuilder {
         is_randomness_enabled: bool,
         rand_check_enabled: bool,
         module_cache: Arc<Mutex<Option<CachedModuleView<CachedStateView>>>>,
+        has_randomness_tx: oneshot::Sender<bool>,
     ) -> TaskResult<RandResult> {
         let mut tracker = Tracker::start_waiting("rand_check", &block);
         parent_block_execute_fut.await?;
@@ -699,6 +706,7 @@ impl PipelineBuilder {
 
         tracker.start_working();
         if !is_randomness_enabled {
+            let _ = has_randomness_tx.send(false);
             return Ok((None, false));
         }
         let grand_parent_id = block.quorum_cert().parent_block().id();
@@ -769,6 +777,7 @@ impl PipelineBuilder {
                 block.round()
             );
         }
+        let _ = has_randomness_tx.send(has_randomness);
         drop(tracker);
         // if rand check is enabled and no txn requires randomness, we skip waiting for randomness
         let mut tracker = Tracker::start_waiting("rand_gen", &block);

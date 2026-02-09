@@ -225,6 +225,7 @@ impl ExecutionProxyClient {
         network_sender: &Arc<NetworkSender>,
         rand_config: RandConfig,
         consensus_sk: Arc<PrivateKey>,
+        rand_check_enabled: bool,
     ) -> (
         UnboundedSender<OrderedBlocks>,
         UnboundedReceiver<OrderedBlocks>,
@@ -248,6 +249,7 @@ impl ExecutionProxyClient {
             self.rand_storage.clone(),
             self.bounded_executor.clone(),
             &self.consensus_config.rand_rb_config,
+            rand_check_enabled,
         );
 
         tokio::spawn(rand_manager.start(
@@ -407,6 +409,7 @@ impl ExecutionProxyClient {
                         &network_sender,
                         rand_config,
                         consensus_sk,
+                        onchain_consensus_config.rand_check_enabled(),
                     );
 
                 let (
@@ -445,6 +448,7 @@ impl ExecutionProxyClient {
                         &network_sender,
                         rand_config,
                         consensus_sk,
+                        onchain_consensus_config.rand_check_enabled(),
                     );
 
                 (
