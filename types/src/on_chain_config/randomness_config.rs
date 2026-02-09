@@ -8,6 +8,7 @@ use crate::{
     on_chain_config::OnChainConfig,
 };
 use anyhow::anyhow;
+use api_types;
 use fixed::types::U64F64;
 use move_core_types::value::{MoveStruct, MoveValue};
 use serde::{Deserialize, Serialize};
@@ -148,9 +149,13 @@ impl OnChainRandomnessConfig {
                 .and_then(|onchain_raw| OnChainRandomnessConfig::try_from(onchain_raw).ok())
                 .unwrap_or_else({
                     #[cfg(not(feature = "randomness_disabled"))]
-                    { OnChainRandomnessConfig::default_for_genesis }
+                    {
+                        OnChainRandomnessConfig::default_for_genesis
+                    }
                     #[cfg(feature = "randomness_disabled")]
-                    { OnChainRandomnessConfig::default_if_missing }
+                    {
+                        OnChainRandomnessConfig::default_if_missing
+                    }
                 })
         }
     }
@@ -251,6 +256,53 @@ impl OnChainRandomnessConfig {
 impl OnChainConfig for RandomnessConfigMoveStruct {
     const MODULE_IDENTIFIER: &'static str = "randomness_config";
     const TYPE_IDENTIFIER: &'static str = "RandomnessConfig";
+
+    fn deserialize_into_config(bytes: &[u8]) -> anyhow::Result<Self> {
+        // Fallback: try deserializing as flat api_types::RandomnessConfigData (from grevm-reth)
+        // and convert to RandomnessConfigMoveStruct with full FixedPoint64 precision
+        let api_config =
+            bcs::from_bytes::<api_types::on_chain_config::dkg::RandomnessConfigData>(bytes)
+                .map_err(|e| {
+                    anyhow::format_err!(
+                        "[on-chain config] Failed to deserialize RandomnessConfigData: {}",
+                        e
+                    )
+                })?;
+
+        let on_chain_config = match api_config.variant {
+            api_types::on_chain_config::dkg::ConfigVariant::V1 => {
+                OnChainRandomnessConfig::V1(ConfigV1 {
+                    secrecy_threshold: FixedPoint64MoveStruct::from_u64f64(
+                        fixed::types::U64F64::from_bits(api_config.configV1.secrecyThreshold.value),
+                    ),
+                    reconstruction_threshold: FixedPoint64MoveStruct::from_u64f64(
+                        fixed::types::U64F64::from_bits(
+                            api_config.configV1.reconstructionThreshold.value,
+                        ),
+                    ),
+                })
+            },
+            api_types::on_chain_config::dkg::ConfigVariant::V2 => {
+                OnChainRandomnessConfig::V2(ConfigV2 {
+                    secrecy_threshold: FixedPoint64MoveStruct::from_u64f64(
+                        fixed::types::U64F64::from_bits(api_config.configV2.secrecyThreshold.value),
+                    ),
+                    reconstruction_threshold: FixedPoint64MoveStruct::from_u64f64(
+                        fixed::types::U64F64::from_bits(
+                            api_config.configV2.reconstructionThreshold.value,
+                        ),
+                    ),
+                    fast_path_secrecy_threshold: FixedPoint64MoveStruct::from_u64f64(
+                        fixed::types::U64F64::from_bits(
+                            api_config.configV2.fastPathSecrecyThreshold.value,
+                        ),
+                    ),
+                })
+            },
+        };
+
+        Ok(RandomnessConfigMoveStruct::from(on_chain_config))
+    }
 }
 
 impl AsMoveValue for RandomnessConfigMoveStruct {

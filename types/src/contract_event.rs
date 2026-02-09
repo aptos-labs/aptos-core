@@ -529,26 +529,9 @@ impl TryFrom<&GravityEvent> for ContractEvent {
             },
             GravityEvent::DKG(dkg) => {
                 let data = DKGStartEvent {
-                    session_metadata: crate::dkg::DKGSessionMetadata {
-                        dealer_epoch: dkg.session_metadata.dealer_epoch,
-                        randomness_config:
-                            crate::on_chain_config::OnChainRandomnessConfig::default_enabled()
-                                .into(),
-                        dealer_validator_set: dkg
-                            .session_metadata
-                            .dealer_validator_set
-                            .clone()
-                            .into_iter()
-                            .map(|v| convert_validator_consensus_info(&v).map(|info| info.into()))
-                            .collect::<Result<Vec<_>, _>>()?,
-                        target_validator_set: dkg
-                            .session_metadata
-                            .target_validator_set
-                            .clone()
-                            .into_iter()
-                            .map(|v| convert_validator_consensus_info(&v).map(|info| info.into()))
-                            .collect::<Result<Vec<_>, _>>()?,
-                    },
+                    session_metadata: crate::dkg::DKGSessionMetadata::from_api_types(
+                        dkg.session_metadata.clone(),
+                    )?,
                     start_time_us: dkg.start_time_us,
                 };
                 Ok(ContractEvent::V2(ContractEventV2::new(

@@ -305,6 +305,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
             epoch = self.epoch_state.epoch,
             my_addr = self.my_addr,
             secs_since_dkg_start = secs_since_dkg_start,
+            randomness_config = dkg_session_metadata.randomness_config,
             "[DKG] Deal transcript started.",
         );
         let public_params = DKG::new_public_params(dkg_session_metadata);

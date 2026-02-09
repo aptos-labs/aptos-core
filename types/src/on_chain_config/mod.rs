@@ -30,7 +30,7 @@ mod execution_config;
 mod gas_schedule;
 mod jwk_consensus_config;
 pub mod randomness_api_v0_config;
-mod randomness_config;
+pub(crate) mod randomness_config;
 mod timed_features;
 mod timestamp;
 mod transaction_fee;

@@ -173,9 +173,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         //     .unwrap_or_else(|_| RandomnessConfigSeqNum::default_if_missing());
         let onchain_randomness_config_seq_num = RandomnessConfigSeqNum { seq_num: 0 };
 
-        // TODO(gravity_lightman_dkg): payload get randomness config
-        // let randomness_config_move_struct = payload.get::<RandomnessConfigMoveStruct>();
-        let randomness_config_move_struct = OnChainRandomnessConfig::default_enabled().try_into();
+        let randomness_config_move_struct = payload.get::<RandomnessConfigMoveStruct>();
 
         info!(
             epoch = epoch_state.epoch,
