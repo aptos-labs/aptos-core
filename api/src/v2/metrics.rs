@@ -14,8 +14,8 @@ use once_cell::sync::Lazy;
 
 /// Sub-millisecond histogram buckets, matching the v1 API pattern.
 const LATENCY_BUCKETS: &[f64] = &[
-    0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.125, 0.15, 0.2,
-    0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
+    0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.125, 0.15, 0.2, 0.25,
+    0.5, 1.0, 2.5, 5.0, 10.0,
 ];
 
 /// Request duration histogram, labeled by method, path pattern, and status code.
@@ -74,6 +74,16 @@ pub static BATCH_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
         "Number of requests in each batch call",
         &[],
         vec![1.0, 2.0, 5.0, 10.0, 15.0, 20.0]
+    )
+    .unwrap()
+});
+
+/// Total number of requests that timed out.
+pub static REQUEST_TIMEOUTS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_api_v2_request_timeouts_total",
+        "Total V2 API requests that timed out",
+        &["method", "path"]
     )
     .unwrap()
 });

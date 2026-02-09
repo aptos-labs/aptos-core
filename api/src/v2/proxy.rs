@@ -49,10 +49,7 @@ impl V1Proxy {
         parts.uri = match new_uri.parse() {
             Ok(uri) => uri,
             Err(e) => {
-                return (
-                    StatusCode::BAD_REQUEST,
-                    format!("Invalid proxy URI: {}", e),
-                )
+                return (StatusCode::BAD_REQUEST, format!("Invalid proxy URI: {}", e))
                     .into_response();
             },
         };

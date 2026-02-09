@@ -1,5 +1,11 @@
 # V2 Design: Structured Error Model
 
+> **Status: Implemented.** The final implementation follows this design closely with these additions:
+>
+> - **`RequestTimeout` error code** (HTTP 408) for the request timeout middleware
+> - **`SseDisabled` error code** (HTTP 501) for when SSE is disabled
+> - **`request_timeout()` constructor** on V2Error for timeout errors
+
 ## Overview
 
 The v1 API uses Poem's macro-generated error types (`generate_error_response!`,
@@ -217,6 +223,16 @@ pub enum ErrorCode {
 
     /// Gas estimation failed.
     GasEstimationFailed,
+
+    // --- Timeout ---
+
+    /// The request exceeded the configured timeout.
+    RequestTimeout,
+
+    // --- SSE ---
+
+    /// Server-Sent Events support is disabled on this node.
+    SseDisabled,
 }
 ```
 

@@ -216,6 +216,9 @@ pub struct ApiV2Config {
     pub websocket_max_connections: usize,
     /// Maximum subscriptions per WebSocket connection.
     pub websocket_max_subscriptions_per_conn: usize,
+    /// Enables Server-Sent Events (SSE) endpoints on v2.
+    #[serde(default = "default_enabled")]
+    pub sse_enabled: bool,
     /// Enables HTTP/2 (h2c) support.
     #[serde(default = "default_enabled")]
     pub http2_enabled: bool,
@@ -229,6 +232,13 @@ pub struct ApiV2Config {
     pub max_runtime_workers: Option<usize>,
     /// Worker thread multiplier (used if max_runtime_workers is None).
     pub runtime_worker_multiplier: usize,
+    /// Per-request timeout in milliseconds. Requests exceeding this duration
+    /// receive a 408 Request Timeout response. Set to 0 to disable.
+    pub request_timeout_ms: u64,
+    /// Timeout (in milliseconds) for draining in-flight connections during
+    /// graceful shutdown. After this period, remaining connections are
+    /// forcibly closed. Set to 0 to shut down immediately.
+    pub graceful_shutdown_timeout_ms: u64,
     /// Path to PEM-encoded TLS certificate for HTTPS. Both `tls_cert_path` and
     /// `tls_key_path` must be set to enable TLS. When TLS is enabled, ALPN
     /// negotiation supports both `h2` and `http/1.1`.
@@ -245,6 +255,7 @@ impl Default for ApiV2Config {
             enabled: default_disabled(),
             address: None,
             websocket_enabled: default_enabled(),
+            sse_enabled: default_enabled(),
             websocket_max_connections: 1000,
             websocket_max_subscriptions_per_conn: 10,
             http2_enabled: default_enabled(),
@@ -252,6 +263,8 @@ impl Default for ApiV2Config {
             content_length_limit: None,
             max_runtime_workers: None,
             runtime_worker_multiplier: 2,
+            request_timeout_ms: 30_000,
+            graceful_shutdown_timeout_ms: 30_000,
             tls_cert_path: None,
             tls_key_path: None,
         }

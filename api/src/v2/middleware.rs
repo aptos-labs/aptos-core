@@ -6,14 +6,14 @@
 //! Provides logging/metrics, request ID, size limiting, CORS, and compression.
 //! Phase 3: adds Prometheus metrics (request count, latency, in-flight gauge).
 
-use super::metrics;
+use super::{error::V2Error, metrics};
 use axum::{
     extract::Request,
     http::{header, HeaderValue, Method},
     middleware::Next,
-    response::Response,
+    response::{IntoResponse, Response},
 };
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use uuid::Uuid;
 
 /// Middleware that attaches a unique request ID to every response.
@@ -87,16 +87,24 @@ fn normalize_path(path: &str) -> String {
 
         let replacement = match prev {
             "accounts" => Some(":address"),
-            "blocks" if *part != "latest" => Some(":height"),
-            "transactions" if part.starts_with("0x") || part.len() == 64 => Some(":hash"),
+            "blocks" if *part != "latest" && *part != "by_version" => Some(":height"),
+            "by_version" => Some(":version"),
+            "tables" => Some(":table_handle"),
+            "transactions"
+                if part.starts_with("0x")
+                    || (part.len() == 64 && part.chars().all(|c| c.is_ascii_hexdigit())) =>
+            {
+                Some(":hash")
+            },
+            "balance" => Some(":asset_type"),
             "events" => Some(":creation_number"),
             "module" => Some(":module_name"),
             "resource" => Some(":resource_type"),
             _ => {
                 // Also catch standalone hex addresses and numeric IDs.
-                if part.starts_with("0x") && part.len() > 6 {
-                    Some(":param")
-                } else if part.chars().all(|c| c.is_ascii_digit()) && part.len() > 2 {
+                if (part.starts_with("0x") && part.len() > 6)
+                    || (part.chars().all(|c| c.is_ascii_digit()) && part.len() > 2)
+                {
                     Some(":param")
                 } else {
                     None
@@ -110,6 +118,32 @@ fn normalize_path(path: &str) -> String {
     normalized.join("/")
 }
 
+/// Middleware that enforces a per-request timeout.
+///
+/// If the downstream handler does not complete within `timeout_ms` milliseconds,
+/// a 408 Request Timeout response is returned. A value of 0 disables the timeout.
+///
+/// This is applied inside the logging layer so that timeouts are always recorded
+/// in metrics and logs.
+pub async fn timeout_layer(timeout_ms: u64, req: Request, next: Next) -> Response {
+    if timeout_ms == 0 {
+        return next.run(req).await;
+    }
+
+    let method = req.method().clone();
+    let path = normalize_path(req.uri().path());
+
+    match tokio::time::timeout(Duration::from_millis(timeout_ms), next.run(req)).await {
+        Ok(response) => response,
+        Err(_) => {
+            metrics::REQUEST_TIMEOUTS
+                .with_label_values(&[method.as_str(), &path])
+                .inc();
+            V2Error::request_timeout(timeout_ms).into_response()
+        },
+    }
+}
+
 /// Build the CORS layer for v2.
 pub fn cors_layer() -> tower_http::cors::CorsLayer {
     tower_http::cors::CorsLayer::new()
@@ -121,11 +155,7 @@ pub fn cors_layer() -> tower_http::cors::CorsLayer {
             Method::DELETE,
             Method::OPTIONS,
         ])
-        .allow_headers([
-            header::CONTENT_TYPE,
-            header::ACCEPT,
-            header::AUTHORIZATION,
-        ])
+        .allow_headers([header::CONTENT_TYPE, header::ACCEPT, header::AUTHORIZATION])
         .expose_headers([header::HeaderName::from_static("x-request-id")])
         .max_age(std::time::Duration::from_secs(3600))
 }
@@ -158,14 +188,8 @@ mod tests {
 
     #[test]
     fn test_normalize_path_blocks() {
-        assert_eq!(
-            normalize_path("/v2/blocks/latest"),
-            "/v2/blocks/latest"
-        );
-        assert_eq!(
-            normalize_path("/v2/blocks/12345"),
-            "/v2/blocks/:height"
-        );
+        assert_eq!(normalize_path("/v2/blocks/latest"), "/v2/blocks/latest");
+        assert_eq!(normalize_path("/v2/blocks/12345"), "/v2/blocks/:height");
     }
 
     #[test]
@@ -174,10 +198,7 @@ mod tests {
             normalize_path("/v2/transactions/0xdeadbeef1234567890abcdef1234567890abcdef1234567890abcdef12345678"),
             "/v2/transactions/:hash"
         );
-        assert_eq!(
-            normalize_path("/v2/transactions"),
-            "/v2/transactions"
-        );
+        assert_eq!(normalize_path("/v2/transactions"), "/v2/transactions");
     }
 
     #[test]

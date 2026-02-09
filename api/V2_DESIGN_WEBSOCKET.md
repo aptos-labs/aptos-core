@@ -1,5 +1,13 @@
 # V2 Design: WebSocket Support
 
+> **Status: Implemented.** The final implementation follows this design closely with these additions:
+>
+> - **Advanced event filtering**: `EventFilter` struct with exact match, module wildcard (`0x1::coin::*`), address wildcard (`0x1::*`), multiple types (OR logic via `event_types[]`), sender address filtering, and `start_version` floor. Zero-alloc per-event matching.
+> - **Adaptive polling**: Block poller poll interval auto-adjusts (20ms–500ms) based on block arrival rate
+> - **SSE integration**: Block poller is shared between WebSocket and SSE — starts when either is enabled
+> - **Graceful shutdown**: Broadcaster exits cleanly on shutdown signal via `watch` channel
+> - **BCS → JSON event data**: Broadcaster converts event BCS data to JSON via `MoveConverter`
+
 ## Overview
 
 The v2 API provides a WebSocket endpoint at `/v2/ws` for real-time push notifications.

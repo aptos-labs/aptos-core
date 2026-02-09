@@ -47,7 +47,8 @@ pub async fn get_resources_handler(
         let (resources, next_cursor) =
             ctx.get_resources_paginated(address, cursor.as_ref(), version)?;
 
-        let converter = state_view.as_converter(ctx.inner().db.clone(), ctx.inner().indexer_reader.clone());
+        let converter =
+            state_view.as_converter(ctx.inner().db.clone(), ctx.inner().indexer_reader.clone());
 
         let move_resources: Vec<MoveResource> = resources
             .into_iter()
@@ -89,7 +90,8 @@ pub async fn get_resource_handler(
         let tag = parse_struct_tag(&resource_type)?;
         let (ledger_info, _version, state_view) = ctx.state_view_at(params.ledger_version)?;
 
-        let converter = state_view.as_converter(ctx.inner().db.clone(), ctx.inner().indexer_reader.clone());
+        let converter =
+            state_view.as_converter(ctx.inner().db.clone(), ctx.inner().indexer_reader.clone());
 
         let api_address: aptos_api_types::Address = address.into();
         let bytes = converter
@@ -114,7 +116,9 @@ pub async fn get_resource_handler(
 fn parse_address(s: &str) -> Result<AccountAddress, V2Error> {
     AccountAddress::from_hex_literal(s)
         .or_else(|_| AccountAddress::from_hex(s))
-        .map_err(|e| V2Error::bad_request(ErrorCode::InvalidInput, format!("Invalid address: {}", e)))
+        .map_err(|e| {
+            V2Error::bad_request(ErrorCode::InvalidInput, format!("Invalid address: {}", e))
+        })
 }
 
 fn parse_struct_tag(s: &str) -> Result<move_core_types::language_storage::StructTag, V2Error> {

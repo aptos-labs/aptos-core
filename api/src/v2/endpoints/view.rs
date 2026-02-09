@@ -39,9 +39,9 @@ pub async fn view_handler(
         let converter =
             state_view.as_converter(ctx.inner().db.clone(), ctx.inner().indexer_reader.clone());
 
-        let view_function = converter.convert_view_function(request).map_err(|e| {
-            V2Error::bad_request(ErrorCode::InvalidInput, e.to_string())
-        })?;
+        let view_function = converter
+            .convert_view_function(request)
+            .map_err(|e| V2Error::bad_request(ErrorCode::InvalidInput, e.to_string()))?;
 
         let output = aptos_vm::AptosVM::execute_view_function(
             &state_view,
@@ -74,7 +74,7 @@ pub async fn view_handler(
             .zip(return_types.into_iter())
             .map(|(v, ty)| {
                 let move_val = converter.try_into_move_value(&ty, &v)?;
-                Ok(move_val.json()?)
+                move_val.json()
             })
             .collect::<anyhow::Result<Vec<_>>>()
             .map_err(V2Error::internal)?;

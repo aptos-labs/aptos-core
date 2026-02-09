@@ -14,18 +14,13 @@ use aptos_api_types::LedgerInfo;
 use aptos_config::config::ApiV2Config;
 use aptos_storage_interface::state_store::state_view::db_state_view::DbStateView;
 use aptos_types::{
-    account_address::AccountAddress,
-    contract_event::EventWithVersion,
-    event::EventKey,
+    account_address::AccountAddress, contract_event::EventWithVersion, event::EventKey,
     transaction::Version,
 };
 use move_core_types::language_storage::{ModuleId, StructTag};
-use std::sync::{
-    atomic::AtomicUsize,
-    Arc,
-};
+use std::sync::{atomic::AtomicUsize, Arc};
 use std::time::Instant;
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::{broadcast, watch, RwLock};
 
 /// Default TTL for cached ledger info (in milliseconds).
 /// Ledger info changes every block (~250ms on mainnet), so 50ms TTL
@@ -56,6 +51,12 @@ pub struct V2Context {
     /// TTL-cached ledger info. Under high QPS, many concurrent requests
     /// within the same ~50ms window share a single DB read.
     ledger_info_cache: Arc<RwLock<Option<CachedLedgerInfo>>>,
+    /// Shutdown signal sender. Sending `true` triggers graceful shutdown
+    /// of the server and all background tasks.
+    shutdown_tx: Arc<watch::Sender<bool>>,
+    /// Shutdown signal receiver. Clone this for each consumer that needs
+    /// to be notified of shutdown.
+    shutdown_rx: watch::Receiver<bool>,
 }
 
 /// v2-specific configuration parsed at startup.
@@ -63,6 +64,7 @@ pub struct V2Context {
 pub struct V2Config {
     pub enabled: bool,
     pub websocket_enabled: bool,
+    pub sse_enabled: bool,
     pub websocket_max_connections: usize,
     pub websocket_max_subscriptions_per_conn: usize,
     pub http2_enabled: bool,
@@ -75,6 +77,8 @@ pub struct V2Config {
     pub max_events_page_size: u16,
     pub wait_by_hash_timeout_ms: u64,
     pub wait_by_hash_poll_interval_ms: u64,
+    pub request_timeout_ms: u64,
+    pub graceful_shutdown_timeout_ms: u64,
 }
 
 impl V2Config {
@@ -82,6 +86,7 @@ impl V2Config {
         V2Config {
             enabled: v2.enabled,
             websocket_enabled: v2.websocket_enabled,
+            sse_enabled: v2.sse_enabled,
             websocket_max_connections: v2.websocket_max_connections,
             websocket_max_subscriptions_per_conn: v2.websocket_max_subscriptions_per_conn,
             http2_enabled: v2.http2_enabled,
@@ -96,6 +101,8 @@ impl V2Config {
             max_events_page_size: api.max_events_page_size,
             wait_by_hash_timeout_ms: api.wait_by_hash_timeout_ms,
             wait_by_hash_poll_interval_ms: api.wait_by_hash_poll_interval_ms,
+            request_timeout_ms: v2.request_timeout_ms,
+            graceful_shutdown_timeout_ms: v2.graceful_shutdown_timeout_ms,
         }
     }
 }
@@ -103,12 +110,15 @@ impl V2Config {
 impl V2Context {
     pub fn new(inner: Context, v2_config: V2Config) -> Self {
         let (ws_broadcaster, _) = broadcaster::create_broadcast_channel();
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
         Self {
             inner: Arc::new(inner),
             v2_config: Arc::new(v2_config),
             ws_broadcaster,
             ws_active_connections: Arc::new(AtomicUsize::new(0)),
             ledger_info_cache: Arc::new(RwLock::new(None)),
+            shutdown_tx: Arc::new(shutdown_tx),
+            shutdown_rx,
         }
     }
 
@@ -130,6 +140,22 @@ impl V2Context {
     /// Get the active WebSocket connection counter.
     pub fn ws_active_connections(&self) -> &AtomicUsize {
         &self.ws_active_connections
+    }
+
+    /// Trigger graceful shutdown of the v2 API server and all background tasks.
+    pub fn trigger_shutdown(&self) {
+        let _ = self.shutdown_tx.send(true);
+    }
+
+    /// Clone the shutdown receiver for passing to background tasks or servers.
+    pub fn shutdown_receiver(&self) -> watch::Receiver<bool> {
+        self.shutdown_rx.clone()
+    }
+
+    /// Returns a future that resolves when shutdown is requested.
+    pub async fn shutdown_signal(&self) {
+        let mut rx = self.shutdown_rx.clone();
+        let _ = rx.wait_for(|&v| v).await;
     }
 
     // --- Core accessors (v2 error conversion) ---

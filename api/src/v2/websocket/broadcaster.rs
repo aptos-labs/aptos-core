@@ -40,13 +40,21 @@ pub fn create_broadcast_channel() -> (broadcast::Sender<WsEvent>, broadcast::Rec
 /// Background task that polls the DB for new committed blocks and
 /// broadcasts events to all connected WebSocket clients.
 ///
-/// This task runs for the lifetime of the v2 API server.
+/// This task runs until the v2 API server receives a shutdown signal.
 pub async fn run_block_poller(ctx: V2Context, ws_tx: broadcast::Sender<WsEvent>) {
     let mut last_known_height: Option<u64> = None;
     let mut poll_interval_ms = POLL_INTERVAL_INITIAL_MS;
+    let mut shutdown_rx = ctx.shutdown_receiver();
 
     loop {
-        tokio::time::sleep(Duration::from_millis(poll_interval_ms)).await;
+        // Race the poll interval against the shutdown signal.
+        tokio::select! {
+            _ = tokio::time::sleep(Duration::from_millis(poll_interval_ms)) => {}
+            _ = shutdown_rx.wait_for(|&v| v) => {
+                debug!("WebSocket block poller received shutdown signal, exiting");
+                return;
+            }
+        }
 
         // Skip if nobody is listening (also back off to max interval).
         if ws_tx.receiver_count() == 0 {
@@ -65,8 +73,8 @@ pub async fn run_block_poller(ctx: V2Context, ws_tx: broadcast::Sender<WsEvent>)
         let start_height = match last_known_height {
             Some(h) if h >= current_height => {
                 // No new blocks: increase poll interval (back off).
-                poll_interval_ms =
-                    ((poll_interval_ms as f64 * POLL_ADAPT_FACTOR) as u64).min(POLL_INTERVAL_MAX_MS);
+                poll_interval_ms = ((poll_interval_ms as f64 * POLL_ADAPT_FACTOR) as u64)
+                    .min(POLL_INTERVAL_MAX_MS);
                 continue;
             },
             Some(h) => h + 1,
@@ -99,7 +107,13 @@ pub async fn run_block_poller(ctx: V2Context, ws_tx: broadcast::Sender<WsEvent>)
                     });
 
                     // Also broadcast events from this block's transactions.
-                    emit_block_events(&ctx, first_version, last_version, ledger_info.version(), &ws_tx);
+                    emit_block_events(
+                        &ctx,
+                        first_version,
+                        last_version,
+                        ledger_info.version(),
+                        &ws_tx,
+                    );
                 },
                 Err(e) => {
                     debug!("Block {} not found during WS poll: {}", height, e);
@@ -135,16 +149,16 @@ fn emit_block_events(
     // Try to get a MoveConverter for JSON event data conversion.
     // If this fails, we'll fall back to null data.
     let state_view = ctx.inner().latest_state_view().ok();
-    let converter = state_view.as_ref().map(|sv| {
-        sv.as_converter(ctx.inner().db.clone(), ctx.inner().indexer_reader.clone())
-    });
+    let converter = state_view
+        .as_ref()
+        .map(|sv| sv.as_converter(ctx.inner().db.clone(), ctx.inner().indexer_reader.clone()));
 
     for txn in txns {
         // Extract sender address from user transactions.
         let sender = txn
             .transaction
             .try_as_signed_user_txn()
-            .map(|user_txn| format!("0x{}", user_txn.sender()));
+            .map(|user_txn| format!("{}", user_txn.sender()));
 
         let events: Vec<(u64, String, serde_json::Value)> = txn
             .events

@@ -459,10 +459,7 @@ fn bench_v1_vs_v2_single_resource(c: &mut Criterion) {
     group.bench_function("v1", |b| {
         b.to_async(&rt).iter(|| {
             let client = client.clone();
-            let url = format!(
-                "{}/v1/accounts/0x1/resource/0x1::account::Account",
-                v1_url
-            );
+            let url = format!("{}/v1/accounts/0x1/resource/0x1::account::Account", v1_url);
             async move {
                 let resp = client.get(&url).send().await.unwrap();
                 assert_eq!(resp.status(), 200);
@@ -474,10 +471,7 @@ fn bench_v1_vs_v2_single_resource(c: &mut Criterion) {
     group.bench_function("v2", |b| {
         b.to_async(&rt).iter(|| {
             let client = client.clone();
-            let url = format!(
-                "{}/v2/accounts/0x1/resource/0x1::account::Account",
-                v2_url
-            );
+            let url = format!("{}/v2/accounts/0x1/resource/0x1::account::Account", v2_url);
             async move {
                 let resp = client.get(&url).send().await.unwrap();
                 assert_eq!(resp.status(), 200);

@@ -3,7 +3,7 @@
 
 use crate::v2::{
     context::{spawn_blocking, V2Context},
-    error::V2Error,
+    error::{ErrorCode, V2Error},
     types::{BlockParams, V2Response},
 };
 use aptos_api_types::{AsConverter, Block};
@@ -59,6 +59,54 @@ pub async fn get_latest_block_handler(
         let ledger_info = ctx.ledger_info()?;
         let block_height: u64 = ledger_info.block_height.into();
         let (bcs_block, ledger_info) = ctx.get_block_by_height(block_height, false)?;
+        let block = render_block(&ctx, &ledger_info, bcs_block)?;
+        Ok(Json(V2Response::new(block, &ledger_info)))
+    })
+    .await
+}
+
+/// GET /v2/blocks/by_version/:version -- get the block containing a specific version.
+#[utoipa::path(
+    get,
+    path = "/v2/blocks/by_version/{version}",
+    tag = "Blocks",
+    params(
+        ("version" = u64, Path, description = "Transaction version"),
+        BlockParams,
+    ),
+    responses(
+        (status = 200, description = "Block containing the version", body = Object),
+        (status = 404, description = "Block not found", body = V2Error),
+        (status = 410, description = "Version pruned", body = V2Error),
+    )
+)]
+pub async fn get_block_by_version_handler(
+    State(ctx): State<V2Context>,
+    Path(version): Path<u64>,
+    Query(params): Query<BlockParams>,
+) -> Result<Json<V2Response<Block>>, V2Error> {
+    let ctx = ctx.clone();
+    spawn_blocking(move || {
+        let with_txns = params.with_transactions.unwrap_or(false);
+        let ledger_info = ctx.ledger_info()?;
+
+        let bcs_block = ctx
+            .inner()
+            .get_block_by_version::<crate::response::BasicErrorWith404>(
+                version,
+                &ledger_info,
+                with_txns,
+            )
+            .map_err(|e| {
+                // Map the v1 error to v2 error
+                let msg = format!("{}", e);
+                if msg.contains("pruned") {
+                    V2Error::gone(ErrorCode::VersionPruned, msg)
+                } else {
+                    V2Error::not_found(ErrorCode::BlockNotFound, msg)
+                }
+            })?;
+
         let block = render_block(&ctx, &ledger_info, bcs_block)?;
         Ok(Json(V2Response::new(block, &ledger_info)))
     })

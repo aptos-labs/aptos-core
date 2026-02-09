@@ -168,7 +168,7 @@ pub async fn submit_transaction_handler(
         let ledger_info = ctx.ledger_info()?;
         Ok(Json(V2Response::new(
             SubmitResult {
-                hash: format!("0x{}", hash),
+                hash: hash.to_hex_literal(),
                 status: "accepted".to_string(),
             },
             &ledger_info,
@@ -224,8 +224,8 @@ pub async fn wait_transaction_handler(
         match result {
             Some(txn_data) => {
                 let ctx_clone = ctx.clone();
-                let txn = spawn_blocking(move || render_single_transaction(&ctx_clone, txn_data))
-                    .await?;
+                let txn =
+                    spawn_blocking(move || render_single_transaction(&ctx_clone, txn_data)).await?;
                 let ledger_info = ctx.ledger_info()?;
                 return Ok(Json(V2Response::new(txn, &ledger_info)));
             },
@@ -245,6 +245,60 @@ pub async fn wait_transaction_handler(
     }
 }
 
+/// GET /v2/transactions/by_version/:version
+#[utoipa::path(
+    get,
+    path = "/v2/transactions/by_version/{version}",
+    tag = "Transactions",
+    params(("version" = u64, Path, description = "Transaction version number")),
+    responses(
+        (status = 200, description = "Transaction details", body = Object),
+        (status = 404, description = "Transaction not found", body = V2Error),
+        (status = 410, description = "Version pruned", body = V2Error),
+    )
+)]
+pub async fn get_transaction_by_version_handler(
+    State(ctx): State<V2Context>,
+    Path(version): Path<u64>,
+) -> Result<Json<V2Response<Transaction>>, V2Error> {
+    let ctx = ctx.clone();
+    spawn_blocking(move || {
+        let ledger_info = ctx.ledger_info()?;
+        let ledger_version = ledger_info.version();
+
+        if version > ledger_version {
+            return Err(V2Error::not_found(
+                ErrorCode::VersionNotFound,
+                format!(
+                    "Transaction version {} not found (latest: {})",
+                    version, ledger_version
+                ),
+            ));
+        }
+
+        let oldest = ledger_info.oldest_version();
+        if version < oldest {
+            return Err(V2Error::gone(
+                ErrorCode::VersionPruned,
+                format!(
+                    "Transaction version {} has been pruned (oldest: {})",
+                    version, oldest
+                ),
+            ));
+        }
+
+        let txn_data = ctx
+            .inner()
+            .get_transaction_by_version(version, ledger_version)
+            .map_err(V2Error::internal)?;
+
+        let txn = render_single_transaction(&ctx, txn_data)?;
+        Ok(Json(V2Response::new(txn, &ledger_info)))
+    })
+    .await
+}
+
+#[allow(clippy::result_large_err)]
 fn parse_hash(s: &str) -> Result<HashValue, V2Error> {
     let s = s.strip_prefix("0x").unwrap_or(s);
     HashValue::from_hex(s).map_err(|e| {

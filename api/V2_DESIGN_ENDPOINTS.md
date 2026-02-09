@@ -1,5 +1,11 @@
 # V2 Design: Endpoints & Request/Response Model
 
+> **Status: Implemented.** The final implementation follows this design closely with these additions:
+>
+> - **Additional endpoints** beyond the initial Phase 1 scope: account info, gas estimation, simulation, table items, transaction by version, block by version, balance, SSE streams
+> - **Request timeout middleware** (configurable, default 30s, returns 408)
+> - **28 total endpoints** (see scratchpad for full inventory)
+
 ## Overview
 
 This document details the v2 endpoint handler patterns, the request/response serialization
@@ -411,24 +417,34 @@ where
 
 | Endpoint | Method | Input | Output | Paginated | Phase |
 |---|---|---|---|---|---|
-| `/v2/health` | GET | - | JSON | No | Phase 1 |
-| `/v2/info` | GET | - | JSON | No | Phase 1 |
-| `/v2/accounts/:addr/resources` | GET | query params | JSON | Yes (StateKey cursor) | Phase 1 |
-| `/v2/accounts/:addr/resource/:type` | GET | query params | JSON | No | Phase 1 |
-| `/v2/accounts/:addr/modules` | GET | query params | JSON | Yes (StateKey cursor) | Phase 1 |
-| `/v2/accounts/:addr/module/:name` | GET | query params | JSON | No | Phase 1 |
-| `/v2/transactions` | GET | query params | JSON | Yes (version cursor) | Phase 1 |
-| `/v2/transactions` | POST | BCS only | JSON | No | Phase 1 |
-| `/v2/transactions/:hash` | GET | - | JSON | No | Phase 1 |
-| `/v2/transactions/:hash/wait` | GET | - | JSON | No | Phase 1 |
-| `/v2/accounts/:addr/transactions` | GET | query params | JSON | Yes (version cursor) | Phase 1 |
-| `/v2/accounts/:addr/events/:creation_number` | GET | query params | JSON | Yes (seq number cursor) | Phase 1 |
-| `/v2/view` | POST | JSON or BCS | JSON | No | Phase 1 |
-| `/v2/blocks/:height` | GET | query params | JSON | No | Phase 1 |
-| `/v2/blocks/latest` | GET | - | JSON | No | Phase 1 |
-| `/v2/batch` | POST | JSON-RPC 2.0 | JSON | N/A | Phase 1 |
-| `/v2/ws` | GET | WebSocket upgrade | JSON frames | N/A | Phase 1 |
-| `/v2/spec.json` | GET | - | JSON | No | Phase 1 |
+| `/v2/health` | GET | - | JSON | No | 1 |
+| `/v2/info` | GET | - | JSON | No | 1 |
+| `/v2/accounts/:addr` | GET | query params | JSON | No | 4 |
+| `/v2/accounts/:addr/resources` | GET | query params | JSON | Yes (StateKey cursor) | 1 |
+| `/v2/accounts/:addr/resource/:type` | GET | query params | JSON | No | 1 |
+| `/v2/accounts/:addr/modules` | GET | query params | JSON | Yes (StateKey cursor) | 1 |
+| `/v2/accounts/:addr/module/:name` | GET | query params | JSON | No | 1 |
+| `/v2/accounts/:addr/balance/:asset` | GET | query params | JSON | No | 4 |
+| `/v2/accounts/:addr/transactions` | GET | query params | JSON | Yes (version cursor) | 1 |
+| `/v2/accounts/:addr/events/:cn` | GET | query params | JSON | Yes (seq cursor) | 1 |
+| `/v2/transactions` | GET | query params | JSON | Yes (version cursor) | 1 |
+| `/v2/transactions` | POST | BCS only | JSON | No | 1 |
+| `/v2/transactions/:hash` | GET | - | JSON | No | 1 |
+| `/v2/transactions/:hash/wait` | GET | - | JSON | No | 1 |
+| `/v2/transactions/simulate` | POST | BCS only | JSON | No | 4 |
+| `/v2/transactions/by_version/:ver` | GET | - | JSON | No | 4 |
+| `/v2/view` | POST | JSON or BCS | JSON | No | 1 |
+| `/v2/blocks/:height` | GET | query params | JSON | No | 1 |
+| `/v2/blocks/latest` | GET | - | JSON | No | 1 |
+| `/v2/blocks/by_version/:ver` | GET | query params | JSON | No | 4 |
+| `/v2/estimate_gas_price` | GET | - | JSON | No | 4 |
+| `/v2/tables/:handle/item` | POST | JSON | JSON | No | 4 |
+| `/v2/batch` | POST | JSON-RPC 2.0 | JSON | N/A | 1 |
+| `/v2/ws` | GET | WebSocket upgrade | JSON frames | N/A | 1 |
+| `/v2/sse/blocks` | GET | query params | SSE stream | N/A | 4 |
+| `/v2/sse/events` | GET | query params | SSE stream | N/A | 4 |
+| `/v2/spec.json` | GET | - | JSON | No | 1 |
+| `/v2/spec.yaml` | GET | - | YAML | No | 1 |
 
 ---
 

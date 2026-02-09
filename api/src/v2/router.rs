@@ -6,9 +6,11 @@
 use super::{
     batch,
     context::V2Context,
-    endpoints::{account_transactions, blocks, events, health, modules, resources, transactions, view},
-    middleware,
-    openapi,
+    endpoints::{
+        account_transactions, accounts, balance, blocks, events, gas_estimation, health, modules,
+        resources, simulate, sse, tables, transactions, view,
+    },
+    middleware, openapi,
     proxy::{self, V1Proxy},
     websocket,
 };
@@ -22,11 +24,19 @@ use std::net::SocketAddr;
 /// Build the v2 Axum router with all endpoints and middleware.
 pub fn build_v2_router(ctx: V2Context) -> Router {
     let content_length_limit = ctx.v2_config.content_length_limit as usize;
+    let request_timeout_ms = ctx.v2_config.request_timeout_ms;
 
     Router::new()
         // Health & info
         .route("/v2/health", get(health::health_handler))
         .route("/v2/info", get(health::info_handler))
+        // Account info
+        .route("/v2/accounts/:address", get(accounts::get_account_handler))
+        // Balance
+        .route(
+            "/v2/accounts/:address/balance/*asset_type",
+            get(balance::get_balance_handler),
+        )
         // Resources
         .route(
             "/v2/accounts/:address/resources",
@@ -52,6 +62,14 @@ pub fn build_v2_router(ctx: V2Context) -> Router {
                 .post(transactions::submit_transaction_handler),
         )
         .route(
+            "/v2/transactions/simulate",
+            post(simulate::simulate_transaction_handler),
+        )
+        .route(
+            "/v2/transactions/by_version/:version",
+            get(transactions::get_transaction_by_version_handler),
+        )
+        .route(
             "/v2/transactions/:hash",
             get(transactions::get_transaction_handler),
         )
@@ -71,14 +89,31 @@ pub fn build_v2_router(ctx: V2Context) -> Router {
         )
         // View
         .route("/v2/view", post(view::view_handler))
+        // Gas estimation
+        .route(
+            "/v2/estimate_gas_price",
+            get(gas_estimation::estimate_gas_price_handler),
+        )
+        // Tables
+        .route(
+            "/v2/tables/:table_handle/item",
+            post(tables::get_table_item_handler),
+        )
         // Blocks
         .route("/v2/blocks/latest", get(blocks::get_latest_block_handler))
+        .route(
+            "/v2/blocks/by_version/:version",
+            get(blocks::get_block_by_version_handler),
+        )
         .route(
             "/v2/blocks/:height",
             get(blocks::get_block_by_height_handler),
         )
         // Batch (JSON-RPC 2.0)
         .route("/v2/batch", post(batch::batch_handler))
+        // SSE (Server-Sent Events)
+        .route("/v2/sse/blocks", get(sse::sse_blocks_handler))
+        .route("/v2/sse/events", get(sse::sse_events_handler))
         // WebSocket
         .route("/v2/ws", get(websocket::ws_handler))
         // OpenAPI spec
@@ -87,6 +122,9 @@ pub fn build_v2_router(ctx: V2Context) -> Router {
         // Middleware stack (applied bottom-up: first listed = outermost)
         .layer(axum_middleware::from_fn(middleware::request_id_layer))
         .layer(axum_middleware::from_fn(middleware::logging_layer))
+        .layer(axum_middleware::from_fn(move |req, next| {
+            middleware::timeout_layer(request_timeout_ms, req, next)
+        }))
         .layer(middleware::cors_layer())
         .layer(middleware::compression_layer())
         .layer(middleware::size_limit_layer(content_length_limit))

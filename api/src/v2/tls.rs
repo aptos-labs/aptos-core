@@ -15,8 +15,15 @@ use hyper_util::{
     server::conn::auto::Builder as AutoBuilder,
 };
 use rustls::{Certificate, PrivateKey, ServerConfig};
-use std::{io::BufReader, sync::Arc};
-use tokio::net::TcpListener;
+use std::{
+    io::BufReader,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
+use tokio::{net::TcpListener, sync::watch};
 use tokio_rustls::TlsAcceptor;
 use tower::Service;
 
@@ -70,8 +77,8 @@ fn read_private_key(path: &str) -> Result<PrivateKey> {
 
     // We need to re-read the file for each key type since rustls-pemfile 1.x
     // consumes the reader. Clone the content first.
-    let key_data = std::fs::read(path)
-        .with_context(|| format!("Failed to read key file: {}", path))?;
+    let key_data =
+        std::fs::read(path).with_context(|| format!("Failed to read key file: {}", path))?;
 
     // Try PKCS8
     let mut reader = BufReader::new(key_data.as_slice());
@@ -114,6 +121,11 @@ fn read_private_key(path: &str) -> Result<PrivateKey> {
 /// in a TLS layer before handing it to `hyper_util::server::conn::auto::Builder`,
 /// which auto-negotiates HTTP/1.1 vs HTTP/2 based on ALPN.
 ///
+/// Supports graceful shutdown: when `shutdown_rx` receives `true`, the server
+/// stops accepting new connections and waits for in-flight connections to
+/// complete (up to `drain_timeout_ms`). Individual connection tasks continue
+/// to serve their in-flight requests naturally.
+///
 /// The `port_tx` uses `futures::channel::oneshot` for compatibility with the
 /// existing runtime bootstrap infrastructure.
 pub async fn serve_tls(
@@ -121,6 +133,8 @@ pub async fn serve_tls(
     tls_acceptor: TlsAcceptor,
     app: Router,
     port_tx: Option<futures::channel::oneshot::Sender<u16>>,
+    shutdown_rx: watch::Receiver<bool>,
+    drain_timeout_ms: u64,
 ) {
     let local_addr = listener.local_addr().expect("Failed to get local addr");
 
@@ -130,46 +144,91 @@ pub async fn serve_tls(
 
     info!("v2 API TLS server listening on {}", local_addr);
 
+    let active_connections = Arc::new(AtomicUsize::new(0));
+    let mut accept_shutdown_rx = shutdown_rx.clone();
+
+    // Accept loop: race between new connections and shutdown signal.
     loop {
-        let (tcp_stream, remote_addr) = match listener.accept().await {
-            Ok(conn) => conn,
-            Err(e) => {
-                warn!("Failed to accept TCP connection: {}", e);
-                continue;
-            },
-        };
+        tokio::select! {
+            result = listener.accept() => {
+                let (tcp_stream, remote_addr) = match result {
+                    Ok(conn) => conn,
+                    Err(e) => {
+                        warn!("Failed to accept TCP connection: {}", e);
+                        continue;
+                    },
+                };
 
-        let tls_acceptor = tls_acceptor.clone();
-        let app = app.clone();
+                let tls_acceptor = tls_acceptor.clone();
+                let app = app.clone();
+                let active = active_connections.clone();
+                active.fetch_add(1, Ordering::Relaxed);
 
-        tokio::spawn(async move {
-            // Perform TLS handshake.
-            let tls_stream = match tls_acceptor.accept(tcp_stream).await {
-                Ok(stream) => stream,
-                Err(e) => {
-                    warn!("TLS handshake failed from {}: {}", remote_addr, e);
-                    return;
-                },
-            };
+                tokio::spawn(async move {
+                    // Perform TLS handshake.
+                    let tls_stream = match tls_acceptor.accept(tcp_stream).await {
+                        Ok(stream) => stream,
+                        Err(e) => {
+                            warn!("TLS handshake failed from {}: {}", remote_addr, e);
+                            active.fetch_sub(1, Ordering::Relaxed);
+                            return;
+                        },
+                    };
 
-            // Wrap in TokioIo for hyper compatibility.
-            let io = TokioIo::new(tls_stream);
+                    // Wrap in TokioIo for hyper compatibility.
+                    let io = TokioIo::new(tls_stream);
 
-            // Create a hyper 1.x service from the axum router.
-            // We use hyper1::service::service_fn to bridge the axum Router
-            // (which takes Request<axum::body::Body>) with hyper's Incoming body.
-            let hyper_service = hyper1::service::service_fn(move |req| {
-                // Clone the app for each request (Router is cheap to clone).
-                let mut app = app.clone();
-                async move { app.call(req).await }
-            });
+                    let hyper_service = hyper1::service::service_fn(move |req| {
+                        let mut app = app.clone();
+                        async move { app.call(req).await }
+                    });
 
-            // Auto-builder negotiates HTTP/1.1 vs HTTP/2 based on ALPN.
-            let builder = AutoBuilder::new(TokioExecutor::new());
-            if let Err(e) = builder.serve_connection(io, hyper_service).await {
-                // Connection errors are common (client disconnect, etc.), log at debug.
-                warn!("Connection error from {}: {}", remote_addr, e);
+                    // Auto-builder negotiates HTTP/1.1 vs HTTP/2 based on ALPN.
+                    let builder = AutoBuilder::new(TokioExecutor::new());
+                    if let Err(e) = builder.serve_connection(io, hyper_service).await {
+                        warn!("Connection error from {}: {}", remote_addr, e);
+                    }
+
+                    active.fetch_sub(1, Ordering::Relaxed);
+                });
             }
-        });
+            _ = accept_shutdown_rx.wait_for(|&v| v) => {
+                info!("[v2] TLS server received shutdown signal, stopping accept loop");
+                break;
+            }
+        }
+    }
+
+    // Drain phase: wait for in-flight connections to complete.
+    let remaining = active_connections.load(Ordering::Relaxed);
+    if remaining > 0 {
+        info!(
+            "[v2] Draining {} active TLS connections (timeout: {}ms)...",
+            remaining, drain_timeout_ms
+        );
+
+        if drain_timeout_ms == 0 {
+            info!("[v2] Drain timeout = 0, shutting down immediately");
+            return;
+        }
+
+        let deadline = tokio::time::Instant::now() + Duration::from_millis(drain_timeout_ms);
+        loop {
+            let count = active_connections.load(Ordering::Relaxed);
+            if count == 0 {
+                info!("[v2] All TLS connections drained successfully");
+                break;
+            }
+            if tokio::time::Instant::now() >= deadline {
+                warn!(
+                    "[v2] TLS drain timeout ({}ms) exceeded, {} connections remaining",
+                    drain_timeout_ms, count
+                );
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    } else {
+        info!("[v2] TLS server shut down (no active connections)");
     }
 }

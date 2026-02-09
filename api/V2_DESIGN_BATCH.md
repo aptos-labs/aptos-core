@@ -1,5 +1,11 @@
 # V2 Design: JSON-RPC 2.0 Batch Endpoint
 
+> **Status: Implemented.** The final implementation follows this design closely with these additions:
+>
+> - **Shared `BatchSnapshot`**: All requests in a batch share a pinned `LedgerInfo` + version (`BatchSnapshot`) for read consistency, eliminating N redundant `ledger_info()` calls
+> - **5 additional batch methods**: `get_account`, `get_transaction_by_version`, `get_block_by_version`, `estimate_gas_price`, `get_table_item`
+> - **Total: 18 supported batch methods**
+
 ## Overview
 
 The v2 API provides a batch endpoint at `POST /v2/batch` that accepts an array of JSON-RPC 2.0
@@ -113,9 +119,13 @@ batch format. This is a widely adopted standard with excellent client library su
 | `get_transaction` | `{hash}` | `GET /v2/transactions/:hash` | No |
 | `get_transactions` | `{cursor?}` | `GET /v2/transactions` | Yes |
 | `get_account_transactions` | `{address, cursor?}` | `GET /v2/accounts/:addr/transactions` | Yes |
-| `get_events` | `{address, creation_number, cursor?}` | `GET /v2/accounts/:addr/events/:creation_number` | Yes |
+| `get_events` | `{address, creation_number, cursor?}` | `GET /v2/accounts/:addr/events/:cn` | Yes |
 | `get_info` | `{}` | `GET /v2/info` | No |
-| `estimate_gas_price` | `{}` | (new in v2) | No |
+| `get_account` | `{address, ledger_version?}` | `GET /v2/accounts/:addr` | No |
+| `get_transaction_by_version` | `{version}` | `GET /v2/transactions/by_version/:ver` | No |
+| `get_block_by_version` | `{version, with_transactions?}` | `GET /v2/blocks/by_version/:ver` | No |
+| `estimate_gas_price` | `{}` | `GET /v2/estimate_gas_price` | No |
+| `get_table_item` | `{table_handle, key_type, value_type, key}` | `POST /v2/tables/:handle/item` | No |
 
 **Paginated methods**: For methods marked "Yes" in the Paginated column, the `cursor` param
 is an opaque string from a previous response, and the result includes a `cursor` field for
@@ -658,9 +668,10 @@ All requests within a batch execute concurrently:
 
 ## Performance Considerations
 
-1. **Shared state view**: For batches where all requests use the same `ledger_version`,
-   we could optimize by creating a single `DbStateView` and sharing it. This is a
-   future optimization (requires ensuring `DbStateView` is `Send + Sync`).
+1. **Shared state view (implemented)**: All requests in a batch share a pinned
+   `LedgerInfo` + version via `BatchSnapshot`. This guarantees read consistency
+   across the batch and eliminates N redundant `ledger_info()` DB calls.
+   Per-request `ledger_version` override is still supported for explicit pinning.
 
 2. **Connection pool**: All batch sub-requests reuse the same DB connection pool,
    so there's no overhead from creating new connections.
@@ -669,6 +680,6 @@ All requests within a batch execute concurrently:
    with big responses, this could use significant memory. The batch size limit
    (`json_rpc_batch_max_size`, default 20) bounds this.
 
-4. **Timeout**: Individual sub-requests don't have a timeout, but the overall HTTP
-   request has the server's response timeout. A single slow sub-request (e.g., a
-   complex view function) delays the entire batch response.
+4. **Timeout**: The overall HTTP request is subject to the `request_timeout_ms`
+   middleware. A single slow sub-request (e.g., a complex view function) delays
+   the entire batch response.

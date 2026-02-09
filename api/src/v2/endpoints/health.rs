@@ -18,9 +18,7 @@ use axum::{extract::State, Json};
         (status = 500, description = "Node is unhealthy", body = V2Error),
     )
 )]
-pub async fn health_handler(
-    State(ctx): State<V2Context>,
-) -> Result<Json<HealthResponse>, V2Error> {
+pub async fn health_handler(State(ctx): State<V2Context>) -> Result<Json<HealthResponse>, V2Error> {
     let ledger_info = ctx.ledger_info()?;
     Ok(Json(HealthResponse {
         status: "ok".to_string(),

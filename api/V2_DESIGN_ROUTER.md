@@ -1,5 +1,11 @@
 # V2 Design: Router Integration & Server Architecture
 
+> **Status: Implemented.** The final implementation differs from this design in one key area:
+>
+> - **Same-port co-hosting** uses a **reverse-proxy** approach (Axum external + Poem on internal random port) instead of the `ApiDispatcher` Tower Service described here. The Axum v2 router handles `/v2/*` routes directly; all other requests are proxied to the internal Poem v1 server via `hyper-util`. This is simpler and avoids the complexity of wrapping Poem as a Tower service.
+> - **TLS** uses `rustls 0.21` + `tokio-rustls 0.24` with a manual accept loop and ALPN negotiation
+> - **Graceful shutdown** uses `axum::serve().with_graceful_shutdown()` for plain mode and atomic connection counters + drain loop for TLS mode
+
 ## Overview
 
 This document details how the Axum-based v2 API coexists with the Poem-based v1 API on
@@ -439,27 +445,30 @@ flowchart TB
 
 ---
 
-## Graceful Shutdown
+## Graceful Shutdown (Implemented)
 
-Both v1 and v2 share the same tokio runtime. When the node shuts down:
+Both v1 and v2 share the same tokio runtime. The v2 graceful shutdown uses:
 
-1. The runtime receives a shutdown signal
-2. All spawned tasks are cancelled
-3. In-flight HTTP connections are allowed to drain (configurable timeout)
-4. WebSocket connections receive a close frame
-5. The TCP listeners are dropped
+1. **`tokio::sync::watch<bool>` channel** in `V2Context` for shutdown signaling
+2. **OS signal listener** (Ctrl+C/SIGINT) spawned in `runtime.rs`
+3. **`V2Context::trigger_shutdown()`** for programmatic shutdown (testing)
+4. **Configurable drain timeout** (`graceful_shutdown_timeout_ms`, default 30s)
 
-For the v2 Axum server, we use `tokio::select!` with a shutdown signal:
-
+### Plain mode (no TLS):
 ```rust
-let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(());
-
-// In the accept loop:
-tokio::select! {
-    conn = listener.accept() => { /* handle connection */ }
-    _ = shutdown_rx.changed() => { break; }
-}
+axum::serve(listener, router)
+    .with_graceful_shutdown(ctx.shutdown_signal())
+    .await
 ```
+Plus a `tokio::select!` with `tokio::time::sleep(drain_timeout)` for bounded draining.
+
+### TLS mode:
+Manual accept loop with `tokio::select!` on `shutdown_rx.changed()`, plus an
+`AtomicUsize` connection counter. After shutdown signal, the accept loop stops
+and a drain poll loop waits until all connections close or the timeout expires.
+
+### Background tasks:
+The WebSocket broadcaster checks `shutdown_rx` and exits cleanly on shutdown.
 
 ---
 

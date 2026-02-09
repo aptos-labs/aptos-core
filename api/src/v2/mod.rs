@@ -9,8 +9,6 @@
 
 pub mod batch;
 pub mod context;
-#[cfg(test)]
-mod tests;
 pub mod cursor;
 pub mod endpoints;
 pub mod error;
@@ -20,6 +18,8 @@ pub mod middleware;
 pub mod openapi;
 pub mod proxy;
 pub mod router;
+#[cfg(test)]
+mod tests;
 pub mod tls;
 pub mod types;
 pub mod websocket;

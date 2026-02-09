@@ -18,7 +18,7 @@ use crate::v2::{
     types::LedgerMetadata,
 };
 use aptos_api_types::{AsConverter, LedgerInfo, MoveModuleBytecode, MoveResource};
-use aptos_types::account_address::AccountAddress;
+use aptos_types::{account_address::AccountAddress, state_store::table::TableHandle};
 use axum::{extract::State, Json};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -95,11 +95,7 @@ pub async fn batch_handler(
     if requests.len() > max_size {
         return Err(V2Error::bad_request(
             ErrorCode::BatchTooLarge,
-            format!(
-                "Batch size {} exceeds maximum {}",
-                requests.len(),
-                max_size
-            ),
+            format!("Batch size {} exceeds maximum {}", requests.len(), max_size),
         ));
     }
 
@@ -183,13 +179,20 @@ async fn dispatch_inner(
 ) -> Result<serde_json::Value, V2Error> {
     match req.method.as_str() {
         "get_ledger_info" => get_ledger_info(snapshot),
+        "get_account" => get_account(ctx, snapshot, &req.params).await,
         "get_resources" => get_resources(ctx, snapshot, &req.params).await,
         "get_resource" => get_resource(ctx, snapshot, &req.params).await,
         "get_modules" => get_modules(ctx, snapshot, &req.params).await,
         "get_module" => get_module(ctx, snapshot, &req.params).await,
         "get_transaction" => get_transaction(ctx, snapshot, &req.params).await,
+        "get_transaction_by_version" => {
+            get_transaction_by_version(ctx, snapshot, &req.params).await
+        },
         "get_transactions" => get_transactions(ctx, snapshot, &req.params).await,
         "get_block" => get_block(ctx, &req.params).await,
+        "get_block_by_version" => get_block_by_version(ctx, &req.params).await,
+        "estimate_gas_price" => estimate_gas_price(ctx, snapshot).await,
+        "get_table_item" => get_table_item(ctx, snapshot, &req.params).await,
         _ => Err(V2Error::bad_request(
             ErrorCode::MethodNotFound,
             format!("Unknown method: {}", req.method),
@@ -283,7 +286,10 @@ async fn get_resource(
         let address = parse_address(&p.address)?;
         let tag: move_core_types::language_storage::StructTag =
             p.resource_type.parse().map_err(|e| {
-                V2Error::bad_request(ErrorCode::InvalidInput, format!("Invalid struct tag: {}", e))
+                V2Error::bad_request(
+                    ErrorCode::InvalidInput,
+                    format!("Invalid struct tag: {}", e),
+                )
             })?;
 
         let version = p.ledger_version.unwrap_or(snap.version);
@@ -396,7 +402,10 @@ async fn get_module(
         let module_id = move_core_types::language_storage::ModuleId::new(
             address,
             move_core_types::identifier::Identifier::new(p.module_name.clone()).map_err(|e| {
-                V2Error::bad_request(ErrorCode::InvalidInput, format!("Invalid module name: {}", e))
+                V2Error::bad_request(
+                    ErrorCode::InvalidInput,
+                    format!("Invalid module name: {}", e),
+                )
             })?,
         );
 
@@ -490,8 +499,7 @@ async fn get_transactions(
     spawn_blocking(move || {
         let cursor = p.cursor.as_ref().map(|c| Cursor::decode(c)).transpose()?;
 
-        let (txns, next_cursor) =
-            ctx.get_transactions_paginated(cursor.as_ref(), snap.version)?;
+        let (txns, next_cursor) = ctx.get_transactions_paginated(cursor.as_ref(), snap.version)?;
 
         let state_view = ctx
             .inner()
@@ -559,6 +567,241 @@ async fn get_block(
     .await
 }
 
+// --- New batch methods ---
+
+#[derive(Deserialize)]
+struct AccountParams {
+    address: String,
+    #[serde(default)]
+    ledger_version: Option<u64>,
+}
+
+async fn get_account(
+    ctx: &V2Context,
+    snapshot: &BatchSnapshot,
+    params: &serde_json::Value,
+) -> Result<serde_json::Value, V2Error> {
+    let p: AccountParams = serde_json::from_value(params.clone())
+        .map_err(|e| V2Error::bad_request(ErrorCode::InvalidInput, e.to_string()))?;
+
+    let ctx = ctx.clone();
+    let snap = snapshot.clone();
+    spawn_blocking(move || {
+        let address = parse_address(&p.address)?;
+        let version = p.ledger_version.unwrap_or(snap.version);
+        validate_version(version, &snap.ledger_info)?;
+
+        let state_view = ctx
+            .inner()
+            .state_view_at_version(version)
+            .map_err(V2Error::internal)?;
+
+        let state_key = aptos_types::state_store::state_key::StateKey::resource_typed::<
+            aptos_types::account_config::AccountResource,
+        >(&address)
+        .map_err(V2Error::internal)?;
+
+        use aptos_types::state_store::TStateView;
+        let bytes = state_view
+            .get_state_value_bytes(&state_key)
+            .map_err(V2Error::internal)?;
+
+        let account_data = match bytes {
+            Some(bytes) => {
+                let ar: aptos_types::account_config::AccountResource =
+                    bcs::from_bytes(&bytes).map_err(V2Error::internal)?;
+                aptos_api_types::AccountData::from(ar)
+            },
+            None => {
+                return Err(V2Error::not_found(
+                    ErrorCode::AccountNotFound,
+                    format!("Account {} not found", address),
+                ));
+            },
+        };
+
+        serde_json::to_value(&account_data).map_err(V2Error::internal)
+    })
+    .await
+}
+
+#[derive(Deserialize)]
+struct TransactionByVersionParams {
+    version: u64,
+}
+
+async fn get_transaction_by_version(
+    ctx: &V2Context,
+    snapshot: &BatchSnapshot,
+    params: &serde_json::Value,
+) -> Result<serde_json::Value, V2Error> {
+    let p: TransactionByVersionParams = serde_json::from_value(params.clone())
+        .map_err(|e| V2Error::bad_request(ErrorCode::InvalidInput, e.to_string()))?;
+
+    let ctx = ctx.clone();
+    let snap = snapshot.clone();
+    spawn_blocking(move || {
+        validate_version(p.version, &snap.ledger_info)?;
+
+        let txn_data = ctx
+            .inner()
+            .get_transaction_by_version(p.version, snap.version)
+            .map_err(V2Error::internal)?;
+
+        let timestamp = ctx
+            .inner()
+            .db
+            .get_block_timestamp(txn_data.version)
+            .map_err(V2Error::internal)?;
+        let state_view = ctx
+            .inner()
+            .state_view_at_version(snap.version)
+            .map_err(V2Error::internal)?;
+        let converter =
+            state_view.as_converter(ctx.inner().db.clone(), ctx.inner().indexer_reader.clone());
+        let txn = converter
+            .try_into_onchain_transaction(timestamp, txn_data)
+            .map_err(V2Error::internal)?;
+
+        serde_json::to_value(&txn).map_err(V2Error::internal)
+    })
+    .await
+}
+
+#[derive(Deserialize)]
+struct BlockByVersionParams {
+    version: u64,
+    #[serde(default)]
+    with_transactions: Option<bool>,
+}
+
+async fn get_block_by_version(
+    ctx: &V2Context,
+    params: &serde_json::Value,
+) -> Result<serde_json::Value, V2Error> {
+    let p: BlockByVersionParams = serde_json::from_value(params.clone())
+        .map_err(|e| V2Error::bad_request(ErrorCode::InvalidInput, e.to_string()))?;
+
+    let ctx = ctx.clone();
+    spawn_blocking(move || {
+        let ledger_info = ctx.ledger_info()?;
+        let with_txns = p.with_transactions.unwrap_or(false);
+
+        let bcs_block = ctx
+            .inner()
+            .get_block_by_version::<crate::response::BasicErrorWith404>(
+                p.version,
+                &ledger_info,
+                with_txns,
+            )
+            .map_err(|e| V2Error::internal(format!("{}", e)))?;
+
+        let block_height: u64 = ledger_info.block_height.into();
+        let block = aptos_api_types::Block {
+            block_height: block_height.into(),
+            block_hash: bcs_block.block_hash.into(),
+            block_timestamp: bcs_block.block_timestamp.into(),
+            first_version: bcs_block.first_version.into(),
+            last_version: bcs_block.last_version.into(),
+            transactions: None,
+        };
+
+        serde_json::to_value(&block).map_err(V2Error::internal)
+    })
+    .await
+}
+
+async fn estimate_gas_price(
+    ctx: &V2Context,
+    snapshot: &BatchSnapshot,
+) -> Result<serde_json::Value, V2Error> {
+    let ctx = ctx.clone();
+    let snap = snapshot.clone();
+    spawn_blocking(move || {
+        let gas_estimation = ctx
+            .inner()
+            .estimate_gas_price(&snap.ledger_info)
+            .map_err(|e: crate::response::BasicError| V2Error::internal(format!("{}", e)))?;
+
+        serde_json::to_value(&gas_estimation).map_err(V2Error::internal)
+    })
+    .await
+}
+
+#[derive(Deserialize)]
+struct TableItemParams {
+    table_handle: String,
+    key_type: aptos_api_types::MoveType,
+    value_type: aptos_api_types::MoveType,
+    key: serde_json::Value,
+    #[serde(default)]
+    ledger_version: Option<u64>,
+}
+
+async fn get_table_item(
+    ctx: &V2Context,
+    snapshot: &BatchSnapshot,
+    params: &serde_json::Value,
+) -> Result<serde_json::Value, V2Error> {
+    let p: TableItemParams = serde_json::from_value(params.clone())
+        .map_err(|e| V2Error::bad_request(ErrorCode::InvalidInput, e.to_string()))?;
+
+    let ctx = ctx.clone();
+    let snap = snapshot.clone();
+    spawn_blocking(move || {
+        let handle_address = parse_address(&p.table_handle)?;
+        let version = p.ledger_version.unwrap_or(snap.version);
+        validate_version(version, &snap.ledger_info)?;
+
+        let state_view = ctx
+            .inner()
+            .state_view_at_version(version)
+            .map_err(V2Error::internal)?;
+
+        let key_type = (&p.key_type).try_into().map_err(|e: anyhow::Error| {
+            V2Error::bad_request(ErrorCode::InvalidInput, format!("Invalid key_type: {}", e))
+        })?;
+        let value_type = (&p.value_type).try_into().map_err(|e: anyhow::Error| {
+            V2Error::bad_request(
+                ErrorCode::InvalidInput,
+                format!("Invalid value_type: {}", e),
+            )
+        })?;
+
+        let converter =
+            state_view.as_converter(ctx.inner().db.clone(), ctx.inner().indexer_reader.clone());
+
+        let vm_key = converter
+            .try_into_vm_value(&key_type, p.key.clone())
+            .map_err(|e| {
+                V2Error::bad_request(ErrorCode::InvalidInput, format!("Invalid key: {}", e))
+            })?;
+        let raw_key = vm_key.undecorate().simple_serialize().ok_or_else(|| {
+            V2Error::bad_request(ErrorCode::InvalidInput, "Failed to serialize table key")
+        })?;
+
+        let state_key = aptos_types::state_store::state_key::StateKey::table_item(
+            &TableHandle(handle_address.into()),
+            &raw_key,
+        );
+
+        use aptos_types::state_store::TStateView;
+        let bytes = state_view
+            .get_state_value_bytes(&state_key)
+            .map_err(V2Error::internal)?
+            .ok_or_else(|| {
+                V2Error::not_found(ErrorCode::TableItemNotFound, "Table item not found")
+            })?;
+
+        let move_value = converter
+            .try_into_move_value(&value_type, &bytes)
+            .map_err(V2Error::internal)?;
+
+        serde_json::to_value(&move_value).map_err(V2Error::internal)
+    })
+    .await
+}
+
 // --- Shared types ---
 
 #[derive(Serialize)]
@@ -581,12 +824,8 @@ fn parse_address(s: &str) -> Result<AccountAddress, V2Error> {
 
 fn parse_hash_str(s: &str) -> Result<aptos_crypto::HashValue, V2Error> {
     let s = s.strip_prefix("0x").unwrap_or(s);
-    aptos_crypto::HashValue::from_hex(s).map_err(|e| {
-        V2Error::bad_request(
-            ErrorCode::InvalidInput,
-            format!("Invalid hash: {}", e),
-        )
-    })
+    aptos_crypto::HashValue::from_hex(s)
+        .map_err(|e| V2Error::bad_request(ErrorCode::InvalidInput, format!("Invalid hash: {}", e)))
 }
 
 /// Validate that a version is within the range visible to the batch snapshot.

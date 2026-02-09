@@ -1524,30 +1524,40 @@ mod tests {
     fn test_serialize_move_resource() {
         use AnnotatedMoveValue::*;
 
-        let res = MoveResource::try_from(annotated_move_struct("Values", vec![
-            (identifier("field_u8"), U8(7)),
-            (identifier("field_u64"), U64(7)),
-            (identifier("field_u128"), U128(7)),
-            (identifier("field_bool"), Bool(true)),
-            (identifier("field_address"), Address(address("0xdd"))),
-            (
-                identifier("field_vector"),
-                Vector(TypeTag::U128, vec![U128(128)]),
-            ),
-            (identifier("field_bytes"), Bytes(vec![9, 9])),
-            (
-                identifier("field_struct"),
-                Struct(annotated_move_struct("Nested", vec![(
-                    identifier("nested_vector"),
-                    Vector(TypeTag::Struct(Box::new(type_struct("Host"))), vec![
-                        Struct(annotated_move_struct("String", vec![
-                            (identifier("address1"), Address(address("0x0"))),
-                            (identifier("address2"), Address(address("0x123"))),
-                        ])),
-                    ]),
-                )])),
-            ),
-        ]))
+        let res = MoveResource::try_from(annotated_move_struct(
+            "Values",
+            vec![
+                (identifier("field_u8"), U8(7)),
+                (identifier("field_u64"), U64(7)),
+                (identifier("field_u128"), U128(7)),
+                (identifier("field_bool"), Bool(true)),
+                (identifier("field_address"), Address(address("0xdd"))),
+                (
+                    identifier("field_vector"),
+                    Vector(TypeTag::U128, vec![U128(128)]),
+                ),
+                (identifier("field_bytes"), Bytes(vec![9, 9])),
+                (
+                    identifier("field_struct"),
+                    Struct(annotated_move_struct(
+                        "Nested",
+                        vec![(
+                            identifier("nested_vector"),
+                            Vector(
+                                TypeTag::Struct(Box::new(type_struct("Host"))),
+                                vec![Struct(annotated_move_struct(
+                                    "String",
+                                    vec![
+                                        (identifier("address1"), Address(address("0x0"))),
+                                        (identifier("address2"), Address(address("0x123"))),
+                                    ],
+                                ))],
+                            ),
+                        )],
+                    )),
+                ),
+            ],
+        ))
         .unwrap();
         let value = to_value(&res).unwrap();
         assert_json(
@@ -1572,10 +1582,13 @@ mod tests {
 
     #[test]
     fn test_serialize_move_resource_with_address_0x0() {
-        let res = MoveResource::try_from(annotated_move_struct("Values", vec![(
-            identifier("address_0x0"),
-            AnnotatedMoveValue::Address(address("0x0")),
-        )]))
+        let res = MoveResource::try_from(annotated_move_struct(
+            "Values",
+            vec![(
+                identifier("address_0x0"),
+                AnnotatedMoveValue::Address(address("0x0")),
+            )],
+        ))
         .unwrap();
         let value = to_value(&res).unwrap();
         assert_json(

@@ -9,10 +9,11 @@
 use super::context::{V2Config, V2Context};
 use super::router::{build_combined_router, build_v2_router};
 use crate::context::Context;
-use aptos_api_test_context::new_test_context as create_test_context;
+use aptos_api_test_context::{new_test_context as create_test_context, TestContext};
 use aptos_config::config::NodeConfig;
 use aptos_types::chain_id::ChainId;
 use std::net::SocketAddr;
+use std::time::Duration;
 
 /// Helper: build a v2 server from a fresh test context.
 ///
@@ -53,6 +54,55 @@ async fn start_v2_server() -> (SocketAddr, tokio::task::JoinHandle<()>) {
     });
 
     (addr, handle)
+}
+
+/// Helper: build a v2 server with custom V2Config overrides.
+///
+/// The `config_fn` closure receives a mutable reference to the V2Config
+/// and can modify it before the server starts.
+async fn start_v2_server_with_config(
+    config_fn: impl FnOnce(&mut V2Config),
+) -> (SocketAddr, V2Context, tokio::task::JoinHandle<()>) {
+    let mut node_config = NodeConfig::default();
+    node_config.storage.rocksdb_configs.enable_storage_sharding = false;
+
+    let test_ctx = create_test_context("v2_test_custom".to_string(), node_config.clone(), false);
+
+    let context = Context::new(
+        ChainId::test(),
+        test_ctx.db.clone(),
+        test_ctx.mempool.ac_client.clone(),
+        node_config.clone(),
+        None,
+    );
+
+    let mut v2_config = V2Config::from_configs(&node_config.api_v2, &node_config.api);
+    config_fn(&mut v2_config);
+    let v2_ctx = V2Context::new(context, v2_config);
+    let router = build_v2_router(v2_ctx.clone());
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("Failed to bind");
+    let addr = listener.local_addr().unwrap();
+
+    let shutdown_rx = v2_ctx.shutdown_receiver();
+    let handle = tokio::spawn(async move {
+        let mut rx1 = shutdown_rx.clone();
+        let mut rx2 = shutdown_rx;
+        let server = axum::serve(listener, router).with_graceful_shutdown(async move {
+            let _ = rx1.wait_for(|&v| v).await;
+        });
+        tokio::select! {
+            result = server => { result.unwrap(); }
+            _ = async {
+                let _ = rx2.wait_for(|&v| v).await;
+                tokio::time::sleep(Duration::from_secs(30)).await;
+            } => {}
+        }
+    });
+
+    (addr, v2_ctx, handle)
 }
 
 fn base_url(addr: SocketAddr) -> String {
@@ -99,12 +149,9 @@ async fn test_v2_get_resources() {
     let (addr, _handle) = start_v2_server().await;
 
     // 0x1 is the framework account which always has resources
-    let resp = reqwest::get(format!(
-        "{}/v2/accounts/0x1/resources",
-        base_url(addr)
-    ))
-    .await
-    .unwrap();
+    let resp = reqwest::get(format!("{}/v2/accounts/0x1/resources", base_url(addr)))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), 200);
 
     let body: serde_json::Value = resp.json().await.unwrap();
@@ -152,12 +199,9 @@ async fn test_v2_resource_not_found() {
 async fn test_v2_get_modules() {
     let (addr, _handle) = start_v2_server().await;
 
-    let resp = reqwest::get(format!(
-        "{}/v2/accounts/0x1/modules",
-        base_url(addr)
-    ))
-    .await
-    .unwrap();
+    let resp = reqwest::get(format!("{}/v2/accounts/0x1/modules", base_url(addr)))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), 200);
 
     let body: serde_json::Value = resp.json().await.unwrap();
@@ -169,12 +213,9 @@ async fn test_v2_get_modules() {
 async fn test_v2_get_single_module() {
     let (addr, _handle) = start_v2_server().await;
 
-    let resp = reqwest::get(format!(
-        "{}/v2/accounts/0x1/module/account",
-        base_url(addr)
-    ))
-    .await
-    .unwrap();
+    let resp = reqwest::get(format!("{}/v2/accounts/0x1/module/account", base_url(addr)))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), 200);
 
     let body: serde_json::Value = resp.json().await.unwrap();
@@ -381,7 +422,10 @@ async fn test_v2_request_id_header() {
     assert_eq!(resp.status(), 200);
 
     let request_id = resp.headers().get("x-request-id");
-    assert!(request_id.is_some(), "x-request-id header should be present");
+    assert!(
+        request_id.is_some(),
+        "x-request-id header should be present"
+    );
     assert!(!request_id.unwrap().to_str().unwrap().is_empty());
 }
 
@@ -437,12 +481,9 @@ async fn test_v2_pagination_cursor_follows() {
     let (addr, _handle) = start_v2_server().await;
 
     // 0x1 has many resources; check pagination works
-    let resp = reqwest::get(format!(
-        "{}/v2/accounts/0x1/resources",
-        base_url(addr)
-    ))
-    .await
-    .unwrap();
+    let resp = reqwest::get(format!("{}/v2/accounts/0x1/resources", base_url(addr)))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), 200);
 
     let body: serde_json::Value = resp.json().await.unwrap();
@@ -640,13 +681,14 @@ async fn test_cohost_v1_proxy_index() {
     let (addr, _handle) = start_combined_server().await;
 
     // Request to root "/" should be proxied to Poem v1
-    let resp = reqwest::get(format!("{}/", base_url(addr)))
-        .await
-        .unwrap();
+    let resp = reqwest::get(format!("{}/", base_url(addr))).await.unwrap();
     assert_eq!(resp.status(), 200);
 
     let body = resp.text().await.unwrap();
-    assert!(body.contains("Aptos Node API"), "Root page should contain 'Aptos Node API'");
+    assert!(
+        body.contains("Aptos Node API"),
+        "Root page should contain 'Aptos Node API'"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -660,8 +702,14 @@ async fn test_cohost_v1_proxy_ledger_info() {
     assert_eq!(resp.status(), 200);
 
     let body: serde_json::Value = resp.json().await.unwrap();
-    assert!(body["chain_id"].is_number(), "v1 ledger info should have chain_id");
-    assert!(body["ledger_version"].is_string(), "v1 ledger info should have ledger_version");
+    assert!(
+        body["chain_id"].is_number(),
+        "v1 ledger info should have chain_id"
+    );
+    assert!(
+        body["ledger_version"].is_string(),
+        "v1 ledger info should have ledger_version"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -713,7 +761,10 @@ async fn test_cohost_both_versions_on_same_port() {
     // Both should report the same chain ID
     let v2_chain_id = v2_body["ledger"]["chain_id"].as_u64().unwrap();
     let v1_chain_id = v1_body["chain_id"].as_u64().unwrap();
-    assert_eq!(v2_chain_id, v1_chain_id, "Both APIs should report the same chain_id");
+    assert_eq!(
+        v2_chain_id, v1_chain_id,
+        "Both APIs should report the same chain_id"
+    );
 }
 
 // ======================================================================
@@ -1101,15 +1152,13 @@ async fn test_ws_subscribe_tx_status_sends_pending_then_not_found() {
                 let val: serde_json::Value = serde_json::from_str(&text).unwrap();
                 match val["type"].as_str() {
                     Some("subscribed") => got_subscribed = true,
-                    Some("transaction_status_update") => {
-                        match val["data"]["status"].as_str() {
-                            Some("pending") => got_pending = true,
-                            Some("not_found") => {
-                                got_not_found = true;
-                                break;
-                            },
-                            _ => {},
-                        }
+                    Some("transaction_status_update") => match val["data"]["status"].as_str() {
+                        Some("pending") => got_pending = true,
+                        Some("not_found") => {
+                            got_not_found = true;
+                            break;
+                        },
+                        _ => {},
                     },
                     _ => {},
                 }
@@ -1147,14 +1196,26 @@ async fn test_openapi_spec_json() {
     assert_eq!(body["info"]["version"], "2.0.0");
 
     // Check that paths are populated.
-    let paths = body["paths"].as_object().expect("paths should be an object");
-    assert!(paths.len() >= 10, "Expected at least 10 paths, got {}", paths.len());
+    let paths = body["paths"]
+        .as_object()
+        .expect("paths should be an object");
+    assert!(
+        paths.len() >= 10,
+        "Expected at least 10 paths, got {}",
+        paths.len()
+    );
 
     // Verify some specific paths exist.
     assert!(paths.contains_key("/v2/health"), "Missing /v2/health");
     assert!(paths.contains_key("/v2/info"), "Missing /v2/info");
-    assert!(paths.contains_key("/v2/transactions"), "Missing /v2/transactions");
-    assert!(paths.contains_key("/v2/blocks/latest"), "Missing /v2/blocks/latest");
+    assert!(
+        paths.contains_key("/v2/transactions"),
+        "Missing /v2/transactions"
+    );
+    assert!(
+        paths.contains_key("/v2/blocks/latest"),
+        "Missing /v2/blocks/latest"
+    );
     assert!(paths.contains_key("/v2/view"), "Missing /v2/view");
 }
 
@@ -1180,8 +1241,14 @@ async fn test_openapi_spec_yaml() {
     );
 
     let body = resp.text().await.unwrap();
-    assert!(body.contains("openapi:"), "YAML should contain openapi field");
-    assert!(body.contains("Aptos Node API v2"), "YAML should contain API title");
+    assert!(
+        body.contains("openapi:"),
+        "YAML should contain openapi field"
+    );
+    assert!(
+        body.contains("Aptos Node API v2"),
+        "YAML should contain API title"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -1198,13 +1265,28 @@ async fn test_openapi_spec_schemas() {
         .expect("schemas should be an object");
 
     // Check that our custom schemas are present.
-    assert!(schemas.contains_key("LedgerMetadata"), "Missing LedgerMetadata schema");
+    assert!(
+        schemas.contains_key("LedgerMetadata"),
+        "Missing LedgerMetadata schema"
+    );
     assert!(schemas.contains_key("V2Error"), "Missing V2Error schema");
-    assert!(schemas.contains_key("ErrorCode"), "Missing ErrorCode schema");
-    assert!(schemas.contains_key("HealthResponse"), "Missing HealthResponse schema");
+    assert!(
+        schemas.contains_key("ErrorCode"),
+        "Missing ErrorCode schema"
+    );
+    assert!(
+        schemas.contains_key("HealthResponse"),
+        "Missing HealthResponse schema"
+    );
     assert!(schemas.contains_key("NodeInfo"), "Missing NodeInfo schema");
-    assert!(schemas.contains_key("SubmitResult"), "Missing SubmitResult schema");
-    assert!(schemas.contains_key("TransactionSummary"), "Missing TransactionSummary schema");
+    assert!(
+        schemas.contains_key("SubmitResult"),
+        "Missing SubmitResult schema"
+    );
+    assert!(
+        schemas.contains_key("TransactionSummary"),
+        "Missing TransactionSummary schema"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -1217,14 +1299,14 @@ async fn test_openapi_spec_tags() {
     let body: serde_json::Value = resp.json().await.unwrap();
 
     let tags = body["tags"].as_array().expect("tags should be an array");
-    let tag_names: Vec<&str> = tags
-        .iter()
-        .filter_map(|t| t["name"].as_str())
-        .collect();
+    let tag_names: Vec<&str> = tags.iter().filter_map(|t| t["name"].as_str()).collect();
 
     assert!(tag_names.contains(&"Health"), "Missing Health tag");
     assert!(tag_names.contains(&"Accounts"), "Missing Accounts tag");
-    assert!(tag_names.contains(&"Transactions"), "Missing Transactions tag");
+    assert!(
+        tag_names.contains(&"Transactions"),
+        "Missing Transactions tag"
+    );
     assert!(tag_names.contains(&"Blocks"), "Missing Blocks tag");
     assert!(tag_names.contains(&"View"), "Missing View tag");
     assert!(tag_names.contains(&"Events"), "Missing Events tag");
@@ -1309,7 +1391,8 @@ async fn start_tls_v2_server() -> (SocketAddr, tokio::task::JoinHandle<()>) {
         // needed since we already built the acceptor, but avoids confusion).
         let _cert = cert_file;
         let _key = key_file;
-        crate::v2::tls::serve_tls(listener, tls_acceptor, router, None).await;
+        let (_, shutdown_rx) = tokio::sync::watch::channel(false);
+        crate::v2::tls::serve_tls(listener, tls_acceptor, router, None, shutdown_rx, 30_000).await;
     });
 
     // Give the server a moment to start.
@@ -1388,12 +1471,879 @@ async fn test_tls_resources_endpoint() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn test_tls_build_acceptor_invalid_cert() {
     // Should fail with a descriptive error.
-    let result = crate::v2::tls::build_tls_acceptor("/nonexistent/cert.pem", "/nonexistent/key.pem");
+    let result =
+        crate::v2::tls::build_tls_acceptor("/nonexistent/cert.pem", "/nonexistent/key.pem");
     assert!(result.is_err());
     let err_msg = format!("{}", result.err().unwrap());
     assert!(
         err_msg.contains("Failed to open TLS cert file"),
         "Error should mention cert file: {}",
         err_msg
+    );
+}
+
+// ---- Account Info ----
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_v2_get_account() {
+    let (addr, _handle) = start_v2_server().await;
+
+    // 0x1 should exist (framework account)
+    let resp = reqwest::get(format!("{}/v2/accounts/0x1", base_url(addr)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200, "Expected 200 for 0x1 account");
+
+    let body: serde_json::Value = resp.json().await.unwrap();
+    assert!(
+        body["data"]["sequence_number"].is_string(),
+        "sequence_number should be present"
+    );
+    assert!(
+        body["data"]["authentication_key"].is_string(),
+        "authentication_key should be present"
+    );
+    assert!(body["ledger"]["ledger_version"].is_number());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_v2_get_account_not_found() {
+    let (addr, _handle) = start_v2_server().await;
+
+    // Random address that doesn't exist
+    let resp = reqwest::get(format!(
+        "{}/v2/accounts/0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+        base_url(addr)
+    ))
+    .await
+    .unwrap();
+    // Expect 404 (or possibly 200 if stateless accounts are enabled)
+    let status = resp.status().as_u16();
+    assert!(
+        status == 404 || status == 200,
+        "Expected 404 or 200, got {}",
+        status
+    );
+}
+
+// ---- Gas Estimation ----
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_v2_estimate_gas_price() {
+    let (addr, _handle) = start_v2_server().await;
+
+    let resp = reqwest::get(format!("{}/v2/estimate_gas_price", base_url(addr)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+
+    let body: serde_json::Value = resp.json().await.unwrap();
+    assert!(
+        body["data"]["gas_estimate"].is_number(),
+        "gas_estimate should be present"
+    );
+    assert!(body["ledger"]["ledger_version"].is_number());
+}
+
+// ---- Transaction by Version ----
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_v2_get_transaction_by_version() {
+    let (addr, _handle) = start_v2_server().await;
+
+    // Version 0 should be the genesis transaction
+    let resp = reqwest::get(format!("{}/v2/transactions/by_version/0", base_url(addr)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200, "Expected 200 for version 0");
+
+    let body: serde_json::Value = resp.json().await.unwrap();
+    assert!(
+        body["data"]["type"].is_string(),
+        "Transaction should have a type field"
+    );
+    assert!(body["ledger"]["ledger_version"].is_number());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_v2_get_transaction_by_version_not_found() {
+    let (addr, _handle) = start_v2_server().await;
+
+    // Version far in the future
+    let resp = reqwest::get(format!(
+        "{}/v2/transactions/by_version/999999999",
+        base_url(addr)
+    ))
+    .await
+    .unwrap();
+    assert_eq!(resp.status(), 404);
+}
+
+// ---- Block by Version ----
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_v2_get_block_by_version() {
+    let (addr, _handle) = start_v2_server().await;
+
+    // Version 0 should be in a block
+    let resp = reqwest::get(format!("{}/v2/blocks/by_version/0", base_url(addr)))
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        200,
+        "Expected 200 for block containing version 0"
+    );
+
+    let body: serde_json::Value = resp.json().await.unwrap();
+    assert!(
+        body["data"]["block_height"].is_string(),
+        "block_height should be present"
+    );
+    assert!(
+        body["data"]["block_hash"].is_string(),
+        "block_hash should be present"
+    );
+    assert!(body["ledger"]["ledger_version"].is_number());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_v2_get_block_by_version_not_found() {
+    let (addr, _handle) = start_v2_server().await;
+
+    let resp = reqwest::get(format!("{}/v2/blocks/by_version/999999999", base_url(addr)))
+        .await
+        .unwrap();
+    // Should be 404 (version in the future) or 500 (from v1 error)
+    let status = resp.status().as_u16();
+    assert!(
+        status == 404 || status == 500,
+        "Expected 404 or 500, got {}",
+        status
+    );
+}
+
+// ---- Batch with new methods ----
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_v2_batch_get_account() {
+    let (addr, _handle) = start_v2_server().await;
+
+    let batch_body = serde_json::json!([{
+        "jsonrpc": "2.0",
+        "method": "get_account",
+        "params": { "address": "0x1" },
+        "id": 1
+    }]);
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(format!("{}/v2/batch", base_url(addr)))
+        .json(&batch_body)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+
+    let body: serde_json::Value = resp.json().await.unwrap();
+    let results = body.as_array().unwrap();
+    assert_eq!(results.len(), 1);
+    assert!(results[0]["result"]["sequence_number"].is_string());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_v2_batch_estimate_gas_price() {
+    let (addr, _handle) = start_v2_server().await;
+
+    let batch_body = serde_json::json!([{
+        "jsonrpc": "2.0",
+        "method": "estimate_gas_price",
+        "params": {},
+        "id": 1
+    }]);
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(format!("{}/v2/batch", base_url(addr)))
+        .json(&batch_body)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+
+    let body: serde_json::Value = resp.json().await.unwrap();
+    let results = body.as_array().unwrap();
+    assert_eq!(results.len(), 1);
+    assert!(results[0]["result"]["gas_estimate"].is_number());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_v2_batch_get_transaction_by_version() {
+    let (addr, _handle) = start_v2_server().await;
+
+    let batch_body = serde_json::json!([{
+        "jsonrpc": "2.0",
+        "method": "get_transaction_by_version",
+        "params": { "version": 0 },
+        "id": 1
+    }]);
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(format!("{}/v2/batch", base_url(addr)))
+        .json(&batch_body)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+
+    let body: serde_json::Value = resp.json().await.unwrap();
+    let results = body.as_array().unwrap();
+    assert_eq!(results.len(), 1);
+    assert!(results[0]["result"]["type"].is_string());
+}
+
+// ---- Balance ----
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_v2_get_balance_apt() {
+    let (addr, _handle) = start_v2_server().await;
+
+    // Query AptosCoin balance for 0x1 (framework account)
+    let resp = reqwest::get(format!(
+        "{}/v2/accounts/0x1/balance/0x1::aptos_coin::AptosCoin",
+        base_url(addr)
+    ))
+    .await
+    .unwrap();
+    assert_eq!(resp.status(), 200, "Expected 200 for APT balance");
+
+    let body: serde_json::Value = resp.json().await.unwrap();
+    assert!(
+        body["data"]["balance"].is_number(),
+        "balance should be a number"
+    );
+    assert!(body["ledger"]["ledger_version"].is_number());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_v2_get_balance_invalid_asset() {
+    let (addr, _handle) = start_v2_server().await;
+
+    let resp = reqwest::get(format!(
+        "{}/v2/accounts/0x1/balance/not_a_valid_type",
+        base_url(addr)
+    ))
+    .await
+    .unwrap();
+    assert_eq!(resp.status(), 400, "Expected 400 for invalid asset type");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_v2_get_balance_nonexistent_coin() {
+    let (addr, _handle) = start_v2_server().await;
+
+    // Query a coin that doesn't exist -- should return 0 balance (not an error),
+    // since the account may simply not hold that coin.
+    let resp = reqwest::get(format!(
+        "{}/v2/accounts/0x1/balance/0x1::fake_coin::FakeCoin",
+        base_url(addr)
+    ))
+    .await
+    .unwrap();
+    assert_eq!(resp.status(), 200);
+
+    let body: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(body["data"]["balance"], 0);
+}
+
+// ---- Request Timeout ----
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_v2_request_timeout_fast_request_succeeds() {
+    // Use default timeout (30s). A fast health check should succeed easily.
+    let (addr, _ctx, _handle) = start_v2_server_with_config(|_| {}).await;
+
+    let resp = reqwest::get(format!("{}/v2/health", base_url(addr)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_v2_request_timeout_disabled() {
+    // Timeout = 0 means disabled; requests should still work.
+    let (addr, _ctx, _handle) = start_v2_server_with_config(|cfg| {
+        cfg.request_timeout_ms = 0;
+    })
+    .await;
+
+    let resp = reqwest::get(format!("{}/v2/health", base_url(addr)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+}
+
+// ---- Graceful Shutdown ----
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_v2_graceful_shutdown_stops_accepting() {
+    let (addr, ctx, handle) = start_v2_server_with_config(|cfg| {
+        cfg.graceful_shutdown_timeout_ms = 5_000;
+    })
+    .await;
+
+    // Verify server is healthy before shutdown.
+    let resp = reqwest::get(format!("{}/v2/health", base_url(addr)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+
+    // Trigger shutdown.
+    ctx.trigger_shutdown();
+
+    // Wait for the server task to complete.
+    let _ = tokio::time::timeout(Duration::from_secs(5), handle).await;
+
+    // After shutdown, new connections should fail.
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(2))
+        .build()
+        .unwrap();
+    let result = client
+        .get(format!("{}/v2/health", base_url(addr)))
+        .send()
+        .await;
+    assert!(result.is_err(), "Requests should fail after shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_v2_graceful_shutdown_drains_inflight() {
+    let (addr, ctx, handle) = start_v2_server_with_config(|cfg| {
+        cfg.graceful_shutdown_timeout_ms = 5_000;
+    })
+    .await;
+
+    // Start a health request (which should be fast and complete before drain).
+    let url = format!("{}/v2/health", base_url(addr));
+    let resp = reqwest::get(&url).await.unwrap();
+    assert_eq!(resp.status(), 200, "Pre-shutdown request should succeed");
+
+    // Trigger shutdown and verify it completes cleanly.
+    ctx.trigger_shutdown();
+    let result = tokio::time::timeout(Duration::from_secs(5), handle).await;
+    assert!(result.is_ok(), "Server should shut down within 5 seconds");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_v2_graceful_shutdown_immediate() {
+    // drain timeout = 0 means immediate shutdown.
+    let (addr, ctx, handle) = start_v2_server_with_config(|cfg| {
+        cfg.graceful_shutdown_timeout_ms = 0;
+    })
+    .await;
+
+    // Verify server works first.
+    let resp = reqwest::get(format!("{}/v2/health", base_url(addr)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+
+    // Trigger immediate shutdown.
+    ctx.trigger_shutdown();
+
+    // Should complete very quickly.
+    let result = tokio::time::timeout(Duration::from_secs(3), handle).await;
+    assert!(result.is_ok(), "Immediate shutdown should be fast");
+}
+
+// ---- SSE (Server-Sent Events) ----
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_v2_sse_blocks_returns_event_stream() {
+    let (addr, _handle) = start_v2_server().await;
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(3))
+        .build()
+        .unwrap();
+
+    let resp = client
+        .get(format!("{}/v2/sse/blocks", base_url(addr)))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), 200);
+    let ct = resp
+        .headers()
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(
+        ct.starts_with("text/event-stream"),
+        "Expected text/event-stream, got: {}",
+        ct
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_v2_sse_events_returns_event_stream() {
+    let (addr, _handle) = start_v2_server().await;
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(3))
+        .build()
+        .unwrap();
+
+    let resp = client
+        .get(format!("{}/v2/sse/events", base_url(addr)))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), 200);
+    let ct = resp
+        .headers()
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(
+        ct.starts_with("text/event-stream"),
+        "Expected text/event-stream, got: {}",
+        ct
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_v2_sse_events_with_filters() {
+    let (addr, _handle) = start_v2_server().await;
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(3))
+        .build()
+        .unwrap();
+
+    // Events endpoint should accept filter query params.
+    let resp = client
+        .get(format!(
+            "{}/v2/sse/events?event_types=0x1::coin::DepositEvent,0x1::coin::WithdrawEvent&sender=0x1&start_version=100",
+            base_url(addr)
+        ))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), 200);
+    let ct = resp
+        .headers()
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(ct.starts_with("text/event-stream"));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_v2_sse_blocks_with_after_height() {
+    let (addr, _handle) = start_v2_server().await;
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(3))
+        .build()
+        .unwrap();
+
+    // Blocks endpoint should accept after_height query param.
+    let resp = client
+        .get(format!(
+            "{}/v2/sse/blocks?after_height=42",
+            base_url(addr)
+        ))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), 200);
+    let ct = resp
+        .headers()
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(ct.starts_with("text/event-stream"));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_v2_sse_disabled_returns_error() {
+    let (addr, _ctx, _handle) = start_v2_server_with_config(|cfg| {
+        cfg.sse_enabled = false;
+    })
+    .await;
+
+    let resp = reqwest::get(format!("{}/v2/sse/blocks", base_url(addr)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 503);
+
+    let body: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(body["code"], "SERVICE_UNAVAILABLE");
+    assert!(body["message"]
+        .as_str()
+        .unwrap()
+        .contains("SSE is disabled"));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_v2_sse_spec_includes_sse_endpoints() {
+    let (addr, _handle) = start_v2_server().await;
+
+    let resp = reqwest::get(format!("{}/v2/spec.json", base_url(addr)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+
+    let spec: serde_json::Value = resp.json().await.unwrap();
+    let paths = spec["paths"].as_object().unwrap();
+
+    assert!(
+        paths.contains_key("/v2/sse/blocks"),
+        "Spec should contain /v2/sse/blocks"
+    );
+    assert!(
+        paths.contains_key("/v2/sse/events"),
+        "Spec should contain /v2/sse/events"
+    );
+
+    // Verify SSE tag exists.
+    let tags: Vec<&str> = spec["tags"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|t| t["name"].as_str())
+        .collect();
+    assert!(tags.contains(&"SSE"), "Spec should have SSE tag");
+}
+
+// ======================================================================
+// End-to-end integration tests
+// ======================================================================
+
+/// Helper: start a v2 server and return the TestContext for E2E testing.
+///
+/// Unlike `start_v2_server`, this returns the `TestContext` so tests can
+/// create transactions, commit blocks, and advance the chain state.
+/// An optional `config_fn` allows customizing the NodeConfig before the
+/// server starts (e.g., to increase wait timeouts for the wait endpoint test).
+async fn start_v2_e2e_server() -> (
+    SocketAddr,
+    TestContext,
+    V2Context,
+    tokio::task::JoinHandle<()>,
+) {
+    start_v2_e2e_server_ext(|_| {}).await
+}
+
+async fn start_v2_e2e_server_ext(
+    config_fn: impl FnOnce(&mut NodeConfig),
+) -> (
+    SocketAddr,
+    TestContext,
+    V2Context,
+    tokio::task::JoinHandle<()>,
+) {
+    let mut node_config = NodeConfig::default();
+    node_config.storage.rocksdb_configs.enable_storage_sharding = false;
+    config_fn(&mut node_config);
+
+    let test_ctx = create_test_context("v2_e2e_test".to_string(), node_config.clone(), false);
+
+    let context = Context::new(
+        ChainId::test(),
+        test_ctx.db.clone(),
+        test_ctx.mempool.ac_client.clone(),
+        node_config.clone(),
+        None,
+    );
+
+    let v2_config = V2Config::from_configs(&node_config.api_v2, &node_config.api);
+    let v2_ctx = V2Context::new(context, v2_config);
+    let router = build_v2_router(v2_ctx.clone());
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("Failed to bind");
+    let addr = listener.local_addr().unwrap();
+
+    let handle = tokio::spawn(async move {
+        axum::serve(listener, router).await.unwrap();
+    });
+
+    (addr, test_ctx, v2_ctx, handle)
+}
+
+/// Helper: BCS-encode a SignedTransaction wrapped in the Versioned envelope.
+fn encode_versioned_bcs(txn: aptos_types::transaction::SignedTransaction) -> Vec<u8> {
+    let versioned = super::extractors::Versioned::V1(txn);
+    bcs::to_bytes(&versioned).expect("BCS serialization failed")
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_e2e_submit_bcs_transaction() {
+    let (addr, mut test_ctx, _v2_ctx, _handle) = start_v2_e2e_server().await;
+
+    // Create a signed transaction using the test context.
+    let account = test_ctx.gen_account();
+    let txn = test_ctx.create_user_account(&account).await;
+    let expected_hash = txn.committed_hash().to_hex_literal();
+
+    // Wrap in Versioned envelope and BCS-encode.
+    let body = encode_versioned_bcs(txn);
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(format!("{}/v2/transactions", base_url(addr)))
+        .header("content-type", "application/x-bcs")
+        .body(body)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200, "BCS submission should be accepted");
+
+    let resp_body: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(resp_body["data"]["status"], "accepted");
+    assert_eq!(resp_body["data"]["hash"], expected_hash);
+    assert!(
+        resp_body["ledger"]["ledger_version"].is_number(),
+        "Response should include ledger metadata"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_e2e_submit_commit_verify_by_hash() {
+    let (addr, mut test_ctx, _v2_ctx, _handle) = start_v2_e2e_server().await;
+
+    let account = test_ctx.gen_account();
+    let txn = test_ctx.create_user_account(&account).await;
+    let hash = txn.committed_hash().to_hex_literal();
+
+    // Submit via v2 API.
+    let body = encode_versioned_bcs(txn);
+
+    let client = reqwest::Client::new();
+    let submit_resp = client
+        .post(format!("{}/v2/transactions", base_url(addr)))
+        .header("content-type", "application/x-bcs")
+        .body(body)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(submit_resp.status(), 200);
+
+    // Commit the transaction from mempool to DB.
+    test_ctx.commit_mempool_txns(1).await;
+
+    // Verify it's committed via GET.
+    let get_resp = client
+        .get(format!("{}/v2/transactions/{}", base_url(addr), hash))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        get_resp.status(),
+        200,
+        "Committed transaction should be found"
+    );
+
+    let resp_body: serde_json::Value = get_resp.json().await.unwrap();
+    assert_eq!(resp_body["data"]["type"], "user_transaction");
+    assert!(resp_body["data"]["success"].as_bool().unwrap_or(false));
+    assert!(resp_body["data"]["hash"].as_str().is_some());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_e2e_submit_and_wait_for_commit() {
+    // Use a longer wait timeout (10s) since the default is only 1s.
+    let (addr, mut test_ctx, _v2_ctx, _handle) = start_v2_e2e_server_ext(|cfg| {
+        cfg.api.wait_by_hash_timeout_ms = 10_000;
+    })
+    .await;
+
+    let account = test_ctx.gen_account();
+    let txn = test_ctx.create_user_account(&account).await;
+    let hash = txn.committed_hash().to_hex_literal();
+
+    // Submit via v2 API.
+    let body = encode_versioned_bcs(txn);
+
+    let client = reqwest::Client::new();
+    let submit_resp = client
+        .post(format!("{}/v2/transactions", base_url(addr)))
+        .header("content-type", "application/x-bcs")
+        .body(body)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(submit_resp.status(), 200);
+
+    // Start wait in background, then commit after a short delay.
+    let wait_client = client.clone();
+    let wait_url = format!("{}/v2/transactions/{}/wait", base_url(addr), hash);
+    let wait_handle = tokio::spawn(async move { wait_client.get(&wait_url).send().await.unwrap() });
+
+    // Give the wait endpoint a moment to start polling, then commit.
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    test_ctx.commit_mempool_txns(1).await;
+
+    // The wait should return the committed transaction.
+    let wait_resp = tokio::time::timeout(Duration::from_secs(15), wait_handle)
+        .await
+        .expect("Wait timed out")
+        .expect("Wait task failed");
+    assert_eq!(wait_resp.status(), 200, "Wait should return committed tx");
+
+    let resp_body: serde_json::Value = wait_resp.json().await.unwrap();
+    assert_eq!(resp_body["data"]["type"], "user_transaction");
+    assert!(resp_body["data"]["success"].as_bool().unwrap_or(false));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_e2e_ws_new_block_on_commit() {
+    let (addr, mut test_ctx, v2_ctx, _handle) = start_v2_e2e_server().await;
+
+    // Start the block poller so WebSocket clients receive notifications.
+    let ws_tx = v2_ctx.ws_broadcaster();
+    tokio::spawn(super::websocket::broadcaster::run_block_poller(
+        v2_ctx.clone(),
+        ws_tx,
+    ));
+
+    // Give the poller time to process the genesis block.
+    tokio::time::sleep(Duration::from_millis(300)).await;
+
+    // Connect WebSocket and subscribe to new_blocks.
+    let mut ws = ws_connect(addr).await;
+    let sub_resp = ws_send_recv(
+        &mut ws,
+        serde_json::json!({
+            "action": "subscribe",
+            "id": "e2e_blocks",
+            "type": "new_blocks"
+        }),
+    )
+    .await;
+    assert_eq!(sub_resp["type"], "subscribed");
+
+    // Create and commit a transaction (which produces a new block).
+    let account = test_ctx.gen_account();
+    let txn = test_ctx.create_user_account(&account).await;
+    test_ctx.commit_block(&vec![txn]).await;
+
+    // Wait for the WebSocket to deliver a new_block notification.
+    use futures::StreamExt;
+    let deadline = Duration::from_secs(5);
+    let start = std::time::Instant::now();
+    let mut got_new_block = false;
+
+    while start.elapsed() < deadline {
+        match tokio::time::timeout(Duration::from_secs(3), ws.next()).await {
+            Ok(Some(Ok(tungstenite::Message::Text(text)))) => {
+                let val: serde_json::Value = serde_json::from_str(&text).unwrap();
+                if val["type"] == "new_block" {
+                    // The committed block should have height > 0 (genesis is 0).
+                    let height = val["data"]["height"].as_u64().unwrap_or(0);
+                    if height > 0 {
+                        got_new_block = true;
+                        assert!(
+                            val["data"]["num_transactions"].as_u64().unwrap_or(0) > 0,
+                            "Block should have transactions"
+                        );
+                        break;
+                    }
+                }
+            },
+            _ => break,
+        }
+    }
+    assert!(
+        got_new_block,
+        "Should have received a new_block notification for the committed block"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_e2e_full_flow_account_creation() {
+    let (addr, mut test_ctx, _v2_ctx, _handle) = start_v2_e2e_server().await;
+
+    let account = test_ctx.gen_account();
+    let new_addr = format!("{}", account.address());
+
+    // Submit CreateAccount transaction via v2 API.
+    let client = reqwest::Client::new();
+    let txn = test_ctx.create_user_account(&account).await;
+    let hash = txn.committed_hash().to_hex_literal();
+    let body = encode_versioned_bcs(txn);
+
+    let submit_resp = client
+        .post(format!("{}/v2/transactions", base_url(addr)))
+        .header("content-type", "application/x-bcs")
+        .body(body)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(submit_resp.status(), 200);
+
+    let submit_body: serde_json::Value = submit_resp.json().await.unwrap();
+    assert_eq!(submit_body["data"]["hash"], hash);
+
+    // Commit the transaction.
+    test_ctx.commit_mempool_txns(1).await;
+
+    // Wait for the ledger info cache to expire (50ms TTL).
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    // Verify the committed transaction succeeded.
+    let tx_resp = client
+        .get(format!("{}/v2/transactions/{}", base_url(addr), hash))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        tx_resp.status(),
+        200,
+        "Committed CreateAccount transaction should be found"
+    );
+    let tx_body: serde_json::Value = tx_resp.json().await.unwrap();
+    assert!(
+        tx_body["data"]["success"].as_bool().unwrap_or(false),
+        "CreateAccount transaction should succeed"
+    );
+    assert_eq!(tx_body["data"]["type"], "user_transaction");
+
+    // Verify the new account is accessible via the accounts endpoint.
+    let acct_resp = client
+        .get(format!("{}/v2/accounts/{}", base_url(addr), new_addr))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(acct_resp.status(), 200, "Account info should be available");
+    let acct_body: serde_json::Value = acct_resp.json().await.unwrap();
+    assert!(
+        acct_body["data"]["sequence_number"].is_string(),
+        "Should have sequence_number"
+    );
+    assert_eq!(
+        acct_body["data"]["sequence_number"], "0",
+        "New account should have seq_num 0"
+    );
+
+    // Verify the ledger advanced from the committed transaction.
+    assert!(
+        acct_body["ledger"]["ledger_version"]
+            .as_u64()
+            .unwrap_or(0)
+            > 0,
+        "Ledger should have advanced past genesis"
     );
 }

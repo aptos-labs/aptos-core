@@ -6,6 +6,9 @@
 //! V2Error is the single error type returned by all v2 endpoints. It implements
 //! `axum::response::IntoResponse` so it can be used directly as a handler return type.
 //! Errors do NOT include ledger metadata.
+//!
+//! V2Error is ~144 bytes, which is intentional -- it carries structured fields
+//! (code, message, details, request_id) for rich API error responses.
 
 use axum::{
     http::StatusCode,
@@ -89,6 +92,9 @@ pub enum ErrorCode {
 
     // Gas
     GasEstimationFailed,
+
+    // Timeout
+    RequestTimeout,
 }
 
 impl ErrorCode {
@@ -115,9 +121,7 @@ impl ErrorCode {
             | ErrorCode::BlockNotFound
             | ErrorCode::TransactionNotFound => StatusCode::NOT_FOUND,
 
-            ErrorCode::Gone | ErrorCode::VersionPruned | ErrorCode::BlockPruned => {
-                StatusCode::GONE
-            },
+            ErrorCode::Gone | ErrorCode::VersionPruned | ErrorCode::BlockPruned => StatusCode::GONE,
 
             ErrorCode::PayloadTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
 
@@ -134,6 +138,8 @@ impl ErrorCode {
             ErrorCode::ServiceUnavailable | ErrorCode::MempoolFull => {
                 StatusCode::SERVICE_UNAVAILABLE
             },
+
+            ErrorCode::RequestTimeout => StatusCode::REQUEST_TIMEOUT,
 
             ErrorCode::WebSocketDisabled => StatusCode::NOT_IMPLEMENTED,
         }
@@ -199,6 +205,18 @@ impl V2Error {
             request_id: None,
             details: None,
             vm_status_code: None,
+        }
+    }
+
+    /// Create a request timeout error.
+    pub fn request_timeout(timeout_ms: u64) -> Self {
+        Self {
+            code: ErrorCode::RequestTimeout,
+            message: format!("Request timed out after {}ms", timeout_ms),
+            request_id: None,
+            details: None,
+            vm_status_code: None,
+            http_status: StatusCode::REQUEST_TIMEOUT,
         }
     }
 

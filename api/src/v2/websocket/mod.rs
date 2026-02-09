@@ -39,8 +39,8 @@ use std::{
 };
 use tokio::sync::{broadcast, mpsc, RwLock};
 use types::{
-    BlockSummary, EventData, EventFilter, SubscriptionType, TransactionStatusData,
-    WsClientMessage, WsEvent, WsServerMessage,
+    BlockSummary, EventData, EventFilter, SubscriptionType, TransactionStatusData, WsClientMessage,
+    WsEvent, WsServerMessage,
 };
 
 /// Subscription entry: the original type and a compiled filter (for events).
@@ -116,15 +116,8 @@ async fn handle_ws_connection(ctx: V2Context, socket: WebSocket) {
     while let Some(Ok(msg)) = ws_receiver.next().await {
         match msg {
             Message::Text(text) => {
-                handle_text_message(
-                    &ctx,
-                    &text,
-                    &subscriptions,
-                    &sub_counter,
-                    max_subs,
-                    &out_tx,
-                )
-                .await;
+                handle_text_message(&ctx, &text, &subscriptions, &sub_counter, max_subs, &out_tx)
+                    .await;
             },
             Message::Close(_) => break,
             Message::Ping(data) => {
@@ -175,10 +168,7 @@ async fn handle_text_message(
 
             // For transaction_status, spawn a dedicated poller task.
             if let SubscriptionType::TransactionStatus { ref hash } = subscription {
-                if let Ok(hash_value) = hash
-                    .strip_prefix("0x")
-                    .unwrap_or(hash)
-                    .parse::<HashValue>()
+                if let Ok(hash_value) = hash.strip_prefix("0x").unwrap_or(hash).parse::<HashValue>()
                 {
                     let tx_ctx = ctx.clone();
                     let tx_out = out_tx.clone();
@@ -230,9 +220,7 @@ async fn handle_text_message(
         Ok(WsClientMessage::Unsubscribe { id }) => {
             let mut subs = subscriptions.write().await;
             if subs.remove(&id).is_some() {
-                let _ = out_tx
-                    .send(WsServerMessage::Unsubscribed { id })
-                    .await;
+                let _ = out_tx.send(WsServerMessage::Unsubscribed { id }).await;
             } else {
                 let _ = out_tx
                     .send(WsServerMessage::Error {
@@ -377,11 +365,13 @@ async fn spawn_tx_status_tracker(
     let deadline = Instant::now() + timeout;
 
     // Send initial "pending" status.
+    let hash_hex = hash.to_hex_literal();
+
     let _ = tx
         .send(WsServerMessage::TransactionStatusUpdate {
             subscription_id: subscription_id.clone(),
             data: TransactionStatusData::Pending {
-                hash: format!("0x{}", hash),
+                hash: hash_hex.clone(),
             },
         })
         .await;
@@ -392,7 +382,7 @@ async fn spawn_tx_status_tracker(
                 .send(WsServerMessage::TransactionStatusUpdate {
                     subscription_id: subscription_id.clone(),
                     data: TransactionStatusData::NotFound {
-                        hash: format!("0x{}", hash),
+                        hash: hash_hex.clone(),
                     },
                 })
                 .await;
@@ -410,7 +400,7 @@ async fn spawn_tx_status_tracker(
                     .send(WsServerMessage::TransactionStatusUpdate {
                         subscription_id: subscription_id.clone(),
                         data: TransactionStatusData::Committed {
-                            hash: format!("0x{}", hash),
+                            hash: hash_hex.clone(),
                             version: txn.version,
                             success,
                             vm_status,

@@ -38,9 +38,7 @@ pub enum SubscriptionType {
     /// Subscribe to new committed blocks.
     NewBlocks,
     /// Subscribe to transaction status updates for a specific hash.
-    TransactionStatus {
-        hash: String,
-    },
+    TransactionStatus { hash: String },
     /// Subscribe to events matching a filter.
     Events {
         /// Single event type filter (backward compatibility).
@@ -113,11 +111,9 @@ impl EventFilter {
             })
             .collect();
 
-        let sender = sender.as_ref().map(|s| {
-            s.strip_prefix("0x")
-                .unwrap_or(s)
-                .to_lowercase()
-        });
+        let sender = sender
+            .as_ref()
+            .map(|s| s.strip_prefix("0x").unwrap_or(s).to_lowercase());
 
         Self {
             type_patterns,
@@ -292,12 +288,8 @@ mod tests {
 
     #[test]
     fn test_module_wildcard() {
-        let filter = EventFilter::from_subscription(
-            &Some("0x1::coin::*".to_string()),
-            &None,
-            &None,
-            &None,
-        );
+        let filter =
+            EventFilter::from_subscription(&Some("0x1::coin::*".to_string()), &None, &None, &None);
         assert!(filter.matches_type("0x1::coin::DepositEvent"));
         assert!(filter.matches_type("0x1::coin::WithdrawEvent"));
         assert!(!filter.matches_type("0x1::aptos_coin::MintEvent"));
@@ -305,12 +297,8 @@ mod tests {
 
     #[test]
     fn test_address_wildcard() {
-        let filter = EventFilter::from_subscription(
-            &Some("0x1::*".to_string()),
-            &None,
-            &None,
-            &None,
-        );
+        let filter =
+            EventFilter::from_subscription(&Some("0x1::*".to_string()), &None, &None, &None);
         assert!(filter.matches_type("0x1::coin::DepositEvent"));
         assert!(filter.matches_type("0x1::aptos_coin::MintEvent"));
         assert!(!filter.matches_type("0x2::nft::TransferEvent"));
@@ -353,12 +341,8 @@ mod tests {
 
     #[test]
     fn test_sender_filter() {
-        let filter = EventFilter::from_subscription(
-            &None,
-            &None,
-            &Some("0xABCD".to_string()),
-            &None,
-        );
+        let filter =
+            EventFilter::from_subscription(&None, &None, &Some("0xABCD".to_string()), &None);
         assert!(filter.matches_sender(&Some("0xabcd".to_string())));
         assert!(filter.matches_sender(&Some("abcd".to_string())));
         assert!(!filter.matches_sender(&Some("0x1234".to_string())));
@@ -397,28 +381,12 @@ mod tests {
             &Some(50),
         );
         // Matches: right type, right sender, right version
-        assert!(filter.matches(
-            "0x1::coin::DepositEvent",
-            &Some("0xabc".to_string()),
-            100
-        ));
+        assert!(filter.matches("0x1::coin::DepositEvent", &Some("0xabc".to_string()), 100));
         // Wrong type
-        assert!(!filter.matches(
-            "0x2::nft::Transfer",
-            &Some("0xabc".to_string()),
-            100
-        ));
+        assert!(!filter.matches("0x2::nft::Transfer", &Some("0xabc".to_string()), 100));
         // Wrong sender
-        assert!(!filter.matches(
-            "0x1::coin::DepositEvent",
-            &Some("0x999".to_string()),
-            100
-        ));
+        assert!(!filter.matches("0x1::coin::DepositEvent", &Some("0x999".to_string()), 100));
         // Version too low
-        assert!(!filter.matches(
-            "0x1::coin::DepositEvent",
-            &Some("0xabc".to_string()),
-            10
-        ));
+        assert!(!filter.matches("0x1::coin::DepositEvent", &Some("0xabc".to_string()), 10));
     }
 }

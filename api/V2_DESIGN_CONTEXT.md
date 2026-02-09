@@ -1,5 +1,13 @@
 # V2 Design: Context Layer
 
+> **Status: Implemented.** This document was written as a pre-implementation design.
+> The final implementation follows this design closely with the following notable additions:
+>
+> - **TTL-cached ledger info** (`ledger_info()` uses a 50ms TTL `RwLock` cache; `ledger_info_uncached()` bypasses it)
+> - **Graceful shutdown signaling** via `tokio::sync::watch<bool>` (`trigger_shutdown()`, `shutdown_receiver()`, `shutdown_signal()`)
+> - **Metrics** are global `Lazy` statics in `v2/metrics.rs` rather than a `V2Metrics` struct on `V2Context`
+> - **SSE support** — block poller starts when either `websocket_enabled` or `sse_enabled` is true
+
 ## Overview
 
 The `Context` struct (`api/src/context.rs`) is the backbone of the v1 API. Every endpoint
@@ -137,17 +145,27 @@ pub struct V2Context {
     /// The shared v1 context. Provides DB, mempool, gas caches, etc.
     inner: Arc<Context>,
 
-    /// Broadcast channel for WebSocket events (new blocks, events, tx status).
-    /// Handlers that detect new data send to this channel; WebSocket connections
+    /// Broadcast channel for WebSocket/SSE events (new blocks, events).
+    /// The block poller sends to this channel; WebSocket/SSE connections
     /// subscribe by calling `ws_broadcaster.subscribe()`.
     ws_broadcaster: broadcast::Sender<WsEvent>,
 
     /// v2-specific configuration (parsed from NodeConfig at startup).
     v2_config: Arc<V2Config>,
 
-    /// v2 request metrics (separate from v1 metrics so we can track adoption).
-    v2_metrics: Arc<V2Metrics>,
+    /// TTL-cached ledger info (50ms expiry). Avoids redundant DB reads
+    /// under high QPS. Bypassed by `ledger_info_uncached()`.
+    ledger_info_cache: Arc<RwLock<Option<(LedgerInfo, Instant)>>>,
+
+    /// Shutdown signal sender. `trigger_shutdown()` sets this to true.
+    shutdown_tx: Arc<watch::Sender<bool>>,
+
+    /// Shutdown signal receiver. Background tasks clone this to detect shutdown.
+    shutdown_rx: watch::Receiver<bool>,
 }
+
+// Note: Metrics are global Lazy statics in v2/metrics.rs (not a V2Metrics struct).
+// This avoids issues with re-registration in tests and is the standard Aptos pattern.
 ```
 
 ### Relationship Diagram
@@ -704,6 +722,11 @@ pub struct V2Config {
     pub view_filter: ViewFilter,  // Reuse v1's ViewFilter type
     pub wait_by_hash_timeout_ms: u64,
     pub wait_by_hash_poll_interval_ms: u64,
+    pub request_timeout_ms: u64,              // Per-request timeout (0 = disabled)
+    pub graceful_shutdown_timeout_ms: u64,    // Connection drain timeout (0 = immediate)
+    pub tls_cert_path: Option<String>,        // PEM cert path for TLS
+    pub tls_key_path: Option<String>,         // PEM key path for TLS
+    pub sse_enabled: bool,                    // Enable SSE endpoints (default: true)
 }
 
 impl From<&NodeConfig> for V2Config {
@@ -739,33 +762,24 @@ impl From<&NodeConfig> for V2Config {
 
 ## V2 Metrics
 
+Metrics are defined as global `Lazy` statics in `api/src/v2/metrics.rs`, following the
+standard Aptos pattern. All metric names are prefixed with `aptos_api_v2_`.
+
 ```rust
-// api/src/v2/metrics.rs
+// api/src/v2/metrics.rs (actual implementation)
 
-pub struct V2Metrics {
-    pub request_duration: HistogramVec,  // by method, path, status
-    pub request_count: IntCounterVec,    // by method, path, status
-    pub ws_active_connections: IntGauge,
-    pub ws_active_subscriptions: IntGauge,
-    pub ws_messages_sent: IntCounterVec, // by subscription_type
-    pub batch_request_size: HistogramVec,
-    pub batch_request_duration: HistogramVec,
-}
-
-impl V2Metrics {
-    pub fn new() -> Self {
-        Self {
-            request_duration: register_histogram_vec!(
-                "aptos_api_v2_request_duration_seconds",
-                "v2 API request duration",
-                &["method", "path", "status"],
-                SUB_MS_BUCKETS.to_vec()
-            ).unwrap(),
-            // ... etc
-        }
-    }
-}
+pub static REQUEST_DURATION: Lazy<HistogramVec> = Lazy::new(|| { ... });
+pub static REQUEST_COUNT: Lazy<IntCounterVec> = Lazy::new(|| { ... });
+pub static INFLIGHT_REQUESTS: Lazy<IntGauge> = Lazy::new(|| { ... });
+pub static WS_ACTIVE_CONNECTIONS: Lazy<IntGauge> = Lazy::new(|| { ... });
+pub static WS_MESSAGES_SENT: Lazy<IntCounterVec> = Lazy::new(|| { ... });
+pub static BATCH_SIZE: Lazy<HistogramVec> = Lazy::new(|| { ... });
+pub static REQUEST_TIMEOUTS: Lazy<IntCounterVec> = Lazy::new(|| { ... });
+pub static LEDGER_INFO_CACHE: Lazy<IntCounterVec> = Lazy::new(|| { ... });
 ```
+
+Path normalization in the logging middleware prevents label cardinality explosion
+by replacing dynamic segments (`0x1`, `0xabc...`) with `:address`, `:hash`, etc.
 
 ---
 

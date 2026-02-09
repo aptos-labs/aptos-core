@@ -75,8 +75,8 @@ pub async fn get_account_transactions_handler(
             .iter()
             .map(|s| TransactionSummary {
                 version: s.version(),
-                hash: format!("0x{}", s.transaction_hash()),
-                sender: format!("0x{}", s.sender()),
+                hash: s.transaction_hash().to_hex_literal(),
+                sender: format!("{}", s.sender()),
             })
             .collect();
 

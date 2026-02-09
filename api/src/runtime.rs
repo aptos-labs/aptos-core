@@ -23,7 +23,7 @@ use crate::{
 };
 use anyhow::{anyhow, Context as AnyhowContext};
 use aptos_config::config::{ApiConfig, NodeConfig};
-use aptos_logger::info;
+use aptos_logger::{info, warn};
 use aptos_mempool::MempoolClientSender;
 use aptos_storage_interface::DbReader;
 use aptos_types::{chain_id::ChainId, indexer::indexer_db_reader::IndexerReader};
@@ -60,14 +60,15 @@ pub fn bootstrap(
         let v2_config = V2Config::from_configs(&config.api_v2, &config.api);
         let v2_ctx = V2Context::new(context.clone(), v2_config);
 
-        // Start the WebSocket block poller if WebSocket is enabled.
-        if config.api_v2.websocket_enabled {
+        // Start the block poller if WebSocket or SSE is enabled (both share the broadcaster).
+        if config.api_v2.websocket_enabled || config.api_v2.sse_enabled {
             let poller_ctx = v2_ctx.clone();
             let ws_tx = v2_ctx.ws_broadcaster();
             runtime.spawn(async move {
                 crate::v2::websocket::broadcaster::run_block_poller(poller_ctx, ws_tx).await;
             });
-            info!("v2 API WebSocket block poller started");
+            info!("v2 API block poller started (ws={}, sse={})",
+                config.api_v2.websocket_enabled, config.api_v2.sse_enabled);
         }
 
         // Build optional TLS acceptor if configured.
@@ -82,26 +83,48 @@ pub fn bootstrap(
             None
         };
 
+        // Listen for OS shutdown signals (SIGINT / Ctrl+C) and propagate to
+        // the V2Context so background tasks and the server can drain gracefully.
+        let ctx_for_signal = v2_ctx.clone();
+        runtime.spawn(async move {
+            let _ = tokio::signal::ctrl_c().await;
+            info!("[v2] Received shutdown signal, initiating graceful shutdown...");
+            ctx_for_signal.trigger_shutdown();
+        });
+
+        let drain_timeout_ms = v2_ctx.v2_config.graceful_shutdown_timeout_ms;
+
         if let Some(v2_address) = config.api_v2.address {
             // ---- Separate port mode ----
             // Poem serves v1 on the main port; Axum serves v2 on a separate port.
             attach_poem_to_runtime(runtime.handle(), context.clone(), config, false, port_tx)
                 .context("Failed to attach poem to runtime")?;
 
-            let v2_router = build_v2_router(v2_ctx);
+            let v2_router = build_v2_router(v2_ctx.clone());
+            let shutdown_rx = v2_ctx.shutdown_receiver();
             info!("Starting v2 API on separate port {}", v2_address);
             runtime.spawn(async move {
                 let listener = tokio::net::TcpListener::bind(v2_address)
                     .await
                     .expect("Failed to bind v2 API listener");
                 if let Some(tls_acceptor) = tls_acceptor {
-                    // TLS mode: ALPN negotiation for h2 + http/1.1.
-                    crate::v2::tls::serve_tls(listener, tls_acceptor, v2_router, None).await;
+                    crate::v2::tls::serve_tls(
+                        listener,
+                        tls_acceptor,
+                        v2_router,
+                        None,
+                        shutdown_rx,
+                        drain_timeout_ms,
+                    )
+                    .await;
                 } else {
-                    // Plain mode: h2c + HTTP/1.1 via axum::serve.
-                    axum::serve(listener, v2_router)
-                        .await
-                        .expect("v2 API server failed");
+                    serve_with_graceful_shutdown(
+                        listener,
+                        v2_router,
+                        shutdown_rx,
+                        drain_timeout_ms,
+                    )
+                    .await;
                 }
             });
         } else {
@@ -123,7 +146,8 @@ pub fn bootstrap(
                 poem_address, config.api.address
             );
 
-            let combined = build_combined_router(v2_ctx, poem_address);
+            let combined = build_combined_router(v2_ctx.clone(), poem_address);
+            let shutdown_rx = v2_ctx.shutdown_receiver();
             let external_addr = config.api.address;
 
             runtime.spawn(async move {
@@ -131,16 +155,22 @@ pub fn bootstrap(
                     .await
                     .expect("Failed to bind combined API listener");
                 if let Some(tls_acceptor) = tls_acceptor {
-                    // TLS mode: ALPN negotiation for h2 + http/1.1.
-                    crate::v2::tls::serve_tls(listener, tls_acceptor, combined, port_tx).await;
+                    crate::v2::tls::serve_tls(
+                        listener,
+                        tls_acceptor,
+                        combined,
+                        port_tx,
+                        shutdown_rx,
+                        drain_timeout_ms,
+                    )
+                    .await;
                 } else {
-                    // Plain mode: send port, then serve h2c + HTTP/1.1.
+                    // Plain mode: send port, then serve with graceful shutdown.
                     if let Some(port_tx) = port_tx {
                         let _ = port_tx.send(listener.local_addr().unwrap().port());
                     }
-                    axum::serve(listener, combined)
-                        .await
-                        .expect("Combined API server failed");
+                    serve_with_graceful_shutdown(listener, combined, shutdown_rx, drain_timeout_ms)
+                        .await;
                 }
             });
         }
@@ -380,6 +410,47 @@ async fn root_handler() -> Html<&'static str> {
 </body>
 </html>";
     Html(response)
+}
+
+/// Serve an Axum router with graceful shutdown support.
+///
+/// When the `shutdown_rx` watch channel receives `true`, the server stops
+/// accepting new connections and drains in-flight requests. If the drain
+/// does not complete within `drain_timeout_ms`, the server shuts down
+/// immediately.
+async fn serve_with_graceful_shutdown(
+    listener: tokio::net::TcpListener,
+    router: axum::Router,
+    shutdown_rx: tokio::sync::watch::Receiver<bool>,
+    drain_timeout_ms: u64,
+) {
+    let mut rx1 = shutdown_rx.clone();
+    let mut rx2 = shutdown_rx;
+
+    let server = axum::serve(listener, router).with_graceful_shutdown(async move {
+        let _ = rx1.wait_for(|&v| v).await;
+        info!("[v2] Graceful shutdown signal received, draining connections...");
+    });
+
+    tokio::select! {
+        result = server => {
+            if let Err(e) = result {
+                warn!("[v2] Server error: {}", e);
+            }
+            info!("[v2] Server shut down gracefully");
+        }
+        _ = async {
+            let _ = rx2.wait_for(|&v| v).await;
+            if drain_timeout_ms > 0 {
+                tokio::time::sleep(std::time::Duration::from_millis(drain_timeout_ms)).await;
+            }
+        } => {
+            warn!(
+                "[v2] Graceful shutdown drain timeout ({}ms) exceeded, forcing close",
+                drain_timeout_ms
+            );
+        }
+    }
 }
 
 /// Returns the maximum number of runtime workers to be given to the

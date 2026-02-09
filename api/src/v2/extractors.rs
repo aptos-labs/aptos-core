@@ -21,6 +21,7 @@ pub enum Versioned<V1> {
 }
 
 impl<V1: serde::de::DeserializeOwned> Versioned<V1> {
+    #[allow(clippy::result_large_err)]
     pub fn from_bcs(bytes: &[u8]) -> Result<Self, V2Error> {
         bcs::from_bytes(bytes).map_err(|e| {
             V2Error::bad_request(
