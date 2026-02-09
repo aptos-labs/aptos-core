@@ -22,6 +22,10 @@ pub use revela::get_revela_path;
 use self_update::{update::ReleaseUpdate, version::bump_is_greater, Status};
 pub use tool::UpdateTool;
 
+/// URL to the Aptos CLI CHANGELOG for directing users to review breaking changes.
+const CHANGELOG_URL: &str =
+    "https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/CHANGELOG.md";
+
 /// Things that implement this trait are able to update a binary.
 trait BinaryUpdater {
     /// For checking the version but not updating
@@ -55,10 +59,10 @@ trait BinaryUpdater {
             .update()
             .map_err(|e| anyhow!("Failed to update {}: {:#}", self.pretty_name(), e))?;
 
-        let message = match result {
+        let mut message = match result {
             Status::UpToDate(_) => unreachable!("We should have caught this already"),
             Status::Updated(_) => match info.current_version {
-                Some(current_version) => format!(
+                Some(ref current_version) => format!(
                     "Successfully updated {} from v{} to v{}",
                     self.pretty_name(),
                     current_version,
@@ -73,6 +77,14 @@ trait BinaryUpdater {
                 },
             },
         };
+
+        if info.is_major_version_bump() {
+            message.push_str(&format!(
+                "\n\nThis is a major version update which may include breaking changes. \
+                 Please review the changelog for details:\n  {}",
+                CHANGELOG_URL
+            ));
+        }
 
         Ok(message)
     }
@@ -108,6 +120,20 @@ impl UpdateRequiredInfo {
             None => Ok(true),
         }
     }
+
+    /// Returns true if the update involves a major version change (e.g. 6.x.x -> 7.x.x).
+    pub fn is_major_version_bump(&self) -> bool {
+        if let Some(ref current_version) = self.current_version {
+            let current_major = current_version.split('.').next();
+            let target_major = self.target_version.split('.').next();
+            match (current_major, target_major) {
+                (Some(c), Some(t)) => c != t,
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
 }
 
 async fn update_binary<Updater: BinaryUpdater + Sync + Send + 'static>(
@@ -118,8 +144,16 @@ async fn update_binary<Updater: BinaryUpdater + Sync + Send + 'static>(
         let info = tokio::task::spawn_blocking(move || updater.get_update_info())
             .await
             .context(format!("Failed to check {} version", name))??;
-        if info.current_version.unwrap_or_default() != info.target_version {
-            return Ok(format!("Update is available ({})", info.target_version));
+        if info.current_version.as_deref().unwrap_or_default() != info.target_version {
+            let mut message = format!("Update is available ({})", info.target_version);
+            if info.is_major_version_bump() {
+                message.push_str(&format!(
+                    "\n\nThis is a major version update which may include breaking changes. \
+                     Please review the changelog for details:\n  {}",
+                    CHANGELOG_URL
+                ));
+            }
+            return Ok(message);
         }
 
         return Ok(format!("Already up to date ({})", info.target_version));
