@@ -32,6 +32,9 @@ use triomphe::Arc as TriompheArc;
 /// Cache for struct layouts constructed during a single layout construction pass.
 /// On cache hit, the `Arc<MoveStructLayout>` is shared (cheap clone), and the
 /// node count is not re-incremented, avoiding spurious `TOO_MANY_TYPE_NODES` errors.
+/// Invariant: this cache must be scoped to one traversal only (one top-level
+/// layout construction). Reusing it across passes could hide depth/cycle checks
+/// and keep cyclic layouts alive; discarding it after the pass avoids leaks.
 type StructLayoutCache = HashMap<(StructNameIndex, Vec<Type>), (Arc<MoveStructLayout>, bool)>;
 
 /// Stores type layout as well as a flag if it contains any delayed fields.
