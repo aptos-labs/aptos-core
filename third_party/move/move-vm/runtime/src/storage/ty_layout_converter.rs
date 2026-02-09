@@ -396,12 +396,16 @@ where
         // Check the per-construction-pass cache. On hit, return the shared Arc without
         // re-constructing or re-counting nodes.
         let cache_key = (*idx, ty_args.to_vec());
-        if let Some((cached_layout, contains_delayed_fields)) = struct_layout_cache.get(&cache_key)
-        {
-            return Ok((
-                MoveTypeLayout::Struct(cached_layout.clone()),
-                *contains_delayed_fields,
-            ));
+        let use_local_cache = self.vm_config().enable_struct_layout_local_cache;
+        if use_local_cache {
+            if let Some((cached_layout, contains_delayed_fields)) =
+                struct_layout_cache.get(&cache_key)
+            {
+                return Ok((
+                    MoveTypeLayout::Struct(cached_layout.clone()),
+                    *contains_delayed_fields,
+                ));
+            }
         }
         let struct_definition = self.struct_definition_loader.load_struct_definition(
             gas_meter,
@@ -597,8 +601,10 @@ where
         };
 
         // Cache the constructed struct layout for reuse within this construction pass.
-        if let MoveTypeLayout::Struct(arc_layout) = &result.0 {
-            struct_layout_cache.insert(cache_key, (arc_layout.clone(), result.1));
+        if use_local_cache {
+            if let MoveTypeLayout::Struct(arc_layout) = &result.0 {
+                struct_layout_cache.insert(cache_key, (arc_layout.clone(), result.1));
+            }
         }
 
         Ok(result)
