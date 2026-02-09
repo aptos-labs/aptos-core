@@ -1873,7 +1873,7 @@ impl ExpData {
     /// Collect struct-related operations including unpacking
     pub fn struct_usage(&self, env: &GlobalEnv, usage: &mut BTreeSet<QualifiedId<StructId>>) {
         self.visit_post_order(&mut |e| {
-            if let ExpData::Call(_, oper, _) = e {
+            if let ExpData::Call(id, oper, _) = e {
                 use Operation::*;
                 match oper {
                     SelectVariants(mid, sid, ..)
@@ -1884,6 +1884,18 @@ impl ExpData {
                         usage.insert(mid.qualified(*sid));
                     },
                     _ => {},
+                }
+                // Collect structs from type instantiations for ALL Call operations
+                if let Some(inst) = env.get_node_instantiation_opt(*id) {
+                    for ty in inst {
+                        ty.visit(&mut |t| {
+                            if let Type::Struct(mid, sid, _) = t {
+                                if env.get_module_opt(*mid).is_some() {
+                                    usage.insert(mid.qualified(*sid));
+                                }
+                            }
+                        });
+                    }
                 }
             } else {
                 match e {
