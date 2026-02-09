@@ -1,0 +1,21 @@
+//# run
+script
+entry public fun main()
+    local l0: bool
+    ld_true
+    st_loc l0
+    move_loc l0
+    br_true l0
+    ld_false
+    not
+    br_false l1
+    ld_u64 42
+    abort
+l1: branch l2
+l0: ret
+l2: ld_false
+    not
+    br_false l3
+    ld_u64 43
+    abort
+l3: ret

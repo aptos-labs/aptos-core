@@ -1,0 +1,14 @@
+//# publish
+module 0x1::Token
+struct T has key
+  b: bool
+
+public fun test()
+    local l0: bool
+    ld_true
+    pack T
+    ld_true
+    pack T
+    eq
+    st_loc l0
+    ret

@@ -222,7 +222,6 @@ members = [
     "third_party/move/move-ir-compiler/move-bytecode-source-map",
     "third_party/move/move-ir-compiler/move-ir-to-bytecode",
     "third_party/move/move-ir-compiler/move-ir-to-bytecode/syntax",
-    "third_party/move/move-ir-compiler/transactional-tests",
     "third_party/move/move-ir/types",
     "third_party/move/move-model",
     "third_party/move/move-model/bytecode",

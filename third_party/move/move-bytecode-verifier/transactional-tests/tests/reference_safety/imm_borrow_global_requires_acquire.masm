@@ -1,0 +1,10 @@
+//# publish
+module 0x1::A
+struct T1 has key
+  b: bool
+
+public fun test(l0: address)
+    move_loc l0
+    borrow_global T1
+    pop
+    ret

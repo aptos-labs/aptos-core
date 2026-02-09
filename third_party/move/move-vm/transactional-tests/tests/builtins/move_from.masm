@@ -1,0 +1,63 @@
+//# publish
+module 0x1::M
+struct R has key
+  x: bool
+
+public fun publish(l0: &signer)
+    move_loc l0
+    ld_false
+    pack R
+    move_to R
+    ret
+
+public fun take_off_and_consume(l0: address) acquires R
+    local l1: bool
+    move_loc l0
+    move_from R
+    unpack R
+    st_loc l1
+    ret
+
+public fun verify_effects(l0: address)
+    move_loc l0
+    exists R
+    not
+    not
+    br_false l0
+    ld_u64 1000
+    abort
+l0: ret
+
+
+
+//# run --signers 0x1
+script
+use 0x1::M
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call M::publish
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x1::M
+use 0x1::signer
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call signer::address_of
+    call M::take_off_and_consume
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x1::M
+use 0x1::signer
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call signer::address_of
+    call M::verify_effects
+    ret
