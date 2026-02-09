@@ -747,6 +747,10 @@ impl StateStore {
         &self.buffered_state
     }
 
+    pub fn set_hot_state_progress(&self, state: State) {
+        self.persisted_state.set_hot_state_progress(state);
+    }
+
     pub fn current_state_locked(&self) -> MutexGuard<'_, LedgerStateWithSummary> {
         self.current_state.lock()
     }

@@ -652,6 +652,14 @@ pub trait DbWriter: Send + Sync {
     ) -> Result<()> {
         unimplemented!()
     }
+
+    /// Advance the hot state progress. The persisted state from `StateMerkleBatchCommitter` may
+    /// be ahead of what is safe to expose through the hot state (due to in-flight speculative
+    /// executions). The block executor calls this once all in-flight executions up to the given
+    /// state have finished.
+    fn set_hot_state_progress(&self, _state: State) {
+        unimplemented!()
+    }
 }
 
 #[derive(Clone)]
