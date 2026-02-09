@@ -10,10 +10,10 @@ module addr::exceed_limit {
     use aptos_token::token::TokenId;
 
     // This struct is too large and exceeds the maximum allowed number of type nodes.
-    enum MyStructEnum has key, store {
-        V1 { x: MyStruct },
-        V2 { x: MyStruct, y: u64 },
-        V3 { x: MyStruct, y: u64, z: u64 },
+    enum MyStructEnum<T> has key, store {
+        V1 { x: T },
+        V2 { x: T, y: T },
+        V3 { x: T, y: T, z: T },
     }
 
     struct MyStruct has key, store {
@@ -85,10 +85,25 @@ module addr::exceed_limit {
 
 
     fun init_module(source_account: &signer) {
+        let x = make_enum(source_account);
+        let y = make_enum(source_account);
+        let z = make_enum(source_account);
+        let enum = MyStructEnum::V3 { x, y, z };
+        move_to(source_account, enum);
+    }
+
+    fun make_enum(source_account: &signer): MyStructEnum<MyStruct> {
+        let x = make_struct(source_account);
+        let y = make_struct(source_account);
+        let z = make_struct(source_account);
+        MyStructEnum::V3 { x, y, z }
+    }
+
+    fun make_struct(source_account: &signer): MyStruct {
         let list = vector::empty<address>();
         let account_addr = signer::address_of(source_account);
-        vector::push_back(&mut list, account_addr);
-        let x = MyStruct {
+        list.push_back(account_addr);
+        MyStruct {
             token_owner: simple_map::create(),
             owners: list,
             game_servers: list,
@@ -107,11 +122,7 @@ module addr::exceed_limit {
             tracks_owners: simple_map::create(),
             latest_epoch_update: 0,
             counter: 0,
-        };
-        move_to(
-            source_account,
-            MyStructEnum::V3 { x, y: 1, z: 2 },
-        );
+        }
     }
 
     fun mint_nft(source_account: &signer) {

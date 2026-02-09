@@ -3,7 +3,9 @@
 
 pub use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_gas_schedule::{
-    gas_feature_versions::{RELEASE_V1_15, RELEASE_V1_30, RELEASE_V1_34, RELEASE_V1_38},
+    gas_feature_versions::{
+        RELEASE_V1_15, RELEASE_V1_30, RELEASE_V1_34, RELEASE_V1_38, RELEASE_V1_41,
+    },
     AptosGasParameters,
 };
 use aptos_types::{
@@ -212,7 +214,9 @@ pub fn aptos_prod_vm_config(
     let enable_enum_option = features.is_enabled(FeatureFlag::ENABLE_ENUM_OPTION);
     let enable_framework_for_option = features.is_enabled(FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION);
 
-    let layout_max_size = if gas_feature_version >= RELEASE_V1_30 {
+    let layout_max_size = if gas_feature_version >= RELEASE_V1_41 {
+        1024
+    } else if gas_feature_version >= RELEASE_V1_30 {
         512
     } else {
         256
