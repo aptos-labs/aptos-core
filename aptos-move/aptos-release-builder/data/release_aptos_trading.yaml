@@ -1,0 +1,17 @@
+---
+remote_endpoint: https://fullnode.mainnet.aptoslabs.com
+# replace with below for actual release, compat test needs concrete URL above:
+# remote_endpoint: ~
+name: "v1.41.0-aptos-trading"
+proposals:
+  - name: proposal_deploy_aptos_trading
+    metadata:
+      title: "Deploy aptos-trading (AIP 120) to mainnet"
+      description: "This includes initial deployment of aptos-trading to mainnet"
+    execution_mode: MultiStep
+    update_sequence:
+      - Framework:
+          bytecode_version: 8
+          git_hash: ~
+          packages:
+            - "aptos-trading"
