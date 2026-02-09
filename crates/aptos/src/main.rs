@@ -26,9 +26,8 @@ fn main() {
     // Spawn a background version check (non-blocking, at most once per day).
     // This reads a local cache file and prints a notice to stderr if a newer
     // version is available. A background task refreshes the cache if stale.
-    let _version_check_handle = runtime.block_on(async {
-        version_check::check_for_update_and_notify()
-    });
+    let _version_check_handle =
+        runtime.block_on(async { version_check::check_for_update_and_notify() });
 
     // Run the corresponding tool.
     let result = runtime.block_on(Tool::parse().execute());
