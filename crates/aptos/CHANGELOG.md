@@ -3,7 +3,7 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # Unreleased
-- Update localnet indexer processors to aptos-indexer-processors-v2.3.0 and processor SDK to aptos-indexer-processor-sdk-v2.1.4. This removes the events processor (now folded into the default processor) and upgrades diesel to v2.3.
+- Updated localnet indexer processors to aptos-indexer-processors-v2.3.0 and processor SDK to aptos-indexer-processor-sdk-v2.1.4. This removes the events processor and upgrades diesel to v2.3. Also updated Hasura metadata accordingly.
 
 ## [7.14.2]
 - Transaction Simulation Session: fix support for simulating transactions that use on-chain randomness (local mode only)
