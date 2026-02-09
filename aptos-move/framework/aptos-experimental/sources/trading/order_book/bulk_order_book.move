@@ -51,7 +51,6 @@ module aptos_experimental::bulk_order_book {
     use aptos_trading::order_book_types::{
         bulk_order_type,
         OrderId,
-        next_order_id,
         next_increasing_idx_type
     };
     use aptos_trading::order_match_types::{
@@ -67,6 +66,7 @@ module aptos_experimental::bulk_order_book {
         new_bulk_order_place_response_success,
         new_bulk_order_place_response_rejection
     };
+    use aptos_experimental::order_id_generation::next_order_id;
     use aptos_experimental::order_book_utils;
     use aptos_experimental::bulk_order_utils;
 

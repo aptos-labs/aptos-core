@@ -247,34 +247,7 @@ Single Order Types Module
 
 
 
-<pre><code><b>const</b> <a href="single_order_types.md#0x5_single_order_types_EINVALID_ORDER_SIZE_DECREASE">EINVALID_ORDER_SIZE_DECREASE</a>: u64 = 4;
-</code></pre>
-
-
-
-<a id="0x5_single_order_types_EINVALID_TRIGGER_CONDITION"></a>
-
-
-
-<pre><code><b>const</b> <a href="single_order_types.md#0x5_single_order_types_EINVALID_TRIGGER_CONDITION">EINVALID_TRIGGER_CONDITION</a>: u64 = 2;
-</code></pre>
-
-
-
-<a id="0x5_single_order_types_EORDER_ALREADY_EXISTS"></a>
-
-
-
-<pre><code><b>const</b> <a href="single_order_types.md#0x5_single_order_types_EORDER_ALREADY_EXISTS">EORDER_ALREADY_EXISTS</a>: u64 = 1;
-</code></pre>
-
-
-
-<a id="0x5_single_order_types_INVALID_MATCH_RESULT"></a>
-
-
-
-<pre><code><b>const</b> <a href="single_order_types.md#0x5_single_order_types_INVALID_MATCH_RESULT">INVALID_MATCH_RESULT</a>: u64 = 3;
+<pre><code><b>const</b> <a href="single_order_types.md#0x5_single_order_types_EINVALID_ORDER_SIZE_DECREASE">EINVALID_ORDER_SIZE_DECREASE</a>: u64 = 1;
 </code></pre>
 
 
