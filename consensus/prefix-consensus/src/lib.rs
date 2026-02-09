@@ -63,14 +63,14 @@ pub use types::{
     Element, PartyId, PrefixConsensusInput, PrefixConsensusOutput, PrefixVector, Round, Vote1,
     Vote2, Vote3, QC1, QC2, QC3,
 };
-pub use utils::{consistency_check, max_common_prefix, min_common_extension};
+pub use utils::{consistency_check, first_non_bot, max_common_prefix, min_common_extension};
 pub use verification::{
     qc1_view, qc2_view, qc3_view, verify_qc1, verify_qc2, verify_qc3, verify_vote1, verify_vote2,
     verify_vote3,
 };
 pub use certificates::{
-    Certificate, DirectCertificate, EmptyViewMessage, EmptyViewStatement, HighestKnownView,
-    IndirectCertificate,
+    cert_reaches_view1, Certificate, DirectCertificate, EmptyViewMessage, EmptyViewStatement,
+    HighestKnownView, IndirectCertificate, StrongPCCommit, StrongPCCommitError,
 };
 pub use view_state::{
     has_certifiable_high, has_committable_low, has_non_bot_entry, RankingManager, ViewOutput,

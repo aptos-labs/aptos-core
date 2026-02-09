@@ -57,7 +57,7 @@ Implementing Prefix Consensus protocols (from research paper "Prefix Consensus F
 - Direct routing in check_epoch() (bypasses UnverifiedEvent)
 
 **Testing**:
-- Unit tests: All 102 tests passing
+- Unit tests: All 134 tests passing
 - Smoke tests: Run manually by user (not in Claude sessions)
   - Output files: `/tmp/prefix_consensus_output_{party_id}.json`
 - Test script: `test_prefix_consensus.sh`
@@ -243,7 +243,7 @@ This layered architecture enables multi-slot censorship-resistant consensus as d
 7. **certificates.rs**: Updated validation to use ValidatorVerifier for >1/3 stake checks
 
 ### Tests
-- All 128 unit tests pass
+- All 134 unit tests pass
 - Build compiles cleanly
 
 ---
@@ -254,7 +254,7 @@ This layered architecture enables multi-slot censorship-resistant consensus as d
 - **Branch**: `prefix-consensus-prototype`
 - **HEAD**: Phase 3 View State and Ranking Management complete
 - **Status**: Working directory has uncommitted changes
-- **Tests**: 128/128 unit tests passing
+- **Tests**: 134/134 unit tests passing
 - **Smoke Tests**: Run manually by user (no need to run in Claude sessions)
 - **Build**: ✅ No warnings or errors
 
@@ -266,6 +266,12 @@ This layered architecture enables multi-slot censorship-resistant consensus as d
 - ✅ **Strong PC Phase 3**: View State and Ranking Management complete (RankingManager, ViewState, ViewOutput)
 - 🚧 **Strong PC Phase 4+**: Multi-view protocol and manager pending
 - ⏳ **Slot Manager**: Future work (after Strong PC complete)
+
+**Main Design Plan**: `.plans/strong-prefix-consensus.md`
+- Contains full implementation plan with all phases
+- Key design decisions documented
+- Architecture diagrams and code sketches
+- TODO section for deferred items
 
 ### Phase 3 Implementation Details
 
@@ -310,28 +316,89 @@ c) Else (both v_low and v_high are all-⊥):
 - `has_committable_low(v_low)`: Semantic alias for commit decision
 - `has_certifiable_high(v_high)`: Semantic alias for certificate creation
 
+### Message Size Optimization: Hashes vs Full Certificates
+
+**Problem**: If input vectors for views > 1 contained full certificates, message sizes would be O(N²):
+- Each Vote contains input vector with certificates (each cert has N signatures)
+- QC aggregates N votes
+- Total: O(N × N) = O(N²) per QC
+
+**Solution**: Use certificate **hashes** in input vectors, not full certificates:
+- Input vectors contain: `[⊥, hash(cert_A), ⊥, ⊥]` (truncated after first non-⊥)
+- Each Vote contains O(hash_size) = O(1)
+- Total per QC: O(N × 1) = O(N)
+
+**View transition protocol**:
+1. Party creates certificate from previous view's output
+2. Party **broadcasts full certificate once** when entering new view
+3. Other parties store the certificate locally, indexed by hash
+4. Votes in Prefix Consensus rounds only contain the hash
+
+**Fetching mechanism** (fallback for Byzantine withholding):
+- When: Party has only a hash but needs full certificate (e.g., to verify chain at commit time)
+- From whom: Any party who signed a vote containing that hash (they must have the cert)
+- Happy path: No fetching needed - parties have certs from view transitions
+- Byzantine case: Rare, fetch when Byzantine party withholds certificate from some parties
+
 ### Termination Mechanism: StrongPCCommit
 
 **Problem**: When one party commits (traces back to View 1), it might stop participating. Other parties might not have committed yet and could lose quorum for progress.
 
 **Solution**: When a party commits, it broadcasts a `StrongPCCommit` message containing:
-- `v_high`: The final Strong PC output (from View 1)
-- `certificate_chain`: Full chain of certificates from committing view back to View 1
-- `epoch`: For validation
+- `committing_proof`: QC3 from the committing view (proves v_low had a non-⊥ entry)
+- `certificate_chain`: Certs traced from v_low back to View 1 via v_high hash links
+- `v_high`: The final Strong PC output (View 1's v_high)
+- `epoch` and `slot`: For validation
 
-**Verification by receiver**:
-1. Verify each certificate in the chain is valid (signatures, QC3)
-2. Verify parent pointers form a valid chain back to View 1
-3. Verify the claimed v_high matches View 1's output
-4. Output v_high and terminate
+**Why full certs in StrongPCCommit but hashes in view-by-view**:
+- StrongPCCommit is one message (not aggregated N times) → O(chain × N) = O(N)
+- View-by-view votes are aggregated N times → O(N²) if full certs
+- Chain is typically short (2-5 certs)
+
+**Verification by receiver (hash-based chain linkage)**:
+1. Validate `committing_proof` QC3 signatures
+2. Derive `v_low = qc3_certify(committing_proof).0`
+3. `first_non_bot(v_low)` → H₀, verify H₀ == `hash(chain[0])`
+4. Walk chain: `first_non_bot(chain[i].v_high()) == hash(chain[i+1])`
+5. Terminal: `cert_reaches_view1(chain[k])` (checks `parent_view() == 1`)
+6. Output match: `chain[k].v_high() == claimed v_high`
+
+**Terminal condition — why `parent_view() == 1` not `view() == 1`**:
+The last cert in the chain can be either DirectCert(V=1) or IndirectCert(empty=V, parent=1).
+Both give View 1's v_high, but only `parent_view()` handles both cases. The IndirectCert
+case arises when an intermediate view was empty — e.g., View 2 is empty, so
+IndirectCert(empty=2, parent=1) is created. If the chain traces to it, `view()=2` but
+`parent_view()=1`. We stop here because its `v_high` contains raw transaction hashes
+(from View 1's QC3), not certificate hashes.
 
 **Design choices**:
-- Include full certificate chain (no fetching) - chain is typically short (2-5 certs)
+- Include committing proof (QC3) so receivers can verify the commit condition
+- Include full certificate chain (no fetching needed)
 - Committing party stops participating immediately after broadcast
 - Network guarantees message delivery
 
+**Reusable helpers** (for both verification and local trace-back in Phase 4):
+- `first_non_bot(vec)` — find first non-⊥ entry in a prefix vector
+- `cert_reaches_view1(cert)` — terminal condition (`parent_view() == 1`)
+
+**Implementation**:
+- `StrongPCCommit` struct with `new()`, `committing_view()`, `verify()` — in `certificates.rs`
+- `StrongPCCommitError` enum with 9 descriptive error variants — in `certificates.rs`
+- `cert_reaches_view1()` terminal condition helper — in `certificates.rs`
+- `first_non_bot()` prefix vector utility — in `utils.rs`
+- All exported from `lib.rs`
+
 ### Next Action
 Begin Strong Prefix Consensus Phase 4: Strong Protocol Core (multi-view state machine)
+
+---
+
+## TODO (Future Work)
+
+- [ ] **Fetching protocol**: Implement certificate fetch by hash for Byzantine withholding scenarios
+- [ ] **StrongPCCommit chain cap**: If chains become long (>5 certs), cap embedded certs and use hashes for the rest
+- [ ] **Fetch DOS protection**: Rate limiting / authentication for fetch requests
+- [ ] **Certificate storage**: Efficient storage and lookup by hash for accumulated certificates
 
 ---
 
@@ -344,12 +411,12 @@ consensus/prefix-consensus/src/
 ├── protocol.rs           - 3-round state machine (490 lines)
 ├── manager.rs            - Event-driven orchestrator (658 lines)
 ├── network_interface.rs  - Network adapter (224 lines)
-├── network_messages.rs   - Message enum (443 lines)
+├── network_messages.rs   - Network message envelope (PrefixConsensusMsg) (450 lines)
 ├── signing.rs            - BLS helpers (184 lines)
 ├── certify.rs            - QC formation (220 lines)
 ├── verification.rs       - Validation (150 lines)
-├── utils.rs              - Prefix operations (180 lines)
-├── certificates.rs       - Strong PC certificates (500 lines) - Phase 2
+├── utils.rs              - Prefix operations + first_non_bot (210 lines)
+├── certificates.rs       - Certificates + StrongPCCommit + cert_reaches_view1 (750 lines) - Phase 2
 └── view_state.rs         - RankingManager, ViewState, ViewOutput (360 lines) - Phase 3
 
 testsuite/smoke-test/src/consensus/prefix_consensus/

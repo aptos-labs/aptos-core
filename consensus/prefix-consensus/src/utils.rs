@@ -1,8 +1,12 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! Utility functions for prefix operations
 
+use aptos_crypto::HashValue;
 use crate::types::PrefixVector;
 
 /// Compute the maximum common prefix (mcp) of a collection of vectors
@@ -161,6 +165,13 @@ pub fn consistency_check(vectors: &[PrefixVector]) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+/// Find the first non-⊥ entry in a prefix vector.
+///
+/// Returns the first `HashValue` that is not `HashValue::zero()`, or `None` if all entries are ⊥.
+pub fn first_non_bot(vec: &PrefixVector) -> Option<HashValue> {
+    vec.iter().find(|h| **h != HashValue::zero()).copied()
 }
 
 #[cfg(test)]
@@ -430,5 +441,36 @@ mod tests {
         let result = consistency_check(&[v1, v2, v3, v4]);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("indices"));
+    }
+
+    // ========================================================================
+    // first_non_bot Tests
+    // ========================================================================
+
+    #[test]
+    fn test_first_non_bot_finds_first() {
+        let vec = vec![HashValue::zero(), HashValue::zero(), HashValue::random()];
+        let result = first_non_bot(&vec);
+        assert!(result.is_some());
+        assert_ne!(result.unwrap(), HashValue::zero());
+    }
+
+    #[test]
+    fn test_first_non_bot_all_bot() {
+        let vec = vec![HashValue::zero(), HashValue::zero()];
+        assert!(first_non_bot(&vec).is_none());
+    }
+
+    #[test]
+    fn test_first_non_bot_empty() {
+        let vec: PrefixVector = vec![];
+        assert!(first_non_bot(&vec).is_none());
+    }
+
+    #[test]
+    fn test_first_non_bot_first_entry() {
+        let h = HashValue::random();
+        let vec = vec![h, HashValue::zero()];
+        assert_eq!(first_non_bot(&vec), Some(h));
     }
 }

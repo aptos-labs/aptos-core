@@ -26,6 +26,7 @@
 
 use crate::certify::qc3_certify;
 use crate::types::{PartyId, PrefixVector, QC3};
+use crate::utils::first_non_bot;
 use crate::verification::{qc3_view, verify_qc3};
 use anyhow::{ensure, Result};
 use aptos_crypto::{bls12381::Signature as BlsSignature, HashValue};
@@ -33,6 +34,7 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::validator_verifier::ValidatorVerifier;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use std::fmt;
 
 // ============================================================================
 // Direct Certificate
@@ -470,10 +472,280 @@ impl HighestKnownView {
     }
 }
 
+// ============================================================================
+// Shared Helper Functions (used by StrongPCCommit and trace-back in Phase 4)
+// ============================================================================
+
+/// Check if a certificate reaches View 1 (terminal condition for trace-back).
+///
+/// Uses `parent_view()` rather than `view()` because the last certificate in a
+/// chain can be either:
+///
+/// - **`DirectCert(view=1)`**: Created by View 1's PC. `parent_view() == view() == 1`.
+///   Its `v_high()` is View 1's raw transaction output.
+///
+/// - **`IndirectCert(empty_view=V, parent=1)`**: Created when some view V > 1 was
+///   empty and the best known non-empty view was View 1. `parent_view() == 1` but
+///   `view() == V ≠ 1`. Its `v_high()` is also View 1's output (derived from
+///   `parent_proof`, which is View 1's QC3).
+///
+/// When the chain reaches such a terminal cert, we cannot follow `v_high` further
+/// because it contains raw transaction hashes (not certificate hashes). This is
+/// the stopping condition.
+///
+/// Note: View 1 itself always creates a DirectCertificate (never Indirect), but
+/// the chain may trace to an IndirectCert that *points to* View 1 without passing
+/// through DirectCert(V=1) — this happens when an intermediate view was empty.
+pub fn cert_reaches_view1(cert: &Certificate) -> bool {
+    cert.parent_view() == 1
+}
+
+// ============================================================================
+// Strong Prefix Consensus Commit Message
+// ============================================================================
+
+/// Error types for StrongPCCommit verification
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StrongPCCommitError {
+    /// Committing proof (QC3) is invalid
+    InvalidCommittingProof(String),
+    /// v_low derived from committing proof has no non-⊥ entry
+    NoCommitInVLow,
+    /// v_low's first non-⊥ doesn't match chain[0]'s hash
+    VLowChainMismatch {
+        expected: HashValue,
+        got: HashValue,
+    },
+    /// Certificate chain is empty
+    EmptyChain,
+    /// Certificate validation failed (bad signatures)
+    InvalidCertificate { view: u64, reason: String },
+    /// Hash linkage broken: first non-⊥ in v_high doesn't match next cert's hash
+    ChainLinkageMismatch {
+        position: usize,
+        expected: HashValue,
+        got: HashValue,
+    },
+    /// Certificate's v_high has no non-⊥ entry but cert isn't terminal
+    NoNextCertInVHigh { position: usize },
+    /// Last certificate doesn't reach View 1
+    DoesNotReachView1 { final_parent_view: u64 },
+    /// Claimed v_high doesn't match derived v_high
+    VHighMismatch,
+}
+
+impl fmt::Display for StrongPCCommitError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidCommittingProof(reason) => {
+                write!(f, "Invalid committing proof (QC3): {}", reason)
+            }
+            Self::NoCommitInVLow => {
+                write!(f, "v_low from committing proof has no non-⊥ entry")
+            }
+            Self::VLowChainMismatch { expected, got } => {
+                write!(
+                    f,
+                    "v_low first non-⊥ hash {:?} does not match chain[0] hash {:?}",
+                    expected, got
+                )
+            }
+            Self::EmptyChain => {
+                write!(f, "Certificate chain is empty")
+            }
+            Self::InvalidCertificate { view, reason } => {
+                write!(f, "Invalid certificate at view {}: {}", view, reason)
+            }
+            Self::ChainLinkageMismatch {
+                position,
+                expected,
+                got,
+            } => {
+                write!(
+                    f,
+                    "Chain linkage mismatch at position {}: v_high hash {:?} != next cert hash {:?}",
+                    position, expected, got
+                )
+            }
+            Self::NoNextCertInVHigh { position } => {
+                write!(
+                    f,
+                    "Certificate at position {} has no non-⊥ entry in v_high but is not terminal",
+                    position
+                )
+            }
+            Self::DoesNotReachView1 { final_parent_view } => {
+                write!(
+                    f,
+                    "Chain does not reach View 1: last cert's parent_view is {}",
+                    final_parent_view
+                )
+            }
+            Self::VHighMismatch => {
+                write!(f, "Claimed v_high does not match derived v_high from chain")
+            }
+        }
+    }
+}
+
+impl std::error::Error for StrongPCCommitError {}
+
+/// Commit announcement with full proof chain for termination
+///
+/// When a party commits (v_low in some view > 1 has a non-⊥ entry that traces
+/// back to View 1), it broadcasts this message so other parties can verify the
+/// chain and terminate with the same output.
+///
+/// ## Verification Flow
+///
+/// 1. Validate `committing_proof` (QC3 from the committing view)
+/// 2. Derive `v_low` from committing_proof, find first non-⊥ → must match `hash(chain[0])`
+/// 3. For each consecutive pair: `first_non_bot(chain[i].v_high()) == hash(chain[i+1])`
+/// 4. Last cert must reach View 1 (`parent_view() == 1`)
+/// 5. `v_high` must match last cert's `v_high()`
+///
+/// ## Example
+///
+/// Party commits at View 5, chain traces View 3 → View 2 → View 1:
+/// ```text
+/// committing_proof = QC3 from View 5
+/// chain[0] = DirectCert(V=3)   // hash found in View 5's v_low
+/// chain[1] = DirectCert(V=2)   // hash found in chain[0].v_high()
+/// chain[2] = DirectCert(V=1)   // hash found in chain[1].v_high() — terminal
+/// v_high = chain[2].v_high()   // View 1's raw transaction output
+/// ```
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct StrongPCCommit {
+    /// QC3 from the committing view — proves v_low had a non-⊥ entry
+    pub committing_proof: QC3,
+
+    /// Chain of certificates traced from v_low back to View 1
+    ///
+    /// - `chain[0]` = cert referenced by first non-⊥ in v_low
+    /// - `chain[i+1]` = cert referenced by first non-⊥ in `chain[i].v_high()`
+    /// - `chain[k]` = cert that reaches View 1 (terminal)
+    pub certificate_chain: Vec<Certificate>,
+
+    /// The final Strong PC v_high output (View 1's v_high)
+    pub v_high: PrefixVector,
+
+    /// Epoch for validation
+    pub epoch: u64,
+
+    /// Slot number for multi-slot consensus
+    pub slot: u64,
+}
+
+impl StrongPCCommit {
+    /// Create a new commit message
+    pub fn new(
+        committing_proof: QC3,
+        certificate_chain: Vec<Certificate>,
+        v_high: PrefixVector,
+        epoch: u64,
+        slot: u64,
+    ) -> Self {
+        Self {
+            committing_proof,
+            certificate_chain,
+            v_high,
+            epoch,
+            slot,
+        }
+    }
+
+    /// Get the committing view from the committing proof's votes.
+    ///
+    /// Returns `None` if the QC3 has no votes (which is invalid).
+    pub fn committing_view(&self) -> Option<u64> {
+        self.committing_proof.votes.first().map(|v| v.view)
+    }
+
+    /// Verify the commit message
+    ///
+    /// Validates the full chain: committing_proof → v_low → chain[0] → v_high
+    /// linkage → ... → View 1 → v_high output.
+    pub fn verify(&self, verifier: &ValidatorVerifier) -> Result<(), StrongPCCommitError> {
+        // 1. Validate committing proof (QC3 signatures)
+        verify_qc3(&self.committing_proof, verifier).map_err(|e| {
+            StrongPCCommitError::InvalidCommittingProof(e.to_string())
+        })?;
+
+        // 2. Derive v_low from committing proof
+        let (v_low, _) = qc3_certify(&self.committing_proof);
+
+        // 3. Find first non-⊥ in v_low (this is the commit condition)
+        let start_hash = first_non_bot(&v_low).ok_or(StrongPCCommitError::NoCommitInVLow)?;
+
+        // 4. Chain must be non-empty
+        if self.certificate_chain.is_empty() {
+            return Err(StrongPCCommitError::EmptyChain);
+        }
+
+        // 5. v_low's first non-⊥ must match chain[0]'s hash
+        let chain_start_hash = self.certificate_chain[0].hash();
+        if start_hash != chain_start_hash {
+            return Err(StrongPCCommitError::VLowChainMismatch {
+                expected: start_hash,
+                got: chain_start_hash,
+            });
+        }
+
+        // 6. Validate each certificate and check v_high hash linkage
+        for (i, cert) in self.certificate_chain.iter().enumerate() {
+            // Validate certificate signatures
+            cert.validate(verifier).map_err(|e| {
+                StrongPCCommitError::InvalidCertificate {
+                    view: cert.view(),
+                    reason: e.to_string(),
+                }
+            })?;
+
+            // For non-last certs: v_high must link to next cert
+            if i < self.certificate_chain.len() - 1 {
+                let v_high = cert.v_high();
+                let next_hash = first_non_bot(&v_high).ok_or(
+                    StrongPCCommitError::NoNextCertInVHigh { position: i },
+                )?;
+                let actual_next = self.certificate_chain[i + 1].hash();
+                if next_hash != actual_next {
+                    return Err(StrongPCCommitError::ChainLinkageMismatch {
+                        position: i,
+                        expected: next_hash,
+                        got: actual_next,
+                    });
+                }
+            }
+        }
+
+        // 7. Last certificate must reach View 1
+        let last_cert = self.certificate_chain.last().unwrap();
+        if !cert_reaches_view1(last_cert) {
+            return Err(StrongPCCommitError::DoesNotReachView1 {
+                final_parent_view: last_cert.parent_view(),
+            });
+        }
+
+        // 8. Claimed v_high must match last cert's v_high
+        let derived_v_high = last_cert.v_high();
+        if derived_v_high != self.v_high {
+            return Err(StrongPCCommitError::VHighMismatch);
+        }
+
+        Ok(())
+    }
+
+    /// Returns the message type name for logging
+    pub fn name(&self) -> &str {
+        "StrongPCCommit"
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::types::{Vote1, Vote2, Vote3, QC1, QC2};
+    use aptos_types::account_address::AccountAddress;
     use aptos_types::validator_verifier::ValidatorConsensusInfo;
 
     fn hash(i: u64) -> HashValue {
@@ -938,5 +1210,116 @@ mod tests {
         let recovered: Certificate = bcs::from_bytes(&bytes).unwrap();
 
         assert_eq!(cert, recovered);
+    }
+
+    // ========================================================================
+    // StrongPCCommit Tests
+    // ========================================================================
+
+    /// Helper: create a dummy QC3 with empty votes (for constructor/serialization tests only)
+    fn dummy_qc3() -> QC3 {
+        QC3::new(vec![])
+    }
+
+    /// Helper: create a dummy QC3 with a vote at a given view
+    fn dummy_qc3_with_view(view: u64) -> QC3 {
+        let vote = Vote3::new(
+            AccountAddress::random(),
+            vec![HashValue::random()],
+            QC2 { votes: vec![], authors: vec![] },
+            1,
+            0,
+            view,
+            dummy_signature(),
+        );
+        QC3::new(vec![vote])
+    }
+
+    #[test]
+    fn test_strong_pc_commit_new() {
+        let qc3 = dummy_qc3();
+        let v_high = vec![HashValue::random()];
+        let commit = StrongPCCommit::new(qc3, vec![], v_high.clone(), 5, 0);
+
+        assert_eq!(commit.v_high, v_high);
+        assert!(commit.certificate_chain.is_empty());
+        assert_eq!(commit.epoch, 5);
+        assert_eq!(commit.slot, 0);
+        assert_eq!(commit.name(), "StrongPCCommit");
+    }
+
+    #[test]
+    fn test_strong_pc_commit_committing_view() {
+        let qc3 = dummy_qc3_with_view(5);
+        let v_high = vec![HashValue::random()];
+        let commit = StrongPCCommit::new(qc3, vec![], v_high, 1, 0);
+
+        assert_eq!(commit.committing_view(), Some(5));
+    }
+
+    #[test]
+    fn test_strong_pc_commit_committing_view_empty_qc3() {
+        let qc3 = dummy_qc3();
+        let v_high = vec![HashValue::random()];
+        let commit = StrongPCCommit::new(qc3, vec![], v_high, 1, 0);
+
+        // Empty QC3 has no votes → None
+        assert_eq!(commit.committing_view(), None);
+    }
+
+    #[test]
+    fn test_strong_pc_commit_serialization_roundtrip() {
+        let qc3 = dummy_qc3_with_view(3);
+        let v_high = vec![HashValue::random(), HashValue::random()];
+        let commit = StrongPCCommit::new(qc3, vec![], v_high, 1, 42);
+
+        let serialized = bcs::to_bytes(&commit).expect("Serialization should succeed");
+        let recovered: StrongPCCommit =
+            bcs::from_bytes(&serialized).expect("Deserialization should succeed");
+
+        assert_eq!(commit, recovered);
+    }
+
+    #[test]
+    fn test_strong_pc_commit_error_display() {
+        let err = StrongPCCommitError::EmptyChain;
+        let display = format!("{}", err);
+        assert!(display.contains("empty"));
+
+        let err = StrongPCCommitError::InvalidCommittingProof("bad sig".into());
+        let display = format!("{}", err);
+        assert!(display.contains("bad sig"));
+
+        let err = StrongPCCommitError::NoCommitInVLow;
+        let display = format!("{}", err);
+        assert!(display.contains("non-⊥"));
+
+        let err = StrongPCCommitError::VLowChainMismatch {
+            expected: HashValue::zero(),
+            got: HashValue::zero(),
+        };
+        let display = format!("{}", err);
+        assert!(display.contains("chain[0]"));
+
+        let err = StrongPCCommitError::ChainLinkageMismatch {
+            position: 1,
+            expected: HashValue::zero(),
+            got: HashValue::zero(),
+        };
+        let display = format!("{}", err);
+        assert!(display.contains("position 1"));
+
+        let err = StrongPCCommitError::NoNextCertInVHigh { position: 2 };
+        let display = format!("{}", err);
+        assert!(display.contains("position 2"));
+
+        let err = StrongPCCommitError::DoesNotReachView1 { final_parent_view: 7 };
+        let display = format!("{}", err);
+        assert!(display.contains("7"));
+        assert!(display.contains("View 1"));
+
+        let err = StrongPCCommitError::VHighMismatch;
+        let display = format!("{}", err);
+        assert!(display.contains("v_high"));
     }
 }
