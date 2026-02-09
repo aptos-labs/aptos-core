@@ -9,7 +9,9 @@
 use super::context::{V2Config, V2Context};
 use super::router::{build_combined_router, build_v2_router};
 use crate::context::Context;
-use aptos_api_test_context::{new_test_context as create_test_context, TestContext};
+use aptos_api_test_context::{
+    new_test_context as create_test_context, new_test_context_no_api, TestContext,
+};
 use aptos_config::config::NodeConfig;
 use aptos_types::chain_id::ChainId;
 use std::net::SocketAddr;
@@ -27,7 +29,9 @@ async fn start_v2_server() -> (SocketAddr, tokio::task::JoinHandle<()>) {
     let mut node_config = NodeConfig::default();
     node_config.storage.rocksdb_configs.enable_storage_sharding = false;
 
-    let test_ctx = create_test_context("v2_test".to_string(), node_config.clone(), false);
+    // Use new_test_context_no_api to avoid starting a v1 Poem server, which
+    // prevents the circular-dep Prometheus AlreadyReg panic in parallel tests.
+    let test_ctx = new_test_context_no_api("v2_test".to_string(), node_config.clone(), false);
 
     // Build a crate-local Context from the test context's components.
     // All component types (AptosDB, MempoolClientSender, etc.) are from
@@ -66,7 +70,8 @@ async fn start_v2_server_with_config(
     let mut node_config = NodeConfig::default();
     node_config.storage.rocksdb_configs.enable_storage_sharding = false;
 
-    let test_ctx = create_test_context("v2_test_custom".to_string(), node_config.clone(), false);
+    let test_ctx =
+        new_test_context_no_api("v2_test_custom".to_string(), node_config.clone(), false);
 
     let context = Context::new(
         ChainId::test(),
@@ -621,7 +626,12 @@ async fn start_combined_server() -> (SocketAddr, tokio::task::JoinHandle<()>) {
     let mut node_config = NodeConfig::default();
     node_config.storage.rocksdb_configs.enable_storage_sharding = false;
 
-    let test_ctx = create_test_context("v2_cohost_test".to_string(), node_config.clone(), false);
+    // Use new_test_context_no_api to skip the Poem server that TestContext
+    // would otherwise start via the aptos-api-test-context copy. We start
+    // our own Poem server below using crate::runtime::attach_poem_to_runtime
+    // (the test binary's own copy) to avoid duplicate metric registration.
+    let test_ctx =
+        new_test_context_no_api("v2_cohost_test".to_string(), node_config.clone(), false);
 
     let context = Context::new(
         ChainId::test(),
@@ -1361,7 +1371,7 @@ async fn start_tls_v2_server() -> (SocketAddr, tokio::task::JoinHandle<()>) {
     let mut node_config = NodeConfig::default();
     node_config.storage.rocksdb_configs.enable_storage_sharding = false;
 
-    let test_ctx = create_test_context("v2_tls_test".to_string(), node_config.clone(), false);
+    let test_ctx = new_test_context_no_api("v2_tls_test".to_string(), node_config.clone(), false);
 
     let context = Context::new(
         ChainId::test(),
@@ -1391,7 +1401,11 @@ async fn start_tls_v2_server() -> (SocketAddr, tokio::task::JoinHandle<()>) {
         // needed since we already built the acceptor, but avoids confusion).
         let _cert = cert_file;
         let _key = key_file;
-        let (_, shutdown_rx) = tokio::sync::watch::channel(false);
+
+        // The shutdown_tx must stay alive for the lifetime of the server.
+        // If the sender is dropped, serve_tls's `wait_for` receives a
+        // channel-closed error and exits the accept loop immediately.
+        let (_shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
         crate::v2::tls::serve_tls(listener, tls_acceptor, router, None, shutdown_rx, 30_000).await;
     });
 
@@ -1402,10 +1416,14 @@ async fn start_tls_v2_server() -> (SocketAddr, tokio::task::JoinHandle<()>) {
 }
 
 /// Build a reqwest client that accepts the test self-signed certificate.
-/// We use `danger_accept_invalid_certs` because the self-signed cert is
-/// not in the system trust store. This is safe for test purposes only.
+///
+/// We use `use_rustls_tls()` to match the server's TLS stack (the default
+/// native-tls on macOS rejects the test cert even with
+/// `danger_accept_invalid_certs`). The `rustls-tls` feature is enabled
+/// as a dev-dependency in Cargo.toml.
 fn tls_test_client() -> reqwest::Client {
     reqwest::Client::builder()
+        .use_rustls_tls()
         .danger_accept_invalid_certs(true)
         .build()
         .expect("Failed to build TLS client")
@@ -1416,8 +1434,10 @@ async fn test_tls_health_endpoint() {
     let (addr, _handle) = start_tls_v2_server().await;
     let client = tls_test_client();
 
+    // Use 127.0.0.1 instead of localhost to ensure IPv4 (the server binds
+    // on 127.0.0.1 and localhost may resolve to ::1 on some systems).
     let resp = client
-        .get(format!("https://localhost:{}/v2/health", addr.port()))
+        .get(format!("https://127.0.0.1:{}/v2/health", addr.port()))
         .send()
         .await
         .expect("TLS request failed");
@@ -1433,7 +1453,7 @@ async fn test_tls_info_endpoint() {
     let client = tls_test_client();
 
     let resp = client
-        .get(format!("https://localhost:{}/v2/info", addr.port()))
+        .get(format!("https://127.0.0.1:{}/v2/info", addr.port()))
         .send()
         .await
         .expect("TLS request failed");
@@ -1455,7 +1475,7 @@ async fn test_tls_resources_endpoint() {
 
     let resp = client
         .get(format!(
-            "https://localhost:{}/v2/accounts/0x1/resources",
+            "https://127.0.0.1:{}/v2/accounts/0x1/resources",
             addr.port()
         ))
         .send()
@@ -2057,6 +2077,10 @@ async fn start_v2_e2e_server_ext(
     node_config.storage.rocksdb_configs.enable_storage_sharding = false;
     config_fn(&mut node_config);
 
+    // E2E tests need the full TestContext with a running Poem v1 server because
+    // methods like create_user_account / root_account use the Poem API to query
+    // sequence numbers. The v1 metrics AlreadyReg issue is handled by making
+    // the v1 metrics registration resilient (see api/src/metrics.rs).
     let test_ctx = create_test_context("v2_e2e_test".to_string(), node_config.clone(), false);
 
     let context = Context::new(

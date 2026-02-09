@@ -11,7 +11,7 @@ pub use prometheus::{
     register_gauge_vec, register_histogram, register_histogram_vec, register_int_counter,
     register_int_counter_vec, register_int_gauge, register_int_gauge_vec, Counter, Encoder, Gauge,
     GaugeVec, Histogram, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, IntGauge,
-    IntGaugeVec, TextEncoder,
+    IntGaugeVec, Opts, TextEncoder,
 };
 
 mod avg_counter;

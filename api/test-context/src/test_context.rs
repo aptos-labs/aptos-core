@@ -120,13 +120,56 @@ pub fn new_test_context(
     )
 }
 
+/// Like `new_test_context` but does NOT start a v1 Poem API server.
+///
+/// Use this when you only need the DB, mempool, and Context infrastructure
+/// (e.g., for v2 API E2E tests that run their own Axum server). This avoids
+/// the circular dependency between `aptos-api` and `aptos-api-test-context`
+/// that causes Prometheus metric `AlreadyReg` panics when both copies of the
+/// metrics `Lazy` statics are initialized in the same test process.
+pub fn new_test_context_no_api(
+    test_name: String,
+    node_config: NodeConfig,
+    use_db_with_indexer: bool,
+) -> TestContext {
+    new_test_context_inner_impl(
+        test_name,
+        node_config,
+        use_db_with_indexer,
+        None,
+        false,
+        false,
+        false, // skip_api_server
+    )
+}
+
 pub fn new_test_context_inner(
+    test_name: String,
+    node_config: NodeConfig,
+    use_db_with_indexer: bool,
+    end_version: Option<u64>,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) -> TestContext {
+    new_test_context_inner_impl(
+        test_name,
+        node_config,
+        use_db_with_indexer,
+        end_version,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+        true, // start_api_server
+    )
+}
+
+fn new_test_context_inner_impl(
     test_name: String,
     mut node_config: NodeConfig,
     use_db_with_indexer: bool,
     end_version: Option<u64>,
     use_txn_payload_v2_format: bool,
     use_orderless_transactions: bool,
+    start_api_server: bool,
 ) -> TestContext {
     // Speculative logging uses a global variable and when many instances use it together, they
     // panic, so we disable this to run tests.
@@ -217,11 +260,17 @@ pub fn new_test_context_inner(
     );
 
     // Configure the testing depending on which API version we're testing.
-    let runtime_handle = tokio::runtime::Handle::current();
-    let poem_address =
-        attach_poem_to_runtime(&runtime_handle, context.clone(), &node_config, true, None)
-            .expect("Failed to attach poem to runtime");
-    let api_specific_config = ApiSpecificConfig::V1(poem_address);
+    let api_specific_config = if start_api_server {
+        let runtime_handle = tokio::runtime::Handle::current();
+        let poem_address =
+            attach_poem_to_runtime(&runtime_handle, context.clone(), &node_config, true, None)
+                .expect("Failed to attach poem to runtime");
+        ApiSpecificConfig::V1(poem_address)
+    } else {
+        // Dummy address — the v1 API server is not started. Callers that use
+        // this TestContext must NOT send requests to the v1 Poem server.
+        ApiSpecificConfig::V1(([127, 0, 0, 1], 0).into())
+    };
 
     TestContext::new(
         context,

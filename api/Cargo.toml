@@ -80,7 +80,7 @@ percent-encoding = { workspace = true }
 proptest = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }
-reqwest = { workspace = true }
+reqwest = { workspace = true, features = ["rustls-tls"] }
 tempfile = { workspace = true }
 tokio-tungstenite = { workspace = true }
 warp = { workspace = true }
