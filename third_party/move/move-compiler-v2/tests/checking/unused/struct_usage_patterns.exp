@@ -1,0 +1,75 @@
+
+Diagnostics:
+warning: Struct `0x42::m::ReallyUnused` is unused: it has no current users and is private to its module.
+   ┌─ tests/checking/unused/struct_usage_patterns.move:23:5
+   │
+23 │ ╭     struct ReallyUnused {
+24 │ │         a: u64
+25 │ │     }
+   │ ╰─────^
+
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    struct ReallyUnused {
+        a: u64,
+    }
+    struct UsedInVector {
+        w: u64,
+    }
+    struct UsedViaBorrow {
+        z: u64,
+    }
+    struct UsedViaConstructor {
+        x: u64,
+    }
+    struct UsedViaDestructuring {
+        y: u64,
+    }
+    public fun test_borrow(s: &UsedViaBorrow): u64 {
+        select m::UsedViaBorrow.z<&UsedViaBorrow>(s)
+    }
+    public fun test_constructor(): UsedViaConstructor {
+        pack m::UsedViaConstructor(1)
+    }
+    public fun test_destructuring(s: UsedViaDestructuring): u64 {
+        {
+          let m::UsedViaDestructuring{ y } = s;
+          y
+        }
+    }
+    public fun test_vector(): vector<UsedInVector> {
+        Vector<UsedInVector>()
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    struct ReallyUnused {
+        a: u64,
+    }
+    struct UsedInVector has drop {
+        w: u64,
+    }
+    struct UsedViaBorrow {
+        z: u64,
+    }
+    struct UsedViaConstructor has drop {
+        x: u64,
+    }
+    struct UsedViaDestructuring has drop {
+        y: u64,
+    }
+    public fun test_borrow(s: &UsedViaBorrow): u64 {
+        s.z
+    }
+    public fun test_constructor(): UsedViaConstructor {
+        UsedViaConstructor{x: 1}
+    }
+    public fun test_destructuring(s: UsedViaDestructuring): u64 {
+        let UsedViaDestructuring{y: y} = s;
+        y
+    }
+    public fun test_vector(): vector<UsedInVector> {
+        vector[]
+    }
+}

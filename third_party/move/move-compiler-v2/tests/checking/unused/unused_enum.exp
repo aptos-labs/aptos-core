@@ -1,3 +1,17 @@
+
+Diagnostics:
+warning: Struct `0x42::enum_types::MessageHolder` is unused: it has no current users and is private to its module.
+   ┌─ tests/checking/unused/unused_enum.move:5:5
+   │
+ 5 │ ╭     enum MessageHolder has key, drop {
+ 6 │ │         Empty,
+ 7 │ │         Message{
+ 8 │ │             message: string::String,
+   · │
+12 │ │         }
+13 │ │     }
+   │ ╰─────^
+
 // -- Model dump before first bytecode pipeline
 module 0x42::enum_types {
     use std::string;

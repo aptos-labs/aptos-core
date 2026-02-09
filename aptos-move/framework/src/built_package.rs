@@ -110,6 +110,9 @@ pub struct BuildOptions {
     pub known_attributes: BTreeSet<String>,
     #[clap(skip)]
     pub experiments: Vec<String>,
+    /// Warning flags in the style of `-W<name>` in GCC.
+    #[clap(long = "W", number_of_values = 1)]
+    pub warnings: Vec<String>,
 }
 
 // Because named_addresses has no parser, we can't use clap's default impl. This must be aligned
@@ -137,6 +140,7 @@ impl Default for BuildOptions {
             check_test_code: true,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
             experiments: vec![],
+            warnings: vec![],
         }
     }
 }
@@ -217,6 +221,7 @@ pub fn build_model(
             known_attributes,
             experiments,
             print_errors: true,
+            warnings: vec![],
         },
     };
     let compiler_version = compiler_version.unwrap_or_default();
@@ -268,6 +273,7 @@ impl BuiltPackage {
                 known_attributes: options.known_attributes.clone(),
                 experiments: options.experiments.clone(),
                 print_errors: true,
+                warnings: options.warnings.clone(),
             },
         })
     }

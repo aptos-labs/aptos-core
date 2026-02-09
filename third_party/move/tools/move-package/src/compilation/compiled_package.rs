@@ -665,6 +665,7 @@ impl CompiledPackage {
                         experiments: config.experiments.clone(),
                         external_checks,
                         print_errors: config.print_errors,
+                        warnings: config.warnings.clone(),
                         ..Default::default()
                     };
                     options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);

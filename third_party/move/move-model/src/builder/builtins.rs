@@ -23,7 +23,7 @@ use move_core_types::{
     int256::{I256, U256},
 };
 use num::BigInt;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Adds builtin functions.
 pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
@@ -55,6 +55,7 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
         ty: ty.clone(),
         value: Value::Number(value),
         visibility,
+        using_functions: BTreeSet::new(),
     };
 
     let mk_num_const =
@@ -65,6 +66,7 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
         ty: bool_t.clone(),
         value: Value::Bool(value),
         visibility,
+        using_functions: BTreeSet::new(),
     };
 
     {

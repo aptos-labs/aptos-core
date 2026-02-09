@@ -1,0 +1,133 @@
+
+Diagnostics:
+warning: Struct `0x42::m::UsedOnlyInSpec` is unused: it has no current users and is private to its module.
+  ┌─ tests/checking/unused/struct_usage_edge_cases.move:3:5
+  │
+3 │ ╭     struct UsedOnlyInSpec {
+4 │ │         x: u64
+5 │ │     }
+  │ ╰─────^
+
+warning: Struct `0x42::m::UsedInLambda` is unused: it has no current users and is private to its module.
+   ┌─ tests/checking/unused/struct_usage_edge_cases.move:27:5
+   │
+27 │ ╭     struct UsedInLambda has drop {
+28 │ │         b: u64
+29 │ │     }
+   │ ╰─────^
+
+warning: Struct `0x42::m::ActuallyUnused` is unused: it has no current users and is private to its module.
+   ┌─ tests/checking/unused/struct_usage_edge_cases.move:37:5
+   │
+37 │ ╭     struct ActuallyUnused {
+38 │ │         d: u64
+39 │ │     }
+   │ ╰─────^
+
+warning: pack of `m::UsedInInline` can only be done within the defining module `0x42::m`, but `m::use_inline` could be called (and expanded) outside the module
+   ┌─ tests/checking/unused/struct_usage_edge_cases.move:49:23
+   │
+49 │     public inline fun use_inline(): UsedInInline {
+   │                       ^^^^^^^^^^
+50 │         UsedInInline { a: 3 }
+   │         --------------------- packed here
+
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    struct ActuallyUnused {
+        d: u64,
+    }
+    struct UsedAsPhantom {
+        y: u64,
+    }
+    struct UsedInBound {
+        c: u64,
+    }
+    struct UsedInConstraint {
+        z: u64,
+    }
+    struct UsedInInline {
+        a: u64,
+    }
+    struct UsedInLambda {
+        b: u64,
+    }
+    struct UsedOnlyInSpec {
+        x: u64,
+    }
+    struct Wrapper<T> {
+        value: u64,
+    }
+    public fun use_bound<T>(x: UsedInBound): T {
+        Abort(0)
+    }
+    public fun use_in_lambda() {
+        {
+          let _f: |UsedInLambda| = |_x: UsedInLambda| Tuple();
+          Tuple()
+        }
+    }
+    public inline fun use_inline(): UsedInInline {
+        pack m::UsedInInline(3)
+    }
+    public fun use_phantom(): Wrapper<UsedAsPhantom> {
+        pack m::Wrapper<UsedAsPhantom>(1)
+    }
+    public fun use_with_constraint<T>(x: T): UsedInConstraint {
+        pack m::UsedInConstraint(2)
+    }
+    spec fun spec_function(s: UsedOnlyInSpec): bool {
+        Gt(select m::UsedOnlyInSpec.x<0x42::m::UsedOnlyInSpec>(s), 0)
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    struct ActuallyUnused {
+        d: u64,
+    }
+    struct UsedAsPhantom {
+        y: u64,
+    }
+    struct UsedInBound has drop {
+        c: u64,
+    }
+    struct UsedInConstraint has copy, drop {
+        z: u64,
+    }
+    struct UsedInInline {
+        a: u64,
+    }
+    struct UsedInLambda has drop {
+        b: u64,
+    }
+    struct UsedOnlyInSpec {
+        x: u64,
+    }
+    struct Wrapper<phantom T> {
+        value: u64,
+    }
+    public fun use_bound<T: drop>(x: UsedInBound): T {
+        abort 0
+    }
+    public fun use_in_lambda() {
+        let _f = |_x| ();
+    }
+    public inline fun use_inline(): UsedInInline {
+        UsedInInline{a: 3}
+    }
+    public fun use_phantom(): Wrapper<UsedAsPhantom> {
+        Wrapper<UsedAsPhantom>{value: 1}
+    }
+    public fun use_with_constraint<T: copy + drop>(x: T): UsedInConstraint {
+        UsedInConstraint{z: 2}
+    }
+}
+
+
+Diagnostics:
+error: function values outside of inline functions not supported in this language version
+   ┌─ tests/checking/unused/struct_usage_edge_cases.move:54:18
+   │
+54 │         let _f = |_x: UsedInLambda| { };
+   │                  ^^^^^^^^^^^^^^^^^^^^^^

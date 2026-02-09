@@ -22,8 +22,9 @@ use crate::{
     metadata::lang_feature_versions::LANGUAGE_VERSION_FOR_PUBLIC_STRUCT,
     model::{
         self, EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, FunctionLoc,
-        Loc, ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, SchemaId,
-        SpecFunId, SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind,
+        Loc, ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter,
+        QualifiedId, SchemaId, SpecFunId, SpecVarId, StructData, StructId, TypeParameter,
+        TypeParameterKind,
     },
     options::ModelBuilderOptions,
     pragmas::{
@@ -510,6 +511,7 @@ impl ModuleBuilder<'_, '_> {
             ty,
             value: Value::Bool(false), // dummy value, actual will be assigned in def_ana
             visibility: EntryVisibility::SpecAndImpl,
+            using_functions: BTreeSet::new(),
         });
     }
 
@@ -1489,6 +1491,41 @@ impl ModuleBuilder<'_, '_> {
             et.finalize_types(true);
             et.check_mutable_borrow_field(&translated);
             et.check_lambda_types(&translated);
+
+            // Track struct usage for unused struct detection
+            let mut used_structs = BTreeSet::new();
+            // Collect structs from function body
+            translated.struct_usage(self.parent.env, &mut used_structs);
+            // Collect structs from function signature (parameters and return type)
+            for Parameter(_, ty, _) in &params {
+                ty.visit(&mut |t| {
+                    if let Type::Struct(mid, sid, _) = t {
+                        used_structs.insert(mid.qualified(*sid));
+                    }
+                });
+            }
+            result_type.visit(&mut |t| {
+                if let Type::Struct(mid, sid, _) = t {
+                    used_structs.insert(mid.qualified(*sid));
+                }
+            });
+            let fun_qid = QualifiedId {
+                module_id: self.module_id,
+                id: FunId::new(full_name.symbol),
+            };
+            for struct_id in used_structs {
+                // Skip structs not in reverse_struct_table (e.g., ghost memory structs)
+                if let Some(qualified_symbol) = self
+                    .parent
+                    .reverse_struct_table
+                    .get(&(struct_id.module_id, struct_id.id))
+                {
+                    if let Some(struct_entry) = self.parent.struct_table.get_mut(qualified_symbol) {
+                        struct_entry.using_functions.insert(fun_qid);
+                    }
+                }
+            }
+
             assert!(self.fun_defs.insert(full_name.symbol, translated).is_none());
             if let Some(specifiers) = access_specifiers {
                 assert!(self
@@ -3770,6 +3807,7 @@ impl ModuleBuilder<'_, '_> {
                 visibility: entry.visibility,
                 has_package_visibility: self.package_structs.contains(&entry.struct_id),
                 is_empty_struct: entry.is_empty_struct,
+                using_funs: RefCell::new(Some(entry.using_functions.clone())),
             };
             struct_data.insert(StructId::new(name.symbol), data);
             if entry.visibility != Visibility::Private
@@ -3849,12 +3887,14 @@ impl ModuleBuilder<'_, '_> {
                 value,
                 ty,
                 visibility: _,
+                using_functions,
             } = const_entry.clone();
             let data = NamedConstantData {
                 name: name.symbol,
                 loc,
                 type_: ty,
                 value,
+                using_funs: using_functions,
             };
             named_constants.insert(NamedConstantId::new(name.symbol), data);
         }
