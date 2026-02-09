@@ -729,6 +729,10 @@ impl StateStore {
         Ok(buffered_state)
     }
 
+    pub fn advance_hot_state_fence(&self, version: Version) {
+        self.persisted_state.advance_hot_state_fence(version);
+    }
+
     pub fn reset(&self) {
         self.buffered_state.lock().quit();
         *self.buffered_state.lock() = Self::create_buffered_state_from_latest_snapshot(

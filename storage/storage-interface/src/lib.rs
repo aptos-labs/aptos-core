@@ -652,6 +652,13 @@ pub trait DbWriter: Send + Sync {
     ) -> Result<()> {
         unimplemented!()
     }
+
+    /// Advance the hot state fence to the given version, allowing buffered hot state
+    /// commits up to this version to proceed. Default no-op for implementations that
+    /// don't use the hot state (e.g. state sync wrappers, mocks).
+    fn advance_hot_state_fence(&self, _version: Version) -> Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Clone)]
