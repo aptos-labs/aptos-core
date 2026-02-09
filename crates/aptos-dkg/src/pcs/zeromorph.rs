@@ -3,7 +3,7 @@
 
 // A lot of this code is copy-pasted from `jolt-core`. TODO: benchmark them against each other
 
-// THIS CODE HAS NOT YET BEEN VETTED, ONLY USE FOR BENCHMARKING PURPOSES!!!!!
+// WARNING: THIS CODE HAS NOT BEEN PROPERLY VETTED, ONLY USE FOR BENCHMARKING PURPOSES!!!!!
 
 use crate::{
     fiat_shamir::PolynomialCommitmentScheme as _,

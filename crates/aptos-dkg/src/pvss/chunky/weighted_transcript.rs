@@ -377,6 +377,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             &dk.dk,
             &pp.pp_elgamal,
             &pp.dlog_table,
+            pp.get_dlog_range_bound(),
             pp.ell,
         );
 
@@ -745,6 +746,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             &dk.dk,
             &pp.pp_elgamal,
             &pp.dlog_table,
+            pp.get_dlog_range_bound(),
             pp.ell,
         );
 

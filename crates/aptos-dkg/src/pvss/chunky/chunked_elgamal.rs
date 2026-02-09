@@ -364,6 +364,7 @@ pub fn decrypt_chunked_scalars<C: CurveGroup>(
     dk: &C::ScalarField,
     pp: &PublicParameters<C>,
     table: &HashMap<Vec<u8>, u64>,
+    table_dlog_range_bound: u64,
     radix_exponent: u8,
 ) -> Vec<C::ScalarField> {
     let mut decrypted_scalars = Vec::with_capacity(Cs_rows.len());
@@ -377,12 +378,16 @@ pub fn decrypt_chunked_scalars<C: CurveGroup>(
             .collect();
 
         // Recover plaintext chunks
-        let chunk_values: Vec<_> =
-            bsgs::dlog_vec(pp.G.into_group(), &exp_chunks, &table, 1 << radix_exponent)
-                .expect("dlog_vec failed")
-                .into_iter()
-                .map(|x| C::ScalarField::from(x))
-                .collect();
+        let chunk_values: Vec<_> = bsgs::dlog_vec(
+            pp.G.into_group(),
+            &exp_chunks,
+            &table,
+            table_dlog_range_bound,
+        )
+        .expect("dlog_vec failed")
+        .into_iter()
+        .map(|x| C::ScalarField::from(x))
+        .collect();
 
         // Convert chunks back to scalar
         let recovered = chunks::le_chunks_to_scalar(radix_exponent, &chunk_values);
@@ -513,6 +518,7 @@ mod tests {
                 &dks[player_id],
                 &pp,
                 &table,
+                1 << (radix_exponent + 1),
                 radix_exponent,
             );
 
