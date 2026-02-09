@@ -608,7 +608,7 @@ impl RngArgs {
 #[derive(Clone, Copy, Debug, Default, Parser, PartialEq, Eq)]
 pub struct PromptOptions {
     /// Assume yes for all yes/no prompts
-    #[clap(long, group = "prompt_options")]
+    #[clap(short = 'y', long, group = "prompt_options")]
     pub assume_yes: bool,
     /// Assume no for all yes/no prompts
     #[clap(long, group = "prompt_options")]
