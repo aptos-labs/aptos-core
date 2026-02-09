@@ -181,6 +181,15 @@ impl TransactionFactory {
         self
     }
 
+    pub fn with_use_replay_protection_nonce(mut self, use_replay_protection_nonce: bool) -> Self {
+        self.use_replay_protection_nonce = use_replay_protection_nonce;
+        // Orderless transactions require the v2 payload format.
+        if use_replay_protection_nonce {
+            self.use_txn_payload_v2_format = true;
+        }
+        self
+    }
+
     pub fn get_max_gas_amount(&self) -> u64 {
         self.max_gas_amount
     }
@@ -387,5 +396,61 @@ impl TransactionFactory {
                 expiration_timestamp,
             } => expiration_timestamp,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aptos_types::transaction::{ReplayProtector, TransactionPayload};
+
+    fn test_payload() -> TransactionPayload {
+        aptos_stdlib::aptos_account_transfer(AccountAddress::ONE, 100)
+    }
+
+    #[test]
+    fn test_orderless_transaction_factory() {
+        let factory =
+            TransactionFactory::new(ChainId::test()).with_use_replay_protection_nonce(true);
+
+        let builder = factory.payload(test_payload());
+
+        // The builder should have a nonce set for orderless transactions.
+        assert!(builder.has_nonce());
+
+        // Building the transaction with u64::MAX as sequence number (orderless
+        // convention) should produce a raw transaction with the nonce in the
+        // payload.
+        let raw_txn = builder
+            .sender(AccountAddress::ONE)
+            .sequence_number(u64::MAX)
+            .build();
+
+        assert!(matches!(
+            raw_txn.replay_protector(),
+            ReplayProtector::Nonce(_)
+        ));
+        assert!(raw_txn.payload_ref().replay_protection_nonce().is_some());
+    }
+
+    #[test]
+    fn test_regular_transaction_factory() {
+        let factory = TransactionFactory::new(ChainId::test());
+
+        let builder = factory.payload(test_payload());
+
+        // Without orderless enabled, there should be no nonce.
+        assert!(!builder.has_nonce());
+
+        let raw_txn = builder
+            .sender(AccountAddress::ONE)
+            .sequence_number(5)
+            .build();
+
+        assert_eq!(
+            raw_txn.replay_protector(),
+            ReplayProtector::SequenceNumber(5)
+        );
+        assert!(raw_txn.payload_ref().replay_protection_nonce().is_none());
     }
 }
