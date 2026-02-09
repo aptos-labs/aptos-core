@@ -186,7 +186,8 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             ],
             // Need to exclude `inlining` because it is under checking
             // TODO: move `inlining` tests to top-level test directory
-            exclude: vec!["/inlining/", "/more-v1/"],
+            // Exclude `unused` because it requires language version 2.4+
+            exclude: vec!["/inlining/", "/more-v1/", "/checking/unused/"],
             stop_after: StopAfter::FirstBytecodeGen, // FileFormat,
             dump_ast: DumpLevel::EndStage,
             ..config().lang(LanguageVersion::V2_1)
@@ -237,6 +238,15 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_ast: DumpLevel::EndStage,
             dump_bytecode: DumpLevel::EndStage,
             dump_bytecode_filter: Some(vec![INITIAL_BYTECODE_STAGE, FILE_FORMAT_STAGE]),
+            ..config().lang(LanguageVersion::V2_4)
+        },
+        // Tests for unused entity detection with struct visibility (requires v2.4+)
+        TestConfig {
+            name: "checking-unused",
+            runner: |p| run_test(p, get_config_by_name("checking-unused")),
+            include: vec!["/checking/unused/"],
+            stop_after: StopAfter::FirstBytecodeGen,
+            dump_ast: DumpLevel::EndStage,
             ..config().lang(LanguageVersion::V2_4)
         },
         TestConfig {
