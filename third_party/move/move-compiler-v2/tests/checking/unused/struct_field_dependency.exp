@@ -1,0 +1,41 @@
+
+Diagnostics:
+warning: Struct `0x42::test::UnusedStruct` is unused: it has no current users and is private to its module.
+   ┌─ tests/checking/unused/struct_field_dependency.move:18:5
+   │
+18 │ ╭     struct UnusedStruct {
+19 │ │         y: u64
+20 │ │     }
+   │ ╰─────^
+
+// -- Model dump before first bytecode pipeline
+module 0x42::test {
+    struct PrivateInner {
+        x: u64,
+    }
+    struct PublicOuter {
+        inner: PrivateInner,
+    }
+    struct UnusedStruct {
+        y: u64,
+    }
+    public fun use_outer(outer: PublicOuter): u64 {
+        select test::PrivateInner.x<PrivateInner>(select test::PublicOuter.inner<PublicOuter>(outer))
+    }
+} // end 0x42::test
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::test {
+    struct PrivateInner {
+        x: u64,
+    }
+    struct PublicOuter {
+        inner: PrivateInner,
+    }
+    struct UnusedStruct {
+        y: u64,
+    }
+    public fun use_outer(outer: PublicOuter): u64 {
+        outer.inner.x
+    }
+}

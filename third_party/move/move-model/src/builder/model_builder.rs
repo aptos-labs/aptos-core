@@ -112,6 +112,13 @@ pub(crate) struct SpecSchemaEntry {
     pub included_spec: Spec,
 }
 
+/// Represents different types of users for a struct or constant
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum UserId {
+    Function(QualifiedId<FunId>),
+    Struct(QualifiedId<StructId>),
+}
+
 /// A declaration of a struct.
 #[derive(Debug, Clone)]
 pub(crate) struct StructEntry {
@@ -130,8 +137,8 @@ pub(crate) struct StructEntry {
     pub is_empty_struct: bool,
     pub is_native: bool,
     pub visibility: Visibility,
-    /// Functions that use this struct
-    pub using_functions: BTreeSet<QualifiedId<FunId>>,
+    /// Entities that use this struct (functions or structs)
+    pub users: BTreeSet<UserId>,
 }
 
 #[derive(Debug, Clone)]
@@ -219,7 +226,7 @@ pub(crate) struct ConstEntry {
     pub ty: Type,
     pub value: Value,
     pub visibility: EntryVisibility,
-    pub using_functions: BTreeSet<QualifiedId<FunId>>,
+    pub users: BTreeSet<UserId>,
 }
 
 impl<'env> ModelBuilder<'env> {
@@ -394,7 +401,7 @@ impl<'env> ModelBuilder<'env> {
             is_empty_struct: false,
             is_native,
             visibility,
-            using_functions: BTreeSet::new(),
+            users: BTreeSet::new(),
         };
         self.struct_table.insert(name.clone(), entry);
         self.reverse_struct_table

@@ -63,7 +63,7 @@ module 0x42::m {
     }
     public fun use_in_lambda() {
         {
-          let _f: |UsedInLambda| = |_x: UsedInLambda| Tuple();
+          let _f: |UsedInLambda| = closure#0m::__lambda__1__use_in_lambda();
           Tuple()
         }
     }
@@ -75,6 +75,9 @@ module 0x42::m {
     }
     public fun use_with_constraint<T>(x: T): UsedInConstraint {
         pack m::UsedInConstraint(2)
+    }
+    private fun __lambda__1__use_in_lambda(_x: UsedInLambda) {
+        Tuple()
     }
     spec fun spec_function(s: UsedOnlyInSpec): bool {
         Gt(select m::UsedOnlyInSpec.x<0x42::m::UsedOnlyInSpec>(s), 0)
@@ -111,7 +114,7 @@ module 0x42::m {
         abort 0
     }
     public fun use_in_lambda() {
-        let _f = |_x| ();
+        let _f = |arg0| lambda__1__use_in_lambda(arg0);
     }
     public inline fun use_inline(): UsedInInline {
         UsedInInline{a: 3}
@@ -122,12 +125,6 @@ module 0x42::m {
     public fun use_with_constraint<T: copy + drop>(x: T): UsedInConstraint {
         UsedInConstraint{z: 2}
     }
+    fun lambda__1__use_in_lambda(_x: UsedInLambda) {
+    }
 }
-
-
-Diagnostics:
-error: function values outside of inline functions not supported in this language version
-   ┌─ tests/checking/unused/struct_usage_edge_cases.move:54:18
-   │
-54 │         let _f = |_x: UsedInLambda| { };
-   │                  ^^^^^^^^^^^^^^^^^^^^^^
