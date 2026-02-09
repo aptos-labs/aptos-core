@@ -1103,9 +1103,16 @@ impl PipelineBuilder {
 
         tracker.start_working();
         let ledger_info_with_sigs_clone = ledger_info_with_sigs.clone();
+        let target_version = ledger_info_with_sigs.ledger_info().version();
         tokio::task::spawn_blocking(move || {
             executor
                 .commit_ledger(ledger_info_with_sigs_clone)
+                .map_err(anyhow::Error::from)?;
+            // Advance the hot state fence after commit+prune. This acquires the execution
+            // lock inside, ensuring no fork block execution is in progress when the
+            // Committer thread is allowed to advance the DashMap.
+            executor
+                .advance_hot_state_fence(target_version)
                 .map_err(anyhow::Error::from)
         })
         .await
