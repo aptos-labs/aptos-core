@@ -38,6 +38,7 @@ use aptos_types::{
     },
     ledger_info::LedgerInfoWithSignatures,
     state_store::StateViewId,
+    transaction::Version,
 };
 use aptos_vm::VMBlockExecutor;
 use block_tree::BlockTree;
@@ -148,6 +149,20 @@ where
             .commit_ledger(ledger_info_with_sigs)
     }
 
+    fn advance_hot_state_fence(&self, version: Version) -> ExecutorResult<()> {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "advance_hot_state_fence"]);
+
+        // Acquire execution_lock to guarantee no block execution is in progress.
+        // This ensures the Committer thread won't race with speculative reads from
+        // a fork block when the fence advances and buffered state is flushed.
+        let _execution_guard = self.execution_lock.lock();
+        self.db
+            .writer
+            .advance_hot_state_fence(version)
+            .map_err(anyhow::Error::from)?;
+        Ok(())
+    }
+
     fn finish(&self) {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "finish"]);
 
@@ -172,6 +187,8 @@ where
 {
     pub fn new(db: DbReaderWriter) -> Result<Self> {
         let block_tree = BlockTree::new(&db.reader)?;
+        let committed_version = db.reader.get_latest_ledger_info_version()?;
+        db.writer.advance_hot_state_fence(committed_version)?;
         Ok(Self {
             db,
             block_tree,

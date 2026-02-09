@@ -171,6 +171,13 @@ pub trait BlockExecutorTrait: Send + Sync {
 
     fn commit_ledger(&self, ledger_info_with_sigs: LedgerInfoWithSignatures) -> ExecutorResult<()>;
 
+    /// Advance the hot state fence to the given version. Implementations should ensure no
+    /// block execution is in progress (e.g. by acquiring the execution lock) so that the
+    /// Committer thread cannot race with speculative reads from a fork block.
+    fn advance_hot_state_fence(&self, _version: Version) -> ExecutorResult<()> {
+        Ok(())
+    }
+
     /// Finishes the block executor by releasing memory held by inner data structures(SMT).
     fn finish(&self);
 
