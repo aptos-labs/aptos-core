@@ -16,6 +16,13 @@ use std::sync::Arc;
 pub struct PersistedState {
     hot_state: Arc<HotState>,
     summary: Arc<Mutex<StateSummary>>,
+    /// The version up to which it's safe to commit to the hot state.
+    /// When `StateMerkleBatchCommitter` passes a `persisted` state, there may still be
+    /// in-flight speculative executions against an older state. The block executor must
+    /// wait for those to finish and manually advance this version. In `set()`, we enqueue
+    /// whichever of `persisted` and `hot_state_progress` has the smaller version, so the hot
+    /// state never exposes a version that could interfere with in-flight executions.
+    hot_state_progress: Arc<Mutex<State>>,
 }
 
 impl PersistedState {
@@ -23,9 +30,14 @@ impl PersistedState {
 
     pub fn new_empty(config: HotStateConfig) -> Self {
         let state = State::new_empty(config);
-        let hot_state = Arc::new(HotState::new(state, config));
+        let hot_state = Arc::new(HotState::new(state.clone(), config));
         let summary = Arc::new(Mutex::new(StateSummary::new_empty(config)));
-        Self { hot_state, summary }
+        let hot_state_progress = Arc::new(Mutex::new(state));
+        Self {
+            hot_state,
+            summary,
+            hot_state_progress,
+        }
     }
 
     pub fn get_state_summary(&self) -> StateSummary {
@@ -47,6 +59,13 @@ impl PersistedState {
         self.hot_state.get_committed()
     }
 
+    /// Advance the hot state progress. The block executor calls this once all in-flight
+    /// speculative executions up to this version have finished, so it is safe to expose this
+    /// state through the hot state.
+    pub fn set_hot_state_progress(&self, state: State) {
+        *self.hot_state_progress.lock() = state;
+    }
+
     pub fn set(&self, persisted: StateWithSummary) {
         let (state, summary) = persisted.into_inner();
 
@@ -58,13 +77,24 @@ impl PersistedState {
         // to as far as v2 (code will panic)
         *self.summary.lock() = summary;
 
-        self.hot_state.enqueue_commit(state);
+        // Enqueue whichever has the smaller version: the persisted state or the hot state
+        // progress. The persisted state from `StateMerkleBatchCommitter` may be ahead of what
+        // the block executor considers safe (due to in-flight speculative executions), so we
+        // cap it at the progress.
+        let safe = self.hot_state_progress.lock().clone();
+        let to_commit = if safe.next_version() < state.next_version() {
+            safe
+        } else {
+            state
+        };
+        self.hot_state.enqueue_commit(to_commit);
     }
 
     // n.b. Can only be used when no on the fly commit is in the queue.
     pub fn hack_reset(&self, state_with_summary: StateWithSummary) {
         let (state, summary) = state_with_summary.into_inner();
         *self.summary.lock() = summary;
+        *self.hot_state_progress.lock() = state.clone();
         self.hot_state.set_commited(state);
     }
 }
