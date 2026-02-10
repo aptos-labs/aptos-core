@@ -116,6 +116,7 @@ async fn test_upgrade_flow() {
                 update_sequence: vec![ReleaseEntry::Framework(FrameworkReleaseConfig {
                     bytecode_version: VERSION_DEFAULT, // TODO: remove explicit bytecode version from sources
                     git_hash: None,
+                    packages: None,
                 })],
             },
             Proposal {
