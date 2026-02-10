@@ -718,8 +718,11 @@ where
     fn charge_slh_dsa_sha2_128s(&mut self) -> VMResult<()> {
         let (cost, res) = self.delegate_charge(|base| base.charge_slh_dsa_sha2_128s());
 
-        self.slh_dsa_sha2_128s_cost =
-            Some(self.slh_dsa_sha2_128s_cost.unwrap_or_else(|| 0.into()) + cost);
+        self.slh_dsa_sha2_128s_cost = Some(
+            self.slh_dsa_sha2_128s_cost
+                .unwrap_or_else(InternalGas::zero)
+                + cost,
+        );
 
         res
     }
@@ -738,10 +741,13 @@ where
 
         let exec_io = ExecutionAndIOCosts {
             gas_scaling_factor: self.base.gas_unit_scaling_factor(),
-            total: self.algebra().execution_gas_used() + self.algebra().io_gas_used(),
-            intrinsic_cost: self.intrinsic_cost.unwrap_or_else(|| 0.into()),
-            keyless_cost: self.keyless_cost.unwrap_or_else(|| 0.into()),
-            slh_dsa_sha2_128s_cost: self.slh_dsa_sha2_128s_cost.unwrap_or_else(|| 0.into()),
+            execution_gas: self.algebra().execution_gas_used(),
+            io_gas: self.algebra().io_gas_used(),
+            intrinsic_cost: self.intrinsic_cost.unwrap_or_else(InternalGas::zero),
+            keyless_cost: self.keyless_cost.unwrap_or_else(InternalGas::zero),
+            slh_dsa_sha2_128s_cost: self
+                .slh_dsa_sha2_128s_cost
+                .unwrap_or_else(InternalGas::zero),
             dependencies: self.dependencies,
             call_graph: self.frames.pop().expect("frame must exist"),
             transaction_transient: self.transaction_transient,
@@ -751,12 +757,12 @@ where
         exec_io.assert_consistency();
 
         let storage = self.storage_fees.unwrap_or_else(|| StorageFees {
-            total: 0.into(),
-            total_refund: 0.into(),
+            total: Fee::zero(),
+            total_refund: Fee::zero(),
             write_set_storage: vec![],
             events: vec![],
-            event_discount: 0.into(),
-            txn_storage: 0.into(),
+            event_discount: Fee::zero(),
+            txn_storage: Fee::zero(),
         });
         storage.assert_consistency();
 
