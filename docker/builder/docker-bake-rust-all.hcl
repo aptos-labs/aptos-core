@@ -113,6 +113,17 @@ target "tools-builder" {
   ]
 }
 
+target "forge-builder" {
+  dockerfile = "docker/builder/builder.Dockerfile"
+  target     = "forge-builder"
+  contexts = {
+    builder-base = "target:builder-base"
+  }
+  secret = [
+    "id=GIT_CREDENTIALS"
+  ]
+}
+
 target "indexer-builder" {
   dockerfile = "docker/builder/builder.Dockerfile"
   target     = "indexer-builder"
@@ -128,6 +139,7 @@ target "_common" {
   contexts = {
     debian-base     = "target:debian-base"
     node-builder    = "target:aptos-node-builder"
+    forge-builder   = "target:forge-builder"
     tools-builder   = "target:tools-builder"
     indexer-builder = "target:indexer-builder"
   }

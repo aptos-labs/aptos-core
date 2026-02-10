@@ -30,7 +30,7 @@ COPY --link --from=tools-builder /aptos/terraform/helm /aptos/terraform/helm
 COPY --link --from=tools-builder /aptos/testsuite/forge/src/backend/k8s/helm-values/aptos-node-default-values.yaml /aptos/terraform/aptos-node-default-values.yaml
 COPY --link --from=tools-builder /aptos/aptos-move/framework/ /aptos/aptos-move/framework/
 COPY --link --from=tools-builder /aptos/aptos-move/aptos-release-builder/ /aptos/aptos-move/aptos-release-builder/
-COPY --link --from=node-builder /aptos/dist/forge /usr/local/bin/forge
+COPY --link --from=forge-builder /aptos/dist/forge /usr/local/bin/forge
 
 ENV RUST_LOG_FORMAT=json
 

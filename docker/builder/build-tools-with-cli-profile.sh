@@ -1,6 +1,6 @@
 #!/bin/bash
-# Copyright (c) Aptos
-# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) Aptos Foundation
+# Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 set -ex
 
 echo "Building tools and services docker images"
@@ -11,7 +11,6 @@ echo "CARGO_TARGET_DIR: $CARGO_TARGET_DIR"
 CLI_PROFILE=cli
 cargo build --locked --profile=$CLI_PROFILE \
     -p aptos \
-    -p aptos-backup-cli \
     -p aptos-faucet-service \
     -p aptos-openapi-spec-generator \
     -p aptos-telemetry-service \
@@ -40,14 +39,3 @@ done
 # Build the Aptos Move framework and place it in dist. It can be found afterwards in the current directory.
 echo "Building the Aptos Move framework..."
 (cd dist && cargo run --locked --profile=$CLI_PROFILE --package aptos-framework -- release)
-
-# We build everything above with `cli` profile, but building `aptos-debugger`
-# with `performance` profile, if specified, helps speed up replay-verify, so we
-# do it here separately.
-BUILD_ENV=()
-if [[ "$PROFILE" == "performance" ]]; then
-  source "$(dirname -- "${BASH_SOURCE[0]}")/performance_rustflags.sh"
-  BUILD_ENV=(RUSTFLAGS="${PERFORMANCE_RUSTFLAGS[*]}")
-fi
-env "${BUILD_ENV[@]}" cargo build --locked --profile=$PROFILE -p aptos-debugger "$@"
-cp $CARGO_TARGET_DIR/$PROFILE/aptos-debugger dist/aptos-debugger
