@@ -703,8 +703,15 @@ where
                     let callee = lazy_function
                         .as_resolved(self.loader, gas_meter, traversal_context)
                         .map_err(|e| set_err_info!(current_frame, e))?;
-                    let num_actual_params =
-                        callee.param_tys().len() - mask.captured_count() as usize;
+                    let num_actual_params = callee.param_tys().len().checked_sub(mask.captured_count() as usize).ok_or_else(|| {
+                        let err = PartialVMError::new_invariant_violation(format!(
+                            "Number of parameters ({}) for function {} is smaller than the number of captured arguments ({})",
+                            callee.param_tys().len(),
+                            lazy_function.to_canonical_string(),
+                            mask.captured_count()
+                        ));
+                        set_err_info!(current_frame, err)
+                    })?;
 
                     // Validate that the closure signature matches the signature of the loaded
                     // callee and has the right number of parameter and return values.
@@ -2465,11 +2472,12 @@ impl Frame {
                         let struct_value = interpreter.operand_stack.pop_as::<Struct>()?;
                         gas_meter.charge_unpack(false, struct_value.field_views())?;
 
-                        let mut num_actual_fields = 0;
+                        let operand_stack_size_before = interpreter.operand_stack.value.len();
                         for value in struct_value.unpack()? {
                             interpreter.operand_stack.push(value)?;
-                            num_actual_fields += 1;
                         }
+                        let num_actual_fields =
+                            interpreter.operand_stack.value.len() - operand_stack_size_before;
                         let num_expected_fields = self.field_count(*sd_idx) as usize;
                         if num_expected_fields != num_actual_fields {
                             return Err(stack_field_count_mismatch_error(
@@ -2485,13 +2493,14 @@ impl Frame {
                         let info = self.get_struct_variant_at(*sd_idx);
                         let num_expected_fields = info.field_count as usize;
 
-                        let mut num_actual_fields = 0;
+                        let operand_stack_size_before = interpreter.operand_stack.value.len();
                         for value in struct_value.unpack_variant(info.variant, &|v| {
                             info.definition_struct_type.variant_name_for_message(v)
                         })? {
                             interpreter.operand_stack.push(value)?;
-                            num_actual_fields += 1;
                         }
+                        let num_actual_fields =
+                            interpreter.operand_stack.value.len() - operand_stack_size_before;
                         if num_expected_fields != num_actual_fields {
                             return Err(stack_field_count_mismatch_error(
                                 num_expected_fields,
@@ -2518,11 +2527,12 @@ impl Frame {
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
                         gas_meter.charge_unpack(true, struct_.field_views())?;
 
-                        let mut num_actual_fields = 0;
+                        let operand_stack_size_before = interpreter.operand_stack.value.len();
                         for value in struct_.unpack()? {
                             interpreter.operand_stack.push(value)?;
-                            num_actual_fields += 1;
                         }
+                        let num_actual_fields =
+                            interpreter.operand_stack.value.len() - operand_stack_size_before;
                         if num_expected_fields != num_actual_fields {
                             return Err(stack_field_count_mismatch_error(
                                 num_expected_fields,
@@ -2546,14 +2556,14 @@ impl Frame {
                         let info = self.get_struct_variant_instantiation_at(*si_idx);
                         let num_expected_fields = info.field_count as usize;
 
-                        let mut num_actual_fields = 0;
+                        let operand_stack_size_before = interpreter.operand_stack.value.len();
                         for value in struct_.unpack_variant(info.variant, &|v| {
                             info.definition_struct_type.variant_name_for_message(v)
                         })? {
                             interpreter.operand_stack.push(value)?;
-                            num_actual_fields += 1;
                         }
-
+                        let num_actual_fields =
+                            interpreter.operand_stack.value.len() - operand_stack_size_before;
                         if num_expected_fields != num_actual_fields {
                             return Err(stack_field_count_mismatch_error(
                                 num_expected_fields,
