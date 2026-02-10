@@ -77,10 +77,10 @@ where
         TupleCodomainShape(self.hom1.apply(x), self.hom2.apply(x))
     }
 
-    fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
+    fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
         TupleCodomainShape(
-            H1::normalize(&self.hom1, &value.0),
-            H2::normalize(&self.hom2, &value.1),
+            H1::normalize(&self.hom1, value.0),
+            H2::normalize(&self.hom2, value.1),
         )
     }
 }
@@ -101,10 +101,10 @@ where
         TupleCodomainShape(self.hom1.apply(x), self.hom2.apply(x))
     }
 
-    fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
+    fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
         TupleCodomainShape(
-            H1::normalize(&self.hom1, &value.0),
-            H2::normalize(&self.hom2, &value.1),
+            H1::normalize(&self.hom1, value.0),
+            H2::normalize(&self.hom2, value.1),
         )
     }
 }
@@ -308,10 +308,13 @@ where
     pub fn prove<Ct: Serialize, R: rand_core::RngCore + rand_core::CryptoRng>(
         &self,
         witness: &<Self as homomorphism::Trait>::Domain,
-        statement: &<Self as homomorphism::Trait>::Codomain,
+        statement: <Self as homomorphism::Trait>::Codomain,
         cntxt: &Ct, // for SoK purposes
         rng: &mut R,
-    ) -> Proof<H1::Scalar, Self> {
+    ) -> (
+        Proof<H1::Scalar, Self>,
+        <Self as homomorphism::Trait>::CodomainNormalized,
+    ) {
         prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
     }
 

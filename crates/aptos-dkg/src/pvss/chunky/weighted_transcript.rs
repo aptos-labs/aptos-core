@@ -24,7 +24,7 @@ use crate::{
     range_proofs::{dekart_univariate_v2, traits::BatchedRangeProof},
     sigma_protocol::{
         self,
-        homomorphism::{tuple::TupleCodomainShape, Trait as _},
+        homomorphism::{tuple::TupleCodomainShape, Trait as _, TrivialShape},
         traits::Trait as _,
     },
     Scalar,
@@ -604,7 +604,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         debug_assert_eq!(f_evals.len(), sc.get_total_weight());
 
         // Encrypt the chunked shares and generate the sharing proof
-        let (Cs_proj, Rs_proj, sharing_proof) =
+        let (Cs, Rs, sharing_proof) =
             Self::encrypt_chunked_shares(&f_evals, eks, pp, sc, sok_cntxt, rng);
 
         // Add constant term for the `\mathbb{G}_2` commitment (we're doing this **after** the previous step
@@ -622,18 +622,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let Vs_proj = sc.group_by_player(&flattened_Vs_proj); // This won't use the last item in `flattened_Vs` because of `sc`
         let V0_proj = *flattened_Vs_proj.last().unwrap();
 
-        // Batch normalize all projective elements to affine before creating Subtranscript
-        // Collect all G1 elements (from Cs and Rs)
-        let mut g1_elems = Vec::new();
-        for player_Cs in &Cs_proj {
-            for chunks in player_Cs {
-                g1_elems.extend(chunks.iter().copied());
-            }
-        }
-        for weight_Rs in &Rs_proj {
-            g1_elems.extend(weight_Rs.iter().copied());
-        }
-
         // Collect all G2 elements (from V0 and Vs)
         let mut g2_elems = vec![V0_proj];
         for row in &Vs_proj {
@@ -641,11 +629,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         }
 
         // Batch normalize
-        let g1_affine = E::G1::normalize_batch(&g1_elems);
         let g2_affine = E::G2::normalize_batch(&g2_elems);
 
         // Reconstruct nested structures in affine form
-        let mut g1_iter = g1_affine.into_iter();
         let mut g2_iter = g2_affine.into_iter();
 
         // V0
@@ -657,23 +643,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             .map(|row| row.iter().map(|_| g2_iter.next().unwrap()).collect())
             .collect();
 
-        // Cs
-        let Cs: Vec<Vec<Vec<E::G1Affine>>> = Cs_proj
-            .iter()
-            .map(|mat| {
-                mat.iter()
-                    .map(|row| row.iter().map(|_| g1_iter.next().unwrap()).collect())
-                    .collect()
-            })
-            .collect();
-
-        // Rs
-        let Rs: Vec<Vec<E::G1Affine>> = Rs_proj
-            .iter()
-            .map(|row| row.iter().map(|_| g1_iter.next().unwrap()).collect())
-            .collect();
-
-        debug_assert!(g1_iter.next().is_none());
         debug_assert!(g2_iter.next().is_none());
 
         Transcript {
@@ -792,7 +761,11 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         sc: &<Self as traits::Transcript>::SecretSharingConfig, // only for debugging purposes?
         sok_cntxt: SokContext<'a, A>,
         rng: &mut R,
-    ) -> (Vec<Vec<Vec<E::G1>>>, Vec<Vec<E::G1>>, SharingProof<E>) {
+    ) -> (
+        Vec<Vec<Vec<E::G1Affine>>>,
+        Vec<Vec<E::G1Affine>>,
+        SharingProof<E>,
+    ) {
         // Generate the required randomness
         let hkzg_randomness = univariate_hiding_kzg::CommitmentRandomness::rand(rng);
         let elgamal_randomness = Scalar::vecvec_from_inner(
@@ -844,9 +817,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         //   (2b) Compute its image (the public statement), so the range proof commitment and chunked_elgamal encryptions
         let statement = hom.apply(&witness);
         //   (2c) Produce the SoK
-        let SoK = hom
-            .prove(&witness, &statement, &sok_cntxt, rng)
-            .change_lifetime(); // Make sure the lifetime of the proof is not coupled to `hom` which has references
+        let (SoK, normalized_statement) = hom.prove(&witness, statement, &sok_cntxt, rng);
+        let SoK = SoK.change_lifetime(); // Make sure the lifetime of the proof is not coupled to `hom` which has references
 
         // Destructure the "public statement" of the above sigma protocol
         let TupleCodomainShape(
@@ -855,7 +827,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
                 chunks: Cs,
                 randomness: Rs,
             },
-        ) = statement;
+        ) = normalized_statement;
 
         // debug_assert_eq!(
         //     Cs.len(),
@@ -868,7 +840,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
             &pp.pk_range_proof,
             &f_evals_chunked_flat,
             pp.ell,
-            &range_proof_commitment,
+            &TrivialShape(range_proof_commitment.0.into()), // TODO: fix this
             &hkzg_randomness,
             rng,
         );
@@ -877,7 +849,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         let sharing_proof = SharingProof {
             SoK,
             range_proof,
-            range_proof_commitment,
+            range_proof_commitment: TrivialShape(range_proof_commitment.0.into()), // TODO: fix this
         };
 
         (Cs, Rs, sharing_proof)

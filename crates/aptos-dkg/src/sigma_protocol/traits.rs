@@ -42,10 +42,10 @@ pub trait Trait<C: CurveGroup>:
     fn prove<Ct: Serialize, R: RngCore + CryptoRng>(
         &self,
         witness: &Self::Domain,
-        statement: &Self::Codomain,
+        statement: Self::Codomain,
         cntxt: &Ct, // for SoK purposes
         rng: &mut R,
-    ) -> Proof<<Self as fixed_base_msms::Trait>::Scalar, Self> { // or C::ScalarField
+    ) -> (Proof<<Self as fixed_base_msms::Trait>::Scalar, Self>, <Self as homomorphism::Trait>::CodomainNormalized) { // or C::ScalarField
         prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
     }
 
@@ -296,12 +296,12 @@ where
 pub fn prove_homomorphism<Ct: Serialize, F: PrimeField, H: homomorphism::Trait, R>(
     homomorphism: &H,
     witness: &H::Domain,
-    statement: &H::Codomain,
+    statement: H::Codomain,
     cntxt: &Ct,
     store_prover_commitment: bool, // true = store prover's commitment, false = store Fiat-Shamir challenge
     rng: &mut R,
     dst: &[u8],
-) -> Proof<F, H>
+) -> (Proof<F, H>, H::CodomainNormalized)
 where
     H::Domain: Witness<F>,
     H::CodomainNormalized: Statement,
@@ -312,13 +312,14 @@ where
 
     // Step 2: Compute commitment A = Ψ(r)
     let A_proj = homomorphism.apply(&r);
-    let A = homomorphism.normalize(&A_proj);
+    let A = homomorphism.normalize(A_proj);
+    let normalized_statement = homomorphism.normalize(statement); // TODO: combine these two normalisations
 
     // Step 3: Obtain Fiat-Shamir challenge
     let c = fiat_shamir_challenge_for_sigma_protocol::<_, F, H>(
         cntxt,
         homomorphism,
-        &homomorphism.normalize(&statement),
+        &normalized_statement,
         &A,
         dst,
     );
@@ -333,8 +334,11 @@ where
         FirstProofItem::Challenge(c)
     };
 
-    Proof {
-        first_proof_item,
-        z,
-    }
+    (
+        Proof {
+            first_proof_item,
+            z,
+        },
+        normalized_statement,
+    )
 }

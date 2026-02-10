@@ -170,7 +170,7 @@ impl<C: CurveGroup> homomorphism::Trait for WeightedHomomorphism<'_, C> {
         }
     }
 
-    fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
+    fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
         <WeightedHomomorphism<C> as fixed_base_msms::Trait>::normalize_output(value)
     }
 }
