@@ -652,6 +652,12 @@ pub trait DbWriter: Send + Sync {
     ) -> Result<()> {
         unimplemented!()
     }
+
+    /// Inform storage that all speculative executions up to this state's version have finished,
+    /// so it is safe to expose this state through the in-memory hot state (DashMap).
+    fn set_hot_state_progress(&self, _state: State) {
+        unimplemented!()
+    }
 }
 
 #[derive(Clone)]
