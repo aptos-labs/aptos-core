@@ -1403,6 +1403,8 @@ impl ModuleBuilder<'_, '_> {
 
         // Mark each field struct as being used by this struct
         for field_struct_id in field_structs {
+            // Skip structs not in current build (e.g., from dependencies like std::vector, std::option)
+            // reverse_struct_table only contains structs from primary target modules being compiled
             if let Some(qualified_symbol) = self
                 .parent
                 .reverse_struct_table
@@ -3776,7 +3778,7 @@ impl ModuleBuilder<'_, '_> {
                 visibility: entry.visibility,
                 has_package_visibility: self.package_structs.contains(&entry.struct_id),
                 is_empty_struct: entry.is_empty_struct,
-                users: RefCell::new(Some(entry.users.clone())),
+                users: entry.users.clone(),
             };
             struct_data.insert(StructId::new(name.symbol), data);
             if entry.visibility != Visibility::Private

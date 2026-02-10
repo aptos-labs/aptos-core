@@ -2003,7 +2003,7 @@ impl GlobalEnv {
             has_package_visibility: false,
             is_empty_struct: false,
             // Ghost memory structs are synthetic and not directly used by function bodies
-            users: RefCell::new(Some(BTreeSet::new())),
+            users: BTreeSet::new(),
         }
     }
 
@@ -3856,7 +3856,7 @@ pub struct StructData {
     pub is_empty_struct: bool,
 
     /// All users of this struct (functions and structs)
-    pub(crate) users: RefCell<Option<BTreeSet<UserId>>>,
+    pub(crate) users: BTreeSet<UserId>,
 }
 
 impl StructData {
@@ -3876,7 +3876,7 @@ impl StructData {
             visibility: Visibility::Private,
             has_package_visibility: false,
             is_empty_struct: false,
-            users: RefCell::new(None),
+            users: BTreeSet::new(),
         }
     }
 }
@@ -4257,16 +4257,8 @@ impl<'env> StructEnv<'env> {
     ///
     /// This information is pre-computed during the build phase by tracking struct usage in
     /// function bodies and as field types in other structs (see module_builder.rs).
-    pub fn get_users(&self) -> BTreeSet<UserId> {
-        self.data
-            .users
-            .borrow()
-            .as_ref()
-            .cloned()
-            .unwrap_or_else(|| {
-                // This should never happen for target modules, but return empty set as safety net
-                BTreeSet::new()
-            })
+    pub fn get_users(&self) -> &BTreeSet<UserId> {
+        &self.data.users
     }
 }
 
