@@ -52,8 +52,9 @@ pub fn start_consensus(
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     vtxn_pool: VTxnPoolState,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
+    num_worker_threads: usize,
 ) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
-    let runtime = aptos_runtimes::spawn_named_runtime("consensus".into(), None);
+    let runtime = aptos_runtimes::spawn_named_runtime("consensus".into(), Some(num_worker_threads));
     let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
     let quorum_store_db = Arc::new(QuorumStoreDB::new(node_config.storage.dir()));
 
