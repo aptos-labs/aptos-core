@@ -279,6 +279,11 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
                 chunk.ledger_info_opt.as_ref(),
                 false, // sync_commit
             )?;
+            // No speculative execution in the chunk executor, so it's always safe to
+            // advance the hot state progress to the latest committed state.
+            self.db
+                .writer
+                .set_hot_state_progress(chunk.output.result_state().latest().clone());
         }
 
         let _timer = CHUNK_OTHER_TIMERS.timer_with(&["commit_chunk_impl__dequeue_and_return"]);
