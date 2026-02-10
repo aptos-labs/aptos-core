@@ -3938,19 +3938,12 @@ impl ModuleBuilder<'_, '_> {
                 visibility: _,
                 users,
             } = const_entry.clone();
-            let using_funs = users
-                .iter()
-                .filter_map(|user| match user {
-                    UserId::Function(fun_id) => Some(*fun_id),
-                    _ => None,
-                })
-                .collect();
             let data = NamedConstantData {
                 name: name.symbol,
                 loc,
                 type_: ty,
                 value,
-                using_funs,
+                users,
             };
             named_constants.insert(NamedConstantId::new(name.symbol), data);
         }

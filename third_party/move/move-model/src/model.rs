@@ -4384,8 +4384,8 @@ pub struct NamedConstantData {
     /// The value of this constant, if known.
     pub(crate) value: Value,
 
-    /// Functions that reference this constant (populated at build time)
-    pub(crate) using_funs: BTreeSet<QualifiedId<FunId>>,
+    /// All users of this constant (functions and structs)
+    pub(crate) users: BTreeSet<UserId>,
 }
 
 #[derive(Debug)]
@@ -4436,9 +4436,9 @@ impl NamedConstantEnv<'_> {
         }
     }
 
-    /// Returns the functions that reference this constant.
-    pub fn get_using_functions(&self) -> &BTreeSet<QualifiedId<FunId>> {
-        &self.data.using_funs
+    /// Returns the users (functions and structs) that reference this constant.
+    pub fn get_users(&self) -> &BTreeSet<UserId> {
+        &self.data.users
     }
 }
 
