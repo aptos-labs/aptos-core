@@ -13,7 +13,7 @@ use crate::{
     intrinsics::IntrinsicDecl,
     model::{
         FieldData, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId,
-        QualifiedInstId, SpecFunId, SpecVarId, StructId, TypeParameter,
+        QualifiedInstId, SpecFunId, SpecVarId, StructId, TypeParameter, UserId,
     },
     symbol::Symbol,
     ty::{Constraint, Type, TypeDisplayContext},
@@ -110,13 +110,6 @@ pub(crate) struct SpecSchemaEntry {
     pub all_vars: BTreeMap<Symbol, LocalVarEntry>,
     // The specification included from other schemas, after renaming and type instantiation.
     pub included_spec: Spec,
-}
-
-/// Represents different types of users for a struct or constant
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum UserId {
-    Function(QualifiedId<FunId>),
-    Struct(QualifiedId<StructId>),
 }
 
 /// A declaration of a struct.

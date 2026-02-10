@@ -13,7 +13,7 @@ use crate::{
         exp_builder::ExpTranslator,
         model_builder::{
             ConstEntry, EntryVisibility, FunEntry, LocalVarEntry, ModelBuilder,
-            SpecOrBuiltinFunEntry, StructLayout, StructVariant, UserId,
+            SpecOrBuiltinFunEntry, StructLayout, StructVariant,
         },
     },
     constant_folder::ConstantFolder,
@@ -24,7 +24,7 @@ use crate::{
         self, EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, FunctionLoc,
         Loc, ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter,
         QualifiedId, SchemaId, SpecFunId, SpecVarId, StructData, StructId, TypeParameter,
-        TypeParameterKind,
+        TypeParameterKind, UserId,
     },
     pragmas::{
         is_pragma_valid_for_block, is_property_valid_for_condition, CONDITION_DEACTIVATED_PROP,
@@ -1386,7 +1386,7 @@ impl ModuleBuilder<'_, '_> {
                         }
                     });
                 }
-            }
+            },
             StructLayout::Variants(variants) => {
                 for variant in variants {
                     for field_data in variant.fields.values() {
@@ -1397,8 +1397,8 @@ impl ModuleBuilder<'_, '_> {
                         });
                     }
                 }
-            }
-            StructLayout::None => {}
+            },
+            StructLayout::None => {},
         }
 
         // Mark each field struct as being used by this struct
@@ -3781,6 +3781,7 @@ impl ModuleBuilder<'_, '_> {
                         })
                         .collect(),
                 )),
+                users: RefCell::new(Some(entry.users.clone())),
             };
             struct_data.insert(StructId::new(name.symbol), data);
             if entry.visibility != Visibility::Private

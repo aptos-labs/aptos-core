@@ -11,7 +11,6 @@ use crate::{
     builder::{
         model_builder::{
             AnyFunEntry, ConstEntry, EntryVisibility, LocalVarEntry, StructEntry, StructLayout,
-            UserId,
         },
         module_builder::{ModuleBuilder, SpecBlockContext},
     },
@@ -20,8 +19,8 @@ use crate::{
         LanguageVersion,
     },
     model::{
-        FieldData, FieldId, FunctionKind, GlobalEnv, GlobalId, Loc, ModuleId, NodeId, Parameter,
-        QualifiedId, QualifiedInstId, SpecFunId, StructId, TypeParameter, TypeParameterKind,
+        FieldData, FieldId, FunctionKind, GlobalEnv, Loc, ModuleId, NodeId, Parameter, QualifiedId,
+        QualifiedInstId, SpecFunId, StructId, TypeParameter, TypeParameterKind, UserId,
     },
     symbol::{Symbol, SymbolPool},
     ty::{

@@ -2004,6 +2004,7 @@ impl GlobalEnv {
             is_empty_struct: false,
             // Ghost memory structs are synthetic and not directly used by function bodies
             using_funs: RefCell::new(Some(BTreeSet::new())),
+            users: RefCell::new(Some(BTreeSet::new())),
         }
     }
 
@@ -3800,6 +3801,13 @@ impl<'env> ModuleEnv<'env> {
 // =================================================================================================
 /// # Struct Environment
 
+/// Represents different types of users for a struct or constant
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum UserId {
+    Function(QualifiedId<FunId>),
+    Struct(QualifiedId<StructId>),
+}
+
 #[derive(Debug)]
 pub struct StructData {
     /// The name of this struct.
@@ -3850,6 +3858,9 @@ pub struct StructData {
 
     /// Functions that use this struct (computed lazily)
     pub(crate) using_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
+
+    /// All users of this struct (functions and structs)
+    pub(crate) users: RefCell<Option<BTreeSet<UserId>>>,
 }
 
 impl StructData {
@@ -3870,6 +3881,7 @@ impl StructData {
             has_package_visibility: false,
             is_empty_struct: false,
             using_funs: RefCell::new(None),
+            users: RefCell::new(None),
         }
     }
 }
@@ -4254,6 +4266,22 @@ impl<'env> StructEnv<'env> {
     pub fn get_using_functions(&self) -> BTreeSet<QualifiedId<FunId>> {
         self.data
             .using_funs
+            .borrow()
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| {
+                // This should never happen for target modules, but return empty set as safety net
+                BTreeSet::new()
+            })
+    }
+
+    /// Returns all users of this struct (both functions and other structs).
+    ///
+    /// This information is pre-computed during the build phase by tracking struct usage in
+    /// function bodies and as field types in other structs (see module_builder.rs).
+    pub fn get_users(&self) -> BTreeSet<UserId> {
+        self.data
+            .users
             .borrow()
             .as_ref()
             .cloned()
