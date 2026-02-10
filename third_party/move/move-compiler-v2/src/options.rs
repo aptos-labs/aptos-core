@@ -109,7 +109,7 @@ pub struct Options {
            default_value=bool_to_str(warn_of_deprecation_use_in_aptos_libs_env_var()))]
     pub warn_of_deprecation_use_in_aptos_libs: bool,
 
-    /// Warning flags (e.g., `unused`, `shadowing`). Use `all` to enable all warnings.
+    /// Warning flags in `-W<name>` format (e.g., `-Wunused`, `-Wshadowing`). Use `-Wall` for all.
     #[clap(long = "W", number_of_values = 1)]
     pub warnings: Vec<String>,
 
