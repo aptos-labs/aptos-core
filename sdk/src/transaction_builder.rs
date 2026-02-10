@@ -183,10 +183,6 @@ impl TransactionFactory {
 
     pub fn with_use_replay_protection_nonce(mut self, use_replay_protection_nonce: bool) -> Self {
         self.use_replay_protection_nonce = use_replay_protection_nonce;
-        // Orderless transactions require the v2 payload format.
-        if use_replay_protection_nonce {
-            self.use_txn_payload_v2_format = true;
-        }
         self
     }
 
@@ -367,7 +363,7 @@ impl TransactionFactory {
             sequence_number: None,
             payload: if self.use_txn_payload_v2_format || self.use_replay_protection_nonce {
                 payload.upgrade_payload_with_fn(
-                    self.use_txn_payload_v2_format,
+                    self.use_txn_payload_v2_format || self.use_replay_protection_nonce,
                     self.use_replay_protection_nonce
                         .then_some(|| thread_rng().r#gen()),
                 )

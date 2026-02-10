@@ -396,17 +396,17 @@ impl MintFunder {
         wait_for_transactions: bool,
         asset_name: &str,
     ) -> Result<Vec<SignedTransaction>, AptosTapError> {
-        // Check if the receiver account already exists.
-        let receiver_exists = client.get_account(receiver_address).await.is_ok();
-
-        if receiver_exists && amount == 0 {
-            return Err(AptosTapError::new(
-                format!(
-                    "Account {} already exists and amount asked for is 0",
-                    receiver_address
-                ),
-                AptosTapErrorCode::InvalidRequest,
-            ));
+        if amount == 0 {
+            let receiver_exists = client.get_account(receiver_address).await.is_ok();
+            if receiver_exists {
+                return Err(AptosTapError::new(
+                    format!(
+                        "Account {} already exists and amount asked for is 0",
+                        receiver_address
+                    ),
+                    AptosTapErrorCode::InvalidRequest,
+                ));
+            }
         }
 
         if check_only {

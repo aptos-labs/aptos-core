@@ -29,7 +29,6 @@ use async_trait::async_trait;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str::FromStr, time::Duration};
-use tokio::sync::RwLock;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct TransferFunderConfig {
@@ -90,7 +89,7 @@ impl TransferFunderConfig {
 }
 
 pub struct TransferFunder {
-    faucet_account: RwLock<LocalAccount>,
+    faucet_account: LocalAccount,
 
     transaction_factory: TransactionFactory,
 
@@ -135,7 +134,7 @@ impl TransferFunder {
             GasUnitPriceManager::new(node_url.clone(), gas_unit_price_ttl_secs);
 
         Self {
-            faucet_account: RwLock::new(faucet_account),
+            faucet_account,
             transaction_factory: TransactionFactory::new(chain_id)
                 .with_max_gas_amount(max_gas_amount)
                 .with_transaction_expiration_time(transaction_expiration_secs)
@@ -202,12 +201,8 @@ impl TransferFunder {
 
         let transaction_builder = transaction_factory.payload(payload);
 
-        // Orderless transactions don't increment the sequence number, so a
-        // read lock is sufficient.
         let signed_transaction = self
             .faucet_account
-            .read()
-            .await
             .sign_with_transaction_builder(transaction_builder);
 
         submit_transaction(
@@ -321,7 +316,7 @@ impl FunderTrait for TransferFunder {
 
     /// Assert funder account actually exists and has the minimum funds.
     async fn is_healthy(&self) -> FunderHealthMessage {
-        let account_address = self.faucet_account.read().await.address();
+        let account_address = self.faucet_account.address();
         let funder_balance = match self
             .get_api_client()
             .view_apt_account_balance(account_address)
