@@ -61,6 +61,11 @@ pub struct VMConfig {
     /// Also controls whether error messages format values (which could cause stack
     /// overflow during Display formatting).
     pub enable_closure_depth_check: bool,
+    /// If true, the layout converter caches struct layouts within a single layout
+    /// construction pass, sharing `Arc<MoveStructLayout>` on cache hits and skipping
+    /// duplicate node-count charges. This avoids spurious `TOO_MANY_TYPE_NODES` errors
+    /// when the same struct appears in multiple positions (e.g., enum variants).
+    pub enable_struct_layout_local_cache: bool,
 }
 
 impl Default for VMConfig {
@@ -91,6 +96,7 @@ impl Default for VMConfig {
             enable_function_caches_for_native_dynamic_dispatch: true,
             enable_debugging: false,
             enable_closure_depth_check: true,
+            enable_struct_layout_local_cache: true,
         }
     }
 }
