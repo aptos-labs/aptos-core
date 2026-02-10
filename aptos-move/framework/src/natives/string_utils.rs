@@ -359,127 +359,130 @@ fn native_format_impl(
             )?;
             out.push(']');
         },
-        MoveTypeLayout::Struct(MoveStructLayout::WithTypes { type_, fields, .. }) => {
-            let strct = val.value_as::<Struct>()?;
-            if type_.name.as_str() == "String"
-                && type_.module.as_str() == "string"
-                && type_.address == AccountAddress::ONE
-            {
-                let v = strct.unpack()?.next().unwrap().value_as::<Vec<u8>>()?;
-                if context.should_charge_gas {
-                    context
-                        .context
-                        .charge(STRING_UTILS_PER_BYTE * NumBytes::new(v.len() as u64))?;
-                }
-                write!(
-                    out,
-                    "\"{}\"",
-                    bytes_as_escaped_string(std::str::from_utf8(&v).unwrap())
-                )
-                .unwrap();
-                return Ok(());
-            } else if type_.is_option() {
-                if context.context.get_feature_flags().is_enum_option_enabled() {
-                    // This outputs the legacy layout of option for backward compatibility.
-                    // when using enum representation of option, we need different logic to format it
-                    format_enum_option(context, fields, strct, depth, out)?;
-                } else {
-                    let mut v = strct
-                        .unpack()?
-                        .next()
-                        .unwrap()
-                        .value_as::<Vector>()?
-                        .unpack_unchecked()?;
-                    if v.is_empty() {
-                        out.push_str("None");
-                    } else {
-                        out.push_str("Some(");
-                        let inner_ty = if let MoveTypeLayout::Vector(inner_ty) = &fields[0].layout {
-                            inner_ty.deref()
-                        } else {
-                            unreachable!()
-                        };
-                        native_format_impl(context, inner_ty, v.pop().unwrap(), depth, out)?;
-                        out.push(')');
+        MoveTypeLayout::Struct(struct_layout) => match struct_layout.as_ref() {
+            MoveStructLayout::WithTypes { type_, fields, .. } => {
+                let strct = val.value_as::<Struct>()?;
+                if type_.name.as_str() == "String"
+                    && type_.module.as_str() == "string"
+                    && type_.address == AccountAddress::ONE
+                {
+                    let v = strct.unpack()?.next().unwrap().value_as::<Vec<u8>>()?;
+                    if context.should_charge_gas {
+                        context
+                            .context
+                            .charge(STRING_UTILS_PER_BYTE * NumBytes::new(v.len() as u64))?;
                     }
+                    write!(
+                        out,
+                        "\"{}\"",
+                        bytes_as_escaped_string(std::str::from_utf8(&v).unwrap())
+                    )
+                    .unwrap();
+                    return Ok(());
+                } else if type_.is_option() {
+                    if context.context.get_feature_flags().is_enum_option_enabled() {
+                        // This outputs the legacy layout of option for backward compatibility.
+                        // when using enum representation of option, we need different logic to format it
+                        format_enum_option(context, fields, strct, depth, out)?;
+                    } else {
+                        let mut v = strct
+                            .unpack()?
+                            .next()
+                            .unwrap()
+                            .value_as::<Vector>()?
+                            .unpack_unchecked()?;
+                        if v.is_empty() {
+                            out.push_str("None");
+                        } else {
+                            out.push_str("Some(");
+                            let inner_ty =
+                                if let MoveTypeLayout::Vector(inner_ty) = &fields[0].layout {
+                                    inner_ty.deref()
+                                } else {
+                                    unreachable!()
+                                };
+                            native_format_impl(context, inner_ty, v.pop().unwrap(), depth, out)?;
+                            out.push(')');
+                        }
+                    }
+                    return Ok(());
                 }
-                return Ok(());
-            }
-            if context.type_tag {
-                write!(out, "{} {{", type_.to_canonical_string()).unwrap();
-            } else {
-                write!(out, "{} {{", type_.name.as_str()).unwrap();
-            };
-            format_vector(
-                context,
-                fields.iter(),
-                strct.unpack()?.collect(),
-                depth,
-                !context.single_line,
-                out,
-            )?;
-            out.push('}');
-        },
-        MoveTypeLayout::Struct(MoveStructLayout::WithFields(fields)) => {
-            let strct = val.value_as::<Struct>()?;
-            out.push('{');
-            format_vector(
-                context,
-                fields.iter(),
-                strct.unpack()?.collect(),
-                depth,
-                !context.single_line,
-                out,
-            )?;
-            out.push('}');
-        },
-        MoveTypeLayout::Struct(MoveStructLayout::Runtime(fields)) => {
-            let strct = val.value_as::<Struct>()?;
-            out.push('{');
-            format_vector(
-                context,
-                fields.iter(),
-                strct.unpack()?.collect(),
-                depth,
-                !context.single_line,
-                out,
-            )?;
-            out.push('}');
-        },
-        MoveTypeLayout::Struct(MoveStructLayout::RuntimeVariants(variants)) => {
-            let struct_value = val.value_as::<Struct>()?;
-            let (tag, elems) = struct_value.unpack_with_tag()?;
-            if (tag as usize) >= variants.len() {
-                return Err(SafeNativeError::abort(EINVALID_FORMAT));
-            }
-            out.push_str(&format!("#{}{{", tag));
-            format_vector(
-                context,
-                variants[tag as usize].iter(),
-                elems.collect(),
-                depth,
-                !context.single_line,
-                out,
-            )?;
-            out.push('}');
-        },
-        MoveTypeLayout::Struct(MoveStructLayout::WithVariants(variants)) => {
-            let struct_value = val.value_as::<Struct>()?;
-            let (tag, elems) = struct_value.unpack_with_tag()?;
-            if (tag as usize) >= variants.len() {
-                return Err(SafeNativeError::abort(EINVALID_FORMAT));
-            }
-            let variant = &variants[tag as usize];
-            out.push_str(&format!("{}{{", variant.name));
-            format_vector(
-                context,
-                variant.fields.iter(),
-                elems.collect(),
-                depth,
-                !context.single_line,
-                out,
-            )?;
-            out.push('}');
+                if context.type_tag {
+                    write!(out, "{} {{", type_.to_canonical_string()).unwrap();
+                } else {
+                    write!(out, "{} {{", type_.name.as_str()).unwrap();
+                };
+                format_vector(
+                    context,
+                    fields.iter(),
+                    strct.unpack()?.collect(),
+                    depth,
+                    !context.single_line,
+                    out,
+                )?;
+                out.push('}');
+            },
+            MoveStructLayout::WithFields(fields) => {
+                let strct = val.value_as::<Struct>()?;
+                out.push('{');
+                format_vector(
+                    context,
+                    fields.iter(),
+                    strct.unpack()?.collect(),
+                    depth,
+                    !context.single_line,
+                    out,
+                )?;
+                out.push('}');
+            },
+            MoveStructLayout::Runtime(fields) => {
+                let strct = val.value_as::<Struct>()?;
+                out.push('{');
+                format_vector(
+                    context,
+                    fields.iter(),
+                    strct.unpack()?.collect(),
+                    depth,
+                    !context.single_line,
+                    out,
+                )?;
+                out.push('}');
+            },
+            MoveStructLayout::RuntimeVariants(variants) => {
+                let struct_value = val.value_as::<Struct>()?;
+                let (tag, elems) = struct_value.unpack_with_tag()?;
+                if (tag as usize) >= variants.len() {
+                    return Err(SafeNativeError::abort(EINVALID_FORMAT));
+                }
+                out.push_str(&format!("#{}{{", tag));
+                format_vector(
+                    context,
+                    variants[tag as usize].iter(),
+                    elems.collect(),
+                    depth,
+                    !context.single_line,
+                    out,
+                )?;
+                out.push('}');
+            },
+            MoveStructLayout::WithVariants(variants) => {
+                let struct_value = val.value_as::<Struct>()?;
+                let (tag, elems) = struct_value.unpack_with_tag()?;
+                if (tag as usize) >= variants.len() {
+                    return Err(SafeNativeError::abort(EINVALID_FORMAT));
+                }
+                let variant = &variants[tag as usize];
+                out.push_str(&format!("{}{{", variant.name));
+                format_vector(
+                    context,
+                    variant.fields.iter(),
+                    elems.collect(),
+                    depth,
+                    !context.single_line,
+                    out,
+                )?;
+                out.push('}');
+            },
         },
         MoveTypeLayout::Function => {
             // Notice that we print the undecorated value representation,
