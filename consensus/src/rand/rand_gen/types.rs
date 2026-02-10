@@ -132,7 +132,7 @@ impl TShare for Share {
                 &rand_config.get_all_certified_apk(),
                 metadata_serialized.as_slice(),
                 &proof,
-                THREAD_MANAGER.get_exe_cpu_pool(),
+                THREAD_MANAGER.get_non_exe_cpu_pool(),
             )
             .is_ok()
             {
@@ -145,7 +145,7 @@ impl TShare for Share {
                 );
                 // Verify shares in parallel using the execution thread pool
                 let verification_results: Vec<bool> =
-                    THREAD_MANAGER.get_exe_cpu_pool().install(|| {
+                    THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
                         shares_vec
                             .par_iter()
                             .map(|share| {
@@ -196,7 +196,7 @@ impl TShare for Share {
             metadata_serialized.as_slice(),
             &rand_config.get_all_certified_apk(),
             &proof,
-            THREAD_MANAGER.get_exe_cpu_pool(),
+            THREAD_MANAGER.get_non_exe_cpu_pool(),
         )
         .map_err(|e| anyhow!("Share::aggregate failed with WVUF derive_eval error: {e}"))?;
         debug!("WVUF derivation time: {} ms", timer.elapsed().as_millis());
