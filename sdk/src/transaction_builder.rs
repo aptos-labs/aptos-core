@@ -181,9 +181,12 @@ impl TransactionFactory {
         self
     }
 
+    /// Enables or disables nonce-based replay protection (orderless transactions).
+    /// When enabled, this also enables the v2 payload format, which is a prerequisite.
+    /// Note: disabling does not revert `use_txn_payload_v2_format` since it may have
+    /// been set independently.
     pub fn with_use_replay_protection_nonce(mut self, use_replay_protection_nonce: bool) -> Self {
         self.use_replay_protection_nonce = use_replay_protection_nonce;
-        // Orderless transactions require the v2 payload format.
         if use_replay_protection_nonce {
             self.use_txn_payload_v2_format = true;
         }
