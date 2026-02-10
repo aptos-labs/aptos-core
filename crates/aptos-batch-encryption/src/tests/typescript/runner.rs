@@ -3,6 +3,7 @@
 
 use anyhow::{anyhow, Context as _};
 use std::{
+    fs::File,
     io::Write as _,
     process::{Command, Stdio},
     sync::Once,
@@ -12,6 +13,10 @@ static INIT: Once = Once::new();
 
 fn ts_init() {
     INIT.call_once(|| {
+        // pnpm doesn't seem to handle being run concurrently well
+        let lock_file = File::create("ts-batch-encrypt/.pnpm-install.lock").unwrap();
+        lock_file.lock().unwrap();
+
         let child = Command::new("pnpm")
             .current_dir("ts-batch-encrypt")
             .arg("install")
@@ -27,8 +32,10 @@ fn ts_init() {
             .unwrap();
         if !output.status.success() {
             println!(
-                "pnpm install failed with error {}",
-                String::from_utf8_lossy(&output.stderr)
+                "pnpm install failed. Status code: {:?}\n stdout: {}\n stderr: {}",
+                output.status.code(),
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr),
             );
         }
     });
