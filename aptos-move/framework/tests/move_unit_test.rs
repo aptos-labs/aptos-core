@@ -29,6 +29,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>, use_latest_language: bool) 
     let pkg_path = path_in_crate(path_to_pkg);
     let compiler_config = CompilerConfig {
         known_attributes: extended_checks::get_all_attribute_names().clone(),
+        print_errors: true,
         ..Default::default()
     };
     let mut build_config = move_package::BuildConfig {
@@ -63,8 +64,10 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>, use_latest_language: bool) 
         &mut std::io::stdout(),
         true,
     );
-    if ok.is_err() || ok.is_ok_and(|r| r == UnitTestResult::Failure) {
-        panic!("move unit tests failed")
+    match ok {
+        Err(e) => panic!("move unit tests failed:\n{:#}", e),
+        Ok(UnitTestResult::Failure) => panic!("move unit tests failed"),
+        Ok(UnitTestResult::Success) => {},
     }
 }
 
