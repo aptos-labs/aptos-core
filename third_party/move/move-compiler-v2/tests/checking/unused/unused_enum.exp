@@ -1,6 +1,6 @@
 
 Diagnostics:
-warning: Struct `0x42::enum_types::MessageHolder` is unused: it has no current users and is private to its module.
+warning: Struct `0x42::enum_types::MessageHolder` is unused: it has no use in the current module and is private to its module.
    ┌─ tests/checking/unused/unused_enum.move:5:5
    │
  5 │ ╭     enum MessageHolder has key, drop {

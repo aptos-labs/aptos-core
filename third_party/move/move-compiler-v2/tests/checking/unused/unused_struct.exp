@@ -1,6 +1,6 @@
 
 Diagnostics:
-warning: Struct `0x42::m::UnusedStruct` is unused: it has no current users and is private to its module.
+warning: Struct `0x42::m::UnusedStruct` is unused: it has no use in the current module and is private to its module.
   ┌─ tests/checking/unused/unused_struct.move:3:5
   │
 3 │ ╭     struct UnusedStruct {

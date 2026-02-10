@@ -11,7 +11,7 @@ use move_model::{
     metadata::LanguageVersion,
     model::{
         FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, NodeId, Parameter, QualifiedId,
-        StructEnv,
+        StructEnv, UserId,
     },
     ty::Type,
 };
@@ -670,22 +670,36 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
 
             // Check for unused structs and constants in this module
             if unused_warnings_enabled {
+                let current_module_id = caller_module.get_id();
+
                 // Check for unused private structs
+                // A private struct is unused if it has no users from the same module
                 for struct_env in caller_module.get_structs() {
-                    if struct_env.get_visibility() == Visibility::Private
-                        && struct_env.get_users().is_empty()
-                    {
-                        let msg = format!(
-                            "Struct `{}` is unused: it has no current users and is private to its module.",
-                            struct_env.get_full_name_with_address(),
-                        );
-                        env.diag(Severity::Warning, &struct_env.get_loc(), &msg);
+                    if struct_env.get_visibility() == Visibility::Private {
+                        let has_same_module_users =
+                            struct_env.get_users().iter().any(|user| match user {
+                                UserId::Function(qid) => qid.module_id == current_module_id,
+                                UserId::Struct(qid) => qid.module_id == current_module_id,
+                            });
+                        if !has_same_module_users {
+                            let msg = format!(
+                                "Struct `{}` is unused: it has no use in the current module and is private to its module.",
+                                struct_env.get_full_name_with_address(),
+                            );
+                            env.diag(Severity::Warning, &struct_env.get_loc(), &msg);
+                        }
                     }
                 }
 
                 // Check for unused constants (all constants are module-private)
+                // A constant is unused if it has no users from the same module
                 for const_env in caller_module.get_named_constants() {
-                    if const_env.get_users().is_empty() {
+                    let has_same_module_users =
+                        const_env.get_users().iter().any(|user| match user {
+                            UserId::Function(qid) => qid.module_id == current_module_id,
+                            UserId::Struct(qid) => qid.module_id == current_module_id,
+                        });
+                    if !has_same_module_users {
                         let msg = format!(
                             "Constant `{}` is unused.",
                             const_env.get_name().display(env.symbol_pool()),

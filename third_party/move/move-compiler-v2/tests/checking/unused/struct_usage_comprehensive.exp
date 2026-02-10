@@ -1,6 +1,6 @@
 
 Diagnostics:
-warning: Struct `0x42::m::TrulyUnused` is unused: it has no current users and is private to its module.
+warning: Struct `0x42::m::TrulyUnused` is unused: it has no use in the current module and is private to its module.
    ┌─ tests/checking/unused/struct_usage_comprehensive.move:51:5
    │
 51 │ ╭     struct TrulyUnused {
