@@ -23,7 +23,7 @@ use fail::fail_point;
 use rayon::prelude::*;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
-use std::{fmt::Debug, sync::Arc};
+use std::{collections::HashSet, fmt::Debug, sync::Arc};
 
 pub const NUM_THREADS_FOR_WVUF_DERIVATION: usize = 8;
 pub const FUTURE_ROUNDS_TO_ACCEPT: u64 = 200;
@@ -103,6 +103,8 @@ impl TShare for Share {
         RandShare::new(rand_config.author(), rand_metadata, share)
     }
 
+    /// Aggregate pre-verified shares into randomness.
+    /// Callers must run `pre_aggregate_verify` first to remove invalid shares.
     fn aggregate<'a>(
         shares: impl Iterator<Item = &'a RandShare<Self>>,
         rand_config: &RandConfig,
@@ -120,76 +122,6 @@ impl TShare for Share {
             anyhow!("Share::aggregate failed with metadata serialization error: {e}")
         })?;
 
-        // When optimistic verification is enabled, shares were not individually verified
-        // on receipt, so we batch-verify the aggregated proof here. On failure, fall back
-        // to individual verification to identify and discard bad shares.
-        // When optimistic verification is disabled, shares were already verified on receipt,
-        // so we can use the aggregated proof directly.
-        let proof = if rand_config.optimistic_rand_share_verification {
-            if WVUF::verify_proof(
-                &rand_config.vuf_pp,
-                rand_config.pk(),
-                &rand_config.get_all_certified_apk(),
-                metadata_serialized.as_slice(),
-                &proof,
-                THREAD_MANAGER.get_non_exe_cpu_pool(),
-            )
-            .is_ok()
-            {
-                proof
-            } else {
-                // Batch verification failed; fall back to individual verification
-                warn!(
-                    "Batch verification failed for round {}, falling back to individual verification",
-                    rand_metadata.round
-                );
-                // Verify shares in parallel using the execution thread pool
-                let verification_results: Vec<bool> =
-                    THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
-                        shares_vec
-                            .par_iter()
-                            .map(|share| {
-                                share
-                                    .share
-                                    .verify(rand_config, &rand_metadata, &share.author)
-                                    .is_ok()
-                            })
-                            .collect()
-                    });
-
-                let mut valid_shares = vec![];
-                for (share, is_valid) in shares_vec.iter().zip(verification_results) {
-                    if is_valid {
-                        valid_shares.push(*share);
-                    } else {
-                        warn!(
-                            "Share from {} failed individual verification, adding to pessimistic set",
-                            share.author
-                        );
-                        rand_config.add_to_pessimistic_set(share.author);
-                    }
-                }
-
-                let valid_apks_and_proofs =
-                    Self::build_apks_and_proofs(&valid_shares, rand_config)?;
-
-                let total_weight: u64 = valid_shares
-                    .iter()
-                    .map(|s| rand_config.get_peer_weight(s.author()))
-                    .sum();
-                ensure!(
-                    total_weight >= rand_config.threshold(),
-                    "Share::aggregate failed: insufficient valid shares after fallback ({} < {})",
-                    total_weight,
-                    rand_config.threshold()
-                );
-
-                WVUF::aggregate_shares(&rand_config.wconfig, &valid_apks_and_proofs)
-            }
-        } else {
-            proof
-        };
-
         let eval = WVUF::derive_eval(
             &rand_config.wconfig,
             &rand_config.vuf_pp,
@@ -204,6 +136,71 @@ impl TShare for Share {
             .map_err(|e| anyhow!("Share::aggregate failed with eval serialization error: {e}"))?;
         let rand_bytes = Sha3_256::digest(eval_bytes.as_slice()).to_vec();
         Ok(Randomness::new(rand_metadata, rand_bytes))
+    }
+
+    fn pre_aggregate_verify<'a>(
+        shares: impl Iterator<Item = &'a RandShare<Self>>,
+        rand_config: &RandConfig,
+        rand_metadata: &RandMetadata,
+    ) -> HashSet<Author> {
+        if !rand_config.optimistic_rand_share_verification {
+            return HashSet::new();
+        }
+
+        let shares_vec: Vec<_> = shares.collect();
+
+        // Try batch verification: build proof and verify in one shot.
+        // If any step fails, fall back to individual verification.
+        let batch_ok = Self::build_apks_and_proofs(&shares_vec, rand_config)
+            .and_then(|apks_and_proofs| {
+                let proof = WVUF::aggregate_shares(&rand_config.wconfig, &apks_and_proofs);
+                let metadata_serialized = bcs::to_bytes(rand_metadata)
+                    .map_err(|e| anyhow!("metadata serialization failed: {e}"))?;
+                WVUF::verify_proof(
+                    &rand_config.vuf_pp,
+                    rand_config.pk(),
+                    &rand_config.get_all_certified_apk(),
+                    metadata_serialized.as_slice(),
+                    &proof,
+                    THREAD_MANAGER.get_non_exe_cpu_pool(),
+                )
+            })
+            .is_ok();
+
+        if batch_ok {
+            return HashSet::new();
+        }
+
+        // Batch verification failed; fall back to individual verification
+        warn!(
+            "Batch verification failed for round {}, falling back to individual verification",
+            rand_metadata.round
+        );
+
+        let verification_results: Vec<bool> = THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
+            shares_vec
+                .par_iter()
+                .map(|share| {
+                    share
+                        .share
+                        .verify(rand_config, rand_metadata, &share.author)
+                        .is_ok()
+                })
+                .collect()
+        });
+
+        let mut bad_authors = HashSet::new();
+        for (share, is_valid) in shares_vec.iter().zip(verification_results) {
+            if !is_valid {
+                warn!(
+                    "Share from {} failed individual verification, adding to pessimistic set",
+                    share.author
+                );
+                rand_config.add_to_pessimistic_set(share.author);
+                bad_authors.insert(share.author);
+            }
+        }
+        bad_authors
     }
 }
 
@@ -382,6 +379,19 @@ pub trait TShare:
     ) -> anyhow::Result<Randomness>
     where
         Self: Sized;
+
+    /// Verify shares before aggregation. Returns the set of authors whose shares
+    /// failed verification and should be removed before spawning the aggregation task.
+    fn pre_aggregate_verify<'a>(
+        _shares: impl Iterator<Item = &'a RandShare<Self>>,
+        _rand_config: &RandConfig,
+        _rand_metadata: &RandMetadata,
+    ) -> HashSet<Author>
+    where
+        Self: Sized,
+    {
+        HashSet::new()
+    }
 }
 
 pub trait TAugmentedData:
@@ -1025,10 +1035,21 @@ mod tests {
             wrong_share.share().clone(),
         ));
 
-        let result = Share::aggregate(shares.iter(), &ctx.rand_configs[0], metadata);
+        // Pre-verify removes the bad share
+        let bad_authors =
+            Share::pre_aggregate_verify(shares.iter(), &ctx.rand_configs[0], &metadata);
+        assert!(bad_authors.contains(&bad_author));
+
+        // Aggregate with only valid shares
+        let valid_shares: Vec<_> = shares
+            .iter()
+            .filter(|s| !bad_authors.contains(s.author()))
+            .cloned()
+            .collect();
+        let result = Share::aggregate(valid_shares.iter(), &ctx.rand_configs[0], metadata);
         assert!(
             result.is_ok(),
-            "Aggregation should succeed via fallback: {:?}",
+            "Aggregation should succeed after pre-verify: {:?}",
             result.err()
         );
 
@@ -1084,7 +1105,7 @@ mod tests {
     }
 
     #[test]
-    fn test_optimistic_share_aggregate_insufficient_valid_shares() {
+    fn test_optimistic_pre_verify_insufficient_valid_shares() {
         // 4 validators with equal weight; threshold is >50%, so need at least 3 valid shares.
         let ctx = MultiValidatorTestContext::new(vec![1, 1, 1, 1], true);
         let metadata = RandMetadata { epoch: 1, round: 1 };
@@ -1103,10 +1124,88 @@ mod tests {
             RandShare::new(ctx.authors[3], metadata.clone(), bad3.share().clone()),
         ];
 
-        let result = Share::aggregate(shares.iter(), &ctx.rand_configs[0], metadata);
+        // Pre-verify identifies 3 bad authors
+        let bad_authors =
+            Share::pre_aggregate_verify(shares.iter(), &ctx.rand_configs[0], &metadata);
+        assert_eq!(bad_authors.len(), 3);
+
+        // Only 1 valid share remains — below threshold, so caller should not aggregate
+        let valid_weight: u64 = shares
+            .iter()
+            .filter(|s| !bad_authors.contains(s.author()))
+            .map(|s| ctx.rand_configs[0].get_peer_weight(s.author()))
+            .sum();
         assert!(
-            result.is_err(),
-            "Aggregation should fail: insufficient valid shares after fallback"
+            valid_weight < ctx.rand_configs[0].threshold(),
+            "Valid weight {} should be below threshold {}",
+            valid_weight,
+            ctx.rand_configs[0].threshold()
+        );
+    }
+
+    #[test]
+    fn test_pre_aggregate_verify_happy_path() {
+        let ctx = MultiValidatorTestContext::new(vec![1, 1, 1, 1], true);
+        let metadata = RandMetadata { epoch: 1, round: 1 };
+
+        let shares: Vec<_> = (0..3)
+            .map(|i| Share::generate(&ctx.rand_configs[i], metadata.clone()))
+            .collect();
+
+        let bad_authors =
+            Share::pre_aggregate_verify(shares.iter(), &ctx.rand_configs[0], &metadata);
+        assert!(bad_authors.is_empty(), "All shares are valid");
+        assert!(ctx.rand_configs[0].pessimistic_verify_set.is_empty());
+    }
+
+    #[test]
+    fn test_pre_aggregate_verify_with_bad_share() {
+        let ctx = MultiValidatorTestContext::new(vec![1, 1, 1, 1, 1], true);
+        let metadata = RandMetadata { epoch: 1, round: 1 };
+
+        let mut shares: Vec<_> = (0..3)
+            .map(|i| Share::generate(&ctx.rand_configs[i], metadata.clone()))
+            .collect();
+
+        // Corrupted share: validator 4's key attributed to validator 3
+        let bad_author = ctx.authors[3];
+        let wrong_share = Share::generate(&ctx.rand_configs[4], metadata.clone());
+        shares.push(RandShare::new(
+            bad_author,
+            metadata.clone(),
+            wrong_share.share().clone(),
+        ));
+
+        let bad_authors =
+            Share::pre_aggregate_verify(shares.iter(), &ctx.rand_configs[0], &metadata);
+        assert_eq!(bad_authors.len(), 1);
+        assert!(bad_authors.contains(&bad_author));
+        assert!(ctx.rand_configs[0]
+            .pessimistic_verify_set
+            .contains(&bad_author));
+    }
+
+    #[test]
+    fn test_pre_aggregate_verify_non_optimistic() {
+        let ctx = MultiValidatorTestContext::new(vec![1, 1, 1, 1, 1], false);
+        let metadata = RandMetadata { epoch: 1, round: 1 };
+
+        // Include a bad share — should still return empty since optimistic is off
+        let mut shares: Vec<_> = (0..3)
+            .map(|i| Share::generate(&ctx.rand_configs[i], metadata.clone()))
+            .collect();
+        let wrong_share = Share::generate(&ctx.rand_configs[4], metadata.clone());
+        shares.push(RandShare::new(
+            ctx.authors[3],
+            metadata.clone(),
+            wrong_share.share().clone(),
+        ));
+
+        let bad_authors =
+            Share::pre_aggregate_verify(shares.iter(), &ctx.rand_configs[0], &metadata);
+        assert!(
+            bad_authors.is_empty(),
+            "Non-optimistic mode skips pre_aggregate_verify"
         );
     }
 }

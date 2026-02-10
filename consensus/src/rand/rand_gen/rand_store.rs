@@ -39,7 +39,7 @@ impl<S: TShare> ShareAggregator<S> {
     }
 
     pub fn try_aggregate(
-        self,
+        mut self,
         rand_config: &RandConfig,
         rand_metadata: FullRandMetadata,
         decision_tx: Sender<Randomness>,
@@ -47,6 +47,21 @@ impl<S: TShare> ShareAggregator<S> {
         if self.total_weight < rand_config.threshold() {
             return Either::Left(self);
         }
+
+        // Pre-verify shares before spawning to ensure aggregation will succeed.
+        let bad_authors =
+            S::pre_aggregate_verify(self.shares.values(), rand_config, &rand_metadata.metadata);
+        for author in &bad_authors {
+            if self.shares.remove(author).is_some() {
+                self.total_weight = self
+                    .total_weight
+                    .saturating_sub(rand_config.get_peer_weight(author));
+            }
+        }
+        if self.total_weight < rand_config.threshold() {
+            return Either::Left(self);
+        }
+
         match self.path_type {
             PathType::Fast => {
                 observe_block(
