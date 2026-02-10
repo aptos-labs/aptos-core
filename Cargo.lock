@@ -16996,7 +16996,7 @@ dependencies = [
 [[package]]
 name = "serde-generate"
 version = "0.20.6"
-source = "git+https://github.com/aptos-labs/serde-reflection?rev=73b6bbf748334b71ff6d7d09d06a29e3062ca075#73b6bbf748334b71ff6d7d09d06a29e3062ca075"
+source = "git+https://github.com/aptos-labs/serde-reflection?rev=9d2374af843a4562a194529b3cadb8518d7fcd65#9d2374af843a4562a194529b3cadb8518d7fcd65"
 dependencies = [
  "bcs 0.1.6",
  "bincode",
@@ -17024,7 +17024,7 @@ dependencies = [
 [[package]]
 name = "serde-reflection"
 version = "0.3.5"
-source = "git+https://github.com/aptos-labs/serde-reflection?rev=73b6bbf748334b71ff6d7d09d06a29e3062ca075#73b6bbf748334b71ff6d7d09d06a29e3062ca075"
+source = "git+https://github.com/aptos-labs/serde-reflection?rev=9d2374af843a4562a194529b3cadb8518d7fcd65#9d2374af843a4562a194529b3cadb8518d7fcd65"
 dependencies = [
  "once_cell",
  "serde",
