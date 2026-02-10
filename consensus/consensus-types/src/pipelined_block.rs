@@ -224,6 +224,10 @@ pub struct PipelinedBlock {
     pipeline_tx: Mutex<Option<PipelineInputTx>>,
     pipeline_abort_handle: Mutex<Option<Vec<AbortHandle>>>,
     block_qc: Mutex<Option<Arc<QuorumCert>>>,
+    /// Receiver for rand_check result from the pipeline.
+    /// The pipeline's rand_check sends `true` if the block has randomness txns, `false` otherwise.
+    /// RandManager takes this receiver to decide whether to verify/reconstruct randomness.
+    rand_check_result_rx: Mutex<Option<oneshot::Receiver<bool>>>,
 }
 
 impl PartialEq for PipelinedBlock {
@@ -392,6 +396,7 @@ impl PipelinedBlock {
             pipeline_tx: Mutex::new(None),
             pipeline_abort_handle: Mutex::new(None),
             block_qc: Mutex::new(None),
+            rand_check_result_rx: Mutex::new(None),
         }
     }
 
@@ -533,6 +538,14 @@ impl PipelinedBlock {
 
     pub fn pipeline_tx(&self) -> &Mutex<Option<PipelineInputTx>> {
         &self.pipeline_tx
+    }
+
+    pub fn set_rand_check_result_rx(&self, rx: oneshot::Receiver<bool>) {
+        *self.rand_check_result_rx.lock() = Some(rx);
+    }
+
+    pub fn take_rand_check_result_rx(&self) -> Option<oneshot::Receiver<bool>> {
+        self.rand_check_result_rx.lock().take()
     }
 
     pub fn abort_pipeline(&self) -> Option<PipelineFutures> {

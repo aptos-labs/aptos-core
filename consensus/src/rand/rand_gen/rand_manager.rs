@@ -67,6 +67,10 @@ pub struct RandManager<S: TShare, D: TAugmentedData> {
 
     // for randomness fast path
     fast_config: Option<RandConfig>,
+
+    // local channel for receiving rand_check results from pipeline via PipelinedBlock oneshots
+    rand_check_result_tx: UnboundedSender<(Round, bool)>,
+    rand_check_result_rx: UnboundedReceiver<(Round, bool)>,
 }
 
 impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
@@ -110,6 +114,8 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             db,
         );
 
+        let (rand_check_result_tx, rand_check_result_rx) = unbounded();
+
         Self {
             author,
             epoch_state,
@@ -126,12 +132,30 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             block_queue: BlockQueue::new(),
 
             fast_config,
+
+            rand_check_result_tx,
+            rand_check_result_rx,
         }
     }
 
     fn process_incoming_blocks(&mut self, blocks: OrderedBlocks) {
         let rounds: Vec<u64> = blocks.ordered_blocks.iter().map(|b| b.round()).collect();
         info!(rounds = rounds, "Processing incoming blocks.");
+
+        // Spawn listeners for rand_check results from the pipeline.
+        // Each block's PipelinedBlock has a oneshot receiver set by PipelineBuilder.
+        for block in &blocks.ordered_blocks {
+            if let Some(rx) = block.take_rand_check_result_rx() {
+                let round = block.round();
+                let tx = self.rand_check_result_tx.clone();
+                tokio::spawn(async move {
+                    if let Ok(has_rand) = rx.await {
+                        let _ = tx.unbounded_send((round, has_rand));
+                    }
+                });
+            }
+        }
+
         let broadcast_handles: Vec<_> = blocks
             .ordered_blocks
             .iter()
@@ -191,6 +215,16 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         self.rand_store.lock().reset(target_round);
         self.stop = matches!(signal, ResetSignal::Stop);
         let _ = tx.send(ResetAck::default());
+    }
+
+    fn process_rand_check_result(&mut self, round: Round, has_rand: bool) {
+        self.rand_store.lock().set_rand_check_result(round, has_rand);
+        if !has_rand {
+            // Set dummy randomness so BlockQueue can dequeue this block without waiting
+            if let Some(item) = self.block_queue.item_mut(round) {
+                item.set_randomness(round, Randomness::default());
+            }
+        }
     }
 
     fn process_randomness(&mut self, randomness: Randomness) {
@@ -386,6 +420,9 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                 }
                 Some(randomness) = self.decision_rx.next()  => {
                     self.process_randomness(randomness);
+                }
+                Some((round, has_rand)) = self.rand_check_result_rx.next() => {
+                    self.process_rand_check_result(round, has_rand);
                 }
                 Some(request) = verified_msg_rx.next() => {
                     let RpcRequest {

@@ -161,7 +161,7 @@ mod tests {
         block_queue::{BlockQueue, QueueItem},
         test_utils::create_ordered_blocks,
     };
-    use aptos_types::randomness::Randomness;
+    use aptos_types::randomness::{RandMetadata, Randomness};
     use std::collections::HashSet;
 
     #[test]
@@ -230,5 +230,37 @@ mod tests {
         assert_eq!(queue.dequeue_rand_ready_prefix().len(), 2);
 
         assert_eq!(queue.queue.len(), 1);
+    }
+
+    #[test]
+    fn test_block_queue_mixed_skip_and_real_randomness() {
+        // Simulates blocks where some have randomness skipped (default) and some have real values
+        let mut queue = BlockQueue::new();
+        let all_rounds = vec![vec![1, 2, 3], vec![5, 8]];
+        for rounds in &all_rounds {
+            queue.push_back(QueueItem::new(create_ordered_blocks(rounds.clone()), None));
+        }
+
+        // Round 1: skip (non-rand block gets default randomness)
+        assert!(queue.set_randomness(1, Randomness::default()));
+        // Round 2: real randomness
+        let metadata = RandMetadata { epoch: 1, round: 2 };
+        assert!(queue.set_randomness(2, Randomness::new(metadata, vec![1, 2, 3])));
+        // Round 3: skip
+        assert!(queue.set_randomness(3, Randomness::default()));
+
+        // First batch should dequeue now
+        let dequeued = queue.dequeue_rand_ready_prefix();
+        assert_eq!(dequeued.len(), 1);
+        assert_eq!(dequeued[0].ordered_blocks.len(), 3);
+
+        // Round 5: real randomness, Round 8: skip
+        let metadata = RandMetadata { epoch: 1, round: 5 };
+        assert!(queue.set_randomness(5, Randomness::new(metadata, vec![4, 5, 6])));
+        assert!(queue.set_randomness(8, Randomness::default()));
+
+        let dequeued = queue.dequeue_rand_ready_prefix();
+        assert_eq!(dequeued.len(), 1);
+        assert_eq!(dequeued[0].ordered_blocks.len(), 2);
     }
 }

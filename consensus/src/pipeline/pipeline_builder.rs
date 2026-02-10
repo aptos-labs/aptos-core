@@ -413,15 +413,18 @@ impl PipelineBuilder {
         >,
         observer_enabled: bool,
     ) {
+        let (rand_check_result_tx, rand_check_result_rx) = oneshot::channel::<bool>();
         let (futs, tx, abort_handles) = self.build_internal(
             parent_futs,
             Arc::new(pipelined_block.block().clone()),
             block_store_callback,
             observer_enabled,
+            rand_check_result_tx,
         );
         pipelined_block.set_pipeline_futs(futs);
         pipelined_block.set_pipeline_tx(tx);
         pipelined_block.set_pipeline_abort_handles(abort_handles);
+        pipelined_block.set_rand_check_result_rx(rand_check_result_rx);
     }
 
     fn build_internal(
@@ -432,6 +435,7 @@ impl PipelineBuilder {
             dyn FnOnce(WrappedLedgerInfo, LedgerInfoWithSignatures) + Send + Sync,
         >,
         observer_enabled: bool,
+        rand_check_result_tx: oneshot::Sender<bool>,
     ) -> (PipelineFutures, PipelineInputTx, Vec<AbortHandle>) {
         let mut abort_handles = vec![];
         let (tx, rx) = Self::channel(&mut abort_handles);
@@ -483,6 +487,7 @@ impl PipelineBuilder {
                 self.is_randomness_enabled,
                 self.rand_check_enabled,
                 self.module_cache.clone(),
+                rand_check_result_tx,
             ),
             Some(&mut abort_handles),
         );
@@ -692,6 +697,7 @@ impl PipelineBuilder {
         is_randomness_enabled: bool,
         rand_check_enabled: bool,
         module_cache: Arc<Mutex<Option<CachedModuleView<CachedStateView>>>>,
+        rand_check_result_tx: oneshot::Sender<bool>,
     ) -> TaskResult<RandResult> {
         let mut tracker = Tracker::start_waiting("rand_check", &block);
         parent_block_execute_fut.await?;
@@ -699,6 +705,7 @@ impl PipelineBuilder {
 
         tracker.start_working();
         if !is_randomness_enabled {
+            let _ = rand_check_result_tx.send(false);
             return Ok((None, false));
         }
         let grand_parent_id = block.quorum_cert().parent_block().id();
@@ -769,6 +776,10 @@ impl PipelineBuilder {
                 block.round()
             );
         }
+        // Signal the rand_check result to RandManager BEFORE waiting on rand_rx.
+        // RandManager uses this to decide whether to verify/reconstruct randomness.
+        let _ = rand_check_result_tx.send(has_randomness);
+
         drop(tracker);
         // if rand check is enabled and no txn requires randomness, we skip waiting for randomness
         let mut tracker = Tracker::start_waiting("rand_gen", &block);

@@ -20,6 +20,7 @@ use rand::{prelude::StdRng, SeedableRng};
 use std::{collections::HashMap, time::Duration};
 use tokio::time::Instant;
 
+mod deferred_rand_check;
 mod disable_feature_0;
 mod disable_feature_1;
 mod dkg_with_validator_down;

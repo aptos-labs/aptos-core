@@ -239,6 +239,10 @@ pub struct RandStore<S> {
     fast_rand_map: Option<BTreeMap<Round, RandItem<S>>>,
     highest_known_round: u64,
     decision_tx: Sender<Randomness>,
+    /// Tracks whether each round's block has randomness transactions.
+    /// `None` (absent) = unknown, `Some(true)` = needs rand, `Some(false)` = skip.
+    /// Aggregation is deferred until this is set to `true`.
+    needs_rand: BTreeMap<Round, bool>,
 }
 
 impl<S: TShare> RandStore<S> {
@@ -258,6 +262,7 @@ impl<S: TShare> RandStore<S> {
             fast_rand_map: fast_rand_config.map(|_| BTreeMap::new()),
             highest_known_round: 0,
             decision_tx,
+            needs_rand: BTreeMap::new(),
         }
     }
 
@@ -271,24 +276,30 @@ impl<S: TShare> RandStore<S> {
         // otherwise if the block re-enters the queue, it'll be stuck
         let _ = self.rand_map.split_off(&round);
         let _ = self.fast_rand_map.as_mut().map(|map| map.split_off(&round));
+        let _ = self.needs_rand.split_off(&round);
     }
 
     pub fn add_rand_metadata(&mut self, rand_metadata: FullRandMetadata) {
+        let round = rand_metadata.round();
         let rand_item = self
             .rand_map
-            .entry(rand_metadata.round())
+            .entry(round)
             .or_insert_with(|| RandItem::new(self.author, PathType::Slow));
         rand_item.add_metadata(&self.rand_config, rand_metadata.clone());
-        rand_item.try_aggregate(&self.rand_config, self.decision_tx.clone());
+        if self.needs_rand.get(&round) == Some(&true) {
+            rand_item.try_aggregate(&self.rand_config, self.decision_tx.clone());
+        }
         // fast path
         if let (Some(fast_rand_map), Some(fast_rand_config)) =
             (self.fast_rand_map.as_mut(), self.fast_rand_config.as_ref())
         {
             let fast_rand_item = fast_rand_map
-                .entry(rand_metadata.round())
+                .entry(round)
                 .or_insert_with(|| RandItem::new(self.author, PathType::Fast));
             fast_rand_item.add_metadata(fast_rand_config, rand_metadata.clone());
-            fast_rand_item.try_aggregate(fast_rand_config, self.decision_tx.clone());
+            if self.needs_rand.get(&round) == Some(&true) {
+                fast_rand_item.try_aggregate(fast_rand_config, self.decision_tx.clone());
+            }
         }
     }
 
@@ -323,8 +334,31 @@ impl<S: TShare> RandStore<S> {
         };
 
         rand_item.add_share(share, rand_config)?;
-        rand_item.try_aggregate(rand_config, self.decision_tx.clone());
+        if self.needs_rand.get(&rand_metadata.round) == Some(&true) {
+            rand_item.try_aggregate(rand_config, self.decision_tx.clone());
+        }
         Ok(rand_item.has_decision())
+    }
+
+    /// Called when the pipeline's rand_check determines whether a block has randomness txns.
+    /// If `has_rand` is true, triggers aggregation if threshold is already met.
+    /// If `has_rand` is false, the caller (RandManager) handles setting dummy randomness.
+    pub fn set_rand_check_result(&mut self, round: Round, has_rand: bool) {
+        self.needs_rand.insert(round, has_rand);
+        if has_rand {
+            // Trigger aggregation for slow path if threshold already met
+            if let Some(rand_item) = self.rand_map.get_mut(&round) {
+                rand_item.try_aggregate(&self.rand_config, self.decision_tx.clone());
+            }
+            // Trigger aggregation for fast path
+            if let (Some(fast_rand_map), Some(fast_rand_config)) =
+                (self.fast_rand_map.as_mut(), self.fast_rand_config.as_ref())
+            {
+                if let Some(fast_rand_item) = fast_rand_map.get_mut(&round) {
+                    fast_rand_item.try_aggregate(fast_rand_config, self.decision_tx.clone());
+                }
+            }
+        }
     }
 
     /// This should only be called after the block is added, returns None if already decided
@@ -569,6 +603,10 @@ mod tests {
             rand_store.add_share(share, PathType::Slow).unwrap();
         }
         assert!(decision_rx.try_next().is_err());
+        // Signal that this round needs randomness
+        rand_store.set_rand_check_result(1, true);
+        // Aggregation still deferred because metadata not yet added
+        assert!(decision_rx.try_next().is_err());
         for metadata in blocks_1.all_rand_metadata() {
             rand_store.add_rand_metadata(metadata);
         }
@@ -580,6 +618,9 @@ mod tests {
         }
         assert!(decision_rx.try_next().is_err());
 
+        // Signal that round 2 needs randomness
+        rand_store.set_rand_check_result(2, true);
+
         for share in ctxt.authors[1..6]
             .iter()
             .map(|author| create_share(metadata_2[0].metadata.clone(), *author))
@@ -587,5 +628,167 @@ mod tests {
             rand_store.add_share(share, PathType::Slow).unwrap();
         }
         assert!(decision_rx.next().await.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_deferred_aggregation_signal_after_threshold() {
+        let ctxt = TestContext::new(vec![100; 7], 0);
+        let (decision_tx, mut decision_rx) = unbounded();
+        let mut rand_store = RandStore::new(
+            ctxt.target_epoch,
+            ctxt.authors[1],
+            ctxt.rand_config.clone(),
+            None,
+            decision_tx,
+        );
+
+        let blocks = QueueItem::new(create_ordered_blocks(vec![1]), None);
+        let metadata = blocks.all_rand_metadata();
+
+        // Add metadata first
+        for m in metadata.iter() {
+            rand_store.add_rand_metadata(m.clone());
+        }
+
+        // Add enough shares to exceed threshold
+        for share in ctxt.authors[0..5]
+            .iter()
+            .map(|author| create_share(metadata[0].metadata.clone(), *author))
+        {
+            rand_store.add_share(share, PathType::Slow).unwrap();
+        }
+
+        // No decision yet because needs_rand not set
+        assert!(decision_rx.try_next().is_err());
+
+        // Signal that the block needs randomness — should trigger aggregation immediately
+        rand_store.set_rand_check_result(1, true);
+        assert!(decision_rx.next().await.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_deferred_aggregation_signal_before_shares() {
+        let ctxt = TestContext::new(vec![100; 7], 0);
+        let (decision_tx, mut decision_rx) = unbounded();
+        let mut rand_store = RandStore::new(
+            ctxt.target_epoch,
+            ctxt.authors[1],
+            ctxt.rand_config.clone(),
+            None,
+            decision_tx,
+        );
+
+        let blocks = QueueItem::new(create_ordered_blocks(vec![1]), None);
+        let metadata = blocks.all_rand_metadata();
+
+        // Signal needs_rand before any shares or metadata
+        rand_store.set_rand_check_result(1, true);
+
+        // Add metadata
+        for m in metadata.iter() {
+            rand_store.add_rand_metadata(m.clone());
+        }
+        assert!(decision_rx.try_next().is_err());
+
+        // Add shares one by one — aggregation should trigger when threshold is met
+        for share in ctxt.authors[0..4]
+            .iter()
+            .map(|author| create_share(metadata[0].metadata.clone(), *author))
+        {
+            rand_store.add_share(share, PathType::Slow).unwrap();
+        }
+        // 4 shares * 100 weight = 400, threshold is > 350 (half of 700)
+        assert!(decision_rx.next().await.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_deferred_aggregation_skip_no_rand() {
+        let ctxt = TestContext::new(vec![100; 7], 0);
+        let (decision_tx, mut decision_rx) = unbounded();
+        let mut rand_store = RandStore::new(
+            ctxt.target_epoch,
+            ctxt.authors[1],
+            ctxt.rand_config.clone(),
+            None,
+            decision_tx,
+        );
+
+        let blocks = QueueItem::new(create_ordered_blocks(vec![1]), None);
+        let metadata = blocks.all_rand_metadata();
+
+        // Add metadata and enough shares
+        for m in metadata.iter() {
+            rand_store.add_rand_metadata(m.clone());
+        }
+        for share in ctxt.authors[0..5]
+            .iter()
+            .map(|author| create_share(metadata[0].metadata.clone(), *author))
+        {
+            rand_store.add_share(share, PathType::Slow).unwrap();
+        }
+
+        // Signal that the block does NOT need randomness
+        rand_store.set_rand_check_result(1, false);
+
+        // No decision should be produced (aggregation skipped)
+        assert!(decision_rx.try_next().is_err());
+    }
+
+    #[tokio::test]
+    async fn test_deferred_aggregation_signal_before_metadata() {
+        let ctxt = TestContext::new(vec![100; 7], 0);
+        let (decision_tx, mut decision_rx) = unbounded();
+        let mut rand_store = RandStore::new(
+            ctxt.target_epoch,
+            ctxt.authors[1],
+            ctxt.rand_config.clone(),
+            None,
+            decision_tx,
+        );
+
+        let blocks = QueueItem::new(create_ordered_blocks(vec![1]), None);
+        let metadata = blocks.all_rand_metadata();
+
+        // Signal needs_rand before metadata arrives
+        rand_store.set_rand_check_result(1, true);
+
+        // Add shares first (they go to PendingMetadata state)
+        for share in ctxt.authors[0..5]
+            .iter()
+            .map(|author| create_share(metadata[0].metadata.clone(), *author))
+        {
+            rand_store.add_share(share, PathType::Slow).unwrap();
+        }
+        // No decision yet — still waiting for metadata
+        assert!(decision_rx.try_next().is_err());
+
+        // Now add metadata — should trigger aggregation since needs_rand=true and threshold met
+        for m in metadata.iter() {
+            rand_store.add_rand_metadata(m.clone());
+        }
+        assert!(decision_rx.next().await.is_some());
+    }
+
+    #[test]
+    fn test_deferred_aggregation_reset_clears_state() {
+        let ctxt = TestContext::new(vec![100; 7], 0);
+        let (decision_tx, _decision_rx) = unbounded();
+        let mut rand_store = RandStore::<MockShare>::new(
+            ctxt.target_epoch,
+            ctxt.authors[1],
+            ctxt.rand_config.clone(),
+            None,
+            decision_tx,
+        );
+
+        rand_store.set_rand_check_result(1, true);
+        rand_store.set_rand_check_result(2, false);
+        rand_store.set_rand_check_result(5, true);
+
+        // Reset to round 3 — rounds >= 3 should be cleared
+        rand_store.reset(3);
+
+        // Round 5 was cleared, so adding it back as false should not crash
+        rand_store.set_rand_check_result(5, false);
     }
 }
