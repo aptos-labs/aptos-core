@@ -41,10 +41,10 @@ module confidential_asset_example::withdraw_example {
         assert!(primary_fungible_store::balance(alice_addr, token) == 0);
 
         print(&utf8(b"Bob's actual balance before the withdrawal is 500"));
-        assert!(confidential_asset::verify_actual_balance(bob_addr, token, &bob_dk, bob_current_amount));
+        assert!(confidential_asset::check_available_balance_decrypts_to(bob_addr, token, &bob_dk, bob_current_amount));
 
-        let current_balance = confidential_balance::decompress_balance(
-            &confidential_asset::actual_balance(bob_addr, token)
+        let current_balance = confidential_balance::decompress(
+            &confidential_asset::get_available_balance(bob_addr, token)
         );
 
         let (proof, new_balance) = confidential_proof::prove_withdrawal(
@@ -74,7 +74,7 @@ module confidential_asset_example::withdraw_example {
         assert!(primary_fungible_store::balance(alice_addr, token) == 50);
 
         print(&utf8(b"Bob's actual balance after the withdrawal is 450"));
-        assert!(confidential_asset::verify_actual_balance(bob_addr, token, &bob_dk, bob_new_amount));
+        assert!(confidential_asset::check_available_balance_decrypts_to(bob_addr, token, &bob_dk, bob_new_amount));
     }
 
     #[test(

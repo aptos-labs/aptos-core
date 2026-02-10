@@ -43,18 +43,18 @@ module confidential_asset_example::deposit_example {
         assert!(primary_fungible_store::balance(bob_addr, token) == 200);
 
         print(&utf8(b"Bob's pending balance is not zero:"));
-        print(&confidential_asset::pending_balance(bob_addr, token));
+        print(&confidential_asset::get_pending_balance(bob_addr, token));
 
         // In real world, we would not be able to see the someone else's balance as it requires
         // the knowledge of the decryption key.
         // The balance decryption requires solving the discrete logarithm problem,
         // so we just check if the passed amount is correct for simplicity.
-        assert!(confidential_asset::verify_pending_balance(bob_addr, token, &bob_dk, bob_amount));
+        assert!(confidential_asset::check_pending_balance_decrypts_to(bob_addr, token, &bob_dk, bob_amount));
 
         print(&utf8(b"Alice's pending balance is not zero:"));
-        print(&confidential_asset::pending_balance(alice_addr, token));
+        print(&confidential_asset::get_pending_balance(alice_addr, token));
 
-        assert!(confidential_asset::verify_pending_balance(alice_addr, token, &alice_dk, alice_amount));
+        assert!(confidential_asset::check_pending_balance_decrypts_to(alice_addr, token, &alice_dk, alice_amount));
     }
 
     #[test(
