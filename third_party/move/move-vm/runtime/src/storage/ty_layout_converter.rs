@@ -26,8 +26,50 @@ use move_vm_types::{
         struct_name_indexing::StructNameIndex,
     },
 };
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    hash::{Hash, Hasher},
+    sync::Arc,
+};
 use triomphe::Arc as TriompheArc;
+
+/// Owned key for [LocalSinglePassStructLayoutCache] representing a fully-instantiated struct.
+#[derive(Clone, Eq, PartialEq)]
+struct StructLayoutKey {
+    idx: StructNameIndex,
+    ty_args: Vec<Type>,
+}
+
+/// Borrowed key for [LocalSinglePassStructLayoutCache] lookups, avoiding `ty_args.to_vec()`
+/// allocation.
+#[derive(Eq, PartialEq)]
+struct StructLayoutKeyRef<'a> {
+    idx: StructNameIndex,
+    ty_args: &'a [Type],
+}
+
+impl hashbrown::Equivalent<StructLayoutKey> for StructLayoutKeyRef<'_> {
+    fn equivalent(&self, other: &StructLayoutKey) -> bool {
+        self.idx == other.idx && self.ty_args == other.ty_args.as_slice()
+    }
+}
+
+// Ensure hash is the same as for StructLayoutKeyRef.
+impl Hash for StructLayoutKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.idx.hash(state);
+        self.ty_args.hash(state);
+    }
+}
+
+// Ensure hash is the same as for StructLayoutKey.
+impl Hash for StructLayoutKeyRef<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.idx.hash(state);
+        self.ty_args.hash(state);
+    }
+}
+
+type StructLayoutMap = hashbrown::HashMap<StructLayoutKey, (Arc<MoveStructLayout>, bool)>;
 
 /// Cache for struct layouts constructed during a single layout construction pass.
 /// On cache hit, the `Arc<MoveStructLayout>` is shared (cheap clone), and the
@@ -35,7 +77,31 @@ use triomphe::Arc as TriompheArc;
 /// Invariant: this cache must be scoped to one traversal only (one top-level
 /// layout construction). Reusing it across passes could hide depth/cycle checks
 /// and keep cyclic layouts alive; discarding it after the pass avoids leaks.
-type StructLayoutCache = HashMap<(StructNameIndex, Vec<Type>), (Arc<MoveStructLayout>, bool)>;
+///
+/// Uses separate maps for runtime vs annotated layouts because enum variant
+/// fields are always processed with ANNOTATED=false, so a single map would
+/// return a non-annotated layout when an annotated one is expected.
+struct LocalSinglePassStructLayoutCache {
+    runtime: StructLayoutMap,
+    annotated: StructLayoutMap,
+}
+
+impl LocalSinglePassStructLayoutCache {
+    fn new() -> Self {
+        Self {
+            runtime: StructLayoutMap::new(),
+            annotated: StructLayoutMap::new(),
+        }
+    }
+
+    fn select<const ANNOTATED: bool>(&mut self) -> &mut StructLayoutMap {
+        if ANNOTATED {
+            &mut self.annotated
+        } else {
+            &mut self.runtime
+        }
+    }
+}
 
 /// Stores type layout as well as a flag if it contains any delayed fields.
 #[derive(Debug, Clone)]
@@ -243,7 +309,7 @@ where
         let mut count = 0;
         // Keep the cache scoped to this single traversal; do not hoist it
         // beyond this call (see invariant above).
-        let mut struct_layout_cache = StructLayoutCache::new();
+        let mut struct_layout_cache = LocalSinglePassStructLayoutCache::new();
         let (layout, contains_delayed_fields) = self.type_to_type_layout_impl::<ANNOTATED>(
             gas_meter,
             traversal_context,
@@ -272,7 +338,7 @@ where
         count: &mut u64,
         depth: u64,
         check_option_type: bool,
-        struct_layout_cache: &mut StructLayoutCache,
+        struct_layout_cache: &mut LocalSinglePassStructLayoutCache,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
         self.check_depth_and_increment_count(count, depth)?;
 
@@ -351,7 +417,7 @@ where
         count: &mut u64,
         depth: u64,
         check_option_type: bool,
-        struct_layout_cache: &mut StructLayoutCache,
+        struct_layout_cache: &mut LocalSinglePassStructLayoutCache,
     ) -> PartialVMResult<(Vec<MoveTypeLayout>, bool)> {
         let mut contains_delayed_fields = false;
         let layouts = tys
@@ -393,24 +459,24 @@ where
         count: &mut u64,
         depth: u64,
         check_option_type: bool,
-        struct_layout_cache: &mut StructLayoutCache,
+        struct_layout_cache: &mut LocalSinglePassStructLayoutCache,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
         let use_local_cache = self.vm_config().enable_struct_layout_local_cache;
         // Check the per-construction-pass cache. On hit, return the shared Arc without
-        // re-constructing or re-counting nodes.
-        let cache_key = if use_local_cache {
-            let cache_key = (*idx, ty_args.to_vec());
-            if let Some((cached_layout, contains_delayed_fields)) =
-                struct_layout_cache.get(&cache_key)
+        // re-constructing or re-counting nodes. Uses a borrowed key to avoid allocation.
+        let insert_into_cache = if use_local_cache {
+            if let Some((cached_layout, contains_delayed_fields)) = struct_layout_cache
+                .select::<ANNOTATED>()
+                .get(&StructLayoutKeyRef { idx: *idx, ty_args })
             {
                 return Ok((
                     MoveTypeLayout::Struct(cached_layout.clone()),
                     *contains_delayed_fields,
                 ));
             }
-            Some(cache_key)
+            true
         } else {
-            None
+            false
         };
         let struct_definition = self.struct_definition_loader.load_struct_definition(
             gas_meter,
@@ -606,9 +672,16 @@ where
         };
 
         // Cache the constructed struct layout for reuse within this construction pass.
-        if use_local_cache {
-            if let (Some(cache_key), MoveTypeLayout::Struct(arc_layout)) = (cache_key, &result.0) {
-                struct_layout_cache.insert(cache_key, (arc_layout.clone(), result.1));
+        // The owned key (with ty_args.to_vec()) is only constructed here on cache miss.
+        if insert_into_cache {
+            if let MoveTypeLayout::Struct(arc_layout) = &result.0 {
+                struct_layout_cache.select::<ANNOTATED>().insert(
+                    StructLayoutKey {
+                        idx: *idx,
+                        ty_args: ty_args.to_vec(),
+                    },
+                    (arc_layout.clone(), result.1),
+                );
             }
         }
 
