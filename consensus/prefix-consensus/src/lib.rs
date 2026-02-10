@@ -43,6 +43,7 @@ pub mod network_interface;
 pub mod network_messages;
 mod protocol;
 pub mod signing;
+pub mod strong_protocol;
 mod types;
 mod utils;
 mod verification;
@@ -72,7 +73,10 @@ pub use certificates::{
     cert_reaches_view1, Certificate, DirectCertificate, EmptyViewMessage, EmptyViewStatement,
     HighestKnownView, IndirectCertificate, StrongPCCommit, StrongPCCommitError,
 };
+pub use strong_protocol::{
+    ChainBuildError, StrongPrefixConsensusProtocol, View1Decision, ViewDecision,
+};
 pub use view_state::{
-    has_certifiable_high, has_committable_low, has_non_bot_entry, RankingManager, ViewOutput,
+    has_non_bot_entry, RankingManager, ViewOutput,
     ViewState,
 };
