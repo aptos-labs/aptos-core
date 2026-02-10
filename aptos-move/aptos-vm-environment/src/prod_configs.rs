@@ -227,6 +227,7 @@ pub fn aptos_prod_vm_config(
     let enable_depth_checks = features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES);
     let enable_capture_option = !timed_features.is_enabled(TimedFeatureFlag::DisabledCaptureOption)
         || features.is_enabled(FeatureFlag::ENABLE_CAPTURE_OPTION);
+    let enable_closure_depth_check = timed_features.is_enabled(TimedFeatureFlag::ClosureDepthCheck);
 
     // Some feature gating was missed, so for native dynamic dispatch the feature is always on for
     // testnet after 1.38 release.
@@ -263,6 +264,7 @@ pub fn aptos_prod_vm_config(
         enable_framework_for_option,
         enable_function_caches_for_native_dynamic_dispatch,
         enable_debugging,
+        enable_closure_depth_check,
     };
 
     // Note: if max_value_nest_depth changed, make sure the constant is in-sync. Do not remove this
