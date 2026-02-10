@@ -23,8 +23,8 @@ use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::{
-    chunk_to_commit::ChunkToCommit, db_ensure as ensure, AptosDbError, DbReader, DbWriter, Result,
-    StateSnapshotReceiver,
+    chunk_to_commit::ChunkToCommit, db_ensure as ensure, state_store::state::State, AptosDbError,
+    DbReader, DbWriter, Result, StateSnapshotReceiver,
 };
 use aptos_types::{
     account_config::new_block_event_key,
@@ -120,6 +120,10 @@ impl DbWriter for AptosDB {
             self.state_store
                 .get_snapshot_receiver(version, expected_root_hash)
         })
+    }
+
+    fn set_hot_state_progress(&self, state: State) {
+        self.state_store.set_hot_state_progress(state);
     }
 
     fn finalize_state_snapshot(
