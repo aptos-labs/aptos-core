@@ -5,7 +5,7 @@ use super::internal_indexer_db_config::InternalIndexerDBConfig;
 use crate::config::{
     node_config_loader::NodeType,
     utils::{are_failpoints_enabled, get_config_name},
-    AdminServiceConfig, ApiConfig, BaseConfig, ConsensusConfig, DagConsensusConfig, Error,
+    AdminServiceConfig, ApiConfig, ApiV2Config, BaseConfig, ConsensusConfig, DagConsensusConfig, Error,
     ExecutionConfig, IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig,
     NodeConfig, StateSyncConfig, StorageConfig,
 };
@@ -50,6 +50,7 @@ impl ConfigSanitizer for NodeConfig {
         // Sanitize all of the sub-configs
         AdminServiceConfig::sanitize(node_config, node_type, chain_id)?;
         ApiConfig::sanitize(node_config, node_type, chain_id)?;
+        ApiV2Config::sanitize(node_config, node_type, chain_id)?;
         BaseConfig::sanitize(node_config, node_type, chain_id)?;
         ConsensusConfig::sanitize(node_config, node_type, chain_id)?;
         DagConsensusConfig::sanitize(node_config, node_type, chain_id)?;

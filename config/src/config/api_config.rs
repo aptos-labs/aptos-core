@@ -313,6 +313,95 @@ impl ApiV2Config {
     }
 }
 
+impl ConfigSanitizer for ApiV2Config {
+    fn sanitize(
+        node_config: &NodeConfig,
+        _node_type: NodeType,
+        _chain_id: Option<ChainId>,
+    ) -> Result<(), Error> {
+        let sanitizer_name = Self::get_sanitizer_name();
+        let v2 = &node_config.api_v2;
+
+        // If v2 API is disabled, skip validation
+        if !v2.enabled {
+            return Ok(());
+        }
+
+        // --- Runtime worker configuration ---
+        if v2.max_runtime_workers.is_none() && v2.runtime_worker_multiplier == 0 {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "runtime_worker_multiplier must be greater than 0 when max_runtime_workers is not set!".into(),
+            ));
+        }
+
+        // --- TLS: both paths must be set together ---
+        match (&v2.tls_cert_path, &v2.tls_key_path) {
+            (Some(_), None) => {
+                return Err(Error::ConfigSanitizerFailed(
+                    sanitizer_name,
+                    "tls_cert_path is set but tls_key_path is missing. Both must be provided for TLS.".into(),
+                ));
+            },
+            (None, Some(_)) => {
+                return Err(Error::ConfigSanitizerFailed(
+                    sanitizer_name,
+                    "tls_key_path is set but tls_cert_path is missing. Both must be provided for TLS.".into(),
+                ));
+            },
+            _ => {},
+        }
+
+        // --- WebSocket limits ---
+        if v2.websocket_enabled && v2.websocket_max_connections == 0 {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "websocket_max_connections must be greater than 0 when WebSocket is enabled!".into(),
+            ));
+        }
+        if v2.websocket_enabled && v2.websocket_max_subscriptions_per_conn == 0 {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "websocket_max_subscriptions_per_conn must be greater than 0 when WebSocket is enabled!".into(),
+            ));
+        }
+
+        // --- Batch size ---
+        if v2.json_rpc_batch_max_size == 0 {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "json_rpc_batch_max_size must be greater than 0!".into(),
+            ));
+        }
+
+        // --- Content length limit ---
+        if let Some(limit) = v2.content_length_limit {
+            if limit == 0 {
+                return Err(Error::ConfigSanitizerFailed(
+                    sanitizer_name,
+                    "content_length_limit must be greater than 0 when explicitly set!".into(),
+                ));
+            }
+        }
+
+        // --- Address conflict: v2 separate address must not equal v1 address ---
+        if let Some(v2_addr) = v2.address {
+            if v2_addr == node_config.api.address {
+                return Err(Error::ConfigSanitizerFailed(
+                    sanitizer_name,
+                    format!(
+                        "v2 address ({}) must differ from the v1 API address ({}). \
+                         Remove api_v2.address to use same-port co-hosting instead.",
+                        v2_addr, node_config.api.address
+                    ),
+                ));
+            }
+        }
+
+        Ok(())
+    }
+}
+
 // This is necessary because we can't import the EntryFunctionId type from the API types.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -420,5 +509,220 @@ mod tests {
             ApiConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()))
                 .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    // ---- ApiV2Config sanitizer tests ----
+
+    /// Helper to create a NodeConfig with v2 API enabled and the given overrides.
+    fn v2_node_config(v2: ApiV2Config) -> NodeConfig {
+        NodeConfig {
+            api_v2: v2,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_v2_sanitize_disabled_skips_validation() {
+        // When v2 is disabled, even invalid settings should pass.
+        let cfg = v2_node_config(ApiV2Config {
+            enabled: false,
+            runtime_worker_multiplier: 0,
+            json_rpc_batch_max_size: 0,
+            ..Default::default()
+        });
+        ApiV2Config::sanitize(&cfg, NodeType::Validator, Some(ChainId::mainnet())).unwrap();
+    }
+
+    #[test]
+    fn test_v2_sanitize_default_passes() {
+        let cfg = v2_node_config(ApiV2Config {
+            enabled: true,
+            ..Default::default()
+        });
+        ApiV2Config::sanitize(&cfg, NodeType::Validator, Some(ChainId::mainnet())).unwrap();
+    }
+
+    #[test]
+    fn test_v2_sanitize_invalid_runtime_workers() {
+        let cfg = v2_node_config(ApiV2Config {
+            enabled: true,
+            max_runtime_workers: None,
+            runtime_worker_multiplier: 0,
+            ..Default::default()
+        });
+        let err =
+            ApiV2Config::sanitize(&cfg, NodeType::Validator, None).unwrap_err();
+        assert!(matches!(err, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_v2_sanitize_explicit_workers_bypasses_multiplier_check() {
+        // When max_runtime_workers is explicitly set, multiplier doesn't matter.
+        let cfg = v2_node_config(ApiV2Config {
+            enabled: true,
+            max_runtime_workers: Some(4),
+            runtime_worker_multiplier: 0,
+            ..Default::default()
+        });
+        ApiV2Config::sanitize(&cfg, NodeType::Validator, None).unwrap();
+    }
+
+    #[test]
+    fn test_v2_sanitize_tls_cert_without_key() {
+        let cfg = v2_node_config(ApiV2Config {
+            enabled: true,
+            tls_cert_path: Some("/tmp/cert.pem".into()),
+            tls_key_path: None,
+            ..Default::default()
+        });
+        let err =
+            ApiV2Config::sanitize(&cfg, NodeType::Validator, None).unwrap_err();
+        assert!(matches!(err, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_v2_sanitize_tls_key_without_cert() {
+        let cfg = v2_node_config(ApiV2Config {
+            enabled: true,
+            tls_cert_path: None,
+            tls_key_path: Some("/tmp/key.pem".into()),
+            ..Default::default()
+        });
+        let err =
+            ApiV2Config::sanitize(&cfg, NodeType::Validator, None).unwrap_err();
+        assert!(matches!(err, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_v2_sanitize_tls_both_paths_ok() {
+        let cfg = v2_node_config(ApiV2Config {
+            enabled: true,
+            tls_cert_path: Some("/tmp/cert.pem".into()),
+            tls_key_path: Some("/tmp/key.pem".into()),
+            ..Default::default()
+        });
+        ApiV2Config::sanitize(&cfg, NodeType::Validator, None).unwrap();
+    }
+
+    #[test]
+    fn test_v2_sanitize_zero_websocket_connections() {
+        let cfg = v2_node_config(ApiV2Config {
+            enabled: true,
+            websocket_enabled: true,
+            websocket_max_connections: 0,
+            ..Default::default()
+        });
+        let err =
+            ApiV2Config::sanitize(&cfg, NodeType::Validator, None).unwrap_err();
+        assert!(matches!(err, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_v2_sanitize_zero_websocket_subs() {
+        let cfg = v2_node_config(ApiV2Config {
+            enabled: true,
+            websocket_enabled: true,
+            websocket_max_subscriptions_per_conn: 0,
+            ..Default::default()
+        });
+        let err =
+            ApiV2Config::sanitize(&cfg, NodeType::Validator, None).unwrap_err();
+        assert!(matches!(err, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_v2_sanitize_websocket_disabled_skips_ws_checks() {
+        // When WebSocket is off, zero connections/subs are fine.
+        let cfg = v2_node_config(ApiV2Config {
+            enabled: true,
+            websocket_enabled: false,
+            websocket_max_connections: 0,
+            websocket_max_subscriptions_per_conn: 0,
+            ..Default::default()
+        });
+        ApiV2Config::sanitize(&cfg, NodeType::Validator, None).unwrap();
+    }
+
+    #[test]
+    fn test_v2_sanitize_zero_batch_size() {
+        let cfg = v2_node_config(ApiV2Config {
+            enabled: true,
+            json_rpc_batch_max_size: 0,
+            ..Default::default()
+        });
+        let err =
+            ApiV2Config::sanitize(&cfg, NodeType::Validator, None).unwrap_err();
+        assert!(matches!(err, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_v2_sanitize_zero_content_length_limit() {
+        let cfg = v2_node_config(ApiV2Config {
+            enabled: true,
+            content_length_limit: Some(0),
+            ..Default::default()
+        });
+        let err =
+            ApiV2Config::sanitize(&cfg, NodeType::Validator, None).unwrap_err();
+        assert!(matches!(err, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_v2_sanitize_content_length_limit_none_ok() {
+        // None means "inherit from v1" -- always valid.
+        let cfg = v2_node_config(ApiV2Config {
+            enabled: true,
+            content_length_limit: None,
+            ..Default::default()
+        });
+        ApiV2Config::sanitize(&cfg, NodeType::Validator, None).unwrap();
+    }
+
+    #[test]
+    fn test_v2_sanitize_address_conflict_with_v1() {
+        let v1_addr: SocketAddr = "127.0.0.1:8080".parse().unwrap();
+        let cfg = NodeConfig {
+            api: ApiConfig {
+                address: v1_addr,
+                ..Default::default()
+            },
+            api_v2: ApiV2Config {
+                enabled: true,
+                address: Some(v1_addr), // same as v1!
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let err =
+            ApiV2Config::sanitize(&cfg, NodeType::Validator, None).unwrap_err();
+        assert!(matches!(err, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_v2_sanitize_separate_address_ok() {
+        let cfg = NodeConfig {
+            api: ApiConfig {
+                address: "127.0.0.1:8080".parse().unwrap(),
+                ..Default::default()
+            },
+            api_v2: ApiV2Config {
+                enabled: true,
+                address: Some("127.0.0.1:8081".parse().unwrap()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        ApiV2Config::sanitize(&cfg, NodeType::Validator, None).unwrap();
+    }
+
+    #[test]
+    fn test_v2_sanitize_cohost_no_address_ok() {
+        // address = None means co-host on v1 port -- always valid.
+        let cfg = v2_node_config(ApiV2Config {
+            enabled: true,
+            address: None,
+            ..Default::default()
+        });
+        ApiV2Config::sanitize(&cfg, NodeType::Validator, None).unwrap();
     }
 }
