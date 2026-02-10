@@ -137,37 +137,15 @@ impl<'a> InstantiationLoopChecker<'a> {
     /// Helper function that extracts type parameters from a given type.
     /// Duplicated entries are removed.
     fn extract_type_parameters(&self, ty: &SignatureToken) -> HashSet<TypeParameterIndex> {
-        use SignatureToken::*;
-
-        let mut type_params = HashSet::new();
-
-        fn rec(type_params: &mut HashSet<TypeParameterIndex>, ty: &SignatureToken) {
-            match ty {
-                Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64
-                | I128 | I256 | Signer | Struct(_) => (),
-                TypeParameter(idx) => {
-                    type_params.insert(*idx);
-                },
-                Vector(ty) => rec(type_params, ty),
-                Function(args, result, _) => {
-                    for ty in args {
-                        rec(type_params, ty);
-                    }
-                    for ty in result {
-                        rec(type_params, ty);
-                    }
-                },
-                Reference(ty) | MutableReference(ty) => rec(type_params, ty),
-                StructInstantiation(_, tys) => {
-                    for ty in tys {
-                        rec(type_params, ty);
-                    }
-                },
-            }
-        }
-
-        rec(&mut type_params, ty);
-        type_params
+        ty.preorder_traversal()
+            .filter_map(|tok| {
+                if let SignatureToken::TypeParameter(idx) = tok {
+                    Some(*idx)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     /// Helper function that creates an edge from one given node to the other.
