@@ -1557,7 +1557,8 @@ impl ModuleBuilder<'_, '_> {
                 id: FunId::new(full_name.symbol),
             };
             for struct_id in used_structs {
-                // Skip structs not in reverse_struct_table (e.g., ghost memory structs)
+                // Skip structs not in current build (e.g., from dependencies like std::vector, std::option)
+                // reverse_struct_table only contains structs from primary target modules being compiled
                 if let Some(qualified_symbol) = self
                     .parent
                     .reverse_struct_table
