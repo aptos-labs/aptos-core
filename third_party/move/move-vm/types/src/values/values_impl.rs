@@ -6169,3 +6169,116 @@ fn check_depth(depth: u64, max_depth: Option<u64>) -> PartialVMResult<()> {
     }
     Ok(())
 }
+
+/// A visitor that checks the depth of values does not exceed a maximum.
+struct DepthCheckingVisitor {
+    max_depth: u64,
+}
+
+impl DepthCheckingVisitor {
+    #[inline]
+    fn check(&self, depth: u64) -> PartialVMResult<()> {
+        if depth > self.max_depth {
+            return Err(PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED));
+        }
+        Ok(())
+    }
+}
+
+impl ValueVisitor for DepthCheckingVisitor {
+    fn visit_delayed(&mut self, depth: u64, _id: DelayedFieldID) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_u8(&mut self, depth: u64, _val: u8) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_u16(&mut self, depth: u64, _val: u16) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_u32(&mut self, depth: u64, _val: u32) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_u64(&mut self, depth: u64, _val: u64) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_u128(&mut self, depth: u64, _val: u128) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_u256(
+        &mut self,
+        depth: u64,
+        _val: &move_core_types::int256::U256,
+    ) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_i8(&mut self, depth: u64, _val: i8) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_i16(&mut self, depth: u64, _val: i16) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_i32(&mut self, depth: u64, _val: i32) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_i64(&mut self, depth: u64, _val: i64) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_i128(&mut self, depth: u64, _val: i128) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_i256(
+        &mut self,
+        depth: u64,
+        _val: &move_core_types::int256::I256,
+    ) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_bool(&mut self, depth: u64, _val: bool) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_address(&mut self, depth: u64, _val: &AccountAddress) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_struct(&mut self, depth: u64, _len: usize) -> PartialVMResult<bool> {
+        self.check(depth)?;
+        Ok(true) // continue into fields
+    }
+
+    fn visit_closure(&mut self, depth: u64, _len: usize) -> PartialVMResult<bool> {
+        self.check(depth)?;
+        Ok(true) // continue into captured values
+    }
+
+    fn visit_vec(&mut self, depth: u64, _len: usize) -> PartialVMResult<bool> {
+        self.check(depth)?;
+        Ok(true) // continue into elements
+    }
+
+    fn visit_ref(&mut self, depth: u64, _is_global: bool) -> PartialVMResult<bool> {
+        self.check(depth)?;
+        Ok(true) // continue into referenced value
+    }
+}
+
+impl Value {
+    /// Check that the depth of this value does not exceed `max_depth`.
+    /// Returns an error with `VM_MAX_VALUE_DEPTH_REACHED` if the depth is exceeded.
+    pub fn check_depth_of_value(&self, max_depth: u64) -> PartialVMResult<()> {
+        self.visit(&mut DepthCheckingVisitor { max_depth })
+    }
+}
