@@ -2002,7 +2002,6 @@ impl GlobalEnv {
             visibility: Visibility::Private,
             has_package_visibility: false,
             is_empty_struct: false,
-            // Ghost memory structs are synthetic and not directly used by function bodies
             users: BTreeSet::new(),
         }
     }
