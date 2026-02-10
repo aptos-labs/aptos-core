@@ -13,6 +13,7 @@ pub mod health;
 pub mod modules;
 pub mod resources;
 pub mod simulate;
+#[cfg(feature = "api-v2-sse")]
 pub mod sse;
 pub mod tables;
 pub mod transactions;

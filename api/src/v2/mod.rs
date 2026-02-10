@@ -22,6 +22,10 @@ pub mod router;
 mod tests;
 pub mod tls;
 pub mod types;
+/// WebSocket types, broadcaster, and handler.
+/// The types and broadcaster submodules are shared by both WebSocket and SSE features.
+/// The handler itself (ws_handler) is only available with `api-v2-websocket`.
+#[cfg(any(feature = "api-v2-websocket", feature = "api-v2-sse"))]
 pub mod websocket;
 
 pub use context::V2Context;

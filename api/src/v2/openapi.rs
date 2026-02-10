@@ -9,11 +9,13 @@
 use crate::v2::{
     endpoints::{
         account_transactions, accounts, balance, blocks, events, gas_estimation, health, modules,
-        resources, simulate, sse, tables, transactions, view,
+        resources, simulate, tables, transactions, view,
     },
     error::{ErrorCode, V2Error},
     types::{HealthResponse, LedgerMetadata, NodeInfo},
 };
+#[cfg(feature = "api-v2-sse")]
+use crate::v2::endpoints::sse;
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -21,7 +23,7 @@ use axum::{
 };
 use utoipa::OpenApi;
 
-/// The OpenAPI spec for the Aptos v2 REST API.
+/// The core OpenAPI spec for the Aptos v2 REST API (always available).
 #[derive(OpenApi)]
 #[openapi(
     info(
@@ -66,9 +68,6 @@ use utoipa::OpenApi;
         blocks::get_block_by_height_handler,
         blocks::get_block_by_version_handler,
         blocks::get_latest_block_handler,
-        // SSE
-        sse::sse_blocks_handler,
-        sse::sse_events_handler,
     ),
     components(schemas(
         // Response envelope & metadata
@@ -92,10 +91,41 @@ use utoipa::OpenApi;
         (name = "View", description = "Execute view functions"),
         (name = "Tables", description = "Table item queries"),
         (name = "Blocks", description = "Block queries"),
+    )
+)]
+struct V2ApiDocCore;
+
+/// SSE endpoints for the OpenAPI spec (only available with `api-v2-sse`).
+#[cfg(feature = "api-v2-sse")]
+#[derive(OpenApi)]
+#[openapi(
+    paths(
+        sse::sse_blocks_handler,
+        sse::sse_events_handler,
+    ),
+    tags(
         (name = "SSE", description = "Server-Sent Events streaming endpoints"),
     )
 )]
+struct V2ApiDocSse;
+
+/// Combined v2 OpenAPI spec. Merges the core spec with optional SSE/WebSocket
+/// docs based on which features are compiled in.
 pub struct V2ApiDoc;
+
+impl V2ApiDoc {
+    pub fn openapi() -> utoipa::openapi::OpenApi {
+        let mut spec = V2ApiDocCore::openapi();
+
+        #[cfg(feature = "api-v2-sse")]
+        {
+            let sse_spec = V2ApiDocSse::openapi();
+            spec.merge(sse_spec);
+        }
+
+        spec
+    }
+}
 
 /// GET /v2/spec.json -- serve the OpenAPI spec as JSON.
 pub async fn spec_json_handler() -> impl IntoResponse {

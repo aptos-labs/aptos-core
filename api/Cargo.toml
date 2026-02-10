@@ -86,6 +86,11 @@ tokio-tungstenite = { workspace = true }
 warp = { workspace = true }
 
 [features]
+default = ["api-v1", "api-v2", "api-v2-websocket", "api-v2-sse"]
+api-v1 = []          # Poem v1 REST API
+api-v2 = []          # Axum v2 REST API (core endpoints, batch, OpenAPI)
+api-v2-websocket = ["api-v2"]  # WebSocket support (requires api-v2)
+api-v2-sse = ["api-v2"]        # Server-Sent Events (requires api-v2)
 failpoints = ["fail/failpoints"]
 
 [[bench]]

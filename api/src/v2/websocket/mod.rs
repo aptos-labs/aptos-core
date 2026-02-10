@@ -15,12 +15,17 @@
 pub mod broadcaster;
 pub mod types;
 
+// --- WebSocket handler (only compiled with api-v2-websocket) ---
+#[cfg(feature = "api-v2-websocket")]
 use crate::v2::{
     context::V2Context,
     error::{ErrorCode, V2Error},
 };
+#[cfg(feature = "api-v2-websocket")]
 use aptos_crypto::HashValue;
+#[cfg(feature = "api-v2-websocket")]
 use aptos_logger::debug;
+#[cfg(feature = "api-v2-websocket")]
 use axum::{
     extract::{
         ws::{Message, WebSocket},
@@ -28,7 +33,9 @@ use axum::{
     },
     response::IntoResponse,
 };
+#[cfg(feature = "api-v2-websocket")]
 use futures::{SinkExt, StreamExt};
+#[cfg(feature = "api-v2-websocket")]
 use std::{
     collections::HashMap,
     sync::{
@@ -37,12 +44,19 @@ use std::{
     },
     time::{Duration, Instant},
 };
+#[cfg(feature = "api-v2-websocket")]
 use tokio::sync::{broadcast, mpsc, RwLock};
+#[cfg(feature = "api-v2-websocket")]
 use types::{
     BlockSummary, EventData, EventFilter, SubscriptionType, TransactionStatusData, WsClientMessage,
     WsEvent, WsServerMessage,
 };
 
+// Everything below this point is the WebSocket handler and its helpers.
+// Only compiled when the `api-v2-websocket` feature is active.
+// The `types` and `broadcaster` submodules above are shared with SSE.
+
+#[cfg(feature = "api-v2-websocket")]
 /// Subscription entry: the original type and a compiled filter (for events).
 struct SubscriptionEntry {
     sub_type: SubscriptionType,
@@ -50,6 +64,7 @@ struct SubscriptionEntry {
     event_filter: Option<EventFilter>,
 }
 
+#[cfg(feature = "api-v2-websocket")]
 /// GET /v2/ws -- WebSocket upgrade endpoint.
 pub async fn ws_handler(
     State(ctx): State<V2Context>,
@@ -73,6 +88,7 @@ pub async fn ws_handler(
     Ok(ws.on_upgrade(move |socket| handle_ws_connection(ctx, socket)))
 }
 
+#[cfg(feature = "api-v2-websocket")]
 /// Handle a single WebSocket connection.
 async fn handle_ws_connection(ctx: V2Context, socket: WebSocket) {
     ctx.ws_active_connections().fetch_add(1, Ordering::Relaxed);
@@ -137,6 +153,7 @@ async fn handle_ws_connection(ctx: V2Context, socket: WebSocket) {
     debug!("WebSocket connection closed");
 }
 
+#[cfg(feature = "api-v2-websocket")]
 /// Process a single text message from the client.
 async fn handle_text_message(
     ctx: &V2Context,
@@ -246,6 +263,7 @@ async fn handle_text_message(
     }
 }
 
+#[cfg(feature = "api-v2-websocket")]
 /// Receive broadcast events, filter by active subscriptions, forward matches.
 async fn run_broadcast_filter(
     mut rx: broadcast::Receiver<WsEvent>,
@@ -279,6 +297,7 @@ async fn run_broadcast_filter(
     }
 }
 
+#[cfg(feature = "api-v2-websocket")]
 /// Determine if a broadcast event matches a subscription. Returns zero or more
 /// messages (one per matching event within a single `WsEvent::Events` broadcast).
 fn match_event(
@@ -353,6 +372,7 @@ fn match_event(
     }
 }
 
+#[cfg(feature = "api-v2-websocket")]
 /// Poll the DB for a specific transaction until committed or timeout.
 async fn spawn_tx_status_tracker(
     ctx: V2Context,

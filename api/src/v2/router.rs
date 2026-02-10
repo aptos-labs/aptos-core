@@ -8,12 +8,15 @@ use super::{
     context::V2Context,
     endpoints::{
         account_transactions, accounts, balance, blocks, events, gas_estimation, health, modules,
-        resources, simulate, sse, tables, transactions, view,
+        resources, simulate, tables, transactions, view,
     },
     middleware, openapi,
     proxy::{self, V1Proxy},
-    websocket,
 };
+#[cfg(feature = "api-v2-sse")]
+use super::endpoints::sse;
+#[cfg(feature = "api-v2-websocket")]
+use super::websocket;
 use axum::{
     middleware as axum_middleware,
     routing::{get, post},
@@ -26,7 +29,7 @@ pub fn build_v2_router(ctx: V2Context) -> Router {
     let content_length_limit = ctx.v2_config.content_length_limit as usize;
     let request_timeout_ms = ctx.v2_config.request_timeout_ms;
 
-    Router::new()
+    let router = Router::new()
         // Health & info
         .route("/v2/health", get(health::health_handler))
         .route("/v2/info", get(health::info_handler))
@@ -110,13 +113,20 @@ pub fn build_v2_router(ctx: V2Context) -> Router {
             get(blocks::get_block_by_height_handler),
         )
         // Batch (JSON-RPC 2.0)
-        .route("/v2/batch", post(batch::batch_handler))
-        // SSE (Server-Sent Events)
+        .route("/v2/batch", post(batch::batch_handler));
+
+    // SSE (Server-Sent Events) -- only compiled with the api-v2-sse feature
+    #[cfg(feature = "api-v2-sse")]
+    let router = router
         .route("/v2/sse/blocks", get(sse::sse_blocks_handler))
-        .route("/v2/sse/events", get(sse::sse_events_handler))
-        // WebSocket
-        .route("/v2/ws", get(websocket::ws_handler))
-        // OpenAPI spec
+        .route("/v2/sse/events", get(sse::sse_events_handler));
+
+    // WebSocket -- only compiled with the api-v2-websocket feature
+    #[cfg(feature = "api-v2-websocket")]
+    let router = router.route("/v2/ws", get(websocket::ws_handler));
+
+    // OpenAPI spec + middleware
+    router
         .route("/v2/spec.json", get(openapi::spec_json_handler))
         .route("/v2/spec.yaml", get(openapi::spec_yaml_handler))
         // Middleware stack (applied bottom-up: first listed = outermost)

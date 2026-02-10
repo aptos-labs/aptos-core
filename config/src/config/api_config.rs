@@ -15,7 +15,12 @@ use std::net::SocketAddr;
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ApiConfig {
-    /// Enables the REST API endpoint
+    /// Enables the v1 REST API endpoint (Poem-based).
+    ///
+    /// Requires the `api-v1` Cargo feature to be compiled in.
+    /// If the feature is absent, this flag is ignored and a warning is logged.
+    ///
+    /// Set to `false` with `api_v2.enabled: true` for v2-only mode.
     #[serde(default = "default_enabled")]
     pub enabled: bool,
     /// Address for the REST API to listen on. Set to 0.0.0.0:port to allow all inbound connections.
@@ -200,16 +205,44 @@ impl ConfigSanitizer for ApiConfig {
 }
 
 /// Configuration for the v2 REST API (Axum-based).
+///
+/// ## Feature Flag Interaction
+///
+/// The v2 API supports compile-time feature flags in addition to runtime
+/// configuration. A feature is only active when **both** the Cargo feature
+/// is compiled in **and** the runtime flag is enabled.
+///
+/// | Cargo Feature        | Runtime Flag              | Effect                         |
+/// |----------------------|---------------------------|--------------------------------|
+/// | `api-v2`             | `enabled: true`           | v2 REST API available          |
+/// | `api-v2-websocket`   | `websocket_enabled: true` | WebSocket endpoint available   |
+/// | `api-v2-sse`         | `sse_enabled: true`       | SSE endpoints available        |
+///
+/// If a runtime flag is `true` but the corresponding feature was not compiled in,
+/// a warning is logged at startup and the flag is effectively ignored.
+///
+/// ## v2-Only Mode
+///
+/// To run the node with only the v2 API (no Poem v1):
+/// - Set `api.enabled: false` and `api_v2.enabled: true` in config, OR
+/// - Compile with `--no-default-features --features api-v2,api-v2-websocket,api-v2-sse`
+///
+/// In v2-only mode, requests to `/v1/*` will return 404.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ApiV2Config {
     /// Enables the v2 REST API.
+    ///
+    /// Requires the `api-v2` Cargo feature to be compiled in.
+    /// If the feature is absent, this flag is ignored and a warning is logged.
     #[serde(default = "default_disabled")]
     pub enabled: bool,
     /// Optional separate address for the v2 API. If None, shares the v1 port.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub address: Option<SocketAddr>,
     /// Enables WebSocket support on v2.
+    ///
+    /// Requires the `api-v2-websocket` Cargo feature to be compiled in.
     #[serde(default = "default_enabled")]
     pub websocket_enabled: bool,
     /// Maximum number of concurrent WebSocket connections.
@@ -217,6 +250,8 @@ pub struct ApiV2Config {
     /// Maximum subscriptions per WebSocket connection.
     pub websocket_max_subscriptions_per_conn: usize,
     /// Enables Server-Sent Events (SSE) endpoints on v2.
+    ///
+    /// Requires the `api-v2-sse` Cargo feature to be compiled in.
     #[serde(default = "default_enabled")]
     pub sse_enabled: bool,
     /// Enables HTTP/2 (h2c) support.

@@ -2,11 +2,14 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    context::Context,
+};
+#[cfg(feature = "api-v1")]
+use crate::{
     accounts::AccountsApi,
     basic::BasicApi,
     blocks::BlocksApi,
     check_size::PostSizeLimit,
-    context::Context,
     error_converter::{convert_error, panic_handler},
     events::EventsApi,
     index::IndexApi,
@@ -15,19 +18,26 @@ use crate::{
     spec::{spec_endpoint_json, spec_endpoint_yaml},
     state::StateApi,
     transactions::TransactionsApi,
-    v2::{
-        build_combined_router, build_v2_router,
-        context::{V2Config, V2Context},
-    },
     view_function::ViewFunctionApi,
 };
-use anyhow::{anyhow, Context as AnyhowContext};
+#[cfg(feature = "api-v2")]
+use crate::v2::{
+    build_v2_router,
+    context::{V2Config, V2Context},
+};
+#[cfg(all(feature = "api-v1", feature = "api-v2"))]
+use crate::v2::build_combined_router;
+#[cfg(any(feature = "api-v1", feature = "api-v2"))]
+use anyhow::Context as AnyhowContext;
+#[cfg(feature = "api-v1")]
+use anyhow::anyhow;
 use aptos_config::config::{ApiConfig, NodeConfig};
 use aptos_logger::{info, warn};
 use aptos_mempool::MempoolClientSender;
 use aptos_storage_interface::DbReader;
 use aptos_types::{chain_id::ChainId, indexer::indexer_db_reader::IndexerReader};
 use futures::channel::oneshot;
+#[cfg(feature = "api-v1")]
 use poem::{
     handler,
     http::Method,
@@ -36,13 +46,27 @@ use poem::{
     web::Html,
     EndpointExt, Route, Server,
 };
+#[cfg(feature = "api-v1")]
 use poem_openapi::{ContactObject, LicenseObject, OpenApiService};
-use std::{net::SocketAddr, sync::Arc};
-use tokio::runtime::{Handle, Runtime};
+use std::sync::Arc;
+#[cfg(any(feature = "api-v1", feature = "api-v2"))]
+use std::net::SocketAddr;
+#[cfg(feature = "api-v1")]
+use tokio::runtime::Handle;
+use tokio::runtime::Runtime;
 
+#[cfg(feature = "api-v1")]
 const VERSION: &str = include_str!("../doc/.version");
 
-/// Create a runtime and attach the Poem webserver to it.
+/// Create a runtime and attach the API webserver(s) to it.
+///
+/// Supports three modes based on compile-time features and runtime config:
+/// 1. **v1 + v2** (default): Both Poem v1 and Axum v2 serve together (co-host or separate ports)
+/// 2. **v2-only**: Only Axum v2 serves (no Poem, no proxy) -- when `api-v1` is compiled out or `api.enabled = false`
+/// 3. **v1-only**: Only Poem v1 serves (existing behavior) -- when `api-v2` is compiled out or `api_v2.enabled = false`
+///
+/// If a feature is compiled out but the corresponding runtime flag is enabled,
+/// a warning is logged and the flag is effectively ignored.
 pub fn bootstrap(
     config: &NodeConfig,
     chain_id: ChainId,
@@ -56,173 +80,315 @@ pub fn bootstrap(
 
     let context = Context::new(chain_id, db, mp_sender, config.clone(), indexer_reader);
 
-    if config.api_v2.enabled {
-        let v2_config = V2Config::from_configs(&config.api_v2, &config.api);
-        let v2_ctx = V2Context::new(context.clone(), v2_config);
+    // Log warnings for compiled-out features that are enabled in config.
+    log_feature_warnings(config);
 
-        // Start the block poller if WebSocket or SSE is enabled (both share the broadcaster).
-        if config.api_v2.websocket_enabled || config.api_v2.sse_enabled {
+    // Determine effective flags: a feature is active only if both compiled in AND enabled at runtime.
+    let v1_active = cfg!(feature = "api-v1") && config.api.enabled;
+    let v2_active = cfg!(feature = "api-v2") && config.api_v2.enabled;
+
+    match (v1_active, v2_active) {
+        // ---- v1 + v2 ----
+        (true, true) => {
+            #[cfg(all(feature = "api-v1", feature = "api-v2"))]
+            {
+                bootstrap_v1_and_v2(&runtime, context.clone(), config, port_tx)?;
+            }
+        },
+        // ---- v2-only ----
+        (false, true) => {
+            #[cfg(feature = "api-v2")]
+            {
+                bootstrap_v2_only(&runtime, context.clone(), config, port_tx)?;
+            }
+        },
+        // ---- v1-only ----
+        (true, false) => {
+            #[cfg(feature = "api-v1")]
+            {
+                attach_poem_to_runtime(runtime.handle(), context.clone(), config, false, port_tx)
+                    .context("Failed to attach poem to runtime")?;
+            }
+        },
+        // ---- No API ----
+        (false, false) => {
+            info!("No API enabled (v1={}, v2={}). API server will not start.",
+                config.api.enabled, config.api_v2.enabled);
+        },
+    }
+
+    // Periodic gas estimation (only when v1 API is compiled in).
+    #[cfg(feature = "api-v1")]
+    {
+        let context_cloned = context.clone();
+        if let Some(period_ms) = config.api.periodic_gas_estimation_ms {
+            runtime.spawn(async move {
+                let mut interval =
+                    tokio::time::interval(tokio::time::Duration::from_millis(period_ms));
+                loop {
+                    interval.tick().await;
+                    let context_cloned = context_cloned.clone();
+                    tokio::task::spawn_blocking(move || {
+                        if let Ok(latest_ledger_info) =
+                            context_cloned
+                                .get_latest_ledger_info::<crate::response::BasicError>()
+                        {
+                            if let Ok(gas_estimation) =
+                                context_cloned.estimate_gas_price::<crate::response::BasicError>(
+                                    &latest_ledger_info,
+                                )
+                            {
+                                TransactionsApi::log_gas_estimation(&gas_estimation);
+                            }
+                        }
+                    })
+                    .await
+                    .unwrap_or(());
+                }
+            });
+        }
+
+        let context_cloned = context.clone();
+        if let Some(period_sec) = config.api.periodic_function_stats_sec {
+            runtime.spawn(async move {
+                let mut interval =
+                    tokio::time::interval(tokio::time::Duration::from_secs(period_sec));
+                loop {
+                    interval.tick().await;
+                    let context_cloned = context_cloned.clone();
+                    tokio::task::spawn_blocking(move || {
+                        context_cloned.view_function_stats().log_and_clear();
+                        context_cloned.simulate_txn_stats().log_and_clear();
+                    })
+                    .await
+                    .unwrap_or(());
+                }
+            });
+        }
+    }
+
+    Ok(runtime)
+}
+
+/// Log warnings when runtime config enables a feature that is compiled out.
+fn log_feature_warnings(config: &NodeConfig) {
+    if !cfg!(feature = "api-v1") && config.api.enabled {
+        warn!(
+            "api.enabled is true but the 'api-v1' feature is not compiled in. \
+             The v1 API will not be available."
+        );
+    }
+    if !cfg!(feature = "api-v2") && config.api_v2.enabled {
+        warn!(
+            "api_v2.enabled is true but the 'api-v2' feature is not compiled in. \
+             The v2 API will not be available."
+        );
+    }
+    #[cfg(feature = "api-v2")]
+    {
+        if !cfg!(feature = "api-v2-websocket") && config.api_v2.websocket_enabled {
+            warn!(
+                "api_v2.websocket_enabled is true but the 'api-v2-websocket' feature is not compiled in. \
+                 WebSocket support will not be available."
+            );
+        }
+        if !cfg!(feature = "api-v2-sse") && config.api_v2.sse_enabled {
+            warn!(
+                "api_v2.sse_enabled is true but the 'api-v2-sse' feature is not compiled in. \
+                 SSE support will not be available."
+            );
+        }
+    }
+}
+
+/// Bootstrap the v2 API components common to both v1+v2 and v2-only modes.
+/// Returns the V2Context and optional TLS acceptor.
+#[cfg(feature = "api-v2")]
+fn bootstrap_v2_common(
+    runtime: &Runtime,
+    context: &Context,
+    config: &NodeConfig,
+) -> anyhow::Result<(V2Context, Option<tokio_rustls::TlsAcceptor>)> {
+    let v2_config = V2Config::from_configs(&config.api_v2, &config.api);
+    let v2_ctx = V2Context::new(context.clone(), v2_config);
+
+    // Start the block poller if WebSocket or SSE is enabled (both share the broadcaster).
+    // Only compiled in when at least one of the features is present.
+    #[cfg(any(feature = "api-v2-websocket", feature = "api-v2-sse"))]
+    {
+        let ws_enabled = cfg!(feature = "api-v2-websocket") && config.api_v2.websocket_enabled;
+        let sse_enabled = cfg!(feature = "api-v2-sse") && config.api_v2.sse_enabled;
+        if ws_enabled || sse_enabled {
             let poller_ctx = v2_ctx.clone();
             let ws_tx = v2_ctx.ws_broadcaster();
             runtime.spawn(async move {
                 crate::v2::websocket::broadcaster::run_block_poller(poller_ctx, ws_tx).await;
             });
-            info!("v2 API block poller started (ws={}, sse={})",
-                config.api_v2.websocket_enabled, config.api_v2.sse_enabled);
-        }
-
-        // Build optional TLS acceptor if configured.
-        let tls_acceptor = if config.api_v2.tls_enabled() {
-            let cert_path = config.api_v2.tls_cert_path.as_ref().unwrap();
-            let key_path = config.api_v2.tls_key_path.as_ref().unwrap();
-            Some(
-                crate::v2::tls::build_tls_acceptor(cert_path, key_path)
-                    .context("Failed to build v2 TLS acceptor")?,
-            )
-        } else {
-            None
-        };
-
-        // Listen for OS shutdown signals (SIGINT / Ctrl+C) and propagate to
-        // the V2Context so background tasks and the server can drain gracefully.
-        let ctx_for_signal = v2_ctx.clone();
-        runtime.spawn(async move {
-            let _ = tokio::signal::ctrl_c().await;
-            info!("[v2] Received shutdown signal, initiating graceful shutdown...");
-            ctx_for_signal.trigger_shutdown();
-        });
-
-        let drain_timeout_ms = v2_ctx.v2_config.graceful_shutdown_timeout_ms;
-
-        if let Some(v2_address) = config.api_v2.address {
-            // ---- Separate port mode ----
-            // Poem serves v1 on the main port; Axum serves v2 on a separate port.
-            attach_poem_to_runtime(runtime.handle(), context.clone(), config, false, port_tx)
-                .context("Failed to attach poem to runtime")?;
-
-            let v2_router = build_v2_router(v2_ctx.clone());
-            let shutdown_rx = v2_ctx.shutdown_receiver();
-            info!("Starting v2 API on separate port {}", v2_address);
-            runtime.spawn(async move {
-                let listener = tokio::net::TcpListener::bind(v2_address)
-                    .await
-                    .expect("Failed to bind v2 API listener");
-                if let Some(tls_acceptor) = tls_acceptor {
-                    crate::v2::tls::serve_tls(
-                        listener,
-                        tls_acceptor,
-                        v2_router,
-                        None,
-                        shutdown_rx,
-                        drain_timeout_ms,
-                    )
-                    .await;
-                } else {
-                    serve_with_graceful_shutdown(
-                        listener,
-                        v2_router,
-                        shutdown_rx,
-                        drain_timeout_ms,
-                    )
-                    .await;
-                }
-            });
-        } else {
-            // ---- Same-port co-hosting mode ----
-            // Start Poem on an internal-only random port, then serve a combined
-            // Axum router on the external port that handles v2 routes directly
-            // and reverse-proxies everything else to the internal Poem server.
-            let poem_address = attach_poem_to_runtime(
-                runtime.handle(),
-                context.clone(),
-                config,
-                true, // random_port = true (internal only)
-                None, // port_tx not forwarded; we'll send it from the combined server
-            )
-            .context("Failed to attach internal poem to runtime")?;
-
             info!(
-                "v2 API co-hosting: Poem v1 internal on {}, combined server on {}",
-                poem_address, config.api.address
+                "v2 API block poller started (ws={}, sse={})",
+                ws_enabled, sse_enabled
             );
-
-            let combined = build_combined_router(v2_ctx.clone(), poem_address);
-            let shutdown_rx = v2_ctx.shutdown_receiver();
-            let external_addr = config.api.address;
-
-            runtime.spawn(async move {
-                let listener = tokio::net::TcpListener::bind(external_addr)
-                    .await
-                    .expect("Failed to bind combined API listener");
-                if let Some(tls_acceptor) = tls_acceptor {
-                    crate::v2::tls::serve_tls(
-                        listener,
-                        tls_acceptor,
-                        combined,
-                        port_tx,
-                        shutdown_rx,
-                        drain_timeout_ms,
-                    )
-                    .await;
-                } else {
-                    // Plain mode: send port, then serve with graceful shutdown.
-                    if let Some(port_tx) = port_tx {
-                        let _ = port_tx.send(listener.local_addr().unwrap().port());
-                    }
-                    serve_with_graceful_shutdown(listener, combined, shutdown_rx, drain_timeout_ms)
-                        .await;
-                }
-            });
         }
+    }
+
+    // Build optional TLS acceptor if configured.
+    let tls_acceptor = if config.api_v2.tls_enabled() {
+        let cert_path = config.api_v2.tls_cert_path.as_ref().unwrap();
+        let key_path = config.api_v2.tls_key_path.as_ref().unwrap();
+        Some(
+            crate::v2::tls::build_tls_acceptor(cert_path, key_path)
+                .context("Failed to build v2 TLS acceptor")?,
+        )
     } else {
-        // ---- v2 disabled ----
-        // Just run Poem v1 on the main port (unchanged from existing behavior).
-        attach_poem_to_runtime(runtime.handle(), context.clone(), config, false, port_tx)
+        None
+    };
+
+    // Listen for OS shutdown signals (SIGINT / Ctrl+C) and propagate to
+    // the V2Context so background tasks and the server can drain gracefully.
+    let ctx_for_signal = v2_ctx.clone();
+    runtime.spawn(async move {
+        let _ = tokio::signal::ctrl_c().await;
+        info!("[v2] Received shutdown signal, initiating graceful shutdown...");
+        ctx_for_signal.trigger_shutdown();
+    });
+
+    Ok((v2_ctx, tls_acceptor))
+}
+
+/// Bootstrap both v1 (Poem) and v2 (Axum) together.
+#[cfg(all(feature = "api-v1", feature = "api-v2"))]
+fn bootstrap_v1_and_v2(
+    runtime: &Runtime,
+    context: Context,
+    config: &NodeConfig,
+    port_tx: Option<oneshot::Sender<u16>>,
+) -> anyhow::Result<()> {
+    let (v2_ctx, tls_acceptor) = bootstrap_v2_common(runtime, &context, config)?;
+    let drain_timeout_ms = v2_ctx.v2_config.graceful_shutdown_timeout_ms;
+
+    if let Some(v2_address) = config.api_v2.address {
+        // ---- Separate port mode ----
+        // Poem serves v1 on the main port; Axum serves v2 on a separate port.
+        attach_poem_to_runtime(runtime.handle(), context, config, false, port_tx)
             .context("Failed to attach poem to runtime")?;
-    }
 
-    let context_cloned = context.clone();
-    if let Some(period_ms) = config.api.periodic_gas_estimation_ms {
+        let v2_router = build_v2_router(v2_ctx.clone());
+        let shutdown_rx = v2_ctx.shutdown_receiver();
+        info!("Starting v2 API on separate port {}", v2_address);
         runtime.spawn(async move {
-            let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(period_ms));
-            loop {
-                interval.tick().await;
-                let context_cloned = context_cloned.clone();
-                tokio::task::spawn_blocking(move || {
-                    if let Ok(latest_ledger_info) =
-                        context_cloned.get_latest_ledger_info::<crate::response::BasicError>()
-                    {
-                        if let Ok(gas_estimation) = context_cloned
-                            .estimate_gas_price::<crate::response::BasicError>(&latest_ledger_info)
-                        {
-                            TransactionsApi::log_gas_estimation(&gas_estimation);
-                        }
-                    }
-                })
+            let listener = tokio::net::TcpListener::bind(v2_address)
                 .await
-                .unwrap_or(());
+                .expect("Failed to bind v2 API listener");
+            if let Some(tls_acceptor) = tls_acceptor {
+                crate::v2::tls::serve_tls(
+                    listener,
+                    tls_acceptor,
+                    v2_router,
+                    None,
+                    shutdown_rx,
+                    drain_timeout_ms,
+                )
+                .await;
+            } else {
+                serve_with_graceful_shutdown(listener, v2_router, shutdown_rx, drain_timeout_ms)
+                    .await;
+            }
+        });
+    } else {
+        // ---- Same-port co-hosting mode ----
+        // Start Poem on an internal-only random port, then serve a combined
+        // Axum router on the external port that handles v2 routes directly
+        // and reverse-proxies everything else to the internal Poem server.
+        let poem_address = attach_poem_to_runtime(
+            runtime.handle(),
+            context,
+            config,
+            true, // random_port = true (internal only)
+            None, // port_tx not forwarded; we'll send it from the combined server
+        )
+        .context("Failed to attach internal poem to runtime")?;
+
+        info!(
+            "v2 API co-hosting: Poem v1 internal on {}, combined server on {}",
+            poem_address, config.api.address
+        );
+
+        let combined = build_combined_router(v2_ctx.clone(), poem_address);
+        let shutdown_rx = v2_ctx.shutdown_receiver();
+        let external_addr = config.api.address;
+
+        runtime.spawn(async move {
+            let listener = tokio::net::TcpListener::bind(external_addr)
+                .await
+                .expect("Failed to bind combined API listener");
+            if let Some(tls_acceptor) = tls_acceptor {
+                crate::v2::tls::serve_tls(
+                    listener,
+                    tls_acceptor,
+                    combined,
+                    port_tx,
+                    shutdown_rx,
+                    drain_timeout_ms,
+                )
+                .await;
+            } else {
+                // Plain mode: send port, then serve with graceful shutdown.
+                if let Some(port_tx) = port_tx {
+                    let _ = port_tx.send(listener.local_addr().unwrap().port());
+                }
+                serve_with_graceful_shutdown(listener, combined, shutdown_rx, drain_timeout_ms)
+                    .await;
             }
         });
     }
 
-    let context_cloned = context.clone();
-    if let Some(period_sec) = config.api.periodic_function_stats_sec {
-        runtime.spawn(async move {
-            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(period_sec));
-            loop {
-                interval.tick().await;
-                let context_cloned = context_cloned.clone();
-                tokio::task::spawn_blocking(move || {
-                    context_cloned.view_function_stats().log_and_clear();
-                    context_cloned.simulate_txn_stats().log_and_clear();
-                })
-                .await
-                .unwrap_or(());
-            }
-        });
-    }
+    Ok(())
+}
 
-    Ok(runtime)
+/// Bootstrap v2 API standalone (no Poem v1, no proxy).
+///
+/// Axum v2 serves directly on the configured address. Requests to `/v1/*`
+/// will return 404 since there is no proxy fallback.
+#[cfg(feature = "api-v2")]
+fn bootstrap_v2_only(
+    runtime: &Runtime,
+    context: Context,
+    config: &NodeConfig,
+    port_tx: Option<oneshot::Sender<u16>>,
+) -> anyhow::Result<()> {
+    let (v2_ctx, tls_acceptor) = bootstrap_v2_common(runtime, &context, config)?;
+    let drain_timeout_ms = v2_ctx.v2_config.graceful_shutdown_timeout_ms;
+
+    // Use v2-specific address if configured, otherwise fall back to the main api address.
+    let listen_addr = config.api_v2.address.unwrap_or(config.api.address);
+    let v2_router = build_v2_router(v2_ctx.clone());
+    let shutdown_rx = v2_ctx.shutdown_receiver();
+
+    info!("Starting v2-only API (no v1) on {}", listen_addr);
+
+    runtime.spawn(async move {
+        let listener = tokio::net::TcpListener::bind(listen_addr)
+            .await
+            .expect("Failed to bind v2-only API listener");
+        if let Some(port_tx) = port_tx {
+            let _ = port_tx.send(listener.local_addr().unwrap().port());
+        }
+        if let Some(tls_acceptor) = tls_acceptor {
+            crate::v2::tls::serve_tls(
+                listener,
+                tls_acceptor,
+                v2_router,
+                None,
+                shutdown_rx,
+                drain_timeout_ms,
+            )
+            .await;
+        } else {
+            serve_with_graceful_shutdown(listener, v2_router, shutdown_rx, drain_timeout_ms).await;
+        }
+    });
+
+    Ok(())
 }
 
 // TODOs regarding spec generation:
@@ -232,6 +398,7 @@ pub fn bootstrap(
 // TODO: https://github.com/poem-web/poem/issues/333
 
 /// Generate the top level API service
+#[cfg(feature = "api-v1")]
 pub fn get_api_service(
     context: Arc<Context>,
 ) -> OpenApiService<
@@ -289,6 +456,7 @@ pub fn get_api_service(
 }
 
 /// Returns address it is running at.
+#[cfg(feature = "api-v1")]
 pub fn attach_poem_to_runtime(
     runtime_handle: &Handle,
     context: Context,
@@ -394,6 +562,7 @@ pub fn attach_poem_to_runtime(
     Ok(actual_address)
 }
 
+#[cfg(feature = "api-v1")]
 #[handler]
 async fn root_handler() -> Html<&'static str> {
     let response = "<html>
@@ -412,6 +581,7 @@ async fn root_handler() -> Html<&'static str> {
     Html(response)
 }
 
+#[cfg(feature = "api-v2")]
 /// Serve an Axum router with graceful shutdown support.
 ///
 /// When the `shutdown_rx` watch channel receives `true`, the server stops

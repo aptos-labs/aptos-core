@@ -7,8 +7,9 @@
 use super::{
     cursor::Cursor,
     error::{ErrorCode, V2Error},
-    websocket::{broadcaster, types::WsEvent},
 };
+#[cfg(any(feature = "api-v2-websocket", feature = "api-v2-sse"))]
+use super::websocket::{broadcaster, types::WsEvent};
 use crate::context::Context;
 use aptos_api_types::LedgerInfo;
 use aptos_config::config::ApiV2Config;
@@ -18,9 +19,13 @@ use aptos_types::{
     transaction::Version,
 };
 use move_core_types::language_storage::{ModuleId, StructTag};
-use std::sync::{atomic::AtomicUsize, Arc};
+#[cfg(any(feature = "api-v2-websocket", feature = "api-v2-sse"))]
+use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
 use std::time::Instant;
-use tokio::sync::{broadcast, watch, RwLock};
+#[cfg(any(feature = "api-v2-websocket", feature = "api-v2-sse"))]
+use tokio::sync::broadcast;
+use tokio::sync::{watch, RwLock};
 
 /// Default TTL for cached ledger info (in milliseconds).
 /// Ledger info changes every block (~250ms on mainnet), so 50ms TTL
@@ -43,10 +48,12 @@ pub struct V2Context {
     inner: Arc<Context>,
     /// v2-specific configuration.
     pub v2_config: Arc<V2Config>,
-    /// WebSocket broadcast channel sender. All connected WS clients subscribe
+    /// WebSocket/SSE broadcast channel sender. All connected WS/SSE clients subscribe
     /// to this channel to receive block/event notifications.
+    #[cfg(any(feature = "api-v2-websocket", feature = "api-v2-sse"))]
     ws_broadcaster: broadcast::Sender<WsEvent>,
     /// Count of active WebSocket connections (for connection limiting).
+    #[cfg(any(feature = "api-v2-websocket", feature = "api-v2-sse"))]
     ws_active_connections: Arc<AtomicUsize>,
     /// TTL-cached ledger info. Under high QPS, many concurrent requests
     /// within the same ~50ms window share a single DB read.
@@ -109,12 +116,15 @@ impl V2Config {
 
 impl V2Context {
     pub fn new(inner: Context, v2_config: V2Config) -> Self {
+        #[cfg(any(feature = "api-v2-websocket", feature = "api-v2-sse"))]
         let (ws_broadcaster, _) = broadcaster::create_broadcast_channel();
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
         Self {
             inner: Arc::new(inner),
             v2_config: Arc::new(v2_config),
+            #[cfg(any(feature = "api-v2-websocket", feature = "api-v2-sse"))]
             ws_broadcaster,
+            #[cfg(any(feature = "api-v2-websocket", feature = "api-v2-sse"))]
             ws_active_connections: Arc::new(AtomicUsize::new(0)),
             ledger_info_cache: Arc::new(RwLock::new(None)),
             shutdown_tx: Arc::new(shutdown_tx),
@@ -127,17 +137,20 @@ impl V2Context {
         &self.inner
     }
 
-    /// Get a new broadcast receiver for WebSocket events.
+    /// Get a new broadcast receiver for WebSocket/SSE events.
+    #[cfg(any(feature = "api-v2-websocket", feature = "api-v2-sse"))]
     pub fn ws_subscribe(&self) -> broadcast::Receiver<WsEvent> {
         self.ws_broadcaster.subscribe()
     }
 
     /// Get a clone of the broadcast sender (for the block poller).
+    #[cfg(any(feature = "api-v2-websocket", feature = "api-v2-sse"))]
     pub fn ws_broadcaster(&self) -> broadcast::Sender<WsEvent> {
         self.ws_broadcaster.clone()
     }
 
     /// Get the active WebSocket connection counter.
+    #[cfg(any(feature = "api-v2-websocket", feature = "api-v2-sse"))]
     pub fn ws_active_connections(&self) -> &AtomicUsize {
         &self.ws_active_connections
     }
