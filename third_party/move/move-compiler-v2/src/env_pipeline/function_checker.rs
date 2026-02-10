@@ -685,7 +685,7 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
 
                 // Check for unused constants (all constants are module-private)
                 for const_env in caller_module.get_named_constants() {
-                    if const_env.get_using_functions().is_empty() {
+                    if const_env.get_users().is_empty() {
                         let msg = format!(
                             "Constant `{}` is unused.",
                             const_env.get_name().display(env.symbol_pool()),
