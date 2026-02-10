@@ -1908,6 +1908,82 @@ impl ExpData {
         });
     }
 
+    /// Collect all types used in the expression, including from patterns and type instantiations
+    pub fn collect_all_types(&self, env: &GlobalEnv, types: &mut BTreeSet<Type>) {
+        // Visit all expression nodes
+        self.visit_post_order(&mut |e| {
+            let node_id = e.node_id();
+
+            // Collect the node's type
+            let ty = env.get_node_type(node_id);
+            ty.visit(&mut |t| {
+                types.insert(t.clone());
+            });
+
+            // Collect type instantiations (generic type arguments)
+            if let Some(inst) = env.get_node_instantiation_opt(node_id) {
+                for ty in inst {
+                    ty.visit(&mut |t| {
+                        types.insert(t.clone());
+                    });
+                }
+            }
+
+            // Collect from patterns
+            match e {
+                ExpData::Assign(_, pat, _) | ExpData::Block(_, pat, _, _) => {
+                    Self::collect_pattern_types(pat, env, types);
+                },
+                ExpData::Lambda(_, pat, _, _, _) => {
+                    Self::collect_pattern_types(pat, env, types);
+                },
+                ExpData::Quant(_, _, pattern_tuple, _, _, _) => {
+                    for (pat, _) in pattern_tuple {
+                        Self::collect_pattern_types(pat, env, types);
+                    }
+                },
+                ExpData::Match(_, _, arms) => {
+                    for arm in arms.iter() {
+                        Self::collect_pattern_types(&arm.pattern, env, types);
+                    }
+                },
+                _ => {},
+            }
+
+            true // keep going
+        });
+    }
+
+    fn collect_pattern_types(pat: &Pattern, env: &GlobalEnv, types: &mut BTreeSet<Type>) {
+        let node_id = pat.node_id();
+        let ty = env.get_node_type(node_id);
+        ty.visit(&mut |t| {
+            types.insert(t.clone());
+        });
+
+        // Recursively visit nested patterns
+        match pat {
+            Pattern::Struct(_, qid, _, pats) => {
+                // Collect types from the struct type instantiation
+                for ty in &qid.inst {
+                    ty.visit(&mut |t| {
+                        types.insert(t.clone());
+                    });
+                }
+                // Recursively collect from nested patterns
+                for p in pats {
+                    Self::collect_pattern_types(p, env, types);
+                }
+            },
+            Pattern::Tuple(_, pats) => {
+                for p in pats {
+                    Self::collect_pattern_types(p, env, types);
+                }
+            },
+            _ => {},
+        }
+    }
+
     /// Collect field-related operations
     pub fn field_usage(&self, usage: &mut BTreeSet<(QualifiedId<StructId>, FieldId)>) {
         self.visit_post_order(&mut |e| {

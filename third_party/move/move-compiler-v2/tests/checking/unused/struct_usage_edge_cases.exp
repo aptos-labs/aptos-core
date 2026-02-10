@@ -8,14 +8,6 @@ warning: Struct `0x42::m::UsedOnlyInSpec` is unused: it has no current users and
 5 │ │     }
   │ ╰─────^
 
-warning: Struct `0x42::m::UsedInLambda` is unused: it has no current users and is private to its module.
-   ┌─ tests/checking/unused/struct_usage_edge_cases.move:27:5
-   │
-27 │ ╭     struct UsedInLambda has drop {
-28 │ │         b: u64
-29 │ │     }
-   │ ╰─────^
-
 warning: Struct `0x42::m::ActuallyUnused` is unused: it has no current users and is private to its module.
    ┌─ tests/checking/unused/struct_usage_edge_cases.move:37:5
    │

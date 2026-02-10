@@ -1532,22 +1532,26 @@ impl ModuleBuilder<'_, '_> {
             et.check_lambda_types(&translated);
 
             // Track struct usage for unused struct detection
-            let mut used_structs = BTreeSet::new();
-            // Collect structs from function body
-            translated.struct_usage(self.parent.env, &mut used_structs);
-            // Collect structs from function signature (parameters and return type)
+            let mut all_types = BTreeSet::new();
+            // Collect all types from function body (includes all types in expressions and patterns)
+            translated.collect_all_types(self.parent.env, &mut all_types);
+            // Collect types from function signature (parameters and return type)
             for Parameter(_, ty, _) in &params {
                 ty.visit(&mut |t| {
-                    if let Type::Struct(mid, sid, _) = t {
-                        used_structs.insert(mid.qualified(*sid));
-                    }
+                    all_types.insert(t.clone());
                 });
             }
             result_type.visit(&mut |t| {
-                if let Type::Struct(mid, sid, _) = t {
-                    used_structs.insert(mid.qualified(*sid));
-                }
+                all_types.insert(t.clone());
             });
+
+            // Extract struct types from all collected types
+            let mut used_structs = BTreeSet::new();
+            for ty in all_types {
+                if let Type::Struct(mid, sid, _) = ty {
+                    used_structs.insert(mid.qualified(sid));
+                }
+            }
             let fun_qid = QualifiedId {
                 module_id: self.module_id,
                 id: FunId::new(full_name.symbol),
