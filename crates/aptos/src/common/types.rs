@@ -1282,9 +1282,7 @@ pub struct MovePackageOptions {
     #[clap(long)]
     pub fail_on_warning: bool,
 
-    /// Warning flags in the style of `--W<name>`.
-    /// Multiple flags can be specified, e.g., `--Wunused --Wshadowing`.
-    /// Use `--Wall` to enable all warnings.
+    /// Warning flags (e.g., `unused`, `shadowing`). Use `all` to enable all warnings.
     #[clap(long = "W", number_of_values = 1)]
     pub warnings: Vec<String>,
 }
