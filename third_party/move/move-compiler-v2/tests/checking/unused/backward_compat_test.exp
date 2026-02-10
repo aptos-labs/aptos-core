@@ -1,9 +1,0 @@
-
-Diagnostics:
-error: structs/enums with key ability cannot have public, package or friend visibility
-  ┌─ tests/checking/unused/backward_compat_test.move:5:5
-  │
-5 │ ╭     public struct Resource has key {
-6 │ │         value: u64
-7 │ │     }
-  │ ╰─────^
