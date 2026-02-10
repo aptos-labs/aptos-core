@@ -70,10 +70,10 @@ spec aptos_framework::coin {
     }
 
     spec fun spec_fun_supply_tracked<CoinType>(val: u64, supply: Option<OptionalAggregator>): bool {
-        option::is_some(supply) ==>
+        supply.is_some() ==>
             val
                 == optional_aggregator::optional_aggregator_value(
-                    option::borrow(supply)
+                    supply.borrow()
                 )
     }
 
@@ -95,11 +95,11 @@ spec aptos_framework::coin {
     spec fun spec_fun_supply_no_change<CoinType>(
         old_supply: Option<OptionalAggregator>, supply: Option<OptionalAggregator>
     ): bool {
-        option::is_some(old_supply) ==>
+        old_supply.is_some() ==>
             optional_aggregator::optional_aggregator_value(
-                option::borrow(old_supply)
+                old_supply.borrow()
             ) == optional_aggregator::optional_aggregator_value(
-                option::borrow(supply)
+                supply.borrow()
             )
     }
 
@@ -237,13 +237,13 @@ spec aptos_framework::coin {
         /// [high-level-req-7.5]
         aborts_if !exists<CoinInfo<CoinType>>(coin_addr);
         let maybe_supply = global<CoinInfo<CoinType>>(coin_addr).supply;
-        let supply = option::borrow(maybe_supply);
+        let supply = maybe_supply.borrow();
         let value = optional_aggregator::optional_aggregator_value(supply);
 
-        ensures if (option::is_some(maybe_supply)) {
+        ensures if (maybe_supply.is_some()) {
             result == option::spec_some(value)
         } else {
-            option::is_none(result)
+            result.is_none()
         };
     }
 
@@ -283,21 +283,21 @@ spec aptos_framework::coin {
         aborts_if coin_store.coin.value < amount;
 
         let maybe_supply = global<CoinInfo<CoinType>>(addr).supply;
-        let supply_aggr = option::borrow(maybe_supply);
+        let supply_aggr = maybe_supply.borrow();
         let value = optional_aggregator::optional_aggregator_value(supply_aggr);
 
         let post post_maybe_supply = global<CoinInfo<CoinType>>(addr).supply;
-        let post post_supply = option::borrow(post_maybe_supply);
+        let post post_supply = post_maybe_supply.borrow();
         let post post_value = optional_aggregator::optional_aggregator_value(post_supply);
 
-        aborts_if option::is_some(maybe_supply) && value < amount;
+        aborts_if maybe_supply.is_some() && value < amount;
 
         ensures post_coin_store.coin.value == coin_store.coin.value - amount;
         /// [managed_coin::high-level-req-5]
-        ensures if (option::is_some(maybe_supply)) {
+        ensures if (maybe_supply.is_some()) {
             post_value == value - amount
         } else {
-            option::is_none(post_maybe_supply)
+            post_maybe_supply.is_none()
         };
         ensures supply<CoinType> == old(supply<CoinType>) - amount;
     }
@@ -402,8 +402,8 @@ spec aptos_framework::coin {
         aborts_if type_info::type_of<CoinType>().account_address != account_addr;
         /// [high-level-req-2]
         aborts_if exists<CoinInfo<CoinType>>(account_addr);
-        aborts_if string::length(name) > MAX_COIN_NAME_LENGTH;
-        aborts_if string::length(symbol) > MAX_COIN_SYMBOL_LENGTH;
+        aborts_if name.length() > MAX_COIN_NAME_LENGTH;
+        aborts_if symbol.length() > MAX_COIN_SYMBOL_LENGTH;
     }
 
     // `account` must be `@aptos_framework`.
@@ -454,7 +454,7 @@ spec aptos_framework::coin {
         };
         let account_addr = signer::address_of(account);
         let post coin_info = global<CoinInfo<CoinType>>(account_addr);
-        let post supply = option::borrow(coin_info.supply);
+        let post supply = coin_info.supply.borrow();
         let post value = optional_aggregator::optional_aggregator_value(supply);
         let post limit = optional_aggregator::optional_aggregator_limit(supply);
         modifies global<CoinInfo<CoinType>>(account_addr);
@@ -470,7 +470,7 @@ spec aptos_framework::coin {
                 && limit == MAX_U128
                 && (parallelizable == optional_aggregator::is_parallelizable(supply))
         } else {
-            option::is_none(coin_info.supply)
+            coin_info.supply.is_none()
         };
         ensures result_1 == BurnCapability<CoinType> {};
         ensures result_2 == FreezeCapability<CoinType> {};

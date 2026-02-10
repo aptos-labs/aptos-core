@@ -331,8 +331,8 @@ if such module isn't accessed previously in the transaction.
 
 
 
-<pre><code><b>aborts_if</b> !<a href="function_info.md#0x1_function_info_spec_is_identifier">spec_is_identifier</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(module_name));
-<b>aborts_if</b> !<a href="function_info.md#0x1_function_info_spec_is_identifier">spec_is_identifier</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(function_name));
+<pre><code><b>aborts_if</b> !<a href="function_info.md#0x1_function_info_spec_is_identifier">spec_is_identifier</a>(module_name.bytes());
+<b>aborts_if</b> !<a href="function_info.md#0x1_function_info_spec_is_identifier">spec_is_identifier</a>(function_name.bytes());
 <b>ensures</b> result == <a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a> {
     module_address: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(module_signer),
     module_name,
@@ -353,8 +353,8 @@ if such module isn't accessed previously in the transaction.
 
 
 
-<pre><code><b>aborts_if</b> !<a href="function_info.md#0x1_function_info_spec_is_identifier">spec_is_identifier</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(module_name));
-<b>aborts_if</b> !<a href="function_info.md#0x1_function_info_spec_is_identifier">spec_is_identifier</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(function_name));
+<pre><code><b>aborts_if</b> !<a href="function_info.md#0x1_function_info_spec_is_identifier">spec_is_identifier</a>(module_name.bytes());
+<b>aborts_if</b> !<a href="function_info.md#0x1_function_info_spec_is_identifier">spec_is_identifier</a>(function_name.bytes());
 <b>ensures</b> result == <a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a> {
     module_address,
     module_name,

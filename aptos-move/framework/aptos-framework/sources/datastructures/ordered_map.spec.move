@@ -166,10 +166,10 @@ spec aptos_std::ordered_map {
     spec upsert {
         pragma opaque;
         pragma verify = false;
-        ensures [abstract] !spec_contains_key(old(self), key) ==> option::is_none(result);
+        ensures [abstract] !spec_contains_key(old(self), key) ==> result.is_none();
         ensures [abstract] spec_contains_key(self, key);
         ensures [abstract] spec_get(self, key) == value;
-        ensures [abstract] spec_contains_key(old(self), key) ==> ((option::is_some(result)) && (option::borrow(result) == spec_get(old(
+        ensures [abstract] spec_contains_key(old(self), key) ==> ((result.is_some()) && (result.borrow() == spec_get(old(
             self), key)));
         ensures [abstract] !spec_contains_key(old(self), key) ==> spec_len(old(self)) + 1 == spec_len(self);
         ensures [abstract] spec_contains_key(old(self), key) ==> spec_len(old(self)) == spec_len(self);
@@ -247,11 +247,11 @@ spec aptos_std::ordered_map {
         (forall k: K {spec_contains_key(self, k)} where spec_contains_key(self, k)
         && k != key: std::cmp::compare(key, k) == std::cmp::Ordering::Less);
         ensures [abstract] result.is_some() <==>
-            spec_contains_key(self, option::borrow(result)) &&
-            (std::cmp::compare(option::borrow(result), key) == std::cmp::Ordering::Less)
-            && (forall k: K {spec_contains_key(self, k), std::cmp::compare(option::borrow(result), k), std::cmp::compare(key, k)} where k != option::borrow(result): ((spec_contains_key(self, k) &&
+            spec_contains_key(self, result.borrow()) &&
+            (std::cmp::compare(result.borrow(), key) == std::cmp::Ordering::Less)
+            && (forall k: K {spec_contains_key(self, k), std::cmp::compare(option::borrow(result), k), std::cmp::compare(key, k)} where k != result.borrow(): ((spec_contains_key(self, k) &&
             std::cmp::compare(k, key) == std::cmp::Ordering::Less)) ==>
-            std::cmp::compare(option::borrow(result), k) == std::cmp::Ordering::Greater);
+            std::cmp::compare(result.borrow(), k) == std::cmp::Ordering::Greater);
     }
 
 
@@ -262,11 +262,11 @@ spec aptos_std::ordered_map {
         (forall k: K {spec_contains_key(self, k)} where spec_contains_key(self, k) && k != key:
         std::cmp::compare(key, k) == std::cmp::Ordering::Greater);
         ensures [abstract] result.is_some() <==>
-            spec_contains_key(self, option::borrow(result)) &&
-            (std::cmp::compare(option::borrow(result), key) == std::cmp::Ordering::Greater)
-            && (forall k: K {spec_contains_key(self, k)} where k != option::borrow(result): ((spec_contains_key(self, k) &&
+            spec_contains_key(self, result.borrow()) &&
+            (std::cmp::compare(result.borrow(), key) == std::cmp::Ordering::Greater)
+            && (forall k: K {spec_contains_key(self, k)} where k != result.borrow(): ((spec_contains_key(self, k) &&
             std::cmp::compare(k, key) == std::cmp::Ordering::Greater)) ==>
-            std::cmp::compare(option::borrow(result), k) == std::cmp::Ordering::Less);
+            std::cmp::compare(result.borrow(), k) == std::cmp::Ordering::Less);
     }
 
 

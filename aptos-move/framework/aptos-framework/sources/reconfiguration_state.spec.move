@@ -27,22 +27,22 @@ spec aptos_framework::reconfiguration_state {
         if (!exists<State>(@aptos_framework)) {
             false
         } else {
-            copyable_any::type_name(global<State>(@aptos_framework).variant).bytes == b"0x1::reconfiguration_state::StateActive"
+            global<State>(@aptos_framework).variant.type_name().bytes == b"0x1::reconfiguration_state::StateActive"
         }
     }
 
     spec State {
         use aptos_std::from_bcs;
         use aptos_std::type_info;
-        invariant copyable_any::type_name(variant).bytes == b"0x1::reconfiguration_state::StateActive" ||
-            copyable_any::type_name(variant).bytes == b"0x1::reconfiguration_state::StateInactive";
-        invariant copyable_any::type_name(variant).bytes == b"0x1::reconfiguration_state::StateActive"
+        invariant variant.type_name().bytes == b"0x1::reconfiguration_state::StateActive" ||
+            variant.type_name().bytes == b"0x1::reconfiguration_state::StateInactive";
+        invariant variant.type_name().bytes == b"0x1::reconfiguration_state::StateActive"
             ==> from_bcs::deserializable<StateActive>(variant.data);
-        invariant copyable_any::type_name(variant).bytes == b"0x1::reconfiguration_state::StateInactive"
+        invariant variant.type_name().bytes == b"0x1::reconfiguration_state::StateInactive"
             ==> from_bcs::deserializable<StateInactive>(variant.data);
-        invariant copyable_any::type_name(variant).bytes == b"0x1::reconfiguration_state::StateActive" ==>
+        invariant variant.type_name().bytes == b"0x1::reconfiguration_state::StateActive" ==>
             type_info::type_name<StateActive>() == variant.type_name;
-        invariant copyable_any::type_name(variant).bytes == b"0x1::reconfiguration_state::StateInactive" ==>
+        invariant variant.type_name().bytes == b"0x1::reconfiguration_state::StateInactive" ==>
             type_info::type_name<StateInactive>() == variant.type_name;
     }
 
@@ -60,12 +60,12 @@ spec aptos_framework::reconfiguration_state {
         };
         let pre_state = global<State>(@aptos_framework);
         let post post_state = global<State>(@aptos_framework);
-        ensures (exists<State>(@aptos_framework) && copyable_any::type_name(pre_state.variant).bytes
-            == b"0x1::reconfiguration_state::StateInactive") ==> copyable_any::type_name(post_state.variant).bytes
+        ensures (exists<State>(@aptos_framework) && pre_state.variant.type_name().bytes
+            == b"0x1::reconfiguration_state::StateInactive") ==> post_state.variant.type_name().bytes
             == b"0x1::reconfiguration_state::StateActive";
-        ensures (exists<State>(@aptos_framework) && copyable_any::type_name(pre_state.variant).bytes
+        ensures (exists<State>(@aptos_framework) && pre_state.variant.type_name().bytes
             == b"0x1::reconfiguration_state::StateInactive") ==> post_state.variant == state;
-        ensures (exists<State>(@aptos_framework) && copyable_any::type_name(pre_state.variant).bytes
+        ensures (exists<State>(@aptos_framework) && pre_state.variant.type_name().bytes
             == b"0x1::reconfiguration_state::StateInactive") ==> from_bcs::deserializable<StateActive>(post_state.variant.data);
     }
 
@@ -81,7 +81,7 @@ spec aptos_framework::reconfiguration_state {
 
     spec schema StartTimeSecsRequirement {
         requires exists<State>(@aptos_framework);
-        requires copyable_any::type_name(global<State>(@aptos_framework).variant).bytes
+        requires global<State>(@aptos_framework).variant.type_name().bytes
             == b"0x1::reconfiguration_state::StateActive";
         include UnpackRequiresStateActive {
             x:  global<State>(@aptos_framework).variant
@@ -102,7 +102,7 @@ spec aptos_framework::reconfiguration_state {
         copyable_any::UnpackAbortsIf<StateActive> {
             self: global<State>(@aptos_framework).variant
         };
-        aborts_if copyable_any::type_name(global<State>(@aptos_framework).variant).bytes
+        aborts_if global<State>(@aptos_framework).variant.type_name().bytes
             != b"0x1::reconfiguration_state::StateActive";
     }
 

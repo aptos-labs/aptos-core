@@ -2646,10 +2646,10 @@ Address @aptos_framework must exist GovernanceEvents.
     <b>let</b> addr = aptos_std::type_info::type_of&lt;AptosCoin&gt;().account_address;
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">coin::CoinInfo</a>&lt;AptosCoin&gt;&gt;(addr);
     <b>let</b> maybe_supply = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">coin::CoinInfo</a>&lt;AptosCoin&gt;&gt;(addr).supply;
-    <b>let</b> supply = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(maybe_supply);
+    <b>let</b> supply = maybe_supply.borrow();
     <b>let</b> total_supply = aptos_framework::optional_aggregator::optional_aggregator_value(supply);
     <b>let</b> early_resolution_vote_threshold_value = total_supply / 2 + 1;
-    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(maybe_supply) && governance_config.min_voting_threshold &gt; early_resolution_vote_threshold_value;
+    <b>aborts_if</b> maybe_supply.is_some() && governance_config.min_voting_threshold &gt; early_resolution_vote_threshold_value;
     <b>aborts_if</b> len(execution_hash) == 0;
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="voting.md#0x1_voting_VotingForum">voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@aptos_framework);
     <b>let</b> voting_forum = <b>global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@aptos_framework);
@@ -2846,37 +2846,37 @@ Address @aptos_framework must exist VotingRecordsV2 if partial_governance_voting
     <b>ensures</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(post_proposal.metadata, key) == std::bcs::to_bytes(<a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>());
     <b>aborts_if</b> used_voting_power + real_voting_power &gt; <a href="aptos_governance.md#0x1_aptos_governance_MAX_U64">MAX_U64</a>;
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceEvents">GovernanceEvents</a>&gt;(@aptos_framework);
-    <b>let</b> early_resolution_threshold = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(proposal.early_resolution_vote_threshold);
+    <b>let</b> early_resolution_threshold = proposal.early_resolution_vote_threshold.borrow();
     <b>let</b> is_voting_period_over = <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>() &gt; proposal_expiration;
     <b>let</b> new_proposal_yes_votes_0 = proposal.yes_votes + real_voting_power;
-    <b>let</b> can_be_resolved_early_0 = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(proposal.early_resolution_vote_threshold) &&
+    <b>let</b> can_be_resolved_early_0 = proposal.early_resolution_vote_threshold.is_some() &&
                                 (new_proposal_yes_votes_0 &gt;= early_resolution_threshold ||
                                  proposal.no_votes &gt;= early_resolution_threshold);
     <b>let</b> is_voting_closed_0 = is_voting_period_over || can_be_resolved_early_0;
     <b>let</b> proposal_state_successed_0 = is_voting_closed_0 && new_proposal_yes_votes_0 &gt; proposal.no_votes &&
                                      new_proposal_yes_votes_0 + proposal.no_votes &gt;= proposal.min_vote_threshold;
     <b>let</b> new_proposal_no_votes_0 = proposal.no_votes + real_voting_power;
-    <b>let</b> can_be_resolved_early_1 = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(proposal.early_resolution_vote_threshold) &&
+    <b>let</b> can_be_resolved_early_1 = proposal.early_resolution_vote_threshold.is_some() &&
                                 (proposal.yes_votes &gt;= early_resolution_threshold ||
                                  new_proposal_no_votes_0 &gt;= early_resolution_threshold);
     <b>let</b> is_voting_closed_1 = is_voting_period_over || can_be_resolved_early_1;
     <b>let</b> proposal_state_successed_1 = is_voting_closed_1 && proposal.yes_votes &gt; new_proposal_no_votes_0 &&
                                      proposal.yes_votes + new_proposal_no_votes_0 &gt;= proposal.min_vote_threshold;
     <b>let</b> new_proposal_yes_votes_1 = proposal.yes_votes + real_voting_power;
-    <b>let</b> can_be_resolved_early_2 = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(proposal.early_resolution_vote_threshold) &&
+    <b>let</b> can_be_resolved_early_2 = proposal.early_resolution_vote_threshold.is_some() &&
                                 (new_proposal_yes_votes_1 &gt;= early_resolution_threshold ||
                                  proposal.no_votes &gt;= early_resolution_threshold);
     <b>let</b> is_voting_closed_2 = is_voting_period_over || can_be_resolved_early_2;
     <b>let</b> proposal_state_successed_2 = is_voting_closed_2 && new_proposal_yes_votes_1 &gt; proposal.no_votes &&
                                      new_proposal_yes_votes_1 + proposal.no_votes &gt;= proposal.min_vote_threshold;
     <b>let</b> new_proposal_no_votes_1 = proposal.no_votes + real_voting_power;
-    <b>let</b> can_be_resolved_early_3 = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(proposal.early_resolution_vote_threshold) &&
+    <b>let</b> can_be_resolved_early_3 = proposal.early_resolution_vote_threshold.is_some() &&
                                 (proposal.yes_votes &gt;= early_resolution_threshold ||
                                  new_proposal_no_votes_1 &gt;= early_resolution_threshold);
     <b>let</b> is_voting_closed_3 = is_voting_period_over || can_be_resolved_early_3;
     <b>let</b> proposal_state_successed_3 = is_voting_closed_3 && proposal.yes_votes &gt; new_proposal_no_votes_1 &&
                                      proposal.yes_votes + new_proposal_no_votes_1 &gt;= proposal.min_vote_threshold;
-    <b>let</b> <b>post</b> can_be_resolved_early = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(proposal.early_resolution_vote_threshold) &&
+    <b>let</b> <b>post</b> can_be_resolved_early = proposal.early_resolution_vote_threshold.is_some() &&
                                 (post_proposal.yes_votes &gt;= early_resolution_threshold ||
                                  post_proposal.no_votes &gt;= early_resolution_threshold);
     <b>let</b> <b>post</b> is_voting_closed = is_voting_period_over || can_be_resolved_early;
@@ -2933,12 +2933,12 @@ Address @aptos_framework must exist VotingRecordsV2 if partial_governance_voting
     <b>let</b> voting_forum = <b>global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@aptos_framework);
     <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
     <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(voting_forum.proposals, proposal_id);
-    <b>let</b> early_resolution_threshold = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(proposal.early_resolution_vote_threshold);
+    <b>let</b> early_resolution_threshold = proposal.early_resolution_vote_threshold.borrow();
     <b>aborts_if</b> <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &lt;= proposal.expiration_secs &&
-        (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(proposal.early_resolution_vote_threshold) ||
+        (proposal.early_resolution_vote_threshold.is_none() ||
         proposal.yes_votes &lt; early_resolution_threshold && proposal.no_votes &lt; early_resolution_threshold);
     <b>aborts_if</b> (<a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt; proposal.expiration_secs ||
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(proposal.early_resolution_vote_threshold) && (proposal.yes_votes &gt;= early_resolution_threshold ||
+        proposal.early_resolution_vote_threshold.is_some() && (proposal.yes_votes &gt;= early_resolution_threshold ||
                                                                            proposal.no_votes &gt;= early_resolution_threshold)) &&
         (proposal.yes_votes &lt;= proposal.no_votes || proposal.yes_votes + proposal.no_votes &lt; proposal.min_vote_threshold);
     <b>let</b> <b>post</b> post_approved_hashes = <b>global</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>&gt;(@aptos_framework);
@@ -2992,7 +2992,7 @@ Address @aptos_framework must exist ApprovedExecutionHashes and GovernancePropos
 <b>let</b> <b>post</b> post_voting_forum = <b>global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@aptos_framework);
 <b>let</b> <b>post</b> post_proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(post_voting_forum.proposals, proposal_id);
 <b>ensures</b> post_proposal.is_resolved == <b>true</b> && post_proposal.resolution_time_secs == <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>();
-<b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(proposal.execution_content);
+<b>aborts_if</b> proposal.execution_content.is_none();
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>&gt;(@aptos_framework);
 <b>let</b> <b>post</b> post_approved_hashes = <b>global</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>&gt;(@aptos_framework).hashes;
 <b>ensures</b> !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(post_approved_hashes, proposal_id);
@@ -3067,9 +3067,9 @@ Address @aptos_framework must exist ApprovedExecutionHashes and GovernancePropos
     <b>let</b> voting_forum = <b>global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@aptos_framework);
     <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
     <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(voting_forum.proposals, proposal_id);
-    <b>let</b> early_resolution_threshold = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(proposal.early_resolution_vote_threshold);
+    <b>let</b> early_resolution_threshold = proposal.early_resolution_vote_threshold.borrow();
     <b>let</b> voting_period_over = <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt; proposal.expiration_secs;
-    <b>let</b> be_resolved_early = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(proposal.early_resolution_vote_threshold) &&
+    <b>let</b> be_resolved_early = proposal.early_resolution_vote_threshold.is_some() &&
                                 (proposal.yes_votes &gt;= early_resolution_threshold ||
                                  proposal.no_votes &gt;= early_resolution_threshold);
     <b>let</b> voting_closed = voting_period_over || be_resolved_early;
@@ -3335,8 +3335,8 @@ pool_address must exist in StakePool.
 <pre><code><b>schema</b> <a href="aptos_governance.md#0x1_aptos_governance_CreateProposalMetadataAbortsIf">CreateProposalMetadataAbortsIf</a> {
     metadata_location: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
     metadata_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(utf8(metadata_location)) &gt; 256;
-    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(utf8(metadata_hash)) &gt; 256;
+    <b>aborts_if</b> utf8(metadata_location).length() &gt; 256;
+    <b>aborts_if</b> utf8(metadata_hash).length() &gt; 256;
     <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(metadata_location);
     <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(metadata_hash);
     <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(<a href="aptos_governance.md#0x1_aptos_governance_METADATA_LOCATION_KEY">METADATA_LOCATION_KEY</a>);

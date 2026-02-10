@@ -63,11 +63,13 @@
 module aptos_framework::resource_account {
     use std::error;
     use std::signer;
-    use std::vector;
     use aptos_framework::account;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin;
     use aptos_std::simple_map::{Self, SimpleMap};
+
+    #[test_only]
+    use std::vector;
 
     /// Container resource not found in account
     const ECONTAINER_NOT_PUBLISHED: u64 = 1;
