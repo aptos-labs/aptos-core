@@ -24,13 +24,13 @@ module confidential_asset_example::rollover_example {
         confidential_asset::deposit(bob, token, bob_amount);
 
         print(&utf8(b"Bob's pending balance is NOT zero:"));
-        print(&confidential_asset::pending_balance(bob_addr, token));
+        print(&confidential_asset::get_pending_balance(bob_addr, token));
 
         print(&utf8(b"Bob's actual balance is zero:"));
-        print(&confidential_asset::actual_balance(bob_addr, token));
+        print(&confidential_asset::get_available_balance(bob_addr, token));
 
-        assert!(confidential_asset::verify_pending_balance(bob_addr, token, &bob_dk, bob_amount));
-        assert!(confidential_asset::verify_actual_balance(bob_addr, token, &bob_dk, 0));
+        assert!(confidential_asset::check_pending_balance_decrypts_to(bob_addr, token, &bob_dk, bob_amount));
+        assert!(confidential_asset::check_available_balance_decrypts_to(bob_addr, token, &bob_dk, 0));
 
         // No explicit normalization is required, as the actual balance is already normalized.
         assert!(confidential_asset::is_normalized(bob_addr, token));
@@ -38,13 +38,13 @@ module confidential_asset_example::rollover_example {
         confidential_asset::rollover_pending_balance(bob, token);
 
         print(&utf8(b"Bob's pending balance is zero:"));
-        print(&confidential_asset::pending_balance(bob_addr, token));
+        print(&confidential_asset::get_pending_balance(bob_addr, token));
 
         print(&utf8(b"Bob's actual balance is NOT zero:"));
-        print(&confidential_asset::actual_balance(bob_addr, token));
+        print(&confidential_asset::get_available_balance(bob_addr, token));
 
-        assert!(confidential_asset::verify_pending_balance(bob_addr, token, &bob_dk, 0));
-        assert!(confidential_asset::verify_actual_balance(bob_addr, token, &bob_dk, (bob_amount as u128)));
+        assert!(confidential_asset::check_pending_balance_decrypts_to(bob_addr, token, &bob_dk, 0));
+        assert!(confidential_asset::check_available_balance_decrypts_to(bob_addr, token, &bob_dk, (bob_amount as u128)));
     }
 
     #[test(

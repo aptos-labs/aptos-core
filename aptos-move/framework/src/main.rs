@@ -15,7 +15,7 @@ enum Commands {
     /// Allows to create a custom release package,
     Custom(CustomRelease),
     /// Rebuilds cached packages (head.mrb and SDK builder files).
-    UpdateCachedPackages,
+    UpdateCachedPackages(UpdateCachedPackages),
 }
 
 fn main() {
@@ -23,7 +23,7 @@ fn main() {
     let result = match cmd {
         Commands::Release(release) => release.execute(),
         Commands::Custom(custom) => custom.execute(),
-        Commands::UpdateCachedPackages => update_cached_packages(),
+        Commands::UpdateCachedPackages(cmd) => cmd.execute(),
     };
     if let Err(e) = result {
         eprintln!("error: {:#}", e);
@@ -69,10 +69,28 @@ impl StandardRelease {
     }
 }
 
-fn update_cached_packages() -> anyhow::Result<()> {
-    let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let output = crate_dir.join("cached-packages/src/head.mrb");
-    ReleaseTarget::Head.create_release(true, Some(output))
+// ========================
+// Update Cached Packages
+
+#[derive(Debug, Parser)]
+struct UpdateCachedPackages {
+    /// When set, compiles the framework with #[test_only] code included.
+    /// Use this to regenerate head.mrb for use with the move-harness-with-test-only feature in e2e-move-tests/.
+    #[clap(long, default_value_t = false)]
+    with_test_mode: bool,
+}
+
+impl UpdateCachedPackages {
+    fn execute(self) -> anyhow::Result<()> {
+        let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let filename = if self.with_test_mode {
+            "cached-packages/src/head-test-only.mrb"
+        } else {
+            "cached-packages/src/head.mrb"
+        };
+        let output = crate_dir.join(filename);
+        ReleaseTarget::Head.create_release(true, Some(output), self.with_test_mode)
+    }
 }
 
 #[test]

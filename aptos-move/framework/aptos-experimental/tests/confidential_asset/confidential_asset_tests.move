@@ -4,7 +4,7 @@ module aptos_experimental::confidential_asset_tests {
     use std::option;
     use std::signer;
     use std::string::utf8;
-    use aptos_std::ristretto255::Scalar;
+    use aptos_std::ristretto255::{Self, Scalar, CompressedRistretto, basepoint_H};
     use aptos_framework::account;
     use aptos_framework::chain_id;
     use aptos_framework::coin;
@@ -15,10 +15,7 @@ module aptos_experimental::confidential_asset_tests {
     use aptos_experimental::confidential_asset;
     use aptos_experimental::confidential_balance;
     use aptos_experimental::confidential_proof;
-    use aptos_experimental::ristretto255_twisted_elgamal::{
-        Self as twisted_elgamal,
-        generate_twisted_elgamal_keypair
-    };
+    use aptos_experimental::ristretto255_twisted_elgamal::generate_twisted_elgamal_keypair;
 
     struct MockCoin {}
 
@@ -31,10 +28,10 @@ module aptos_experimental::confidential_asset_tests {
         new_amount: u128
     ) {
         let from = signer::address_of(sender);
-        let sender_ek = confidential_asset::encryption_key(from, token);
+        let sender_ek = confidential_asset::get_encryption_key(from, token);
         let current_balance =
-            confidential_balance::decompress_balance(
-                &confidential_asset::actual_balance(from, token)
+            confidential_balance::decompress(
+                &confidential_asset::get_available_balance(from, token)
             );
 
         let (proof, new_balance) =
@@ -81,11 +78,11 @@ module aptos_experimental::confidential_asset_tests {
         new_amount: u128
     ) {
         let from = signer::address_of(sender);
-        let sender_ek = confidential_asset::encryption_key(from, token);
-        let recipient_ek = confidential_asset::encryption_key(to, token);
+        let sender_ek = confidential_asset::get_encryption_key(from, token);
+        let recipient_ek = confidential_asset::get_encryption_key(to, token);
         let current_balance =
-            confidential_balance::decompress_balance(
-                &confidential_asset::actual_balance(from, token)
+            confidential_balance::decompress(
+                &confidential_asset::get_available_balance(from, token)
             );
 
         let (proof, new_balance, sender_amount, recipient_amount, _) =
@@ -124,14 +121,14 @@ module aptos_experimental::confidential_asset_tests {
         to: address,
         amount: u64,
         new_amount: u128,
-        auditor_eks: &vector<twisted_elgamal::CompressedPubkey>
+        auditor_eks: &vector<CompressedRistretto>
     ): vector<confidential_balance::ConfidentialBalance> {
         let from = signer::address_of(sender);
-        let sender_ek = confidential_asset::encryption_key(from, token);
-        let recipient_ek = confidential_asset::encryption_key(to, token);
+        let sender_ek = confidential_asset::get_encryption_key(from, token);
+        let recipient_ek = confidential_asset::get_encryption_key(to, token);
         let current_balance =
-            confidential_balance::decompress_balance(
-                &confidential_asset::actual_balance(from, token)
+            confidential_balance::decompress(
+                &confidential_asset::get_available_balance(from, token)
             );
 
         let (proof, new_balance, sender_amount, recipient_amount, auditor_amounts) =
@@ -170,36 +167,22 @@ module aptos_experimental::confidential_asset_tests {
         sender_dk: &Scalar,
         token: Object<Metadata>,
         new_dk: &Scalar,
-        new_ek: &twisted_elgamal::CompressedPubkey,
-        amount: u128
     ) {
-        let from = signer::address_of(sender);
-        let sender_ek = confidential_asset::encryption_key(from, token);
-        let current_balance =
-            confidential_balance::decompress_balance(
-                &confidential_asset::actual_balance(from, token)
-            );
-
-        let (proof, new_balance) =
-            confidential_proof::prove_rotation(
+        let new_ek = ristretto255::point_mul(&basepoint_H(), &ristretto255::scalar_invert(new_dk).extract());
+        let proof =
+            confidential_asset::generate_key_rotation_proof(
+                signer::address_of(sender),
+                token,
                 sender_dk,
                 new_dk,
-                &sender_ek,
-                new_ek,
-                amount,
-                &current_balance
             );
 
-        let (sigma_proof, zkrp_new_balance) =
-            confidential_proof::serialize_rotation_proof(&proof);
-
-        confidential_asset::rotate_encryption_key(
+        confidential_asset::rotate_encryption_key_internal(
             sender,
             token,
-            twisted_elgamal::pubkey_to_bytes(new_ek),
-            confidential_balance::balance_to_bytes(&new_balance),
-            zkrp_new_balance,
-            sigma_proof
+            new_ek,
+            proof,
+            true, // unpause
         );
     }
 
@@ -210,10 +193,10 @@ module aptos_experimental::confidential_asset_tests {
         amount: u128
     ) {
         let from = signer::address_of(sender);
-        let sender_ek = confidential_asset::encryption_key(from, token);
+        let sender_ek = confidential_asset::get_encryption_key(from, token);
         let current_balance =
-            confidential_balance::decompress_balance(
-                &confidential_asset::actual_balance(from, token)
+            confidential_balance::decompress(
+                &confidential_asset::get_available_balance(from, token)
             );
 
         let (proof, new_balance) =
@@ -323,10 +306,10 @@ module aptos_experimental::confidential_asset_tests {
         let (bob_dk, bob_ek) = generate_twisted_elgamal_keypair();
 
         confidential_asset::register(
-            &alice, token, twisted_elgamal::pubkey_to_bytes(&alice_ek)
+            &alice, token, ristretto255::compressed_point_to_bytes(alice_ek)
         );
         confidential_asset::register(
-            &bob, token, twisted_elgamal::pubkey_to_bytes(&bob_ek)
+            &bob, token, ristretto255::compressed_point_to_bytes(bob_ek)
         );
 
         confidential_asset::deposit(&alice, token, 100);
@@ -334,11 +317,11 @@ module aptos_experimental::confidential_asset_tests {
 
         assert!(primary_fungible_store::balance(alice_addr, token) == 250, 1);
         assert!(
-            confidential_asset::verify_pending_balance(alice_addr, token, &alice_dk, 100),
+            confidential_asset::check_pending_balance_decrypts_to(alice_addr, token, &alice_dk, 100),
             1
         );
         assert!(
-            confidential_asset::verify_pending_balance(bob_addr, token, &bob_dk, 150),
+            confidential_asset::check_pending_balance_decrypts_to(bob_addr, token, &bob_dk, 150),
             1
         );
     }
@@ -376,7 +359,7 @@ module aptos_experimental::confidential_asset_tests {
         let (alice_dk, alice_ek) = generate_twisted_elgamal_keypair();
 
         confidential_asset::register(
-            &alice, token, twisted_elgamal::pubkey_to_bytes(&alice_ek)
+            &alice, token, ristretto255::compressed_point_to_bytes(alice_ek)
         );
 
         confidential_asset::deposit(&alice, token, 200);
@@ -386,7 +369,7 @@ module aptos_experimental::confidential_asset_tests {
 
         assert!(primary_fungible_store::balance(bob_addr, token) == 550, 1);
         assert!(
-            confidential_asset::verify_actual_balance(alice_addr, token, &alice_dk, 150),
+            confidential_asset::check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 150),
             1
         );
 
@@ -394,7 +377,7 @@ module aptos_experimental::confidential_asset_tests {
 
         assert!(primary_fungible_store::balance(alice_addr, token) == 350, 1);
         assert!(
-            confidential_asset::verify_actual_balance(alice_addr, token, &alice_dk, 100),
+            confidential_asset::check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 100),
             1
         );
     }
@@ -433,10 +416,10 @@ module aptos_experimental::confidential_asset_tests {
         let (bob_dk, bob_ek) = generate_twisted_elgamal_keypair();
 
         confidential_asset::register(
-            &alice, token, twisted_elgamal::pubkey_to_bytes(&alice_ek)
+            &alice, token, ristretto255::compressed_point_to_bytes(alice_ek)
         );
         confidential_asset::register(
-            &bob, token, twisted_elgamal::pubkey_to_bytes(&bob_ek)
+            &bob, token, ristretto255::compressed_point_to_bytes(bob_ek)
         );
 
         confidential_asset::deposit(&alice, token, 200);
@@ -445,22 +428,22 @@ module aptos_experimental::confidential_asset_tests {
         transfer(&alice, &alice_dk, token, bob_addr, 100, 100);
 
         assert!(
-            confidential_asset::verify_actual_balance(alice_addr, token, &alice_dk, 100),
+            confidential_asset::check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 100),
             1
         );
         assert!(
-            confidential_asset::verify_pending_balance(bob_addr, token, &bob_dk, 100),
+            confidential_asset::check_pending_balance_decrypts_to(bob_addr, token, &bob_dk, 100),
             1
         );
 
         transfer(&alice, &alice_dk, token, alice_addr, 100, 0);
 
         assert!(
-            confidential_asset::verify_actual_balance(alice_addr, token, &alice_dk, 0),
+            confidential_asset::check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 0),
             1
         );
         assert!(
-            confidential_asset::verify_pending_balance(alice_addr, token, &alice_dk, 100),
+            confidential_asset::check_pending_balance_decrypts_to(alice_addr, token, &alice_dk, 100),
             1
         );
     }
@@ -500,17 +483,17 @@ module aptos_experimental::confidential_asset_tests {
         let (auditor1_dk, auditor1_ek) = generate_twisted_elgamal_keypair();
         let (auditor2_dk, auditor2_ek) = generate_twisted_elgamal_keypair();
 
-        confidential_asset::set_auditor(
+        confidential_asset::set_auditor_for_asset_type(
             &aptos_fx,
             token,
-            twisted_elgamal::pubkey_to_bytes(&auditor1_ek)
+            ristretto255::compressed_point_to_bytes(auditor1_ek)
         );
 
         confidential_asset::register(
-            &alice, token, twisted_elgamal::pubkey_to_bytes(&alice_ek)
+            &alice, token, ristretto255::compressed_point_to_bytes(alice_ek)
         );
         confidential_asset::register(
-            &bob, token, twisted_elgamal::pubkey_to_bytes(&bob_ek)
+            &bob, token, ristretto255::compressed_point_to_bytes(bob_ek)
         );
 
         confidential_asset::deposit(&alice, token, 200);
@@ -528,22 +511,22 @@ module aptos_experimental::confidential_asset_tests {
             );
 
         assert!(
-            confidential_asset::verify_actual_balance(alice_addr, token, &alice_dk, 100),
+            confidential_asset::check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 100),
             1
         );
         assert!(
-            confidential_asset::verify_pending_balance(bob_addr, token, &bob_dk, 100),
+            confidential_asset::check_pending_balance_decrypts_to(bob_addr, token, &bob_dk, 100),
             1
         );
 
         assert!(
-            confidential_balance::verify_pending_balance(
+            confidential_balance::check_decrypts_to(
                 &auditor_amounts[0], &auditor1_dk, 100
             ),
             1
         );
         assert!(
-            confidential_balance::verify_pending_balance(
+            confidential_balance::check_decrypts_to(
                 &auditor_amounts[1], &auditor2_dk, 100
             ),
             1
@@ -559,7 +542,7 @@ module aptos_experimental::confidential_asset_tests {
             bob = @0xb0
         )
     ]
-    #[expected_failure(abort_code = 0x010006, location = confidential_asset)]
+    #[expected_failure(abort_code = 66535, location = confidential_asset)]
     fun fail_audit_transfer_if_wrong_auditor_list(
         confidential_asset: signer,
         aptos_fx: signer,
@@ -585,17 +568,17 @@ module aptos_experimental::confidential_asset_tests {
         let (_, auditor1_ek) = generate_twisted_elgamal_keypair();
         let (_, auditor2_ek) = generate_twisted_elgamal_keypair();
 
-        confidential_asset::set_auditor(
+        confidential_asset::set_auditor_for_asset_type(
             &aptos_fx,
             token,
-            twisted_elgamal::pubkey_to_bytes(&auditor1_ek)
+            ristretto255::compressed_point_to_bytes(auditor1_ek)
         );
 
         confidential_asset::register(
-            &alice, token, twisted_elgamal::pubkey_to_bytes(&alice_ek)
+            &alice, token, ristretto255::compressed_point_to_bytes(alice_ek)
         );
         confidential_asset::register(
-            &bob, token, twisted_elgamal::pubkey_to_bytes(&bob_ek)
+            &bob, token, ristretto255::compressed_point_to_bytes(bob_ek)
         );
 
         confidential_asset::deposit(&alice, token, 200);
@@ -648,13 +631,16 @@ module aptos_experimental::confidential_asset_tests {
         let (alice_dk, alice_ek) = generate_twisted_elgamal_keypair();
 
         confidential_asset::register(
-            &alice, token, twisted_elgamal::pubkey_to_bytes(&alice_ek)
+            &alice, token, ristretto255::compressed_point_to_bytes(alice_ek)
         );
 
         confidential_asset::deposit(&alice, token, 200);
         confidential_asset::rollover_pending_balance(&alice, token);
 
         withdraw(&alice, &alice_dk, token, bob_addr, 50, 150);
+
+        // Must pause incoming transfers before key rotation (pending balance is already zero)
+        confidential_asset::pause_incoming_transactions(&alice, token);
 
         let (new_alice_dk, new_alice_ek) = generate_twisted_elgamal_keypair();
 
@@ -663,13 +649,11 @@ module aptos_experimental::confidential_asset_tests {
             &alice_dk,
             token,
             &new_alice_dk,
-            &new_alice_ek,
-            150
         );
 
-        assert!(confidential_asset::encryption_key(alice_addr, token) == new_alice_ek, 1);
+        assert!(confidential_asset::get_encryption_key(alice_addr, token) == new_alice_ek, 1);
         assert!(
-            confidential_asset::verify_actual_balance(
+            confidential_asset::check_available_balance_decrypts_to(
                 alice_addr, token, &new_alice_dk, 150
             ),
             1
@@ -709,7 +693,7 @@ module aptos_experimental::confidential_asset_tests {
         let (alice_dk, alice_ek) = generate_twisted_elgamal_keypair();
 
         confidential_asset::register(
-            &alice, token, twisted_elgamal::pubkey_to_bytes(&alice_ek)
+            &alice, token, ristretto255::compressed_point_to_bytes(alice_ek)
         );
 
         confidential_asset::deposit(&alice, token, max_chunk_value);
@@ -719,7 +703,7 @@ module aptos_experimental::confidential_asset_tests {
 
         assert!(!confidential_asset::is_normalized(alice_addr, token));
         assert!(
-            !confidential_asset::verify_actual_balance(
+            !confidential_asset::check_available_balance_decrypts_to(
                 alice_addr,
                 token,
                 &alice_dk,
@@ -737,7 +721,7 @@ module aptos_experimental::confidential_asset_tests {
 
         assert!(confidential_asset::is_normalized(alice_addr, token));
         assert!(
-            confidential_asset::verify_actual_balance(
+            confidential_asset::check_available_balance_decrypts_to(
                 alice_addr,
                 token,
                 &alice_dk,
@@ -755,7 +739,7 @@ module aptos_experimental::confidential_asset_tests {
             alice = @0xa1
         )
     ]
-    #[expected_failure(abort_code = 0x01000D, location = confidential_asset)]
+    #[expected_failure(abort_code = 65545, location = confidential_asset)]
     fun fail_register_if_token_disallowed(
         confidential_asset: signer,
         aptos_fx: signer,
@@ -773,12 +757,12 @@ module aptos_experimental::confidential_asset_tests {
                 500
             );
 
-        confidential_asset::enable_allow_list(&aptos_fx);
+        confidential_asset::enable_allow_listing(&aptos_fx);
 
         let (_, alice_ek) = generate_twisted_elgamal_keypair();
 
         confidential_asset::register(
-            &alice, token, twisted_elgamal::pubkey_to_bytes(&alice_ek)
+            &alice, token, ristretto255::compressed_point_to_bytes(alice_ek)
         );
     }
 
@@ -807,13 +791,13 @@ module aptos_experimental::confidential_asset_tests {
                 500
             );
 
-        confidential_asset::enable_allow_list(&aptos_fx);
-        confidential_asset::enable_token(&aptos_fx, token);
+        confidential_asset::enable_allow_listing(&aptos_fx);
+        confidential_asset::enable_confidentiality_for_asset_type(&aptos_fx, token);
 
         let (_, alice_ek) = generate_twisted_elgamal_keypair();
 
         confidential_asset::register(
-            &alice, token, twisted_elgamal::pubkey_to_bytes(&alice_ek)
+            &alice, token, ristretto255::compressed_point_to_bytes(alice_ek)
         );
     }
 
@@ -858,7 +842,7 @@ module aptos_experimental::confidential_asset_tests {
         let (_, alice_ek) = generate_twisted_elgamal_keypair();
 
         confidential_asset::register(
-            &alice, token, twisted_elgamal::pubkey_to_bytes(&alice_ek)
+            &alice, token, ristretto255::compressed_point_to_bytes(alice_ek)
         );
         confidential_asset::deposit(&alice, token, 100);
     }
