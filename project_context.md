@@ -248,13 +248,12 @@ This layered architecture enables multi-slot censorship-resistant consensus as d
 
 ---
 
-## Current Status (February 6, 2026)
+## Current Status (February 7, 2026)
 
 ### Repository State
 - **Branch**: `prefix-consensus-prototype`
-- **HEAD**: Phase 3 View State and Ranking Management complete
-- **Status**: Working directory has uncommitted changes
-- **Tests**: 134/134 unit tests passing
+- **HEAD**: Phase 4 Chunks 1-2 complete (Strong Protocol + Network Messages)
+- **Tests**: 178/178 unit tests passing
 - **Smoke Tests**: Run manually by user (no need to run in Claude sessions)
 - **Build**: ✅ No warnings or errors
 
@@ -264,7 +263,9 @@ This layered architecture enables multi-slot censorship-resistant consensus as d
 - ✅ **Strong PC Phase 2**: Certificate types complete (Direct/Indirect certificates + view field)
 - ✅ **Stake-Weighted Quorum**: Refactored from count-based to proof-of-stake weighted voting
 - ✅ **Strong PC Phase 3**: View State and Ranking Management complete (RankingManager, ViewState, ViewOutput)
-- 🚧 **Strong PC Phase 4+**: Multi-view protocol and manager pending
+- ✅ **Strong PC Phase 4 Chunk 1**: Strong Protocol state machine complete (strong_protocol.rs)
+- ✅ **Strong PC Phase 4 Chunk 2**: Network messages complete (StrongPrefixConsensusMsg + types)
+- 🚧 **Strong PC Phase 4 Chunk 3**: Strong Manager pending (strong_manager.rs)
 - ⏳ **Slot Manager**: Future work (after Strong PC complete)
 
 **Main Design Plan**: `.plans/strong-prefix-consensus.md`
@@ -311,10 +312,8 @@ c) Else (both v_low and v_high are all-⊥):
 
 **Key insight**: A vector like `[⊥, ⊥, ⊥]` is NOT meaningful in views > 1 (no certificate to trace). But in View 1, even all-⊥ outputs are valid (raw inputs, not certificates).
 
-**Helper methods (implemented in view_state.rs)**:
-- `has_non_bot_entry(vector)`: Core check - true if any entry is not `HashValue::zero()`
-- `has_committable_low(v_low)`: Semantic alias for commit decision
-- `has_certifiable_high(v_high)`: Semantic alias for certificate creation
+**Helper method (implemented in view_state.rs)**:
+- `has_non_bot_entry(vector)`: True if any entry is not `HashValue::zero()` — used for both commit decision (v_low) and certificate creation (v_high)
 
 ### Message Size Optimization: Hashes vs Full Certificates
 
@@ -388,8 +387,41 @@ IndirectCert(empty=2, parent=1) is created. If the chain traces to it, `view()=2
 - `first_non_bot()` prefix vector utility — in `utils.rs`
 - All exported from `lib.rs`
 
+### Phase 4 Implementation Details (Chunks 1-2 Complete)
+
+**Chunk 1 — Strong Protocol** (`strong_protocol.rs`, ~900 lines):
+- `StrongPrefixConsensusProtocol`: Pure state machine (no I/O, no async)
+- `View1Decision`: Always DirectCert (View 1 is special)
+- `ViewDecision`: Three-way — Commit > DirectCert > EmptyView
+- Certificate store (`HashMap<HashValue, Certificate>`) for trace-back
+- `build_certificate_chain()`: Follows v_low → v_high hash links back to View 1
+- `build_commit_message()`: Wraps chain into StrongPCCommit
+- `highest_known_view`: Tracks best non-empty view for EmptyViewMessages
+- `ChainBuildError::MissingCert`: Signals manager to fetch missing certs
+- 27 unit tests covering all decision paths and trace-back scenarios
+
+**Chunk 2 — Network Messages**:
+- `ViewProposal`: Certificate proposal for a view (in `types.rs`)
+- `CertFetchRequest`: Request certificate by hash (in `types.rs`)
+- `CertFetchResponse`: Response with certificate (in `types.rs`)
+- `StrongPrefixConsensusMsg`: 6-variant enum wrapping all Strong PC messages (in `network_messages.rs`)
+  - `InnerPC { view, msg }`, `Proposal`, `EmptyView`, `Commit`, `FetchRequest`, `FetchResponse`
+  - Helper methods: `epoch()`, `slot()`, `view()`, `name()`, `author()`
+- 17 unit tests covering construction, helpers, and serialization roundtrips
+
+**Design decisions**:
+- Protocol/Manager split: Protocol is pure logic, Manager handles async/I/O
+- Data types (`ViewProposal`, etc.) in `types.rs`, message envelope in `network_messages.rs`
+- `CertFetchResponse` has non-optional `Certificate` — if you don't have it, don't reply
+- `EmptyViewMessage` doesn't carry epoch/slot — manager filters by slot before dispatching
+- Slot validation is manager-level (Chunk 3), not in `StrongPCCommit::verify()`
+
+**TODO for Chunk 3 (Strong Manager)**:
+- Manager must filter by slot before calling `process_received_commit()` (cross-slot replay prevention)
+- Same slot filtering for `EmptyViewMessage` proofs via `HighestKnownView`
+
 ### Next Action
-Begin Strong Prefix Consensus Phase 4: Strong Protocol Core (multi-view state machine)
+Begin Strong Prefix Consensus Phase 4 Chunk 3: Strong Manager (async event loop)
 
 ---
 
@@ -404,37 +436,26 @@ Begin Strong Prefix Consensus Phase 4: Strong Protocol Core (multi-view state ma
 
 ## Repository Structure
 
-### Basic Prefix Consensus (Complete)
+### Prefix Consensus Crate
 ```
 consensus/prefix-consensus/src/
-├── types.rs              - Vote/QC types with BLS (350 lines)
+├── types.rs              - Vote/QC types + ViewProposal/CertFetch types (850 lines)
 ├── protocol.rs           - 3-round state machine (490 lines)
 ├── manager.rs            - Event-driven orchestrator (658 lines)
 ├── network_interface.rs  - Network adapter (224 lines)
-├── network_messages.rs   - Network message envelope (PrefixConsensusMsg) (450 lines)
+├── network_messages.rs   - PrefixConsensusMsg + StrongPrefixConsensusMsg (650 lines)
 ├── signing.rs            - BLS helpers (184 lines)
 ├── certify.rs            - QC formation (220 lines)
 ├── verification.rs       - Validation (150 lines)
 ├── utils.rs              - Prefix operations + first_non_bot (210 lines)
-├── certificates.rs       - Certificates + StrongPCCommit + cert_reaches_view1 (750 lines) - Phase 2
-└── view_state.rs         - RankingManager, ViewState, ViewOutput (360 lines) - Phase 3
+├── certificates.rs       - Certificates + StrongPCCommit + cert_reaches_view1 (750 lines)
+├── view_state.rs         - RankingManager, ViewState, ViewOutput (340 lines)
+├── strong_protocol.rs    - Strong PC state machine (900 lines) - Phase 4 Chunk 1
+└── strong_manager.rs     - Strong PC event orchestrator (pending) - Phase 4 Chunk 3
 
 testsuite/smoke-test/src/consensus/prefix_consensus/
 ├── helpers.rs            - Test helpers
 └── basic_test.rs         - 2 smoke tests
-```
-
-### Strong Prefix Consensus (Planned)
-```
-consensus/prefix-consensus/src/
-├── certificates.rs       - Cert types (300 lines) - Phase 2
-├── view_state.rs         - View management (400 lines) - Phase 3
-├── strong_protocol.rs    - Multi-view protocol (800 lines) - Phase 4
-└── strong_manager.rs     - Event orchestrator (700 lines) - Phase 6
-
-testsuite/smoke-test/src/consensus/strong_prefix_consensus/
-├── helpers.rs            - Test helpers (200 lines) - Phase 8
-└── basic_test.rs         - 4 smoke tests (400 lines) - Phase 8
 ```
 
 ### Plans

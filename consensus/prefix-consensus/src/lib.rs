@@ -54,15 +54,15 @@ pub use manager::PrefixConsensusManager;
 pub use network_interface::{
     NetworkSenderAdapter, PrefixConsensusNetworkClient, PrefixConsensusNetworkSender,
 };
-pub use network_messages::PrefixConsensusMsg;
+pub use network_messages::{PrefixConsensusMsg, StrongPrefixConsensusMsg};
 pub use protocol::PrefixConsensusProtocol;
 pub use signing::{
     sign_vote1, sign_vote2, sign_vote3, verify_vote1_signature, verify_vote2_signature,
     verify_vote3_signature,
 };
 pub use types::{
-    Element, PartyId, PrefixConsensusInput, PrefixConsensusOutput, PrefixVector, Round, Vote1,
-    Vote2, Vote3, QC1, QC2, QC3,
+    CertFetchRequest, CertFetchResponse, Element, PartyId, PrefixConsensusInput,
+    PrefixConsensusOutput, PrefixVector, Round, ViewProposal, Vote1, Vote2, Vote3, QC1, QC2, QC3,
 };
 pub use utils::{consistency_check, first_non_bot, max_common_prefix, min_common_extension};
 pub use verification::{

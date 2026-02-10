@@ -432,6 +432,97 @@ impl QC3 {
 }
 
 // ============================================================================
+// Strong Prefix Consensus Message Types
+// ============================================================================
+
+/// Certificate proposal for a view
+///
+/// When a party creates a certificate from completing a view, it broadcasts the
+/// full certificate as a proposal for the next view. Other parties store it and
+/// use its hash in their truncated input vectors.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ViewProposal {
+    /// The view this proposal is FOR (the next view after the cert was created)
+    pub target_view: u64,
+    /// The certificate being proposed as input for target_view
+    pub certificate: crate::certificates::Certificate,
+    /// Epoch for validation
+    pub epoch: u64,
+    /// Slot for multi-slot consensus
+    pub slot: u64,
+}
+
+impl ViewProposal {
+    pub fn new(
+        target_view: u64,
+        certificate: crate::certificates::Certificate,
+        epoch: u64,
+        slot: u64,
+    ) -> Self {
+        Self {
+            target_view,
+            certificate,
+            epoch,
+            slot,
+        }
+    }
+}
+
+/// Request to fetch a certificate by hash
+///
+/// Sent when a party needs a certificate for trace-back but doesn't have it
+/// in its local store (typically because it entered a view via case (b) and
+/// skipped intermediate views).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CertFetchRequest {
+    /// Hash of the certificate to fetch
+    pub cert_hash: HashValue,
+    /// Epoch for validation
+    pub epoch: u64,
+    /// Slot for multi-slot consensus
+    pub slot: u64,
+}
+
+impl CertFetchRequest {
+    pub fn new(cert_hash: HashValue, epoch: u64, slot: u64) -> Self {
+        Self {
+            cert_hash,
+            epoch,
+            slot,
+        }
+    }
+}
+
+/// Response to a certificate fetch request
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CertFetchResponse {
+    /// Hash of the requested certificate
+    pub cert_hash: HashValue,
+    /// The certificate
+    pub certificate: crate::certificates::Certificate,
+    /// Epoch for validation
+    pub epoch: u64,
+    /// Slot for multi-slot consensus
+    pub slot: u64,
+}
+
+impl CertFetchResponse {
+    pub fn new(
+        cert_hash: HashValue,
+        certificate: crate::certificates::Certificate,
+        epoch: u64,
+        slot: u64,
+    ) -> Self {
+        Self {
+            cert_hash,
+            certificate,
+            epoch,
+            slot,
+        }
+    }
+}
+
+// ============================================================================
 // Input/Output Types
 // ============================================================================
 

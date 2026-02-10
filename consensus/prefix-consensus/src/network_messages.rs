@@ -9,7 +9,8 @@
 //! This module defines the message envelope types that are transmitted over the network
 //! between validators during Prefix Consensus execution.
 
-use crate::types::{PartyId, Vote1, Vote2, Vote3};
+use crate::certificates::{EmptyViewMessage, StrongPCCommit};
+use crate::types::{CertFetchRequest, CertFetchResponse, PartyId, ViewProposal, Vote1, Vote2, Vote3};
 use serde::{Deserialize, Serialize};
 
 /// Network message type for Prefix Consensus
@@ -132,6 +133,109 @@ impl From<Vote2> for PrefixConsensusMsg {
 impl From<Vote3> for PrefixConsensusMsg {
     fn from(vote: Vote3) -> Self {
         PrefixConsensusMsg::Vote3Msg(Box::new(vote))
+    }
+}
+
+// ============================================================================
+// Strong Prefix Consensus Messages
+// ============================================================================
+
+/// Network message type for Strong Prefix Consensus
+///
+/// Wraps all message types for the multi-view protocol, including inner PC
+/// messages (Vote1/2/3) tagged with view numbers.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum StrongPrefixConsensusMsg {
+    /// Inner PC message for a specific view (Vote1, Vote2, or Vote3)
+    InnerPC {
+        view: u64,
+        msg: PrefixConsensusMsg,
+    },
+
+    /// Certificate proposal for the next view
+    Proposal(Box<ViewProposal>),
+
+    /// Empty-view message (party got all-⊥ output)
+    EmptyView(Box<EmptyViewMessage>),
+
+    /// Commit announcement with full proof chain
+    Commit(Box<StrongPCCommit>),
+
+    /// Certificate fetch request
+    FetchRequest(CertFetchRequest),
+
+    /// Certificate fetch response
+    FetchResponse(Box<CertFetchResponse>),
+}
+
+impl StrongPrefixConsensusMsg {
+    /// Get the epoch of this message
+    pub fn epoch(&self) -> u64 {
+        match self {
+            StrongPrefixConsensusMsg::InnerPC { msg, .. } => msg.epoch(),
+            StrongPrefixConsensusMsg::Proposal(p) => p.epoch,
+            StrongPrefixConsensusMsg::EmptyView(_) => {
+                // EmptyViewMessage doesn't carry epoch directly;
+                // the manager filters by slot before dispatching.
+                // This is a placeholder — callers should use slot-level filtering.
+                0
+            }
+            StrongPrefixConsensusMsg::Commit(c) => c.epoch,
+            StrongPrefixConsensusMsg::FetchRequest(r) => r.epoch,
+            StrongPrefixConsensusMsg::FetchResponse(r) => r.epoch,
+        }
+    }
+
+    /// Get the slot of this message
+    pub fn slot(&self) -> u64 {
+        match self {
+            StrongPrefixConsensusMsg::InnerPC { msg, .. } => msg.slot(),
+            StrongPrefixConsensusMsg::Proposal(p) => p.slot,
+            StrongPrefixConsensusMsg::EmptyView(_) => {
+                // EmptyViewMessage doesn't carry slot directly;
+                // the manager filters by slot before dispatching.
+                0
+            }
+            StrongPrefixConsensusMsg::Commit(c) => c.slot,
+            StrongPrefixConsensusMsg::FetchRequest(r) => r.slot,
+            StrongPrefixConsensusMsg::FetchResponse(r) => r.slot,
+        }
+    }
+
+    /// Get the view this message relates to (for routing)
+    pub fn view(&self) -> Option<u64> {
+        match self {
+            StrongPrefixConsensusMsg::InnerPC { view, .. } => Some(*view),
+            StrongPrefixConsensusMsg::Proposal(p) => Some(p.target_view),
+            StrongPrefixConsensusMsg::EmptyView(e) => Some(e.empty_view()),
+            StrongPrefixConsensusMsg::Commit(_) => None,
+            StrongPrefixConsensusMsg::FetchRequest(_) => None,
+            StrongPrefixConsensusMsg::FetchResponse(_) => None,
+        }
+    }
+
+    /// Message type name for logging
+    pub fn name(&self) -> &'static str {
+        match self {
+            StrongPrefixConsensusMsg::InnerPC { .. } => "InnerPC",
+            StrongPrefixConsensusMsg::Proposal(_) => "Proposal",
+            StrongPrefixConsensusMsg::EmptyView(_) => "EmptyView",
+            StrongPrefixConsensusMsg::Commit(_) => "Commit",
+            StrongPrefixConsensusMsg::FetchRequest(_) => "FetchRequest",
+            StrongPrefixConsensusMsg::FetchResponse(_) => "FetchResponse",
+        }
+    }
+
+    /// Get the author/sender (where applicable)
+    pub fn author(&self) -> Option<PartyId> {
+        match self {
+            StrongPrefixConsensusMsg::InnerPC { msg, .. } => Some(msg.author()),
+            StrongPrefixConsensusMsg::Proposal(_) => None,
+            StrongPrefixConsensusMsg::EmptyView(e) => Some(e.author),
+            StrongPrefixConsensusMsg::Commit(_) => None,
+            StrongPrefixConsensusMsg::FetchRequest(_) => None,
+            StrongPrefixConsensusMsg::FetchResponse(_) => None,
+        }
     }
 }
 
@@ -447,5 +551,252 @@ mod tests {
         assert!(size1 > 0);
         assert!(size2 > 0);
         assert!(size3 > 0);
+    }
+
+    // ==================== Strong Prefix Consensus Message Tests ====================
+
+    use crate::certificates::{
+        Certificate, DirectCertificate, EmptyViewMessage, StrongPCCommit,
+    };
+    use crate::types::{CertFetchRequest, CertFetchResponse, QC3, ViewProposal};
+
+    fn create_test_direct_cert(view: u64) -> Certificate {
+        let proof = QC3::new(vec![]);
+        Certificate::Direct(DirectCertificate::new(view, proof))
+    }
+
+    fn create_test_view_proposal() -> ViewProposal {
+        ViewProposal::new(3, create_test_direct_cert(2), 1, 0)
+    }
+
+    fn create_test_cert_fetch_request() -> CertFetchRequest {
+        CertFetchRequest::new(HashValue::random(), 1, 0)
+    }
+
+    fn create_test_cert_fetch_response() -> CertFetchResponse {
+        CertFetchResponse::new(HashValue::random(), create_test_direct_cert(2), 1, 0)
+    }
+
+    fn create_test_empty_view_message() -> EmptyViewMessage {
+        EmptyViewMessage::new(
+            3,
+            AccountAddress::random(),
+            1,
+            QC3::new(vec![]),
+            BlsSignature::dummy_signature(),
+        )
+    }
+
+    fn create_test_strong_pc_commit() -> StrongPCCommit {
+        StrongPCCommit::new(
+            QC3::new(vec![]),
+            vec![create_test_direct_cert(1)],
+            vec![HashValue::random()],
+            1,
+            0,
+        )
+    }
+
+    // --- ViewProposal tests ---
+
+    #[test]
+    fn test_view_proposal_new() {
+        let cert = create_test_direct_cert(2);
+        let proposal = ViewProposal::new(3, cert, 1, 0);
+        assert_eq!(proposal.target_view, 3);
+        assert_eq!(proposal.epoch, 1);
+        assert_eq!(proposal.slot, 0);
+        assert_eq!(proposal.certificate.view(), 2);
+    }
+
+    #[test]
+    fn test_view_proposal_serialization_roundtrip() {
+        let proposal = create_test_view_proposal();
+        let serialized = bcs::to_bytes(&proposal).expect("Serialization should succeed");
+        let deserialized: ViewProposal =
+            bcs::from_bytes(&serialized).expect("Deserialization should succeed");
+        assert_eq!(deserialized.target_view, proposal.target_view);
+        assert_eq!(deserialized.epoch, proposal.epoch);
+        assert_eq!(deserialized.slot, proposal.slot);
+    }
+
+    // --- CertFetchRequest tests ---
+
+    #[test]
+    fn test_cert_fetch_request_new() {
+        let hash = HashValue::random();
+        let req = CertFetchRequest::new(hash, 1, 0);
+        assert_eq!(req.cert_hash, hash);
+        assert_eq!(req.epoch, 1);
+        assert_eq!(req.slot, 0);
+    }
+
+    #[test]
+    fn test_cert_fetch_request_serialization_roundtrip() {
+        let req = create_test_cert_fetch_request();
+        let serialized = bcs::to_bytes(&req).expect("Serialization should succeed");
+        let deserialized: CertFetchRequest =
+            bcs::from_bytes(&serialized).expect("Deserialization should succeed");
+        assert_eq!(deserialized.cert_hash, req.cert_hash);
+        assert_eq!(deserialized.epoch, req.epoch);
+    }
+
+    // --- CertFetchResponse tests ---
+
+    #[test]
+    fn test_cert_fetch_response_new() {
+        let hash = HashValue::random();
+        let cert = create_test_direct_cert(2);
+        let resp = CertFetchResponse::new(hash, cert, 1, 0);
+        assert_eq!(resp.cert_hash, hash);
+        assert_eq!(resp.certificate.view(), 2);
+        assert_eq!(resp.epoch, 1);
+        assert_eq!(resp.slot, 0);
+    }
+
+    #[test]
+    fn test_cert_fetch_response_serialization_roundtrip() {
+        let resp = create_test_cert_fetch_response();
+        let serialized = bcs::to_bytes(&resp).expect("Serialization should succeed");
+        let deserialized: CertFetchResponse =
+            bcs::from_bytes(&serialized).expect("Deserialization should succeed");
+        assert_eq!(deserialized.cert_hash, resp.cert_hash);
+        assert_eq!(deserialized.certificate.view(), resp.certificate.view());
+    }
+
+    // --- StrongPrefixConsensusMsg tests ---
+
+    #[test]
+    fn test_strong_msg_inner_pc() {
+        let vote1 = create_test_vote1();
+        let epoch = vote1.epoch;
+        let slot = vote1.slot;
+        let author = vote1.author;
+        let inner = PrefixConsensusMsg::from(vote1);
+        let msg = StrongPrefixConsensusMsg::InnerPC { view: 2, msg: inner };
+
+        assert_eq!(msg.name(), "InnerPC");
+        assert_eq!(msg.epoch(), epoch);
+        assert_eq!(msg.slot(), slot);
+        assert_eq!(msg.view(), Some(2));
+        assert_eq!(msg.author(), Some(author));
+    }
+
+    #[test]
+    fn test_strong_msg_proposal() {
+        let proposal = create_test_view_proposal();
+        let msg = StrongPrefixConsensusMsg::Proposal(Box::new(proposal));
+
+        assert_eq!(msg.name(), "Proposal");
+        assert_eq!(msg.epoch(), 1);
+        assert_eq!(msg.slot(), 0);
+        assert_eq!(msg.view(), Some(3));
+        assert_eq!(msg.author(), None);
+    }
+
+    #[test]
+    fn test_strong_msg_empty_view() {
+        let empty = create_test_empty_view_message();
+        let author = empty.author;
+        let msg = StrongPrefixConsensusMsg::EmptyView(Box::new(empty));
+
+        assert_eq!(msg.name(), "EmptyView");
+        assert_eq!(msg.view(), Some(3));
+        assert_eq!(msg.author(), Some(author));
+    }
+
+    #[test]
+    fn test_strong_msg_commit() {
+        let commit = create_test_strong_pc_commit();
+        let msg = StrongPrefixConsensusMsg::Commit(Box::new(commit));
+
+        assert_eq!(msg.name(), "Commit");
+        assert_eq!(msg.epoch(), 1);
+        assert_eq!(msg.slot(), 0);
+        assert_eq!(msg.view(), None);
+        assert_eq!(msg.author(), None);
+    }
+
+    #[test]
+    fn test_strong_msg_fetch_request() {
+        let req = create_test_cert_fetch_request();
+        let msg = StrongPrefixConsensusMsg::FetchRequest(req);
+
+        assert_eq!(msg.name(), "FetchRequest");
+        assert_eq!(msg.epoch(), 1);
+        assert_eq!(msg.slot(), 0);
+        assert_eq!(msg.view(), None);
+        assert_eq!(msg.author(), None);
+    }
+
+    #[test]
+    fn test_strong_msg_fetch_response() {
+        let resp = create_test_cert_fetch_response();
+        let msg = StrongPrefixConsensusMsg::FetchResponse(Box::new(resp));
+
+        assert_eq!(msg.name(), "FetchResponse");
+        assert_eq!(msg.epoch(), 1);
+        assert_eq!(msg.slot(), 0);
+        assert_eq!(msg.view(), None);
+        assert_eq!(msg.author(), None);
+    }
+
+    #[test]
+    fn test_strong_msg_inner_pc_serialization_roundtrip() {
+        let vote1 = create_test_vote1();
+        let inner = PrefixConsensusMsg::from(vote1);
+        let msg = StrongPrefixConsensusMsg::InnerPC { view: 2, msg: inner };
+
+        let serialized = bcs::to_bytes(&msg).expect("Serialization should succeed");
+        let deserialized: StrongPrefixConsensusMsg =
+            bcs::from_bytes(&serialized).expect("Deserialization should succeed");
+
+        assert_eq!(deserialized.name(), "InnerPC");
+        assert_eq!(deserialized.view(), Some(2));
+    }
+
+    #[test]
+    fn test_strong_msg_proposal_serialization_roundtrip() {
+        let proposal = create_test_view_proposal();
+        let msg = StrongPrefixConsensusMsg::Proposal(Box::new(proposal));
+
+        let serialized = bcs::to_bytes(&msg).expect("Serialization should succeed");
+        let deserialized: StrongPrefixConsensusMsg =
+            bcs::from_bytes(&serialized).expect("Deserialization should succeed");
+
+        assert_eq!(deserialized.name(), "Proposal");
+        assert_eq!(deserialized.view(), Some(3));
+        assert_eq!(deserialized.epoch(), 1);
+    }
+
+    #[test]
+    fn test_strong_msg_commit_serialization_roundtrip() {
+        let commit = create_test_strong_pc_commit();
+        let msg = StrongPrefixConsensusMsg::Commit(Box::new(commit));
+
+        let serialized = bcs::to_bytes(&msg).expect("Serialization should succeed");
+        let deserialized: StrongPrefixConsensusMsg =
+            bcs::from_bytes(&serialized).expect("Deserialization should succeed");
+
+        assert_eq!(deserialized.name(), "Commit");
+        assert_eq!(deserialized.epoch(), 1);
+    }
+
+    #[test]
+    fn test_strong_msg_fetch_roundtrip() {
+        let req = create_test_cert_fetch_request();
+        let hash = req.cert_hash;
+        let msg = StrongPrefixConsensusMsg::FetchRequest(req);
+
+        let serialized = bcs::to_bytes(&msg).expect("Serialization should succeed");
+        let deserialized: StrongPrefixConsensusMsg =
+            bcs::from_bytes(&serialized).expect("Deserialization should succeed");
+
+        assert_eq!(deserialized.name(), "FetchRequest");
+        if let StrongPrefixConsensusMsg::FetchRequest(r) = deserialized {
+            assert_eq!(r.cert_hash, hash);
+        } else {
+            panic!("Expected FetchRequest");
+        }
     }
 }
