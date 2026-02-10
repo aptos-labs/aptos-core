@@ -9,6 +9,7 @@ use aptos_temppath::TempPath;
 use aptos_types::account_address::AccountAddress;
 use git2::Repository;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
 pub struct FrameworkReleaseConfig {
@@ -70,6 +71,21 @@ pub fn generate_upgrade_proposals(
                     .map(|(addr, path, _)| (*addr, *path))
                     .collect()
             } else {
+                // Validate that the requested packages are valid
+                let all_package_names = all_packages
+                    .iter()
+                    .map(|(_, _, name)| name.to_string())
+                    .collect::<HashSet<String>>();
+                for package in requested_packages {
+                    if !all_package_names.contains(package) {
+                        return Err(anyhow::anyhow!(
+                            "Invalid package name specified: {}, must be one of: {:?}",
+                            package,
+                            all_package_names
+                        ));
+                    }
+                }
+
                 // Filter to only requested packages
                 all_packages
                     .iter()
