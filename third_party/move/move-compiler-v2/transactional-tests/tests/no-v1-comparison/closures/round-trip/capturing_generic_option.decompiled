@@ -1,0 +1,136 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/capturing_generic_option.move`
+
+//# publish
+module 0x42::test {
+    use 0x1::option;
+    struct Data has copy, drop {
+        value: u64,
+    }
+    struct Validator has key {
+        check: |u64|(bool) has copy + drop + store,
+    }
+    fun apply_validator(p0: ||(bool)): bool {
+        p0()
+    }
+    #[persistent]
+    fun foo(p0: u64, p1: option::Option<u64>): bool {
+        if (option::is_some<u64>(&p1)) {
+            let _v0 = *option::borrow<u64>(&p1);
+            return p0 >= _v0
+        };
+        false
+    }
+    public entry fun test_capture_and_compare() {
+        let _v0 = option::some<u64>(10);
+        let _v1 = option::some<u64>(20);
+        let _v2: ||bool has copy + drop = || lambda__1__test_capture_and_compare(_v0, _v1);
+        assert!(_v2(), 5);
+    }
+    fun lambda__1__test_capture_and_compare(p0: option::Option<u64>, p1: option::Option<u64>): bool {
+        let _v0;
+        if (option::is_some<u64>(&p0)) _v0 = option::is_some<u64>(&p1) else _v0 = false;
+        if (_v0) {
+            let _v1 = *option::borrow<u64>(&p0);
+            let _v2 = *option::borrow<u64>(&p1);
+            return _v1 < _v2
+        };
+        false
+    }
+    public entry fun test_capture_and_extract() {
+        let _v0 = option::some<u64>(100);
+        let _v1: ||u64 has copy + drop = || lambda__1__test_capture_and_extract(_v0);
+        assert!(_v1() == 200, 3);
+    }
+    fun lambda__1__test_capture_and_extract(p0: option::Option<u64>): u64 {
+        if (option::is_some<u64>(&p0)) return *option::borrow<u64>(&p0) * 2;
+        0
+    }
+    public entry fun test_capture_generic_option() {
+        let _v0 = option::some<Data>(Data{value: 123});
+        let _v1: ||bool has copy + drop = || lambda__1__test_capture_generic_option(_v0);
+        assert!(_v1(), 6);
+    }
+    fun lambda__1__test_capture_generic_option(p0: option::Option<Data>): bool {
+        if (option::is_some<Data>(&p0)) return *&option::borrow<Data>(&p0).value == 123;
+        false
+    }
+    public entry fun test_capture_none() {
+        let _v0 = option::none<u64>();
+        let _v1: ||bool has copy + drop = || lambda__1__test_capture_none(_v0);
+        assert!(_v1(), 2);
+    }
+    fun lambda__1__test_capture_none(p0: option::Option<u64>): bool {
+        option::is_none<u64>(&p0)
+    }
+    public entry fun test_capture_some() {
+        let _v0 = option::some<u64>(42);
+        let _v1: ||bool has copy + drop = || lambda__1__test_capture_some(_v0);
+        assert!(_v1(), 1);
+    }
+    fun lambda__1__test_capture_some(p0: option::Option<u64>): bool {
+        if (option::is_some<u64>(&p0)) return *option::borrow<u64>(&p0) == 42;
+        false
+    }
+    public entry fun test_multiple_closures_same_option() {
+        let _v0 = option::some<u64>(50);
+        let _v1: ||bool has copy + drop = || lambda__1__test_multiple_closures_same_option(_v0);
+        let _v2 = || lambda__2__test_multiple_closures_same_option(_v0);
+        let _v3 = || lambda__3__test_multiple_closures_same_option(_v0);
+        assert!(_v1(), 8);
+        assert!(_v2() == 50, 9);
+        assert!(_v3(), 10);
+    }
+    fun lambda__1__test_multiple_closures_same_option(p0: option::Option<u64>): bool {
+        option::is_some<u64>(&p0)
+    }
+    fun lambda__2__test_multiple_closures_same_option(p0: option::Option<u64>): u64 {
+        if (option::is_some<u64>(&p0)) return *option::borrow<u64>(&p0);
+        0
+    }
+    fun lambda__3__test_multiple_closures_same_option(p0: option::Option<u64>): bool {
+        if (option::is_some<u64>(&p0)) return *option::borrow<u64>(&p0) == 50;
+        false
+    }
+    public entry fun test_pass_closure_with_captured_option() {
+        let _v0 = option::some<u64>(99);
+        assert!(apply_validator(|| lambda__1__test_pass_closure_with_captured_option(_v0)), 7);
+    }
+    fun lambda__1__test_pass_closure_with_captured_option(p0: option::Option<u64>): bool {
+        if (option::is_some<u64>(&p0)) return *option::borrow<u64>(&p0) == 99;
+        false
+    }
+    public entry fun test_resource_with_captured_option(p0: &signer) {
+        let _v0 = option::some<u64>(100);
+        let _v1 = Validator{check: |arg0| foo(arg0, _v0)};
+        move_to<Validator>(p0, _v1);
+    }
+    public entry fun test_use_resource_with_captured_option(p0: &signer)
+        acquires Validator
+    {
+        test_resource_with_captured_option(p0);
+        let _v0 = borrow_global<Validator>(@0x42);
+        let _v1 = *&_v0.check;
+        assert!(_v1(100), 11);
+        let _v2 = *&_v0.check;
+        assert!(_v2(200), 12);
+        let _v3 = *&_v0.check;
+        if (_v3(50)) abort 13;
+    }
+}
+
+
+//# run 0x42::test::test_capture_some
+
+//# run 0x42::test::test_capture_none
+
+//# run 0x42::test::test_capture_and_extract
+
+//# run 0x42::test::test_capture_and_compare
+
+//# run 0x42::test::test_capture_generic_option
+
+//# run 0x42::test::test_pass_closure_with_captured_option
+
+//# run 0x42::test::test_multiple_closures_same_option
+
+//# run --signers 0x42 -- 0x42::test::test_use_resource_with_captured_option
