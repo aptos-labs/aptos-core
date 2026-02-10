@@ -27,7 +27,8 @@ use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::{
     state_store::{
-        state_summary::ProvableStateSummary, state_view::cached_state_view::CachedStateView,
+        state::State, state_summary::ProvableStateSummary,
+        state_view::cached_state_view::CachedStateView,
     },
     DbReaderWriter,
 };
@@ -42,14 +43,14 @@ use aptos_types::{
 use aptos_vm::VMBlockExecutor;
 use block_tree::BlockTree;
 use fail::fail_point;
-use std::sync::Arc;
+use std::sync::{mpsc::SyncSender, Arc};
 
 pub mod block_tree;
 
 pub struct BlockExecutor<V> {
     pub db: DbReaderWriter,
     inner: RwLock<Option<BlockExecutorInner<V>>>,
-    execution_lock: Mutex<()>,
+    execution_lock: Arc<Mutex<()>>,
 }
 
 impl<V> BlockExecutor<V>
@@ -60,7 +61,7 @@ where
         Self {
             db,
             inner: RwLock::new(None),
-            execution_lock: Mutex::new(()),
+            execution_lock: Arc::new(Mutex::new(())),
         }
     }
 
@@ -90,7 +91,10 @@ where
     fn reset(&self) -> Result<()> {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "reset"]);
 
-        *self.inner.write() = Some(BlockExecutorInner::new(self.db.clone())?);
+        *self.inner.write() = Some(BlockExecutorInner::new(
+            self.db.clone(),
+            self.execution_lock.clone(),
+        )?);
         Ok(())
     }
 
@@ -103,7 +107,13 @@ where
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "execute_and_state_checkpoint"]);
 
         self.maybe_initialize()?;
-        // guarantee only one block being executed at a time
+        // Guarantee only one block being executed at a time.
+        //
+        // n.b. The inner function's locals (including `Arc<Block>` references like
+        // `parent_block`) are dropped when it returns, which happens BEFORE this guard
+        // is dropped and the lock is released. This ordering is relied upon by the
+        // `hot_state_prog` worker thread: by the time it acquires this lock, all Arc
+        // references from the previous execution are guaranteed to be gone.
         let _guard = self.execution_lock.lock();
         self.inner
             .read()
@@ -164,19 +174,64 @@ struct BlockExecutorInner<V> {
     db: DbReaderWriter,
     block_tree: BlockTree,
     block_executor: V,
+    /// Sends `(drop_receiver, state)` to a dedicated worker thread that waits for old blocks
+    /// to be dropped before advancing the hot state progress.
+    hot_state_progress_tx: SyncSender<State>,
 }
 
 impl<V> BlockExecutorInner<V>
 where
     V: VMBlockExecutor,
 {
-    pub fn new(db: DbReaderWriter) -> Result<Self> {
+    pub fn new(db: DbReaderWriter, execution_lock: Arc<Mutex<()>>) -> Result<Self> {
         let block_tree = BlockTree::new(&db.reader)?;
+        let hot_state_progress_tx =
+            Self::spawn_hot_state_progress_worker(db.writer.clone(), execution_lock);
         Ok(Self {
             db,
             block_tree,
             block_executor: V::new(),
+            hot_state_progress_tx,
         })
+    }
+
+    /// Spawns a long-lived worker thread that advances the hot state progress.
+    ///
+    /// After `commit_ledger` prunes the block tree, the old root is scheduled for async
+    /// drop and a `Receiver<()>` is returned. However, the drop receiver firing only means
+    /// the dropper's `Arc<Block>` copy was dropped (refcount decremented) -- an in-flight
+    /// `execute_and_update_state` may still hold its own `Arc<Block>` to the parent block.
+    ///
+    /// To ensure safety, the worker:
+    ///   1. Waits on the drop receiver (avoids holding the lock while the dropper works).
+    ///   2. Acquires `execution_lock` -- the same lock held by
+    ///      `BlockExecutor::execute_and_update_state` for the entire duration of execution.
+    ///      Because the inner function's `Arc<Block>` locals are dropped before the outer
+    ///      function releases this lock, acquiring it here guarantees that any previously
+    ///      in-flight execution has finished AND its block references have been cleaned up.
+    ///   3. Calls `set_hot_state_progress`.
+    ///
+    /// If a new execution acquires the lock before the worker, that's still safe: old-fork
+    /// blocks are already gone from the lookup (cleaned up when the previous execution's
+    /// Arcs were dropped), so the new execution can only reference the new tree. Advancing
+    /// `hot_state_progress` afterward is correct because the new execution's base version
+    /// is >= the committed version.
+    fn spawn_hot_state_progress_worker(
+        writer: Arc<dyn aptos_storage_interface::DbWriter>,
+        execution_lock: Arc<Mutex<()>>,
+    ) -> SyncSender<State> {
+        let (tx, rx) = std::sync::mpsc::sync_channel(1);
+
+        std::thread::Builder::new()
+            .name("hot_state_prog".to_string())
+            .spawn(move || {
+                while let Ok(state) = rx.recv() {
+                    let _guard = execution_lock.lock();
+                    writer.set_hot_state_progress(state);
+                }
+            })
+            .expect("Failed to spawn hot-state-progress thread.");
+        tx
     }
 }
 
@@ -390,6 +445,20 @@ where
             .commit_ledger(target_version, Some(&ledger_info_with_sigs), None)?;
 
         self.block_tree.prune(ledger_info_with_sigs.ledger_info())?;
+
+        // After pruning, the new root's state is safe to expose through the hot state once
+        // all in-flight blocks (that may reference the old root) are truly dropped. Send to
+        // the dedicated worker thread which waits for the drop and advances the hot state.
+        let state = self
+            .block_tree
+            .root_block()
+            .output
+            .result_state()
+            .latest()
+            .clone();
+        self.hot_state_progress_tx
+            .send(state)
+            .expect("Hot state progress worker thread exited unexpectedly.");
 
         Ok(())
     }
