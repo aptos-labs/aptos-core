@@ -11,55 +11,19 @@ use aptos_logger::info;
 use aptos_types::{dkg::DKGState, on_chain_config::OnChainRandomnessConfig};
 use std::{sync::Arc, time::Duration};
 
-/// Verify randomness works end-to-end with optimistic share verification enabled.
+/// Combined test for optimistic share verification covering:
+/// 1. Happy path: all shares valid, randomness produced normally
+/// 2. Corrupt share with sufficient valid shares: pre_aggregate_verify detects
+///    and removes the bad share, 3 remaining valid shares meet threshold
+/// 3. Stall: corrupt share + stopped validator = only 2 valid shares < threshold,
+///    chain stalls because consensus waits for randomness
+/// 4. Recovery: restart stopped validator, 3 valid shares meet threshold again,
+///    chain resumes
 #[tokio::test]
-async fn optimistic_verification_happy_path() {
+async fn optimistic_verification() {
     let epoch_duration_secs = 20;
 
-    let (swarm, _cli, _faucet) = SwarmBuilder::new_local(4)
-        .with_num_fullnodes(1)
-        .with_aptos()
-        .with_init_genesis_config(Arc::new(move |conf| {
-            conf.epoch_duration_secs = epoch_duration_secs;
-            conf.consensus_config.enable_validator_txns();
-            conf.consensus_config.disable_rand_check();
-            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
-        }))
-        .build_with_cli(0)
-        .await;
-
-    let decrypt_key_map = decrypt_key_map(&swarm);
-    let rest_client = swarm.validators().next().unwrap().rest_client();
-
-    info!("Wait for epoch 2. Epoch 1 does not have randomness.");
-    swarm
-        .wait_for_all_nodes_to_catchup_to_epoch(2, Duration::from_secs(epoch_duration_secs * 2))
-        .await
-        .expect("Epoch 2 taking too long to arrive!");
-
-    info!("Verify DKG correctness for epoch 2.");
-    let dkg_session = get_on_chain_resource::<DKGState>(&rest_client).await;
-    assert!(verify_dkg_transcript(dkg_session.last_complete(), &decrypt_key_map).is_ok());
-
-    info!("Verify randomness correctness for 10 versions with optimistic verification.");
-    for _ in 0..10 {
-        let cur_txn_version = get_current_version(&rest_client).await;
-        info!("Verifying WVUF output for version {}.", cur_txn_version);
-        let wvuf_verify_result =
-            verify_randomness(&decrypt_key_map, &rest_client, cur_txn_version).await;
-        assert!(wvuf_verify_result.is_ok());
-    }
-}
-
-/// Verify that randomness still works when one validator sends corrupted shares.
-/// The corrupted share passes optimistic_verify (structural checks only) but fails
-/// batch verification in aggregate(), triggering the fallback path which discards
-/// the bad share and re-aggregates with remaining valid shares.
-#[tokio::test]
-async fn optimistic_verification_with_corrupt_share() {
-    let epoch_duration_secs = 20;
-
-    let (swarm, _cli, _faucet) = SwarmBuilder::new_local(4)
+    let (mut swarm, _cli, _faucet) = SwarmBuilder::new_local(4)
         .with_num_fullnodes(1)
         .with_aptos()
         .with_init_config(Arc::new(|_, conf, _| {
@@ -76,21 +40,28 @@ async fn optimistic_verification_with_corrupt_share() {
 
     let decrypt_key_map = decrypt_key_map(&swarm);
     let validator_clients: Vec<_> = swarm.validators().map(|v| v.rest_client()).collect();
-    let rest_client = &validator_clients[0];
+    let rest_client = &validator_clients[1]; // validator 1 stays up throughout
 
-    info!("Wait for epoch 2.");
+    // --- Phase 1: Happy path ---
+    info!("Wait for epoch 2. Epoch 1 does not have randomness.");
     swarm
         .wait_for_all_nodes_to_catchup_to_epoch(2, Duration::from_secs(epoch_duration_secs * 2))
         .await
         .expect("Epoch 2 taking too long to arrive!");
 
-    info!("Verify randomness works before injecting fault.");
-    for _ in 0..5 {
-        let cur_txn_version = get_current_version(rest_client).await;
-        let result = verify_randomness(&decrypt_key_map, rest_client, cur_txn_version).await;
-        assert!(result.is_ok());
+    info!("Verify DKG correctness for epoch 2.");
+    let dkg_session = get_on_chain_resource::<DKGState>(rest_client).await;
+    assert!(verify_dkg_transcript(dkg_session.last_complete(), &decrypt_key_map).is_ok());
+
+    info!("Verify randomness correctness for 10 versions.");
+    for _ in 0..10 {
+        let v = get_current_version(rest_client).await;
+        assert!(verify_randomness(&decrypt_key_map, rest_client, v)
+            .await
+            .is_ok());
     }
 
+    // --- Phase 2: Corrupt share, sufficient valid shares ---
     info!("Inject corrupt share failpoint on validator 0.");
     validator_clients[0]
         .set_failpoint(
@@ -100,33 +71,56 @@ async fn optimistic_verification_with_corrupt_share() {
         .await
         .unwrap();
 
-    info!("Wait for randomness to continue working despite corrupt shares.");
     tokio::time::sleep(Duration::from_secs(5)).await;
 
-    info!("Verify randomness still works with one validator sending bad shares.");
+    info!("Verify randomness still works with 3 valid shares.");
     for _ in 0..10 {
-        let cur_txn_version = get_current_version(rest_client).await;
-        let result = verify_randomness(&decrypt_key_map, rest_client, cur_txn_version).await;
+        let v = get_current_version(rest_client).await;
         assert!(
-            result.is_ok(),
+            verify_randomness(&decrypt_key_map, rest_client, v)
+                .await
+                .is_ok(),
             "Randomness should survive corrupt shares via fallback"
         );
     }
 
-    info!("Disable corrupt share failpoint.");
-    validator_clients[0]
-        .set_failpoint(
-            "consensus::rand::corrupt_share".to_string(),
-            "off".to_string(),
-        )
-        .await
-        .unwrap();
+    // --- Phase 3: Stall — stop validator 3, only 2 valid shares remain ---
+    info!("Stop validator 3.");
+    swarm.validators_mut().nth(3).unwrap().stop();
 
-    info!("Verify randomness continues working after failpoint disabled.");
-    tokio::time::sleep(Duration::from_secs(5)).await;
-    for _ in 0..5 {
-        let cur_txn_version = get_current_version(rest_client).await;
-        let result = verify_randomness(&decrypt_key_map, rest_client, cur_txn_version).await;
-        assert!(result.is_ok());
+    // Wait for pipeline to drain, then verify chain has stalled.
+    tokio::time::sleep(Duration::from_secs(10)).await;
+    let version_before = get_current_version(rest_client).await;
+    tokio::time::sleep(Duration::from_secs(10)).await;
+    let version_after = get_current_version(rest_client).await;
+    info!(
+        "Chain stall check: version_before={}, version_after={}",
+        version_before, version_after
+    );
+    assert_eq!(
+        version_before, version_after,
+        "Chain should stall with only 2 valid shares (below threshold 3)"
+    );
+
+    // --- Phase 4: Recovery — restart validator 3 ---
+    info!("Start validator 3.");
+    swarm.validators_mut().nth(3).unwrap().start().unwrap();
+
+    tokio::time::sleep(Duration::from_secs(15)).await;
+
+    info!("Verify chain resumed and randomness works via unhappy path.");
+    let version_after_recovery = get_current_version(rest_client).await;
+    assert!(
+        version_after_recovery > version_after,
+        "Chain should resume after starting validator 3"
+    );
+    for _ in 0..10 {
+        let v = get_current_version(rest_client).await;
+        assert!(
+            verify_randomness(&decrypt_key_map, rest_client, v)
+                .await
+                .is_ok(),
+            "Randomness should work via unhappy path with 3 valid shares"
+        );
     }
 }
