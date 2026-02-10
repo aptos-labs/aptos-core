@@ -203,8 +203,19 @@ impl TransactionDataCache {
                 .serialize(&value, &layout)?
                 .map(Into::into)
                 .ok_or_else(|| {
-                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
-                        .with_message(format!("Error when serializing resource {}.", value))
+                    // Note: When enable_closure_depth_check is enabled, do not format
+                    // `value` here - deeply nested closures can cause stack overflow
+                    // during Display formatting.
+                    let enable_closure_depth_check = module_storage
+                        .runtime_environment()
+                        .vm_config()
+                        .enable_closure_depth_check;
+                    let message = if enable_closure_depth_check {
+                        "Error when serializing resource.".to_string()
+                    } else {
+                        format!("Error when serializing resource {}.", value)
+                    };
+                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(message)
                 })
         };
         self.into_custom_effects(&resource_converter)
