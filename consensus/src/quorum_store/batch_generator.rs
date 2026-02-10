@@ -248,6 +248,18 @@ impl BatchGenerator {
                 batches.push(batch);
                 *total_batches_remaining = total_batches_remaining.saturating_sub(1);
                 txns_remaining -= num_batch_txns;
+            } else {
+                // First transaction exceeds sender_max_batch_bytes - skip to avoid infinite loop
+                if let Some(txn) = txns.drain(0..1).next() {
+                    warn!(
+                        "Skipping transaction that exceeds sender_max_batch_bytes ({} bytes): sender={}, size={}",
+                        self.config.sender_max_batch_bytes,
+                        txn.sender(),
+                        txn.txn_bytes_len()
+                    );
+                    counters::BATCH_GENERATOR_SKIPPED_OVERSIZED_TXN.inc();
+                }
+                txns_remaining -= 1;
             }
         }
     }
