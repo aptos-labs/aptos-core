@@ -3844,16 +3844,6 @@ impl ModuleBuilder<'_, '_> {
                 visibility: entry.visibility,
                 has_package_visibility: self.package_structs.contains(&entry.struct_id),
                 is_empty_struct: entry.is_empty_struct,
-                using_funs: RefCell::new(Some(
-                    entry
-                        .users
-                        .iter()
-                        .filter_map(|user| match user {
-                            UserId::Function(fun_id) => Some(*fun_id),
-                            _ => None,
-                        })
-                        .collect(),
-                )),
                 users: RefCell::new(Some(entry.users.clone())),
             };
             struct_data.insert(StructId::new(name.symbol), data);

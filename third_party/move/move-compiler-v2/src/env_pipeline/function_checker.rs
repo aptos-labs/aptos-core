@@ -672,7 +672,7 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
             if unused_warnings_enabled {
                 for struct_env in caller_module.get_structs() {
                     if struct_env.get_visibility() == Visibility::Private
-                        && struct_env.get_using_functions().is_empty()
+                        && struct_env.get_users().is_empty()
                     {
                         let loc = struct_env.get_loc();
                         let msg = format!(
