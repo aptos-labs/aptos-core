@@ -36,7 +36,10 @@
 ///      + This would require a storage-friendly RistrettoBasepointTable and an in-memory variant of it too
 ///      + Similar to the CompressedRistretto and RistrettoPoint structs in this module
 ///      + The challenge is that curve25519-dalek's RistrettoBasepointTable is not serializable
-
+///
+/// TODO:
+///  - make fetching the `RistrettoPoint`'s for the basepoint and the hased basepoint instant via natives, by not going
+///    through point decompression
 module aptos_std::ristretto255 {
     use std::features;
     use std::option::Option;
@@ -60,10 +63,14 @@ module aptos_std::ristretto255 {
     /// The maximum size in bytes of a canonically-encoded Ristretto255 point is 32 bytes.
     const MAX_POINT_NUM_BYTES: u64 = 32u64;
 
+    /// The identity point
+    const IDENTITY_POINT: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
+
     /// The basepoint (generator) of the Ristretto255 group
     const BASE_POINT: vector<u8> = x"e2f2ae0a6abc4e71a884a961c500515f58e30b6aa582dd8db6a65945e08d2d76";
 
     /// The hash of the basepoint of the Ristretto255 group using SHA3_512
+    /// TODO: Can we rename this?
     const HASH_BASE_POINT: vector<u8> = x"8c9240b456a9e6dc65c377a1048d745f94a08cdb7f44cbcd7b46f34048871134";
 
     //
@@ -80,6 +87,8 @@ module aptos_std::ristretto255 {
     const E_TOO_MANY_POINTS_CREATED: u64 = 4;
     /// The native function has not been deployed yet.
     const E_NATIVE_FUN_NOT_AVAILABLE: u64 = 5;
+    /// Non-canonical encoding of a Ristretto255 point
+    const E_NON_CANONICAL_ENCODING: u64 = 6;
 
     //
     // Scalar and point structs
@@ -113,7 +122,7 @@ module aptos_std::ristretto255 {
     /// Returns the identity point as a CompressedRistretto.
     public fun point_identity_compressed(): CompressedRistretto {
         CompressedRistretto {
-            data: x"0000000000000000000000000000000000000000000000000000000000000000"
+            data: IDENTITY_POINT
         }
     }
 
@@ -131,11 +140,21 @@ module aptos_std::ristretto255 {
         }
     }
 
-    /// Returns the hash-to-point result of serializing the basepoint of the Ristretto255 group.
-    /// For use as the random value basepoint in Pedersen commitments
+    /// Returns a Ristretto255 group generator `H` obtained from hashing (the serialization of) the basepoint `G` to the group.
+    /// Useful for using it as the randomness basepoint in Pedersen commitments: i.e., C = v G + r H
+    public fun basepoint_H_compressed(): CompressedRistretto {
+        CompressedRistretto { data: HASH_BASE_POINT }
+    }
+
+    /// Like `hash_to_point_base_compressed` but returns a decompressed point.
+    public fun basepoint_H(): RistrettoPoint {
+        point_decompress(&basepoint_H_compressed())
+    }
+
+    #[deprecated]
+    /// Should call `basepoint_H` instead.
     public fun hash_to_point_base(): RistrettoPoint {
-        let comp_res = CompressedRistretto { data: HASH_BASE_POINT };
-        point_decompress(&comp_res)
+        point_decompress(&basepoint_H_compressed())
     }
 
     /// Returns the basepoint (generator) of the Ristretto255 group
@@ -155,8 +174,8 @@ module aptos_std::ristretto255 {
         }
     }
 
-    /// Creates a new CompressedRistretto point from a sequence of 32 bytes. If those bytes do not represent a valid
-    /// point, returns None.
+    /// Creates a new CompressedRistretto point from a sequence of 32 bytes. Actually attempts decompression to check
+    /// that the bytes represent a valid Ristretto255 point. If not, returns None.
     public fun new_compressed_point_from_bytes(bytes: vector<u8>): Option<CompressedRistretto> {
         if (point_is_canonical_internal(bytes)) {
             std::option::some(CompressedRistretto {
@@ -178,11 +197,31 @@ module aptos_std::ristretto255 {
         }
     }
 
+    /// Without this function, it is not possible to efficiently parse a 32-byte array both as RistrettoPoint and as a
+    /// CompressedRistretto without doing two decompressions.
+    ///
+    /// Note: Due to limitations of Move, this function will abort instead of returning an Option::None, because we cannot
+    /// have tuples as the option's type.
+    public fun new_point_and_compressed_from_bytes(bytes: vector<u8>): (RistrettoPoint, CompressedRistretto) {
+        let (handle, is_canonical) = point_decompress_internal(bytes);
+        if (is_canonical) {
+            (
+                RistrettoPoint { handle },
+                CompressedRistretto {
+                    data: bytes
+                }
+            )
+        } else {
+            abort(std::error::invalid_argument(E_NON_CANONICAL_ENCODING))
+        }
+    }
+
     /// Given a compressed ristretto point `point`, returns the byte representation of that point
     public fun compressed_point_to_bytes(point: CompressedRistretto): vector<u8> {
         point.data
     }
 
+    #[deprecated]
     /// DEPRECATED: Use the more clearly-named `new_point_from_sha2_512`
     ///
     /// Hashes the input to a uniformly-at-random RistrettoPoint via SHA512.
@@ -304,6 +343,17 @@ module aptos_std::ristretto255 {
     /// Returns true if the two RistrettoPoints are the same points on the elliptic curve.
     native public fun point_equals(g: &RistrettoPoint, h: &RistrettoPoint): bool;
 
+    /// Returns true if the two compressed points are the same points on the elliptic curve.
+    /// Recall that serialization is canonical, so testing equality this way is correct.
+    public fun compressed_point_equals(lhs: &CompressedRistretto, rhs: &CompressedRistretto): bool {
+        lhs.data == rhs.data
+    }
+
+    /// Returns true if the compressed point is the identity point.
+    public fun is_identity(self: &CompressedRistretto): bool {
+        self.data == IDENTITY_POINT
+    }
+
     /// Computes a double-scalar multiplication, returning a_1 p_1 + a_2 p_2
     /// This function is much faster than computing each a_i p_i using `point_mul` and adding up the results using `point_add`.
     public fun double_scalar_mul(scalar1: &Scalar, point1: &RistrettoPoint, scalar2: &Scalar, point2: &RistrettoPoint): RistrettoPoint {
@@ -345,6 +395,7 @@ module aptos_std::ristretto255 {
         }
     }
 
+    #[deprecated]
     /// DEPRECATED: Use the more clearly-named `new_scalar_from_sha2_512`
     ///
     /// Hashes the input to a uniformly-at-random Scalar via SHA2-512

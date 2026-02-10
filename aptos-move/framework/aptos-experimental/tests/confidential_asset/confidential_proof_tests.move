@@ -1,14 +1,12 @@
 #[test_only]
 module aptos_experimental::confidential_proof_tests {
-    use aptos_experimental::confidential_balance;
+    use aptos_std::ristretto255::CompressedRistretto;
+    use aptos_experimental::confidential_balance::{Self, get_num_pending_chunks, get_num_available_chunks};
     use aptos_experimental::confidential_proof;
-    use aptos_experimental::ristretto255_twisted_elgamal::{
-        Self as twisted_elgamal,
-        generate_twisted_elgamal_keypair
-    };
+    use aptos_experimental::ristretto255_twisted_elgamal::generate_twisted_elgamal_keypair;
 
     struct WithdrawParameters has drop {
-        ek: twisted_elgamal::CompressedPubkey,
+        ek: CompressedRistretto,
         amount: u64,
         current_balance: confidential_balance::ConfidentialBalance,
         new_balance: confidential_balance::ConfidentialBalance,
@@ -16,30 +14,21 @@ module aptos_experimental::confidential_proof_tests {
     }
 
     struct TransferParameters has drop {
-        sender_ek: twisted_elgamal::CompressedPubkey,
-        recipient_ek: twisted_elgamal::CompressedPubkey,
+        sender_ek: CompressedRistretto,
+        recipient_ek: CompressedRistretto,
         amount: u64,
         new_amount: u128,
         current_balance: confidential_balance::ConfidentialBalance,
         new_balance: confidential_balance::ConfidentialBalance,
         sender_amount: confidential_balance::ConfidentialBalance,
         recipient_amount: confidential_balance::ConfidentialBalance,
-        auditor_eks: vector<twisted_elgamal::CompressedPubkey>,
+        auditor_eks: vector<CompressedRistretto>,
         auditor_amounts: vector<confidential_balance::ConfidentialBalance>,
         proof: confidential_proof::TransferProof
     }
 
-    struct RotationParameters has drop {
-        current_ek: twisted_elgamal::CompressedPubkey,
-        new_ek: twisted_elgamal::CompressedPubkey,
-        amount: u128,
-        current_balance: confidential_balance::ConfidentialBalance,
-        new_balance: confidential_balance::ConfidentialBalance,
-        proof: confidential_proof::RotationProof
-    }
-
     struct NormalizationParameters has drop {
-        ek: twisted_elgamal::CompressedPubkey,
+        ek: CompressedRistretto,
         amount: u128,
         current_balance: confidential_balance::ConfidentialBalance,
         new_balance: confidential_balance::ConfidentialBalance,
@@ -58,8 +47,8 @@ module aptos_experimental::confidential_proof_tests {
         let current_balance_r = confidential_balance::generate_balance_randomness();
 
         let current_balance =
-            confidential_balance::new_actual_balance_from_u128(
-                current_amount, &current_balance_r, &ek
+            confidential_balance::new_balance_from_amount(
+                current_amount, get_num_available_chunks(), &current_balance_r, &ek
             );
 
         let (proof, new_balance) =
@@ -82,8 +71,9 @@ module aptos_experimental::confidential_proof_tests {
 
         let current_balance_r = confidential_balance::generate_balance_randomness();
         let current_balance =
-            confidential_balance::new_actual_balance_from_u128(
+            confidential_balance::new_balance_from_amount(
                 current_amount,
+                get_num_available_chunks(),
                 &current_balance_r,
                 &sender_ek
             );
@@ -118,38 +108,6 @@ module aptos_experimental::confidential_proof_tests {
         }
     }
 
-    fun rotate(): RotationParameters {
-        let (current_dk, current_ek) = generate_twisted_elgamal_keypair();
-        let (new_dk, new_ek) = generate_twisted_elgamal_keypair();
-
-        let amount = 150;
-
-        let current_balance_r = confidential_balance::generate_balance_randomness();
-        let current_balance =
-            confidential_balance::new_actual_balance_from_u128(
-                amount, &current_balance_r, &current_ek
-            );
-
-        let (proof, new_balance) =
-            confidential_proof::prove_rotation(
-                &current_dk,
-                &new_dk,
-                &current_ek,
-                &new_ek,
-                amount,
-                &current_balance
-            );
-
-        RotationParameters {
-            current_ek,
-            new_ek,
-            amount,
-            current_balance,
-            new_balance,
-            proof
-        }
-    }
-
     fun normalize(): NormalizationParameters {
         let (dk, ek) = generate_twisted_elgamal_keypair();
 
@@ -157,13 +115,13 @@ module aptos_experimental::confidential_proof_tests {
 
         let current_balance_r = confidential_balance::generate_balance_randomness();
         let current_balance =
-            confidential_balance::new_actual_balance_from_u128(
-                amount / 2, &current_balance_r, &ek
+            confidential_balance::new_balance_from_amount(
+                amount / 2, get_num_available_chunks(), &current_balance_r, &ek
             );
         confidential_balance::add_balances_mut(
             &mut current_balance,
-            &confidential_balance::new_actual_balance_from_u128(
-                amount / 2, &current_balance_r, &ek
+            &confidential_balance::new_balance_from_amount(
+                amount / 2, get_num_available_chunks(), &current_balance_r, &ek
             )
         );
 
@@ -208,8 +166,9 @@ module aptos_experimental::confidential_proof_tests {
         confidential_proof::verify_withdrawal_proof(
             &params.ek,
             params.amount,
-            &confidential_balance::new_actual_balance_from_u128(
+            &confidential_balance::new_balance_from_amount(
                 1000,
+                get_num_available_chunks(),
                 &confidential_balance::generate_balance_randomness(),
                 &params.ek
             ),
@@ -227,8 +186,9 @@ module aptos_experimental::confidential_proof_tests {
             &params.ek,
             params.amount,
             &params.current_balance,
-            &confidential_balance::new_actual_balance_from_u128(
+            &confidential_balance::new_balance_from_amount(
                 1000,
+                get_num_available_chunks(),
                 &confidential_balance::generate_balance_randomness(),
                 &params.ek
             ),
@@ -313,8 +273,9 @@ module aptos_experimental::confidential_proof_tests {
         confidential_proof::verify_transfer_proof(
             &params.sender_ek,
             &params.recipient_ek,
-            &confidential_balance::new_actual_balance_from_u128(
+            &confidential_balance::new_balance_from_amount(
                 1000,
+                get_num_available_chunks(),
                 &confidential_balance::generate_balance_randomness(),
                 &params.sender_ek
             ),
@@ -357,8 +318,9 @@ module aptos_experimental::confidential_proof_tests {
             &params.recipient_ek,
             &params.current_balance,
             &params.new_balance,
-            &confidential_balance::new_pending_balance_from_u64(
+            &confidential_balance::new_balance_from_amount(
                 1000,
+                get_num_pending_chunks(),
                 &confidential_balance::generate_balance_randomness(),
                 &params.recipient_ek
             ),
@@ -380,8 +342,9 @@ module aptos_experimental::confidential_proof_tests {
             &params.current_balance,
             &params.new_balance,
             &params.sender_amount,
-            &confidential_balance::new_pending_balance_from_u64(
+            &confidential_balance::new_balance_from_amount(
                 1000,
+                get_num_pending_chunks(),
                 &confidential_balance::generate_balance_randomness(),
                 &params.recipient_ek
             ),
@@ -419,8 +382,9 @@ module aptos_experimental::confidential_proof_tests {
 
         let (_, auditor_ek) = generate_twisted_elgamal_keypair();
         let auditor_amount =
-            confidential_balance::new_pending_balance_from_u64(
+            confidential_balance::new_balance_from_amount(
                 1000,
+                get_num_pending_chunks(),
                 &confidential_balance::generate_balance_randomness(),
                 &auditor_ek
             );
@@ -435,83 +399,6 @@ module aptos_experimental::confidential_proof_tests {
             &params.recipient_amount,
             &params.auditor_eks,
             &auditor_amounts,
-            &params.proof
-        );
-    }
-
-    #[test]
-    fun success_rotate() {
-        let params = rotate();
-
-        confidential_proof::verify_rotation_proof(
-            &params.current_ek,
-            &params.new_ek,
-            &params.current_balance,
-            &params.new_balance,
-            &params.proof
-        );
-    }
-
-    #[test]
-    #[expected_failure(abort_code = 0x010001, location = confidential_proof)]
-    fun fail_rotate_if_wrong_current_ek() {
-        let params = rotate();
-
-        confidential_proof::verify_rotation_proof(
-            &params.new_ek,
-            &params.new_ek,
-            &params.current_balance,
-            &params.new_balance,
-            &params.proof
-        );
-    }
-
-    #[test]
-    #[expected_failure(abort_code = 0x010001, location = confidential_proof)]
-    fun fail_rotate_if_wrong_new_ek() {
-        let params = rotate();
-
-        confidential_proof::verify_rotation_proof(
-            &params.current_ek,
-            &params.current_ek,
-            &params.current_balance,
-            &params.new_balance,
-            &params.proof
-        );
-    }
-
-    #[test]
-    #[expected_failure(abort_code = 0x010001, location = confidential_proof)]
-    fun fail_rotate_if_wrong_current_balance() {
-        let params = rotate();
-
-        confidential_proof::verify_rotation_proof(
-            &params.current_ek,
-            &params.new_ek,
-            &confidential_balance::new_actual_balance_from_u128(
-                1000,
-                &confidential_balance::generate_balance_randomness(),
-                &params.current_ek
-            ),
-            &params.new_balance,
-            &params.proof
-        );
-    }
-
-    #[test]
-    #[expected_failure(abort_code = 0x010001, location = confidential_proof)]
-    fun fail_rotate_if_wrong_new_balance() {
-        let params = rotate();
-
-        confidential_proof::verify_rotation_proof(
-            &params.current_ek,
-            &params.new_ek,
-            &params.current_balance,
-            &confidential_balance::new_actual_balance_from_u128(
-                1000,
-                &confidential_balance::generate_balance_randomness(),
-                &params.new_ek
-            ),
             &params.proof
         );
     }
@@ -550,8 +437,9 @@ module aptos_experimental::confidential_proof_tests {
 
         confidential_proof::verify_normalization_proof(
             &params.ek,
-            &confidential_balance::new_actual_balance_from_u128(
+            &confidential_balance::new_balance_from_amount(
                 1000,
+                get_num_available_chunks(),
                 &confidential_balance::generate_balance_randomness(),
                 &params.ek
             ),
@@ -568,8 +456,9 @@ module aptos_experimental::confidential_proof_tests {
         confidential_proof::verify_normalization_proof(
             &params.ek,
             &params.current_balance,
-            &confidential_balance::new_actual_balance_from_u128(
+            &confidential_balance::new_balance_from_amount(
                 1000,
+                get_num_available_chunks(),
                 &confidential_balance::generate_balance_randomness(),
                 &params.ek
             ),

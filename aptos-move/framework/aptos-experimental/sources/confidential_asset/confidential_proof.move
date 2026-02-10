@@ -1,5 +1,5 @@
 /// The `confidential_proof` module provides the infrastructure for verifying zero-knowledge proofs used in the Confidential Asset protocol.
-/// These proofs ensure correctness for operations such as `confidential_transfer`, `withdraw`, `rotate_encryption_key`, and `normalize`.
+/// These proofs ensure correctness for operations such as `confidential_transfer`, `withdraw`, and `normalize`.
 module aptos_experimental::confidential_proof {
     use std::error;
     use std::option;
@@ -8,8 +8,9 @@ module aptos_experimental::confidential_proof {
     use aptos_std::ristretto255::{Self, CompressedRistretto, Scalar};
     use aptos_std::ristretto255_bulletproofs::{Self as bulletproofs, RangeProof};
 
-    use aptos_experimental::confidential_balance;
-    use aptos_experimental::ristretto255_twisted_elgamal as twisted_elgamal;
+    use aptos_experimental::confidential_balance::{Self, get_num_pending_chunks};
+    #[test_only]
+    use aptos_experimental::confidential_balance::get_num_available_chunks;
 
     friend aptos_experimental::confidential_asset;
 
@@ -26,7 +27,6 @@ module aptos_experimental::confidential_proof {
 
     const FIAT_SHAMIR_WITHDRAWAL_SIGMA_DST: vector<u8> = b"AptosConfidentialAsset/WithdrawalProofFiatShamir";
     const FIAT_SHAMIR_TRANSFER_SIGMA_DST: vector<u8> = b"AptosConfidentialAsset/TransferProofFiatShamir";
-    const FIAT_SHAMIR_ROTATION_SIGMA_DST: vector<u8> = b"AptosConfidentialAsset/RotationProofFiatShamir";
     const FIAT_SHAMIR_NORMALIZATION_SIGMA_DST: vector<u8> = b"AptosConfidentialAsset/NormalizationProofFiatShamir";
 
     const BULLETPROOFS_DST: vector<u8> = b"AptosConfidentialAsset/BulletproofRangeProof";
@@ -59,14 +59,6 @@ module aptos_experimental::confidential_proof {
         /// Sigma proof ensuring that the normalization operation maintains balance integrity.
         sigma_proof: NormalizationSigmaProof,
         /// Range proof ensuring that the resulting balance chunks are normalized (i.e., within the 16-bit limit).
-        zkrp_new_balance: RangeProof
-    }
-
-    /// Represents the proof structure for validating a key rotation operation.
-    struct RotationProof has drop {
-        /// Sigma proof ensuring that the key rotation operation preserves balance integrity.
-        sigma_proof: RotationSigmaProof,
-        /// Range proof ensuring that the resulting balance chunks after key rotation are normalized (i.e., within the 16-bit limit).
         zkrp_new_balance: RangeProof
     }
 
@@ -162,35 +154,6 @@ module aptos_experimental::confidential_proof {
         xs: NormalizationSigmaProofXs
     }
 
-    struct RotationSigmaProofXs has drop {
-        x1: CompressedRistretto,
-        x2: CompressedRistretto,
-        x3: CompressedRistretto,
-        x4s: vector<CompressedRistretto>,
-        x5s: vector<CompressedRistretto>
-    }
-
-    struct RotationSigmaProofAlphas has drop {
-        a1s: vector<Scalar>,
-        a2: Scalar,
-        a3: Scalar,
-        a4: Scalar,
-        a5s: vector<Scalar>
-    }
-
-    struct RotationSigmaProofGammas has drop {
-        g1: Scalar,
-        g2: Scalar,
-        g3: Scalar,
-        g4s: vector<Scalar>,
-        g5s: vector<Scalar>
-    }
-
-    struct RotationSigmaProof has drop {
-        alphas: RotationSigmaProofAlphas,
-        xs: RotationSigmaProofXs
-    }
-
     //
     // Proof verification functions
     //
@@ -205,7 +168,7 @@ module aptos_experimental::confidential_proof {
     ///
     /// If all conditions are satisfied, the proof validates the withdrawal; otherwise, the function causes an error.
     public fun verify_withdrawal_proof(
-        ek: &twisted_elgamal::CompressedPubkey,
+        ek: &CompressedRistretto,
         amount: u64,
         current_balance: &confidential_balance::ConfidentialBalance,
         new_balance: &confidential_balance::ConfidentialBalance,
@@ -235,13 +198,13 @@ module aptos_experimental::confidential_proof {
     ///
     /// If all conditions are satisfied, the proof validates the transfer; otherwise, the function causes an error.
     public fun verify_transfer_proof(
-        sender_ek: &twisted_elgamal::CompressedPubkey,
-        recipient_ek: &twisted_elgamal::CompressedPubkey,
+        sender_ek: &CompressedRistretto,
+        recipient_ek: &CompressedRistretto,
         current_balance: &confidential_balance::ConfidentialBalance,
         new_balance: &confidential_balance::ConfidentialBalance,
         sender_amount: &confidential_balance::ConfidentialBalance,
         recipient_amount: &confidential_balance::ConfidentialBalance,
-        auditor_eks: &vector<twisted_elgamal::CompressedPubkey>,
+        auditor_eks: &vector<CompressedRistretto>,
         auditor_amounts: &vector<confidential_balance::ConfidentialBalance>,
         proof: &TransferProof
     ) {
@@ -279,7 +242,7 @@ module aptos_experimental::confidential_proof {
     ///
     /// If all conditions are satisfied, the proof validates the normalization; otherwise, the function causes an error.
     public fun verify_normalization_proof(
-        ek: &twisted_elgamal::CompressedPubkey,
+        ek: &CompressedRistretto,
         current_balance: &confidential_balance::ConfidentialBalance,
         new_balance: &confidential_balance::ConfidentialBalance,
         proof: &NormalizationProof
@@ -293,46 +256,19 @@ module aptos_experimental::confidential_proof {
         verify_new_balance_range_proof(new_balance, &proof.zkrp_new_balance);
     }
 
-    /// Verifies the validity of the `rotate_encryption_key` operation.
-    ///
-    /// This function ensures that the provided proof (`RotationProof`) meets the following conditions:
-    /// 1. The current balance (`current_balance`) and new balance (`new_balance`) encrypt the same value under the
-    ///    current encryption key (`current_ek`) and the new encryption key (`new_ek`), respectively, verifying
-    ///    that the key rotation preserves the balance value.
-    /// 2. The new balance (`new_balance`) is properly normalized, with each chunk adhering to the range [0, 2^16),
-    ///    ensuring balance integrity after the key rotation.
-    ///
-    /// If all conditions are satisfied, the proof validates the key rotation; otherwise, the function causes an error.
-    public fun verify_rotation_proof(
-        current_ek: &twisted_elgamal::CompressedPubkey,
-        new_ek: &twisted_elgamal::CompressedPubkey,
-        current_balance: &confidential_balance::ConfidentialBalance,
-        new_balance: &confidential_balance::ConfidentialBalance,
-        proof: &RotationProof
-    ) {
-        verify_rotation_sigma_proof(
-            current_ek,
-            new_ek,
-            current_balance,
-            new_balance,
-            &proof.sigma_proof
-        );
-        verify_new_balance_range_proof(new_balance, &proof.zkrp_new_balance);
-    }
-
     //
     // Verification functions implementations
     //
 
     /// Verifies the validity of the `WithdrawalSigmaProof`.
     fun verify_withdrawal_sigma_proof(
-        ek: &twisted_elgamal::CompressedPubkey,
+        ek: &CompressedRistretto,
         amount: u64,
         current_balance: &confidential_balance::ConfidentialBalance,
         new_balance: &confidential_balance::ConfidentialBalance,
         proof: &WithdrawalSigmaProof
     ) {
-        let amount_chunks = confidential_balance::split_into_chunks_u64(amount);
+        let amount_chunks = confidential_balance::split_into_chunks((amount as u128), get_num_pending_chunks());
         let amount = ristretto255::new_scalar_from_u64(amount);
 
         let rho =
@@ -405,12 +341,12 @@ module aptos_experimental::confidential_proof {
         let points_rhs = vector[
             ristretto255::basepoint(),
             ristretto255::hash_to_point_base(),
-            twisted_elgamal::pubkey_to_point(ek)
+            ristretto255::point_decompress(ek)
         ];
-        points_rhs.append(confidential_balance::balance_to_points_d(current_balance));
-        points_rhs.append(confidential_balance::balance_to_points_d(new_balance));
-        points_rhs.append(confidential_balance::balance_to_points_c(current_balance));
-        points_rhs.append(confidential_balance::balance_to_points_c(new_balance));
+        points_rhs.append(current_balance.get_D().map_ref(|d| ristretto255::point_clone(d)));
+        points_rhs.append(new_balance.get_D().map_ref(|d| ristretto255::point_clone(d)));
+        points_rhs.append(current_balance.get_C().map_ref(|c| ristretto255::point_clone(c)));
+        points_rhs.append(new_balance.get_C().map_ref(|c| ristretto255::point_clone(c)));
 
         let lhs = ristretto255::multi_scalar_mul(&points_lhs, &scalars_lhs);
         let rhs = ristretto255::multi_scalar_mul(&points_rhs, &scalars_rhs);
@@ -423,13 +359,13 @@ module aptos_experimental::confidential_proof {
 
     /// Verifies the validity of the `TransferSigmaProof`.
     fun verify_transfer_sigma_proof(
-        sender_ek: &twisted_elgamal::CompressedPubkey,
-        recipient_ek: &twisted_elgamal::CompressedPubkey,
+        sender_ek: &CompressedRistretto,
+        recipient_ek: &CompressedRistretto,
         current_balance: &confidential_balance::ConfidentialBalance,
         new_balance: &confidential_balance::ConfidentialBalance,
         sender_amount: &confidential_balance::ConfidentialBalance,
         recipient_amount: &confidential_balance::ConfidentialBalance,
-        auditor_eks: &vector<twisted_elgamal::CompressedPubkey>,
+        auditor_eks: &vector<CompressedRistretto>,
         auditor_amounts: &vector<confidential_balance::ConfidentialBalance>,
         proof: &TransferSigmaProof
     ) {
@@ -609,20 +545,20 @@ module aptos_experimental::confidential_proof {
         let points_rhs = vector[
             ristretto255::basepoint(),
             ristretto255::hash_to_point_base(),
-            twisted_elgamal::pubkey_to_point(sender_ek),
-            twisted_elgamal::pubkey_to_point(recipient_ek)
+            ristretto255::point_decompress(sender_ek),
+            ristretto255::point_decompress(recipient_ek)
         ];
-        points_rhs.append(auditor_eks.map_ref(|ek| twisted_elgamal::pubkey_to_point(ek)));
-        points_rhs.append(confidential_balance::balance_to_points_d(new_balance));
-        points_rhs.append(confidential_balance::balance_to_points_d(recipient_amount));
-        points_rhs.append(confidential_balance::balance_to_points_d(current_balance));
+        points_rhs.append(auditor_eks.map_ref(|ek| ristretto255::point_decompress(ek)));
+        points_rhs.append(new_balance.get_D().map_ref(|d| ristretto255::point_clone(d)));
+        points_rhs.append(recipient_amount.get_D().map_ref(|d| ristretto255::point_clone(d)));
+        points_rhs.append(current_balance.get_D().map_ref(|d| ristretto255::point_clone(d)));
         auditor_amounts.for_each_ref(|balance| {
-            points_rhs.append(confidential_balance::balance_to_points_d(balance));
+            points_rhs.append(balance.get_D().map_ref(|d| ristretto255::point_clone(d)));
         });
-        points_rhs.append(confidential_balance::balance_to_points_d(sender_amount));
-        points_rhs.append(confidential_balance::balance_to_points_c(current_balance));
-        points_rhs.append(confidential_balance::balance_to_points_c(recipient_amount));
-        points_rhs.append(confidential_balance::balance_to_points_c(new_balance));
+        points_rhs.append(sender_amount.get_D().map_ref(|d| ristretto255::point_clone(d)));
+        points_rhs.append(current_balance.get_C().map_ref(|c| ristretto255::point_clone(c)));
+        points_rhs.append(recipient_amount.get_C().map_ref(|c| ristretto255::point_clone(c)));
+        points_rhs.append(new_balance.get_C().map_ref(|c| ristretto255::point_clone(c)));
 
         let lhs = ristretto255::multi_scalar_mul(&points_lhs, &scalars_lhs);
         let rhs = ristretto255::multi_scalar_mul(&points_rhs, &scalars_rhs);
@@ -635,7 +571,7 @@ module aptos_experimental::confidential_proof {
 
     /// Verifies the validity of the `NormalizationSigmaProof`.
     fun verify_normalization_sigma_proof(
-        ek: &twisted_elgamal::CompressedPubkey,
+        ek: &CompressedRistretto,
         current_balance: &confidential_balance::ConfidentialBalance,
         new_balance: &confidential_balance::ConfidentialBalance,
         proof: &NormalizationSigmaProof
@@ -705,112 +641,12 @@ module aptos_experimental::confidential_proof {
         let points_rhs = vector[
             ristretto255::basepoint(),
             ristretto255::hash_to_point_base(),
-            twisted_elgamal::pubkey_to_point(ek)
+            ristretto255::point_decompress(ek)
         ];
-        points_rhs.append(confidential_balance::balance_to_points_d(current_balance));
-        points_rhs.append(confidential_balance::balance_to_points_d(new_balance));
-        points_rhs.append(confidential_balance::balance_to_points_c(current_balance));
-        points_rhs.append(confidential_balance::balance_to_points_c(new_balance));
-
-        let lhs = ristretto255::multi_scalar_mul(&points_lhs, &scalars_lhs);
-        let rhs = ristretto255::multi_scalar_mul(&points_rhs, &scalars_rhs);
-
-        assert!(
-            ristretto255::point_equals(&lhs, &rhs),
-            error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)
-        );
-    }
-
-    /// Verifies the validity of the `RotationSigmaProof`.
-    fun verify_rotation_sigma_proof(
-        current_ek: &twisted_elgamal::CompressedPubkey,
-        new_ek: &twisted_elgamal::CompressedPubkey,
-        current_balance: &confidential_balance::ConfidentialBalance,
-        new_balance: &confidential_balance::ConfidentialBalance,
-        proof: &RotationSigmaProof
-    ) {
-        let rho =
-            fiat_shamir_rotation_sigma_proof_challenge(
-                current_ek,
-                new_ek,
-                current_balance,
-                new_balance,
-                &proof.xs
-            );
-        let gammas = msm_rotation_gammas(&rho);
-
-        let scalars_lhs = vector[gammas.g1, gammas.g2, gammas.g3];
-        scalars_lhs.append(gammas.g4s);
-        scalars_lhs.append(gammas.g5s);
-
-        let points_lhs = vector[
-            ristretto255::point_decompress(&proof.xs.x1),
-            ristretto255::point_decompress(&proof.xs.x2),
-            ristretto255::point_decompress(&proof.xs.x3)
-        ];
-        points_lhs.append(proof.xs.x4s.map_ref(|x| ristretto255::point_decompress(x)));
-        points_lhs.append(proof.xs.x5s.map_ref(|x| ristretto255::point_decompress(x)));
-
-        let scalar_g =
-            scalar_linear_combination(
-                &proof.alphas.a1s,
-                &vector::range(0, 8).map(|i| new_scalar_from_pow2(i * 16))
-            );
-        ristretto255::scalar_mul_assign(&mut scalar_g, &gammas.g1);
-        ristretto255::scalar_add_assign(
-            &mut scalar_g,
-            &scalar_linear_combination(&gammas.g4s, &proof.alphas.a1s)
-        );
-
-        let scalar_h = ristretto255::scalar_mul(&gammas.g2, &proof.alphas.a3);
-        ristretto255::scalar_add_assign(
-            &mut scalar_h, &ristretto255::scalar_mul(&gammas.g3, &proof.alphas.a4)
-        );
-        ristretto255::scalar_add_assign(
-            &mut scalar_h,
-            &scalar_linear_combination(&gammas.g4s, &proof.alphas.a5s)
-        );
-
-        let scalar_ek_cur = ristretto255::scalar_mul(&gammas.g2, &rho);
-
-        let scalar_ek_new = ristretto255::scalar_mul(&gammas.g3, &rho);
-        ristretto255::scalar_add_assign(
-            &mut scalar_ek_new,
-            &scalar_linear_combination(&gammas.g5s, &proof.alphas.a5s)
-        );
-
-        let scalars_current_balance_d = vector::range(0, 8).map(|i| {
-            scalar_mul_3(&gammas.g1, &proof.alphas.a2, &new_scalar_from_pow2(i * 16))
-        });
-
-        let scalars_new_balance_d = vector::range(0, 8).map(|i| {
-            ristretto255::scalar_mul(&gammas.g5s[i], &rho)
-        });
-
-        let scalars_current_balance_c = vector::range(0, 8).map(|i| {
-            scalar_mul_3(&gammas.g1, &rho, &new_scalar_from_pow2(i * 16))
-        });
-
-        let scalars_new_balance_c = vector::range(0, 8).map(|i| {
-            ristretto255::scalar_mul(&gammas.g4s[i], &rho)
-        });
-
-        let scalars_rhs = vector[scalar_g, scalar_h, scalar_ek_cur, scalar_ek_new];
-        scalars_rhs.append(scalars_current_balance_d);
-        scalars_rhs.append(scalars_new_balance_d);
-        scalars_rhs.append(scalars_current_balance_c);
-        scalars_rhs.append(scalars_new_balance_c);
-
-        let points_rhs = vector[
-            ristretto255::basepoint(),
-            ristretto255::hash_to_point_base(),
-            twisted_elgamal::pubkey_to_point(current_ek),
-            twisted_elgamal::pubkey_to_point(new_ek)
-        ];
-        points_rhs.append(confidential_balance::balance_to_points_d(current_balance));
-        points_rhs.append(confidential_balance::balance_to_points_d(new_balance));
-        points_rhs.append(confidential_balance::balance_to_points_c(current_balance));
-        points_rhs.append(confidential_balance::balance_to_points_c(new_balance));
+        points_rhs.append(current_balance.get_D().map_ref(|d| ristretto255::point_clone(d)));
+        points_rhs.append(new_balance.get_D().map_ref(|d| ristretto255::point_clone(d)));
+        points_rhs.append(current_balance.get_C().map_ref(|c| ristretto255::point_clone(c)));
+        points_rhs.append(new_balance.get_C().map_ref(|c| ristretto255::point_clone(c)));
 
         let lhs = ristretto255::multi_scalar_mul(&points_lhs, &scalars_lhs);
         let rhs = ristretto255::multi_scalar_mul(&points_rhs, &scalars_rhs);
@@ -826,7 +662,7 @@ module aptos_experimental::confidential_proof {
         new_balance: &confidential_balance::ConfidentialBalance,
         zkrp_new_balance: &RangeProof
     ) {
-        let balance_c = confidential_balance::balance_to_points_c(new_balance);
+        let balance_c = new_balance.get_C().map_ref(|c| ristretto255::point_clone(c));
 
         assert!(
             bulletproofs::verify_batch_range_proof(
@@ -846,7 +682,7 @@ module aptos_experimental::confidential_proof {
         transfer_amount: &confidential_balance::ConfidentialBalance,
         zkrp_transfer_amount: &RangeProof
     ) {
-        let balance_c = confidential_balance::balance_to_points_c(transfer_amount);
+        let balance_c = transfer_amount.get_C().map_ref(|c| ristretto255::point_clone(c));
 
         assert!(
             bulletproofs::verify_batch_range_proof(
@@ -936,24 +772,6 @@ module aptos_experimental::confidential_proof {
 
         option::some(
             NormalizationProof { sigma_proof: sigma_proof.extract(), zkrp_new_balance }
-        )
-    }
-
-    /// Deserializes the `RotationProof` from the byte array.
-    /// Returns `Some(RotationProof)` if the deserialization is successful; otherwise, returns `None`.
-    public fun deserialize_rotation_proof(
-        sigma_proof_bytes: vector<u8>, zkrp_new_balance_bytes: vector<u8>
-    ): Option<RotationProof> {
-        let sigma_proof = deserialize_rotation_sigma_proof(sigma_proof_bytes);
-        let zkrp_new_balance =
-            bulletproofs::range_proof_from_bytes(zkrp_new_balance_bytes);
-
-        if (sigma_proof.is_none()) {
-            return option::none()
-        };
-
-        option::some(
-            RotationProof { sigma_proof: sigma_proof.extract(), zkrp_new_balance }
         )
     }
 
@@ -1104,49 +922,6 @@ module aptos_experimental::confidential_proof {
         )
     }
 
-    /// Deserializes the `RotationSigmaProof` from the byte array.
-    /// Returns `Some(RotationSigmaProof)` if the deserialization is successful; otherwise, returns `None`.
-    fun deserialize_rotation_sigma_proof(proof_bytes: vector<u8>): Option<RotationSigmaProof> {
-        let alphas_count = 19;
-        let xs_count = 19;
-
-        if (proof_bytes.length() != 32 * xs_count + 32 * alphas_count) {
-            return option::none()
-        };
-
-        let alphas = vector::range(0, alphas_count).map(|i| {
-            ristretto255::new_scalar_from_bytes(proof_bytes.slice(i * 32, (i + 1) * 32))
-        });
-        let xs = vector::range(alphas_count, alphas_count + xs_count).map(|i| {
-            ristretto255::new_compressed_point_from_bytes(
-                proof_bytes.slice(i * 32, (i + 1) * 32)
-            )
-        });
-
-        if (alphas.any(|alpha| alpha.is_none()) || xs.any(|x| x.is_none())) {
-            return option::none()
-        };
-
-        option::some(
-            RotationSigmaProof {
-                alphas: RotationSigmaProofAlphas {
-                    a1s: alphas.slice(0, 8).map(|alpha| alpha.extract()),
-                    a2: alphas[8].extract(),
-                    a3: alphas[9].extract(),
-                    a4: alphas[10].extract(),
-                    a5s: alphas.slice(11, 19).map(|alpha| alpha.extract())
-                },
-                xs: RotationSigmaProofXs {
-                    x1: xs[0].extract(),
-                    x2: xs[1].extract(),
-                    x3: xs[2].extract(),
-                    x4s: xs.slice(3, 11).map(|x| x.extract()),
-                    x5s: xs.slice(11, 19).map(|x| x.extract())
-                }
-            }
-        )
-    }
-
     //
     // Public view functions
     //
@@ -1170,12 +945,6 @@ module aptos_experimental::confidential_proof {
     }
 
     #[view]
-    /// Returns the Fiat Shamir DST for the `RotationSigmaProof`.
-    public fun get_fiat_shamir_rotation_sigma_dst(): vector<u8> {
-        FIAT_SHAMIR_ROTATION_SIGMA_DST
-    }
-
-    #[view]
     /// Returns the DST for the range proofs.
     public fun get_bulletproofs_dst(): vector<u8> {
         BULLETPROOFS_DST
@@ -1195,7 +964,7 @@ module aptos_experimental::confidential_proof {
 
     /// Derives the Fiat-Shamir challenge for the `WithdrawalSigmaProof`.
     fun fiat_shamir_withdrawal_sigma_proof_challenge(
-        ek: &twisted_elgamal::CompressedPubkey,
+        ek: &CompressedRistretto,
         amount_chunks: &vector<Scalar>,
         current_balance: &confidential_balance::ConfidentialBalance,
         proof_xs: &WithdrawalSigmaProofXs
@@ -1211,7 +980,7 @@ module aptos_experimental::confidential_proof {
                 ristretto255::point_compress(&ristretto255::hash_to_point_base())
             )
         );
-        bytes.append(twisted_elgamal::pubkey_to_bytes(ek));
+        bytes.append(ristretto255::compressed_point_to_bytes(*ek));
         amount_chunks.for_each_ref(|chunk| {
             bytes.append(ristretto255::scalar_to_bytes(chunk));
         });
@@ -1230,13 +999,13 @@ module aptos_experimental::confidential_proof {
 
     /// Derives the Fiat-Shamir challenge for the `TransferSigmaProof`.
     fun fiat_shamir_transfer_sigma_proof_challenge(
-        sender_ek: &twisted_elgamal::CompressedPubkey,
-        recipient_ek: &twisted_elgamal::CompressedPubkey,
+        sender_ek: &CompressedRistretto,
+        recipient_ek: &CompressedRistretto,
         current_balance: &confidential_balance::ConfidentialBalance,
         new_balance: &confidential_balance::ConfidentialBalance,
         sender_amount: &confidential_balance::ConfidentialBalance,
         recipient_amount: &confidential_balance::ConfidentialBalance,
-        auditor_eks: &vector<twisted_elgamal::CompressedPubkey>,
+        auditor_eks: &vector<CompressedRistretto>,
         auditor_amounts: &vector<confidential_balance::ConfidentialBalance>,
         proof_xs: &TransferSigmaProofXs
     ): Scalar {
@@ -1251,15 +1020,15 @@ module aptos_experimental::confidential_proof {
                 ristretto255::point_compress(&ristretto255::hash_to_point_base())
             )
         );
-        bytes.append(twisted_elgamal::pubkey_to_bytes(sender_ek));
-        bytes.append(twisted_elgamal::pubkey_to_bytes(recipient_ek));
+        bytes.append(ristretto255::compressed_point_to_bytes(*sender_ek));
+        bytes.append(ristretto255::compressed_point_to_bytes(*recipient_ek));
         auditor_eks.for_each_ref(|ek| {
-            bytes.append(twisted_elgamal::pubkey_to_bytes(ek));
+            bytes.append(ristretto255::compressed_point_to_bytes(*ek));
         });
         bytes.append(confidential_balance::balance_to_bytes(current_balance));
         bytes.append(confidential_balance::balance_to_bytes(recipient_amount));
         auditor_amounts.for_each_ref(|balance| {
-            confidential_balance::balance_to_points_d(balance).for_each_ref(|d| {
+            balance.get_D().for_each_ref(|d| {
                 bytes.append(
                     ristretto255::compressed_point_to_bytes(
                         ristretto255::point_compress(d)
@@ -1267,7 +1036,7 @@ module aptos_experimental::confidential_proof {
                 );
             });
         });
-        confidential_balance::balance_to_points_d(sender_amount).for_each_ref(|d| {
+        sender_amount.get_D().for_each_ref(|d| {
             bytes.append(
                 ristretto255::compressed_point_to_bytes(ristretto255::point_compress(d))
             );
@@ -1301,7 +1070,7 @@ module aptos_experimental::confidential_proof {
 
     /// Derives the Fiat-Shamir challenge for the `NormalizationSigmaProof`.
     fun fiat_shamir_normalization_sigma_proof_challenge(
-        ek: &twisted_elgamal::CompressedPubkey,
+        ek: &CompressedRistretto,
         current_balance: &confidential_balance::ConfidentialBalance,
         new_balance: &confidential_balance::ConfidentialBalance,
         proof_xs: &NormalizationSigmaProofXs
@@ -1317,7 +1086,7 @@ module aptos_experimental::confidential_proof {
                 ristretto255::point_compress(&ristretto255::hash_to_point_base())
             )
         );
-        bytes.append(twisted_elgamal::pubkey_to_bytes(ek));
+        bytes.append(ristretto255::compressed_point_to_bytes(*ek));
         bytes.append(confidential_balance::balance_to_bytes(current_balance));
         bytes.append(confidential_balance::balance_to_bytes(new_balance));
         bytes.append(ristretto255::point_to_bytes(&proof_xs.x1));
@@ -1326,42 +1095,6 @@ module aptos_experimental::confidential_proof {
             bytes.append(ristretto255::point_to_bytes(x));
         });
         proof_xs.x4s.for_each_ref(|x| {
-            bytes.append(ristretto255::point_to_bytes(x));
-        });
-
-        ristretto255::new_scalar_from_sha2_512(bytes)
-    }
-
-    /// Derives the Fiat-Shamir challenge for the `RotationSigmaProof`.
-    fun fiat_shamir_rotation_sigma_proof_challenge(
-        current_ek: &twisted_elgamal::CompressedPubkey,
-        new_ek: &twisted_elgamal::CompressedPubkey,
-        current_balance: &confidential_balance::ConfidentialBalance,
-        new_balance: &confidential_balance::ConfidentialBalance,
-        proof_xs: &RotationSigmaProofXs
-    ): Scalar {
-        // rho = H(DST, G, H, P_cur, P_new, (C_cur, D_cur)_{1..8}, (C_new, D_new)_{1..8}, X_{1..19})
-        let bytes = FIAT_SHAMIR_ROTATION_SIGMA_DST;
-
-        bytes.append(
-            ristretto255::compressed_point_to_bytes(ristretto255::basepoint_compressed())
-        );
-        bytes.append(
-            ristretto255::compressed_point_to_bytes(
-                ristretto255::point_compress(&ristretto255::hash_to_point_base())
-            )
-        );
-        bytes.append(twisted_elgamal::pubkey_to_bytes(current_ek));
-        bytes.append(twisted_elgamal::pubkey_to_bytes(new_ek));
-        bytes.append(confidential_balance::balance_to_bytes(current_balance));
-        bytes.append(confidential_balance::balance_to_bytes(new_balance));
-        bytes.append(ristretto255::point_to_bytes(&proof_xs.x1));
-        bytes.append(ristretto255::point_to_bytes(&proof_xs.x2));
-        bytes.append(ristretto255::point_to_bytes(&proof_xs.x3));
-        proof_xs.x4s.for_each_ref(|x| {
-            bytes.append(ristretto255::point_to_bytes(x));
-        });
-        proof_xs.x5s.for_each_ref(|x| {
             bytes.append(ristretto255::point_to_bytes(x));
         });
 
@@ -1429,21 +1162,6 @@ module aptos_experimental::confidential_proof {
             }),
             g4s: vector::range(0, 8).map(|i| {
                 ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 4, (i as u8)))
-            })
-        }
-    }
-
-    /// Returns the scalar multipliers for the `RotationSigmaProof`.
-    fun msm_rotation_gammas(rho: &Scalar): RotationSigmaProofGammas {
-        RotationSigmaProofGammas {
-            g1: ristretto255::new_scalar_from_sha2_512(msm_gamma_1(rho, 1)),
-            g2: ristretto255::new_scalar_from_sha2_512(msm_gamma_1(rho, 2)),
-            g3: ristretto255::new_scalar_from_sha2_512(msm_gamma_1(rho, 3)),
-            g4s: vector::range(0, 8).map(|i| {
-                ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 4, (i as u8)))
-            }),
-            g5s: vector::range(0, 8).map(|i| {
-                ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 5, (i as u8)))
             })
         }
     }
@@ -1528,15 +1246,6 @@ module aptos_experimental::confidential_proof {
         x4s: vector<Scalar>
     }
 
-    #[test_only]
-    struct RotationSigmaProofRandomness has drop {
-        x1s: vector<Scalar>,
-        x2: Scalar,
-        x3: Scalar,
-        x4: Scalar,
-        x5s: vector<Scalar>
-    }
-
     //
     // Test-only prove functions
     //
@@ -1544,15 +1253,15 @@ module aptos_experimental::confidential_proof {
     #[test_only]
     public fun prove_withdrawal(
         dk: &Scalar,
-        ek: &twisted_elgamal::CompressedPubkey,
+        ek: &CompressedRistretto,
         amount: u64,
         new_amount: u128,
         current_balance: &confidential_balance::ConfidentialBalance
     ): (WithdrawalProof, confidential_balance::ConfidentialBalance) {
         let new_balance_r = confidential_balance::generate_balance_randomness();
         let new_balance =
-            confidential_balance::new_actual_balance_from_u128(
-                new_amount, &new_balance_r, ek
+            confidential_balance::new_balance_from_amount(
+                new_amount, get_num_available_chunks(), &new_balance_r, ek
             );
 
         let new_balance_r =
@@ -1573,7 +1282,7 @@ module aptos_experimental::confidential_proof {
             &mut x1,
             &ristretto255::point_mul(
                 &ristretto255::multi_scalar_mul(
-                    &confidential_balance::balance_to_points_d(current_balance),
+                    &current_balance.get_D().map_ref(|d| ristretto255::point_clone(d)),
                     &vector::range(0, 8).map(|i| new_scalar_from_pow2(i * 16))
                 ),
                 &sigma_r.x2
@@ -1594,7 +1303,7 @@ module aptos_experimental::confidential_proof {
             x3i
         });
         let x4s = vector::range(0, 8).map(|i| {
-            ristretto255::point_mul(&twisted_elgamal::pubkey_to_point(ek), &sigma_r.x4s[i])
+            ristretto255::point_mul(&ristretto255::point_decompress(ek), &sigma_r.x4s[i])
         });
 
         let proof_xs = WithdrawalSigmaProofXs {
@@ -1604,14 +1313,14 @@ module aptos_experimental::confidential_proof {
             x4s: x4s.map(|x| ristretto255::point_compress(&x))
         };
 
-        let amount_chunks = confidential_balance::split_into_chunks_u64(amount);
+        let amount_chunks = confidential_balance::split_into_chunks((amount as u128), get_num_pending_chunks());
 
         let rho =
             fiat_shamir_withdrawal_sigma_proof_challenge(
                 ek, &amount_chunks, current_balance, &proof_xs
             );
 
-        let new_amount_chunks = confidential_balance::split_into_chunks_u128(new_amount);
+        let new_amount_chunks = confidential_balance::split_into_chunks(new_amount, get_num_available_chunks());
 
         let a1s = vector::range(0, 8).map(|i| {
             ristretto255::scalar_sub(
@@ -1649,12 +1358,12 @@ module aptos_experimental::confidential_proof {
     #[test_only]
     public fun prove_transfer(
         sender_dk: &Scalar,
-        sender_ek: &twisted_elgamal::CompressedPubkey,
-        recipient_ek: &twisted_elgamal::CompressedPubkey,
+        sender_ek: &CompressedRistretto,
+        recipient_ek: &CompressedRistretto,
         amount: u64,
         new_amount: u128,
         current_balance: &confidential_balance::ConfidentialBalance,
-        auditor_eks: &vector<twisted_elgamal::CompressedPubkey>
+        auditor_eks: &vector<CompressedRistretto>
     ): (
         TransferProof,
         confidential_balance::ConfidentialBalance,
@@ -1666,21 +1375,21 @@ module aptos_experimental::confidential_proof {
         let new_balance_r = confidential_balance::generate_balance_randomness();
 
         let new_balance =
-            confidential_balance::new_actual_balance_from_u128(
-                new_amount, &new_balance_r, sender_ek
+            confidential_balance::new_balance_from_amount(
+                new_amount, get_num_available_chunks(), &new_balance_r, sender_ek
             );
 
         let sender_amount =
-            confidential_balance::new_pending_balance_from_u64(
-                amount, &amount_r, sender_ek
+            confidential_balance::new_balance_from_amount(
+                (amount as u128), get_num_pending_chunks(), &amount_r, sender_ek
             );
         let recipient_amount =
-            confidential_balance::new_pending_balance_from_u64(
-                amount, &amount_r, recipient_ek
+            confidential_balance::new_balance_from_amount(
+                (amount as u128), get_num_pending_chunks(), &amount_r, recipient_ek
             );
         let auditor_amounts =
             auditor_eks.map_ref(|ek| {
-                confidential_balance::new_pending_balance_from_u64(amount, &amount_r, ek)
+                confidential_balance::new_balance_from_amount((amount as u128), get_num_pending_chunks(), &amount_r, ek)
             });
 
         let amount_r =
@@ -1718,9 +1427,8 @@ module aptos_experimental::confidential_proof {
             )
         );
 
-        let current_balance_d =
-            confidential_balance::balance_to_points_d(current_balance);
-        let new_balance_d = confidential_balance::balance_to_points_d(&new_balance);
+        let current_balance_d = current_balance.get_D().map_ref(|d| ristretto255::point_clone(d));
+        let new_balance_d = (&new_balance).get_D().map_ref(|d| ristretto255::point_clone(d));
 
         vector::range(0, 8).for_each(
             |i| {
@@ -1751,12 +1459,12 @@ module aptos_experimental::confidential_proof {
 
         let x2s = vector::range(0, 8).map(|i| {
             ristretto255::point_mul(
-                &twisted_elgamal::pubkey_to_point(sender_ek), &sigma_r.x6s[i]
+                &ristretto255::point_decompress(sender_ek), &sigma_r.x6s[i]
             )
         });
         let x3s = vector::range(0, 4).map(|i| {
             ristretto255::point_mul(
-                &twisted_elgamal::pubkey_to_point(recipient_ek), &sigma_r.x3s[i]
+                &ristretto255::point_decompress(recipient_ek), &sigma_r.x3s[i]
             )
         });
         let x4s = vector::range(0, 4).map(|i| {
@@ -1786,13 +1494,13 @@ module aptos_experimental::confidential_proof {
             auditor_eks.map_ref(|ek| {
                 vector::range(0, 4).map(|i| {
                     ristretto255::point_mul(
-                        &twisted_elgamal::pubkey_to_point(ek), &sigma_r.x3s[i]
+                        &ristretto255::point_decompress(ek), &sigma_r.x3s[i]
                     )
                 })
             });
         let x8s = vector::range(0, 4).map(|i| {
             ristretto255::point_mul(
-                &twisted_elgamal::pubkey_to_point(sender_ek), &sigma_r.x3s[i]
+                &ristretto255::point_decompress(sender_ek), &sigma_r.x3s[i]
             )
         });
 
@@ -1822,8 +1530,8 @@ module aptos_experimental::confidential_proof {
                 &proof_xs
             );
 
-        let amount_chunks = confidential_balance::split_into_chunks_u64(amount);
-        let new_amount_chunks = confidential_balance::split_into_chunks_u128(new_amount);
+        let amount_chunks = confidential_balance::split_into_chunks((amount as u128), get_num_pending_chunks());
+        let new_amount_chunks = confidential_balance::split_into_chunks(new_amount, get_num_available_chunks());
 
         let a1s = vector::range(0, 8).map(|i| {
             ristretto255::scalar_sub(
@@ -1876,14 +1584,14 @@ module aptos_experimental::confidential_proof {
     #[test_only]
     public fun prove_normalization(
         dk: &Scalar,
-        ek: &twisted_elgamal::CompressedPubkey,
+        ek: &CompressedRistretto,
         amount: u128,
         current_balance: &confidential_balance::ConfidentialBalance
     ): (NormalizationProof, confidential_balance::ConfidentialBalance) {
         let new_balance_r = confidential_balance::generate_balance_randomness();
         let new_balance =
-            confidential_balance::new_actual_balance_from_u128(
-                amount, &new_balance_r, ek
+            confidential_balance::new_balance_from_amount(
+                amount, get_num_available_chunks(), &new_balance_r, ek
             );
 
         let new_balance_r =
@@ -1901,8 +1609,7 @@ module aptos_experimental::confidential_proof {
                 )
             );
 
-        let current_balance_d =
-            confidential_balance::balance_to_points_d(current_balance);
+        let current_balance_d = current_balance.get_D().map_ref(|d| ristretto255::point_clone(d));
 
         vector::range(0, 8).for_each(
             |i| {
@@ -1932,7 +1639,7 @@ module aptos_experimental::confidential_proof {
             x3i
         });
         let x4s = vector::range(0, 8).map(|i| {
-            ristretto255::point_mul(&twisted_elgamal::pubkey_to_point(ek), &sigma_r.x4s[i])
+            ristretto255::point_mul(&ristretto255::point_decompress(ek), &sigma_r.x4s[i])
         });
 
         let proof_xs = NormalizationSigmaProofXs {
@@ -1947,7 +1654,7 @@ module aptos_experimental::confidential_proof {
                 ek, current_balance, &new_balance, &proof_xs
             );
 
-        let amount_chunks = confidential_balance::split_into_chunks_u128(amount);
+        let amount_chunks = confidential_balance::split_into_chunks(amount, get_num_available_chunks());
 
         let a1s = vector::range(0, 8).map(|i| {
             ristretto255::scalar_sub(
@@ -1975,134 +1682,6 @@ module aptos_experimental::confidential_proof {
                 sigma_proof: NormalizationSigmaProof {
                     xs: proof_xs,
                     alphas: NormalizationSigmaProofAlphas { a1s, a2, a3, a4s }
-                },
-                zkrp_new_balance
-            },
-            new_balance
-        )
-    }
-
-    #[test_only]
-    public fun prove_rotation(
-        current_dk: &Scalar,
-        new_dk: &Scalar,
-        current_ek: &twisted_elgamal::CompressedPubkey,
-        new_ek: &twisted_elgamal::CompressedPubkey,
-        amount: u128,
-        current_balance: &confidential_balance::ConfidentialBalance
-    ): (RotationProof, confidential_balance::ConfidentialBalance) {
-        let new_balance_r = confidential_balance::generate_balance_randomness();
-        let new_balance =
-            confidential_balance::new_actual_balance_from_u128(
-                amount, &new_balance_r, new_ek
-            );
-
-        let new_balance_r =
-            confidential_balance::balance_randomness_as_scalars(&new_balance_r);
-
-        let sigma_r = generate_rotation_sigma_proof_randomness();
-
-        let zkrp_new_balance = prove_new_balance_range(amount, new_balance_r);
-
-        let x1 =
-            ristretto255::basepoint_mul(
-                &scalar_linear_combination(
-                    &sigma_r.x1s,
-                    &vector::range(0, 8).map(|i| new_scalar_from_pow2(i * 16))
-                )
-            );
-        let current_balance_d =
-            confidential_balance::balance_to_points_d(current_balance);
-
-        vector::range(0, 8).for_each(
-            |i| {
-                ristretto255::point_add_assign(
-                    &mut x1,
-                    &ristretto255::point_mul(
-                        &current_balance_d[i],
-                        &ristretto255::scalar_mul(
-                            &sigma_r.x2, &new_scalar_from_pow2(i * 16)
-                        )
-                    )
-                );
-            }
-        );
-
-        let x2 = ristretto255::point_mul(
-            &ristretto255::hash_to_point_base(), &sigma_r.x3
-        );
-        let x3 = ristretto255::point_mul(
-            &ristretto255::hash_to_point_base(), &sigma_r.x4
-        );
-        let x4s = vector::range(0, 8).map(|i| {
-            let x4i = ristretto255::basepoint_mul(&sigma_r.x1s[i]);
-            ristretto255::point_add_assign(
-                &mut x4i,
-                &ristretto255::point_mul(
-                    &ristretto255::hash_to_point_base(), &sigma_r.x5s[i]
-                )
-            );
-            x4i
-        });
-        let x5s = vector::range(0, 8).map(|i| {
-            ristretto255::point_mul(
-                &twisted_elgamal::pubkey_to_point(new_ek), &sigma_r.x5s[i]
-            )
-        });
-
-        let proof_xs = RotationSigmaProofXs {
-            x1: ristretto255::point_compress(&x1),
-            x2: ristretto255::point_compress(&x2),
-            x3: ristretto255::point_compress(&x3),
-            x4s: x4s.map(|x| ristretto255::point_compress(&x)),
-            x5s: x5s.map(|x| ristretto255::point_compress(&x))
-        };
-
-        let rho =
-            fiat_shamir_rotation_sigma_proof_challenge(
-                current_ek,
-                new_ek,
-                current_balance,
-                &new_balance,
-                &proof_xs
-            );
-
-        let amount_chunks = confidential_balance::split_into_chunks_u128(amount);
-
-        let a1s = vector::range(0, 8).map(|i| {
-            ristretto255::scalar_sub(
-                &sigma_r.x1s[i], &ristretto255::scalar_mul(&rho, &amount_chunks[i])
-            )
-        });
-        let a2 =
-            ristretto255::scalar_sub(
-                &sigma_r.x2, &ristretto255::scalar_mul(&rho, current_dk)
-            );
-        let a3 =
-            ristretto255::scalar_sub(
-                &sigma_r.x3,
-                &ristretto255::scalar_mul(
-                    &rho, &ristretto255::scalar_invert(current_dk).extract()
-                )
-            );
-        let a4 =
-            ristretto255::scalar_sub(
-                &sigma_r.x4,
-                &ristretto255::scalar_mul(
-                    &rho, &ristretto255::scalar_invert(new_dk).extract()
-                )
-            );
-        let a5s = vector::range(0, 8).map(|i| {
-            ristretto255::scalar_sub(
-                &sigma_r.x5s[i], &ristretto255::scalar_mul(&rho, &new_balance_r[i])
-            )
-        });
-
-        (
-            RotationProof {
-                sigma_proof: RotationSigmaProof {
-                    xs: proof_xs,
-                    alphas: RotationSigmaProofAlphas { a1s, a2, a3, a4, a5s }
                 },
                 zkrp_new_balance
             },
@@ -2139,14 +1718,6 @@ module aptos_experimental::confidential_proof {
         (vector<u8>, vector<u8>) {
         (
             serialize_normalization_sigma_proof(&proof.sigma_proof),
-            bulletproofs::range_proof_to_bytes(&proof.zkrp_new_balance)
-        )
-    }
-
-    #[test_only]
-    public fun serialize_rotation_proof(proof: &RotationProof): (vector<u8>, vector<u8>) {
-        (
-            serialize_rotation_sigma_proof(&proof.sigma_proof),
             bulletproofs::range_proof_to_bytes(&proof.zkrp_new_balance)
         )
     }
@@ -2248,33 +1819,6 @@ module aptos_experimental::confidential_proof {
         bytes
     }
 
-    #[test_only]
-    fun serialize_rotation_sigma_proof(proof: &RotationSigmaProof): vector<u8> {
-        let bytes = vector[];
-
-        proof.alphas.a1s.for_each_ref(|alpha| {
-            bytes.append(ristretto255::scalar_to_bytes(alpha));
-        });
-        bytes.append(ristretto255::scalar_to_bytes(&proof.alphas.a2));
-        bytes.append(ristretto255::scalar_to_bytes(&proof.alphas.a3));
-        bytes.append(ristretto255::scalar_to_bytes(&proof.alphas.a4));
-        proof.alphas.a5s.for_each_ref(|alpha| {
-            bytes.append(ristretto255::scalar_to_bytes(alpha));
-        });
-
-        bytes.append(ristretto255::point_to_bytes(&proof.xs.x1));
-        bytes.append(ristretto255::point_to_bytes(&proof.xs.x2));
-        bytes.append(ristretto255::point_to_bytes(&proof.xs.x3));
-        proof.xs.x4s.for_each_ref(|x| {
-            bytes.append(ristretto255::point_to_bytes(x));
-        });
-        proof.xs.x5s.for_each_ref(|x| {
-            bytes.append(ristretto255::point_to_bytes(x));
-        });
-
-        bytes
-    }
-
     //
     // Test-only private functions
     //
@@ -2283,7 +1827,7 @@ module aptos_experimental::confidential_proof {
     fun prove_new_balance_range(
         new_amount: u128, randomness: &vector<Scalar>
     ): RangeProof {
-        let new_amount_chunks = confidential_balance::split_into_chunks_u128(new_amount);
+        let new_amount_chunks = confidential_balance::split_into_chunks(new_amount, get_num_available_chunks());
 
         let (proof, _) =
             bulletproofs::prove_batch_range_pedersen(
@@ -2299,7 +1843,7 @@ module aptos_experimental::confidential_proof {
     fun prove_transfer_amount_range(
         amount: u64, randomness: &vector<Scalar>
     ): RangeProof {
-        let amount_chunks = confidential_balance::split_into_chunks_u64(amount);
+        let amount_chunks = confidential_balance::split_into_chunks((amount as u128), get_num_pending_chunks());
 
         let (proof, _) =
             bulletproofs::prove_batch_range_pedersen(
@@ -2343,14 +1887,4 @@ module aptos_experimental::confidential_proof {
         }
     }
 
-    #[test_only]
-    fun generate_rotation_sigma_proof_randomness(): RotationSigmaProofRandomness {
-        RotationSigmaProofRandomness {
-            x1s: vector::range(0, 8).map(|_| ristretto255::random_scalar()),
-            x2: ristretto255::random_scalar(),
-            x3: ristretto255::random_scalar(),
-            x4: ristretto255::random_scalar(),
-            x5s: vector::range(0, 8).map(|_| ristretto255::random_scalar())
-        }
-    }
 }

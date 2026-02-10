@@ -21,13 +21,13 @@ module confidential_asset_example::register_example {
         confidential_asset::register(bob, token, bob_ek);
 
         print(&utf8(b"Bob's pending balance is zero:"));
-        print(&confidential_asset::pending_balance(bob_addr, token));
+        print(&confidential_asset::get_pending_balance(bob_addr, token));
 
         print(&utf8(b"Bob's actual balance is zero:"));
-        print(&confidential_asset::actual_balance(bob_addr, token));
+        print(&confidential_asset::get_available_balance(bob_addr, token));
 
         print(&utf8(b"Bob's encryption key is set:"));
-        print(&confidential_asset::encryption_key(bob_addr, token));
+        print(&confidential_asset::get_encryption_key(bob_addr, token));
     }
 
     #[test(
