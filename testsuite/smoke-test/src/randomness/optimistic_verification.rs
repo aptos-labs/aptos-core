@@ -130,3 +130,71 @@ async fn optimistic_verification_with_corrupt_share() {
         assert!(result.is_ok());
     }
 }
+
+/// Verify that when aggregation fails transiently, the recovery path
+/// (Aggregating → handle_aggregation_failure → retry) produces correct randomness.
+///
+/// Uses the `force_aggregation_failure` failpoint with "1*return" so each validator's
+/// first aggregation attempt returns Err. The RandItem enters `Aggregating` state,
+/// receives the Failure result, merges valid shares + buffered shares, and retries.
+/// On retry the failpoint is exhausted, aggregation succeeds, and randomness is correct.
+#[tokio::test]
+async fn optimistic_verification_aggregation_recovery() {
+    let epoch_duration_secs = 20;
+
+    let (swarm, _cli, _faucet) = SwarmBuilder::new_local(4)
+        .with_num_fullnodes(1)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, conf, _| {
+            conf.api.failpoints_enabled = true;
+        }))
+        .with_init_genesis_config(Arc::new(move |conf| {
+            conf.epoch_duration_secs = epoch_duration_secs;
+            conf.consensus_config.enable_validator_txns();
+            conf.consensus_config.disable_rand_check();
+            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
+        }))
+        .build_with_cli(0)
+        .await;
+
+    let decrypt_key_map = decrypt_key_map(&swarm);
+    let validator_clients: Vec<_> = swarm.validators().map(|v| v.rest_client()).collect();
+    let rest_client = &validator_clients[0];
+
+    info!("Wait for epoch 2.");
+    swarm
+        .wait_for_all_nodes_to_catchup_to_epoch(2, Duration::from_secs(epoch_duration_secs * 2))
+        .await
+        .expect("Epoch 2 taking too long to arrive!");
+
+    info!("Verify randomness works before injecting fault.");
+    for _ in 0..5 {
+        let cur_txn_version = get_current_version(rest_client).await;
+        let result = verify_randomness(&decrypt_key_map, rest_client, cur_txn_version).await;
+        assert!(result.is_ok());
+    }
+
+    info!("Inject force_aggregation_failure failpoint on all validators (fires once each).");
+    for client in &validator_clients {
+        client
+            .set_failpoint(
+                "consensus::rand::force_aggregation_failure".to_string(),
+                "1*return".to_string(),
+            )
+            .await
+            .unwrap();
+    }
+
+    info!("Wait for the transient failures to be handled by recovery.");
+    tokio::time::sleep(Duration::from_secs(5)).await;
+
+    info!("Verify randomness is still produced correctly after recovery.");
+    for _ in 0..10 {
+        let cur_txn_version = get_current_version(rest_client).await;
+        let result = verify_randomness(&decrypt_key_map, rest_client, cur_txn_version).await;
+        assert!(
+            result.is_ok(),
+            "Randomness should recover after transient aggregation failure"
+        );
+    }
+}

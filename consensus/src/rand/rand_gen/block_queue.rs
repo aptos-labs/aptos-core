@@ -66,6 +66,12 @@ impl QueueItem {
             .collect()
     }
 
+    pub fn add_broadcast_handle(&mut self, handle: DropGuard) {
+        self.broadcast_handle
+            .get_or_insert_with(Vec::new)
+            .push(handle);
+    }
+
     pub fn set_randomness(&mut self, round: Round, rand: Randomness) -> bool {
         let offset = self.offset(round);
         if !self.blocks()[offset].has_randomness() {

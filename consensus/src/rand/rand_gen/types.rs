@@ -28,7 +28,7 @@ use std::{fmt::Debug, sync::Arc};
 pub const NUM_THREADS_FOR_WVUF_DERIVATION: usize = 8;
 pub const FUTURE_ROUNDS_TO_ACCEPT: u64 = 200;
 
-#[derive(PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PathType {
     Fast,
     Slow,
@@ -111,6 +111,12 @@ impl TShare for Share {
     where
         Self: Sized,
     {
+        fail_point!("consensus::rand::force_aggregation_failure", |_| {
+            Err(anyhow!(
+                "forced aggregation failure for round {}",
+                rand_metadata.round
+            ))
+        });
         let timer = std::time::Instant::now();
         let shares_vec: Vec<_> = shares.collect();
         let apks_and_proofs = Self::build_apks_and_proofs(&shares_vec, rand_config)?;
@@ -808,6 +814,10 @@ impl RandConfig {
 
     pub fn add_to_pessimistic_set(&self, author: Author) {
         self.pessimistic_verify_set.insert(author);
+    }
+
+    pub fn is_in_pessimistic_set(&self, author: &Author) -> bool {
+        self.pessimistic_verify_set.contains(author)
     }
 
     pub fn pk(&self) -> &PK {
