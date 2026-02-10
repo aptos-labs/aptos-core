@@ -127,9 +127,7 @@ pub struct CompilerConfig {
     #[clap(long, default_value = "true")]
     pub print_errors: bool,
 
-    /// Warning flags in the style of `--W<name>`.
-    /// Multiple flags can be specified, e.g., `--Wunused --Wshadowing`.
-    /// Use `--Wall` to enable all warnings.
+    /// Warning flags (e.g., `unused`, `shadowing`). Use `all` to enable all warnings.
     #[clap(long = "W", number_of_values = 1, global = true)]
     pub warnings: Vec<String>,
 }
