@@ -667,34 +667,6 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
                     }
                 }
             }
-
-            // Check for unused private structs
-            if unused_warnings_enabled {
-                for struct_env in caller_module.get_structs() {
-                    if struct_env.get_visibility() == Visibility::Private
-                        && struct_env.get_users().is_empty()
-                    {
-                        let loc = struct_env.get_loc();
-                        let msg = format!(
-                            "Struct `{}` is unused: it has no current users and is private to its module.",
-                            struct_env.get_full_name_with_address(),
-                        );
-                        env.diag(Severity::Warning, &loc, &msg);
-                    }
-                }
-
-                // Check for unused constants (all constants are module-private)
-                for const_env in caller_module.get_named_constants() {
-                    if const_env.get_using_functions().is_empty() {
-                        let loc = const_env.get_loc();
-                        let msg = format!(
-                            "Constant `{}` is unused.",
-                            const_env.get_name().display(env.symbol_pool()),
-                        );
-                        env.diag(Severity::Warning, &loc, &msg);
-                    }
-                }
-            }
         }
     }
 
@@ -727,6 +699,35 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
                             }
                         );
                         env.diag(Severity::Warning, &callee_loc, &msg);
+                    }
+                }
+            }
+        }
+
+        // Check for unused structs and constants
+        for module in env.get_modules() {
+            if module.is_primary_target() {
+                // Check for unused private structs
+                for struct_env in module.get_structs() {
+                    if struct_env.get_visibility() == Visibility::Private
+                        && struct_env.get_users().is_empty()
+                    {
+                        let msg = format!(
+                            "Struct `{}` is unused: it has no current users and is private to its module.",
+                            struct_env.get_full_name_with_address(),
+                        );
+                        env.diag(Severity::Warning, &struct_env.get_loc(), &msg);
+                    }
+                }
+
+                // Check for unused constants (all constants are module-private)
+                for const_env in module.get_named_constants() {
+                    if const_env.get_using_functions().is_empty() {
+                        let msg = format!(
+                            "Constant `{}` is unused.",
+                            const_env.get_name().display(env.symbol_pool()),
+                        );
+                        env.diag(Severity::Warning, &const_env.get_loc(), &msg);
                     }
                 }
             }

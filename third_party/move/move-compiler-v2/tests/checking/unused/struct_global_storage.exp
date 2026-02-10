@@ -1,13 +1,5 @@
 
 Diagnostics:
-warning: Struct `0x42::m::UsedInExists` is unused: it has no current users and is private to its module.
-   ┌─ tests/checking/unused/struct_global_storage.move:23:5
-   │
-23 │ ╭     struct UsedInExists has key {
-24 │ │         a: u64
-25 │ │     }
-   │ ╰─────^
-
 warning: Struct `0x42::m::TrulyUnused` is unused: it has no current users and is private to its module.
    ┌─ tests/checking/unused/struct_global_storage.move:33:5
    │

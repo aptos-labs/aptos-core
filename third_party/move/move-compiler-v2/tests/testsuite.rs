@@ -639,6 +639,7 @@ fn run_test(path: &Path, config: TestConfig) -> anyhow::Result<()> {
     let mut options = config.options.clone();
     if path_str.contains("/unused/") {
         options.warnings.push("unused".to_string());
+        options.language_version = Some(LanguageVersion::V2_4);
     }
     options.warn_deprecated = path_str.contains("/deprecated/");
     options.compile_verify_code = path_str.contains("/verification/verify/");
