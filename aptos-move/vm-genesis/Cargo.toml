@@ -40,4 +40,3 @@ proptest-derive = { workspace = true }
 [features]
 default = []
 fuzzing = ["aptos-types/fuzzing", "move-core-types/fuzzing", "move-vm-types/fuzzing"]
-move-harness-with-test-only = ["aptos-cached-packages/move-harness-with-test-only"]

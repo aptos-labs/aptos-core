@@ -48,13 +48,13 @@ module confidential_asset_example::transfer_example {
         confidential_asset::rollover_pending_balance(bob, token);
 
         print(&utf8(b"Bob's actual balance is 300"));
-        assert!(confidential_asset::verify_actual_balance(bob_addr, token, &bob_dk, (bob_current_amount as u128)));
+        assert!(confidential_asset::check_available_balance_decrypts_to(bob_addr, token, &bob_dk, (bob_current_amount as u128)));
 
         print(&utf8(b"Alice's pending balance is zero"));
-        assert!(confidential_asset::verify_pending_balance(alice_addr, token, &alice_dk, alice_current_amount));
+        assert!(confidential_asset::check_pending_balance_decrypts_to(alice_addr, token, &alice_dk, alice_current_amount));
 
-        let current_balance = confidential_balance::decompress_balance(
-            &confidential_asset::actual_balance(bob_addr, token)
+        let current_balance = confidential_balance::decompress(
+            &confidential_asset::get_available_balance(bob_addr, token)
         );
 
         let (
@@ -98,10 +98,10 @@ module confidential_asset_example::transfer_example {
         );
 
         print(&utf8(b"Bob's actual balance is 250"));
-        assert!(confidential_asset::verify_actual_balance(bob_addr, token, &bob_dk, bob_new_amount));
+        assert!(confidential_asset::check_available_balance_decrypts_to(bob_addr, token, &bob_dk, bob_new_amount));
 
         print(&utf8(b"Alice's pending balance is 50"));
-        assert!(confidential_asset::verify_pending_balance(alice_addr, token, &alice_dk, alice_new_amount));
+        assert!(confidential_asset::check_pending_balance_decrypts_to(alice_addr, token, &alice_dk, alice_new_amount));
     }
 
     #[test(

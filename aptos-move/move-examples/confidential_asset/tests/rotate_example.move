@@ -31,12 +31,12 @@ module confidential_asset_example::rotate_example {
         confidential_asset::rollover_pending_balance_and_freeze(bob, token);
 
         print(&utf8(b"Bob's encryption key before the rotation:"));
-        print(&confidential_asset::encryption_key(bob_addr, token));
+        print(&confidential_asset::get_encryption_key(bob_addr, token));
 
-        assert!(confidential_asset::verify_actual_balance(bob_addr, token, &bob_current_dk, bob_amount));
+        assert!(confidential_asset::check_available_balance_decrypts_to(bob_addr, token, &bob_current_dk, bob_amount));
 
-        let current_balance = confidential_balance::decompress_balance(
-            &confidential_asset::actual_balance(bob_addr, token)
+        let current_balance = confidential_balance::decompress(
+            &confidential_asset::get_available_balance(bob_addr, token)
         );
 
         let (proof, new_balance) = confidential_proof::prove_rotation(
@@ -64,10 +64,10 @@ module confidential_asset_example::rotate_example {
         );
 
         print(&utf8(b"Bob's encryption key after the rotation:"));
-        print(&confidential_asset::encryption_key(bob_addr, token));
+        print(&confidential_asset::get_encryption_key(bob_addr, token));
 
         // Note that here we use the new decryption key to verify the actual balance.
-        assert!(confidential_asset::verify_actual_balance(bob_addr, token, &bob_new_dk, bob_amount));
+        assert!(confidential_asset::check_available_balance_decrypts_to(bob_addr, token, &bob_new_dk, bob_amount));
     }
 
     #[test(

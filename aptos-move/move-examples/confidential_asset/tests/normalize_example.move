@@ -35,8 +35,8 @@ module confidential_asset_example::normalize_example {
         // You will get an error if you try to rollover an unnormalized balance:
         // confidential_asset::rollover_pending_balance(bob, token);
 
-        let current_balance = confidential_balance::decompress_balance(
-            &confidential_asset::actual_balance(bob_addr, token)
+        let current_balance = confidential_balance::decompress(
+            &confidential_asset::get_available_balance(bob_addr, token)
         );
 
         let (
@@ -60,7 +60,7 @@ module confidential_asset_example::normalize_example {
         );
 
         assert!(confidential_asset::is_normalized(bob_addr, token));
-        assert!(confidential_asset::verify_actual_balance(bob_addr, token, &bob_dk, bob_amount));
+        assert!(confidential_asset::check_available_balance_decrypts_to(bob_addr, token, &bob_dk, bob_amount));
 
         // A rollover can be performed once the balance is normalized.
         // Note that functions like `withdraw` and `confidential_transfer` do not require the actual balance

@@ -59,4 +59,4 @@ doctest = false
 [features]
 default = []
 profiling = ["aptos-vm/profiling"]
-move-harness-with-test-only = ["aptos-language-e2e-tests/move-harness-with-test-only"]
+move-harness-with-test-only = ["aptos-cached-packages/move-harness-with-test-only"]

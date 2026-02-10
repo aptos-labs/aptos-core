@@ -55,7 +55,6 @@ const BOB_ADDRESS: &str = "0xb0b";
 // =================================================================================================
 
 /// Creates a new MoveHarness with the necessary feature flags enabled, just in case they are not.
-/// When the `move-harness-with-test-only` feature is enabled, this includes #[test_only] code.
 fn setup_harness() -> MoveHarness {
     let mut h = MoveHarness::new();
 
@@ -121,11 +120,11 @@ fn set_up_confidential_store_for_apt(h: &mut MoveHarness) -> AccountAddress {
         .exec_function_bypass_visibility(
             EXPERIMENTAL_ADDRESS,
             MODULE_NAME,
-            "get_fa_store_address",
+            "get_fa_controller_address",
             vec![],
             vec![],
         )
-        .expect("get_fa_store_address should succeed");
+        .expect("get_fa_controller_address should succeed");
 
     let (bytes, _) = &return_values.return_values[0];
     let fa_store_address: AccountAddress =
@@ -286,9 +285,10 @@ fn create_confidential_transfer_payload(
 fn create_rotate_encryption_key_payload(
     token_metadata: AccountAddress,
     new_ek_bytes: Vec<u8>,
-    new_balance_bytes: Vec<u8>,
-    zkrp_new_balance_bytes: Vec<u8>,
-    sigma_proof_bytes: Vec<u8>,
+    unpause: bool,
+    new_d_bytes: Vec<Vec<u8>>,
+    sigma_proto_comm: Vec<Vec<u8>>,
+    sigma_proto_resp: Vec<Vec<u8>>,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(EXPERIMENTAL_ADDRESS, ident_str!(MODULE_NAME).to_owned()),
@@ -297,9 +297,10 @@ fn create_rotate_encryption_key_payload(
         vec![
             bcs::to_bytes(&token_metadata).unwrap(),
             bcs::to_bytes(&new_ek_bytes).unwrap(),
-            bcs::to_bytes(&new_balance_bytes).unwrap(),
-            bcs::to_bytes(&zkrp_new_balance_bytes).unwrap(),
-            bcs::to_bytes(&sigma_proof_bytes).unwrap(),
+            bcs::to_bytes(&unpause).unwrap(),
+            bcs::to_bytes(&new_d_bytes).unwrap(),
+            bcs::to_bytes(&sigma_proto_comm).unwrap(),
+            bcs::to_bytes(&sigma_proto_resp).unwrap(),
         ],
     ))
 }
@@ -842,7 +843,7 @@ fn profile_confidential_asset_rotate_encryption_key(detailed: bool) {
 
     // Generate valid keypairs for Alice (current and new)
     let (alice_dk, alice_ek) = generate_keypair(&mut h);
-    let (new_dk, new_ek) = generate_keypair(&mut h);
+    let (new_dk, _new_ek) = generate_keypair(&mut h);
 
     // Register Alice for confidential assets
     register_account(&mut h, &alice, apt_metadata, &alice_ek);
@@ -858,42 +859,67 @@ fn profile_confidential_asset_rotate_encryption_key(detailed: bool) {
     let status = h.run_transaction_payload(&alice, rollover_freeze_payload);
     assert_success(&status, "rollover_pending_balance_and_freeze");
 
-    // Generate rotation proof bytes using test-only Move function
-    let balance_amount = deposit_amount as u128;
+    // Mirror types for deserializing Move's KeyRotationProof from BCS.
+    // RistrettoPoint in Move is { handle: u64 } (a VM-internal handle, not actual point bytes).
+    // CompressedRistretto and Scalar are { data: Vec<u8> }.
+    #[derive(serde::Deserialize)]
+    struct MoveRistrettoPoint { handle: u64 }
+    #[derive(serde::Deserialize)]
+    struct MoveCompressedRistretto { data: Vec<u8> }
+    #[derive(serde::Deserialize)]
+    struct MoveScalar { data: Vec<u8> }
+    #[derive(serde::Deserialize)]
+    struct MoveSigmaProof {
+        comm_a: Vec<MoveRistrettoPoint>,
+        compressed_comm_a: Vec<MoveCompressedRistretto>,
+        resp_sigma: Vec<MoveScalar>,
+    }
+    #[derive(serde::Deserialize)]
+    enum MoveKeyRotationProof {
+        V1 {
+            compressed_new_ek: MoveCompressedRistretto,
+            new_d: Vec<MoveRistrettoPoint>,
+            compressed_new_d: Vec<MoveCompressedRistretto>,
+            sigma: MoveSigmaProof,
+        }
+    }
 
+    // Generate rotation proof using test-only Move function.
+    // Note: Scalar has the same BCS layout as Vec<u8>, so alice_dk/new_dk pass through directly.
     let result = h
         .exec_function_bypass_visibility(
             EXPERIMENTAL_ADDRESS,
             MODULE_NAME,
-            "generate_rotation_proof_bytes",
+            "generate_key_rotation_proof",
             vec![],
             vec![
                 bcs::to_bytes(alice.address()).unwrap(),
                 bcs::to_bytes(&apt_metadata).unwrap(),
                 bcs::to_bytes(&alice_dk).unwrap(),
                 bcs::to_bytes(&new_dk).unwrap(),
-                bcs::to_bytes(&new_ek).unwrap(),
-                bcs::to_bytes(&balance_amount).unwrap(),
             ],
         )
-        .expect("generate_rotation_proof_bytes should succeed");
+        .expect("generate_key_rotation_proof should succeed");
 
-    // Extract the three return values
-    assert_eq!(result.return_values.len(), 3);
-    let new_balance_bytes: Vec<u8> =
-        bcs::from_bytes(&result.return_values[0].0).expect("deserialize new_balance_bytes");
-    let zkrp_new_balance_bytes: Vec<u8> =
-        bcs::from_bytes(&result.return_values[1].0).expect("deserialize zkrp_bytes");
-    let sigma_proof_bytes: Vec<u8> =
-        bcs::from_bytes(&result.return_values[2].0).expect("deserialize sigma_bytes");
+    assert_eq!(result.return_values.len(), 1);
+    let (bytes, _) = &result.return_values[0];
+    let proof: MoveKeyRotationProof =
+        bcs::from_bytes(bytes).expect("deserialize KeyRotationProof");
+    let MoveKeyRotationProof::V1 { compressed_new_ek, new_d: _, compressed_new_d, sigma } = proof;
+
+    let new_ek_bytes = compressed_new_ek.data;
+    let new_d_bytes: Vec<Vec<u8>> = compressed_new_d.into_iter().map(|p| p.data).collect();
+    let sigma_proto_comm: Vec<Vec<u8>> = sigma.compressed_comm_a.into_iter().map(|p| p.data).collect();
+    let sigma_proto_resp: Vec<Vec<u8>> = sigma.resp_sigma.into_iter().map(|s| s.data).collect();
 
     // Create and execute the rotate_encryption_key transaction
     let payload = create_rotate_encryption_key_payload(
         apt_metadata,
-        new_ek.clone(),
-        new_balance_bytes,
-        zkrp_new_balance_bytes,
-        sigma_proof_bytes,
+        new_ek_bytes,
+        true, // unpause
+        new_d_bytes,
+        sigma_proto_comm,
+        sigma_proto_resp,
     );
 
     let (status, gas_log, gas_used, fee_statement) =
@@ -1039,13 +1065,13 @@ fn bench_gas_normalize_detailed() {
 #[test]
 #[ignore]
 fn test_call_private_function() {
-    let mut h = MoveHarness::new();
+    let mut h = setup_harness();
 
     let return_values = h
         .exec_function_bypass_visibility(
             EXPERIMENTAL_ADDRESS,
             MODULE_NAME,
-            "get_fa_store_address",
+            "get_fa_controller_address",
             vec![],
             vec![],
         )
@@ -1068,7 +1094,7 @@ fn test_call_private_function() {
 /// 2. Creates Alice with APT balance
 /// 3. Registers Alice for confidential assets
 /// 4. Deposits APT to Alice's confidential balance
-/// 5. Calls verify_pending_balance to verify the deposit succeeded
+/// 5. Calls check_pending_balance_decrypts_to to verify the deposit succeeded
 #[test]
 #[ignore]
 #[cfg(feature = "move-harness-with-test-only")]
@@ -1101,12 +1127,12 @@ fn call_test_only_function() {
     assert_success(&status, "deposit_to");
     println!("Deposited {} to Alice's pending balance", deposit_amount);
 
-    // Now call the #[test_only] function verify_pending_balance
+    // Now call the #[test_only] function check_pending_balance_decrypts_to
     // This should succeed and return true since we just deposited `deposit_amount`
     let result = h.exec_function_bypass_visibility(
         EXPERIMENTAL_ADDRESS,
         MODULE_NAME,
-        "verify_pending_balance",
+        "check_pending_balance_decrypts_to",
         vec![],
         vec![
             bcs::to_bytes(alice.address()).unwrap(),
@@ -1122,18 +1148,18 @@ fn call_test_only_function() {
             let (bytes, _) = &return_values.return_values[0];
             let verified: bool = bcs::from_bytes(bytes).expect("Failed to deserialize bool");
             println!(
-                "verify_pending_balance returned: {} (expected: true)",
+                "check_pending_balance_decrypts_to returned: {} (expected: true)",
                 verified
             );
             assert!(
                 verified,
-                "verify_pending_balance should return true for correct amount"
+                "check_pending_balance_decrypts_to should return true for correct amount"
             );
-            println!("SUCCESS: #[test_only] function verify_pending_balance worked correctly!");
+            println!("SUCCESS: #[test_only] function check_pending_balance_decrypts_to worked correctly!");
         },
         Err(e) => {
             panic!(
-                "verify_pending_balance should succeed with proper setup, but got: {:?}",
+                "check_pending_balance_decrypts_to should succeed with proper setup, but got: {:?}",
                 e
             );
         },
@@ -1144,7 +1170,7 @@ fn call_test_only_function() {
     let result = h.exec_function_bypass_visibility(
         EXPERIMENTAL_ADDRESS,
         MODULE_NAME,
-        "verify_pending_balance",
+        "check_pending_balance_decrypts_to",
         vec![],
         vec![
             bcs::to_bytes(alice.address()).unwrap(),
@@ -1159,17 +1185,17 @@ fn call_test_only_function() {
             let (bytes, _) = &return_values.return_values[0];
             let verified: bool = bcs::from_bytes(bytes).expect("Failed to deserialize bool");
             println!(
-                "verify_pending_balance with wrong amount returned: {} (expected: false)",
+                "check_pending_balance_decrypts_to with wrong amount returned: {} (expected: false)",
                 verified
             );
             assert!(
                 !verified,
-                "verify_pending_balance should return false for wrong amount"
+                "check_pending_balance_decrypts_to should return false for wrong amount"
             );
         },
         Err(e) => {
             panic!(
-                "verify_pending_balance should succeed (and return false), but got: {:?}",
+                "check_pending_balance_decrypts_to should succeed (and return false), but got: {:?}",
                 e
             );
         },
