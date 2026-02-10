@@ -77,6 +77,7 @@ EOF
       INTEGRATION_TEST=1
       GEN_ARTIFACTS=1
       GIT_CHECKS=1
+      BUILD_CACHED_PACKAGES=1
   esac
 done
 
