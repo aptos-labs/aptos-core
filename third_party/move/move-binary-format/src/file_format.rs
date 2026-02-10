@@ -754,7 +754,7 @@ impl FunctionDefinition {
 )]
 pub struct TypeSignature(pub SignatureToken);
 
-// TODO: remove at some point or move it in the front end (language/move-ir-compiler)
+// TODO: remove at some point or move it in the front end.
 /// A `FunctionSignature` in internally used to create a unique representation of the overall
 /// signature as need. Consider deprecated...
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
