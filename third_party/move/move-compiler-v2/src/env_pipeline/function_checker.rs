@@ -11,7 +11,7 @@ use move_model::{
     metadata::LanguageVersion,
     model::{
         FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, NodeId, Parameter, QualifiedId,
-        StructEnv, StructId,
+        StructEnv, StructId, UserId,
     },
     ty::Type,
 };
@@ -670,35 +670,41 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
 
             // Check for unused private structs (consolidated into main loop)
             if unused_warnings_enabled {
-                // Compute transitive closure of used structs
+                // Compute transitive closure of used structs using pre-computed users information
                 let mut used_structs: BTreeSet<QualifiedId<StructId>> = BTreeSet::new();
                 let mut worklist: Vec<QualifiedId<StructId>> = Vec::new();
 
                 // Initialize with structs directly used by functions
                 for struct_env in caller_module.get_structs() {
-                    if !struct_env.get_using_functions().is_empty() {
+                    let users = struct_env.get_users();
+                    // A struct is initially used if it has at least one function user
+                    if users.iter().any(|user| matches!(user, UserId::Function(_))) {
                         let struct_id = struct_env.get_qualified_id();
                         used_structs.insert(struct_id);
                         worklist.push(struct_id);
                     }
                 }
 
-                // Propagate usage through field dependencies
+                // Propagate usage through pre-computed field dependencies
+                // If struct A is used and struct B has UserId::Struct(A) in its users, then B is used
+                // (because B is used as a field type in A)
                 while let Some(used_struct_id) = worklist.pop() {
-                    let used_struct_env = env
-                        .get_module(used_struct_id.module_id)
-                        .into_struct(used_struct_id.id);
+                    // Find all structs that have used_struct_id as a user
+                    for struct_env in caller_module.get_structs() {
+                        let struct_id = struct_env.get_qualified_id();
+                        if used_structs.contains(&struct_id) {
+                            continue; // Already marked as used
+                        }
 
-                    // Mark all structs in fields of used_struct as used
-                    for field in used_struct_env.get_fields() {
-                        field.get_type().visit(&mut |ty| {
-                            if let Type::Struct(mid, sid, _) = ty {
-                                let field_struct_id = mid.qualified(*sid);
-                                if used_structs.insert(field_struct_id) {
-                                    worklist.push(field_struct_id);
-                                }
-                            }
-                        });
+                        let users = struct_env.get_users();
+                        // If used_struct uses this struct (as a field), mark it as used
+                        if users
+                            .iter()
+                            .any(|user| matches!(user, UserId::Struct(id) if *id == used_struct_id))
+                        {
+                            used_structs.insert(struct_id);
+                            worklist.push(struct_id);
+                        }
                     }
                 }
 
