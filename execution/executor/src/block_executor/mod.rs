@@ -27,7 +27,8 @@ use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::{
     state_store::{
-        state_summary::ProvableStateSummary, state_view::cached_state_view::CachedStateView,
+        state::State, state_summary::ProvableStateSummary,
+        state_view::cached_state_view::CachedStateView,
     },
     DbReaderWriter,
 };
@@ -42,14 +43,14 @@ use aptos_types::{
 use aptos_vm::VMBlockExecutor;
 use block_tree::BlockTree;
 use fail::fail_point;
-use std::sync::Arc;
+use std::sync::{mpsc::SyncSender, Arc};
 
 pub mod block_tree;
 
 pub struct BlockExecutor<V> {
     pub db: DbReaderWriter,
     inner: RwLock<Option<BlockExecutorInner<V>>>,
-    execution_lock: Mutex<()>,
+    execution_lock: Arc<Mutex<()>>,
 }
 
 impl<V> BlockExecutor<V>
@@ -60,7 +61,7 @@ where
         Self {
             db,
             inner: RwLock::new(None),
-            execution_lock: Mutex::new(()),
+            execution_lock: Arc::new(Mutex::new(())),
         }
     }
 
@@ -90,7 +91,10 @@ where
     fn reset(&self) -> Result<()> {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "reset"]);
 
-        *self.inner.write() = Some(BlockExecutorInner::new(self.db.clone())?);
+        *self.inner.write() = Some(BlockExecutorInner::new(
+            self.db.clone(),
+            self.execution_lock.clone(),
+        )?);
         Ok(())
     }
 
@@ -103,7 +107,7 @@ where
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "execute_and_state_checkpoint"]);
 
         self.maybe_initialize()?;
-        // guarantee only one block being executed at a time
+        // Guarantee only one block being executed at a time
         let _guard = self.execution_lock.lock();
         self.inner
             .read()
@@ -164,19 +168,45 @@ struct BlockExecutorInner<V> {
     db: DbReaderWriter,
     block_tree: BlockTree,
     block_executor: V,
+    /// Channel to the background worker that advances the hot state commit gate.
+    hot_state_progress_tx: SyncSender<State>,
 }
 
 impl<V> BlockExecutorInner<V>
 where
     V: VMBlockExecutor,
 {
-    pub fn new(db: DbReaderWriter) -> Result<Self> {
+    pub fn new(db: DbReaderWriter, execution_lock: Arc<Mutex<()>>) -> Result<Self> {
         let block_tree = BlockTree::new(&db.reader)?;
+        let hot_state_progress_tx =
+            Self::spawn_hot_state_progress_worker(db.writer.clone(), execution_lock);
         Ok(Self {
             db,
             block_tree,
             block_executor: V::new(),
+            hot_state_progress_tx,
         })
+    }
+
+    fn spawn_hot_state_progress_worker(
+        writer: Arc<dyn aptos_storage_interface::DbWriter>,
+        execution_lock: Arc<Mutex<()>>,
+    ) -> SyncSender<State> {
+        let (tx, rx) = std::sync::mpsc::sync_channel(1);
+
+        std::thread::Builder::new()
+            .name("hot_state_prog".to_string())
+            .spawn(move || {
+                while let Ok(state) = rx.recv() {
+                    // Hold the lock to prevent the situation where a block that's being executed
+                    // reads the old persisted version, and this advances the version before that
+                    // block finishes executing.
+                    let _guard = execution_lock.lock();
+                    writer.set_hot_state_progress(state);
+                }
+            })
+            .expect("Failed to spawn hot-state-progress thread.");
+        tx
     }
 }
 
@@ -390,6 +420,21 @@ where
             .commit_ledger(target_version, Some(&ledger_info_with_sigs), None)?;
 
         self.block_tree.prune(ledger_info_with_sigs.ledger_info())?;
+
+        // After pruning, the new root block is the committed one. Advance the hot state
+        // commit gate to this version so that subsequent pre-commits can expose it.
+        // This is sent to a background worker that acquires `execution_lock` to ensure no
+        // concurrent block execution observes a partially-committed hot state.
+        let committed_state = self
+            .block_tree
+            .root_block()
+            .output
+            .result_state()
+            .latest()
+            .clone();
+        self.hot_state_progress_tx
+            .send(committed_state)
+            .expect("Hot state progress worker thread exited unexpectedly.");
 
         Ok(())
     }
