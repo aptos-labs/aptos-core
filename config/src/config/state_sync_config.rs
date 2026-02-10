@@ -13,8 +13,8 @@ use serde_yaml::Value;
 const SERVER_MAX_MESSAGE_SIZE: usize = 10 * 1024 * 1024; // 10 MiB
 
 // The maximum message size per state sync message (for v2 data requests)
-const CLIENT_MAX_MESSAGE_SIZE_V2: usize = 30 * 1024 * 1024; // 30 MiB (used for v2 data requests)
-const SERVER_MAX_MESSAGE_SIZE_V2: usize = 40 * 1024 * 1024; // 40 MiB (used for v2 data requests)
+const CLIENT_MAX_MESSAGE_SIZE_V2: usize = 40 * 1024 * 1024; // 40 MiB (used for v2 data requests)
+const SERVER_MAX_MESSAGE_SIZE_V2: usize = 50 * 1024 * 1024; // 50 MiB (used for v2 data requests)
 
 // The maximum chunk sizes for data client requests and response
 const MAX_EPOCH_CHUNK_SIZE: u64 = 200;
@@ -130,9 +130,9 @@ pub struct StateSyncDriverConfig {
 impl Default for StateSyncDriverConfig {
     fn default() -> Self {
         Self {
-            bootstrapping_mode: BootstrappingMode::ExecuteOrApplyFromGenesis,
+            bootstrapping_mode: BootstrappingMode::ApplyTransactionOutputsFromGenesis,
             commit_notification_timeout_ms: 5000,
-            continuous_syncing_mode: ContinuousSyncingMode::ExecuteTransactionsOrApplyOutputs,
+            continuous_syncing_mode: ContinuousSyncingMode::ApplyTransactionOutputs,
             enable_auto_bootstrapping: false,
             fallback_to_output_syncing_secs: 180, // 3 minutes
             progress_check_interval_ms: 100,
