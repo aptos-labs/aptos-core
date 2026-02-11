@@ -1,0 +1,34 @@
+
+Diagnostics:
+warning: Constant `TRULY_UNUSED_CONST` is unused.
+  ┌─ tests/checking/unused/const_in_spec_fun_var.move:9:5
+  │
+9 │     const TRULY_UNUSED_CONST: u64 = 300;
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    struct Ghost$initialized_value {
+        v: u64,
+    }
+    public fun test_function(): u64 {
+        42
+    }
+    spec {
+      ensures Eq<u64>(result0(), m::helper_spec_fun());
+    }
+
+    spec fun helper_spec_fun(): u64 {
+        Add(100, 10)
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    struct Ghost_initialized_value has copy, drop, store, key {
+        v: u64,
+    }
+    public fun test_function(): u64 {
+        42
+    }
+}

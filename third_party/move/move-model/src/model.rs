@@ -3846,7 +3846,7 @@ pub struct StructData {
     /// Note: by default set to false when created from compiled module since the info is not available
     pub is_empty_struct: bool,
 
-    /// All users of this struct (functions and structs)
+    /// All users of this struct (functions, structs, and specs)
     pub(crate) users: BTreeSet<UserId>,
 }
 
@@ -4244,10 +4244,7 @@ impl<'env> StructEnv<'env> {
         self.data.has_package_visibility
     }
 
-    /// Returns all users of this struct (both functions and other structs).
-    ///
-    /// This information is pre-computed during the build phase by tracking struct usage in
-    /// function bodies and as field types in other structs (see module_builder.rs).
+    /// Returns all users of this struct
     pub fn get_users(&self) -> &BTreeSet<UserId> {
         &self.data.users
     }
@@ -4379,7 +4376,7 @@ pub struct NamedConstantData {
     /// The value of this constant, if known.
     pub(crate) value: Value,
 
-    /// All users of this constant (functions and other constants)
+    /// All users of this constant (functions, other constants, and specs)
     pub(crate) users: BTreeSet<UserId>,
 }
 
@@ -4431,7 +4428,7 @@ impl NamedConstantEnv<'_> {
         }
     }
 
-    /// Returns the users (functions and other constants) that reference this constant.
+    /// Returns the users that reference this constant.
     pub fn get_users(&self) -> &BTreeSet<UserId> {
         &self.data.users
     }

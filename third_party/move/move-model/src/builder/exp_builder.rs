@@ -19,9 +19,9 @@ use crate::{
         LanguageVersion,
     },
     model::{
-        FieldData, FieldId, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, NamedConstantId, NodeId,
-        Parameter, QualifiedId, QualifiedInstId, SpecFunId, StructId, TypeParameter,
-        TypeParameterKind, UserId,
+        FieldData, FieldId, FunId, FunctionKind, GlobalEnv, GlobalId, Loc, ModuleId,
+        NamedConstantId, NodeId, Parameter, QualifiedId, QualifiedInstId, SpecFunId, StructId,
+        TypeParameter, TypeParameterKind, UserId,
     },
     symbol::{Symbol, SymbolPool},
     ty::{

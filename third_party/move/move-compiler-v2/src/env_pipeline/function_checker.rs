@@ -673,7 +673,6 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
 
             // Check for unused structs and constants in this module
             if unused_warnings_enabled {
-                // Check for unused private structs
                 // A private struct is unused if it has no users from the same module
                 for struct_env in caller_module.get_structs() {
                     if should_warn_unused_struct(env, &struct_env, caller_module_id) {
@@ -692,7 +691,6 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
                 }
 
                 // Check for unused constants (all constants are module-private)
-                // A constant is unused if it has no users from the same module
                 for const_env in caller_module.get_named_constants() {
                     if !has_users_in_module(const_env.get_users(), caller_module_id, env) {
                         let msg = format!(
@@ -752,7 +750,6 @@ fn has_users_in_module(users: &BTreeSet<UserId>, module_id: ModuleId, _env: &Glo
 }
 
 /// Check if a function should be excluded from unused checks.
-/// Some functions are special VM hooks that shouldn't be warned about.
 fn is_excluded_from_unused_check(env: &GlobalEnv, func: &FunctionEnv) -> bool {
     let func_name = env.symbol_pool().string(func.get_name());
     // Functions that should never be reported as unused:
@@ -766,7 +763,6 @@ fn is_excluded_from_unused_check(env: &GlobalEnv, func: &FunctionEnv) -> bool {
 
 /// Check if a struct has attributes that suppress unused warnings.
 fn has_suppression_attribute(env: &GlobalEnv, struct_env: &StructEnv) -> bool {
-    // Attributes that suppress unused warnings:
     // - deprecated: Marks structs that can't be removed due to on-chain published modules
     // - resource_group: Empty marker structs used by VM for storage optimization
     // - resource_group_member: Structs belonging to a resource group, used by VM verifier
@@ -819,7 +815,7 @@ fn should_warn_unused_struct(env: &GlobalEnv, struct_env: &StructEnv, module_id:
         return false;
     }
 
-    // Don't warn for ghost memory structs (used only in specs)
+    // Don't warn for ghost memory structs (created internally for specs)
     if struct_env.is_ghost_memory() {
         return false;
     }

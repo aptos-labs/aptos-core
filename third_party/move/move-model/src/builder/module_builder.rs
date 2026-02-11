@@ -1531,9 +1531,8 @@ impl ModuleBuilder<'_, '_> {
             et.finalize_types(true);
             et.check_mutable_borrow_field(&translated);
             et.check_lambda_types(&translated);
-
+            // Collect types from body
             translated.collect_all_types(self.parent.env, &mut all_used_types);
-
             assert!(self.fun_defs.insert(full_name.symbol, translated).is_none());
             if let Some(specifiers) = access_specifiers {
                 assert!(self
@@ -2031,7 +2030,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .expect("invalid spec block context")
                     .clone();
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
-                et.set_spec_block_context(SpecBlockContext::Function(name.clone()));
+                et.set_spec_block_context(SpecBlockContext::FunctionCodeV2(
+                    name.clone(),
+                    locals.clone(),
+                    from_lambda.clone(),
+                ));
                 for (pos, TypeParameter(name, kind, loc)) in entry.type_params.iter().enumerate() {
                     et.define_type_param(loc, *name, Type::new_param(pos), kind.clone(), false);
                 }
@@ -2710,6 +2713,8 @@ impl ModuleBuilder<'_, '_> {
                 let params = entry.params.clone();
                 let result_type = entry.result_type.clone();
                 let mut et = ExpTranslator::new(self);
+                // Spec functions are module-level helpers
+                et.set_spec_block_context(SpecBlockContext::Module);
                 let loc = et.to_loc(&body.loc);
                 et.define_type_params(&loc, &type_params, false);
                 et.enter_scope();
@@ -2726,7 +2731,7 @@ impl ModuleBuilder<'_, '_> {
                 // Run finalization again, this time with reporting errors.
                 et.finalize_types(true);
                 self.spec_funs[self.spec_fun_index].body = Some(translated.clone());
-
+                // Track types in body
                 self.track_structs_from_exp(&translated, user_id);
             },
             EA::FunctionBody_::Native => {
@@ -2745,7 +2750,7 @@ impl ModuleBuilder<'_, '_> {
 impl ModuleBuilder<'_, '_> {
     /// Definition analysis for a specification variable function.
     fn def_ana_global_var(&mut self, loc: &Loc, name: &Name, init: Option<&EA::Exp>) {
-        // Track type
+        // Track type in declaration
         let sym = self.qualified_by_module_from_name(name);
         let decl = self
             .spec_vars
@@ -2769,6 +2774,8 @@ impl ModuleBuilder<'_, '_> {
                 .expect("spec var defined")
                 .clone();
             let mut et = ExpTranslator::new(self);
+            // Spec variables are module-level declarations
+            et.set_spec_block_context(SpecBlockContext::Module);
             et.define_type_params(loc, &entry.type_params, false);
             let translated = et.translate_exp(exp, &entry.type_);
             et.finalize_types(true);
@@ -2778,6 +2785,7 @@ impl ModuleBuilder<'_, '_> {
                 .iter_mut()
                 .find(|d| d.name == sym.symbol)
                 .expect("spec var defined");
+            // Track type in initialization
             let init_exp = translated.into_exp();
             decl.init = Some(init_exp.clone());
 
