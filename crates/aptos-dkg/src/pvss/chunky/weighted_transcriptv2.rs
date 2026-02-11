@@ -50,6 +50,7 @@ use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_ff::{AdditiveGroup, Fp, FpConfig};
 use ark_poly::EvaluationDomain;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
 /// Domain-separation tag (DST) used to ensure that all cryptographic hashes and
@@ -83,13 +84,14 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
     }
 
     #[allow(non_snake_case)]
-    fn verify<A: Serialize + Clone>(
+    fn verify<A: Serialize + Clone, R: RngCore + CryptoRng>(
         &self,
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         spks: &[Self::SigningPubKey],
         eks: &[Self::EncryptPubKey],
         sid: &A,
+        rng: &mut R,
     ) -> anyhow::Result<()> {
         if eks.len() != sc.get_total_num_players() {
             bail!(
@@ -120,8 +122,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             self.dealer.id,
             DST.to_vec(),
         ); // As above, this is a bit hacky... though we have access to `self` now
-
-        let mut rng = rand::thread_rng(); // TODO: make `rng` a parameter of fn verify()?
 
         {
             // // Verify the PoK
@@ -169,7 +169,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
                 sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize,
                 pp.ell,
                 &self.sharing_proof.range_proof_commitment,
-                &mut rand::thread_rng(), // TODO: make `rng` a parameter of fn verify()?
+                rng,
             ) {
                 bail!("Range proof batch verification failed: {:?}", err);
             }
@@ -177,7 +177,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
 
         // Do the SCRAPE LDT
         let ldt = LowDegreeTest::random(
-            &mut rng,
+            rng,
             sc.get_threshold_weight(),
             sc.get_total_weight() + 1,
             true,
@@ -223,7 +223,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             ),
             &self.sharing_proof.SoK,
             &sok_cntxt,
-            &mut rng,
+            rng,
         );
 
         hom.check_first_msm_eval(first_msm_terms)?;
@@ -231,7 +231,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         verify_msm_terms_with_start::<E::G2>(
             vec![ldt_msm_terms],
             second_msm_terms,
-            sample_field_elements(1, &mut rng),
+            sample_field_elements(1, rng),
         )?;
 
         // ldt.low_degree_test_group::<E::G2>(&Vs_flat)?;
