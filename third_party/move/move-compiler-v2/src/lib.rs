@@ -21,7 +21,8 @@ use crate::{
         cyclic_instantiation_checker, flow_insensitive_checkers, function_checker, inliner,
         inlining_optimization, lambda_lifter, lambda_lifter::LambdaLiftingOptions, model_ast_lints,
         recursive_struct_checker, rewrite_target::RewritingScope, seqs_in_binop_checker,
-        spec_checker, spec_rewriter, unused_params_checker, EnvProcessorPipeline,
+        spec_checker, spec_rewriter, struct_usage_collector, unused_params_checker,
+        EnvProcessorPipeline,
     },
     pipeline::{
         ability_processor::AbilityProcessor,
@@ -59,7 +60,7 @@ use move_binary_format::errors::VMError;
 use move_bytecode_source_map::source_map::SourceMap;
 use move_core_types::vm_status::StatusType;
 use move_model::{
-    metadata::LanguageVersion,
+    metadata::{lang_feature_versions::LANGUAGE_VERSION_FOR_UNUSED_CHECK, LanguageVersion},
     model::{GlobalEnv, Loc, MoveIrLoc},
     PackageInfo,
 };
@@ -355,11 +356,42 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
         });
     }
 
+    let unused_check_version = options
+        .language_version
+        .unwrap_or_default()
+        .is_at_least(LANGUAGE_VERSION_FOR_UNUSED_CHECK);
+
+    if unused_check_version {
+        // checks for unused private functions, private structs, and constants
+        // Needs to run before inlining
+
+        if options.experiment_on(Experiment::UNUSED_CONSTANT_CHECK) {
+            env_pipeline.add("unused constant check", |env: &mut GlobalEnv| {
+                function_checker::check_unused_constants(env)
+            });
+        }
+
+        if options.experiment_on(Experiment::UNUSED_FUNCTION_CHECK) {
+            env_pipeline.add("unused function check", |env: &mut GlobalEnv| {
+                function_checker::check_unused_functions(env)
+            });
+        }
+
+        if options.experiment_on(Experiment::UNUSED_STRUCT_CHECK) {
+            env_pipeline.add(
+                "collect struct usage",
+                struct_usage_collector::collect_struct_usage,
+            );
+            env_pipeline.add("unused struct check", |env: &mut GlobalEnv| {
+                function_checker::check_unused_structs(env)
+            });
+        }
+    }
+
     if options.experiment_on(Experiment::ACCESS_CHECK) {
-        env_pipeline.add(
-            "access and use check before inlining",
-            |env: &mut GlobalEnv| function_checker::check_access_and_use(env, true),
-        );
+        env_pipeline.add("access check before inlining", |env: &mut GlobalEnv| {
+            function_checker::check_access_before_inlining(env)
+        });
     }
 
     let check_seqs_in_binops = !options
@@ -410,10 +442,9 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
     }
 
     if options.experiment_on(Experiment::ACCESS_CHECK) {
-        env_pipeline.add(
-            "access and use check after inlining",
-            |env: &mut GlobalEnv| function_checker::check_access_and_use(env, false),
-        );
+        env_pipeline.add("access check after inlining", |env: &mut GlobalEnv| {
+            function_checker::check_access_after_inlining(env)
+        });
     }
 
     if options.experiment_on(Experiment::ACQUIRES_CHECK) {

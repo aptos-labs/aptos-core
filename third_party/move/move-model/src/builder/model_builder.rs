@@ -130,7 +130,7 @@ pub(crate) struct StructEntry {
     pub is_empty_struct: bool,
     pub is_native: bool,
     pub visibility: Visibility,
-    /// Entities that use this struct (functions or structs)
+    /// Users of this struct
     pub users: BTreeSet<UserId>,
 }
 
@@ -220,6 +220,7 @@ pub(crate) struct ConstEntry {
     pub value: Value,
     pub visibility: EntryVisibility,
     pub users: BTreeSet<UserId>,
+    pub attributes: Vec<Attribute>,
 }
 
 impl<'env> ModelBuilder<'env> {

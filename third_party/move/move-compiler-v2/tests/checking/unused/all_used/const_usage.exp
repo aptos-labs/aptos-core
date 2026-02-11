@@ -1,0 +1,35 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    struct Data {
+        value: u64,
+    }
+    private fun create_default(): Data {
+        pack m::Data(42)
+    }
+    public fun test(x: u64): u64 {
+        if Lt<u64>(x, 100) {
+          Tuple()
+        } else {
+          Abort(1)
+        };
+        {
+          let d: Data = m::create_default();
+          Add<u64>(Add<u64>(20, select m::Data.value<Data>(d)), x)
+        }
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    struct Data has drop {
+        value: u64,
+    }
+    fun create_default(): Data {
+        Data{value: 42}
+    }
+    public fun test(x: u64): u64 {
+        if (x < 100) () else abort 1;
+        let d = create_default();
+        20 + d.value + x
+    }
+}

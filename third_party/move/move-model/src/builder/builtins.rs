@@ -56,6 +56,7 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
         value: Value::Number(value),
         visibility,
         users: BTreeSet::new(),
+        attributes: vec![],
     };
 
     let mk_num_const =
@@ -67,6 +68,7 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
         value: Value::Bool(value),
         visibility,
         users: BTreeSet::new(),
+        attributes: vec![],
     };
 
     {

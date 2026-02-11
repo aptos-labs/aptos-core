@@ -19,7 +19,7 @@ use crate::{
         LanguageVersion,
     },
     model::{
-        FieldData, FieldId, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, NamedConstantId, NodeId,
+        FieldData, FieldId, FunId, FunctionKind, GlobalEnv, GlobalId, Loc, ModuleId, NodeId,
         Parameter, QualifiedId, QualifiedInstId, SpecFunId, StructId, TypeParameter,
         TypeParameterKind, UserId,
     },
@@ -29,10 +29,7 @@ use crate::{
         ReceiverFunctionInstance, ReferenceKind, Substitution, Type, TypeDisplayContext,
         TypeUnificationError, UnificationContext, Variance, WideningOrder, BOOL_TYPE,
     },
-    well_known::{
-        BORROW_MUT_NAME, BORROW_NAME, UNSPECIFIED_ABORT_CODE, VECTOR_FUNCS_WITH_BYTECODE_INSTRS,
-        VECTOR_MODULE,
-    },
+    well_known::{UNSPECIFIED_ABORT_CODE, VECTOR_FUNCS_WITH_BYTECODE_INSTRS, VECTOR_MODULE},
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -74,10 +71,9 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     pub local_table: LinkedList<BTreeMap<Symbol, LocalVarEntry>>,
     /// The name of the function this expression is associated with, if there is one.
     pub fun_name: Option<QualifiedSymbol>,
-    /// The constant currently being defined, if we're translating a constant's initializer.
-    pub const_name: Option<QualifiedSymbol>,
-    /// The spec block context this expression is associated with, if any.
-    pub spec_block_context: Option<SpecBlockContext>,
+    /// Context for tracking constant usage. When set, user of the constant
+    /// being translated will be recorded in it.
+    pub constant_use_context: Option<UserId>,
     /// Whether we are translating an inline function body.
     pub fun_is_inline: bool,
     /// The result type of the function this expression is associated with.
@@ -173,8 +169,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             fun_ptrs_table: BTreeMap::new(),
             local_table: LinkedList::new(),
             fun_name: None,
-            const_name: None,
-            spec_block_context: None,
+            constant_use_context: None,
             fun_is_inline: false,
             result_type: None,
             lambda_result_type_stack: vec![],
@@ -247,8 +242,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         self.fun_name = Some(name)
     }
 
-    pub fn set_spec_block_context(&mut self, context: SpecBlockContext) {
-        self.spec_block_context = Some(context)
+    pub fn set_constant_use_context(&mut self, context: UserId) {
+        self.constant_use_context = Some(context)
     }
 
     pub fn set_result_type(&mut self, ty: Type) {
@@ -515,7 +510,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 );
             }
         }
-
         ty
     }
 
@@ -4018,25 +4012,11 @@ impl ExpTranslator<'_, '_, '_> {
             );
             self.new_error_exp()
         } else {
-            // Record usage
-            if let Some(fun_name) = &self.fun_name {
-                let user_id = UserId::Function(QualifiedId {
-                    module_id: self.parent.module_id,
-                    id: FunId::new(fun_name.symbol),
-                });
-                self.track_constant_usage(sym, user_id);
-            }
-            if let Some(const_name) = &self.const_name {
-                let user_id = UserId::Constant(QualifiedId {
-                    module_id: self.parent.module_id,
-                    id: NamedConstantId::new(const_name.symbol),
-                });
-                self.track_constant_usage(sym, user_id);
-            }
-            if let Some(spec_block_context) = &self.spec_block_context {
-                if let Some(user_id) = self.spec_context_to_user_id(spec_block_context) {
-                    self.track_constant_usage(sym, user_id);
-                }
+            // Record constant usage.
+            // Why tracking constants on the fly:
+            // - they are replaced by values after translation!
+            if let Some(user_id) = &self.constant_use_context {
+                self.track_constant_usage(loc, sym, user_id.clone());
             }
             let ConstEntry { ty, value, .. } = entry;
             let ty = self.check_type(loc, &ty, expected_type, context);
@@ -4045,29 +4025,18 @@ impl ExpTranslator<'_, '_, '_> {
         }
     }
 
-    /// Convert SpecBlockContext to UserId. Returns None for schemas.
-    fn spec_context_to_user_id(&self, context: &SpecBlockContext) -> Option<UserId> {
-        let module_id = self.parent.module_id;
-        match context {
-            SpecBlockContext::Function(qsym) | SpecBlockContext::FunctionCodeV2(qsym, ..) => {
-                Some(UserId::FunctionSpec(QualifiedId {
-                    module_id,
-                    id: FunId::new(qsym.symbol),
-                }))
-            },
-            SpecBlockContext::Struct(qsym) => Some(UserId::StructSpec(QualifiedId {
-                module_id,
-                id: StructId::new(qsym.symbol),
-            })),
-            SpecBlockContext::Module => Some(UserId::ModuleSpec(module_id)),
-            SpecBlockContext::Schema(_) => None, // Schemas don't track usage
-        }
-    }
-
-    /// Record constant usage.
-    fn track_constant_usage(&mut self, const_sym: &QualifiedSymbol, user_id: UserId) {
+    fn track_constant_usage(&mut self, loc: &Loc, const_sym: &QualifiedSymbol, user_id: UserId) {
         if let Some(const_entry) = self.parent.parent.const_table.get_mut(const_sym) {
             const_entry.users.insert(user_id);
+        } else {
+            self.parent.parent.env.diag(
+                Severity::Bug,
+                loc,
+                &format!(
+                    "constant `{}` not found in const_table while tracking usage",
+                    const_sym.display(self.parent.parent.env)
+                ),
+            );
         }
     }
 

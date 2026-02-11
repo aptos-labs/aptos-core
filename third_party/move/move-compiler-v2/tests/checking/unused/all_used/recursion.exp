@@ -1,0 +1,51 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    private fun factorial(n: u64): u64 {
+        if Le<u64>(n, 1) {
+          1
+        } else {
+          Mul<u64>(n, m::factorial(Sub<u64>(n, 1)))
+        }
+    }
+    private fun is_even(n: u64): bool {
+        if Eq<u64>(n, 0) {
+          true
+        } else {
+          m::is_odd(Sub<u64>(n, 1))
+        }
+    }
+    private fun is_odd(n: u64): bool {
+        if Eq<u64>(n, 0) {
+          false
+        } else {
+          m::is_even(Sub<u64>(n, 1))
+        }
+    }
+    public fun test(): u64 {
+        {
+          let f: u64 = m::factorial(5);
+          if m::is_even(f) {
+            f
+          } else {
+            Add<u64>(f, 1)
+          }
+        }
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    fun factorial(n: u64): u64 {
+        if (n <= 1) 1 else n * factorial(n - 1)
+    }
+    fun is_even(n: u64): bool {
+        if (n == 0) true else is_odd(n - 1)
+    }
+    fun is_odd(n: u64): bool {
+        if (n == 0) false else is_even(n - 1)
+    }
+    public fun test(): u64 {
+        let f = factorial(5);
+        if (is_even(f)) f else f + 1
+    }
+}

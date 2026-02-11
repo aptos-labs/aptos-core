@@ -4,7 +4,7 @@ error: function `0x2::X::foo` cannot be called from a script because it is not p
    ┌─ tests/checking/visibility-checker/main_call_visibility_friend.move:3:24
    │
  3 │     public(friend) fun foo() {}
-   │                        ^^^ callee
+   │                        ^^^ called from a script
    ·
 13 │     0x2::X::foo();
    │     ------------- called here
@@ -16,7 +16,7 @@ error: function `0x2::X::baz` cannot be called from a script because it is not p
    ┌─ tests/checking/visibility-checker/main_call_visibility_friend.move:7:9
    │
  7 │     fun baz() {}
-   │         ^^^ callee
+   │         ^^^ called from a script
    ·
 16 │     0x2::X::baz();
    │     ------------- called here

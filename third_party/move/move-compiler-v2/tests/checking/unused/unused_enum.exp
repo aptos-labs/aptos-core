@@ -1,6 +1,6 @@
 
 Diagnostics:
-warning: Enum `MessageHolder` is unused in its defining module (only place where it can be packed, unpacked, or have fields accessed). Consider removing it or adding the `#[deprecated]` attribute to suppress this warning.
+warning: enum `MessageHolder` is unused in current package. Remove it (if not published), or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.
    ┌─ tests/checking/unused/unused_enum.move:5:5
    │
  5 │ ╭     enum MessageHolder has key, drop {

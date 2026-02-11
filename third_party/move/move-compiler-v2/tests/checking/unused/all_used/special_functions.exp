@@ -1,0 +1,41 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    public fun caller(): u64 {
+        m::private_helper()
+    }
+    public entry fun entry_func() {
+        Tuple()
+    }
+    friend fun friend_func(): u64 {
+        2
+    }
+    private fun init_module(_account: &signer) {
+        Tuple()
+    }
+    private fun private_helper(): u64 {
+        3
+    }
+    public fun public_func(): u64 {
+        1
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    public fun caller(): u64 {
+        private_helper()
+    }
+    public entry fun entry_func() {
+    }
+    friend fun friend_func(): u64 {
+        2
+    }
+    fun init_module(_account: &signer) {
+    }
+    fun private_helper(): u64 {
+        3
+    }
+    public fun public_func(): u64 {
+        1
+    }
+}

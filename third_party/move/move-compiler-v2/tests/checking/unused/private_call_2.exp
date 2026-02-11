@@ -1,0 +1,56 @@
+
+Diagnostics:
+warning: public inline function `foo` calls `m::bar` which may not be accessible when expanded
+  ┌─ tests/checking/unused/private_call_2.move:3:23
+  │
+3 │     public inline fun foo(): u64 {
+  │                       ^^^ contains calls that may be inaccessible when expanded
+4 │         bar()
+  │         ----- friend function may not be accessible in all contexts where `foo` can be called
+
+error: friend function `0x42::m::bar` cannot be called from `0x42::n` (not a friend of `0x42::m`)
+   ┌─ tests/checking/unused/private_call_2.move:7:24
+   │
+ 4 │         bar()
+   │         ----- called here
+   ·
+ 7 │     public(friend) fun bar(): u64 { 42 }
+   │                        ^^^ called from function `0x42::n::test`
+   ·
+14 │         m::foo();
+   │         -------- from a call inlined at this callsite
+   ·
+25 │         assert!(o::foo() == 42, 1);
+   │                 -------- from a call inlined at this callsite
+
+warning: public inline function `foo` calls `m::bar` which may not be accessible when expanded
+   ┌─ tests/checking/unused/private_call_2.move:13:23
+   │
+ 4 │         bar()
+   │         ----- friend function may not be accessible in all contexts where `foo` can be called
+   ·
+13 │     public inline fun foo(): u64 {
+   │                       ^^^ contains calls that may be inaccessible when expanded
+14 │         m::foo();
+   │         -------- from a call inlined at this callsite
+
+warning: public inline function `foo` calls `o::bar` which may not be accessible when expanded
+   ┌─ tests/checking/unused/private_call_2.move:13:23
+   │
+13 │     public inline fun foo(): u64 {
+   │                       ^^^ contains calls that may be inaccessible when expanded
+14 │         m::foo();
+15 │     bar()
+   │     ----- private function may not be accessible in all contexts where `foo` can be called
+
+error: function `0x42::o::bar` is private to module `0x42::o`
+   ┌─ tests/checking/unused/private_call_2.move:18:9
+   │
+15 │     bar()
+   │     ----- called here
+   ·
+18 │     fun bar(): u64 { 42 }
+   │         ^^^ called from function `0x42::n::test`
+   ·
+25 │         assert!(o::foo() == 42, 1);
+   │                 -------- from a call inlined at this callsite

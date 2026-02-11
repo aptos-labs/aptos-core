@@ -1852,148 +1852,121 @@ impl ExpData {
     fn collect_struct_pattern(pat: &Pattern, usage: &mut BTreeSet<QualifiedId<StructId>>) {
         if let Pattern::Struct(_, qid, _, pats) = pat {
             usage.insert(qid.to_qualified_id());
+            // Collect struct types from the type instantiation (e.g., Inner in Outer<Inner>)
+            for ty in &qid.inst {
+                ty.visit(&mut |t| {
+                    if let Type::Struct(mid, sid, _) = t {
+                        usage.insert(mid.qualified(*sid));
+                    }
+                });
+            }
             for p in pats {
                 Self::collect_struct_pattern(p, usage);
             }
         }
     }
 
-    /// Collect struct-related operations including unpacking
-    pub fn struct_usage(&self, env: &GlobalEnv, usage: &mut BTreeSet<QualifiedId<StructId>>) {
-        self.visit_post_order(&mut |e| {
-            if let ExpData::Call(_, oper, _) = e {
-                use Operation::*;
-                match oper {
-                    SelectVariants(mid, sid, ..)
-                    | TestVariants(mid, sid, ..)
-                    | Select(mid, sid, ..)
-                    | UpdateField(mid, sid, ..)
-                    | Pack(mid, sid, _) => {
-                        usage.insert(mid.qualified(*sid));
-                    },
-                    _ => {},
-                }
-            } else {
-                match e {
-                    ExpData::Assign(_, pat, _) | ExpData::Block(_, pat, _, _) => {
-                        Self::collect_struct_pattern(pat, usage);
-                    },
-                    ExpData::Lambda(id, pat, _, _, _) => {
-                        let fun_ty = env.get_node_type(*id);
-                        if let Some((wrapper_struct, _)) = fun_ty.get_struct(env) {
-                            usage.insert(wrapper_struct.get_qualified_id());
-                        }
-                        Self::collect_struct_pattern(pat, usage);
-                    },
-                    ExpData::Quant(_, _, pattern_tuple, _, _, _) => {
-                        for (pat, _) in pattern_tuple {
-                            Self::collect_struct_pattern(pat, usage);
-                        }
-                    },
-                    ExpData::Match(_, _, arms) => {
-                        for arm in arms.iter() {
-                            Self::collect_struct_pattern(&arm.pattern, usage);
-                        }
-                    },
-                    ExpData::Invoke(_, exp, _) => {
-                        let fun_ty = env.get_node_type(exp.node_id());
-                        if let Some((wrapper_struct, _)) = fun_ty.get_struct(env) {
-                            usage.insert(wrapper_struct.get_qualified_id());
-                        }
-                    },
-                    _ => {},
-                }
-            }
-            true // keep going.
-        });
-    }
-
-    /// Collect all types used in the expression, including from patterns and type instantiations
-    pub fn collect_all_types(&self, env: &GlobalEnv, types: &mut BTreeSet<Type>) {
-        // Visit all expression nodes
-        self.visit_post_order(&mut |e| {
-            let node_id = e.node_id();
-
-            // Collect the node's type
-            let ty = env.get_node_type(node_id);
-            ty.visit(&mut |t| {
-                types.insert(t.clone());
-            });
-
-            // Collect type instantiations (generic type arguments)
-            if let Some(inst) = env.get_node_instantiation_opt(node_id) {
-                for ty in inst {
-                    ty.visit(&mut |t| {
-                        types.insert(t.clone());
-                    });
-                }
+    /// Collect struct-related operations including unpacking.
+    /// If `include_specs` is false, spec blocks are skipped.
+    pub fn struct_usage(
+        &self,
+        env: &GlobalEnv,
+        include_specs: bool,
+    ) -> BTreeSet<QualifiedId<StructId>> {
+        let mut usage = BTreeSet::new();
+        let mut spec_depth = 0usize;
+        self.visit_pre_post(&mut |post, e| {
+            // Skip spec blocks when not including specs
+            if !include_specs && matches!(e, ExpData::SpecBlock(..)) {
+                spec_depth = if post {
+                    spec_depth.saturating_sub(1)
+                } else {
+                    spec_depth + 1
+                };
             }
 
-            // Collect from patterns
+            // We skip `post` since the exp has been visited during `pre`
+            // Also, `spec_depth > 0` implies inside a spec block and `!include_specs`
+            if post || spec_depth > 0 {
+                return true;
+            }
+
             match e {
-                ExpData::Assign(_, pat, _) | ExpData::Block(_, pat, _, _) => {
-                    Self::collect_pattern_types(pat, env, types);
+                ExpData::Call(node_id, oper, _) => {
+                    use Operation::*;
+                    match oper {
+                        SelectVariants(mid, sid, ..)
+                        | TestVariants(mid, sid, ..)
+                        | Select(mid, sid, ..)
+                        | UpdateField(mid, sid, ..)
+                        | Pack(mid, sid, _) => {
+                            usage.insert(mid.qualified(*sid));
+                        },
+                        MoveFunction(..) | Closure(..) | Tuple | SpecFunction(..)
+                        | Behavior(..) | Result(..) | Index | Slice | Range | Implies | Iff
+                        | Identical | Add | Sub | Mul | Mod | Div | BitOr | BitAnd | Xor | Shl
+                        | Shr | And | Or | Eq | Neq | Lt | Gt | Le | Ge | Copy | Move | Not
+                        | Cast | Negate | Exists(..) | BorrowGlobal(..) | Borrow(..) | Deref
+                        | MoveTo | MoveFrom | Freeze(..) | Abort(..) | Vector | Len | TypeValue
+                        | TypeDomain | ResourceDomain | Global(..) | CanModify | Old
+                        | Trace(..) | EmptyVec | SingleVec | UpdateVec | ConcatVec | IndexOfVec
+                        | ContainsVec | InRangeRange | InRangeVec | RangeVec | MaxU8 | MaxU16
+                        | MaxU32 | MaxU64 | MaxU128 | MaxU256 | Bv2Int | Int2Bv | AbortFlag
+                        | AbortCode | WellFormed | BoxValue | UnboxValue | EmptyEventStore
+                        | ExtendEventStore | EventStoreIncludes | EventStoreIncludedIn | NoOp => {},
+                    }
+                    // Collect struct types from type instantiations (e.g., borrow_global<MyStruct>)
+                    if let Some(inst) = env.get_node_instantiation_opt(*node_id) {
+                        for ty in inst {
+                            ty.visit(&mut |t| {
+                                if let Type::Struct(mid, sid, _) = t {
+                                    usage.insert(mid.qualified(*sid));
+                                }
+                            });
+                        }
+                    }
                 },
-                ExpData::Lambda(_, pat, _, _, _) => {
-                    Self::collect_pattern_types(pat, env, types);
+                ExpData::Assign(_, pat, _) | ExpData::Block(_, pat, _, _) => {
+                    Self::collect_struct_pattern(pat, &mut usage);
+                },
+                ExpData::Lambda(id, pat, _, _, _) => {
+                    let fun_ty = env.get_node_type(*id);
+                    if let Some((wrapper_struct, _)) = fun_ty.get_struct(env) {
+                        usage.insert(wrapper_struct.get_qualified_id());
+                    }
+                    Self::collect_struct_pattern(pat, &mut usage);
                 },
                 ExpData::Quant(_, _, pattern_tuple, _, _, _) => {
                     for (pat, _) in pattern_tuple {
-                        Self::collect_pattern_types(pat, env, types);
+                        Self::collect_struct_pattern(pat, &mut usage);
                     }
                 },
                 ExpData::Match(_, _, arms) => {
                     for arm in arms.iter() {
-                        Self::collect_pattern_types(&arm.pattern, env, types);
+                        Self::collect_struct_pattern(&arm.pattern, &mut usage);
                     }
                 },
-                ExpData::Call(..)
-                | ExpData::IfElse(..)
-                | ExpData::Invoke(..)
-                | ExpData::Loop(..)
-                | ExpData::Return(..)
-                | ExpData::Sequence(..)
-                | ExpData::SpecBlock(..)
-                | ExpData::Mutate(..)
-                | ExpData::LoopCont(..)
+                ExpData::Invoke(_, exp, _) => {
+                    let fun_ty = env.get_node_type(exp.node_id());
+                    if let Some((wrapper_struct, _)) = fun_ty.get_struct(env) {
+                        usage.insert(wrapper_struct.get_qualified_id());
+                    }
+                },
+                ExpData::Invalid(..)
                 | ExpData::Value(..)
                 | ExpData::LocalVar(..)
                 | ExpData::Temporary(..)
-                | ExpData::Invalid(..) => {},
+                | ExpData::IfElse(..)
+                | ExpData::Return(..)
+                | ExpData::Sequence(..)
+                | ExpData::Loop(..)
+                | ExpData::LoopCont(..)
+                | ExpData::Mutate(..)
+                | ExpData::SpecBlock(..) => {},
             }
-
-            true // keep going
+            true // continue visiting
         });
-    }
-
-    fn collect_pattern_types(pat: &Pattern, env: &GlobalEnv, types: &mut BTreeSet<Type>) {
-        let node_id = pat.node_id();
-        let ty = env.get_node_type(node_id);
-        ty.visit(&mut |t| {
-            types.insert(t.clone());
-        });
-
-        // Recursively visit nested patterns
-        match pat {
-            Pattern::Struct(_, qid, _, pats) => {
-                // Collect types from the struct type instantiation
-                for ty in &qid.inst {
-                    ty.visit(&mut |t| {
-                        types.insert(t.clone());
-                    });
-                }
-                // Recursively collect from nested patterns
-                for p in pats {
-                    Self::collect_pattern_types(p, env, types);
-                }
-            },
-            Pattern::Tuple(_, pats) => {
-                for p in pats {
-                    Self::collect_pattern_types(p, env, types);
-                }
-            },
-            Pattern::Var(..) | Pattern::Wildcard(_) | Pattern::Error(_) => {},
-        }
+        usage
     }
 
     /// Collect field-related operations

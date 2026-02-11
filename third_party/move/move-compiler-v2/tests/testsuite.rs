@@ -200,7 +200,9 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             stop_after: StopAfter::FirstBytecodeGen,
             dump_ast: DumpLevel::EndStage,
             ..config()
-                .exp(Experiment::UNUSED_CHECK)
+                .exp(Experiment::UNUSED_CONSTANT_CHECK)
+                .exp(Experiment::UNUSED_FUNCTION_CHECK)
+                .exp(Experiment::UNUSED_STRUCT_CHECK)
                 .lang(LanguageVersion::V2_4)
         },
         TestConfig {
