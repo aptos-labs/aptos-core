@@ -208,5 +208,4 @@ impl BatchThresholdEncryption for FPTX {
     ) -> Result<P> {
         decryption_key.decrypt(&ct.prepare_individual(digest, eval_proof)?)
     }
-
 }
