@@ -4,6 +4,7 @@
 use crate::{metrics::OTHER_TIMERS_SECONDS, state_store::hot_state::HotState};
 use aptos_config::config::HotStateConfig;
 use aptos_infallible::Mutex;
+use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::SUBTREE_DROPPER;
 use aptos_storage_interface::state_store::{
@@ -16,6 +17,9 @@ use std::sync::Arc;
 pub struct PersistedState {
     hot_state: Arc<HotState>,
     summary: Arc<Mutex<StateSummary>>,
+    /// The furthest state that the block executor has declared safe to expose through the hot
+    /// state. Updated only after all in-flight speculative executions up to that version complete.
+    hot_state_progress: Arc<Mutex<State>>,
 }
 
 impl PersistedState {
@@ -23,9 +27,14 @@ impl PersistedState {
 
     pub fn new_empty(config: HotStateConfig) -> Self {
         let state = State::new_empty(config);
-        let hot_state = Arc::new(HotState::new(state, config));
+        let hot_state = Arc::new(HotState::new(state.clone(), config));
         let summary = Arc::new(Mutex::new(StateSummary::new_empty(config)));
-        Self { hot_state, summary }
+        let hot_state_progress = Arc::new(Mutex::new(state));
+        Self {
+            hot_state,
+            summary,
+            hot_state_progress,
+        }
     }
 
     pub fn get_state_summary(&self) -> StateSummary {
@@ -47,6 +56,15 @@ impl PersistedState {
         self.hot_state.get_committed()
     }
 
+    /// Advance the hot state progress. The block executor calls this once all in-flight
+    /// speculative executions up to this version have finished, so it is safe to expose this
+    /// state through the hot state.
+    pub fn set_hot_state_progress(&self, state: State) {
+        let mut old = self.hot_state_progress.lock();
+        assert!(state.is_descendant_of(&old));
+        *old = state;
+    }
+
     pub fn set(&self, persisted: StateWithSummary) {
         let (state, summary) = persisted.into_inner();
 
@@ -58,13 +76,34 @@ impl PersistedState {
         // to as far as v2 (code will panic)
         *self.summary.lock() = summary;
 
-        self.hot_state.enqueue_commit(state);
+        // Gate: only advance the hot state up to what the execution layer has marked safe.
+        // If `state` is ahead of `allowed_progress`, a fork branch may still be executing
+        // against the old committed data, so we must not expose the newer state yet.
+        let allowed_progress = self.hot_state_progress.lock().clone();
+        let to_commit = if allowed_progress.next_version() < state.next_version() {
+            assert!(
+                state.is_descendant_of(&allowed_progress),
+                "Persisted state (version {:?}) is not a descendant of allowed_progress (version {:?}).",
+                state.version(),
+                allowed_progress.version(),
+            );
+            info!(
+                persisted_version = state.version(),
+                allowed_version = allowed_progress.version(),
+                "Hot state commit gated: persisted state is ahead of allowed progress.",
+            );
+            allowed_progress
+        } else {
+            state
+        };
+        self.hot_state.enqueue_commit(to_commit);
     }
 
     // n.b. Can only be used when no on the fly commit is in the queue.
     pub fn hack_reset(&self, state_with_summary: StateWithSummary) {
         let (state, summary) = state_with_summary.into_inner();
         *self.summary.lock() = summary;
+        *self.hot_state_progress.lock() = state.clone();
         self.hot_state.set_commited(state);
     }
 }

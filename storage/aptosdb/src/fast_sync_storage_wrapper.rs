@@ -8,7 +8,8 @@ use aptos_crypto::HashValue;
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_infallible::RwLock;
 use aptos_storage_interface::{
-    chunk_to_commit::ChunkToCommit, DbReader, DbWriter, Result, StateSnapshotReceiver,
+    chunk_to_commit::ChunkToCommit, state_store::state::State, DbReader, DbWriter, Result,
+    StateSnapshotReceiver,
 };
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -182,6 +183,10 @@ impl DbWriter for FastSyncStorageWrapper {
     ) -> Result<()> {
         self.get_aptos_db_write_ref()
             .commit_ledger(version, ledger_info_with_sigs, chunk_opt)
+    }
+
+    fn set_hot_state_progress(&self, state: State) {
+        self.get_aptos_db_write_ref().set_hot_state_progress(state);
     }
 }
 
