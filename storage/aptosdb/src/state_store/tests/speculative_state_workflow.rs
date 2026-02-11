@@ -661,6 +661,9 @@ fn commit_state_buffer(
 ) {
     while let Ok(snapshot) = from_buffered_state_commit.recv() {
         let next_version = snapshot.next_version();
+        // No speculative execution in this test, so it's always safe to advance
+        // the hot state progress to the snapshot's version.
+        persisted_state.set_hot_state_progress(snapshot.state().clone());
         persisted_state.set(snapshot);
 
         let hot_state = persisted_state.get_hot_state();

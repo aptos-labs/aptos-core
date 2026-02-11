@@ -193,6 +193,9 @@ impl Committer {
         info!("HotState committer thread started.");
 
         while let Some(to_commit) = self.next_to_commit() {
+            if to_commit.next_version() == self.committed.lock().next_version() {
+                continue;
+            }
             self.commit(&to_commit);
             *self.committed.lock() = to_commit;
 
