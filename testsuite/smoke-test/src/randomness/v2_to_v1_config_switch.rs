@@ -30,6 +30,7 @@ async fn v2_to_v1_config_switch() {
 
             // Start with V2 (fast path enabled).
             conf.consensus_config.enable_validator_txns();
+            conf.consensus_config.disable_rand_check();
             conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
         }))
         .build_with_cli(0)
