@@ -32,6 +32,7 @@ mod enable_feature_2;
 mod entry_func_attrs;
 mod randomness_stall_recovery;
 mod validator_restart_during_dkg;
+mod v2_to_v1_config_switch;
 
 #[allow(dead_code)]
 async fn get_current_version(rest_client: &Client) -> u64 {
