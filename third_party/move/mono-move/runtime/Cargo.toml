@@ -1,0 +1,18 @@
+[package]
+name = "mono-move-runtime"
+description = "MonoMove runtime: interpreter, GC, and verifier"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+mono-move-micro-ops = { workspace = true }
+rand = { workspace = true }

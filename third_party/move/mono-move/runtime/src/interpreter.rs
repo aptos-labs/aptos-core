@@ -1,0 +1,609 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
+//! Interpreter with unified stack (frame metadata inlined in linear memory)
+//! and a bump-allocated heap with copying GC.
+
+use crate::{
+    heap::Heap,
+    memory::{read_ptr, read_u64, vec_elem_ptr, write_ptr, write_u64, MemoryRegion},
+    types::{
+        Function, ObjectDescriptor, StepResult, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE,
+        FRAME_METADATA_SIZE, META_SAVED_FP_OFFSET, META_SAVED_FUNC_ID_OFFSET, META_SAVED_PC_OFFSET,
+        SENTINEL_FUNC_ID, VEC_CAPACITY_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    },
+};
+use anyhow::{bail, Result};
+use mono_move_micro_ops::MicroOp;
+use rand::{rngs::StdRng, Rng, SeedableRng};
+
+// ---------------------------------------------------------------------------
+// Runtime state
+// ---------------------------------------------------------------------------
+
+/// Interpreter context with a unified call stack and a GC-managed heap.
+///
+/// `frame_ptr` (fp) is an absolute pointer into the linear stack memory, so
+/// operand accesses are a single addition (`fp + offset`). It is recomputed
+/// only on `CallFunc` and `Return`.
+pub struct InterpreterContext<'a> {
+    pub(crate) functions: &'a [Function],
+    pub(crate) descriptors: &'a [ObjectDescriptor],
+
+    pub(crate) pc: usize,
+    pub(crate) func_id: usize,
+    pub(crate) frame_ptr: *mut u8,
+
+    pub(crate) stack: MemoryRegion,
+    pub(crate) heap: Heap,
+    rng: StdRng,
+}
+
+impl<'a> InterpreterContext<'a> {
+    pub fn new(
+        functions: &'a [Function],
+        descriptors: &'a [ObjectDescriptor],
+        func_id: usize,
+    ) -> Self {
+        Self::with_heap_size(functions, descriptors, func_id, DEFAULT_HEAP_SIZE)
+    }
+
+    /// Create a new context with a custom heap size (for testing GC pressure).
+    pub fn with_heap_size(
+        functions: &'a [Function],
+        descriptors: &'a [ObjectDescriptor],
+        func_id: usize,
+        heap_size: usize,
+    ) -> Self {
+        assert!(
+            func_id < functions.len(),
+            "entry func_id {} is out of bounds (have {} functions)",
+            func_id,
+            functions.len()
+        );
+
+        let verification_errors = crate::verifier::verify_program(functions, descriptors);
+        assert!(
+            verification_errors.is_empty(),
+            "verification failed:\n{}",
+            verification_errors
+                .iter()
+                .map(|e| format!("  {}", e))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+
+        let stack = MemoryRegion::new(DEFAULT_STACK_SIZE);
+        let base = stack.as_ptr();
+        let frame_ptr = unsafe { base.add(FRAME_METADATA_SIZE) };
+
+        unsafe {
+            write_u64(base, META_SAVED_PC_OFFSET, 0);
+            write_u64(base, META_SAVED_FP_OFFSET, 0);
+            write_u64(base, META_SAVED_FUNC_ID_OFFSET, SENTINEL_FUNC_ID);
+        }
+
+        Self {
+            functions,
+            descriptors,
+            pc: 0,
+            func_id,
+            frame_ptr,
+            stack,
+            heap: Heap::new(heap_size),
+            rng: StdRng::seed_from_u64(0),
+        }
+    }
+
+    pub fn set_rng_seed(&mut self, seed: u64) {
+        self.rng = StdRng::seed_from_u64(seed);
+    }
+
+    pub fn gc_count(&self) -> usize {
+        self.heap.gc_count
+    }
+
+    /// Reset the context to call a different function, preserving the heap.
+    ///
+    /// Use `set_root_arg` to place arguments before calling `run()`.
+    pub fn invoke(&mut self, func_id: usize) {
+        assert!(
+            func_id < self.functions.len(),
+            "func_id {} out of bounds (have {} functions)",
+            func_id,
+            self.functions.len()
+        );
+
+        let func = &self.functions[func_id];
+        let base = self.stack.as_ptr();
+
+        // Reset execution state to root frame.
+        self.frame_ptr = unsafe { base.add(FRAME_METADATA_SIZE) };
+        self.pc = 0;
+        self.func_id = func_id;
+
+        // Re-write sentinel metadata so Return from root triggers Done.
+        unsafe {
+            write_u64(base, META_SAVED_PC_OFFSET, 0);
+            write_u64(base, META_SAVED_FP_OFFSET, 0);
+            write_u64(base, META_SAVED_FUNC_ID_OFFSET, SENTINEL_FUNC_ID);
+        }
+
+        // Zero locals (beyond args) so pointer slots start as null.
+        if func.zero_locals {
+            unsafe {
+                std::ptr::write_bytes(
+                    self.frame_ptr.add(func.args_size),
+                    0,
+                    func.data_size - func.args_size,
+                );
+            }
+        }
+    }
+
+    /// Read a u64 from the root frame's slot 0 (where the result lands).
+    pub fn root_result(&self) -> u64 {
+        unsafe { read_u64(self.stack.as_ptr(), FRAME_METADATA_SIZE) }
+    }
+
+    /// Read a u64 from the root frame at the given byte offset.
+    pub fn root_result_at(&self, offset: u32) -> u64 {
+        unsafe { read_u64(self.stack.as_ptr(), FRAME_METADATA_SIZE + offset as usize) }
+    }
+
+    /// Copy argument bytes into the root frame at the given byte offset.
+    pub fn set_root_arg(&mut self, offset: u32, arg: &[u8]) {
+        unsafe {
+            let dst = self
+                .stack
+                .as_ptr()
+                .add(FRAME_METADATA_SIZE + offset as usize);
+            std::ptr::copy_nonoverlapping(arg.as_ptr(), dst, arg.len());
+        }
+    }
+
+    /// Read a raw heap pointer from the root frame at the given byte offset.
+    pub fn root_heap_ptr(&self, offset: u32) -> *const u8 {
+        unsafe { read_ptr(self.stack.as_ptr(), FRAME_METADATA_SIZE + offset as usize) }
+    }
+
+    /// Allocate a vector of `u64` values on the heap and return its address
+    /// as a `u64` suitable for embedding in args. Useful for passing pre-built
+    /// data into a program without generating initialization micro-ops.
+    pub fn alloc_u64_vec(&mut self, descriptor_id: u16, values: &[u64]) -> Result<u64> {
+        let n = values.len() as u64;
+        let ptr = self.alloc_vec(descriptor_id, 8, n)?;
+        unsafe {
+            write_u64(ptr, VEC_LENGTH_OFFSET, n);
+            let data = ptr.add(VEC_DATA_OFFSET);
+            for (i, &v) in values.iter().enumerate() {
+                write_u64(data, i * 8, v);
+            }
+        }
+        Ok(ptr as u64)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Interpreter loop
+// ---------------------------------------------------------------------------
+
+impl InterpreterContext<'_> {
+    #[inline(always)]
+    pub fn step(&mut self) -> Result<StepResult> {
+        let func = &self.functions[self.func_id];
+        if self.pc >= func.code.len() {
+            bail!(
+                "pc out of bounds: pc={} but function {} has {} instructions",
+                self.pc,
+                self.func_id,
+                func.code.len()
+            );
+        }
+
+        let fp = self.frame_ptr;
+        let instr = &func.code[self.pc];
+
+        // SAFETY: fp points into the interpreter's linear stack; all byte
+        // offsets are within the current frame (enforced by the bytecode
+        // compiler). Heap pointers read from the frame are kept valid by GC.
+        unsafe {
+            match *instr {
+                // ----- Control flow (set pc explicitly, return early) -----
+                MicroOp::CallFunc { func_id } => {
+                    let func_id = func_id as usize;
+                    let callee = &self.functions[func_id];
+                    let new_fp = fp.add(func.data_size + FRAME_METADATA_SIZE);
+                    let stack_end = self.stack.as_ptr().add(self.stack.len());
+                    if new_fp.add(callee.extended_frame_size) > stack_end {
+                        bail!("stack overflow");
+                    }
+                    // Zero the callee's local area (beyond args) so that
+                    // pointer slots start as null. The argument region
+                    // (0..args_size) was already written by the caller.
+                    if callee.zero_locals {
+                        let local_size = callee.data_size - callee.args_size;
+                        std::ptr::write_bytes(new_fp.add(callee.args_size), 0, local_size);
+                    }
+                    let meta = fp.add(func.data_size);
+                    write_u64(meta, META_SAVED_PC_OFFSET, (self.pc + 1) as u64);
+                    write_ptr(meta, META_SAVED_FP_OFFSET, fp);
+                    write_u64(meta, META_SAVED_FUNC_ID_OFFSET, self.func_id as u64);
+                    self.frame_ptr = new_fp;
+                    self.pc = 0;
+                    self.func_id = func_id;
+                    return Ok(StepResult::Continue);
+                },
+
+                MicroOp::JumpNotZeroU64 { target, src } => {
+                    self.pc = if read_u64(fp, src) != 0 {
+                        target.into()
+                    } else {
+                        self.pc + 1
+                    };
+                    return Ok(StepResult::Continue);
+                },
+
+                MicroOp::JumpGreaterEqualU64Imm { target, src, imm } => {
+                    self.pc = if read_u64(fp, src) >= imm {
+                        target.into()
+                    } else {
+                        self.pc + 1
+                    };
+                    return Ok(StepResult::Continue);
+                },
+
+                MicroOp::JumpLessU64Imm { target, src, imm } => {
+                    self.pc = if read_u64(fp, src) < imm {
+                        target.into()
+                    } else {
+                        self.pc + 1
+                    };
+                    return Ok(StepResult::Continue);
+                },
+
+                MicroOp::JumpLessU64 { target, lhs, rhs } => {
+                    self.pc = if read_u64(fp, lhs) < read_u64(fp, rhs) {
+                        target.into()
+                    } else {
+                        self.pc + 1
+                    };
+                    return Ok(StepResult::Continue);
+                },
+
+                MicroOp::JumpGreaterEqualU64 { target, lhs, rhs } => {
+                    self.pc = if read_u64(fp, lhs) >= read_u64(fp, rhs) {
+                        target.into()
+                    } else {
+                        self.pc + 1
+                    };
+                    return Ok(StepResult::Continue);
+                },
+
+                MicroOp::JumpNotEqualU64 { target, lhs, rhs } => {
+                    self.pc = if read_u64(fp, lhs) != read_u64(fp, rhs) {
+                        target.into()
+                    } else {
+                        self.pc + 1
+                    };
+                    return Ok(StepResult::Continue);
+                },
+
+                MicroOp::Jump { target } => {
+                    self.pc = target.into();
+                    return Ok(StepResult::Continue);
+                },
+
+                MicroOp::Return => {
+                    let meta = fp.sub(FRAME_METADATA_SIZE);
+                    let saved_func_id = read_u64(meta, META_SAVED_FUNC_ID_OFFSET);
+                    if saved_func_id == SENTINEL_FUNC_ID {
+                        return Ok(StepResult::Done);
+                    }
+                    self.pc = read_u64(meta, META_SAVED_PC_OFFSET) as usize;
+                    self.frame_ptr = read_ptr(meta, META_SAVED_FP_OFFSET);
+                    self.func_id = saved_func_id as usize;
+                    return Ok(StepResult::Continue);
+                },
+
+                // ----- Arithmetic -----
+                MicroOp::StoreImm8 { dst, imm } => {
+                    write_u64(fp, dst, imm);
+                },
+
+                MicroOp::SubU64Imm { dst, src, imm } => {
+                    let v = read_u64(fp, src);
+                    let result = v.checked_sub(imm).expect("arithmetic underflow");
+                    write_u64(fp, dst, result);
+                },
+
+                MicroOp::AddU64 { dst, lhs, rhs } => {
+                    let v1 = read_u64(fp, lhs);
+                    let v2 = read_u64(fp, rhs);
+                    let result = v1.checked_add(v2).expect("arithmetic overflow");
+                    write_u64(fp, dst, result);
+                },
+
+                MicroOp::AddU64Imm { dst, src, imm } => {
+                    let v = read_u64(fp, src);
+                    let result = v.checked_add(imm).expect("arithmetic overflow");
+                    write_u64(fp, dst, result);
+                },
+
+                MicroOp::RSubU64Imm { dst, src, imm } => {
+                    let v = read_u64(fp, src);
+                    let result = imm.checked_sub(v).expect("arithmetic underflow");
+                    write_u64(fp, dst, result);
+                },
+
+                MicroOp::XorU64 { dst, lhs, rhs } => {
+                    let lhs_val = read_u64(fp, lhs);
+                    let rhs_val = read_u64(fp, rhs);
+                    write_u64(fp, dst, lhs_val ^ rhs_val);
+                },
+
+                MicroOp::ShrU64Imm { dst, src, imm } => {
+                    let v = read_u64(fp, src);
+                    write_u64(fp, dst, v >> imm);
+                },
+
+                MicroOp::ModU64 { dst, lhs, rhs } => {
+                    let lhs_val = read_u64(fp, lhs);
+                    let rhs_val = read_u64(fp, rhs);
+                    assert!(rhs_val != 0, "ModU64: division by zero");
+                    write_u64(fp, dst, lhs_val % rhs_val);
+                },
+
+                MicroOp::StoreRandomU64 { dst } => {
+                    let val: u64 = self.rng.r#gen();
+                    write_u64(fp, dst, val);
+                },
+
+                MicroOp::ForceGC => {
+                    self.gc_collect()?;
+                },
+
+                MicroOp::Move8 { dst, src } => {
+                    let v = read_u64(fp, src);
+                    write_u64(fp, dst, v);
+                },
+
+                MicroOp::Move { dst, src, size } => {
+                    std::ptr::copy(fp.add(src.into()), fp.add(dst.into()), size as usize);
+                },
+
+                // ----- Vector instructions -----
+                MicroOp::VecNew {
+                    dst,
+                    descriptor_id,
+                    elem_size,
+                    initial_capacity,
+                } => {
+                    let ptr = self.alloc_vec(descriptor_id, elem_size, initial_capacity)?;
+                    write_ptr(fp, dst, ptr);
+                },
+
+                MicroOp::VecLen { dst, heap_ptr } => {
+                    let vec_ptr = read_ptr(fp, heap_ptr);
+                    let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
+                    write_u64(fp, dst, len);
+                },
+
+                MicroOp::VecPushBack {
+                    heap_ptr,
+                    elem,
+                    elem_size,
+                } => {
+                    let vec_slot = fp.add(heap_ptr.into()) as *mut u64;
+                    let mut vec_ptr = read_ptr(fp, heap_ptr);
+
+                    let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
+                    let cap = read_u64(vec_ptr, VEC_CAPACITY_OFFSET);
+
+                    if len >= cap {
+                        vec_ptr = self.grow_vec(vec_slot, elem_size, len + 1)?;
+                    }
+
+                    std::ptr::copy_nonoverlapping(
+                        fp.add(elem.into()),
+                        vec_elem_ptr(vec_ptr, len, elem_size) as *mut u8,
+                        elem_size as usize,
+                    );
+                    write_u64(vec_ptr, VEC_LENGTH_OFFSET, len + 1);
+                },
+
+                MicroOp::VecPopBack {
+                    dst,
+                    heap_ptr,
+                    elem_size,
+                } => {
+                    let vec_ptr = read_ptr(fp, heap_ptr);
+                    let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
+                    if len == 0 {
+                        bail!("VecPopBack on empty vector");
+                    }
+                    let new_len = len - 1;
+                    std::ptr::copy_nonoverlapping(
+                        vec_elem_ptr(vec_ptr, new_len, elem_size),
+                        fp.add(dst.into()),
+                        elem_size as usize,
+                    );
+                    write_u64(vec_ptr, VEC_LENGTH_OFFSET, new_len);
+                },
+
+                MicroOp::VecLoadElem {
+                    dst,
+                    heap_ptr,
+                    idx,
+                    elem_size,
+                } => {
+                    let vec_ptr = read_ptr(fp, heap_ptr);
+                    let idx_val = read_u64(fp, idx);
+                    let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
+                    if idx_val >= len {
+                        bail!(
+                            "VecLoadElem index out of bounds: idx={} len={}",
+                            idx_val,
+                            len
+                        );
+                    }
+                    std::ptr::copy_nonoverlapping(
+                        vec_elem_ptr(vec_ptr, idx_val, elem_size),
+                        fp.add(dst.into()),
+                        elem_size as usize,
+                    );
+                },
+
+                MicroOp::VecStoreElem {
+                    heap_ptr,
+                    idx,
+                    src,
+                    elem_size,
+                } => {
+                    let vec_ptr = read_ptr(fp, heap_ptr);
+                    let idx_val = read_u64(fp, idx);
+                    let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
+                    if idx_val >= len {
+                        bail!(
+                            "VecStoreElem index out of bounds: idx={} len={}",
+                            idx_val,
+                            len
+                        );
+                    }
+                    std::ptr::copy_nonoverlapping(
+                        fp.add(src.into()),
+                        vec_elem_ptr(vec_ptr, idx_val, elem_size) as *mut u8,
+                        elem_size as usize,
+                    );
+                },
+
+                // ----- Reference (fat pointer) instructions -----
+                MicroOp::VecBorrow {
+                    dst,
+                    heap_ptr,
+                    idx,
+                    elem_size,
+                } => {
+                    let vec_ptr = read_ptr(fp, heap_ptr);
+                    let idx_val = read_u64(fp, idx);
+                    let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
+                    if idx_val >= len {
+                        bail!("VecBorrow index out of bounds: idx={} len={}", idx_val, len);
+                    }
+                    let offset = VEC_DATA_OFFSET as u64 + idx_val * elem_size as u64;
+                    write_ptr(fp, dst, vec_ptr);
+                    write_u64(fp, dst + 8, offset);
+                },
+
+                MicroOp::SlotBorrow { dst, local } => {
+                    write_ptr(fp, dst, fp.add(local.into()));
+                    write_u64(fp, dst + 8, 0);
+                },
+
+                MicroOp::ReadRef { dst, ref_ptr, size } => {
+                    let base = read_ptr(fp, ref_ptr);
+                    let offset = read_u64(fp, ref_ptr + 8);
+                    let target = base.add(offset as usize);
+                    std::ptr::copy_nonoverlapping(target, fp.add(dst.into()), size as usize);
+                },
+
+                MicroOp::WriteRef { ref_ptr, src, size } => {
+                    let base = read_ptr(fp, ref_ptr);
+                    let offset = read_u64(fp, ref_ptr + 8);
+                    let target = base.add(offset as usize);
+                    std::ptr::copy_nonoverlapping(fp.add(src.into()), target, size as usize);
+                },
+
+                // ----- Heap object instructions (structs and enums) -----
+                MicroOp::HeapNew { dst, descriptor_id } => {
+                    let ptr = self.alloc_obj(descriptor_id)?;
+                    write_ptr(fp, dst, ptr);
+                },
+
+                MicroOp::HeapMoveFrom8 {
+                    dst,
+                    heap_ptr,
+                    offset,
+                } => {
+                    let obj_ptr = read_ptr(fp, heap_ptr);
+                    let val = read_u64(obj_ptr, offset as usize);
+                    write_u64(fp, dst, val);
+                },
+
+                MicroOp::HeapMoveFrom {
+                    dst,
+                    heap_ptr,
+                    offset,
+                    size,
+                } => {
+                    let obj_ptr = read_ptr(fp, heap_ptr);
+                    std::ptr::copy_nonoverlapping(
+                        obj_ptr.add(offset as usize),
+                        fp.add(dst.into()),
+                        size as usize,
+                    );
+                },
+
+                MicroOp::HeapMoveTo8 {
+                    heap_ptr,
+                    offset,
+                    src,
+                } => {
+                    let obj_ptr = read_ptr(fp, heap_ptr);
+                    let val = read_u64(fp, src);
+                    write_u64(obj_ptr, offset as usize, val);
+                },
+
+                MicroOp::HeapMoveToImm8 {
+                    heap_ptr,
+                    offset,
+                    imm,
+                } => {
+                    let obj_ptr = read_ptr(fp, heap_ptr);
+                    write_u64(obj_ptr, offset as usize, imm);
+                },
+
+                MicroOp::HeapMoveTo {
+                    heap_ptr,
+                    offset,
+                    src,
+                    size,
+                } => {
+                    let obj_ptr = read_ptr(fp, heap_ptr);
+                    std::ptr::copy_nonoverlapping(
+                        fp.add(src.into()),
+                        obj_ptr.add(offset as usize),
+                        size as usize,
+                    );
+                },
+
+                MicroOp::HeapBorrow {
+                    dst,
+                    heap_ptr,
+                    offset,
+                } => {
+                    let obj_ptr = read_ptr(fp, heap_ptr);
+                    write_ptr(fp, dst, obj_ptr);
+                    write_u64(fp, dst + 8, offset as u64);
+                },
+            }
+        }
+
+        self.pc += 1;
+        Ok(StepResult::Continue)
+    }
+
+    // TODO: Hoist pc, fp, and func_id into local variables in the run loop
+    // instead of reading/writing self.pc, self.frame_ptr, self.func_id each
+    // iteration. LLVM can't keep them in registers because heap operations
+    // (VecPushBack, etc.) take &mut self, which may alias these fields.
+    // Write back only on CallFunc/Return.
+    pub fn run(&mut self) -> Result<()> {
+        loop {
+            match self.step()? {
+                StepResult::Continue => {},
+                StepResult::Done => return Ok(()),
+            }
+        }
+    }
+}

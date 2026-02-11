@@ -102,7 +102,7 @@
 //! Frame slots that refer to heap objects store a raw pointer to the heap
 //! allocation. Every heap object has a header
 //! `[descriptor_id: u32 | size_in_bytes: u32]`.
-//! `descriptor_id` indexes into a table of [`HeapObjectDescriptor`] entries
+//! `descriptor_id` indexes into a table of `ObjectDescriptor` entries
 //! that tell the GC how to trace internal pointers. Three variants:
 //!
 //! - **Trivial** — no internal heap pointers; GC just copies the blob.
@@ -118,9 +118,32 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FrameOffset(pub u32);
 
+impl From<FrameOffset> for usize {
+    #[inline(always)]
+    fn from(o: FrameOffset) -> usize {
+        o.0 as usize
+    }
+}
+
+impl std::ops::Add<u32> for FrameOffset {
+    type Output = usize;
+
+    #[inline(always)]
+    fn add(self, rhs: u32) -> usize {
+        self.0 as usize + rhs as usize
+    }
+}
+
 /// A typed wrapper around a `u32` program-counter offset (instruction index).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CodeOffset(pub u32);
+
+impl From<CodeOffset> for usize {
+    #[inline(always)]
+    fn from(o: CodeOffset) -> usize {
+        o.0 as usize
+    }
+}
 
 #[derive(Debug)]
 pub enum MicroOp {
@@ -187,6 +210,13 @@ pub enum MicroOp {
         imm: u64,
     },
 
+    /// `dst = lhs ^ rhs` (u64, bitwise XOR).
+    XorU64 {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+    },
+
     /// `dst = src >> imm` (u64, logical right shift).
     ShrU64Imm {
         dst: FrameOffset,
@@ -245,8 +275,29 @@ pub enum MicroOp {
         imm: u64,
     },
 
+    /// Jump to `target` if the u64 at `src` is **<** `imm`.
+    JumpLessU64Imm {
+        target: CodeOffset,
+        src: FrameOffset,
+        imm: u64,
+    },
+
     /// Jump to `target` if u64 at `lhs` < u64 at `rhs`.
     JumpLessU64 {
+        target: CodeOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+    },
+
+    /// Jump to `target` if u64 at `lhs` >= u64 at `rhs`.
+    JumpGreaterEqualU64 {
+        target: CodeOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+    },
+
+    /// Jump to `target` if u64 at `lhs` != u64 at `rhs`.
+    JumpNotEqualU64 {
         target: CodeOffset,
         lhs: FrameOffset,
         rhs: FrameOffset,
@@ -489,16 +540,16 @@ pub enum MicroOp {
 pub const FRAME_METADATA_SIZE: usize = 24;
 
 /// Size of the object header: [descriptor_id: u32 | size_in_bytes: u32].
-const OBJECT_HEADER_SIZE: usize = 8;
+pub const OBJECT_HEADER_SIZE: usize = 8;
 
 /// Offset where struct field data begins (same as OBJECT_HEADER_SIZE).
-const STRUCT_DATA_OFFSET: usize = OBJECT_HEADER_SIZE; // 8
+pub const STRUCT_DATA_OFFSET: usize = OBJECT_HEADER_SIZE; // 8
 
 /// Offset of the variant tag (u64) within an enum object.
-const ENUM_TAG_OFFSET: usize = OBJECT_HEADER_SIZE; // 8
+pub const ENUM_TAG_OFFSET: usize = OBJECT_HEADER_SIZE; // 8
 
 /// Offset where enum variant field data begins (after header + tag).
-const ENUM_DATA_OFFSET: usize = OBJECT_HEADER_SIZE + 8; // 16
+pub const ENUM_DATA_OFFSET: usize = OBJECT_HEADER_SIZE + 8; // 16
 
 impl MicroOp {
     // ----- Struct helpers (offsets relative to STRUCT_DATA_OFFSET) -----
