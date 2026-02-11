@@ -230,7 +230,16 @@ pub trait Aggregated<T: Aggregatable>: Sized {
 pub trait AggregatableTranscript:
     Transcript + Aggregatable<SecretSharingConfig = <Self as TranscriptCore>::SecretSharingConfig>
 {
-    // The signature here is slightly different from `NonAggregatableTranscript`, because our aggregatable PVSSs needs all of the session ids
+    /// Verifies the validity of the PVSS transcript: i.e., the transcripts correctly encrypts shares
+    /// of an `InputSecret` $s$ which has been $(t, n)$ secret-shared such that only $\ge t$ players
+    /// can reconstruct it as a `DealtSecret`.
+    ///
+    /// Additionally, verifies that the transcript was indeed aggregated from a set of players
+    /// identified by the public keys in `spks`, by verifying each player $i$'s signature on the
+    /// transcript and on `aux[i]`.
+    ///
+    /// The signature here is slightly different from [HasAggregatableSubtranscript], because our aggregatable
+    /// PVSSs needs all of the session ids, and don't need an rng
     fn verify<A: Serialize + Clone>(
         &self,
         sc: &<Self as TranscriptCore>::SecretSharingConfig,
