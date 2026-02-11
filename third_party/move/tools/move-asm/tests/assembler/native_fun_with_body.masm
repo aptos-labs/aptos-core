@@ -1,0 +1,6 @@
+//# publish
+module 0x66::test
+
+native fun f(l0: u64): u64
+    move_loc l0
+    ret

@@ -14,10 +14,7 @@ module aptos_trading::single_order_types {
     #[test_only]
     use aptos_trading::order_book_types::good_till_cancelled;
 
-    const EORDER_ALREADY_EXISTS: u64 = 1;
-    const EINVALID_TRIGGER_CONDITION: u64 = 2;
-    const INVALID_MATCH_RESULT: u64 = 3;
-    const EINVALID_ORDER_SIZE_DECREASE: u64 = 4;
+    const EINVALID_ORDER_SIZE_DECREASE: u64 = 1;
 
     enum SingleOrderRequest<M: store + copy + drop> has store, copy, drop {
         V1 {

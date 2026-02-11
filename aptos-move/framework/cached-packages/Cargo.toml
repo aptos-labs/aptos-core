@@ -22,12 +22,6 @@ once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 
-[build-dependencies]
-anyhow = { workspace = true }
-aptos-framework = { workspace = true }
-sha2 = { workspace = true }
-walkdir = { workspace = true }
-
 [features]
 default = []
 fuzzing = ["proptest", "proptest-derive"]

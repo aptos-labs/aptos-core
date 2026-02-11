@@ -10,14 +10,14 @@ use crate::{
             tuple::{TupleCodomainShape, TupleHomomorphism},
             LiftHomomorphism, TrivialShape,
         },
-        traits::FirstProofItem,
+        FirstProofItem,
     },
     Scalar,
 };
 use aptos_crypto::{
     arkworks::random::{
-        sample_field_element, sample_field_elements, unsafe_random_point_group,
-        unsafe_random_points_group, UniformRand,
+        sample_field_element, sample_field_elements, unsafe_random_point, unsafe_random_points,
+        UniformRand,
     },
     weighted_config::WeightedConfigArkworks,
     TSecretSharingConfig,
@@ -140,20 +140,26 @@ impl<'a, E: Pairing> WeightedProof<'a, E> {
         // or should number_of_chunks_per_share be a const?
         Self {
             first_proof_item: FirstProofItem::Commitment(TupleCodomainShape(
-                TrivialShape(unsafe_random_point_group(rng)), // because TrivialShape is the codomain of univariate_hiding_kzg::CommitmentHomomorphism. TODO: develop generate() methods there? Maybe make it part of sigma_protocol::Trait ?
+                TrivialShape(unsafe_random_point::<E::G1, _>(rng)), // because TrivialShape is the codomain of univariate_hiding_kzg::CommitmentHomomorphism. TODO: develop generate() methods there? Maybe make it part of sigma_protocol::Trait ?
                 chunked_elgamal::WeightedCodomainShape {
                     chunks: (0..sc.get_total_num_players())
                         .map(|i| {
                             let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
                             (0..w)
                                 .map(|_| {
-                                    unsafe_random_points_group(number_of_chunks_per_share, rng)
+                                    unsafe_random_points::<E::G1, _>(
+                                        number_of_chunks_per_share,
+                                        rng,
+                                    )
                                 })
                                 .collect()
                         })
                         .collect(),
                     randomness: vec![
-                        unsafe_random_points_group(number_of_chunks_per_share, rng);
+                        unsafe_random_points::<E::G1, _>(
+                            number_of_chunks_per_share,
+                            rng
+                        );
                         sc.get_max_weight()
                     ],
                 },

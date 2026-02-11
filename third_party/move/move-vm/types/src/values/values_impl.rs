@@ -4857,7 +4857,7 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Va
             (L::Struct(struct_layout), Value::Container(Container::Struct(r))) => {
                 (SerializationReadyValue {
                     ctx: self.ctx,
-                    layout: struct_layout,
+                    layout: struct_layout.as_ref(),
                     value: &*r.borrow(),
                     // Note: for struct, we increment depth for fields in the corresponding
                     // serializer.
@@ -5132,7 +5132,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveTypeLay
             L::Struct(struct_layout) => {
                 let seed = DeserializationSeed {
                     ctx: self.ctx,
-                    layout: struct_layout,
+                    layout: struct_layout.as_ref(),
                 };
                 Ok(Value::struct_(seed.deserialize(deserializer)?))
             },
@@ -5909,31 +5909,32 @@ pub mod prop {
                     .prop_map(|vals| Value::Container(Container::Vec(Rc::new(RefCell::new(vals)))))
                     .boxed(),
             },
-            L::Struct(_struct_layout @ MoveStructLayout::RuntimeVariants(variants)) => {
-                // Randomly choose a variant index
-                let variant_count = variants.len();
-                let variants = variants.clone();
-                (0..variant_count as u16)
-                    .prop_flat_map(move |variant_tag| {
-                        let variant_layouts = variants[variant_tag as usize].clone();
-                        variant_layouts
-                            .iter()
-                            .map(value_strategy_with_layout)
-                            .collect::<Vec<_>>()
-                            .prop_map(move |vals| {
-                                Value::struct_(Struct::pack_variant(variant_tag, vals))
-                            })
-                    })
-                    .boxed()
+            L::Struct(struct_layout) => match struct_layout.as_ref() {
+                MoveStructLayout::RuntimeVariants(variants) => {
+                    // Randomly choose a variant index
+                    let variant_count = variants.len();
+                    let variants = variants.clone();
+                    (0..variant_count as u16)
+                        .prop_flat_map(move |variant_tag| {
+                            let variant_layouts = variants[variant_tag as usize].clone();
+                            variant_layouts
+                                .iter()
+                                .map(value_strategy_with_layout)
+                                .collect::<Vec<_>>()
+                                .prop_map(move |vals| {
+                                    Value::struct_(Struct::pack_variant(variant_tag, vals))
+                                })
+                        })
+                        .boxed()
+                },
+                _ => struct_layout
+                    .fields(None)
+                    .iter()
+                    .map(value_strategy_with_layout)
+                    .collect::<Vec<_>>()
+                    .prop_map(move |vals| Value::struct_(Struct::pack(vals)))
+                    .boxed(),
             },
-
-            L::Struct(struct_layout) => struct_layout
-                .fields(None)
-                .iter()
-                .map(value_strategy_with_layout)
-                .collect::<Vec<_>>()
-                .prop_map(move |vals| Value::struct_(Struct::pack(vals)))
-                .boxed(),
 
             L::Function => {
                 (
@@ -6008,9 +6009,9 @@ pub mod prop {
                 prop_oneof![
                     1 => inner.clone().prop_map(|layout| L::Vector(Box::new(layout))),
                     1 => vec(inner.clone(), 0..=5).prop_map(|f_layouts| {
-                            L::Struct(MoveStructLayout::new(f_layouts))}),
+                            L::new_struct(MoveStructLayout::new(f_layouts))}),
                     1 => vec(vec(inner, 0..=3), 1..=4).prop_map(|variant_layouts| {
-                            L::Struct(MoveStructLayout::new_variants(variant_layouts))}),
+                            L::new_struct(MoveStructLayout::new_variants(variant_layouts))}),
                 ]
             }),
             2 => Just(L::Function),
@@ -6059,7 +6060,7 @@ impl Value {
                 let values_ref = r.borrow();
                 let values = values_ref.as_slice();
                 if let Some((tag, variant_layouts)) =
-                    try_get_variant_field_layouts(struct_layout, values)
+                    try_get_variant_field_layouts(struct_layout.as_ref(), values)
                 {
                     MoveValue::Struct(MoveStruct::new_variant(
                         tag,
@@ -6168,4 +6169,117 @@ fn check_depth(depth: u64, max_depth: Option<u64>) -> PartialVMResult<()> {
         return Err(PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED));
     }
     Ok(())
+}
+
+/// A visitor that checks the depth of values does not exceed a maximum.
+struct DepthCheckingVisitor {
+    max_depth: u64,
+}
+
+impl DepthCheckingVisitor {
+    #[inline]
+    fn check(&self, depth: u64) -> PartialVMResult<()> {
+        if depth > self.max_depth {
+            return Err(PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED));
+        }
+        Ok(())
+    }
+}
+
+impl ValueVisitor for DepthCheckingVisitor {
+    fn visit_delayed(&mut self, depth: u64, _id: DelayedFieldID) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_u8(&mut self, depth: u64, _val: u8) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_u16(&mut self, depth: u64, _val: u16) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_u32(&mut self, depth: u64, _val: u32) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_u64(&mut self, depth: u64, _val: u64) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_u128(&mut self, depth: u64, _val: u128) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_u256(
+        &mut self,
+        depth: u64,
+        _val: &move_core_types::int256::U256,
+    ) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_i8(&mut self, depth: u64, _val: i8) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_i16(&mut self, depth: u64, _val: i16) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_i32(&mut self, depth: u64, _val: i32) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_i64(&mut self, depth: u64, _val: i64) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_i128(&mut self, depth: u64, _val: i128) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_i256(
+        &mut self,
+        depth: u64,
+        _val: &move_core_types::int256::I256,
+    ) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_bool(&mut self, depth: u64, _val: bool) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_address(&mut self, depth: u64, _val: &AccountAddress) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
+    fn visit_struct(&mut self, depth: u64, _len: usize) -> PartialVMResult<bool> {
+        self.check(depth)?;
+        Ok(true) // continue into fields
+    }
+
+    fn visit_closure(&mut self, depth: u64, _len: usize) -> PartialVMResult<bool> {
+        self.check(depth)?;
+        Ok(true) // continue into captured values
+    }
+
+    fn visit_vec(&mut self, depth: u64, _len: usize) -> PartialVMResult<bool> {
+        self.check(depth)?;
+        Ok(true) // continue into elements
+    }
+
+    fn visit_ref(&mut self, depth: u64, _is_global: bool) -> PartialVMResult<bool> {
+        self.check(depth)?;
+        Ok(true) // continue into referenced value
+    }
+}
+
+impl Value {
+    /// Check that the depth of this value does not exceed `max_depth`.
+    /// Returns an error with `VM_MAX_VALUE_DEPTH_REACHED` if the depth is exceeded.
+    pub fn check_depth_of_value(&self, max_depth: u64) -> PartialVMResult<()> {
+        self.visit(&mut DepthCheckingVisitor { max_depth })
+    }
 }

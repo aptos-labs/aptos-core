@@ -1,15 +1,23 @@
 //# publish
 module 0x66::incompatible_function_ability_since_public
 public fun foo(): |u64|u32 has store
+    ld_u64 0
+    abort
 
 //# publish --verbose
 module 0x66::incompatible_function_ability_since_public
 public fun foo(): |bool|u32 has copy+store
+    ld_u64 0
+    abort
 
 //# publish --verbose
 module 0x66::incompatible_function_ability2_since_public
 public fun foo(): |u64|u32 has store+copy
+    ld_u64 0
+    abort
 
 //# publish --verbose
 module 0x66::incompatible_function_ability2_since_public
 public fun foo(): |bool|u32 has copy
+    ld_u64 0
+    abort

@@ -6,6 +6,7 @@ use aptos_crypto::arkworks::{
     random::{sample_field_element, sample_field_elements},
 };
 use aptos_dkg::{
+    pvss::chunky::chunked_scalar_mul::Witness,
     sigma_protocol::{
         self, homomorphism,
         homomorphism::{
@@ -39,7 +40,7 @@ where
 
     let proof = hom.prove(&witness, &statement, CNTXT, &mut rng);
 
-    hom.verify(&statement, &proof, CNTXT)
+    hom.verify(&hom.normalize(&statement), &proof, CNTXT)
         .expect("Sigma protocol proof failed verification");
 }
 
@@ -58,14 +59,12 @@ fn test_imhomog_chaum_pedersen<
 
     let proof = hom.prove(&witness, &statement, CNTXT, &mut rng);
 
-    hom.verify(&statement, &proof, CNTXT)
+    hom.verify(&hom.normalize(&statement), &proof, CNTXT)
         .expect("Inhomogeneous Chaum Pederson sigma proof failed verification");
 }
 
-use aptos_dkg::pvss::chunky::chunked_scalar_mul::Witness;
-
-fn test_imhomog_scalar_mul<E>(
-    hom: chunked_scalar_mul::InhomogChunkedScalarMul<E>,
+fn test_imhomog_scalar_mul<'a, E>(
+    hom: chunked_scalar_mul::InhomogChunkedScalarMul<'a, E>,
     witness: Witness<E::ScalarField>,
 ) where
     E: Pairing,
@@ -76,7 +75,7 @@ fn test_imhomog_scalar_mul<E>(
 
     let proof = hom.prove(&witness, &statement, CNTXT, &mut rng);
 
-    hom.verify(&statement, &proof, CNTXT)
+    hom.verify(&hom.normalize(&statement), &proof, CNTXT)
         .expect("Inhomogeneous Chaum Pederson sigma proof failed verification");
 }
 
@@ -103,10 +102,15 @@ mod schnorr {
         for Schnorr<C>
     {
         type Codomain = CodomainShape<C>;
+        type CodomainNormalized = CodomainShape<C::Affine>;
         type Domain = Fp<P, N>;
 
         fn apply(&self, input: &Self::Domain) -> Self::Codomain {
             self.apply_msm(self.msm_terms(input))
+        }
+
+        fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
+            <Schnorr<C> as fixed_base_msms::Trait>::normalize_output(value)
         }
     }
 
@@ -132,6 +136,12 @@ mod schnorr {
             // for the homomorphism we only need `input.bases()[0] * input.scalars()[0]`
             // but the verification needs a 3-term MSM... so we should really do a custom MSM which dispatches based on length TODO
             C::msm(input.bases(), input.scalars()).expect("MSM failed in Schnorr")
+        }
+
+        fn batch_normalize(
+            msm_output: Vec<Self::MsmOutput>,
+        ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
+            C::normalize_batch(&msm_output)
         }
     }
 
@@ -194,20 +204,31 @@ mod chaum_pedersen {
 mod chunked_scalar_mul {
     use super::*;
     use aptos_dkg::pvss::chunky::chunked_scalar_mul;
+    use ark_ec::scalar_mul::BatchMulPreprocessing;
 
-    pub type InhomogChunkedScalarMul<E> = PairingTupleHomomorphism<
+    pub type InhomogChunkedScalarMul<'a, E> = PairingTupleHomomorphism<
         E,
-        chunked_scalar_mul::Homomorphism<<E as Pairing>::G1>,
-        chunked_scalar_mul::Homomorphism<<E as Pairing>::G2>,
+        chunked_scalar_mul::Homomorphism<'a, <E as Pairing>::G1>,
+        chunked_scalar_mul::Homomorphism<'a, <E as Pairing>::G2>,
     >;
 
-    #[allow(non_snake_case)]
-    pub fn make_inhomogeneous_scalar_mul<E: Pairing>() -> InhomogChunkedScalarMul<E> {
-        let G_1 = E::G1::generator().into_affine();
-        let G_2 = E::G2::generator().into_affine();
+    pub fn make_inhomogeneous_scalar_mul<'a, E: Pairing>(
+        table1: &'a BatchMulPreprocessing<<E as Pairing>::G1>,
+        table2: &'a BatchMulPreprocessing<<E as Pairing>::G2>,
+    ) -> InhomogChunkedScalarMul<'a, E> {
+        let g_1 = E::G1::generator().into_affine();
+        let g_2 = E::G2::generator().into_affine();
 
-        let hom1 = chunked_scalar_mul::Homomorphism { base: G_1, ell: 16 };
-        let hom2 = chunked_scalar_mul::Homomorphism { base: G_2, ell: 16 };
+        let hom1 = chunked_scalar_mul::Homomorphism {
+            base: g_1,
+            table: table1,
+            ell: 16,
+        };
+        let hom2 = chunked_scalar_mul::Homomorphism {
+            base: g_2,
+            table: table2,
+            ell: 16,
+        };
 
         PairingTupleHomomorphism {
             hom1,
@@ -257,22 +278,23 @@ fn test_chaum_pedersen() {
         witness_bls,
     );
 
+    // TODO: move this to a separate test?
     use crate::chunked_scalar_mul::make_inhomogeneous_scalar_mul;
     use aptos_dkg::pvss::chunky::{chunked_scalar_mul::Witness, chunks};
+    use ark_bn254::Fr;
+    use ark_ec::scalar_mul::BatchMulPreprocessing;
 
     let ell = 16u8;
 
     let scalars = sample_field_elements(1, &mut rng);
 
-    use ark_bn254::Fr;
-
-    let chunked_values: Vec<Vec<Vec<Scalar<Fr>>>> = scalars
+    let chunked_values: Vec<Vec<Scalar<Fr>>> = scalars
         .iter()
         .map(|s| {
-            vec![chunks::scalar_to_le_chunks(ell, s)
+            chunks::scalar_to_le_chunks(ell, s)
                 .into_iter()
                 .map(Scalar)
-                .collect::<Vec<_>>()]
+                .collect::<Vec<_>>()
         })
         .collect();
 
@@ -280,5 +302,12 @@ fn test_chaum_pedersen() {
         chunked_values: chunked_values.clone(),
     };
 
-    test_imhomog_scalar_mul::<Bn254>(make_inhomogeneous_scalar_mul(), witness);
+    // Create tables for batch multiplication preprocessing
+    let g_1 = <Bn254 as Pairing>::G1::generator().into_affine();
+    let g_2 = <Bn254 as Pairing>::G2::generator().into_affine();
+    let table1 = BatchMulPreprocessing::new(g_1.into(), 256); // TODO: change 256?
+    let table2 = BatchMulPreprocessing::new(g_2.into(), 256); // TODO: change 256?
+
+    let hom = make_inhomogeneous_scalar_mul::<Bn254>(&table1, &table2);
+    test_imhomog_scalar_mul::<Bn254>(hom, witness);
 }

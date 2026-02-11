@@ -53,6 +53,48 @@
     </header>
 
     <section>
+        <h2>Summary</h2>
+        <p>
+            This summary corresponds to the <code>FeeStatement</code> event emitted by the transaction.
+        </p>
+        <table>
+            <tr>
+                <th>Category</th>
+                <th style="text-align: right">Cost</th>
+                <th>Unit</th>
+                <th>Description</th>
+            </tr>
+            <tr>
+                <td><b>Execution Gas</b></td>
+                <td style="text-align: right">{{summary-execution-gas}}</td>
+                <td>gas units</td>
+                <td>Transient resources for execution, like CPU time or memory</td>
+            </tr>
+            <tr>
+                <td><b>IO Gas</b></td>
+                <td style="text-align: right">{{summary-io-gas}}</td>
+                <td>gas units</td>
+                <td>Storage reads and writes</td>
+            </tr>
+            <tr>
+                <td><b>Storage Fee</b></td>
+                <td style="text-align: right">{{summary-storage-fee}}</td>
+                <td>APT</td>
+                <td>Cost for new or expanded storage slots</td>
+            </tr>
+            <tr>
+                <td><b>Storage Refund</b></td>
+                <td style="text-align: right">{{summary-storage-refund}}</td>
+                <td>APT</td>
+                <td>Refund for deleted storage slots</td>
+            </tr>
+        </table>
+        <p style="font-size: 0.9em; color: #666;">
+            <b>Note:</b> Values may differ slightly from the <code>FeeStatement</code> due to rounding.
+        </p>
+    </section>
+
+    <section>
         <h2>Flamegraphs</h2>
         {{#if graph-exec-io}}
         <object data="assets/exec_io.svg" type="image/svg+xml" class="flamegraph"></object>
@@ -69,28 +111,25 @@
 
     <section>
         <h2>Cost Break-down</h2>
-        The Aptos network charges a transaction in two parts: (1) execution and IO, and (2) storage.
+        The Aptos network charges a transaction in three parts: (1) execution, (2) IO, and (3) storage.
+        Execution and IO are measured in gas units; storage is measured in APT.
 
-        <h3> Execution & IO</h3>
-        The execution & IO costs cover the transient resources used for executing the transaction
-        and are quantified in gas units, meaning that the final fee incurred will be subject to the gas unit
-        price established by the gas fee market. This allows one to benefit from low transaction fees when
-        the network is not at capacity.
+        <h3>Execution</h3>
+        Execution costs cover transient resources used for executing the transaction,
+        such as CPU time or memory usage.
+        <p>Total: {{summary-execution-gas}} gas units</p>
 
         <h4>Intrinsic Cost</h4>
-        {{intrinsic}} gas units
-        {{#if intrinsic-percentage}}
-        , {{intrinsic-percentage}} of the total cost for execution & IO.
-        {{/if}}
+        {{intrinsic}} gas units{{#if intrinsic-percentage}}, {{intrinsic-percentage}} of execution gas.{{/if}}
 
         {{#if keyless}}
         <h4>Keyless Cost</h4>
-        {{keyless}} gas units, {{keyless-percentage}} of the total cost for execution & IO.
+        {{keyless}} gas units, {{keyless-percentage}} of execution gas.
         {{/if}}
 
         {{#if slh_dsa_sha2_128s}}
         <h4>SLH-DSA-SHA2-128s Cost</h4>
-        {{slh_dsa_sha2_128s}} gas units, {{slh_dsa_sha2_128s-percentage}} of the total cost for execution & IO.
+        {{slh_dsa_sha2_128s}} gas units, {{slh_dsa_sha2_128s-percentage}} of execution gas.
         {{/if}}
 
         <h4>Dependencies</h4>
@@ -114,7 +153,8 @@
         {{else}}
         (No dependencies to show. System dependencies are excluded.)
         {{/if}}
-        <h4>Execution</h4>
+
+        <h4>Operations</h4>
         {{#if ops}}
         <table>
             <tr>
@@ -177,6 +217,11 @@
         {{else}}
         (No methods to show.)
         {{/if}}
+
+        <h3>IO</h3>
+        IO costs cover reading and writing data to storage.
+        <p>Total: {{summary-io-gas}} gas units</p>
+
         <h4>State Reads</h4>
         {{#if reads}}
         <table>
@@ -258,10 +303,8 @@
         The storage fees cover the extended-term storage of states and events and are assessed at a fixed price in APT.
 
         <h4>Transaction</h4>
-        {{storage-txn}} APT
-        {{#if storage-txn-percentage}}
-        , {{storage-txn-percentage}} of the total cost for storage.
-        {{/if}}
+        {{storage-txn}} APT{{#if storage-txn-percentage}}, {{storage-txn-percentage}} of the total cost for
+        storage.{{/if}}
         <h4>States</h4>
         {{#if storage-writes}}
         <table>

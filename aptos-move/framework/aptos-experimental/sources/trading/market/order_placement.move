@@ -68,11 +68,11 @@ module aptos_experimental::order_placement {
         immediate_or_cancel,
         post_only,
         single_order_type,
-        next_order_id,
         OrderType
     };
     use aptos_trading::order_match_types::OrderMatchDetails;
     use aptos_trading::single_order_types::new_single_order_request;
+    use aptos_experimental::order_id_generation::next_order_id;
     use aptos_experimental::market_clearinghouse_order_info::new_clearinghouse_order_info;
     use aptos_experimental::pre_cancellation_tracker::{is_pre_cancelled};
     use aptos_experimental::market_types::{

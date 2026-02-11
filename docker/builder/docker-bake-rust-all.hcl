@@ -67,8 +67,8 @@ group "forge-images" {
 target "debian-base" {
   dockerfile = "docker/builder/debian-base.Dockerfile"
   contexts = {
-    # Run `docker buildx imagetools inspect debian:bullseye` to find the latest multi-platform hash
-    debian = "docker-image://debian:bullseye@sha256:1b1fd1445c1d0ed68123cf76c2d7c7cb47dfdab3df56f7ff9303063110d43291"
+    # Run `docker buildx imagetools inspect debian:trixie` to find the latest multi-platform hash
+    debian = "docker-image://debian:trixie@sha256:2c91e484d93f0830a7e05a2b9d92a7b102be7cab562198b984a84fdbc7806d91"
   }
 }
 
@@ -77,8 +77,8 @@ target "builder-base" {
   target     = "builder-base"
   context    = "."
   contexts = {
-    # Run `docker buildx imagetools inspect rust:1.90.0-bullseye` to find the latest multi-platform hash
-    rust = "docker-image://rust:1.90.0-bullseye@sha256:cfb3f582db21e4b4168bffa96397db118d288f1c55026cf016911e147476184e"
+    # Run `docker buildx imagetools inspect rust:1.91.0-trixie` to find the latest multi-platform hash
+    rust = "docker-image://rust:1.91.0-trixie@sha256:a0dba1c1b2c90585fc44421b55ddf8063323760dc644ba1d35f5b389ad3e8e14"
   }
   args = {
     PROFILE            = "${PROFILE}"
@@ -113,6 +113,17 @@ target "tools-builder" {
   ]
 }
 
+target "forge-builder" {
+  dockerfile = "docker/builder/builder.Dockerfile"
+  target     = "forge-builder"
+  contexts = {
+    builder-base = "target:builder-base"
+  }
+  secret = [
+    "id=GIT_CREDENTIALS"
+  ]
+}
+
 target "indexer-builder" {
   dockerfile = "docker/builder/builder.Dockerfile"
   target     = "indexer-builder"
@@ -128,6 +139,7 @@ target "_common" {
   contexts = {
     debian-base     = "target:debian-base"
     node-builder    = "target:aptos-node-builder"
+    forge-builder   = "target:forge-builder"
     tools-builder   = "target:tools-builder"
     indexer-builder = "target:indexer-builder"
   }

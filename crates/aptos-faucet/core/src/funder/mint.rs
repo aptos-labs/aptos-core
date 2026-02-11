@@ -31,8 +31,8 @@ static MINTER_SCRIPT: &[u8] = include_bytes!(
 );
 
 use super::common::{
-    submit_transaction, update_sequence_numbers, ApiConnectionConfig, AssetConfig,
-    GasUnitPriceManager, TransactionSubmissionConfig, DEFAULT_AMOUNT_TO_FUND, DEFAULT_ASSET_NAME,
+    submit_transaction, ApiConnectionConfig, AssetConfig, GasUnitPriceManager,
+    TransactionSubmissionConfig, DEFAULT_AMOUNT_TO_FUND, DEFAULT_ASSET_NAME,
 };
 
 /// Entry function identifier containing module and function information.
@@ -211,12 +211,6 @@ pub struct MintFunder {
 
     gas_unit_price_manager: GasUnitPriceManager,
 
-    /// When recovering from being overloaded, this struct ensures we handle
-    /// requests in the order they came in. Each asset has its own independent queue
-    /// (HashMap<String, Vec<(AccountAddress, u64)>>), maintaining FIFO ordering
-    /// within each asset without interference between assets.
-    outstanding_requests: RwLock<HashMap<String, Vec<(AccountAddress, u64)>>>,
-
     // Multi-asset support: store asset configs
     assets: HashMap<String, (MintAssetConfig, RwLock<LocalAccount>)>,
     default_asset: String,
@@ -238,7 +232,8 @@ impl MintFunder {
             GasUnitPriceManager::new(node_url.clone(), txn_config.get_gas_unit_price_ttl_secs());
         let transaction_factory = TransactionFactory::new(chain_id)
             .with_max_gas_amount(txn_config.max_gas_amount)
-            .with_transaction_expiration_time(txn_config.transaction_expiration_secs);
+            .with_transaction_expiration_time(txn_config.transaction_expiration_secs)
+            .with_use_replay_protection_nonce(true);
         Self {
             node_url,
             node_api_key,
@@ -246,7 +241,6 @@ impl MintFunder {
             txn_config,
             transaction_factory,
             gas_unit_price_manager,
-            outstanding_requests: RwLock::new(HashMap::new()),
             assets,
             default_asset,
             amount_to_fund,
@@ -392,7 +386,7 @@ impl MintFunder {
         Ok(())
     }
 
-    /// Core processing logic that handles sequence numbers and transaction submission.
+    /// Core processing logic that handles transaction submission.
     pub async fn process(
         &self,
         client: &Client,
@@ -402,25 +396,17 @@ impl MintFunder {
         wait_for_transactions: bool,
         asset_name: &str,
     ) -> Result<Vec<SignedTransaction>, AptosTapError> {
-        let (_faucet_seq, receiver_seq) = update_sequence_numbers(
-            client,
-            self.get_asset_account(asset_name)?,
-            &self.outstanding_requests,
-            receiver_address,
-            amount,
-            self.txn_config.wait_for_outstanding_txns_secs,
-            asset_name,
-        )
-        .await?;
-
-        if receiver_seq.is_some() && amount == 0 {
-            return Err(AptosTapError::new(
-                format!(
-                    "Account {} already exists and amount asked for is 0",
-                    receiver_address
-                ),
-                AptosTapErrorCode::InvalidRequest,
-            ));
+        if amount == 0 {
+            let receiver_exists = client.get_account(receiver_address).await.is_ok();
+            if receiver_exists {
+                return Err(AptosTapError::new(
+                    format!(
+                        "Account {} already exists and amount asked for is 0",
+                        receiver_address
+                    ),
+                    AptosTapErrorCode::InvalidRequest,
+                ));
+            }
         }
 
         if check_only {
@@ -431,7 +417,9 @@ impl MintFunder {
         let transaction_factory = self.get_transaction_factory().await?;
 
         let txn = {
-            let faucet_account = self.get_asset_account(asset_name)?.write().await;
+            // Orderless transactions don't increment the sequence number, so a
+            // read lock is sufficient.
+            let faucet_account = self.get_asset_account(asset_name)?.read().await;
 
             let payload = match &asset_config.transaction_method {
                 TransactionMethod::EntryFunction(entry_function_id) => {
@@ -496,14 +484,7 @@ impl MintFunder {
         };
 
         Ok(vec![
-            submit_transaction(
-                client,
-                self.get_asset_account(asset_name)?,
-                txn,
-                &receiver_address,
-                wait_for_transactions,
-            )
-            .await?,
+            submit_transaction(client, txn, &receiver_address, wait_for_transactions).await?,
         ])
     }
 }

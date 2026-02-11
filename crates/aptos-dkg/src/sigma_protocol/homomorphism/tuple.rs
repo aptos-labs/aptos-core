@@ -6,12 +6,12 @@ use crate::{
     sigma_protocol::{
         homomorphism,
         homomorphism::{fixed_base_msms, EntrywiseMap},
-        traits::{fiat_shamir_challenge_for_sigma_protocol, prove_homomorphism, FirstProofItem},
-        Proof,
+        traits::{fiat_shamir_challenge_for_sigma_protocol, prove_homomorphism},
+        FirstProofItem, Proof,
     },
 };
 use anyhow::ensure;
-use aptos_crypto::utils;
+use aptos_crypto::{arkworks::msm::IsMsmInput, utils};
 use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_ff::{UniformRand, Zero};
 use ark_serialize::{
@@ -70,10 +70,18 @@ where
     H2::Codomain: CanonicalSerialize + CanonicalDeserialize,
 {
     type Codomain = TupleCodomainShape<H1::Codomain, H2::Codomain>;
+    type CodomainNormalized = TupleCodomainShape<H1::CodomainNormalized, H2::CodomainNormalized>;
     type Domain = H1::Domain;
 
     fn apply(&self, x: &Self::Domain) -> Self::Codomain {
         TupleCodomainShape(self.hom1.apply(x), self.hom2.apply(x))
+    }
+
+    fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
+        TupleCodomainShape(
+            H1::normalize(&self.hom1, &value.0),
+            H2::normalize(&self.hom2, &value.1),
+        )
     }
 }
 
@@ -86,10 +94,18 @@ where
     H2::Codomain: CanonicalSerialize + CanonicalDeserialize,
 {
     type Codomain = TupleCodomainShape<H1::Codomain, H2::Codomain>;
+    type CodomainNormalized = TupleCodomainShape<H1::CodomainNormalized, H2::CodomainNormalized>;
     type Domain = H1::Domain;
 
     fn apply(&self, x: &Self::Domain) -> Self::Codomain {
         TupleCodomainShape(self.hom1.apply(x), self.hom2.apply(x))
+    }
+
+    fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
+        TupleCodomainShape(
+            H1::normalize(&self.hom1, &value.0),
+            H2::normalize(&self.hom2, &value.1),
+        )
     }
 }
 
@@ -214,6 +230,12 @@ where
     fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
         H1::msm_eval(input)
     }
+
+    fn batch_normalize(
+        msm_output: Vec<Self::MsmOutput>,
+    ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
+        H1::batch_normalize(msm_output)
+    }
 }
 
 impl<C: CurveGroup, H1, H2> sigma_protocol::Trait<C> for TupleHomomorphism<H1, H2>
@@ -296,14 +318,14 @@ where
     #[allow(non_snake_case)]
     pub fn verify<Ct: Serialize, H>(
         &self,
-        public_statement: &<Self as homomorphism::Trait>::Codomain,
+        public_statement: &<Self as homomorphism::Trait>::CodomainNormalized,
         proof: &Proof<H1::Scalar, H>, // Would like to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
         cntxt: &Ct,
     ) -> anyhow::Result<()>
     where
         H: homomorphism::Trait<
             Domain = <Self as homomorphism::Trait>::Domain,
-            Codomain = <Self as homomorphism::Trait>::Codomain,
+            CodomainNormalized = <Self as homomorphism::Trait>::CodomainNormalized,
         >,
     {
         let (first_msm_terms, second_msm_terms) =
@@ -321,14 +343,14 @@ where
     #[allow(non_snake_case)]
     fn msm_terms_for_verify<Ct: Serialize, H>(
         &self,
-        public_statement: &<Self as homomorphism::Trait>::Codomain,
+        public_statement: &<Self as homomorphism::Trait>::CodomainNormalized,
         proof: &Proof<H1::Scalar, H>,
         cntxt: &Ct,
     ) -> (H1::MsmInput, H2::MsmInput)
     where
         H: homomorphism::Trait<
             Domain = <Self as homomorphism::Trait>::Domain,
-            Codomain = <Self as homomorphism::Trait>::Codomain,
+            CodomainNormalized = <Self as homomorphism::Trait>::CodomainNormalized,
         >, // need this?
     {
         let prover_first_message = match &proof.first_proof_item {
@@ -340,7 +362,7 @@ where
         let c = fiat_shamir_challenge_for_sigma_protocol::<_, H1::Scalar, _>(
             cntxt,
             self,
-            public_statement,
+            &public_statement,
             &prover_first_message,
             &self.dst(),
         );

@@ -1,0 +1,28 @@
+//# publish
+module 0x1::M
+struct Box<T0>
+  x: T0
+
+fun unbox<T0>(l0: Box<T0>): T0
+    local l1: T0
+    move_loc l0
+    unpack Box<T0>
+    st_loc l1
+    move_loc l1
+    ret
+
+fun f<T0>(l0: u64, l1: T0): T0
+    copy_loc l0
+    ld_u64 0
+    eq
+    br_true l0
+    copy_loc l0
+    ld_u64 1
+    sub
+    move_loc l1
+    pack Box<T0>
+    call f<Box<T0>>
+    call unbox<T0>
+    ret
+l0: move_loc l1
+    ret

@@ -1,0 +1,100 @@
+//# publish
+module 0x1::M
+struct K has key
+  dummy: bool
+
+struct BoxCopy<T0> has copy
+  f: T0
+
+struct BoxDrop<T0> has drop
+  f: T0
+
+struct BoxStore<T0> has store
+  f: T0
+
+struct BoxKey<T0> has key
+  f: T0
+
+struct NeedsCopy<T0: copy>
+  dummy: bool
+
+struct NeedsDrop<T0: drop>
+  dummy: bool
+
+struct NeedsStore<T0: store>
+  dummy: bool
+
+struct NeedsKey<T0: key>
+  dummy: bool
+
+
+
+//# run --type-args u64 --args false
+script
+use 0x1::M
+entry public fun main<T0: copy>(l0: M::NeedsCopy<T0>)
+    ld_u64 0
+    abort
+
+
+
+//# run --type-args u64 --args false
+script
+use 0x1::M
+entry public fun main<T0: drop>(l0: M::NeedsDrop<T0>)
+    ld_u64 0
+    abort
+
+
+
+//# run --type-args u64 --args false
+script
+use 0x1::M
+entry public fun main<T0: store>(l0: M::NeedsStore<T0>)
+    ld_u64 0
+    abort
+
+
+
+//# run --type-args 0x1::M::K --args false
+script
+use 0x1::M
+entry public fun main<T0: key>(l0: M::NeedsKey<T0>)
+    ld_u64 0
+    abort
+
+
+
+//# run --type-args u64 --args false
+script
+use 0x1::M
+entry public fun main<T0: copy>(l0: M::NeedsCopy<M::BoxCopy<T0>>)
+    ld_u64 0
+    abort
+
+
+
+//# run --type-args u64 --args false
+script
+use 0x1::M
+entry public fun main<T0: drop>(l0: M::NeedsDrop<M::BoxDrop<T0>>)
+    ld_u64 0
+    abort
+
+
+
+//# run --type-args u64 --args false
+script
+use 0x1::M
+entry public fun main<T0: store>(l0: M::NeedsStore<M::BoxStore<T0>>)
+    ld_u64 0
+    abort
+
+
+
+//# run --type-args u64 --args false
+script
+use 0x1::M
+entry public fun main<T0: store>(l0: M::NeedsKey<M::BoxKey<T0>>)
+    ld_u64 0
+    abort

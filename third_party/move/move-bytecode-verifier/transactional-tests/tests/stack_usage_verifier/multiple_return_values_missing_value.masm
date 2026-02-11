@@ -1,0 +1,22 @@
+//# publish
+module 0x1::Test
+struct T
+  b: bool
+
+public fun new(): T
+    ld_true
+    pack T
+    ret
+
+public fun test(l0: &u64, l1: T): (u64, T, bool)
+    move_loc l0
+    read_ref
+    move_loc l1
+    ret
+
+public fun destroy(l0: T)
+    local l1: bool
+    move_loc l0
+    unpack T
+    st_loc l1
+    ret

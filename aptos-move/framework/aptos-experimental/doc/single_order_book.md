@@ -121,15 +121,6 @@ types of pending orders are supported.
 
 
 
-<a id="0x7_single_order_book_EORDER_ALREADY_EXISTS"></a>
-
-
-
-<pre><code><b>const</b> <a href="single_order_book.md#0x7_single_order_book_EORDER_ALREADY_EXISTS">EORDER_ALREADY_EXISTS</a>: u64 = 1;
-</code></pre>
-
-
-
 <a id="0x7_single_order_book_EINVALID_ADD_SIZE_TO_ORDER"></a>
 
 
@@ -144,6 +135,15 @@ types of pending orders are supported.
 
 
 <pre><code><b>const</b> <a href="single_order_book.md#0x7_single_order_book_EINVALID_INACTIVE_ORDER_STATE">EINVALID_INACTIVE_ORDER_STATE</a>: u64 = 5;
+</code></pre>
+
+
+
+<a id="0x7_single_order_book_EORDER_ALREADY_EXISTS"></a>
+
+
+
+<pre><code><b>const</b> <a href="single_order_book.md#0x7_single_order_book_EORDER_ALREADY_EXISTS">EORDER_ALREADY_EXISTS</a>: u64 = 1;
 </code></pre>
 
 

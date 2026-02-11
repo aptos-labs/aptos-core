@@ -301,7 +301,7 @@ impl FakeAptosDB {
                 self.txn_info_by_version
                     .insert(ver, txn_to_commit.transaction_info().clone());
                 self.txn_version_by_hash
-                    .insert(txn_to_commit.transaction().hash(), ver);
+                    .insert(txn_to_commit.transaction().committed_hash(), ver);
 
                 // If it is a user transaction, also update the account sequence number
                 if let Some(user_txn) = txn_to_commit.transaction().try_as_signed_user_txn() {
@@ -1072,7 +1072,7 @@ mod tests {
             // Verify transaction hash.
             assert_eq!(
                 txn_info.transaction_hash(),
-                txn_to_commit.transaction().hash()
+                txn_to_commit.transaction().committed_hash()
             );
 
             if !txn_to_commit.is_state_checkpoint() {
@@ -1083,7 +1083,7 @@ mod tests {
                     .unwrap();
                 let txn_with_proof = db
                     .get_transaction_by_hash(
-                        txn_to_commit.transaction().hash(),
+                        txn_to_commit.transaction().committed_hash(),
                         ledger_version,
                         true,
                     )
@@ -1091,8 +1091,8 @@ mod tests {
                     .unwrap();
 
                 assert_eq!(
-                    txn_with_proof.transaction.hash(),
-                    txn_to_commit.transaction().hash()
+                    txn_with_proof.transaction.committed_hash(),
+                    txn_to_commit.transaction().committed_hash()
                 );
 
                 verify_user_txn(
@@ -1160,7 +1160,7 @@ mod tests {
             sequence_number,
         );
 
-        let txn_hash = transaction_with_proof.transaction.hash();
+        let txn_hash = transaction_with_proof.transaction.committed_hash();
         ensure!(
             txn_hash
                 == transaction_with_proof
@@ -1225,7 +1225,7 @@ mod tests {
             );
 
             // Verify the transaction hashes match those of the transaction infos
-            let txn_hash = txn.hash();
+            let txn_hash = txn.committed_hash();
             ensure!(
                 txn_hash == txn_info.transaction_hash(),
                 "The transaction hash does not match the hash in transaction info. \
