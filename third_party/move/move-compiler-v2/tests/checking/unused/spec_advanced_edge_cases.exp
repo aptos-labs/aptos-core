@@ -1,0 +1,180 @@
+
+Diagnostics:
+note: unused schema m::TestSchema
+   ┌─ tests/checking/unused/spec_advanced_edge_cases.move:23:5
+   │
+23 │ ╭     spec schema TestSchema {
+24 │ │         requires exists<OnlyInSchema>(@0x1);
+25 │ │     }
+   │ ╰─────^
+
+
+Diagnostics:
+warning: Struct `OnlyInSchema` is unused in its defining module (only place where it can be packed, unpacked, or have fields accessed). Consider removing it or adding the `#[deprecated]` attribute to suppress this warning.
+   ┌─ tests/checking/unused/spec_advanced_edge_cases.move:19:5
+   │
+19 │ ╭     struct OnlyInSchema has drop {
+20 │ │         x: u64
+21 │ │     }
+   │ ╰─────^
+
+warning: Struct `CompletelyUnused` is unused in its defining module (only place where it can be packed, unpacked, or have fields accessed). Consider removing it or adding the `#[deprecated]` attribute to suppress this warning.
+    ┌─ tests/checking/unused/spec_advanced_edge_cases.move:111:5
+    │
+111 │ ╭     struct CompletelyUnused has drop {
+112 │ │         unused_field: u64
+113 │ │     }
+    │ ╰─────^
+
+warning: Constant `UNUSED_CONST` is unused.
+    ┌─ tests/checking/unused/spec_advanced_edge_cases.move:115:5
+    │
+115 │     const UNUSED_CONST: u64 = 999;
+    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    struct CompletelyUnused {
+        unused_field: u64,
+    }
+    struct FirstParam {
+        a: u64,
+    }
+    struct GenericStruct<T> {
+        item: T,
+    }
+    struct OnlyInAppliedSchema {
+        y: u64,
+    }
+    struct OnlyInSchema {
+        x: u64,
+    }
+    struct ReturnType {
+        c: u64,
+    }
+    struct SecondParam {
+        b: u64,
+    }
+    struct UsedInAbortsIfCondition {
+        error_code: u64,
+    }
+    struct UsedInAssume {
+        val: u64,
+    }
+    struct UsedInNativeSpecFun {
+        value: u64,
+    }
+    struct VectorStruct {
+        items: vector<u64>,
+    }
+    public fun test_aborts_condition(): u64 {
+        0
+    }
+    spec {
+      aborts_if Not(exists<0x42::m::UsedInAbortsIfCondition>(0x42));
+    }
+
+    public fun test_assume(): u64 {
+        spec {
+          assume exists<0x42::m::UsedInAssume>(0x1);
+        }
+        ;
+        100
+    }
+    public fun test_complex_native(): u64 {
+        0
+    }
+    spec {
+      ensures Eq<u64>(result0(), select m::ReturnType.c<0x42::m::ReturnType>(m::complex_native_spec(pack m::FirstParam(1), pack m::SecondParam(2))));
+      requires exists<0x42::m::OnlyInAppliedSchema>(0x2);
+    }
+
+    public fun test_generic(): u64 {
+        0
+    }
+    spec {
+      requires exists<0x42::m::GenericStruct<u64>>(0x1);
+      ensures Eq<u64>(result0(), 0);
+    }
+
+    public fun test_native_spec(): u64 {
+        42
+    }
+    spec {
+      ensures Eq<u64>(result0(), m::native_helper(pack m::UsedInNativeSpecFun(10)));
+    }
+
+    public fun test_vector(): u64 {
+        0
+    }
+    spec {
+      ensures exists<0x42::m::VectorStruct>(0x1);
+    }
+
+    spec fun native_helper(s: UsedInNativeSpecFun): u64;
+    spec fun complex_native_spec(p1: FirstParam,p2: SecondParam): ReturnType;
+    spec fun unused_spec_fun(x: u64): u64 {
+        Add(x, 1)
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    struct CompletelyUnused has drop {
+        unused_field: u64,
+    }
+    struct FirstParam has drop {
+        a: u64,
+    }
+    struct GenericStruct<T> has drop {
+        item: T,
+    }
+    struct OnlyInAppliedSchema has drop {
+        y: u64,
+    }
+    struct OnlyInSchema has drop {
+        x: u64,
+    }
+    struct ReturnType has drop {
+        c: u64,
+    }
+    struct SecondParam has drop {
+        b: u64,
+    }
+    struct UsedInAbortsIfCondition has key {
+        error_code: u64,
+    }
+    struct UsedInAssume has drop {
+        val: u64,
+    }
+    struct UsedInNativeSpecFun has drop {
+        value: u64,
+    }
+    struct VectorStruct has drop {
+        items: vector<u64>,
+    }
+    public fun test_aborts_condition(): u64 {
+        0
+    }
+    public fun test_assume(): u64 {
+
+        /* spec {
+          assume exists<0x42::m::UsedInAssume>(0x1);
+        }
+         */
+        ;
+        100
+    }
+    public fun test_complex_native(): u64 {
+        0
+    }
+    public fun test_generic(): u64 {
+        0
+    }
+    public fun test_native_spec(): u64 {
+        42
+    }
+    public fun test_vector(): u64 {
+        0
+    }
+}

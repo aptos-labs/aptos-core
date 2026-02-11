@@ -1,0 +1,106 @@
+
+Diagnostics:
+warning: Struct `CompletelyUnused` is unused in its defining module (only place where it can be packed, unpacked, or have fields accessed). Consider removing it or adding the `#[deprecated]` attribute to suppress this warning.
+   ┌─ tests/checking/unused/spec_usage_comprehensive.move:13:5
+   │
+13 │ ╭     struct CompletelyUnused has copy, drop {
+14 │ │         y: u64
+15 │ │     }
+   │ ╰─────^
+
+warning: Constant `UNUSED_CONST` is unused.
+   ┌─ tests/checking/unused/spec_usage_comprehensive.move:24:5
+   │
+24 │     const UNUSED_CONST: u64 = 300;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: Struct `StructUsingConst` is unused in its defining module (only place where it can be packed, unpacked, or have fields accessed). Consider removing it or adding the `#[deprecated]` attribute to suppress this warning.
+   ┌─ tests/checking/unused/spec_usage_comprehensive.move:64:5
+   │
+64 │ ╭     struct StructUsingConst has key {
+65 │ │         amount: u64
+66 │ │     }
+   │ ╰─────^
+
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    spec {
+      invariant update forall addr: address: TypeDomain<address>(): Implies(exists<0x42::m::SpecOnlyStruct>(addr), Le(select m::SpecOnlyStruct.value<0x42::m::SpecOnlyStruct>(global<0x42::m::SpecOnlyStruct>(addr)), 100));
+    }
+
+    struct CompletelyUnused {
+        y: u64,
+    }
+    struct SpecOnlyStruct {
+        value: u64,
+    }
+    struct StructUsingConst {
+        amount: u64,
+    }
+    spec {
+      invariant Le(select m::StructUsingConst.amount(), 500);
+    }
+
+    struct UsedInBody {
+        x: u64,
+    }
+    public fun test_aborts(x: u64): u64 {
+        x
+    }
+    spec {
+      aborts_if Not(exists<0x42::m::SpecOnlyStruct>(0x42));
+    }
+
+    public fun test_ensures(x: u64): u64 {
+        x
+    }
+    spec {
+      ensures Le(result0(), 100);
+    }
+
+    public fun test_function_spec(x: u64): u64 {
+        Add<u64>(x, 200)
+    }
+    spec {
+      requires exists<0x42::m::SpecOnlyStruct>(0x42);
+      ensures Eq<u64>(result0(), Add($t0, 100));
+    }
+
+    public fun use_body_struct(): UsedInBody {
+        pack m::UsedInBody(42)
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    struct CompletelyUnused has copy, drop {
+        y: u64,
+    }
+    struct SpecOnlyStruct has copy, drop {
+        value: u64,
+    }
+    struct StructUsingConst has key {
+        amount: u64,
+    }
+    /*
+     spec {
+      invariant Le(select m::StructUsingConst.amount(), 500);
+    }
+
+    */
+    struct UsedInBody has copy, drop {
+        x: u64,
+    }
+    public fun test_aborts(x: u64): u64 {
+        x
+    }
+    public fun test_ensures(x: u64): u64 {
+        x
+    }
+    public fun test_function_spec(x: u64): u64 {
+        x + 200
+    }
+    public fun use_body_struct(): UsedInBody {
+        UsedInBody{x: 42}
+    }
+}

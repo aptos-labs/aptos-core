@@ -1947,7 +1947,19 @@ impl ExpData {
                         Self::collect_pattern_types(&arm.pattern, env, types);
                     }
                 },
-                _ => {},
+                ExpData::Call(..)
+                | ExpData::IfElse(..)
+                | ExpData::Invoke(..)
+                | ExpData::Loop(..)
+                | ExpData::Return(..)
+                | ExpData::Sequence(..)
+                | ExpData::SpecBlock(..)
+                | ExpData::Mutate(..)
+                | ExpData::LoopCont(..)
+                | ExpData::Value(..)
+                | ExpData::LocalVar(..)
+                | ExpData::Temporary(..)
+                | ExpData::Invalid(..) => {},
             }
 
             true // keep going
@@ -1980,7 +1992,7 @@ impl ExpData {
                     Self::collect_pattern_types(p, env, types);
                 }
             },
-            _ => {},
+            Pattern::Var(..) | Pattern::Wildcard(_) | Pattern::Error(_) => {},
         }
     }
 

@@ -1,41 +1,41 @@
 
 Diagnostics:
 warning: Struct `UnusedStruct` is unused in its defining module (only place where it can be packed, unpacked, or have fields accessed). Consider removing it or adding the `#[deprecated]` attribute to suppress this warning.
-  ┌─ tests/checking/unused/unused_struct.move:3:5
-  │
-3 │ ╭     struct UnusedStruct {
-4 │ │         x: u64
-5 │ │     }
-  │ ╰─────^
+   ┌─ tests/checking/unused/suppression_deprecated.move:9:5
+   │
+ 9 │ ╭     struct UnusedStruct {
+10 │ │         y: u64
+11 │ │     }
+   │ ╰─────^
 
 // -- Model dump before first bytecode pipeline
 module 0x42::m {
-    struct PublicStruct {
-        y: u64,
+    struct DeprecatedStruct {
+        x: u64,
     }
     struct UnusedStruct {
-        x: u64,
+        y: u64,
     }
     struct UsedStruct {
         z: u64,
     }
-    public fun test(): UsedStruct {
+    public fun use_struct(): UsedStruct {
         pack m::UsedStruct(42)
     }
 } // end 0x42::m
 
 // -- Sourcified model before first bytecode pipeline
 module 0x42::m {
-    struct PublicStruct {
-        y: u64,
+    struct DeprecatedStruct {
+        x: u64,
     }
     struct UnusedStruct {
-        x: u64,
+        y: u64,
     }
     struct UsedStruct {
         z: u64,
     }
-    public fun test(): UsedStruct {
+    public fun use_struct(): UsedStruct {
         UsedStruct{z: 42}
     }
 }

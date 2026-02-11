@@ -8,7 +8,7 @@ use codespan_reporting::diagnostic::Severity;
 use move_binary_format::file_format::Visibility;
 use move_model::{
     ast::{ExpData, Operation, Pattern},
-    metadata::LanguageVersion,
+    metadata::{lang_feature_versions::LANGUAGE_VERSION_FOR_UNUSED_CHECK, LanguageVersion},
     model::{
         FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, NodeId, Parameter, QualifiedId,
         StructEnv, UserId,
@@ -524,11 +524,14 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
     // Record all private and friendless public(friend) functions to check for uses.
     let mut private_funcs: BTreeSet<QualifiedFunId> = BTreeSet::new();
 
-    // Get options and check if unused warnings are enabled
+    // Get options and check if unused check experiment is enabled
     let options = env
         .get_extension::<Options>()
         .expect("Options is available");
-    let unused_warnings_enabled = before_inlining && options.warning_enabled("unused");
+    let language_version = options.language_version.unwrap_or_default();
+    let unused_warnings_enabled = before_inlining
+        && options.experiment_on(Experiment::UNUSED_CHECK)
+        && language_version >= LANGUAGE_VERSION_FOR_UNUSED_CHECK;
 
     for caller_module in env.get_modules() {
         // TODO(#13745): fix when we can tell in general if two modules are in the same package
@@ -670,36 +673,28 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
 
             // Check for unused structs and constants in this module
             if unused_warnings_enabled {
-                let current_module_id = caller_module.get_id();
-
                 // Check for unused private structs
                 // A private struct is unused if it has no users from the same module
                 for struct_env in caller_module.get_structs() {
-                    if struct_env.get_visibility() == Visibility::Private {
-                        let has_same_module_users =
-                            struct_env.get_users().iter().any(|user| match user {
-                                UserId::Function(qid) => qid.module_id == current_module_id,
-                                UserId::Struct(qid) => qid.module_id == current_module_id,
-                            });
-                        if !has_same_module_users {
-                            let msg = format!(
-                                "Struct `{}` is unused: it has no use in the current module and is private to its module.",
-                                struct_env.get_full_name_with_address(),
-                            );
-                            env.diag(Severity::Warning, &struct_env.get_loc(), &msg);
-                        }
+                    if should_warn_unused_struct(env, &struct_env, caller_module_id) {
+                        let entity_type = if struct_env.has_variants() {
+                            "Enum"
+                        } else {
+                            "Struct"
+                        };
+                        let msg = format!(
+                            "{} `{}` is unused in its defining module (only place where it can be packed, unpacked, or have fields accessed). Consider removing it or adding the `#[deprecated]` attribute to suppress this warning.",
+                            entity_type,
+                            struct_env.get_name_str()
+                        );
+                        env.diag(Severity::Warning, &struct_env.get_loc(), &msg);
                     }
                 }
 
                 // Check for unused constants (all constants are module-private)
                 // A constant is unused if it has no users from the same module
                 for const_env in caller_module.get_named_constants() {
-                    let has_same_module_users =
-                        const_env.get_users().iter().any(|user| match user {
-                            UserId::Function(qid) => qid.module_id == current_module_id,
-                            UserId::Struct(qid) => qid.module_id == current_module_id,
-                        });
-                    if !has_same_module_users {
+                    if !has_users_in_module(const_env.get_users(), caller_module_id, env) {
                         let msg = format!(
                             "Constant `{}` is unused.",
                             const_env.get_name().display(env.symbol_pool()),
@@ -717,11 +712,8 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
                 // We saw no uses of private/friendless function `callee`.
                 let callee_func = env.get_function(callee);
                 let callee_loc = callee_func.get_id_loc();
-                let callee_is_script = callee_func.module_env.get_name().is_script();
 
-                // Entry functions in a script don't need any uses.
-                // Check others which are private.
-                if !callee_is_script {
+                if should_warn_unused_function(env, &callee_func) {
                     let is_private = matches!(callee_func.visibility(), Visibility::Private);
                     if functions_with_inaccessible_callers.contains(&callee) {
                         let msg = format!(
@@ -745,6 +737,94 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
             }
         }
     }
+}
+
+/// Checks if any user in the given set belongs to the specified module
+fn has_users_in_module(users: &BTreeSet<UserId>, module_id: ModuleId, _env: &GlobalEnv) -> bool {
+    users.iter().any(|user| match user {
+        UserId::Function(qid) => qid.module_id == module_id,
+        UserId::Struct(qid) => qid.module_id == module_id,
+        UserId::Constant(qid) => qid.module_id == module_id,
+        UserId::FunctionSpec(qid) => qid.module_id == module_id,
+        UserId::StructSpec(qid) => qid.module_id == module_id,
+        UserId::ModuleSpec(mid) => *mid == module_id,
+    })
+}
+
+/// Check if a function should be excluded from unused checks.
+/// Some functions are special VM hooks that shouldn't be warned about.
+fn is_excluded_from_unused_check(env: &GlobalEnv, func: &FunctionEnv) -> bool {
+    let func_name = env.symbol_pool().string(func.get_name());
+    // Functions that should never be reported as unused:
+    // - init_module: VM hook called automatically when module is published
+    let excluded_functions = &["init_module"];
+
+    excluded_functions
+        .iter()
+        .any(|&name| func_name.as_ref() == name)
+}
+
+/// Check if a struct has attributes that suppress unused warnings.
+fn has_suppression_attribute(env: &GlobalEnv, struct_env: &StructEnv) -> bool {
+    // Attributes that suppress unused warnings:
+    // - deprecated: Marks structs that can't be removed due to on-chain published modules
+    // - resource_group: Empty marker structs used by VM for storage optimization
+    // - resource_group_member: Structs belonging to a resource group, used by VM verifier
+    let suppression_attrs = &["deprecated", "resource_group", "resource_group_member"];
+
+    struct_env.has_attribute(|attr| {
+        let name = attr.name();
+        suppression_attrs
+            .iter()
+            .any(|&s| name == env.symbol_pool().make(s))
+    })
+}
+
+/// Returns true if function should be warned as unused.
+fn should_warn_unused_function(env: &GlobalEnv, func: &FunctionEnv) -> bool {
+    let is_script = func.module_env.get_name().is_script();
+
+    // Don't warn for functions in script modules
+    if is_script {
+        return false;
+    }
+
+    // Don't warn for entry functions (callable from transactions)
+    if func.is_entry() {
+        return false;
+    }
+
+    // Don't warn for special VM hook functions (like init_module)
+    if is_excluded_from_unused_check(env, func) {
+        return false;
+    }
+
+    true
+}
+
+/// Returns true if struct should be warned as unused.
+fn should_warn_unused_struct(env: &GlobalEnv, struct_env: &StructEnv, module_id: ModuleId) -> bool {
+    // Only check private structs
+    if struct_env.get_visibility() != Visibility::Private {
+        return false;
+    }
+
+    // Check if the struct has users in its defining module
+    if has_users_in_module(struct_env.get_users(), module_id, env) {
+        return false;
+    }
+
+    // Don't warn if the struct has suppression attributes
+    if has_suppression_attribute(env, struct_env) {
+        return false;
+    }
+
+    // Don't warn for ghost memory structs (used only in specs)
+    if struct_env.is_ghost_memory() {
+        return false;
+    }
+
+    true
 }
 
 /// Check the body of inline functions (after inlining) to ensure they do not call

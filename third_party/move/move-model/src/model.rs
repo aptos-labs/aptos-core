@@ -3791,6 +3791,10 @@ impl<'env> ModuleEnv<'env> {
 pub enum UserId {
     Function(QualifiedId<FunId>),
     Struct(QualifiedId<StructId>),
+    Constant(QualifiedId<NamedConstantId>),
+    FunctionSpec(QualifiedId<FunId>),
+    StructSpec(QualifiedId<StructId>),
+    ModuleSpec(ModuleId),
 }
 
 #[derive(Debug)]
@@ -4375,7 +4379,7 @@ pub struct NamedConstantData {
     /// The value of this constant, if known.
     pub(crate) value: Value,
 
-    /// All users of this constant (functions and structs)
+    /// All users of this constant (functions and other constants)
     pub(crate) users: BTreeSet<UserId>,
 }
 
@@ -4427,7 +4431,7 @@ impl NamedConstantEnv<'_> {
         }
     }
 
-    /// Returns the users (functions and structs) that reference this constant.
+    /// Returns the users (functions and other constants) that reference this constant.
     pub fn get_users(&self) -> &BTreeSet<UserId> {
         &self.data.users
     }

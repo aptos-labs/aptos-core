@@ -1,5 +1,5 @@
 module 0x42::m {
-    // Used only in spec - should still be marked as unused in implementation
+    // Used only in spec - should NOT be marked as unused because specs are part of the module
     struct UsedOnlyInSpec {
         x: u64
     }

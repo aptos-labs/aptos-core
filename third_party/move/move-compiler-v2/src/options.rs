@@ -109,10 +109,6 @@ pub struct Options {
            default_value=bool_to_str(warn_of_deprecation_use_in_aptos_libs_env_var()))]
     pub warn_of_deprecation_use_in_aptos_libs: bool,
 
-    /// Warning flags in `-W<name>` format (e.g., `-Wunused`, `-Wshadowing`). Use `-Wall` for all.
-    #[clap(long = "W", number_of_values = 1)]
-    pub warnings: Vec<String>,
-
     /// Whether to compile everything, including dependencies.
     #[clap(long)]
     pub whole_program: bool,
@@ -240,12 +236,6 @@ impl Options {
             warn_of_deprecation_use_in_aptos_libs: value,
             ..self
         }
-    }
-
-    /// Checks if a warning is enabled. Returns true if the specific warning name
-    /// is in the warnings list, or if "all" is in the list.
-    pub fn warning_enabled(&self, name: &str) -> bool {
-        self.warnings.iter().any(|w| w == name || w == "all")
     }
 
     pub fn set_external_checks(self, value: Vec<Arc<dyn ExternalChecks>>) -> Self {

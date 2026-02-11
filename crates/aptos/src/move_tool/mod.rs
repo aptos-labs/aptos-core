@@ -605,7 +605,6 @@ impl CliCommand<&'static str> for TestPackage {
                     .or_else(|| Some(LanguageVersion::latest_stable())),
                 experiments: self.move_options.compute_experiments(),
                 print_errors: true,
-                warnings: self.move_options.warnings.clone(),
             },
             ..Default::default()
         };
@@ -956,7 +955,6 @@ impl IncludedArtifacts {
             check_test_code,
             experiments,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
-            warnings: move_options.warnings.clone(),
             ..BuildOptions::default()
         };
         use IncludedArtifacts::*;
