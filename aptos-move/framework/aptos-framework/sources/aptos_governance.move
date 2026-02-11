@@ -329,10 +329,10 @@ module aptos_framework::aptos_governance {
             @aptos_framework,
             proposal_id
         );
-        let lockup_until = stake::get_lockup_secs(stake_pool);
         // The voter's stake needs to be locked up at least as long as the proposal's expiration.
         // Also no one can vote on a expired proposal.
-        if (proposal_expiration > lockup_until || timestamp::now_seconds() > proposal_expiration) {
+        if (!stake_pool_is_eligible_to_vote(stake_pool, proposal_expiration)
+            || is_proposal_expired(proposal_expiration)) {
             return 0
         };
 
@@ -357,13 +357,28 @@ module aptos_framework::aptos_governance {
         );
         // The voter's stake needs to be locked up at least as long as the proposal's expiration.
         assert!(
-            proposal_expiration <= stake::get_lockup_secs(stake_pool),
+            stake_pool_is_eligible_to_vote(stake_pool, proposal_expiration),
             error::invalid_argument(EINSUFFICIENT_STAKE_LOCKUP),
         );
         assert!(
-            timestamp::now_seconds() <= proposal_expiration,
+            !is_proposal_expired(proposal_expiration),
             error::invalid_argument(EPROPOSAL_EXPIRED),
         );
+    }
+
+    inline fun stake_pool_is_eligible_to_vote(
+        stake_pool: address, proposal_expiration: u64
+    ): bool {
+        // The voter's stake needs to be locked up at least as long as the proposal's expiration.
+        // Also no one can vote on a expired proposal.
+        // Note the boundary condition must be strictly less than to avoid the edge case where the
+        // proposal expiration is equal to the lockup until.
+        proposal_expiration < stake::get_lockup_secs(stake_pool)
+    }
+
+    inline fun is_proposal_expired(proposal_expiration: u64): bool {
+        // Expiration time is defined as the time since when the proposal is no longer eligible to be voted on.
+        timestamp::now_seconds() >= proposal_expiration
     }
 
     /// Create a single-step proposal with the backing `stake_pool`.
@@ -431,7 +446,7 @@ module aptos_framework::aptos_governance {
         let current_time = timestamp::now_seconds();
         let proposal_expiration = current_time + governance_config.voting_duration_secs;
         assert!(
-            stake::get_lockup_secs(stake_pool) >= proposal_expiration,
+            stake_pool_is_eligible_to_vote(stake_pool, proposal_expiration),
             error::invalid_argument(EINSUFFICIENT_STAKE_LOCKUP),
         );
 
