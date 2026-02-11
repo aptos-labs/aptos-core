@@ -34,7 +34,7 @@ macro_rules! setup_jemalloc {
         pub static mut malloc_conf: *const ::std::ffi::c_char = c"\
               prof:true,lg_prof_sample:23,\
               percpu_arena:percpu,\
-              thp:always,metadata_thp:always,\
+              metadata_thp:always,\
               background_thread:true,max_background_threads:4,\
               dirty_decay_ms:30000,muzzy_decay_ms:120000,\
               lg_tcache_max:16,tcache_nslots_large:32"
