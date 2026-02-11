@@ -52,6 +52,7 @@ use ark_ec::{
 use ark_ff::{AdditiveGroup, Fp, FpConfig};
 use ark_poly::EvaluationDomain;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
 /// Domain-separation tag (DST) used to ensure that all cryptographic hashes and
@@ -84,13 +85,14 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
     }
 
     #[allow(non_snake_case)]
-    fn verify<A: Serialize + Clone>(
+    fn verify<A: Serialize + Clone, R: RngCore + CryptoRng>(
         &self,
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         spks: &[Self::SigningPubKey],
         eks: &[Self::EncryptPubKey],
         sid: &A,
+        rng: &mut R,
     ) -> anyhow::Result<()> {
         if eks.len() != sc.get_total_num_players() {
             bail!(
@@ -149,7 +151,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
                 ),
                 &self.sharing_proof.SoK,
                 &sok_cntxt,
-                &mut rand::thread_rng(), // TODO: make `rng` a parameter of fn verify()?
+                rng,
             ) {
                 bail!("PoK verification failed: {:?}", err);
             }
@@ -160,17 +162,15 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
                 sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize,
                 pp.ell,
                 &self.sharing_proof.range_proof_commitment,
-                &mut rand::thread_rng(), // TODO: make `rng` a parameter of fn verify()?
+                rng,
             ) {
                 bail!("Range proof batch verification failed: {:?}", err);
             }
         }
 
-        let mut rng = rand::thread_rng(); // TODO: make `rng` a parameter of fn verify()?
-
         // Do the SCRAPE LDT
         let ldt = LowDegreeTest::random(
-            &mut rng,
+            rng,
             sc.get_threshold_weight(),
             sc.get_total_weight() + 1,
             true,
@@ -186,7 +186,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         let mut base_vec = Vec::new();
         let mut exp_vec = Vec::new();
 
-        let beta = sample_field_element(&mut rng);
+        let beta = sample_field_element(rng);
         let powers_of_beta = utils::powers(beta, sc.get_total_weight() + 1);
 
         let Cs_flat: Vec<_> = self.subtrs.Cs.iter().flatten().cloned().collect();
