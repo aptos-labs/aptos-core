@@ -18,11 +18,11 @@ use aptos_crypto::{
     utils,
 };
 use ark_ec::CurveGroup;
-use ark_ff::{Field, Fp, FpConfig, PrimeField};
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_ff::{Field, Fp, FpConfig, PrimeField, Zero};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress};
 use rand_core::{CryptoRng, RngCore};
 use serde::Serialize;
-use std::fmt::Debug;
+use std::{collections::HashMap, fmt::Debug};
 
 // `CurveGroup` is needed here because the code does `into_affine()` // TODO: not anymore!!!
 pub trait Trait<C: CurveGroup>:
@@ -147,16 +147,16 @@ pub trait Trait<C: CurveGroup>:
         c: C::ScalarField,
     ) -> Self::MsmInput
     {
-        let mut final_basis = Vec::new();
-        let mut final_scalars = Vec::new();
+        // Aggregate (basis, scalar) pairs so each basis appears at most once (scalars summed).
+        // Key = canonical serialization of basis (curve points don't implement Hash).
+        let mut aggregated: HashMap<Vec<u8>, (C::Affine, C::ScalarField)> = HashMap::new();
 
-
-    for (((term, A), P), beta_power) in msm_terms
-        .into_iter()
-        .zip(prover_first_message.clone().into_iter())
-        .zip(statement.clone().into_iter())
-        .zip(powers_of_beta)
-    {
+        for (((term, A), P), beta_power) in msm_terms
+            .into_iter()
+            .zip(prover_first_message.clone().into_iter())
+            .zip(statement.clone().into_iter())
+            .zip(powers_of_beta)
+        {
             let mut bases = term.bases().to_vec();
             let mut scalars = term.scalars().to_vec();
 
@@ -169,14 +169,28 @@ pub trait Trait<C: CurveGroup>:
             bases.push(A); // this is the element `A` from the prover's first message
             bases.push(P); // this is the element `P` from the statement, but we'll need `P^c`
 
-            scalars.push(- (*beta_power));
+            scalars.push(-(*beta_power));
             scalars.push(-c * beta_power);
 
-            final_basis.extend(bases);
-            final_scalars.extend(scalars);
+            for (base, scalar) in bases.into_iter().zip(scalars) {
+                let mut key = Vec::new();
+                base.serialize_with_mode(&mut key, Compress::No)
+                    .expect("basis serialization");
+                aggregated
+                    .entry(key)
+                    .and_modify(|(_, s)| *s += scalar)
+                    .or_insert((base, scalar));
+            }
         }
 
-        Self::MsmInput::new(final_basis, final_scalars).expect("Something went wrong constructing MSM input")
+        // Build final MSM input, skipping terms with zero scalar (0·P = identity).
+        let (final_basis, final_scalars): (Vec<_>, Vec<_>) = aggregated
+            .into_values()
+            .filter(|(_, s)| !s.is_zero())
+            .unzip();
+
+        Self::MsmInput::new(final_basis, final_scalars)
+            .expect("Something went wrong constructing MSM input")
     }
 }
 
