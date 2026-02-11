@@ -105,6 +105,7 @@ impl PrunerOpt {
                 batch_size: self.ledger_pruning_batch_size,
                 user_pruning_window_offset: 0,
             },
+            ..Default::default()
         }
     }
 }
