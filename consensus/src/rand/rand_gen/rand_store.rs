@@ -3,6 +3,7 @@
 
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
+    counters,
     rand::rand_gen::{
         rand_manager::Sender,
         types::{PathType, RandConfig, RandShare, TShare, FUTURE_ROUNDS_TO_ACCEPT},
@@ -49,8 +50,10 @@ impl<S: TShare> ShareAggregator<S> {
         }
 
         // Pre-verify shares before spawning to ensure aggregation will succeed.
+        let _verify_timer = counters::RAND_PRE_AGGREGATE_VERIFY_DURATION.start_timer();
         let bad_authors =
             S::pre_aggregate_verify(self.shares.values(), rand_config, &rand_metadata.metadata);
+        drop(_verify_timer);
         for author in &bad_authors {
             if self.shares.remove(author).is_some() {
                 self.total_weight = self
@@ -82,11 +85,13 @@ impl<S: TShare> ShareAggregator<S> {
             .get_self_share()
             .expect("Aggregated item should have self share");
         tokio::task::spawn_blocking(move || {
+            let _agg_timer = counters::RAND_AGGREGATION_DURATION.start_timer();
             let maybe_randomness = S::aggregate(
                 self.shares.values(),
                 &rand_config,
                 rand_metadata.metadata.clone(),
             );
+            drop(_agg_timer);
             match maybe_randomness {
                 Ok(randomness) => {
                     let _ = decision_tx.unbounded_send(randomness);
