@@ -14,7 +14,7 @@ import { g2ToBytes } from './curveSerialization.ts';
 
 // Domain separation tag for hash-to-curve.
 // This must be identical between Rust and TypeScript implementations.
-const HASH_TO_G1_DST = "APTOS_BATCH_ENCRYPT_H2C_BLS12381G1_";
+const HASH_G2_ELEMENT_DST = "APTOS_BATCH_ENCRYPTION_HASH_G2_ELEMENT";
 
 export class Test extends Serializable {
   s: string;
@@ -164,11 +164,7 @@ export function hash_to_fq(input: Uint8Array) {
 }
 
 
-/**
- * Hash a G2 element to a G1 element using the standard hash-to-curve algorithm (RFC 9380).
- * This uses the WB (Wahby-Boneh) map which is the recommended approach for BLS12-381.
- */
 export function hash_g2_element(g2_element: WeierstrassPoint<Fp2>): WeierstrassPoint<bigint> {
   const bytes = g2ToBytes(g2_element);
-  return bls12_381.G1.hashToCurve(bytes, { DST: HASH_TO_G1_DST });
+  return bls12_381.G1.hashToCurve(bytes, { DST: HASH_G2_ELEMENT_DST });
 }

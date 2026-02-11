@@ -150,19 +150,19 @@ pub fn hmac_kdf(
 
 /// Domain separation tag for hash-to-curve.
 /// This must be identical between Rust and TypeScript implementations.
-const HASH_TO_G1_DST: &[u8] = b"APTOS_BATCH_ENCRYPT_H2C_BLS12381G1_";
+const HASH_G2_ELEMENT_DST: &[u8] = b"APTOS_BATCH_ENCRYPTION_HASH_G2_ELEMENT";
 
 /// Type alias for the hash-to-curve hasher for BLS12-381 G1.
 type G1Hasher = MapToCurveBasedHasher<G1Projective, DefaultFieldHasher<Sha256>, WBMap<G1Config>>;
 
 /// Hash a G2 element to a G1 element using the standard hash-to-curve algorithm (RFC 9380).
-/// This uses the WB (Wahby-Boneh) map which is the recommended approach for BLS12-381.
+/// This uses the WB (Wahby-Boneh) map.
 pub fn hash_g2_element(g2_element: G2Affine) -> Result<G1Affine> {
     let mut bytes = Vec::new();
     g2_element.serialize_compressed(&mut bytes)?;
 
     let hasher =
-        G1Hasher::new(HASH_TO_G1_DST).map_err(|_| BatchEncryptionError::Hash2CurveFailure)?;
+        G1Hasher::new(HASH_G2_ELEMENT_DST).map_err(|_| BatchEncryptionError::Hash2CurveFailure)?;
     let point: G1Affine = hasher
         .hash(&bytes)
         .map_err(|_| BatchEncryptionError::Hash2CurveFailure)?;
