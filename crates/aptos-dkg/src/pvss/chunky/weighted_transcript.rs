@@ -151,7 +151,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
                 ),
                 &self.sharing_proof.SoK,
                 &sok_cntxt,
-                &mut rand::thread_rng(), // TODO: make `rng` a parameter of fn verify()?
+                rng,
             ) {
                 bail!("PoK verification failed: {:?}", err);
             }
@@ -162,7 +162,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
                 sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize,
                 pp.ell,
                 &self.sharing_proof.range_proof_commitment,
-                &mut rand::thread_rng(), // TODO: make `rng` a parameter of fn verify()?
+                rng,
             ) {
                 bail!("Range proof batch verification failed: {:?}", err);
             }
