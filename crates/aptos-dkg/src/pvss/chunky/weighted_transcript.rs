@@ -231,79 +231,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
     }
 }
 
-impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::TranscriptCore
-    for Subtranscript<E>
-{
-    type DealtPubKey = keys::DealtPubKey<E>;
-    type DealtPubKeyShare = Vec<keys::DealtPubKeyShare<E>>;
-    type DealtSecretKey = keys::DealtSecretKey<E::ScalarField>;
-    type DealtSecretKeyShare = Vec<keys::DealtSecretKeyShare<E::ScalarField>>;
-    type DecryptPrivKey = keys::DecryptPrivKey<E>;
-    type EncryptPubKey = keys::EncryptPubKey<E>;
-    type PublicParameters = PublicParameters<E>;
-    type SecretSharingConfig = SecretSharingConfig<E>;
-
-    #[allow(non_snake_case)]
-    fn get_public_key_share(
-        &self,
-        _sc: &Self::SecretSharingConfig,
-        player: &Player,
-    ) -> Self::DealtPubKeyShare {
-        self.Vs[player.id]
-            .iter()
-            .map(|&V_i| keys::DealtPubKeyShare::<E>::new(keys::DealtPubKey::new(V_i)))
-            .collect()
-    }
-
-    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
-        Self::DealtPubKey::new(self.V0)
-    }
-
-    #[allow(non_snake_case)]
-    fn decrypt_own_share(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        player: &Player,
-        dk: &Self::DecryptPrivKey,
-        pp: &Self::PublicParameters,
-    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        let Cs = &self.Cs[player.id];
-        debug_assert_eq!(Cs.len(), sc.get_player_weight(player));
-
-        if !Cs.is_empty() {
-            if let Some(first_key) = self.Rs.first() {
-                debug_assert_eq!(
-                    first_key.len(),
-                    Cs[0].len(),
-                    "Number of ephemeral keys does not match the number of ciphertext chunks"
-                );
-            }
-        }
-
-        let pk_shares = self.get_public_key_share(sc, player);
-
-        let sk_shares: Vec<_> = decrypt_chunked_scalars(
-            &Cs,
-            &self.Rs,
-            &dk.dk,
-            &pp.pp_elgamal,
-            &pp.dlog_table,
-            pp.get_dlog_range_bound(),
-            pp.ell,
-        );
-
-        (
-            Scalar::vec_from_inner(sk_shares),
-            pk_shares, // TODO: review this formalism... why do we need this here?
-        )
-    }
-}
-
-impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Subtranscript
-    for Subtranscript<E>
-{
-}
-
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct SharingProof<P: Pairing> {
@@ -380,8 +307,6 @@ type SokContext<'a, A: Serialize + Clone> = (
     usize,   // This is for the player id
     Vec<u8>, // This is for the DST
 );
-
-use crate::pvss::chunky::chunked_elgamal::decrypt_chunked_scalars;
 
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Transcript
     for Transcript<E>
