@@ -16,7 +16,7 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use aptos_dkg::pvss::{
-    traits::{Reconstructable as _, Subtranscript},
+    traits::{Reconstructable as _, TranscriptCore},
     Player,
 };
 use ark_ff::UniformRand as _;
@@ -47,11 +47,11 @@ impl BatchThresholdEncryption for FPTX {
 
     fn setup(
         _digest_key: &Self::DigestKey,
-        _pvss_public_params: &<Self::SubTranscript as Subtranscript>::PublicParameters,
+        _pvss_public_params: &<Self::SubTranscript as TranscriptCore>::PublicParameters,
         _subtranscript: &Self::SubTranscript,
         _threshold_config: &Self::ThresholdConfig,
         _current_player: Player,
-        _msk_share_decryption_key: &<Self::SubTranscript as Subtranscript>::DecryptPrivKey,
+        _msk_share_decryption_key: &<Self::SubTranscript as TranscriptCore>::DecryptPrivKey,
     ) -> Result<(
         Self::EncryptionKey,
         Vec<Self::VerificationKey>,

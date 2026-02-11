@@ -81,7 +81,8 @@ use aptos_crypto::{SigningKey, Uniform};
 use aptos_dkg::pvss::{
     test_utils::NoAux,
     traits::{
-        transcript::HasAggregatableSubtranscript, Convert, HasEncryptionPublicParams, Transcript,
+        transcript::{HasAggregatableSubtranscript, TranscriptCore},
+        Convert, HasEncryptionPublicParams, Transcript,
     },
 };
 
@@ -91,7 +92,7 @@ fn weighted_smoke_with_pvss() {
     let mut rng_aptos = rand::thread_rng();
 
     let tc = WeightedConfigArkworks::new(3, vec![1, 2, 5]).unwrap();
-    let pp = <T as Transcript>::PublicParameters::new_with_commitment_base(
+    let pp = <T as TranscriptCore>::PublicParameters::new_with_commitment_base(
         tc.get_total_weight(),
         aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_TESTING,
         tc.get_total_num_players(),
@@ -107,10 +108,10 @@ fn weighted_smoke_with_pvss() {
         .map(|ssk| ssk.verifying_key())
         .collect::<Vec<<T as Transcript>::SigningPubKey>>();
 
-    let dks: Vec<<T as Transcript>::DecryptPrivKey> = (0..tc.get_total_num_players())
-        .map(|_| <T as Transcript>::DecryptPrivKey::generate(&mut rng_aptos))
+    let dks: Vec<<T as TranscriptCore>::DecryptPrivKey> = (0..tc.get_total_num_players())
+        .map(|_| <T as TranscriptCore>::DecryptPrivKey::generate(&mut rng_aptos))
         .collect();
-    let eks: Vec<<T as Transcript>::EncryptPubKey> = dks
+    let eks: Vec<<T as TranscriptCore>::EncryptPubKey> = dks
         .iter()
         .map(|dk| dk.to(pp.get_encryption_public_params()))
         .collect();

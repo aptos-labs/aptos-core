@@ -70,7 +70,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::bls12381::PrivateKey;
 use aptos_dkg::{
-    pvss::{traits::Transcript, Player},
+    pvss::{traits::TranscriptCore, Player},
     weighted_vuf::traits::WeightedVUF,
 };
 use aptos_event_notifications::ReconfigNotificationListener;

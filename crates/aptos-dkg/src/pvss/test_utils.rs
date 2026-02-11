@@ -3,7 +3,7 @@
 
 use crate::pvss::{
     traits::{
-        transcript::{Transcript, WithMaxNumShares},
+        transcript::{Transcript, TranscriptCore, WithMaxNumShares},
         Convert, HasEncryptionPublicParams, Subtranscript,
     },
     Player, ThresholdConfigBlstrs,
@@ -129,8 +129,8 @@ pub fn generate_keys_and_secrets<T: Transcript, R: rand_core::RngCore + rand_cor
     Vec<T::EncryptPubKey>,
     Vec<T::InputSecret>,
     T::InputSecret,
-    <T as Transcript>::DealtSecretKey,
-    <T as Transcript>::DealtPubKey,
+    <T as TranscriptCore>::DealtSecretKey,
+    <T as TranscriptCore>::DealtPubKey,
 ) {
     let ssks = (0..sc.get_total_num_players())
         .map(|_| T::SigningSecretKey::generate(rng))
@@ -339,12 +339,12 @@ pub fn get_weighted_configs_for_benchmarking<T: traits::ThresholdConfig>() -> Ve
 }
 
 pub fn reconstruct_dealt_secret_key_randomly<R, T: Transcript>(
-    sc: &<T as Transcript>::SecretSharingConfig,
+    sc: &<T as TranscriptCore>::SecretSharingConfig,
     rng: &mut R,
-    dks: &Vec<<T as Transcript>::DecryptPrivKey>,
+    dks: &Vec<<T as TranscriptCore>::DecryptPrivKey>,
     trx: T,
     pp: &T::PublicParameters,
-) -> <T as Transcript>::DealtSecretKey
+) -> <T as TranscriptCore>::DealtSecretKey
 where
     R: rand_core::RngCore,
 {
@@ -365,12 +365,12 @@ where
 }
 
 pub fn reconstruct_dealt_secret_key_randomly_subtranscript<R, T: Subtranscript>(
-    sc: &<T as Subtranscript>::SecretSharingConfig,
+    sc: &<T as TranscriptCore>::SecretSharingConfig,
     rng: &mut R,
-    dks: &Vec<<T as Subtranscript>::DecryptPrivKey>,
+    dks: &Vec<<T as TranscriptCore>::DecryptPrivKey>,
     trx: T,
-    pp: &<T as Subtranscript>::PublicParameters,
-) -> <T as Subtranscript>::DealtSecretKey
+    pp: &<T as TranscriptCore>::PublicParameters,
+) -> <T as TranscriptCore>::DealtSecretKey
 where
     R: rand_core::RngCore,
 {
@@ -387,5 +387,5 @@ where
         })
         .collect::<Vec<(Player, T::DealtSecretKeyShare)>>();
 
-    <T as Subtranscript>::DealtSecretKey::reconstruct(sc, &players_and_shares).unwrap()
+    <T as TranscriptCore>::DealtSecretKey::reconstruct(sc, &players_and_shares).unwrap()
 }

@@ -349,7 +349,7 @@ mod tests {
     use aptos_consensus_types::common::Author;
     use aptos_crypto::{bls12381, HashValue, Uniform};
     use aptos_dkg::{
-        pvss::{traits::Transcript, Player, WeightedConfigBlstrs},
+        pvss::{traits::TranscriptCore, Player, WeightedConfigBlstrs},
         weighted_vuf::traits::WeightedVUF,
     };
     use aptos_types::{
