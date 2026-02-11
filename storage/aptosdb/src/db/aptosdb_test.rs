@@ -251,6 +251,7 @@ pub fn test_state_merkle_pruning_impl(
                 prune_window: 10,
                 batch_size: 1,
             },
+            ..Default::default()
         },
         RocksdbConfigs::default(),
         false, /* enable_indexer */
