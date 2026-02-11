@@ -406,10 +406,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 poly_randomness: Scalar(r),
                 hiding_kzg_randomness: Scalar(delta_rho),
             },
-            &two_term_msm::CodomainShape(hatC - comm.0),
+            two_term_msm::CodomainShape(hatC - comm.0),
             &Self::DST,
             rng,
-        );
+        )
+        .0; // TODO: we're throwing away the normalised statment here, fix it
 
         // Step 3b
         fiat_shamir::append_sigma_proof::<E>(&mut fs_t, &pi_PoK);
@@ -649,12 +650,13 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     }
 
     #[allow(non_snake_case)]
-    fn verify(
+    fn verify<R: RngCore + CryptoRng>(
         &self,
         vk: &Self::VerificationKey,
         n: usize,
         ell: u8,
         comm: &Self::Commitment,
+        rng: &mut R,
     ) -> anyhow::Result<()> {
         let mut fs_t = merlin::Transcript::new(Self::DST);
 
@@ -703,6 +705,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             &(two_term_msm::CodomainShape((*hatC - comm.0).into_affine())),
             pi_PoK,
             &Self::DST,
+            rng,
         )?;
 
         // Step 4a
@@ -962,7 +965,7 @@ pub mod two_term_msm {
             )
         }
 
-        fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
+        fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
             <Homomorphism<C> as fixed_base_msms::Trait>::normalize_output(value)
         }
     }

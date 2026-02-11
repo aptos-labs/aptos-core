@@ -18,12 +18,11 @@ use aptos_crypto::{
     utils,
 };
 use ark_ec::CurveGroup;
-use ark_ff::{Field, Fp, FpConfig, PrimeField};
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::UniformRand;
+use ark_ff::{Field, Fp, FpConfig, PrimeField, Zero};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress};
 use rand_core::{CryptoRng, RngCore};
 use serde::Serialize;
-use std::fmt::Debug;
+use std::{collections::HashMap, fmt::Debug};
 
 // `CurveGroup` is needed here because the code does `into_affine()` // TODO: not anymore!!!
 pub trait Trait<C: CurveGroup>:
@@ -42,27 +41,29 @@ pub trait Trait<C: CurveGroup>:
     fn prove<Ct: Serialize, R: RngCore + CryptoRng>(
         &self,
         witness: &Self::Domain,
-        statement: &Self::Codomain,
+        statement: Self::Codomain,
         cntxt: &Ct, // for SoK purposes
         rng: &mut R,
-    ) -> Proof<<Self as fixed_base_msms::Trait>::Scalar, Self> { // or C::ScalarField
+    ) -> (Proof<<Self as fixed_base_msms::Trait>::Scalar, Self>, <Self as homomorphism::Trait>::CodomainNormalized) { // or C::ScalarField
         prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
     }
 
     #[allow(non_snake_case)]
-    fn verify<Ct: Serialize, H>(
+    fn verify<Ct: Serialize, H, R: RngCore + CryptoRng>(
         &self,
         public_statement: &Self::CodomainNormalized,
-        proof: &Proof<C::ScalarField, H>, // Would like to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
+        proof: &Proof<C::ScalarField, H>, // Would seem natural to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
         cntxt: &Ct,
+        rng: &mut R,
     ) -> anyhow::Result<()>
     where
         H: homomorphism::Trait<Domain = Self::Domain, CodomainNormalized = Self::CodomainNormalized>, // need this because `H` is technically different from `Self` due to lifetime changes
     {
-        let msm_terms = self.msm_terms_for_verify::<_, H>(
+        let msm_terms = self.msm_terms_for_verify::<_, H, _>(
             public_statement,
             proof,
             cntxt,
+            rng,
         );
 
         let msm_result = Self::msm_eval(msm_terms);
@@ -72,12 +73,13 @@ pub trait Trait<C: CurveGroup>:
     }
 
     #[allow(non_snake_case)]
-    fn compute_verifier_challenges<Ct>(
+    fn compute_verifier_challenges<Ct, R: RngCore + CryptoRng>(
         &self,
         public_statement: &Self::CodomainNormalized,
         prover_first_message: &Self::CodomainNormalized, // TODO: this input will have to be modified for `compact` proofs; we just need something serializable, could pass `FirstProofItem<F, H>` instead
         cntxt: &Ct,
         number_of_beta_powers: usize,
+        rng: &mut R,
     ) -> (C::ScalarField, Vec<C::ScalarField>)
     where
         Ct: Serialize,
@@ -93,8 +95,7 @@ pub trait Trait<C: CurveGroup>:
         );
 
         // --- Random verifier challenge β ---
-        let mut rng = ark_std::rand::thread_rng(); // TODO: move this to trait!!
-        let beta = C::ScalarField::rand(&mut rng);
+        let beta = sample_field_element(rng);
         let powers_of_beta = utils::powers(beta, number_of_beta_powers);
 
         (c, powers_of_beta)
@@ -102,11 +103,12 @@ pub trait Trait<C: CurveGroup>:
 
     // Returns the MSM terms that `verify()` needs
     #[allow(non_snake_case)]
-    fn msm_terms_for_verify<Ct: Serialize, H>(
+    fn msm_terms_for_verify<Ct: Serialize, H, R: RngCore + CryptoRng>(
         &self,
         public_statement: &Self::CodomainNormalized,
         proof: &Proof<C::ScalarField, H>,
         cntxt: &Ct,
+        rng: &mut R,
     ) -> Self::MsmInput
     where
         H: homomorphism::Trait<Domain = Self::Domain, CodomainNormalized = Self::CodomainNormalized>, // Need this because the lifetime was changed
@@ -120,7 +122,7 @@ pub trait Trait<C: CurveGroup>:
 
         let number_of_beta_powers = public_statement.clone().into_iter().count(); // TODO: maybe pass the into_iter version in merge_msm_terms?
 
-        let (c, powers_of_beta) = self.compute_verifier_challenges(public_statement, prover_first_message, cntxt, number_of_beta_powers);
+        let (c, powers_of_beta) = self.compute_verifier_challenges(public_statement, prover_first_message, cntxt, number_of_beta_powers, rng);
 
         let msm_terms_for_prover_response = self.msm_terms(&proof.z);
 
@@ -145,16 +147,16 @@ pub trait Trait<C: CurveGroup>:
         c: C::ScalarField,
     ) -> Self::MsmInput
     {
-        let mut final_basis = Vec::new();
-        let mut final_scalars = Vec::new();
+        // Aggregate (basis, scalar) pairs so each basis appears at most once (scalars summed).
+        // Key = canonical serialization of basis (curve points don't implement Hash).
+        let mut aggregated: HashMap<Vec<u8>, (C::Affine, C::ScalarField)> = HashMap::new();
 
-
-    for (((term, A), P), beta_power) in msm_terms
-        .into_iter()
-        .zip(prover_first_message.clone().into_iter())
-        .zip(statement.clone().into_iter())
-        .zip(powers_of_beta)
-    {
+        for (((term, A), P), beta_power) in msm_terms
+            .into_iter()
+            .zip(prover_first_message.clone().into_iter())
+            .zip(statement.clone().into_iter())
+            .zip(powers_of_beta)
+        {
             let mut bases = term.bases().to_vec();
             let mut scalars = term.scalars().to_vec();
 
@@ -167,14 +169,28 @@ pub trait Trait<C: CurveGroup>:
             bases.push(A); // this is the element `A` from the prover's first message
             bases.push(P); // this is the element `P` from the statement, but we'll need `P^c`
 
-            scalars.push(- (*beta_power));
+            scalars.push(-(*beta_power));
             scalars.push(-c * beta_power);
 
-            final_basis.extend(bases);
-            final_scalars.extend(scalars);
+            for (base, scalar) in bases.into_iter().zip(scalars) {
+                let mut key = Vec::new();
+                base.serialize_with_mode(&mut key, Compress::No)
+                    .expect("basis serialization");
+                aggregated
+                    .entry(key)
+                    .and_modify(|(_, s)| *s += scalar)
+                    .or_insert((base, scalar));
+            }
         }
 
-        Self::MsmInput::new(final_basis, final_scalars).expect("Something went wrong constructing MSM input")
+        // Build final MSM input, skipping terms with zero scalar (0·P = identity).
+        let (final_basis, final_scalars): (Vec<_>, Vec<_>) = aggregated
+            .into_values()
+            .filter(|(_, s)| !s.is_zero())
+            .unzip();
+
+        Self::MsmInput::new(final_basis, final_scalars)
+            .expect("Something went wrong constructing MSM input")
     }
 }
 
@@ -296,12 +312,12 @@ where
 pub fn prove_homomorphism<Ct: Serialize, F: PrimeField, H: homomorphism::Trait, R>(
     homomorphism: &H,
     witness: &H::Domain,
-    statement: &H::Codomain,
+    statement: H::Codomain,
     cntxt: &Ct,
     store_prover_commitment: bool, // true = store prover's commitment, false = store Fiat-Shamir challenge
     rng: &mut R,
     dst: &[u8],
-) -> Proof<F, H>
+) -> (Proof<F, H>, H::CodomainNormalized)
 where
     H::Domain: Witness<F>,
     H::CodomainNormalized: Statement,
@@ -312,13 +328,14 @@ where
 
     // Step 2: Compute commitment A = Ψ(r)
     let A_proj = homomorphism.apply(&r);
-    let A = homomorphism.normalize(&A_proj);
+    let A = homomorphism.normalize(A_proj);
+    let normalized_statement = homomorphism.normalize(statement); // TODO: combine these two normalisations
 
     // Step 3: Obtain Fiat-Shamir challenge
     let c = fiat_shamir_challenge_for_sigma_protocol::<_, F, H>(
         cntxt,
         homomorphism,
-        &homomorphism.normalize(&statement),
+        &normalized_statement,
         &A,
         dst,
     );
@@ -333,8 +350,11 @@ where
         FirstProofItem::Challenge(c)
     };
 
-    Proof {
-        first_proof_item,
-        z,
-    }
+    (
+        Proof {
+            first_proof_item,
+            z,
+        },
+        normalized_statement,
+    )
 }

@@ -8,6 +8,7 @@ use aptos_logger::warn;
 use aptos_types::dkg::chunky_dkg::{ChunkyDKGConfig, ChunkyTranscript};
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use move_core_types::account_address::AccountAddress;
+use rand::thread_rng;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -137,6 +138,7 @@ impl MissingTranscriptFetcher {
                                             &transcript_response.transcript_bytes,
                                         ) {
                                             // TODO(ibalajiarun): There is indexing in verify method which can panic.
+                                            let mut rng = thread_rng();
                                             if transcript
                                                 .verify(
                                                     &self.dkg_config.threshold_config,
@@ -144,6 +146,7 @@ impl MissingTranscriptFetcher {
                                                     &signing_pubkeys,
                                                     &self.dkg_config.eks,
                                                     &self.dkg_config.session_metadata,
+                                                    &mut rng,
                                                 )
                                                 .is_ok()
                                             {
