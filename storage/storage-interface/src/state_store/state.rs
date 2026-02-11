@@ -399,7 +399,7 @@ pub struct LedgerState {
 
 impl LedgerState {
     pub fn new(latest: State, last_checkpoint: State) -> Self {
-        assert!(latest.is_descendant_of(&latest));
+        assert!(latest.is_descendant_of(&last_checkpoint));
 
         Self {
             latest,
