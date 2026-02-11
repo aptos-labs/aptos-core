@@ -304,7 +304,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "8.0.0"
+version = "8.1.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -4700,6 +4700,7 @@ dependencies = [
  "anyhow",
  "aptos-api-types",
  "aptos-crypto",
+ "aptos-gas-profiling",
  "aptos-resource-viewer",
  "aptos-rest-client",
  "aptos-transaction-simulation",

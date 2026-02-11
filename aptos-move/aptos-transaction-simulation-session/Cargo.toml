@@ -25,6 +25,7 @@ move-core-types = { workspace = true }
 
 aptos-api-types = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-gas-profiling = { workspace = true }
 aptos-resource-viewer = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-transaction-simulation = { workspace = true }
