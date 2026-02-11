@@ -1,0 +1,15 @@
+---
+remote_endpoint: ~
+name: "disable-randomness-fast-path"
+proposals:
+  - name: step_1_disable_randomness-fast-path
+    metadata:
+      title: "Disable randomness fast path"
+      description: "Fast-path randomness shares are no longer help with block latency and should be disabled to save consensus computational cost."
+      discussion_url: "https://github.com/aptos-labs/aptos-core/issues/18706"
+    execution_mode: MultiStep
+    update_sequence:
+      - Randomness:
+          V1:
+            secrecy_threshold_in_percentage: 50
+            reconstruct_threshold_in_percentage: 66
