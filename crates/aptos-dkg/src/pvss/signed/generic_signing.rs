@@ -158,13 +158,14 @@ impl<
         T::get_subtranscript(&self.trs)
     }
 
-    fn verify<A: Serialize + Clone>(
+    fn verify<A: Serialize + Clone, R: RngCore + CryptoRng>(
         &self,
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         spks: &[Self::SigningPubKey],
         eks: &[Self::EncryptPubKey],
         sid: &A,
+        rng: &mut R,
     ) -> anyhow::Result<()> {
         self.sig.verify(
             &SessionContribution {
@@ -174,6 +175,6 @@ impl<
             &spks[self.get_dealers()[0].id],
         )?;
 
-        T::verify(&self.trs, sc, pp, spks, eks, sid)
+        T::verify(&self.trs, sc, pp, spks, eks, sid, rng)
     }
 }
