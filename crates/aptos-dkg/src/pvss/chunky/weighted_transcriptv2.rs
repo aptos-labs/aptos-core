@@ -33,6 +33,7 @@ use crate::{
 use anyhow::bail;
 use aptos_crypto::{
     arkworks::{
+        msm::verify_msm_terms_with_start,
         random::{
             sample_field_elements, unsafe_random_point, unsafe_random_point_group,
             unsafe_random_points, UniformRand,
@@ -120,44 +121,47 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             DST.to_vec(),
         ); // As above, this is a bit hacky... though we have access to `self` now
 
+        let mut rng = rand::thread_rng(); // TODO: make `rng` a parameter of fn verify()?
+
         {
-            // Verify the PoK
-            let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
-            let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
-                SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,
-                SrsBasis::PowersOfTau { .. } => {
-                    bail!("Expected a Lagrange basis, received powers of tau basis instead")
-                },
-            };
-            let hom = hkzg_chunked_elgamal_commit::Homomorphism::<E>::new(
-                lagr_g1,
-                pp.pk_range_proof.ck_S.xi_1,
-                &pp.pp_elgamal,
-                &pp.G2_table,
-                &eks_inner,
-                pp.get_commitment_base(),
-                pp.ell,
-            );
-            if let Err(err) = hom.verify(
-                &TupleCodomainShape(
-                    TupleCodomainShape(
-                        sigma_protocol::homomorphism::TrivialShape(
-                            self.sharing_proof.range_proof_commitment.0.into_affine(), // Because it's not affine by default. Should probably change that
-                        ),
-                        chunked_elgamal::WeightedCodomainShape {
-                            chunks: self.subtrs.Cs.clone(),
-                            randomness: self.subtrs.Rs.clone(),
-                        },
-                    ),
-                    chunked_scalar_mul::CodomainShape(
-                        self.subtrs.Vs.iter().flatten().cloned().collect(),
-                    ),
-                ),
-                &self.sharing_proof.SoK,
-                &sok_cntxt,
-            ) {
-                bail!("PoK verification failed: {:?}", err);
-            }
+            // // Verify the PoK
+            // let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
+            // let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
+            //     SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,
+            //     SrsBasis::PowersOfTau { .. } => {
+            //         bail!("Expected a Lagrange basis, received powers of tau basis instead")
+            //     },
+            // };
+            // let hom = hkzg_chunked_elgamal_commit::Homomorphism::<E>::new(
+            //     lagr_g1,
+            //     pp.pk_range_proof.ck_S.xi_1,
+            //     &pp.pp_elgamal,
+            //     &pp.G2_table,
+            //     &eks_inner,
+            //     pp.get_commitment_base(),
+            //     pp.ell,
+            // );
+            // if let Err(err) = hom.verify(
+            //     &TupleCodomainShape(
+            //         TupleCodomainShape(
+            //             sigma_protocol::homomorphism::TrivialShape(
+            //                 self.sharing_proof.range_proof_commitment.0.into_affine(), // Because it's not affine by default. Should probably change that
+            //             ),
+            //             chunked_elgamal::WeightedCodomainShape {
+            //                 chunks: self.subtrs.Cs.clone(),
+            //                 randomness: self.subtrs.Rs.clone(),
+            //             },
+            //         ),
+            //         chunked_scalar_mul::CodomainShape(
+            //             self.subtrs.Vs.iter().flatten().cloned().collect(),
+            //         ),
+            //     ),
+            //     &self.sharing_proof.SoK,
+            //     &sok_cntxt,
+            //     &mut rng,
+            // ) {
+            //     bail!("PoK verification failed: {:?}", err);
+            // }
 
             // Verify the range proof
             if let Err(err) = self.sharing_proof.range_proof.verify(
@@ -171,8 +175,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             }
         }
 
-        let mut rng = rand::thread_rng(); // TODO: make `rng` a parameter of fn verify()?
-
         // Do the SCRAPE LDT
         let ldt = LowDegreeTest::random(
             &mut rng,
@@ -185,7 +187,54 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         let mut Vs_flat: Vec<E::G2Affine> = self.subtrs.Vs.iter().flatten().copied().collect();
         Vs_flat.push(self.subtrs.V0);
         // could add an assert_eq here with sc.get_total_weight()
-        ldt.low_degree_test_group::<E::G2>(&Vs_flat)?;
+        let ldt_msm_terms = ldt.ldt_msm_input::<E::G2>(&Vs_flat)?;
+
+        let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
+        let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
+            SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,
+            SrsBasis::PowersOfTau { .. } => {
+                bail!("Expected a Lagrange basis, received powers of tau basis instead")
+            },
+        };
+        let hom = hkzg_chunked_elgamal_commit::Homomorphism::<E>::new(
+            lagr_g1,
+            pp.pk_range_proof.ck_S.xi_1,
+            &pp.pp_elgamal,
+            &pp.G2_table,
+            &eks_inner,
+            pp.get_commitment_base(),
+            pp.ell,
+        );
+
+        let (first_msm_terms, second_msm_terms) = hom.msm_terms_for_verify(
+            &TupleCodomainShape(
+                TupleCodomainShape(
+                    sigma_protocol::homomorphism::TrivialShape(
+                        self.sharing_proof.range_proof_commitment.0.into_affine(), // Because it's not affine by default. Should probably change that
+                    ),
+                    chunked_elgamal::WeightedCodomainShape {
+                        chunks: self.subtrs.Cs.clone(),
+                        randomness: self.subtrs.Rs.clone(),
+                    },
+                ),
+                chunked_scalar_mul::CodomainShape(
+                    self.subtrs.Vs.iter().flatten().cloned().collect(),
+                ),
+            ),
+            &self.sharing_proof.SoK,
+            &sok_cntxt,
+            &mut rng,
+        );
+
+        hom.check_first_msm_eval(first_msm_terms)?;
+
+        verify_msm_terms_with_start::<E::G2>(
+            vec![ldt_msm_terms],
+            second_msm_terms,
+            sample_field_elements(1, &mut rng),
+        )?;
+
+        // ldt.low_degree_test_group::<E::G2>(&Vs_flat)?;
 
         // let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
         // let hom = hkzg_chunked_elgamal::WeightedHomomorphism::new(

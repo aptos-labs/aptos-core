@@ -11,13 +11,17 @@ use crate::{
     },
 };
 use anyhow::ensure;
-use aptos_crypto::{arkworks::msm::IsMsmInput, utils};
+use aptos_crypto::{
+    arkworks::{msm::IsMsmInput, random::sample_field_element},
+    utils,
+};
 use ark_ec::{pairing::Pairing, CurveGroup};
-use ark_ff::{UniformRand, Zero};
+use ark_ff::Zero;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid,
 };
 use ark_std::io::Write;
+use rand_core::{CryptoRng, RngCore};
 use serde::Serialize;
 use std::fmt::Debug;
 
@@ -305,7 +309,21 @@ where
         (terms1, terms2)
     }
 
-    pub fn prove<Ct: Serialize, R: rand_core::RngCore + rand_core::CryptoRng>(
+    // TODO: maybe remove, see comment below
+    pub fn check_first_msm_eval(&self, input: H1::MsmInput) -> anyhow::Result<()> {
+        let result = H1::msm_eval(input);
+        ensure!(result == H1::MsmOutput::zero());
+        Ok(())
+    }
+
+    // TODO: Doesn't get used atm... so we're implicitly mixing different MSM code :-/
+    pub fn check_second_msm_eval(&self, input: H2::MsmInput) -> anyhow::Result<()> {
+        let result = H2::msm_eval(input);
+        ensure!(result == H2::MsmOutput::zero());
+        Ok(())
+    }
+
+    pub fn prove<Ct: Serialize, R: RngCore + CryptoRng>(
         &self,
         witness: &<Self as homomorphism::Trait>::Domain,
         statement: <Self as homomorphism::Trait>::Codomain,
@@ -319,12 +337,12 @@ where
     }
 
     #[allow(non_snake_case)]
-    pub fn verify<Ct: Serialize, H>(
+    pub fn verify<Ct: Serialize, H, R: RngCore + CryptoRng>(
         &self,
         public_statement: &<Self as homomorphism::Trait>::CodomainNormalized,
         proof: &Proof<H1::Scalar, H>, // Would like to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
         cntxt: &Ct,
-        // TODO: add rng here?
+        rng: &mut R,
     ) -> anyhow::Result<()>
     where
         H: homomorphism::Trait<
@@ -333,7 +351,7 @@ where
         >,
     {
         let (first_msm_terms, second_msm_terms) =
-            self.msm_terms_for_verify::<_, H>(public_statement, proof, cntxt);
+            self.msm_terms_for_verify::<_, H, _>(public_statement, proof, cntxt, rng);
 
         let first_msm_result = H1::msm_eval(first_msm_terms);
         ensure!(first_msm_result == H1::MsmOutput::zero());
@@ -345,11 +363,12 @@ where
     }
 
     #[allow(non_snake_case)]
-    fn msm_terms_for_verify<Ct: Serialize, H>(
+    pub fn msm_terms_for_verify<Ct: Serialize, H, R: RngCore + CryptoRng>(
         &self,
         public_statement: &<Self as homomorphism::Trait>::CodomainNormalized,
         proof: &Proof<H1::Scalar, H>,
         cntxt: &Ct,
+        rng: &mut R,
     ) -> (H1::MsmInput, H2::MsmInput)
     where
         H: homomorphism::Trait<
@@ -371,8 +390,7 @@ where
             &self.dst(),
         );
 
-        let mut rng = ark_std::rand::thread_rng(); // TODO: make this part of the function input?
-        let beta = H1::Scalar::rand(&mut rng); // verifier-specific challenge
+        let beta = sample_field_element(rng); // verifier-specific challenge
         let len1 = public_statement.0.clone().into_iter().count(); // hmm maybe pass the into_iter version in merge_msm_terms?
         let len2 = public_statement.1.clone().into_iter().count();
         let powers_of_beta = utils::powers(beta, len1 + len2);
