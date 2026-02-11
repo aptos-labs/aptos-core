@@ -1,0 +1,14 @@
+//# publish
+module 0x1::M
+struct R
+  b: bool
+
+struct Box<T0>
+  x: T0
+
+fun foo(l0: Box<R>): Box<R>
+    local l1: Box<R>
+    copy_loc l0
+    st_loc l1
+    move_loc l1
+    ret

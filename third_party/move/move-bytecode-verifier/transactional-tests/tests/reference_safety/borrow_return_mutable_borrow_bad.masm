@@ -1,0 +1,21 @@
+//# publish
+module 0x1::M
+struct X
+  f: Y
+
+struct Y
+  g: u64
+  h: u64
+
+fun t1(l0: &mut X): (&mut Y, &u64)
+    local l1: &mut Y
+    local l2: &u64
+    move_loc l0
+    mut_borrow_field X, f
+    st_loc l1
+    copy_loc l1
+    borrow_field Y, g
+    st_loc l2
+    move_loc l1
+    move_loc l2
+    ret

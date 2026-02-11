@@ -29,7 +29,7 @@ mod tests {
     // Enums
 
     fn enum_layout() -> MoveTypeLayout {
-        MoveTypeLayout::Struct(MoveStructLayout::RuntimeVariants(vec![
+        MoveTypeLayout::new_struct(MoveStructLayout::RuntimeVariants(vec![
             vec![MoveTypeLayout::U64],
             vec![],
             vec![MoveTypeLayout::Bool, MoveTypeLayout::U32],
@@ -463,8 +463,8 @@ mod tests {
             Value::delayed_value(DelayedFieldID::new_with_width(12, 60));
 
         // First field is a string, second field is a padding to ensure constant size.
-        let derived_string_layout = Struct(Runtime(vec![
-            Struct(Runtime(vec![Vector(Box::new(U8))])),
+        let derived_string_layout = MoveTypeLayout::new_struct(Runtime(vec![
+            MoveTypeLayout::new_struct(Runtime(vec![Vector(Box::new(U8))])),
             Vector(Box::new(U8)),
         ]));
 
@@ -494,7 +494,7 @@ mod tests {
                     Value::bool(true),
                     Value::vector_u32(vec![1, 2, 3, 4, 5]),
                 ])),
-                Struct(Runtime(vec![Bool, Vector(Box::new(U32))])),
+                MoveTypeLayout::new_struct(Runtime(vec![Bool, Vector(Box::new(U32))])),
             ),
         ];
         for (value, layout) in good_values_layouts_sizes {

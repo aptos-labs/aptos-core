@@ -1498,7 +1498,7 @@ module aptos_framework::stake {
             let candidate = if (candidate_idx < num_cur_actives) {
                 cur_validator_set.active_validators.borrow(candidate_idx)
             } else {
-                cur_validator_set.pending_active.borrow(candidate_idx - num_cur_actives)
+                cur_validator_set.pending_active.borrow(num_candidates - 1 - candidate_idx)
             };
             let stake_pool = borrow_global<StakePool>(candidate.addr);
             let cur_active = coin::value(&stake_pool.active);
@@ -3391,7 +3391,10 @@ module aptos_framework::stake {
         set_validator_perf_at_least_one_block();
         timestamp::fast_forward_seconds(EPOCH_DURATION);
         reconfiguration_state::on_reconfig_start();
+        let actual = next_validator_consensus_infos().map(|i|validator_consensus_info::get_addr(&i));
         on_new_epoch();
+        let expected = cur_validator_consensus_infos().map(|i|validator_consensus_info::get_addr(&i));
+        assert!(expected == actual, 999);
         reconfiguration_state::on_reconfig_finish();
     }
 

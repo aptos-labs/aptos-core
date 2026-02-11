@@ -1,0 +1,32 @@
+//# publish
+module 0x42::A
+struct Coin has store
+  value: u64
+
+struct T
+  g: Coin
+
+public fun zero(): Coin
+    ld_u64 0
+    pack Coin
+    ret
+
+public fun new(l0: Coin): T
+    move_loc l0
+    pack T
+    ret
+
+
+
+//# run
+script
+use 0x42::A
+entry public fun main()
+    local l0: A::Coin
+    local l1: A::T
+    call A::zero
+    st_loc l0
+    move_loc l0
+    call A::new
+    st_loc l1
+    ret

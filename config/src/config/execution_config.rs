@@ -17,7 +17,7 @@ use std::{
 };
 
 // Default execution concurrency level
-pub const DEFAULT_EXECUTION_CONCURRENCY_LEVEL: u16 = 32;
+pub const DEFAULT_EXECUTION_CONCURRENCY_LEVEL: u16 = 16;
 
 // Genesis constants
 const GENESIS_BLOB_FILENAME: &str = "genesis.blob";

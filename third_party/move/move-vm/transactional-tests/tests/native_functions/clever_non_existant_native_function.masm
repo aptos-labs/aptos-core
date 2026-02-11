@@ -1,0 +1,17 @@
+//# publish
+module 0x42::Hash
+public native fun sha2_256(l0: vector<u8>): vector<u8>
+
+public native fun sha3_256(l0: vector<u8>): vector<u8>
+
+
+
+//# publish
+module 0x43::Hash
+public native fun sha2_256(l0: vector<u8>): vector<u8>
+
+
+
+//# publish
+module 0x44::Hash
+public native fun sha3_256(l0: vector<u8>): vector<u8>

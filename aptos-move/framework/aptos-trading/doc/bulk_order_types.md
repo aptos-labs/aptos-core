@@ -38,16 +38,7 @@ price levels with associated sizes.
 - **Order Management**: Helper functions for order state management and cleanup
 
 
-<a id="@Error_Codes:_4"></a>
-
-### Error Codes:
-
-- <code><a href="bulk_order_types.md#0x5_bulk_order_types_EUNEXPECTED_MATCH_PRICE">EUNEXPECTED_MATCH_PRICE</a></code>: Unexpected price during order matching
-- <code>EUNEXPECTED_MATCH_SIZE</code>: Unexpected size during order matching
-- <code><a href="bulk_order_types.md#0x5_bulk_order_types_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a></code>: Order mismatch during reinsertion validation
-
-
-<a id="@Usage_Example:_5"></a>
+<a id="@Usage_Example:_4"></a>
 
 ### Usage Example:
 
@@ -67,29 +58,28 @@ creation_time_micros
     -  [Key Data Structures:](#@Key_Data_Structures:_1)
         -  [1. BulkOrder](#@1._BulkOrder_2)
     -  [Core Functionality:](#@Core_Functionality:_3)
-    -  [Error Codes:](#@Error_Codes:_4)
-    -  [Usage Example:](#@Usage_Example:_5)
+    -  [Usage Example:](#@Usage_Example:_4)
 -  [Enum `BulkOrderRequest`](#0x5_bulk_order_types_BulkOrderRequest)
-    -  [Fields:](#@Fields:_6)
-    -  [Validation:](#@Validation:_7)
+    -  [Fields:](#@Fields:_5)
+    -  [Validation:](#@Validation:_6)
 -  [Enum `BulkOrder`](#0x5_bulk_order_types_BulkOrder)
-    -  [Fields:](#@Fields:_8)
+    -  [Fields:](#@Fields:_7)
 -  [Enum `BulkOrderPlaceResponse`](#0x5_bulk_order_types_BulkOrderPlaceResponse)
--  [Constants](#@Constants_9)
+-  [Constants](#@Constants_8)
 -  [Function `new_bulk_order`](#0x5_bulk_order_types_new_bulk_order)
-    -  [Arguments:](#@Arguments:_10)
+    -  [Arguments:](#@Arguments:_9)
 -  [Function `new_bulk_order_request`](#0x5_bulk_order_types_new_bulk_order_request)
-    -  [Arguments:](#@Arguments:_11)
-    -  [Returns:](#@Returns:_12)
-    -  [Aborts:](#@Aborts:_13)
+    -  [Arguments:](#@Arguments:_10)
+    -  [Returns:](#@Returns:_11)
+    -  [Aborts:](#@Aborts:_12)
 -  [Function `new_bulk_order_place_response_success`](#0x5_bulk_order_types_new_bulk_order_place_response_success)
 -  [Function `new_bulk_order_place_response_rejection`](#0x5_bulk_order_types_new_bulk_order_place_response_rejection)
 -  [Function `get_unique_priority_idx`](#0x5_bulk_order_types_get_unique_priority_idx)
-    -  [Arguments:](#@Arguments:_14)
-    -  [Returns:](#@Returns:_15)
+    -  [Arguments:](#@Arguments:_13)
+    -  [Returns:](#@Returns:_14)
 -  [Function `get_order_id`](#0x5_bulk_order_types_get_order_id)
-    -  [Arguments:](#@Arguments:_16)
-    -  [Returns:](#@Returns:_17)
+    -  [Arguments:](#@Arguments:_15)
+    -  [Returns:](#@Returns:_16)
 -  [Function `get_creation_time_micros`](#0x5_bulk_order_types_get_creation_time_micros)
 -  [Function `get_order_request`](#0x5_bulk_order_types_get_order_request)
 -  [Function `get_order_request_mut`](#0x5_bulk_order_types_get_order_request_mut)
@@ -97,27 +87,27 @@ creation_time_micros
 -  [Function `get_sequence_number`](#0x5_bulk_order_types_get_sequence_number)
 -  [Function `get_total_remaining_size`](#0x5_bulk_order_types_get_total_remaining_size)
 -  [Function `get_active_price`](#0x5_bulk_order_types_get_active_price)
-    -  [Arguments:](#@Arguments:_18)
-    -  [Returns:](#@Returns:_19)
+    -  [Arguments:](#@Arguments:_17)
+    -  [Returns:](#@Returns:_18)
 -  [Function `get_all_prices`](#0x5_bulk_order_types_get_all_prices)
 -  [Function `get_all_prices_mut`](#0x5_bulk_order_types_get_all_prices_mut)
 -  [Function `get_all_sizes`](#0x5_bulk_order_types_get_all_sizes)
 -  [Function `get_all_sizes_mut`](#0x5_bulk_order_types_get_all_sizes_mut)
 -  [Function `get_active_size`](#0x5_bulk_order_types_get_active_size)
-    -  [Arguments:](#@Arguments:_20)
-    -  [Returns:](#@Returns:_21)
+    -  [Arguments:](#@Arguments:_19)
+    -  [Returns:](#@Returns:_20)
 -  [Function `get_prices_and_sizes_mut`](#0x5_bulk_order_types_get_prices_and_sizes_mut)
 -  [Function `is_success_response`](#0x5_bulk_order_types_is_success_response)
 -  [Function `is_rejection_response`](#0x5_bulk_order_types_is_rejection_response)
 -  [Function `destroy_bulk_order_place_response_success`](#0x5_bulk_order_types_destroy_bulk_order_place_response_success)
 -  [Function `destroy_bulk_order_place_response_rejection`](#0x5_bulk_order_types_destroy_bulk_order_place_response_rejection)
 -  [Function `validate_not_zero_sizes`](#0x5_bulk_order_types_validate_not_zero_sizes)
-    -  [Arguments:](#@Arguments:_22)
+    -  [Arguments:](#@Arguments:_21)
 -  [Function `validate_price_ordering`](#0x5_bulk_order_types_validate_price_ordering)
-    -  [Arguments:](#@Arguments:_23)
+    -  [Arguments:](#@Arguments:_22)
 -  [Function `new_bulk_order_match`](#0x5_bulk_order_types_new_bulk_order_match)
 -  [Function `set_empty`](#0x5_bulk_order_types_set_empty)
-    -  [Arguments:](#@Arguments:_24)
+    -  [Arguments:](#@Arguments:_23)
 -  [Function `destroy_bulk_order`](#0x5_bulk_order_types_destroy_bulk_order)
 -  [Function `destroy_bulk_order_request`](#0x5_bulk_order_types_destroy_bulk_order_request)
 
@@ -137,7 +127,7 @@ creation_time_micros
 Request structure for placing a new bulk order with multiple price levels.
 
 
-<a id="@Fields:_6"></a>
+<a id="@Fields:_5"></a>
 
 ### Fields:
 
@@ -149,7 +139,7 @@ Request structure for placing a new bulk order with multiple price levels.
 - <code>metadata</code>: Additional metadata for the order
 
 
-<a id="@Validation:_7"></a>
+<a id="@Validation:_6"></a>
 
 ### Validation:
 
@@ -239,7 +229,7 @@ Each side can have multiple price levels with associated sizes. The order mainta
 both original and remaining sizes for tracking purposes.
 
 
-<a id="@Fields:_8"></a>
+<a id="@Fields:_7"></a>
 
 ### Fields:
 
@@ -401,43 +391,16 @@ both original and remaining sizes for tracking purposes.
 
 </details>
 
-<a id="@Constants_9"></a>
+<a id="@Constants_8"></a>
 
 ## Constants
-
-
-<a id="0x5_bulk_order_types_E_REINSERT_ORDER_MISMATCH"></a>
-
-
-
-<pre><code><b>const</b> <a href="bulk_order_types.md#0x5_bulk_order_types_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>: u64 = 3;
-</code></pre>
-
-
-
-<a id="0x5_bulk_order_types_EINVLID_MM_ORDER_REQUEST"></a>
-
-
-
-<pre><code><b>const</b> <a href="bulk_order_types.md#0x5_bulk_order_types_EINVLID_MM_ORDER_REQUEST">EINVLID_MM_ORDER_REQUEST</a>: u64 = 4;
-</code></pre>
-
 
 
 <a id="0x5_bulk_order_types_EPRICE_CROSSING"></a>
 
 
 
-<pre><code><b>const</b> <a href="bulk_order_types.md#0x5_bulk_order_types_EPRICE_CROSSING">EPRICE_CROSSING</a>: u64 = 5;
-</code></pre>
-
-
-
-<a id="0x5_bulk_order_types_EUNEXPECTED_MATCH_PRICE"></a>
-
-
-
-<pre><code><b>const</b> <a href="bulk_order_types.md#0x5_bulk_order_types_EUNEXPECTED_MATCH_PRICE">EUNEXPECTED_MATCH_PRICE</a>: u64 = 1;
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x5_bulk_order_types_EPRICE_CROSSING">EPRICE_CROSSING</a>: u64 = 1;
 </code></pre>
 
 
@@ -446,7 +409,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<pre><code><b>const</b> <a href="bulk_order_types.md#0x5_bulk_order_types_E_ASK_LENGTH_MISMATCH">E_ASK_LENGTH_MISMATCH</a>: u64 = 7;
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x5_bulk_order_types_E_ASK_LENGTH_MISMATCH">E_ASK_LENGTH_MISMATCH</a>: u64 = 3;
 </code></pre>
 
 
@@ -455,7 +418,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<pre><code><b>const</b> <a href="bulk_order_types.md#0x5_bulk_order_types_E_ASK_ORDER_INVALID">E_ASK_ORDER_INVALID</a>: u64 = 13;
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x5_bulk_order_types_E_ASK_ORDER_INVALID">E_ASK_ORDER_INVALID</a>: u64 = 8;
 </code></pre>
 
 
@@ -464,7 +427,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<pre><code><b>const</b> <a href="bulk_order_types.md#0x5_bulk_order_types_E_ASK_SIZE_ZERO">E_ASK_SIZE_ZERO</a>: u64 = 11;
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x5_bulk_order_types_E_ASK_SIZE_ZERO">E_ASK_SIZE_ZERO</a>: u64 = 6;
 </code></pre>
 
 
@@ -473,7 +436,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<pre><code><b>const</b> <a href="bulk_order_types.md#0x5_bulk_order_types_E_BID_LENGTH_MISMATCH">E_BID_LENGTH_MISMATCH</a>: u64 = 6;
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x5_bulk_order_types_E_BID_LENGTH_MISMATCH">E_BID_LENGTH_MISMATCH</a>: u64 = 2;
 </code></pre>
 
 
@@ -482,7 +445,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<pre><code><b>const</b> <a href="bulk_order_types.md#0x5_bulk_order_types_E_BID_ORDER_INVALID">E_BID_ORDER_INVALID</a>: u64 = 12;
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x5_bulk_order_types_E_BID_ORDER_INVALID">E_BID_ORDER_INVALID</a>: u64 = 7;
 </code></pre>
 
 
@@ -491,7 +454,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<pre><code><b>const</b> <a href="bulk_order_types.md#0x5_bulk_order_types_E_BID_SIZE_ZERO">E_BID_SIZE_ZERO</a>: u64 = 10;
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x5_bulk_order_types_E_BID_SIZE_ZERO">E_BID_SIZE_ZERO</a>: u64 = 5;
 </code></pre>
 
 
@@ -500,7 +463,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<pre><code><b>const</b> <a href="bulk_order_types.md#0x5_bulk_order_types_E_BULK_ORDER_DEPTH_EXCEEDED">E_BULK_ORDER_DEPTH_EXCEEDED</a>: u64 = 14;
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x5_bulk_order_types_E_BULK_ORDER_DEPTH_EXCEEDED">E_BULK_ORDER_DEPTH_EXCEEDED</a>: u64 = 9;
 </code></pre>
 
 
@@ -509,7 +472,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<pre><code><b>const</b> <a href="bulk_order_types.md#0x5_bulk_order_types_E_EMPTY_ORDER">E_EMPTY_ORDER</a>: u64 = 9;
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x5_bulk_order_types_E_EMPTY_ORDER">E_EMPTY_ORDER</a>: u64 = 4;
 </code></pre>
 
 
@@ -518,7 +481,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<pre><code><b>const</b> <a href="bulk_order_types.md#0x5_bulk_order_types_E_INVALID_SEQUENCE_NUMBER">E_INVALID_SEQUENCE_NUMBER</a>: u64 = 15;
+<pre><code><b>const</b> <a href="bulk_order_types.md#0x5_bulk_order_types_E_INVALID_SEQUENCE_NUMBER">E_INVALID_SEQUENCE_NUMBER</a>: u64 = 10;
 </code></pre>
 
 
@@ -541,7 +504,7 @@ This limit prevents gas DoS scenarios when cancelling bulk orders.
 Creates a new bulk order with the specified parameters.
 
 
-<a id="@Arguments:_10"></a>
+<a id="@Arguments:_9"></a>
 
 ### Arguments:
 
@@ -588,7 +551,7 @@ Does no validation itself.
 Creates a new bulk order request with the specified price levels and sizes.
 
 
-<a id="@Arguments:_11"></a>
+<a id="@Arguments:_10"></a>
 
 ### Arguments:
 
@@ -600,14 +563,14 @@ Creates a new bulk order request with the specified price levels and sizes.
 - <code>metadata</code>: Additional metadata for the order
 
 
-<a id="@Returns:_12"></a>
+<a id="@Returns:_11"></a>
 
 ### Returns:
 
 A <code><a href="bulk_order_types.md#0x5_bulk_order_types_BulkOrderRequest">BulkOrderRequest</a></code> instance.
 
 
-<a id="@Aborts:_13"></a>
+<a id="@Aborts:_12"></a>
 
 ### Aborts:
 
@@ -751,14 +714,14 @@ A <code><a href="bulk_order_types.md#0x5_bulk_order_types_BulkOrderRequest">Bulk
 Gets the unique priority index of a bulk order.
 
 
-<a id="@Arguments:_14"></a>
+<a id="@Arguments:_13"></a>
 
 ### Arguments:
 
 - <code>self</code>: Reference to the bulk order
 
 
-<a id="@Returns:_15"></a>
+<a id="@Returns:_14"></a>
 
 ### Returns:
 
@@ -792,14 +755,14 @@ The unique priority index for time-based ordering.
 Gets the order ID of a bulk order.
 
 
-<a id="@Arguments:_16"></a>
+<a id="@Arguments:_15"></a>
 
 ### Arguments:
 
 - <code>self</code>: Reference to the bulk order
 
 
-<a id="@Returns:_17"></a>
+<a id="@Returns:_16"></a>
 
 ### Returns:
 
@@ -988,7 +951,7 @@ The unique order identifier.
 Gets the active price for a specific side of a bulk order.
 
 
-<a id="@Arguments:_18"></a>
+<a id="@Arguments:_17"></a>
 
 ### Arguments:
 
@@ -996,7 +959,7 @@ Gets the active price for a specific side of a bulk order.
 - <code>is_bid</code>: True to get bid price, false for ask price
 
 
-<a id="@Returns:_19"></a>
+<a id="@Returns:_18"></a>
 
 ### Returns:
 
@@ -1160,7 +1123,7 @@ An option containing the active price if available, none otherwise.
 Gets the active size for a specific side of a bulk order.
 
 
-<a id="@Arguments:_20"></a>
+<a id="@Arguments:_19"></a>
 
 ### Arguments:
 
@@ -1168,7 +1131,7 @@ Gets the active size for a specific side of a bulk order.
 - <code>is_bid</code>: True to get bid size, false for ask size
 
 
-<a id="@Returns:_21"></a>
+<a id="@Returns:_20"></a>
 
 ### Returns:
 
@@ -1373,7 +1336,7 @@ An option containing the active size if available, none otherwise.
 Validates that all sizes in the vector are greater than 0.
 
 
-<a id="@Arguments:_22"></a>
+<a id="@Arguments:_21"></a>
 
 ### Arguments:
 
@@ -1412,7 +1375,7 @@ Validates that all sizes in the vector are greater than 0.
 Validates that prices are in the correct order (descending for bids, ascending for asks).
 
 
-<a id="@Arguments:_23"></a>
+<a id="@Arguments:_22"></a>
 
 ### Arguments:
 
@@ -1512,7 +1475,7 @@ This function is used during order cancellation to clear the order state
 while preserving the order ID for potential reuse.
 
 
-<a id="@Arguments:_24"></a>
+<a id="@Arguments:_23"></a>
 
 ### Arguments:
 

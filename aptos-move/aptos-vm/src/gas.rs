@@ -78,7 +78,7 @@ pub(crate) fn check_gas(
     log_context: &AdapterLogSchema,
 ) -> Result<(), VMStatus> {
     let txn_gas_params = &gas_params.vm.txn;
-    let raw_bytes_len = txn_metadata.transaction_size;
+    let txn_bytes_len = txn_metadata.transaction_size;
 
     if is_approved_gov_script {
         let max_txn_size_gov = if gas_feature_version >= RELEASE_V1_13 {
@@ -87,18 +87,18 @@ pub(crate) fn check_gas(
             MAXIMUM_APPROVED_TRANSACTION_SIZE_LEGACY.into()
         };
 
-        if txn_metadata.transaction_size > max_txn_size_gov
+        if txn_bytes_len > max_txn_size_gov
             // Ensure that it is only the approved payload that exceeds the
             // maximum. The (unknown) user input should be restricted to the original
             // maximum transaction size.
-            || txn_metadata.transaction_size
+            || txn_bytes_len
                 > txn_metadata.script_size + txn_gas_params.max_transaction_size_in_bytes
         {
             speculative_warn!(
                 log_context,
                 format!(
                     "[VM] Governance transaction size too big {} payload size {}",
-                    txn_metadata.transaction_size, txn_metadata.script_size,
+                    txn_bytes_len, txn_metadata.script_size,
                 ),
             );
             return Err(VMStatus::error(
@@ -106,12 +106,12 @@ pub(crate) fn check_gas(
                 None,
             ));
         }
-    } else if txn_metadata.transaction_size > txn_gas_params.max_transaction_size_in_bytes {
+    } else if txn_bytes_len > txn_gas_params.max_transaction_size_in_bytes {
         speculative_warn!(
             log_context,
             format!(
                 "[VM] Transaction size too big {} (max {})",
-                txn_metadata.transaction_size, txn_gas_params.max_transaction_size_in_bytes
+                txn_bytes_len, txn_gas_params.max_transaction_size_in_bytes
             ),
         );
         return Err(VMStatus::error(
@@ -139,8 +139,7 @@ pub(crate) fn check_gas(
     }
 
     // The submitted transactions max gas units needs to be at least enough to cover the
-    // intrinsic cost of the transaction as calculated against the size of the
-    // underlying `RawTransaction`.
+    // intrinsic cost of the transaction as calculated against the transaction size.
     let keyless = if txn_metadata.is_keyless() {
         KEYLESS_BASE_COST.evaluate(gas_feature_version, &gas_params.vm)
     } else {
@@ -152,7 +151,7 @@ pub(crate) fn check_gas(
         InternalGas::zero()
     };
     let intrinsic_gas = txn_gas_params
-        .calculate_intrinsic_gas(raw_bytes_len)
+        .calculate_intrinsic_gas(txn_bytes_len)
         .evaluate(gas_feature_version, &gas_params.vm);
     let total_rounded: Gas =
         (intrinsic_gas + keyless + slh_dsa_sha2_128s).to_unit_round_up_with_params(txn_gas_params);

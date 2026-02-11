@@ -13,7 +13,6 @@ pub mod code_unit_verifier;
 pub mod constants;
 pub mod control_flow;
 pub mod control_flow_v5;
-pub mod cyclic_dependencies;
 pub mod dependencies;
 pub mod friends;
 pub mod instantiation_loops;

@@ -352,8 +352,23 @@ pub async fn get_stake_balances(
             // inactive will not have commission because commission has already been extracted
             requested_balance = Some(stake_pool.inactive.to_string());
         } else if owner_account.is_pending_inactive_stake() {
+            // BCS view endpoint wraps all return values in a vector (ULEB128 length + concatenated BCS).
+            let pending_distribution = view::<Vec<u64>>(
+                rest_client,
+                version,
+                AccountAddress::ONE,
+                ident_str!(STAKING_CONTRACT_MODULE),
+                ident_str!("pending_attribution_snapshot"),
+                vec![],
+                vec![
+                    bcs::to_bytes(&owner_address)?,
+                    bcs::to_bytes(&operator_address)?,
+                    bcs::to_bytes(&owner_address)?,
+                ],
+            )
+            .await?;
             // pending_inactive will not have commission because commission has already been extracted
-            requested_balance = Some(stake_pool.pending_inactive.to_string());
+            requested_balance = Some(pending_distribution[0].to_string());
         } else if owner_account.is_total_stake() {
             // total stake includes commission since it includes active stake, which includes commission
             requested_balance =

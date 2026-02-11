@@ -1,0 +1,33 @@
+//# run --type-args u64 --args 0
+script
+entry public fun main<T0: copy + drop>(l0: T0)
+    ret
+
+
+
+//# run --type-args u8 --args 1u8
+script
+entry public fun main<T0>(l0: &T0)
+    ret
+
+
+
+//# run --type-args u8 --args b"hello"
+script
+entry public fun main<T0: copy + drop>(l0: vector<T0>)
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct Box<T0> has drop
+  x: T0
+
+
+
+//# run --type-args u8 --args 0u8
+script
+use 0x42::M
+entry public fun main<T0: copy + drop>(l0: M::Box<M::Box<T0>>)
+    ret

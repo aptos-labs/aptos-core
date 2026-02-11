@@ -72,7 +72,7 @@ pub struct RunLocalnet {
     /// This will wipe the aptosdb in `--test-dir` to remove any incompatible changes, and start
     /// the chain fresh. Note, that you will need to publish the module again and distribute funds
     /// from the faucet accordingly.
-    #[clap(long)]
+    #[clap(short = 'f', long)]
     force_restart: bool,
 
     #[clap(flatten)]

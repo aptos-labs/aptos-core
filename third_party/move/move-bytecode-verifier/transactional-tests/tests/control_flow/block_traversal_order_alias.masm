@@ -1,0 +1,60 @@
+//# publish
+module 0x1::Test
+struct K has drop
+  x: u64
+
+public fun no_alias(l0: &mut K, l1: &mut K)
+    copy_loc l0
+    borrow_field K, x
+    read_ref
+    ld_u64 100
+    eq
+    copy_loc l1
+    borrow_field K, x
+    read_ref
+    ld_u64 100
+    eq
+    and
+    not
+    not
+    br_false l0
+    ld_u64 123
+    abort
+l0: ret
+
+public fun t()
+    local l0: K
+    local l1: K
+    local l2: &mut K
+    local l3: u64
+    local l4: u64
+    ld_u64 100
+    pack K
+    st_loc l0
+    ld_u64 200
+    pack K
+    st_loc l1
+    mut_borrow_loc l1
+    st_loc l2
+    ld_u64 0
+    st_loc l3
+l2: copy_loc l3
+    ld_u64 2
+    eq
+    br_true l0
+    mut_borrow_loc l0
+    copy_loc l2
+    call no_alias
+    branch l1
+l3: ld_u64 1
+    st_loc l4
+    mut_borrow_loc l0
+    st_loc l2
+    ld_true
+    br_true l2
+l1: copy_loc l3
+    ld_u64 1
+    add
+    st_loc l3
+    branch l3
+l0: ret

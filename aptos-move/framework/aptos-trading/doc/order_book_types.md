@@ -18,7 +18,6 @@ Order book type definitions
 -  [Function `bulk_order_type`](#0x5_order_book_types_bulk_order_type)
 -  [Function `is_bulk_order_type`](#0x5_order_book_types_is_bulk_order_type)
 -  [Function `is_single_order_type`](#0x5_order_book_types_is_single_order_type)
--  [Function `next_order_id`](#0x5_order_book_types_next_order_id)
 -  [Function `new_order_id_type`](#0x5_order_book_types_new_order_id_type)
 -  [Function `new_account_client_order_id`](#0x5_order_book_types_new_account_client_order_id)
 -  [Function `next_increasing_idx_type`](#0x5_order_book_types_next_increasing_idx_type)
@@ -32,7 +31,6 @@ Order book type definitions
 -  [Function `price_move_up_condition`](#0x5_order_book_types_price_move_up_condition)
 -  [Function `price_move_down_condition`](#0x5_order_book_types_price_move_down_condition)
 -  [Function `get_trigger_condition_indices`](#0x5_order_book_types_get_trigger_condition_indices)
--  [Function `reverse_bits`](#0x5_order_book_types_reverse_bits)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
@@ -364,15 +362,6 @@ Order time in force
 
 
 
-<a id="0x5_order_book_types_U128_MAX"></a>
-
-
-
-<pre><code><b>const</b> <a href="order_book_types.md#0x5_order_book_types_U128_MAX">U128_MAX</a>: u128 = 340282366920938463463374607431768211455;
-</code></pre>
-
-
-
 <a id="0x5_order_book_types_single_order_type"></a>
 
 ## Function `single_order_type`
@@ -462,35 +451,6 @@ Order time in force
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x5_order_book_types_is_single_order_type">is_single_order_type</a>(order_type: &<a href="order_book_types.md#0x5_order_book_types_OrderType">OrderType</a>): bool {
     order_type.type == <a href="order_book_types.md#0x5_order_book_types_SINGLE_ORDER_TYPE">SINGLE_ORDER_TYPE</a>
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x5_order_book_types_next_order_id"></a>
-
-## Function `next_order_id`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x5_order_book_types_next_order_id">next_order_id</a>(): <a href="order_book_types.md#0x5_order_book_types_OrderId">order_book_types::OrderId</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x5_order_book_types_next_order_id">next_order_id</a>(): <a href="order_book_types.md#0x5_order_book_types_OrderId">OrderId</a> {
-    // reverse bits <b>to</b> make order ids random, so indices on top of them are shuffled.
-    <a href="order_book_types.md#0x5_order_book_types_OrderId">OrderId</a> {
-        order_id: <a href="order_book_types.md#0x5_order_book_types_reverse_bits">reverse_bits</a>(
-            <a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">transaction_context::monotonically_increasing_counter</a>()
-        )
-    }
 }
 </code></pre>
 
@@ -588,7 +548,7 @@ Order time in force
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x5_order_book_types_into_decreasing_idx_type">into_decreasing_idx_type</a>(self: &<a href="order_book_types.md#0x5_order_book_types_IncreasingIdx">IncreasingIdx</a>): <a href="order_book_types.md#0x5_order_book_types_DecreasingIdx">DecreasingIdx</a> {
-    <a href="order_book_types.md#0x5_order_book_types_DecreasingIdx">DecreasingIdx</a> { idx: <a href="order_book_types.md#0x5_order_book_types_U128_MAX">U128_MAX</a> - self.idx }
+    <a href="order_book_types.md#0x5_order_book_types_DecreasingIdx">DecreasingIdx</a> { idx: MAX_U128 - self.idx }
 }
 </code></pre>
 
@@ -825,67 +785,6 @@ Order time in force
             (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*time))
         }
     }
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x5_order_book_types_reverse_bits"></a>
-
-## Function `reverse_bits`
-
-Reverse the bits in a u128 value using divide and conquer approach
-This is more efficient than the bit-by-bit approach, reducing from O(n) to O(log n)
-
-
-<pre><code><b>fun</b> <a href="order_book_types.md#0x5_order_book_types_reverse_bits">reverse_bits</a>(value: u128): u128
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="order_book_types.md#0x5_order_book_types_reverse_bits">reverse_bits</a>(value: u128): u128 {
-    <b>let</b> v = value;
-
-    // Swap odd and even bits
-    v =
-        ((v & 0x55555555555555555555555555555555) &lt;&lt; 1)
-            | ((v &gt;&gt; 1) & 0x55555555555555555555555555555555);
-
-    // Swap consecutive pairs
-    v =
-        ((v & 0x33333333333333333333333333333333) &lt;&lt; 2)
-            | ((v &gt;&gt; 2) & 0x33333333333333333333333333333333);
-
-    // Swap nibbles
-    v =
-        ((v & 0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f) &lt;&lt; 4)
-            | ((v &gt;&gt; 4) & 0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f);
-
-    // Swap bytes
-    v =
-        ((v & 0x00ff00ff00ff00ff00ff00ff00ff00ff) &lt;&lt; 8)
-            | ((v &gt;&gt; 8) & 0x00ff00ff00ff00ff00ff00ff00ff00ff);
-
-    // Swap 2-byte chunks
-    v =
-        ((v & 0x0000ffff0000ffff0000ffff0000ffff) &lt;&lt; 16)
-            | ((v &gt;&gt; 16) & 0x0000ffff0000ffff0000ffff0000ffff);
-
-    // Swap 4-byte chunks
-    v =
-        ((v & 0x00000000ffffffff00000000ffffffff) &lt;&lt; 32)
-            | ((v &gt;&gt; 32) & 0x00000000ffffffff00000000ffffffff);
-
-    // Swap 8-byte chunks
-    v = (v &lt;&lt; 64) | (v &gt;&gt; 64);
-
-    v
 }
 </code></pre>
 

@@ -1,0 +1,34 @@
+//# publish
+module 0x42::Test
+struct T has drop
+  fint: u64
+  fv: bool
+
+public fun t1(l0: u64, l1: bool): T
+    move_loc l0
+    move_loc l1
+    pack T
+    ret
+
+public fun t2(l0: u64): T
+    move_loc l0
+    ld_false
+    pack T
+    ret
+
+
+
+//# run
+script
+use 0x42::Test
+entry public fun main()
+    local l0: Test::T
+    local l1: Test::T
+    ld_u64 0
+    ld_false
+    call Test::t1
+    st_loc l0
+    ld_u64 0
+    call Test::t2
+    st_loc l1
+    ret

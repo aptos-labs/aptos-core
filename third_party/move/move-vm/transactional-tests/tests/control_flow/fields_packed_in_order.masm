@@ -1,0 +1,30 @@
+//# publish
+module 0x1::M
+struct T has drop
+  b: u64
+  a: u64
+
+public fun error(l0: u64): u64
+    move_loc l0
+    abort
+    ld_u64 0
+    ret
+
+public fun new(): T
+    ld_u64 42
+    call error
+    ld_u64 100
+    call error
+    pack T
+    ret
+
+
+
+//# run
+script
+use 0x1::M
+entry public fun main()
+    local l0: M::T
+    call M::new
+    st_loc l0
+    ret

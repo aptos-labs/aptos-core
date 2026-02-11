@@ -20,7 +20,7 @@ use anyhow::{anyhow, bail, ensure, Context, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_crypto::{hash::CryptoHash, SigningKey, Uniform};
 use aptos_dkg::pvss::{
-    traits::{transcript::HasAggregatableSubtranscript, Aggregatable},
+    traits::transcript::{Aggregatable, HasAggregatableSubtranscript},
     Player,
 };
 use aptos_infallible::{duration_since_epoch, Mutex};
@@ -787,13 +787,10 @@ impl ChunkyDKGManager {
             "Not enough subtranscripts"
         );
 
-        // Aggregate subtranscripts using the same logic as in chunky_agg_trx_producer
-        let mut recomputed_subtranscript = subtranscripts.remove(0);
-        for other in subtranscripts.iter() {
-            recomputed_subtranscript
-                .aggregate_with(&dkg_config.threshold_config, other)
+        // Aggregate subtranscripts in projective form, then normalize (same logic as chunky_agg_trx_producer)
+        let recomputed_subtranscript =
+            ChunkySubtranscript::aggregate(&dkg_config.threshold_config, subtranscripts)
                 .context("failed to aggregate subtranscripts")?;
-        }
         let recomputed_aggsubtranscript = AggregatedSubtranscript {
             subtranscript: recomputed_subtranscript,
             dealers: req.aggregated_subtrx_dealers.clone(),

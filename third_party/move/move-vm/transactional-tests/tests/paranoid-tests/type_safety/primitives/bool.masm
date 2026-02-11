@@ -1,0 +1,123 @@
+//# publish
+module 0x22::A
+struct A has drop
+  x: bool
+
+public fun make_a(): A
+    ld_true
+    pack A
+    ret
+
+public fun test(l0: &mut A)
+    ld_true
+    move_loc l0
+    mut_borrow_field A, x
+    write_ref
+    ret
+
+public fun test_invalid(l0: &mut A)
+    ld_u64 10
+    move_loc l0
+    mut_borrow_field A, x
+    write_ref
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::A
+entry public fun main(l0: signer)
+    local l1: A::A
+    call A::make_a
+    st_loc l1
+    mut_borrow_loc l1
+    call A::test
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::A
+entry public fun main(l0: signer)
+    local l1: A::A
+    call A::make_a
+    st_loc l1
+    mut_borrow_loc l1
+    call A::test_invalid
+    ret
+
+
+
+//# run --signers 0x1
+script
+entry public fun main(l0: signer)
+    local l1: vector<bool>
+    local l2: &mut bool
+    vec_pack <bool>, 0
+    st_loc l1
+    mut_borrow_loc l1
+    ld_true
+    vec_push_back <bool>
+    mut_borrow_loc l1
+    ld_u64 0
+    vec_mut_borrow <bool>
+    st_loc l2
+    ld_false
+    move_loc l2
+    write_ref
+    ret
+
+
+
+//# run --signers 0x1
+script
+entry public fun main(l0: signer)
+    local l1: vector<bool>
+    local l2: &mut bool
+    vec_pack <bool>, 0
+    st_loc l1
+    mut_borrow_loc l1
+    ld_true
+    vec_push_back <bool>
+    mut_borrow_loc l1
+    ld_u64 0
+    vec_mut_borrow <bool>
+    st_loc l2
+    ld_u64 5
+    move_loc l2
+    write_ref
+    ret
+
+
+
+//# run --signers 0x1
+script
+entry public fun main(l0: signer)
+    local l1: bool
+    local l2: &mut bool
+    ld_false
+    st_loc l1
+    mut_borrow_loc l1
+    st_loc l2
+    ld_true
+    move_loc l2
+    write_ref
+    ret
+
+
+
+//# run --signers 0x1
+script
+entry public fun main(l0: signer)
+    local l1: bool
+    local l2: &mut bool
+    ld_false
+    st_loc l1
+    mut_borrow_loc l1
+    st_loc l2
+    ld_u64 10
+    move_loc l2
+    write_ref
+    ret
