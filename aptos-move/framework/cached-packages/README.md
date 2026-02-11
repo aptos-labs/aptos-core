@@ -27,4 +27,4 @@ scripts/cargo_build_aptos_cached_packages.sh
 
 Then commit the updated artifacts together with your changes.
 
-CI runs the same script with `--check` to verify the artifacts are fresh. If that check fails, run the command above and commit the result.
+CI runs the same script with `--check` to verify the artifacts are fresh. This check is **advisory (non-blocking)** because concurrent PR merges can make the checked-in artifacts appear stale even when a PR itself is correct. If the check fails on your PR, run the command above and commit the result.
