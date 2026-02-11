@@ -1,0 +1,81 @@
+//# publish
+module 0x42::Tester
+struct T has drop
+  v: u64
+
+public fun new(l0: u64): T
+    move_loc l0
+    pack T
+    ret
+
+public fun update(l0: &mut T)
+    local l1: &mut u64
+    move_loc l0
+    mut_borrow_field T, v
+    st_loc l1
+    ld_u64 1
+    move_loc l1
+    write_ref
+    ret
+
+public fun vref(l0: &mut T): &u64
+    local l1: &u64
+    copy_loc l0
+    borrow_field T, v
+    st_loc l1
+    move_loc l0
+    pop
+    move_loc l1
+    ret
+
+
+
+//# run
+script
+use 0x42::Tester
+entry public fun main()
+    local l0: Tester::T
+    local l1: &mut Tester::T
+    local l2: &u64
+    local l3: &mut Tester::T
+    local l4: &u64
+    ld_u64 0
+    call Tester::new
+    st_loc l0
+    mut_borrow_loc l0
+    st_loc l1
+    move_loc l1
+    call Tester::vref
+    st_loc l2
+    copy_loc l2
+    read_ref
+    ld_u64 0
+    eq
+    not
+    br_false l0
+    ld_u64 42
+    abort
+l0: mut_borrow_loc l0
+    st_loc l3
+    copy_loc l3
+    call Tester::update
+    move_loc l3
+    call Tester::vref
+    st_loc l4
+    move_loc l2
+    read_ref
+    ld_u64 1
+    eq
+    not
+    br_false l1
+    ld_u64 42
+    abort
+l1: move_loc l4
+    read_ref
+    ld_u64 1
+    eq
+    not
+    br_false l2
+    ld_u64 42
+    abort
+l2: ret

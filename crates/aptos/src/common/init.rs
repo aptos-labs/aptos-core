@@ -456,10 +456,11 @@ impl InitTool {
 /// A simplified list of all networks supported by the CLI
 ///
 /// Any command using this, will be simpler to setup as profiles
-#[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize, Eq, PartialEq)]
 pub enum Network {
     Mainnet,
     Testnet,
+    #[default]
     Devnet,
     Local,
     Custom,
@@ -494,11 +495,5 @@ impl FromStr for Network {
                 )));
             },
         })
-    }
-}
-
-impl Default for Network {
-    fn default() -> Self {
-        Self::Devnet
     }
 }

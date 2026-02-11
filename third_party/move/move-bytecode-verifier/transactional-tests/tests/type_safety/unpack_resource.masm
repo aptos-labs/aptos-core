@@ -1,0 +1,66 @@
+//# publish
+module 0x1::Test
+struct X
+  b: bool
+
+struct T
+  i: u64
+  x: X
+  b: bool
+
+public fun new_x(): X
+    ld_true
+    pack X
+    ret
+
+public fun new_t(l0: X): T
+    ld_u64 0
+    move_loc l0
+    ld_false
+    pack T
+    ret
+
+public fun destroy_x(l0: X)
+    local l1: bool
+    move_loc l0
+    unpack X
+    st_loc l1
+    ret
+
+public fun destroy_t(l0: T): (u64, X, bool)
+    local l1: u64
+    local l2: X
+    local l3: bool
+    move_loc l0
+    unpack T
+    st_loc l3
+    st_loc l2
+    st_loc l1
+    move_loc l1
+    move_loc l2
+    move_loc l3
+    ret
+
+
+
+//# run
+script
+use 0x1::Test
+entry public fun main()
+    local l0: Test::X
+    local l1: u64
+    local l2: Test::T
+    local l3: bool
+    call Test::new_x
+    st_loc l0
+    move_loc l0
+    call Test::new_t
+    st_loc l2
+    move_loc l2
+    call Test::destroy_t
+    st_loc l3
+    st_loc l0
+    st_loc l1
+    move_loc l0
+    call Test::destroy_x
+    ret

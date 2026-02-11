@@ -122,7 +122,7 @@ function install_build_essentials {
 
 function install_clang {
   PACKAGE_MANAGER=$1
-  VERSION=${2:-20}
+  VERSION=${2:-21}
 
   if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
     "${PRE_COMMAND[@]}" apt-get install -y gnupg lsb-release software-properties-common wget

@@ -13,8 +13,8 @@ use aptos_dkg::pvss::{
         DealingArgs, NoAux,
     },
     traits::transcript::{
-        Aggregatable, AggregatableTranscript, HasAggregatableSubtranscript, MalleableTranscript,
-        Transcript, WithMaxNumShares,
+        Aggregatable, AggregatableTranscript, Aggregated, HasAggregatableSubtranscript,
+        MalleableTranscript, Transcript, WithMaxNumShares,
     },
     WeightedConfigBlstrs,
 };
@@ -210,8 +210,9 @@ fn pvss_aggregate<T: AggregatableTranscript, M: Measurement>(
                 );
                 (trx.clone(), trx)
             },
-            |(mut first, second)| {
-                first.aggregate_with(&sc, &second).unwrap();
+            |(first, second)| {
+                let mut agg = first.to_aggregated();
+                agg.aggregate_with(&sc, &second).unwrap();
             },
         )
     });
@@ -239,9 +240,8 @@ where
                 (trs.clone(), trs)
             },
             |(first, second)| {
-                first
-                    .get_subtranscript()
-                    .aggregate_with(&sc, &second.get_subtranscript())
+                let mut agg = first.get_subtranscript().to_aggregated();
+                agg.aggregate_with(&sc, &second.get_subtranscript())
                     .unwrap();
             },
         )
@@ -463,11 +463,44 @@ fn pvss_decrypt_own_share<T: Transcript, M: Measurement>(
         &mut rng,
     );
 
+    // TODO: the following code is obviously messy. Easiest fix is to extend `get_player_weight()`
+    // to `SecretSharingConfig`
     g.bench_function(format!("decrypt-share/{}", sc), move |b| {
+        // Pre-compute valid player indices by checking if get_public_key_share
+        // returns non-empty results. For weighted transcripts, DealtPubKeyShare is Vec,
+        // for unweighted it's a single value. We can't check weight generically since
+        // get_player_weight is not (yet!) part of the SecretSharingConfig trait, so we
+        // check if the share is non-empty by attempting to use it.
+        let valid_players: Vec<usize> = (0..sc.get_total_num_players())
+            .filter(|&i| {
+                // Ensure player has a decryption key
+                if dks.get(i).is_none() {
+                    return false;
+                }
+                let player = sc.get_player(i);
+                let pk_share = trx.get_public_key_share(&sc, &player);
+                // For weighted configs, pk_share is Vec<...>, check if non-empty
+                // For unweighted, it's always valid (single value)
+                // We can't check this generically, so we use Debug formatting as a proxy
+                // If the Debug representation is meaningful (not empty/default), assume valid
+                let debug_str = format!("{:?}", pk_share);
+                // Empty Vec would show as "[]", single values would show their content
+                !debug_str.is_empty() && debug_str != "[]"
+            })
+            .collect();
+
+        assert!(
+            !valid_players.is_empty(),
+            "No valid players found for benchmark"
+        );
+
         b.iter_with_setup(
-            || rng.gen_range(0, sc.get_total_num_players()),
+            || {
+                let idx = rng.gen_range(0, valid_players.len());
+                valid_players[idx]
+            },
             |i| {
-                trx.decrypt_own_share(&sc, &sc.get_player(i), &dks[i], pp);
+                black_box(trx.decrypt_own_share(&sc, &sc.get_player(i), &dks[i], pp));
             },
         )
     });

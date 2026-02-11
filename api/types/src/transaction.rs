@@ -20,7 +20,9 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     block_metadata_ext::BlockMetadataExt,
     contract_event::{ContractEvent, EventWithVersion},
-    dkg::{DKGTranscript, DKGTranscriptMetadata},
+    dkg::{
+        chunky_dkg::CertifiedAggregatedChunkySubtranscript, DKGTranscript, DKGTranscriptMetadata,
+    },
     function_info::FunctionInfo,
     jwks::{jwk::JWK, ProviderJWKs, QuorumCertifiedUpdate},
     keyless,
@@ -598,12 +600,19 @@ pub struct BlockMetadataExtensionRandomness {
     randomness: Option<HexEncodedBytes>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct BlockMetadataExtensionRandomnessAndDecKey {
+    randomness: Option<HexEncodedBytes>,
+    decryption_key: Option<HexEncodedBytes>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum BlockMetadataExtension {
     V0(BlockMetadataExtensionEmpty),
     V1(BlockMetadataExtensionRandomness),
+    V2(BlockMetadataExtensionRandomnessAndDecKey),
 }
 
 impl BlockMetadataExtension {
@@ -615,6 +624,16 @@ impl BlockMetadataExtension {
                     .randomness
                     .as_ref()
                     .map(|pr| HexEncodedBytes::from(pr.randomness_cloned())),
+            }),
+            BlockMetadataExt::V2(payload) => Self::V2(BlockMetadataExtensionRandomnessAndDecKey {
+                randomness: payload
+                    .randomness
+                    .as_ref()
+                    .map(|pr| HexEncodedBytes::from(pr.randomness_cloned())),
+                decryption_key: payload
+                    .decryption_key
+                    .as_ref()
+                    .map(|dk| HexEncodedBytes::from(dk.decryption_key_cloned())),
             }),
         }
     }
@@ -664,6 +683,7 @@ impl BlockMetadataTransaction {
             None => "block_metadata_transaction",
             Some(BlockMetadataExtension::V0(_)) => "block_metadata_ext_transaction__v0",
             Some(BlockMetadataExtension::V1(_)) => "block_metadata_ext_transaction__v1",
+            Some(BlockMetadataExtension::V2(_)) => "block_metadata_ext_transaction__v2",
         }
     }
 }
@@ -678,6 +698,7 @@ impl BlockMetadataTransaction {
 pub enum ValidatorTransaction {
     ObservedJwkUpdate(JWKUpdateTransaction),
     DkgResult(DKGResultTransaction),
+    ChunkyDKGResult(ChunkyDKGResultTransaction),
 }
 
 impl ValidatorTransaction {
@@ -687,6 +708,7 @@ impl ValidatorTransaction {
                 "validator_transaction__observed_jwk_update"
             },
             ValidatorTransaction::DkgResult(_) => "validator_transaction__dkg_result",
+            ValidatorTransaction::ChunkyDKGResult(_) => "validator_transaction__chunky_dkg_result",
         }
     }
 
@@ -694,6 +716,7 @@ impl ValidatorTransaction {
         match self {
             ValidatorTransaction::ObservedJwkUpdate(t) => &t.info,
             ValidatorTransaction::DkgResult(t) => &t.info,
+            ValidatorTransaction::ChunkyDKGResult(t) => &t.info,
         }
     }
 
@@ -701,6 +724,7 @@ impl ValidatorTransaction {
         match self {
             ValidatorTransaction::ObservedJwkUpdate(t) => &mut t.info,
             ValidatorTransaction::DkgResult(t) => &mut t.info,
+            ValidatorTransaction::ChunkyDKGResult(t) => &mut t.info,
         }
     }
 
@@ -708,6 +732,7 @@ impl ValidatorTransaction {
         match self {
             ValidatorTransaction::ObservedJwkUpdate(t) => t.timestamp,
             ValidatorTransaction::DkgResult(t) => t.timestamp,
+            ValidatorTransaction::ChunkyDKGResult(t) => t.timestamp,
         }
     }
 
@@ -715,6 +740,7 @@ impl ValidatorTransaction {
         match self {
             ValidatorTransaction::ObservedJwkUpdate(t) => &t.events,
             ValidatorTransaction::DkgResult(t) => &t.events,
+            ValidatorTransaction::ChunkyDKGResult(t) => &t.events,
         }
     }
 }
@@ -752,6 +778,14 @@ impl
                 timestamp: U64::from(timestamp),
                 quorum_certified_update: quorum_certified_update.into(),
             }),
+            aptos_types::validator_txn::ValidatorTransaction::ChunkyDKGResult(certified_subtrx) => {
+                Self::ChunkyDKGResult(ChunkyDKGResultTransaction {
+                    info,
+                    events,
+                    timestamp: U64::from(timestamp),
+                    certified_subtrx: certified_subtrx.into(),
+                })
+            },
         }
     }
 }
@@ -856,6 +890,45 @@ impl From<DKGTranscript> for ExportedDKGTranscript {
             epoch: epoch.into(),
             author: author.into(),
             payload: HexEncodedBytes::from(transcript_bytes),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct ChunkyDKGResultTransaction {
+    #[serde(flatten)]
+    #[oai(flatten)]
+    pub info: TransactionInfo,
+    pub events: Vec<Event>,
+    pub timestamp: U64,
+    pub certified_subtrx: ExportedCertifiedAggregatedChunkySubtranscript,
+}
+
+/// A more API-friendly representation of the on-chain
+/// `aptos_types::dkg::chunky_dkg::CertifiedAggregatedChunkySubtranscript`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct ExportedCertifiedAggregatedChunkySubtranscript {
+    pub epoch: U64,
+    pub author: Address,
+    pub subtrx: HexEncodedBytes,
+    pub signature: ExportedAggregateSignature,
+}
+
+impl From<CertifiedAggregatedChunkySubtranscript>
+    for ExportedCertifiedAggregatedChunkySubtranscript
+{
+    fn from(value: CertifiedAggregatedChunkySubtranscript) -> Self {
+        let CertifiedAggregatedChunkySubtranscript {
+            metadata,
+            transcript_bytes,
+            signature,
+        } = value;
+        let DKGTranscriptMetadata { epoch, author } = metadata;
+        Self {
+            epoch: epoch.into(),
+            author: author.into(),
+            subtrx: HexEncodedBytes::from(transcript_bytes),
+            signature: signature.into(),
         }
     }
 }

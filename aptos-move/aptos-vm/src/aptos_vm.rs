@@ -62,9 +62,10 @@ use aptos_types::{
         transaction_slice_metadata::TransactionSliceMetadata,
     },
     block_metadata::BlockMetadata,
-    block_metadata_ext::{BlockMetadataExt, BlockMetadataWithRandomness},
+    block_metadata_ext::BlockMetadataExt,
     chain_id::ChainId,
     contract_event::ContractEvent,
+    decryption::BlockTxnDecryptionKey,
     fee_statement::FeeStatement,
     function_info::FunctionInfo,
     move_utils::as_move_value::AsMoveValue,
@@ -350,7 +351,7 @@ impl AptosVM {
     }
 
     #[inline(always)]
-    fn timed_features(&self) -> &TimedFeatures {
+    pub(crate) fn timed_features(&self) -> &TimedFeatures {
         self.move_vm.env.timed_features()
     }
 
@@ -2140,7 +2141,7 @@ impl AptosVM {
         G: AptosGasMeter,
         F: FnOnce(u64, VMGasParameters, StorageGasParameters, bool, Gas, &'a C) -> G,
     {
-        let txn_metadata = TransactionMetadata::new(txn, auxiliary_info);
+        let txn_metadata = TransactionMetadata::new(txn, auxiliary_info, self.timed_features());
 
         let is_approved_gov_script = is_approved_gov_script(resolver, txn, &txn_metadata);
 
@@ -2487,40 +2488,56 @@ impl AptosVM {
             None,
         );
 
-        let block_metadata_with_randomness = match block_metadata_ext {
+        // Extract common fields and determine which function to call
+        let (function_name, args) = match block_metadata_ext {
             BlockMetadataExt::V0(_) => unreachable!(),
-            BlockMetadataExt::V1(v1) => v1,
+            BlockMetadataExt::V1(v1) => {
+                let args = vec![
+                    MoveValue::Signer(AccountAddress::ZERO), // Run as 0x0
+                    MoveValue::Address(AccountAddress::from_bytes(v1.id.to_vec()).unwrap()),
+                    MoveValue::U64(v1.epoch),
+                    MoveValue::U64(v1.round),
+                    MoveValue::Address(v1.proposer),
+                    v1.failed_proposer_indices
+                        .into_iter()
+                        .map(|i| i as u64)
+                        .collect::<Vec<_>>()
+                        .as_move_value(),
+                    v1.previous_block_votes_bitvec.as_move_value(),
+                    MoveValue::U64(v1.timestamp_usecs),
+                    v1.randomness
+                        .as_ref()
+                        .map(Randomness::randomness_cloned)
+                        .as_move_value(),
+                ];
+                (BLOCK_PROLOGUE_EXT, args)
+            },
+            BlockMetadataExt::V2(v2) => {
+                let args = vec![
+                    MoveValue::Signer(AccountAddress::ZERO), // Run as 0x0
+                    MoveValue::Address(AccountAddress::from_bytes(v2.id.to_vec()).unwrap()),
+                    MoveValue::U64(v2.epoch),
+                    MoveValue::U64(v2.round),
+                    MoveValue::Address(v2.proposer),
+                    v2.failed_proposer_indices
+                        .into_iter()
+                        .map(|i| i as u64)
+                        .collect::<Vec<_>>()
+                        .as_move_value(),
+                    v2.previous_block_votes_bitvec.as_move_value(),
+                    MoveValue::U64(v2.timestamp_usecs),
+                    v2.randomness
+                        .as_ref()
+                        .map(Randomness::randomness_cloned)
+                        .as_move_value(),
+                    v2.decryption_key
+                        .as_ref()
+                        .map(BlockTxnDecryptionKey::decryption_key_cloned)
+                        .as_move_value(),
+                ];
+                (BLOCK_PROLOGUE_EXT_V2, args)
+            },
         };
-
-        let BlockMetadataWithRandomness {
-            id,
-            epoch,
-            round,
-            proposer,
-            previous_block_votes_bitvec,
-            failed_proposer_indices,
-            timestamp_usecs,
-            randomness,
-        } = block_metadata_with_randomness;
-
-        let args = vec![
-            MoveValue::Signer(AccountAddress::ZERO), // Run as 0x0
-            MoveValue::Address(AccountAddress::from_bytes(id.to_vec()).unwrap()),
-            MoveValue::U64(epoch),
-            MoveValue::U64(round),
-            MoveValue::Address(proposer),
-            failed_proposer_indices
-                .into_iter()
-                .map(|i| i as u64)
-                .collect::<Vec<_>>()
-                .as_move_value(),
-            previous_block_votes_bitvec.as_move_value(),
-            MoveValue::U64(timestamp_usecs),
-            randomness
-                .as_ref()
-                .map(Randomness::randomness_cloned)
-                .as_move_value(),
-        ];
 
         let traversal_storage = TraversalStorage::new();
         let mut traversal_context = TraversalContext::new(&traversal_storage);
@@ -2528,7 +2545,7 @@ impl AptosVM {
         session
             .execute_function_bypass_visibility(
                 &BLOCK_MODULE,
-                BLOCK_PROLOGUE_EXT,
+                function_name,
                 vec![],
                 serialize_values(&args),
                 &mut gas_meter,
@@ -2537,7 +2554,7 @@ impl AptosVM {
             )
             .map(|_return_vals| ())
             .or_else(|e| {
-                expect_only_successful_execution(e, BLOCK_PROLOGUE_EXT.as_str(), log_context)
+                expect_only_successful_execution(e, function_name.as_str(), log_context)
             })?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
@@ -3236,7 +3253,7 @@ impl VMValidator for AptosVM {
             },
         };
         let auxiliary_info = AuxiliaryInfo::new_timestamp_not_yet_assigned(0);
-        let txn_data = TransactionMetadata::new(&txn, &auxiliary_info);
+        let txn_data = TransactionMetadata::new(&txn, &auxiliary_info, self.timed_features());
 
         let resolver = self.as_move_resolver(&state_view);
         let is_approved_gov_script = is_approved_gov_script(&resolver, &txn, &txn_data);

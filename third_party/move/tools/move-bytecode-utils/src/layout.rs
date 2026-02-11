@@ -86,7 +86,7 @@ impl TypeLayoutBuilder {
                 compiled_module_view,
                 layout_type,
             )?)),
-            Struct(s) => MoveTypeLayout::Struct(StructLayoutBuilder::build(
+            Struct(s) => MoveTypeLayout::new_struct(StructLayoutBuilder::build(
                 s,
                 compiled_module_view,
                 layout_type,
@@ -112,7 +112,7 @@ impl TypeLayoutBuilder {
                 compiled_module_view,
                 layout_type,
             )?)),
-            Struct(shi) => MoveTypeLayout::Struct(StructLayoutBuilder::build_from_handle_idx(
+            Struct(shi) => MoveTypeLayout::new_struct(StructLayoutBuilder::build_from_handle_idx(
                 m,
                 *shi,
                 vec![],
@@ -132,7 +132,7 @@ impl TypeLayoutBuilder {
                         )
                     })
                     .collect::<anyhow::Result<Vec<_>>>()?;
-                MoveTypeLayout::Struct(StructLayoutBuilder::build_from_handle_idx(
+                MoveTypeLayout::new_struct(StructLayoutBuilder::build_from_handle_idx(
                     m,
                     *shi,
                     actual_layouts,

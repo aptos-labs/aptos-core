@@ -532,7 +532,7 @@ impl NativeVMExecutorTask {
 
         let concurrent_supply_rg_tag = &self.db_util.common.concurrent_supply;
 
-        let concurrent_supply_layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![
+        let concurrent_supply_layout = MoveTypeLayout::new_struct(MoveStructLayout::new(vec![
             MoveTypeLayout::Native(
                 IdentifierMappingKind::Aggregator,
                 Box::new(MoveTypeLayout::U128),

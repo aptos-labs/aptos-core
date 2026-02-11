@@ -1,7 +1,7 @@
 processed 6 tasks
-task 0 lines 1-20:  publish [module 0x42.tu8 {]
-task 1 lines 22-41:  publish [module 0x42.tu16 {]
-task 2 lines 43-62:  publish [module 0x42.tu32 {]
-task 3 lines 64-83:  publish [module 0x42.tu64 {]
-task 4 lines 85-104:  publish [module 0x42.tu128 {]
-task 5 lines 106-125:  publish [module 0x42.tu256 {]
+task 0 lines 1-49:  publish [module 0x42::tu8]
+task 1 lines 53-101:  publish [module 0x42::tu16]
+task 2 lines 105-153:  publish [module 0x42::tu32]
+task 3 lines 157-205:  publish [module 0x42::tu64]
+task 4 lines 209-257:  publish [module 0x42::tu128]
+task 5 lines 261-309:  publish [module 0x42::tu256]

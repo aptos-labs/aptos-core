@@ -1,0 +1,128 @@
+//# publish
+module 0x42::M
+use 0x1::signer
+struct R1 has key
+  f: bool
+
+struct R2<T0> has key
+  f: T0
+
+public fun store(l0: &signer, l1: bool)
+    copy_loc l0
+    move_loc l1
+    pack R1
+    move_to R1
+    ret
+
+public fun store_gen<T0: store>(l0: &signer, l1: T0)
+    copy_loc l0
+    move_loc l1
+    pack R2<T0>
+    move_to R2<T0>
+    ret
+
+public fun read(l0: &signer): bool acquires R1
+    move_loc l0
+    call signer::address_of
+    borrow_global R1
+    borrow_field R1, f
+    read_ref
+    ret
+
+public fun read_gen<T0: copy + drop + store>(l0: &signer): T0 acquires R2
+    move_loc l0
+    call signer::address_of
+    borrow_global R2<T0>
+    borrow_field R2<T0>, f
+    read_ref
+    ret
+
+
+
+//# run --signers 0x42
+script
+use 0x42::M
+entry public fun main(l0: signer)
+    borrow_loc l0
+    ld_false
+    call M::store
+    borrow_loc l0
+    call M::read
+    ld_false
+    eq
+    not
+    br_false l0
+    ld_u64 42
+    abort
+l0: borrow_loc l0
+    ld_true
+    call M::store_gen<bool>
+    borrow_loc l0
+    call M::read_gen<bool>
+    ld_true
+    eq
+    not
+    br_false l1
+    ld_u64 42
+    abort
+l1: borrow_loc l0
+    ld_u64 112
+    call M::store_gen<u64>
+    borrow_loc l0
+    call M::read_gen<u64>
+    ld_u64 112
+    eq
+    not
+    br_false l2
+    ld_u64 42
+    abort
+l2: ret
+
+
+
+//# run --signers 0xA
+script
+use 0x42::M
+entry public fun main(l0: signer)
+    borrow_loc l0
+    ld_false
+    call M::store
+    borrow_loc l0
+    ld_true
+    call M::store_gen<bool>
+    borrow_loc l0
+    ld_u64 112
+    call M::store_gen<u64>
+    ret
+
+
+
+//# run --signers 0xA
+script
+use 0x42::M
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call M::read
+    ld_false
+    eq
+    not
+    br_false l0
+    ld_u64 42
+    abort
+l0: borrow_loc l0
+    call M::read_gen<bool>
+    ld_true
+    eq
+    not
+    br_false l1
+    ld_u64 42
+    abort
+l1: borrow_loc l0
+    call M::read_gen<u64>
+    ld_u64 112
+    eq
+    not
+    br_false l2
+    ld_u64 42
+    abort
+l2: ret

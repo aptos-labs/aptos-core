@@ -9,6 +9,7 @@ use aptos_temppath::TempPath;
 use aptos_types::account_address::AccountAddress;
 use git2::Repository;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
 pub struct FrameworkReleaseConfig {
@@ -17,6 +18,12 @@ pub struct FrameworkReleaseConfig {
     /// Compile the framework release at a given git commit hash.
     /// If set to None, we will use the aptos framework under current repo.
     pub git_hash: Option<String>,
+    /// Optional list of specific framework packages to include.
+    /// If None or empty, all packages will be included.
+    /// Valid package names: "move-stdlib", "aptos-stdlib", "aptos-framework",
+    /// "aptos-token", "aptos-token-objects", "aptos-trading"
+    #[serde(default)]
+    pub packages: Option<Vec<String>>,
 }
 
 pub fn generate_upgrade_proposals(
@@ -35,13 +42,64 @@ pub fn generate_upgrade_proposals(
     // NOTE: This is skipping 0x7 (aptos-experimental package) which is only meant to be released
     // to devnet (or local testnet) via the genesis process and never released/upgraded in testnet
     // or mainnet.
-    let mut package_path_list = [
-        ("0x1", "aptos-move/framework/move-stdlib"),
-        ("0x1", "aptos-move/framework/aptos-stdlib"),
-        ("0x1", "aptos-move/framework/aptos-framework"),
-        ("0x3", "aptos-move/framework/aptos-token"),
-        ("0x4", "aptos-move/framework/aptos-token-objects"),
+
+    // Define all available packages with their metadata
+    let all_packages = [
+        ("0x1", "aptos-move/framework/move-stdlib", "move-stdlib"),
+        ("0x1", "aptos-move/framework/aptos-stdlib", "aptos-stdlib"),
+        (
+            "0x1",
+            "aptos-move/framework/aptos-framework",
+            "aptos-framework",
+        ),
+        ("0x3", "aptos-move/framework/aptos-token", "aptos-token"),
+        (
+            "0x4",
+            "aptos-move/framework/aptos-token-objects",
+            "aptos-token-objects",
+        ),
+        ("0x5", "aptos-move/framework/aptos-trading", "aptos-trading"),
     ];
+
+    // Filter packages if specific ones are requested
+    let mut package_path_list: Vec<(&str, &str)> =
+        if let Some(requested_packages) = &config.packages {
+            if requested_packages.is_empty() {
+                // If packages field exists but is empty, include all packages
+                all_packages
+                    .iter()
+                    .map(|(addr, path, _)| (*addr, *path))
+                    .collect()
+            } else {
+                // Validate that the requested packages are valid
+                let all_package_names = all_packages
+                    .iter()
+                    .map(|(_, _, name)| name.to_string())
+                    .collect::<HashSet<String>>();
+                for package in requested_packages {
+                    if !all_package_names.contains(package) {
+                        return Err(anyhow::anyhow!(
+                            "Invalid package name specified: {}, must be one of: {:?}",
+                            package,
+                            all_package_names
+                        ));
+                    }
+                }
+
+                // Filter to only requested packages
+                all_packages
+                    .iter()
+                    .filter(|(_, _, name)| requested_packages.contains(&name.to_string()))
+                    .map(|(addr, path, _)| (*addr, *path))
+                    .collect()
+            }
+        } else {
+            // If packages field is None, include all packages (default behavior)
+            all_packages
+                .iter()
+                .map(|(addr, path, _)| (*addr, *path))
+                .collect()
+        };
 
     let mut result: Vec<(String, String)> = vec![];
 

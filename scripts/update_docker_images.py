@@ -9,8 +9,8 @@ ARCH = "amd64"
 OS = "linux"
 
 IMAGES = {
-    "debian": "debian:bullseye",
-    "rust": "rust:1.80.1-bullseye",
+    "debian": "debian:trixie",
+    "rust": "rust:1.91.0-trixie",
 }
 
 

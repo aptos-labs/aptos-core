@@ -296,6 +296,9 @@ impl<T: fmt::Write> Disassembler<T> {
             Visibility::Public => self.out.write_str("public ")?,
             Visibility::Friend => self.out.write_str("friend ")?,
         }
+        if fdef.is_native() {
+            self.out.write_str("native ")?;
+        }
         write!(self.out, "fun {}", fdef.name())?;
         if !fdef.type_parameters().is_empty() {
             self.list(

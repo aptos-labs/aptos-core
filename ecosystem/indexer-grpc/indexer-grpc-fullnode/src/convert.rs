@@ -1021,6 +1021,10 @@ fn convert_validator_transaction(
                     )
                 )
             },
+            ApiValidatorTransactionEnum::ChunkyDKGResult(_) => {
+                // TODO(ibalajiarun): Support indexer
+                None
+            },
         },
         events: convert_events(api_validator_txn.events()),
     })

@@ -1,0 +1,95 @@
+//# publish
+module 0x22::A
+struct G<T0> has drop + key
+  x: T0
+
+public fun make_g(): G<u64>
+    ld_u64 1
+    pack G<u64>
+    ret
+
+public fun borrow(l0: &G<u64>): &u64
+    move_loc l0
+    borrow_field G<u64>, x
+    ret
+
+public fun borrow_mut(l0: &mut G<u64>): &mut u64
+    move_loc l0
+    mut_borrow_field G<u64>, x
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::A
+entry public fun main(l0: signer)
+    local l1: A::G<u64>
+    local l2: &u64
+    local l3: u64
+    call A::make_g
+    st_loc l1
+    borrow_loc l1
+    call A::borrow
+    st_loc l2
+    move_loc l2
+    read_ref
+    st_loc l3
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::A
+entry public fun main(l0: signer)
+    local l1: A::G<u64>
+    local l2: &u64
+    local l3: u64
+    call A::make_g
+    st_loc l1
+    borrow_loc l1
+    call A::borrow
+    st_loc l2
+    ld_u64 10
+    move_loc l2
+    write_ref
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::A
+entry public fun main(l0: signer)
+    local l1: A::G<u64>
+    local l2: &u64
+    local l3: u64
+    call A::make_g
+    st_loc l1
+    mut_borrow_loc l1
+    call A::borrow_mut
+    st_loc l2
+    move_loc l2
+    read_ref
+    st_loc l3
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::A
+entry public fun main(l0: signer)
+    local l1: A::G<u64>
+    local l2: &mut u64
+    local l3: u64
+    call A::make_g
+    st_loc l1
+    mut_borrow_loc l1
+    call A::borrow_mut
+    st_loc l2
+    ld_u64 10
+    move_loc l2
+    write_ref
+    ret

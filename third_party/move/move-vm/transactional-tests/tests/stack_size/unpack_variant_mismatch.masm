@@ -1,0 +1,110 @@
+//# publish
+module 0x3::trusted
+
+enum A
+    V1
+        x: u64
+    V2
+        x: u64
+        y: u64
+    V3
+        x: u64
+        y: u64
+        z: u64
+
+public fun pack_v2_unpack_v2(): u64
+    ld_u64 20
+    ld_u64 30
+    pack_variant A, V2
+    unpack_variant A, V2
+    pop
+    ret
+
+public fun pack_v2_unpack_v1(): u64
+    ld_u64 20
+    ld_u64 30
+    pack_variant A, V2
+    unpack_variant A, V1
+    ret
+
+public fun pack_v2_unpack_v3(): u64
+    ld_u64 20
+    ld_u64 30
+    pack_variant A, V2
+    unpack_variant A, V3
+    pop
+    pop
+    ret
+
+//# run --verbose 0x3::trusted::pack_v2_unpack_v2
+
+//# run --verbose 0x3::trusted::pack_v2_unpack_v1
+
+//# run --verbose 0x3::trusted::pack_v2_unpack_v3
+
+//# publish
+module 0x4::trusted
+
+enum A
+    V1
+        x: u64
+    V2
+        x: u64
+        y: u64
+    V3
+        x: u64
+        y: u64
+        z: u64
+
+enum B
+    V1
+        x: u64
+        y: u64
+    V2
+        x: u64
+        y: u64
+    V3
+        x: u64
+        y: u64
+
+public fun pack_a_v1_unpack_b_v1(): u64
+    ld_u64 20
+    pack_variant A, V1
+    unpack_variant B, V1
+    pop
+    ret
+
+public fun pack_a_v2_unpack_b_v2(): u64
+    ld_u64 20
+    ld_u64 30
+    pack_variant A, V2
+    // Succeeds: stack is balanced even though type is wrong.
+    unpack_variant B, V2
+    pop
+    ret
+
+public fun pack_a_v3_unpack_b_v3(): u64
+   ld_u64 20
+   ld_u64 30
+   ld_u64 40
+   pack_variant A, V3
+   unpack_variant B, V3
+   pop
+   ret
+
+public fun pack_a_v3_unpack_b_v2(): u64
+   ld_u64 20
+   ld_u64 30
+   ld_u64 40
+   pack_variant A, V3
+   unpack_variant B, V2
+   pop
+   ret
+
+//# run --verbose 0x4::trusted::pack_a_v1_unpack_b_v1
+
+//# run --verbose 0x4::trusted::pack_a_v2_unpack_b_v2
+
+//# run --verbose 0x4::trusted::pack_a_v3_unpack_b_v3
+
+//# run --verbose 0x4::trusted::pack_a_v3_unpack_b_v2

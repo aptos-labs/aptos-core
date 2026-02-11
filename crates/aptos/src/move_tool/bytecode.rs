@@ -47,7 +47,7 @@ const DECOMPILER_EXTENSION: &str = "mv.move";
 ///
 /// For example, if you want to disassemble an on-chain package `PackName` at account `0x42`:
 /// 1. Download the package with `aptos move download --account 0x42 --package PackName --bytecode`
-/// 2. Disassemble the package bytecode with `aptos move disassemble --package-path PackName/bytecode_modules`
+/// 2. Disassemble the package bytecode with `aptos move disassemble --package-dir PackName/bytecode_modules`
 #[derive(Debug, Parser)]
 pub struct Disassemble {
     #[clap(flatten)]
@@ -61,7 +61,7 @@ pub struct Disassemble {
 ///
 /// For example, if you want to decompile an on-chain package `PackName` at account `0x42`:
 /// 1. Download the package with `aptos move download --account 0x42 --package PackName --bytecode`
-/// 2. Decompile the package bytecode with `aptos decompile --package-path PackName/bytecode_modules`
+/// 2. Decompile the package bytecode with `aptos move decompile --package-dir PackName/bytecode_modules`
 #[derive(Debug, Parser)]
 pub struct Decompile {
     #[clap(flatten)]
@@ -132,12 +132,12 @@ pub struct BytecodeCommand {
 #[group(required = true, multiple = false)]
 pub struct BytecodeCommandInput {
     /// The path to a directory containing Move bytecode files with the extension `.mv`.
-    /// The tool will process all files find in this directory
+    /// The tool will process all files found in this directory.
     ///
     /// If present, a source map at the same location ending in `.mvsm` and the source
-    /// file itself ending in`.move` will be processed by the tool.
-    #[clap(long)]
-    pub package_path: Option<PathBuf>,
+    /// file itself ending in `.move` will be processed by the tool.
+    #[clap(long, alias = "package-path")]
+    pub package_dir: Option<PathBuf>,
 
     /// Alternatively to a package path, path to a single bytecode file which should be processed.
     #[clap(long)]
@@ -197,7 +197,7 @@ impl BytecodeCommand {
     ) -> CliTypedResult<String> {
         let inputs = if let Some(path) = self.input.bytecode_path.clone() {
             vec![path]
-        } else if let Some(path) = self.input.package_path.clone() {
+        } else if let Some(path) = self.input.package_dir.clone() {
             read_dir_files(path.as_path(), |p| {
                 p.extension()
                     .map(|s| s == MOVE_COMPILED_EXTENSION)

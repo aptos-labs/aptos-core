@@ -45,6 +45,7 @@ use tokio::{
 
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
 const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
+const DEFAULT_MAX_NUM_WORKER_THREADS: usize = 32;
 
 /// Bootstraps the API and the indexer. Returns the Mempool client
 /// receiver, and both the api and indexer runtimes.
@@ -155,6 +156,12 @@ pub fn start_consensus_runtime(
     let reconfig_subscription = consensus_reconfig_subscription
         .expect("Consensus requires a reconfiguration subscription!");
 
+    let num_worker_threads = if node_config.consensus.num_tokio_worker_threads == 0 {
+        (num_cpus::get() / 2).clamp(1, DEFAULT_MAX_NUM_WORKER_THREADS)
+    } else {
+        node_config.consensus.num_tokio_worker_threads as usize
+    };
+
     let consensus = aptos_consensus::consensus_provider::start_consensus(
         node_config,
         consensus_network_interfaces.network_client,
@@ -165,6 +172,7 @@ pub fn start_consensus_runtime(
         reconfig_subscription,
         vtxn_pool,
         consensus_publisher,
+        num_worker_threads,
     );
     debug!("Consensus started in {} ms", instant.elapsed().as_millis());
 
@@ -232,8 +240,10 @@ pub fn start_peer_monitoring_service(
     let network_service_events = network_interfaces.network_service_events;
 
     // Create a new runtime for the monitoring service
-    let peer_monitoring_service_runtime =
-        aptos_runtimes::spawn_named_runtime("peer-mon".into(), None);
+    let peer_monitoring_service_runtime = aptos_runtimes::spawn_named_runtime(
+        "peer-mon".into(),
+        node_config.peer_monitoring_service.num_threads,
+    );
 
     // Create and spawn the peer monitoring server
     let peer_monitoring_network_events =

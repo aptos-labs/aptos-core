@@ -32,7 +32,7 @@ pub fn start_chunky_subtranscript_certification(
     epoch_state: Arc<EpochState>,
     _dkg_config: ChunkyDKGConfig,
     aggregated_subtranscript: AggregatedSubtranscript,
-    validated_trx_tx: Option<Sender<(), CertifiedAggregatedSubtranscript>>,
+    certified_agg_subtx_tx: Option<Sender<(), CertifiedAggregatedSubtranscript>>,
 ) -> AbortHandle {
     let epoch = epoch_state.epoch;
     let rb = reliable_broadcast.clone();
@@ -57,7 +57,7 @@ pub fn start_chunky_subtranscript_certification(
             my_addr = my_addr,
             "[ChunkyDKG] validated aggregate subtranscript locally"
         );
-        if let Err(e) = validated_trx_tx
+        if let Err(e) = certified_agg_subtx_tx
             .expect("[ChunkyDKG] validated_trx_tx should be available")
             .push((), validated_trx)
         {

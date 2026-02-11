@@ -1,5 +1,5 @@
 processed 2 tasks
-task 0 lines 1-11:  publish [module 0x1.M {]
+task 0 lines 1-8:  publish [module 0x1::M]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M'. Got VMError: {
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,
@@ -7,7 +7,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(Signature, 1)],
     offsets: [],
 }
-task 1 lines 13-24:  publish [module 0x1.M2 {]
+task 1 lines 12-22:  publish [module 0x1::M2]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M2'. Got VMError: {
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,

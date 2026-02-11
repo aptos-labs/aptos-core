@@ -4207,7 +4207,7 @@ Return the <code>ValidatorConsensusInfo</code> of each current validator, sorted
         <b>let</b> candidate = <b>if</b> (candidate_idx &lt; num_cur_actives) {
             cur_validator_set.active_validators.borrow(candidate_idx)
         } <b>else</b> {
-            cur_validator_set.pending_active.borrow(candidate_idx - num_cur_actives)
+            cur_validator_set.pending_active.borrow(num_candidates - 1 - candidate_idx)
         };
         <b>let</b> stake_pool = <b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(candidate.addr);
         <b>let</b> cur_active = <a href="coin.md#0x1_coin_value">coin::value</a>(&stake_pool.active);

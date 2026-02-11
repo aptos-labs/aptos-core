@@ -10,7 +10,7 @@ use clap::*;
 use legacy_move_compiler::shared::NumericalAddress;
 use move_command_line_common::{
     address::ParsedAddress,
-    files::{MOVE_ASM_EXTENSION, MOVE_EXTENSION, MOVE_IR_EXTENSION},
+    files::{MOVE_ASM_EXTENSION, MOVE_EXTENSION},
     types::{ParsedStructType, ParsedType},
     values::{ParsableValue, ParsedValue},
 };
@@ -208,7 +208,6 @@ impl<T> TaskInput<T> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SyntaxChoice {
     Source,
-    IR,
     ASM,
 }
 
@@ -219,14 +218,14 @@ pub enum PrintBytecodeInputChoice {
     Module,
 }
 
-/// Translates the given Move IR module or script into bytecode, then prints a textual
+/// Translates the given Move module or script into bytecode, then prints a textual
 /// representation of that bytecode.
 #[derive(Debug, Parser)]
 pub struct PrintBytecodeCommand {
     /// The kind of input: either a script, or a module.
     #[clap(long = "input", value_enum, ignore_case = true, default_value_t = PrintBytecodeInputChoice::Script)]
     pub input: PrintBytecodeInputChoice,
-    /// Select Move source ("move"), MoveIR ("mvir"), or Move Assembler ("masm").  Is inferred
+    /// Select Move source ("move") or Move Assembler ("masm"). Is inferred
     /// from filename if absent.
     #[clap(long = "syntax")]
     pub syntax: Option<SyntaxChoice>,
@@ -417,7 +416,6 @@ impl fmt::Display for SyntaxChoice {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             SyntaxChoice::Source => MOVE_EXTENSION,
-            SyntaxChoice::IR => MOVE_IR_EXTENSION,
             SyntaxChoice::ASM => MOVE_ASM_EXTENSION,
         })
     }
@@ -429,12 +427,10 @@ impl FromStr for SyntaxChoice {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             MOVE_EXTENSION => Ok(SyntaxChoice::Source),
-            MOVE_IR_EXTENSION => Ok(SyntaxChoice::IR),
             MOVE_ASM_EXTENSION => Ok(SyntaxChoice::ASM),
             _ => Err(anyhow!(
-                "Invalid syntax choice. Expected '{}' or '{}' or '{}'",
+                "Invalid syntax choice. Expected '{}' or '{}'",
                 MOVE_EXTENSION,
-                MOVE_IR_EXTENSION,
                 MOVE_ASM_EXTENSION
             )),
         }

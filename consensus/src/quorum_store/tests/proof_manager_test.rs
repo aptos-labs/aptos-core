@@ -138,7 +138,7 @@ async fn test_block_request() {
     let proof = create_proof(PeerId::random(), 10, 1);
     proof_manager.receive_proofs(vec![proof.clone()]);
 
-    get_proposal_and_assert(&mut proof_manager, 100, &[], &vec![proof]).await;
+    get_proposal_and_assert(&mut proof_manager, 100, &[], &[proof]).await;
 }
 
 #[tokio::test]
@@ -157,7 +157,7 @@ async fn test_max_txns_from_block_to_execute() {
             Some(max_txns_from_block_to_execute),
             Some(block_gas_limit),
         ),
-        &vec![proof],
+        &[proof],
         Some(max_txns_from_block_to_execute),
         Some(block_gas_limit),
     );
@@ -171,7 +171,7 @@ async fn test_block_timestamp_expiration() {
     proof_manager.receive_proofs(vec![proof.clone()]);
 
     proof_manager.handle_commit_notification(1, vec![]);
-    get_proposal_and_assert(&mut proof_manager, 100, &[], &vec![proof]).await;
+    get_proposal_and_assert(&mut proof_manager, 100, &[], &[proof]).await;
 
     proof_manager.handle_commit_notification(20, vec![]);
     get_proposal_and_assert(&mut proof_manager, 100, &[], &[]).await;
@@ -188,7 +188,7 @@ async fn test_batch_commit() {
     proof_manager.receive_proofs(vec![proof1.clone()]);
 
     proof_manager.handle_commit_notification(1, vec![proof1.info().clone()]);
-    get_proposal_and_assert(&mut proof_manager, 100, &[], &vec![proof0]).await;
+    get_proposal_and_assert(&mut proof_manager, 100, &[], &[proof0]).await;
 }
 
 #[tokio::test]
@@ -242,14 +242,14 @@ async fn test_proposal_fairness() {
     get_proposal_and_assert(&mut proof_manager, 100, &[], &expected).await;
 
     // The first two proofs are taken fairly from each peer
-    get_proposal_and_assert(&mut proof_manager, 2, &[], &vec![
+    get_proposal_and_assert(&mut proof_manager, 2, &[], &[
         peer0_proofs[0].clone(),
         peer1_proof_0.clone(),
     ])
     .await;
 
     // The next two proofs are taken from the remaining peer
-    let filter = vec![peer0_proofs[0].clone(), peer1_proof_0.clone()];
+    let filter = [peer0_proofs[0].clone(), peer1_proof_0.clone()];
     let filter: Vec<_> = filter.iter().map(ProofOfStore::info).cloned().collect();
     get_proposal_and_assert(&mut proof_manager, 2, &filter, &peer0_proofs[1..3]).await;
 
@@ -285,7 +285,7 @@ async fn test_duplicate_batches_on_commit() {
     proof_manager.receive_proofs(vec![proof1.clone()]);
 
     // Only one copy of the batch exists
-    get_proposal_and_assert(&mut proof_manager, 10, &[], &vec![proof0.clone()]).await;
+    get_proposal_and_assert(&mut proof_manager, 10, &[], std::slice::from_ref(&proof0)).await;
 
     // Nothing goes wrong on commits
     proof_manager.handle_commit_notification(4, vec![batch.clone().into()]);
@@ -323,11 +323,11 @@ async fn test_duplicate_batches_on_expiration() {
     proof_manager.receive_proofs(vec![proof1.clone()]);
 
     // Only one copy of the batch exists
-    get_proposal_and_assert(&mut proof_manager, 10, &[], &vec![proof0.clone()]).await;
+    get_proposal_and_assert(&mut proof_manager, 10, &[], std::slice::from_ref(&proof0)).await;
 
     // Nothing goes wrong on expiration
     proof_manager.handle_commit_notification(5, vec![]);
-    get_proposal_and_assert(&mut proof_manager, 10, &[], &vec![proof0.clone()]).await;
+    get_proposal_and_assert(&mut proof_manager, 10, &[], std::slice::from_ref(&proof0)).await;
     proof_manager.handle_commit_notification(12, vec![]);
     get_proposal_and_assert(&mut proof_manager, 10, &[], &[]).await;
 }
