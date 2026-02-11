@@ -8,7 +8,6 @@ use crate::v2::{
     types::V2Response,
 };
 use aptos_api_types::{AsConverter, Transaction, TransactionOnChainData, UserTransaction};
-use aptos_crypto::hash::CryptoHash;
 use aptos_types::transaction::SignedTransaction;
 use aptos_vm::AptosSimulationVM;
 use axum::{
@@ -117,7 +116,7 @@ pub async fn simulate_transaction_handler(
         let sim_txn = aptos_types::transaction::Transaction::UserTransaction(txn);
         let zero_hash = aptos_crypto::HashValue::zero();
         let info = aptos_types::transaction::TransactionInfo::new(
-            sim_txn.hash(),
+            sim_txn.committed_hash(),
             zero_hash,
             zero_hash,
             None,
