@@ -1789,6 +1789,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-experimental-new-interpreter"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "rand 0.7.3",
+]
+
+[[package]]
 name = "aptos-experimental-ptx-executor"
 version = "0.1.0"
 dependencies = [

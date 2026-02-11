@@ -152,6 +152,7 @@ members = [
     "execution/executor-types",
     "experimental/bulk-txn-submit",
     "experimental/execution/ptx-executor",
+    "experimental/new-interpreter",
     "experimental/runtimes",
     "experimental/storage/hexy",
     "experimental/storage/layered-map",
@@ -342,6 +343,7 @@ aptos-executor-types = { path = "execution/executor-types" }
 aptos-experimental-hexy = { path = "experimental/storage/hexy" }
 aptos-experimental-bulk-txn-submit = { path = "experimental/bulk-txn-submit" }
 aptos-experimental-layered-map = { path = "experimental/storage/layered-map" }
+aptos-experimental-new-interpreter = { path = "experimental/new-interpreter" }
 aptos-experimental-ptx-executor = { path = "experimental/execution/ptx-executor" }
 aptos-experimental-runtimes = { path = "experimental/runtimes" }
 aptos-faucet-cli = { path = "crates/aptos-faucet/cli" }
