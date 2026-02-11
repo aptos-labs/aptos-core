@@ -214,7 +214,7 @@ impl SecretShareManager {
             let epoch_state_clone = epoch_state.clone();
             let config_clone = config.clone();
             bounded_executor
-                .spawn(async move {
+                .spawn_blocking(move || {
                     match bcs::from_bytes::<SecretShareMessage>(dec_msg.req.data()) {
                         Ok(msg) => {
                             if msg.verify(&epoch_state_clone, &config_clone).is_ok() {

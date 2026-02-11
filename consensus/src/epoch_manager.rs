@@ -1595,7 +1595,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let payload_manager = self.payload_manager.clone();
             let pending_blocks = self.pending_blocks.clone();
             self.bounded_executor
-                .spawn(async move {
+                .spawn_blocking(move || {
                     match monitor!(
                         "verify_message",
                         unverified_event.clone().verify(
