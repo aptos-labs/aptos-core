@@ -221,16 +221,14 @@ impl BlockStore {
                 PipelinedBlock::new(
                     *commit_root_block,
                     vec![],
-                    // Create a dummy state_compute_result with necessary fields filled in.
-                    result.clone(),
+                    Some(result.clone()),
                 )
             },
             Some(window_block) => {
                 PipelinedBlock::new(
                     *window_block,
                     vec![],
-                    // Create a dummy state_compute_result with necessary fields filled in.
-                    result.clone(),
+                    Some(result.clone()),
                 )
             },
         };

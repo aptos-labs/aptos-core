@@ -13,7 +13,6 @@ use aptos_consensus_types::{
     quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
-use aptos_executor_types::state_compute_result::StateComputeResult;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -38,7 +37,7 @@ pub fn create_ordered_blocks(rounds: Vec<Round>) -> OrderedBlocks {
                     None,
                 ),
                 vec![],
-                StateComputeResult::new_dummy(),
+                None,
             ))
         })
         .collect();

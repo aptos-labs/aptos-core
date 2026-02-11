@@ -24,7 +24,6 @@ use aptos_consensus_types::{
     quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
-use aptos_executor_types::state_compute_result::StateComputeResult;
 use aptos_infallible::RwLock;
 use aptos_logger::{error, info};
 use aptos_storage_interface::DbReader;
@@ -195,7 +194,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                 node_digests,
             ),
             vec![],
-            StateComputeResult::new_dummy(),
+            None,
         ));
         let block_info = block.block_info();
         *self.parent_block_info.write() = block_info.clone();

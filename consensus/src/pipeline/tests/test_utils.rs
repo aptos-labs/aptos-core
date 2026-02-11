@@ -114,7 +114,7 @@ pub fn prepare_executed_blocks_with_ledger_info(
             Arc::new(PipelinedBlock::new(
                 proposal.block().clone(),
                 vec![],
-                compute_result.clone(),
+                Some(compute_result.clone()),
             ))
         })
         .collect();

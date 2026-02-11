@@ -20,6 +20,7 @@ use aptos_logger::{error, info, warn};
 use aptos_types::{
     block_info::BlockInfo,
     contract_event::ContractEvent,
+    proof::AccumulatorExtensionProof,
     decryption::BlockTxnDecryptionKey,
     ledger_info::LedgerInfoWithSignatures,
     randomness::Randomness,
@@ -215,7 +216,7 @@ pub struct PipelinedBlock {
     /// The state_compute_result is calculated for all the pending blocks prior to insertion to
     /// the tree. The execution results are not persisted: they're recalculated again for the
     /// pending blocks upon restart.
-    state_compute_result: Mutex<StateComputeResult>,
+    state_compute_result: OnceCell<StateComputeResult>,
     randomness: OnceCell<Randomness>,
     pipeline_insertion_time: OnceCell<Instant>,
     execution_summary: OnceCell<ExecutionSummary>,
@@ -275,7 +276,7 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
             input_transactions,
             randomness,
         } = SerializedBlock::deserialize(deserializer)?;
-        let block = PipelinedBlock::new(block, input_transactions, StateComputeResult::new_dummy());
+        let block = PipelinedBlock::new(block, input_transactions, None);
         if let Some(r) = randomness {
             block.set_randomness(r);
         }
@@ -314,23 +315,24 @@ impl PipelinedBlock {
                 .as_ref()
                 .map(|info| info.block_effective_gas_units()),
         };
-        *self.state_compute_result.lock() = state_compute_result;
 
-        // We might be retrying execution, so it might have already been set.
+        // We might be retrying execution, so the compute result might have already been set.
         // Because we use this for statistics, it's ok that we drop the newer value.
-        if let Some(previous) = self.execution_summary.get() {
-            if previous.root_hash == execution_summary.root_hash
-                || previous.root_hash == *ACCUMULATOR_PLACEHOLDER_HASH
-            {
-                warn!(
-                    "Skipping re-inserting execution result, from {:?} to {:?}",
-                    previous, execution_summary
-                );
-            } else {
-                error!(
-                    "Re-inserting execution result with different root hash: from {:?} to {:?}",
-                    previous, execution_summary
-                );
+        if self.state_compute_result.set(state_compute_result).is_err() {
+            if let Some(previous) = self.execution_summary.get() {
+                if previous.root_hash == execution_summary.root_hash
+                    || previous.root_hash == *ACCUMULATOR_PLACEHOLDER_HASH
+                {
+                    warn!(
+                        "Skipping re-inserting execution result, from {:?} to {:?}",
+                        previous, execution_summary
+                    );
+                } else {
+                    error!(
+                        "Re-inserting execution result with different root hash: from {:?} to {:?}",
+                        previous, execution_summary
+                    );
+                }
             }
         } else {
             self.execution_summary
@@ -378,13 +380,17 @@ impl PipelinedBlock {
     pub fn new(
         block: Block,
         input_transactions: Vec<SignedTransaction>,
-        state_compute_result: StateComputeResult,
+        state_compute_result: Option<StateComputeResult>,
     ) -> Self {
+        let cell = OnceCell::new();
+        if let Some(result) = state_compute_result {
+            cell.set(result).expect("Setting into new OnceCell");
+        }
         Self {
             block,
             block_window: OrderedBlockWindow::empty(),
             input_transactions,
-            state_compute_result: Mutex::new(state_compute_result),
+            state_compute_result: cell,
             randomness: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
             execution_summary: OnceCell::new(),
@@ -402,9 +408,7 @@ impl PipelinedBlock {
     }
 
     pub fn new_ordered(block: Block, window: OrderedBlockWindow) -> Self {
-        let input_transactions = Vec::new();
-        let state_compute_result = StateComputeResult::new_dummy();
-        Self::new(block, input_transactions, state_compute_result).with_block_window(window)
+        Self::new(block, Vec::new(), None).with_block_window(window)
     }
 
     pub fn block(&self) -> &Block {
@@ -448,7 +452,10 @@ impl PipelinedBlock {
     }
 
     pub fn compute_result(&self) -> StateComputeResult {
-        self.state_compute_result.lock().clone()
+        self.state_compute_result
+            .get()
+            .expect("Compute result must be set")
+            .clone()
     }
 
     pub fn randomness(&self) -> Option<&Randomness> {
@@ -460,22 +467,35 @@ impl PipelinedBlock {
     }
 
     pub fn block_info(&self) -> BlockInfo {
-        let compute_result = self.compute_result();
-        self.block().gen_block_info(
-            compute_result.root_hash(),
-            compute_result.last_version_or_0(),
-            compute_result.epoch_state().clone(),
-        )
+        match self.state_compute_result.get() {
+            Some(compute_result) => self.block().gen_block_info(
+                compute_result.root_hash(),
+                compute_result.last_version_or_0(),
+                compute_result.epoch_state().clone(),
+            ),
+            None => self.block().gen_block_info(
+                *ACCUMULATOR_PLACEHOLDER_HASH,
+                0,
+                None,
+            ),
+        }
     }
 
     pub fn vote_proposal(&self) -> VoteProposal {
-        let compute_result = self.compute_result();
-        VoteProposal::new(
-            compute_result.extension_proof(),
-            self.block.clone(),
-            compute_result.epoch_state().clone(),
-            true,
-        )
+        match self.state_compute_result.get() {
+            Some(compute_result) => VoteProposal::new(
+                compute_result.extension_proof(),
+                self.block.clone(),
+                compute_result.epoch_state().clone(),
+                true,
+            ),
+            None => VoteProposal::new(
+                AccumulatorExtensionProof::new(vec![], 0, vec![]),
+                self.block.clone(),
+                None,
+                true,
+            ),
+        }
     }
 
     pub fn order_vote_proposal(&self, quorum_cert: Arc<QuorumCert>) -> OrderVoteProposal {
@@ -483,21 +503,28 @@ impl PipelinedBlock {
     }
 
     pub fn subscribable_events(&self) -> Vec<ContractEvent> {
-        // reconfiguration suffix don't count, the state compute result is carried over from parents
-        if self.is_reconfiguration_suffix() {
-            return vec![];
+        match self.state_compute_result.get() {
+            Some(result) => {
+                // reconfiguration suffix don't count, the state compute result is carried over from parents
+                if self.is_reconfiguration_suffix() {
+                    return vec![];
+                }
+                result.subscribable_events().to_vec()
+            },
+            None => vec![],
         }
-        self.compute_result().subscribable_events().to_vec()
     }
 
     /// The block is suffix of a reconfiguration block if the state result carries over the epoch state
     /// from parent but has no transaction.
     pub fn is_reconfiguration_suffix(&self) -> bool {
-        let state_compute_result = self.compute_result();
-        state_compute_result.has_reconfiguration()
-            && state_compute_result
-                .compute_status_for_input_txns()
-                .is_empty()
+        match self.state_compute_result.get() {
+            Some(result) => {
+                result.has_reconfiguration()
+                    && result.compute_status_for_input_txns().is_empty()
+            },
+            None => false,
+        }
     }
 
     pub fn elapsed_in_pipeline(&self) -> Option<Duration> {
