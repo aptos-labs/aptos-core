@@ -1281,10 +1281,6 @@ pub struct MovePackageOptions {
     /// Fail the compilation if there are any warnings.
     #[clap(long)]
     pub fail_on_warning: bool,
-
-    /// Warning flags in `-W<name>` format (e.g., `-Wunused`, `-Wshadowing`). Use `-Wall` for all.
-    #[clap(long = "W", number_of_values = 1)]
-    pub warnings: Vec<String>,
 }
 
 impl Default for MovePackageOptions {
@@ -1310,7 +1306,6 @@ impl MovePackageOptions {
             optimize: None,
             fail_on_warning: false,
             experiments: vec![],
-            warnings: vec![],
         }
     }
 

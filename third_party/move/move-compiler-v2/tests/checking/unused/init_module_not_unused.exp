@@ -1,0 +1,25 @@
+
+Diagnostics:
+warning: Function `0x42::m::unused_helper` is unused: it has no current callers and is private to its module.
+  ┌─ tests/checking/unused/init_module_not_unused.move:9:9
+  │
+9 │     fun unused_helper() {
+  │         ^^^^^^^^^^^^^
+
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    private fun init_module(account: &signer) {
+        Tuple()
+    }
+    private fun unused_helper() {
+        Tuple()
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    fun init_module(account: &signer) {
+    }
+    fun unused_helper() {
+    }
+}

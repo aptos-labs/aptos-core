@@ -68,7 +68,6 @@ pub fn create_move_prover_v2_model<W: WriteColor>(
         sources_deps: vec![],
         warn_deprecated: false,
         warn_of_deprecation_use_in_aptos_libs: false,
-        warnings: vec![],
         whole_program: false,
         compile_test_code: false,
         compile_verify_code: true,

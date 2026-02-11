@@ -189,6 +189,11 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Inherited(Experiment::CHECKS.to_string()),
         },
         Experiment {
+            name: Experiment::UNUSED_CHECK.to_string(),
+            description: "Whether to check for unused private entities (functions, structs, constants)".to_string(),
+            default: Given(false),
+        },
+        Experiment {
             name: Experiment::VARIABLE_COALESCING.to_string(),
             description: "Whether to run variable coalescing".to_string(),
             default: Inherited(Experiment::OPTIMIZE.to_string()),
@@ -359,6 +364,7 @@ impl Experiment {
     pub const UNINITIALIZED_CHECK: &'static str = "uninitialized-check";
     pub const UNSAFE_PACKAGE_VISIBILITY: &'static str = "unsafe-package-visibility";
     pub const UNUSED_ASSIGNMENT_CHECK: &'static str = "unused-assignment-check";
+    pub const UNUSED_CHECK: &'static str = "unused-check";
     pub const UNUSED_STRUCT_PARAMS_CHECK: &'static str = "unused-struct-params-check";
     pub const USAGE_CHECK: &'static str = "usage-check";
     pub const VARIABLE_COALESCING: &'static str = "variable-coalescing";

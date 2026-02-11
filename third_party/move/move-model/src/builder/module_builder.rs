@@ -1258,6 +1258,8 @@ impl ModuleBuilder<'_, '_> {
         let value = {
             // Type check the constant.
             let mut et = ExpTranslator::new(self);
+            // Track the constant being evaluated
+            et.const_name = Some(qsym.clone());
             et.set_translate_move_fun();
             let exp = et.translate_exp(&def.value, &ty).into_exp();
             et.finalize_types(true);
@@ -1372,18 +1374,16 @@ impl ModuleBuilder<'_, '_> {
         entry.is_empty_struct = is_empty_struct;
 
         // Track structs used as field types
-        let struct_qid = QualifiedId {
+        let user_id = UserId::Struct(QualifiedId {
             module_id: self.module_id,
             id: entry.struct_id,
-        };
-        let mut field_structs = BTreeSet::new();
+        });
+        let mut all_field_types = BTreeSet::new();
         match &entry.layout {
             StructLayout::Singleton(fields, _) => {
                 for field_data in fields.values() {
                     field_data.ty.visit(&mut |ty| {
-                        if let Type::Struct(mid, sid, _) = ty {
-                            field_structs.insert(mid.qualified(*sid));
-                        }
+                        all_field_types.insert(ty.clone());
                     });
                 }
             },
@@ -1391,31 +1391,14 @@ impl ModuleBuilder<'_, '_> {
                 for variant in variants {
                     for field_data in variant.fields.values() {
                         field_data.ty.visit(&mut |ty| {
-                            if let Type::Struct(mid, sid, _) = ty {
-                                field_structs.insert(mid.qualified(*sid));
-                            }
+                            all_field_types.insert(ty.clone());
                         });
                     }
                 }
             },
             StructLayout::None => {},
         }
-
-        // Mark each field struct as being used by this struct
-        for field_struct_id in field_structs {
-            // Skip structs not in current build (e.g., from dependencies like std::vector, std::option)
-            // reverse_struct_table only contains structs from primary target modules being compiled
-            if let Some(qualified_symbol) = self
-                .parent
-                .reverse_struct_table
-                .get(&(field_struct_id.module_id, field_struct_id.id))
-            {
-                if let Some(field_struct_entry) = self.parent.struct_table.get_mut(qualified_symbol)
-                {
-                    field_struct_entry.users.insert(UserId::Struct(struct_qid));
-                }
-            }
-        }
+        self.track_structs_from_types(all_field_types, user_id);
     }
 
     fn build_field_map(
@@ -1493,18 +1476,29 @@ impl ModuleBuilder<'_, '_> {
     /// If we are operating as a Move compiler, we also translate its body.
     fn def_ana_fun(&mut self, name: &PA::FunctionName, def: &EA::Function) {
         let body = &def.body;
-        if let EA::FunctionBody_::Defined(seq) = &body.value {
-            let full_name = self.qualified_by_module_from_name(&name.0);
-            let entry = self
-                .parent
-                .fun_table
-                .get(&full_name)
-                .expect("function defined");
-            let type_params = entry.type_params.clone();
-            let params = entry.params.clone();
-            let result_type = entry.result_type.clone();
-            let spec_block_map = entry.inline_specs.clone();
+        let full_name = self.qualified_by_module_from_name(&name.0);
+        let entry = self
+            .parent
+            .fun_table
+            .get(&full_name)
+            .expect("function entry expected");
+        let type_params = entry.type_params.clone();
+        let params = entry.params.clone();
+        let result_type = entry.result_type.clone();
+        let spec_block_map = entry.inline_specs.clone();
 
+        // Collect types from signature and body
+        let mut all_used_types = BTreeSet::new();
+        for Parameter(_, ty, _) in &params {
+            ty.visit(&mut |t| {
+                all_used_types.insert(t.clone());
+            });
+        }
+        result_type.visit(&mut |t| {
+            all_used_types.insert(t.clone());
+        });
+
+        if let EA::FunctionBody_::Defined(seq) = &body.value {
             let mut et = ExpTranslator::new(self);
             et.set_spec_block_map(spec_block_map);
             et.set_result_type(result_type.clone());
@@ -1533,44 +1527,7 @@ impl ModuleBuilder<'_, '_> {
             et.check_mutable_borrow_field(&translated);
             et.check_lambda_types(&translated);
 
-            // Track struct usage for unused struct detection
-            let mut all_types = BTreeSet::new();
-            // Collect all types from function body (includes all types in expressions and patterns)
-            translated.collect_all_types(self.parent.env, &mut all_types);
-            // Collect types from function signature (parameters and return type)
-            for Parameter(_, ty, _) in &params {
-                ty.visit(&mut |t| {
-                    all_types.insert(t.clone());
-                });
-            }
-            result_type.visit(&mut |t| {
-                all_types.insert(t.clone());
-            });
-
-            // Extract struct types from all collected types
-            let mut used_structs = BTreeSet::new();
-            for ty in all_types {
-                if let Type::Struct(mid, sid, _) = ty {
-                    used_structs.insert(mid.qualified(sid));
-                }
-            }
-            let fun_qid = QualifiedId {
-                module_id: self.module_id,
-                id: FunId::new(full_name.symbol),
-            };
-            for struct_id in used_structs {
-                // Skip structs not in current build (e.g., from dependencies like std::vector, std::option)
-                // reverse_struct_table only contains structs from primary target modules being compiled
-                if let Some(qualified_symbol) = self
-                    .parent
-                    .reverse_struct_table
-                    .get(&(struct_id.module_id, struct_id.id))
-                {
-                    if let Some(struct_entry) = self.parent.struct_table.get_mut(qualified_symbol) {
-                        struct_entry.users.insert(UserId::Function(fun_qid));
-                    }
-                }
-            }
+            translated.collect_all_types(self.parent.env, &mut all_used_types);
 
             assert!(self.fun_defs.insert(full_name.symbol, translated).is_none());
             if let Some(specifiers) = access_specifiers {
@@ -1580,6 +1537,13 @@ impl ModuleBuilder<'_, '_> {
                     .is_none());
             }
         }
+
+        // Record struct usage
+        let user_id = UserId::Function(QualifiedId {
+            module_id: self.module_id,
+            id: FunId::new(full_name.symbol),
+        });
+        self.track_structs_from_types(all_used_types, user_id);
     }
 }
 
@@ -2028,6 +1992,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .expect("invalid spec block context")
                     .clone();
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
+                et.set_spec_block_context(SpecBlockContext::Function(name.clone()));
                 for (pos, TypeParameter(name, kind, loc)) in entry.type_params.iter().enumerate() {
                     et.define_type_param(
                         loc,
@@ -2068,6 +2033,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .expect("invalid spec block context")
                     .clone();
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
+                et.set_spec_block_context(SpecBlockContext::Function(name.clone()));
                 for (pos, TypeParameter(name, kind, loc)) in entry.type_params.iter().enumerate() {
                     et.define_type_param(loc, *name, Type::new_param(pos), kind.clone(), false);
                 }
@@ -2103,6 +2069,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .clone();
 
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
+                et.set_spec_block_context(SpecBlockContext::Struct(name.clone()));
                 et.define_type_params(loc, &entry.type_params, false);
                 if let StructLayout::Singleton(fields, _is_positional) = &entry.layout {
                     et.enter_scope();
@@ -2149,6 +2116,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             },
             Module => {
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
+                et.set_spec_block_context(SpecBlockContext::Module);
 
                 // define the type params
                 match kind {
@@ -2721,6 +2689,22 @@ impl ModuleBuilder<'_, '_> {
         _signature: &EA::FunctionSignature,
         body: &EA::FunctionBody,
     ) {
+        // Track signature types
+        let user_id = UserId::ModuleSpec(self.module_id);
+        let spec_fun = &self.spec_funs[self.spec_fun_index];
+
+        let mut all_types = BTreeSet::new();
+        for Parameter(_sym, ty, _loc) in &spec_fun.params {
+            ty.visit(&mut |t| {
+                all_types.insert(t.clone());
+            });
+        }
+        spec_fun.result_type.visit(&mut |t| {
+            all_types.insert(t.clone());
+        });
+
+        self.track_structs_from_types(all_types, user_id.clone());
+
         match &body.value {
             EA::FunctionBody_::Defined(seq) => {
                 let entry = &self.spec_funs[self.spec_fun_index];
@@ -2743,7 +2727,9 @@ impl ModuleBuilder<'_, '_> {
                 let translated = et.post_process_body(translated.into_exp());
                 // Run finalization again, this time with reporting errors.
                 et.finalize_types(true);
-                self.spec_funs[self.spec_fun_index].body = Some(translated);
+                self.spec_funs[self.spec_fun_index].body = Some(translated.clone());
+
+                self.track_structs_from_exp(&translated, user_id);
             },
             EA::FunctionBody_::Native => {
                 if !uninterpreted {
@@ -2751,6 +2737,7 @@ impl ModuleBuilder<'_, '_> {
                 }
             },
         }
+
         self.spec_fun_index += 1;
     }
 }
@@ -2760,9 +2747,23 @@ impl ModuleBuilder<'_, '_> {
 impl ModuleBuilder<'_, '_> {
     /// Definition analysis for a specification variable function.
     fn def_ana_global_var(&mut self, loc: &Loc, name: &Name, init: Option<&EA::Exp>) {
+        // Track type
+        let sym = self.qualified_by_module_from_name(name);
+        let decl = self
+            .spec_vars
+            .iter()
+            .find(|d| d.name == sym.symbol)
+            .expect("spec var defined");
+
+        let user_id = UserId::ModuleSpec(self.module_id);
+        let mut all_types = BTreeSet::new();
+        decl.type_.visit(&mut |t| {
+            all_types.insert(t.clone());
+        });
+        self.track_structs_from_types(all_types, user_id.clone());
+
         if let Some(exp) = init {
             // Type check and translate the initialization expression.
-            let sym = self.qualified_by_module_from_name(name);
             let entry = &self
                 .parent
                 .spec_var_table
@@ -2779,7 +2780,10 @@ impl ModuleBuilder<'_, '_> {
                 .iter_mut()
                 .find(|d| d.name == sym.symbol)
                 .expect("spec var defined");
-            decl.init = Some(translated.into_exp())
+            let init_exp = translated.into_exp();
+            decl.init = Some(init_exp.clone());
+
+            self.track_structs_from_exp(&init_exp, user_id);
         }
     }
 
@@ -3683,24 +3687,59 @@ impl ModuleBuilder<'_, '_> {
                 .iter()
                 .map(|m| self.parent.to_loc(&m.loc))
                 .collect_vec();
-            let target = match self.get_spec_block_context(&block.value.target) {
-                Some(SpecBlockContext::Module) => SpecBlockTarget::Module(self.module_id),
+
+            let context = self.get_spec_block_context(&block.value.target);
+            let target = match &context {
+                Some(SpecBlockContext::Module) => {
+                    // Track struct usage from module spec
+                    self.track_spec_struct_usage_for_context(
+                        &self.module_spec.clone(),
+                        UserId::ModuleSpec(self.module_id),
+                    );
+                    SpecBlockTarget::Module(self.module_id)
+                },
                 Some(SpecBlockContext::Function(qsym)) => {
+                    // Track struct usage from function spec
+                    if let Some(spec) = self.fun_specs.get(&qsym.symbol) {
+                        let user_id = UserId::FunctionSpec(QualifiedId {
+                            module_id: self.module_id,
+                            id: FunId::new(qsym.symbol),
+                        });
+                        self.track_spec_struct_usage_for_context(&spec.clone(), user_id);
+                    }
                     SpecBlockTarget::Function(self.module_id, FunId::new(qsym.symbol))
                 },
-                Some(SpecBlockContext::FunctionCodeV2(qsym, ..)) => SpecBlockTarget::FunctionCode(
-                    self.module_id,
-                    FunId::new(qsym.symbol),
-                    0, // TODO: investigate what to do with this in v2 compile chain
-                ),
+                Some(SpecBlockContext::FunctionCodeV2(qsym, ..)) => {
+                    // Track struct usage from inline function spec
+                    if let Some(spec) = self.fun_specs.get(&qsym.symbol) {
+                        let user_id = UserId::FunctionSpec(QualifiedId {
+                            module_id: self.module_id,
+                            id: FunId::new(qsym.symbol),
+                        });
+                        self.track_spec_struct_usage_for_context(&spec.clone(), user_id);
+                    }
+                    SpecBlockTarget::FunctionCode(
+                        self.module_id,
+                        FunId::new(qsym.symbol),
+                        0, // TODO: investigate what to do with this in v2 compile chain
+                    )
+                },
                 Some(SpecBlockContext::Struct(qsym)) => {
+                    // Track struct usage from struct spec
+                    if let Some(spec) = self.struct_specs.get(&qsym.symbol) {
+                        let user_id = UserId::StructSpec(QualifiedId {
+                            module_id: self.module_id,
+                            id: StructId::new(qsym.symbol),
+                        });
+                        self.track_spec_struct_usage_for_context(&spec.clone(), user_id);
+                    }
                     SpecBlockTarget::Struct(self.module_id, StructId::new(qsym.symbol))
                 },
                 Some(SpecBlockContext::Schema(qsym)) => {
                     let entry = self
                         .parent
                         .spec_schema_table
-                        .get(&qsym)
+                        .get(qsym)
                         .expect("schema defined");
                     SpecBlockTarget::Schema(
                         self.module_id,
@@ -3727,6 +3766,54 @@ impl ModuleBuilder<'_, '_> {
 /// # Environment Population and finalization
 
 impl ModuleBuilder<'_, '_> {
+    /// Record struct usage.
+    fn record_struct_usage(&mut self, mid: ModuleId, sid: StructId, user_id: UserId) {
+        let struct_id = mid.qualified(sid);
+        if let Some(qualified_symbol) = self
+            .parent
+            .reverse_struct_table
+            .get(&(struct_id.module_id, struct_id.id))
+        {
+            if let Some(struct_entry) = self.parent.struct_table.get_mut(qualified_symbol) {
+                struct_entry.users.insert(user_id);
+            }
+        }
+    }
+
+    /// Record structs from types.
+    fn track_structs_from_types(&mut self, types: BTreeSet<Type>, user_id: UserId) {
+        for ty in types {
+            if let Type::Struct(mid, sid, _) = ty {
+                self.record_struct_usage(mid, sid, user_id.clone());
+            }
+        }
+    }
+
+    /// Record structs from expression.
+    fn track_structs_from_exp(&mut self, exp: &Exp, user_id: UserId) {
+        let mut all_used_types = BTreeSet::new();
+        exp.collect_all_types(self.parent.env, &mut all_used_types);
+        self.track_structs_from_types(all_used_types, user_id);
+    }
+
+    fn track_spec_struct_usage_for_context(&mut self, spec: &Spec, user_id: UserId) {
+        // Conditions
+        for condition in &spec.conditions {
+            self.track_structs_from_exp(&condition.exp, user_id.clone());
+            for additional_exp in &condition.additional_exps {
+                self.track_structs_from_exp(additional_exp, user_id.clone());
+            }
+        }
+
+        // Update map (ghost variable updates)
+        for (_node_id, condition) in &spec.update_map {
+            self.track_structs_from_exp(&condition.exp, user_id.clone());
+            for additional_exp in &condition.additional_exps {
+                self.track_structs_from_exp(additional_exp, user_id.clone());
+            }
+        }
+    }
+
     fn populate_and_finalize_env(&mut self, loc: Loc, attributes: Vec<Attribute>) {
         let mut struct_data: BTreeMap<StructId, StructData> = Default::default();
         for (name, entry) in &self.parent.struct_table {

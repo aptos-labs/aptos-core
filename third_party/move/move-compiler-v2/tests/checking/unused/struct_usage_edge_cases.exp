@@ -1,14 +1,6 @@
 
 Diagnostics:
-warning: Struct `0x42::m::UsedOnlyInSpec` is unused: it has no use in the current module and is private to its module.
-  ┌─ tests/checking/unused/struct_usage_edge_cases.move:3:5
-  │
-3 │ ╭     struct UsedOnlyInSpec {
-4 │ │         x: u64
-5 │ │     }
-  │ ╰─────^
-
-warning: Struct `0x42::m::ActuallyUnused` is unused: it has no use in the current module and is private to its module.
+warning: Struct `ActuallyUnused` is unused in its defining module (only place where it can be packed, unpacked, or have fields accessed). Consider removing it or adding the `#[deprecated]` attribute to suppress this warning.
    ┌─ tests/checking/unused/struct_usage_edge_cases.move:37:5
    │
 37 │ ╭     struct ActuallyUnused {

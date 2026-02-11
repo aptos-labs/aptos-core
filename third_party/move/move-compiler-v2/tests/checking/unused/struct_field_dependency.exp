@@ -1,6 +1,6 @@
 
 Diagnostics:
-warning: Struct `0x42::test::UnusedStruct` is unused: it has no use in the current module and is private to its module.
+warning: Struct `UnusedStruct` is unused in its defining module (only place where it can be packed, unpacked, or have fields accessed). Consider removing it or adding the `#[deprecated]` attribute to suppress this warning.
    ┌─ tests/checking/unused/struct_field_dependency.move:18:5
    │
 18 │ ╭     struct UnusedStruct {

@@ -1,6 +1,6 @@
 
 Diagnostics:
-warning: Struct `0x42::m::TrulyUnused` is unused: it has no use in the current module and is private to its module.
+warning: Struct `TrulyUnused` is unused in its defining module (only place where it can be packed, unpacked, or have fields accessed). Consider removing it or adding the `#[deprecated]` attribute to suppress this warning.
    ┌─ tests/checking/unused/struct_global_storage.move:33:5
    │
 33 │ ╭     struct TrulyUnused has key {

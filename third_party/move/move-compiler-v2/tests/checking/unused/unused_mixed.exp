@@ -6,7 +6,7 @@ warning: Constant `UNUSED_A` is unused.
 3 │     const UNUSED_A: u64 = 1;
   │     ^^^^^^^^^^^^^^^^^^^^^^^^
 
-warning: Struct `0x42::m::UnusedStruct1` is unused: it has no use in the current module and is private to its module.
+warning: Struct `UnusedStruct1` is unused in its defining module (only place where it can be packed, unpacked, or have fields accessed). Consider removing it or adding the `#[deprecated]` attribute to suppress this warning.
   ┌─ tests/checking/unused/unused_mixed.move:6:5
   │
 6 │ ╭     struct UnusedStruct1 {
@@ -14,7 +14,7 @@ warning: Struct `0x42::m::UnusedStruct1` is unused: it has no use in the current
 8 │ │     }
   │ ╰─────^
 
-warning: Struct `0x42::m::UnusedStruct2` is unused: it has no use in the current module and is private to its module.
+warning: Struct `UnusedStruct2` is unused in its defining module (only place where it can be packed, unpacked, or have fields accessed). Consider removing it or adding the `#[deprecated]` attribute to suppress this warning.
    ┌─ tests/checking/unused/unused_mixed.move:24:5
    │
 24 │ ╭     struct UnusedStruct2 has drop {
