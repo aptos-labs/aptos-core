@@ -12,7 +12,7 @@ use crate::{
             input_secret::InputSecret,
             keys,
             public_parameters::PublicParameters,
-            weighted_transcript,
+            subtranscript::Subtranscript,
         },
         traits::{
             self,
@@ -59,148 +59,23 @@ pub const DST: &[u8; 42] = b"APTOS_WEIGHTED_CHUNKY_FIELD_PVSS_v2_FS_DST";
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Transcript<E: Pairing> {
     dealer: Player,
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     /// This is the aggregatable subtranscript
-    pub subtrs: weighted_transcript::Subtranscript<E>,
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
+    pub subtrs: Subtranscript<E>,
     /// Proof (of knowledge) showing that the s_{i,j}'s in C are base-B representations (of the s_i's in V, but this is not part of the proof), and that the r_j's in R are used in C
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub sharing_proof: SharingProof<E>,
 }
 
-// #[allow(non_snake_case)]
-// impl<E: Pairing> CanonicalSerialize for Subtranscript<E> {
-//     fn serialize_with_mode<W: Write>(
-//         &self,
-//         mut writer: W,
-//         compress: Compress,
-//     ) -> Result<(), SerializationError> {
-//         //
-//         // 1. Collect all G2 and G1 elements for batch normalization
-//         //
-//         let mut g2_elems = Vec::with_capacity(1 + self.Vs.iter().map(|r| r.len()).sum::<usize>());
-//         let mut g1_elems = Vec::new();
-
-//         // V0
-//         g2_elems.push(self.V0);
-
-//         // Vs
-//         for row in &self.Vs {
-//             for v in row {
-//                 g2_elems.push(*v);
-//             }
-//         }
-
-//         // Cs
-//         for mat in &self.Cs {
-//             for row in mat {
-//                 for c in row {
-//                     g1_elems.push(*c);
-//                 }
-//             }
-//         }
-
-//         // Rs
-//         for row in &self.Rs {
-//             for r in row {
-//                 g1_elems.push(*r);
-//             }
-//         }
-
-//         //
-//         // 2. Batch normalize
-//         //
-//         let g2_affine = E::G2::normalize_batch(&g2_elems);
-//         let g1_affine = E::G1::normalize_batch(&g1_elems);
-
-//         //
-//         // 3. Reconstruct nested structures in affine form
-//         //
-//         let mut g2_iter = g2_affine.into_iter();
-//         let mut g1_iter = g1_affine.into_iter();
-
-//         // V0
-//         let V0_affine = g2_iter.next().unwrap();
-
-//         // Vs_affine
-//         let Vs_affine: Vec<Vec<E::G2Affine>> = self
-//             .Vs
-//             .iter()
-//             .map(|row| row.iter().map(|_| g2_iter.next().unwrap()).collect())
-//             .collect();
-
-//         // Cs_affine
-//         let Cs_affine: Vec<Vec<Vec<E::G1Affine>>> = self
-//             .Cs
-//             .iter()
-//             .map(|mat| {
-//                 mat.iter()
-//                     .map(|row| row.iter().map(|_| g1_iter.next().unwrap()).collect())
-//                     .collect()
-//             })
-//             .collect();
-
-//         // Rs_affine
-//         let Rs_affine: Vec<Vec<E::G1Affine>> = self
-//             .Rs
-//             .iter()
-//             .map(|row| row.iter().map(|_| g1_iter.next().unwrap()).collect())
-//             .collect();
-
-//         //
-//         // 4. Serialize in canonical order using nested structure
-//         //
-//         V0_affine.serialize_with_mode(&mut writer, compress)?;
-//         Vs_affine.serialize_with_mode(&mut writer, compress)?;
-//         Cs_affine.serialize_with_mode(&mut writer, compress)?;
-//         Rs_affine.serialize_with_mode(&mut writer, compress)?;
-
-//         Ok(())
-//     }
-
-//     fn serialized_size(&self, compress: Compress) -> usize {
-//         // 1. V0
-//         let mut size = <E::G2 as CurveGroup>::Affine::zero().serialized_size(compress);
-
-//         // 2. Vs (Vec<Vec<E::G2Affine>>)
-//         // Outer length
-//         size += 4;
-//         for row in &self.Vs {
-//             size += 4; // inner row length
-//             size += row.len() * <E::G2 as CurveGroup>::Affine::zero().serialized_size(compress);
-//             // this is the weight of player i
-//         }
-
-//         // 3. Cs (Vec<Vec<Vec<E::G1Affine>>>)
-//         size += 4; // outer length
-//         for mat in &self.Cs {
-//             size += 4; // inner matrix length
-//             for row in mat {
-//                 size += 4; // row length
-//                 size += row.len() * <E::G1 as CurveGroup>::Affine::zero().serialized_size(compress);
-//                 // this can be done simpler
-//             }
-//         }
-
-//         // 4. Rs (Vec<Vec<E::G1Affine>>)
-//         size += 4; // outer length
-//         for row in &self.Rs {
-//             size += 4; // row length
-//             size += row.len() * <E::G1 as CurveGroup>::Affine::zero().serialized_size(compress);
-//             // same, something like 4 + Rs.len() * (4 + Rs[0].len() * zero().serialized_size(compress))
-//         }
-
-//         size
-//     }
-// }
-
 /// This is the secret sharing config that will be used for weighted `chunky`
+/// TODO: remove after merging subtranscript trait
 #[allow(type_alias_bounds)]
 type SecretSharingConfig<E: Pairing> = WeightedConfigArkworks<E::ScalarField>;
 
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
     HasAggregatableSubtranscript for Transcript<E>
 {
-    type Subtranscript = weighted_transcript::Subtranscript<E>;
+    type Subtranscript = Subtranscript<E>;
 
     fn get_subtranscript(&self) -> Self::Subtranscript {
         self.subtrs.clone()
@@ -443,7 +318,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         Transcript {
             dealer: *dealer,
-            subtrs: weighted_transcript::Subtranscript {
+            subtrs: Subtranscript {
                 V0: V0_proj.into_affine(),
                 Vs,
                 Cs,
@@ -540,7 +415,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         Transcript {
             dealer: sc.get_player(0),
-            subtrs: weighted_transcript::Subtranscript { V0, Vs, Cs, Rs },
+            subtrs: Subtranscript { V0, Vs, Cs, Rs },
             sharing_proof: SharingProof {
                 range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
                     unsafe_random_point_group::<E::G1, _>(rng),

@@ -15,7 +15,7 @@ use ark_ec::pairing::Pairing;
 use criterion::{
     criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, BenchmarkId, Criterion,
 };
-use rand::{rngs::StdRng, thread_rng, SeedableRng};
+use rand::{rngs::StdRng, SeedableRng};
 
 /// WARNING: Do not change this, since our range proof benchmark instructions in
 /// `crates/aptos-crypto/README.md` rely on it.
@@ -86,7 +86,7 @@ fn bench_verify<E: Pairing, B: BatchedRangeProof<E>>(
         |b| {
             b.iter_with_setup(
                 || {
-                    let mut rng = StdRng::seed_from_u64(42);
+                    let mut rng = StdRng::seed_from_u64(42); // TODO: hmm not ideal to put this here
                     let group_generators = GroupGenerators::default();
                     let (pk, vk) = B::setup(n, ell, group_generators, &mut rng);
                     let (values, comm, r) =
@@ -112,15 +112,14 @@ fn bench_prove<E: Pairing, B: BatchedRangeProof<E>>(
         move |b| {
             b.iter_with_setup(
                 || {
-                    let mut rng = thread_rng();
+                    let mut rng = StdRng::seed_from_u64(42);
                     let group_generators = GroupGenerators::default();
                     let (pk, _) = B::setup(n, ell, group_generators, &mut rng);
                     let (values, comm, r) =
                         test_utils::range_proof_random_instance::<_, B, _>(&pk, n, ell, &mut rng);
-                    (pk, values, comm, r)
+                    (pk, values, comm, r, rng)
                 },
-                |(pk, values, comm, r)| {
-                    let mut rng = thread_rng();
+                |(pk, values, comm, r, mut rng)| {
                     let _proof = B::prove(&pk, &values, ell, &comm, &r, &mut rng);
                 },
             )

@@ -11,12 +11,11 @@ use crate::{
             input_secret::InputSecret,
             keys,
             public_parameters::PublicParameters,
+            subtranscript::Subtranscript,
         },
         traits::{
             self,
-            transcript::{
-                Aggregatable, Aggregated, HasAggregatableSubtranscript, MalleableTranscript,
-            },
+            transcript::{HasAggregatableSubtranscript, MalleableTranscript},
             HasEncryptionPublicParams,
         },
         Player,
@@ -63,66 +62,12 @@ pub const DST: &[u8; 39] = b"APTOS_WEIGHTED_CHUNKY_FIELD_PVSS_FS_DST";
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Transcript<P: Pairing> {
     dealer: Player,
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     /// This is the aggregatable subtranscript
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub subtrs: Subtranscript<P>,
     /// Proof (of knowledge) showing that the s_{i,j}'s in C are base-B representations (of the s_i's in V, but this is not part of the proof), and that the r_j's in R are used in C
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub sharing_proof: SharingProof<P>,
-}
-
-#[allow(non_snake_case)]
-#[derive(
-    CanonicalSerialize, CanonicalDeserialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq,
-)]
-pub struct Subtranscript<P: Pairing> {
-    // The dealt public key
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub V0: P::G2Affine,
-    // The dealt public key shares
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub Vs: Vec<Vec<P::G2Affine>>,
-    /// First chunked ElGamal component: C[i][j] = s_{i,j} * G + r_j * ek_i. Here s_i = \sum_j s_{i,j} * B^j // TODO: change notation because B is not a group element?
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub Cs: Vec<Vec<Vec<P::G1Affine>>>,
-    /// Second chunked ElGamal component: R[j] = r_j * H
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub Rs: Vec<Vec<P::G1Affine>>,
-}
-
-#[allow(non_snake_case)]
-#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct SubtranscriptProjective<P: Pairing> {
-    // The dealt public key
-    #[serde(deserialize_with = "ark_de")]
-    pub V0: P::G2,
-    // The dealt public key shares
-    #[serde(deserialize_with = "ark_de")]
-    pub Vs: Vec<Vec<P::G2>>,
-    /// First chunked ElGamal component: C[i][j] = s_{i,j} * G + r_j * ek_i. Here s_i = \sum_j s_{i,j} * B^j // TODO: change notation because B is not a group element?
-    #[serde(deserialize_with = "ark_de")]
-    pub Cs: Vec<Vec<Vec<P::G1>>>,
-    /// Second chunked ElGamal component: R[j] = r_j * H
-    #[serde(deserialize_with = "ark_de")]
-    pub Rs: Vec<Vec<P::G1>>,
-}
-
-impl<P: Pairing> ValidCryptoMaterial for Subtranscript<P> {
-    const AIP_80_PREFIX: &'static str = "";
-
-    fn to_bytes(&self) -> Vec<u8> {
-        // TODO: using `Result<Vec<u8>>` and `.map_err(|_| CryptoMaterialError::DeserializationError)` would be more consistent here?
-        bcs::to_bytes(&self).expect("Unexpected error during PVSS transcript serialization")
-    }
-}
-
-impl<P: Pairing> TryFrom<&[u8]> for Subtranscript<P> {
-    type Error = CryptoMaterialError;
-
-    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        bcs::from_bytes::<Subtranscript<P>>(bytes)
-            .map_err(|_| CryptoMaterialError::DeserializationError)
-    }
 }
 
 /// This is the secret sharing config that will be used for weighted `chunky`
@@ -373,134 +318,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             Scalar::vec_from_inner(sk_shares),
             pk_shares, // TODO: review this formalism... why do we need this here?
         )
-    }
-}
-
-impl<E: Pairing> Aggregatable for Subtranscript<E> {
-    type Aggregated = SubtranscriptProjective<E>;
-    type SecretSharingConfig = SecretSharingConfig<E>;
-
-    fn to_aggregated(&self) -> Self::Aggregated {
-        SubtranscriptProjective {
-            V0: self.V0.into(),
-            Vs: self
-                .Vs
-                .iter()
-                .map(|row| row.iter().map(|x| (*x).into()).collect())
-                .collect(),
-            Cs: self
-                .Cs
-                .iter()
-                .map(|i| {
-                    i.iter()
-                        .map(|j| j.iter().map(|x| (*x).into()).collect())
-                        .collect()
-                })
-                .collect(),
-            Rs: self
-                .Rs
-                .iter()
-                .map(|row| row.iter().map(|x| (*x).into()).collect())
-                .collect(),
-        }
-    }
-}
-
-impl<E: Pairing> Aggregated<Subtranscript<E>> for SubtranscriptProjective<E> {
-    #[allow(non_snake_case)]
-    fn aggregate_with(
-        &mut self,
-        sc: &SecretSharingConfig<E>,
-        other: &Subtranscript<E>,
-    ) -> anyhow::Result<()> {
-        debug_assert_eq!(self.Cs.len(), sc.get_total_num_players());
-        debug_assert_eq!(self.Vs.len(), sc.get_total_num_players());
-        debug_assert_eq!(self.Cs.len(), other.Cs.len());
-        debug_assert_eq!(self.Rs.len(), other.Rs.len());
-        debug_assert_eq!(self.Vs.len(), other.Vs.len());
-
-        // Aggregate the V0s
-        self.V0 += other.V0;
-
-        // Aggregate Vs (nested) element-wise
-        for i in 0..self.Vs.len() {
-            debug_assert_eq!(self.Vs[i].len(), other.Vs[i].len());
-            for j in 0..self.Vs[i].len() {
-                // Aggregate the V_{i,j}s
-                self.Vs[i][j] += other.Vs[i][j];
-            }
-        }
-
-        for i in 0..sc.get_total_num_players() {
-            for j in 0..self.Cs[i].len() {
-                for k in 0..self.Cs[i][j].len() {
-                    // Aggregate the C_{i,j,k}s
-                    self.Cs[i][j][k] += other.Cs[i][j][k];
-                }
-            }
-        }
-
-        for j in 0..self.Rs.len() {
-            for (R_jk, other_R_jk) in self.Rs[j].iter_mut().zip(&other.Rs[j]) {
-                // Aggregate the R_{j,k}s
-                *R_jk += *other_R_jk;
-            }
-        }
-
-        Ok(())
-    }
-
-    fn normalize(self) -> Subtranscript<E> {
-        // Collect all G1 elements (from Cs and Rs)
-        let mut g1_elems = Vec::new();
-        for player_cs in &self.Cs {
-            for chunks in player_cs {
-                g1_elems.extend(chunks.iter().copied());
-            }
-        }
-        for weight_rs in &self.Rs {
-            g1_elems.extend(weight_rs.iter().copied());
-        }
-
-        // Collect all G2 elements (from V0 and Vs)
-        let mut g2_elems = vec![self.V0];
-        for row in &self.Vs {
-            g2_elems.extend(row.iter().copied());
-        }
-
-        // Batch normalize
-        let g1_affine = E::G1::normalize_batch(&g1_elems);
-        let g2_affine = E::G2::normalize_batch(&g2_elems);
-
-        // Reconstruct nested structures in affine form
-        let mut g1_iter = g1_affine.into_iter();
-        let mut g2_iter = g2_affine.into_iter();
-
-        let result = Subtranscript {
-            V0: g2_iter.next().unwrap(),
-            Vs: self
-                .Vs
-                .iter()
-                .map(|row| row.iter().map(|_| g2_iter.next().unwrap()).collect())
-                .collect(),
-            Cs: self
-                .Cs
-                .iter()
-                .map(|mat| {
-                    mat.iter()
-                        .map(|row| row.iter().map(|_| g1_iter.next().unwrap()).collect())
-                        .collect()
-                })
-                .collect(),
-            Rs: self
-                .Rs
-                .iter()
-                .map(|row| row.iter().map(|_| g1_iter.next().unwrap()).collect())
-                .collect(),
-        };
-        debug_assert!(g1_iter.next().is_none());
-        debug_assert!(g2_iter.next().is_none());
-        result
     }
 }
 
