@@ -12,6 +12,139 @@ use fixed::types::U64F64;
 use rand::{thread_rng, Rng};
 use std::ops::Deref;
 
+/// Thresholds from disable-randomness-fast-path.yaml (Randomness V1: 50% secrecy, 66% reconstruct, no fast path).
+fn v1_secrecy_threshold() -> U64F64 {
+    U64F64::from_num(50) / U64F64::from_num(100)
+}
+fn v1_reconstruct_threshold() -> U64F64 {
+    U64F64::from_num(66) / U64F64::from_num(100)
+}
+
+/// Mainnet validator voting_power (stakes) for V1 rounding test. Snapshot from 0x1::stake::ValidatorSet.
+pub const MAINNET_STAKES_V1: [u64; 121] = [
+    117253809505204,
+    195311866678970,
+    1198958522279618,
+    1417937347780238,
+    304885226418817,
+    160458823109233,
+    344150625420941,
+    289124533763189,
+    854901763421965,
+    855092844003006,
+    289000249712870,
+    313251640408293,
+    389588690070091,
+    169858456899262,
+    854902740174904,
+    729456853067396,
+    807830358661518,
+    329617367307420,
+    305612981099201,
+    1079067863738487,
+    807743430639267,
+    294028544498534,
+    317189556810426,
+    306973480211283,
+    240890617583765,
+    771193504929957,
+    870007131164552,
+    996027897906475,
+    147128803783366,
+    1953623404996116,
+    203225102560744,
+    504565600012818,
+    748077261632889,
+    859636401621571,
+    858396820532061,
+    860237274998313,
+    232206983586036,
+    341867665067879,
+    265427737821568,
+    1686248681380487,
+    538195635528108,
+    746412986696168,
+    745093859521176,
+    745050330999762,
+    499933950932256,
+    744764824769293,
+    1354425472718789,
+    1021779338285953,
+    1355900621276593,
+    1008086402510429,
+    1008098624215723,
+    415900770352310,
+    2490467052077019,
+    588583839839258,
+    462925719394754,
+    1053864655586196,
+    759616062654468,
+    1001726781035455,
+    281887492699783,
+    230043140814239,
+    512989457679044,
+    336068926165701,
+    238248412447988,
+    1001706398173424,
+    108566463736605,
+    149322795089050,
+    1023882904631239,
+    1032612619400875,
+    220645844144651,
+    548218658355603,
+    190131518743791,
+    722276451658931,
+    1512147511227114,
+    990084325967461,
+    247035470710922,
+    1702673175920816,
+    627010527656988,
+    1901325221493471,
+    1917760514108519,
+    2560912546397659,
+    416307084013120,
+    423728360308727,
+    125228177498266,
+    137070367008938,
+    211672837612296,
+    1451601627711626,
+    211011786952676,
+    581098417474447,
+    583428857094457,
+    585307317954427,
+    1040594791721888,
+    477281233543734,
+    476045984371681,
+    476448688884136,
+    632465589653879,
+    920573630730192,
+    324347863584494,
+    171770767028156,
+    981797655993635,
+    1025829007802591,
+    478799011547550,
+    1306612085384003,
+    1194181730632187,
+    261781227456041,
+    741740241970041,
+    314384239373518,
+    214503877844164,
+    1440467108788058,
+    691645012020740,
+    2027612908282052,
+    170280310750015,
+    307572084275087,
+    531117975217181,
+    514558734080310,
+    204930070719167,
+    132038648471431,
+    405072364745060,
+    189476760921413,
+    1512147872347019,
+    165544732408544,
+    932995244933406,
+];
+
 #[test]
 fn compute_mainnet_rounding() {
     let validator_stakes = MAINNET_STAKES.to_vec();
@@ -39,6 +172,35 @@ fn compute_mainnet_rounding() {
         &dkg_rounding.profile,
         *DEFAULT_RECONSTRUCT_THRESHOLD.deref()
     ));
+}
+
+/// DKG rounding with Randomness V1 config (disable-randomness-fast-path: 50% secrecy, 66% reconstruct, no fast path).
+/// Uses hardcoded mainnet validator stakes (MAINNET_STAKES_V1).
+/// Run with: cargo test -p aptos-types compute_mainnet_rounding_v1_no_fast_path -- --nocapture
+#[test]
+fn compute_mainnet_rounding_v1_no_fast_path() {
+    let validator_stakes = MAINNET_STAKES_V1.to_vec();
+    println!("validators: {} (MAINNET_STAKES_V1)", validator_stakes.len());
+
+    let dkg_rounding = DKGRounding::new(
+        &validator_stakes,
+        v1_secrecy_threshold(),
+        v1_reconstruct_threshold(),
+        None, // no fast path in V1
+    );
+    println!("mainnet rounding profile (V1, no fast path): {:?}", dkg_rounding.profile);
+
+    let total_weight_min = total_weight_lower_bound(&validator_stakes);
+    let total_weight_max = total_weight_upper_bound(
+        &validator_stakes,
+        v1_reconstruct_threshold(),
+        v1_secrecy_threshold(),
+    );
+    let total_weight = dkg_rounding.profile.validator_weights.iter().sum::<u64>();
+    assert!(total_weight >= total_weight_min as u64);
+    assert!(total_weight <= total_weight_max as u64);
+
+    assert!(is_valid_profile(&dkg_rounding.profile, v1_reconstruct_threshold()));
 }
 
 #[test]
