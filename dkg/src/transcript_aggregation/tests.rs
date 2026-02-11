@@ -8,7 +8,7 @@ use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{
     dkg::{real_dkg::RealDKG, DKGSessionMetadata, DKGTrait, DKGTranscript, DKGTranscriptMetadata},
     epoch_state::EpochState,
-    on_chain_config::OnChainRandomnessConfig,
+    on_chain_config::{OnChainRandomnessConfig, RandomnessConfigV2},
     validator_verifier::{
         ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct, ValidatorVerifier,
     },
@@ -42,9 +42,11 @@ fn test_transcript_aggregation_state() {
         .map(ValidatorConsensusInfoMoveStruct::from)
         .collect::<Vec<_>>();
     let verifier = ValidatorVerifier::new(validator_infos.clone());
+    // Use V2 config to enable fast path, needed for testing inconsistent fast/main secrets.
+    let randomness_config = OnChainRandomnessConfig::V2(RandomnessConfigV2::default());
     let pub_params = RealDKG::new_public_params(&DKGSessionMetadata {
         dealer_epoch: 999,
-        randomness_config: OnChainRandomnessConfig::default_enabled().into(),
+        randomness_config: randomness_config.into(),
         dealer_validator_set: validator_consensus_info_move_structs.clone(),
         target_validator_set: validator_consensus_info_move_structs.clone(),
     });
