@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use rand::{CryptoRng, RngCore};
 use crate::{
     chunky::types::{AggregatedSubtranscript, ChunkyDKGTranscriptRequest},
     counters,
@@ -133,11 +134,12 @@ impl ChunkyTranscriptAggregationState {
     }
 
     /// Validates metadata and deserializes the transcript, and verifies it.
-    fn validate_and_deserialize_transcript(
+    fn validate_and_deserialize_transcript<R: RngCore + CryptoRng>(
         &self,
         sender: Author,
         metadata: &DKGTranscriptMetadata,
         transcript_bytes: &[u8],
+        rng: &mut R,
     ) -> anyhow::Result<(ChunkyTranscript, u64)> {
         // Validate metadata
         ensure!(
@@ -167,6 +169,7 @@ impl ChunkyTranscriptAggregationState {
                 &self.signing_pubkeys,
                 &self.dkg_config.eks,
                 &self.dkg_config.session_metadata,
+                rng,
             )
             .context("chunky transcript verification failed")?;
 
@@ -203,10 +206,11 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
     type Message = ChunkyDKGTranscriptRequest;
     type Response = ChunkyDKGTranscript;
 
-    fn add(
+    fn add<R: RngCore + CryptoRng>(
         &self,
         sender: Author,
         chunky_dkg_transcript: ChunkyDKGTranscript,
+        rng: &mut R,
     ) -> anyhow::Result<Option<Self::Aggregated>> {
         let epoch = self.epoch_state.epoch;
 

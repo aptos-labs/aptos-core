@@ -108,7 +108,7 @@ impl AptosVM {
         )
         .map_err(|_| Expected(TranscriptDeserializationFailed))?;
 
-        DefaultDKG::verify_transcript(&pub_params, &transcript)
+        DefaultDKG::verify_transcript(&pub_params, &transcript, &mut rand::thread_rng())
             .map_err(|_| Expected(TranscriptVerificationFailed))?;
 
         // All check passed, invoke VM to publish DKG result on chain.

@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use rand::{CryptoRng, RngCore};
 use crate::{
     algebra::polynomials::shamir_secret_share,
     pvss::{
@@ -277,13 +278,14 @@ impl traits::Transcript for Transcript {
 
 impl AggregatableTranscript for Transcript {
     #[allow(non_snake_case)]
-    fn verify<A: Serialize + Clone>(
+    fn verify<A: Serialize + Clone, R: RngCore + CryptoRng>(
         &self,
         sc: &<Self as traits::Transcript>::SecretSharingConfig,
         pp: &Self::PublicParameters,
         spks: &[Self::SigningPubKey],
         eks: &[Self::EncryptPubKey],
         auxs: &[A],
+        _rng: &mut R,
     ) -> anyhow::Result<()> {
         self.check_sizes(sc)?;
         let n = sc.get_total_num_players();

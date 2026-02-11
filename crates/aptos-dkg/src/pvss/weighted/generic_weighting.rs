@@ -196,13 +196,14 @@ where
     T: Aggregatable<SecretSharingConfig = ThresholdConfigBlstrs>,
     T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>,
 {
-    fn verify<A: Serialize + Clone>(
+    fn verify<A: Serialize + Clone, R: RngCore + CryptoRng>(
         &self,
         sc: &<Self as Transcript>::SecretSharingConfig,
         pp: &Self::PublicParameters,
         spk: &[Self::SigningPubKey],
         eks: &[Self::EncryptPubKey],
         aux: &[A],
+        rng: &mut R,
     ) -> anyhow::Result<()> {
         let duplicated_eks = GenericWeighting::<T>::to_weighted_encryption_keys(sc, eks);
 
@@ -213,6 +214,7 @@ where
             spk,
             &duplicated_eks,
             aux,
+            rng,
         )
     }
 }

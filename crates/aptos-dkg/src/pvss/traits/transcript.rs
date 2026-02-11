@@ -47,6 +47,7 @@
 //! that one can always derive a public key from a secret key, which in our PVSS construction's case
 //! does not hold.
 
+use rand::{CryptoRng, RngCore};
 use crate::pvss::{
     traits::{Convert, HasEncryptionPublicParams},
     Player,
@@ -292,13 +293,14 @@ pub trait AggregatableTranscript:
     Transcript + Aggregatable<SecretSharingConfig = <Self as Transcript>::SecretSharingConfig>
 {
     // The signature here is slightly different from `NonAggregatableTranscript`, because our aggregatable PVSSs needs all of the session ids
-    fn verify<A: Serialize + Clone>(
+    fn verify<A: Serialize + Clone, R: RngCore + CryptoRng>(
         &self,
         sc: &<Self as Transcript>::SecretSharingConfig,
         pp: &Self::PublicParameters,
         spks: &[Self::SigningPubKey],
         eks: &[Self::EncryptPubKey],
         sids: &[A],
+        rng: &mut R,
     ) -> anyhow::Result<()>;
 }
 
@@ -317,13 +319,14 @@ pub trait HasAggregatableSubtranscript: Transcript {
 
     fn get_subtranscript(&self) -> Self::Subtranscript;
 
-    fn verify<A: Serialize + Clone>(
+    fn verify<A: Serialize + Clone, R: RngCore + CryptoRng>(
         &self,
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         spks: &[Self::SigningPubKey],
         eks: &[Self::EncryptPubKey],
         sid: &A, // Note the different function signature heres
+        rng: &mut R,
     ) -> anyhow::Result<()>;
 }
 

@@ -330,9 +330,10 @@ impl DKGTrait for RealDKG {
     }
 
     /// NOTE: this is used in VM.
-    fn verify_transcript(
+    fn verify_transcript<R: CryptoRng + RngCore>(
         params: &Self::PublicParams,
         trx: &Self::Transcript,
+        rng: &mut R
     ) -> anyhow::Result<()> {
         // Verify dealer indices are valid.
         let dealers = trx
@@ -372,6 +373,7 @@ impl DKGTrait for RealDKG {
             &spks,
             &all_eks,
             &aux,
+            rng,
         )?;
 
         // Verify fast path is present if and only if fast_wconfig is present.
@@ -395,7 +397,7 @@ impl DKGTrait for RealDKG {
         if let (Some(fast_trx), Some(fast_wconfig)) =
             (trx.fast.as_ref(), params.pvss_config.fast_wconfig.as_ref())
         {
-            fast_trx.verify(fast_wconfig, &params.pvss_config.pp, &spks, &all_eks, &aux)?;
+            fast_trx.verify(fast_wconfig, &params.pvss_config.pp, &spks, &all_eks, &aux, rng)?;
         }
 
         Ok(())

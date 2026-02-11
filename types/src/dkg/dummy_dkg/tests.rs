@@ -113,7 +113,7 @@ fn test_dummy_dkg_correctness() {
             &dealer_state.sk,
             &dealer_state.pk,
         );
-        assert!(DummyDKG::verify_transcript(&pub_params, &trx).is_ok());
+        assert!(DummyDKG::verify_transcript(&pub_params, &trx, &mut rng).is_ok());
         dealer_state.transcript = Some(trx);
     }
 
@@ -127,12 +127,12 @@ fn test_dummy_dkg_correctness() {
         DummyDKG::aggregate_transcripts(&pub_params, &mut agg_transcript, trx);
     });
 
-    assert!(DummyDKG::verify_transcript(&pub_params, &agg_transcript).is_ok());
+    assert!(DummyDKG::verify_transcript(&pub_params, &agg_transcript, &mut rng).is_ok());
 
     // Optional check: bad transcript should be rejected.
     let mut mauled_agg_transcript = agg_transcript.clone();
     mauled_agg_transcript.secret.val = !mauled_agg_transcript.secret.val;
-    assert!(DummyDKG::verify_transcript(&pub_params, &mauled_agg_transcript).is_err());
+    assert!(DummyDKG::verify_transcript(&pub_params, &mauled_agg_transcript, &mut rng).is_err());
 
     // Every new validator decrypt their own secret share.
     for (idx, nvi) in new_validator_states.iter_mut().enumerate() {

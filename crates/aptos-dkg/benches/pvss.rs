@@ -259,6 +259,7 @@ fn pvss_verify<T: AggregatableTranscript, M: Measurement>(
     g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
 
     let mut rng = StdRng::seed_from_u64(42);
+    let mut rng2 = StdRng::seed_from_u64(42);
 
     g.bench_function(format!("verify/{}", sc), move |b| {
         b.iter_with_setup(
@@ -277,7 +278,7 @@ fn pvss_verify<T: AggregatableTranscript, M: Measurement>(
                 )
             },
             |trx| {
-                trx.verify(&sc, &pp, &[spks[0].clone()], &eks, &[NoAux])
+                trx.verify(&sc, &pp, &[spks[0].clone()], &eks, &[NoAux], &mut rng2)
                     .expect("PVSS transcript verification should succeed");
             },
         )
@@ -350,6 +351,7 @@ fn pvss_nonaggregate_verify<T: HasAggregatableSubtranscript, M: Measurement>(
     g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
 
     let mut rng = StdRng::seed_from_u64(42);
+    let mut rng2 = StdRng::seed_from_u64(42);
 
     g.bench_function(format!("verify/{}", sc), move |b| {
         b.iter_with_setup(
@@ -371,7 +373,7 @@ fn pvss_nonaggregate_verify<T: HasAggregatableSubtranscript, M: Measurement>(
                 // we have to serialize and deserialize because otherwise verify gets a transcript with "non-normalised" projective group elements
             },
             |trx| {
-                trx.verify(&sc, &pp, &[spks[0].clone()], &eks, &NoAux)
+                trx.verify(&sc, &pp, &[spks[0].clone()], &eks, &NoAux, &mut rng2)
                     .expect("PVSS transcript verification should succeed");
             },
         )
@@ -430,7 +432,8 @@ fn pvss_aggregate_verify<T: AggregatableTranscript + MalleableTranscript, M: Mea
                 trx
             },
             |trx| {
-                trx.verify(&sc, &pp, &spks, &eks, &vec![NoAux; num_aggr])
+                let mut verify_rng = StdRng::seed_from_u64(43);
+                trx.verify(&sc, &pp, &spks, &eks, &vec![NoAux; num_aggr], &mut verify_rng)
                     .expect("aggregate PVSS transcript verification should succeed");
             },
         )

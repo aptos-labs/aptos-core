@@ -66,9 +66,10 @@ impl DKGTrait for DummyDKG {
         Ok(())
     }
 
-    fn verify_transcript(
+    fn verify_transcript<R: CryptoRng + RngCore>(
         _params: &Self::PublicParams,
         transcript: &Self::Transcript,
+        _rng: &mut R
     ) -> anyhow::Result<()> {
         let secret_another = DummyDKG::aggregate_input_secret(
             transcript

@@ -46,7 +46,7 @@ pub trait BroadcastStatus<Req: RBMessage, Res: RBMessage = Req>: Send + Sync + C
     type Message: Into<Req> + TryFrom<Req> + Clone;
     type Response: Into<Res> + TryFrom<Res> + Clone;
 
-    fn add(
+    fn add<R: RngCore + CryptoRng>(
         &self,
         peer: Author,
         response: Self::Response,

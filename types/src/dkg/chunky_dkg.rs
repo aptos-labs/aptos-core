@@ -173,12 +173,13 @@ impl ChunkyDKG {
         )
     }
 
-    pub fn verify<A: Serialize + Clone>(
+    pub fn verify<A: Serialize + Clone, R: RngCore + CryptoRng>(
         &self,
         transcript: &ChunkyTranscript,
         spks: &[DealerPublicKey],
         eks: &[ChunkyEncryptPubKey],
         sid: &A,
+        rng: &mut R,
     ) -> Result<()> {
         transcript.verify(
             &self.threshold_config,
@@ -186,6 +187,7 @@ impl ChunkyDKG {
             spks,
             eks,
             sid,
+            rng
         )
     }
 

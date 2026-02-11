@@ -77,6 +77,7 @@ fn aggregatable_dkg<T: AggregatableTranscript + CryptoHash>(
         &(0..sc.get_total_num_players())
             .map(|_| NoAux)
             .collect::<Vec<NoAux>>(),
+        &mut rng,
     )
     .expect("aggregated PVSS transcript failed verification");
 

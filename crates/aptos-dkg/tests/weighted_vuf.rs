@@ -73,7 +73,7 @@ where
     );
 
     // Make sure the PVSS dealt correctly
-    trx.verify(&wc, &d.pp, &[d.spks[0].clone()], &d.eks, &[NoAux])
+    trx.verify(&wc, &d.pp, &[d.spks[0].clone()], &d.eks, &[NoAux], rng)
         .expect("PVSS transcript failed verification");
 
     (wc, d, trx)

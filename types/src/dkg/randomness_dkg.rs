@@ -64,7 +64,7 @@ pub trait DKGTrait: std::fmt::Debug {
     ) -> Self::Transcript;
 
     /// NOTE: used in VM.
-    fn verify_transcript(params: &Self::PublicParams, trx: &Self::Transcript)
+    fn verify_transcript<R: CryptoRng + RngCore>(params: &Self::PublicParams, trx: &Self::Transcript, rng: &mut R)
         -> anyhow::Result<()>;
 
     fn verify_transcript_extra(
