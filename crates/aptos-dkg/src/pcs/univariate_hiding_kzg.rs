@@ -350,7 +350,7 @@ impl<E: Pairing> homomorphism::Trait for CommitmentHomomorphism<'_, E> {
         self.apply_msm(self.msm_terms(input))
     }
 
-    fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
+    fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
         <CommitmentHomomorphism<E> as fixed_base_msms::Trait>::normalize_output(value)
     }
 }

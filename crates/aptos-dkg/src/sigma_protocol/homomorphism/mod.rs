@@ -39,7 +39,7 @@ pub trait Trait: CanonicalSerialize {
     type CodomainNormalized;
 
     fn apply(&self, element: &Self::Domain) -> Self::Codomain;
-    fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized;
+    fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized;
 }
 
 /// `LiftHomomorphism` adapts a homomorphism `H` defined on some `Domain`
@@ -108,7 +108,7 @@ where
         self.hom.apply(&projected)
     }
 
-    fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
+    fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
         H::normalize(&self.hom, value)
     }
 }

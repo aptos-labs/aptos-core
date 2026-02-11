@@ -12,7 +12,7 @@ use crate::{
             input_secret::InputSecret,
             keys,
             public_parameters::PublicParameters,
-            weighted_transcript,
+            subtranscript::Subtranscript,
         },
         traits::{
             self,
@@ -25,7 +25,7 @@ use crate::{
         self,
         homomorphism::{
             tuple::{PairingTupleHomomorphism, TupleCodomainShape},
-            Trait as _,
+            Trait as _, TrivialShape,
         },
     },
     Scalar,
@@ -33,6 +33,7 @@ use crate::{
 use anyhow::bail;
 use aptos_crypto::{
     arkworks::{
+        msm::verify_msm_terms_with_start,
         random::{
             sample_field_elements, unsafe_random_point, unsafe_random_point_group,
             unsafe_random_points, UniformRand,
@@ -59,148 +60,23 @@ pub const DST: &[u8; 42] = b"APTOS_WEIGHTED_CHUNKY_FIELD_PVSS_v2_FS_DST";
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Transcript<E: Pairing> {
     dealer: Player,
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     /// This is the aggregatable subtranscript
-    pub subtrs: weighted_transcript::Subtranscript<E>,
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
+    pub subtrs: Subtranscript<E>,
     /// Proof (of knowledge) showing that the s_{i,j}'s in C are base-B representations (of the s_i's in V, but this is not part of the proof), and that the r_j's in R are used in C
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub sharing_proof: SharingProof<E>,
 }
 
-// #[allow(non_snake_case)]
-// impl<E: Pairing> CanonicalSerialize for Subtranscript<E> {
-//     fn serialize_with_mode<W: Write>(
-//         &self,
-//         mut writer: W,
-//         compress: Compress,
-//     ) -> Result<(), SerializationError> {
-//         //
-//         // 1. Collect all G2 and G1 elements for batch normalization
-//         //
-//         let mut g2_elems = Vec::with_capacity(1 + self.Vs.iter().map(|r| r.len()).sum::<usize>());
-//         let mut g1_elems = Vec::new();
-
-//         // V0
-//         g2_elems.push(self.V0);
-
-//         // Vs
-//         for row in &self.Vs {
-//             for v in row {
-//                 g2_elems.push(*v);
-//             }
-//         }
-
-//         // Cs
-//         for mat in &self.Cs {
-//             for row in mat {
-//                 for c in row {
-//                     g1_elems.push(*c);
-//                 }
-//             }
-//         }
-
-//         // Rs
-//         for row in &self.Rs {
-//             for r in row {
-//                 g1_elems.push(*r);
-//             }
-//         }
-
-//         //
-//         // 2. Batch normalize
-//         //
-//         let g2_affine = E::G2::normalize_batch(&g2_elems);
-//         let g1_affine = E::G1::normalize_batch(&g1_elems);
-
-//         //
-//         // 3. Reconstruct nested structures in affine form
-//         //
-//         let mut g2_iter = g2_affine.into_iter();
-//         let mut g1_iter = g1_affine.into_iter();
-
-//         // V0
-//         let V0_affine = g2_iter.next().unwrap();
-
-//         // Vs_affine
-//         let Vs_affine: Vec<Vec<E::G2Affine>> = self
-//             .Vs
-//             .iter()
-//             .map(|row| row.iter().map(|_| g2_iter.next().unwrap()).collect())
-//             .collect();
-
-//         // Cs_affine
-//         let Cs_affine: Vec<Vec<Vec<E::G1Affine>>> = self
-//             .Cs
-//             .iter()
-//             .map(|mat| {
-//                 mat.iter()
-//                     .map(|row| row.iter().map(|_| g1_iter.next().unwrap()).collect())
-//                     .collect()
-//             })
-//             .collect();
-
-//         // Rs_affine
-//         let Rs_affine: Vec<Vec<E::G1Affine>> = self
-//             .Rs
-//             .iter()
-//             .map(|row| row.iter().map(|_| g1_iter.next().unwrap()).collect())
-//             .collect();
-
-//         //
-//         // 4. Serialize in canonical order using nested structure
-//         //
-//         V0_affine.serialize_with_mode(&mut writer, compress)?;
-//         Vs_affine.serialize_with_mode(&mut writer, compress)?;
-//         Cs_affine.serialize_with_mode(&mut writer, compress)?;
-//         Rs_affine.serialize_with_mode(&mut writer, compress)?;
-
-//         Ok(())
-//     }
-
-//     fn serialized_size(&self, compress: Compress) -> usize {
-//         // 1. V0
-//         let mut size = <E::G2 as CurveGroup>::Affine::zero().serialized_size(compress);
-
-//         // 2. Vs (Vec<Vec<E::G2Affine>>)
-//         // Outer length
-//         size += 4;
-//         for row in &self.Vs {
-//             size += 4; // inner row length
-//             size += row.len() * <E::G2 as CurveGroup>::Affine::zero().serialized_size(compress);
-//             // this is the weight of player i
-//         }
-
-//         // 3. Cs (Vec<Vec<Vec<E::G1Affine>>>)
-//         size += 4; // outer length
-//         for mat in &self.Cs {
-//             size += 4; // inner matrix length
-//             for row in mat {
-//                 size += 4; // row length
-//                 size += row.len() * <E::G1 as CurveGroup>::Affine::zero().serialized_size(compress);
-//                 // this can be done simpler
-//             }
-//         }
-
-//         // 4. Rs (Vec<Vec<E::G1Affine>>)
-//         size += 4; // outer length
-//         for row in &self.Rs {
-//             size += 4; // row length
-//             size += row.len() * <E::G1 as CurveGroup>::Affine::zero().serialized_size(compress);
-//             // same, something like 4 + Rs.len() * (4 + Rs[0].len() * zero().serialized_size(compress))
-//         }
-
-//         size
-//     }
-// }
-
 /// This is the secret sharing config that will be used for weighted `chunky`
+/// TODO: remove after merging subtranscript trait
 #[allow(type_alias_bounds)]
 type SecretSharingConfig<E: Pairing> = WeightedConfigArkworks<E::ScalarField>;
 
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
     HasAggregatableSubtranscript for Transcript<E>
 {
-    type Subtranscript = weighted_transcript::Subtranscript<E>;
+    type Subtranscript = Subtranscript<E>;
 
     fn get_subtranscript(&self) -> Self::Subtranscript {
         self.subtrs.clone()
@@ -245,44 +121,47 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             DST.to_vec(),
         ); // As above, this is a bit hacky... though we have access to `self` now
 
+        let mut rng = rand::thread_rng(); // TODO: make `rng` a parameter of fn verify()?
+
         {
-            // Verify the PoK
-            let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
-            let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
-                SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,
-                SrsBasis::PowersOfTau { .. } => {
-                    bail!("Expected a Lagrange basis, received powers of tau basis instead")
-                },
-            };
-            let hom = hkzg_chunked_elgamal_commit::Homomorphism::<E>::new(
-                lagr_g1,
-                pp.pk_range_proof.ck_S.xi_1,
-                &pp.pp_elgamal,
-                &pp.G2_table,
-                &eks_inner,
-                pp.get_commitment_base(),
-                pp.ell,
-            );
-            if let Err(err) = hom.verify(
-                &TupleCodomainShape(
-                    TupleCodomainShape(
-                        sigma_protocol::homomorphism::TrivialShape(
-                            self.sharing_proof.range_proof_commitment.0.into_affine(), // Because it's not affine by default. Should probably change that
-                        ),
-                        chunked_elgamal::WeightedCodomainShape {
-                            chunks: self.subtrs.Cs.clone(),
-                            randomness: self.subtrs.Rs.clone(),
-                        },
-                    ),
-                    chunked_scalar_mul::CodomainShape(
-                        self.subtrs.Vs.iter().flatten().cloned().collect(),
-                    ),
-                ),
-                &self.sharing_proof.SoK,
-                &sok_cntxt,
-            ) {
-                bail!("PoK verification failed: {:?}", err);
-            }
+            // // Verify the PoK
+            // let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
+            // let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
+            //     SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,
+            //     SrsBasis::PowersOfTau { .. } => {
+            //         bail!("Expected a Lagrange basis, received powers of tau basis instead")
+            //     },
+            // };
+            // let hom = hkzg_chunked_elgamal_commit::Homomorphism::<E>::new(
+            //     lagr_g1,
+            //     pp.pk_range_proof.ck_S.xi_1,
+            //     &pp.pp_elgamal,
+            //     &pp.G2_table,
+            //     &eks_inner,
+            //     pp.get_commitment_base(),
+            //     pp.ell,
+            // );
+            // if let Err(err) = hom.verify(
+            //     &TupleCodomainShape(
+            //         TupleCodomainShape(
+            //             sigma_protocol::homomorphism::TrivialShape(
+            //                 self.sharing_proof.range_proof_commitment.0.into_affine(), // Because it's not affine by default. Should probably change that
+            //             ),
+            //             chunked_elgamal::WeightedCodomainShape {
+            //                 chunks: self.subtrs.Cs.clone(),
+            //                 randomness: self.subtrs.Rs.clone(),
+            //             },
+            //         ),
+            //         chunked_scalar_mul::CodomainShape(
+            //             self.subtrs.Vs.iter().flatten().cloned().collect(),
+            //         ),
+            //     ),
+            //     &self.sharing_proof.SoK,
+            //     &sok_cntxt,
+            //     &mut rng,
+            // ) {
+            //     bail!("PoK verification failed: {:?}", err);
+            // }
 
             // Verify the range proof
             if let Err(err) = self.sharing_proof.range_proof.verify(
@@ -290,12 +169,11 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
                 sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize,
                 pp.ell,
                 &self.sharing_proof.range_proof_commitment,
+                &mut rand::thread_rng(), // TODO: make `rng` a parameter of fn verify()?
             ) {
                 bail!("Range proof batch verification failed: {:?}", err);
             }
         }
-
-        let mut rng = rand::thread_rng(); // TODO: make `rng` a parameter of fn verify()?
 
         // Do the SCRAPE LDT
         let ldt = LowDegreeTest::random(
@@ -309,7 +187,54 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         let mut Vs_flat: Vec<E::G2Affine> = self.subtrs.Vs.iter().flatten().copied().collect();
         Vs_flat.push(self.subtrs.V0);
         // could add an assert_eq here with sc.get_total_weight()
-        ldt.low_degree_test_group::<E::G2>(&Vs_flat)?;
+        let ldt_msm_terms = ldt.ldt_msm_input::<E::G2>(&Vs_flat)?;
+
+        let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
+        let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
+            SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,
+            SrsBasis::PowersOfTau { .. } => {
+                bail!("Expected a Lagrange basis, received powers of tau basis instead")
+            },
+        };
+        let hom = hkzg_chunked_elgamal_commit::Homomorphism::<E>::new(
+            lagr_g1,
+            pp.pk_range_proof.ck_S.xi_1,
+            &pp.pp_elgamal,
+            &pp.G2_table,
+            &eks_inner,
+            pp.get_commitment_base(),
+            pp.ell,
+        );
+
+        let (first_msm_terms, second_msm_terms) = hom.msm_terms_for_verify(
+            &TupleCodomainShape(
+                TupleCodomainShape(
+                    sigma_protocol::homomorphism::TrivialShape(
+                        self.sharing_proof.range_proof_commitment.0.into_affine(), // Because it's not affine by default. Should probably change that
+                    ),
+                    chunked_elgamal::WeightedCodomainShape {
+                        chunks: self.subtrs.Cs.clone(),
+                        randomness: self.subtrs.Rs.clone(),
+                    },
+                ),
+                chunked_scalar_mul::CodomainShape(
+                    self.subtrs.Vs.iter().flatten().cloned().collect(),
+                ),
+            ),
+            &self.sharing_proof.SoK,
+            &sok_cntxt,
+            &mut rng,
+        );
+
+        hom.check_first_msm_eval(first_msm_terms)?;
+
+        verify_msm_terms_with_start::<E::G2>(
+            vec![ldt_msm_terms],
+            second_msm_terms,
+            sample_field_elements(1, &mut rng),
+        )?;
+
+        // ldt.low_degree_test_group::<E::G2>(&Vs_flat)?;
 
         // let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
         // let hom = hkzg_chunked_elgamal::WeightedHomomorphism::new(
@@ -434,69 +359,20 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         debug_assert_eq!(f_evals.len(), sc.get_total_weight());
 
         // Encrypt the chunked shares and generate the sharing proof
-        let (Cs_proj, Rs_proj, Vs_proj, sharing_proof) =
+        let (Cs, Rs, Vs, sharing_proof) =
             Self::encrypt_chunked_shares(&f_evals, eks, pp, sc, sok_cntxt, rng);
 
         // Compute V0 (projective)
         let V0_proj = pp.get_commitment_base() * f[0];
 
-        // Batch normalize all projective elements to affine before creating Subtranscript
-        // Collect all G1 elements (from Cs and Rs)
-        let mut g1_elems = Vec::new();
-        for player_Cs in &Cs_proj {
-            for chunks in player_Cs {
-                g1_elems.extend(chunks.iter().copied());
-            }
-        }
-        for weight_Rs in &Rs_proj {
-            g1_elems.extend(weight_Rs.iter().copied());
-        }
-
-        // Collect all G2 elements (from V0 and Vs)
-        let mut g2_elems = vec![V0_proj];
-        for row in &Vs_proj {
-            g2_elems.extend(row.iter().copied());
-        }
-
-        // Batch normalize
-        let g1_affine = E::G1::normalize_batch(&g1_elems);
-        let g2_affine = E::G2::normalize_batch(&g2_elems);
-
-        // Reconstruct nested structures in affine form
-        let mut g1_iter = g1_affine.into_iter();
-        let mut g2_iter = g2_affine.into_iter();
-
-        // V0
-        let V0 = g2_iter.next().unwrap();
-
-        // Vs
-        let Vs: Vec<Vec<E::G2Affine>> = Vs_proj
-            .iter()
-            .map(|row| row.iter().map(|_| g2_iter.next().unwrap()).collect())
-            .collect();
-
-        // Cs
-        let Cs: Vec<Vec<Vec<E::G1Affine>>> = Cs_proj
-            .iter()
-            .map(|mat| {
-                mat.iter()
-                    .map(|row| row.iter().map(|_| g1_iter.next().unwrap()).collect())
-                    .collect()
-            })
-            .collect();
-
-        // Rs
-        let Rs: Vec<Vec<E::G1Affine>> = Rs_proj
-            .iter()
-            .map(|row| row.iter().map(|_| g1_iter.next().unwrap()).collect())
-            .collect();
-
-        debug_assert!(g1_iter.next().is_none());
-        debug_assert!(g2_iter.next().is_none());
-
         Transcript {
             dealer: *dealer,
-            subtrs: weighted_transcript::Subtranscript { V0, Vs, Cs, Rs },
+            subtrs: Subtranscript {
+                V0: V0_proj.into_affine(),
+                Vs,
+                Cs,
+                Rs,
+            },
             sharing_proof,
         }
     }
@@ -588,7 +464,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         Transcript {
             dealer: sc.get_player(0),
-            subtrs: weighted_transcript::Subtranscript { V0, Vs, Cs, Rs },
+            subtrs: Subtranscript { V0, Vs, Cs, Rs },
             sharing_proof: SharingProof {
                 range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
                     unsafe_random_point_group::<E::G1, _>(rng),
@@ -615,9 +491,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         sok_cntxt: SokContext<'a, A>,
         rng: &mut R,
     ) -> (
-        Vec<Vec<Vec<E::G1>>>,
-        Vec<Vec<E::G1>>,
-        Vec<Vec<E::G2>>,
+        Vec<Vec<Vec<E::G1Affine>>>,
+        Vec<Vec<E::G1Affine>>,
+        Vec<Vec<E::G2Affine>>,
         SharingProof<E>,
     ) {
         // Generate the required randomness
@@ -674,8 +550,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         //   (2b) Compute its image (the public statement), so the range proof commitment and chunked_elgamal encryptions
         let statement = hom.apply(&witness); // hmm slightly inefficient that we're unchunking here, so might be better to set up a "small" hom just for this part
                                              //   (2c) Produce the SoK
-        let SoK = PairingTupleHomomorphism::prove(&hom, &witness, &statement, &sok_cntxt, rng)
-            .change_lifetime(); // Make sure the lifetime of the proof is not coupled to `hom` which has references
+        let (SoK, normalized_statement) =
+            PairingTupleHomomorphism::prove(&hom, &witness, statement, &sok_cntxt, rng);
+        let SoK = SoK.change_lifetime(); // Make sure the lifetime of the proof is not coupled to `hom` which has references
 
         // Destructure the "public statement" of the above sigma protocol
         let TupleCodomainShape(
@@ -687,11 +564,11 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
                 },
             ),
             chunked_scalar_mul::CodomainShape(Vs_flat),
-        ) = statement;
+        ) = normalized_statement;
 
         // Group Vs by player (convert flat Vec<E::G2> to Vec<Vec<E::G2>>)
         // Vs_flat is the inner Vec<E::G2> from CodomainShape
-        let Vs: Vec<Vec<E::G2>> = sc.group_by_player(&Vs_flat);
+        let Vs: Vec<Vec<E::G2Affine>> = sc.group_by_player(&Vs_flat);
 
         // debug_assert_eq!(
         //     Cs.len(),
@@ -704,7 +581,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
             &pp.pk_range_proof,
             &f_evals_chunked_flat,
             pp.ell,
-            &range_proof_commitment,
+            &TrivialShape(range_proof_commitment.0.into()), // TODO: fix this
             &hkzg_randomness,
             rng,
         );
@@ -713,7 +590,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         let sharing_proof = SharingProof {
             SoK,
             range_proof,
-            range_proof_commitment,
+            range_proof_commitment: TrivialShape(range_proof_commitment.0.into()), // TODO: fix this
         };
 
         // Vs is already flat from CodomainShape

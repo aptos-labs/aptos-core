@@ -35,7 +35,7 @@ impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<'a, E> {
         self.apply_msm(self.msm_terms(input))
     }
 
-    fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
+    fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
         <Homomorphism<E> as fixed_base_msms::Trait>::normalize_output(value)
     }
 }
