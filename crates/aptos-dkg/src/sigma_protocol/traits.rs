@@ -20,7 +20,6 @@ use aptos_crypto::{
 use ark_ec::CurveGroup;
 use ark_ff::{Field, Fp, FpConfig, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::UniformRand;
 use rand_core::{CryptoRng, RngCore};
 use serde::Serialize;
 use std::fmt::Debug;
@@ -50,19 +49,21 @@ pub trait Trait<C: CurveGroup>:
     }
 
     #[allow(non_snake_case)]
-    fn verify<Ct: Serialize, H>(
+    fn verify<Ct: Serialize, H, R: RngCore + CryptoRng>(
         &self,
         public_statement: &Self::CodomainNormalized,
-        proof: &Proof<C::ScalarField, H>, // Would like to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
+        proof: &Proof<C::ScalarField, H>, // Would seem natural to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
         cntxt: &Ct,
+        rng: &mut R,
     ) -> anyhow::Result<()>
     where
         H: homomorphism::Trait<Domain = Self::Domain, CodomainNormalized = Self::CodomainNormalized>, // need this because `H` is technically different from `Self` due to lifetime changes
     {
-        let msm_terms = self.msm_terms_for_verify::<_, H>(
+        let msm_terms = self.msm_terms_for_verify::<_, H, _>(
             public_statement,
             proof,
             cntxt,
+            rng,
         );
 
         let msm_result = Self::msm_eval(msm_terms);
@@ -72,12 +73,13 @@ pub trait Trait<C: CurveGroup>:
     }
 
     #[allow(non_snake_case)]
-    fn compute_verifier_challenges<Ct>(
+    fn compute_verifier_challenges<Ct, R: RngCore + CryptoRng>(
         &self,
         public_statement: &Self::CodomainNormalized,
         prover_first_message: &Self::CodomainNormalized, // TODO: this input will have to be modified for `compact` proofs; we just need something serializable, could pass `FirstProofItem<F, H>` instead
         cntxt: &Ct,
         number_of_beta_powers: usize,
+        rng: &mut R,
     ) -> (C::ScalarField, Vec<C::ScalarField>)
     where
         Ct: Serialize,
@@ -93,8 +95,7 @@ pub trait Trait<C: CurveGroup>:
         );
 
         // --- Random verifier challenge β ---
-        let mut rng = ark_std::rand::thread_rng(); // TODO: move this to trait!!
-        let beta = C::ScalarField::rand(&mut rng);
+        let beta = sample_field_element(rng);
         let powers_of_beta = utils::powers(beta, number_of_beta_powers);
 
         (c, powers_of_beta)
@@ -102,11 +103,12 @@ pub trait Trait<C: CurveGroup>:
 
     // Returns the MSM terms that `verify()` needs
     #[allow(non_snake_case)]
-    fn msm_terms_for_verify<Ct: Serialize, H>(
+    fn msm_terms_for_verify<Ct: Serialize, H, R: RngCore + CryptoRng>(
         &self,
         public_statement: &Self::CodomainNormalized,
         proof: &Proof<C::ScalarField, H>,
         cntxt: &Ct,
+        rng: &mut R,
     ) -> Self::MsmInput
     where
         H: homomorphism::Trait<Domain = Self::Domain, CodomainNormalized = Self::CodomainNormalized>, // Need this because the lifetime was changed
@@ -120,7 +122,7 @@ pub trait Trait<C: CurveGroup>:
 
         let number_of_beta_powers = public_statement.clone().into_iter().count(); // TODO: maybe pass the into_iter version in merge_msm_terms?
 
-        let (c, powers_of_beta) = self.compute_verifier_challenges(public_statement, prover_first_message, cntxt, number_of_beta_powers);
+        let (c, powers_of_beta) = self.compute_verifier_challenges(public_statement, prover_first_message, cntxt, number_of_beta_powers, rng);
 
         let msm_terms_for_prover_response = self.msm_terms(&proof.z);
 

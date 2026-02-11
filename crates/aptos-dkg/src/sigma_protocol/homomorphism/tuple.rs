@@ -324,6 +324,7 @@ where
         public_statement: &<Self as homomorphism::Trait>::CodomainNormalized,
         proof: &Proof<H1::Scalar, H>, // Would like to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
         cntxt: &Ct,
+        // TODO: add rng here?
     ) -> anyhow::Result<()>
     where
         H: homomorphism::Trait<

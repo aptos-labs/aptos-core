@@ -52,12 +52,13 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
         rng: &mut R,
     ) -> Self;
 
-    fn verify(
+    fn verify<R: RngCore + CryptoRng>(
         &self,
         vk: &Self::VerificationKey,
         n: usize,
         ell: u8,
         comm: &Self::Commitment,
+        rng: &mut R,
     ) -> anyhow::Result<()>;
 
     fn maul(&mut self);

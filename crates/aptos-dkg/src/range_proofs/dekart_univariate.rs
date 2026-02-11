@@ -558,12 +558,13 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         }
     }
 
-    fn verify(
+    fn verify<R: RngCore + CryptoRng>(
         &self,
         vk: &Self::VerificationKey,
         n: usize,
         ell: u8,
         comm: &Self::Commitment,
+        _rng: &mut R,
     ) -> anyhow::Result<()> {
         let mut fs_t = merlin::Transcript::new(Self::DST);
 
