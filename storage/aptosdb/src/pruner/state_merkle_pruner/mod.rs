@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 pub(in crate::pruner) mod generics;
+pub(crate) mod leaked_stale_node_cleaner;
 mod state_merkle_metadata_pruner;
 pub(crate) mod state_merkle_pruner_manager;
 mod state_merkle_shard_pruner;

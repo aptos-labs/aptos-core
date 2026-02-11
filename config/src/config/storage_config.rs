@@ -320,6 +320,7 @@ pub const NO_OP_STORAGE_PRUNER_CONFIG: PrunerConfig = PrunerConfig {
         prune_window: 0,
         batch_size: 0,
     },
+    stale_node_cleanup_batch_size: 50_000,
 };
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -376,12 +377,26 @@ impl From<EpochSnapshotPrunerConfig> for StateMerklePrunerConfig {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, Default)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct PrunerConfig {
     pub ledger_pruner_config: LedgerPrunerConfig,
     pub state_merkle_pruner_config: StateMerklePrunerConfig,
     pub epoch_snapshot_pruner_config: EpochSnapshotPrunerConfig,
+    /// Batch size for the one-time leaked stale node cleanup that runs on startup.
+    /// Set to 0 to disable.
+    pub stale_node_cleanup_batch_size: usize,
+}
+
+impl Default for PrunerConfig {
+    fn default() -> Self {
+        Self {
+            ledger_pruner_config: LedgerPrunerConfig::default(),
+            state_merkle_pruner_config: StateMerklePrunerConfig::default(),
+            epoch_snapshot_pruner_config: EpochSnapshotPrunerConfig::default(),
+            stale_node_cleanup_batch_size: 50_000,
+        }
+    }
 }
 
 impl Default for LedgerPrunerConfig {
