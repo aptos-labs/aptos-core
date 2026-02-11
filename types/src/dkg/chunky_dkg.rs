@@ -20,7 +20,9 @@ use aptos_dkg::pvss::{
         EncryptPubKey, InputSecret, PublicParameters, SignedWeightedTranscript,
         WeightedSubtranscript,
     },
-    traits::transcript::{Aggregated, HasAggregatableSubtranscript, Transcript, WithMaxNumShares},
+    traits::transcript::{
+        Aggregatable, HasAggregatableSubtranscript, Transcript, WithMaxNumShares,
+    },
     Player,
 };
 use move_core_types::{
@@ -191,16 +193,8 @@ impl ChunkyDKG {
         &self,
         sub_transcripts: &[ChunkySubtranscript],
     ) -> Result<ChunkySubtranscript> {
-        if sub_transcripts.is_empty() {
-            anyhow::bail!("Cannot aggregate empty vector of subtranscripts");
-        }
-
-        let mut accumulator = sub_transcripts[0].clone();
-        for other in sub_transcripts.iter().skip(1) {
-            accumulator.aggregate_with(&self.threshold_config, other)?;
-        }
-
-        Ok(accumulator)
+        // Do all aggregations in projective form, then normalize to affine
+        ChunkySubtranscript::aggregate(&self.threshold_config, sub_transcripts.to_vec())
     }
 
     /// Generate secret sharing config and public parameters from DKG session metadata.

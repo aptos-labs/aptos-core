@@ -1,0 +1,95 @@
+//# publish
+module 0x1::m1
+struct Baz<T0> has key
+  x: T0
+
+struct Foo<T0: key> has store + key
+  x: T0
+
+struct Bar has store
+  x: bool
+
+fun f(l0: address) acquires Baz
+    move_loc l0
+    borrow_global Baz<Foo<Bar>>
+    pop
+    ret
+
+
+
+//# publish
+module 0x1::m2
+struct Baz<T0> has key
+  x: T0
+
+struct Foo<T0: key> has store + key
+  x: T0
+
+struct Bar has store
+  x: bool
+
+fun f(l0: address) acquires Baz
+    move_loc l0
+    mut_borrow_global Baz<Foo<Bar>>
+    pop
+    ret
+
+
+
+//# publish
+module 0x1::m3
+struct Baz<T0> has key
+  x: T0
+
+struct Foo<T0: key> has store + key
+  x: T0
+
+struct Bar has store
+  x: bool
+
+fun f(l0: address) acquires Baz
+    move_loc l0
+    exists Baz<Foo<Bar>>
+    pop
+    ret
+
+
+
+//# publish
+module 0x1::m4
+struct Baz<T0> has key
+  x: T0
+
+struct Foo<T0: key> has store + key
+  x: T0
+
+struct Bar has store
+  x: bool
+
+fun f(l0: address) acquires Baz
+    move_loc l0
+    move_from Baz<Foo<Bar>>
+    pop
+    ret
+
+
+
+//# publish
+module 0x1::m5
+struct Baz<T0> has key
+  x: T0
+
+struct Foo<T0: key> has store + key
+  x: T0
+
+struct Bar has store
+  x: bool
+
+fun f(l0: address) acquires Baz
+    move_loc l0
+    ld_true
+    pack Bar
+    pack Foo
+    pack Baz
+    move_to Baz<Foo<Bar>>
+    ret

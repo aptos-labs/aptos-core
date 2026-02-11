@@ -351,7 +351,7 @@ impl AptosVM {
     }
 
     #[inline(always)]
-    fn timed_features(&self) -> &TimedFeatures {
+    pub(crate) fn timed_features(&self) -> &TimedFeatures {
         self.move_vm.env.timed_features()
     }
 
@@ -2141,7 +2141,7 @@ impl AptosVM {
         G: AptosGasMeter,
         F: FnOnce(u64, VMGasParameters, StorageGasParameters, bool, Gas, &'a C) -> G,
     {
-        let txn_metadata = TransactionMetadata::new(txn, auxiliary_info);
+        let txn_metadata = TransactionMetadata::new(txn, auxiliary_info, self.timed_features());
 
         let is_approved_gov_script = is_approved_gov_script(resolver, txn, &txn_metadata);
 
@@ -3253,7 +3253,7 @@ impl VMValidator for AptosVM {
             },
         };
         let auxiliary_info = AuxiliaryInfo::new_timestamp_not_yet_assigned(0);
-        let txn_data = TransactionMetadata::new(&txn, &auxiliary_info);
+        let txn_data = TransactionMetadata::new(&txn, &auxiliary_info, self.timed_features());
 
         let resolver = self.as_move_resolver(&state_view);
         let is_approved_gov_script = is_approved_gov_script(&resolver, &txn, &txn_data);

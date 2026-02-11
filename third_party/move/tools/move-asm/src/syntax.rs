@@ -39,6 +39,7 @@
 //!   [ "#[" attribute "]"
 //!   [ "entry" ]
 //!   [ "public" | "friend" ]
+//!   [ "native" ]
 //!
 //! attribute := ID
 //!
@@ -172,6 +173,7 @@ pub struct Fun {
     pub name: Identifier,
     pub visibility: Visibility,
     pub is_entry: bool,
+    pub is_native: bool,
     pub attributes: Vec<FunctionAttribute>,
     pub type_params: Vec<(Identifier, AbilitySet)>,
     pub params: Vec<Decl>,
@@ -776,6 +778,7 @@ impl AsmParser {
             || self.is_soft_kw("entry")
             || self.is_soft_kw("public")
             || self.is_soft_kw("friend")
+            || self.is_soft_kw("native")
             || self.is_special("#") && self.lookahead_special("[")
     }
 
@@ -788,6 +791,12 @@ impl AsmParser {
             false
         };
         let visibility = self.visibility()?;
+        let is_native = if self.is_soft_kw("native") {
+            self.advance()?;
+            true
+        } else {
+            false
+        };
         self.expect_soft_kw("fun")?;
         let loc = self.next_loc;
         let name = self.ident()?;
@@ -837,11 +846,18 @@ impl AsmParser {
             }
             self.expect_newline()?
         }
+        if is_native && (!locals.is_empty() || !instrs.is_empty()) {
+            return Err(error(loc, "native function cannot have a body or locals"));
+        }
+        if !is_native && instrs.is_empty() {
+            return Err(error(loc, "non-native function must have a body"));
+        }
         Ok(Fun {
             loc,
             name,
             visibility,
             is_entry,
+            is_native,
             attributes,
             type_params,
             params,

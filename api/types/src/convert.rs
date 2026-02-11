@@ -929,7 +929,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 self.try_into_vm_value_vector(item_layout.as_ref(), val)?
             },
             MoveTypeLayout::Struct(struct_layout) => {
-                self.try_into_vm_value_struct(struct_layout, val)?
+                self.try_into_vm_value_struct(struct_layout.as_ref(), val)?
             },
             MoveTypeLayout::Function => {
                 // TODO(#15664): do we actually need this? It appears the code here is dead and

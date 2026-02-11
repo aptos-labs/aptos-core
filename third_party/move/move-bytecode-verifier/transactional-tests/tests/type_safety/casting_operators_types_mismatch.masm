@@ -1,0 +1,201 @@
+//# run
+script
+entry public fun main()
+    ld_true
+    cast_u8
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    cast_u64
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    cast_u128
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    cast_u16
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    cast_u32
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_true
+    cast_u256
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    cast_u8
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    cast_u64
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    cast_u128
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    cast_u16
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    cast_u32
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_const<address> 0
+    cast_u256
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct S
+  x: bool
+
+fun f()
+    ld_true
+    pack S
+    cast_u8
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct S
+  x: bool
+
+fun g()
+    ld_true
+    pack S
+    cast_u64
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct S
+  x: bool
+
+fun h()
+    ld_true
+    pack S
+    cast_u128
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct S
+  x: bool
+
+fun f()
+    ld_true
+    pack S
+    cast_u16
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct S
+  x: bool
+
+fun g()
+    ld_true
+    pack S
+    cast_u32
+    pop
+    ret
+
+
+
+//# publish
+module 0x42::M
+struct S
+  x: bool
+
+fun h()
+    ld_true
+    pack S
+    cast_u256
+    pop
+    ret

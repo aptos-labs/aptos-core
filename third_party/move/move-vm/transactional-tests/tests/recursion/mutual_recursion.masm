@@ -1,0 +1,79 @@
+//# publish
+module 0x42::Math
+public fun even(l0: u64): bool
+    local l1: bool
+    copy_loc l0
+    ld_u64 0
+    eq
+    br_false l0
+    ld_true
+    ret
+l0: move_loc l0
+    ld_u64 1
+    sub
+    call odd
+    st_loc l1
+    move_loc l1
+    ret
+
+public fun odd(l0: u64): bool
+    local l1: bool
+    copy_loc l0
+    ld_u64 0
+    eq
+    br_false l0
+    ld_false
+    ret
+l0: move_loc l0
+    ld_u64 1
+    sub
+    call even
+    st_loc l1
+    move_loc l1
+    ret
+
+
+
+//# run
+script
+use 0x42::Math
+entry public fun main()
+    local l0: bool
+    local l1: bool
+    local l2: bool
+    local l3: bool
+    ld_u64 0
+    call Math::even
+    st_loc l0
+    move_loc l0
+    not
+    br_false l0
+    ld_u64 50
+    abort
+l0: ld_u64 0
+    call Math::odd
+    st_loc l1
+    move_loc l1
+    not
+    not
+    br_false l1
+    ld_u64 51
+    abort
+l1: ld_u64 10
+    call Math::even
+    st_loc l2
+    move_loc l2
+    not
+    br_false l2
+    ld_u64 52
+    abort
+l2: ld_u64 10
+    call Math::odd
+    st_loc l3
+    move_loc l3
+    not
+    not
+    br_false l3
+    ld_u64 53
+    abort
+l3: ret

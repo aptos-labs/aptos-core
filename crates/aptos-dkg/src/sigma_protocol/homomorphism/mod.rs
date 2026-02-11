@@ -17,13 +17,29 @@ pub mod tuple;
 /// In the context of sigma protocols, homomorphisms are the key building blocks:
 /// they capture the algebraic relations that proofs are designed to demonstrate.
 ///
-/// CanonicalSerialize is added here so its parameters (which will be MSM bases)
-/// can be used for Fiat-Shamir challenges.
+/// The `Codomain` type represents the output of the homomorphism, which may admit
+/// multiple equivalent representations (e.g. projective vs. affine group elements).
+///
+/// The associated type `CodomainNormalized` represents a *canonical* or
+/// *normalized* form of the codomain element. This form is intended to be:
+///
+/// - uniquely determined,
+/// - suitable for deterministic serialization, and
+/// - stable for use as input to Fiat–Shamir transcripts and challenge
+///   derivation.
+///
+/// The `normalize` method converts a `Codomain` value into this canonical
+/// representation.
+///
+/// CanonicalSerialize is added here so the parameters of the homomorphism (which will
+/// be MSM bases) can be used for Fiat-Shamir challenges.
 pub trait Trait: CanonicalSerialize {
     type Domain;
     type Codomain;
+    type CodomainNormalized;
 
     fn apply(&self, element: &Self::Domain) -> Self::Codomain;
+    fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized;
 }
 
 /// `LiftHomomorphism` adapts a homomorphism `H` defined on some `Domain`
@@ -84,11 +100,16 @@ where
     H: Trait,
 {
     type Codomain = H::Codomain;
+    type CodomainNormalized = H::CodomainNormalized;
     type Domain = LargerDomain;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
         let projected = (self.projection)(input);
         self.hom.apply(&projected)
+    }
+
+    fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
+        H::normalize(&self.hom, value)
     }
 }
 

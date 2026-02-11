@@ -35,14 +35,6 @@ static REJECTION_REASONS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static NUM_OUTSTANDING_TRANSACTIONS: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
-        "aptos_tap_num_outstanding_transactions",
-        "Number of transactions we've submitted but have not been processed by the blockchain.",
-    )
-    .unwrap()
-});
-
 // TODO: Consider using IntGaugeVec to attach the account address as a label.
 pub static TRANSFER_FUNDER_ACCOUNT_BALANCE: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(

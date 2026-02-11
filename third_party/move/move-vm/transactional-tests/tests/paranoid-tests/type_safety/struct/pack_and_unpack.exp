@@ -1,7 +1,7 @@
 processed 3 tasks
-task 0 lines 1-21:  publish [module 0x22.A {]
-task 1 lines 23-43:  publish [module 0x22.B {]
-task 2 lines 45-51:  run --signers 0x1 [import 0x22.B;]
+task 0 lines 1-23:  publish [module 0x22::A]
+task 1 lines 27-47:  publish [module 0x22::B]
+task 2 lines 51-57:  run --signers 0x1 [script]
 Error: Script execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: Some(1),
