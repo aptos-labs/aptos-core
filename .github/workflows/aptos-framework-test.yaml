@@ -18,11 +18,23 @@ env:
   SUI_BIN: ~/.cargo/bin/sui
   APTOS_BIN: ~/.local/bin/aptos
   SCRYPTO_BIN: ~/.cargo/bin/scrypto
+  REPO_KEY: ${{ secrets.REPO_KEY }}
+
 jobs:
   build:
     runs-on: ghr-elastic-supra-aptos-core-runner
     timeout-minutes: 90
     steps:
+      - name: Install SSH Client
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.REPO_KEY }}
+
+      - name: SSH key Scan
+        run: |
+              mkdir -p ~/.ssh
+              ssh-keyscan github.com >> ~/.ssh/known_hosts
+              
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/checkout@v4
       - run: cargo test --release -p aptos-types --lib unit_tests --no-fail-fast
