@@ -161,6 +161,32 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
         )
     }
 
+    /// Borrows an immutable reference to a resource in global storage.
+    /// Returns the reference value and the number of bytes loaded.
+    pub fn borrow_resource(
+        &mut self,
+        address: AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(Value, Option<NumBytes>)> {
+        self.data_cache
+            .native_borrow_resource(self.gas_meter, self.traversal_context, &address, ty)
+    }
+
+    /// Borrows a mutable reference to a resource in global storage.
+    /// Returns the reference value and the number of bytes loaded.
+    pub fn borrow_resource_mut(
+        &mut self,
+        address: AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(Value, Option<NumBytes>)> {
+        self.data_cache.native_borrow_resource_mut(
+            self.gas_meter,
+            self.traversal_context,
+            &address,
+            ty,
+        )
+    }
+
     pub fn type_to_type_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
         self.module_storage.runtime_environment().ty_to_ty_tag(ty)
     }

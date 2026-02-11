@@ -16,9 +16,17 @@ module aptos_framework::box {
         Box { addr: signer::address_of(&unique_signer) }
     }
 
-    public native fun borrow<T: store>(self: &Box<T>): &T;
+    // Internal natives that take BoxedResource<T> as a type parameter (like table's borrow_box)
+    native fun borrow_boxed<T: store, BR>(self: &Box<T>): &BR;
+    native fun borrow_boxed_mut<T: store, BR>(self: &mut Box<T>): &mut BR;
 
-    public native fun borrow_mut<T: store>(self: &mut Box<T>): &mut T;
+    public fun borrow<T: store>(self: &Box<T>): &T {
+        &self.borrow_boxed<T, BoxedResource<T>>().val
+    }
+
+    public fun borrow_mut<T: store>(self: &mut Box<T>): &mut T {
+        &mut self.borrow_boxed_mut<T, BoxedResource<T>>().val
+    }
 
     public fun copy_box<T: store + copy>(self: &Box<T>): Box<T> {
         new(*self.borrow())
@@ -32,7 +40,7 @@ module aptos_framework::box {
 
     #[test]
     public fun test_box() {
-        let box = new(1);
+        let box = new(1u64);
         assert!(box.borrow() == &1);
         *box.borrow_mut() += 1;
         assert!(box.borrow() == &2);

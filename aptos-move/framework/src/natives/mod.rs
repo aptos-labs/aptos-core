@@ -5,6 +5,7 @@ pub mod account;
 
 pub mod account_abstraction;
 pub mod aggregator_natives;
+pub mod r#box;
 pub mod code;
 pub mod consensus_config;
 pub mod create_signer;
@@ -54,6 +55,7 @@ pub fn all_natives(
     }
 
     add_natives_from_module!("account", account::make_all(builder));
+    add_natives_from_module!("box", r#box::make_all(builder));
     add_natives_from_module!("create_signer", create_signer::make_all(builder));
     add_natives_from_module!("ed25519", ed25519::make_all(builder));
     add_natives_from_module!("crypto_algebra", cryptography::algebra::make_all(builder));
