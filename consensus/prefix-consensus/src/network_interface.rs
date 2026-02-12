@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
@@ -8,7 +11,7 @@
 //! self-message delivery through channels.
 
 use crate::{
-    network_messages::PrefixConsensusMsg,
+    network_messages::{PrefixConsensusMsg, StrongPrefixConsensusMsg},
     types::{Vote1, Vote2, Vote3},
 };
 use aptos_channels::UnboundedSender;
@@ -34,6 +37,16 @@ pub trait PrefixConsensusNetworkSender: Send + Sync + Clone {
 
     /// Broadcast a Vote3 message to all validators
     async fn broadcast_vote3(&self, vote: Vote3);
+}
+
+/// Trait for sending Strong Prefix Consensus messages over the network
+#[async_trait::async_trait]
+pub trait StrongPrefixConsensusNetworkSender: Send + Sync + Clone {
+    /// Broadcast a Strong PC message to all validators
+    async fn broadcast_strong_msg(&self, msg: StrongPrefixConsensusMsg);
+
+    /// Send a Strong PC message to a specific peer
+    async fn send_strong_msg(&self, peer: Author, msg: StrongPrefixConsensusMsg);
 }
 
 /// Network client wrapper for Prefix Consensus

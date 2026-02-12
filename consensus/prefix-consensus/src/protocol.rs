@@ -131,7 +131,10 @@ impl PrefixConsensusProtocol {
     // ========================================================================
 
     /// Start Round 1: Broadcast Vote1 with input vector
-    pub async fn start_round1(&self, signer: &ValidatorSigner) -> Result<Vote1> {
+    ///
+    /// Returns the Vote1 to broadcast and an optional QC1 if quorum was already
+    /// reached by processing the self-vote (e.g., enough votes arrived before we started).
+    pub async fn start_round1(&self, signer: &ValidatorSigner) -> Result<(Vote1, Option<QC1>)> {
         let mut state = self.state.write().await;
         if *state != ProtocolState::NotStarted {
             bail!("Cannot start Round 1: protocol already started");
@@ -169,9 +172,9 @@ impl PrefixConsensusProtocol {
         );
 
         // Add own vote to pending votes
-        self.process_vote1(vote.clone()).await?;
+        let qc1 = self.process_vote1(vote.clone()).await?;
 
-        Ok(vote)
+        Ok((vote, qc1))
     }
 
     /// Process an incoming Vote1
@@ -234,7 +237,10 @@ impl PrefixConsensusProtocol {
     // ========================================================================
 
     /// Start Round 2: Broadcast Vote2 with certified prefix from QC1
-    pub async fn start_round2(&self, signer: &ValidatorSigner) -> Result<Vote2> {
+    ///
+    /// Returns the Vote2 to broadcast and an optional QC2 if quorum was already
+    /// reached by processing the self-vote (e.g., enough votes arrived before QC1 formed).
+    pub async fn start_round2(&self, signer: &ValidatorSigner) -> Result<(Vote2, Option<QC2>)> {
         let mut state = self.state.write().await;
         if *state != ProtocolState::Round1Complete {
             bail!("Cannot start Round 2: Round 1 not complete");
@@ -288,9 +294,9 @@ impl PrefixConsensusProtocol {
         );
 
         // Add own vote to pending votes
-        self.process_vote2(vote.clone()).await?;
+        let qc2 = self.process_vote2(vote.clone()).await?;
 
-        Ok(vote)
+        Ok((vote, qc2))
     }
 
     /// Process an incoming Vote2
@@ -352,7 +358,10 @@ impl PrefixConsensusProtocol {
     // ========================================================================
 
     /// Start Round 3: Broadcast Vote3 with mcp prefix from QC2
-    pub async fn start_round3(&self, signer: &ValidatorSigner) -> Result<Vote3> {
+    ///
+    /// Returns the Vote3 to broadcast and an optional PrefixConsensusOutput if quorum
+    /// was already reached by processing the self-vote.
+    pub async fn start_round3(&self, signer: &ValidatorSigner) -> Result<(Vote3, Option<PrefixConsensusOutput>)> {
         let mut state = self.state.write().await;
         if *state != ProtocolState::Round2Complete {
             bail!("Cannot start Round 3: Round 2 not complete");
@@ -406,9 +415,9 @@ impl PrefixConsensusProtocol {
         );
 
         // Add own vote to pending votes
-        self.process_vote3(vote.clone()).await?;
+        let output = self.process_vote3(vote.clone()).await?;
 
-        Ok(vote)
+        Ok((vote, output))
     }
 
     /// Process an incoming Vote3

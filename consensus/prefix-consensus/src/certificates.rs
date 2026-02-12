@@ -141,6 +141,10 @@ pub struct EmptyViewMessage {
     pub highest_known_proof: QC3,
     /// Signature on the statement
     pub signature: BlsSignature,
+    /// Epoch number (for cross-epoch replay filtering)
+    pub epoch: u64,
+    /// Slot number (for cross-slot replay filtering)
+    pub slot: u64,
 }
 
 impl EmptyViewMessage {
@@ -150,12 +154,16 @@ impl EmptyViewMessage {
         highest_known_view: u64,
         highest_known_proof: QC3,
         signature: BlsSignature,
+        epoch: u64,
+        slot: u64,
     ) -> Self {
         Self {
             statement: EmptyViewStatement::new(empty_view, highest_known_view),
             author,
             highest_known_proof,
             signature,
+            epoch,
+            slot,
         }
     }
 
@@ -234,14 +242,19 @@ impl IndirectCertificate {
         empty_view: u64,
         messages: Vec<EmptyViewMessage>,
         verifier: &ValidatorVerifier,
-    ) -> Result<Self> {
-        ensure!(!messages.is_empty(), "Need at least one message");
+    ) -> Option<Self> {
+        if messages.is_empty() {
+            return None;
+        }
 
         // Check that message authors have sufficient voting power (>1/3 stake)
         let authors: Vec<_> = messages.iter().map(|m| m.author).collect();
-        verifier
+        if verifier
             .check_voting_power(authors.iter(), false)
-            .map_err(|e| anyhow::anyhow!("Insufficient voting power for indirect certificate: {}", e))?;
+            .is_err()
+        {
+            return None; // Not enough stake yet
+        }
 
         // Find message with max highest_known_view
         let best_message = messages
@@ -249,7 +262,7 @@ impl IndirectCertificate {
             .max_by_key(|m| m.highest_known_view())
             .unwrap();
 
-        Ok(Self {
+        Some(Self {
             empty_view,
             parent_view: best_message.highest_known_view(),
             parent_proof: best_message.highest_known_proof.clone(),
@@ -461,6 +474,8 @@ impl HighestKnownView {
         empty_view: u64,
         author: PartyId,
         signature: BlsSignature,
+        epoch: u64,
+        slot: u64,
     ) -> EmptyViewMessage {
         EmptyViewMessage::new(
             empty_view,
@@ -468,6 +483,8 @@ impl HighestKnownView {
             self.view,
             self.proof.clone(),
             signature,
+            epoch,
+            slot,
         )
     }
 }
@@ -900,11 +917,15 @@ mod tests {
             3,
             qc3,
             dummy_signature(),
+            1,
+            0,
         );
 
         assert_eq!(msg.empty_view(), 5);
         assert_eq!(msg.highest_known_view(), 3);
         assert_eq!(msg.author, dummy_party_id(0));
+        assert_eq!(msg.epoch, 1);
+        assert_eq!(msg.slot, 0);
     }
 
     // ========================================================================
@@ -930,9 +951,9 @@ mod tests {
 
         // Messages with different highest_known_views (3 messages = >1/3 of 4)
         let messages = vec![
-            EmptyViewMessage::new(5, dummy_party_id(0), 2, qc3_view2.clone(), dummy_signature()),
-            EmptyViewMessage::new(5, dummy_party_id(1), 3, qc3_view3.clone(), dummy_signature()),
-            EmptyViewMessage::new(5, dummy_party_id(2), 2, qc3_view2, dummy_signature()),
+            EmptyViewMessage::new(5, dummy_party_id(0), 2, qc3_view2.clone(), dummy_signature(), 1, 0),
+            EmptyViewMessage::new(5, dummy_party_id(1), 3, qc3_view3.clone(), dummy_signature(), 1, 0),
+            EmptyViewMessage::new(5, dummy_party_id(2), 2, qc3_view2, dummy_signature(), 1, 0),
         ];
 
         let cert = IndirectCertificate::from_messages(5, messages, &verifier).unwrap();
@@ -943,10 +964,10 @@ mod tests {
     }
 
     #[test]
-    fn test_indirect_certificate_empty_messages_error() {
+    fn test_indirect_certificate_empty_messages_returns_none() {
         let verifier = create_test_verifier(4);
         let result = IndirectCertificate::from_messages(5, vec![], &verifier);
-        assert!(result.is_err());
+        assert!(result.is_none());
     }
 
     #[test]
@@ -961,8 +982,8 @@ mod tests {
         ]);
 
         let messages = vec![
-            EmptyViewMessage::new(5, dummy_party_id(0), 3, qc3.clone(), dummy_signature()),
-            EmptyViewMessage::new(5, dummy_party_id(1), 3, qc3.clone(), dummy_signature()),
+            EmptyViewMessage::new(5, dummy_party_id(0), 3, qc3.clone(), dummy_signature(), 1, 0),
+            EmptyViewMessage::new(5, dummy_party_id(1), 3, qc3.clone(), dummy_signature(), 1, 0),
         ];
 
         let cert1 = IndirectCertificate::from_messages(5, messages.clone(), &verifier).unwrap();
@@ -1003,8 +1024,8 @@ mod tests {
         ]);
 
         let messages = vec![
-            EmptyViewMessage::new(5, dummy_party_id(0), 3, qc3.clone(), dummy_signature()),
-            EmptyViewMessage::new(5, dummy_party_id(1), 3, qc3, dummy_signature()),
+            EmptyViewMessage::new(5, dummy_party_id(0), 3, qc3.clone(), dummy_signature(), 1, 0),
+            EmptyViewMessage::new(5, dummy_party_id(1), 3, qc3, dummy_signature(), 1, 0),
         ];
 
         let indirect = IndirectCertificate::from_messages(5, messages, &verifier).unwrap();
@@ -1031,8 +1052,8 @@ mod tests {
         let direct = Certificate::Direct(DirectCertificate::new(1, qc3.clone()));
 
         let messages = vec![
-            EmptyViewMessage::new(5, dummy_party_id(0), 3, qc3.clone(), dummy_signature()),
-            EmptyViewMessage::new(5, dummy_party_id(1), 3, qc3, dummy_signature()),
+            EmptyViewMessage::new(5, dummy_party_id(0), 3, qc3.clone(), dummy_signature(), 1, 0),
+            EmptyViewMessage::new(5, dummy_party_id(1), 3, qc3, dummy_signature(), 1, 0),
         ];
         let indirect = Certificate::Indirect(
             IndirectCertificate::from_messages(5, messages, &verifier).unwrap()
@@ -1148,6 +1169,8 @@ mod tests {
             5,
             dummy_party_id(0),
             dummy_signature(),
+            1,
+            0,
         );
 
         assert_eq!(msg.empty_view(), 5);
@@ -1186,8 +1209,8 @@ mod tests {
         ]);
 
         let messages = vec![
-            EmptyViewMessage::new(5, dummy_party_id(0), 3, qc3.clone(), dummy_signature()),
-            EmptyViewMessage::new(5, dummy_party_id(1), 3, qc3, dummy_signature()),
+            EmptyViewMessage::new(5, dummy_party_id(0), 3, qc3.clone(), dummy_signature(), 1, 0),
+            EmptyViewMessage::new(5, dummy_party_id(1), 3, qc3, dummy_signature(), 1, 0),
         ];
 
         let cert = IndirectCertificate::from_messages(5, messages, &verifier).unwrap();

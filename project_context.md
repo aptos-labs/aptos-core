@@ -252,8 +252,8 @@ This layered architecture enables multi-slot censorship-resistant consensus as d
 
 ### Repository State
 - **Branch**: `prefix-consensus-prototype`
-- **HEAD**: Phase 4 Chunks 1-2 complete (Strong Protocol + Network Messages)
-- **Tests**: 178/178 unit tests passing
+- **HEAD**: Phase 4 Chunks 1-3 complete (Strong Protocol + Network Messages + Strong Manager)
+- **Tests**: 186/186 unit tests passing
 - **Smoke Tests**: Run manually by user (no need to run in Claude sessions)
 - **Build**: ✅ No warnings or errors
 
@@ -265,7 +265,8 @@ This layered architecture enables multi-slot censorship-resistant consensus as d
 - ✅ **Strong PC Phase 3**: View State and Ranking Management complete (RankingManager, ViewState, ViewOutput)
 - ✅ **Strong PC Phase 4 Chunk 1**: Strong Protocol state machine complete (strong_protocol.rs)
 - ✅ **Strong PC Phase 4 Chunk 2**: Network messages complete (StrongPrefixConsensusMsg + types)
-- 🚧 **Strong PC Phase 4 Chunk 3**: Strong Manager pending (strong_manager.rs)
+- ✅ **Strong PC Phase 4 Chunk 3**: Strong Manager complete (strong_manager.rs) + cross-cutting fixes
+- ⏳ **Strong PC Phase 5**: Integration with consensus layer (EpochManager)
 - ⏳ **Slot Manager**: Future work (after Strong PC complete)
 
 **Main Design Plan**: `.plans/strong-prefix-consensus.md`
@@ -387,9 +388,9 @@ IndirectCert(empty=2, parent=1) is created. If the chain traces to it, `view()=2
 - `first_non_bot()` prefix vector utility — in `utils.rs`
 - All exported from `lib.rs`
 
-### Phase 4 Implementation Details (Chunks 1-2 Complete)
+### Phase 4 Implementation Details (Chunks 1-3 Complete)
 
-**Chunk 1 — Strong Protocol** (`strong_protocol.rs`, ~900 lines):
+**Chunk 1 — Strong Protocol** (`strong_protocol.rs`, ~918 lines):
 - `StrongPrefixConsensusProtocol`: Pure state machine (no I/O, no async)
 - `View1Decision`: Always DirectCert (View 1 is special)
 - `ViewDecision`: Three-way — Commit > DirectCert > EmptyView
@@ -409,19 +410,34 @@ IndirectCert(empty=2, parent=1) is created. If the chain traces to it, `view()=2
   - Helper methods: `epoch()`, `slot()`, `view()`, `name()`, `author()`
 - 17 unit tests covering construction, helpers, and serialization roundtrips
 
-**Design decisions**:
-- Protocol/Manager split: Protocol is pure logic, Manager handles async/I/O
-- Data types (`ViewProposal`, etc.) in `types.rs`, message envelope in `network_messages.rs`
-- `CertFetchResponse` has non-optional `Certificate` — if you don't have it, don't reply
-- `EmptyViewMessage` doesn't carry epoch/slot — manager filters by slot before dispatching
-- Slot validation is manager-level (Chunk 3), not in `StrongPCCommit::verify()`
+**Chunk 3 — Strong Manager** (`strong_manager.rs`, ~1394 lines):
+- `StrongPrefixConsensusManager<NetworkSender>`: Async event-driven orchestrator
+- `PCState`: Per-view inner PC instance state (protocol + round tracking + completed flag)
+- View start timer: 300ms timeout OR first-ranked certificate arrival triggers inner PC start
+- Proposal adoption: when receiving a valid proposal for a future view, adopt the certificate and broadcast as own before entering
+- Certificate fetching: request missing certs by hash, retry chain building on response
+- DoS protection on fetch responses: check `pending_fetches` before doing validation work
+- `propose_and_enter()`: Helper that broadcasts proposal, adds own cert to ViewState, enters new view. Guards against double proposals (Byzantine behavior) via `next_view <= current_view` check.
+- `finalize_view()`: Extracted helper for view completion logic (handles commit trace-back, StrongPCCommit broadcast, and certificate fetching for missing chain links)
+- `Box::pin` on `start_pc_now` to handle recursive async call chain: `start_pc_now → start_view_round2 → start_view_round3 → finalize_view → handle_view_complete → propose_and_enter → enter_view → start_pc_now`
+- Empty view handling: sign EmptyViewMessage, collect >1/3 stake, form IndirectCertificate
+- Epoch/slot filtering on all incoming messages in `process_message`
 
-**TODO for Chunk 3 (Strong Manager)**:
-- Manager must filter by slot before calling `process_received_commit()` (cross-slot replay prevention)
-- Same slot filtering for `EmptyViewMessage` proofs via `HighestKnownView`
+**Cross-cutting fixes during Chunk 3**:
+- **Early QC bug fix** (protocol.rs + manager.rs): `start_round1/2/3` methods internally call `process_vote*` for the self-vote, which could form a QC if enough early votes accumulated. The QC was silently discarded. Fixed by changing return types to `(Vote, Option<QC>)` and handling early QC in both managers.
+- **EmptyViewMessage epoch/slot** (certificates.rs + network_messages.rs): Added `epoch` and `slot` fields to `EmptyViewMessage` for uniform filtering in `process_message`. Removed special-case handling.
+- **IndirectCertificate::from_messages** (certificates.rs): Changed from `Result<Self>` to `Option<Self>` since insufficient stake is a normal condition, not an error.
+- **ViewProposal doesn't need signing**: Network authenticates sender, certificate is validated. Any party can propose any valid certificate — this is by design for proposal adoption (honest parties forward certificates to help others catch up).
+
+**Key design decisions documented during Chunk 3**:
+- **No double proposals**: A party must never broadcast two different certificates for the same view. This would be Byzantine behavior and could cause prefix cuts in inner PC (different parties see different input vectors).
+- **Proposal adoption vs echoing**: Parties adopt received certificates as their own proposals (not echo/relay). The adopting party broadcasts under its own identity for its ranking position.
+- **Timer-based view start**: All parties must participate in inner PC to ensure quorum formation. Even if no certificates arrive, parties run inner PC with empty input after 300ms timeout.
+- **Fetch DoS protection**: Check `pending_fetches` before validating unsolicited `CertFetchResponse` messages. Keep entry in `pending_fetches` until successful validation (don't remove on failed validation — would lose the hash for retry).
+- **Unreachable vs legitimate None guards**: 4 cases where `None` is unreachable use `expect()`, 3 cases in `process_view_vote1/2/3` where `None` means stale view use `return`.
 
 ### Next Action
-Begin Strong Prefix Consensus Phase 4 Chunk 3: Strong Manager (async event loop)
+Begin Strong Prefix Consensus Phase 5: Integration with consensus layer (EpochManager wiring, real NetworkSender implementation)
 
 ---
 
@@ -431,6 +447,10 @@ Begin Strong Prefix Consensus Phase 4 Chunk 3: Strong Manager (async event loop)
 - [ ] **StrongPCCommit chain cap**: If chains become long (>5 certs), cap embedded certs and use hashes for the rest
 - [ ] **Fetch DOS protection**: Rate limiting / authentication for fetch requests
 - [ ] **Certificate storage**: Efficient storage and lookup by hash for accumulated certificates
+- [ ] **Configurable view start timeout**: `VIEW_START_TIMEOUT` (300ms) is currently a hardcoded constant in `strong_manager.rs`. Make it configurable via consensus config or constructor parameter.
+- [ ] **Empty view without inner PC**: Consider sending EmptyViewMessage directly (without running the inner PC) when no certificates have arrived at timeout. This saves 3 rounds of inner PC for the all-bot case. Caveat: all parties must participate in the inner PC to ensure others can form QCs, so this optimization only applies when ALL parties have no certificates for the view.
+- [ ] **View 1 start timer for multi-slot protocol**: When Strong Prefix Consensus is used within the multi-slot final protocol (Slot Manager), add a timer before starting View 1 to allow parties to collect input vectors from other slots before beginning. Currently View 1 starts immediately with the local input vector.
+- [ ] **Garbage collect data structures on slot commit**: When a slot is committed, clean up accumulated state (e.g., `view_states`, `pc_states`, `empty_view_collectors`, `pending_fetches`, `pending_commit_proof`, cert store) to free memory and avoid unbounded growth across slots.
 
 ---
 
@@ -439,19 +459,19 @@ Begin Strong Prefix Consensus Phase 4 Chunk 3: Strong Manager (async event loop)
 ### Prefix Consensus Crate
 ```
 consensus/prefix-consensus/src/
-├── types.rs              - Vote/QC types + ViewProposal/CertFetch types (850 lines)
-├── protocol.rs           - 3-round state machine (490 lines)
-├── manager.rs            - Event-driven orchestrator (658 lines)
+├── types.rs              - Vote/QC types + ViewProposal/CertFetch types (1039 lines)
+├── protocol.rs           - 3-round state machine (606 lines)
+├── manager.rs            - Event-driven orchestrator (737 lines)
 ├── network_interface.rs  - Network adapter (224 lines)
-├── network_messages.rs   - PrefixConsensusMsg + StrongPrefixConsensusMsg (650 lines)
+├── network_messages.rs   - PrefixConsensusMsg + StrongPrefixConsensusMsg (795 lines)
 ├── signing.rs            - BLS helpers (184 lines)
 ├── certify.rs            - QC formation (220 lines)
 ├── verification.rs       - Validation (150 lines)
 ├── utils.rs              - Prefix operations + first_non_bot (210 lines)
-├── certificates.rs       - Certificates + StrongPCCommit + cert_reaches_view1 (750 lines)
-├── view_state.rs         - RankingManager, ViewState, ViewOutput (340 lines)
-├── strong_protocol.rs    - Strong PC state machine (900 lines) - Phase 4 Chunk 1
-└── strong_manager.rs     - Strong PC event orchestrator (pending) - Phase 4 Chunk 3
+├── certificates.rs       - Certificates + StrongPCCommit + cert_reaches_view1 (1348 lines)
+├── view_state.rs         - RankingManager, ViewState, ViewOutput (695 lines)
+├── strong_protocol.rs    - Strong PC state machine (918 lines) - Phase 4 Chunk 1
+└── strong_manager.rs     - Strong PC event orchestrator (1394 lines) - Phase 4 Chunk 3
 
 testsuite/smoke-test/src/consensus/prefix_consensus/
 ├── helpers.rs            - Test helpers

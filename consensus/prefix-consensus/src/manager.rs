@@ -15,7 +15,7 @@ use crate::{
     network_messages::PrefixConsensusMsg,
     protocol::PrefixConsensusProtocol,
     signing::{verify_vote1_signature, verify_vote2_signature, verify_vote3_signature},
-    types::{PartyId, PrefixConsensusOutput, Vote1, Vote2, Vote3, QC1, QC2},
+    types::{PartyId, PrefixConsensusOutput, Vote1, Vote2, Vote3},
 };
 use anyhow::Result;
 use aptos_consensus_types::common::Author;
@@ -122,7 +122,7 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
         // Broadcast Vote1 FIRST before entering message loop
         // This ensures the receiver is ready before our own Vote1 arrives via self-send
         match self.protocol.start_round1(&self.validator_signer).await {
-            Ok(vote1) => {
+            Ok((vote1, qc1)) => {
                 info!(
                     party_id = %self.party_id,
                     vote_author = %vote1.author,
@@ -130,6 +130,11 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
                     "Broadcasting Vote1"
                 );
                 self.network_sender.broadcast_vote1(vote1).await;
+                if qc1.is_some() {
+                    if let Err(e) = self.start_round2().await {
+                        error!(party_id = %self.party_id, error = ?e, "Failed to start Round 2 after early QC1");
+                    }
+                }
             }
             Err(e) => {
                 error!(
@@ -270,7 +275,7 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
                     qc_size = qc1.votes.len(),
                     "QC1 formed, starting Round 2"
                 );
-                self.start_round2(qc1).await?;
+                self.start_round2().await?;
             },
             Ok(None) => {
                 // Vote processed, but QC not yet formed
@@ -292,14 +297,14 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
     }
 
     /// Start Round 2 after QC1 formation
-    async fn start_round2(&self, _qc1: QC1) -> Result<()> {
+    async fn start_round2(&self) -> Result<()> {
         info!(
             party_id = %self.party_id,
             "Starting Round 2"
         );
 
         // Protocol creates Vote2 (QC1 is already stored in protocol)
-        let vote2 = self.protocol.start_round2(&self.validator_signer).await?;
+        let (vote2, qc2) = self.protocol.start_round2(&self.validator_signer).await?;
 
         info!(
             party_id = %self.party_id,
@@ -310,6 +315,12 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
 
         // Broadcast our Vote2
         self.network_sender.broadcast_vote2(vote2).await;
+
+        // If QC2 formed during self-vote processing (early votes accumulated),
+        // immediately start Round 3
+        if qc2.is_some() {
+            self.start_round3().await?;
+        }
 
         Ok(())
     }
@@ -367,7 +378,7 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
                     qc_size = qc2.votes.len(),
                     "QC2 formed, starting Round 3"
                 );
-                self.start_round3(qc2).await?;
+                self.start_round3().await?;
             },
             Ok(None) => {
                 debug!(
@@ -388,14 +399,14 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
     }
 
     /// Start Round 3 after QC2 formation
-    async fn start_round3(&self, _qc2: QC2) -> Result<()> {
+    async fn start_round3(&self) -> Result<()> {
         info!(
             party_id = %self.party_id,
             "Starting Round 3"
         );
 
         // Protocol creates Vote3 (QC2 is already stored in protocol)
-        let vote3 = self.protocol.start_round3(&self.validator_signer).await?;
+        let (vote3, output) = self.protocol.start_round3(&self.validator_signer).await?;
 
         info!(
             party_id = %self.party_id,
@@ -406,6 +417,15 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
 
         // Broadcast our Vote3
         self.network_sender.broadcast_vote3(vote3).await;
+
+        // If output formed during self-vote processing (early votes accumulated),
+        // protocol is already complete — output file will be written on next loop check
+        if output.is_some() {
+            info!(
+                party_id = %self.party_id,
+                "QC3 formed during Round 3 start (early votes)"
+            );
+        }
 
         Ok(())
     }

@@ -43,6 +43,7 @@ pub mod network_interface;
 pub mod network_messages;
 mod protocol;
 pub mod signing;
+pub mod strong_manager;
 pub mod strong_protocol;
 mod types;
 mod utils;
@@ -53,6 +54,7 @@ pub use certify::{qc1_certify, qc2_certify, qc3_certify};
 pub use manager::PrefixConsensusManager;
 pub use network_interface::{
     NetworkSenderAdapter, PrefixConsensusNetworkClient, PrefixConsensusNetworkSender,
+    StrongPrefixConsensusNetworkSender,
 };
 pub use network_messages::{PrefixConsensusMsg, StrongPrefixConsensusMsg};
 pub use protocol::PrefixConsensusProtocol;
@@ -73,6 +75,7 @@ pub use certificates::{
     cert_reaches_view1, Certificate, DirectCertificate, EmptyViewMessage, EmptyViewStatement,
     HighestKnownView, IndirectCertificate, StrongPCCommit, StrongPCCommitError,
 };
+pub use strong_manager::StrongPrefixConsensusManager;
 pub use strong_protocol::{
     ChainBuildError, StrongPrefixConsensusProtocol, View1Decision, ViewDecision,
 };

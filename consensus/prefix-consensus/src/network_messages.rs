@@ -174,12 +174,7 @@ impl StrongPrefixConsensusMsg {
         match self {
             StrongPrefixConsensusMsg::InnerPC { msg, .. } => msg.epoch(),
             StrongPrefixConsensusMsg::Proposal(p) => p.epoch,
-            StrongPrefixConsensusMsg::EmptyView(_) => {
-                // EmptyViewMessage doesn't carry epoch directly;
-                // the manager filters by slot before dispatching.
-                // This is a placeholder — callers should use slot-level filtering.
-                0
-            }
+            StrongPrefixConsensusMsg::EmptyView(e) => e.epoch,
             StrongPrefixConsensusMsg::Commit(c) => c.epoch,
             StrongPrefixConsensusMsg::FetchRequest(r) => r.epoch,
             StrongPrefixConsensusMsg::FetchResponse(r) => r.epoch,
@@ -191,11 +186,7 @@ impl StrongPrefixConsensusMsg {
         match self {
             StrongPrefixConsensusMsg::InnerPC { msg, .. } => msg.slot(),
             StrongPrefixConsensusMsg::Proposal(p) => p.slot,
-            StrongPrefixConsensusMsg::EmptyView(_) => {
-                // EmptyViewMessage doesn't carry slot directly;
-                // the manager filters by slot before dispatching.
-                0
-            }
+            StrongPrefixConsensusMsg::EmptyView(e) => e.slot,
             StrongPrefixConsensusMsg::Commit(c) => c.slot,
             StrongPrefixConsensusMsg::FetchRequest(r) => r.slot,
             StrongPrefixConsensusMsg::FetchResponse(r) => r.slot,
@@ -584,6 +575,8 @@ mod tests {
             1,
             QC3::new(vec![]),
             BlsSignature::dummy_signature(),
+            1,
+            0,
         )
     }
 
