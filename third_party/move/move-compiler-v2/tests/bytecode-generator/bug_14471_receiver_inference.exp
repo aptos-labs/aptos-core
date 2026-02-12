@@ -55,9 +55,9 @@ module 0x815::m {
         acquires MyMap
     {
         let my_map = borrow_global_mut<MyMap>(@0x815);
-        if (!contains<address,ValueWrap>(&my_map.table, key)) {
+        if (!contains<address, ValueWrap>(&my_map.table, key)) {
             let wrap = ValueWrap{val: val};
-            add<address,ValueWrap>(&mut my_map.table, key, wrap);
+            add<address, ValueWrap>(&mut my_map.table, key, wrap);
         }
     }
 }

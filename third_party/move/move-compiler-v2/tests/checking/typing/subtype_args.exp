@@ -48,15 +48,15 @@ module 0x8675309::M {
     fun mut_imm<T>(_x: &mut T, _y: &T) {
     }
     fun t0() {
-        imm<u64>(/*freeze*/&mut 0);
+        imm<u64>(&mut 0);
         imm<u64>(&0);
-        imm<S>(/*freeze*/&mut S{});
+        imm<S>(&mut S{});
         imm<S>(&S{});
     }
     fun t1() {
-        imm_mut<u64>(/*freeze*/&mut 0, &mut 0);
-        mut_imm<u64>(&mut 0, /*freeze*/&mut 0);
-        imm_imm<u64>(/*freeze*/&mut 0, /*freeze*/&mut 0);
+        imm_mut<u64>(&mut 0, &mut 0);
+        mut_imm<u64>(&mut 0, &mut 0);
+        imm_imm<u64>(&mut 0, &mut 0);
     }
     inline fun t2(f: |&u64, &mut u64|) {
         f(&mut 0, &mut 0);

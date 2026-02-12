@@ -2131,33 +2131,18 @@ pub type MemoryLabel = GlobalId;
 
 /// State labels for behavior predicates.
 /// Pre-label refers to state before an operation, post-label refers to state after.
-/// The label names (Symbols) are used for validation - pre-labels must reference
-/// post-labels defined elsewhere, and there cannot be cycles.
+/// Label names are stored in GlobalEnv and can be looked up via `get_memory_label_name`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct BehaviorState {
     /// Pre-state label - references another predicate's post-state
     pub pre: Option<MemoryLabel>,
     /// Post-state label - defines this predicate's post-state
     pub post: Option<MemoryLabel>,
-    /// Name of the pre-state label (for validation)
-    pub pre_name: Option<Symbol>,
-    /// Name of the post-state label (for validation)
-    pub post_name: Option<Symbol>,
 }
 
 impl BehaviorState {
-    pub fn new(
-        pre: Option<MemoryLabel>,
-        post: Option<MemoryLabel>,
-        pre_name: Option<Symbol>,
-        post_name: Option<Symbol>,
-    ) -> Self {
-        Self {
-            pre,
-            post,
-            pre_name,
-            post_name,
-        }
+    pub fn new(pre: Option<MemoryLabel>, post: Option<MemoryLabel>) -> Self {
+        Self { pre, post }
     }
 
     pub fn has_labels(&self) -> bool {

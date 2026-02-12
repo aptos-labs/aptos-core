@@ -224,85 +224,85 @@ module 0x42::constants {
         let a_ann = 0i128;
         let b_ann = 1i128;
         let c_ann = -1i128;
-        let d_ann = 170141183460469231731687303715884105727i128;
-        let e_ann = -170141183460469231731687303715884105728i128;
+        let d_ann = MAX_I128;
+        let e_ann = MIN_I128;
         let a = 0i128;
         let b = 1i128;
         let c = -1i128;
-        let d = 170141183460469231731687303715884105727i128;
-        let e = -170141183460469231731687303715884105728i128;
+        let d = MAX_I128;
+        let e = MIN_I128;
         let (x,y,z) = (-1i128, -2i128, -3i128);
-        0i128 + 1i128 + 1i128 + -1i128 + -1i128 + 170141183460469231731687303715884105727i128 + 170141183460469231731687303715884105727i128 + -170141183460469231731687303715884105728i128 + -170141183460469231731687303715884105728i128 + a_ann + b_ann + c_ann + d_ann + e_ann + a + b + c + d + e + x + y + z
+        0i128 + 1i128 + 1i128 + -1i128 + -1i128 + MAX_I128 + MAX_I128 + MIN_I128 + MIN_I128 + a_ann + b_ann + c_ann + d_ann + e_ann + a + b + c + d + e + x + y + z
     }
     public fun test_i16(): i16 {
         let a_ann = 0i16;
         let b_ann = 1i16;
         let c_ann = -1i16;
-        let d_ann = 32767i16;
-        let e_ann = -32768i16;
+        let d_ann = MAX_I16;
+        let e_ann = MIN_I16;
         let a = 0i16;
         let b = 1i16;
         let c = -1i16;
-        let d = 32767i16;
-        let e = -32768i16;
+        let d = MAX_I16;
+        let e = MIN_I16;
         let (x,y,z) = (-1i16, -2i16, -3i16);
-        0i16 + 1i16 + 1i16 + -1i16 + -1i16 + 32767i16 + 32767i16 + -32768i16 + -32768i16 + a_ann + b_ann + c_ann + d_ann + e_ann + a + b + c + d + e + x + y + z
+        0i16 + 1i16 + 1i16 + -1i16 + -1i16 + MAX_I16 + MAX_I16 + MIN_I16 + MIN_I16 + a_ann + b_ann + c_ann + d_ann + e_ann + a + b + c + d + e + x + y + z
     }
     public fun test_i256(): i256 {
         let a_ann = 0i256;
         let b_ann = 1i256;
         let c_ann = -1i256;
-        let d_ann = 57896044618658097711785492504343953926634992332820282019728792003956564819967i256;
-        let e_ann = -57896044618658097711785492504343953926634992332820282019728792003956564819968i256;
+        let d_ann = MAX_I256;
+        let e_ann = MIN_I256;
         let a = 0i256;
         let b = 1i256;
         let c = -1i256;
-        let d = 57896044618658097711785492504343953926634992332820282019728792003956564819967i256;
-        let e = -57896044618658097711785492504343953926634992332820282019728792003956564819968i256;
+        let d = MAX_I256;
+        let e = MIN_I256;
         let (x,y,z) = (-1i256, -2i256, -3i256);
-        0i256 + 1i256 + 1i256 + -1i256 + -1i256 + 57896044618658097711785492504343953926634992332820282019728792003956564819967i256 + 57896044618658097711785492504343953926634992332820282019728792003956564819967i256 + -57896044618658097711785492504343953926634992332820282019728792003956564819968i256 + -57896044618658097711785492504343953926634992332820282019728792003956564819968i256 + a_ann + b_ann + c_ann + d_ann + e_ann + a + b + c + d + e + x + y + z
+        0i256 + 1i256 + 1i256 + -1i256 + -1i256 + MAX_I256 + MAX_I256 + MIN_I256 + MIN_I256 + a_ann + b_ann + c_ann + d_ann + e_ann + a + b + c + d + e + x + y + z
     }
     public fun test_i32(): i32 {
         let a_ann = 0i32;
         let b_ann = 1i32;
         let c_ann = -1i32;
-        let d_ann = 2147483647i32;
-        let e_ann = -2147483648i32;
+        let d_ann = MAX_I32;
+        let e_ann = MIN_I32;
         let a = 0i32;
         let b = 1i32;
         let c = -1i32;
-        let d = 2147483647i32;
-        let e = -2147483648i32;
+        let d = MAX_I32;
+        let e = MIN_I32;
         let (x,y,z) = (-1i32, -2i32, -3i32);
-        0i32 + 1i32 + 1i32 + -1i32 + -1i32 + 2147483647i32 + 2147483647i32 + -2147483648i32 + -2147483648i32 + a_ann + b_ann + c_ann + d_ann + e_ann + a + b + c + d + e + x + y + z
+        0i32 + 1i32 + 1i32 + -1i32 + -1i32 + MAX_I32 + MAX_I32 + MIN_I32 + MIN_I32 + a_ann + b_ann + c_ann + d_ann + e_ann + a + b + c + d + e + x + y + z
     }
     public fun test_i64(): i64 {
         let a_ann = 0i64;
         let b_ann = 1i64;
         let c_ann = -1i64;
-        let d_ann = 9223372036854775807i64;
-        let e_ann = -9223372036854775808i64;
+        let d_ann = MAX_I64;
+        let e_ann = MIN_I64;
         let a = 0i64;
         let b = 1i64;
         let c = -1i64;
-        let d = 9223372036854775807i64;
-        let e = -9223372036854775808i64;
+        let d = MAX_I64;
+        let e = MIN_I64;
         let (x,y,z) = (-1i64, -2i64, -3i64);
-        0i64 + 1i64 + 1i64 + -1i64 + -1i64 + 9223372036854775807i64 + 9223372036854775807i64 + -9223372036854775808i64 + -9223372036854775808i64 + a_ann + b_ann + c_ann + d_ann + e_ann + a + b + c + d + e + x + y + z
+        0i64 + 1i64 + 1i64 + -1i64 + -1i64 + MAX_I64 + MAX_I64 + MIN_I64 + MIN_I64 + a_ann + b_ann + c_ann + d_ann + e_ann + a + b + c + d + e + x + y + z
     }
     public fun test_i8(): i8 {
         let a_ann = 0i8;
         let b_ann = 1i8;
         let c_ann = -1i8;
-        let d_ann = 127i8;
-        let e_ann = -128i8;
+        let d_ann = MAX_I8;
+        let e_ann = MIN_I8;
         let a = 0i8;
         let b = 1i8;
         let c = -1i8;
-        let d = 127i8;
-        let e = -128i8;
+        let d = MAX_I8;
+        let e = MIN_I8;
         let (x,y,z) = (-1i8, -2i8, -3i8);
-        0i8 + 1i8 + 1i8 + -1i8 + -1i8 + 127i8 + 127i8 + -128i8 + -128i8 + a_ann + b_ann + c_ann + d_ann + e_ann + a + b + c + d + e + x + y + z
+        0i8 + 1i8 + 1i8 + -1i8 + -1i8 + MAX_I8 + MAX_I8 + MIN_I8 + MIN_I8 + a_ann + b_ann + c_ann + d_ann + e_ann + a + b + c + d + e + x + y + z
     }
 }
 
