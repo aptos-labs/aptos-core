@@ -14,3 +14,7 @@ rust-version = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 jemallocator = { workspace = true }
+jemalloc-ctl = { workspace = true, features = ["stats"] }
+aptos-metrics-core = { workspace = true }
+aptos-logger = { workspace = true }
+once_cell = { workspace = true }

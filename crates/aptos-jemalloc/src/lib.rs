@@ -4,6 +4,11 @@
 #[cfg(unix)]
 pub use jemallocator;
 
+#[cfg(unix)]
+mod metrics;
+#[cfg(unix)]
+pub use metrics::start_jemalloc_metrics_thread;
+
 /// Sets up jemalloc as the global allocator and configures `malloc_conf`.
 ///
 /// Invoke at the top level of a binary crate (`main.rs`).
