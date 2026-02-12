@@ -17,7 +17,7 @@ use std::{cmp::max, collections::HashSet};
 
 fn create_proof_manager() -> ProofManager {
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    ProofManager::new(PeerId::random(), 10, 10, batch_store, true, true, 1)
+    ProofManager::new(PeerId::random(), 10, 10, batch_store, true, 1)
 }
 
 fn create_proof(
@@ -82,36 +82,26 @@ fn assert_payload_response(
     expected_block_gas_limit: Option<u64>,
 ) {
     match payload {
-        Payload::InQuorumStore(proofs) => {
-            assert_eq!(proofs.proofs.len(), expected.len());
-            for proof in proofs.proofs {
-                assert!(expected.contains(&proof.into()));
-            }
-        },
-        Payload::InQuorumStoreWithLimit(proofs) => {
-            assert_eq!(proofs.proof_with_data.proofs.len(), expected.len());
-            for proof in proofs.proof_with_data.proofs {
-                assert!(expected.contains(&proof.into()));
-            }
-            assert_eq!(proofs.max_txns_to_execute, max_txns_from_block_to_execute);
-        },
-        Payload::QuorumStoreInlineHybrid(_inline_batches, proofs, max_txns_to_execute) => {
-            assert_eq!(proofs.proofs.len(), expected.len());
-            for proof in proofs.proofs {
-                assert!(expected.contains(&proof.into()));
-            }
-            assert_eq!(max_txns_to_execute, max_txns_from_block_to_execute);
-        },
-        Payload::QuorumStoreInlineHybridV2(_inline_batches, proofs, execution_limits) => {
-            assert_eq!(proofs.proofs.len(), expected.len());
-            for proof in proofs.proofs {
-                assert!(expected.contains(&proof.into()));
-            }
-            assert_eq!(
-                execution_limits.max_txns_to_execute(),
-                max_txns_from_block_to_execute
-            );
-            assert_eq!(execution_limits.block_gas_limit(), expected_block_gas_limit);
+        Payload::OptQuorumStore(opt_qs) => match opt_qs {
+            aptos_consensus_types::payload::OptQuorumStorePayload::V1(p) => {
+                let proofs = &p.proof_with_data().batch_summary;
+                assert_eq!(proofs.len(), expected.len());
+                for proof in proofs {
+                    let proof_ext: ProofOfStore<BatchInfoExt> = proof.clone().into();
+                    assert!(expected.contains(&proof_ext));
+                }
+                assert_eq!(p.max_txns_to_execute(), max_txns_from_block_to_execute);
+                assert_eq!(p.block_gas_limit(), expected_block_gas_limit);
+            },
+            aptos_consensus_types::payload::OptQuorumStorePayload::V2(p) => {
+                let proofs = &p.proof_with_data().batch_summary;
+                assert_eq!(proofs.len(), expected.len());
+                for proof in proofs {
+                    assert!(expected.contains(proof));
+                }
+                assert_eq!(p.max_txns_to_execute(), max_txns_from_block_to_execute);
+                assert_eq!(p.block_gas_limit(), expected_block_gas_limit);
+            },
         },
         _ => panic!("Unexpected variant"),
     }
