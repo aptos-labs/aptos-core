@@ -31,6 +31,7 @@ use aptos_types::{
         Auth,
     },
 };
+use base64::Engine as _;
 use bip39::{Language, Mnemonic, Seed};
 use ed25519_dalek_bip32::{DerivationPath, ExtendedSecretKey};
 use keyless::FederatedKeylessPublicKey;
@@ -292,7 +293,7 @@ impl LocalAccount {
                 *keyless::circuit_testcases::SAMPLE_JWK_SK,
                 jwt_msg.as_bytes(),
             );
-            let jwt_sig_b64 = base64::encode_config(jwt_sig, base64::URL_SAFE_NO_PAD);
+            let jwt_sig_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(jwt_sig);
             let jwt = format!("{}.{}", jwt_msg, jwt_sig_b64);
 
             let pepper = keyless::test_utils::get_sample_pepper();
@@ -1123,14 +1124,14 @@ pub async fn derive_keyless_account(
 pub fn extract_claims_from_jwt(jwt: &str) -> Result<Claims> {
     let parts: Vec<&str> = jwt.split('.').collect();
     let jwt_payload_json =
-        base64::decode_config(parts.get(1).context("jwt malformed")?, base64::URL_SAFE)?;
+        base64::engine::general_purpose::URL_SAFE.decode(parts.get(1).context("jwt malformed")?)?;
     let claims: Claims = serde_json::from_slice(&jwt_payload_json)?;
     Ok(claims)
 }
 
 pub fn extract_header_json_from_jwt(jwt: &str) -> Result<String> {
     let parts: Vec<&str> = jwt.split('.').collect();
-    let header_bytes = base64::decode(parts.first().context("jwt malformed")?)?;
+    let header_bytes = base64::engine::general_purpose::STANDARD.decode(parts.first().context("jwt malformed")?)?;
 
     Ok(String::from_utf8(header_bytes)?)
 }

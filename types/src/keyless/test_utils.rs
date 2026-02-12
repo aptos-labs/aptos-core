@@ -26,7 +26,7 @@ use aptos_crypto::{
 };
 use ark_bn254::Bn254;
 use ark_groth16::{prepare_verifying_key, PreparedVerifyingKey};
-use base64::{encode_config, URL_SAFE_NO_PAD};
+use base64::Engine as _;
 use move_core_types::account_address::AccountAddress;
 use once_cell::sync::Lazy;
 use ring::{signature, signature::RsaKeyPair};
@@ -303,7 +303,7 @@ pub fn get_sample_jwt_token_from_payload(payload: &str) -> String {
     )
     .unwrap();
 
-    let base64url_string = encode_config(jwt_sig.clone(), URL_SAFE_NO_PAD);
+    let base64url_string = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(jwt_sig.clone());
 
     format!("{}.{}", msg, base64url_string)
 }

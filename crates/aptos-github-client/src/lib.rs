@@ -284,6 +284,7 @@ struct GetResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::Engine as _;
 
     const OWNER: &str = "OWNER";
     const REPOSITORY: &str = "REPOSITORY";
@@ -296,22 +297,22 @@ mod tests {
     fn test_files() {
         let path = "data.txt";
         let value1 = "hello";
-        let value1_encoded = base64::encode(value1);
+        let value1_encoded = base64::engine::general_purpose::STANDARD.encode(value1);
         let value2 = "world";
-        let value2_encoded = base64::encode(value2);
+        let value2_encoded = base64::engine::general_purpose::STANDARD.encode(value2);
 
         let github = Client::new(OWNER.into(), REPOSITORY.into(), BRANCH.into(), TOKEN.into());
 
         // Try a create
         github.get_file(path).unwrap_err();
         github.put(path, &value1_encoded).unwrap();
-        let b64_value = base64::decode(github.get_file(path).unwrap()).unwrap();
+        let b64_value = base64::engine::general_purpose::STANDARD.decode(github.get_file(path).unwrap()).unwrap();
         let value = std::str::from_utf8(&b64_value).unwrap();
         assert_eq!(value, value1);
 
         // Try an update
         github.put(path, &value2_encoded).unwrap();
-        let b64_value = base64::decode(github.get_file(path).unwrap()).unwrap();
+        let b64_value = base64::engine::general_purpose::STANDARD.decode(github.get_file(path).unwrap()).unwrap();
         let value = std::str::from_utf8(&b64_value).unwrap();
         assert_eq!(value, value2);
 
@@ -326,12 +327,12 @@ mod tests {
         let path1_root = "dir";
         let path1 = "dir/data1.txt";
         let value1 = "hello";
-        let value1_encoded = base64::encode(value1);
+        let value1_encoded = base64::engine::general_purpose::STANDARD.encode(value1);
 
         let path2_root = "dir1";
         let path2 = "dir1/data1.txt";
         let value2 = "world";
-        let value2_encoded = base64::encode(value2);
+        let value2_encoded = base64::engine::general_purpose::STANDARD.encode(value2);
 
         let github = Client::new(OWNER.into(), REPOSITORY.into(), BRANCH.into(), TOKEN.into());
 
@@ -340,11 +341,11 @@ mod tests {
         github.put(path2, &value2_encoded).unwrap();
 
         // Verify the contents
-        let b64_value = base64::decode(github.get_file(path1).unwrap()).unwrap();
+        let b64_value = base64::engine::general_purpose::STANDARD.decode(github.get_file(path1).unwrap()).unwrap();
         let value = std::str::from_utf8(&b64_value).unwrap();
         assert_eq!(value, value1);
 
-        let b64_value = base64::decode(github.get_file(path2).unwrap()).unwrap();
+        let b64_value = base64::engine::general_purpose::STANDARD.decode(github.get_file(path2).unwrap()).unwrap();
         let value = std::str::from_utf8(&b64_value).unwrap();
         assert_eq!(value, value2);
 
@@ -354,7 +355,7 @@ mod tests {
         // Verify one is good and the other is gone
         github.get_directory(path1_root).unwrap_err();
 
-        let b64_value = base64::decode(github.get_file(path2).unwrap()).unwrap();
+        let b64_value = base64::engine::general_purpose::STANDARD.decode(github.get_file(path2).unwrap()).unwrap();
         let value = std::str::from_utf8(&b64_value).unwrap();
         assert_eq!(value, value2);
 
@@ -370,18 +371,18 @@ mod tests {
         let file0 = "root_dir/another_dir/another_dir/ok.txt";
         let file1 = "root_dir/another_dir/ok.txt";
         let value = "hello";
-        let value_encoded = base64::encode(value);
+        let value_encoded = base64::engine::general_purpose::STANDARD.encode(value);
 
         let github = Client::new(OWNER.into(), REPOSITORY.into(), BRANCH.into(), TOKEN.into());
 
         github.put(file0, &value_encoded).unwrap();
         github.put(file1, &value_encoded).unwrap();
 
-        let b64_value = base64::decode(github.get_file(file0).unwrap()).unwrap();
+        let b64_value = base64::engine::general_purpose::STANDARD.decode(github.get_file(file0).unwrap()).unwrap();
         let rv = std::str::from_utf8(&b64_value).unwrap();
         assert_eq!(value, rv);
 
-        let b64_value = base64::decode(github.get_file(file1).unwrap()).unwrap();
+        let b64_value = base64::engine::general_purpose::STANDARD.decode(github.get_file(file1).unwrap()).unwrap();
         let rv = std::str::from_utf8(&b64_value).unwrap();
         assert_eq!(value, rv);
 

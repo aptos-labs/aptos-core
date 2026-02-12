@@ -411,6 +411,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
 mod tests {
     use super::*;
     use aptos_protos::util::timestamp::Timestamp;
+    use base64::Engine as _;
     use prost::Message;
     use redis_test::{MockCmd, MockRedisConnection};
 
@@ -506,7 +507,7 @@ mod tests {
         let mut buf = vec![];
         let key = "1";
         transactions[0].encode(&mut buf).unwrap();
-        let encoded_proto_data = base64::encode(&buf);
+        let encoded_proto_data = base64::engine::general_purpose::STANDARD.encode(&buf);
         let cmds = vec![MockCmd::new(
             redis::cmd("SET")
                 .arg(key)
@@ -537,7 +538,7 @@ mod tests {
         }];
         let mut buf = vec![];
         transactions[0].encode(&mut buf).unwrap();
-        let encoded_proto_data = base64::encode(&buf);
+        let encoded_proto_data = base64::engine::general_purpose::STANDARD.encode(&buf);
         let mut redis_pipeline = redis::pipe();
         redis_pipeline
             .cmd("SET")

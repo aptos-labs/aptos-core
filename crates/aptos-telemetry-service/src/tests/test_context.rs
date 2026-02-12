@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use base64::Engine as _;
 use crate::{
     context::{ClientTuple, Context, GroupedMetricsClients, JsonWebTokenService, PeerStoreTuple},
     index,
@@ -89,7 +90,7 @@ pub async fn new_test_context_with_multiple_contracts(
     };
 
     let peers = PeerStoreTuple::default();
-    let jwt_service = JsonWebTokenService::from_base64_secret(&base64::encode("jwt_secret_key"));
+    let jwt_service = JsonWebTokenService::from_base64_secret(&base64::engine::general_purpose::STANDARD.encode("jwt_secret_key"));
 
     // Build custom contract clients if configured
     let custom_contract_clients = if !config.custom_contract_configs.is_empty() {

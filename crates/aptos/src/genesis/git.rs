@@ -9,6 +9,7 @@ use crate::{
     CliCommand,
 };
 use aptos_config::config::Token;
+use base64::Engine as _;
 use aptos_framework::ReleaseBundle;
 use aptos_genesis::config::Layout;
 use aptos_github_client::Client as GithubClient;
@@ -240,7 +241,7 @@ impl Client {
                 Ok(ReleaseBundle::read(path)?)
             },
             Client::Github(client) => {
-                let bytes = base64::decode(client.get_file(FRAMEWORK_NAME)?)?;
+                let bytes = base64::engine::general_purpose::STANDARD.decode(client.get_file(FRAMEWORK_NAME)?)?;
                 Ok(bcs::from_bytes::<ReleaseBundle>(&bytes)?)
             },
         }
@@ -256,9 +257,9 @@ pub fn from_yaml<T: DeserializeOwned>(input: &str) -> CliTypedResult<T> {
 }
 
 pub fn to_base64_encoded_yaml<T: Serialize + ?Sized>(input: &T) -> CliTypedResult<String> {
-    Ok(base64::encode(to_yaml(input)?))
+    Ok(base64::engine::general_purpose::STANDARD.encode(to_yaml(input)?))
 }
 
 pub fn from_base64_encoded_yaml<T: DeserializeOwned>(input: &str) -> CliTypedResult<T> {
-    from_yaml(&String::from_utf8(base64::decode(input)?)?)
+    from_yaml(&String::from_utf8(base64::engine::general_purpose::STANDARD.decode(input)?)?)
 }

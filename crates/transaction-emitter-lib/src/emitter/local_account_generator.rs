@@ -2,6 +2,7 @@ use anyhow::bail;
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use aptos_crypto::ed25519::Ed25519PrivateKey;
+use base64::Engine as _;
 use aptos_sdk::types::{
     AccountKey, EphemeralKeyPair, EphemeralPrivateKey, KeylessAccount, LocalAccount,
 };
@@ -42,9 +43,9 @@ pub fn create_keyless_account_generator(
     keyless_config: keyless::Configuration,
 ) -> anyhow::Result<Box<dyn LocalAccountGenerator>> {
     let parts: Vec<&str> = jwt.split('.').collect();
-    let header_bytes = base64::decode(parts[0]).unwrap();
+    let header_bytes = base64::engine::general_purpose::STANDARD.decode(parts[0]).unwrap();
     let jwt_header_json = String::from_utf8(header_bytes).unwrap();
-    let jwt_payload_json = base64::decode_config(parts[1], base64::URL_SAFE).unwrap();
+    let jwt_payload_json = base64::engine::general_purpose::URL_SAFE.decode(parts[1]).unwrap();
     let claims: Claims = serde_json::from_slice(&jwt_payload_json)?;
     Ok(Box::new(KeylessAccountGenerator {
         proof_file_path: proof_file_path.map(|s| s.to_string()),
