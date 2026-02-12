@@ -43,9 +43,10 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{StatusCode, VMStatus},
 };
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use once_cell::sync::{Lazy, OnceCell};
+use once_cell::sync::OnceCell;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     marker::PhantomData,
@@ -53,16 +54,6 @@ use std::{
 };
 use triomphe::Arc as TriompheArc;
 use vm_wrapper::AptosExecutorTask;
-
-static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
-    Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .thread_name(|index| format!("par_exec-{}", index))
-            .build()
-            .unwrap(),
-    )
-});
 
 /// Output type wrapper used by block executor. VM output is stored first, then
 /// transformed into TransactionOutput type that is returned.
@@ -599,7 +590,7 @@ impl<
         transaction_commit_listener: Option<L>,
     ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
         Self::execute_block_on_thread_pool::<S, L, TP>(
-            Arc::clone(&RAYON_EXEC_POOL),
+            THREAD_MANAGER.get_exe_cpu_pool_arc(),
             signature_verified_block,
             state_view,
             module_cache_manager,
