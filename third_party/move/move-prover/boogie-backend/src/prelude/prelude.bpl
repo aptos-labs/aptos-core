@@ -117,14 +117,13 @@ procedure {:inline 1} $Mul{{name}}(src1: int, src2: int) returns (dst: int)
 function $undefined_int(): int;
 
 function {:inline} $truncDiv(src1: int, src2: int): int {
-    // Euclidean div: a = q*b + r where 0 <= r < |b|
-    // Truncation div: rounds toward zero
-    // They are equal when src1 >= 0 or when exact.
-    // When src1 < 0 and src2 > 0 and not exact: trunc = euc + 1
-    // When src1 < 0 and src2 < 0 and not exact: trunc = euc - 1
-    if ( src1 >= 0 ) then
+    // Boogie's `div` is Euclidean division (remainder always non-negative).
+    // Move/Rust use truncation division (rounds toward zero).
+    // For unsigned integers (src1 >= 0 && src2 > 0), they are identical.
+    // We check this first to avoid expensive mod operations for the common case.
+    if (src1 >= 0 && src2 > 0) then
         src1 div src2
-    else if (src1 mod src2 == 0) then
+    else if (src1 >= 0 || src1 mod src2 == 0) then
         src1 div src2
     else if (src2 > 0) then
         (src1 div src2) + 1
@@ -133,9 +132,13 @@ function {:inline} $truncDiv(src1: int, src2: int): int {
 }
 
 function {:inline} $truncMod(src1: int, src2: int): int {
-    if (src1 >= 0) then
+    // Boogie's `mod` is Euclidean (remainder always non-negative).
+    // Move/Rust use truncation mod (remainder has sign of dividend).
+    // For unsigned integers (src1 >= 0 && src2 > 0), they are identical.
+    // We check this first to avoid expensive mod comparisons for the common case.
+    if (src1 >= 0 && src2 > 0) then
         src1 mod src2
-    else if (src1 mod src2 == 0) then
+    else if (src1 >= 0 || src1 mod src2 == 0) then
         src1 mod src2
     else if (src2 > 0) then
         (src1 mod src2) - src2
