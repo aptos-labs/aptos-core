@@ -20,6 +20,7 @@ use aptos_logger::{error, info, warn};
 use aptos_types::{
     block_info::BlockInfo,
     contract_event::ContractEvent,
+    decryption::BlockTxnDecryptionKey,
     ledger_info::LedgerInfoWithSignatures,
     randomness::Randomness,
     secret_sharing::{SecretShare, SecretSharedKey},
@@ -69,8 +70,17 @@ pub type TaskResult<T> = Result<T, TaskError>;
 pub type TaskFuture<T> = Shared<BoxFuture<'static, TaskResult<T>>>;
 
 pub type MaterializeResult = (Vec<SignedTransaction>, Option<u64>, Option<u64>);
-pub type DecryptionResult = (Vec<SignedTransaction>, Option<u64>, Option<u64>);
-pub type PrepareResult = (Arc<Vec<SignatureVerifiedTransaction>>, Option<u64>);
+pub type DecryptionResult = (
+    Vec<SignedTransaction>,
+    Option<u64>,
+    Option<u64>,
+    Option<Option<BlockTxnDecryptionKey>>,
+);
+pub type PrepareResult = (
+    Arc<Vec<SignatureVerifiedTransaction>>,
+    Option<u64>,
+    Option<Option<BlockTxnDecryptionKey>>,
+);
 // First Option is whether randomness is enabled
 // Second Option is whether randomness is skipped
 pub type RandResult = (Option<Option<Randomness>>, bool);

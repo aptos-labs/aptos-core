@@ -7,6 +7,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_crypto::{weighted_config::WeightedConfigArkworks, TSecretSharingConfig as _};
+use aptos_dkg::pvss::traits::transcript::Aggregatable;
 use ark_ec::AffineRepr as _;
 use ark_std::rand::{seq::SliceRandom, thread_rng, CryptoRng, Rng as _, RngCore};
 
@@ -24,7 +25,7 @@ fn weighted_smoke_with_setup<R: RngCore + CryptoRng>(
     let ct = FPTXWeighted::encrypt(&ek, rng, &plaintext, &associated_data).unwrap();
     FPTXWeighted::verify_ct(&ct, &associated_data).unwrap();
 
-    let (d, pfs_promise) = FPTXWeighted::digest(&dk, &vec![ct.clone()], 0).unwrap();
+    let (d, pfs_promise) = FPTXWeighted::digest(&dk, std::slice::from_ref(&ct), 0).unwrap();
     let pfs = FPTXWeighted::eval_proofs_compute_all(&pfs_promise, &dk);
 
     let dk_shares: Vec<<FPTXWeighted as BatchThresholdEncryption>::DecryptionKeyShare> = msk_shares
@@ -51,7 +52,7 @@ fn weighted_smoke_with_setup<R: RngCore + CryptoRng>(
     ek.verify_decryption_key(&d, &dk).unwrap();
 
     let decrypted_plaintexts: Vec<String> =
-        FPTXWeighted::decrypt(&dk, &vec![ct.prepare(&d, &pfs).unwrap()]).unwrap();
+        FPTXWeighted::decrypt(&dk, &[ct.prepare(&d, &pfs).unwrap()]).unwrap();
 
     assert_eq!(decrypted_plaintexts[0], plaintext);
 
@@ -80,8 +81,7 @@ use aptos_crypto::{SigningKey, Uniform};
 use aptos_dkg::pvss::{
     test_utils::NoAux,
     traits::{
-        transcript::{Aggregatable, HasAggregatableSubtranscript},
-        Convert, HasEncryptionPublicParams, Transcript,
+        transcript::HasAggregatableSubtranscript, Convert, HasEncryptionPublicParams, Transcript,
     },
 };
 
@@ -139,10 +139,9 @@ fn weighted_smoke_with_pvss() {
         })
         .collect();
 
-    let mut subtranscript = subtrx_paths[0].clone();
-    for acc in &subtrx_paths[1..] {
-        subtranscript.aggregate_with(&tc, acc).unwrap();
-    }
+    // Do all aggregations in projective form, then normalize to affine
+    let subtranscript =
+        <T as HasAggregatableSubtranscript>::Subtranscript::aggregate(&tc, subtrx_paths).unwrap();
 
     let dk = DigestKey::new(&mut rng, 8, 1).unwrap();
 

@@ -1,0 +1,71 @@
+//# publish
+module 0x1::B
+struct T has drop
+  g: u64
+
+public fun new(l0: u64): T
+    move_loc l0
+    pack T
+    ret
+
+public fun t(l0: &T)
+    local l1: &u64
+    local l2: u64
+    move_loc l0
+    borrow_field T, g
+    st_loc l1
+    move_loc l1
+    read_ref
+    st_loc l2
+    copy_loc l2
+    ld_u64 2
+    eq
+    not
+    br_false l0
+    ld_u64 42
+    abort
+l0: ret
+
+
+
+//# publish
+module 0x1::A
+use 0x1::B
+struct T has drop
+  f: B::T
+
+public fun new(l0: B::T): T
+    move_loc l0
+    pack T
+    ret
+
+public fun t(l0: &T)
+    local l1: &B::T
+    move_loc l0
+    borrow_field T, f
+    st_loc l1
+    move_loc l1
+    call B::t
+    ret
+
+
+
+//# run
+script
+use 0x1::A
+use 0x1::B
+entry public fun main()
+    local l0: B::T
+    local l1: A::T
+    local l2: &A::T
+    ld_u64 2
+    call B::new
+    st_loc l0
+    move_loc l0
+    call A::new
+    st_loc l1
+    borrow_loc l1
+    st_loc l2
+    move_loc l2
+    call A::t
+    ret

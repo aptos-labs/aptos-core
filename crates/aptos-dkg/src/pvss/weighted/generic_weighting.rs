@@ -7,12 +7,11 @@
 /// keys, which might not be safe depending on the PVSS scheme.
 use crate::pvss::{
     traits::{
-        transcript::{AggregatableTranscript, MalleableTranscript},
+        transcript::{Aggregatable, AggregatableTranscript, Aggregated, MalleableTranscript},
         Transcript,
     },
     Player, ThresholdConfigBlstrs, WeightedConfigBlstrs,
 };
-use crate::traits::transcript::Aggregatable;
 use aptos_crypto::{
     traits::TSecretSharingConfig as _, weighted_config::WeightedConfig, CryptoMaterialError,
     ValidCryptoMaterial,
@@ -223,16 +222,42 @@ where
     T: AggregatableTranscript
         + Aggregatable<SecretSharingConfig = ThresholdConfigBlstrs>
         + Transcript<SecretSharingConfig = ThresholdConfigBlstrs>,
+    T::Aggregated: Aggregated<T>,
 {
+    type Aggregated = GenericWeighting<T::Aggregated>;
     type SecretSharingConfig = WeightedConfig<ThresholdConfigBlstrs>;
 
+    fn to_aggregated(&self) -> Self::Aggregated {
+        GenericWeighting {
+            trx: self.trx.to_aggregated(),
+        }
+    }
+}
+
+impl<T> Aggregated<GenericWeighting<T>> for GenericWeighting<T::Aggregated>
+where
+    T: AggregatableTranscript
+        + Aggregatable<SecretSharingConfig = ThresholdConfigBlstrs>
+        + Transcript<SecretSharingConfig = ThresholdConfigBlstrs>,
+    T::Aggregated: Aggregated<T>,
+{
     fn aggregate_with(
         &mut self,
         sc: &WeightedConfig<ThresholdConfigBlstrs>,
-        other: &Self,
+        other: &GenericWeighting<T>,
     ) -> anyhow::Result<()> {
-        T::aggregate_with(&mut self.trx, sc.get_threshold_config(), &other.trx)?;
+        // self.trx is T::Aggregated, other.trx is T
+        // Aggregate other.trx into self.trx
+        self.trx
+            .aggregate_with(sc.get_threshold_config(), &other.trx)?;
         Ok(())
+    }
+
+    fn normalize(self) -> GenericWeighting<T> {
+        // Convert T::Aggregated back to T
+        GenericWeighting {
+            trx: self.trx.normalize(),
+        }
     }
 }
 

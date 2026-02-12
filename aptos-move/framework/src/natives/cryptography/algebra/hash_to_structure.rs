@@ -13,7 +13,7 @@ use aptos_gas_schedule::gas_params::natives::{aptos_framework::*, move_stdlib::*
 use aptos_native_interface::{
     safely_pop_arg, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
-use aptos_types::on_chain_config::FeatureFlag;
+use aptos_types::on_chain_config::{FeatureFlag, TimedFeatureFlag};
 use ark_ec::hashing::HashToCurve;
 use either::Either;
 use move_core_types::gas_algebra::{InternalGas, NumBytes};
@@ -23,6 +23,10 @@ use move_vm_types::{
 };
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, rc::Rc};
+
+/// Equivalent to `std::error::internal(99)` in Move.
+/// Used when type to type tag conversion fails unexpectedly.
+const E_TYPE_TO_TYPE_TAG_CONVERSION_FAILED: u64 = 0x0B_0063;
 
 fn feature_flag_of_hash_to_structure(
     structure_opt: Option<Structure>,
@@ -44,11 +48,25 @@ macro_rules! abort_unless_hash_to_structure_enabled {
     };
 }
 
-macro_rules! suite_from_ty_arg {
-    ($context:expr, $typ:expr) => {{
-        let type_tag = $context.type_to_type_tag($typ).unwrap();
-        HashToStructureSuite::try_from(type_tag).ok()
-    }};
+fn suite_from_ty_arg(
+    context: &SafeNativeContext,
+    ty: &Type,
+) -> SafeNativeResult<Option<HashToStructureSuite>> {
+    let result = context.type_to_type_tag(ty);
+    let type_tag =
+        if context.timed_feature_enabled(TimedFeatureFlag::FixCryptoAlgebraNativesResultHandling) {
+            if let Ok(type_tag) = result {
+                type_tag
+            } else {
+                return Err(SafeNativeError::abort_with_message(
+                    E_TYPE_TO_TYPE_TAG_CONVERSION_FAILED,
+                    "Conversion from type to type tag failed (too complex)",
+                ));
+            }
+        } else {
+            result.unwrap()
+        };
+    Ok(HashToStructureSuite::try_from(type_tag).ok())
 }
 
 macro_rules! hash_to_bls12381gx_cost {
@@ -85,7 +103,7 @@ pub fn hash_to_internal(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(2, ty_args.len());
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    let suite_opt = suite_from_ty_arg!(context, &ty_args[1]);
+    let suite_opt = suite_from_ty_arg(context, &ty_args[1])?;
     abort_unless_hash_to_structure_enabled!(context, structure_opt, suite_opt);
     let vector_ref = safely_pop_arg!(args, VectorRef);
     let bytes_ref = vector_ref.as_bytes_ref();

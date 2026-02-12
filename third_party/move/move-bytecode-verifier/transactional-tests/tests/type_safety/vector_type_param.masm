@@ -1,0 +1,28 @@
+//# publish
+module 0x42::M1
+struct S<T0: copy>
+  t: T0
+
+public fun bad_sig<T0>(l0: vector<S<T0>>): vector<S<T0>>
+    move_loc l0
+    ret
+
+
+
+//# publish
+module 0x42::M2
+struct S<T0: copy>
+  t: T0
+
+public fun bad_sig<T0>(l0: &vector<S<T0>>)
+    ret
+
+
+
+//# publish
+module 0x42::M3
+struct S<T0: copy>
+  t: T0
+
+public fun bad_sig<T0>(l0: &mut vector<S<T0>>)
+    ret

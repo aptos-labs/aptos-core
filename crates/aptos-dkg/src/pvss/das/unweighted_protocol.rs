@@ -13,7 +13,7 @@ use crate::{
         },
         LowDegreeTest, Player, ThresholdConfigBlstrs,
     },
-    traits::transcript::Aggregatable,
+    traits::transcript::{Aggregatable, Aggregated},
     utils::{
         g1_multi_exp, g2_multi_exp,
         random::{
@@ -300,9 +300,9 @@ impl AggregatableTranscript for Transcript {
         let g_1_inverse = pp.get_encryption_public_params().pubkey_base().neg();
 
         // The vector of left-hand-side ($\mathbb{G}_1$) inputs to each pairing in the multi-pairing.
-        let lhs = vec![h_1, ek.add(g_1_inverse), self.C_0.add(c.neg())];
+        let lhs = [h_1, ek.add(g_1_inverse), self.C_0.add(c.neg())];
         // The vector of right-hand-side ($\mathbb{G}_2$) inputs to each pairing in the multi-pairing.
-        let rhs = vec![v, self.hat_w, g_2];
+        let rhs = [v, self.hat_w, g_2];
 
         let res = multi_pairing(lhs.iter(), rhs.iter());
         if res != Gt::identity() {
@@ -314,8 +314,15 @@ impl AggregatableTranscript for Transcript {
 }
 
 impl Aggregatable for Transcript {
+    type Aggregated = Self;
     type SecretSharingConfig = ThresholdConfigBlstrs;
 
+    fn to_aggregated(&self) -> Self::Aggregated {
+        self.clone()
+    }
+}
+
+impl Aggregated<Transcript> for Transcript {
     fn aggregate_with(
         &mut self,
         sc: &ThresholdConfigBlstrs,
@@ -341,6 +348,10 @@ impl Aggregatable for Transcript {
         debug_assert_eq!(self.V.len(), other.V.len());
 
         Ok(())
+    }
+
+    fn normalize(self) -> Transcript {
+        self
     }
 }
 

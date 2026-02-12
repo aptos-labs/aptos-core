@@ -7,14 +7,23 @@ module aptos_experimental::price_time_index {
     use std::option::{Self, Option};
     use aptos_std::math64::mul_div;
     use aptos_framework::big_ordered_map::BigOrderedMap;
-    use aptos_trading::order_book_types::{OrderId, IncreasingIdx, OrderType, DecreasingIdx};
+    use aptos_trading::order_book_types::{
+        OrderId,
+        IncreasingIdx,
+        OrderType,
+        DecreasingIdx
+    };
     use aptos_trading::order_match_types::{ActiveMatchedOrder, new_active_matched_order};
     use aptos_experimental::order_book_utils;
 
     #[test_only]
     use std::vector;
     #[test_only]
-    use aptos_trading::order_book_types::{new_order_id_type, new_increasing_idx_type, single_order_type};
+    use aptos_trading::order_book_types::{
+        new_order_id_type,
+        new_increasing_idx_type,
+        single_order_type
+    };
 
     const EINVALID_MAKER_ORDER: u64 = 1;
     /// There is a code bug that breaks internal invariant
@@ -120,7 +129,10 @@ module aptos_experimental::price_time_index {
         self: &PriceTimeIndex, is_bid: bool, slippage_bps: u64
     ): Option<u64> {
         if (!is_bid) {
-            assert!(slippage_bps <= get_slippage_pct_precision() * 100, EINVALID_SLIPPAGE_BPS);
+            assert!(
+                slippage_bps <= get_slippage_pct_precision() * 100,
+                EINVALID_SLIPPAGE_BPS
+            );
         };
         let mid_price = self.get_mid_price();
         if (mid_price.is_none()) {
@@ -144,7 +156,10 @@ module aptos_experimental::price_time_index {
         is_bid: bool
     ): u64 {
         if (is_bid) {
-            let key = PriceDescTime { price, tie_breaker: unique_priority_idx.into_decreasing_idx_type() };
+            let key = PriceDescTime {
+                price,
+                tie_breaker: unique_priority_idx.into_decreasing_idx_type()
+            };
             self.buys.remove(&key).size
         } else {
             let key = PriceAscTime { price, tie_breaker: unique_priority_idx };
@@ -179,7 +194,9 @@ module aptos_experimental::price_time_index {
                 cur_value.size
             } else {
                 modify_order_data(
-                    orders, &cur_key, |order_data| {
+                    orders,
+                    &cur_key,
+                    |order_data| {
                         order_data.size -= remaining_size;
                     }
                 );
@@ -221,7 +238,9 @@ module aptos_experimental::price_time_index {
     }
 
     inline fun modify_order_data<K: drop + copy + store>(
-        orders: &mut BigOrderedMap<K, OrderData>, key: &K, modify_fn: |&mut  OrderData|
+        orders: &mut BigOrderedMap<K, OrderData>,
+        key: &K,
+        modify_fn: |&mut OrderData|
     ) {
         let order = orders.borrow_mut(key);
         modify_fn(order);
@@ -249,16 +268,23 @@ module aptos_experimental::price_time_index {
         is_bid: bool
     ) {
         if (is_bid) {
-            let key = PriceDescTime { price, tie_breaker: unique_priority_idx.into_decreasing_idx_type() };
+            let key = PriceDescTime {
+                price,
+                tie_breaker: unique_priority_idx.into_decreasing_idx_type()
+            };
             modify_order_data(
-                &mut self.buys, &key, |order_data| {
+                &mut self.buys,
+                &key,
+                |order_data| {
                     order_data.size += size_delta;
                 }
             );
         } else {
             let key = PriceAscTime { price, tie_breaker: unique_priority_idx };
             modify_order_data(
-                &mut self.sells, &key, |order_data| {
+                &mut self.sells,
+                &key,
+                |order_data| {
                     order_data.size += size_delta;
                 }
             );
@@ -274,16 +300,23 @@ module aptos_experimental::price_time_index {
         is_bid: bool
     ) {
         if (is_bid) {
-            let key = PriceDescTime { price, tie_breaker: unique_priority_idx.into_decreasing_idx_type() };
+            let key = PriceDescTime {
+                price,
+                tie_breaker: unique_priority_idx.into_decreasing_idx_type()
+            };
             modify_order_data(
-                &mut self.buys, &key, |order_data| {
+                &mut self.buys,
+                &key,
+                |order_data| {
                     order_data.size -= size_delta;
                 }
             );
         } else {
             let key = PriceAscTime { price, tie_breaker: unique_priority_idx };
             modify_order_data(
-                &mut self.sells, &key, |order_data| {
+                &mut self.sells,
+                &key,
+                |order_data| {
                     order_data.size -= size_delta;
                 }
             );
@@ -303,7 +336,10 @@ module aptos_experimental::price_time_index {
         // Assert that this is not a taker order
         assert!(!self.is_taker_order(price, is_bid), EINVALID_MAKER_ORDER);
         if (is_bid) {
-            let key = PriceDescTime { price, tie_breaker: unique_priority_idx.into_decreasing_idx_type() };
+            let key = PriceDescTime {
+                price,
+                tie_breaker: unique_priority_idx.into_decreasing_idx_type()
+            };
             self.buys.add(key, value);
         } else {
             let key = PriceAscTime { price, tie_breaker: unique_priority_idx };
@@ -329,21 +365,24 @@ module aptos_experimental::price_time_index {
     }
 
     #[test_only]
-    fun place_test_order(self: &mut PriceTimeIndex, order: TestOrder):
-        vector<ActiveMatchedOrder> {
+    fun place_test_order(self: &mut PriceTimeIndex, order: TestOrder)
+        : vector<ActiveMatchedOrder> {
         let result = vector::empty();
         let remaining_size = order.size;
         while (remaining_size > 0) {
             if (!self.is_taker_order(order.price, order.is_bid)) {
                 self.place_maker_order(
-                    order.order_id, single_order_type(), order.price, order.unique_idx, order.size, order.is_bid
+                    order.order_id,
+                    single_order_type(),
+                    order.price,
+                    order.unique_idx,
+                    order.size,
+                    order.is_bid
                 );
                 return result;
             };
             let match_result =
-                self.get_single_match_result(
-                    order.price, remaining_size, order.is_bid
-                );
+                self.get_single_match_result(order.price, remaining_size, order.is_bid);
             remaining_size -= match_result.get_active_matched_size();
             result.push_back(match_result);
         };
@@ -532,13 +571,13 @@ module aptos_experimental::price_time_index {
         assert!(
             match_result
                 == vector[
-                new_active_matched_order(
-                    new_order_id_type(0),
-                    500, // matched size
-                    500, // remaining size
-                    single_order_type()
-                )
-            ]
+                    new_active_matched_order(
+                        new_order_id_type(0),
+                        500, // matched size
+                        500, // remaining size
+                        single_order_type()
+                    )
+                ]
         );
 
         let match_result =

@@ -7,12 +7,10 @@ use crate::{
     types::DKGMessage,
 };
 use anyhow::{anyhow, ensure, Context};
+use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
 use aptos_dkg::pvss::{
-    traits::{
-        transcript::{HasAggregatableSubtranscript, Transcript},
-        Aggregatable,
-    },
+    traits::transcript::{Aggregatable, Aggregated, HasAggregatableSubtranscript, Transcript},
     Player,
 };
 use aptos_infallible::{Mutex, RwLock};
@@ -30,9 +28,9 @@ use aptos_types::{
     validator_verifier::VerifyError,
 };
 use futures::future::AbortHandle;
-use futures_channel::oneshot;
 use futures_util::future::Abortable;
 use move_core_types::account_address::AccountAddress;
+use rand::{thread_rng, CryptoRng, RngCore};
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -51,7 +49,7 @@ pub fn start_subtranscript_aggregation(
     dkg_config: ChunkyDKGConfig,
     spks: Vec<DealerPublicKey>,
     start_time: Duration,
-    agg_subtrx_tx: Option<oneshot::Sender<AggregatedSubtranscript>>,
+    agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscript>>,
     received_transcripts: Arc<Mutex<HashMap<AccountAddress, ChunkyTranscript>>>,
 ) -> AbortHandle {
     let epoch = dkg_config.session_metadata.dealer_epoch;
@@ -82,15 +80,19 @@ pub fn start_subtranscript_aggregation(
     abort_handle
 }
 
+/// Projective accumulator type for ChunkySubtranscript (aggregate_with in projective form, normalize when quorum met).
+type ChunkySubtranscriptProjective = <ChunkySubtranscript as Aggregatable>::Aggregated;
+
 struct InnerState {
     valid_peer_transcript_seen: bool,
     contributors: HashSet<AccountAddress>,
-    subtrx: Option<ChunkySubtranscript>,
-    agg_subtrx_tx: Option<oneshot::Sender<AggregatedSubtranscript>>,
+    /// Accumulator in projective form; use aggregate_with for each transcript, then normalize when quorum is met.
+    subtrx: Option<ChunkySubtranscriptProjective>,
+    agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscript>>,
 }
 
 impl InnerState {
-    fn new(agg_subtrx_tx: Option<oneshot::Sender<AggregatedSubtranscript>>) -> Self {
+    fn new(agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscript>>) -> Self {
         Self {
             valid_peer_transcript_seen: false,
             contributors: HashSet::new(),
@@ -117,7 +119,7 @@ impl ChunkyTranscriptAggregationState {
         dkg_config: ChunkyDKGConfig,
         signing_pubkeys: Vec<DealerPublicKey>,
         start_time: Duration,
-        agg_subtrx_tx: Option<oneshot::Sender<AggregatedSubtranscript>>,
+        agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscript>>,
         received_transcripts: Arc<Mutex<HashMap<AccountAddress, ChunkyTranscript>>>,
     ) -> Self {
         Self {
@@ -132,11 +134,12 @@ impl ChunkyTranscriptAggregationState {
     }
 
     /// Validates metadata and deserializes the transcript, and verifies it.
-    fn validate_and_deserialize_transcript(
+    fn validate_and_deserialize_transcript<R: RngCore + CryptoRng>(
         &self,
         sender: Author,
         metadata: &DKGTranscriptMetadata,
         transcript_bytes: &[u8],
+        rng: &mut R,
     ) -> anyhow::Result<(ChunkyTranscript, u64)> {
         // Validate metadata
         ensure!(
@@ -166,6 +169,7 @@ impl ChunkyTranscriptAggregationState {
                 &self.signing_pubkeys,
                 &self.dkg_config.eks,
                 &self.dkg_config.session_metadata,
+                rng,
             )
             .context("chunky transcript verification failed")?;
 
@@ -222,8 +226,9 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
         }
 
         // RwLock allows concurrent validation of multiple transcripts
+        let mut rng = thread_rng();
         let (transcript, peer_power) =
-            self.validate_and_deserialize_transcript(sender, metadata, transcript_bytes)?;
+            self.validate_and_deserialize_transcript(sender, metadata, transcript_bytes, &mut rng)?;
 
         let mut inner_state = self.inner_state.write();
         // Track first peer transcript for metrics
@@ -243,7 +248,7 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
             received_transcripts.insert(metadata.author, transcript.clone());
         }
 
-        // Aggregate the transcript
+        // Aggregate the transcript (projective accumulator; normalize when quorum is met)
         // TODO(ibalajiarun): Should the transcript be aggregated if quorum is already met?
         inner_state.contributors.insert(metadata.author);
         if let Some(agg_subtrx) = inner_state.subtrx.as_mut() {
@@ -254,7 +259,7 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
                 )
                 .context("chunky transcript aggregation failed")?;
         } else {
-            inner_state.subtrx = Some(transcript.get_subtranscript());
+            inner_state.subtrx = Some(transcript.get_subtranscript().to_aggregated());
         }
 
         // Check quorum and send if needed
@@ -273,7 +278,7 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
         // Send to agg_subtrx_tx when quorum is met (only once)
         if quorum_met {
             if let Some(tx) = inner_state.agg_subtrx_tx.take() {
-                let agg_trx = inner_state.subtrx.clone().unwrap();
+                let agg_trx = inner_state.subtrx.take().unwrap().normalize();
                 // Convert AccountAddress contributors to Player by getting their validator indices.
                 // Sort by AccountAddress so dealers order is deterministic (HashSet iteration is
                 // non-deterministic); AggregatedSubtranscript is BCSCryptoHash'd for certification.
@@ -294,7 +299,7 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
                     subtranscript: agg_trx,
                     dealers,
                 };
-                if let Err(e) = tx.send(agg_subtrx) {
+                if let Err(e) = tx.push((), agg_subtrx) {
                     info!(
                         epoch = epoch,
                         "[ChunkyDKG] Failed to send aggregated chunky transcript to ChunkyDKGManager when quorum met: {:?}", e

@@ -6,7 +6,7 @@
 use crate::{
     ledger_db::LedgerDb,
     metrics::{OTHER_TIMERS_SECONDS, STATE_ITEMS, TOTAL_STATE_BYTES},
-    pruner::{StateKvPrunerManager, StateMerklePrunerManager},
+    pruner::{leaked_stale_node_cleaner, StateKvPrunerManager, StateMerklePrunerManager},
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         stale_node_index::StaleNodeIndexSchema,
@@ -132,10 +132,15 @@ impl StatePruner {
             config.state_merkle_pruner_config,
         );
         let epoch_snapshot_pruner = StateMerklePrunerManager::new(
-            state_merkle_db,
+            Arc::clone(&state_merkle_db),
             config.epoch_snapshot_pruner_config.into(),
         );
         let state_kv_pruner = StateKvPrunerManager::new(state_kv_db, config.ledger_pruner_config);
+
+        leaked_stale_node_cleaner::maybe_start_cleaner(
+            state_merkle_db,
+            config.stale_node_cleanup_batch_size,
+        );
 
         Self {
             hot_state_merkle_pruner,

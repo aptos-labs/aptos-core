@@ -187,7 +187,7 @@ impl From<OnChainRandomnessConfig> for RandomnessConfigMoveStruct {
 
 impl OnChainRandomnessConfig {
     pub fn default_enabled() -> Self {
-        Self::V2(ConfigV2::default())
+        Self::V1(ConfigV1::default())
     }
 
     pub fn default_disabled() -> Self {
@@ -199,7 +199,7 @@ impl OnChainRandomnessConfig {
     }
 
     pub fn default_for_genesis() -> Self {
-        Self::V2(ConfigV2::default())
+        Self::V1(ConfigV1::default())
     }
 
     pub fn randomness_enabled(&self) -> bool {

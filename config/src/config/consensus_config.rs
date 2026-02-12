@@ -101,6 +101,9 @@ pub struct ConsensusConfig {
     pub enable_round_timeout_msg: bool,
     pub enable_optimistic_proposal_rx: bool,
     pub enable_optimistic_proposal_tx: bool,
+    // Number of tokio worker theads to use for the Consensus runtime.
+    // If set to 0, it will be minimum of num_cpus/2 and DEFAULT_WORKER_THREADS.
+    pub num_tokio_worker_threads: u16,
 }
 
 /// Deprecated
@@ -155,7 +158,7 @@ impl Default for ExecutionBackpressureTxnLimitConfig {
                 min_block_time_ms_to_activate: 50,
                 min_blocks_to_activate: 4,
                 metric: ExecutionBackpressureMetric::Percentile(0.5),
-                target_block_time_ms: 90,
+                target_block_time_ms: 150,
             },
             min_calibrated_txns_per_block: 30,
         }
@@ -383,6 +386,7 @@ impl Default for ConsensusConfig {
             enable_round_timeout_msg: true,
             enable_optimistic_proposal_rx: true,
             enable_optimistic_proposal_tx: true,
+            num_tokio_worker_threads: 0,
         }
     }
 }

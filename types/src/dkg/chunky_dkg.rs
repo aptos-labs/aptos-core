@@ -26,8 +26,10 @@ use aptos_dkg::pvss::{
     Player,
 };
 use move_core_types::{
-    account_address::AccountAddress, ident_str, identifier::IdentStr, move_resource::MoveStructType,
+    account_address::AccountAddress, ident_str, identifier::IdentStr, language_storage::TypeTag,
+    move_resource::MoveStructType,
 };
+use once_cell::sync::Lazy;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
@@ -129,6 +131,9 @@ impl MoveStructType for ChunkyDKGStartEvent {
     const STRUCT_NAME: &'static IdentStr = ident_str!("ChunkyDKGStartEvent");
 }
 
+pub static CHUNKY_DKG_START_EVENT_MOVE_TYPE_TAG: Lazy<TypeTag> =
+    Lazy::new(|| TypeTag::Struct(Box::new(ChunkyDKGStartEvent::struct_tag())));
+
 pub struct ChunkyDKG {
     threshold_config: ChunkyDKGThresholdConfig,
     public_parameters: PublicParameters<Pairing>,
@@ -168,12 +173,13 @@ impl ChunkyDKG {
         )
     }
 
-    pub fn verify<A: Serialize + Clone>(
+    pub fn verify<A: Serialize + Clone, R: RngCore + CryptoRng>(
         &self,
         transcript: &ChunkyTranscript,
         spks: &[DealerPublicKey],
         eks: &[ChunkyEncryptPubKey],
         sid: &A,
+        rng: &mut R,
     ) -> Result<()> {
         transcript.verify(
             &self.threshold_config,
@@ -181,6 +187,7 @@ impl ChunkyDKG {
             spks,
             eks,
             sid,
+            rng,
         )
     }
 
@@ -188,16 +195,8 @@ impl ChunkyDKG {
         &self,
         sub_transcripts: &[ChunkySubtranscript],
     ) -> Result<ChunkySubtranscript> {
-        if sub_transcripts.is_empty() {
-            anyhow::bail!("Cannot aggregate empty vector of subtranscripts");
-        }
-
-        let mut accumulator = sub_transcripts[0].clone();
-        for other in sub_transcripts.iter().skip(1) {
-            accumulator.aggregate_with(&self.threshold_config, other)?;
-        }
-
-        Ok(accumulator)
+        // Do all aggregations in projective form, then normalize to affine
+        ChunkySubtranscript::aggregate(&self.threshold_config, sub_transcripts.to_vec())
     }
 
     /// Generate secret sharing config and public parameters from DKG session metadata.

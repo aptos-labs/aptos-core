@@ -11,6 +11,7 @@ use crate::utils;
 use anyhow::ensure;
 use ark_ec::CurveGroup;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use std::fmt::Debug;
 
 /// Input to a (not necessarily fixed-base) multi-scalar multiplication (MSM).
 ///
@@ -40,11 +41,11 @@ pub struct MsmInput<
 pub trait IsMsmInput: Sized {
     // maybe make B and S associated types instead
     /// The scalar type used in the MSMs.
-    type Scalar: Clone + CanonicalSerialize + CanonicalDeserialize; // scrap and make associated type of MsmInput
+    type Scalar: Clone + CanonicalSerialize + CanonicalDeserialize + Eq + Debug;
 
     /// The group/base type used in the MSMs. Current instantiations always use E::G1Affine but as explained
     /// in the TODO of doc comment of `fn verify_msm_hom`, we might want to be working with enums here in the future.
-    type Base: Clone + CanonicalSerialize + CanonicalDeserialize; // scrap and make associated type of MsmInput
+    type Base: Clone + CanonicalSerialize + CanonicalDeserialize + Eq + Debug;
 
     /// Returns a reference to the slice of base elements in this MSM input.
     fn bases(&self) -> &[Self::Base];
@@ -60,8 +61,8 @@ pub trait IsMsmInput: Sized {
 
 impl<B, S> IsMsmInput for MsmInput<B, S>
 where
-    B: CanonicalSerialize + CanonicalDeserialize + Clone,
-    S: CanonicalSerialize + CanonicalDeserialize + Clone,
+    B: CanonicalSerialize + CanonicalDeserialize + Clone + Eq + Debug,
+    S: CanonicalSerialize + CanonicalDeserialize + Clone + Eq + Debug,
 {
     type Base = B;
     type Scalar = S;
@@ -94,16 +95,20 @@ where
 /// "started", which is *useful* since the sigma protocol's MSM scalars are
 /// already manipulated with betas, and changing that would make things a
 /// tiny bit slower
+///
+/// TODO: in theory the hash table approach as in the sigma protocol might be useful here again - move it
 #[allow(non_snake_case)]
 pub fn verify_msm_terms_with_start<C: CurveGroup>(
-    msm_terms: Vec<MsmInput<C::Affine, C::ScalarField>>,
-    mut final_bases: Vec<C::Affine>,
-    mut final_scalars: Vec<C::ScalarField>,
+    new_msm_terms: Vec<MsmInput<C::Affine, C::ScalarField>>,
+    existing_msm_terms: MsmInput<C::Affine, C::ScalarField>,
     powers_of_beta: Vec<C::ScalarField>,
 ) -> anyhow::Result<()> {
-    assert_eq!(msm_terms.len(), powers_of_beta.len());
+    assert_eq!(new_msm_terms.len(), powers_of_beta.len());
 
-    for (term, beta_power) in msm_terms.into_iter().zip(powers_of_beta) {
+    let mut final_bases = existing_msm_terms.bases().to_vec();
+    let mut final_scalars = existing_msm_terms.scalars().to_vec();
+
+    for (term, beta_power) in new_msm_terms.into_iter().zip(powers_of_beta) {
         let mut scalars = term.scalars().to_vec();
 
         for scalar in scalars.iter_mut() {
@@ -124,6 +129,8 @@ pub fn verify_msm_terms_with_start<C: CurveGroup>(
 /// them into one big MSM using random linear combination, following the
 /// Schwartz-Zippel philosophy; delegates the actual work to
 /// `verify_msm_terms_with_start()`
+///
+/// TODO: doesn't get used?
 #[allow(non_snake_case)]
 pub fn verify_msm_terms<C: CurveGroup>(
     msm_terms: Vec<MsmInput<C::Affine, C::ScalarField>>,
@@ -131,5 +138,9 @@ pub fn verify_msm_terms<C: CurveGroup>(
 ) -> anyhow::Result<()> {
     let powers_of_beta = utils::powers(beta, msm_terms.len());
 
-    verify_msm_terms_with_start::<C>(msm_terms, Vec::new(), Vec::new(), powers_of_beta)
+    verify_msm_terms_with_start::<C>(
+        msm_terms,
+        MsmInput::new(Vec::new(), Vec::new()).unwrap(),
+        powers_of_beta,
+    )
 }

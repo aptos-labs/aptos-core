@@ -1,0 +1,481 @@
+//# run
+script
+entry public fun main()
+    ld_u256 0
+    ld_u256 0
+    add
+    ld_u256 0
+    eq
+    not
+    br_false l0
+    ld_u64 1000
+    abort
+l0: ld_u256 0
+    ld_u256 1
+    add
+    ld_u256 1
+    eq
+    not
+    br_false l1
+    ld_u64 1001
+    abort
+l1: ld_u256 1
+    ld_u256 1
+    add
+    ld_u256 2
+    eq
+    not
+    br_false l2
+    ld_u64 1002
+    abort
+l2: ld_u256 13
+    ld_u256 67
+    add
+    ld_u256 80
+    eq
+    not
+    br_false l3
+    ld_u64 1100
+    abort
+l3: ld_u256 100
+    ld_u256 10
+    add
+    ld_u256 110
+    eq
+    not
+    br_false l4
+    ld_u64 1101
+    abort
+l4: ld_u256 0
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    add
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    eq
+    not
+    br_false l5
+    ld_u64 1200
+    abort
+l5: ld_u256 1
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639934
+    add
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    eq
+    not
+    br_false l6
+    ld_u64 1201
+    abort
+l6: ld_u256 5
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639930
+    add
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    eq
+    not
+    br_false l7
+    ld_u64 1202
+    abort
+l7: ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u256 1
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    add
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639932
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639931
+    add
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u256 0
+    ld_u256 0
+    sub
+    ld_u256 0
+    eq
+    not
+    br_false l0
+    ld_u64 2000
+    abort
+l0: ld_u256 1
+    ld_u256 0
+    sub
+    ld_u256 1
+    eq
+    not
+    br_false l1
+    ld_u64 2001
+    abort
+l1: ld_u256 1
+    ld_u256 1
+    sub
+    ld_u256 0
+    eq
+    not
+    br_false l2
+    ld_u64 2002
+    abort
+l2: ld_u256 52
+    ld_u256 13
+    sub
+    ld_u256 39
+    eq
+    not
+    br_false l3
+    ld_u64 2100
+    abort
+l3: ld_u256 100
+    ld_u256 10
+    sub
+    ld_u256 90
+    eq
+    not
+    br_false l4
+    ld_u64 2101
+    abort
+l4: ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    sub
+    ld_u256 0
+    eq
+    not
+    br_false l5
+    ld_u64 2200
+    abort
+l5: ld_u256 5
+    ld_u256 1
+    sub
+    ld_u256 4
+    sub
+    ld_u256 0
+    eq
+    not
+    br_false l6
+    ld_u64 2201
+    abort
+l6: ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u256 0
+    ld_u256 1
+    sub
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u256 54
+    ld_u256 100
+    sub
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u256 0
+    ld_u256 0
+    mul
+    ld_u256 0
+    eq
+    not
+    br_false l0
+    ld_u64 3000
+    abort
+l0: ld_u256 1
+    ld_u256 0
+    mul
+    ld_u256 0
+    eq
+    not
+    br_false l1
+    ld_u64 3001
+    abort
+l1: ld_u256 1
+    ld_u256 1
+    mul
+    ld_u256 1
+    eq
+    not
+    br_false l2
+    ld_u64 3002
+    abort
+l2: ld_u256 6
+    ld_u256 7
+    mul
+    ld_u256 42
+    eq
+    not
+    br_false l3
+    ld_u64 3100
+    abort
+l3: ld_u256 10
+    ld_u256 10
+    mul
+    ld_u256 100
+    eq
+    not
+    br_false l4
+    ld_u64 3101
+    abort
+l4: ld_u256 57896044618658097711785492504343953926634992332820282019728792003956564819967
+    ld_u256 2
+    mul
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639934
+    eq
+    not
+    br_false l5
+    ld_u64 3200
+    abort
+l5: ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u256 57896044618658097711785492504343953926634992332820282019728792003956564819967
+    ld_u256 57896044618658097711785492504343953926634992332820282019728792003956564819967
+    mul
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u256 57896044618658097711785492504343953926634992332820282019728792003956564819968
+    ld_u256 2
+    mul
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u256 0
+    ld_u256 1
+    div
+    ld_u256 0
+    eq
+    not
+    br_false l0
+    ld_u64 4000
+    abort
+l0: ld_u256 1
+    ld_u256 1
+    div
+    ld_u256 1
+    eq
+    not
+    br_false l1
+    ld_u64 4001
+    abort
+l1: ld_u256 1
+    ld_u256 2
+    div
+    ld_u256 0
+    eq
+    not
+    br_false l2
+    ld_u64 4002
+    abort
+l2: ld_u256 6
+    ld_u256 3
+    div
+    ld_u256 2
+    eq
+    not
+    br_false l3
+    ld_u64 4100
+    abort
+l3: ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    ld_u256 4315342637539806
+    div
+    ld_u256 26832652459627105301847093122056309129973091557185267691720404
+    eq
+    not
+    br_false l4
+    ld_u64 4101
+    abort
+l4: ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639934
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    div
+    ld_u256 0
+    eq
+    not
+    br_false l5
+    ld_u64 4200
+    abort
+l5: ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    div
+    ld_u256 1
+    eq
+    not
+    br_false l6
+    ld_u64 4201
+    abort
+l6: ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u256 0
+    ld_u256 0
+    div
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u256 1
+    ld_u256 0
+    div
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    ld_u256 0
+    div
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u256 0
+    ld_u256 1
+    mod
+    ld_u256 0
+    eq
+    not
+    br_false l0
+    ld_u64 5000
+    abort
+l0: ld_u256 1
+    ld_u256 1
+    mod
+    ld_u256 0
+    eq
+    not
+    br_false l1
+    ld_u64 5001
+    abort
+l1: ld_u256 1
+    ld_u256 2
+    mod
+    ld_u256 1
+    eq
+    not
+    br_false l2
+    ld_u64 5002
+    abort
+l2: ld_u256 8
+    ld_u256 3
+    mod
+    ld_u256 2
+    eq
+    not
+    br_false l3
+    ld_u64 5100
+    abort
+l3: ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    ld_u256 4315342637539806
+    mod
+    ld_u256 2132250957238311
+    eq
+    not
+    br_false l4
+    ld_u64 5101
+    abort
+l4: ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639934
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    mod
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639934
+    eq
+    not
+    br_false l5
+    ld_u64 5200
+    abort
+l5: ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    mod
+    ld_u256 0
+    eq
+    not
+    br_false l6
+    ld_u64 5201
+    abort
+l6: ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u256 0
+    ld_u256 0
+    mod
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u256 1
+    ld_u256 0
+    mod
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    ld_u256 0
+    mod
+    pop
+    ret

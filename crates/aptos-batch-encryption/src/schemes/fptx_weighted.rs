@@ -285,6 +285,14 @@ impl BatchThresholdEncryption for FPTXWeighted {
         Ok((ek, vks, msk_share))
     }
 
+    fn extract_encryption_key(
+        digest_key: &Self::DigestKey,
+        subtranscript: &Self::SubTranscript,
+    ) -> Result<Self::EncryptionKey> {
+        let mpk_g2: G2Affine = subtranscript.get_dealt_public_key().as_g2();
+        Ok(EncryptionKey::new(mpk_g2, digest_key.tau_g2))
+    }
+
     fn setup_for_testing(
         seed: u64,
         max_batch_size: usize,

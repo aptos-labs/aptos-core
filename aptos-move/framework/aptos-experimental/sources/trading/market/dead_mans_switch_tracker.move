@@ -73,7 +73,7 @@ module aptos_experimental::dead_mans_switch_tracker {
             market: address,
             account: address,
             session_start_time_secs: u64,
-            expiration_time_secs: u64,
+            expiration_time_secs: u64
         }
     }
 
@@ -89,7 +89,7 @@ module aptos_experimental::dead_mans_switch_tracker {
             parent: address,
             market: address,
             account: address,
-            was_registered: bool,
+            was_registered: bool
         }
     }
 
@@ -105,7 +105,7 @@ module aptos_experimental::dead_mans_switch_tracker {
             parent: address,
             market: address,
             old_min_keep_alive_time_secs: u64,
-            new_min_keep_alive_time_secs: u64,
+            new_min_keep_alive_time_secs: u64
         }
     }
 
@@ -118,7 +118,7 @@ module aptos_experimental::dead_mans_switch_tracker {
     //   If current time is after this (strictly greater), the session is expired.
     struct KeepAliveState has store {
         session_start_time_secs: u64,
-        expiration_time_secs: u64,
+        expiration_time_secs: u64
     }
 
     // Main tracker for managing dead man's switch state across all traders
@@ -144,10 +144,12 @@ module aptos_experimental::dead_mans_switch_tracker {
     /// ```move
     /// let tracker = new_dead_mans_switch_tracker(60); // 60 second minimum
     /// ```
-    public(friend) fun new_dead_mans_switch_tracker(min_keep_alive_time_secs: u64): DeadMansSwitchTracker {
+    public(friend) fun new_dead_mans_switch_tracker(
+        min_keep_alive_time_secs: u64
+    ): DeadMansSwitchTracker {
         DeadMansSwitchTracker {
             min_keep_alive_time_secs,
-            state: order_book_utils::new_default_big_ordered_map(),
+            state: order_book_utils::new_default_big_ordered_map()
         }
     }
 
@@ -155,7 +157,7 @@ module aptos_experimental::dead_mans_switch_tracker {
         tracker: &mut DeadMansSwitchTracker,
         parent: address,
         market: address,
-        min_keep_alive_time_secs: u64,
+        min_keep_alive_time_secs: u64
     ) {
         let old_min_keep_alive_time_secs = tracker.min_keep_alive_time_secs;
         tracker.min_keep_alive_time_secs = min_keep_alive_time_secs;
@@ -164,8 +166,8 @@ module aptos_experimental::dead_mans_switch_tracker {
                 parent,
                 market,
                 old_min_keep_alive_time_secs,
-                new_min_keep_alive_time_secs: min_keep_alive_time_secs,
-            },
+                new_min_keep_alive_time_secs: min_keep_alive_time_secs
+            }
         );
     }
 
@@ -205,7 +207,7 @@ module aptos_experimental::dead_mans_switch_tracker {
     public fun is_order_valid(
         tracker: &DeadMansSwitchTracker,
         account: address,
-        order_creation_time_secs: Option<u64>,
+        order_creation_time_secs: Option<u64>
     ): bool {
         let itr = tracker.state.internal_find(&account);
         if (itr.iter_is_end(&tracker.state)) {
@@ -213,11 +215,12 @@ module aptos_experimental::dead_mans_switch_tracker {
             return true;
         };
         let current_time = aptos_std::timestamp::now_seconds();
-        let order_creation_time_secs = if (order_creation_time_secs.is_some()) {
-            order_creation_time_secs.destroy_some()
-        } else {
-            current_time
-        };
+        let order_creation_time_secs =
+            if (order_creation_time_secs.is_some()) {
+                order_creation_time_secs.destroy_some()
+            } else {
+                current_time
+            };
         let state = itr.iter_borrow(&tracker.state);
         if (state.session_start_time_secs > order_creation_time_secs) {
             // Order was placed before the session started, so it is invalid
@@ -230,22 +233,18 @@ module aptos_experimental::dead_mans_switch_tracker {
         tracker: &mut DeadMansSwitchTracker,
         parent: address,
         market: address,
-        account: address,
+        account: address
     ) {
         let removed = tracker.state.remove_or_none(&account);
         let was_registered = removed.is_some();
         if (was_registered) {
-            let KeepAliveState { session_start_time_secs: _, expiration_time_secs: _ } = removed.destroy_some();
+            let KeepAliveState { session_start_time_secs: _, expiration_time_secs: _ } =
+                removed.destroy_some();
         } else {
             removed.destroy_none();
         };
         event::emit(
-            KeepAliveDisabledEvent::V1 {
-                parent,
-                market,
-                account,
-                was_registered,
-            },
+            KeepAliveDisabledEvent::V1 { parent, market, account, was_registered }
         );
     }
 
@@ -298,7 +297,7 @@ module aptos_experimental::dead_mans_switch_tracker {
         parent: address,
         market: address,
         account: address,
-        timeout_seconds: u64,
+        timeout_seconds: u64
     ) {
         if (timeout_seconds == 0) {
             disable_keep_alive(tracker, parent, market, account);
@@ -306,13 +305,13 @@ module aptos_experimental::dead_mans_switch_tracker {
         };
         assert!(
             timeout_seconds >= tracker.min_keep_alive_time_secs,
-            E_KEEP_ALIVE_TIMEOUT_TOO_SHORT, // ERROR_KEEP_ALIVE_TIMEOUT_TOO_SHORT
+            E_KEEP_ALIVE_TIMEOUT_TOO_SHORT // ERROR_KEEP_ALIVE_TIMEOUT_TOO_SHORT
         );
         let current_time = aptos_std::timestamp::now_seconds();
         let expiration_time = current_time + timeout_seconds;
         let itr = tracker.state.internal_find(&account);
         if (!itr.iter_is_end(&tracker.state)) {
-           let state = itr.iter_borrow_mut(&mut tracker.state);
+            let state = itr.iter_borrow_mut(&mut tracker.state);
             if (current_time > state.expiration_time_secs) {
                 // Start a new session - this means any order placed before this time is invalidated
                 state.session_start_time_secs = current_time;
@@ -325,13 +324,13 @@ module aptos_experimental::dead_mans_switch_tracker {
                     market,
                     account,
                     session_start_time_secs: state.session_start_time_secs,
-                    expiration_time_secs: state.expiration_time_secs,
-                },
+                    expiration_time_secs: state.expiration_time_secs
+                }
             );
         } else {
             let new_state = KeepAliveState {
                 session_start_time_secs: 0, // this means that all existing orders are valid
-                expiration_time_secs: expiration_time,
+                expiration_time_secs: expiration_time
             };
             tracker.state.add(account, new_state);
             event::emit(
@@ -340,25 +339,27 @@ module aptos_experimental::dead_mans_switch_tracker {
                     market,
                     account,
                     session_start_time_secs: 0,
-                    expiration_time_secs: expiration_time,
-                },
+                    expiration_time_secs: expiration_time
+                }
             );
         }
     }
 
     #[test_only]
     public fun destroy_tracker(tracker: DeadMansSwitchTracker) {
-        let DeadMansSwitchTracker {
-            min_keep_alive_time_secs: _,
-            state
-        } = tracker;
-        state.destroy(|v| {
-            let KeepAliveState { session_start_time_secs: _, expiration_time_secs: _ } = v;
-        });
+        let DeadMansSwitchTracker { min_keep_alive_time_secs: _, state } = tracker;
+        state.destroy(
+            |v| {
+                let KeepAliveState { session_start_time_secs: _, expiration_time_secs: _ } =
+                    v;
+            }
+        );
     }
 
     #[test_only]
-    public fun new_dead_mans_switch_tracker_for_test(min_keep_alive_time_secs: u64): DeadMansSwitchTracker {
+    public fun new_dead_mans_switch_tracker_for_test(
+        min_keep_alive_time_secs: u64
+    ): DeadMansSwitchTracker {
         new_dead_mans_switch_tracker(min_keep_alive_time_secs)
     }
 
@@ -366,15 +367,14 @@ module aptos_experimental::dead_mans_switch_tracker {
     public fun update_keep_alive_state_for_test(
         tracker: &mut DeadMansSwitchTracker,
         account: address,
-        timeout_seconds: u64,
+        timeout_seconds: u64
     ) {
         keep_alive(tracker, @0x0, @0x0, account, timeout_seconds)
     }
 
     #[test_only]
     public fun disable_keep_alive_for_test(
-        tracker: &mut DeadMansSwitchTracker,
-        account: address,
+        tracker: &mut DeadMansSwitchTracker, account: address
     ) {
         disable_keep_alive(tracker, @0x0, @0x0, account)
     }

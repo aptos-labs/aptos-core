@@ -191,7 +191,7 @@ impl AllowlistCacheUpdater {
     async fn update(&self) {
         for contract in self.contracts.iter() {
             match self.update_contract(contract).await {
-                Ok(count) => {
+                Ok(Some(count)) => {
                     ALLOWLIST_CACHE_UPDATE_SUCCESS_COUNT
                         .with_label_values(&[&contract.name])
                         .inc();
@@ -199,6 +199,9 @@ impl AllowlistCacheUpdater {
                         "allowlist cache update successful for contract '{}': {} addresses",
                         contract.name, count
                     );
+                },
+                Ok(None) => {
+                    // Contract has no on_chain_auth (open telemetry mode) - nothing to update
                 },
                 Err(err) => {
                     // Log error but don't clear cache - stale data is better than no data
@@ -216,12 +219,23 @@ impl AllowlistCacheUpdater {
         }
     }
 
-    /// Update allowlist for a single contract
+    /// Update allowlist for a single contract.
+    /// Returns Ok(None) if the contract has no on_chain_auth (open telemetry mode).
     async fn update_contract(
         &self,
         contract: &CustomContractConfig,
-    ) -> Result<usize, AllowlistUpdateError> {
-        let config = &contract.on_chain_auth;
+    ) -> Result<Option<usize>, AllowlistUpdateError> {
+        // Skip contracts without on_chain_auth (open telemetry mode)
+        let config = match &contract.on_chain_auth {
+            Some(config) => config,
+            None => {
+                debug!(
+                    "skipping allowlist update for contract '{}' (no on_chain_auth configured)",
+                    contract.name
+                );
+                return Ok(None);
+            },
+        };
         let chain_id = ChainId::new(config.chain_id);
 
         // Resolve the resource/function path (with env var substitution)
@@ -258,7 +272,7 @@ impl AllowlistCacheUpdater {
 
         let count = addresses.len();
         self.cache.update(&contract.name, &chain_id, addresses);
-        Ok(count)
+        Ok(Some(count))
     }
 }
 

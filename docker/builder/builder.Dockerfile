@@ -3,16 +3,27 @@
 FROM rust as rust-base
 WORKDIR /aptos
 
-
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
+
+# Workaround: LLVM apt repo uses SHA1 signatures, but Trixie disabled SHA1 by default
+# See https://github.com/llvm/llvm-project/issues/179148
+RUN <<EOF
+mkdir -p /etc/crypto-policies/back-ends/
+cat > /etc/crypto-policies/back-ends/sequoia.config << 'CONFIGEOF'
+[hash_algorithms]
+sha1 = "always"
+
+[asymmetric_algorithms]
+rsa1024 = "always"
+CONFIGEOF
+EOF
+
 # NOTE: the version of LLVM installed here MUST match the version of LLVM rustc
 # uses internally, so we may need to upgrade this when upgrading Rust versions.
-ARG CLANG_VERSION=20
+ARG CLANG_VERSION=21
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    sed -i 's|http://deb.debian.org/debian|http://cloudfront.debian.net/debian|g' /etc/apt/sources.list \
-    && apt update \
-    && apt-get --no-install-recommends install -y \
+    apt-get update && apt-get --no-install-recommends install -y \
         binutils \
         cmake \
         curl \
@@ -25,7 +36,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         lld \
         lsb-release \
         pkg-config \
-        software-properties-common \
         wget \
     && bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" llvm.sh ${CLANG_VERSION} \
     && update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${CLANG_VERSION} 100 \
@@ -66,18 +76,29 @@ FROM builder-base as aptos-node-builder
 RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git-credentials \
     --mount=type=cache,target=/usr/local/cargo/git,id=node-builder-cargo-git-cache \
     --mount=type=cache,target=/usr/local/cargo/registry,id=node-builder-cargo-registry-cache \
-    docker/builder/build-node.sh
+    --mount=type=cache,target=/aptos/target,id=node-builder-target-cache-trixie \
+    docker/builder/build-with-feature.sh
+
+FROM builder-base as forge-builder
+
+RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git-credentials \
+    --mount=type=cache,target=/usr/local/cargo/git,id=forge-builder-cargo-git-cache \
+    --mount=type=cache,target=/usr/local/cargo/registry,id=forge-builder-cargo-registry-cache \
+    --mount=type=cache,target=/aptos/target,id=forge-builder-target-cache-trixie \
+    docker/builder/build-forge-cli.sh
 
 FROM builder-base as tools-builder
 
 RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git-credentials \
     --mount=type=cache,target=/usr/local/cargo/git,id=tools-builder-cargo-git-cache \
     --mount=type=cache,target=/usr/local/cargo/registry,id=tools-builder-cargo-registry-cache \
-    docker/builder/build-tools.sh
+    --mount=type=cache,target=/aptos/target,id=tools-builder-target-cache-trixie \
+    docker/builder/build-tools-with-cli-profile.sh
 
 FROM builder-base as indexer-builder
 
 RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git-credentials \
     --mount=type=cache,target=/usr/local/cargo/git,id=indexer-builder-cargo-git-cache \
     --mount=type=cache,target=/usr/local/cargo/registry,id=indexer-builder-cargo-registry-cache \
+    --mount=type=cache,target=/aptos/target,id=indexer-builder-target-cache-trixie \
     docker/builder/build-indexer.sh

@@ -183,7 +183,7 @@ mod testing {
             annotated_type_layout.as_ref().map(|l| l.as_ref())
         {
             // Note: this stdlib is not used in production, so cloning here is acceptable.
-            Ok(annotated_struct_layout.clone())
+            Ok(annotated_struct_layout.as_ref().clone())
         } else {
             Err(
                 PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(

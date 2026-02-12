@@ -1,0 +1,67 @@
+//# publish
+module 0x42::B
+struct T has copy + drop
+  g: u64
+
+public fun new(l0: u64): T
+    move_loc l0
+    pack T
+    ret
+
+public fun t(l0: &mut T)
+    local l1: &mut u64
+    move_loc l0
+    mut_borrow_field T, g
+    st_loc l1
+    ld_u64 3
+    move_loc l1
+    write_ref
+    ret
+
+
+
+//# publish
+module 0x42::A
+use 0x42::B
+struct T has drop
+  f: B::T
+
+public fun new(l0: B::T): T
+    move_loc l0
+    pack T
+    ret
+
+public fun t(l0: &mut T)
+    local l1: &mut B::T
+    local l2: B::T
+    move_loc l0
+    mut_borrow_field T, f
+    st_loc l1
+    copy_loc l1
+    call B::t
+    move_loc l1
+    read_ref
+    st_loc l2
+    ret
+
+
+
+//# run
+script
+use 0x42::A
+use 0x42::B
+entry public fun main()
+    local l0: B::T
+    local l1: A::T
+    local l2: &mut A::T
+    ld_u64 0
+    call B::new
+    st_loc l0
+    move_loc l0
+    call A::new
+    st_loc l1
+    mut_borrow_loc l1
+    st_loc l2
+    move_loc l2
+    call A::t
+    ret
