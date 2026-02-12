@@ -13,10 +13,18 @@ on:
         required: false
         type: string
         description: The docker image tag to test. If not specified, it is derived from the current check-out
-      FORGE_IMAGE_TAG:
+      FORGE_RUNNER_IMAGE_TAG:
         required: false
         type: string
         description: The docker image tag to use for forge runner. If not specified, it is derived from the current check-out
+      FORGE_RUNNER_IMAGE_NAME:
+        required: false
+        type: choice
+        default: forge
+        options:
+          - forge
+          - etna
+        description: The docker image name to use for the forge runner
       FORGE_RUNNER_DURATION_SECS:
         required: false
         type: string
@@ -62,7 +70,8 @@ jobs:
         run: |
           echo "GIT_SHA: ${{ inputs.GIT_SHA }}"
           echo "IMAGE_TAG: ${{ inputs.IMAGE_TAG }}"
-          echo "FORGE_IMAGE_TAG: ${{ inputs.FORGE_IMAGE_TAG }}"
+          echo "FORGE_RUNNER_IMAGE_TAG: ${{ inputs.FORGE_RUNNER_IMAGE_TAG }}"
+          echo "FORGE_RUNNER_IMAGE_NAME: ${{ inputs.FORGE_RUNNER_IMAGE_NAME }}"
           echo "FORGE_RUNNER_DURATION_SECS: ${{ inputs.FORGE_RUNNER_DURATION_SECS }}"
           echo "FORGE_TEST_SUITE: ${{ inputs.FORGE_TEST_SUITE }}"
           echo "FORGE_CLUSTER_NAME: ${{ inputs.FORGE_CLUSTER_NAME }}"
@@ -73,7 +82,8 @@ jobs:
     outputs:
       gitSha: ${{ inputs.GIT_SHA }}
       imageTag: ${{ inputs.IMAGE_TAG }}
-      forgeImageTag: ${{ inputs.FORGE_IMAGE_TAG }}
+      forgeImageTag: ${{ inputs.FORGE_RUNNER_IMAGE_TAG }}
+      forgeImageName: ${{ inputs.FORGE_RUNNER_IMAGE_NAME }}
       forgeRunnerDurationSecs: ${{ inputs.FORGE_RUNNER_DURATION_SECS || 600 }}
       forgeTestSuite: ${{ inputs.FORGE_TEST_SUITE }}
       forgeClusterName: ${{ inputs.FORGE_CLUSTER_NAME }}
@@ -89,12 +99,12 @@ jobs:
       GIT_SHA: ${{ needs.determine-forge-run-metadata.outputs.gitSha }}
       IMAGE_TAG: ${{ needs.determine-forge-run-metadata.outputs.imageTag }}
       FORGE_IMAGE_TAG: ${{ needs.determine-forge-run-metadata.outputs.forgeImageTag }}
+      FORGE_IMAGE_NAME: ${{ needs.determine-forge-run-metadata.outputs.forgeImageName }}
       FORGE_TEST_SUITE: ${{ needs.determine-forge-run-metadata.outputs.forgeTestSuite }}
       FORGE_RUNNER_DURATION_SECS: ${{ fromJSON(needs.determine-forge-run-metadata.outputs.forgeRunnerDurationSecs) }} # fromJSON converts to integer
       FORGE_CLUSTER_NAME: ${{ needs.determine-forge-run-metadata.outputs.forgeClusterName }}
       FORGE_NUM_VALIDATORS: ${{ needs.determine-forge-run-metadata.outputs.forgeNumValidators }}
       FORGE_NUM_VALIDATOR_FULLNODES: ${{ needs.determine-forge-run-metadata.outputs.forgeNumValidatorFullnodes }}
       FORGE_RETAIN_DEBUG_LOGS: ${{ needs.determine-forge-run-metadata.outputs.forgeRetainDebugLogs == 'true' }}
-      # Indexer outputs are derived from a single one, to avoid using too many inputs for this workflow_dispatch trigger
       FORGE_ENABLE_INDEXER: ${{ needs.determine-forge-run-metadata.outputs.forgeIndexerDeployerProfile != '' }}
       FORGE_DEPLOYER_PROFILE: ${{ needs.determine-forge-run-metadata.outputs.forgeIndexerDeployerProfile }}
