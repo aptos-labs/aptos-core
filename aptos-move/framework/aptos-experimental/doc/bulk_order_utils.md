@@ -6,20 +6,26 @@
 
 
 -  [Constants](#@Constants_0)
+-  [Function `new_bulk_order_request_with_sanitization`](#0x7_bulk_order_utils_new_bulk_order_request_with_sanitization)
+    -  [Aborts:](#@Aborts:_1)
 -  [Function `new_bulk_order_with_sanitization`](#0x7_bulk_order_utils_new_bulk_order_with_sanitization)
-    -  [Arguments:](#@Arguments:_1)
-    -  [Returns:](#@Returns:_2)
+    -  [Arguments:](#@Arguments:_2)
+    -  [Returns:](#@Returns:_3)
+-  [Function `validate_not_zero_sizes`](#0x7_bulk_order_utils_validate_not_zero_sizes)
+    -  [Arguments:](#@Arguments:_4)
+-  [Function `validate_price_ordering`](#0x7_bulk_order_utils_validate_price_ordering)
+    -  [Arguments:](#@Arguments:_5)
 -  [Function `trim_start`](#0x7_bulk_order_utils_trim_start)
 -  [Function `discard_price_crossing_levels`](#0x7_bulk_order_utils_discard_price_crossing_levels)
 -  [Function `reinsert_order_into_bulk_order`](#0x7_bulk_order_utils_reinsert_order_into_bulk_order)
-    -  [Arguments:](#@Arguments:_3)
+    -  [Arguments:](#@Arguments:_6)
 -  [Function `match_order_and_get_next_from_bulk_order`](#0x7_bulk_order_utils_match_order_and_get_next_from_bulk_order)
-    -  [Arguments:](#@Arguments:_4)
-    -  [Returns:](#@Returns:_5)
-    -  [Aborts:](#@Aborts:_6)
--  [Function `cancel_at_price_level`](#0x7_bulk_order_utils_cancel_at_price_level)
     -  [Arguments:](#@Arguments:_7)
     -  [Returns:](#@Returns:_8)
+    -  [Aborts:](#@Aborts:_9)
+-  [Function `cancel_at_price_level`](#0x7_bulk_order_utils_cancel_at_price_level)
+    -  [Arguments:](#@Arguments:_10)
+    -  [Returns:](#@Returns:_11)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
@@ -37,14 +43,187 @@
 ## Constants
 
 
+<a id="0x7_bulk_order_utils_EPRICE_CROSSING"></a>
+
+
+
+<pre><code><b>const</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_EPRICE_CROSSING">EPRICE_CROSSING</a>: u64 = 1;
+</code></pre>
+
+
+
 <a id="0x7_bulk_order_utils_EUNEXPECTED_MATCH_SIZE"></a>
 
 
 
-<pre><code><b>const</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_EUNEXPECTED_MATCH_SIZE">EUNEXPECTED_MATCH_SIZE</a>: u64 = 2;
+<pre><code><b>const</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_EUNEXPECTED_MATCH_SIZE">EUNEXPECTED_MATCH_SIZE</a>: u64 = 11;
 </code></pre>
 
 
+
+<a id="0x7_bulk_order_utils_E_ASK_LENGTH_MISMATCH"></a>
+
+
+
+<pre><code><b>const</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_E_ASK_LENGTH_MISMATCH">E_ASK_LENGTH_MISMATCH</a>: u64 = 3;
+</code></pre>
+
+
+
+<a id="0x7_bulk_order_utils_E_ASK_ORDER_INVALID"></a>
+
+
+
+<pre><code><b>const</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_E_ASK_ORDER_INVALID">E_ASK_ORDER_INVALID</a>: u64 = 8;
+</code></pre>
+
+
+
+<a id="0x7_bulk_order_utils_E_ASK_SIZE_ZERO"></a>
+
+
+
+<pre><code><b>const</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_E_ASK_SIZE_ZERO">E_ASK_SIZE_ZERO</a>: u64 = 6;
+</code></pre>
+
+
+
+<a id="0x7_bulk_order_utils_E_BID_LENGTH_MISMATCH"></a>
+
+
+
+<pre><code><b>const</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_E_BID_LENGTH_MISMATCH">E_BID_LENGTH_MISMATCH</a>: u64 = 2;
+</code></pre>
+
+
+
+<a id="0x7_bulk_order_utils_E_BID_ORDER_INVALID"></a>
+
+
+
+<pre><code><b>const</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_E_BID_ORDER_INVALID">E_BID_ORDER_INVALID</a>: u64 = 7;
+</code></pre>
+
+
+
+<a id="0x7_bulk_order_utils_E_BID_SIZE_ZERO"></a>
+
+
+
+<pre><code><b>const</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_E_BID_SIZE_ZERO">E_BID_SIZE_ZERO</a>: u64 = 5;
+</code></pre>
+
+
+
+<a id="0x7_bulk_order_utils_E_BULK_ORDER_DEPTH_EXCEEDED"></a>
+
+
+
+<pre><code><b>const</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_E_BULK_ORDER_DEPTH_EXCEEDED">E_BULK_ORDER_DEPTH_EXCEEDED</a>: u64 = 9;
+</code></pre>
+
+
+
+<a id="0x7_bulk_order_utils_E_EMPTY_ORDER"></a>
+
+
+
+<pre><code><b>const</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_E_EMPTY_ORDER">E_EMPTY_ORDER</a>: u64 = 4;
+</code></pre>
+
+
+
+<a id="0x7_bulk_order_utils_E_INVALID_SEQUENCE_NUMBER"></a>
+
+
+
+<pre><code><b>const</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_E_INVALID_SEQUENCE_NUMBER">E_INVALID_SEQUENCE_NUMBER</a>: u64 = 10;
+</code></pre>
+
+
+
+<a id="0x7_bulk_order_utils_MAX_BULK_ORDER_DEPTH_PER_SIDE"></a>
+
+Maximum number of price levels per side (bid or ask) in a bulk order.
+This limit prevents gas DoS scenarios when cancelling bulk orders.
+
+
+<pre><code><b>const</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_MAX_BULK_ORDER_DEPTH_PER_SIDE">MAX_BULK_ORDER_DEPTH_PER_SIDE</a>: u64 = 30;
+</code></pre>
+
+
+
+<a id="0x7_bulk_order_utils_new_bulk_order_request_with_sanitization"></a>
+
+## Function `new_bulk_order_request_with_sanitization`
+
+
+<a id="@Aborts:_1"></a>
+
+### Aborts:
+
+- If sequence_number is 0 (reserved to avoid ambiguity in events)
+- If bid_prices and bid_sizes have different lengths
+- If ask_prices and ask_sizes have different lengths
+- If bid_prices or ask_prices exceeds MAX_BULK_ORDER_DEPTH_PER_SIDE (30) levels
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_new_bulk_order_request_with_sanitization">new_bulk_order_request_with_sanitization</a>&lt;M: <b>copy</b>, drop, store&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, sequence_number: u64, bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, metadata: M): <a href="_BulkOrderRequest">bulk_order_types::BulkOrderRequest</a>&lt;M&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_new_bulk_order_request_with_sanitization">new_bulk_order_request_with_sanitization</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
+    sequence_number: u64,
+    bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    metadata: M
+): BulkOrderRequest&lt;M&gt; {
+    // Sequence number 0 is reserved <b>to</b> avoid ambiguity in events
+    <b>assert</b>!(sequence_number &gt; 0, <a href="bulk_order_utils.md#0x7_bulk_order_utils_E_INVALID_SEQUENCE_NUMBER">E_INVALID_SEQUENCE_NUMBER</a>);
+
+    <b>let</b> num_bids = bid_prices.length();
+    <b>let</b> num_asks = ask_prices.length();
+
+    // Basic length validation
+    <b>assert</b>!(num_bids == bid_sizes.length(), <a href="bulk_order_utils.md#0x7_bulk_order_utils_E_BID_LENGTH_MISMATCH">E_BID_LENGTH_MISMATCH</a>);
+    <b>assert</b>!(num_asks == ask_sizes.length(), <a href="bulk_order_utils.md#0x7_bulk_order_utils_E_ASK_LENGTH_MISMATCH">E_ASK_LENGTH_MISMATCH</a>);
+    <b>assert</b>!(num_bids &gt; 0 || num_asks &gt; 0, <a href="bulk_order_utils.md#0x7_bulk_order_utils_E_EMPTY_ORDER">E_EMPTY_ORDER</a>);
+    // Depth validation <b>to</b> prevent gas DoS when cancelling
+    <b>assert</b>!(num_bids &lt;= <a href="bulk_order_utils.md#0x7_bulk_order_utils_MAX_BULK_ORDER_DEPTH_PER_SIDE">MAX_BULK_ORDER_DEPTH_PER_SIDE</a>, <a href="bulk_order_utils.md#0x7_bulk_order_utils_E_BULK_ORDER_DEPTH_EXCEEDED">E_BULK_ORDER_DEPTH_EXCEEDED</a>);
+    <b>assert</b>!(num_asks &lt;= <a href="bulk_order_utils.md#0x7_bulk_order_utils_MAX_BULK_ORDER_DEPTH_PER_SIDE">MAX_BULK_ORDER_DEPTH_PER_SIDE</a>, <a href="bulk_order_utils.md#0x7_bulk_order_utils_E_BULK_ORDER_DEPTH_EXCEEDED">E_BULK_ORDER_DEPTH_EXCEEDED</a>);
+    <b>assert</b>!(<a href="bulk_order_utils.md#0x7_bulk_order_utils_validate_not_zero_sizes">validate_not_zero_sizes</a>(&bid_sizes), <a href="bulk_order_utils.md#0x7_bulk_order_utils_E_BID_SIZE_ZERO">E_BID_SIZE_ZERO</a>);
+    <b>assert</b>!(<a href="bulk_order_utils.md#0x7_bulk_order_utils_validate_not_zero_sizes">validate_not_zero_sizes</a>(&ask_sizes), <a href="bulk_order_utils.md#0x7_bulk_order_utils_E_ASK_SIZE_ZERO">E_ASK_SIZE_ZERO</a>);
+    <b>assert</b>!(<a href="bulk_order_utils.md#0x7_bulk_order_utils_validate_price_ordering">validate_price_ordering</a>(&bid_prices, <b>true</b>), <a href="bulk_order_utils.md#0x7_bulk_order_utils_E_BID_ORDER_INVALID">E_BID_ORDER_INVALID</a>);
+    <b>assert</b>!(<a href="bulk_order_utils.md#0x7_bulk_order_utils_validate_price_ordering">validate_price_ordering</a>(&ask_prices, <b>false</b>), <a href="bulk_order_utils.md#0x7_bulk_order_utils_E_ASK_ORDER_INVALID">E_ASK_ORDER_INVALID</a>);
+
+    <b>if</b> (num_bids &gt; 0 && num_asks &gt; 0) {
+        // First element in bids is the highest (descending order), first element in asks is the lowest (ascending
+        // order).
+        <b>assert</b>!(bid_prices[0] &lt; ask_prices[0], <a href="bulk_order_utils.md#0x7_bulk_order_utils_EPRICE_CROSSING">EPRICE_CROSSING</a>);
+    };
+    <a href="_new_bulk_order_request">bulk_order_types::new_bulk_order_request</a>(
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        sequence_number,
+        bid_prices,
+        bid_sizes,
+        ask_prices,
+        ask_sizes,
+        metadata
+    )
+}
+</code></pre>
+
+
+
+</details>
 
 <a id="0x7_bulk_order_utils_new_bulk_order_with_sanitization"></a>
 
@@ -53,7 +232,7 @@
 Creates a new bulk order with the specified parameters.
 
 
-<a id="@Arguments:_1"></a>
+<a id="@Arguments:_2"></a>
 
 ### Arguments:
 
@@ -64,7 +243,7 @@ Creates a new bulk order with the specified parameters.
 - <code>best_ask_price</code>: Current best ask price in the market
 
 
-<a id="@Returns:_2"></a>
+<a id="@Returns:_3"></a>
 
 ### Returns:
 
@@ -152,6 +331,96 @@ A tuple containing:
 
 </details>
 
+<a id="0x7_bulk_order_utils_validate_not_zero_sizes"></a>
+
+## Function `validate_not_zero_sizes`
+
+Validates that all sizes in the vector are greater than 0.
+
+
+<a id="@Arguments:_4"></a>
+
+### Arguments:
+
+- <code>sizes</code>: Vector of sizes to validate
+
+
+<pre><code><b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_validate_not_zero_sizes">validate_not_zero_sizes</a>(sizes: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_validate_not_zero_sizes">validate_not_zero_sizes</a>(sizes: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): bool {
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; sizes.length()) {
+        <b>if</b> (sizes[i] == 0) {
+            <b>return</b> <b>false</b>;
+        };
+        i += 1;
+    };
+    <b>true</b>
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_bulk_order_utils_validate_price_ordering"></a>
+
+## Function `validate_price_ordering`
+
+Validates that prices are in the correct order (descending for bids, ascending for asks).
+
+
+<a id="@Arguments:_5"></a>
+
+### Arguments:
+
+- <code>prices</code>: Vector of prices to validate
+- <code>is_descending</code>: True if prices should be in descending order, false for ascending
+
+
+<pre><code><b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_validate_price_ordering">validate_price_ordering</a>(prices: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, is_descending: bool): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_validate_price_ordering">validate_price_ordering</a>(
+    prices: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, is_descending: bool
+): bool {
+    <b>let</b> i = 0;
+    <b>if</b> (prices.length() == 0) {
+        <b>return</b> <b>true</b>; // No prices <b>to</b> validate
+    };
+    <b>while</b> (i &lt; prices.length() - 1) {
+        <b>if</b> (is_descending) {
+            <b>if</b> (prices[i] &lt;= prices[i + 1]) {
+                <b>return</b> <b>false</b>;
+            };
+        } <b>else</b> {
+            <b>if</b> (prices[i] &gt;= prices[i + 1]) {
+                <b>return</b> <b>false</b>;
+            };
+        };
+        i += 1;
+    };
+    <b>true</b>
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x7_bulk_order_utils_trim_start"></a>
 
 ## Function `trim_start`
@@ -228,7 +497,7 @@ of the bulk order. If the price already exists at the first level, it increases
 the size; otherwise, it inserts the new price level at the front.
 
 
-<a id="@Arguments:_3"></a>
+<a id="@Arguments:_6"></a>
 
 ### Arguments:
 
@@ -280,7 +549,7 @@ This function reduces the size at the first price level by the matched size.
 If the first level becomes empty, it is removed and the next level becomes active.
 
 
-<a id="@Arguments:_4"></a>
+<a id="@Arguments:_7"></a>
 
 ### Arguments:
 
@@ -289,14 +558,14 @@ If the first level becomes empty, it is removed and the next level becomes activ
 - <code>matched_size</code>: Size that was matched in this operation
 
 
-<a id="@Returns:_5"></a>
+<a id="@Returns:_8"></a>
 
 ### Returns:
 
 A tuple containing the next active price and size as options.
 
 
-<a id="@Aborts:_6"></a>
+<a id="@Aborts:_9"></a>
 
 ### Aborts:
 
@@ -346,7 +615,7 @@ This function finds the price level matching the specified price and removes it 
 the order, keeping other price levels intact.
 
 
-<a id="@Arguments:_7"></a>
+<a id="@Arguments:_10"></a>
 
 ### Arguments:
 
@@ -355,7 +624,7 @@ the order, keeping other price levels intact.
 - <code>is_bid</code>: True to cancel from bid side, false for ask side
 
 
-<a id="@Returns:_8"></a>
+<a id="@Returns:_11"></a>
 
 ### Returns:
 

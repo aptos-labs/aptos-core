@@ -1,7 +1,6 @@
-module aptos_trading::bulk_order_types_tests {
-    #[test_only]
-    use aptos_trading::bulk_order_types::new_bulk_order_request;
-    #[test_only]
+#[test_only]
+module aptos_experimental::bulk_order_types_tests {
+    use aptos_experimental::bulk_order_utils::new_bulk_order_request_with_sanitization;
     use aptos_trading::order_book_types::new_test_metadata;
 
     // Test accounts
@@ -21,7 +20,7 @@ module aptos_trading::bulk_order_types_tests {
     const TOTAL_SIZE_PER_SIDE: u64 = SIZE_1 + SIZE_2;
 
     #[test]
-    #[expected_failure(abort_code = aptos_trading::bulk_order_types::E_BID_ORDER_INVALID)]
+    #[expected_failure(abort_code = aptos_experimental::bulk_order_utils::E_BID_ORDER_INVALID)]
     fun test_invalid_bid_prices_not_descending() {
         // Test placing an order with bid prices not in descending order - should return rejection
         // Bid prices in ascending order (invalid - should be descending)
@@ -31,7 +30,7 @@ module aptos_trading::bulk_order_types_tests {
         let ask_sizes = vector[SIZE_1, SIZE_2];
 
         let _response =
-            new_bulk_order_request(
+            new_bulk_order_request_with_sanitization(
                 TEST_ACCOUNT_1,
                 1,
                 bid_prices,
@@ -43,7 +42,7 @@ module aptos_trading::bulk_order_types_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_trading::bulk_order_types::E_ASK_ORDER_INVALID)]
+    #[expected_failure(abort_code = aptos_experimental::bulk_order_utils::E_ASK_ORDER_INVALID)]
     fun test_invalid_ask_prices_not_ascending() {
         // Test placing an order with ask prices not in ascending order - should return rejection
         // Ask prices in descending order (invalid - should be ascending)
@@ -53,7 +52,7 @@ module aptos_trading::bulk_order_types_tests {
         let ask_sizes = vector[SIZE_1, SIZE_2];
 
         let _response =
-            new_bulk_order_request(
+            new_bulk_order_request_with_sanitization(
                 TEST_ACCOUNT_1,
                 1,
                 bid_prices,
@@ -65,7 +64,7 @@ module aptos_trading::bulk_order_types_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_trading::bulk_order_types::E_BID_SIZE_ZERO)]
+    #[expected_failure(abort_code = aptos_experimental::bulk_order_utils::E_BID_SIZE_ZERO)]
     fun test_zero_bid_size() {
         // Test placing an order with zero bid size - should return rejection
         let bid_prices = vector[BID_PRICE_1, BID_PRICE_2];
@@ -74,7 +73,7 @@ module aptos_trading::bulk_order_types_tests {
         let ask_sizes = vector[SIZE_1, SIZE_2];
 
         let _response =
-            new_bulk_order_request(
+            new_bulk_order_request_with_sanitization(
                 TEST_ACCOUNT_1,
                 1,
                 bid_prices,
@@ -86,7 +85,7 @@ module aptos_trading::bulk_order_types_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_trading::bulk_order_types::E_ASK_SIZE_ZERO)]
+    #[expected_failure(abort_code = aptos_experimental::bulk_order_utils::E_ASK_SIZE_ZERO)]
     fun test_zero_ask_size() {
         // Test placing an order with zero ask size - should return rejection
         let bid_prices = vector[BID_PRICE_1, BID_PRICE_2];
@@ -95,7 +94,7 @@ module aptos_trading::bulk_order_types_tests {
         let ask_sizes = vector[SIZE_1, 0]; // Zero size in second ask level
 
         let _response =
-            new_bulk_order_request(
+            new_bulk_order_request_with_sanitization(
                 TEST_ACCOUNT_1,
                 1,
                 bid_prices,
@@ -107,7 +106,7 @@ module aptos_trading::bulk_order_types_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_trading::bulk_order_types::E_BID_SIZE_ZERO)]
+    #[expected_failure(abort_code = aptos_experimental::bulk_order_utils::E_BID_SIZE_ZERO)]
     fun test_all_zero_sizes() {
         // Test placing an order with all zero sizes - should return rejection
         let bid_prices = vector[BID_PRICE_1];
@@ -116,7 +115,7 @@ module aptos_trading::bulk_order_types_tests {
         let ask_sizes = vector[0]; // All zero ask sizes
 
         let _response =
-            new_bulk_order_request(
+            new_bulk_order_request_with_sanitization(
                 TEST_ACCOUNT_1,
                 1,
                 bid_prices,
@@ -129,7 +128,7 @@ module aptos_trading::bulk_order_types_tests {
 
     #[test]
     #[expected_failure(
-        abort_code = aptos_trading::bulk_order_types::E_BID_LENGTH_MISMATCH
+        abort_code = aptos_experimental::bulk_order_utils::E_BID_LENGTH_MISMATCH
     )]
     fun test_mismatched_bid_prices_and_sizes() {
         // Test placing an order with mismatched bid prices and sizes lengths - should return rejection
@@ -139,7 +138,7 @@ module aptos_trading::bulk_order_types_tests {
         let ask_sizes = vector[SIZE_1, SIZE_2];
 
         let _response =
-            new_bulk_order_request(
+            new_bulk_order_request_with_sanitization(
                 TEST_ACCOUNT_1,
                 1,
                 bid_prices,
@@ -152,7 +151,7 @@ module aptos_trading::bulk_order_types_tests {
 
     #[test]
     #[expected_failure(
-        abort_code = aptos_trading::bulk_order_types::E_ASK_LENGTH_MISMATCH
+        abort_code = aptos_experimental::bulk_order_utils::E_ASK_LENGTH_MISMATCH
     )]
     fun test_mismatched_ask_prices_and_sizes() {
         // Test placing an order with mismatched ask prices and sizes lengths - should return rejection
@@ -162,7 +161,7 @@ module aptos_trading::bulk_order_types_tests {
         let ask_sizes = vector[SIZE_1, SIZE_2]; // 2 sizes
 
         let _response =
-            new_bulk_order_request(
+            new_bulk_order_request_with_sanitization(
                 TEST_ACCOUNT_1,
                 1,
                 bid_prices,
