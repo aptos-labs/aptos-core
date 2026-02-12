@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    delegate_transcript_core_to_subtrs,
     pcs::univariate_hiding_kzg,
     pvss::{
         chunky::{
@@ -264,40 +265,7 @@ impl<E: Pairing> TryFrom<&[u8]> for Transcript<E> {
     }
 }
 
-impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::TranscriptCore
-    for Transcript<E>
-{
-    type DealtPubKey = keys::DealtPubKey<E>;
-    type DealtPubKeyShare = Vec<keys::DealtPubKeyShare<E>>;
-    type DealtSecretKey = keys::DealtSecretKey<E::ScalarField>;
-    type DealtSecretKeyShare = Vec<keys::DealtSecretKeyShare<E::ScalarField>>;
-    type DecryptPrivKey = keys::DecryptPrivKey<E>;
-    type EncryptPubKey = keys::EncryptPubKey<E>;
-    type PublicParameters = PublicParameters<E>;
-    type SecretSharingConfig = SecretSharingConfig<E>;
-
-    fn get_public_key_share(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        player: &Player,
-    ) -> Self::DealtPubKeyShare {
-        traits::TranscriptCore::get_public_key_share(&self.subtrs, sc, player)
-    }
-
-    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
-        traits::TranscriptCore::get_dealt_public_key(&self.subtrs)
-    }
-
-    fn decrypt_own_share(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        player: &Player,
-        dk: &Self::DecryptPrivKey,
-        pp: &Self::PublicParameters,
-    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        traits::TranscriptCore::decrypt_own_share(&self.subtrs, sc, player, dk, pp)
-    }
-}
+delegate_transcript_core_to_subtrs!(Transcript<E>, subtrs);
 
 // Temporary hack, will deal with this at some point... a struct would be cleaner
 #[allow(type_alias_bounds)]

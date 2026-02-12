@@ -242,7 +242,7 @@ pub trait AggregatableTranscript:
 
 /// Transcript that has an aggregatable part with the same core interface as the transcript.
 pub trait HasAggregatableSubtranscript: Transcript {
-    /// The aggregatable subtranscript type; must match this transcript's core associated types.
+    /// The aggregatable subtranscript type; will delegate so must match this transcript's core associated types.
     type Subtranscript: Aggregatable
         + TranscriptCore<
             PublicParameters = Self::PublicParameters,
@@ -266,6 +266,47 @@ pub trait HasAggregatableSubtranscript: Transcript {
         sid: &A, // Note the different function signature heres
         rng: &mut R,
     ) -> anyhow::Result<()>;
+}
+
+/// Macro to delegate `TranscriptCore` methods to a subtranscript field.
+#[macro_export]
+macro_rules! delegate_transcript_core_to_subtrs {
+    ($t:ty, $subfield:ident) => {
+        impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
+            traits::TranscriptCore for $t
+        {
+            type DealtPubKey = keys::DealtPubKey<E>;
+            type DealtPubKeyShare = Vec<keys::DealtPubKeyShare<E>>;
+            type DealtSecretKey = keys::DealtSecretKey<E::ScalarField>;
+            type DealtSecretKeyShare = Vec<keys::DealtSecretKeyShare<E::ScalarField>>;
+            type DecryptPrivKey = keys::DecryptPrivKey<E>;
+            type EncryptPubKey = keys::EncryptPubKey<E>;
+            type PublicParameters = PublicParameters<E>;
+            type SecretSharingConfig = SecretSharingConfig<E>;
+
+            fn get_public_key_share(
+                &self,
+                sc: &Self::SecretSharingConfig,
+                player: &Player,
+            ) -> Self::DealtPubKeyShare {
+                traits::TranscriptCore::get_public_key_share(&self.$subfield, sc, player)
+            }
+
+            fn get_dealt_public_key(&self) -> Self::DealtPubKey {
+                traits::TranscriptCore::get_dealt_public_key(&self.$subfield)
+            }
+
+            fn decrypt_own_share(
+                &self,
+                sc: &Self::SecretSharingConfig,
+                player: &Player,
+                dk: &Self::DecryptPrivKey,
+                pp: &Self::PublicParameters,
+            ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
+                traits::TranscriptCore::decrypt_own_share(&self.$subfield, sc, player, dk, pp)
+            }
+        }
+    };
 }
 
 /// This traits defines testing-only and benchmarking-only interfaces.
