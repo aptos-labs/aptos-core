@@ -10,7 +10,11 @@ import { bls12_381 } from '@noble/curves/bls12-381.js';
 import { leBytesToBigint } from './fieldSerialization.ts';
 import { type WeierstrassPoint } from '@noble/curves/abstract/weierstrass.js';
 import type { Fp2 } from '@noble/curves/abstract/tower.js';
-import { g2ToBytes, weierstrassEquation } from './curveSerialization.ts';
+import { g2ToBytes } from './curveSerialization.ts';
+
+// Domain separation tag for hash-to-curve.
+// This must be identical between Rust and TypeScript implementations.
+const HASH_G2_ELEMENT_DST = "APTOS_BATCH_ENCRYPTION_HASH_G2_ELEMENT";
 
 export class Test extends Serializable {
   s: string;
@@ -161,24 +165,6 @@ export function hash_to_fq(input: Uint8Array) {
 
 
 export function hash_g2_element(g2_element: WeierstrassPoint<Fp2>): WeierstrassPoint<bigint> {
-  for (let ctr = 0; ctr <= 255; ctr++) {
-    let bytes_without_ctr = g2ToBytes(g2_element);
-    let hash_source_bytes = new Uint8Array(bytes_without_ctr.length + 1);
-    hash_source_bytes.set(bytes_without_ctr);
-    hash_source_bytes.set([ctr], bytes_without_ctr.length);
-    console.error(hash_source_bytes);
-    let x = hash_to_fq(hash_source_bytes);
-    console.error(x);
-    let y_squared = weierstrassEquation(x, bls12_381.G1.Point);
-    try {
-      let y = bls12_381.G1.Point.Fp.sqrt(y_squared);
-      console.error(y);
-      let result = new bls12_381.G1.Point(x, y, 1n).clearCofactor();
-      console.error(result.toAffine());
-      return result;
-    } catch (sqrtError) {
-      continue;
-    }
-  }
-  throw new Error("Hash-to-curve failure");
+  const bytes = g2ToBytes(g2_element);
+  return bls12_381.G1.hashToCurve(bytes, { DST: HASH_G2_ELEMENT_DST });
 }
