@@ -6,8 +6,8 @@ module aptos_experimental::market_bulk_order {
 
     use std::signer;
     use std::option::{Self, Option};
-    use aptos_trading::bulk_order_types::new_bulk_order_request;
     use aptos_trading::order_book_types::OrderId;
+    use aptos_experimental::bulk_order_utils::new_bulk_order_request_with_sanitization;
     use aptos_experimental::market_types::{Self, MarketClearinghouseCallbacks, Market};
 
     const E_SEQUENCE_NUMBER_MISMATCH: u64 = 0;
@@ -53,7 +53,7 @@ module aptos_experimental::market_bulk_order {
             E_CLEARINGHOUSE_VALIDATION_FAILED
         );
         let request =
-            new_bulk_order_request(
+            new_bulk_order_request_with_sanitization(
                 account,
                 sequence_number,
                 bid_prices,
