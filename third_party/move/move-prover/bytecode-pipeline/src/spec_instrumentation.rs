@@ -8,7 +8,7 @@ use crate::{options::ProverOptions, verification_analysis};
 use itertools::Itertools;
 use move_model::{
     ast,
-    ast::{Exp, ExpData, TempIndex, Value},
+    ast::{Exp, ExpData, QuantKind, TempIndex, Value},
     exp_generator::ExpGenerator,
     model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, QualifiedId, QualifiedInstId, StructId},
     pragmas::{ABORTS_IF_IS_PARTIAL_PRAGMA, EMITS_IS_PARTIAL_PRAGMA, EMITS_IS_STRICT_PRAGMA},
@@ -42,6 +42,7 @@ const ABORTS_CODE_NOT_COVERED: &str =
     "abort code not covered by any of the `aborts_if` or `aborts_with` clauses";
 const EMITS_FAILS_MESSAGE: &str = "function does not emit the expected event";
 const EMITS_NOT_COVERED: &str = "emitted event not covered by any of the `emits` clauses";
+const CHOICE_WITNESS_FAILS_MESSAGE: &str = "choice expression requires a witness to exist";
 
 fn modify_check_fails_message(
     env: &GlobalEnv,
@@ -70,6 +71,72 @@ fn modify_check_fails_message(
             .display(env.symbol_pool()),
         targs_str
     )
+}
+
+/// Checks if an expression uses memory operations or behavioral predicates.
+/// This is used to determine if a choice expression needs a well-formedness assertion.
+fn uses_memory_or_behavior(exp: &Exp) -> bool {
+    use ast::Operation;
+    let mut uses_memory = false;
+    exp.visit_pre_order(&mut |e| {
+        if let ExpData::Call(_, op, _) = e {
+            match op {
+                Operation::Global(_)
+                | Operation::Exists(_)
+                | Operation::CanModify
+                | Operation::ResourceDomain
+                | Operation::Behavior(_, _) => {
+                    uses_memory = true;
+                    return false; // stop traversal
+                },
+                _ => {},
+            }
+        }
+        !uses_memory // continue only if we haven't found memory ops
+    });
+    uses_memory
+}
+
+/// For choice expressions that involve memory or behavioral predicates,
+/// return the existential well-formedness check.
+/// Converts `choose y: T where pred(y)` to `exists y: T :: pred(y)`.
+///
+/// We only emit this for choices involving state/memory because:
+/// 1. The SMT solver may not be able to prove simple mathematical existentials
+///    like `exists i: u64 :: i > 0` due to quantifier handling
+/// 2. The fix is specifically needed for behavioral predicates and stateful choices
+///    where Z3 ignores the conditional choice axiom
+fn extract_choice_exists_check(env: &GlobalEnv, exp: &Exp) -> Option<Exp> {
+    if let ExpData::Quant(node_id, kind, ranges, triggers, condition, body) = exp.as_ref() {
+        if kind.is_choice() {
+            // Only emit well-formedness assertion for choices involving memory/state
+            // Pure mathematical choices don't need this and may cause false positives
+            if !uses_memory_or_behavior(body)
+                && condition
+                    .as_ref()
+                    .is_none_or(|c| !uses_memory_or_behavior(c))
+            {
+                return None;
+            }
+            // Create exists with same structure but QuantKind::Exists
+            let exists_id = env.new_node(env.get_node_loc(*node_id), BOOL_TYPE.clone());
+            if let Some(inst) = env.get_node_instantiation_opt(*node_id) {
+                env.set_node_instantiation(exists_id, inst);
+            }
+            return Some(
+                ExpData::Quant(
+                    exists_id,
+                    QuantKind::Exists,
+                    ranges.clone(),
+                    triggers.clone(),
+                    condition.clone(),
+                    body.clone(),
+                )
+                .into_exp(),
+            );
+        }
+    }
+    None
 }
 
 //  ================================================================================================
@@ -323,6 +390,11 @@ impl<'a> Instrumenter<'a> {
                 .emit_with(move |attr_id| Prop(attr_id, Assume, exp))
         }
 
+        // Emit well-formedness checks for choice expressions in let bindings.
+        // This must happen AFTER preconditions are assumed, so that preconditions
+        // like `requires exists y: T: pred(y)` can establish witnesses for choices.
+        self.emit_choice_wellformedness(spec, false);
+
         if self.is_verified() {
             // Inject 'CanModify' assumptions for this function.
             for (loc, exp) in &spec.modifies {
@@ -533,6 +605,13 @@ impl<'a> Instrumenter<'a> {
             }
         }
 
+        // Emit well-formedness checks for choice expressions in callee's pre-state let bindings.
+        // This must happen AFTER preconditions are asserted, so that preconditions
+        // like `requires exists y: T: pred(y)` can establish witnesses for choices.
+        if callee_opaque {
+            self.emit_choice_wellformedness(&callee_spec, false);
+        }
+
         // Emit modify permissions as assertions if this is the verification variant. For
         // non-verification variants, we don't need to do this because they are independently
         // verified.
@@ -663,6 +742,9 @@ impl<'a> Instrumenter<'a> {
 
             // Emit `let post` assignments.
             self.emit_lets(&callee_spec, true);
+
+            // Emit well-formedness checks for choice expressions in callee's post-state let bindings.
+            self.emit_choice_wellformedness(&callee_spec, true);
 
             // Emit spec var updates.
             self.emit_updates(&callee_spec, None);
@@ -818,6 +900,29 @@ impl<'a> Instrumenter<'a> {
                 .mk_identical(self.builder.mk_temporary(*temp), exp.clone());
             self.builder
                 .emit_with(|id| Prop(id, PropKind::Assume, assign));
+        }
+    }
+
+    /// Emit well-formedness assertions for choice expressions in let bindings.
+    /// This should be called AFTER preconditions are assumed, so that the
+    /// preconditions can establish witnesses for the choices.
+    fn emit_choice_wellformedness(&mut self, spec: &TranslatedSpec, post_state: bool) {
+        use Bytecode::*;
+        if !self.is_verified() {
+            return;
+        }
+        let lets = spec
+            .lets
+            .iter()
+            .filter(|(_, is_post, ..)| *is_post == post_state);
+        for (loc, _, _, exp) in lets {
+            let env = self.builder.global_env();
+            if let Some(exists_check) = extract_choice_exists_check(env, exp) {
+                self.builder
+                    .set_loc_and_vc_info(loc.clone(), CHOICE_WITNESS_FAILS_MESSAGE);
+                self.builder
+                    .emit_with(|id| Prop(id, PropKind::Assert, exists_check));
+            }
         }
     }
 
@@ -978,6 +1083,9 @@ impl<'a> Instrumenter<'a> {
             if !lets_emitted {
                 self.emit_lets(spec, true);
             }
+
+            // Emit well-formedness checks for choice expressions in post-state let bindings.
+            self.emit_choice_wellformedness(spec, true);
 
             // Emit the negation of all aborts conditions.
             for (loc, abort_cond, _) in &spec.aborts {
