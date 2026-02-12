@@ -75,7 +75,7 @@ module 0x42::m {
     }
 
     spec S {
-        invariant exec<num,bool>(|x| x > 0, f);
+        invariant exec<num, bool>(|x| x > 0, f);
     }
 
     fun exec<T: copy + drop, R>(f: |T|R has copy + drop, x: T): R {
@@ -87,7 +87,7 @@ module 0x42::m {
     }
     fun function_code_spec_block(x: u64): u64 {
         spec {
-            assert exec<num,bool>(|arg0| lambda__1__function_code_spec_block(arg0), x);
+            assert exec<num, bool>(|arg0| lambda__1__function_code_spec_block(arg0), x);
         };
         x + 1
     }
@@ -96,8 +96,8 @@ module 0x42::m {
     }
 
     spec function_spec_block(x: u64): u64 {
-        ensures result == exec<num,num>(|arg0| lambda__1__function_spec_block(arg0), x);
-        ensures result == exec<num,num>(|arg0| lambda__2__function_spec_block(arg0), x);
+        ensures result == exec<num, num>(|arg0| lambda__1__function_spec_block(arg0), x);
+        ensures result == exec<num, num>(|arg0| lambda__2__function_spec_block(arg0), x);
     }
 
     inline fun get<R: key>(a: address): &R {

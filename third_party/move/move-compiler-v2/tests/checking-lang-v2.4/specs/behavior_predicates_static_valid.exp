@@ -545,7 +545,7 @@ module 0x42::M {
     }
 
     fun test_pair_generic_explicit(x: u64, y: bool): (u64, bool) {
-        pair<u64,bool>(x, y)
+        pair<u64, bool>(x, y)
     }
 
     spec test_pair_generic_explicit(x: u64, y: bool): (u64, bool) {

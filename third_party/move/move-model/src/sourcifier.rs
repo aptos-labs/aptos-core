@@ -378,6 +378,7 @@ impl<'a> Sourcifier<'a> {
 
     /// Returns the name of a MIN/MAX constant if the given value matches the
     /// boundary of the given primitive type (e.g., `u8::MAX` -> `"MAX_U8"`).
+    #[allow(clippy::only_used_in_recursion)]
     fn min_max_const_name(&self, prim: &PrimitiveType, value: &BigInt) -> Option<&'static str> {
         use PrimitiveType::*;
         // For `Num` (the spec-only abstract numeric type), try all concrete int types
@@ -717,13 +718,7 @@ impl<'a> Sourcifier<'a> {
     /// Prints condition properties (e.g., `[concrete]`, `[global]`).
     fn print_properties(&self, props: &PropertyBag) {
         if !props.is_empty() {
-            emit!(self.writer, "[");
-            let mut first = true;
-            for (key, value) in props {
-                if !first {
-                    emit!(self.writer, ", ");
-                }
-                first = false;
+            self.print_list("[", ", ", "] ", props.iter(), |(key, value)| {
                 emit!(self.writer, "{}", key.display(self.env().symbol_pool()));
                 match value {
                     PropertyValue::Value(v) => {
@@ -742,8 +737,7 @@ impl<'a> Sourcifier<'a> {
                         );
                     },
                 }
-            }
-            emit!(self.writer, "] ");
+            });
         }
     }
 
@@ -861,14 +855,9 @@ impl<'a> Sourcifier<'a> {
             GlobalInvariant(type_params) | GlobalInvariantUpdate(type_params) => {
                 emit!(self.writer, "invariant");
                 if !type_params.is_empty() {
-                    emit!(self.writer, "<");
-                    for (i, (sym, _)) in type_params.iter().enumerate() {
-                        if i > 0 {
-                            emit!(self.writer, ", ");
-                        }
+                    self.print_list("<", ", ", ">", type_params.iter(), |(sym, _)| {
                         emit!(self.writer, "{}", sym.display(self.env().symbol_pool()));
-                    }
-                    emit!(self.writer, ">");
+                    });
                 }
                 if matches!(cond.kind, GlobalInvariantUpdate(_)) {
                     emit!(self.writer, " update ");
@@ -888,14 +877,9 @@ impl<'a> Sourcifier<'a> {
             Axiom(type_params) => {
                 emit!(self.writer, "axiom");
                 if !type_params.is_empty() {
-                    emit!(self.writer, "<");
-                    for (i, (sym, _)) in type_params.iter().enumerate() {
-                        if i > 0 {
-                            emit!(self.writer, ", ");
-                        }
+                    self.print_list("<", ", ", ">", type_params.iter(), |(sym, _)| {
                         emit!(self.writer, "{}", sym.display(self.env().symbol_pool()));
-                    }
-                    emit!(self.writer, ">");
+                    });
                 }
                 emit!(self.writer, " ");
                 self.print_properties(&cond.properties);
@@ -2169,7 +2153,7 @@ impl<'a> ExpSourcifier<'a> {
 
     fn print_inst(&self, inst: &[Type]) {
         if !inst.is_empty() {
-            self.parent.print_list("<", ",", ">", inst.iter(), |ty| {
+            self.parent.print_list("<", ", ", ">", inst.iter(), |ty| {
                 emit!(self.wr(), "{}", self.ty(ty))
             });
         }
