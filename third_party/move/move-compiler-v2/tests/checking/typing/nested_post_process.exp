@@ -64,7 +64,7 @@ module 0x42::simple_map {
         data: vector<Element<Key, Value>>,
     }
     public fun borrow<Key: store, Value: store>(map: &SimpleMap<Key, Value>, key: &Key): &Value {
-        let maybe_idx = find<Key,Value>(map, key);
+        let maybe_idx = find<Key, Value>(map, key);
         if (0x1::option::is_some<u64>(&maybe_idx)) () else abort 0x1::error::invalid_argument(2);
         let idx = 0x1::option::extract<u64>(&mut maybe_idx);
         &0x1::vector::borrow<Element<Key, Value>>(&map.data, idx).value
