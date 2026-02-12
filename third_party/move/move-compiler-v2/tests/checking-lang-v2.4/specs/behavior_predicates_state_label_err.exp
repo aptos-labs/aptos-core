@@ -45,3 +45,11 @@ error: cyclic state label reference detected: a -> b -> a
 49 │ │         ensures b@ensures_of<f>(x, result)@a;
 50 │ │     }
    │ ╰─────^
+
+error: cyclic state label reference detected: a -> a
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_state_label_err.move:57:5
+   │
+57 │ ╭     spec apply_self_cycle {
+58 │ │         ensures a@ensures_of<f>(x, result)@a;
+59 │ │     }
+   │ ╰─────^

@@ -48,4 +48,13 @@ module 0x42::M {
         ensures a@ensures_of<f>(x, result)@b;
         ensures b@ensures_of<f>(x, result)@a;
     }
+
+    // Error: self-referencing state label (length-1 cycle)
+    fun apply_self_cycle(f: |u64| u64, x: u64): u64 {
+        f(x)
+    }
+
+    spec apply_self_cycle {
+        ensures a@ensures_of<f>(x, result)@a;
+    }
 }

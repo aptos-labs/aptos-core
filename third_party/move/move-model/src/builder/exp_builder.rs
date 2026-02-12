@@ -19,8 +19,8 @@ use crate::{
         LanguageVersion,
     },
     model::{
-        FieldData, FieldId, FunctionKind, GlobalEnv, Loc, ModuleId, NodeId, Parameter, QualifiedId,
-        QualifiedInstId, SpecFunId, StructId, TypeParameter, TypeParameterKind,
+        FieldData, FieldId, FunctionKind, GlobalEnv, GlobalId, Loc, ModuleId, NodeId, Parameter,
+        QualifiedId, QualifiedInstId, SpecFunId, StructId, TypeParameter, TypeParameterKind,
     },
     symbol::{Symbol, SymbolPool},
     ty::{
@@ -110,6 +110,9 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     pub insert_freeze: bool,
     /// A stack of open loops and their optional label
     pub loop_stack: Vec<Option<PA::Label>>,
+    /// Map from state label names to their GlobalId, ensuring the same label name
+    /// always resolves to the same MemoryLabel across behavior predicates.
+    pub state_label_map: BTreeMap<Symbol, GlobalId>,
 }
 
 #[derive(Debug)]
@@ -181,6 +184,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             placeholder_map: BTreeMap::new(),
             insert_freeze: true,
             loop_stack: vec![],
+            state_label_map: BTreeMap::new(),
         }
     }
 
@@ -5824,15 +5828,25 @@ impl ExpTranslator<'_, '_, '_> {
             );
         }
 
-        // Convert labels to memory labels and extract names
-        let pre = pre_label.as_ref().map(|_| self.env().new_global_id());
-        let post = post_label.as_ref().map(|_| self.env().new_global_id());
+        // Convert labels to memory labels and extract names, ensuring the same label
+        // name always resolves to the same GlobalId.
         let pre_name = pre_label
             .as_ref()
             .map(|l| self.symbol_pool().make(l.value().as_str()));
         let post_name = post_label
             .as_ref()
             .map(|l| self.symbol_pool().make(l.value().as_str()));
+        let mut get_or_create_label = |sym: Symbol| -> GlobalId {
+            if let Some(&id) = self.state_label_map.get(&sym) {
+                id
+            } else {
+                let id = self.env().new_global_id();
+                self.state_label_map.insert(sym, id);
+                id
+            }
+        };
+        let pre = pre_name.map(&mut get_or_create_label);
+        let post = post_name.map(&mut get_or_create_label);
 
         BehaviorState::new(pre, post, pre_name, post_name)
     }
