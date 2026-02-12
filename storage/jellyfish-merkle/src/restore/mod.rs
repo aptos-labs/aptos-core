@@ -15,6 +15,7 @@ use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::info;
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
@@ -26,7 +27,6 @@ use aptos_types::{
     transaction::Version,
 };
 use itertools::Itertools;
-use once_cell::sync::Lazy;
 use std::{
     cmp::Eq,
     collections::HashMap,
@@ -35,14 +35,6 @@ use std::{
         Arc,
     },
 };
-
-static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(32)
-        .thread_name(|index| format!("jmt_batch_{}", index))
-        .build()
-        .unwrap()
-});
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum ChildInfo<K> {
@@ -400,7 +392,7 @@ where
             std::mem::swap(&mut frozen_nodes, &mut self.frozen_nodes);
             let store = self.store.clone();
 
-            IO_POOL.spawn(move || {
+            THREAD_MANAGER.get_io_pool().spawn(move || {
                 let res = store.write_node_batch(&frozen_nodes);
                 tx.send(res).unwrap();
             });
