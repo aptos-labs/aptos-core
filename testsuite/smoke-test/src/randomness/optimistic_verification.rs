@@ -63,6 +63,8 @@ async fn optimistic_verification() {
     }
 
     // --- Phase 2: Corrupt share, sufficient valid shares ---
+    let version_before_corrupt = get_current_version(rest_client).await;
+
     info!("Inject corrupt share failpoint on validator 0.");
     validator_clients[0]
         .set_failpoint(
@@ -74,7 +76,17 @@ async fn optimistic_verification() {
 
     tokio::time::sleep(Duration::from_secs(5)).await;
 
-    info!("Verify randomness still works with 3 valid shares.");
+    let version_after_corrupt = get_current_version(rest_client).await;
+    info!(
+        "Corrupt share check: version_before={}, version_after={}",
+        version_before_corrupt, version_after_corrupt
+    );
+    assert!(
+        version_after_corrupt > version_before_corrupt,
+        "Chain should advance despite corrupt shares from validator 0"
+    );
+
+    info!("Verify randomness produced during corrupt-share window is correct.");
     for _ in 0..10 {
         let v = get_current_version(rest_client).await;
         assert!(

@@ -10,7 +10,7 @@ use crate::{
         aug_data_store::AugDataStore,
         block_queue::{BlockQueue, QueueItem},
         network_messages::{RandMessage, RpcRequest},
-        rand_store::RandStore,
+        rand_store::{AggregationResult, RandStore},
         reliable_broadcast_state::{
             AugDataCertBuilder, CertifiedAugDataAckState, ShareAggregateState,
         },
@@ -56,8 +56,8 @@ pub struct RandManager<S: TShare, D: TAugmentedData> {
     reliable_broadcast: Arc<ReliableBroadcast<RandMessage<S, D>, ExponentialBackoff>>,
     network_sender: Arc<NetworkSender>,
 
-    // local channel received from rand_store
-    decision_rx: Receiver<Randomness>,
+    // local channel received from rand_store for aggregation results
+    decision_rx: Receiver<AggregationResult<S>>,
     // downstream channels
     outgoing_blocks: Sender<OrderedBlocks>,
     // local state
@@ -384,8 +384,44 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                     while matches!(incoming_blocks.try_next(), Ok(Some(_))) {}
                     self.process_reset(reset);
                 }
-                Some(randomness) = self.decision_rx.next()  => {
-                    self.process_randomness(randomness);
+                Some(result) = self.decision_rx.next() => {
+                    match result {
+                        AggregationResult::Success { randomness, round, path_type } => {
+                            self.rand_store.lock().handle_aggregation_success(round, path_type);
+                            self.process_randomness(randomness);
+                        },
+                        AggregationResult::Failure {
+                            round,
+                            path_type,
+                            metadata,
+                            shares,
+                            total_weight,
+                        } => {
+                            warn!(
+                                epoch = metadata.metadata.epoch,
+                                round = round,
+                                "Aggregation failed, attempting recovery with {} valid shares (weight={})",
+                                shares.len(),
+                                total_weight,
+                            );
+                            let rand_metadata = metadata.metadata.clone();
+                            let re_aggregated = self.rand_store.lock().handle_aggregation_failure(
+                                round,
+                                path_type,
+                                metadata,
+                                shares,
+                                total_weight,
+                            );
+                            if !re_aggregated {
+                                // Insufficient shares for re-aggregation; spawn a new
+                                // slow-path broadcast to request the missing shares.
+                                let handle = self.spawn_aggregate_shares_task(rand_metadata);
+                                if let Some(item) = self.block_queue.item_mut(round) {
+                                    item.add_broadcast_handle(handle);
+                                }
+                            }
+                        },
+                    }
                 }
                 Some(request) = verified_msg_rx.next() => {
                     let RpcRequest {

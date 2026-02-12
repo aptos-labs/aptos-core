@@ -16,6 +16,21 @@ use aptos_types::randomness::{FullRandMetadata, RandMetadata, Randomness};
 use itertools::Either;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
+pub enum AggregationResult<S> {
+    Success {
+        randomness: Randomness,
+        round: Round,
+        path_type: PathType,
+    },
+    Failure {
+        round: Round,
+        path_type: PathType,
+        metadata: FullRandMetadata,
+        shares: HashMap<Author, RandShare<S>>,
+        total_weight: u64,
+    },
+}
+
 pub struct ShareAggregator<S> {
     author: Author,
     shares: HashMap<Author, RandShare<S>>,
@@ -50,13 +65,17 @@ impl<S: TShare> ShareAggregator<S> {
         mut self,
         rand_config: &RandConfig,
         rand_metadata: FullRandMetadata,
-        decision_tx: Sender<Randomness>,
-    ) -> Either<Self, RandShare<S>> {
+        result_tx: Sender<AggregationResult<S>>,
+    ) -> Either<Self, (RandShare<S>, PathType)> {
         if self.total_weight < rand_config.threshold() {
             return Either::Left(self);
         }
 
-        // Pre-verify shares before spawning to ensure aggregation will succeed.
+        // Pre-verify shares synchronously before spawning the aggregation task.
+        // This runs while the RandStore mutex is held (~7ms on mainnet).
+        // TODO: move pre_aggregate_verify into spawn_blocking and add failure
+        // recovery for the below-threshold case (requires sending Failure from
+        // the async task when pre-verify drops weight below threshold).
         let _verify_timer = counters::RAND_PRE_AGGREGATE_VERIFY_DURATION.start_timer();
         let bad_authors =
             S::pre_aggregate_verify(self.shares.values(), rand_config, &rand_metadata.metadata);
@@ -91,6 +110,7 @@ impl<S: TShare> ShareAggregator<S> {
         let self_share = self
             .get_self_share()
             .expect("Aggregated item should have self share");
+        let path_type = self.path_type;
         tokio::task::spawn_blocking(move || {
             let _agg_timer = counters::RAND_AGGREGATION_DURATION.start_timer();
             let maybe_randomness = S::aggregate(
@@ -101,7 +121,11 @@ impl<S: TShare> ShareAggregator<S> {
             drop(_agg_timer);
             match maybe_randomness {
                 Ok(randomness) => {
-                    let _ = decision_tx.unbounded_send(randomness);
+                    let _ = result_tx.unbounded_send(AggregationResult::Success {
+                        randomness,
+                        round: rand_metadata.metadata.round,
+                        path_type,
+                    });
                 },
                 Err(e) => {
                     warn!(
@@ -109,10 +133,28 @@ impl<S: TShare> ShareAggregator<S> {
                         round = rand_metadata.metadata.round,
                         "Aggregation error: {e}"
                     );
+                    if path_type == PathType::Fast {
+                        return;
+                    }
+                    // Filter out authors added to the pessimistic set during fallback.
+                    self.shares
+                        .retain(|author, _| !rand_config.is_in_pessimistic_set(author));
+                    let total_weight: u64 = self
+                        .shares
+                        .keys()
+                        .map(|author| rand_config.get_peer_weight(author))
+                        .sum();
+                    let _ = result_tx.unbounded_send(AggregationResult::Failure {
+                        round: rand_metadata.metadata.round,
+                        path_type,
+                        metadata: rand_metadata,
+                        shares: self.shares,
+                        total_weight,
+                    });
                 },
             }
         });
-        Either::Right(self_share)
+        Either::Right((self_share, path_type))
     }
 
     fn retain(&mut self, rand_config: &RandConfig, rand_metadata: &FullRandMetadata) {
@@ -140,6 +182,13 @@ enum RandItem<S> {
         metadata: FullRandMetadata,
         share_aggregator: ShareAggregator<S>,
     },
+    /// Aggregation is in progress asynchronously. New shares are buffered here.
+    Aggregating {
+        metadata: FullRandMetadata,
+        self_share: RandShare<S>,
+        buffered_shares: Vec<RandShare<S>>,
+        path_type: PathType,
+    },
     Decided {
         self_share: RandShare<S>,
     },
@@ -156,12 +205,15 @@ impl<S: TShare> RandItem<S> {
             RandItem::PendingDecision {
                 share_aggregator, ..
             } => Some(share_aggregator.total_weights()),
-            RandItem::Decided { .. } => None,
+            RandItem::Aggregating { .. } | RandItem::Decided { .. } => None,
         }
     }
 
     fn has_decision(&self) -> bool {
-        matches!(self, RandItem::Decided { .. })
+        matches!(
+            self,
+            RandItem::Decided { .. } | RandItem::Aggregating { .. }
+        )
     }
 
     fn add_share(&mut self, share: RandShare<S>, rand_config: &RandConfig) -> anyhow::Result<()> {
@@ -182,24 +234,51 @@ impl<S: TShare> RandItem<S> {
                 share_aggregator.add_share(rand_config.get_peer_weight(share.author()), share);
                 Ok(())
             },
+            RandItem::Aggregating {
+                metadata,
+                buffered_shares,
+                ..
+            } => {
+                ensure!(
+                    &metadata.metadata == share.metadata(),
+                    "[RandStore] RandShare metadata from {} mismatch with block metadata!",
+                    share.author(),
+                );
+                buffered_shares.push(share);
+                Ok(())
+            },
             RandItem::Decided { .. } => Ok(()),
         }
     }
 
-    fn try_aggregate(&mut self, rand_config: &RandConfig, decision_tx: Sender<Randomness>) {
+    fn try_aggregate(&mut self, rand_config: &RandConfig, result_tx: Sender<AggregationResult<S>>) {
         let item = std::mem::replace(self, Self::new(Author::ONE, PathType::Slow));
         let new_item = match item {
             RandItem::PendingDecision {
                 share_aggregator,
                 metadata,
-            } => match share_aggregator.try_aggregate(rand_config, metadata.clone(), decision_tx) {
+            } => match share_aggregator.try_aggregate(rand_config, metadata.clone(), result_tx) {
                 Either::Left(share_aggregator) => Self::PendingDecision {
                     metadata,
                     share_aggregator,
                 },
-                Either::Right(self_share) => Self::Decided { self_share },
+                Either::Right((self_share, path_type)) => {
+                    if path_type == PathType::Fast {
+                        // Fast path is optimistic; no recovery needed on failure.
+                        Self::Decided { self_share }
+                    } else {
+                        Self::Aggregating {
+                            metadata,
+                            self_share,
+                            buffered_shares: Vec::new(),
+                            path_type,
+                        }
+                    }
+                },
             },
-            item @ (RandItem::Decided { .. } | RandItem::PendingMetadata(_)) => item,
+            item @ (RandItem::Decided { .. }
+            | RandItem::PendingMetadata(_)
+            | RandItem::Aggregating { .. }) => item,
         };
         let _ = std::mem::replace(self, new_item);
     }
@@ -214,7 +293,9 @@ impl<S: TShare> RandItem<S> {
                     share_aggregator,
                 }
             },
-            item @ (RandItem::PendingDecision { .. } | RandItem::Decided { .. }) => item,
+            item @ (RandItem::PendingDecision { .. }
+            | RandItem::Decided { .. }
+            | RandItem::Aggregating { .. }) => item,
         };
         let _ = std::mem::replace(self, new_item);
     }
@@ -224,7 +305,7 @@ impl<S: TShare> RandItem<S> {
             RandItem::PendingDecision {
                 share_aggregator, ..
             } => Some(share_aggregator.shares.keys().cloned().collect()),
-            RandItem::Decided { .. } => None,
+            RandItem::Decided { .. } | RandItem::Aggregating { .. } => None,
             RandItem::PendingMetadata(_) => {
                 unreachable!("Should only be called after block is added")
             },
@@ -237,6 +318,7 @@ impl<S: TShare> RandItem<S> {
             RandItem::PendingDecision {
                 share_aggregator, ..
             } => share_aggregator.get_self_share(),
+            RandItem::Aggregating { self_share, .. } => Some(self_share.clone()),
             RandItem::Decided { self_share, .. } => Some(self_share.clone()),
         }
     }
@@ -250,7 +332,7 @@ pub struct RandStore<S> {
     fast_rand_config: Option<RandConfig>,
     fast_rand_map: Option<BTreeMap<Round, RandItem<S>>>,
     highest_known_round: u64,
-    decision_tx: Sender<Randomness>,
+    result_tx: Sender<AggregationResult<S>>,
 }
 
 impl<S: TShare> RandStore<S> {
@@ -259,7 +341,7 @@ impl<S: TShare> RandStore<S> {
         author: Author,
         rand_config: RandConfig,
         fast_rand_config: Option<RandConfig>,
-        decision_tx: Sender<Randomness>,
+        result_tx: Sender<AggregationResult<S>>,
     ) -> Self {
         Self {
             epoch,
@@ -269,7 +351,7 @@ impl<S: TShare> RandStore<S> {
             fast_rand_config: fast_rand_config.clone(),
             fast_rand_map: fast_rand_config.map(|_| BTreeMap::new()),
             highest_known_round: 0,
-            decision_tx,
+            result_tx,
         }
     }
 
@@ -291,7 +373,7 @@ impl<S: TShare> RandStore<S> {
             .entry(rand_metadata.round())
             .or_insert_with(|| RandItem::new(self.author, PathType::Slow));
         rand_item.add_metadata(&self.rand_config, rand_metadata.clone());
-        rand_item.try_aggregate(&self.rand_config, self.decision_tx.clone());
+        rand_item.try_aggregate(&self.rand_config, self.result_tx.clone());
         // fast path
         if let (Some(fast_rand_map), Some(fast_rand_config)) =
             (self.fast_rand_map.as_mut(), self.fast_rand_config.as_ref())
@@ -300,7 +382,7 @@ impl<S: TShare> RandStore<S> {
                 .entry(rand_metadata.round())
                 .or_insert_with(|| RandItem::new(self.author, PathType::Fast));
             fast_rand_item.add_metadata(fast_rand_config, rand_metadata.clone());
-            fast_rand_item.try_aggregate(fast_rand_config, self.decision_tx.clone());
+            fast_rand_item.try_aggregate(fast_rand_config, self.result_tx.clone());
         }
     }
 
@@ -335,7 +417,7 @@ impl<S: TShare> RandStore<S> {
         };
 
         rand_item.add_share(share, rand_config)?;
-        rand_item.try_aggregate(rand_config, self.decision_tx.clone());
+        rand_item.try_aggregate(rand_config, self.result_tx.clone());
         Ok(rand_item.has_decision())
     }
 
@@ -363,15 +445,122 @@ impl<S: TShare> RandStore<S> {
             .and_then(|item| item.get_self_share())
             .filter(|share| share.metadata() == metadata))
     }
+
+    /// Called when an async aggregation task succeeds.
+    /// Transitions the item from Aggregating to Decided.
+    pub fn handle_aggregation_success(&mut self, round: Round, path_type: PathType) {
+        let rand_map = if path_type == PathType::Fast {
+            match self.fast_rand_map.as_mut() {
+                Some(map) => map,
+                None => return,
+            }
+        } else {
+            &mut self.rand_map
+        };
+
+        if let Some(item) = rand_map.get_mut(&round) {
+            let current = std::mem::replace(item, RandItem::new(self.author, path_type));
+            *item = match current {
+                RandItem::Aggregating { self_share, .. } => RandItem::Decided { self_share },
+                other => other,
+            };
+        }
+    }
+
+    /// Called when an async aggregation task fails.
+    /// Merges valid shares from the failed attempt with buffered shares,
+    /// then retries aggregation or falls back to PendingDecision.
+    /// Returns true if re-aggregation was triggered, false if insufficient shares remain
+    /// (caller should re-initiate the slow path broadcast for this round).
+    pub fn handle_aggregation_failure(
+        &mut self,
+        round: Round,
+        path_type: PathType,
+        metadata: FullRandMetadata,
+        mut valid_shares: HashMap<Author, RandShare<S>>,
+        mut valid_weight: u64,
+    ) -> bool {
+        let rand_config = if path_type == PathType::Fast {
+            match self.fast_rand_config.as_ref() {
+                Some(config) => config.clone(),
+                None => return false,
+            }
+        } else {
+            self.rand_config.clone()
+        };
+        let rand_map = if path_type == PathType::Fast {
+            match self.fast_rand_map.as_mut() {
+                Some(map) => map,
+                None => return false,
+            }
+        } else {
+            &mut self.rand_map
+        };
+
+        let Some(item) = rand_map.get_mut(&round) else {
+            return false;
+        };
+
+        let current = std::mem::replace(item, RandItem::new(self.author, path_type));
+        let mut re_aggregated = false;
+        *item = match current {
+            RandItem::Aggregating {
+                metadata: agg_metadata,
+                self_share,
+                buffered_shares,
+                path_type: agg_path,
+            } => {
+                // Guard against stale failure messages
+                if agg_metadata != metadata {
+                    RandItem::Aggregating {
+                        metadata: agg_metadata,
+                        self_share,
+                        buffered_shares,
+                        path_type: agg_path,
+                    }
+                } else {
+                    // Merge buffered shares into valid_shares, filtering out
+                    // authors added to the pessimistic set during the failed aggregation.
+                    for share in buffered_shares {
+                        let author = *share.author();
+                        if share.metadata() == &metadata.metadata
+                            && !rand_config.is_in_pessimistic_set(&author)
+                        {
+                            if !valid_shares.contains_key(&author) {
+                                valid_weight += rand_config.get_peer_weight(&author);
+                            }
+                            valid_shares.insert(author, share);
+                        }
+                    }
+                    // Rebuild ShareAggregator from merged shares
+                    let share_aggregator = ShareAggregator {
+                        author: self.author,
+                        shares: valid_shares,
+                        total_weight: valid_weight,
+                        path_type,
+                    };
+                    let mut new_item = RandItem::PendingDecision {
+                        metadata,
+                        share_aggregator,
+                    };
+                    new_item.try_aggregate(&rand_config, self.result_tx.clone());
+                    re_aggregated = new_item.has_decision();
+                    new_item
+                }
+            },
+            other => other,
+        };
+        re_aggregated
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::rand::rand_gen::{
         block_queue::QueueItem,
-        rand_store::{RandItem, RandStore, ShareAggregator},
+        rand_store::{AggregationResult, RandItem, RandStore, ShareAggregator},
         test_utils::{create_ordered_blocks, create_share, create_share_for_round},
-        types::{MockShare, PathType, RandConfig},
+        types::{MockShare, PathType, RandConfig, RandShare, TShare},
     };
     use aptos_consensus_types::common::Author;
     use aptos_crypto::{bls12381, HashValue, Uniform};
@@ -382,7 +571,7 @@ mod tests {
     use aptos_types::{
         dkg::{real_dkg::maybe_dk_from_bls_sk, DKGSessionMetadata, DKGTrait, DefaultDKG},
         on_chain_config::OnChainRandomnessConfig,
-        randomness::{FullRandMetadata, RandKeys, WvufPP, WVUF},
+        randomness::{FullRandMetadata, RandKeys, RandMetadata, Randomness, WvufPP, WVUF},
         validator_verifier::{
             ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct, ValidatorVerifier,
         },
@@ -390,7 +579,40 @@ mod tests {
     use futures::StreamExt;
     use futures_channel::mpsc::unbounded;
     use rand::thread_rng;
-    use std::str::FromStr;
+    use serde::{Deserialize, Serialize};
+    use std::{collections::HashMap, str::FromStr};
+
+    /// A mock share whose aggregate always fails. Used to test the failure path
+    /// in ShareAggregator::try_aggregate.
+    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+    struct FailingMockShare;
+
+    impl TShare for FailingMockShare {
+        fn verify(
+            &self,
+            _rand_config: &RandConfig,
+            _rand_metadata: &RandMetadata,
+            _author: &Author,
+        ) -> anyhow::Result<()> {
+            Ok(())
+        }
+
+        fn generate(rand_config: &RandConfig, rand_metadata: RandMetadata) -> RandShare<Self> {
+            RandShare::new(rand_config.author(), rand_metadata, Self)
+        }
+
+        fn aggregate<'a>(
+            _shares: impl Iterator<Item = &'a RandShare<Self>>,
+            _rand_config: &RandConfig,
+            _rand_metadata: RandMetadata,
+        ) -> anyhow::Result<Randomness> {
+            Err(anyhow::anyhow!("Simulated aggregation failure"))
+        }
+    }
+
+    fn create_failing_share(metadata: RandMetadata, author: Author) -> RandShare<FailingMockShare> {
+        RandShare::new(author, metadata, FailingMockShare)
+    }
 
     /// Captures important data items across the whole DKG-WVUF flow.
     struct TestContext {
@@ -524,7 +746,7 @@ mod tests {
     #[tokio::test]
     async fn test_rand_item() {
         let ctxt = TestContext::new(vec![1, 2, 3], 1);
-        let (tx, _rx) = unbounded();
+        let (tx, mut rx) = unbounded::<AggregationResult<MockShare>>();
         let shares = [
             create_share_for_round(ctxt.target_epoch, 2, ctxt.authors[0]),
             create_share_for_round(ctxt.target_epoch, 1, ctxt.authors[1]),
@@ -542,7 +764,14 @@ mod tests {
         );
         assert_eq!(item.total_weights().unwrap(), 5);
         item.try_aggregate(&ctxt.rand_config, tx);
+        // After try_aggregate, item is in Aggregating state (async task in flight)
+        assert!(matches!(item, RandItem::Aggregating { .. }));
         assert!(item.has_decision());
+        // The async task should send Success
+        assert!(matches!(
+            rx.next().await,
+            Some(AggregationResult::Success { .. })
+        ));
 
         let mut item = RandItem::<MockShare>::new(ctxt.authors[0], PathType::Slow);
         item.add_metadata(
@@ -558,13 +787,13 @@ mod tests {
     #[tokio::test]
     async fn test_rand_store() {
         let ctxt = TestContext::new(vec![100; 7], 0);
-        let (decision_tx, mut decision_rx) = unbounded();
+        let (result_tx, mut result_rx) = unbounded::<AggregationResult<MockShare>>();
         let mut rand_store = RandStore::new(
             ctxt.target_epoch,
             ctxt.authors[1],
             ctxt.rand_config.clone(),
             None,
-            decision_tx,
+            result_tx,
         );
 
         let rounds = [vec![1], vec![2, 3], vec![5, 8, 13]];
@@ -580,17 +809,20 @@ mod tests {
         {
             rand_store.add_share(share, PathType::Slow).unwrap();
         }
-        assert!(decision_rx.try_next().is_err());
+        assert!(result_rx.try_next().is_err());
         for metadata in blocks_1.all_rand_metadata() {
             rand_store.add_rand_metadata(metadata);
         }
-        assert!(decision_rx.next().await.is_some());
+        assert!(matches!(
+            result_rx.next().await,
+            Some(AggregationResult::Success { .. })
+        ));
 
         // metadata come after shares
         for metadata in blocks_2.all_rand_metadata() {
             rand_store.add_rand_metadata(metadata);
         }
-        assert!(decision_rx.try_next().is_err());
+        assert!(result_rx.try_next().is_err());
 
         for share in ctxt.authors[1..6]
             .iter()
@@ -598,6 +830,479 @@ mod tests {
         {
             rand_store.add_share(share, PathType::Slow).unwrap();
         }
-        assert!(decision_rx.next().await.is_some());
+        assert!(matches!(
+            result_rx.next().await,
+            Some(AggregationResult::Success { .. })
+        ));
+    }
+
+    // ==================== FailingMockShare tests (A-C) ====================
+
+    /// Test A: FailingMockShare::aggregate returns Err → AggregationResult::Failure
+    /// sent on channel with correct fields and all shares returned.
+    #[tokio::test]
+    async fn test_aggregation_failure_sends_failure_on_channel() {
+        let ctxt = TestContext::new(vec![1, 2, 3], 1);
+        let (tx, mut rx) = unbounded::<AggregationResult<FailingMockShare>>();
+        let metadata = FullRandMetadata::new(ctxt.target_epoch, 1, HashValue::zero(), 1700000000);
+
+        let mut item = RandItem::<FailingMockShare>::new(ctxt.authors[1], PathType::Slow);
+        item.add_metadata(&ctxt.rand_config, metadata.clone());
+
+        // author[1] (w=2) + author[2] (w=3) = 5 >= threshold 3
+        let share1 = create_failing_share(metadata.metadata.clone(), ctxt.authors[1]);
+        let share2 = create_failing_share(metadata.metadata.clone(), ctxt.authors[2]);
+        item.add_share(share1, &ctxt.rand_config).unwrap();
+        item.add_share(share2, &ctxt.rand_config).unwrap();
+
+        item.try_aggregate(&ctxt.rand_config, tx);
+        assert!(matches!(item, RandItem::Aggregating { .. }));
+
+        // FailingMockShare::aggregate returns Err → Failure on channel
+        match rx.next().await {
+            Some(AggregationResult::Failure {
+                round,
+                path_type,
+                shares,
+                total_weight,
+                ..
+            }) => {
+                assert_eq!(round, 1);
+                assert_eq!(path_type, PathType::Slow);
+                // No pessimistic filtering (FailingMockShare doesn't add to set)
+                assert_eq!(shares.len(), 2);
+                assert!(shares.contains_key(&ctxt.authors[1]));
+                assert!(shares.contains_key(&ctxt.authors[2]));
+                assert_eq!(total_weight, 5); // 2 + 3
+            },
+            other => panic!("Expected Failure, got Success={}", other.is_some()),
+        }
+    }
+
+    /// Test B: Authors in pessimistic set are filtered from valid_shares in Failure.
+    #[tokio::test]
+    async fn test_aggregation_failure_with_pessimistic_filtering() {
+        let ctxt = TestContext::new(vec![1, 2, 3], 1);
+        let (tx, mut rx) = unbounded::<AggregationResult<FailingMockShare>>();
+        let metadata = FullRandMetadata::new(ctxt.target_epoch, 1, HashValue::zero(), 1700000000);
+
+        // Pre-add author[2] to pessimistic set
+        ctxt.rand_config.add_to_pessimistic_set(ctxt.authors[2]);
+
+        let mut item = RandItem::<FailingMockShare>::new(ctxt.authors[1], PathType::Slow);
+        item.add_metadata(&ctxt.rand_config, metadata.clone());
+
+        let share0 = create_failing_share(metadata.metadata.clone(), ctxt.authors[0]);
+        let share1 = create_failing_share(metadata.metadata.clone(), ctxt.authors[1]);
+        let share2 = create_failing_share(metadata.metadata.clone(), ctxt.authors[2]);
+        item.add_share(share0, &ctxt.rand_config).unwrap();
+        item.add_share(share1, &ctxt.rand_config).unwrap();
+        item.add_share(share2, &ctxt.rand_config).unwrap();
+
+        item.try_aggregate(&ctxt.rand_config, tx);
+
+        match rx.next().await {
+            Some(AggregationResult::Failure {
+                shares,
+                total_weight,
+                ..
+            }) => {
+                // author[2] filtered out by pessimistic set
+                assert_eq!(shares.len(), 2);
+                assert!(shares.contains_key(&ctxt.authors[0]));
+                assert!(shares.contains_key(&ctxt.authors[1]));
+                assert!(!shares.contains_key(&ctxt.authors[2]));
+                assert_eq!(total_weight, 3); // 1 + 2
+            },
+            other => panic!("Expected Failure, got Success={}", other.is_some()),
+        }
+    }
+
+    /// Test C: Full RandStore roundtrip with FailingMockShare: fail → buffer → recover → fail again.
+    #[tokio::test]
+    async fn test_aggregation_failure_full_store_roundtrip() {
+        let ctxt = TestContext::new(vec![1, 2, 3], 1);
+        let (result_tx, mut result_rx) = unbounded::<AggregationResult<FailingMockShare>>();
+        let mut rand_store = RandStore::<FailingMockShare>::new(
+            ctxt.target_epoch,
+            ctxt.authors[1],
+            ctxt.rand_config.clone(),
+            None,
+            result_tx,
+        );
+
+        let metadata = FullRandMetadata::new(ctxt.target_epoch, 1, HashValue::zero(), 1700000000);
+        rand_store.update_highest_known_round(1);
+        rand_store.add_rand_metadata(metadata.clone());
+
+        // Trigger aggregation: author[1] (w=2) + author[2] (w=3) = 5 >= 3
+        let share1 = create_failing_share(metadata.metadata.clone(), ctxt.authors[1]);
+        let share2 = create_failing_share(metadata.metadata.clone(), ctxt.authors[2]);
+        rand_store
+            .add_share(share1.clone(), PathType::Slow)
+            .unwrap();
+        rand_store
+            .add_share(share2.clone(), PathType::Slow)
+            .unwrap();
+
+        // Receive first Failure
+        let result = result_rx.next().await;
+        assert!(matches!(result, Some(AggregationResult::Failure { .. })));
+
+        // Buffer a share while in Aggregating
+        let share0 = create_failing_share(metadata.metadata.clone(), ctxt.authors[0]);
+        rand_store
+            .add_share(share0.clone(), PathType::Slow)
+            .unwrap();
+
+        // Extract failure data and feed into handle_aggregation_failure
+        if let Some(AggregationResult::Failure {
+            round,
+            path_type,
+            metadata: fail_meta,
+            shares: valid_shares,
+            total_weight,
+        }) = result
+        {
+            rand_store.handle_aggregation_failure(
+                round,
+                path_type,
+                fail_meta,
+                valid_shares,
+                total_weight,
+            );
+            // Merged shares (share1 w=2 + share2 w=3 + buffered share0 w=1 = 6) >= threshold
+            // → retries aggregation → FailingMockShare fails again
+            let result2 = result_rx.next().await;
+            assert!(matches!(result2, Some(AggregationResult::Failure { .. })));
+        }
+    }
+
+    // ==================== State machine & handler tests (D-J) ====================
+
+    /// Test D: Shares arriving in Aggregating state are buffered correctly.
+    #[tokio::test]
+    async fn test_aggregating_state_buffers_shares() {
+        let ctxt = TestContext::new(vec![1, 2, 3], 1);
+        let (tx, mut rx) = unbounded::<AggregationResult<MockShare>>();
+        let metadata = FullRandMetadata::new(ctxt.target_epoch, 1, HashValue::zero(), 1700000000);
+
+        let mut item = RandItem::<MockShare>::new(ctxt.authors[1], PathType::Slow);
+        item.add_metadata(&ctxt.rand_config, metadata.clone());
+
+        // Reach threshold: author[1] (w=2) + author[2] (w=3) = 5 >= 3
+        let share1 = create_share(metadata.metadata.clone(), ctxt.authors[1]);
+        let share2 = create_share(metadata.metadata.clone(), ctxt.authors[2]);
+        item.add_share(share1, &ctxt.rand_config).unwrap();
+        item.add_share(share2, &ctxt.rand_config).unwrap();
+
+        item.try_aggregate(&ctxt.rand_config, tx);
+        assert!(matches!(item, RandItem::Aggregating { .. }));
+
+        // Aggregating counts as decided (stops reliable broadcast)
+        assert!(item.has_decision());
+        assert!(item.get_all_shares_authors().is_none());
+        assert!(item.total_weights().is_none());
+
+        // Buffer a share
+        let share0 = create_share(metadata.metadata.clone(), ctxt.authors[0]);
+        item.add_share(share0.clone(), &ctxt.rand_config).unwrap();
+
+        // Inspect buffered_shares
+        match &item {
+            RandItem::Aggregating {
+                buffered_shares, ..
+            } => {
+                assert_eq!(buffered_shares.len(), 1);
+                assert_eq!(buffered_shares[0].author(), &ctxt.authors[0]);
+            },
+            _ => panic!("Expected Aggregating state"),
+        }
+
+        // State invariants still hold
+        assert!(item.has_decision());
+
+        // Drain Success from MockShare
+        assert!(matches!(
+            rx.next().await,
+            Some(AggregationResult::Success { .. })
+        ));
+    }
+
+    /// Test E: handle_aggregation_success transitions Aggregating → Decided.
+    #[tokio::test]
+    async fn test_handle_aggregation_success() {
+        let ctxt = TestContext::new(vec![1, 2, 3], 1);
+        let (result_tx, mut result_rx) = unbounded::<AggregationResult<MockShare>>();
+        let mut rand_store = RandStore::new(
+            ctxt.target_epoch,
+            ctxt.authors[1],
+            ctxt.rand_config.clone(),
+            None,
+            result_tx,
+        );
+
+        let metadata = FullRandMetadata::new(ctxt.target_epoch, 1, HashValue::zero(), 1700000000);
+        rand_store.update_highest_known_round(1);
+        rand_store.add_rand_metadata(metadata.clone());
+
+        let share1 = create_share(metadata.metadata.clone(), ctxt.authors[1]);
+        let share2 = create_share(metadata.metadata.clone(), ctxt.authors[2]);
+        rand_store
+            .add_share(share1.clone(), PathType::Slow)
+            .unwrap();
+        rand_store
+            .add_share(share2.clone(), PathType::Slow)
+            .unwrap();
+
+        // Drain Success from MockShare
+        assert!(matches!(
+            result_rx.next().await,
+            Some(AggregationResult::Success { .. })
+        ));
+
+        // Transition Aggregating → Decided
+        rand_store.handle_aggregation_success(1, PathType::Slow);
+
+        // Verify Decided: add_share returns has_decision() = true
+        let share0 = create_share(metadata.metadata.clone(), ctxt.authors[0]);
+        let has_decision = rand_store.add_share(share0, PathType::Slow).unwrap();
+        assert!(has_decision);
+
+        // No new aggregation result
+        assert!(result_rx.try_next().is_err());
+        assert!(rand_store.get_all_shares_authors(1).is_none());
+    }
+
+    /// Test F: Failure with valid_shares + buffered shares >= threshold triggers retry.
+    #[tokio::test]
+    async fn test_handle_aggregation_failure_retry_succeeds() {
+        let ctxt = TestContext::new(vec![1, 2, 3], 1);
+        let (result_tx, mut result_rx) = unbounded::<AggregationResult<MockShare>>();
+        let mut rand_store = RandStore::new(
+            ctxt.target_epoch,
+            ctxt.authors[1],
+            ctxt.rand_config.clone(),
+            None,
+            result_tx,
+        );
+
+        let metadata = FullRandMetadata::new(ctxt.target_epoch, 1, HashValue::zero(), 1700000000);
+        rand_store.update_highest_known_round(1);
+        rand_store.add_rand_metadata(metadata.clone());
+
+        let share1 = create_share(metadata.metadata.clone(), ctxt.authors[1]);
+        let share2 = create_share(metadata.metadata.clone(), ctxt.authors[2]);
+        rand_store
+            .add_share(share1.clone(), PathType::Slow)
+            .unwrap();
+        rand_store
+            .add_share(share2.clone(), PathType::Slow)
+            .unwrap();
+
+        // Drain Success
+        let _ = result_rx.next().await;
+
+        // Buffer a share while in Aggregating
+        let share0 = create_share(metadata.metadata.clone(), ctxt.authors[0]);
+        rand_store
+            .add_share(share0.clone(), PathType::Slow)
+            .unwrap();
+
+        // Simulate failure: only share1 valid (w=2)
+        // After merge with buffered share0 (w=1), total = 3 >= threshold
+        let mut valid_shares = HashMap::new();
+        valid_shares.insert(*share1.author(), share1.clone());
+
+        rand_store.handle_aggregation_failure(1, PathType::Slow, metadata.clone(), valid_shares, 2);
+
+        // Merged shares meet threshold → MockShare succeeds → Success on channel
+        assert!(matches!(
+            result_rx.next().await,
+            Some(AggregationResult::Success { .. })
+        ));
+    }
+
+    /// Test G: Failure with insufficient shares → PendingDecision. Add more shares later → retry.
+    #[tokio::test]
+    async fn test_handle_aggregation_failure_insufficient_shares() {
+        let ctxt = TestContext::new(vec![1, 2, 3], 1);
+        let (result_tx, mut result_rx) = unbounded::<AggregationResult<MockShare>>();
+        let mut rand_store = RandStore::new(
+            ctxt.target_epoch,
+            ctxt.authors[1],
+            ctxt.rand_config.clone(),
+            None,
+            result_tx,
+        );
+
+        let metadata = FullRandMetadata::new(ctxt.target_epoch, 1, HashValue::zero(), 1700000000);
+        rand_store.update_highest_known_round(1);
+        rand_store.add_rand_metadata(metadata.clone());
+
+        let share1 = create_share(metadata.metadata.clone(), ctxt.authors[1]);
+        let share2 = create_share(metadata.metadata.clone(), ctxt.authors[2]);
+        rand_store
+            .add_share(share1.clone(), PathType::Slow)
+            .unwrap();
+        rand_store
+            .add_share(share2.clone(), PathType::Slow)
+            .unwrap();
+
+        // Drain Success
+        let _ = result_rx.next().await;
+
+        // No buffered shares. Simulate failure with only self share (w=2) valid.
+        // In practice, self share always passes verification.
+        let mut valid_shares = HashMap::new();
+        valid_shares.insert(*share1.author(), share1.clone());
+
+        rand_store.handle_aggregation_failure(
+            1,
+            PathType::Slow,
+            metadata.clone(),
+            valid_shares,
+            2, // weight of share1
+        );
+
+        // Insufficient weight (2 < 3) → no new aggregation
+        assert!(result_rx.try_next().is_err());
+
+        // Item is in PendingDecision: add_share returns has_decision=false
+        let share0 = create_share(metadata.metadata.clone(), ctxt.authors[0]);
+        let has_decision = rand_store.add_share(share0, PathType::Slow).unwrap();
+        assert!(has_decision); // 2 + 1 = 3 >= 3 → triggers aggregation, Aggregating counts as decided
+
+        // Wait, weight is now 3 >= 3, so aggregation triggered immediately
+        assert!(matches!(
+            result_rx.next().await,
+            Some(AggregationResult::Success { .. })
+        ));
+    }
+
+    /// Test H: Failure with stale metadata (different block_id) → item stays Aggregating.
+    #[tokio::test]
+    async fn test_handle_aggregation_failure_stale_metadata() {
+        let ctxt = TestContext::new(vec![1, 2, 3], 1);
+        let (result_tx, mut result_rx) = unbounded::<AggregationResult<MockShare>>();
+        let mut rand_store = RandStore::new(
+            ctxt.target_epoch,
+            ctxt.authors[1],
+            ctxt.rand_config.clone(),
+            None,
+            result_tx,
+        );
+
+        let metadata = FullRandMetadata::new(ctxt.target_epoch, 1, HashValue::zero(), 1700000000);
+        rand_store.update_highest_known_round(1);
+        rand_store.add_rand_metadata(metadata.clone());
+
+        let share1 = create_share(metadata.metadata.clone(), ctxt.authors[1]);
+        let share2 = create_share(metadata.metadata.clone(), ctxt.authors[2]);
+        rand_store
+            .add_share(share1.clone(), PathType::Slow)
+            .unwrap();
+        rand_store
+            .add_share(share2.clone(), PathType::Slow)
+            .unwrap();
+
+        // Drain Success
+        let _ = result_rx.next().await;
+
+        // Stale metadata: different block_id
+        let stale_metadata = FullRandMetadata::new(
+            ctxt.target_epoch,
+            1,
+            HashValue::from_slice([1u8; 32]).unwrap(),
+            1700000000,
+        );
+
+        let mut valid_shares = HashMap::new();
+        valid_shares.insert(*share1.author(), share1.clone());
+
+        rand_store.handle_aggregation_failure(1, PathType::Slow, stale_metadata, valid_shares, 2);
+
+        // Stale → no retry
+        assert!(result_rx.try_next().is_err());
+        // Still in Aggregating (not PendingDecision): get_all_shares_authors returns None
+        assert!(rand_store.get_all_shares_authors(1).is_none());
+    }
+
+    /// Test I: reset() removes round → handle_aggregation_failure is no-op.
+    #[tokio::test]
+    async fn test_handle_aggregation_failure_after_reset() {
+        let ctxt = TestContext::new(vec![1, 2, 3], 1);
+        let (result_tx, mut result_rx) = unbounded::<AggregationResult<MockShare>>();
+        let mut rand_store = RandStore::new(
+            ctxt.target_epoch,
+            ctxt.authors[1],
+            ctxt.rand_config.clone(),
+            None,
+            result_tx,
+        );
+
+        let metadata = FullRandMetadata::new(ctxt.target_epoch, 1, HashValue::zero(), 1700000000);
+        rand_store.update_highest_known_round(1);
+        rand_store.add_rand_metadata(metadata.clone());
+
+        let share1 = create_share(metadata.metadata.clone(), ctxt.authors[1]);
+        let share2 = create_share(metadata.metadata.clone(), ctxt.authors[2]);
+        rand_store
+            .add_share(share1.clone(), PathType::Slow)
+            .unwrap();
+        rand_store
+            .add_share(share2.clone(), PathType::Slow)
+            .unwrap();
+
+        // Drain Success
+        let _ = result_rx.next().await;
+
+        // Reset removes round >= 1
+        rand_store.reset(1);
+
+        // handle_aggregation_failure for removed round → no-op, no crash
+        let mut valid_shares = HashMap::new();
+        valid_shares.insert(*share1.author(), share1.clone());
+        rand_store.handle_aggregation_failure(1, PathType::Slow, metadata.clone(), valid_shares, 2);
+
+        assert!(result_rx.try_next().is_err());
+        assert!(rand_store.get_all_shares_authors(1).is_none());
+    }
+
+    /// Test J: try_aggregate in Aggregating state is no-op — only one result.
+    #[tokio::test]
+    async fn test_try_aggregate_noop_in_aggregating() {
+        let ctxt = TestContext::new(vec![1, 2, 3], 1);
+        let (tx, mut rx) = unbounded::<AggregationResult<MockShare>>();
+        let metadata = FullRandMetadata::new(ctxt.target_epoch, 1, HashValue::zero(), 1700000000);
+
+        let mut item = RandItem::<MockShare>::new(ctxt.authors[1], PathType::Slow);
+        item.add_metadata(&ctxt.rand_config, metadata.clone());
+
+        let share1 = create_share(metadata.metadata.clone(), ctxt.authors[1]);
+        let share2 = create_share(metadata.metadata.clone(), ctxt.authors[2]);
+        item.add_share(share1, &ctxt.rand_config).unwrap();
+        item.add_share(share2, &ctxt.rand_config).unwrap();
+
+        // First try_aggregate → Aggregating
+        item.try_aggregate(&ctxt.rand_config, tx.clone());
+        assert!(matches!(item, RandItem::Aggregating { .. }));
+
+        // Drain the first (and only) result
+        assert!(matches!(
+            rx.next().await,
+            Some(AggregationResult::Success { .. })
+        ));
+
+        // Add a share and call try_aggregate again while in Aggregating
+        let share0 = create_share(metadata.metadata.clone(), ctxt.authors[0]);
+        item.add_share(share0, &ctxt.rand_config).unwrap();
+        // Keep a sender alive so the channel stays open (try_next returns Err = no pending items)
+        let _keep_alive = tx.clone();
+        item.try_aggregate(&ctxt.rand_config, tx);
+
+        // Still Aggregating, no second result
+        assert!(matches!(item, RandItem::Aggregating { .. }));
+        assert!(rx.try_next().is_err());
     }
 }
