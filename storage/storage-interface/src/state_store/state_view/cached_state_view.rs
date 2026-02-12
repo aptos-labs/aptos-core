@@ -15,6 +15,7 @@ use crate::{
     DbReader,
 };
 use anyhow::Result;
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
 use aptos_types::{
     state_store::{
@@ -25,7 +26,6 @@ use aptos_types::{
 };
 use core::fmt;
 use dashmap::{mapref::entry::Entry, DashMap};
-use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use rayon::prelude::*;
 use std::{
@@ -35,14 +35,6 @@ use std::{
 };
 
 pub type StateCacheShard = DashMap<StateKey, StateSlot>;
-
-static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(32)
-        .thread_name(|index| format!("kv_reader_{}", index))
-        .build()
-        .unwrap()
-});
 
 #[derive(Debug)]
 pub struct ShardedStateCache {
@@ -178,7 +170,7 @@ impl CachedStateView {
     pub fn prime_cache(&self, updates: &StateUpdateRefs, policy: PrimingPolicy) -> Result<()> {
         let _timer = TIMER.timer_with(&["prime_state_cache"]);
 
-        IO_POOL.install(|| {
+        THREAD_MANAGER.get_io_pool().install(|| {
             if let Some(updates) = updates.for_last_checkpoint_batched() {
                 self.prime_cache_for_batched_updates(updates, policy)?;
             }
