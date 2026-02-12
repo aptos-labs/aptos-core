@@ -39,6 +39,13 @@ impl<S: TShare> ShareAggregator<S> {
         }
     }
 
+    /// Attempt to aggregate shares if threshold is met.
+    ///
+    /// NOTE: This method is called while holding the `Mutex<RandStore>` lock.
+    /// `pre_aggregate_verify` below takes ~7ms on mainnet (150 validators), which blocks
+    /// all other share additions for any round during that time. A future improvement is to
+    /// move `pre_aggregate_verify` outside the lock into an async task with a failure recovery
+    /// path (e.g., an `Aggregating` state that retries on verification failure).
     pub fn try_aggregate(
         mut self,
         rand_config: &RandConfig,

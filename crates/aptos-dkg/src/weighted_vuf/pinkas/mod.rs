@@ -13,10 +13,9 @@ use crate::{
 };
 use anyhow::{anyhow, bail};
 use aptos_crypto::blstrs::{multi_pairing, random_scalar};
-use blst::blst_fp12;
-use blstrs::{pairing, Fp12, G1Projective, G2Projective, Gt, Scalar};
+use blstrs::{pairing, G1Projective, G2Projective, Gt, Scalar};
 use ff::Field;
-use group::{prime::PrimeCurveAffine, Curve, Group};
+use group::{Curve, Group};
 use rand::thread_rng;
 use rayon::{
     iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator},
@@ -201,29 +200,11 @@ impl WeightedVUF for PinkasWUF {
         let (rhs, rks, lagr, ranges) =
             Self::collect_lagrange_coeffs_shares_and_rks(wc, apks, proof)?;
 
-        // Fuse multiexp + to_affine + miller_loop into a single parallel pass.
-        // This eliminates the sequential to_affine conversion (~600us for ~100 items)
-        // and the overhead of two separate thread_pool.install calls.
-        let res = thread_pool.install(|| {
-            let ml = proof
-                .par_iter()
-                .enumerate()
-                .with_min_len(MIN_MULTIEXP_NUM_JOBS)
-                .map(|(idx, _)| {
-                    let g1 = g1_multi_exp(rks[idx], &lagr[ranges[idx].clone()]);
-                    let g1a = g1.to_affine();
-                    let g2a = rhs[idx].to_affine();
-                    if (g1a.is_identity() | g2a.is_identity()).into() {
-                        blst_fp12::default()
-                    } else {
-                        blst_fp12::miller_loop(g2a.as_ref(), g1a.as_ref())
-                    }
-                })
-                .reduce(|| blst_fp12::default(), |acc, val| acc * val);
-            Gt::from(Fp12::from(blst_fp12::final_exp(&ml)))
-        });
+        // Compute the RK multiexps in parallel
+        let lhs = Self::rk_multiexps(proof, rks, &lagr, &ranges, thread_pool);
 
-        Ok(res)
+        // Interpolate the WVUF evaluation in parallel
+        Ok(Self::multi_pairing(lhs, rhs, thread_pool))
     }
 
     /// Verifies the proof shares (using batch verification)
@@ -239,7 +220,19 @@ impl WeightedVUF for PinkasWUF {
             bail!("Number of proof shares ({}) exceeds number of APKs ({}) when verifying aggregated WVUF proof", proof.len(), apks.len());
         }
 
-        // Collect pis (G1 points) for each player in the proof.
+        // TODO: Fiat-Shamir transform instead of RNG
+        let tau = random_scalar(&mut thread_rng());
+        let taus = get_powers_of_tau(&tau, proof.len());
+
+        // [share_i^{\tau^i}]_{i \in [0, n)} -- parallelize the G2 scalar multiplications
+        let shares: Vec<G2Projective> = thread_pool.install(|| {
+            proof
+                .par_iter()
+                .zip(taus.par_iter())
+                .map(|((_, share), tau)| share.mul(tau))
+                .collect()
+        });
+
         let mut pis = Vec::with_capacity(proof.len());
         for (player, _) in proof {
             if player.id >= apks.len() {
@@ -259,53 +252,17 @@ impl WeightedVUF for PinkasWUF {
             );
         }
 
-        // TODO: Fiat-Shamir transform instead of RNG
-        let tau = random_scalar(&mut thread_rng());
-        let taus = get_powers_of_tau(&tau, proof.len());
+        let h = Self::hash_to_curve(msg);
+        let sum_of_taus: Scalar = taus.iter().sum();
 
-        // Use rayon::join to overlap the hash_to_curve + extra term computation with
-        // the main parallel work. On uniform-core servers, this hides ~460us of
-        // sequential overhead (hash_to_curve ~157us, scalar mul ~78us, miller loop ~222us).
-        let pp_g_neg = pp.g_neg;
-        let res = thread_pool.install(|| {
-            let (ml_product, extra) = rayon::join(
-                || {
-                    // Main parallel work: G1 scalar mul + to_affine + miller_loop per share.
-                    // By bilinearity: e(pi_i, share_i * tau^i) = e(tau^i * pi_i, share_i).
-                    // G1 scalar muls are ~2-3x faster than G2 in BLS12-381.
-                    pis.par_iter()
-                        .zip(taus.par_iter())
-                        .zip(proof.par_iter())
-                        .with_min_len(MIN_MULTIPAIR_NUM_JOBS)
-                        .map(|((pi, tau), (_, share))| {
-                            let scaled_pi = pi.mul(tau).to_affine();
-                            let share_affine = share.to_affine();
-                            if (scaled_pi.is_identity() | share_affine.is_identity()).into() {
-                                blst_fp12::default()
-                            } else {
-                                blst_fp12::miller_loop(share_affine.as_ref(), scaled_pi.as_ref())
-                            }
-                        })
-                        .reduce(|| blst_fp12::default(), |acc, val| acc * val)
-                },
-                || {
-                    // Overlapped: compute hash, sum_of_taus, g_neg_scaled, and extra miller loop
-                    let h_affine = Self::hash_to_curve(msg).to_affine();
-                    let sum_of_taus: Scalar = taus.iter().sum();
-                    let g_neg_scaled_affine = pp_g_neg.mul(sum_of_taus).to_affine();
-                    if (g_neg_scaled_affine.is_identity() | h_affine.is_identity()).into() {
-                        blst_fp12::default()
-                    } else {
-                        blst_fp12::miller_loop(h_affine.as_ref(), g_neg_scaled_affine.as_ref())
-                    }
-                },
-            );
-
-            let combined = ml_product * extra;
-            Gt::from(Fp12::from(blst_fp12::final_exp(&combined)))
-        });
-
-        if res != Gt::identity() {
+        let h_tau = h.mul(sum_of_taus);
+        if parallel_multi_pairing(
+            pis.iter().chain([pp.g_neg].iter()),
+            shares.iter().chain([h_tau].iter()),
+            thread_pool,
+            MIN_MULTIPAIR_NUM_JOBS,
+        ) != Gt::identity()
+        {
             bail!("Multipairing check in batched aggregate verification failed");
         }
 
