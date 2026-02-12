@@ -85,7 +85,7 @@ fn uses_memory_or_behavior(exp: &Exp) -> bool {
                 | Operation::Exists(_)
                 | Operation::CanModify
                 | Operation::ResourceDomain
-                | Operation::Behavior(_, _) => {
+                | Operation::Behavior(..) => {
                     uses_memory = true;
                     return false; // stop traversal
                 },
