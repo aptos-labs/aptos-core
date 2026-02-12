@@ -18,13 +18,14 @@ use aptos_types::{
     transaction::{ExecutionStatus, Script, TransactionArgument, TransactionStatus},
     vm_status::StatusCode,
 };
+use indoc::{formatdoc, indoc};
+use move_asm::assembler;
 use move_binary_format::file_format::CompiledModule;
 use move_core_types::{
     gas_algebra::GasQuantity,
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
 };
-use move_ir_compiler::Compiler;
 use test_case::test_case;
 
 pub const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 6 * 1024 * 1024;
@@ -544,25 +545,31 @@ fn verify_max_sequence_number() {
 }
 
 fn bad_module() -> (CompiledModule, Vec<u8>) {
-    let bad_module_code = "
-    module 0x1.Test {
-        struct R1 { b: bool }
-        struct S1 has copy, drop { r1: Self.R1 }
+    let bad_module_code = indoc! {"
+        module 0x1::Test
+        struct R1
+          b: bool
 
-        public new_S1(): Self.S1 {
-            let s: Self.S1;
-            let r: Self.R1;
-        label b0:
-            r = R1 { b: true };
-            s = S1 { r1: move(r) };
-            return move(s);
-        }
-    }
-    ";
-    let compiler = Compiler { deps: vec![] };
-    let module = compiler
-        .into_compiled_module(bad_module_code)
-        .expect("Failed to compile");
+        struct S1 has copy + drop
+          r1: R1
+
+        public fun new_S1(): S1
+            local l0: S1
+            local l1: R1
+            ld_true
+            pack R1
+            st_loc l1
+            move_loc l1
+            pack S1
+            st_loc l0
+            move_loc l0
+            ret
+    "};
+    let options = assembler::Options::default();
+    let module = assembler::assemble(&options, bad_module_code, std::iter::empty())
+        .expect("Assembly failed")
+        .left()
+        .expect("Expected module, got script");
     let mut bytes = vec![];
     module.serialize(&mut bytes).unwrap();
     (module, bytes)
@@ -572,37 +579,35 @@ fn good_module_uses_bad(
     address: AccountAddress,
     bad_dep: &CompiledModule,
 ) -> (CompiledModule, Vec<u8>) {
-    let good_module_code = format!(
+    let good_module_code = formatdoc!(
         "
-    module 0x{}.Test2 {{
-        import 0x1.Test;
-        struct S {{ b: bool }}
+        module 0x{}::Test2
+        use 0x1::Test
+        struct S
+          b: bool
 
-        public foo() {{
-            let s: Test.S1;
-        label b0:
-            s = Test.new_S1();
-            return;
-        }}
-        public bar() {{
-        label b0:
-            return;
-        }}
-    }}
-    ",
+        public fun foo()
+            local l0: Test::S1
+            call Test::new_S1
+            st_loc l0
+            ret
+
+        public fun bar()
+            ret
+        ",
         address.to_hex(),
     );
 
     let framework_modules = aptos_cached_packages::head_release_bundle().compiled_modules();
-    let compiler = Compiler {
-        deps: framework_modules
-            .iter()
-            .chain(std::iter::once(bad_dep))
-            .collect(),
-    };
-    let module = compiler
-        .into_compiled_module(good_module_code.as_str())
-        .expect("Failed to compile");
+    let options = assembler::Options::default();
+    let module = assembler::assemble(
+        &options,
+        &good_module_code,
+        framework_modules.iter().chain(std::iter::once(bad_dep)),
+    )
+    .expect("Assembly failed")
+    .left()
+    .expect("Expected module, got script");
     let mut bytes = vec![];
     module.serialize(&mut bytes).unwrap();
     (module, bytes)
@@ -623,16 +628,20 @@ fn execute_script_for_test(
         good_module_uses_bad(account_config::CORE_CODE_ADDRESS, &bad_module);
     executor.add_module(&good_module.self_id(), good_module_bytes);
 
-    let deps = if link_to_good_module {
+    let deps: Vec<&CompiledModule> = if link_to_good_module {
         vec![&good_module]
     } else {
         vec![&bad_module]
     };
-    let compiler = Compiler { deps };
-
-    let script = compiler
-        .into_script_blob(script_code)
-        .expect("Failed to compile");
+    let options = assembler::Options::default();
+    let compiled_script = assembler::assemble(&options, script_code, deps.into_iter())
+        .expect("Script assembly failed")
+        .right()
+        .expect("Expected script, got module");
+    let mut script_bytes = vec![];
+    compiled_script
+        .serialize(&mut script_bytes)
+        .expect("Script serialization failed");
 
     // Create a transaction that tries to use that module.
     let sender = executor.create_raw_account_data(1_000_000, 10);
@@ -641,7 +650,7 @@ fn execute_script_for_test(
     let txn = sender
         .account()
         .transaction()
-        .script(Script::new(script, ty_args, vec![]))
+        .script(Script::new(script_bytes, ty_args, vec![]))
         .sequence_number(10)
         .max_gas_amount(100_000)
         .gas_unit_price(1)
@@ -655,16 +664,15 @@ fn execute_script_for_test(
 fn test_script_dependency_fails_verification(enable_lazy_loading: bool) {
     let mut executor = executor_with_lazy_loading(enable_lazy_loading);
 
-    let code = "
-    import 0x1.Test;
-
-    main() {
-        let x: Test.S1;
-    label b0:
-        x = Test.new_S1();
-        return;
-    }
-    ";
+    let code = indoc! {"
+        script
+        use 0x1::Test
+        entry public fun main()
+            local l0: Test::S1
+            call Test::new_S1
+            st_loc l0
+            ret
+    "};
 
     let status = execute_script_for_test(&mut executor, code, vec![], false);
     assert!(matches!(
@@ -680,12 +688,11 @@ fn test_script_dependency_fails_verification(enable_lazy_loading: bool) {
 fn test_type_tag_dependency_fails_verification(enable_lazy_loading: bool) {
     let mut executor = executor_with_lazy_loading(enable_lazy_loading);
 
-    let code = "
-    main<T>() {
-    label b0:
-        return;
-    }
-    ";
+    let code = indoc! {"
+        script
+        entry public fun main<T0>()
+            ret
+    "};
 
     let ty_args = vec![TypeTag::Struct(Box::new(StructTag {
         address: account_config::CORE_CODE_ADDRESS,
@@ -707,16 +714,14 @@ fn test_type_tag_dependency_fails_verification(enable_lazy_loading: bool) {
 fn test_script_transitive_dependency_fails_verification_bar(enable_lazy_loading: bool) {
     let mut executor = executor_with_lazy_loading(enable_lazy_loading);
 
-    let code = "
-    import 0x1.Test2;
-
-    main() {
-    label b0:
-        // bar does not use bad module, but Test2 does
-        Test2.bar();
-        return;
-    }
-    ";
+    let code = indoc! {"
+        script
+        use 0x1::Test2
+        entry public fun main()
+            // bar does not use bad module, but Test2 does
+            call Test2::bar
+            ret
+    "};
 
     let status = execute_script_for_test(&mut executor, code, vec![], true);
     success_if_lazy_loading_enabled_or_invariant_violation(enable_lazy_loading, status);
@@ -727,16 +732,14 @@ fn test_script_transitive_dependency_fails_verification_bar(enable_lazy_loading:
 fn test_script_transitive_dependency_fails_verification_foo(enable_lazy_loading: bool) {
     let mut executor = executor_with_lazy_loading(enable_lazy_loading);
 
-    let code = "
-    import 0x1.Test2;
-
-    main() {
-    label b0:
-        // foo uses bad module
-        Test2.foo();
-        return;
-    }
-    ";
+    let code = indoc! {"
+        script
+        use 0x1::Test2
+        entry public fun main()
+            // foo uses bad module
+            call Test2::foo
+            ret
+    "};
 
     let status = execute_script_for_test(&mut executor, code, vec![], true);
     assert!(matches!(
@@ -752,12 +755,11 @@ fn test_script_transitive_dependency_fails_verification_foo(enable_lazy_loading:
 fn test_type_tag_transitive_dependency_fails_verification(enable_lazy_loading: bool) {
     let mut executor = executor_with_lazy_loading(enable_lazy_loading);
 
-    let code = "
-    main<T>() {
-    label b0:
-        return;
-    }
-    ";
+    let code = indoc! {"
+        script
+        entry public fun main<T0>()
+            ret
+    "};
 
     let ty_args = vec![TypeTag::Struct(Box::new(StructTag {
         address: account_config::CORE_CODE_ADDRESS,

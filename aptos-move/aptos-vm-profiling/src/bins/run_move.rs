@@ -7,11 +7,11 @@ use aptos_move_stdlib::natives::all_natives;
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_table_natives::NativeTableContext;
 use aptos_types::on_chain_config::{Features, TimedFeaturesBuilder};
+use move_asm::assembler;
 use move_binary_format::CompiledModule;
 use move_core_types::{
     account_address::AccountAddress, ident_str, identifier::Identifier, language_storage::ModuleId,
 };
-use move_ir_compiler::Compiler;
 use move_vm_runtime::{
     data_cache::{MoveVmDataCacheAdapter, TransactionDataCache},
     dispatch_loader,
@@ -49,91 +49,132 @@ fn make_native_create_signer() -> NativeFunction {
     })
 }
 
+fn dedent(s: &str) -> String {
+    let lines: Vec<&str> = s.lines().collect();
+    let min_indent = lines
+        .iter()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| l.len() - l.trim_start().len())
+        .min()
+        .unwrap_or(0);
+    lines
+        .iter()
+        .map(|l| {
+            if l.len() >= min_indent {
+                &l[min_indent..]
+            } else {
+                l.trim()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn assemble_module(src: &str) -> CompiledModule {
+    let options = assembler::Options::default();
+    let src = dedent(src);
+    let src = src.trim();
+    assembler::assemble(&options, src, std::iter::empty())
+        .unwrap_or_else(|diags| {
+            panic!(
+                "failed to assemble module: {}",
+                assembler::diag_to_string("dep", src, diags)
+            )
+        })
+        .left()
+        .expect("expected module, got script")
+}
+
 fn compile_test_modules() -> Vec<CompiledModule> {
     let module_sources = [
         r#"
-            module 0x1.Test {
-                native public create_signer(addr: address): signer;
-            }
+            module 0x1::Test
+            public native fun create_signer(l0: address): signer
         "#,
         r#"
-            module 0x1.bcs {
-                native public to_bytes<MoveValue>(v: &MoveValue): vector<u8>;
-            }
+            module 0x1::bcs
+            public native fun to_bytes<T0>(l0: &T0): vector<u8>
         "#,
         r#"
-            module 0x1.hash {
-                native public sha2_256(data: vector<u8>): vector<u8>;
-                native public sha3_256(data: vector<u8>): vector<u8>;
-            }
+            module 0x1::hash
+            public native fun sha2_256(l0: vector<u8>): vector<u8>
+            public native fun sha3_256(l0: vector<u8>): vector<u8>
         "#,
         r#"
-            module 0x1.table {
-                struct Table<phantom K: copy + drop, phantom V> has store {
-                    handle: address,
-                    length: u64,
-                }
+            module 0x1::table
+            struct Table<phantom T0: copy + drop, phantom T1> has store
+              handle: address
+              length: u64
 
-                struct Box<V> has key, drop, store {
-                    val: V
-                }
+            struct Box<T0> has drop + store + key
+              val: T0
 
-                native new_table_handle<K, V>(): address;
-                native add_box<K: copy + drop, V, B>(table: &mut Self.Table<K, V>, key: K, val: Self.Box<V>);
-                native borrow_box<K: copy + drop, V, B>(table: &Self.Table<K, V>, key: K): &Self.Box<V>;
-                native borrow_box_mut<K: copy + drop, V, B>(table: &mut Self.Table<K, V>, key: K): &mut Self.Box<V>;
-                native contains_box<K: copy + drop, V, B>(table: &Self.Table<K, V>, key: K): bool;
-                native remove_box<K: copy + drop, V, B>(table: &mut Self.Table<K, V>, key: K): Self.Box<V>;
-                native destroy_empty_box<K: copy + drop, V, B>(table: &Self.Table<K, V>);
-                native drop_unchecked_box<K: copy + drop, V, B>(table: Self.Table<K, V>);
+            native fun new_table_handle<T0, T1>(): address
 
-                public new<K: copy + drop, V: store>(): Self.Table<K, V> {
-                label b0:
-                    return Table<K, V> {
-                        handle: Self.new_table_handle<K, V>(),
-                        length: 0,
-                    };
-                }
+            native fun add_box<T0: copy + drop, T1, T2>(l0: &mut Table<T0, T1>, l1: T0, l2: Box<T1>)
 
-                public destroy_empty<K: copy + drop, V>(table: Self.Table<K, V>) {
-                label b0:
-                    Self.destroy_empty_box<K, V, Self.Box<V>>(&table);
-                    Self.drop_unchecked_box<K, V, Self.Box<V>>(move(table));
-                    return;
-                }
+            native fun borrow_box<T0: copy + drop, T1, T2>(l0: &Table<T0, T1>, l1: T0): &Box<T1>
 
-                public add<K: copy + drop, V>(table: &mut Self.Table<K, V>, key: K, val: V) {
-                    let b: Self.Box<V>;
-                label b0:
-                    b = Box<V> { val: move(val) };
-                    Self.add_box<K, V, Self.Box<V>>(move(table), move(key), move(b));
-                    return;
-                }
+            native fun borrow_box_mut<T0: copy + drop, T1, T2>(l0: &mut Table<T0, T1>, l1: T0): &mut Box<T1>
 
-                public borrow<K: copy + drop, V>(table: &Self.Table<K, V>, key: K): &V {
-                label b0:
-                    return &Self.borrow_box<K, V, Self.Box<V>>(move(table), move(key)).Box<V>::val;
-                }
+            native fun contains_box<T0: copy + drop, T1, T2>(l0: &Table<T0, T1>, l1: T0): bool
 
-                public contains<K: copy + drop, V>(table: &Self.Table<K, V>, key: K): bool {
-                label b0:
-                    return Self.contains_box<K, V, Self.Box<V>>(move(table), move(key));
-                }
+            native fun remove_box<T0: copy + drop, T1, T2>(l0: &mut Table<T0, T1>, l1: T0): Box<T1>
 
-                public remove<K: copy + drop, V>(table: &mut Self.Table<K, V>, key: K): V {
-                    let v: V;
-                label b0:
-                    Box<V> { v } = Self.remove_box<K, V, Self.Box<V>>(move(table), move(key));
-                    return move(v);
-                }
-            }
+            native fun destroy_empty_box<T0: copy + drop, T1, T2>(l0: &Table<T0, T1>)
+
+            native fun drop_unchecked_box<T0: copy + drop, T1, T2>(l0: Table<T0, T1>)
+
+            public fun new<T0: copy + drop, T1: store>(): Table<T0, T1>
+                call new_table_handle<T0, T1>
+                ld_u64 0
+                pack Table<T0, T1>
+                ret
+
+            public fun destroy_empty<T0: copy + drop, T1>(l0: Table<T0, T1>)
+                borrow_loc l0
+                call destroy_empty_box<T0, T1, Box<T1>>
+                move_loc l0
+                call drop_unchecked_box<T0, T1, Box<T1>>
+                ret
+
+            public fun add<T0: copy + drop, T1>(l0: &mut Table<T0, T1>, l1: T0, l2: T1)
+                local l3: Box<T1>
+                move_loc l2
+                pack Box<T1>
+                st_loc l3
+                move_loc l0
+                move_loc l1
+                move_loc l3
+                call add_box<T0, T1, Box<T1>>
+                ret
+
+            public fun borrow<T0: copy + drop, T1>(l0: &Table<T0, T1>, l1: T0): &T1
+                move_loc l0
+                move_loc l1
+                call borrow_box<T0, T1, Box<T1>>
+                borrow_field Box<T1>, val
+                ret
+
+            public fun contains<T0: copy + drop, T1>(l0: &Table<T0, T1>, l1: T0): bool
+                move_loc l0
+                move_loc l1
+                call contains_box<T0, T1, Box<T1>>
+                ret
+
+            public fun remove<T0: copy + drop, T1>(l0: &mut Table<T0, T1>, l1: T0): T1
+                local l2: T1
+                move_loc l0
+                move_loc l1
+                call remove_box<T0, T1, Box<T1>>
+                unpack Box<T1>
+                st_loc l2
+                move_loc l2
+                ret
         "#,
     ];
 
-    module_sources
-        .into_iter()
-        .map(|src| Compiler::new(vec![]).into_compiled_module(src).unwrap())
-        .collect()
+    module_sources.into_iter().map(assemble_module).collect()
 }
 
 fn main() -> Result<()> {
@@ -176,16 +217,26 @@ fn main() -> Result<()> {
     }
 
     let src = fs::read_to_string(&args[1])?;
-    let entrypoint = if let Ok(script_blob) =
-        Compiler::new(test_modules.iter().collect()).into_script_blob(&src)
-    {
-        Entrypoint::Script(script_blob)
-    } else {
-        let module = Compiler::new(test_modules.iter().collect()).into_compiled_module(&src)?;
-        let mut module_blob = vec![];
-        module.serialize(&mut module_blob)?;
-        storage.add_module_bytes(module.self_addr(), module.self_name(), module_blob.into());
-        Entrypoint::Module(module.self_id())
+    let options = assembler::Options::default();
+    let assembled =
+        assembler::assemble(&options, &src, test_modules.iter()).unwrap_or_else(|diags| {
+            panic!(
+                "failed to assemble: {}",
+                assembler::diag_to_string(&args[1], &src, diags)
+            )
+        });
+    let entrypoint = match assembled {
+        either::Either::Right(script) => {
+            let mut script_blob = vec![];
+            script.serialize(&mut script_blob)?;
+            Entrypoint::Script(script_blob)
+        },
+        either::Either::Left(module) => {
+            let mut module_blob = vec![];
+            module.serialize(&mut module_blob)?;
+            storage.add_module_bytes(module.self_addr(), module.self_name(), module_blob.into());
+            Entrypoint::Module(module.self_id())
+        },
     };
 
     let mut extensions = NativeContextExtensions::default();
