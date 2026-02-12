@@ -1,7 +1,70 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::M {
+    struct Counter {
+        value: u64,
+    }
+    private fun apply_modifies(f: |address|,addr: address) {
+        (f)(addr)
+    }
+    spec {
+      ensures modifies_of($t0, global<0x42::M::Counter>($t1));
+    }
 
-Diagnostics:
-error: `modifies_of` is not supported for function-typed parameters
-   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_param_err.move:15:17
-   │
-15 │         ensures modifies_of<f>(global<Counter>(addr));
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+} // end 0x42::M
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::M {
+    struct Counter has key {
+        value: u64,
+    }
+    fun apply_modifies(f: |address|, addr: address) {
+        f(addr)
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun M::apply_modifies($t0: |address|, $t1: address) {
+  0: invoke($t1, $t0)
+  1: return ()
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::M {
+    struct Counter {
+        value: u64,
+    }
+    private fun apply_modifies(f: |address|,addr: address) {
+        (f)(addr)
+    }
+    spec {
+      ensures modifies_of($t0, global<0x42::M::Counter>($t1));
+    }
+
+} // end 0x42::M
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun M::apply_modifies($t0: |address|, $t1: address) {
+  0: invoke($t1, $t0)
+  1: return ()
+}
+
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0x42::M
+struct Counter has key
+  value: u64
+
+// Function definition at index 0
+fun apply_modifies(l0: |address|, l1: address)
+    move_loc l1
+    move_loc l0
+    call_closure <|address|>
+    ret
+
+
+============ bytecode verification succeeded ========
