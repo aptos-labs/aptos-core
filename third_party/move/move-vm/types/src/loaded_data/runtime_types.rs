@@ -330,60 +330,6 @@ pub enum Type {
     I256,
 }
 
-pub struct TypePreorderTraversalIter<'a> {
-    stack: SmallVec<[&'a Type; 32]>,
-}
-
-impl<'a> Iterator for TypePreorderTraversalIter<'a> {
-    type Item = &'a Type;
-
-    #[cfg_attr(feature = "force-inline", inline(always))]
-    fn next(&mut self) -> Option<Self::Item> {
-        use Type::*;
-
-        match self.stack.pop() {
-            Some(ty) => {
-                match ty {
-                    Signer
-                    | Bool
-                    | Address
-                    | U8
-                    | U16
-                    | U32
-                    | U64
-                    | U128
-                    | U256
-                    | I8
-                    | I16
-                    | I32
-                    | I64
-                    | I128
-                    | I256
-                    | Struct { .. }
-                    | TyParam(..) => (),
-
-                    Reference(ty) | MutableReference(ty) => {
-                        self.stack.push(ty);
-                    },
-
-                    Vector(ty) => {
-                        self.stack.push(ty);
-                    },
-
-                    StructInstantiation { ty_args, .. } => self.stack.extend(ty_args.iter().rev()),
-
-                    Function { args, results, .. } => {
-                        self.stack.extend(args.iter());
-                        self.stack.extend(results.iter())
-                    },
-                }
-                Some(ty)
-            },
-            None => None,
-        }
-    }
-}
-
 struct TypePreorderTraversalIterWithDepth<'a> {
     stack: SmallVec<[(&'a Type, usize); 32]>,
 }
@@ -895,13 +841,7 @@ impl Type {
         }
     }
 
-    pub fn preorder_traversal(&self) -> TypePreorderTraversalIter<'_> {
-        TypePreorderTraversalIter {
-            stack: smallvec![self],
-        }
-    }
-
-    pub fn preorder_traversal_with_depth(&self) -> TypePreorderTraversalIterWithDepth<'_> {
+    fn preorder_traversal_with_depth(&self) -> TypePreorderTraversalIterWithDepth<'_> {
         TypePreorderTraversalIterWithDepth {
             stack: smallvec![(self, 1)],
         }
@@ -915,7 +855,7 @@ impl Type {
     ///   - `Foo<u64, Bar<u8, bool>>` has 5 nodes.
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn num_nodes(&self) -> usize {
-        self.preorder_traversal().count()
+        self.preorder_traversal_with_depth().count()
     }
 
     /// Returns the number of nodes the type has and the maximum depth.
@@ -1084,16 +1024,6 @@ impl TypeBuilder {
     }
 
     #[inline(always)]
-    pub fn max_ty_depth(&self) -> u64 {
-        self.max_ty_depth
-    }
-
-    #[inline(always)]
-    pub fn max_ty_size(&self) -> u64 {
-        self.max_ty_size
-    }
-
-    #[inline(always)]
     pub fn create_bool_ty(&self) -> Type {
         Type::Bool
     }
@@ -1173,7 +1103,7 @@ impl TypeBuilder {
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn create_ref_ty(&self, inner_ty: &Type, is_mut: bool) -> PartialVMResult<Type> {
         let mut count = 1;
-        let check = |c: &mut u64, d: u64| self.check(*c, d);
+        let check = |c: &mut u64, d: u64| self.check_before_count_increment(c, d);
         let inner_ty = self
             .clone_impl(inner_ty, &mut count, 2, check)
             .map_err(|e| {
@@ -1198,7 +1128,7 @@ impl TypeBuilder {
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn create_vec_ty(&self, elem_ty: &Type) -> PartialVMResult<Type> {
         let mut count = 1;
-        let check = |c: &mut u64, d: u64| self.check(*c, d);
+        let check = |c: &mut u64, d: u64| self.check_before_count_increment(c, d);
         let elem_ty = self
             .clone_impl(elem_ty, &mut count, 2, check)
             .map_err(|e| {
@@ -1231,7 +1161,7 @@ impl TypeBuilder {
         // account struct type itself. We simply shift count and depth by 1 and
         // call inner APIs, to save extra cloning.
         let mut count = 1;
-        let check = |c: &mut u64, d: u64| self.check(*c, d);
+        let check = |c: &mut u64, d: u64| self.check_before_count_increment(c, d);
 
         let ty_args = ty_params
             .iter()
@@ -1289,17 +1219,27 @@ impl TypeBuilder {
     /// Clones the given type, at the same time instantiating all its type parameters.
     pub fn create_ty_with_subst(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<Type> {
         let mut count = 0;
-        let check = |c: &mut u64, d: u64| self.check(*c, d);
+        let check = |c: &mut u64, d: u64| self.check_before_count_increment(c, d);
         self.subst_impl(ty, ty_args, &mut count, 1, check)
     }
 
-    pub fn check_size_and_depth(&self, count: u64, depth: u64) -> PartialVMResult<()> {
-        self.check(count, depth)
+    /// Given [`Type`]'s node count and depth, returns an error if these values exceed limits.
+    pub fn check_final_size_and_depth(&self, count: u64, depth: u64) -> PartialVMResult<()> {
+        // Note: must be greater than because we check for final node count.
+        if count > self.max_ty_size {
+            return self.too_many_nodes_error();
+        }
+        if depth > self.max_ty_depth {
+            return self.too_large_depth_error();
+        }
+        Ok(())
     }
 
     #[inline]
-    fn check(&self, count: u64, depth: u64) -> PartialVMResult<()> {
-        if count >= self.max_ty_size {
+    fn check_before_count_increment(&self, count: &mut u64, depth: u64) -> PartialVMResult<()> {
+        // Note: must be greater than or equal to because we check for node count prior to
+        // incrementing it.
+        if *count >= self.max_ty_size {
             return self.too_many_nodes_error();
         }
         if depth > self.max_ty_depth {
@@ -1337,7 +1277,7 @@ impl TypeBuilder {
         use SignatureToken as S;
         use Type::*;
 
-        self.check(*count, depth)?;
+        self.check_before_count_increment(count, depth)?;
         *count += 1;
         Ok(match const_tok {
             S::Bool => Bool,
@@ -1549,7 +1489,7 @@ impl TypeBuilder {
         use Type::*;
         use TypeTag as T;
 
-        self.check(*count, depth)?;
+        self.check_before_count_increment(count, depth)?;
         *count += 1;
         Ok(match ty_tag {
             T::Bool => Bool,
@@ -1634,7 +1574,7 @@ impl TypeBuilder {
     fn num_nodes_in_subst(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<usize> {
         let mut count = 0;
 
-        let check = |c: &mut u64, d: u64| self.check(*c, d);
+        let check = |c: &mut u64, d: u64| self.check_before_count_increment(c, d);
         self.subst_impl(ty, ty_args, &mut count, 1, check)?;
         Ok(count as usize)
     }

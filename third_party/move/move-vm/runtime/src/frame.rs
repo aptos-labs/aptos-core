@@ -203,7 +203,7 @@ impl Frame {
                     // types (which may fail because types are too deep). This check ensures
                     // runtime checks never fail because of limits.
                     if vm_config.check_depth_on_type_counts {
-                        ty_builder.check_size_and_depth(num_nodes as u64, depth as u64)?;
+                        ty_builder.check_final_size_and_depth(num_nodes as u64, depth as u64)?;
                     }
 
                     local_ty_counts.push(cnt);

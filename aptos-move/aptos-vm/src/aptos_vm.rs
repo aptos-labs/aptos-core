@@ -416,8 +416,8 @@ impl AptosVM {
                     true
                 },
                 Ok(TransactionExecutableRef::EntryFunction(f)) => {
-                    // Skip async checks for entry functions at special addresses (e.g., framework
-                    // code at 0x1).
+                    // Perform in-place checks for entry functions at special addresses (e.g.,
+                    // framework code at 0x1) and not asynchronously.
                     //
                     // Rationale:
                     // Special addresses contain trusted code. With the trusted code optimization,

@@ -1108,7 +1108,7 @@ where
         if RTTCheck::should_perform_checks(&current_frame.function.function) {
             for i in (0..num_param_tys).rev() {
                 let expected_ty = &function.param_tys()[i];
-                if !mask.is_captured(i) {
+                let arg_ty = if !mask.is_captured(i) {
                     let ty = self.operand_stack.pop_ty()?;
                     // For param type to argument, use assignability
                     if ty_args.is_empty() {
@@ -1117,15 +1117,13 @@ where
                         let expected_ty = ty_builder.create_ty_with_subst(expected_ty, ty_args)?;
                         ty.paranoid_check_assignable(&expected_ty)?;
                     }
-                    arg_tys.push_front(ty);
+                    ty
+                } else if ty_args.is_empty() {
+                    expected_ty.clone()
                 } else {
-                    if ty_args.is_empty() {
-                        arg_tys.push_front(expected_ty.clone())
-                    } else {
-                        let expected_ty = ty_builder.create_ty_with_subst(expected_ty, ty_args)?;
-                        arg_tys.push_front(expected_ty)
-                    }
-                }
+                    ty_builder.create_ty_with_subst(expected_ty, ty_args)?
+                };
+                arg_tys.push_front(arg_ty);
             }
         }
 
