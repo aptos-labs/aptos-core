@@ -295,17 +295,20 @@ where
                 &mut rng,
             );
 
-            wvuf_verify_proof::<WT, WVUF, ThreadRng>(
-                &wc,
-                &vuf_pp,
-                &pk,
-                &asks,
-                &apks,
-                group,
-                &mut rng,
-                pick_subset_fn,
-                &subset_type,
-            );
+            for num_threads in [1, 2, 4, 8, 16, 32] {
+                wvuf_verify_proof::<WT, WVUF, ThreadRng>(
+                    &wc,
+                    &vuf_pp,
+                    &pk,
+                    &asks,
+                    &apks,
+                    group,
+                    &mut rng,
+                    pick_subset_fn,
+                    &subset_type,
+                    num_threads,
+                );
+            }
 
             for num_threads in [1, 2, 4, 8, 16, 32] {
                 wvuf_derive_eval::<WT, WVUF, ThreadRng>(
@@ -708,11 +711,17 @@ fn wvuf_verify_proof<
     rng: &mut R,
     pick_subset_fn: fn(&WeightedConfigBlstrs, &mut R) -> Vec<Player>,
     subset_type: &String,
+    num_threads: usize,
 ) where
     WVUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
 {
+    let pool = spawn_rayon_thread_pool("bench-wvuf".to_string(), Some(num_threads));
+
     group.bench_function(
-        format!("verify_proof/{}-subset/{}", subset_type, wc),
+        format!(
+            "verify_proof/{}-subset/{}-thread/{}",
+            subset_type, num_threads, wc
+        ),
         move |b| {
             b.iter_with_setup(
                 || {
@@ -725,7 +734,10 @@ fn wvuf_verify_proof<
                         .iter()
                         .map(|apk| Some(apk.clone()))
                         .collect::<Vec<Option<WVUF::AugmentedPubKeyShare>>>();
-                    assert!(WVUF::verify_proof(pp, pk, apks.as_slice(), BENCH_MSG, &proof).is_ok())
+                    assert!(
+                        WVUF::verify_proof(pp, pk, apks.as_slice(), BENCH_MSG, &proof, &pool)
+                            .is_ok()
+                    )
                 },
             )
         },
