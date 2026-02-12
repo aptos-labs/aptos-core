@@ -19,14 +19,12 @@ aptos-experimental-runtimes = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-types = { workspace = true }
-aptos-vm = { workspace = true }
 bitvec = { workspace = true }
 criterion = { workspace = true, optional = true }
 dashmap = { workspace = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }
-rayon = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
