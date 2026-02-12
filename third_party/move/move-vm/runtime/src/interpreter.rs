@@ -1111,15 +1111,20 @@ where
                 if !mask.is_captured(i) {
                     let ty = self.operand_stack.pop_ty()?;
                     // For param type to argument, use assignability
-                    if !ty_args.is_empty() {
+                    if ty_args.is_empty() {
+                        ty.paranoid_check_assignable(expected_ty)?;
+                    } else {
                         let expected_ty = ty_builder.create_ty_with_subst(expected_ty, ty_args)?;
                         ty.paranoid_check_assignable(&expected_ty)?;
-                    } else {
-                        ty.paranoid_check_assignable(expected_ty)?;
                     }
                     arg_tys.push_front(ty);
                 } else {
-                    arg_tys.push_front(expected_ty.clone())
+                    if ty_args.is_empty() {
+                        arg_tys.push_front(expected_ty.clone())
+                    } else {
+                        let expected_ty = ty_builder.create_ty_with_subst(expected_ty, ty_args)?;
+                        arg_tys.push_front(expected_ty)
+                    }
                 }
             }
         }
