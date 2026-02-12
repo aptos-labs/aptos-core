@@ -654,7 +654,7 @@ impl<
                         incarnation,
                         Arc::new(value),
                         layout,
-                    );
+                    )?;
                 }
             }
         }

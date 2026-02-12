@@ -27,6 +27,7 @@ pub(crate) fn execute_workload(
             allow_fallback: true,
             discard_failed_blocks: false,
             module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
+            enable_pre_write: true,
         },
         // For replay, there is no block limit.
         onchain: BlockExecutorConfigFromOnchain::on_but_large_for_test(),
