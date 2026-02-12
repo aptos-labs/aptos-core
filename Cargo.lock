@@ -205,6 +205,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anes"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b46cbb362ab8752921c97e041f5e366ee6297bd428a31275b9fcf1e380f7299"
+
+[[package]]
 name = "annotate-snippets"
 version = "0.11.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -706,7 +712,7 @@ dependencies = [
  "ark-std 0.5.0",
  "bcs 0.1.4",
  "bytes",
- "criterion",
+ "criterion 0.5.1",
  "ed25519-dalek 2.1.1",
  "generic-array",
  "hmac 0.12.1",
@@ -766,7 +772,7 @@ dependencies = [
  "cfg-if",
  "claims",
  "concurrent-queue",
- "criterion",
+ "criterion 0.5.1",
  "crossbeam",
  "dashmap 7.0.0-rc2",
  "derivative",
@@ -798,7 +804,7 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "clap 4.5.21",
- "criterion",
+ "criterion 0.5.1",
  "dashmap 7.0.0-rc2",
  "itertools 0.13.0",
  "move-core-types",
@@ -1139,7 +1145,7 @@ dependencies = [
  "bulletproofs",
  "byteorder",
  "bytes",
- "criterion",
+ "criterion 0.5.1",
  "curve25519-dalek 3.2.0",
  "curve25519-dalek-ng",
  "digest 0.9.0",
@@ -1414,7 +1420,7 @@ dependencies = [
  "bcs 0.1.4",
  "blst",
  "blstrs",
- "criterion",
+ "criterion 0.5.1",
  "derive_more 0.99.17",
  "ff",
  "group",
@@ -1572,7 +1578,7 @@ dependencies = [
  "arr_macro",
  "bcs 0.1.4",
  "bytes",
- "criterion",
+ "criterion 0.5.1",
  "fail",
  "itertools 0.13.0",
  "move-core-types",
@@ -1717,7 +1723,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-types",
  "bcs 0.1.4",
- "criterion",
+ "criterion 0.5.1",
  "derive_more 0.99.17",
  "itertools 0.13.0",
  "once_cell",
@@ -1757,7 +1763,7 @@ dependencies = [
  "aptos-experimental-layered-map",
  "aptos-infallible",
  "aptos-metrics-core",
- "criterion",
+ "criterion 0.5.1",
  "itertools 0.13.0",
  "once_cell",
  "proptest",
@@ -1778,7 +1784,7 @@ dependencies = [
  "aptos-schemadb",
  "aptos-temppath",
  "bitvec",
- "criterion",
+ "criterion 0.5.1",
  "itertools 0.13.0",
  "once_cell",
  "proptest",
@@ -4019,7 +4025,7 @@ dependencies = [
  "aptos-types",
  "aptos-vault-client",
  "claims",
- "criterion",
+ "criterion 0.5.1",
  "hex",
  "once_cell",
  "proptest",
@@ -4059,7 +4065,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "bitvec",
- "criterion",
+ "criterion 0.5.1",
  "dashmap 7.0.0-rc2",
  "itertools 0.13.0",
  "once_cell",
@@ -4551,7 +4557,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-logging",
  "clap 4.5.21",
- "criterion",
+ "criterion 0.5.1",
  "criterion-cpu-time",
  "num_cpus",
  "proptest",
@@ -4804,7 +4810,7 @@ dependencies = [
  "ciborium",
  "claims",
  "coset",
- "criterion",
+ "criterion 0.5.1",
  "dashmap 7.0.0-rc2",
  "derivative",
  "fixed",
@@ -7506,7 +7512,7 @@ dependencies = [
  "atty",
  "cast",
  "clap 2.34.0",
- "criterion-plot",
+ "criterion-plot 0.4.5",
  "csv",
  "itertools 0.10.5",
  "lazy_static",
@@ -7524,12 +7530,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "criterion"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2b12d017a929603d80db1831cd3a24082f8137ce19c69e6447f54f5fc8d692f"
+dependencies = [
+ "anes",
+ "cast",
+ "ciborium",
+ "clap 4.5.21",
+ "criterion-plot 0.5.0",
+ "is-terminal",
+ "itertools 0.10.5",
+ "num-traits",
+ "once_cell",
+ "oorandom",
+ "plotters",
+ "rayon",
+ "regex",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "tinytemplate",
+ "walkdir",
+]
+
+[[package]]
 name = "criterion-cpu-time"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "63aaaf47e457badbcb376c65a49d0f182c317ebd97dc6d1ced94c8e1d09c0f3a"
 dependencies = [
- "criterion",
+ "criterion 0.3.6",
  "libc",
 ]
 
@@ -7538,6 +7570,16 @@ name = "criterion-plot"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2673cc8207403546f45f5fd319a974b1e6983ad1a3ee7e6041650013be041876"
+dependencies = [
+ "cast",
+ "itertools 0.10.5",
+]
+
+[[package]]
+name = "criterion-plot"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b50826342786a51a89e2da3a28f1c32b06e387201bc2d19791f622c673706b1"
 dependencies = [
  "cast",
  "itertools 0.10.5",
