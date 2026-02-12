@@ -258,4 +258,90 @@ If you want to start with the highest-impact, lowest-effort changes:
 
 ---
 
+## 6. Dependency Deduplication Plan & Progress
+
+### 6.1 Completed
+
+| Dependency | Old Version | New Version | Impact |
+|-----------|-------------|-------------|--------|
+| `base64` | 0.13.0 | 0.22.1 | Eliminates one of 4 versions; workspace code now on modern API |
+
+### 6.2 Attempted and Reverted
+
+| Dependency | Attempted | Reason for Revert |
+|-----------|-----------|-------------------|
+| `criterion` | 0.3.5 → 0.5.1 | `criterion-cpu-time 0.1.0` implements `Measurement` trait for criterion 0.3 only; no updated version available |
+
+### 6.3 Remaining Duplicates -- Classification & Plan
+
+The following table classifies all remaining duplicate dependencies by whether they're **directly controlled** (workspace Cargo.toml declares them) or **transitively pulled** (from external crates we depend on).
+
+#### Crypto Stack (Deeply Interconnected -- Requires Dedicated Project)
+
+These form a single interconnected graph through `aptos-crypto`:
+
+| Dependency | Versions | Root Cause | Fix Approach |
+|-----------|----------|------------|-------------|
+| `rand` | 0.7, 0.8, 0.9 | Workspace pins 0.7; `ed25519-dalek` 1.0 requires 0.7 | Upgrade `ed25519-dalek` to 2.x + `rand` to 0.8 |
+| `rand_core` | 0.5, 0.6, 0.9, 0.10-rc | Follows rand versions | Fixed by rand upgrade |
+| `rand_chacha` | 0.2, 0.3, 0.9 | Follows rand versions | Fixed by rand upgrade |
+| `digest` | 0.9, 0.10, 0.11-rc | Workspace pins 0.9; `sha2 0.9` needs it | Upgrade `sha2`/`digest` to 0.10 |
+| `sha2` | 0.9, 0.10, 0.11-rc | Workspace pins 0.9 | Upgrade to 0.10 |
+| `sha3` | 0.9, 0.11-rc | Workspace pins 0.9 | Upgrade to 0.10 |
+| `hmac` | 0.8, 0.10, 0.12, 0.13-rc | Various crypto crates | Fixed by digest upgrade |
+| `hkdf` | 0.10, 0.12 | Workspace pins 0.10 | Fixed by digest upgrade |
+| `ed25519-dalek` | 1.0, 2.1 | Workspace pins 1.0 | Major upgrade (signature API change) |
+| `curve25519-dalek` | 3.2, 4.1 | `ed25519-dalek` 1.0 needs v3 | Fixed by ed25519-dalek upgrade |
+| `signature` | 1.6, 2.2, 3.0-rc | Crypto crate version splits | Fixed by crypto stack upgrade |
+| `ring` | 0.16, 0.17 | Workspace pins 0.16; rustls uses 0.17 | Upgrade ring to 0.17 (part of crypto upgrade) |
+| `rsa` | 0.6, 0.9 | 0.6 from `google-cloud-storage` | Update `google-cloud-storage` dependency |
+| `getrandom` | 0.1, 0.2, 0.3 | Follows rand | Fixed by rand upgrade |
+| `block-buffer` | 0.9, 0.10, 0.11 | Follows digest | Fixed by digest upgrade |
+| `crypto-common` | 0.1, 0.2-rc | Follows digest | Fixed by digest upgrade |
+
+**Estimated effort**: 2-4 weeks of dedicated work by a developer familiar with `aptos-crypto`.
+**Risk**: HIGH -- security-critical cryptographic code.
+**Recommendation**: Plan as a dedicated project with thorough review and testing.
+
+#### HTTP/TLS Stack (External Crate Upgrades)
+
+| Dependency | Versions | Root Cause | Fix Approach |
+|-----------|----------|------------|-------------|
+| `http` | 0.2, 1.1 | `reqwest` 0.11 uses http 0.2; `hyper` 1.x uses http 1.x | Upgrade `reqwest` to 0.12+ |
+| `hyper` | 0.14, 1.4 | Workspace pins 0.14 | Upgrade to 1.x |
+| `rustls` | 0.21, 0.22, 0.23 | Various TLS consumers | Consolidate to 0.23 |
+| `tokio-rustls` | 0.24, 0.25, 0.26 | Follows rustls | Fixed by rustls consolidation |
+| `h2` | 0.3, 0.4 | From old/new hyper | Fixed by hyper upgrade |
+| `cookie` | 0.16, 0.18 | From warp 0.3 vs poem | Update warp or drop it |
+
+**Estimated effort**: 1-2 weeks -- `reqwest` 0.12 and `hyper` 1.x have API changes.
+**Risk**: MEDIUM -- networking code changes but no cryptographic risk.
+
+#### Serialization (Fork Dependencies)
+
+| Dependency | Versions | Root Cause | Fix Approach |
+|-----------|----------|------------|-------------|
+| `serde_yaml` | 0.8, 0.9 | Workspace uses 0.8; `poem` uses 0.9; `serde-generate` fork pins 0.8 | Update Aptos `serde-generate` fork |
+| `indexmap` | 1.9, 2.7 | `serde_yaml 0.8` and `tower 0.4` use 1.x | Fixed by serde_yaml + tower upgrade |
+| `bcs` | 0.1.4, 0.1.6 | Aptos fork vs processor SDK version | Align versions |
+
+**Estimated effort**: 1 week -- `serde_yaml::Value` behavior changed between 0.8 and 0.9.
+**Risk**: MEDIUM -- config parsing might break subtly.
+
+#### Misc Crates (Mostly Transitive, Low Priority)
+
+| Dependency | Versions | Root Cause | Can Fix? |
+|-----------|----------|------------|---------|
+| `syn` | 1.0, 2.0 | `derivative` and old proc macros use syn 1 | Replace `derivative` with manual impls |
+| `num-bigint` | 0.2, 0.3, 0.4 | 0.3 from workspace (tied to rand 0.7); 0.2 from `simple_asn1`; 0.4 transitive | Fixed by rand upgrade |
+| `hashbrown` | 0.12, 0.14, 0.15 | Various transitive deps | Partially -- upgrade workspace to 0.15 |
+| `itertools` | 0.10, 0.12, 0.13 | 0.10 from `criterion 0.3`; 0.12 from `yup-oauth2` | Fixed by criterion upgrade |
+| `base64` | 0.12, 0.21, 0.22 | 0.12 from `cloud-storage`; 0.21 from `reqwest`/`rustls-pemfile` | Fixed by reqwest/cloud-storage upgrade |
+| `clap` | 2.34, 4.5 | `criterion 0.3` and `dudect-bencher` use clap 2 | Drop or fork criterion-cpu-time for criterion 0.5 |
+| `bitflags` | 1.3, 2.9 | Old crates use 1.x | Most migration to 2.x is trivial |
+| `strum` | 0.25, 0.27 | `passkey-types` uses 0.25 | Wait for passkey-types update |
+| `derive_more` | 0.99, 1.0 | Transitive from various crates | Wait for ecosystem migration |
+
+---
+
 *Report generated by automated analysis of the Aptos Core repository.*
