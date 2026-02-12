@@ -18,7 +18,7 @@ use std::path::PathBuf;
 
 // NOTE: when changing, make sure to update QuorumStoreBackPressureConfig::backlog_txn_limit_count as well.
 const MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING: u64 = 1800;
-const MAX_SENDING_OPT_BLOCK_TXNS_AFTER_FILTERING: u64 = 1000;
+const MAX_SENDING_OPT_BLOCK_TXNS_AFTER_FILTERING: u64 = 2000;
 const MAX_SENDING_BLOCK_TXNS: u64 = 5000;
 pub(crate) static MAX_RECEIVING_BLOCK_TXNS: Lazy<u64> =
     Lazy::new(|| 10000.max(2 * MAX_SENDING_BLOCK_TXNS));
@@ -261,7 +261,7 @@ impl Default for ConsensusConfig {
             vote_back_pressure_limit: 12,
             min_max_txns_in_block_after_filtering_from_backpressure: MIN_BLOCK_TXNS_AFTER_FILTERING,
             execution_backpressure: Some(ExecutionBackpressureConfig {
-                txn_limit: Some(ExecutionBackpressureTxnLimitConfig::default()),
+                txn_limit: None,
                 gas_limit: Some(ExecutionBackpressureGasLimitConfig::default()),
             }),
             pipeline_backpressure: vec![

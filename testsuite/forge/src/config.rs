@@ -6,7 +6,7 @@ use crate::{
     *,
 };
 use aptos_config::config::{
-    ExecutionBackpressureGasLimitConfig, ExecutionBackpressureTxnLimitConfig, NodeConfig,
+    ExecutionBackpressureGasLimitConfig, NodeConfig,
     OverrideNodeConfig,
 };
 use aptos_framework::ReleaseBundle;
@@ -249,12 +249,8 @@ impl ForgeConfig {
             helm_values["validator"]["config"]["consensus"]["enable_optimistic_proposal_tx"] =
                 true.into();
 
-            let mut txn_limit_backpressure = ExecutionBackpressureTxnLimitConfig::default();
-            txn_limit_backpressure.lookback_config.target_block_time_ms = 63;
             let mut gas_limit_backpressure = ExecutionBackpressureGasLimitConfig::default();
             gas_limit_backpressure.lookback_config.target_block_time_ms = 63;
-            helm_values["validator"]["config"]["consensus"]["execution_backpressure"]
-                ["txn_limit"] = serde_yaml::to_value(&txn_limit_backpressure).unwrap();
             helm_values["validator"]["config"]["consensus"]["execution_backpressure"]
                 ["gas_limit"] = serde_yaml::to_value(&gas_limit_backpressure).unwrap();
         }))

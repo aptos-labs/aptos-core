@@ -118,7 +118,7 @@ impl OnChainExecutionConfig {
         Self::V7(ExecutionConfigV7 {
             transaction_shuffler_type: TransactionShufflerType::default_for_genesis(),
             block_gas_limit_type: BlockGasLimitType::default_for_genesis(),
-            enable_per_block_gas_limit: false,
+            enable_per_block_gas_limit: true,
             transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
             gas_price_to_burn: 90,
             persisted_auxiliary_info_version: 1,
