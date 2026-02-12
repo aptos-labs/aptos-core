@@ -11,7 +11,7 @@ use move_model::{
     metadata::{lang_feature_versions::LANGUAGE_VERSION_FOR_UNUSED_CHECK, LanguageVersion},
     model::{
         FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, NodeId, Parameter, QualifiedId,
-        StructEnv, UserId,
+        StructEnv,
     },
     ty::Type,
 };
@@ -282,250 +282,316 @@ fn check_for_access_error_or_warning<F>(
 
 /// Check for privileged operations on a struct/enum that can only be performed
 /// within the module that defines it.
+///
+/// This function walks the AST and checks:
+/// - Storage operations (exists, borrow_global, move_from, move_to)
+/// - Field access operations (select, select_variants)
+/// - Struct construction (pack) and destruction (unpack)
+/// - Enum operations (test_variants, match)
 fn check_privileged_operations_on_structs(env: &GlobalEnv, fun_env: &FunctionEnv) {
-    if let Some(fun_body) = fun_env.get_def() {
-        let caller_module_id = fun_env.module_env.get_id();
-        let caller_is_inline_non_private =
-            fun_env.is_inline() && fun_env.visibility() != Visibility::Private;
-        // Ancestor spec blocks seen during AST traversal.
-        let mut spec_blocks_seen = 0;
-        fun_body.visit_pre_post(&mut |post, exp: &ExpData| {
-            if !post {
-                if matches!(exp, ExpData::SpecBlock(..)) {
-                    spec_blocks_seen += 1;
-                }
-                if spec_blocks_seen > 0 {
-                    // we are inside a spec block, no privileged operation check needed
-                    return true;
-                }
-                match exp {
-                    ExpData::Call(id, oper, _) => match oper {
-                        Operation::Exists(_)
-                        | Operation::BorrowGlobal(_)
-                        | Operation::MoveFrom
-                        | Operation::MoveTo => {
-                            let inst = env.get_node_instantiation(*id);
-                            debug_assert!(!inst.is_empty());
-                            if let Some((struct_env, _)) = inst[0].get_struct(env) {
-                                let mid = struct_env.module_env.get_id();
-                                let sid = struct_env.get_id();
-                                let qualified_struct_id = mid.qualified(sid);
-                                let struct_env = env.get_struct(qualified_struct_id);
-                                let msg_maker = || {
-                                    format!(
-                                        "storage operation on type `{}`",
-                                        struct_env.get_full_name_str(),
-                                    )
-                                };
-                                check_for_access_error_or_warning(
-                                    env,
-                                    fun_env,
-                                    &struct_env,
-                                    &caller_module_id,
-                                    true,
-                                    id,
-                                    "called",
-                                    msg_maker,
-                                    &struct_env.module_env,
-                                    mid != caller_module_id,
-                                    caller_is_inline_non_private,
-                                );
-                            }
-                        },
-                        Operation::Select(mid, sid, fid) => {
-                            let qualified_struct_id = mid.qualified(*sid);
-                            let struct_env = env.get_struct(qualified_struct_id);
-                            let msg_maker = || {
-                                format!(
-                                    "access of the field `{}` on type `{}`",
-                                    fid.symbol().display(struct_env.symbol_pool()),
-                                    struct_env.get_full_name_str(),
-                                )
-                            };
-                            check_for_access_error_or_warning(
-                                env,
-                                fun_env,
-                                &struct_env,
-                                &caller_module_id,
-                                false,
-                                id,
-                                "accessed",
-                                msg_maker,
-                                &struct_env.module_env,
-                                *mid != caller_module_id,
-                                caller_is_inline_non_private,
-                            );
-                        },
-                        Operation::SelectVariants(mid, sid, fids) => {
-                            let qualified_struct_id = mid.qualified(*sid);
-                            let struct_env = env.get_struct(qualified_struct_id);
-                            // All field names are the same, so take one representative field id to report.
-                            let field_env = struct_env.get_field(fids[0]);
-                            let msg_maker = || {
-                                format!(
-                                    "access of the field `{}` on enum type `{}`",
-                                    field_env.get_name().display(struct_env.symbol_pool()),
-                                    struct_env.get_full_name_str(),
-                                )
-                            };
-                            check_for_access_error_or_warning(
-                                env,
-                                fun_env,
-                                &struct_env,
-                                &caller_module_id,
-                                false,
-                                id,
-                                "accessed",
-                                msg_maker,
-                                &struct_env.module_env,
-                                *mid != caller_module_id,
-                                caller_is_inline_non_private,
-                            );
-                        },
-                        Operation::TestVariants(mid, sid, _) => {
-                            let qualified_struct_id = mid.qualified(*sid);
-                            let struct_env = env.get_struct(qualified_struct_id);
-                            let msg_maker = || {
-                                format!(
-                                    "variant test on enum type `{}`",
-                                    struct_env.get_full_name_str(),
-                                )
-                            };
-                            check_for_access_error_or_warning(
-                                env,
-                                fun_env,
-                                &struct_env,
-                                &caller_module_id,
-                                false,
-                                id,
-                                "tested",
-                                msg_maker,
-                                &struct_env.module_env,
-                                *mid != caller_module_id,
-                                caller_is_inline_non_private,
-                            );
-                        },
-                        Operation::Pack(mid, sid, _) => {
-                            let qualified_struct_id = mid.qualified(*sid);
-                            let struct_env = env.get_struct(qualified_struct_id);
-                            let msg_maker =
-                                || format!("pack of `{}`", struct_env.get_full_name_str());
-                            check_for_access_error_or_warning(
-                                env,
-                                fun_env,
-                                &struct_env,
-                                &caller_module_id,
-                                false,
-                                id,
-                                "packed",
-                                msg_maker,
-                                &struct_env.module_env,
-                                *mid != caller_module_id,
-                                caller_is_inline_non_private,
-                            );
-                        },
-                        _ => {
-                            // all the other operations are either:
-                            // - not related to structs
-                            // - spec-only
-                        },
-                    },
-                    ExpData::Assign(_, pat, _)
-                    | ExpData::Block(_, pat, _, _)
-                    | ExpData::Lambda(_, pat, _, _, _) => {
-                        pat.visit_pre_post(&mut |_, pat| {
-                            if let Pattern::Struct(id, str, _, _) = pat {
-                                let module_id = str.module_id;
-                                let struct_env = env.get_struct(str.to_qualified_id());
-                                let msg_maker =
-                                    || format!("unpack of `{}`", struct_env.get_full_name_str(),);
-                                check_for_access_error_or_warning(
-                                    env,
-                                    fun_env,
-                                    &struct_env,
-                                    &caller_module_id,
-                                    false,
-                                    id,
-                                    "unpacked",
-                                    msg_maker,
-                                    &struct_env.module_env,
-                                    module_id != caller_module_id,
-                                    caller_is_inline_non_private,
-                                );
-                            }
-                        });
-                    },
-                    ExpData::Match(_, discriminator, _) => {
-                        let discriminator_node_id = discriminator.node_id();
-                        if let Type::Struct(mid, sid, _) =
-                            env.get_node_type(discriminator_node_id).drop_reference()
-                        {
-                            let qualified_struct_id = mid.qualified(sid);
-                            let struct_env = env.get_struct(qualified_struct_id);
-                            let msg_maker = || {
-                                format!("match on enum type `{}`", struct_env.get_full_name_str(),)
-                            };
-                            check_for_access_error_or_warning(
-                                env,
-                                fun_env,
-                                &struct_env,
-                                &caller_module_id,
-                                false,
-                                &discriminator_node_id,
-                                "matched",
-                                msg_maker,
-                                &struct_env.module_env,
-                                mid != caller_module_id,
-                                caller_is_inline_non_private,
-                            );
-                        }
-                    },
-                    ExpData::Invalid(_)
-                    | ExpData::Value(..)
-                    | ExpData::LocalVar(..)
-                    | ExpData::Temporary(..)
-                    | ExpData::Invoke(..)
-                    | ExpData::Quant(..)
-                    | ExpData::IfElse(..)
-                    | ExpData::Return(..)
-                    | ExpData::Sequence(..)
-                    | ExpData::Loop(..)
-                    | ExpData::LoopCont(..)
-                    | ExpData::Mutate(..) => {},
-                    ExpData::SpecBlock(_, _) => {
-                        unreachable!("we have already checked for spec blocks");
-                    },
-                }
-            } else {
-                // post visit
-                if matches!(exp, ExpData::SpecBlock(..)) {
-                    debug_assert!(spec_blocks_seen > 0, "should match in pre and post");
-                    spec_blocks_seen -= 1;
-                }
+    let Some(fun_body) = fun_env.get_def() else {
+        return;
+    };
+
+    let caller_module_id = fun_env.module_env.get_id();
+    let caller_is_inline_non_private =
+        fun_env.is_inline() && fun_env.visibility() != Visibility::Private;
+
+    // Track nesting depth of spec blocks - we skip checks inside spec blocks
+    let mut spec_blocks_seen = 0;
+
+    fun_body.visit_pre_post(&mut |post, exp: &ExpData| {
+        if post {
+            // Post-visit: decrement spec block counter
+            if matches!(exp, ExpData::SpecBlock(..)) {
+                debug_assert!(spec_blocks_seen > 0, "should match in pre and post");
+                spec_blocks_seen -= 1;
             }
-            true
-        });
+            return true;
+        }
+
+        // Pre-visit: track spec blocks and skip checks inside them
+        if matches!(exp, ExpData::SpecBlock(..)) {
+            spec_blocks_seen += 1;
+        }
+        if spec_blocks_seen > 0 {
+            return true; // Skip checks inside spec blocks
+        }
+
+        // Check different expression types for privileged operations
+        match exp {
+            ExpData::Call(id, oper, _) => {
+                check_operation(
+                    env,
+                    fun_env,
+                    oper,
+                    id,
+                    &caller_module_id,
+                    caller_is_inline_non_private,
+                );
+            },
+            ExpData::Assign(_, pat, _)
+            | ExpData::Block(_, pat, _, _)
+            | ExpData::Lambda(_, pat, _, _, _) => {
+                check_pattern_unpacks(
+                    env,
+                    fun_env,
+                    pat,
+                    &caller_module_id,
+                    caller_is_inline_non_private,
+                );
+            },
+            ExpData::Match(_, discriminator, _) => {
+                check_match_discriminator(
+                    env,
+                    fun_env,
+                    discriminator,
+                    &caller_module_id,
+                    caller_is_inline_non_private,
+                );
+            },
+            ExpData::SpecBlock(_, _) => {
+                unreachable!("should have been handled above");
+            },
+            _ => {
+                // Other expression types don't involve privileged struct operations
+            },
+        }
+        true
+    });
+}
+
+/// Check operations on structs (storage ops, field access, pack, etc.)
+fn check_operation(
+    env: &GlobalEnv,
+    fun_env: &FunctionEnv,
+    oper: &Operation,
+    id: &NodeId,
+    caller_module_id: &ModuleId,
+    caller_is_inline_non_private: bool,
+) {
+    match oper {
+        // Storage operations: only allowed within the struct's module
+        Operation::Exists(_)
+        | Operation::BorrowGlobal(_)
+        | Operation::MoveFrom
+        | Operation::MoveTo => {
+            let inst = env.get_node_instantiation(*id);
+            debug_assert!(!inst.is_empty());
+            if let Some((struct_env, _)) = inst[0].get_struct(env) {
+                let mid = struct_env.module_env.get_id();
+                let sid = struct_env.get_id();
+                check_struct_operation(
+                    env,
+                    fun_env,
+                    mid,
+                    sid,
+                    caller_module_id,
+                    true, // storage operation
+                    id,
+                    "called",
+                    |s| format!("storage operation on type `{}`", s.get_full_name_str()),
+                    caller_is_inline_non_private,
+                );
+            }
+        },
+
+        Operation::Select(mid, sid, fid) => {
+            check_struct_operation(
+                env,
+                fun_env,
+                *mid,
+                *sid,
+                caller_module_id,
+                false,
+                id,
+                "accessed",
+                |s| {
+                    format!(
+                        "access of the field `{}` on type `{}`",
+                        fid.symbol().display(s.symbol_pool()),
+                        s.get_full_name_str(),
+                    )
+                },
+                caller_is_inline_non_private,
+            );
+        },
+
+        Operation::SelectVariants(mid, sid, fids) => {
+            check_struct_operation(
+                env,
+                fun_env,
+                *mid,
+                *sid,
+                caller_module_id,
+                false,
+                id,
+                "accessed",
+                |s| {
+                    let field = s.get_field(fids[0]);
+                    format!(
+                        "access of the field `{}` on enum type `{}`",
+                        field.get_name().display(s.symbol_pool()),
+                        s.get_full_name_str(),
+                    )
+                },
+                caller_is_inline_non_private,
+            );
+        },
+
+        Operation::TestVariants(mid, sid, _) => {
+            check_struct_operation(
+                env,
+                fun_env,
+                *mid,
+                *sid,
+                caller_module_id,
+                false,
+                id,
+                "tested",
+                |s| format!("variant test on enum type `{}`", s.get_full_name_str()),
+                caller_is_inline_non_private,
+            );
+        },
+
+        Operation::Pack(mid, sid, _) => {
+            check_struct_operation(
+                env,
+                fun_env,
+                *mid,
+                *sid,
+                caller_module_id,
+                false,
+                id,
+                "packed",
+                |s| format!("pack of `{}`", s.get_full_name_str()),
+                caller_is_inline_non_private,
+            );
+        },
+
+        _ => {
+            // Other operations don't involve privileged struct access
+        },
     }
 }
 
-/// For all function in target modules:
-///
-/// If `before_inlining`, then
-/// - check that all function calls involving inline functions are accessible;
-/// - warn about unused private functions
-/// Otherwise  (`!before_inlining`):
-/// - check that all function calls *not* involving inline functions are accessible.
-/// - check privileged operations on structs cannot be done across module boundary
-pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
-    // For each function seen, we record whether it has an accessible caller.
-    let mut functions_with_callers: BTreeSet<QualifiedFunId> = BTreeSet::new();
-    // For each function seen, we record whether it has an inaccessible caller.
-    let mut functions_with_inaccessible_callers: BTreeSet<QualifiedFunId> = BTreeSet::new();
-    // Record all private and friendless public(friend) functions to check for uses.
-    let mut private_funcs: BTreeSet<QualifiedFunId> = BTreeSet::new();
+/// Common helper for checking struct operations
+fn check_struct_operation<F>(
+    env: &GlobalEnv,
+    fun_env: &FunctionEnv,
+    mid: ModuleId,
+    sid: move_model::model::StructId,
+    caller_module_id: &ModuleId,
+    storage_operation: bool,
+    id: &NodeId,
+    oper: &str,
+    msg_maker: F,
+    caller_is_inline_non_private: bool,
+) where
+    F: Fn(&StructEnv) -> String,
+{
+    let struct_env = env.get_struct(mid.qualified(sid));
+    let cross_module = mid != *caller_module_id;
+    check_for_access_error_or_warning(
+        env,
+        fun_env,
+        &struct_env,
+        caller_module_id,
+        storage_operation,
+        id,
+        oper,
+        || msg_maker(&struct_env),
+        &struct_env.module_env,
+        cross_module,
+        caller_is_inline_non_private,
+    );
+}
 
-    // Get options and check if unused check experiment is enabled
-    let options = env
+/// Check patterns for struct unpacks
+fn check_pattern_unpacks(
+    env: &GlobalEnv,
+    fun_env: &FunctionEnv,
+    pat: &Pattern,
+    caller_module_id: &ModuleId,
+    caller_is_inline_non_private: bool,
+) {
+    pat.visit_pre_post(&mut |_, pat| {
+        if let Pattern::Struct(id, str, _, _) = pat {
+            check_struct_operation(
+                env,
+                fun_env,
+                str.module_id,
+                str.id,
+                caller_module_id,
+                false,
+                id,
+                "unpacked",
+                |s| format!("unpack of `{}`", s.get_full_name_str()),
+                caller_is_inline_non_private,
+            );
+        }
+    });
+}
+
+/// Check match expression discriminators
+fn check_match_discriminator(
+    env: &GlobalEnv,
+    fun_env: &FunctionEnv,
+    discriminator: &Exp,
+    caller_module_id: &ModuleId,
+    caller_is_inline_non_private: bool,
+) {
+    let discriminator_node_id = discriminator.node_id();
+    if let Type::Struct(mid, sid, _) = env.get_node_type(discriminator_node_id).drop_reference() {
+        check_struct_operation(
+            env,
+            fun_env,
+            mid,
+            sid,
+            caller_module_id,
+            false,
+            &discriminator_node_id,
+            "matched",
+            |s| format!("match on enum type `{}`", s.get_full_name_str()),
+            caller_is_inline_non_private,
+        );
+    }
+}
+
+/// Check function accessibility and report unused entities. Called twice during compilation.
+///
+/// **Before inlining:**
+/// - Check visibility of calls to/from inline functions:
+///   - Public: callable from any module
+///   - Friend: callable only from friend modules
+///   - Private: callable only within the same module
+/// - Report unused private functions
+/// - Report unused private structs
+/// - Report unused constants
+///
+/// **After inlining:**
+/// - Check visibility of non-inline function calls (same rules as above)
+/// - Check visibility of struct operations (pack, unpack, field access):
+///   - Public structs: operations allowed from any module
+///   - Friend structs: operations allowed only from friend modules
+///   - Private structs: operations allowed only within the defining module
+/// - Check storage operations (exists, borrow_global, move_from, move_to):
+///   - Always restricted to the struct's defining module (even for public structs)
+/// - Check visibility of enum operations (match, variant test): same rules as struct operations
+/// - Warn when inline functions call private helpers that won't be accessible after inlining
+pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
+    if before_inlining {
+        check_before_inlining(env);
+    } else {
+        check_after_inlining(env);
+    }
+}
+
+/// Check accessibility and usage before inlining.
+/// - Checks that inline function calls are accessible (before they disappear)
+/// - Collects and reports unused entity warnings (functions, structs, constants)
+fn check_before_inlining(env: &mut GlobalEnv) {
+    let unused_warnings_enabled = env
         .get_extension::<Options>()
         .expect("Options is available");
     let language_version = options.language_version.unwrap_or_default();
@@ -533,409 +599,576 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
         && options.experiment_on(Experiment::UNUSED_CHECK)
         && language_version >= LANGUAGE_VERSION_FOR_UNUSED_CHECK;
 
-    for caller_module in env.get_modules() {
-        // TODO(#13745): fix when we can tell in general if two modules are in the same package
-        if caller_module.is_primary_target() {
-            let caller_module_id = caller_module.get_id();
-            let caller_module_has_friends = !caller_module.has_no_friends();
-            let caller_module_is_script = caller_module.get_name().is_script();
-            for caller_func in caller_module.get_functions() {
-                if !before_inlining {
-                    check_privileged_operations_on_structs(env, &caller_func);
-                    check_inline_function_bodies_for_calls(env, &caller_func);
-                }
-                let caller_qfid = caller_func.get_qualified_id();
+    // Track function usage for unused function detection
+    let mut functions_with_callers = BTreeSet::new();
+    let mut functions_with_inaccessible_callers = BTreeSet::new();
+    let mut private_funcs = BTreeSet::new();
 
-                // During first pass, record private functions for later
-                if before_inlining {
-                    match caller_func.visibility() {
-                        Visibility::Public => {},
-                        Visibility::Friend => {
-                            if !caller_module_has_friends {
-                                // Function is essentially private
-                                private_funcs.insert(caller_qfid);
-                            }
-                        },
-                        Visibility::Private => {
-                            private_funcs.insert(caller_qfid);
-                        },
-                    };
-                }
+    // Collect module IDs to avoid borrow checker issues
+    let module_ids: Vec<_> = env
+        .get_modules()
+        .filter(|m| m.is_primary_target())
+        .map(|m| m.get_id())
+        .collect();
 
-                // Check that functions being called are accessible.
-                if let Some(def) = caller_func.get_def() {
-                    let callees_with_sites = def.used_funs_with_uses();
-                    for (callee, sites) in &callees_with_sites {
-                        let callee_func = env.get_function(*callee);
+    // Process each module
+    for module_id in module_ids {
+        let module = env.get_module(module_id);
 
-                        // Script functions cannot be called.
-                        if callee_func.module_env.is_script_module() {
-                            calling_script_function_error(env, sites, &callee_func);
-                        }
-
-                        // Check visibility.
-
-                        // Same module is always visible
-                        let same_module = callee_func.module_env.get_id() == caller_module_id;
-                        let call_involves_inline_function =
-                            callee_func.is_inline() || caller_func.is_inline();
-
-                        // SKIP check if same_module or
-                        // if before inlining and the call doesn't involve inline function.
-                        let skip_check =
-                            same_module || (before_inlining && !call_involves_inline_function);
-
-                        let callee_is_accessible = if skip_check {
-                            true
-                        } else {
-                            match callee_func.visibility() {
-                                Visibility::Public => true,
-                                _ if caller_module_is_script => {
-                                    // Only public functions are visible from scripts.
-                                    generic_error(
-                                        env,
-                                        "a script ",
-                                        "it is not public",
-                                        sites,
-                                        &callee_func,
-                                    );
-                                    false
-                                },
-                                Visibility::Friend => {
-                                    if callee_func.module_env.has_friend(&caller_module_id) {
-                                        true
-                                    } else if callee_func.has_package_visibility() {
-                                        if callee_func.module_env.self_address()
-                                            == caller_func.module_env.self_address()
-                                        {
-                                            // if callee is also a primary target, then they are in the same package
-                                            // TODO(#13745): fix when we can tell in general if two modules are in the same package
-                                            if callee_func.module_env.is_primary_target() {
-                                                // we should've inferred the friend declaration
-                                                panic!(
-                                                    "{} should have friend {}",
-                                                    callee_func.module_env.get_full_name_str(),
-                                                    caller_func.module_env.get_full_name_str()
-                                                );
-                                            } else {
-                                                // With "unsafe package visibility" experiment on, all package functions are made
-                                                // visible in all modules with the same address. The prover uses this in filter mode
-                                                // to get around the lack of package-based target filtering functionality.
-                                                let options = env
-                                                    .get_extension::<Options>()
-                                                    .expect("Options is available");
-                                                if options.experiment_on(
-                                                    Experiment::UNSAFE_PACKAGE_VISIBILITY,
-                                                ) {
-                                                    true
-                                                } else {
-                                                    call_package_fun_from_diff_package_error(
-                                                        env,
-                                                        sites,
-                                                        &caller_func,
-                                                        &callee_func,
-                                                    );
-                                                    false
-                                                }
-                                            }
-                                        } else {
-                                            call_package_fun_from_diff_addr_error(
-                                                env,
-                                                sites,
-                                                &caller_func,
-                                                &callee_func,
-                                            );
-                                            false
-                                        }
-                                    } else {
-                                        not_a_friend_error(env, sites, &caller_func, &callee_func);
-                                        false
-                                    }
-                                },
-                                Visibility::Private => {
-                                    private_to_module_error(env, sites, &caller_func, &callee_func);
-                                    false
-                                },
-                            }
-                        };
-                        // Only record and warn about unused functions before inlining:
-                        if before_inlining {
-                            // Record called functions for Unused check below.
-                            if callee_is_accessible {
-                                functions_with_callers.insert(*callee);
-                            } else {
-                                functions_with_inaccessible_callers.insert(*callee);
-                            }
-                        }
-                    }
-                }
+        // Check inline function call accessibility and track function usage
+        for caller_func in module.get_functions() {
+            // Track private and friendless public(friend) functions for unused detection
+            match caller_func.visibility() {
+                Visibility::Public => {},
+                Visibility::Friend if !module.has_no_friends() => {},
+                _ => {
+                    private_funcs.insert(caller_func.get_qualified_id());
+                },
             }
 
-            // Check for unused structs and constants in this module
-            if unused_warnings_enabled {
-                // A private struct is unused if it has no users from the same module
-                for struct_env in caller_module.get_structs() {
-                    if should_warn_unused_struct(env, &struct_env, caller_module_id) {
-                        let entity_type = if struct_env.has_variants() {
-                            "Enum"
-                        } else {
-                            "Struct"
-                        };
-                        let msg = format!(
-                            "{} `{}` is unused in its defining module (only place where it can be packed, unpacked, or have fields accessed). Consider removing it or adding the `#[deprecated]` attribute to suppress this warning.",
-                            entity_type,
-                            struct_env.get_name_str()
-                        );
-                        env.diag(Severity::Warning, &struct_env.get_loc(), &msg);
-                    }
-                }
+            // Check cross-module inline calls and track all function calls
+            check_and_track_function_calls(
+                env,
+                &caller_func,
+                module_id,
+                &mut functions_with_callers,
+                &mut functions_with_inaccessible_callers,
+            );
+        }
 
-                // Check for unused constants (all constants are module-private)
-                for const_env in caller_module.get_named_constants() {
-                    if !has_users_in_module(const_env.get_users(), caller_module_id, env) {
-                        let msg = format!(
-                            "Constant `{}` is unused.",
-                            const_env.get_name().display(env.symbol_pool()),
-                        );
-                        env.diag(Severity::Warning, &const_env.get_loc(), &msg);
-                    }
-                }
-            }
+        // Check for unused entities if warnings are enabled
+        if unused_warnings_enabled {
+            check_unused_structs(env, module_id);
+            check_unused_constants(env, module_id);
         }
     }
 
+    // Report unused functions
     if unused_warnings_enabled {
-        for callee in private_funcs {
-            if !functions_with_callers.contains(&callee) {
-                // We saw no uses of private/friendless function `callee`.
-                let callee_func = env.get_function(callee);
-                let callee_loc = callee_func.get_id_loc();
-
-                if should_warn_unused_function(env, &callee_func) {
-                    let is_private = matches!(callee_func.visibility(), Visibility::Private);
-                    if functions_with_inaccessible_callers.contains(&callee) {
-                        let msg = format!(
-                            "Function `{}` may be unused: it has callers, but none with access.",
-                            callee_func.get_full_name_with_address(),
-                        );
-                        env.diag(Severity::Warning, &callee_loc, &msg);
-                    } else {
-                        let msg = format!(
-                            "Function `{}` is unused: it has no current callers and {}.",
-                            callee_func.get_full_name_with_address(),
-                            if is_private {
-                                "is private to its module"
-                            } else {
-                                "is `public(friend)` but its module has no friends"
-                            }
-                        );
-                        env.diag(Severity::Warning, &callee_loc, &msg);
-                    }
-                }
-            }
-        }
+        report_unused_functions(
+            env,
+            &private_funcs,
+            &functions_with_callers,
+            &functions_with_inaccessible_callers,
+        );
     }
 }
 
-/// Checks if any user in the given set belongs to the specified module
-fn has_users_in_module(users: &BTreeSet<UserId>, module_id: ModuleId, _env: &GlobalEnv) -> bool {
-    users.iter().any(|user| match user {
-        UserId::Function(qid) => qid.module_id == module_id,
-        UserId::Struct(qid) => qid.module_id == module_id,
-        UserId::Constant(qid) => qid.module_id == module_id,
-        UserId::FunctionSpec(qid) => qid.module_id == module_id,
-        UserId::StructSpec(qid) => qid.module_id == module_id,
-        UserId::ModuleSpec(mid) => *mid == module_id,
-    })
-}
-
-/// Check if a function should be excluded from unused checks.
-fn is_excluded_from_unused_check(env: &GlobalEnv, func: &FunctionEnv) -> bool {
-    let func_name = env.symbol_pool().string(func.get_name());
-    // Functions that should never be reported as unused:
-    // - init_module: VM hook called automatically when module is published
-    let excluded_functions = &["init_module"];
-
-    excluded_functions
-        .iter()
-        .any(|&name| func_name.as_ref() == name)
-}
-
-/// Check if a struct has attributes that suppress unused warnings.
-fn has_suppression_attribute(env: &GlobalEnv, struct_env: &StructEnv) -> bool {
-    // - deprecated: Marks structs that can't be removed due to on-chain published modules
-    // - resource_group: Empty marker structs used by VM for storage optimization
-    // - resource_group_member: Structs belonging to a resource group, used by VM verifier
-    let suppression_attrs = &["deprecated", "resource_group", "resource_group_member"];
-
-    struct_env.has_attribute(|attr| {
-        let name = attr.name();
-        suppression_attrs
-            .iter()
-            .any(|&s| name == env.symbol_pool().make(s))
-    })
-}
-
-/// Returns true if function should be warned as unused.
-fn should_warn_unused_function(env: &GlobalEnv, func: &FunctionEnv) -> bool {
-    let is_script = func.module_env.get_name().is_script();
-
-    // Don't warn for functions in script modules
-    if is_script {
-        return false;
-    }
-
-    // Don't warn for entry functions (callable from transactions)
-    if func.is_entry() {
-        return false;
-    }
-
-    // Don't warn for special VM hook functions (like init_module)
-    if is_excluded_from_unused_check(env, func) {
-        return false;
-    }
-
-    true
-}
-
-/// Returns true if struct should be warned as unused.
-fn should_warn_unused_struct(env: &GlobalEnv, struct_env: &StructEnv, module_id: ModuleId) -> bool {
-    // Only check private structs
-    if struct_env.get_visibility() != Visibility::Private {
-        return false;
-    }
-
-    // Check if the struct has users in its defining module
-    if has_users_in_module(struct_env.get_users(), module_id, env) {
-        return false;
-    }
-
-    // Don't warn if the struct has suppression attributes
-    if has_suppression_attribute(env, struct_env) {
-        return false;
-    }
-
-    // Don't warn for ghost memory structs (created internally for specs)
-    if struct_env.is_ghost_memory() {
-        return false;
-    }
-
-    true
-}
-
-/// Check the body of inline functions (after inlining) to ensure they do not call
-/// inaccessible functions.
-fn check_inline_function_bodies_for_calls(env: &GlobalEnv, caller_func: &FunctionEnv) {
-    if !caller_func.is_inline() {
-        return;
-    }
+/// Check cross-module inline function calls for accessibility and track all function calls.
+///
+/// For each function call:
+/// - If cross-module with inline functions: check visibility now (before inlining)
+/// - Otherwise: just track as called (for unused detection or check after inlining)
+fn check_and_track_function_calls(
+    env: &GlobalEnv,
+    caller_func: &FunctionEnv,
+    caller_module_id: ModuleId,
+    functions_with_callers: &mut BTreeSet<QualifiedFunId>,
+    functions_with_inaccessible_callers: &mut BTreeSet<QualifiedFunId>,
+) {
     let Some(def) = caller_func.get_def() else {
         return;
     };
-    let caller_visibility = caller_func.visibility();
-    if caller_visibility == Visibility::Private {
-        // if caller is private inline function, it can only be called from the same module
-        return;
-    }
-    let callees_with_sites = def.used_funs_with_uses();
-    for (callee, sites) in &callees_with_sites {
-        let callee_func = env.get_function(*callee);
-        let callee_visibility = callee_func.visibility();
-        let warn_info = match (caller_visibility, callee_visibility) {
-            (_, Visibility::Public) => {
-                // callee can be called from anywhere, so nothing to warn about
-                None
+
+    let caller_is_inline = caller_func.is_inline();
+    let caller_is_script = caller_func.module_env.get_name().is_script();
+
+    for (callee_id, sites) in &def.used_funs_with_uses() {
+        let callee_func = env.get_function(*callee_id);
+
+        // Script functions cannot be called - always error
+        if callee_func.module_env.is_script_module() {
+            calling_script_function_error(env, sites, &callee_func);
+            continue;
+        }
+
+        let callee_is_inline = callee_func.is_inline();
+        let same_module = callee_func.module_env.get_id() == caller_module_id;
+        let involves_inline = caller_is_inline || callee_is_inline;
+
+        // Determine which calls to check now (before inlining)
+        match (same_module, involves_inline) {
+            // Same module: always accessible, no check needed
+            (true, _) => {
+                functions_with_callers.insert(*callee_id);
             },
-            (Visibility::Public, _) => Some("".to_string()),
-            (Visibility::Friend, Visibility::Private) => {
-                let caller_module = &caller_func.module_env;
-                Some(format!(
-                    ", such as in a {}friend module of `{}`",
-                    if caller_module.has_no_friends() {
-                        "(future) "
-                    } else {
-                        ""
-                    },
-                    caller_module.get_full_name_str()
-                ))
+
+            // Cross-module without inline: don't check now, will be checked in second pass after inlining
+            // (inline functions disappear after inlining, so we must check them before;
+            //  non-inline functions remain, so we check them in a second pass after inlining)
+            (false, false) => {
+                functions_with_callers.insert(*callee_id);
             },
-            (Visibility::Friend, Visibility::Friend) => {
-                match (
-                    caller_func.has_package_visibility(),
-                    callee_func.has_package_visibility(),
-                ) {
-                    (_, true) => {
-                        // TODO(#13745): fix when we can explicitly say if two modules are in the same package.
-                        let same_package = callee_func.module_env.is_primary_target()
-                            && callee_func.module_env.self_address()
-                                == caller_func.module_env.self_address();
-                        if !same_package {
-                            Some("".to_string())
-                        } else {
-                            // caller and callee are in the same package, caller can only be called from
-                            // friend contexts, so callee (package function) can also be called there.
-                            None
-                        }
-                    },
-                    (true, false) => Some(format!(
-                        ", such as from a module in this package that is not a friend of `{}`",
-                        callee_func.module_env.get_full_name_str()
-                    )),
-                    (false, false) => {
-                        let caller_friends = caller_func.module_env.get_friend_modules();
-                        let callee_friends = callee_func.module_env.get_friend_modules();
-                        let covered = caller_friends.difference(&callee_friends).next().is_none();
-                        if !covered {
-                            Some(format!(
-                                ", such as from a module that is a friend of `{}` but not a friend of `{}`",
-                                caller_func.module_env.get_full_name_str(),
-                                callee_func.module_env.get_full_name_str()
-                            ))
-                        } else {
-                            // all of caller's friends are also callee's friends, so no warning
-                            None
-                        }
-                    },
+
+            // Cross-module with inline: check now (before inline functions disappear)
+            (false, true) => {
+                let is_accessible = check_inline_call_visibility(
+                    env,
+                    caller_func,
+                    &callee_func,
+                    caller_module_id,
+                    caller_is_script,
+                    sites,
+                );
+
+                if is_accessible {
+                    functions_with_callers.insert(*callee_id);
+                } else {
+                    functions_with_inaccessible_callers.insert(*callee_id);
                 }
             },
-            (Visibility::Private, _) => {
-                unreachable!("we return early")
-            },
+        }
+    }
+}
+
+/// Check if an inline function call is accessible.
+fn check_inline_call_visibility(
+    env: &GlobalEnv,
+    caller_func: &FunctionEnv,
+    callee_func: &FunctionEnv,
+    caller_module_id: ModuleId,
+    caller_is_script: bool,
+    sites: &BTreeSet<NodeId>,
+) -> bool {
+    // Scripts can only call public functions
+    if caller_is_script && callee_func.visibility() != Visibility::Public {
+        generic_error(env, "a script ", "it is not public", sites, callee_func);
+        return false;
+    }
+
+    match callee_func.visibility() {
+        Visibility::Public => true,
+
+        Visibility::Friend => {
+            check_friend_call_accessibility(env, caller_func, callee_func, caller_module_id, sites)
+        },
+
+        Visibility::Private => {
+            private_to_module_error(env, sites, caller_func, callee_func);
+            false
+        },
+    }
+}
+
+/// Check friend visibility for function calls.
+///
+/// Friend functions can be called in two ways:
+/// 1. Explicit friend declaration: `friend module_name;`
+/// 2. Package visibility: `public(package)` - callable within the same package
+fn check_friend_call_accessibility(
+    env: &GlobalEnv,
+    caller_func: &FunctionEnv,
+    callee_func: &FunctionEnv,
+    caller_module_id: ModuleId,
+    sites: &BTreeSet<NodeId>,
+) -> bool {
+    // Case 1: Explicit friend declaration
+    if callee_func.module_env.has_friend(&caller_module_id) {
+        return true; // Caller is an explicit friend
+    }
+
+    // Case 2: Package visibility
+    if !callee_func.has_package_visibility() {
+        // Not a friend and not package-visible: error
+        not_a_friend_error(env, sites, caller_func, callee_func);
+        return false;
+    }
+
+    // Has package visibility: check if caller is in the same package
+    check_package_visibility(env, caller_func, callee_func, sites)
+}
+
+/// Check if a package-visible function can be called (must be same package).
+fn check_package_visibility(
+    env: &GlobalEnv,
+    caller_func: &FunctionEnv,
+    callee_func: &FunctionEnv,
+    sites: &BTreeSet<NodeId>,
+) -> bool {
+    let caller_addr = caller_func.module_env.self_address();
+    let callee_addr = callee_func.module_env.self_address();
+
+    // Must have same address to be in the same package
+    if caller_addr != callee_addr {
+        call_package_fun_from_diff_addr_error(env, sites, caller_func, callee_func);
+        return false;
+    }
+
+    // Same address: check if both are in the same package
+    // TODO(#13745): improve package detection - currently only works for primary targets
+    if callee_func.module_env.is_primary_target() {
+        // Both caller and callee are primary targets with the same address.
+        // This means they are in the same package, so the compiler should have already
+        // inferred a friend declaration between them.
+        //
+        // We should never reach this code path because:
+        // - If they're in the same package, friend declaration should exist
+        // - If friend declaration exists, we would have returned true earlier
+        //
+        // If we're here, it's a compiler bug - friend inference failed.
+        panic!(
+            "{} should have friend {}",
+            callee_func.module_env.get_full_name_str(),
+            caller_func.module_env.get_full_name_str()
+        );
+    }
+
+    // Callee is not a primary target: use experimental package visibility check
+    let options = env
+        .get_extension::<Options>()
+        .expect("Options is available");
+    if options.experiment_on(Experiment::UNSAFE_PACKAGE_VISIBILITY) {
+        true // Experiment enabled: allow same-address calls
+    } else {
+        call_package_fun_from_diff_package_error(env, sites, caller_func, callee_func);
+        false
+    }
+}
+
+/// Check for unused private structs in a module.
+fn check_unused_structs(env: &mut GlobalEnv, module_id: ModuleId) {
+    let module = env.get_module(module_id);
+    for struct_env in module.get_structs() {
+        if struct_env.get_visibility() == Visibility::Private && struct_env.get_users().is_empty()
+        {
+            let msg = format!(
+                "Struct `{}` is unused: it has no current users and is private to its module.",
+                struct_env.get_full_name_with_address(),
+            );
+            env.diag(Severity::Warning, &struct_env.get_loc(), &msg);
+        }
+    }
+}
+
+/// Check for unused constants in a module.
+fn check_unused_constants(env: &mut GlobalEnv, module_id: ModuleId) {
+    let module = env.get_module(module_id);
+    for const_env in module.get_named_constants() {
+        if const_env.get_using_functions().is_empty() {
+            let msg = format!(
+                "Constant `{}` is unused.",
+                const_env.get_name().display(env.symbol_pool()),
+            );
+            env.diag(Severity::Warning, &const_env.get_loc(), &msg);
+        }
+    }
+}
+
+/// Report unused private and friendless public(friend) functions.
+fn report_unused_functions(
+    env: &mut GlobalEnv,
+    private_funcs: &BTreeSet<QualifiedFunId>,
+    functions_with_callers: &BTreeSet<QualifiedFunId>,
+    functions_with_inaccessible_callers: &BTreeSet<QualifiedFunId>,
+) {
+    for &func_id in private_funcs {
+        if functions_with_callers.contains(&func_id) {
+            continue; // Function has accessible callers
+        }
+
+        let func = env.get_function(func_id);
+
+        // Entry functions in scripts don't need callers
+        if func.module_env.get_name().is_script() {
+            continue;
+        }
+
+        let msg = if functions_with_inaccessible_callers.contains(&func_id) {
+            format!(
+                "Function `{}` may be unused: it has callers, but none with access.",
+                func.get_full_name_with_address(),
+            )
+        } else {
+            let reason = if matches!(func.visibility(), Visibility::Private) {
+                "is private to its module"
+            } else {
+                "is `public(friend)` but its module has no friends"
+            };
+            format!(
+                "Function `{}` is unused: it has no current callers and {}.",
+                func.get_full_name_with_address(),
+                reason
+            )
         };
-        if let Some(additional_context) = warn_info {
-            // We use just one call site as the warning label.
-            let label: Vec<_> = sites
-                    .first()
-                    .map(|node_id| {
-                        (
-                            env.get_node_loc(*node_id),
-                            format!(
-                                "inline expansion calls {} function that may not be accessible in all locations that `{}` can be called",
-                                function_visibility_description(&callee_func),
-                                caller_func.get_full_name_str()
-                            ),
-                        )
-                    })
-                    .iter()
-                    .cloned()
-                    .collect::<Vec<(Loc, String)>>();
-            env.diag_with_primary_and_labels(
-                Severity::Warning,
-                &caller_func.get_id_loc(),
-                &format!(
-                    "{} inline function `{}` cannot be called from all locations it is accessible",
-                    function_visibility_description(caller_func),
-                    caller_func.get_name_str()
-                ),
-                &format!(
-                    "if called from a location where `{}` is not accessible{}",
-                    callee_func.get_full_name_str(),
-                    additional_context
-                ),
-                label,
+
+        env.diag(Severity::Warning, &func.get_id_loc(), &msg);
+    }
+}
+
+/// Check accessibility after inlining.
+///
+/// After inlining, inline function calls have been replaced with their bodies.
+/// This pass checks:
+/// 1. Regular (non-inline) function calls respect visibility rules
+/// 2. Struct operations (pack/unpack/field access/storage) respect visibility rules
+///    (including operations that came from inlined function bodies)
+/// 3. Inline function bodies don't contain calls that would violate accessibility
+///    when inlined into different contexts
+fn check_after_inlining(env: &mut GlobalEnv) {
+    // Collect module IDs first to avoid borrow checker issues
+    let module_ids: Vec<_> = env
+        .get_modules()
+        .filter(|m| m.is_primary_target())
+        .map(|m| m.get_id())
+        .collect();
+
+    for caller_module_id in module_ids {
+        let caller_module = env.get_module(caller_module_id);
+
+        for caller_func in caller_module.get_functions() {
+            // 1. Check struct operations (pack/unpack/field access/storage ops)
+            //    These operations may have come from inlined function bodies
+            check_privileged_operations_on_structs(env, &caller_func);
+
+            // 2. Check inline function bodies for problematic calls
+            //    (calls that would be inaccessible when inlined into certain contexts)
+            check_inline_bodies_with_inaccessible_calls(env, &caller_func);
+
+            // 3. Check regular (non-inline) function call accessibility
+            //    Inline calls were already checked before inlining and no longer exist
+            let func_id = caller_func.get_qualified_id();
+            check_non_inline_call_visibility(env, func_id, caller_module_id);
+        }
+    }
+}
+
+/// Check visibility of non-inline function calls.
+///
+/// Inline calls are skipped - they were already checked before inlining and no longer exist.
+fn check_non_inline_call_visibility(
+    env: &GlobalEnv,
+    caller_id: QualifiedId<FunId>,
+    caller_module_id: ModuleId,
+) {
+    let caller_func = env.get_function(caller_id);
+    let Some(def) = caller_func.get_def() else {
+        return;
+    };
+    let caller_is_inline = caller_func.is_inline();
+    let caller_is_script = caller_func.module_env.get_name().is_script();
+
+    let callees_with_sites = def.used_funs_with_uses();
+    for (callee_id, call_sites) in &callees_with_sites {
+        let callee_func = env.get_function(*callee_id);
+
+        // Special case: script functions can never be called
+        if callee_func.module_env.is_script_module() {
+            calling_script_function_error(env, call_sites, &callee_func);
+            continue;
+        }
+
+        // Skip if same module (always accessible) or involves inline functions
+        // (inline calls were already checked and are now gone)
+        let same_module = callee_func.module_env.get_id() == caller_module_id;
+        let involves_inline = callee_func.is_inline() || caller_is_inline;
+        if same_module || involves_inline {
+            continue;
+        }
+
+        // Check visibility rules
+        match callee_func.visibility() {
+            // Public functions are always accessible
+            Visibility::Public => {},
+
+            // Scripts can only call public functions
+            _ if caller_is_script => {
+                generic_error(
+                    env,
+                    "a script ",
+                    "it is not public",
+                    call_sites,
+                    &callee_func,
+                );
+            },
+
+            // Friend visibility: check friend relationship or package visibility
+            Visibility::Friend => {
+                check_friend_call_accessibility(
+                    env,
+                    &caller_func,
+                    &callee_func,
+                    caller_module_id,
+                    call_sites,
+                );
+            },
+
+            // Private functions are only accessible within their module
+            Visibility::Private => {
+                private_to_module_error(env, call_sites, &caller_func, &callee_func);
+            },
+        }
+    }
+}
+
+/// Check inline function bodies for calls that become inaccessible when inlined.
+///
+/// When an inline function is inlined, its body is copied into the caller. If the inline function
+/// calls a less-visible helper, that call executes in the caller's context and may fail.
+///
+/// Example:
+/// ```move
+/// module A {
+///   public inline fun foo() { private_helper() }
+///   fun private_helper() {}
+/// }
+/// module B {
+///   fun bar() { A::foo() }  // After inlining: bar calls private_helper - ERROR
+/// }
+/// ```
+fn check_inline_bodies_with_inaccessible_calls(env: &GlobalEnv, caller_func: &FunctionEnv) {
+    if !caller_func.is_inline() {
+        return;
+    }
+
+    let Some(def) = caller_func.get_def() else {
+        return;
+    };
+
+    // Private inline functions only callable within their module - no issue
+    if caller_func.visibility() == Visibility::Private {
+        return;
+    }
+
+    for (callee_id, sites) in &def.used_funs_with_uses() {
+        let callee_func = env.get_function(*callee_id);
+        if let Some(problem_context) = check_inlined_call_accessibility(caller_func, &callee_func) {
+            warn_inline_accessibility_issue(
+                env,
+                caller_func,
+                &callee_func,
+                sites,
+                &problem_context,
             );
         }
     }
+}
+
+/// Check if a call within an inline function becomes inaccessible when inlined.
+///
+/// Returns Some(context) describing where the problem occurs, or None if no problem.
+fn check_inlined_call_accessibility(
+    inline_func: &FunctionEnv,
+    callee_func: &FunctionEnv,
+) -> Option<String> {
+    let inline_vis = inline_func.visibility();
+    let callee_vis = callee_func.visibility();
+
+    match (inline_vis, callee_vis) {
+        // Public callee: accessible everywhere
+        (_, Visibility::Public) => None,
+
+        // Public inline calling non-public: callee not accessible everywhere inline is
+        (Visibility::Public, Visibility::Friend | Visibility::Private) => Some(String::new()),
+
+        // Friend inline calling private: callee not accessible in friend modules
+        (Visibility::Friend, Visibility::Private) => {
+            let module = &inline_func.module_env;
+            Some(format!(
+                ", such as in a {}friend module of `{}`",
+                if module.has_no_friends() {
+                    "(future) "
+                } else {
+                    ""
+                },
+                module.get_full_name_str()
+            ))
+        },
+
+        // Friend inline calling friend: check if friend sets are compatible
+        (Visibility::Friend, Visibility::Friend) => {
+            check_friend_inline_calling_friend(inline_func, callee_func)
+        },
+
+        (Visibility::Private, _) => unreachable!("filtered out earlier"),
+    }
+}
+
+/// Check friend inline calling friend - requires friend set compatibility.
+///
+/// The inline function can be called from its friends. When inlined, those same friends
+/// must be able to call the callee.
+fn check_friend_inline_calling_friend(
+    inline_func: &FunctionEnv,
+    callee_func: &FunctionEnv,
+) -> Option<String> {
+    let inline_has_package_vis = inline_func.has_package_visibility();
+    let callee_has_package_vis = callee_func.has_package_visibility();
+
+    match (inline_has_package_vis, callee_has_package_vis) {
+        // Callee has package visibility: check same package
+        (_, true) => {
+            let same_package = callee_func.module_env.is_primary_target()
+                && callee_func.module_env.self_address() == inline_func.module_env.self_address();
+            if same_package {
+                None
+            } else {
+                Some(String::new())
+            }
+        },
+
+        // Inline has package visibility, callee has explicit friends:
+        // some package modules may not be friends of callee
+        (true, false) => Some(format!(
+            ", such as from a module in this package that is not a friend of `{}`",
+            callee_func.module_env.get_full_name_str()
+        )),
+
+        // Both have explicit friends: inline's friends must be subset of callee's friends
+        (false, false) => {
+            let inline_friends = inline_func.module_env.get_friend_modules();
+            let callee_friends = callee_func.module_env.get_friend_modules();
+
+            if inline_friends.is_subset(&callee_friends) {
+                None
+            } else {
+                Some(format!(
+                    ", such as from a module that is a friend of `{}` but not a friend of `{}`",
+                    inline_func.module_env.get_full_name_str(),
+                    callee_func.module_env.get_full_name_str()
+                ))
+            }
+        },
+    }
+}
+
+/// Emit warning for inline function calling inaccessible function.
+fn warn_inline_accessibility_issue(
+    env: &GlobalEnv,
+    inline_func: &FunctionEnv,
+    callee_func: &FunctionEnv,
+    sites: &BTreeSet<NodeId>,
+    problem_context: &str,
+) {
+    let label: Vec<_> = sites
+        .first()
+        .map(|node_id| {
+            (
+                env.get_node_loc(*node_id),
+                format!(
+                    "inline expansion calls {} function that may not be accessible in all locations that `{}` can be called",
+                    function_visibility_description(callee_func),
+                    inline_func.get_full_name_str()
+                ),
+            )
+        })
+        .into_iter()
+        .collect();
+
+    env.diag_with_primary_and_labels(
+        Severity::Warning,
+        &inline_func.get_id_loc(),
+        &format!(
+            "{} inline function `{}` cannot be called from all locations it is accessible",
+            function_visibility_description(inline_func),
+            inline_func.get_name_str()
+        ),
+        &format!(
+            "if called from a location where `{}` is not accessible{}",
+            callee_func.get_full_name_str(),
+            problem_context
+        ),
+        label,
+    );
 }
 
 fn function_visibility_description(func: &FunctionEnv) -> String {
