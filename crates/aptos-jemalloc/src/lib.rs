@@ -13,8 +13,7 @@ pub use jemallocator;
 ///   - `prof:true,lg_prof_sample:23` -- Heap profiling with an 8 MiB sampling interval.
 ///   - `percpu_arena:percpu` -- Per-CPU arenas to reduce cross-thread contention.
 ///     Also the default arena count without this setting (4x #CPUs) can be a bit excessive.
-///   - `thp:always,metadata_thp:always` -- Transparent Huge Pages reduce dTLB misses
-///     (ignored on macOS).
+///   - `hpa:true,metadata_thp:auto` -- Use Huge Pages to reduce dTLB misses (ignored on macOS).
 ///   - `background_thread:true,max_background_threads:4` -- Background purging threads.
 ///   - `dirty_decay_ms:30000,muzzy_decay_ms:120000` -- Longer decay trades RSS for
 ///     fewer `madvise` syscalls.
@@ -34,7 +33,7 @@ macro_rules! setup_jemalloc {
         pub static mut malloc_conf: *const ::std::ffi::c_char = c"\
               prof:true,lg_prof_sample:23,\
               percpu_arena:percpu,\
-              thp:always,metadata_thp:always,\
+              hpa:true,metadata_thp:auto,\
               background_thread:true,max_background_threads:4,\
               dirty_decay_ms:30000,muzzy_decay_ms:120000,\
               lg_tcache_max:16,tcache_nslots_large:32"
