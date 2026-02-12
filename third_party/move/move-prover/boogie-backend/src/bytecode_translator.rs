@@ -7,9 +7,8 @@
 use crate::{
     boogie_helpers::{
         boogie_address, boogie_address_blob, boogie_behavioral_eval_fun_name,
-        boogie_behavioral_result_fun_name, boogie_behavioral_results_fun_name,
-        boogie_behavioral_spec_fun_name, boogie_bv_type, boogie_byte_blob,
-        boogie_closure_pack_name, boogie_constant_blob, boogie_debug_track_abort,
+        boogie_behavioral_result_fun_name, boogie_behavioral_spec_fun_name, boogie_bv_type,
+        boogie_byte_blob, boogie_closure_pack_name, boogie_constant_blob, boogie_debug_track_abort,
         boogie_debug_track_local, boogie_debug_track_return, boogie_equality_for_type,
         boogie_field_sel, boogie_field_update, boogie_fun_apply_name, boogie_fun_param_name,
         boogie_function_bv_name, boogie_function_name, boogie_make_vec_from_strings,
@@ -590,6 +589,12 @@ impl<'env> BoogieTranslator<'env> {
                 if is_last { "" } else { "," }
             );
         }
+        if total_count == 0 {
+            // Emit a dummy constructor to avoid an empty Boogie datatype, which
+            // can happen when a function type is referenced but no closures or
+            // function parameters are constructed for it.
+            emitln!(self.writer, "$dummy'{}()'()", fun_ty_boogie_name);
+        }
         self.writer.unindent();
         emitln!(self.writer, "}");
         emitln!(
@@ -807,8 +812,13 @@ impl<'env> BoogieTranslator<'env> {
             if !result_locals.is_empty() {
                 if result_locals.len() == 1 {
                     // Single result: use ensures_of_result function directly
-                    let result_fun_name =
-                        boogie_behavioral_result_fun_name(self.env, &info.fun, info.param_sym, &[]);
+                    let result_fun_name = boogie_behavioral_result_fun_name(
+                        self.env,
+                        &info.fun,
+                        info.param_sym,
+                        &[],
+                        false,
+                    );
                     let result_local = &result_locals[0];
                     if explicit_result_count == 1 {
                         // Explicit result: check if it's a mutable reference
@@ -848,9 +858,13 @@ impl<'env> BoogieTranslator<'env> {
                     }
                 } else {
                     // Multiple results: use ensures_of_results function returning a tuple
-                    let result_fun_name =
-                        boogie_behavioral_results_fun_name(self.env, &info.fun, info.param_sym, &[
-                        ]);
+                    let result_fun_name = boogie_behavioral_result_fun_name(
+                        self.env,
+                        &info.fun,
+                        info.param_sym,
+                        &[],
+                        true,
+                    );
                     // Bind the tuple result to a temporary and extract each component
                     emitln!(
                         self.writer,
@@ -1299,8 +1313,13 @@ impl<'env> BoogieTranslator<'env> {
             if all_result_types.len() == 1 {
                 // Single result: generate simple function ensures_of_result(args) : result_type
                 // all_result_types already has dereferenced types.
-                let result_fun_name =
-                    boogie_behavioral_result_fun_name(self.env, &info.fun, info.param_sym, &[]);
+                let result_fun_name = boogie_behavioral_result_fun_name(
+                    self.env,
+                    &info.fun,
+                    info.param_sym,
+                    &[],
+                    false,
+                );
                 emitln!(
                     self.writer,
                     "function {}({}): {};",
@@ -1343,8 +1362,13 @@ impl<'env> BoogieTranslator<'env> {
                 );
             } else if all_result_types.len() >= 2 {
                 // Multiple results: generate tuple-returning function ensures_of_results(args) : $Tuple{n} ...
-                let result_fun_name =
-                    boogie_behavioral_results_fun_name(self.env, &info.fun, info.param_sym, &[]);
+                let result_fun_name = boogie_behavioral_result_fun_name(
+                    self.env,
+                    &info.fun,
+                    info.param_sym,
+                    &[],
+                    true,
+                );
 
                 // Build tuple type for all results
                 // All mutable references are dereferenced because behavioral specs work with values.
