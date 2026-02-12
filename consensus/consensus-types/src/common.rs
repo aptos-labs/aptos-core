@@ -268,13 +268,14 @@ impl Payload {
         }
     }
 
-    pub fn empty(quorum_store_enabled: bool, allow_batches_without_pos_in_proposal: bool) -> Self {
+    pub fn empty(quorum_store_enabled: bool) -> Self {
         if quorum_store_enabled {
-            if allow_batches_without_pos_in_proposal {
-                Payload::QuorumStoreInlineHybrid(Vec::new(), ProofWithData::new(Vec::new()), None)
-            } else {
-                Payload::InQuorumStore(ProofWithData::new(Vec::new()))
-            }
+            Payload::OptQuorumStore(OptQuorumStorePayload::new(
+                Vec::<(BatchInfo, Vec<SignedTransaction>)>::new().into(),
+                Vec::<BatchInfo>::new().into(),
+                Vec::<ProofOfStore<BatchInfo>>::new().into(),
+                PayloadExecutionLimit::None,
+            ))
         } else {
             Payload::DirectMempool(Vec::new())
         }
