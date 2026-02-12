@@ -1505,7 +1505,8 @@ impl ModuleBuilder<'_, '_> {
 impl ModuleBuilder<'_, '_> {
     fn def_ana_spec_block(&mut self, context: &SpecBlockContext, block: &EA::SpecBlock) {
         let block_loc = self.parent.env.to_loc(&block.loc);
-        self.update_spec(context, move |spec| spec.loc = Some(block_loc));
+        let block_loc_for_spec = block_loc.clone();
+        self.update_spec(context, move |spec| spec.loc = Some(block_loc_for_spec));
 
         assert!(self.spec_block_lets.is_empty());
 
@@ -1525,8 +1526,154 @@ impl ModuleBuilder<'_, '_> {
             self.def_ana_spec_block_member(context, member)
         }
 
+        // Validate behavior predicate state labels
+        self.validate_behavior_state_labels(context, &block_loc);
+
         // clear the let bindings stored in the build.
         self.spec_block_lets.clear();
+    }
+
+    /// Validates state labels in behavior predicates within a spec block.
+    /// Checks that:
+    /// 1. Every pre-state label references a post-state label defined in the same spec
+    /// 2. There are no cycles in state label references
+    fn validate_behavior_state_labels(&mut self, context: &SpecBlockContext, loc: &Loc) {
+        use std::collections::{BTreeMap, BTreeSet};
+
+        // Each behavior predicate with state labels can have:
+        // - A pre-label: reads from this state (must be defined by another predicate's post-label)
+        // - A post-label: defines this state (other predicates can reference it as pre-label)
+
+        // Collect: (pre_name, post_name, loc) for each predicate
+        // pre_name is what state it reads from, post_name is what state it defines
+        let mut behavior_predicates: Vec<(Option<Symbol>, Option<Symbol>, NodeId)> = Vec::new();
+
+        self.update_spec(context, |spec| {
+            fn collect_behavior_predicates(
+                exp: &Exp,
+                predicates: &mut Vec<(Option<Symbol>, Option<Symbol>, NodeId)>,
+            ) {
+                exp.visit_pre_order(&mut |e| {
+                    if let ExpData::Call(id, Operation::Behavior(_, state), _) = e {
+                        if state.pre_name.is_some() || state.post_name.is_some() {
+                            predicates.push((state.pre_name, state.post_name, *id));
+                        }
+                    }
+                    true
+                });
+            }
+
+            for cond in &spec.conditions {
+                collect_behavior_predicates(&cond.exp, &mut behavior_predicates);
+                for additional in &cond.additional_exps {
+                    collect_behavior_predicates(additional, &mut behavior_predicates);
+                }
+            }
+        });
+
+        // Build set of defined post-labels and used pre-labels
+        let mut defined_post_labels: BTreeMap<Symbol, Loc> = BTreeMap::new();
+        let mut used_pre_labels: BTreeSet<Symbol> = BTreeSet::new();
+        for (pre_name, post_name, node_id) in &behavior_predicates {
+            if let Some(post) = post_name {
+                let exp_loc = self.parent.env.get_node_loc(*node_id);
+                defined_post_labels.insert(*post, exp_loc);
+            }
+            if let Some(pre) = pre_name {
+                used_pre_labels.insert(*pre);
+            }
+        }
+
+        let symbol_pool = self.symbol_pool();
+
+        // Validate that all pre-labels reference defined post-labels
+        for (pre_name, _, node_id) in &behavior_predicates {
+            if let Some(pre) = pre_name {
+                if !defined_post_labels.contains_key(pre) {
+                    let exp_loc = self.parent.env.get_node_loc(*node_id);
+                    self.parent.env.error(
+                        &exp_loc,
+                        &format!(
+                            "state label `{}` is not defined; \
+                             pre-state labels must reference a post-state label defined by another behavior predicate in the same spec",
+                            pre.display(symbol_pool)
+                        ),
+                    );
+                }
+            }
+        }
+
+        // Validate that all post-labels are referenced by some pre-label
+        for (post_label, post_loc) in &defined_post_labels {
+            if !used_pre_labels.contains(post_label) {
+                self.parent.env.error(
+                    post_loc,
+                    &format!(
+                        "state label `{}` is defined but never referenced; \
+                         every post-state label must be referenced by a pre-state label in another behavior predicate",
+                        post_label.display(symbol_pool)
+                    ),
+                );
+            }
+        }
+
+        // Check for cycles: build a dependency graph
+        // Each predicate that defines a post-label and uses a pre-label creates an edge:
+        // post_label_defined -> pre_label_used
+        // This means: to get the state of `post_label_defined`, we need the state of `pre_label_used`
+        let mut edges: BTreeMap<Symbol, BTreeSet<Symbol>> = BTreeMap::new();
+        for (pre_name, post_name, _) in &behavior_predicates {
+            if let (Some(pre), Some(post)) = (pre_name, post_name) {
+                // The predicate defines `post` and reads from `pre`
+                // So `post` depends on `pre`
+                edges.entry(*post).or_default().insert(*pre);
+            }
+        }
+
+        // Detect cycles using DFS
+        fn has_cycle(
+            node: Symbol,
+            edges: &BTreeMap<Symbol, BTreeSet<Symbol>>,
+            visiting: &mut BTreeSet<Symbol>,
+            visited: &mut BTreeSet<Symbol>,
+        ) -> Option<Vec<Symbol>> {
+            if visiting.contains(&node) {
+                return Some(vec![node]); // Found cycle
+            }
+            if visited.contains(&node) {
+                return None; // Already fully processed
+            }
+
+            visiting.insert(node);
+            if let Some(neighbors) = edges.get(&node) {
+                for &neighbor in neighbors {
+                    if let Some(mut cycle) = has_cycle(neighbor, edges, visiting, visited) {
+                        cycle.push(node);
+                        return Some(cycle);
+                    }
+                }
+            }
+            visiting.remove(&node);
+            visited.insert(node);
+            None
+        }
+
+        let mut visiting = BTreeSet::new();
+        let mut visited = BTreeSet::new();
+        for &start in edges.keys() {
+            if let Some(cycle) = has_cycle(start, &edges, &mut visiting, &mut visited) {
+                let cycle_str = cycle
+                    .iter()
+                    .rev()
+                    .map(|s| s.display(symbol_pool).to_string())
+                    .join(" -> ");
+                self.parent.env.error(
+                    loc,
+                    &format!("cyclic state label reference detected: {}", cycle_str),
+                );
+                break; // Report only one cycle
+            }
+        }
     }
 
     fn def_ana_spec_block_member(

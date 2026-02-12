@@ -30,6 +30,7 @@ use aptos_types::{
 use futures::future::AbortHandle;
 use futures_util::future::Abortable;
 use move_core_types::account_address::AccountAddress;
+use rand::{thread_rng, CryptoRng, RngCore};
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -133,11 +134,12 @@ impl ChunkyTranscriptAggregationState {
     }
 
     /// Validates metadata and deserializes the transcript, and verifies it.
-    fn validate_and_deserialize_transcript(
+    fn validate_and_deserialize_transcript<R: RngCore + CryptoRng>(
         &self,
         sender: Author,
         metadata: &DKGTranscriptMetadata,
         transcript_bytes: &[u8],
+        rng: &mut R,
     ) -> anyhow::Result<(ChunkyTranscript, u64)> {
         // Validate metadata
         ensure!(
@@ -167,6 +169,7 @@ impl ChunkyTranscriptAggregationState {
                 &self.signing_pubkeys,
                 &self.dkg_config.eks,
                 &self.dkg_config.session_metadata,
+                rng,
             )
             .context("chunky transcript verification failed")?;
 
@@ -223,8 +226,9 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
         }
 
         // RwLock allows concurrent validation of multiple transcripts
+        let mut rng = thread_rng();
         let (transcript, peer_power) =
-            self.validate_and_deserialize_transcript(sender, metadata, transcript_bytes)?;
+            self.validate_and_deserialize_transcript(sender, metadata, transcript_bytes, &mut rng)?;
 
         let mut inner_state = self.inner_state.write();
         // Track first peer transcript for metrics

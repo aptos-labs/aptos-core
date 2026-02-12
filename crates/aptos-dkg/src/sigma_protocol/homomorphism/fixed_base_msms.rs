@@ -96,13 +96,14 @@ pub trait Trait:
         msms.map(|msm_input| Self::msm_eval(msm_input))
     }
 
-    // Depending on the elliptic curve library, the implementatation will be
-    // called e.g. `C::batch_normalize()` or `C::normalize_batch()`
+    // Depending on the elliptic curve library (arkworks, blstrs, etc.), the implementatation
+    // will be called e.g. `C::batch_normalize()` or `C::normalize_batch()`
     fn batch_normalize(
         msm_output: Vec<Self::MsmOutput>,
     ) -> Vec<<Self::MsmInput as IsMsmInput>::Base>;
 
-    fn normalize_output(projective_output: &Self::Codomain) -> Self::CodomainNormalized
+    // Instead of calling `normalize_outputs` with a single input, this is a tiny bit faster
+    fn normalize_output(projective_output: Self::Codomain) -> Self::CodomainNormalized
     where
         Self::Codomain: EntrywiseMap<
             Self::MsmOutput,
@@ -111,6 +112,7 @@ pub trait Trait:
     {
         // 1. Collect all elements into a Vec
         let msm_vec: Vec<Self::MsmOutput> = projective_output.clone().into_iter().collect();
+        // TODO: want projective_output.iter().cloned().collect();
 
         // 2. Apply batch_normalize
         let normalized_vec: Vec<<Self::MsmInput as IsMsmInput>::Base> =
@@ -119,9 +121,42 @@ pub trait Trait:
         // 3. Replace elements in projective_output with normalized values
         let mut iter = normalized_vec.into_iter();
 
-        projective_output
-            .clone()
-            .map(|_t| iter.next().expect("Not enough elements, somehow"))
+        projective_output.map(|_t| iter.next().expect("Not enough elements, somehow"))
+    }
+
+    fn normalize_outputs(projective_outputs: Vec<Self::Codomain>) -> Vec<Self::CodomainNormalized>
+    where
+        Self::Codomain: EntrywiseMap<
+            Self::MsmOutput,
+            Output<<Self::MsmInput as IsMsmInput>::Base> = Self::CodomainNormalized,
+        >,
+    {
+        // 1. Collect (codomain, its MsmOutput vec) for each so we can rebuild shapes later
+        let outputs_with_flat_outputs: Vec<(Self::Codomain, Vec<Self::MsmOutput>)> =
+            projective_outputs
+                .into_iter()
+                .map(|c| {
+                    let flat_output_vec: Vec<Self::MsmOutput> = c.clone().into_iter().collect();
+                    (c, flat_output_vec)
+                })
+                .collect();
+
+        // 2. Flatten all elements into one Vec and normalize just once
+        let all_outputs: Vec<Self::MsmOutput> = outputs_with_flat_outputs
+            .iter()
+            .flat_map(|(_, flat_output_vec)| flat_output_vec.clone())
+            .collect();
+        let normalized_output_vec: Vec<<Self::MsmInput as IsMsmInput>::Base> =
+            Self::batch_normalize(all_outputs);
+        let mut iter = normalized_output_vec.into_iter();
+
+        // 3. Rebuild each CodomainNormalized from the single normalized slice
+        outputs_with_flat_outputs
+            .into_iter()
+            .map(|(projective_output, _)| {
+                projective_output.map(|_t| iter.next().expect("Not enough elements, somehow"))
+            })
+            .collect()
     }
 }
 

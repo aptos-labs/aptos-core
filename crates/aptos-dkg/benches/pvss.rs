@@ -350,6 +350,7 @@ fn pvss_nonaggregate_verify<T: HasAggregatableSubtranscript, M: Measurement>(
     g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
 
     let mut rng = StdRng::seed_from_u64(42);
+    let mut rng2 = StdRng::seed_from_u64(43);
 
     g.bench_function(format!("verify/{}", sc), move |b| {
         b.iter_with_setup(
@@ -371,7 +372,7 @@ fn pvss_nonaggregate_verify<T: HasAggregatableSubtranscript, M: Measurement>(
                 // we have to serialize and deserialize because otherwise verify gets a transcript with "non-normalised" projective group elements
             },
             |trx| {
-                trx.verify(&sc, &pp, &[spks[0].clone()], &eks, &NoAux)
+                trx.verify(&sc, &pp, &[spks[0].clone()], &eks, &NoAux, &mut rng2)
                     .expect("PVSS transcript verification should succeed");
             },
         )

@@ -921,7 +921,7 @@ impl BufferManager {
                 let tx = verified_commit_msg_tx.clone();
                 let epoch_state_clone = epoch_state.clone();
                 bounded_executor
-                    .spawn(async move {
+                    .spawn_blocking(move || {
                         match commit_msg.req.verify(sender, &epoch_state_clone.verifier) {
                             Ok(_) => {
                                 let _ = tx.unbounded_send(commit_msg);

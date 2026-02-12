@@ -24,7 +24,7 @@ echo "*************** [move-pr] Assuming move root at $MOVE_BASE"
 # Run only tests which would also be run on CI
 export ENV_TEST_ON_CI=1
 
-while getopts "htcgdi2a" opt; do
+while getopts "htcCpgdi2a" opt; do
   case $opt in
     h)
       cat <<EOF
@@ -36,6 +36,8 @@ Flags:
     -t   Run tests
     -i   In addition to -t, run integration tests (Aptos framework and e2e tests)
     -c   Run xclippy and fmt +nightly
+    -C   Like -c, but also rebuild cached framework packages
+    -p   Rebuild cached framework packages only
     -g   Run the git checks script (whitespace check). This works
          only for committed clients.
     -d   Run artifact generation for move-stdlib and other Move libraries.
@@ -58,6 +60,13 @@ EOF
     c)
       CHECK=1
       ;;
+    C)
+      CHECK=1
+      BUILD_CACHED_PACKAGES=1
+      ;;
+    p)
+      BUILD_CACHED_PACKAGES=1
+      ;;
     d)
       GEN_ARTIFACTS=1
       ;;
@@ -68,6 +77,7 @@ EOF
       INTEGRATION_TEST=1
       GEN_ARTIFACTS=1
       GIT_CHECKS=1
+      BUILD_CACHED_PACKAGES=1
   esac
 done
 
@@ -136,6 +146,11 @@ if [ ! -z "$CHECK" ]; then
     cargo sort --grouped --workspace
     cargo machete
   )
+fi
+
+if [ ! -z "$BUILD_CACHED_PACKAGES" ]; then
+  echo "*************** [move-pr] Building cached framework packages"
+  $BASE/scripts/cargo_build_aptos_cached_packages.sh
 fi
 
 CARGO_OP_PARAMS="--profile $MOVE_PR_PROFILE"

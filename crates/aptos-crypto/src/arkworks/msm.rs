@@ -95,16 +95,20 @@ where
 /// "started", which is *useful* since the sigma protocol's MSM scalars are
 /// already manipulated with betas, and changing that would make things a
 /// tiny bit slower
+///
+/// TODO: in theory the hash table approach as in the sigma protocol might be useful here again - move it
 #[allow(non_snake_case)]
 pub fn verify_msm_terms_with_start<C: CurveGroup>(
-    msm_terms: Vec<MsmInput<C::Affine, C::ScalarField>>,
-    mut final_bases: Vec<C::Affine>,
-    mut final_scalars: Vec<C::ScalarField>,
+    new_msm_terms: Vec<MsmInput<C::Affine, C::ScalarField>>,
+    existing_msm_terms: MsmInput<C::Affine, C::ScalarField>,
     powers_of_beta: Vec<C::ScalarField>,
 ) -> anyhow::Result<()> {
-    assert_eq!(msm_terms.len(), powers_of_beta.len());
+    assert_eq!(new_msm_terms.len(), powers_of_beta.len());
 
-    for (term, beta_power) in msm_terms.into_iter().zip(powers_of_beta) {
+    let mut final_bases = existing_msm_terms.bases().to_vec();
+    let mut final_scalars = existing_msm_terms.scalars().to_vec();
+
+    for (term, beta_power) in new_msm_terms.into_iter().zip(powers_of_beta) {
         let mut scalars = term.scalars().to_vec();
 
         for scalar in scalars.iter_mut() {
@@ -125,6 +129,8 @@ pub fn verify_msm_terms_with_start<C: CurveGroup>(
 /// them into one big MSM using random linear combination, following the
 /// Schwartz-Zippel philosophy; delegates the actual work to
 /// `verify_msm_terms_with_start()`
+///
+/// TODO: doesn't get used?
 #[allow(non_snake_case)]
 pub fn verify_msm_terms<C: CurveGroup>(
     msm_terms: Vec<MsmInput<C::Affine, C::ScalarField>>,
@@ -132,5 +138,9 @@ pub fn verify_msm_terms<C: CurveGroup>(
 ) -> anyhow::Result<()> {
     let powers_of_beta = utils::powers(beta, msm_terms.len());
 
-    verify_msm_terms_with_start::<C>(msm_terms, Vec::new(), Vec::new(), powers_of_beta)
+    verify_msm_terms_with_start::<C>(
+        msm_terms,
+        MsmInput::new(Vec::new(), Vec::new()).unwrap(),
+        powers_of_beta,
+    )
 }

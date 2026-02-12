@@ -304,7 +304,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "7.14.2"
+version = "8.0.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -830,7 +830,6 @@ dependencies = [
 name = "aptos-cached-packages"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "aptos-framework",
  "aptos-package-builder",
  "aptos-types",
@@ -839,8 +838,6 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "sha2 0.9.9",
- "walkdir",
 ]
 
 [[package]]
@@ -2799,6 +2796,10 @@ dependencies = [
 name = "aptos-jemalloc"
 version = "0.1.0"
 dependencies = [
+ "aptos-logger",
+ "aptos-metrics-core",
+ "once_cell",
+ "tikv-jemalloc-ctl",
  "tikv-jemallocator",
 ]
 
