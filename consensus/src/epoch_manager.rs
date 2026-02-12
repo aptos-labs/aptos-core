@@ -1086,6 +1086,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             })
             .collect::<Vec<_>>();
 
+        // Get aggregate public keys from the transcript for batch verification
+        let aggregate_pk_main = transcript.main.get_dealt_public_key();
+        let aggregate_pk_fast = transcript.fast.as_ref().map(|t| t.get_dealt_public_key());
+
         // Recover existing augmented key pair or generate a new one
         let (augmented_key_pair, fast_augmented_key_pair) = if let Some((_, key_pair)) = self
             .rand_storage
@@ -1133,6 +1137,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             vuf_pp.clone(),
             keys,
             dkg_pub_params.pvss_config.wconfig.clone(),
+            aggregate_pk_main,
+            self.config.optimistic_rand_share_verification,
         );
 
         let fast_rand_config = if let (Some((ask, apk)), Some(trx), Some(wconfig)) = (
@@ -1154,6 +1160,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 vuf_pp,
                 fast_keys,
                 fast_wconfig,
+                aggregate_pk_fast.expect("Fast PK must exist when fast path is enabled"),
+                self.config.optimistic_rand_share_verification,
             ))
         } else {
             None

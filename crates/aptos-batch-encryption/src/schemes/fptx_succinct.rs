@@ -59,6 +59,14 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         unimplemented!()
     }
 
+    fn extract_encryption_key(
+        _digest_key: &Self::DigestKey,
+        _subtranscript: &Self::SubTranscript,
+    ) -> Result<Self::EncryptionKey> {
+        // B/c unweighted chunky is being removed
+        unimplemented!()
+    }
+
     fn setup_for_testing(
         seed: u64,
         max_batch_size: usize,

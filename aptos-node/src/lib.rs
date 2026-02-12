@@ -697,6 +697,10 @@ pub fn setup_environment_and_start_node(
     // Log the node config at node startup
     node_config.log_all_configs();
 
+    // Start periodic jemalloc metrics collection
+    #[cfg(unix)]
+    aptos_jemalloc::start_jemalloc_metrics_thread();
+
     // Starts the admin service
     let mut admin_service = services::start_admin_service(&node_config);
 
