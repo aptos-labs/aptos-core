@@ -1,0 +1,31 @@
+//# publish
+module 0x42::M
+struct S has drop
+  f: u64
+
+entry public fun foo(l0: S, l1: &S, l2: &mut S)
+    ret
+
+entry public fun foo_gen<T0: drop>(l0: T0, l1: &T0, l2: &mut T0)
+    ret
+
+
+
+//# run --args 0 0 0
+script
+use 0x42::M
+entry public fun main(l0: M::S, l1: &M::S, l2: &mut M::S)
+    ret
+
+
+
+//# run --type-args 0x42::M::S --args 0 0 0
+script
+entry public fun main<T0: drop>(l0: T0, l1: &T0, l2: &mut T0)
+    ret
+
+
+
+//# run 0x42::M::foo --args 0 0 0
+
+//# run 0x42::M::foo_gen --type-args 0x42::M::S --args 0 0 0

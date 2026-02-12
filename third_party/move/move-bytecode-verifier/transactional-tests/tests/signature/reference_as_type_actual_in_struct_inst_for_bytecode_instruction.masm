@@ -1,0 +1,129 @@
+//# publish
+module 0x1::M
+use 0x1::signer
+struct Some<T0> has key
+  item: T0
+
+fun foo(l0: &signer) acquires Some
+    move_loc l0
+    call signer::address_of
+    move_from Some<&u64>
+    ret
+
+
+
+//# publish
+module 0x1::M
+use 0x1::signer
+struct Some<T0> has key
+  item: T0
+
+fun foo(l0: &signer)
+    local l1: Some<u64>
+    copy_loc l0
+    move_loc l1
+    move_to Some<&u64>
+    ret
+
+
+
+//# publish
+module 0x1::M
+use 0x1::signer
+struct Some<T0> has key
+  item: T0
+
+fun foo(l0: &signer)
+    move_loc l0
+    call signer::address_of
+    exists Some<&u64>
+    ret
+
+
+
+//# publish
+module 0x1::M
+use 0x1::signer
+struct Some<T0> has key
+  item: T0
+
+fun foo(l0: &signer)
+    move_loc l0
+    call signer::address_of
+    borrow_global Some<&u64>
+    ret
+
+
+
+//# publish
+module 0x1::M
+use 0x1::signer
+struct Some<T0> has key
+  item: T0
+
+fun foo(l0: &signer)
+    move_loc l0
+    call signer::address_of
+    mut_borrow_global Some<&u64>
+    ret
+
+
+
+//# publish
+module 0x1::M
+struct Some<T0>
+  item: T0
+
+fun foo()
+    local l0: u64
+    local l1: &u64
+    local l2: Some<u64>
+    borrow_loc l0
+    st_loc l1
+    move_loc l1
+    pack Some<&u64>
+    st_loc l2
+    ret
+
+
+
+//# publish
+module 0x1::M
+struct Some<T0>
+  item: T0
+
+fun foo()
+    local l0: &u64
+    local l1: Some<u64>
+    move_loc l1
+    unpack Some<&u64>
+    st_loc l0
+    ret
+
+
+
+//# publish
+module 0x1::M
+struct S<T0>
+  v: T0
+
+fun foo(l0: S<&u64>): u64
+    borrow_loc l0
+    borrow_field S, v
+    read_ref
+    read_ref
+    ret
+
+
+
+//# publish
+module 0x1::M
+struct S<T0>
+  v: T0
+
+fun foo(l0: S<&u64>): u64
+    mut_borrow_loc l0
+    mut_borrow_field S, v
+    read_ref
+    read_ref
+    ret

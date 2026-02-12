@@ -1,0 +1,7 @@
+//# publish
+module 0x42::M
+struct A
+  b: B
+
+struct B
+  a: A

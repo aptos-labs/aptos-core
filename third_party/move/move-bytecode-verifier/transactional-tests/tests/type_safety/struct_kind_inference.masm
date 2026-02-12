@@ -1,0 +1,72 @@
+//# publish
+module 0x1::M1
+struct MyResource
+  b: bool
+
+struct S<T0>
+  t: T0
+
+public fun p(l0: S<MyResource>)
+    ret
+
+
+
+//# publish
+module 0x1::M2
+struct MyResource
+  b: bool
+
+struct S<T0>
+  t: T0
+
+public fun p(l0: S<MyResource>, l1: S<MyResource>): S<MyResource>
+    move_loc l1
+    st_loc l0
+    move_loc l0
+    ret
+
+
+
+//# publish
+module 0x1::M3
+struct MyResource
+  b: bool
+
+struct S<T0>
+  t: T0
+
+public fun p(l0: &S<MyResource>): S<MyResource>
+    move_loc l0
+    read_ref
+    ret
+
+
+
+//# publish
+module 0x1::M4
+struct MyResource
+  b: bool
+
+struct S<T0>
+  t: T0
+
+public fun p(l0: &mut S<MyResource>, l1: S<MyResource>)
+    move_loc l1
+    move_loc l0
+    write_ref
+    ret
+
+
+
+//# publish
+module 0x1::M5
+struct MyResource
+  b: bool
+
+struct S<T0>
+  t: T0
+
+public fun p(l0: S<MyResource>): (S<MyResource>, S<MyResource>)
+    copy_loc l0
+    move_loc l0
+    ret

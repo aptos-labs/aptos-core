@@ -1,0 +1,148 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::M {
+    private fun apply_longer_chain(f: |u64|u64,x: u64): u64 {
+        (f)(x)
+    }
+    spec {
+      ensures ensures_of@2($t0, $t1, result0());
+      ensures 3@ensures_of@4($t0, $t1, result0());
+      ensures 5@ensures_of($t0, $t1, result0());
+    }
+
+    private fun apply_result_chain(f: |u64|u64,x: u64): u64 {
+        (f)(x)
+    }
+    spec {
+      ensures Eq<u64>(result_of@6($t0, $t1), result0());
+      ensures Eq<u64>(7@result_of($t0, $t1), result0());
+    }
+
+    private fun apply_simple_chain(f: |u64|u64,x: u64): u64 {
+        (f)(x)
+    }
+    spec {
+      ensures ensures_of@0($t0, $t1, result0());
+      ensures 1@ensures_of($t0, $t1, result0());
+    }
+
+} // end 0x42::M
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::M {
+    fun apply_longer_chain(f: |u64|u64, x: u64): u64 {
+        f(x)
+    }
+    fun apply_result_chain(f: |u64|u64, x: u64): u64 {
+        f(x)
+    }
+    fun apply_simple_chain(f: |u64|u64, x: u64): u64 {
+        f(x)
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun M::apply_longer_chain($t0: |u64|u64, $t1: u64): u64 {
+     var $t2: u64
+  0: $t2 := invoke($t1, $t0)
+  1: return $t2
+}
+
+
+[variant baseline]
+fun M::apply_result_chain($t0: |u64|u64, $t1: u64): u64 {
+     var $t2: u64
+  0: $t2 := invoke($t1, $t0)
+  1: return $t2
+}
+
+
+[variant baseline]
+fun M::apply_simple_chain($t0: |u64|u64, $t1: u64): u64 {
+     var $t2: u64
+  0: $t2 := invoke($t1, $t0)
+  1: return $t2
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::M {
+    private fun apply_longer_chain(f: |u64|u64,x: u64): u64 {
+        (f)(x)
+    }
+    spec {
+      ensures ensures_of@2($t0, $t1, result0());
+      ensures 3@ensures_of@4($t0, $t1, result0());
+      ensures 5@ensures_of($t0, $t1, result0());
+    }
+
+    private fun apply_result_chain(f: |u64|u64,x: u64): u64 {
+        (f)(x)
+    }
+    spec {
+      ensures Eq<u64>(result_of@6($t0, $t1), result0());
+      ensures Eq<u64>(7@result_of($t0, $t1), result0());
+    }
+
+    private fun apply_simple_chain(f: |u64|u64,x: u64): u64 {
+        (f)(x)
+    }
+    spec {
+      ensures ensures_of@0($t0, $t1, result0());
+      ensures 1@ensures_of($t0, $t1, result0());
+    }
+
+} // end 0x42::M
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun M::apply_longer_chain($t0: |u64|u64, $t1: u64): u64 {
+     var $t2: u64
+  0: $t2 := invoke($t1, $t0)
+  1: return $t2
+}
+
+
+[variant baseline]
+fun M::apply_result_chain($t0: |u64|u64, $t1: u64): u64 {
+     var $t2: u64
+  0: $t2 := invoke($t1, $t0)
+  1: return $t2
+}
+
+
+[variant baseline]
+fun M::apply_simple_chain($t0: |u64|u64, $t1: u64): u64 {
+     var $t2: u64
+  0: $t2 := invoke($t1, $t0)
+  1: return $t2
+}
+
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0x42::M
+// Function definition at index 0
+fun apply_longer_chain(l0: |u64|u64, l1: u64): u64
+    move_loc l1
+    move_loc l0
+    call_closure <|u64|u64>
+    ret
+
+// Function definition at index 1
+fun apply_result_chain(l0: |u64|u64, l1: u64): u64
+    move_loc l1
+    move_loc l0
+    call_closure <|u64|u64>
+    ret
+
+// Function definition at index 2
+fun apply_simple_chain(l0: |u64|u64, l1: u64): u64
+    move_loc l1
+    move_loc l0
+    call_closure <|u64|u64>
+    ret
+
+
+============ bytecode verification succeeded ========

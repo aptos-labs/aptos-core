@@ -1,0 +1,62 @@
+//# publish
+module 0x42::Test
+struct T has drop
+  value: u64
+
+fun initial_value(): u64
+    ld_u64 42
+    ret
+
+public fun new(): T
+    local l0: u64
+    call initial_value
+    st_loc l0
+    move_loc l0
+    pack T
+    ret
+
+public fun get_value(l0: &T): u64
+    local l1: &u64
+    copy_loc l0
+    borrow_field T, value
+    st_loc l1
+    move_loc l0
+    pop
+    move_loc l1
+    read_ref
+    ret
+
+public fun set_value(l0: &mut T, l1: u64)
+    move_loc l0
+    move_loc l1
+    call internal_set_value
+    ret
+
+fun internal_set_value(l0: &mut T, l1: u64)
+    local l2: &mut u64
+    copy_loc l0
+    mut_borrow_field T, value
+    st_loc l2
+    move_loc l1
+    move_loc l2
+    write_ref
+    move_loc l0
+    pop
+    ret
+
+
+
+//# run
+script
+use 0x42::Test
+entry public fun main()
+    local l0: Test::T
+    local l1: &Test::T
+    call Test::new
+    st_loc l0
+    borrow_loc l0
+    st_loc l1
+    move_loc l1
+    ld_u64 1
+    call Test::internal_set_value
+    ret
