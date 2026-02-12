@@ -5806,7 +5806,8 @@ impl ExpTranslator<'_, '_, '_> {
     }
 
     /// Validates and translates state labels for behavior predicates.
-    /// Returns a BehaviorState with the translated memory labels and names.
+    /// Returns a BehaviorState with the translated memory labels. Names are registered
+    /// in GlobalEnv for lookup during printing.
     fn translate_behavior_state_labels(
         &mut self,
         loc: &Loc,
@@ -5828,8 +5829,7 @@ impl ExpTranslator<'_, '_, '_> {
             );
         }
 
-        // Convert labels to memory labels and extract names, ensuring the same label
-        // name always resolves to the same GlobalId.
+        // Convert labels to memory labels and register names with GlobalEnv
         let pre_name = pre_label
             .as_ref()
             .map(|l| self.symbol_pool().make(l.value().as_str()));
@@ -5842,13 +5842,13 @@ impl ExpTranslator<'_, '_, '_> {
             } else {
                 let id = self.env().new_global_id();
                 self.state_label_map.insert(sym, id);
+                self.env().set_memory_label_name(id, sym);
                 id
             }
         };
         let pre = pre_name.map(&mut get_or_create_label);
         let post = post_name.map(&mut get_or_create_label);
-
-        BehaviorState::new(pre, post, pre_name, post_name)
+        BehaviorState::new(pre, post)
     }
 
     /// Resolves the target of a behavior predicate to either a local variable or a function.

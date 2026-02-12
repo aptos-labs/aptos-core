@@ -18,6 +18,7 @@ in a single transaction, improving efficiency for market makers.
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="">0x5::bulk_order_types</a>;
 <b>use</b> <a href="">0x5::order_book_types</a>;
+<b>use</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils">0x7::bulk_order_utils</a>;
 <b>use</b> <a href="market_types.md#0x7_market_types">0x7::market_types</a>;
 <b>use</b> <a href="order_book.md#0x7_order_book">0x7::order_book</a>;
 </code></pre>
@@ -102,7 +103,7 @@ Returns:
         <a href="market_bulk_order.md#0x7_market_bulk_order_E_CLEARINGHOUSE_VALIDATION_FAILED">E_CLEARINGHOUSE_VALIDATION_FAILED</a>
     );
     <b>let</b> request =
-        new_bulk_order_request(
+        new_bulk_order_request_with_sanitization(
             <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
             sequence_number,
             bid_prices,

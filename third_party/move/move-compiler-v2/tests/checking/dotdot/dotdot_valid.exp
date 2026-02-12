@@ -372,16 +372,16 @@ module 0x42::test {
         let S4<bool>{x: _x2, y: S3{x: _x1, y: _}} = x;
     }
     fun nested2(x: S5<bool, S1>) {
-        let S5<bool,S1>(_, S1(_)) = x;
+        let S5<bool, S1>(_, S1(_)) = x;
     }
     fun nested2_ref(x: &S5<bool, S1>) {
-        let S5<bool,S1>(_, S1(_)) = x;
+        let S5<bool, S1>(_, S1(_)) = x;
     }
     fun nested3(x: S5<bool, S4<bool>>) {
-        let S5<bool,S4<bool>>(_, S4<bool>{x: _, y: _}) = x;
+        let S5<bool, S4<bool>>(_, S4<bool>{x: _, y: _}) = x;
     }
     fun nested3_ref(x: &S5<bool, S4<bool>>) {
-        let S5<bool,S4<bool>>(_, S4<bool>{x: _, y: _}) = x;
+        let S5<bool, S4<bool>>(_, S4<bool>{x: _, y: _}) = x;
     }
     fun nested4(x: S4<S1>) {
         let S4<S1>{x: S1(_), y: _} = x;
@@ -458,7 +458,7 @@ module 0x42::test {
     fun test_lambda_param(): bool {
         let ();
         let x = S2(true, S0{});
-        let (S2(x, _)) = (x);
+        let S2(x, _) = x;
         x
     }
 }

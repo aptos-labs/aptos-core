@@ -290,16 +290,16 @@ module 0x42::LambdaTest2 {
     }
     public inline fun inline_apply2(g: |u64|u64, c: u64): u64 {
         {
-            let (b) = (g({
+            let b = g({
                 let (a,b) = (c, {
-                    let (b) = (3);
-                    let (x) = (b);
+                    let b = 3;
+                    let x = b;
                     x
                 });
                 a * b
-            }));
+            });
             let (a,b) = ({
-                let (z) = (b);
+                let z = b;
                 z
             } + 1, {
                 let (a,b) = (3, 4);
@@ -310,18 +310,18 @@ module 0x42::LambdaTest2 {
     }
     public inline fun inline_apply3(c: u64): u64 {
         {
-            let (b) = ({
+            let b = {
                 let (a,b) = (c, {
-                    let (b) = (3);
-                    let (x) = (b);
-                    let (b) = (x);
-                    let (y) = (b);
+                    let b = 3;
+                    let x = b;
+                    let b = x;
+                    let y = b;
                     y
                 });
                 a * b
-            });
+            };
             let (a,b) = ({
-                let (x) = (b);
+                let x = b;
                 x + 1
             } + 1, {
                 let (a,b) = (3, 4);
@@ -334,11 +334,11 @@ module 0x42::LambdaTest2 {
         let v = vector[1, 2, 3];
         let product = 1;
         {
-            let (v) = (&v);
+            let v = &v;
             let i = 0;
             while (i < 0x1::vector::length<u64>(v)) {
                 {
-                    let (e) = (0x1::vector::borrow<u64>(v, i));
+                    let e = 0x1::vector::borrow<u64>(v, i);
                     product = {
                         let (a,b) = (product, *e);
                         a * b
@@ -356,21 +356,21 @@ module 0x42::LambdaTest {
     }
     public inline fun inline_apply_test(): u64 {
         {
-            let (c) = (3);
+            let c = 3;
             {
-                let (b) = ({
-                    let (x) = ({
+                let b = {
+                    let x = {
                         let (a,b) = (c, {
-                            let (b) = (3);
-                            let (x) = (b);
+                            let b = 3;
+                            let x = b;
                             x
                         });
                         a * b
-                    });
+                    };
                     x + 1
-                });
+                };
                 let (a,b) = ({
-                    let (z) = (b);
+                    let z = b;
                     z
                 } + 1, {
                     let (a,b) = (3, 4);
@@ -379,25 +379,25 @@ module 0x42::LambdaTest {
                 a * b
             } + 2
         } + {
-            let (c) = ({
-                let (b) = (3);
-                let (y) = (b);
+            let c = {
+                let b = 3;
+                let y = b;
                 y
-            });
+            };
             {
-                let (b) = ({
-                    let (x) = ({
+                let b = {
+                    let x = {
                         let (a,b) = (c, {
-                            let (b) = (3);
-                            let (x) = (b);
+                            let b = 3;
+                            let x = b;
                             x
                         });
                         a * b
-                    });
+                    };
                     x * x
-                });
+                };
                 let (a,b) = ({
-                    let (z) = (b);
+                    let z = b;
                     z
                 } + 1, {
                     let (a,b) = (3, 4);
@@ -411,21 +411,21 @@ module 0x42::LambdaTest {
         let a = {
             let ();
             {
-                let (c) = (3);
+                let c = 3;
                 {
-                    let (b) = ({
-                        let (x) = ({
+                    let b = {
+                        let x = {
                             let (a,b) = (c, {
-                                let (b) = (3);
-                                let (x) = (b);
+                                let b = 3;
+                                let x = b;
                                 x
                             });
                             a * b
-                        });
+                        };
                         x + 1
-                    });
+                    };
                     let (a,b) = ({
-                        let (z) = (b);
+                        let z = b;
                         z
                     } + 1, {
                         let (a,b) = (3, 4);
@@ -434,25 +434,25 @@ module 0x42::LambdaTest {
                     a * b
                 } + 2
             } + {
-                let (c) = ({
-                    let (b) = (3);
-                    let (y) = (b);
+                let c = {
+                    let b = 3;
+                    let y = b;
                     y
-                });
+                };
                 {
-                    let (b) = ({
-                        let (x) = ({
+                    let b = {
+                        let x = {
                             let (a,b) = (c, {
-                                let (b) = (3);
-                                let (x) = (b);
+                                let b = 3;
+                                let x = b;
                                 x
                             });
                             a * b
-                        });
+                        };
                         x * x
-                    });
+                    };
                     let (a,b) = ({
-                        let (z) = (b);
+                        let z = b;
                         z
                     } + 1, {
                         let (a,b) = (3, 4);

@@ -308,8 +308,8 @@ module 0x815::m {
         let x = 1;
         let r = match (&mut self) {
             Color::Red{} => &x,
-            Color::Blue{} => /*freeze*/&mut x,
-            _ => /*freeze*/&mut x,
+            Color::Blue{} => &mut x,
+            _ => &mut x,
         };
         *r
     }

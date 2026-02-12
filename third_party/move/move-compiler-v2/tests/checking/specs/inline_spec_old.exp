@@ -12,11 +12,8 @@ module 0x42::m {
 // -- Sourcified model before first bytecode pipeline
 module 0x42::m {
     public fun foo(vec: &mut vector<bool>) {
-
-        /* spec {
-          assert forall k: num: Range(0, Len<bool>($t0)): Eq<bool>(Index($t0, k), Index(Old<vector<bool>>($t0), k));
-        }
-         */
-        ;
+        spec {
+            assert forall k in 0..len(vec): vec[k] == old(vec)[k];
+        };
     }
 }

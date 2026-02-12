@@ -58,29 +58,29 @@ module 0x8675309::M {
         g: u64,
     }
     fun t(r1: &mut u64, r2: &mut u64, s: &mut S) {
-        /*freeze*/r1 == /*freeze*/r1;
-        /*freeze*/r1 == /*freeze*/r2;
-        /*freeze*/r2 == /*freeze*/r2;
-        /*freeze*/r2 == /*freeze*/r2;
-        /*freeze*/r1 != /*freeze*/r1;
-        /*freeze*/r1 != /*freeze*/r2;
-        /*freeze*/r2 != /*freeze*/r2;
-        /*freeze*/r2 != /*freeze*/r2;
-        /*freeze*/&mut s.f == /*freeze*/&mut s.f;
-        /*freeze*/&mut s.f == /*freeze*/&mut s.g;
-        /*freeze*/&mut s.g == /*freeze*/&mut s.f;
-        /*freeze*/&mut s.g == /*freeze*/&mut s.g;
-        /*freeze*/&mut s.f != /*freeze*/&mut s.f;
-        /*freeze*/&mut s.f != /*freeze*/&mut s.g;
-        /*freeze*/&mut s.g != /*freeze*/&mut s.f;
-        /*freeze*/&mut s.g != /*freeze*/&mut s.g;
+        r1 == r1;
+        r1 == r2;
+        r2 == r2;
+        r2 == r2;
+        r1 != r1;
+        r1 != r2;
+        r2 != r2;
+        r2 != r2;
+        &mut s.f == &mut s.f;
+        &mut s.f == &mut s.g;
+        &mut s.g == &mut s.f;
+        &mut s.g == &mut s.g;
+        &mut s.f != &mut s.f;
+        &mut s.f != &mut s.g;
+        &mut s.g != &mut s.f;
+        &mut s.g != &mut s.g;
     }
     fun t1(p: &mut P) {
-        let comp = /*freeze*/&mut p.b1 == /*freeze*/&mut p.b2;
+        let comp = &mut p.b1 == &mut p.b2;
         p.b1.f = comp
     }
     fun t2(p: &mut P) {
-        let comp = /*freeze*/&mut p.b1 != /*freeze*/&mut p.b2;
+        let comp = &mut p.b1 != &mut p.b2;
         p.b1.f = comp
     }
 }

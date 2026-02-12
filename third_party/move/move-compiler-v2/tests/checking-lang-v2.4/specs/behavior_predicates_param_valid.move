@@ -50,4 +50,16 @@ module 0x42::M {
         ensures requires_of<f>(x);
         ensures ensures_of<f>(x, result);
     }
+
+    // Another function to test with valid state label chains
+    fun apply2(f: |u64| u64, x: u64): u64 {
+        f(x)
+    }
+
+    spec apply2 {
+        // First predicate defines post-state "s1"
+        ensures ensures_of<f>(x, result)@s1;
+        // Second predicate reads from "s1" (completes the chain)
+        ensures s1@ensures_of<f>(x, result);
+    }
 }

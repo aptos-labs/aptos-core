@@ -11,7 +11,7 @@ script {
 //# run
 script {
     fun main() {
-        let _v0 = 1 + 18446744073709551615;
+        let _v0 = 1 + MAX_U64;
     }
 }
 
@@ -99,7 +99,7 @@ script {
 //# run
 script {
     fun main() {
-        let _v0 = 18446744073709551615 / 0;
+        let _v0 = MAX_U64 / 0;
     }
 }
 
@@ -131,6 +131,6 @@ script {
 //# run
 script {
     fun main() {
-        let _v0 = 18446744073709551615 % 0;
+        let _v0 = MAX_U64 % 0;
     }
 }

@@ -7,8 +7,76 @@ module aptos_experimental::bulk_order_utils {
     use aptos_trading::order_match_types::OrderMatchDetails;
 
     friend aptos_experimental::bulk_order_book;
+    friend aptos_experimental::market_bulk_order;
+    #[test_only]
+    friend aptos_experimental::bulk_order_book_tests;
+    #[test_only]
+    friend aptos_experimental::bulk_order_types_tests;
 
-    const EUNEXPECTED_MATCH_SIZE: u64 = 2;
+    // Error codes for various failure scenarios
+    const EPRICE_CROSSING: u64 = 1;
+    const E_BID_LENGTH_MISMATCH: u64 = 2;
+    const E_ASK_LENGTH_MISMATCH: u64 = 3;
+    const E_EMPTY_ORDER: u64 = 4;
+    const E_BID_SIZE_ZERO: u64 = 5;
+    const E_ASK_SIZE_ZERO: u64 = 6;
+    const E_BID_ORDER_INVALID: u64 = 7;
+    const E_ASK_ORDER_INVALID: u64 = 8;
+    const E_BULK_ORDER_DEPTH_EXCEEDED: u64 = 9;
+    const E_INVALID_SEQUENCE_NUMBER: u64 = 10;
+    const EUNEXPECTED_MATCH_SIZE: u64 = 11;
+
+    /// Maximum number of price levels per side (bid or ask) in a bulk order.
+    /// This limit prevents gas DoS scenarios when cancelling bulk orders.
+    const MAX_BULK_ORDER_DEPTH_PER_SIDE: u64 = 30;
+
+    /// # Aborts:
+    /// - If sequence_number is 0 (reserved to avoid ambiguity in events)
+    /// - If bid_prices and bid_sizes have different lengths
+    /// - If ask_prices and ask_sizes have different lengths
+    /// - If bid_prices or ask_prices exceeds MAX_BULK_ORDER_DEPTH_PER_SIDE (30) levels
+    public(friend) fun new_bulk_order_request_with_sanitization<M: store + copy + drop>(
+        account: address,
+        sequence_number: u64,
+        bid_prices: vector<u64>,
+        bid_sizes: vector<u64>,
+        ask_prices: vector<u64>,
+        ask_sizes: vector<u64>,
+        metadata: M
+    ): BulkOrderRequest<M> {
+        // Sequence number 0 is reserved to avoid ambiguity in events
+        assert!(sequence_number > 0, E_INVALID_SEQUENCE_NUMBER);
+
+        let num_bids = bid_prices.length();
+        let num_asks = ask_prices.length();
+
+        // Basic length validation
+        assert!(num_bids == bid_sizes.length(), E_BID_LENGTH_MISMATCH);
+        assert!(num_asks == ask_sizes.length(), E_ASK_LENGTH_MISMATCH);
+        assert!(num_bids > 0 || num_asks > 0, E_EMPTY_ORDER);
+        // Depth validation to prevent gas DoS when cancelling
+        assert!(num_bids <= MAX_BULK_ORDER_DEPTH_PER_SIDE, E_BULK_ORDER_DEPTH_EXCEEDED);
+        assert!(num_asks <= MAX_BULK_ORDER_DEPTH_PER_SIDE, E_BULK_ORDER_DEPTH_EXCEEDED);
+        assert!(validate_not_zero_sizes(&bid_sizes), E_BID_SIZE_ZERO);
+        assert!(validate_not_zero_sizes(&ask_sizes), E_ASK_SIZE_ZERO);
+        assert!(validate_price_ordering(&bid_prices, true), E_BID_ORDER_INVALID);
+        assert!(validate_price_ordering(&ask_prices, false), E_ASK_ORDER_INVALID);
+
+        if (num_bids > 0 && num_asks > 0) {
+            // First element in bids is the highest (descending order), first element in asks is the lowest (ascending
+            // order).
+            assert!(bid_prices[0] < ask_prices[0], EPRICE_CROSSING);
+        };
+        bulk_order_types::new_bulk_order_request(
+            account,
+            sequence_number,
+            bid_prices,
+            bid_sizes,
+            ask_prices,
+            ask_sizes,
+            metadata
+        )
+    }
 
     /// Creates a new bulk order with the specified parameters.
     ///
@@ -86,6 +154,50 @@ module aptos_experimental::bulk_order_utils {
             cancelled_ask_prices,
             cancelled_ask_sizes
         )
+    }
+
+    /// Validates that all sizes in the vector are greater than 0.
+    ///
+    /// # Arguments:
+    /// - `sizes`: Vector of sizes to validate
+    ///
+    fun validate_not_zero_sizes(sizes: &vector<u64>): bool {
+        let i = 0;
+        while (i < sizes.length()) {
+            if (sizes[i] == 0) {
+                return false;
+            };
+            i += 1;
+        };
+        true
+    }
+
+    /// Validates that prices are in the correct order (descending for bids, ascending for asks).
+    ///
+    /// # Arguments:
+    /// - `prices`: Vector of prices to validate
+    /// - `is_descending`: True if prices should be in descending order, false for ascending
+    ///
+    fun validate_price_ordering(
+        prices: &vector<u64>, is_descending: bool
+    ): bool {
+        let i = 0;
+        if (prices.length() == 0) {
+            return true; // No prices to validate
+        };
+        while (i < prices.length() - 1) {
+            if (is_descending) {
+                if (prices[i] <= prices[i + 1]) {
+                    return false;
+                };
+            } else {
+                if (prices[i] >= prices[i + 1]) {
+                    return false;
+                };
+            };
+            i += 1;
+        };
+        true
     }
 
     fun trim_start<Element>(v: &mut vector<Element>, new_start: u64): vector<Element> {
