@@ -6,6 +6,7 @@ on:
     branches:
       - movement
       - l1-migration
+      - m1
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
 
 env:
@@ -208,3 +209,28 @@ jobs:
           echo "📦 Image: ghcr.io/movementlabsxyz/aptos-node:${{ env.GIT_SHA_SHORT }}"
           echo "🏷️  Tag: ${{ env.GIT_SHA_SHORT }}"
           echo "🌐 Registry: ghcr.io/movementlabsxyz/aptos-node"
+
+  # Test CLI release build to verify the release workflow will work
+  test-cli-release-build:
+    name: "Test CLI Release Build (${{ matrix.os }})"
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            platform: "macOS"
+          - os: macos-14-large
+            platform: "macOS"
+          - os: ubuntu-22.04
+            platform: "Linux"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/cli-rust-setup
+      - name: Test CLI release build
+        run: |
+          # Build with skip_checks=true since we're just testing the build
+          scripts/cli/build_cli_release.sh "${{ matrix.platform }}" "0.0.0-test" "true" "false"
+      - name: Verify artifact
+        run: |
+          ls -la movement-cli-*.zip
+          echo "✅ CLI release build successful on ${{ matrix.os }}"

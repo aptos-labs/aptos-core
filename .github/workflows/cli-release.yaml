@@ -1,0 +1,106 @@
+# Movement CLI Release Workflow
+# Builds and releases the Movement CLI for macOS (ARM & x86_64) and Linux (x86_64)
+# Trigger: Actions Tab -> "Release CLI" -> "Run Workflow"
+
+name: "Release CLI"
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        type: string
+        required: true
+        description: "The release version (e.g. 7.4.0)"
+      source_git_ref_override:
+        type: string
+        required: false
+        description: "Git ref override (branch, tag, or SHA). Defaults to workflow ref."
+      dry_run:
+        type: boolean
+        required: false
+        default: true
+        description: "Dry run - If checked, the release will not be created"
+      skip_checks:
+        type: boolean
+        required: false
+        default: false
+        description: "Skip version validation checks"
+
+jobs:
+  build-linux-x86_64:
+    name: "Build Linux x86_64"
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.source_git_ref_override }}
+      - uses: ./.github/actions/cli-rust-setup
+      - name: Build CLI
+        run: scripts/cli/build_cli_release.sh "Linux" "${{ inputs.release_version }}" "${{ inputs.skip_checks }}" "false"
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-builds-linux-x86_64
+          path: movement-cli-*.zip
+
+  build-macos-x86_64:
+    name: "Build macOS x86_64"
+    runs-on: macos-14-large
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.source_git_ref_override }}
+      - uses: ./.github/actions/cli-rust-setup
+      - name: Build CLI
+        run: scripts/cli/build_cli_release.sh "macOS" "${{ inputs.release_version }}" "${{ inputs.skip_checks }}" "false"
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-builds-macos-x86_64
+          path: movement-cli-*.zip
+
+  build-macos-arm64:
+    name: "Build macOS ARM64"
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.source_git_ref_override }}
+      - uses: ./.github/actions/cli-rust-setup
+      - name: Build CLI
+        run: scripts/cli/build_cli_release.sh "macOS" "${{ inputs.release_version }}" "${{ inputs.skip_checks }}" "false"
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-builds-macos-arm64
+          path: movement-cli-*.zip
+
+  release:
+    name: "Create GitHub Release"
+    needs:
+      - build-linux-x86_64
+      - build-macos-x86_64
+      - build-macos-arm64
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    if: ${{ inputs.dry_run == false }}
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: cli-builds-*
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -la movement-cli-*.zip
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "movement-cli-v${{ inputs.release_version }}"
+          name: "Movement CLI v${{ inputs.release_version }}"
+          draft: false
+          prerelease: false
+          files: movement-cli-*.zip
+          generate_release_notes: true
