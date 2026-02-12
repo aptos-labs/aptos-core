@@ -572,7 +572,7 @@ fn start_node_mempool(
         })
         .unwrap();
 
-    let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
+    let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None, None);
     start_shared_mempool(
         runtime.handle(),
         &config,

@@ -162,7 +162,7 @@ pub async fn create_emitter_and_request(
 }
 
 pub fn traffic_emitter_runtime() -> Result<Runtime> {
-    let runtime = aptos_runtimes::spawn_named_runtime("emitter".into(), Some(64));
+    let runtime = aptos_runtimes::spawn_named_runtime("emitter".into(), Some(64), None);
     Ok(runtime)
 }
 

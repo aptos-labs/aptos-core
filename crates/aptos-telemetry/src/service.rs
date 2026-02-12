@@ -131,6 +131,7 @@ pub fn start_telemetry_service(
     let telemetry_runtime = aptos_runtimes::spawn_named_runtime(
         "telemetry".into(),
         node_config.telemetry_service.num_threads,
+        Some(4),
     );
     telemetry_runtime.handle().spawn(spawn_telemetry_service(
         node_config,

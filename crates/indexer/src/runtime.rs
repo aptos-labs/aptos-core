@@ -84,7 +84,7 @@ pub fn bootstrap(
         return None;
     }
 
-    let runtime = aptos_runtimes::spawn_named_runtime("indexer".into(), None);
+    let runtime = aptos_runtimes::spawn_named_runtime("indexer".into(), Some(4), Some(4));
 
     let indexer_config = config.indexer.clone();
     let node_config = config.clone();

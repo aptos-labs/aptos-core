@@ -438,7 +438,7 @@ pub fn setup_networks_and_get_interfaces(
         );
         let netbench_service_threads = node_config.netbench.unwrap().netbench_service_threads;
         let netbench_runtime =
-            aptos_runtimes::spawn_named_runtime("benchmark".into(), netbench_service_threads);
+            aptos_runtimes::spawn_named_runtime("benchmark".into(), netbench_service_threads, Some(8));
         start_netbench_service(node_config, netbench_interfaces, netbench_runtime.handle());
         network_runtimes.push(netbench_runtime);
     }
@@ -465,7 +465,7 @@ fn create_network_runtime(network_config: &NetworkConfig) -> Runtime {
         "network-{}",
         network_id.as_str().chars().take(3).collect::<String>()
     );
-    aptos_runtimes::spawn_named_runtime(thread_name, network_config.runtime_threads)
+    aptos_runtimes::spawn_named_runtime(thread_name, network_config.runtime_threads, Some(8))
 }
 
 /// Registers a new application client and service with the network

@@ -243,6 +243,7 @@ pub fn start_peer_monitoring_service(
     let peer_monitoring_service_runtime = aptos_runtimes::spawn_named_runtime(
         "peer-mon".into(),
         node_config.peer_monitoring_service.num_threads,
+        Some(4),
     );
 
     // Create and spawn the peer monitoring server

@@ -250,7 +250,7 @@ fn create_consensus_publisher(
     }
 
     // Create the publisher runtime
-    let runtime = aptos_runtimes::spawn_named_runtime("publisher".into(), None);
+    let runtime = aptos_runtimes::spawn_named_runtime("publisher".into(), Some(4), Some(4));
 
     // Create the consensus publisher
     let (consensus_publisher, outbound_message_receiver) =
@@ -278,7 +278,7 @@ fn create_observer_network_handler(
     Receiver<(), ConsensusPublisherNetworkMessage>,
 ) {
     // Create the consensus observer runtime
-    let consensus_observer_runtime = aptos_runtimes::spawn_named_runtime("observer".into(), None);
+    let consensus_observer_runtime = aptos_runtimes::spawn_named_runtime("observer".into(), Some(8), Some(16));
 
     // Create the consensus observer network events
     let consensus_observer_events = ConsensusObserverNetworkEvents::new(consensus_observer_events);

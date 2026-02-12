@@ -35,7 +35,7 @@ pub fn start_dkg_runtime(
     rb_config: ReliableBroadcastConfig,
     randomness_override_seq_num: u64,
 ) -> Runtime {
-    let runtime = aptos_runtimes::spawn_named_runtime("dkg".into(), Some(4));
+    let runtime = aptos_runtimes::spawn_named_runtime("dkg".into(), Some(4), Some(4));
     let (self_sender, self_receiver) = aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
     let dkg_network_client = DKGNetworkClient::new(network_client);
 

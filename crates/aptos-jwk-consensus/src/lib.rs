@@ -31,7 +31,7 @@ pub fn start_jwk_consensus_runtime(
     jwk_updated_events: EventNotificationListener,
     vtxn_pool_writer: VTxnPoolState,
 ) -> Runtime {
-    let runtime = aptos_runtimes::spawn_named_runtime("jwk".into(), Some(4));
+    let runtime = aptos_runtimes::spawn_named_runtime("jwk".into(), Some(4), Some(4));
     let (self_sender, self_receiver) = aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
     let jwk_consensus_network_client = JWKConsensusNetworkClient::new(network_client);
     let epoch_manager = EpochManager::new(
