@@ -62,8 +62,8 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, ops::AddAssign};
 
 /// Core trait for types that expose dealt key shares and decryption.
-/// Shared by both [Subtranscript] and [Transcript] to avoid duplicating associated types and methods.
-pub trait TranscriptCore {
+/// Implemented by both the aggregatable "subtranscript" type and full [Transcript]s.
+pub trait TranscriptCore: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     type PublicParameters: HasEncryptionPublicParams
         + WithMaxNumShares
         + Default
@@ -119,21 +119,13 @@ pub trait TranscriptCore {
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare);
 }
 
-/// A subtranscript (e.g. the aggregatable part of a full transcript) that exposes shares and decryption.
-pub trait Subtranscript:
-    TranscriptCore + Debug + ValidCryptoMaterial + Clone + PartialEq + Eq
-{
-}
-
 /// A trait for a PVSS protocol transcript. This trait allows both for:
 ///
 /// 1. Normal/unweighted $t$-out-of-$n$ PVSS protocols where any $t$ players (or more) can
 ///    reconstruct the secret (but no fewer can)
 /// 2. Weighted $w$-out-of-$W$ PVSS protocols where any players with combined weight $\ge w$ can
 ///    reconstruct the secret (but players with combined weight $< w$ cannot)
-pub trait Transcript:
-    TranscriptCore + Debug + ValidCryptoMaterial + Clone + PartialEq + Eq
-{
+pub trait Transcript: TranscriptCore {
     type SigningSecretKey: Uniform + SigningKey<VerifyingKeyMaterial = Self::SigningPubKey>;
     type SigningPubKey: VerifyingKey<SigningKeyMaterial = Self::SigningSecretKey>;
 
@@ -156,7 +148,7 @@ pub trait Transcript:
     /// The dealer will sign the transcript (or part of it; typically just a commitment to the dealt
     /// secret) together with his player ID in `dealer` and the auxiliary data in `aux` (which might
     /// be needed for the security of higher-level protocols; e.g., replay protection).
-    fn deal<A: Serialize + Clone, R: rand_core::RngCore + rand_core::CryptoRng>(
+    fn deal<A: Serialize + Clone, R: RngCore + CryptoRng>(
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         ssk: &Self::SigningSecretKey,
@@ -176,13 +168,11 @@ pub trait Transcript:
 
     /// Generates a random looking transcript (but not a valid one).
     /// Useful for testing and benchmarking.
-    fn generate<R>(
+    fn generate<R: RngCore + CryptoRng>(
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         rng: &mut R,
-    ) -> Self
-    where
-        R: rand_core::RngCore + rand_core::CryptoRng;
+    ) -> Self;
 }
 
 /// Trait for types that can be aggregated.
@@ -250,9 +240,11 @@ pub trait AggregatableTranscript:
     ) -> anyhow::Result<()>;
 }
 
+/// Transcript that has an aggregatable part with the same core interface as the transcript.
 pub trait HasAggregatableSubtranscript: Transcript {
+    /// The aggregatable subtranscript type; must match this transcript's core associated types.
     type Subtranscript: Aggregatable
-        + Subtranscript<
+        + TranscriptCore<
             PublicParameters = Self::PublicParameters,
             SecretSharingConfig = Self::SecretSharingConfig,
             DealtPubKeyShare = Self::DealtPubKeyShare,

@@ -2,14 +2,14 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use anyhow::Result;
 use aptos_crypto::player::Player;
-use aptos_dkg::pvss::traits::{Subtranscript, TranscriptCore};
+use aptos_dkg::pvss::traits::TranscriptCore;
 use ark_std::rand::{CryptoRng, RngCore};
 use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;
 
 pub trait BatchThresholdEncryption {
     type ThresholdConfig: aptos_crypto::TSecretSharingConfig;
-    type SubTranscript: Subtranscript;
+    type SubTranscript: TranscriptCore;
 
     /// An encryption key for the scheme. Allows for generating ciphertexts. If we want to actually
     /// deploy this scheme, the functionality here will have to be implemented in the SDK.

@@ -3,7 +3,6 @@
 
 use crate::{
     pvss::chunky::{chunked_elgamal::decrypt_chunked_scalars, keys, PublicParameters},
-    traits,
     traits::{transcript::Aggregated, Aggregatable, TranscriptCore},
     Scalar,
 };
@@ -263,9 +262,4 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
             pk_shares, // TODO: review this formalism... why do we need this here?
         )
     }
-}
-
-impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Subtranscript
-    for Subtranscript<E>
-{
 }
