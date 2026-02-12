@@ -18,7 +18,8 @@ set -e
 
 NAME='movement-cli'
 CRATE_NAME='movement'
-CARGO_PATH="crates/$CRATE_NAME/Cargo.toml"
+CRATE_DIR='aptos'
+CARGO_PATH="crates/$CRATE_DIR/Cargo.toml"
 PLATFORM_NAME="$1"
 EXPECTED_VERSION="$2"
 SKIP_CHECKS="$3"
