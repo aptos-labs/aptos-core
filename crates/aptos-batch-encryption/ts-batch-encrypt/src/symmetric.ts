@@ -3,7 +3,7 @@
 import { randomBytes } from '@noble/ciphers/utils.js';
 import { gcm } from '@noble/ciphers/aes.js';
 import { Serializable, Serializer, Deserializer } from "@aptos-labs/ts-sdk";
-import { hmac } from '@noble/hashes/hmac.js';
+import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { type H2COpts, hash_to_field } from '@noble/curves/abstract/hash-to-curve.js';
 import { bls12_381 } from '@noble/curves/bls12-381.js';
@@ -127,10 +127,15 @@ export class SymmetricKey extends Serializable {
   }
 }
 
+// Domain separation salt for the OTP KDF.
+// This must be identical between Rust and TypeScript implementations.
+const HKDF_SALT = new TextEncoder().encode("APTOS_BATCH_ENCRYPTION_OTP");
+
+/**
+ * Derives a 32-byte key from high-entropy source bytes using HKDF (RFC 5869).
+ */
 export function hmac_kdf(otp_source: Uint8Array): Uint8Array {
-  var mac = hmac.create(sha256, new Uint8Array());
-  mac.update(otp_source);
-  return mac.digest();
+  return hkdf(sha256, otp_source, HKDF_SALT, new Uint8Array(), 32);
 }
 
 
