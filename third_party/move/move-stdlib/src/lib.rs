@@ -21,8 +21,6 @@ const MODULES_DIR: &str = "sources";
 const NURSERY_DIR: &str = "nursery";
 const DOCS_DIR: &str = "docs";
 const NURSERY_DOCS_DIR: &str = "nursery/docs";
-const ERRMAP_FILE: &str = "error_description.errmap";
-
 const REFERENCES_TEMPLATE: &str = "doc_templates/references.md";
 const OVERVIEW_TEMPLATE: &str = "doc_templates/overview.md";
 
@@ -52,10 +50,6 @@ pub fn move_stdlib_docs_full_path() -> String {
 
 pub fn move_nursery_docs_full_path() -> String {
     format!("{}/{}", env!("CARGO_MANIFEST_DIR"), NURSERY_DOCS_DIR)
-}
-
-pub fn move_stdlib_errmap_full_path() -> String {
-    format!("{}/{}", env!("CARGO_MANIFEST_DIR"), ERRMAP_FILE)
 }
 
 pub fn move_stdlib_files() -> Vec<String> {
@@ -156,39 +150,4 @@ pub fn build_nursery_doc(output_path: &str) {
         false,
         move_stdlib_named_addresses(),
     )
-}
-
-pub fn build_error_code_map(output_path: &str) {
-    let named_address_mapping: Vec<String> = move_stdlib_named_addresses()
-        .iter()
-        .map(|(name, addr)| format!("{}={}", name, addr))
-        .collect();
-    let compiler_options = move_compiler_v2::Options {
-        sources: crate::move_stdlib_files(),
-        dependencies: vec![],
-        named_address_mapping,
-        skip_attribute_checks: true,
-        compile_verify_code: true,
-        ..Default::default()
-    };
-    let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
-    let model =
-        move_compiler_v2::run_move_compiler_for_analysis(&mut error_writer, compiler_options)
-            .expect("model building failed");
-    let errmapgen_options = move_errmapgen::ErrmapOptions {
-        output_file: output_path.to_string(),
-        ..Default::default()
-    };
-    let mut generator = move_errmapgen::ErrmapGen::new(&model, &errmapgen_options);
-    generator.r#gen();
-    generator.save_result();
-    if model.has_errors() {
-        panic!("error map generation failed");
-    }
-}
-
-const ERROR_DESCRIPTIONS: &[u8] = include_bytes!("../error_description.errmap");
-
-pub fn error_descriptions() -> &'static [u8] {
-    ERROR_DESCRIPTIONS
 }

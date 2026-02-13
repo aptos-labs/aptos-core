@@ -12697,20 +12697,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-errmapgen"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "codespan-reporting",
- "datatest-stable",
- "move-command-line-common",
- "move-core-types",
- "move-model",
- "move-prover",
- "serde",
-]
-
-[[package]]
 name = "move-examples"
 version = "0.1.1"
 dependencies = [
@@ -12920,7 +12906,6 @@ dependencies = [
  "log",
  "move-command-line-common",
  "move-compiler-v2",
- "move-errmapgen",
  "move-model",
  "move-package",
  "move-prover-boogie-backend",
@@ -13065,8 +13050,6 @@ version = "0.1.1"
 dependencies = [
  "anyhow",
  "codespan-reporting",
- "dir-diff",
- "file_diff",
  "hex",
  "legacy-move-compiler",
  "move-binary-format",
@@ -13074,7 +13057,6 @@ dependencies = [
  "move-compiler-v2",
  "move-core-types",
  "move-docgen",
- "move-errmapgen",
  "move-package",
  "move-prover",
  "move-unit-test",
