@@ -18,7 +18,6 @@ log = { workspace = true, features = ["serde"] }
 move-abigen = { workspace = true }
 move-command-line-common = { workspace = true }
 move-compiler-v2 = { workspace = true }
-move-docgen = { workspace = true }
 move-errmapgen = { workspace = true }
 move-model = { workspace = true }
 move-package = { workspace = true }

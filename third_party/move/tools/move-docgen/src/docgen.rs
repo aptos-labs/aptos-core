@@ -68,28 +68,37 @@ pub enum OutputFormat {
 }
 
 /// Options passed into the documentation generator.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, clap::Parser, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct DocgenOptions {
     /// The level where we start sectioning. Often markdown sections are rendered with
     /// unnecessary large section fonts, setting this value high reduces the size.
+    #[clap(long, default_value_t = 1)]
     pub section_level_start: usize,
     /// Whether to include private functions in the generated docs.
+    #[clap(long, action = clap::ArgAction::Set, default_value_t = true)]
     pub include_private_fun: bool,
     /// Whether to include specifications in the generated docs.
+    #[clap(long, action = clap::ArgAction::Set, default_value_t = true)]
     pub include_specs: bool,
     /// Whether to put specifications in the same section as a declaration or put them all
     /// into an independent section.
+    #[clap(long, action = clap::ArgAction::Set, default_value_t = true)]
     pub specs_inlined: bool,
     /// Whether to include Move implementations.
+    #[clap(long, action = clap::ArgAction::Set, default_value_t = true)]
     pub include_impl: bool,
     /// Max depth to which sections are displayed in table-of-contents.
+    #[clap(long, default_value_t = 3)]
     pub toc_depth: usize,
     /// Whether to use collapsed sections (`<details>`) for implementation and specs
+    #[clap(long, action = clap::ArgAction::Set, default_value_t = true)]
     pub collapsed_sections: bool,
     /// In which directory to store output.
+    #[clap(long, default_value = "doc")]
     pub output_directory: String,
     /// In which directories to look for references.
+    #[clap(long, default_value = "doc")]
     pub doc_path: Vec<String>,
     /// A list of paths to files containing templates for root documents for the generated
     /// documentation.
@@ -114,19 +123,26 @@ pub struct DocgenOptions {
     /// For a module or script which is included in the root document, no
     /// separate file is generated. References between the included and the standalone
     /// module/script content work transparently.
+    #[clap(long)]
     pub root_doc_templates: Vec<String>,
     /// An optional file containing reference definitions. The content of this file will
     /// be added to each generated Markdown doc.
+    #[clap(long)]
     pub references_file: Option<String>,
     /// Whether to include dependency diagrams in the generated docs.
+    #[clap(long)]
     pub include_dep_diagrams: bool,
     /// Whether to include call diagrams in the generated docs.
+    #[clap(long)]
     pub include_call_diagrams: bool,
     /// If this is being compiled relative to a different place where it will be stored (output directory).
+    #[clap(long)]
     pub compile_relative_to_output_dir: bool,
     /// Output format for docs, either MD or MDX
+    #[clap(long, value_enum)]
     pub output_format: Option<OutputFormat>,
     /// Ensure Unix paths
+    #[clap(long)]
     pub ensure_unix_paths: bool,
 }
 

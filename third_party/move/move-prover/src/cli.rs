@@ -12,7 +12,6 @@ use codespan_reporting::diagnostic::Severity;
 use legacy_move_compiler::{command_line::SKIP_ATTRIBUTE_CHECKS, shared::NumericalAddress};
 use log::LevelFilter;
 use move_abigen::AbigenOptions;
-use move_docgen::DocgenOptions;
 use move_errmapgen::ErrmapOptions;
 use move_model::{
     metadata::LanguageVersion, model::VerificationScope, options::ModelBuilderOptions,
@@ -39,8 +38,6 @@ pub struct Options {
     pub output_path: String,
     /// Verbosity level for logging.
     pub verbosity_level: LevelFilter,
-    /// Whether to run the documentation generator instead of the prover.
-    pub run_docgen: bool,
     /// Whether to run the ABI generator instead of the prover.
     pub run_abigen: bool,
     /// Whether to run the error map generator instead of the prover.
@@ -70,8 +67,6 @@ pub struct Options {
     /// BEGIN OF STRUCTURED OPTIONS. DO NOT ADD VALUE FIELDS AFTER THIS
     /// Options for the model builder.
     pub model_builder: ModelBuilderOptions,
-    /// Options for the documentation generator.
-    pub docgen: DocgenOptions,
     /// Options for the prover.
     pub prover: ProverOptions,
     /// Options for the prover backend.
@@ -88,7 +83,6 @@ impl Default for Options {
     fn default() -> Self {
         Self {
             output_path: "output.bpl".to_string(),
-            run_docgen: false,
             run_abigen: false,
             run_errmapgen: false,
             run_read_write_set: false,
@@ -99,7 +93,6 @@ impl Default for Options {
             model_builder: ModelBuilderOptions::default(),
             prover: ProverOptions::default(),
             backend: BoogieOptions::default(),
-            docgen: DocgenOptions::default(),
             abigen: AbigenOptions::default(),
             errmapgen: ErrmapOptions::default(),
             experimental_pipeline: false,
@@ -287,19 +280,6 @@ impl Options {
                     .num_args(0..)
                     .help("Specify one simplification pass to run on the specifications. \
                     This option May be specified multiple times to compose a pipeline")
-            )
-            .arg(
-                Arg::new("docgen")
-                    .long("docgen")
-                    .action(SetTrue)
-                    .help("runs the documentation generator instead of the prover. \
-                    Generated docs will be written into the directory `./doc` unless configured otherwise via toml"),
-            )
-            .arg(
-                Arg::new("docgen-template")
-                    .long("docgen-template")
-                    .value_name("FILE")
-                    .help("a template for documentation generation."),
             )
             .arg(
                 Arg::new("abigen")
@@ -616,16 +596,6 @@ impl Options {
         }
         if matches.get_flag("ignore-pragma-opaque-internal-only") {
             options.model_builder.ignore_pragma_opaque_internal_only = true;
-        }
-        if matches.get_flag("docgen") {
-            options.run_docgen = true;
-        }
-        if matches.contains_id("docgen-template") {
-            options.run_docgen = true;
-            options.docgen.root_doc_templates = vec![matches
-                .get_one("docgen-template")
-                .map(|s: &&str| s.to_string())
-                .unwrap()]
         }
         if matches.get_flag("abigen") {
             options.run_abigen = true;
