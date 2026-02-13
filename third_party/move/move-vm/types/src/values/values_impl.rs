@@ -4404,6 +4404,13 @@ impl GlobalValue {
     pub fn is_mutated(&self) -> bool {
         self.0.is_mutated()
     }
+
+    pub fn as_value(&self) -> Option<&Value> {
+        match &self.0 {
+            GlobalValueImpl::None | GlobalValueImpl::Deleted => None,
+            GlobalValueImpl::Fresh { value } | GlobalValueImpl::Cached { value, .. } => Some(value),
+        }
+    }
 }
 
 /***************************************************************************************
@@ -6281,5 +6288,242 @@ impl Value {
     /// Returns an error with `VM_MAX_VALUE_DEPTH_REACHED` if the depth is exceeded.
     pub fn check_depth_of_value(&self, max_depth: u64) -> PartialVMResult<()> {
         self.visit(&mut DepthCheckingVisitor { max_depth })
+    }
+}
+
+/***************************************************************************************
+ *
+ * Size Estimation for Metrics
+ *
+ **************************************************************************************/
+
+/// Represents the memory footprint of a value.
+///
+/// Captures both the inline size (pointers, primitives) and separate heap allocations.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ValueSize {
+    /// Size of data stored inline (pointers for containers, actual data for primitives)
+    pub inline_bytes: usize,
+    /// Sizes of separate heap allocations (vector data, struct fields, nested structures)
+    /// Empty if everything fits inline (e.g., primitives, references)
+    pub heap_allocations: Vec<usize>,
+}
+
+impl ValueSize {
+    /// Create a size for primitive values (stored entirely inline)
+    pub fn primitive(bytes: usize) -> Self {
+        Self {
+            inline_bytes: bytes,
+            heap_allocations: vec![],
+        }
+    }
+
+    /// Create a size for reference values (8-byte pointer)
+    pub fn reference() -> Self {
+        Self {
+            inline_bytes: 8,
+            heap_allocations: vec![],
+        }
+    }
+
+    /// Total memory usage across all allocations
+    pub fn total_bytes(&self) -> usize {
+        self.inline_bytes + self.heap_allocations.iter().sum::<usize>()
+    }
+}
+
+impl Value {
+    /// Estimate the memory size of this value in the current Move VM.
+    pub fn estimate_size(&self) -> ValueSize {
+        match self {
+            Value::U8(_) => ValueSize::primitive(1),
+            Value::U16(_) => ValueSize::primitive(2),
+            Value::U32(_) => ValueSize::primitive(4),
+            Value::U64(_) => ValueSize::primitive(8),
+            Value::U128(_) => ValueSize::primitive(16),
+            Value::U256(_) => ValueSize::primitive(32),
+            Value::I8(_) => ValueSize::primitive(1),
+            Value::I16(_) => ValueSize::primitive(2),
+            Value::I32(_) => ValueSize::primitive(4),
+            Value::I64(_) => ValueSize::primitive(8),
+            Value::I128(_) => ValueSize::primitive(16),
+            Value::I256(_) => ValueSize::primitive(32),
+            Value::Bool(_) => ValueSize::primitive(1),
+            Value::Address(_) => ValueSize::primitive(32),
+            Value::DelayedFieldID { .. } => ValueSize::reference(), // Pointer-sized
+            Value::Container(c) => c.estimate_size(),
+            Value::ContainerRef(_) | Value::IndexedRef(_) => ValueSize::reference(), // 8-byte pointers
+            Value::ClosureValue(_) => ValueSize::reference(), // Treat as pointer
+            Value::Invalid => ValueSize::primitive(0),
+        }
+    }
+}
+
+impl Container {
+    /// Estimate the memory size of this container in the current Move VM.
+    fn estimate_size(&self) -> ValueSize {
+        match self {
+            // Specialized vectors
+            // Memory layout: Rc pointer (8 bytes inline) + Vec header (24 bytes) + data buffer
+            Container::VecU8(r) => {
+                let len = r.borrow().len();
+                ValueSize {
+                    inline_bytes: 8,
+                    heap_allocations: vec![24, len],
+                }
+            },
+            Container::VecU16(r) => {
+                let len = r.borrow().len();
+                ValueSize {
+                    inline_bytes: 8,
+                    heap_allocations: vec![24, len * 2],
+                }
+            },
+            Container::VecU32(r) => {
+                let len = r.borrow().len();
+                ValueSize {
+                    inline_bytes: 8,
+                    heap_allocations: vec![24, len * 4],
+                }
+            },
+            Container::VecU64(r) => {
+                let len = r.borrow().len();
+                ValueSize {
+                    inline_bytes: 8,
+                    heap_allocations: vec![24, len * 8],
+                }
+            },
+            Container::VecU128(r) => {
+                let len = r.borrow().len();
+                ValueSize {
+                    inline_bytes: 8,
+                    heap_allocations: vec![24, len * 16],
+                }
+            },
+            Container::VecU256(r) => {
+                let len = r.borrow().len();
+                ValueSize {
+                    inline_bytes: 8,
+                    heap_allocations: vec![24, len * 32],
+                }
+            },
+            Container::VecI8(r) => {
+                let len = r.borrow().len();
+                ValueSize {
+                    inline_bytes: 8,
+                    heap_allocations: vec![24, len],
+                }
+            },
+            Container::VecI16(r) => {
+                let len = r.borrow().len();
+                ValueSize {
+                    inline_bytes: 8,
+                    heap_allocations: vec![24, len * 2],
+                }
+            },
+            Container::VecI32(r) => {
+                let len = r.borrow().len();
+                ValueSize {
+                    inline_bytes: 8,
+                    heap_allocations: vec![24, len * 4],
+                }
+            },
+            Container::VecI64(r) => {
+                let len = r.borrow().len();
+                ValueSize {
+                    inline_bytes: 8,
+                    heap_allocations: vec![24, len * 8],
+                }
+            },
+            Container::VecI128(r) => {
+                let len = r.borrow().len();
+                ValueSize {
+                    inline_bytes: 8,
+                    heap_allocations: vec![24, len * 16],
+                }
+            },
+            Container::VecI256(r) => {
+                let len = r.borrow().len();
+                ValueSize {
+                    inline_bytes: 8,
+                    heap_allocations: vec![24, len * 32],
+                }
+            },
+            Container::VecBool(r) => {
+                let len = r.borrow().len();
+                ValueSize {
+                    inline_bytes: 8,
+                    heap_allocations: vec![24, len],
+                }
+            },
+            Container::VecAddress(r) => {
+                let len = r.borrow().len();
+                ValueSize {
+                    inline_bytes: 8,
+                    heap_allocations: vec![24, len * 32],
+                }
+            },
+            // General vector - contains arbitrary Values
+            // Memory layout: Rc pointer (8 bytes inline) + Vec header (24 bytes) + element data buffer
+            Container::Vec(r) => {
+                let vals = r.borrow();
+                let mut heap_total = 0;
+                let mut all_heap_allocations = Vec::new();
+
+                for val in vals.iter() {
+                    let size = val.estimate_size();
+                    heap_total += size.inline_bytes; // Elements' inline sizes contribute to vec's data buffer
+                    all_heap_allocations.extend(size.heap_allocations); // Nested heap allocations
+                }
+
+                // Allocations: Vec header (24 bytes), then the data buffer, then nested allocations
+                let mut result = vec![24, heap_total];
+                result.extend(all_heap_allocations);
+                ValueSize {
+                    inline_bytes: 8,
+                    heap_allocations: result,
+                }
+            },
+            // Struct - stored behind Rc with fields
+            Container::Struct(r) => {
+                let vals = r.borrow();
+                // 8-byte pointer inline + heap allocation for struct fields
+                let mut heap_total = 0;
+                let mut all_heap_allocations = Vec::new();
+
+                for val in vals.iter() {
+                    let size = val.estimate_size();
+                    heap_total += size.inline_bytes; // Fields' inline sizes contribute to struct's heap allocation
+                    all_heap_allocations.extend(size.heap_allocations); // Nested heap allocations
+                }
+
+                // First allocation is the struct itself
+                let mut result = vec![heap_total];
+                result.extend(all_heap_allocations);
+                ValueSize {
+                    inline_bytes: 8,
+                    heap_allocations: result,
+                }
+            },
+            // Locals container
+            Container::Locals(r) => {
+                let vals = r.borrow();
+                let mut heap_total = 0;
+                let mut all_heap_allocations = Vec::new();
+
+                for val in vals.iter() {
+                    let size = val.estimate_size();
+                    heap_total += size.inline_bytes;
+                    all_heap_allocations.extend(size.heap_allocations);
+                }
+
+                let mut result = vec![heap_total];
+                result.extend(all_heap_allocations);
+                ValueSize {
+                    inline_bytes: 8,
+                    heap_allocations: result,
+                }
+            },
+        }
     }
 }
