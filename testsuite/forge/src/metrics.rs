@@ -45,7 +45,7 @@ impl ClusterPhase {
 /// Labels: namespace, phase, success
 pub static FORGE_CLUSTER_SPINUP_DURATION_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
-        "forge_cluster_spinup_duration_seconds",
+        "aptos_forge_cluster_spinup_duration_seconds",
         "Duration of cluster spin-up phases in seconds",
         &["namespace", "phase", "success"],
         // Buckets from 1s to ~17 minutes (1024s)
@@ -58,7 +58,7 @@ pub static FORGE_CLUSTER_SPINUP_DURATION_SECONDS: Lazy<HistogramVec> = Lazy::new
 /// Labels: namespace, phase, success
 pub static FORGE_CLUSTER_SPINUP_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "forge_cluster_spinup_total",
+        "aptos_forge_cluster_spinup_total",
         "Total count of cluster spin-up phase attempts",
         &["namespace", "phase", "success"]
     )

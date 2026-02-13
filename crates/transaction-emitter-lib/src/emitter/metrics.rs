@@ -15,7 +15,7 @@ use once_cell::sync::Lazy;
 /// Counter for total transactions submitted across all workers.
 pub static TXN_EMITTER_SUBMITTED: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "txn_emitter_submitted_total",
+        "aptos_txn_emitter_submitted_total",
         "Total number of transactions submitted by the emitter"
     )
     .unwrap()
@@ -24,7 +24,7 @@ pub static TXN_EMITTER_SUBMITTED: Lazy<IntCounter> = Lazy::new(|| {
 /// Counter for total transactions committed.
 pub static TXN_EMITTER_COMMITTED: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "txn_emitter_committed_total",
+        "aptos_txn_emitter_committed_total",
         "Total number of transactions committed on chain"
     )
     .unwrap()
@@ -33,7 +33,7 @@ pub static TXN_EMITTER_COMMITTED: Lazy<IntCounter> = Lazy::new(|| {
 /// Counter for total transactions that expired without being committed.
 pub static TXN_EMITTER_EXPIRED: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "txn_emitter_expired_total",
+        "aptos_txn_emitter_expired_total",
         "Total number of transactions that expired"
     )
     .unwrap()
@@ -42,7 +42,7 @@ pub static TXN_EMITTER_EXPIRED: Lazy<IntCounter> = Lazy::new(|| {
 /// Counter for total failed transaction submissions.
 pub static TXN_EMITTER_FAILED_SUBMISSION: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "txn_emitter_failed_submission_total",
+        "aptos_txn_emitter_failed_submission_total",
         "Total number of failed transaction submissions"
     )
     .unwrap()
@@ -52,7 +52,7 @@ pub static TXN_EMITTER_FAILED_SUBMISSION: Lazy<IntCounter> = Lazy::new(|| {
 /// Buckets range from 100ms to ~26 seconds (exponential).
 pub static TXN_EMITTER_LATENCY_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
-        "txn_emitter_latency_seconds",
+        "aptos_txn_emitter_latency_seconds",
         "Transaction latency from submission to commit in seconds",
         // Buckets from 0.1s to ~26s
         exponential_buckets(0.1, 2.0, 9).unwrap()
@@ -63,7 +63,7 @@ pub static TXN_EMITTER_LATENCY_SECONDS: Lazy<Histogram> = Lazy::new(|| {
 /// Gauge for current committed transactions per second.
 pub static TXN_EMITTER_COMMITTED_TPS: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "txn_emitter_committed_tps",
+        "aptos_txn_emitter_committed_tps",
         "Current committed transactions per second"
     )
     .unwrap()
@@ -72,7 +72,7 @@ pub static TXN_EMITTER_COMMITTED_TPS: Lazy<IntGauge> = Lazy::new(|| {
 /// Gauge for current submitted transactions per second.
 pub static TXN_EMITTER_SUBMITTED_TPS: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "txn_emitter_submitted_tps",
+        "aptos_txn_emitter_submitted_tps",
         "Current submitted transactions per second"
     )
     .unwrap()
