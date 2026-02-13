@@ -774,7 +774,7 @@ reconfiguration with DKG and Chunky DKG after epoch timed out.
     <a href="decryption.md#0x1_decryption_on_new_block">decryption::on_new_block</a>(&vm, epoch, round, decryption_key);
 
     <b>if</b> (<a href="timestamp.md#0x1_timestamp">timestamp</a> - <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>() &gt;= epoch_interval) {
-        <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_try_start">reconfiguration_with_dkg::try_start</a>();
+        <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_try_start_with_chunky_dkg">reconfiguration_with_dkg::try_start_with_chunky_dkg</a>();
     };
 }
 </code></pre>
