@@ -97,7 +97,6 @@ pub fn run_model_builder_in_compiler_mode(
         ModelBuilderOptions {
             language_version,
             compile_for_testing: compile_test_code,
-            ..ModelBuilderOptions::default()
         },
         Flags::model_compilation()
             .set_warn_of_deprecation_use(warn_of_deprecation_use)

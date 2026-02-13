@@ -50,10 +50,6 @@ pub struct ProverOptions {
     #[clap(long)]
     pub cvc5: bool,
 
-    /// The depth until which stratified functions are expanded.
-    #[clap(long)]
-    pub stratification_depth: Option<usize>,
-
     /// A seed for the prover.
     #[clap(long)]
     pub random_seed: Option<usize>,
@@ -169,7 +165,6 @@ impl ProverOptions {
         )?;
         let mut options = self.convert_options(package_path)?;
         options.language_version = language_version;
-        options.model_builder.language_version = language_version.unwrap_or_default();
         // Need to ensure a distinct output.bpl file for concurrent execution. In non-test
         // mode, we actually want to use the static output.bpl for debugging purposes
         let _temp_holder = if for_test {
@@ -246,9 +241,6 @@ impl ProverOptions {
                 use_cvc5: self.cvc5 || base_opts.backend.use_cvc5,
                 boogie_flags: vec![],
                 generate_smt: self.dump || base_opts.backend.generate_smt,
-                stratification_depth: self
-                    .stratification_depth
-                    .unwrap_or(base_opts.backend.stratification_depth),
                 proc_cores: self.proc_cores.unwrap_or(base_opts.backend.proc_cores),
                 shards: self.shards.unwrap_or(base_opts.backend.shards),
                 only_shard: self.only_shard.or(base_opts.backend.only_shard),
