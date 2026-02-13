@@ -151,7 +151,7 @@ impl TimedFeatureFlag {
                 .unwrap()
                 .with_timezone(&Utc),
             (ClosureDepthCheck, MAINNET) => Los_Angeles
-                .with_ymd_and_hms(2026, 2, 5, 10, 0, 0)
+                .with_ymd_and_hms(2026, 2, 9, 12, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 
@@ -164,7 +164,7 @@ impl TimedFeatureFlag {
                 .unwrap()
                 .with_timezone(&Utc),
             (FixCryptoAlgebraNativesResultHandling, MAINNET) => Los_Angeles
-                .with_ymd_and_hms(2026, 2, 5, 10, 0, 0)
+                .with_ymd_and_hms(2026, 2, 9, 12, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 
@@ -178,7 +178,7 @@ impl TimedFeatureFlag {
                 .unwrap()
                 .with_timezone(&Utc),
             (UseFullTransactionSizeForGasCheck, MAINNET) => Los_Angeles
-                .with_ymd_and_hms(2026, 2, 5, 10, 0, 0)
+                .with_ymd_and_hms(2026, 2, 9, 12, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 
