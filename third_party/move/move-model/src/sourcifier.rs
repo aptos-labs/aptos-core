@@ -21,7 +21,7 @@ use crate::{
 };
 use itertools::Itertools;
 use move_core_types::ability::AbilitySet;
-use num::BigInt;
+use num::{BigInt, Zero};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet},
@@ -318,6 +318,13 @@ impl<'a> Sourcifier<'a> {
                         return;
                     }
                 }
+                // Try MAX - k or MIN + k for small offsets (spec context only)
+                if for_spec {
+                    if let Some(s) = self.near_bound_name(ty, int) {
+                        emit!(self.writer, "{}", s);
+                        return;
+                    }
+                }
                 emit!(self.writer, "{}", int);
                 // Only print type suffix when not in spec context (specs use arbitrary precision)
                 if !for_spec {
@@ -418,6 +425,58 @@ impl<'a> Sourcifier<'a> {
             });
         }
         None
+    }
+
+    /// Returns a display string for a value near a type bound, e.g. `MAX_U64 - 1`.
+    /// Only used for small offsets (≤ 32) and when the value's decimal representation
+    /// is long enough that the bound expression is more readable (≥ 5 digits).
+    fn near_bound_name(&self, ty: Option<&Type>, value: &BigInt) -> Option<String> {
+        // Only use offset notation for values large enough to be unreadable as decimal
+        let decimal_str = value.to_string();
+        let decimal_len = if decimal_str.starts_with('-') {
+            decimal_str.len() - 1
+        } else {
+            decimal_str.len()
+        };
+        if decimal_len < 5 {
+            return None;
+        }
+        let try_prim = |prim: &PrimitiveType, value: &BigInt| -> Option<String> {
+            if let Some(max) = prim.get_max_value() {
+                let diff = &max - value;
+                if diff > BigInt::zero() && diff <= BigInt::from(32) {
+                    if let Some(name) = self.min_max_const_name(prim, &max) {
+                        return Some(format!("{} - {}", name, diff));
+                    }
+                }
+            }
+            if let Some(min) = prim.get_min_value() {
+                let diff = value - &min;
+                if diff > BigInt::zero() && diff <= BigInt::from(32) {
+                    if let Some(name) = self.min_max_const_name(prim, &min) {
+                        return Some(format!("{} + {}", name, diff));
+                    }
+                }
+            }
+            None
+        };
+        let try_all = || {
+            PrimitiveType::all_unsigned_int_types()
+                .iter()
+                .chain(PrimitiveType::all_signed_int_types().iter())
+                .find_map(|t| try_prim(t, value))
+        };
+        match ty {
+            Some(Type::Primitive(prim)) => {
+                if *prim == PrimitiveType::Num {
+                    try_all()
+                } else {
+                    try_prim(prim, value).or_else(try_all)
+                }
+            },
+            // For non-primitive types (e.g., Num from reference erasure), try all integer types
+            _ => try_all(),
+        }
     }
 
     /// Prints a struct (or enum) declaration.
@@ -721,6 +780,9 @@ impl<'a> Sourcifier<'a> {
             self.print_list("[", ", ", "] ", props.iter(), |(key, value)| {
                 emit!(self.writer, "{}", key.display(self.env().symbol_pool()));
                 match value {
+                    PropertyValue::Value(Value::Bool(true)) => {
+                        // Omit "= true", it's implied for boolean properties
+                    },
                     PropertyValue::Value(v) => {
                         emit!(self.writer, " = ");
                         self.print_value(v, None, false);
@@ -941,10 +1003,28 @@ impl<'a> Sourcifier<'a> {
         emitln!(self.writer, ";");
     }
 
+    /// Prints pragma declarations from a spec's PropertyBag.
+    fn print_pragmas(&self, properties: &PropertyBag) {
+        if properties.is_empty() {
+            return;
+        }
+        emit!(self.writer, "pragma ");
+        let mut first = true;
+        for (key, value) in properties {
+            if !first {
+                emit!(self.writer, ", ");
+            }
+            first = false;
+            let key_str = key.display(self.env().symbol_pool());
+            emit!(self.writer, "{} = {}", key_str, self.env().display(value));
+        }
+        emitln!(self.writer, ";");
+    }
+
     /// Prints a spec block for a function, including the repeated signature.
     pub fn print_fun_spec(&self, fun_env: &FunctionEnv) {
         let spec = fun_env.get_spec();
-        if spec.conditions.is_empty() {
+        if spec.conditions.is_empty() && spec.properties.is_empty() {
             return;
         }
 
@@ -955,6 +1035,8 @@ impl<'a> Sourcifier<'a> {
 
         self.writer.indent();
         let tctx = fun_env.get_type_display_ctx();
+
+        self.print_pragmas(&spec.properties);
 
         // Print spec variable declarations that are referenced in this spec
         let spec_var_ids = self.collect_spec_var_refs(&spec);
@@ -1002,7 +1084,7 @@ impl<'a> Sourcifier<'a> {
     /// Prints a spec block for a struct.
     pub fn print_struct_spec(&self, struct_env: &StructEnv) {
         let spec = struct_env.get_spec();
-        if spec.conditions.is_empty() {
+        if spec.conditions.is_empty() && spec.properties.is_empty() {
             return;
         }
 
@@ -1010,6 +1092,7 @@ impl<'a> Sourcifier<'a> {
         emitln!(self.writer, "spec {} {{", self.sym(struct_env.get_name()));
 
         self.writer.indent();
+        self.print_pragmas(&spec.properties);
         let tctx = struct_env.get_type_display_ctx();
         let exp_sourcifier = ExpSourcifier::for_spec(self, tctx, self.amend);
         for cond in &spec.conditions {
@@ -1023,7 +1106,7 @@ impl<'a> Sourcifier<'a> {
 
     /// Prints a spec block directly from a Spec object with the given header.
     pub fn print_spec(&self, spec: &Spec, header: &str, tctx: TypeDisplayContext) {
-        if spec.conditions.is_empty() {
+        if spec.conditions.is_empty() && spec.properties.is_empty() {
             return;
         }
 
@@ -1031,6 +1114,7 @@ impl<'a> Sourcifier<'a> {
         emitln!(self.writer, "spec {} {{", header);
 
         self.writer.indent();
+        self.print_pragmas(&spec.properties);
         let exp_sourcifier = ExpSourcifier::for_spec(self, tctx, self.amend);
         for cond in &spec.conditions {
             self.print_condition(cond, &exp_sourcifier);
@@ -1368,6 +1452,42 @@ impl<'a> ExpSourcifier<'a> {
                         _ => self.print_exp(Prio::General, false, loop_body),
                     }
                 };
+                // Extract spec blocks from a while condition. Returns (actual_cond, spec_blocks).
+                // The compiler puts loop invariants into the condition as:
+                //   Sequence([SpecBlock(...), ..., actual_cond])
+                let extract_spec_blocks = |cond: &Exp| -> (Exp, Vec<Exp>) {
+                    match cond.as_ref() {
+                        Sequence(_, stms) if stms.len() >= 2 => {
+                            let specs: Vec<Exp> = stms
+                                .iter()
+                                .filter(|e| matches!(e.as_ref(), SpecBlock(..)))
+                                .cloned()
+                                .collect();
+                            if !specs.is_empty() {
+                                let actual: Vec<Exp> = stms
+                                    .iter()
+                                    .filter(|e| !matches!(e.as_ref(), SpecBlock(..)))
+                                    .cloned()
+                                    .collect();
+                                let actual_cond = if actual.len() == 1 {
+                                    actual.into_iter().next().unwrap()
+                                } else {
+                                    Sequence(stms[0].as_ref().node_id(), actual).into_exp()
+                                };
+                                return (actual_cond, specs);
+                            }
+                            (cond.clone(), vec![])
+                        },
+                        _ => (cond.clone(), vec![]),
+                    }
+                };
+                // Print spec blocks after the loop body
+                let print_trailing_specs = |specs: &[Exp]| {
+                    for spec_exp in specs {
+                        emit!(self.wr(), " ");
+                        self.print_exp(Prio::General, false, spec_exp);
+                    }
+                };
                 let general_loop = || {
                     emit!(self.wr(), "loop ");
                     print_loop_body(body)
@@ -1377,21 +1497,21 @@ impl<'a> ExpSourcifier<'a> {
                 match body.as_ref() {
                     // Pattern 1: loop { if (c) e else break }
                     IfElse(_, cond, if_true, if_false) if if_false.is_loop_cont(Some(0), false) => {
+                        let (actual_cond, specs) = extract_spec_blocks(cond);
                         emit!(self.wr(), "while (");
-                        self.print_exp(Prio::General, false, cond);
+                        self.print_exp(Prio::General, false, &actual_cond);
                         emit!(self.wr(), ") ");
-                        print_loop_body(if_true)
+                        print_loop_body(if_true);
+                        print_trailing_specs(&specs);
                     },
                     // Pattern 2: loop { if (c) break else e }
                     IfElse(_, cond, if_true, if_false) if if_true.is_loop_cont(Some(0), false) => {
+                        let (actual_cond, specs) = extract_spec_blocks(cond);
                         emit!(self.wr(), "while (");
-                        self.print_exp(
-                            Prio::General,
-                            false,
-                            &self.parent.builder.not(cond.clone()),
-                        );
+                        self.print_exp(Prio::General, false, &self.parent.builder.not(actual_cond));
                         emit!(self.wr(), ") ");
-                        print_loop_body(if_false)
+                        print_loop_body(if_false);
+                        print_trailing_specs(&specs);
                     },
                     // Pattern 3: loop { if (c) e; break }
                     Sequence(_, stms)
@@ -1399,10 +1519,12 @@ impl<'a> ExpSourcifier<'a> {
                     {
                         match stms[0].as_ref() {
                             IfElse(_, cond, if_true, if_false) if if_false.is_unit_exp() => {
+                                let (actual_cond, specs) = extract_spec_blocks(cond);
                                 emit!(self.wr(), "while (");
-                                self.print_exp(Prio::General, false, cond);
+                                self.print_exp(Prio::General, false, &actual_cond);
                                 emit!(self.wr(), ") ");
-                                print_loop_body(if_true)
+                                print_loop_body(if_true);
+                                print_trailing_specs(&specs);
                             },
                             _ => general_loop(),
                         }
@@ -1412,10 +1534,13 @@ impl<'a> ExpSourcifier<'a> {
                         if let Some((cond, rest)) =
                             self.parent.builder.match_if_break_list(body.clone())
                         {
+                            let not_cond = self.parent.builder.not(cond);
+                            let (actual_cond, specs) = extract_spec_blocks(&not_cond);
                             emit!(self.wr(), "while (");
-                            self.print_exp(Prio::General, false, &self.parent.builder.not(cond));
+                            self.print_exp(Prio::General, false, &actual_cond);
                             emit!(self.wr(), ") ");
-                            print_loop_body(&rest)
+                            print_loop_body(&rest);
+                            print_trailing_specs(&specs);
                         } else {
                             general_loop()
                         }
@@ -1495,13 +1620,31 @@ impl<'a> ExpSourcifier<'a> {
                     emit!(self.wr(), "{} ", keyword);
 
                     // Print ranges: x in range, y in range, ...
+                    // For type domains, use `x: Type` syntax instead of `x in domain<Type>()`
                     for (i, (pat, range)) in ranges.iter().enumerate() {
                         if i > 0 {
                             emit!(self.wr(), ", ");
                         }
                         self.print_pat(pat, false, true);
-                        emit!(self.wr(), " in ");
-                        self.print_exp(Prio::General, false, range);
+                        if let ExpData::Call(range_id, Operation::TypeDomain, args) = range.as_ref()
+                        {
+                            if args.is_empty() {
+                                // Print as `x: Type` using the type instantiation
+                                let inst = self.env().get_node_instantiation(*range_id);
+                                if let Some(ty) = inst.first() {
+                                    emit!(self.wr(), ": {}", self.ty(ty));
+                                } else {
+                                    emit!(self.wr(), " in ");
+                                    self.print_exp(Prio::General, false, range);
+                                }
+                            } else {
+                                emit!(self.wr(), " in ");
+                                self.print_exp(Prio::General, false, range);
+                            }
+                        } else {
+                            emit!(self.wr(), " in ");
+                            self.print_exp(Prio::General, false, range);
+                        }
                     }
 
                     // Print triggers if present: {trigger1, trigger2}
@@ -1775,11 +1918,17 @@ impl<'a> ExpSourcifier<'a> {
                 let ty = self.env().get_node_type(id);
                 emit!(self.wr(), " as {}", self.ty(&ty))
             }),
-            Operation::Exists(_) => self.parenthesize(context_prio, Prio::Postfix, || {
-                emit!(self.wr(), "exists");
-                self.print_node_inst(id);
-                self.print_exp_list("(", ")", args)
-            }),
+            Operation::Exists(memory_label) => {
+                self.parenthesize(context_prio, Prio::Postfix, || {
+                    if let Some(label) = memory_label {
+                        self.print_memory_label(label);
+                        emit!(self.wr(), "@");
+                    }
+                    emit!(self.wr(), "exists");
+                    self.print_node_inst(id);
+                    self.print_exp_list("(", ")", args)
+                })
+            },
             Operation::BorrowGlobal(kind) => self.parenthesize(context_prio, Prio::Postfix, || {
                 if *kind == ReferenceKind::Mutable {
                     emit!(self.wr(), "borrow_global_mut")
@@ -1830,13 +1979,12 @@ impl<'a> ExpSourcifier<'a> {
             }),
             Operation::Global(memory_label) => {
                 self.parenthesize(context_prio, Prio::Postfix, || {
+                    if let Some(label) = memory_label {
+                        self.print_memory_label(label);
+                        emit!(self.wr(), "@");
+                    }
                     emit!(self.wr(), "global");
                     self.print_node_inst(id);
-                    if let Some(label) = memory_label {
-                        emit!(self.wr(), "[@");
-                        self.print_memory_label(label);
-                        emit!(self.wr(), "]");
-                    }
                     emit!(self.wr(), "(");
                     self.print_exp(Prio::General, false, &args[0]);
                     emit!(self.wr(), ")")
@@ -1851,10 +1999,22 @@ impl<'a> ExpSourcifier<'a> {
                 self.print_exp(Prio::Range + 1, false, &args[1])
             }),
             Operation::Index => self.parenthesize(context_prio, Prio::Postfix, || {
-                self.print_exp(Prio::Postfix, false, &args[0]);
-                emit!(self.wr(), "[");
-                self.print_exp(Prio::General, false, &args[1]);
-                emit!(self.wr(), "]")
+                let base_ty = self.env().get_node_type(args[0].node_id());
+                if let Type::Tuple(_) = &base_ty {
+                    // Tuple element selection: print `.N` instead of `[N]`
+                    self.print_exp(Prio::Postfix, false, &args[0]);
+                    if let ExpData::Value(_, Value::Number(n)) = args[1].as_ref() {
+                        emit!(self.wr(), ".{}", n)
+                    } else {
+                        emit!(self.wr(), ".");
+                        self.print_exp(Prio::Postfix, false, &args[1])
+                    }
+                } else {
+                    self.print_exp(Prio::Postfix, false, &args[0]);
+                    emit!(self.wr(), "[");
+                    self.print_exp(Prio::General, false, &args[1]);
+                    emit!(self.wr(), "]")
+                }
             }),
             Operation::Slice => self.parenthesize(context_prio, Prio::Postfix, || {
                 self.print_exp(Prio::Postfix, false, &args[0]);
