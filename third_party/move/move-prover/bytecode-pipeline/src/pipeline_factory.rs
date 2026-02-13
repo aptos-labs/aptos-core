@@ -12,7 +12,7 @@ use crate::{
     memory_instrumentation::MemoryInstrumentationProcessor, mono_analysis::MonoAnalysisProcessor,
     mut_ref_instrumentation::MutRefInstrumenter,
     number_operation_analysis::NumberOperationProcessor, options::ProverOptions,
-    spec_instrumentation::SpecInstrumentationProcessor,
+    spec_inference::SpecInferenceProcessor, spec_instrumentation::SpecInstrumentationProcessor,
     verification_analysis::VerificationAnalysisProcessor,
     well_formed_instrumentation::WellFormedInstrumentationProcessor,
 };
@@ -36,10 +36,13 @@ pub fn default_pipeline_with_options(options: &ProverOptions) -> FunctionTargetP
         LiveVarAnalysisProcessor::new(),
         BorrowAnalysisProcessor::new_borrow_natives(options.borrow_natives.clone()),
         MemoryInstrumentationProcessor::new(),
+    ];
+
+    processors.append(&mut vec![
         CleanAndOptimizeProcessor::new(),
         UsageProcessor::new(),
         VerificationAnalysisProcessor::new(),
-    ];
+    ]);
 
     if !options.skip_loop_analysis {
         processors.push(LoopAnalysisProcessor::new());
@@ -52,17 +55,21 @@ pub fn default_pipeline_with_options(options: &ProverOptions) -> FunctionTargetP
         GlobalInvariantInstrumentationProcessor::new(),
         WellFormedInstrumentationProcessor::new(),
         DataInvariantInstrumentationProcessor::new(),
-        // monomorphization
-        MonoAnalysisProcessor::new(),
     ]);
 
-    // inconsistency check instrumentation should be the last one in the pipeline
-    if options.check_inconsistency {
-        processors.push(InconsistencyCheckInstrumenter::new());
-    }
+    if options.inference {
+        processors.push(SpecInferenceProcessor::new(options.stable_test_output));
+    } else {
+        // monomorphization
+        processors.push(MonoAnalysisProcessor::new());
 
-    if !options.for_interpretation {
-        processors.push(NumberOperationProcessor::new());
+        if options.check_inconsistency {
+            processors.push(InconsistencyCheckInstrumenter::new());
+        }
+
+        if !options.for_interpretation {
+            processors.push(NumberOperationProcessor::new());
+        }
     }
 
     let mut res = FunctionTargetPipeline::default();

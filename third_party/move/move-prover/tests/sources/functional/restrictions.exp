@@ -16,15 +16,3 @@ error: [boogie translator] lambda not supported in spec expressions
    │
 18 │             let f = |x| x + 1;
    │                     ^^^^^^^^^
-
-error: bug: operation closure#0M::__lambda__1__use_them is not supported in the current context
-   ┌─ tests/sources/functional/restrictions.move:46:20
-   │
-46 │         ensures f3(|x|x) == f3(|x|x);
-   │                    ^^^^
-
-error: bug: operation closure#0M::__lambda__2__use_them is not supported in the current context
-   ┌─ tests/sources/functional/restrictions.move:46:32
-   │
-46 │         ensures f3(|x|x) == f3(|x|x);
-   │                                ^^^^

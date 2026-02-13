@@ -15,6 +15,7 @@ move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-model = { workspace = true }
 move-stackless-bytecode = { workspace = true }
+num = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
