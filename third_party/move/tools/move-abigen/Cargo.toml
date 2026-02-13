@@ -21,7 +21,7 @@ serde = { workspace = true, features = ["derive"] }
 [dev-dependencies]
 codespan-reporting = { workspace = true }
 datatest-stable = { workspace = true }
-move-prover = { workspace = true }
+move-compiler-v2 = { workspace = true }
 move-prover-test-utils = { workspace = true }
 tempfile = { workspace = true }
 
