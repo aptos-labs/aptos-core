@@ -11,7 +11,6 @@ use clap::{builder::PossibleValuesParser, Arg, ArgAction, ArgAction::SetTrue, Co
 use codespan_reporting::diagnostic::Severity;
 use legacy_move_compiler::{command_line::SKIP_ATTRIBUTE_CHECKS, shared::NumericalAddress};
 use log::LevelFilter;
-use move_abigen::AbigenOptions;
 use move_errmapgen::ErrmapOptions;
 use move_model::{
     metadata::LanguageVersion, model::VerificationScope, options::ModelBuilderOptions,
@@ -38,8 +37,6 @@ pub struct Options {
     pub output_path: String,
     /// Verbosity level for logging.
     pub verbosity_level: LevelFilter,
-    /// Whether to run the ABI generator instead of the prover.
-    pub run_abigen: bool,
     /// Whether to run the error map generator instead of the prover.
     pub run_errmapgen: bool,
     /// Whether to run the read write set analysis instead of the prover
@@ -71,8 +68,6 @@ pub struct Options {
     pub prover: ProverOptions,
     /// Options for the prover backend.
     pub backend: BoogieOptions,
-    /// Options for the ABI generator.
-    pub abigen: AbigenOptions,
     /// Options for the error map generator.
     /// TODO: this currently create errors during deserialization, so skip them for this.
     #[serde(skip_serializing)]
@@ -83,7 +78,6 @@ impl Default for Options {
     fn default() -> Self {
         Self {
             output_path: "output.bpl".to_string(),
-            run_abigen: false,
             run_errmapgen: false,
             run_read_write_set: false,
             verbosity_level: LevelFilter::Info,
@@ -93,7 +87,6 @@ impl Default for Options {
             model_builder: ModelBuilderOptions::default(),
             prover: ProverOptions::default(),
             backend: BoogieOptions::default(),
-            abigen: AbigenOptions::default(),
             errmapgen: ErrmapOptions::default(),
             experimental_pipeline: false,
             skip_attribute_checks: false,
@@ -280,13 +273,6 @@ impl Options {
                     .num_args(0..)
                     .help("Specify one simplification pass to run on the specifications. \
                     This option May be specified multiple times to compose a pipeline")
-            )
-            .arg(
-                Arg::new("abigen")
-                    .long("abigen")
-                    .action(SetTrue)
-                    .help("runs the ABI generator instead of the prover. \
-                    Generated ABIs will be written into the directory `./abi` unless configured otherwise via toml"),
             )
             .arg(
                 Arg::new("errmapgen")
@@ -596,9 +582,6 @@ impl Options {
         }
         if matches.get_flag("ignore-pragma-opaque-internal-only") {
             options.model_builder.ignore_pragma_opaque_internal_only = true;
-        }
-        if matches.get_flag("abigen") {
-            options.run_abigen = true;
         }
         if matches.get_flag("errmapgen") {
             options.run_errmapgen = true;

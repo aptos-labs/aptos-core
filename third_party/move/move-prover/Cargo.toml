@@ -15,7 +15,6 @@ colored = { workspace = true }
 itertools = { workspace = true }
 legacy-move-compiler = { workspace = true }
 log = { workspace = true, features = ["serde"] }
-move-abigen = { workspace = true }
 move-command-line-common = { workspace = true }
 move-compiler-v2 = { workspace = true }
 move-errmapgen = { workspace = true }
