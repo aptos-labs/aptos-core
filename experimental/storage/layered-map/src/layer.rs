@@ -146,7 +146,27 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> MapLayer<K, V> {
     }
 
     pub fn is_descendant_of(&self, other: &Self) -> bool {
-        self.is_family(other) && self.inner.layer >= other.inner.layer
+        if !self.is_family(other) {
+            return false;
+        }
+
+        // Walk up the parent chain from `self` to verify `other` is an actual ancestor,
+        // not merely a same-family node on a different fork.
+        let mut cur = Arc::clone(&self.inner);
+        loop {
+            if Arc::ptr_eq(&cur, &other.inner) {
+                return true;
+            }
+            if cur.layer <= other.inner.layer {
+                // Reached or passed the target layer without finding `other`.
+                return false;
+            }
+            match cur.parent.upgrade() {
+                Some(parent) => cur = parent,
+                // Parent has been dropped — `other` is not an ancestor.
+                None => return false,
+            }
+        }
     }
 
     pub(crate) fn layer(&self) -> u64 {
