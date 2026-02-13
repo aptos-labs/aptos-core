@@ -2,7 +2,7 @@
 remote_endpoint: https://fullnode.mainnet.aptoslabs.com
 # replace with below for actual release, compat test needs concrete URL above:
 # remote_endpoint: ~
-name: "vX.YY.Z"
+name: "v1.41.0"
 proposals:
   - name: proposal_1_upgrade_framework
     metadata:
@@ -11,10 +11,8 @@ proposals:
     execution_mode: MultiStep
     update_sequence:
       - Gas:
-          new: current
-          # replace with below for actual release, above "current" is needed for compat tests:
-          # old: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/vX.WW.Z.json
-          # new: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/vX.YY.Z.json
+          old: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/v1.40.1.json
+          new: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/v1.41.0.json
       - Framework:
           bytecode_version: 8
           git_hash: ~
