@@ -90,10 +90,16 @@ pub fn record_commit_stats(committed: u64, expired: u64) {
     TXN_EMITTER_EXPIRED.inc_by(expired);
 }
 
-/// Records transaction latency in milliseconds.
-pub fn record_latency_ms(latency_ms: u64) {
+/// Records transaction latency in milliseconds for a batch of transactions.
+/// The latency is recorded once per transaction in the batch to ensure
+/// histogram percentiles are accurate.
+pub fn record_latency_ms(latency_ms: u64, count: u64) {
     // Convert ms to seconds for the histogram
-    TXN_EMITTER_LATENCY_SECONDS.observe(latency_ms as f64 / 1000.0);
+    let latency_secs = latency_ms as f64 / 1000.0;
+    // Record one observation per transaction to properly weight the histogram
+    for _ in 0..count {
+        TXN_EMITTER_LATENCY_SECONDS.observe(latency_secs);
+    }
 }
 
 /// Updates TPS gauges with current rates.
@@ -119,8 +125,8 @@ mod tests {
 
     #[test]
     fn test_record_latency() {
-        record_latency_ms(500); // 500ms
-        record_latency_ms(1000); // 1s
+        record_latency_ms(500, 10); // 500ms for 10 txns
+        record_latency_ms(1000, 5); // 1s for 5 txns
     }
 
     #[test]

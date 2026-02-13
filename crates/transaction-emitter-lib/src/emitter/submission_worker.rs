@@ -407,8 +407,8 @@ impl SubmissionWorker {
                     .latencies
                     .record_data_point(avg_latency, num_committed as u64);
 
-                // Record Prometheus latency metric
-                record_latency_ms(avg_latency);
+                // Record Prometheus latency metric (once per committed txn for accurate percentiles)
+                record_latency_ms(avg_latency, num_committed as u64);
             }
         }
     }
