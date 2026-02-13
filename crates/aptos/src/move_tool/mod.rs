@@ -65,7 +65,6 @@ use async_trait::async_trait;
 use clap::{Parser, Subcommand, ValueEnum};
 use colored::Colorize;
 use itertools::Itertools;
-use move_cli::{self, base::test::UnitTestResult};
 use move_command_line_common::{address::NumericalAddress, env::MOVE_HOME};
 use move_core_types::{
     identifier::Identifier,
@@ -74,7 +73,7 @@ use move_core_types::{
 };
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig};
-use move_unit_test::UnitTestingConfig;
+use move_unit_test::{package_test::UnitTestResult, UnitTestingConfig};
 pub use package_hooks::*;
 use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
@@ -610,7 +609,7 @@ impl CliCommand<&'static str> for TestPackage {
         };
 
         let path = self.move_options.get_package_path()?;
-        let result = move_cli::base::test::run_move_unit_tests(
+        let result = move_unit_test::package_test::run_move_unit_tests(
             path.as_path(),
             config.clone(),
             UnitTestingConfig {

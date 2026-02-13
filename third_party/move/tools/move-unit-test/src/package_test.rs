@@ -1,10 +1,11 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use super::reroot_path;
-use crate::{base::test_validation, NativeFunctionRecord};
+use crate::{
+    test_reporter::{UnitTestFactory, UnitTestFactoryWithCostTable},
+    test_validation, UnitTestingConfig,
+};
 use anyhow::{bail, Result};
-use clap::*;
 use codespan_reporting::term::{termcolor, termcolor::StandardStream};
 use legacy_move_compiler::{
     shared::{NumberFormat, NumericalAddress},
@@ -14,15 +15,10 @@ use move_command_line_common::files::{FileHash, MOVE_COVERAGE_MAP_EXTENSION};
 use move_compiler_v2::plan_builder as plan_builder_v2;
 use move_core_types::effects::ChangeSet;
 use move_coverage::coverage_map::{output_map_to_file, CoverageMap};
-use move_package::{
-    compilation::{build_plan::BuildPlan, compiled_package::build_and_report_no_exit_v2_driver},
-    BuildConfig,
+use move_package::compilation::{
+    build_plan::BuildPlan, compiled_package::build_and_report_no_exit_v2_driver,
 };
-use move_unit_test::{
-    test_reporter::{UnitTestFactory, UnitTestFactoryWithCostTable},
-    UnitTestingConfig,
-};
-use move_vm_runtime::tracing;
+use move_vm_runtime::{native_functions::NativeFunctionTable, tracing};
 use move_vm_test_utils::gas_schedule::CostTable;
 // if unix
 #[cfg(target_family = "unix")]
@@ -30,111 +26,11 @@ use std::os::unix::prelude::ExitStatusExt;
 // if windows
 #[cfg(target_family = "windows")]
 use std::os::windows::process::ExitStatusExt;
-use std::{
-    collections::HashMap,
-    fs,
-    io::Write,
-    ops::Deref,
-    path::{Path, PathBuf},
-    process::ExitStatus,
-};
+use std::{collections::HashMap, fs, io::Write, ops::Deref, path::Path, process::ExitStatus};
 
 // if not windows nor unix
 #[cfg(not(any(target_family = "windows", target_family = "unix")))]
 compile_error!("Unsupported OS, currently we only support windows and unix family");
-
-/// Run Move unit tests in this package.
-#[derive(Parser)]
-#[clap(name = "test")]
-pub struct Test {
-    /// Bound the amount of gas used by any one test.
-    #[clap(name = "gas_limit", short = 'i', long = "gas_limit")]
-    pub gas_limit: Option<u64>,
-    /// An optional filter string to determine which unit tests to run. A unit test will be run only if it
-    /// contains this string in its fully qualified (`<addr>::<module_name>::<fn_name>`) name.
-    #[clap(name = "filter")]
-    pub filter: Option<String>,
-    /// List all tests
-    #[clap(name = "list", short = 'l', long = "list")]
-    pub list: bool,
-    /// Number of threads to use for running tests.
-    #[clap(
-        name = "num_threads",
-        default_value = "8",
-        short = 't',
-        long = "threads"
-    )]
-    pub num_threads: usize,
-    /// Report test statistics at the end of testing
-    #[clap(name = "report_statistics", short = 's', long = "statistics")]
-    pub report_statistics: bool,
-    /// Show the storage state at the end of execution of a failing test
-    #[clap(name = "global_state_on_error", short = 'g', long = "state_on_error")]
-    pub report_storage_on_error: bool,
-
-    /// Ignore compiler's warning, and continue run tests
-    #[clap(name = "ignore_compile_warnings", long = "ignore_compile_warnings")]
-    pub ignore_compile_warnings: bool,
-
-    /// Verbose mode
-    #[clap(long = "verbose")]
-    pub verbose_mode: bool,
-    /// Collect coverage information for later use with the various `move coverage` subcommands
-    #[clap(long = "coverage")]
-    pub compute_coverage: bool,
-}
-
-impl Test {
-    pub fn execute(
-        self,
-        path: Option<PathBuf>,
-        config: BuildConfig,
-        natives: Vec<NativeFunctionRecord>,
-        genesis: ChangeSet,
-        cost_table: Option<CostTable>,
-    ) -> anyhow::Result<()> {
-        let rerooted_path = reroot_path(path)?;
-        let Self {
-            gas_limit,
-            filter,
-            list,
-            num_threads,
-            report_statistics,
-            report_storage_on_error,
-            ignore_compile_warnings,
-            verbose_mode,
-            compute_coverage,
-        } = self;
-        let unit_test_config = UnitTestingConfig {
-            filter,
-            list,
-            num_threads,
-            report_statistics,
-            report_storage_on_error,
-            verbose: verbose_mode,
-            ignore_compile_warnings,
-            ..UnitTestingConfig::default()
-        };
-        let result = run_move_unit_tests(
-            &rerooted_path,
-            config,
-            unit_test_config,
-            natives,
-            genesis,
-            gas_limit,
-            cost_table,
-            compute_coverage,
-            &mut std::io::stdout(),
-            false,
-        )?;
-
-        // Return a non-zero exit code if any test failed
-        if let UnitTestResult::Failure = result {
-            std::process::exit(1)
-        }
-        Ok(())
-    }
-}
 
 /// Encapsulates the possible returned states when running unit tests on a move package.
 #[derive(PartialEq, Eq, Debug)]
@@ -147,7 +43,7 @@ pub fn run_move_unit_tests<W: Write + Send>(
     pkg_path: &Path,
     build_config: move_package::BuildConfig,
     unit_test_config: UnitTestingConfig,
-    natives: Vec<NativeFunctionRecord>,
+    natives: NativeFunctionTable,
     genesis: ChangeSet,
     gas_limit: Option<u64>,
     cost_table: Option<CostTable>,
@@ -172,7 +68,7 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
     pkg_path: &Path,
     mut build_config: move_package::BuildConfig,
     mut unit_test_config: UnitTestingConfig,
-    natives: Vec<NativeFunctionRecord>,
+    natives: NativeFunctionTable,
     genesis: ChangeSet,
     compute_coverage: bool,
     writer: &mut W,
