@@ -4,8 +4,9 @@
 use crate::{
     common::native_coin,
     types::{
-        Currency, CurrencyMetadata, OperationType, Transaction, FUNGIBLE_ASSET_MODULE,
-        FUNGIBLE_STORE_RESOURCE, OBJECT_CORE_RESOURCE, OBJECT_MODULE, OBJECT_RESOURCE_GROUP,
+        Currency, CurrencyMetadata, OperationType, Transaction, TransactionType,
+        FUNGIBLE_ASSET_MODULE, FUNGIBLE_STORE_RESOURCE, OBJECT_CORE_RESOURCE, OBJECT_MODULE,
+        OBJECT_RESOURCE_GROUP,
     },
     RosettaContext,
 };
@@ -454,4 +455,173 @@ async fn test_fa_transfer_other_currency() {
     );
     assert_eq!(operation_3.amount.as_ref().unwrap().currency, native_coin());
     // TODO: Check fee
+}
+
+#[tokio::test]
+async fn test_fa_mint_other_currency() {
+    let context = test_rosetta_context().await;
+
+    let version = 0;
+    let amount = 200;
+    let sender = AccountAddress::random();
+    let store_address = AccountAddress::random();
+    let (mint_changes, mint_events) = mint_fa_output(
+        sender,
+        AccountAddress::from_str(OTHER_CURRENCY_ADDRESS).unwrap(),
+        store_address,
+        0,
+        amount,
+    );
+    let input = test_transaction(sender, version, mint_changes, mint_events);
+
+    let result = Transaction::from_transaction(&context, input).await;
+    let expected_txn = result.expect("Must succeed");
+    assert_eq!(2, expected_txn.operations.len());
+
+    let operation_1 = expected_txn.operations.first().unwrap();
+    assert_eq!(operation_1.operation_type, OperationType::Deposit.to_string());
+    assert_eq!(operation_1.amount.as_ref().unwrap().value, format!("{}", amount));
+    assert_eq!(operation_1.amount.as_ref().unwrap().currency, OTHER_CURRENCY.to_owned());
+}
+
+#[tokio::test]
+async fn test_unknown_currency_skipped() {
+    let context = test_rosetta_context().await;
+
+    let version = 0;
+    let amount = 100;
+    let sender = AccountAddress::random();
+    let store_address = AccountAddress::random();
+    // Use a random address that is not in the configured currencies
+    let unknown_fa = AccountAddress::random();
+    let (mint_changes, mint_events) = mint_fa_output(sender, unknown_fa, store_address, 0, amount);
+    let input = test_transaction(sender, version, mint_changes, mint_events);
+
+    let result = Transaction::from_transaction(&context, input).await;
+    let expected_txn = result.expect("Must succeed");
+    // Only fee should remain, the FA operations for unknown currency are skipped
+    assert_eq!(1, expected_txn.operations.len());
+    assert_eq!(expected_txn.operations[0].operation_type, OperationType::Fee.to_string());
+}
+
+#[tokio::test]
+async fn test_transaction_metadata() {
+    let context = test_rosetta_context().await;
+
+    let version = 42;
+    let sender = AccountAddress::random();
+    let store_address = AccountAddress::random();
+    let (mint_changes, mint_events) = mint_fa_output(sender, APT_ADDRESS, store_address, 0, 100);
+    let input = test_transaction(sender, version, mint_changes, mint_events);
+
+    let result = Transaction::from_transaction(&context, input).await;
+    let txn = result.expect("Must succeed");
+
+    assert_eq!(txn.metadata.transaction_type, TransactionType::User);
+    assert_eq!(txn.metadata.version.0, 42);
+    assert!(!txn.metadata.failed);
+    assert!(txn.metadata.vm_status.contains("Success"));
+}
+
+#[tokio::test]
+async fn test_gas_fee_calculation() {
+    let context = test_rosetta_context().await;
+
+    let version = 0;
+    let sender = AccountAddress::random();
+    let store_address = AccountAddress::random();
+    let (mint_changes, mint_events) = mint_fa_output(sender, APT_ADDRESS, store_address, 0, 100);
+    let input = test_transaction(sender, version, mint_changes, mint_events);
+
+    let result = Transaction::from_transaction(&context, input).await;
+    let txn = result.expect("Must succeed");
+
+    // Gas fee is the last operation
+    let fee_op = txn.operations.last().unwrap();
+    assert_eq!(fee_op.operation_type, OperationType::Fee.to_string());
+    assert_eq!(fee_op.status.as_deref(), Some("success"));
+    // gas_used=178, gas_unit_price=101, so fee = 178*101 = 17978
+    assert_eq!(fee_op.amount.as_ref().unwrap().value, format!("-{}", 178 * 101));
+    assert_eq!(fee_op.amount.as_ref().unwrap().currency, native_coin());
+}
+
+#[tokio::test]
+async fn test_operations_are_sorted() {
+    let context = test_rosetta_context().await;
+
+    let version = 0;
+    let amount = 100;
+    let sender = AccountAddress::random();
+    let receiver = AccountAddress::random();
+    let store_address = AccountAddress::random();
+    let receiver_store_address = AccountAddress::random();
+    let (changes, events) = transfer_fa_output(
+        sender,
+        APT_ADDRESS,
+        store_address,
+        amount * 2,
+        receiver,
+        receiver_store_address,
+        0,
+        amount,
+    );
+    let input = test_transaction(sender, version, changes, events);
+
+    let result = Transaction::from_transaction(&context, input).await;
+    let txn = result.expect("Must succeed");
+
+    // Verify operations are properly sorted: withdraw before deposit before fee
+    let types: Vec<&str> = txn.operations.iter().map(|op| op.operation_type.as_str()).collect();
+    assert_eq!(types, vec!["withdraw", "deposit", "fee"]);
+
+    // Verify operation indices are sequential
+    for (i, op) in txn.operations.iter().enumerate() {
+        assert_eq!(op.operation_identifier.index, i as u64);
+    }
+}
+
+#[tokio::test]
+async fn test_empty_write_set_produces_only_fee() {
+    let context = test_rosetta_context().await;
+
+    let version = 0;
+    let sender = AccountAddress::random();
+    let write_set = WriteSetMut::new(vec![]).freeze().unwrap();
+    let input = test_transaction(sender, version, write_set, vec![]);
+
+    let result = Transaction::from_transaction(&context, input).await;
+    let txn = result.expect("Must succeed");
+    // Only fee operation
+    assert_eq!(txn.operations.len(), 1);
+    assert_eq!(txn.operations[0].operation_type, OperationType::Fee.to_string());
+}
+
+#[tokio::test]
+async fn test_large_amount_transfer() {
+    let context = test_rosetta_context().await;
+
+    let version = 0;
+    let amount = u64::MAX / 2; // Large but not overflowing
+    let sender = AccountAddress::random();
+    let receiver = AccountAddress::random();
+    let store_address = AccountAddress::random();
+    let receiver_store_address = AccountAddress::random();
+    let (changes, events) = transfer_fa_output(
+        sender,
+        APT_ADDRESS,
+        store_address,
+        amount + 1000,
+        receiver,
+        receiver_store_address,
+        0,
+        amount,
+    );
+    let input = test_transaction(sender, version, changes, events);
+
+    let result = Transaction::from_transaction(&context, input).await;
+    let txn = result.expect("Must succeed");
+    assert_eq!(3, txn.operations.len());
+    // Verify the amount string for large values
+    let withdraw = &txn.operations[0];
+    assert_eq!(withdraw.amount.as_ref().unwrap().value, format!("-{}", amount));
 }

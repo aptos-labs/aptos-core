@@ -2999,3 +2999,571 @@ pub struct UnlockDelegatedStake {
     pub pool_address: AccountAddress,
     pub amount: u64,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::common::native_coin;
+    use aptos_types::account_address::AccountAddress;
+
+    // ---- Amount Tests ----
+
+    #[test]
+    fn test_amount_suggested_gas_fee() {
+        let fee = Amount::suggested_gas_fee(100, 2000);
+        assert_eq!(fee.value, "200000");
+        assert_eq!(fee.currency, native_coin());
+    }
+
+    #[test]
+    fn test_amount_suggested_gas_fee_zero() {
+        let fee = Amount::suggested_gas_fee(0, 0);
+        assert_eq!(fee.value, "0");
+    }
+
+    #[test]
+    fn test_amount_value_positive() {
+        let amount = Amount {
+            value: "12345".to_string(),
+            currency: native_coin(),
+        };
+        assert_eq!(amount.value().unwrap(), 12345i128);
+    }
+
+    #[test]
+    fn test_amount_value_negative() {
+        let amount = Amount {
+            value: "-999".to_string(),
+            currency: native_coin(),
+        };
+        assert_eq!(amount.value().unwrap(), -999i128);
+    }
+
+    #[test]
+    fn test_amount_value_invalid() {
+        let amount = Amount {
+            value: "not_a_number".to_string(),
+            currency: native_coin(),
+        };
+        assert!(amount.value().is_err());
+    }
+
+    // ---- Currency Tests ----
+
+    #[test]
+    fn test_currency_equality() {
+        let c1 = native_coin();
+        let c2 = native_coin();
+        assert_eq!(c1, c2);
+    }
+
+    #[test]
+    fn test_currency_hash() {
+        use std::collections::HashSet;
+        let mut set = HashSet::new();
+        set.insert(native_coin());
+        set.insert(native_coin());
+        assert_eq!(set.len(), 1);
+    }
+
+    #[test]
+    fn test_currency_metadata_serialization() {
+        let currency = Currency {
+            symbol: "TEST".to_string(),
+            decimals: 4,
+            metadata: None,
+        };
+        let json = serde_json::to_string(&currency).unwrap();
+        assert!(!json.contains("metadata")); // skip_serializing_if
+    }
+
+    // ---- Operation Constructor Tests ----
+
+    #[test]
+    fn test_operation_create_account() {
+        let op = Operation::create_account(
+            0,
+            Some(OperationStatusType::Success),
+            AccountAddress::TWO,
+            AccountAddress::ONE,
+        );
+        assert_eq!(op.operation_type, "create_account");
+        assert_eq!(op.operation_identifier.index, 0);
+        assert_eq!(op.status.as_deref(), Some("success"));
+        assert_eq!(op.account.as_ref().unwrap().account_address().unwrap(), AccountAddress::TWO);
+        assert_eq!(op.sender().unwrap(), AccountAddress::ONE);
+    }
+
+    #[test]
+    fn test_operation_deposit() {
+        let op = Operation::deposit(
+            1,
+            Some(OperationStatusType::Success),
+            AccountIdentifier::base_account(AccountAddress::ONE),
+            native_coin(),
+            1000,
+        );
+        assert_eq!(op.operation_type, "deposit");
+        assert_eq!(op.amount.as_ref().unwrap().value, "1000");
+        assert_eq!(op.amount.as_ref().unwrap().currency, native_coin());
+    }
+
+    #[test]
+    fn test_operation_withdraw() {
+        let op = Operation::withdraw(
+            0,
+            Some(OperationStatusType::Success),
+            AccountIdentifier::base_account(AccountAddress::ONE),
+            native_coin(),
+            500,
+        );
+        assert_eq!(op.operation_type, "withdraw");
+        assert_eq!(op.amount.as_ref().unwrap().value, "-500");
+    }
+
+    #[test]
+    fn test_operation_gas_fee() {
+        let op = Operation::gas_fee(0, AccountAddress::ONE, 100, 50);
+        assert_eq!(op.operation_type, "fee");
+        assert_eq!(op.amount.as_ref().unwrap().value, "-5000");
+        assert_eq!(op.status.as_deref(), Some("success")); // Fee always success
+    }
+
+    #[test]
+    fn test_operation_set_operator() {
+        let op = Operation::set_operator(
+            0,
+            None,
+            AccountAddress::ONE,
+            Some(AccountIdentifier::base_account(AccountAddress::TWO)),
+            AccountIdentifier::base_account(AccountAddress::from_hex_literal("0x3").unwrap()),
+            Some(1000),
+        );
+        assert_eq!(op.operation_type, "set_operator");
+        assert!(op.status.is_none()); // No status for construction
+        assert_eq!(op.old_operator().unwrap(), AccountAddress::TWO);
+        assert_eq!(op.new_operator().unwrap(), AccountAddress::from_hex_literal("0x3").unwrap());
+        assert_eq!(op.staked_balance(), Some(1000));
+    }
+
+    #[test]
+    fn test_operation_set_voter() {
+        let op = Operation::set_voter(
+            0,
+            None,
+            AccountAddress::ONE,
+            Some(AccountIdentifier::base_account(AccountAddress::TWO)),
+            AccountIdentifier::base_account(AccountAddress::from_hex_literal("0x3").unwrap()),
+        );
+        assert_eq!(op.operation_type, "set_voter");
+        assert_eq!(op.new_voter().unwrap(), AccountAddress::from_hex_literal("0x3").unwrap());
+    }
+
+    #[test]
+    fn test_operation_staking_reward() {
+        let op = Operation::staking_reward(
+            0,
+            Some(OperationStatusType::Success),
+            AccountIdentifier::base_account(AccountAddress::ONE),
+            native_coin(),
+            5000,
+        );
+        assert_eq!(op.operation_type, "staking_reward");
+        assert_eq!(op.amount.as_ref().unwrap().value, "5000");
+    }
+
+    #[test]
+    fn test_operation_reset_lockup() {
+        let op = Operation::reset_lockup(
+            0,
+            None,
+            AccountAddress::ONE,
+            Some(AccountIdentifier::base_account(AccountAddress::TWO)),
+        );
+        assert_eq!(op.operation_type, "reset_lockup");
+        assert_eq!(op.operator().unwrap(), AccountAddress::TWO);
+    }
+
+    #[test]
+    fn test_operation_unlock_stake() {
+        let op = Operation::unlock_stake(
+            0,
+            None,
+            AccountAddress::ONE,
+            Some(AccountIdentifier::base_account(AccountAddress::TWO)),
+            Some(999),
+        );
+        assert_eq!(op.operation_type, "unlock_stake");
+        assert_eq!(op.metadata_amount(), Some(999));
+    }
+
+    #[test]
+    fn test_operation_update_commission() {
+        let op = Operation::update_commission(
+            0,
+            None,
+            AccountAddress::ONE,
+            Some(AccountIdentifier::base_account(AccountAddress::TWO)),
+            Some(15),
+        );
+        assert_eq!(op.operation_type, "update_commission");
+        assert_eq!(op.commission_percentage(), Some(15));
+    }
+
+    #[test]
+    fn test_operation_distribute_staking_rewards() {
+        let op = Operation::distribute_staking_rewards(
+            0,
+            None,
+            AccountAddress::ONE,
+            AccountIdentifier::base_account(AccountAddress::TWO),
+            AccountIdentifier::base_account(AccountAddress::from_hex_literal("0x3").unwrap()),
+        );
+        assert_eq!(op.operation_type, "distribute_staking_rewards");
+        assert_eq!(op.staker().unwrap(), AccountAddress::from_hex_literal("0x3").unwrap());
+    }
+
+    #[test]
+    fn test_operation_add_delegated_stake() {
+        let op = Operation::add_delegated_stake(
+            0,
+            None,
+            AccountAddress::ONE,
+            AccountIdentifier::base_account(AccountAddress::TWO),
+            Some(5000),
+        );
+        assert_eq!(op.operation_type, "add_delegated_stake");
+        assert_eq!(op.metadata_amount(), Some(5000));
+    }
+
+    #[test]
+    fn test_operation_unlock_delegated_stake() {
+        let op = Operation::unlock_delegated_stake(
+            0,
+            None,
+            AccountAddress::ONE,
+            AccountIdentifier::base_account(AccountAddress::TWO),
+            Some(3000),
+        );
+        assert_eq!(op.operation_type, "unlock_delegated_stake");
+    }
+
+    #[test]
+    fn test_operation_withdraw_undelegated_stake() {
+        let op = Operation::withdraw_undelegated_stake(
+            0,
+            None,
+            AccountAddress::ONE,
+            AccountIdentifier::base_account(AccountAddress::TWO),
+            Some(1500),
+        );
+        assert_eq!(op.operation_type, "withdraw_undelegated_funds");
+    }
+
+    // ---- Operation Ordering Tests ----
+
+    #[test]
+    fn test_operation_ordering_fee_last() {
+        let mut ops = vec![
+            Operation::gas_fee(0, AccountAddress::ONE, 100, 50),
+            Operation::deposit(1, Some(OperationStatusType::Success), AccountIdentifier::base_account(AccountAddress::TWO), native_coin(), 500),
+            Operation::withdraw(2, Some(OperationStatusType::Success), AccountIdentifier::base_account(AccountAddress::ONE), native_coin(), 500),
+        ];
+        ops.sort();
+        assert_eq!(ops[0].operation_type, "withdraw");
+        assert_eq!(ops[1].operation_type, "deposit");
+        assert_eq!(ops[2].operation_type, "fee");
+    }
+
+    #[test]
+    fn test_operation_ordering_create_first() {
+        let mut ops = vec![
+            Operation::deposit(0, None, AccountIdentifier::base_account(AccountAddress::TWO), native_coin(), 500),
+            Operation::create_account(1, None, AccountAddress::TWO, AccountAddress::ONE),
+            Operation::withdraw(2, None, AccountIdentifier::base_account(AccountAddress::ONE), native_coin(), 500),
+        ];
+        ops.sort();
+        assert_eq!(ops[0].operation_type, "create_account");
+        assert_eq!(ops[1].operation_type, "withdraw");
+        assert_eq!(ops[2].operation_type, "deposit");
+    }
+
+    // ---- InternalOperation Sender Tests ----
+
+    #[test]
+    fn test_internal_operation_sender() {
+        assert_eq!(
+            InternalOperation::CreateAccount(CreateAccount {
+                sender: AccountAddress::ONE,
+                new_account: AccountAddress::TWO,
+            }).sender(),
+            AccountAddress::ONE
+        );
+
+        assert_eq!(
+            InternalOperation::Transfer(Transfer {
+                sender: AccountAddress::ONE,
+                receiver: AccountAddress::TWO,
+                amount: 100u64.into(),
+                currency: native_coin(),
+            }).sender(),
+            AccountAddress::ONE
+        );
+
+        assert_eq!(
+            InternalOperation::SetOperator(SetOperator {
+                owner: AccountAddress::ONE,
+                old_operator: None,
+                new_operator: AccountAddress::TWO,
+            }).sender(),
+            AccountAddress::ONE
+        );
+
+        assert_eq!(
+            InternalOperation::AddDelegatedStake(AddDelegatedStake {
+                delegator: AccountAddress::ONE,
+                pool_address: AccountAddress::TWO,
+                amount: 100,
+            }).sender(),
+            AccountAddress::ONE
+        );
+    }
+
+    // ---- InternalOperation Extract Tests ----
+
+    #[tokio::test]
+    async fn test_extract_create_account() {
+        let context = RosettaContext::new(None, aptos_types::chain_id::ChainId::test(), None, std::collections::HashSet::new()).await;
+        let ops = vec![Operation::create_account(0, None, AccountAddress::TWO, AccountAddress::ONE)];
+        let result = InternalOperation::extract(&context, &ops).unwrap();
+        match result {
+            InternalOperation::CreateAccount(ca) => {
+                assert_eq!(ca.sender, AccountAddress::ONE);
+                assert_eq!(ca.new_account, AccountAddress::TWO);
+            },
+            _ => panic!("Expected CreateAccount"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_extract_transfer() {
+        let context = RosettaContext::new(None, aptos_types::chain_id::ChainId::test(), None, std::collections::HashSet::new()).await;
+        let ops = vec![
+            Operation::withdraw(0, None, AccountIdentifier::base_account(AccountAddress::ONE), native_coin(), 1000),
+            Operation::deposit(1, None, AccountIdentifier::base_account(AccountAddress::TWO), native_coin(), 1000),
+        ];
+        let result = InternalOperation::extract(&context, &ops).unwrap();
+        match result {
+            InternalOperation::Transfer(t) => {
+                assert_eq!(t.sender, AccountAddress::ONE);
+                assert_eq!(t.receiver, AccountAddress::TWO);
+                assert_eq!(t.amount.0, 1000);
+            },
+            _ => panic!("Expected Transfer"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_extract_transfer_mismatched_amounts() {
+        let context = RosettaContext::new(None, aptos_types::chain_id::ChainId::test(), None, std::collections::HashSet::new()).await;
+        let ops = vec![
+            Operation::withdraw(0, None, AccountIdentifier::base_account(AccountAddress::ONE), native_coin(), 1000),
+            Operation::deposit(1, None, AccountIdentifier::base_account(AccountAddress::TWO), native_coin(), 999),
+        ];
+        let result = InternalOperation::extract(&context, &ops);
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_extract_transfer_mismatched_currency() {
+        let context = RosettaContext::new(None, aptos_types::chain_id::ChainId::test(), None, std::collections::HashSet::new()).await;
+        let other_coin = Currency {
+            symbol: "OTHER".to_string(),
+            decimals: 6,
+            metadata: None,
+        };
+        let ops = vec![
+            Operation::withdraw(0, None, AccountIdentifier::base_account(AccountAddress::ONE), native_coin(), 1000),
+            Operation::deposit(1, None, AccountIdentifier::base_account(AccountAddress::TWO), other_coin, 1000),
+        ];
+        let result = InternalOperation::extract(&context, &ops);
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_extract_set_operator() {
+        let context = RosettaContext::new(None, aptos_types::chain_id::ChainId::test(), None, std::collections::HashSet::new()).await;
+        let ops = vec![Operation::set_operator(
+            0, None, AccountAddress::ONE,
+            Some(AccountIdentifier::base_account(AccountAddress::TWO)),
+            AccountIdentifier::base_account(AccountAddress::from_hex_literal("0x3").unwrap()),
+            None,
+        )];
+        let result = InternalOperation::extract(&context, &ops).unwrap();
+        match result {
+            InternalOperation::SetOperator(so) => {
+                assert_eq!(so.owner, AccountAddress::ONE);
+                assert_eq!(so.old_operator, Some(AccountAddress::TWO));
+                assert_eq!(so.new_operator, AccountAddress::from_hex_literal("0x3").unwrap());
+            },
+            _ => panic!("Expected SetOperator"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_extract_too_many_operations() {
+        let context = RosettaContext::new(None, aptos_types::chain_id::ChainId::test(), None, std::collections::HashSet::new()).await;
+        let ops = vec![
+            Operation::withdraw(0, None, AccountIdentifier::base_account(AccountAddress::ONE), native_coin(), 100),
+            Operation::deposit(1, None, AccountIdentifier::base_account(AccountAddress::TWO), native_coin(), 100),
+            Operation::create_account(2, None, AccountAddress::from_hex_literal("0x3").unwrap(), AccountAddress::ONE),
+        ];
+        let result = InternalOperation::extract(&context, &ops);
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_extract_empty_operations() {
+        let context = RosettaContext::new(None, aptos_types::chain_id::ChainId::test(), None, std::collections::HashSet::new()).await;
+        let ops: Vec<Operation> = vec![];
+        let result = InternalOperation::extract(&context, &ops);
+        assert!(result.is_err());
+    }
+
+    // ---- InternalOperation Payload Tests ----
+
+    #[test]
+    fn test_payload_create_account() {
+        let op = InternalOperation::CreateAccount(CreateAccount {
+            sender: AccountAddress::ONE,
+            new_account: AccountAddress::TWO,
+        });
+        let (payload, sender) = op.payload().unwrap();
+        assert_eq!(sender, AccountAddress::ONE);
+        match payload {
+            TransactionPayload::EntryFunction(_) => {},
+            _ => panic!("Expected EntryFunction"),
+        }
+    }
+
+    #[test]
+    fn test_payload_transfer_apt() {
+        let op = InternalOperation::Transfer(Transfer {
+            sender: AccountAddress::ONE,
+            receiver: AccountAddress::TWO,
+            amount: 1000u64.into(),
+            currency: native_coin(),
+        });
+        let (payload, sender) = op.payload().unwrap();
+        assert_eq!(sender, AccountAddress::ONE);
+        match payload {
+            TransactionPayload::EntryFunction(_) => {},
+            _ => panic!("Expected EntryFunction"),
+        }
+    }
+
+    #[test]
+    fn test_payload_set_operator_without_old_operator_fails() {
+        let op = InternalOperation::SetOperator(SetOperator {
+            owner: AccountAddress::ONE,
+            old_operator: None,
+            new_operator: AccountAddress::TWO,
+        });
+        assert!(op.payload().is_err());
+    }
+
+    #[test]
+    fn test_payload_set_voter_without_operator_fails() {
+        let op = InternalOperation::SetVoter(SetVoter {
+            owner: AccountAddress::ONE,
+            operator: None,
+            new_voter: AccountAddress::TWO,
+        });
+        assert!(op.payload().is_err());
+    }
+
+    #[test]
+    fn test_payload_set_operator_with_old_operator() {
+        let op = InternalOperation::SetOperator(SetOperator {
+            owner: AccountAddress::ONE,
+            old_operator: Some(AccountAddress::TWO),
+            new_operator: AccountAddress::from_hex_literal("0x3").unwrap(),
+        });
+        let (_, sender) = op.payload().unwrap();
+        assert_eq!(sender, AccountAddress::ONE);
+    }
+
+    #[test]
+    fn test_payload_delegation_operations() {
+        let op = InternalOperation::AddDelegatedStake(AddDelegatedStake {
+            delegator: AccountAddress::ONE,
+            pool_address: AccountAddress::TWO,
+            amount: 100,
+        });
+        let (_, sender) = op.payload().unwrap();
+        assert_eq!(sender, AccountAddress::ONE);
+
+        let op = InternalOperation::UnlockDelegatedStake(UnlockDelegatedStake {
+            delegator: AccountAddress::ONE,
+            pool_address: AccountAddress::TWO,
+            amount: 50,
+        });
+        let (_, sender) = op.payload().unwrap();
+        assert_eq!(sender, AccountAddress::ONE);
+
+        let op = InternalOperation::WithdrawUndelegated(WithdrawUndelegated {
+            delegator: AccountAddress::ONE,
+            pool_address: AccountAddress::TWO,
+            amount_withdrawn: 25,
+        });
+        let (_, sender) = op.payload().unwrap();
+        assert_eq!(sender, AccountAddress::ONE);
+    }
+
+    // ---- PublicKey Tests ----
+
+    #[test]
+    fn test_public_key_roundtrip() {
+        use aptos_crypto::ed25519::Ed25519PrivateKey;
+        use aptos_crypto::{PrivateKey, Uniform};
+
+        let private_key = Ed25519PrivateKey::generate_for_testing();
+        let ed_pub_key = private_key.public_key();
+        let rosetta_key: PublicKey = ed_pub_key.clone().try_into().unwrap();
+        assert_eq!(rosetta_key.curve_type, CurveType::Edwards25519);
+
+        let recovered: aptos_crypto::ed25519::Ed25519PublicKey = rosetta_key.try_into().unwrap();
+        assert_eq!(recovered, ed_pub_key);
+    }
+
+    // ---- OperationMetadata Tests ----
+
+    #[test]
+    fn test_operation_metadata_create_account() {
+        let meta = OperationMetadata::create_account(AccountAddress::ONE);
+        assert!(meta.sender.is_some());
+        assert!(meta.operator.is_none());
+    }
+
+    #[test]
+    fn test_operation_metadata_set_operator() {
+        let meta = OperationMetadata::set_operator(
+            Some(AccountIdentifier::base_account(AccountAddress::ONE)),
+            AccountIdentifier::base_account(AccountAddress::TWO),
+            Some(1000),
+        );
+        assert!(meta.old_operator.is_some());
+        assert!(meta.new_operator.is_some());
+        assert_eq!(meta.staked_balance, Some(1000u64.into()));
+    }
+
+    // ---- TransactionType Display Tests ----
+
+    #[test]
+    fn test_transaction_type_display() {
+        assert_eq!(TransactionType::User.to_string(), "User");
+        assert_eq!(TransactionType::Genesis.to_string(), "Genesis");
+        assert_eq!(TransactionType::BlockMetadata.to_string(), "BlockResource");
+        assert_eq!(TransactionType::StateCheckpoint.to_string(), "StateCheckpoint");
+    }
+}

@@ -1552,3 +1552,295 @@ async fn construction_submit(
         transaction_identifier: hash.into(),
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aptos_types::account_address::AccountAddress;
+
+    // ---- parse_function_arg Tests ----
+
+    #[test]
+    fn test_parse_function_arg_valid() {
+        let value: u64 = 42;
+        let encoded = bcs::to_bytes(&value).unwrap();
+        let args = vec![encoded];
+        let result: u64 = parse_function_arg("test", &args, 0).unwrap();
+        assert_eq!(result, 42);
+    }
+
+    #[test]
+    fn test_parse_function_arg_out_of_bounds() {
+        let args: Vec<Vec<u8>> = vec![];
+        let result = parse_function_arg::<u64>("test", &args, 0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_function_arg_wrong_type() {
+        let value: u64 = 42;
+        let encoded = bcs::to_bytes(&value).unwrap();
+        let args = vec![encoded];
+        let result = parse_function_arg::<AccountAddress>("test", &args, 0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_function_arg_address() {
+        let addr = AccountAddress::ONE;
+        let encoded = bcs::to_bytes(&addr).unwrap();
+        let args = vec![encoded];
+        let result: AccountAddress = parse_function_arg("test", &args, 0).unwrap();
+        assert_eq!(result, AccountAddress::ONE);
+    }
+
+    // ---- parse_create_account_operation Tests ----
+
+    #[test]
+    fn test_parse_create_account_operation() {
+        let sender = AccountAddress::ONE;
+        let new_account = AccountAddress::TWO;
+        let args = vec![bcs::to_bytes(&new_account).unwrap()];
+        let result = parse_create_account_operation(sender, &[], &args).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].operation_type, "create_account");
+        assert_eq!(result[0].account.as_ref().unwrap().account_address().unwrap(), new_account);
+        assert_eq!(result[0].sender().unwrap(), sender);
+    }
+
+    #[test]
+    fn test_parse_create_account_operation_with_type_args_fails() {
+        let type_args = vec![TypeTag::Bool];
+        let args = vec![bcs::to_bytes(&AccountAddress::ONE).unwrap()];
+        let result = parse_create_account_operation(AccountAddress::ONE, &type_args, &args);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_create_account_operation_no_args_fails() {
+        let result = parse_create_account_operation(AccountAddress::ONE, &[], &[]);
+        assert!(result.is_err());
+    }
+
+    // ---- parse_account_transfer_operation Tests ----
+
+    #[test]
+    fn test_parse_account_transfer_operation() {
+        let sender = AccountAddress::ONE;
+        let receiver = AccountAddress::TWO;
+        let amount: u64 = 1000;
+        let args = vec![
+            bcs::to_bytes(&receiver).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ];
+        let result = parse_account_transfer_operation(sender, &[], &args).unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].operation_type, "withdraw");
+        assert_eq!(result[0].amount.as_ref().unwrap().value, "-1000");
+        assert_eq!(result[1].operation_type, "deposit");
+        assert_eq!(result[1].amount.as_ref().unwrap().value, "1000");
+    }
+
+    #[test]
+    fn test_parse_account_transfer_with_type_args_fails() {
+        let result = parse_account_transfer_operation(
+            AccountAddress::ONE,
+            &[TypeTag::Bool],
+            &[],
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_account_transfer_no_receiver_fails() {
+        let result = parse_account_transfer_operation(AccountAddress::ONE, &[], &[]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_account_transfer_no_amount_fails() {
+        let args = vec![bcs::to_bytes(&AccountAddress::TWO).unwrap()];
+        let result = parse_account_transfer_operation(AccountAddress::ONE, &[], &args);
+        assert!(result.is_err());
+    }
+
+    // ---- parse_set_operator_operation Tests ----
+
+    #[test]
+    fn test_parse_set_operator_operation() {
+        let sender = AccountAddress::ONE;
+        let old_op = AccountAddress::TWO;
+        let new_op = AccountAddress::from_hex_literal("0x3").unwrap();
+        let args = vec![
+            bcs::to_bytes(&old_op).unwrap(),
+            bcs::to_bytes(&new_op).unwrap(),
+        ];
+        let result = parse_set_operator_operation(sender, &[], &args).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].operation_type, "set_operator");
+        assert_eq!(result[0].old_operator().unwrap(), old_op);
+        assert_eq!(result[0].new_operator().unwrap(), new_op);
+    }
+
+    #[test]
+    fn test_parse_set_operator_with_type_args_fails() {
+        let result = parse_set_operator_operation(AccountAddress::ONE, &[TypeTag::Bool], &[]);
+        assert!(result.is_err());
+    }
+
+    // ---- parse_set_voter_operation Tests ----
+
+    #[test]
+    fn test_parse_set_voter_operation() {
+        let sender = AccountAddress::ONE;
+        let operator = AccountAddress::TWO;
+        let new_voter = AccountAddress::from_hex_literal("0x3").unwrap();
+        let args = vec![
+            bcs::to_bytes(&operator).unwrap(),
+            bcs::to_bytes(&new_voter).unwrap(),
+        ];
+        let result = parse_set_voter_operation(sender, &[], &args).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].operation_type, "set_voter");
+    }
+
+    // ---- parse_create_stake_pool_operation Tests ----
+
+    #[test]
+    fn test_parse_create_stake_pool_operation() {
+        let sender = AccountAddress::ONE;
+        let operator = AccountAddress::TWO;
+        let voter = AccountAddress::from_hex_literal("0x3").unwrap();
+        let amount: u64 = 1000;
+        let commission: u64 = 10;
+        let args = vec![
+            bcs::to_bytes(&operator).unwrap(),
+            bcs::to_bytes(&voter).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+            bcs::to_bytes(&commission).unwrap(),
+        ];
+        let result = parse_create_stake_pool_operation(sender, &[], &args).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].operation_type, "initialize_stake_pool");
+    }
+
+    // ---- parse_reset_lockup_operation Tests ----
+
+    #[test]
+    fn test_parse_reset_lockup_operation() {
+        let sender = AccountAddress::ONE;
+        let operator = AccountAddress::TWO;
+        let args = vec![bcs::to_bytes(&operator).unwrap()];
+        let result = parse_reset_lockup_operation(sender, &[], &args).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].operation_type, "reset_lockup");
+    }
+
+    #[test]
+    fn test_parse_reset_lockup_with_type_args_fails() {
+        let result = parse_reset_lockup_operation(AccountAddress::ONE, &[TypeTag::Bool], &[]);
+        assert!(result.is_err());
+    }
+
+    // ---- parse_unlock_stake_operation Tests ----
+
+    #[test]
+    fn test_parse_unlock_stake_operation() {
+        let sender = AccountAddress::ONE;
+        let operator = AccountAddress::TWO;
+        let amount: u64 = 500;
+        let args = vec![
+            bcs::to_bytes(&operator).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ];
+        let result = parse_unlock_stake_operation(sender, &[], &args).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].operation_type, "unlock_stake");
+    }
+
+    // ---- parse_update_commission_operation Tests ----
+
+    #[test]
+    fn test_parse_update_commission_operation() {
+        let sender = AccountAddress::ONE;
+        let operator = AccountAddress::TWO;
+        let commission: u64 = 15;
+        let args = vec![
+            bcs::to_bytes(&operator).unwrap(),
+            bcs::to_bytes(&commission).unwrap(),
+        ];
+        let result = parse_update_commission_operation(sender, &[], &args).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].operation_type, "update_commission");
+    }
+
+    // ---- parse_distribute_staking_rewards_operation Tests ----
+
+    #[test]
+    fn test_parse_distribute_staking_rewards_operation() {
+        let sender = AccountAddress::ONE;
+        let staker = AccountAddress::TWO;
+        let operator = AccountAddress::from_hex_literal("0x3").unwrap();
+        let args = vec![
+            bcs::to_bytes(&staker).unwrap(),
+            bcs::to_bytes(&operator).unwrap(),
+        ];
+        let result = parse_distribute_staking_rewards_operation(sender, &[], &args).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].operation_type, "distribute_staking_rewards");
+    }
+
+    // ---- parse_delegation_pool_*_operation Tests ----
+
+    #[test]
+    fn test_parse_delegation_pool_add_stake_operation() {
+        let delegator = AccountAddress::ONE;
+        let pool = AccountAddress::TWO;
+        let amount: u64 = 2000;
+        let args = vec![
+            bcs::to_bytes(&pool).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ];
+        let result = parse_delegation_pool_add_stake_operation(delegator, &[], &args).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].operation_type, "add_delegated_stake");
+    }
+
+    #[test]
+    fn test_parse_delegation_pool_unlock_operation() {
+        let delegator = AccountAddress::ONE;
+        let pool = AccountAddress::TWO;
+        let amount: u64 = 1000;
+        let args = vec![
+            bcs::to_bytes(&pool).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ];
+        let result = parse_delegation_pool_unlock_operation(delegator, &[], &args).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].operation_type, "unlock_delegated_stake");
+    }
+
+    #[test]
+    fn test_parse_delegation_pool_withdraw_operation() {
+        let delegator = AccountAddress::ONE;
+        let pool = AccountAddress::TWO;
+        let amount: u64 = 500;
+        let args = vec![
+            bcs::to_bytes(&pool).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ];
+        let result = parse_delegation_pool_withdraw_operation(delegator, &[], &args).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].operation_type, "withdraw_undelegated_funds");
+    }
+
+    #[test]
+    fn test_parse_delegation_pool_add_stake_with_type_args_fails() {
+        let result = parse_delegation_pool_add_stake_operation(
+            AccountAddress::ONE,
+            &[TypeTag::Bool],
+            &[],
+        );
+        assert!(result.is_err());
+    }
+}

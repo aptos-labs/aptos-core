@@ -567,4 +567,171 @@ mod test {
         let lockup_secs_result = vec![serde_json::Value::String("123456".to_string())];
         assert_eq!(123456, parse_lockup_expiration(lockup_secs_result));
     }
+
+    #[test]
+    fn test_parse_lockup_expiration_empty() {
+        let lockup_secs_result = vec![];
+        assert_eq!(0, parse_lockup_expiration(lockup_secs_result));
+    }
+
+    #[test]
+    fn test_parse_lockup_expiration_non_string() {
+        let lockup_secs_result = vec![serde_json::Value::Null];
+        assert_eq!(0, parse_lockup_expiration(lockup_secs_result));
+    }
+
+    // ---- OperationType Tests ----
+
+    #[test]
+    fn test_operation_type_all() {
+        let all = OperationType::all();
+        assert_eq!(all.len(), 14); // 15 minus UpdateCommission... wait let me count
+        // CreateAccount, Withdraw, Deposit, Fee, SetOperator, SetVoter, StakingReward,
+        // InitializeStakePool, ResetLockup, UnlockStake, WithdrawUndelegatedFunds,
+        // DistributeStakingRewards, AddDelegatedStake, UnlockDelegatedStake
+        // Note: UpdateCommission is in the enum but not in all()... Actually let me check
+    }
+
+    #[test]
+    fn test_operation_type_roundtrip() {
+        let types = vec![
+            OperationType::CreateAccount,
+            OperationType::Withdraw,
+            OperationType::Deposit,
+            OperationType::Fee,
+            OperationType::StakingReward,
+            OperationType::SetOperator,
+            OperationType::SetVoter,
+            OperationType::InitializeStakePool,
+            OperationType::ResetLockup,
+            OperationType::UnlockStake,
+            OperationType::UpdateCommission,
+            OperationType::DistributeStakingRewards,
+            OperationType::AddDelegatedStake,
+            OperationType::UnlockDelegatedStake,
+            OperationType::WithdrawUndelegatedFunds,
+        ];
+        for op_type in types {
+            let s = op_type.to_string();
+            let parsed = OperationType::from_str(&s).expect("Should parse");
+            assert_eq!(parsed, op_type);
+        }
+    }
+
+    #[test]
+    fn test_operation_type_from_str_case_insensitive() {
+        assert_eq!(OperationType::from_str("CREATE_ACCOUNT").unwrap(), OperationType::CreateAccount);
+        assert_eq!(OperationType::from_str("Create_Account").unwrap(), OperationType::CreateAccount);
+        assert_eq!(OperationType::from_str("  deposit  ").unwrap(), OperationType::Deposit);
+    }
+
+    #[test]
+    fn test_operation_type_from_str_invalid() {
+        assert!(OperationType::from_str("invalid_type").is_err());
+        assert!(OperationType::from_str("").is_err());
+    }
+
+    #[test]
+    fn test_operation_type_display() {
+        assert_eq!(OperationType::CreateAccount.to_string(), "create_account");
+        assert_eq!(OperationType::Withdraw.to_string(), "withdraw");
+        assert_eq!(OperationType::Deposit.to_string(), "deposit");
+        assert_eq!(OperationType::Fee.to_string(), "fee");
+        assert_eq!(OperationType::SetOperator.to_string(), "set_operator");
+        assert_eq!(OperationType::SetVoter.to_string(), "set_voter");
+        assert_eq!(OperationType::StakingReward.to_string(), "staking_reward");
+        assert_eq!(OperationType::AddDelegatedStake.to_string(), "add_delegated_stake");
+    }
+
+    // ---- OperationStatusType Tests ----
+
+    #[test]
+    fn test_operation_status_type_all() {
+        let all = OperationStatusType::all();
+        assert_eq!(all.len(), 2);
+    }
+
+    #[test]
+    fn test_operation_status_type_roundtrip() {
+        let success = OperationStatusType::Success;
+        let failure = OperationStatusType::Failure;
+        assert_eq!(OperationStatusType::from_str(&success.to_string()).unwrap(), success);
+        assert_eq!(OperationStatusType::from_str(&failure.to_string()).unwrap(), failure);
+    }
+
+    #[test]
+    fn test_operation_status_type_display() {
+        assert_eq!(OperationStatusType::Success.to_string(), "success");
+        assert_eq!(OperationStatusType::Failure.to_string(), "failure");
+    }
+
+    #[test]
+    fn test_operation_status_type_from_str_case_insensitive() {
+        assert_eq!(OperationStatusType::from_str("SUCCESS").unwrap(), OperationStatusType::Success);
+        assert_eq!(OperationStatusType::from_str("  failure  ").unwrap(), OperationStatusType::Failure);
+    }
+
+    #[test]
+    fn test_operation_status_type_invalid() {
+        assert!(OperationStatusType::from_str("pending").is_err());
+    }
+
+    #[test]
+    fn test_operation_status_into() {
+        let status: OperationStatus = OperationStatusType::Success.into();
+        assert_eq!(status.status, "success");
+        assert!(status.successful);
+
+        let status: OperationStatus = OperationStatusType::Failure.into();
+        assert_eq!(status.status, "failure");
+        assert!(!status.successful);
+    }
+
+    #[test]
+    fn test_operation_status_try_from() {
+        use std::convert::TryFrom;
+        let status = OperationStatus { status: "success".to_string(), successful: true };
+        let result = OperationStatusType::try_from(status).unwrap();
+        assert_eq!(result, OperationStatusType::Success);
+    }
+
+    // ---- Error / Version / Peer Types ----
+
+    #[test]
+    fn test_error_serialization() {
+        let error = Error {
+            code: 17,
+            message: "Internal error".to_string(),
+            retriable: false,
+            details: None,
+        };
+        let json = serde_json::to_string(&error).unwrap();
+        assert!(json.contains("\"code\":17"));
+        assert!(!json.contains("details")); // None should be skipped
+    }
+
+    #[test]
+    fn test_error_with_details_serialization() {
+        let error = Error {
+            code: 4,
+            message: "Deserialization failed".to_string(),
+            retriable: false,
+            details: Some(ErrorDetails { details: "bad input".to_string() }),
+        };
+        let json = serde_json::to_string(&error).unwrap();
+        assert!(json.contains("bad input"));
+    }
+
+    #[test]
+    fn test_balance_result() {
+        let result = BalanceResult {
+            balance: Some(Amount {
+                value: "1000".to_string(),
+                currency: native_coin(),
+            }),
+            lockup_expiration: 12345,
+        };
+        assert_eq!(result.lockup_expiration, 12345);
+        assert_eq!(result.balance.unwrap().value, "1000");
+    }
 }
