@@ -282,6 +282,9 @@ pub enum BehaviorKind {
     EnsuresOf,
     /// `modifies_of<f>(args)` - the modify clauses of function `f`
     ModifiesOf,
+    /// `result_of<f>(args)` - deterministic result selector based on `ensures_of`
+    /// Semantics: `result_of<f>(x) == choose y where ensures_of<f>(x, y)`
+    ResultOf,
 }
 
 impl fmt::Display for BehaviorKind {
@@ -292,24 +295,7 @@ impl fmt::Display for BehaviorKind {
             AbortsOf => write!(f, "aborts_of"),
             EnsuresOf => write!(f, "ensures_of"),
             ModifiesOf => write!(f, "modifies_of"),
-        }
-    }
-}
-
-/// The target of a behavior predicate - either a function parameter or a known function.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum BehaviorTarget {
-    /// A parameter of function type, identified by its symbol.
-    Parameter(Symbol),
-    /// A known Move function.
-    Function(QualifiedInstId<FunId>),
-}
-
-impl fmt::Display for BehaviorTarget {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            BehaviorTarget::Parameter(sym) => write!(f, "param#{:?}", sym),
-            BehaviorTarget::Function(qid) => write!(f, "{:?}", qid),
+            ResultOf => write!(f, "result_of"),
         }
     }
 }
@@ -1145,6 +1131,8 @@ impl ExpData {
 
     /// Returns the temporaries used in this expression, with types. Result is ordered by occurrence.
     pub fn used_temporaries_with_types(&self, env: &GlobalEnv) -> Vec<(TempIndex, Type)> {
+        // Temporaries in behavior predicates (args[0]) are captured by the standard visitor
+        // since they are now represented as regular Temporary expressions.
         self.used_temporaries_with_ids()
             .into_iter()
             .map(|(t, i)| (t, env.get_node_type(i)))
@@ -2039,14 +2027,12 @@ pub enum Operation {
     SpecFunction(ModuleId, SpecFunId, Option<Vec<MemoryLabel>>),
     UpdateField(ModuleId, StructId, FieldId),
     /// Behavior predicate for function values (requires_of, aborts_of, ensures_of, modifies_of).
-    /// Arguments: kind of predicate, pre-state label, target function/parameter, post-state label.
-    /// Labels are currently ignored but reserved for future state-binding functionality.
-    Behavior(
-        BehaviorKind,
-        Option<MemoryLabel>,
-        BehaviorTarget,
-        Option<MemoryLabel>,
-    ),
+    /// args[0] is the function expression (Closure for global functions, Temporary for
+    /// function parameters, LocalVar for spec function parameters).
+    /// args[1..] are the predicate arguments.
+    /// The BehaviorState contains optional pre/post state labels for reasoning about
+    /// state at different program points.
+    Behavior(BehaviorKind, BehaviorState),
     Result(usize),
     Index,
     Slice,
@@ -2142,6 +2128,27 @@ pub enum Operation {
 
 /// A label used for referring to a specific memory in Global and Exists expressions.
 pub type MemoryLabel = GlobalId;
+
+/// State labels for behavior predicates.
+/// Pre-label refers to state before an operation, post-label refers to state after.
+/// Label names are stored in GlobalEnv and can be looked up via `get_memory_label_name`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct BehaviorState {
+    /// Pre-state label - references another predicate's post-state
+    pub pre: Option<MemoryLabel>,
+    /// Post-state label - defines this predicate's post-state
+    pub post: Option<MemoryLabel>,
+}
+
+impl BehaviorState {
+    pub fn new(pre: Option<MemoryLabel>, post: Option<MemoryLabel>) -> Self {
+        Self { pre, post }
+    }
+
+    pub fn has_labels(&self) -> bool {
+        self.pre.is_some() || self.post.is_some()
+    }
+}
 
 /// A pattern, either a variable, a tuple, or a struct instantiation applied to a sequence of patterns.
 /// Carries a node_id which has (at least) a type and location.
@@ -3823,27 +3830,13 @@ impl fmt::Display for OperationDisplay<'_> {
                 write!(f, "update {}", self.field_str(mid, sid, fid))
             },
             Result(t) => write!(f, "result{}", t),
-            Behavior(kind, pre_label, target, post_label) => {
-                if let Some(label) = pre_label {
-                    write!(f, "@{}", label)?;
+            Behavior(kind, state) => {
+                if let Some(pre) = &state.pre {
+                    write!(f, "{}@", pre.as_usize())?;
                 }
                 write!(f, "{}", kind)?;
-                write!(f, "<")?;
-                match target {
-                    BehaviorTarget::Parameter(sym) => {
-                        write!(f, "{}", sym.display(self.env.symbol_pool()))?
-                    },
-                    BehaviorTarget::Function(qid) => write!(
-                        f,
-                        "{}",
-                        self.env
-                            .get_function(qid.to_qualified_id())
-                            .get_full_name_str()
-                    )?,
-                }
-                write!(f, ">")?;
-                if let Some(label) = post_label {
-                    write!(f, "@{}", label)?;
+                if let Some(post) = &state.post {
+                    write!(f, "@{}", post.as_usize())?;
                 }
                 Ok(())
             },

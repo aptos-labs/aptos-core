@@ -2098,9 +2098,9 @@ dependencies = [
  "bcs 0.1.4",
  "clap 4.5.21",
  "float-cmp",
+ "move-asm",
  "move-binary-format",
  "move-core-types",
- "move-ir-compiler",
  "nalgebra",
  "walkdir",
 ]
@@ -2796,6 +2796,10 @@ dependencies = [
 name = "aptos-jemalloc"
 version = "0.1.0"
 dependencies = [
+ "aptos-logger",
+ "aptos-metrics-core",
+ "once_cell",
+ "tikv-jemalloc-ctl",
  "tikv-jemallocator",
 ]
 
@@ -2973,11 +2977,12 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "goldenfile",
+ "indoc",
+ "move-asm",
  "move-binary-format",
  "move-command-line-common",
  "move-core-types",
  "move-coverage",
- "move-ir-compiler",
  "move-model",
  "move-vm-runtime",
  "move-vm-types",
@@ -5054,10 +5059,11 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "clap 4.5.21",
+ "either",
  "glob",
+ "move-asm",
  "move-binary-format",
  "move-core-types",
- "move-ir-compiler",
  "move-vm-runtime",
  "move-vm-test-utils",
  "move-vm-types",
@@ -11688,10 +11694,11 @@ dependencies = [
  "aptos-vm-genesis",
  "claims",
  "fail",
+ "indoc",
+ "move-asm",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
- "move-ir-compiler",
  "proptest",
  "test-case",
 ]

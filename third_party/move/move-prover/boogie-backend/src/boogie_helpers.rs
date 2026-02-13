@@ -13,7 +13,7 @@ use move_core_types::{
     ability::AbilitySet, account_address::AccountAddress, function::ClosureMask,
 };
 use move_model::{
-    ast::{Address, MemoryLabel, TempIndex, Value},
+    ast::{Address, BehaviorKind, MemoryLabel, TempIndex, Value},
     model::{
         FieldEnv, FieldId, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, QualifiedInstId,
         SpecFunId, StructEnv, StructId, SCRIPT_MODULE_NAME,
@@ -351,23 +351,29 @@ pub fn boogie_type(env: &GlobalEnv, ty: &Type) -> String {
         Reference(_, bt) => format!("$Mutation ({})", boogie_type(env, bt)),
         TypeParameter(idx) => boogie_type_param(env, *idx),
         Fun(param, result, abilities) => fun_type(env, param, result, *abilities),
-        Tuple(elems) => {
-            let n = elems.len();
-            if n == 0 || n == 1 {
-                format!("<<unsupported: {:?}>>", ty)
-            } else if n > MAX_TUPLE_SIZE {
-                format!(
-                    "<<tuple too large: {} elements, max is {}>>",
-                    n, MAX_TUPLE_SIZE
-                )
-            } else {
-                let args = elems.iter().map(|t| boogie_type(env, t)).join(" ");
-                format!("$Tuple{} {}", n, args)
-            }
-        },
+        Tuple(elems) => boogie_tuple_type(ty, elems, |t| boogie_type(env, t)),
         TypeDomain(..) | ResourceDomain(..) | Error | Var(..) => {
             format!("<<unsupported: {:?}>>", ty)
         },
+    }
+}
+
+/// Helper to generate a Boogie tuple type from element types. The `type_fn` closure
+/// maps each element type to its Boogie representation.
+fn boogie_tuple_type(ty: &Type, elems: &[Type], type_fn: impl Fn(&Type) -> String) -> String {
+    let n = elems.len();
+    if n == 0 || n == 1 {
+        format!("<<unsupported: {:?}>>", ty)
+    } else if n > MAX_TUPLE_SIZE {
+        format!(
+            "<<tuple too large: {} elements, max is {}>>",
+            n, MAX_TUPLE_SIZE
+        )
+    } else {
+        // Use space-separated syntax with each argument in parentheses
+        // to handle complex types like $Mutation (int)
+        let args = elems.iter().map(|t| format!("({})", type_fn(t))).join(" ");
+        format!("$Tuple{} {}", n, args)
     }
 }
 
@@ -421,20 +427,7 @@ pub fn boogie_bv_type(env: &GlobalEnv, ty: &Type) -> String {
         Reference(_, bt) => format!("$Mutation ({})", boogie_bv_type(env, bt)),
         TypeParameter(idx) => boogie_type_param(env, *idx),
         Fun(param, result, abilities) => fun_type(env, param, result, *abilities),
-        Tuple(elems) => {
-            let n = elems.len();
-            if n == 0 || n == 1 {
-                format!("<<unsupported: {:?}>>", ty)
-            } else if n > MAX_TUPLE_SIZE {
-                format!(
-                    "<<tuple too large: {} elements, max is {}>>",
-                    n, MAX_TUPLE_SIZE
-                )
-            } else {
-                let args = elems.iter().map(|t| boogie_bv_type(env, t)).join(" ");
-                format!("$Tuple{} {}", n, args)
-            }
-        },
+        Tuple(elems) => boogie_tuple_type(ty, elems, |t| boogie_bv_type(env, t)),
         TypeDomain(..) | ResourceDomain(..) | Error | Var(..) => {
             format!("<<unsupported: {:?}>>", ty)
         },
@@ -1259,4 +1252,84 @@ pub fn boogie_closure_pack_name(
     let fun_env = env.get_function(fun.to_qualified_id());
     let fun_name = boogie_function_name(&fun_env, &fun.inst);
     format!("$closure'{}'_{}", fun_name, mask)
+}
+
+/// Return name of the datatype constructor for a function parameter variant.
+/// These variants represent function-typed parameters of verification targets.
+pub fn boogie_fun_param_name(
+    env: &GlobalEnv,
+    fun: &QualifiedInstId<FunId>,
+    param_sym: Symbol,
+) -> String {
+    let fun_env = env.get_function(fun.to_qualified_id());
+    let fun_name = boogie_function_name(&fun_env, &fun.inst);
+    let param_name = param_sym.display(env.symbol_pool());
+    format!("$param'{}${}'", fun_name, param_name)
+}
+
+/// Return name of a behavioral predicate spec function (requires_of, aborts_of, ensures_of)
+/// for a function-typed parameter in Boogie.
+pub fn boogie_behavioral_spec_fun_name(
+    env: &GlobalEnv,
+    fun: &QualifiedInstId<FunId>,
+    param_sym: Symbol,
+    kind: BehaviorKind,
+    inst: &[Type],
+) -> String {
+    let fun_env = env.get_function(fun.to_qualified_id());
+    let module_name = boogie_module_name(&fun_env.module_env);
+    let fun_name_sym = fun_env.get_name();
+    let fun_name = fun_name_sym.display(env.symbol_pool());
+    let param_name = param_sym.display(env.symbol_pool());
+    // The spec function name format matches what spec_rewriter generates and what
+    // spec_translator expects: ${module}_$${kind}$${fun}$${param}${suffix}
+    format!(
+        "${}_${}${}${}{}",
+        module_name,
+        kind,
+        fun_name,
+        param_name,
+        boogie_inst_suffix(env, inst)
+    )
+}
+
+/// Return name of a behavioral predicate result function for ensures_of.
+/// This is an uninterpreted function that returns the result value(s) for a given input.
+/// When `multi_result` is false (single result), the format is
+/// `${module}_$ensures_of_result$${fun}$${param}${suffix}`.
+/// When `multi_result` is true (2+ results as a tuple), the format is
+/// `${module}_$ensures_of_results$${fun}$${param}${suffix}`.
+pub fn boogie_behavioral_result_fun_name(
+    env: &GlobalEnv,
+    fun: &QualifiedInstId<FunId>,
+    param_sym: Symbol,
+    inst: &[Type],
+    multi_result: bool,
+) -> String {
+    let fun_env = env.get_function(fun.to_qualified_id());
+    let module_name = boogie_module_name(&fun_env.module_env);
+    let fun_name_sym = fun_env.get_name();
+    let fun_name = fun_name_sym.display(env.symbol_pool());
+    let param_name = param_sym.display(env.symbol_pool());
+    let plural = if multi_result { "s" } else { "" };
+    format!(
+        "${}_$ensures_of_result{}${}${}{}",
+        module_name,
+        plural,
+        fun_name,
+        param_name,
+        boogie_inst_suffix(env, inst)
+    )
+}
+
+/// Return name of the behavioral predicate evaluation function for a function type.
+/// These inline functions dispatch on closure variants to evaluate behavioral predicates.
+/// Format: `${kind}'${type_suffix}'`
+/// For example: `$ensures_of'$fun_u64_u64'`
+pub fn boogie_behavioral_eval_fun_name(
+    env: &GlobalEnv,
+    fun_type: &Type,
+    kind: BehaviorKind,
+) -> String {
+    format!("${}'{}'", kind, boogie_type_suffix(env, fun_type))
 }

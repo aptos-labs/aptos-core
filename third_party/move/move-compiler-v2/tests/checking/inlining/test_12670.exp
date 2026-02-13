@@ -39,11 +39,11 @@ module 0x1::Test {
     fun foo(xs: vector<S>) {
         let sum = 0u8;
         {
-            let (v) = (&xs);
+            let v = &xs;
             let i = 0;
             while (i < 0x1::vector::length<S>(v)) {
                 {
-                    let (e) = (0x1::vector::borrow<S>(v, i));
+                    let e = 0x1::vector::borrow<S>(v, i);
                     sum = sum + e.x;
                 };
                 i = i + 1

@@ -52,10 +52,10 @@ module 0x42::m {
         let s2 = S{x: 4};
         let p2 = &s2;
         let p2m = &mut s;
-        let x1 = sum(/*freeze*/p1m, p1);
-        let x2 = sum(/*freeze*/p1m, /*freeze*/p1m);
-        let x3 = sum(/*freeze*/p1m, p2);
-        let x4 = sum(/*freeze*/p2m, /*freeze*/p2m);
+        let x1 = sum(p1m, p1);
+        let x2 = sum(p1m, p1m);
+        let x3 = sum(p1m, p2);
+        let x4 = sum(p2m, p2m);
         x1 + x2 + x3 + x4
     }
 }

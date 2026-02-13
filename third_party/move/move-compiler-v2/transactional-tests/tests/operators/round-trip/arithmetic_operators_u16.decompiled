@@ -11,7 +11,7 @@ script {
 //# run
 script {
     fun main() {
-        let _v0 = 1u16 + 65535u16;
+        let _v0 = 1u16 + MAX_U16;
     }
 }
 
@@ -99,7 +99,7 @@ script {
 //# run
 script {
     fun main() {
-        let _v0 = 65535u16 / 0u16;
+        let _v0 = MAX_U16 / 0u16;
     }
 }
 
@@ -131,6 +131,6 @@ script {
 //# run
 script {
     fun main() {
-        let _v0 = 65535u16 % 0u16;
+        let _v0 = MAX_U16 % 0u16;
     }
 }

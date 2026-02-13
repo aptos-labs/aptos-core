@@ -74,7 +74,7 @@ fn profile_move_snippets(regenerate_all: bool) -> Result<()> {
     println!("Profiling Move VM...");
 
     let root = Path::join(&PATH_CRATE_ROOT, "move");
-    let pat = format!("{}/**/*.mvir", root.to_string_lossy());
+    let pat = format!("{}/**/*.masm", root.to_string_lossy());
 
     let bin_mod_time = fs::metadata(&*PATH_BIN_RUN_MOVE)?.modified()?;
 

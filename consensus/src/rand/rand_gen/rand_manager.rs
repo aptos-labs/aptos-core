@@ -232,7 +232,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             let config_clone = rand_config.clone();
             let fast_config_clone = fast_rand_config.clone();
             bounded_executor
-                .spawn(async move {
+                .spawn_blocking(move || {
                     match bcs::from_bytes::<RandMessage<S, D>>(rand_gen_msg.req.data()) {
                         Ok(msg) => {
                             if msg

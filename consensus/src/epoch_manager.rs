@@ -943,9 +943,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             chain_health_backoff_config,
             self.quorum_store_enabled,
             onchain_consensus_config.effective_validator_txn_config(),
-            self.config
-                .quorum_store
-                .allow_batches_without_pos_in_proposal,
             opt_qs_payload_param_provider,
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
@@ -1086,6 +1083,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             })
             .collect::<Vec<_>>();
 
+        // Get aggregate public keys from the transcript for batch verification
+        let aggregate_pk_main = transcript.main.get_dealt_public_key();
+        let aggregate_pk_fast = transcript.fast.as_ref().map(|t| t.get_dealt_public_key());
+
         // Recover existing augmented key pair or generate a new one
         let (augmented_key_pair, fast_augmented_key_pair) = if let Some((_, key_pair)) = self
             .rand_storage
@@ -1133,6 +1134,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             vuf_pp.clone(),
             keys,
             dkg_pub_params.pvss_config.wconfig.clone(),
+            aggregate_pk_main,
+            self.config.optimistic_rand_share_verification,
         );
 
         let fast_rand_config = if let (Some((ask, apk)), Some(trx), Some(wconfig)) = (
@@ -1154,6 +1157,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 vuf_pp,
                 fast_keys,
                 fast_wconfig,
+                aggregate_pk_fast.expect("Fast PK must exist when fast path is enabled"),
+                self.config.optimistic_rand_share_verification,
             ))
         } else {
             None
@@ -1508,9 +1513,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_randomness_config,
             onchain_jwk_consensus_config,
             self.bounded_executor.clone(),
-            self.config
-                .quorum_store
-                .allow_batches_without_pos_in_proposal,
         );
 
         let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);
@@ -1587,7 +1589,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let payload_manager = self.payload_manager.clone();
             let pending_blocks = self.pending_blocks.clone();
             self.bounded_executor
-                .spawn(async move {
+                .spawn_blocking(move || {
                     match monitor!(
                         "verify_message",
                         unverified_event.clone().verify(

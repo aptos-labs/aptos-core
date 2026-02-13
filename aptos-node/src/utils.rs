@@ -65,6 +65,7 @@ pub fn set_aptos_vm_configurations(node_config: &NodeConfig) {
         node_config.execution.num_proof_reading_threads as usize,
     );
     AptosVM::set_blockstm_v2_enabled_once(node_config.execution.blockstm_v2_enabled);
+    AptosVM::set_enable_pre_write_once(node_config.execution.enable_pre_write);
 
     if node_config
         .execution

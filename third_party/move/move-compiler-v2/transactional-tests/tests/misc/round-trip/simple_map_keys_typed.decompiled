@@ -25,14 +25,14 @@ module 0x42::simple_map {
         _v1
     }
     public fun run() {
-        let _v0 = Element<u64,u64>{key: 1, value: 2};
+        let _v0 = Element<u64, u64>{key: 1, value: 2};
         let _v1 = 0x1::vector::empty<Element<u64, u64>>();
         let _v2 = &mut _v1;
         0x1::vector::push_back<Element<u64, u64>>(_v2, _v0);
         0x1::vector::push_back<Element<u64, u64>>(_v2, _v0);
         0x1::vector::push_back<Element<u64, u64>>(_v2, _v0);
-        let _v3 = SimpleMap<u64,u64>{data: _v1};
-        assert!(keys<u64,u64>(&_v3) == vector[1, 1, 1], 33);
+        let _v3 = SimpleMap<u64, u64>{data: _v1};
+        assert!(keys<u64, u64>(&_v3) == vector[1, 1, 1], 33);
     }
 }
 
