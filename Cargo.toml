@@ -232,7 +232,6 @@ members = [
     "third_party/move/move-prover/bytecode-pipeline",
     "third_party/move/move-prover/lab",
     "third_party/move/move-prover/move-abigen",
-    "third_party/move/move-prover/move-docgen",
     "third_party/move/move-prover/move-errmapgen",
     "third_party/move/move-prover/test-utils",
     "third_party/move/move-symbol-pool",
@@ -250,6 +249,7 @@ members = [
     "third_party/move/tools/move-coverage",
     "third_party/move/tools/move-decompiler",
     "third_party/move/tools/move-disassembler",
+    "third_party/move/tools/move-docgen",
     "third_party/move/tools/move-linter",
     "third_party/move/tools/move-package",
     "third_party/move/tools/move-package-cache",
@@ -877,7 +877,7 @@ legacy-move-compiler = { path = "third_party/move/move-compiler-v2/legacy-move-c
 move-compiler-v2 = { path = "third_party/move/move-compiler-v2" }
 move-core-types = { path = "third_party/move/move-core/types" }
 move-decompiler = { path = "third_party/move/tools/move-decompiler" }
-move-docgen = { path = "third_party/move/move-prover/move-docgen" }
+move-docgen = { path = "third_party/move/tools/move-docgen" }
 move-disassembler = { path = "third_party/move/tools/move-disassembler" }
 move-errmapgen = { path = "third_party/move/move-prover/move-errmapgen" }
 move-ir-types = { path = "third_party/move/move-ir/types" }
