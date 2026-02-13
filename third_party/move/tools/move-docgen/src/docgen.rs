@@ -76,29 +76,29 @@ pub struct DocgenOptions {
     #[clap(long, default_value_t = 1)]
     pub section_level_start: usize,
     /// Whether to include private functions in the generated docs.
-    #[clap(long, default_value_t = true)]
+    #[clap(long, action = clap::ArgAction::Set, default_value_t = true)]
     pub include_private_fun: bool,
     /// Whether to include specifications in the generated docs.
-    #[clap(long, default_value_t = true)]
+    #[clap(long, action = clap::ArgAction::Set, default_value_t = true)]
     pub include_specs: bool,
     /// Whether to put specifications in the same section as a declaration or put them all
     /// into an independent section.
-    #[clap(long, default_value_t = true)]
+    #[clap(long, action = clap::ArgAction::Set, default_value_t = true)]
     pub specs_inlined: bool,
     /// Whether to include Move implementations.
-    #[clap(long, default_value_t = true)]
+    #[clap(long, action = clap::ArgAction::Set, default_value_t = true)]
     pub include_impl: bool,
     /// Max depth to which sections are displayed in table-of-contents.
     #[clap(long, default_value_t = 3)]
     pub toc_depth: usize,
     /// Whether to use collapsed sections (`<details>`) for implementation and specs
-    #[clap(long, default_value_t = true)]
+    #[clap(long, action = clap::ArgAction::Set, default_value_t = true)]
     pub collapsed_sections: bool,
     /// In which directory to store output.
     #[clap(long, default_value = "doc")]
     pub output_directory: String,
     /// In which directories to look for references.
-    #[clap(long)]
+    #[clap(long, default_value = "doc")]
     pub doc_path: Vec<String>,
     /// A list of paths to files containing templates for root documents for the generated
     /// documentation.

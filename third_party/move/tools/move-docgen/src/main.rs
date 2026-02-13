@@ -3,7 +3,10 @@
 
 use anyhow::anyhow;
 use clap::Parser;
-use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
+use codespan_reporting::{
+    diagnostic::Severity,
+    term::termcolor::{ColorChoice, StandardStream},
+};
 use move_docgen::{Docgen, DocgenOptions};
 use move_model::metadata::LanguageVersion;
 use std::{fs, path::PathBuf};
@@ -64,6 +67,7 @@ fn run(cli: Cli) -> anyhow::Result<()> {
         fs::write(path.as_path(), content)?;
     }
 
+    model.report_diag(&mut error_writer, Severity::Warning);
     if model.has_errors() {
         Err(anyhow!("documentation generation failed"))
     } else {
