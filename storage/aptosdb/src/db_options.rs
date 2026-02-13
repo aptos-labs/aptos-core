@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::schema::*;
-use aptos_config::config::{IndexType, RocksdbConfig};
+use aptos_config::config::{BlobDbConfig, IndexType, RocksdbConfig};
 use aptos_schemadb::{
     BlockBasedIndexType, BlockBasedOptions, Cache, ColumnFamilyDescriptor, ColumnFamilyName,
     DBCompressionType, Options, SliceTransform, DEFAULT_COLUMN_FAMILY_NAME,
@@ -172,6 +172,7 @@ where
         cf_opts.set_compression_type(DBCompressionType::Lz4);
         cf_opts.set_block_based_table_factory(&table_options);
         cf_opts.add_compact_on_deletion_collector_factory(0, 0, 0.4);
+        apply_blob_db_config(&rocksdb_config.blob_db_config, block_cache, &mut cf_opts);
         cf_opts_post_processor(cf_name, &mut cf_opts);
         cfds.push(ColumnFamilyDescriptor::new((*cf_name).to_string(), cf_opts));
     }
@@ -219,6 +220,26 @@ fn convert_index_type(index_type: IndexType) -> BlockBasedIndexType {
         IndexType::BinarySearch => BlockBasedIndexType::BinarySearch,
         IndexType::HashSearch => BlockBasedIndexType::HashSearch,
         IndexType::TwoLevelIndexSearch => BlockBasedIndexType::TwoLevelIndexSearch,
+    }
+}
+
+fn apply_blob_db_config(
+    blob_config: &BlobDbConfig,
+    block_cache: Option<&Cache>,
+    cf_opts: &mut Options,
+) {
+    if blob_config.enabled {
+        cf_opts.set_enable_blob_files(true);
+        cf_opts.set_min_blob_size(blob_config.min_blob_size);
+        cf_opts.set_blob_file_size(blob_config.blob_file_size);
+        cf_opts.set_blob_compression_type(DBCompressionType::Lz4);
+        cf_opts.set_enable_blob_gc(blob_config.enable_blob_gc);
+        cf_opts.set_blob_gc_age_cutoff(blob_config.blob_gc_age_cutoff);
+        cf_opts.set_blob_gc_force_threshold(blob_config.blob_gc_force_threshold);
+        cf_opts.set_blob_compaction_readahead_size(blob_config.blob_compaction_readahead_size);
+        if let Some(cache) = block_cache {
+            cf_opts.set_blob_cache(cache);
+        }
     }
 }
 

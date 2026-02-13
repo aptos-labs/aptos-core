@@ -119,6 +119,43 @@ pub enum IndexType {
     TwoLevelIndexSearch,
 }
 
+/// Configuration for RocksDB BlobDB (value separation).
+/// When enabled, values larger than `min_blob_size` are stored in separate
+/// append-only blob files, reducing LSM compaction write amplification.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct BlobDbConfig {
+    /// Whether to enable blob files (value separation) for this DB.
+    pub enabled: bool,
+    /// Minimum value size (in bytes) to store in blob files.
+    /// Values smaller than this remain in SST files.
+    pub min_blob_size: u64,
+    /// Target size for individual blob files (in bytes).
+    pub blob_file_size: u64,
+    /// Enable garbage collection of blob files during compaction.
+    pub enable_blob_gc: bool,
+    /// Fraction of oldest blob files to consider for GC (0.0 to 1.0).
+    pub blob_gc_age_cutoff: f64,
+    /// Force GC on blob files exceeding this garbage ratio (0.0 to 1.0).
+    pub blob_gc_force_threshold: f64,
+    /// Read-ahead size in bytes for blob compaction.
+    pub blob_compaction_readahead_size: u64,
+}
+
+impl Default for BlobDbConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            min_blob_size: 256,
+            blob_file_size: 256 * 1024 * 1024, // 256MB
+            enable_blob_gc: true,
+            blob_gc_age_cutoff: 0.25,
+            blob_gc_force_threshold: 1.0,
+            blob_compaction_readahead_size: 256 * 1024, // 256KB
+        }
+    }
+}
+
 /// Port selected RocksDB options for tuning underlying rocksdb instance of AptosDB.
 /// see <https://github.com/facebook/rocksdb/blob/master/include/rocksdb/options.h>
 /// for detailed explanations.
@@ -155,6 +192,8 @@ pub struct RocksdbConfig {
     pub bloom_filter_bits: Option<f64>,
     /// If not `None`, use hybrid ribbon filter policy.
     pub bloom_before_level: Option<i32>,
+    /// BlobDB (value separation) configuration.
+    pub blob_db_config: BlobDbConfig,
 }
 
 impl RocksdbConfig {
@@ -187,6 +226,7 @@ impl Default for RocksdbConfig {
             stats_dump_period_sec: None,
             bloom_filter_bits: None,
             bloom_before_level: None,
+            blob_db_config: BlobDbConfig::default(),
         }
     }
 }
