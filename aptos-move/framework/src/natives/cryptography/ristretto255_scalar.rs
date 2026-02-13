@@ -4,6 +4,7 @@
 use crate::natives::cryptography::ristretto255::{
     pop_32_byte_slice, pop_64_byte_slice, pop_scalar_from_bytes, SCALAR_NUM_BYTES,
 };
+use crate::natives::cryptography::ristretto255_point::E_RISTRETTO255_SCALAR_INVALID_BYTES_LENGTH;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
     safely_assert_eq, safely_pop_arg, SafeNativeContext, SafeNativeError, SafeNativeResult,
@@ -22,9 +23,6 @@ use std::{
     convert::TryFrom,
     ops::{Add, Mul, Neg, Sub},
 };
-
-/// Equivalent to `std::errors::internal(1)` in Move.
-const E_RISTRETTO255_SCALAR_INVALID_BYTES_LENGTH: u64 = 0x0A_0001;
 
 #[cfg(feature = "testing")]
 /// This is a test-only native that charges zero gas. It is only exported in testing mode.

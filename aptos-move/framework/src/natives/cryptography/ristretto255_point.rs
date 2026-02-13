@@ -76,6 +76,9 @@ const E_MSM_LOG2_FAILED: u64 = 0x0A_0002;
 /// Equivalent to `std::errors::internal(3)` in Move.
 const E_RISTRETTO255_POINT_DUPLICATE_HANDLE: u64 = 0x0A_0003;
 
+/// Equivalent to `std::errors::internal(4)` in Move. Invalid Ristretto scalar bytes length.
+pub(crate) const E_RISTRETTO255_SCALAR_INVALID_BYTES_LENGTH: u64 = 0x0A_0004;
+
 /// A structure representing mutable data of the NativeRistrettoPointContext. This is in a RefCell
 /// of the overall context so we can mutate while still accessing the overall context.
 #[derive(Default)]
