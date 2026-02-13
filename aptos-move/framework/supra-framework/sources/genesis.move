@@ -19,6 +19,8 @@ module supra_framework::genesis {
     use supra_framework::evm_genesis_config;
     use supra_framework::create_signer::create_signer;
     use supra_framework::gas_schedule;
+    use supra_framework::leader_ban_registry;
+    use supra_framework::leader_ban_registry_config;
     use supra_framework::multisig_account;
     use supra_framework::pbo_delegation_pool;
     use supra_framework::reconfiguration;
@@ -289,6 +291,15 @@ module supra_framework::genesis {
         evm_genesis_config: vector<u8>,
     ) {
         evm_genesis_config::initialize(supra_framework, evm_genesis_config);
+    }
+
+    /// Initialize the leader ban config
+    fun initialize_leader_ban_registry_config(
+        supra_framework: &signer,
+        leader_ban_registry_config: vector<u8>,
+    ) {
+        leader_ban_registry_config::initialize(supra_framework, leader_ban_registry_config);
+        leader_ban_registry::initialize_leader_ban_registry(supra_framework);
     }
 
 

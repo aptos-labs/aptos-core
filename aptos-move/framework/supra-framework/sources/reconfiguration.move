@@ -4,6 +4,7 @@ module supra_framework::reconfiguration {
     use std::error;
     use std::features;
     use std::signer;
+    use supra_framework::leader_ban_registry;
 
     use supra_framework::account;
     use supra_framework::chain_status;
@@ -151,6 +152,7 @@ module supra_framework::reconfiguration {
 
         // Call stake to compute the new validator set and distribute rewards and transaction fees.
         stake::on_new_epoch();
+        leader_ban_registry::on_new_epoch();
         storage_gas::on_reconfig();
 
         assert!(current_time > config_ref.last_reconfiguration_time, error::invalid_state(EINVALID_BLOCK_TIME));

@@ -40,6 +40,10 @@ module supra_framework::stake {
     friend supra_framework::reconfiguration;
     friend supra_framework::reconfiguration_with_dkg;
     friend supra_framework::transaction_fee;
+    friend supra_framework::leader_ban_registry;
+
+    #[test_only]
+    friend supra_framework::test_leader_ban_registry;
 
     /// Validator Config not published.
     const EVALIDATOR_CONFIG: u64 = 1;
@@ -504,6 +508,66 @@ module supra_framework::stake {
     public(friend) fun store_supra_coin_mint_cap(supra_framework: &signer, mint_cap: MintCapability<SupraCoin>) {
         system_addresses::assert_supra_framework(supra_framework);
         move_to(supra_framework, SupraCoinCapabilities { mint_cap })
+    }
+
+    /// To get validator pool address from validator index
+    public(friend) fun get_pool_address_from_index(index: u64) : Option<address>
+    acquires ValidatorSet
+    {
+        if (exists<ValidatorSet>(@supra_framework)) {
+            let validator_set = borrow_global<ValidatorSet>(@supra_framework);
+            // it can happen that some validator may added a leave request in between
+            // this can change the order of indexes in active validator
+            // so need to iterate through all until find pool address in active and  pending_active
+            let (is_index_exist, i) = vector::find(&validator_set.active_validators, |v| {
+                let v: &ValidatorInfo = v;
+                v.config.validator_index == index
+            });
+            if (is_index_exist) {
+                let v_info = vector::borrow(&validator_set.active_validators, i);
+                return option::some(v_info.addr)
+            };
+            let (is_index_exist, i) = vector::find(&validator_set.pending_inactive, |v| {
+                let v: &ValidatorInfo = v;
+                v.config.validator_index == index
+            });
+            if (is_index_exist) {
+                let v_info = vector::borrow(&validator_set.pending_inactive, i);
+                return option::some(v_info.addr)
+            };
+        };
+        option::none()
+    }
+
+    /// Returns committee size
+    public(friend) fun get_committee_size() : u64
+    acquires ValidatorSet
+    {
+        let commitee_size= 0;
+        if (exists<ValidatorSet>(@supra_framework)) {
+            let validator_set = borrow_global<ValidatorSet>(@supra_framework);
+            commitee_size = vector::length(&validator_set.active_validators) + vector::length(&validator_set.pending_inactive);
+        };
+        commitee_size
+    }
+
+    /// Returns pool addresses of current committee including pending inactive
+    public(friend) fun get_committee_pool_addresses() : vector<address>
+    acquires ValidatorSet
+    {
+        let pool_addresses= vector::empty();
+        if (exists<ValidatorSet>(@supra_framework)) {
+            let validator_set = borrow_global<ValidatorSet>(@supra_framework);
+            vector::for_each_ref(&validator_set.active_validators, |validator_info| {
+                let validator_info: &ValidatorInfo = validator_info;
+                vector::push_back(&mut pool_addresses, validator_info.addr);
+            });
+            vector::for_each_ref(&validator_set.pending_inactive, |validator_info| {
+                let validator_info: &ValidatorInfo = validator_info;
+                vector::push_back(&mut pool_addresses, validator_info.addr);
+            });
+        };
+        pool_addresses
     }
 
     /// Allow on chain governance to remove validators from the validator set.

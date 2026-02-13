@@ -10,6 +10,7 @@ module supra_framework::reconfiguration_with_dkg {
     use supra_framework::jwk_consensus_config;
     use supra_framework::jwks;
     use supra_framework::keyless_account;
+    use supra_framework::leader_ban_registry_config;
     use supra_framework::randomness_api_v0_config;
     use supra_framework::randomness_config;
     use supra_framework::randomness_config_seqnum;
@@ -60,6 +61,7 @@ module supra_framework::reconfiguration_with_dkg {
         jwk_consensus_config::on_new_epoch(framework);
         jwks::on_new_epoch(framework);
         keyless_account::on_new_epoch(framework);
+        leader_ban_registry_config::on_new_epoch(framework);
         randomness_config_seqnum::on_new_epoch(framework);
         randomness_config::on_new_epoch(framework);
         randomness_api_v0_config::on_new_epoch(framework);
