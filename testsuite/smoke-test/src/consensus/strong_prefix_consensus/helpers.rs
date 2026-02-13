@@ -34,6 +34,14 @@ pub struct StrongPrefixConsensusOutputFile {
 }
 
 impl StrongPrefixConsensusOutputFile {
+    /// Parse input hashes from hex strings
+    pub fn input_hashes(&self) -> Result<Vec<HashValue>> {
+        self.input
+            .iter()
+            .map(|hex| HashValue::from_hex(hex).map_err(|e| anyhow::anyhow!("Invalid hex: {}", e)))
+            .collect()
+    }
+
     /// Parse v_low hashes from hex strings
     pub fn v_low_hashes(&self) -> Result<Vec<HashValue>> {
         self.v_low

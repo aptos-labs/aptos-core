@@ -4,8 +4,8 @@
 
 Implementing Prefix Consensus protocols (from research paper "Prefix Consensus For Censorship Resistant BFT") within Aptos Core for leaderless, censorship-resistant consensus.
 
-**Current Phase**: Strong Prefix Consensus - Multi-view protocol for v_high agreement
-**Completed**: Basic Prefix Consensus primitive with Verifiable Prefix Consensus (Phase 1)
+**Current Phase**: Strong Prefix Consensus - Smoke tests complete, inner PC abstraction next
+**Completed**: Basic Prefix Consensus, Strong PC through Phase 8 (Smoke Tests)
 
 ---
 
@@ -57,10 +57,12 @@ Implementing Prefix Consensus protocols (from research paper "Prefix Consensus F
 - Direct routing in check_epoch() (bypasses UnverifiedEvent)
 
 **Testing**:
-- Unit tests: All 134 tests passing
-- Smoke tests: Run manually by user (not in Claude sessions)
-  - Output files: `/tmp/prefix_consensus_output_{party_id}.json`
-- Test script: `test_prefix_consensus.sh`
+- Unit tests: All 186 tests passing (includes strong PC tests)
+- Smoke tests: 4 tests, all passing with in-code property verification
+  - Basic PC: `test_prefix_consensus_identical_inputs`, `test_prefix_consensus_divergent_inputs`
+  - Strong PC: `test_strong_prefix_consensus_identical_inputs`, `test_strong_prefix_consensus_divergent_inputs`
+  - Output files: `/tmp/{prefix,strong_prefix}_consensus_output_{party_id:x}.json`
+- Test scripts: `test_prefix_consensus.sh`, `test_strong_prefix_consensus.sh`
 
 ### Technical Achievements
 
@@ -136,8 +138,8 @@ Implementing Prefix Consensus protocols (from research paper "Prefix Consensus F
 ## Strong Prefix Consensus - In Progress 🚧
 
 **Goal**: Multi-view protocol where all parties agree on identical v_high output
-**Status**: Planning complete, ready for implementation
-**Plan**: `.plans/strong-prefix-consensus.md` (10 phases, ~10-11 days estimated)
+**Status**: Phases 1-8 complete (core implementation + smoke tests), Phase 9 (Inner PC Abstraction) next
+**Plan**: `.plans/strong-prefix-consensus.md`
 
 ### What is Strong Prefix Consensus?
 
@@ -252,10 +254,9 @@ This layered architecture enables multi-slot censorship-resistant consensus as d
 
 ### Repository State
 - **Branch**: `prefix-consensus-prototype`
-- **HEAD**: Phase 5 complete (Strong PC Integration with EpochManager)
-- **Tests**: 186/186 unit tests passing
-- **Smoke Tests**: Run manually by user (no need to run in Claude sessions)
-- **Build**: ✅ Clean (only expected dead-code warnings for not-yet-called strong PC start method)
+- **HEAD**: Phase 8 complete (Strong PC Smoke Tests)
+- **Tests**: 186/186 unit tests passing, 4/4 smoke tests passing
+- **Build**: ✅ Clean
 
 ### Progress Summary
 - ✅ **Basic Prefix Consensus**: Complete (Phase 1-6 of network-integration.md)
@@ -267,7 +268,8 @@ This layered architecture enables multi-slot censorship-resistant consensus as d
 - ✅ **Strong PC Phase 4 Chunk 2**: Network messages complete (StrongPrefixConsensusMsg + types)
 - ✅ **Strong PC Phase 4 Chunk 3**: Strong Manager complete (strong_manager.rs) + cross-cutting fixes
 - ✅ **Strong PC Phase 5**: Integration with consensus layer (EpochManager wiring + network bridges)
-- ⏳ **Strong PC Phase 6 (Smoke Tests)**: Next
+- ✅ **Strong PC Phase 8 (Smoke Tests)**: 2 strong PC tests + 2 basic PC tests, 4 integration bugs fixed
+- ⏳ **Strong PC Phase 9 (Inner PC Abstraction)**: Next — extract trait for swappable inner algorithm
 - ⏳ **Slot Manager**: Future work (after Strong PC complete)
 
 **Main Design Plan**: `.plans/strong-prefix-consensus.md`
@@ -464,8 +466,31 @@ StrongPrefixConsensusManager::new(...)
 
 **Bridge refactor**: Both `ConsensusNetworkBridge` and `StrongConsensusNetworkBridge` moved from `epoch_manager.rs` to `network_interface.rs` (where `ConsensusMsg` lives). Made generic over `NetworkClient` type parameter.
 
+### Phase 8 Implementation Details (Smoke Tests)
+
+**Completed**: February 12, 2026
+**Detailed plan**: `.plans/strong-pc-smoke-test.md`
+
+**Infrastructure changes**:
+- `config/src/config/consensus_config.rs` — Added `strong_prefix_consensus_test_input` config field
+- `consensus/prefix-consensus/src/strong_manager.rs` — Added `write_output_file()` method, called on commit
+- `consensus/src/epoch_manager.rs` — Extracted `trigger_test_prefix_consensus()` method, called from both `start()` and `start_new_epoch()` to survive epoch transitions
+- `consensus/src/network.rs` — Added `StrongPrefixConsensusMsg` to DirectSend dispatch whitelist
+
+**Smoke tests** (all pass with 100% success rate):
+1. `test_strong_prefix_consensus_identical_inputs` — 4 validators, 5 identical hashes → v_low = v_high = input
+2. `test_strong_prefix_consensus_divergent_inputs` — 4 validators, diverge at position 2 → v_low = [hash1, hash2]
+3. `test_prefix_consensus_identical_inputs` — (basic PC, fixed race condition + format mismatch)
+4. `test_prefix_consensus_divergent_inputs` — (basic PC, fixed race condition + format mismatch)
+
+**Bugs fixed during smoke test development** (4 total):
+1. **File path format mismatch**: `AccountAddress` Display (`{}`) adds `0x` prefix, LowerHex (`{:x}`) does not. Fixed readers to use `{:x}`.
+2. **Race condition**: `cleanup_output_files()` ran after swarm build, deleting files written during startup. Added `cleanup_all_output_files()` called before swarm construction.
+3. **Epoch transition**: DKG completes ~1.5s after epoch 1, triggering epoch 1→2 that kills the protocol. Fixed by calling triggers on every epoch start.
+4. **DirectSend dispatch**: `StrongPrefixConsensusMsg` missing from `network.rs` match arm, silently dropping all strong PC network messages.
+
 ### Next Action
-Begin Strong Prefix Consensus Phase 6: Smoke tests (wire `start_strong_prefix_consensus` into smoke test harness, test multi-view agreement)
+Strong Prefix Consensus Phase 9: Inner PC Abstraction Trait — extract inner Prefix Consensus behind a trait so the Strong Manager can swap algorithms (e.g., 2-round good case from Appendix D)
 
 ---
 
@@ -503,8 +528,13 @@ consensus/prefix-consensus/src/
 └── strong_manager.rs     - Strong PC event orchestrator (1394 lines) - Phase 4 Chunk 3
 
 testsuite/smoke-test/src/consensus/prefix_consensus/
-├── helpers.rs            - Test helpers
-└── basic_test.rs         - 2 smoke tests
+├── helpers.rs            - Test helpers (cleanup_all, wait_for_outputs, generate_hashes)
+└── basic_test.rs         - 2 smoke tests (identical + divergent inputs)
+
+testsuite/smoke-test/src/consensus/strong_prefix_consensus/
+├── mod.rs                - Module declarations
+├── helpers.rs            - Test helpers (cleanup_all, wait_for_outputs, generate_hashes)
+└── basic_test.rs         - 2 smoke tests (identical + divergent inputs)
 ```
 
 ### Plans
@@ -526,7 +556,9 @@ testsuite/smoke-test/src/consensus/prefix_consensus/
 9. **f5e736d906** (Feb 4): Divergent inputs test
 10. **537848ce43** (Feb 4): Update docs (Phase 6 complete, Strong PC plan)
 11. **(pending)** (Feb 5): Security enhancements for Verifiable Prefix Consensus
-12. **(pending)** (Feb 12): Strong PC integration with EpochManager (Phase 5) ← HEAD
+12. **2c52a342f7** (Feb 12): Strong PC integration with EpochManager (Phase 5)
+13. **7df6a297e1** (Feb 12): Strong PC smoke test and integration bug fixes (Phase 8)
+14. **(pending)**: Strong PC divergent inputs smoke test ← HEAD
 
 ---
 
