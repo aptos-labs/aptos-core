@@ -377,9 +377,12 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
 
             // Record test failure metric at the end of the run.
             // Use GITHUB_HEAD_REF (for PRs) or GITHUB_REF_NAME (for branches) to identify the branch.
+            // Note: GITHUB_HEAD_REF may be set but empty for non-PR runs, so we filter empty strings.
             let branch = std::env::var("GITHUB_HEAD_REF")
-                .or_else(|_| std::env::var("GITHUB_REF_NAME"))
-                .unwrap_or_else(|_| "unknown".to_string());
+                .ok()
+                .filter(|s| !s.is_empty())
+                .or_else(|| std::env::var("GITHUB_REF_NAME").ok().filter(|s| !s.is_empty()))
+                .unwrap_or_else(|| "unknown".to_string());
             record_test_failures(&suite_name, &branch, summary.failed_count());
         }
 
