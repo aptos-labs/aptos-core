@@ -555,6 +555,20 @@ pub enum Exp_ {
         Spanned<Vec<Exp>>, // arguments
         Option<Label>,     // post-state label
     ), // spec only
+    // Labeled resource access in specifications:
+    // label@global<R>(addr) or label@exists<R>(addr)
+    LabeledCall(
+        Label,             // memory state label
+        ModuleAccess,      // function name (global/exists)
+        Option<Vec<Type>>, // type arguments
+        Spanned<Vec<Exp>>, // arguments
+    ), // spec only
+    // label@R[addr] — labeled resource index access
+    LabeledIndex(
+        Label,    // memory state label
+        Box<Exp>, // target (resource name expression)
+        Box<Exp>, // index (address expression)
+    ), // spec only
 
     Assign(LValueList, Box<Exp>),
     FieldMutate(Box<ExpDotted>, Box<Exp>),
@@ -1901,6 +1915,25 @@ impl AstDebug for Exp_ {
                 if let Some(label) = post_label {
                     w.write(format!("@{}", label.value().as_str()));
                 }
+            },
+            E::LabeledCall(label, name, type_args, sp!(_, args)) => {
+                w.write(format!("{}@", label.value().as_str()));
+                name.ast_debug(w);
+                if let Some(tys) = type_args {
+                    w.write("<");
+                    w.comma(tys, |w, ty| ty.ast_debug(w));
+                    w.write(">");
+                }
+                w.write("(");
+                w.comma(args, |w, e| e.ast_debug(w));
+                w.write(")");
+            },
+            E::LabeledIndex(label, target, index) => {
+                w.write(format!("{}@", label.value().as_str()));
+                target.ast_debug(w);
+                w.write("[");
+                index.ast_debug(w);
+                w.write("]");
             },
             E::UnresolvedError => w.write("_|_"),
         }

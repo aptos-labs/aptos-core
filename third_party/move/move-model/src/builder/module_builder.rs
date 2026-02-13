@@ -1544,15 +1544,27 @@ impl ModuleBuilder<'_, '_> {
         let mut behavior_predicates: Vec<(Option<MemoryLabel>, Option<MemoryLabel>, NodeId)> =
             Vec::new();
 
+        // Also collect labels used in Global/Exists memory access operations
+        let mut memory_access_labels: BTreeSet<MemoryLabel> = BTreeSet::new();
+
         self.update_spec(context, |spec| {
             fn collect_behavior_predicates(
                 exp: &Exp,
                 predicates: &mut Vec<(Option<MemoryLabel>, Option<MemoryLabel>, NodeId)>,
+                memory_labels: &mut BTreeSet<MemoryLabel>,
             ) {
                 exp.visit_pre_order(&mut |e| {
-                    if let ExpData::Call(id, Operation::Behavior(_, state), _) = e {
-                        if state.pre.is_some() || state.post.is_some() {
-                            predicates.push((state.pre, state.post, *id));
+                    if let ExpData::Call(id, op, _) = e {
+                        match op {
+                            Operation::Behavior(_, state)
+                                if state.pre.is_some() || state.post.is_some() =>
+                            {
+                                predicates.push((state.pre, state.post, *id));
+                            },
+                            Operation::Global(Some(label)) | Operation::Exists(Some(label)) => {
+                                memory_labels.insert(*label);
+                            },
+                            _ => {},
                         }
                     }
                     true
@@ -1560,9 +1572,17 @@ impl ModuleBuilder<'_, '_> {
             }
 
             for cond in &spec.conditions {
-                collect_behavior_predicates(&cond.exp, &mut behavior_predicates);
+                collect_behavior_predicates(
+                    &cond.exp,
+                    &mut behavior_predicates,
+                    &mut memory_access_labels,
+                );
                 for additional in &cond.additional_exps {
-                    collect_behavior_predicates(additional, &mut behavior_predicates);
+                    collect_behavior_predicates(
+                        additional,
+                        &mut behavior_predicates,
+                        &mut memory_access_labels,
+                    );
                 }
             }
         });
@@ -1581,6 +1601,12 @@ impl ModuleBuilder<'_, '_> {
             }
             if let Some(pre_name) = pre_label.and_then(&get_label_name) {
                 used_pre_labels.insert(pre_name);
+            }
+        }
+        // Labels in Global/Exists memory accesses also count as references
+        for label in &memory_access_labels {
+            if let Some(name) = get_label_name(*label) {
+                used_pre_labels.insert(name);
             }
         }
 

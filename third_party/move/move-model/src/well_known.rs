@@ -33,6 +33,7 @@ pub const TEST_VARIANT: &str = "test_variant";
 pub const PARAM_NAME_FOR_STRUCT_API: &str = "_s";
 
 pub const VECTOR_MODULE: &str = "vector";
+pub const SIGNER_MODULE: &str = "signer";
 pub const VECTOR_BORROW_MUT: &str = "vector::borrow_mut";
 pub const EVENT_EMIT_EVENT: &str = "event::emit_event";
 pub const BORROW_NAME: &str = "borrow";

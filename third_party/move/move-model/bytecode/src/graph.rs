@@ -137,7 +137,7 @@ impl<T: Ord + Copy + Debug> Graph<T> {
     }
 }
 
-struct DomRelation<T: Ord + Copy + Debug> {
+pub struct DomRelation<T: Ord + Copy + Debug> {
     node_to_postorder_num: BTreeMap<T, usize>,
     postorder_num_to_node: Vec<T>,
     idom_tree: BTreeMap<usize, usize>,
@@ -160,6 +160,17 @@ impl<T: Ord + Copy + Debug> DomRelation<T> {
     /// This function returns true iff `x` is reachable from the entry node of the graph.
     pub fn is_reachable(&self, x: T) -> bool {
         self.node_to_postorder_num.contains_key(&x)
+    }
+
+    /// Returns the immediate dominator of `x`, or `None` if `x` is the entry node
+    /// or unreachable.
+    pub fn immediate_dominator(&self, x: T) -> Option<T> {
+        let x_num = *self.node_to_postorder_num.get(&x)?;
+        if x_num == self.entry_num() {
+            return None; // entry has no immediate dominator
+        }
+        let idom_num = *self.idom_tree.get(&x_num)?;
+        Some(self.postorder_num_to_node[idom_num])
     }
 
     /// This function returns true iff `x` is dominated by `y`.

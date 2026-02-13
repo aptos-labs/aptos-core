@@ -2489,6 +2489,15 @@ impl GlobalEnv {
         None
     }
 
+    /// Returns the value of a symbol property.
+    pub fn get_symbol_property(&self, properties: &PropertyBag, name: &str) -> Option<Symbol> {
+        let sym = &self.symbol_pool().make(name);
+        if let Some(PropertyValue::Symbol(s)) = properties.get(sym) {
+            return Some(*s);
+        }
+        None
+    }
+
     /// Gets the location of the given node.
     pub fn get_node_loc(&self, node_id: NodeId) -> Loc {
         self.exp_info
@@ -4872,6 +4881,19 @@ impl<'env> FunctionEnv<'env> {
         }
         if let Some(n) = env.get_num_property(&self.module_env.get_spec().properties, name) {
             return Some(n);
+        }
+        None
+    }
+
+    /// Returns the value of a symbol pragma for this function. This first looks up a pragma in
+    /// this function, then the enclosing module.
+    pub fn get_symbol_pragma(&self, name: &str) -> Option<Symbol> {
+        let env = self.module_env.env;
+        if let Some(s) = env.get_symbol_property(&self.get_spec().properties, name) {
+            return Some(s);
+        }
+        if let Some(s) = env.get_symbol_property(&self.module_env.get_spec().properties, name) {
+            return Some(s);
         }
         None
     }

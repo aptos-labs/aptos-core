@@ -36,3 +36,7 @@ walkdir = { workspace = true }
 [[test]]
 name = "testsuite"
 harness = false
+
+[[test]]
+name = "inference_testsuite"
+harness = false

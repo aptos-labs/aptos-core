@@ -316,11 +316,17 @@ impl GlobalNumberOperationState {
         sid: &StructId,
         field_id: &FieldId,
     ) -> &NumOperation {
+        static BOTTOM: NumOperation = NumOperation::Bottom;
         self.struct_operation_map
             .get(&(*mid, *sid))
             .expect("struct must have a struct operation state")
             .get(field_id)
-            .expect("expect to get the state")
+            // For enum types, the map uses variant-qualified field IDs
+            // (e.g., `Circle.radius`), but Select/UpdateField operations
+            // from spec inference use plain field IDs (e.g., `radius`).
+            // Since pragma bv is not supported for enums, all variant
+            // fields are Bottom, so returning Bottom is correct here.
+            .unwrap_or(&BOTTOM)
     }
 
     /// Gets the number operation of the given node.
