@@ -3,6 +3,7 @@
 
 use crate::{
     emitter::{
+        metrics::{record_commit_stats, record_latency_ms, record_submission_stats},
         stats::{DynamicStatsTracking, StatsAccumulator},
         wait_for_accounts_sequence, wait_for_orderless_txns,
     },
@@ -365,6 +366,9 @@ impl SubmissionWorker {
             failed_orderless_txns,
         );
 
+        // Record Prometheus metrics for commit stats
+        record_commit_stats(num_committed as u64, num_expired as u64);
+
         if num_expired > 0 {
             loop_stats
                 .expired
@@ -402,6 +406,9 @@ impl SubmissionWorker {
                 loop_stats
                     .latencies
                     .record_data_point(avg_latency, num_committed as u64);
+
+                // Record Prometheus latency metric
+                record_latency_ms(avg_latency);
             }
         }
     }
@@ -531,15 +538,19 @@ pub(crate) async fn submit_transactions(
         txns.len() as u64 * offset.as_millis() as u64,
         Ordering::Relaxed,
     );
+    let submitted_count = txns.len() as u64;
     stats
         .submitted
-        .fetch_add(txns.len() as u64, Ordering::Relaxed);
+        .fetch_add(submitted_count, Ordering::Relaxed);
 
     match client.submit_batch_bcs(txns).await {
         Err(e) => {
+            let failed_count = txns.len() as u64;
             stats
                 .failed_submission
-                .fetch_add(txns.len() as u64, Ordering::Relaxed);
+                .fetch_add(failed_count, Ordering::Relaxed);
+            // Record Prometheus metrics
+            record_submission_stats(submitted_count, failed_count);
             if let Some(rotator) = rotator {
                 if let RestError::Api(ref api_err) = e {
                     if let Some(ref state) = api_err.state {
@@ -561,10 +572,14 @@ pub(crate) async fn submit_transactions(
                 rotator.observe_state(v.state());
             }
             let failures = v.into_inner().transaction_failures;
+            let failed_count = failures.len() as u64;
 
             stats
                 .failed_submission
-                .fetch_add(failures.len() as u64, Ordering::Relaxed);
+                .fetch_add(failed_count, Ordering::Relaxed);
+
+            // Record Prometheus metrics
+            record_submission_stats(submitted_count, failed_count);
 
             let by_error = failures
                 .iter()

@@ -13,6 +13,7 @@ use crate::{
 };
 use anyhow::{format_err, Error, Result};
 use aptos_config::config::NodeConfig;
+use aptos_push_metrics::MetricsPusher;
 use clap::{Parser, ValueEnum};
 use rand::{rngs::OsRng, Rng, SeedableRng};
 use std::{
@@ -266,6 +267,30 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
         summary.write_starting_msg()?;
 
         if test_count > 0 {
+            // Start metrics pusher if PUSH_METRICS_ENDPOINT is set
+            // The pusher will run in the background and push metrics periodically.
+            // If pushing fails (e.g., invalid URL), it logs a warning but does not block.
+            let suite_name = self
+                .tests
+                .get_suite_name()
+                .unwrap_or_else(|| "forge".to_string());
+            let namespace =
+                std::env::var("FORGE_NAMESPACE").unwrap_or_else(|_| "unknown".to_string());
+            let pod_name =
+                std::env::var("KUBERNETES_POD_NAME").unwrap_or_else(|_| "unknown".to_string());
+            let chain_name =
+                std::env::var("FORGE_CHAIN_NAME").unwrap_or_else(|_| "unknown".to_string());
+            let run_id = format!("{:x}", rand::random::<u64>());
+
+            let _metrics_pusher = MetricsPusher::start(vec![
+                "role=forge".to_string(),
+                format!("suite={}", suite_name),
+                format!("namespace={}", namespace),
+                format!("kubernetes_pod_name={}", pod_name),
+                format!("chain_name={}", chain_name),
+                format!("run_id={}", run_id),
+            ]);
+
             println!(
                 "Starting Swarm with supported versions: {:?}",
                 self.factory
