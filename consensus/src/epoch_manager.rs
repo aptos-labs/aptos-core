@@ -1356,6 +1356,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             )
             .await
         }
+
+        // Re-trigger test-only prefix consensus protocols for new epoch
+        self.trigger_test_prefix_consensus().await;
     }
 
     async fn initialize_shared_component(
@@ -1972,6 +1975,73 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
     }
 
+    /// Trigger test-only prefix consensus protocols if configured.
+    ///
+    /// Called at the start of each epoch. Checks the config for test inputs and
+    /// starts basic and/or strong prefix consensus accordingly.
+    async fn trigger_test_prefix_consensus(&mut self) {
+        // Check for test-only basic prefix consensus trigger
+        if let Some(test_input_hex) = self.config.prefix_consensus_test_input.clone() {
+            info!("Test config detected: triggering prefix consensus with {} hashes", test_input_hex.len());
+
+            let mut input_vec = Vec::new();
+            for hex_str in &test_input_hex {
+                match aptos_crypto::HashValue::from_hex(hex_str) {
+                    Ok(hash) => input_vec.push(hash),
+                    Err(e) => {
+                        error!("Failed to parse hash from hex string '{}': {}", hex_str, e);
+                        continue;
+                    },
+                }
+            }
+
+            if !input_vec.is_empty() {
+                let input = aptos_prefix_consensus::PrefixConsensusInput::new(
+                    input_vec,
+                    self.author,
+                    self.epoch(),
+                    0, // slot = 0 for standalone basic Prefix Consensus
+                    1, // view = 1 for standalone basic Prefix Consensus
+                );
+
+                if let Err(e) = self.start_prefix_consensus(input).await {
+                    error!("Failed to start prefix consensus from test config: {}", e);
+                }
+            }
+        }
+
+        // Check for test-only strong prefix consensus trigger
+        if let Some(test_input_hex) = self.config.strong_prefix_consensus_test_input.clone() {
+            info!("Test config detected: triggering strong prefix consensus with {} hashes", test_input_hex.len());
+
+            let mut input_vec = Vec::new();
+            for hex_str in &test_input_hex {
+                match aptos_crypto::HashValue::from_hex(hex_str) {
+                    Ok(hash) => input_vec.push(hash),
+                    Err(e) => {
+                        error!("Failed to parse hash from hex string '{}': {}", hex_str, e);
+                        continue;
+                    },
+                }
+            }
+
+            if !input_vec.is_empty() {
+                let initial_ranking: Vec<_> = self
+                    .epoch_state()
+                    .verifier
+                    .get_ordered_account_addresses_iter()
+                    .collect();
+
+                if let Err(e) = self
+                    .start_strong_prefix_consensus(0, initial_ranking, input_vec)
+                    .await
+                {
+                    error!("Failed to start strong prefix consensus from test config: {}", e);
+                }
+            }
+        }
+    }
+
     /// Start prefix consensus with the given input
     ///
     /// Creates a PrefixConsensusManager and spawns it to run prefix consensus protocol.
@@ -2231,36 +2301,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         // initial start of the processor
         self.await_reconfig_notification().await;
 
-        // Check for test-only prefix consensus trigger
-        if let Some(test_input_hex) = self.config.prefix_consensus_test_input.as_ref() {
-            info!("Test config detected: triggering prefix consensus with {} hashes", test_input_hex.len());
-
-            // Parse hex strings to HashValues
-            let mut input_vec = Vec::new();
-            for hex_str in test_input_hex {
-                match aptos_crypto::HashValue::from_hex(hex_str) {
-                    Ok(hash) => input_vec.push(hash),
-                    Err(e) => {
-                        error!("Failed to parse hash from hex string '{}': {}", hex_str, e);
-                        continue;
-                    }
-                }
-            }
-
-            if !input_vec.is_empty() {
-                let input = aptos_prefix_consensus::PrefixConsensusInput::new(
-                    input_vec,
-                    self.author,
-                    self.epoch(),
-                    0, // slot = 0 for standalone basic Prefix Consensus
-                    1, // view = 1 for standalone basic Prefix Consensus
-                );
-
-                if let Err(e) = self.start_prefix_consensus(input).await {
-                    error!("Failed to start prefix consensus from test config: {}", e);
-                }
-            }
-        }
+        // Trigger test-only prefix consensus protocols for the initial epoch
+        self.trigger_test_prefix_consensus().await;
 
         loop {
             tokio::select! {

@@ -4,7 +4,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! Helper functions for prefix consensus smoke tests
+//! Helper functions for strong prefix consensus smoke tests
 
 use anyhow::{bail, Result};
 use aptos_crypto::HashValue;
@@ -24,23 +24,16 @@ pub fn generate_test_hashes(count: usize) -> Vec<HashValue> {
 
 /// Output structure matching what validators write to files
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PrefixConsensusOutputFile {
+pub struct StrongPrefixConsensusOutputFile {
     pub party_id: String,
     pub epoch: u64,
+    pub slot: u64,
     pub input: Vec<String>,  // Hex-encoded hashes (party's input vector)
     pub v_low: Vec<String>,  // Hex-encoded hashes
     pub v_high: Vec<String>, // Hex-encoded hashes
 }
 
-impl PrefixConsensusOutputFile {
-    /// Parse input hashes from hex strings
-    pub fn input_hashes(&self) -> Result<Vec<HashValue>> {
-        self.input
-            .iter()
-            .map(|hex| HashValue::from_hex(hex).map_err(|e| anyhow::anyhow!("Invalid hex: {}", e)))
-            .collect()
-    }
-
+impl StrongPrefixConsensusOutputFile {
     /// Parse v_low hashes from hex strings
     pub fn v_low_hashes(&self) -> Result<Vec<HashValue>> {
         self.v_low
@@ -58,23 +51,14 @@ impl PrefixConsensusOutputFile {
     }
 }
 
-/// Wait for all validators to write their individual prefix consensus output files
+/// Wait for all validators to write their strong prefix consensus output files
 ///
 /// Polls the filesystem for output files from all validators, returning when
 /// all files exist or timing out if they don't appear in time.
-///
-/// # Arguments
-/// * `_swarm_dir` - The swarm's root directory (unused, kept for API compatibility)
-/// * `peer_ids` - List of validator peer IDs to wait for
-/// * `timeout` - Maximum time to wait for all outputs
-///
-/// # Returns
-/// Vector of parsed outputs in same order as peer_ids, or error if timeout
-pub async fn wait_for_prefix_consensus_outputs(
-    _swarm_dir: &std::path::Path,
+pub async fn wait_for_strong_pc_outputs(
     peer_ids: &[PeerId],
     timeout: Duration,
-) -> Result<Vec<PrefixConsensusOutputFile>> {
+) -> Result<Vec<StrongPrefixConsensusOutputFile>> {
     let start_time = std::time::Instant::now();
 
     loop {
@@ -82,18 +66,21 @@ pub async fn wait_for_prefix_consensus_outputs(
         let mut all_exist = true;
 
         for peer_id in peer_ids {
-            let output_file = format!("/tmp/prefix_consensus_output_{:x}.json", peer_id);
+            let output_file = format!("/tmp/strong_prefix_consensus_output_{:x}.json", peer_id);
 
             if let Ok(contents) = std::fs::read_to_string(&output_file) {
-                match serde_json::from_str::<PrefixConsensusOutputFile>(&contents) {
+                match serde_json::from_str::<StrongPrefixConsensusOutputFile>(&contents) {
                     Ok(output) => {
                         all_outputs.push(output);
                         continue;
-                    }
+                    },
                     Err(e) => {
                         // File exists but invalid JSON - might be mid-write, continue polling
-                        eprintln!("Output file {} has invalid JSON (might be incomplete): {}", output_file, e);
-                    }
+                        eprintln!(
+                            "Output file {} has invalid JSON (might be incomplete): {}",
+                            output_file, e
+                        );
+                    },
                 }
             }
 
@@ -111,13 +98,14 @@ pub async fn wait_for_prefix_consensus_outputs(
             let missing: Vec<_> = peer_ids
                 .iter()
                 .filter(|peer_id| {
-                    let output_file = format!("/tmp/prefix_consensus_output_{:x}.json", peer_id);
+                    let output_file =
+                        format!("/tmp/strong_prefix_consensus_output_{:x}.json", peer_id);
                     !std::path::Path::new(&output_file).exists()
                 })
                 .collect();
 
             bail!(
-                "Timeout waiting for prefix consensus outputs. Missing {} out of {} validators: {:?}",
+                "Timeout waiting for strong PC outputs. Missing {} out of {} validators: {:?}",
                 missing.len(),
                 peer_ids.len(),
                 missing
@@ -129,13 +117,13 @@ pub async fn wait_for_prefix_consensus_outputs(
     }
 }
 
-/// Clean up ALL prefix consensus output files (glob-based, no peer IDs needed).
+/// Clean up ALL strong prefix consensus output files (glob-based, no peer IDs needed).
 /// Call this BEFORE building the swarm, since the protocol may complete during startup.
 pub fn cleanup_all_output_files() {
     if let Ok(entries) = std::fs::read_dir("/tmp") {
         for entry in entries.flatten() {
             let name = entry.file_name().to_string_lossy().to_string();
-            if name.starts_with("prefix_consensus_output_") && name.ends_with(".json") {
+            if name.starts_with("strong_prefix_consensus_output_") && name.ends_with(".json") {
                 let _ = std::fs::remove_file(entry.path());
             }
         }
@@ -143,9 +131,9 @@ pub fn cleanup_all_output_files() {
 }
 
 /// Clean up output files for specific peer IDs
-pub fn cleanup_output_files(_swarm_dir: &std::path::Path, peer_ids: &[PeerId]) {
+pub fn cleanup_output_files(peer_ids: &[PeerId]) {
     for peer_id in peer_ids {
-        let output_file = format!("/tmp/prefix_consensus_output_{:x}.json", peer_id);
+        let output_file = format!("/tmp/strong_prefix_consensus_output_{:x}.json", peer_id);
         let _ = std::fs::remove_file(&output_file);
     }
 }
@@ -163,9 +151,9 @@ mod tests {
         let hashes2 = generate_test_hashes(3);
         assert_eq!(hashes, hashes2);
 
-        // Different counts should produce different first elements when extended
+        // First 3 of a 5-element set should match
         let hashes_5 = generate_test_hashes(5);
-        assert_eq!(hashes[0], hashes_5[0]); // First 3 should match
+        assert_eq!(hashes[0], hashes_5[0]);
         assert_eq!(hashes[1], hashes_5[1]);
         assert_eq!(hashes[2], hashes_5[2]);
     }

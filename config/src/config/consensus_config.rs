@@ -104,6 +104,9 @@ pub struct ConsensusConfig {
     /// Test-only: Input vector for prefix consensus smoke tests (hex-encoded hashes)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prefix_consensus_test_input: Option<Vec<String>>,
+    /// Test-only: Input vector for strong prefix consensus smoke tests (hex-encoded hashes)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strong_prefix_consensus_test_input: Option<Vec<String>>,
 }
 
 /// Deprecated
@@ -387,6 +390,7 @@ impl Default for ConsensusConfig {
             enable_optimistic_proposal_rx: true,
             enable_optimistic_proposal_tx: true,
             prefix_consensus_test_input: None,
+            strong_prefix_consensus_test_input: None,
         }
     }
 }

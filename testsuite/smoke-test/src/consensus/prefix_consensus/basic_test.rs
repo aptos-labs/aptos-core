@@ -10,7 +10,7 @@
 //! configuration, and verify the protocol completes successfully with correct outputs.
 
 use crate::smoke_test_environment::SwarmBuilder;
-use super::helpers::{cleanup_output_files, generate_test_hashes, wait_for_prefix_consensus_outputs};
+use super::helpers::{cleanup_all_output_files, cleanup_output_files, generate_test_hashes, wait_for_prefix_consensus_outputs};
 use std::{sync::Arc, time::Duration};
 
 /// Test prefix consensus with all validators having identical inputs
@@ -26,6 +26,9 @@ async fn test_prefix_consensus_identical_inputs() {
 
     println!("Test input ({} hashes): {:?}", test_input.len(), test_input_hex);
 
+    // Clean up old output files BEFORE building swarm — the protocol may complete during startup
+    cleanup_all_output_files();
+
     // Build swarm with 4 validators, all configured with same input
     let swarm = SwarmBuilder::new_local(4)
         .with_init_config(Arc::new(move |_, config, _| {
@@ -39,9 +42,6 @@ async fn test_prefix_consensus_identical_inputs() {
     // Get validator peer IDs
     let peer_ids: Vec<_> = swarm.validators().map(|v| v.peer_id()).collect();
     println!("Validator peer IDs: {:?}", peer_ids);
-
-    // Clean up any old output files
-    cleanup_output_files(swarm.dir(), &peer_ids);
 
     // Swarm is already launched by build(). Prefix consensus will start on epoch startup.
     println!("Swarm launched successfully");
@@ -201,6 +201,9 @@ async fn test_prefix_consensus_divergent_inputs() {
         println!("  Validator {}: {:?}", i, input);
     }
 
+    // Clean up old output files BEFORE building swarm — the protocol may complete during startup
+    cleanup_all_output_files();
+
     // Build swarm with 4 validators, each with different input at position 2
     let swarm = SwarmBuilder::new_local(4)
         .with_init_config(Arc::new(move |idx, config, _| {
@@ -214,9 +217,6 @@ async fn test_prefix_consensus_divergent_inputs() {
     // Get validator peer IDs
     let peer_ids: Vec<_> = swarm.validators().map(|v| v.peer_id()).collect();
     println!("Validator peer IDs: {:?}", peer_ids);
-
-    // Clean up any old output files
-    cleanup_output_files(swarm.dir(), &peer_ids);
 
     println!("Swarm launched successfully");
 

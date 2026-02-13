@@ -562,6 +562,7 @@ impl<NetworkSender: StrongPrefixConsensusNetworkSender>
                 let msg = StrongPrefixConsensusMsg::Commit(Box::new(commit));
                 self.network_sender.broadcast_strong_msg(msg).await;
                 self.protocol.set_committed(v_high);
+                self.write_output_file();
             }
             Err(ChainBuildError::MissingCert { hash }) => {
                 info!(
@@ -1028,6 +1029,7 @@ impl<NetworkSender: StrongPrefixConsensusNetworkSender>
                     party_id = %self.party_id,
                     "Received valid StrongPCCommit, protocol complete"
                 );
+                self.write_output_file();
             }
             Err(e) => {
                 warn!(
@@ -1148,6 +1150,71 @@ impl<NetworkSender: StrongPrefixConsensusNetworkSender>
     /// Get the slot
     pub fn slot(&self) -> u64 {
         self.slot
+    }
+
+    /// Write output to file for smoke test validation
+    fn write_output_file(&self) {
+        use serde::{Deserialize, Serialize};
+
+        #[derive(Serialize, Deserialize)]
+        struct OutputFile {
+            party_id: String,
+            epoch: u64,
+            slot: u64,
+            input: Vec<String>,
+            v_low: Vec<String>,
+            v_high: Vec<String>,
+        }
+
+        let v_low = match self.protocol.v_low() {
+            Some(v) => v.iter().map(|h| h.to_hex()).collect(),
+            None => {
+                warn!(party_id = %self.party_id, "Cannot write output file: v_low not set");
+                return;
+            }
+        };
+        let v_high = match self.protocol.v_high() {
+            Some(v) => v.iter().map(|h| h.to_hex()).collect(),
+            None => {
+                warn!(party_id = %self.party_id, "Cannot write output file: v_high not set");
+                return;
+            }
+        };
+
+        let output_file = OutputFile {
+            party_id: format!("{:x}", self.party_id),
+            epoch: self.epoch,
+            slot: self.slot,
+            input: self.input_vector.iter().map(|h| h.to_hex()).collect(),
+            v_low,
+            v_high,
+        };
+
+        let file_path = format!("/tmp/strong_prefix_consensus_output_{:x}.json", self.party_id);
+        match serde_json::to_string_pretty(&output_file) {
+            Ok(json) => {
+                if let Err(e) = std::fs::write(&file_path, json) {
+                    warn!(
+                        party_id = %self.party_id,
+                        error = ?e,
+                        "Failed to write strong PC output file"
+                    );
+                } else {
+                    info!(
+                        party_id = %self.party_id,
+                        file_path = %file_path,
+                        "Wrote strong prefix consensus output file"
+                    );
+                }
+            }
+            Err(e) => {
+                warn!(
+                    party_id = %self.party_id,
+                    error = ?e,
+                    "Failed to serialize strong PC output"
+                );
+            }
+        }
     }
 }
 
