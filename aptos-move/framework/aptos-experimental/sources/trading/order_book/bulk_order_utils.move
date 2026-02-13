@@ -11,7 +11,7 @@ module aptos_experimental::bulk_order_utils {
     #[test_only]
     friend aptos_experimental::bulk_order_book_tests;
     #[test_only]
-    friend aptos_experimental::bulk_order_types_tests;
+    friend aptos_experimental::other_bulk_order_types_tests;
 
     // Error codes for various failure scenarios
     const EPRICE_CROSSING: u64 = 1;

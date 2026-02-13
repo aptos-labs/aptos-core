@@ -52,6 +52,10 @@ module aptos_trading::order_book_types {
         order_type.type == SINGLE_ORDER_TYPE
     }
 
+    public fun next_order_id(): OrderId {
+       abort 1
+    }
+
     public fun new_order_id_type(order_id: u128): OrderId {
         OrderId { order_id }
     }

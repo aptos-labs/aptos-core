@@ -1,5 +1,5 @@
 #[test_only]
-module aptos_experimental::bulk_order_types_tests {
+module aptos_experimental::other_bulk_order_types_tests {
     use aptos_experimental::bulk_order_utils::new_bulk_order_request_with_sanitization;
     use aptos_trading::order_book_types::new_test_metadata;
 
