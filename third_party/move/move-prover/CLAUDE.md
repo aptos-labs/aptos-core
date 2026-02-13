@@ -219,13 +219,26 @@ pub struct ProverOptions {
 
 # Debugging
 
-- To run the Move Prover directly on test files from the command line, use alias `mvp <source.move>`
-- In order to inspect generated Boogie, use `mvp --keep <source.move>`. The following output will be generated:
+- You can run the Move prover as
+```
+cargo run -p move-prover -- \
+    --language-version 2.4 \
+    -d <rooot>/third_party/move/move-stdlib/sources \
+    -a std=0x1 \
+    <source-files>
+```
+- In order to inspect generated Boogie, use `--keep`. The following output will be generated:
   - `output.bpl` with the Boogie narrowed to verify given function
   - `output.bpl.log` the model as returned by Boogie to the Move Prover. The prover prints error messages derived from this to console
-- In order to inspect generated smtlib file and the z3 log for a *given function*, use `mvp --generate-smt --z3-trace=<function> <source.move>`. The following output will be produced, assuming that source contains a function `<addr>::<module>::<function>`:
+- In order to inspect generated smtlib file and the z3 log for a *given function*, use `--generate-smt --z3-trace=<function>`. The following output will be produced, assuming that source contains a function `<addr>::<module>::<function>`:
   - a file `_<addr>_<module>_<function>.smt` containing the smtlib input for Z3 as generated from the Boogie
   - a file `<function>.z3log` containing Z3 log during verifying the function.
+
+# Important: Language Version
+
+When testing the prover on standalone Move files, pass `--language-version 2.4`
+(or use a config file with `language_version = "2.4"`), otherwise newer syntax
+features (e.g., `@` state labels) won't parse.
 
 # Testing
 

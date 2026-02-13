@@ -1370,14 +1370,43 @@ impl SpecTranslator<'_> {
                 }
                 emit!(self.writer, ")");
             },
+            Operation::Closure(mid, fid, mask) => {
+                // Translate closure construction to a Boogie pack constructor.
+                let inst = self.env.get_node_instantiation(node_id);
+                let inst = Type::instantiate_slice(&inst, &self.type_inst);
+                let fun_qid = mid.qualified_inst(*fid, inst);
+                let ctor_name = boogie_closure_pack_name(self.env, &fun_qid, *mask);
+                emit!(self.writer, "{}(", ctor_name);
+                let mut first = true;
+                for arg in args {
+                    if !first {
+                        emit!(self.writer, ", ");
+                    }
+                    first = false;
+                    self.translate_exp(arg);
+                }
+                emit!(self.writer, ")");
+            },
+            // TODO(#18763): To properly support old() in behavioral predicate evaluators,
+            // re-run the move-model SpecTranslator on the callee's spec in
+            // translate_closure_condition_for_kind (bytecode_translator.rs) to
+            // eliminate Old before Boogie translation. The SpecTranslator converts
+            // Old(Global(None)) -> Global(Some(label)) with saved memory labels;
+            // corresponding Boogie saved-memory variable declarations would need
+            // to be emitted alongside the evaluator function.
+            Operation::Old => {
+                self.env.error(
+                    &self.env.get_node_loc(node_id),
+                    "old() in function specifications used by behavioral predicates \
+                     (ensures_of/aborts_of) is not yet supported in the verification pipeline",
+                );
+            },
             Operation::MoveFunction(_, _)
             | Operation::BorrowGlobal(_)
             | Operation::Borrow(..)
             | Operation::Deref
             | Operation::MoveTo
-            | Operation::MoveFrom
-            | Operation::Closure(..)
-            | Operation::Old => {
+            | Operation::MoveFrom => {
                 self.env.error(
                     &self.env.get_node_loc(node_id),
                     &format!(

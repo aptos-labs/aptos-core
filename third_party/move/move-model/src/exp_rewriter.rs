@@ -32,6 +32,7 @@ pub struct ExpRewriter<'env, 'rewriter> {
 /// This is used as a parameter to the `replacer` function which defines the behavior of
 /// the rewriter. Notice we use a single function entry point for `replacer` to allow it
 /// to be a function which mutates its context.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RewriteTarget {
     LocalVar(Symbol),
     Temporary(TempIndex),
