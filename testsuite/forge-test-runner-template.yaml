@@ -41,6 +41,12 @@ spec:
           value: "{FORGE_JUNIT_XML_PATH}"
         - name: FORGE_NAMESPACE
           value: {FORGE_NAMESPACE}
+        - name: FORGE_CHAIN_NAME
+          value: {FORGE_CHAIN_NAME}
+        - name: GITHUB_HEAD_REF
+          value: "{GITHUB_HEAD_REF}"
+        - name: GITHUB_REF_NAME
+          value: "{GITHUB_REF_NAME}"
         - name: KUBERNETES_POD_NAME
           valueFrom:
             fieldRef:
