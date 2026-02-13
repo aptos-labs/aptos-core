@@ -3890,6 +3890,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-resource-light-client"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-types",
+ "move-core-types",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "aptos-resource-viewer"
 version = "0.1.0"
 dependencies = [

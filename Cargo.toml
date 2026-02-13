@@ -92,6 +92,7 @@ members = [
     "crates/aptos-profiler",
     "crates/aptos-proptest-helpers",
     "crates/aptos-push-metrics",
+    "crates/aptos-resource-light-client",
     "crates/aptos-rest-client",
     "crates/aptos-retrier",
     "crates/aptos-rosetta",
