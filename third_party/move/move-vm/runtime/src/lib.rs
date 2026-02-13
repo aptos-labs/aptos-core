@@ -19,6 +19,7 @@ pub mod native_functions;
 #[macro_use]
 pub mod tracing;
 pub mod config;
+pub mod metrics_collector;
 pub mod module_traversal;
 
 mod debug;

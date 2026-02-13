@@ -2189,6 +2189,9 @@ impl AptosVM {
         // of gas in epilogue), we record the trace of all executed instructions.
         output.set_trace(trace_recorder.finish());
 
+        // Write accumulated metrics to file if metrics collection is enabled
+        move_vm_runtime::metrics_collector::write_and_clear_metrics();
+
         (vm_status, output)
     }
 

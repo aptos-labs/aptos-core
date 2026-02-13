@@ -11,6 +11,7 @@ use crate::{
     frame_type_cache::{FrameTypeCache, PerInstructionCache},
     interpreter_caches::InterpreterFunctionCaches,
     loader::LazyLoadedFunction,
+    metrics_collector,
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
@@ -531,6 +532,9 @@ where
                             vec![],
                         )?;
                         trace_recorder.record_successful_instruction(&Instruction::Call(fh_idx));
+                        metrics_collector::record_successful_instruction(&Instruction::Call(
+                            fh_idx,
+                        ));
                         if dispatched {
                             trace_recorder.record_entrypoint(&current_frame.function)
                         }
@@ -548,6 +552,7 @@ where
                         vec![],
                     )?;
                     trace_recorder.record_successful_instruction(&Instruction::Call(fh_idx));
+                    metrics_collector::record_successful_instruction(&Instruction::Call(fh_idx));
                 },
                 ExitCode::CallGeneric(idx) => {
                     let (function, frame_cache) = if self.vm_config.enable_function_caches {
@@ -652,6 +657,9 @@ where
                         )?;
                         trace_recorder
                             .record_successful_instruction(&Instruction::CallGeneric(idx));
+                        metrics_collector::record_successful_instruction(
+                            &Instruction::CallGeneric(idx),
+                        );
                         if dispatched {
                             trace_recorder.record_entrypoint(&current_frame.function)
                         }
@@ -669,6 +677,9 @@ where
                         vec![],
                     )?;
                     trace_recorder.record_successful_instruction(&Instruction::CallGeneric(idx));
+                    metrics_collector::record_successful_instruction(&Instruction::CallGeneric(
+                        idx,
+                    ));
                 },
                 ExitCode::CallClosure(sig_idx) => {
                     // Notice the closure is type-checked in runtime_type_checker
@@ -791,6 +802,9 @@ where
                         // has to be set as the current frame's function).
                         trace_recorder
                             .record_successful_instruction(&Instruction::CallClosure(sig_idx));
+                        metrics_collector::record_successful_instruction(
+                            &Instruction::CallClosure(sig_idx),
+                        );
                         trace_recorder.record_call_closure(&callee, mask);
                         if dispatched {
                             trace_recorder.record_entrypoint(&current_frame.function)
@@ -814,6 +828,9 @@ where
                         )?;
                         trace_recorder
                             .record_successful_instruction(&Instruction::CallClosure(sig_idx));
+                        metrics_collector::record_successful_instruction(
+                            &Instruction::CallClosure(sig_idx),
+                        );
                         trace_recorder.record_call_closure(current_frame.function.as_ref(), mask);
                     }
                 },
@@ -1455,6 +1472,10 @@ where
             self.load_resource(data_cache, gas_meter, traversal_context, addr, ty)?
         };
 
+        if let Some(value) = gv.as_value() {
+            metrics_collector::record_borrow_global(is_mut, is_generic, ty, value);
+        }
+
         let res = gv.borrow_global();
         gas_meter.charge_borrow_global(
             is_mut,
@@ -1564,6 +1585,7 @@ where
                     Some(&resource),
                 )?;
                 self.check_access(runtime_environment, AccessKind::Writes, ty, addr)?;
+                metrics_collector::record_move_from(is_generic, ty, &resource);
                 resource
             },
             Err(err) => {
@@ -2267,16 +2289,19 @@ impl Frame {
                         // TODO(Gas): We should charge gas before copying the value.
                         let local = self.locals.copy_loc(*idx as usize)?;
                         gas_meter.charge_copy_loc(&local)?;
+                        metrics_collector::record_copy_loc(&local);
                         interpreter.operand_stack.push(local)?;
                     },
                     Instruction::MoveLoc(idx) => {
                         let local = self.locals.move_loc(*idx as usize)?;
                         gas_meter.charge_move_loc(&local)?;
+                        metrics_collector::record_move_loc(&local);
                         interpreter.operand_stack.push(local)?;
                     },
                     Instruction::StLoc(idx) => {
                         let value_to_store = interpreter.operand_stack.pop()?;
                         gas_meter.charge_store_loc(&value_to_store)?;
+                        metrics_collector::record_st_loc(&value_to_store);
                         self.locals.store_loc(*idx as usize, value_to_store)?;
                     },
                     Instruction::Call(idx) => {
@@ -2413,6 +2438,7 @@ impl Frame {
                             interpreter.operand_stack.last_n(field_count as usize)?,
                         )?;
                         let args = interpreter.operand_stack.popn(field_count)?;
+                        metrics_collector::record_pack(false, &struct_type, &args);
                         interpreter
                             .operand_stack
                             .push(Value::struct_(Struct::pack(args)))?;
@@ -2432,6 +2458,7 @@ impl Frame {
                                 .last_n(info.field_count as usize)?,
                         )?;
                         let args = interpreter.operand_stack.popn(info.field_count)?;
+                        metrics_collector::record_pack_variant(false, &struct_type, &args);
                         interpreter
                             .operand_stack
                             .push(Value::struct_(Struct::pack_variant(info.variant, args)))?;
@@ -2461,6 +2488,7 @@ impl Frame {
                             interpreter.operand_stack.last_n(field_count as usize)?,
                         )?;
                         let args = interpreter.operand_stack.popn(field_count)?;
+                        metrics_collector::record_pack(true, ty, &args);
                         interpreter
                             .operand_stack
                             .push(Value::struct_(Struct::pack(args)))?;
@@ -2489,6 +2517,7 @@ impl Frame {
                                 .last_n(info.field_count as usize)?,
                         )?;
                         let args = interpreter.operand_stack.popn(info.field_count)?;
+                        metrics_collector::record_pack_variant(true, ty, &args);
                         interpreter
                             .operand_stack
                             .push(Value::struct_(Struct::pack_variant(info.variant, args)))?;
@@ -2509,6 +2538,15 @@ impl Frame {
                                 num_expected_fields,
                                 num_actual_fields,
                             ));
+                        }
+
+                        if metrics_collector::are_metrics_enabled() {
+                            let unpacked_values = interpreter
+                                .operand_stack
+                                .last_n(num_actual_fields)?
+                                .collect();
+                            let ty = self.get_struct_ty(*sd_idx);
+                            metrics_collector::record_unpack(false, &ty, unpacked_values);
                         }
                     },
                     Instruction::UnpackVariant(sd_idx) => {
@@ -2532,6 +2570,15 @@ impl Frame {
                                 num_actual_fields,
                             ));
                         }
+
+                        if metrics_collector::are_metrics_enabled() {
+                            let unpacked_values = interpreter
+                                .operand_stack
+                                .last_n(num_actual_fields)?
+                                .collect();
+                            let ty = self.create_struct_ty(&info.definition_struct_type);
+                            metrics_collector::record_unpack_variant(false, &ty, unpacked_values);
+                        }
                     },
                     Instruction::UnpackGeneric(si_idx) => {
                         // TODO: Even though the types are not needed for execution, we still
@@ -2546,7 +2593,7 @@ impl Frame {
                             gas_meter.charge_create_ty(*ty_count)?;
                         }
 
-                        let (_, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
+                        let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
 
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
@@ -2564,6 +2611,14 @@ impl Frame {
                                 num_actual_fields,
                             ));
                         }
+
+                        if metrics_collector::are_metrics_enabled() {
+                            let unpacked_values = interpreter
+                                .operand_stack
+                                .last_n(num_actual_fields)?
+                                .collect();
+                            metrics_collector::record_unpack(true, ty, unpacked_values);
+                        }
                     },
                     Instruction::UnpackVariantGeneric(si_idx) => {
                         let ty_and_field_counts =
@@ -2572,7 +2627,7 @@ impl Frame {
                             gas_meter.charge_create_ty(*ty_count)?;
                         }
 
-                        let (_, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
+                        let (ty, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
 
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
@@ -2594,6 +2649,14 @@ impl Frame {
                                 num_expected_fields,
                                 num_actual_fields,
                             ));
+                        }
+
+                        if metrics_collector::are_metrics_enabled() {
+                            let unpacked_values = interpreter
+                                .operand_stack
+                                .last_n(num_actual_fields)?
+                                .collect();
+                            metrics_collector::record_unpack_variant(true, ty, unpacked_values);
                         }
                     },
                     Instruction::TestVariant(sd_idx) => {
@@ -2713,12 +2776,14 @@ impl Frame {
                         let reference = interpreter.operand_stack.pop_as::<Reference>()?;
                         gas_meter.charge_read_ref(reference.value_view())?;
                         let value = reference.read_ref()?;
+                        metrics_collector::record_read_ref(&value);
                         interpreter.operand_stack.push(value)?;
                     },
                     Instruction::WriteRef => {
                         let reference = interpreter.operand_stack.pop_as::<Reference>()?;
                         let value = interpreter.operand_stack.pop()?;
                         gas_meter.charge_write_ref(&value, reference.value_view())?;
+                        metrics_collector::record_write_ref(&value);
                         reference.write_ref(value)?;
                     },
                     Instruction::CastU8 => {
@@ -3052,6 +3117,7 @@ impl Frame {
                             .read_ref()?
                             .value_as::<AccountAddress>()?;
                         let ty = self.get_struct_ty(*sd_idx);
+                        metrics_collector::record_move_to(false, &ty, &resource);
                         interpreter.move_to(
                             false,
                             data_cache,
@@ -3072,6 +3138,7 @@ impl Frame {
                             .value_as::<AccountAddress>()?;
                         let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
+                        metrics_collector::record_move_to(true, ty, &resource);
                         interpreter.move_to(
                             true,
                             data_cache,
@@ -3172,6 +3239,7 @@ impl Frame {
                     },
                 }
                 trace_recorder.record_successful_instruction(instruction);
+                metrics_collector::record_successful_instruction(instruction);
 
                 RTTCheck::post_execution_type_stack_transition(
                     self,
