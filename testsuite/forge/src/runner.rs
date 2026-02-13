@@ -4,6 +4,7 @@
 // TODO going to remove random seed once cluster deployment supports re-run genesis
 use crate::{
     config::ForgeConfig,
+    metrics::record_test_failures,
     observer::junit::JunitTestObserver,
     result::{TestResult, TestSummary},
     success_criteria::SuccessCriteriaErrors,
@@ -373,6 +374,13 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 println!();
                 println!("Swarm logs can be found here: {}", logs_location);
             }
+
+            // Record test failure metric at the end of the run.
+            // Use GITHUB_HEAD_REF (for PRs) or GITHUB_REF_NAME (for branches) to identify the branch.
+            let branch = std::env::var("GITHUB_HEAD_REF")
+                .or_else(|_| std::env::var("GITHUB_REF_NAME"))
+                .unwrap_or_else(|_| "unknown".to_string());
+            record_test_failures(&suite_name, &branch, summary.failed_count());
         }
 
         summary.write_summary()?;

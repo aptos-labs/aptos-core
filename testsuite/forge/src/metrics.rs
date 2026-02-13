@@ -8,8 +8,8 @@
 //! environment variable.
 
 use aptos_metrics_core::{
-    exponential_buckets, register_histogram_vec, register_int_counter_vec, HistogramVec,
-    IntCounterVec,
+    exponential_buckets, register_histogram_vec, register_int_counter_vec, register_int_gauge_vec,
+    HistogramVec, IntCounterVec, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 use std::time::Instant;
@@ -65,6 +65,18 @@ pub static FORGE_CLUSTER_SPINUP_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Gauge for test failures at the end of a Forge run.
+/// Labels: suite_name, branch
+/// This is emitted once at the end of each Forge run with the count of failed tests.
+pub static FORGE_TEST_FAILURES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_forge_test_failures",
+        "Number of failed tests in a Forge run",
+        &["suite_name", "branch"]
+    )
+    .unwrap()
+});
+
 /// Records metrics for a cluster spin-up phase.
 ///
 /// # Arguments
@@ -90,6 +102,18 @@ pub fn record_cluster_spinup_phase(
         .inc();
 }
 
+/// Records the number of test failures at the end of a Forge run.
+///
+/// # Arguments
+/// * `suite_name` - Name of the test suite
+/// * `branch` - Git branch or PR identifier
+/// * `failures` - Number of failed tests (hard failures only)
+pub fn record_test_failures(suite_name: &str, branch: &str, failures: usize) {
+    FORGE_TEST_FAILURES
+        .with_label_values(&[suite_name, branch])
+        .set(failures as i64);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -109,5 +133,12 @@ mod tests {
         // Just verify it doesn't panic
         record_cluster_spinup_phase("test-namespace", ClusterPhase::Cleanup, start, true);
         record_cluster_spinup_phase("test-namespace", ClusterPhase::TestnetInstall, start, false);
+    }
+
+    #[test]
+    fn test_record_test_failures() {
+        // Just verify it doesn't panic
+        record_test_failures("test-suite", "main", 0);
+        record_test_failures("test-suite", "pr-123", 3);
     }
 }
