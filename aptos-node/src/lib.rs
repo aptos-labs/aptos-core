@@ -199,7 +199,6 @@ pub struct AptosHandle {
     _api_runtime: Option<Runtime>,
     _backup_runtime: Option<Runtime>,
     _consensus_observer_runtime: Option<Runtime>,
-    _consensus_publisher_runtime: Option<Runtime>,
     _consensus_runtime: Option<Runtime>,
     _dkg_runtime: Option<Runtime>,
     _indexer_grpc_runtime: Option<Runtime>,
@@ -831,7 +830,7 @@ pub fn setup_environment_and_start_node(
     debug!("State sync initialization complete.");
 
     // Create the consensus observer and publisher (if enabled)
-    let (consensus_observer_runtime, consensus_publisher_runtime, consensus_publisher) =
+    let (consensus_observer_runtime, consensus_publisher) =
         consensus::create_consensus_observer_and_publisher(
             &node_config,
             consensus_observer_network_interfaces,
@@ -859,7 +858,6 @@ pub fn setup_environment_and_start_node(
         _api_runtime: api_runtime,
         _backup_runtime: backup_service,
         _consensus_observer_runtime: consensus_observer_runtime,
-        _consensus_publisher_runtime: consensus_publisher_runtime,
         _consensus_runtime: consensus_runtime,
         _dkg_runtime: dkg_runtime,
         _indexer_grpc_runtime: indexer_grpc_runtime,

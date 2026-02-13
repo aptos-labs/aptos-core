@@ -148,17 +148,13 @@ pub fn create_consensus_observer_and_publisher(
     consensus_observer_reconfig_subscription: Option<
         ReconfigNotificationListener<DbBackedOnChainConfig>,
     >,
-) -> (
-    Option<Runtime>,
-    Option<Runtime>,
-    Option<Arc<ConsensusPublisher>>,
-) {
+) -> (Option<Runtime>, Option<Arc<ConsensusPublisher>>) {
     // If none of the consensus observer or publisher are enabled, return early
     if !node_config
         .consensus_observer
         .is_observer_or_publisher_enabled()
     {
-        return (None, None, None);
+        return (None, None);
     }
 
     // Fetch the consensus observer network client and events
@@ -177,8 +173,9 @@ pub fn create_consensus_observer_and_publisher(
     ) = create_observer_network_handler(node_config, consensus_observer_events);
 
     // Create the consensus publisher (if enabled)
-    let (consensus_publisher_runtime, consensus_publisher) = create_consensus_publisher(
+    let consensus_publisher = create_consensus_publisher(
         node_config,
+        &consensus_observer_runtime,
         consensus_observer_client.clone(),
         consensus_publisher_message_receiver,
     );
@@ -196,11 +193,7 @@ pub fn create_consensus_observer_and_publisher(
         consensus_observer_reconfig_subscription,
     );
 
-    (
-        Some(consensus_observer_runtime),
-        consensus_publisher_runtime,
-        consensus_publisher,
-    )
+    (Some(consensus_observer_runtime), consensus_publisher)
 }
 
 /// Creates and starts the consensus observer (if enabled)
@@ -236,35 +229,34 @@ fn create_consensus_observer(
     );
 }
 
-/// Creates and returns the consensus publisher and runtime (if enabled)
+/// Creates and returns the consensus publisher (if enabled), spawning it
+/// on the provided runtime
 fn create_consensus_publisher(
     node_config: &NodeConfig,
+    runtime: &Runtime,
     consensus_observer_client: Arc<
         ConsensusObserverClient<NetworkClient<ConsensusObserverMessage>>,
     >,
     publisher_message_receiver: Receiver<(), ConsensusPublisherNetworkMessage>,
-) -> (Option<Runtime>, Option<Arc<ConsensusPublisher>>) {
+) -> Option<Arc<ConsensusPublisher>> {
     // If the publisher is not enabled, return early
     if !node_config.consensus_observer.publisher_enabled {
-        return (None, None);
+        return None;
     }
-
-    // Create the publisher runtime
-    let runtime = aptos_runtimes::spawn_named_runtime("publisher".into(), Some(4), Some(4));
 
     // Create the consensus publisher
     let (consensus_publisher, outbound_message_receiver) =
         ConsensusPublisher::new(node_config.consensus_observer, consensus_observer_client);
 
-    // Start the consensus publisher
+    // Start the consensus publisher on the shared runtime
     runtime.spawn(
         consensus_publisher
             .clone()
             .start(outbound_message_receiver, publisher_message_receiver),
     );
 
-    // Return the runtime and publisher
-    (Some(runtime), Some(Arc::new(consensus_publisher)))
+    // Return the publisher
+    Some(Arc::new(consensus_publisher))
 }
 
 /// Creates the consensus observer network handler, and returns the observer
@@ -277,8 +269,8 @@ fn create_observer_network_handler(
     Receiver<(), ConsensusObserverNetworkMessage>,
     Receiver<(), ConsensusPublisherNetworkMessage>,
 ) {
-    // Create the consensus observer runtime
-    let consensus_observer_runtime = aptos_runtimes::spawn_named_runtime("observer".into(), Some(8), Some(16));
+    // Create the consensus observer/publisher runtime
+    let consensus_observer_runtime = aptos_runtimes::spawn_named_runtime("cons-aux".into(), Some(8), Some(16));
 
     // Create the consensus observer network events
     let consensus_observer_events = ConsensusObserverNetworkEvents::new(consensus_observer_events);
