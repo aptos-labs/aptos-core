@@ -1,0 +1,762 @@
+module 0xcafe::Pack
+struct Foo has drop
+  x: u64
+  y: u64
+
+struct Bar has drop
+  x: u64
+  y: u64
+  z: Foo
+
+struct T1 has drop
+  x: u64
+
+struct T2 has drop
+  x: T1
+
+struct T3 has drop
+  x: T2
+
+struct T4 has drop
+  x: T3
+
+struct T5 has drop
+  x: T4
+
+struct T6 has drop
+  x: T5
+
+struct T7 has drop
+  x: T6
+
+struct T8 has drop
+  x: T7
+
+struct T9 has drop
+  x: T8
+
+struct T10 has drop
+  x: T9
+
+struct T11 has drop
+  x: T10
+
+struct T12 has drop
+  x: T11
+
+struct T13 has drop
+  x: T12
+
+struct T14 has drop
+  x: T13
+
+struct T15 has drop
+  x: T14
+
+struct T16 has drop
+  x: T15
+
+struct T17 has drop
+  x: T16
+
+struct T18 has drop
+  x: T17
+
+struct T19 has drop
+  x: T18
+
+struct T20 has drop
+  x: T19
+
+struct T21 has drop
+  x: T20
+
+struct T22 has drop
+  x: T21
+
+struct T23 has drop
+  x: T22
+
+struct T24 has drop
+  x: T23
+
+struct T25 has drop
+  x: T24
+
+struct T26 has drop
+  x: T25
+
+struct T27 has drop
+  x: T26
+
+struct T28 has drop
+  x: T27
+
+struct T29 has drop
+  x: T28
+
+struct T30 has drop
+  x: T29
+
+struct T31 has drop
+  x: T30
+
+public fun calibrate_pack_foo_impl(l0: u64)
+    local l1: u64
+    ld_u64 0
+    st_loc l1
+l1: copy_loc l1
+    copy_loc l0
+    lt
+    br_false l0
+    move_loc l1
+    ld_u64 1
+    add
+    st_loc l1
+    ld_u64 0
+    ld_u64 0
+    pack Foo
+    ld_u64 0
+    ld_u64 0
+    pack Foo
+    ld_u64 0
+    ld_u64 0
+    pack Foo
+    ld_u64 0
+    ld_u64 0
+    pack Foo
+    ld_u64 0
+    ld_u64 0
+    pack Foo
+    ld_u64 0
+    ld_u64 0
+    pack Foo
+    ld_u64 0
+    ld_u64 0
+    pack Foo
+    ld_u64 0
+    ld_u64 0
+    pack Foo
+    ld_u64 0
+    ld_u64 0
+    pack Foo
+    ld_u64 0
+    ld_u64 0
+    pack Foo
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    branch l1
+l0: ret
+
+entry public fun calibrate_pack_foo_x100()
+    ld_u64 10
+    call calibrate_pack_foo_impl
+    ret
+
+entry public fun calibrate_pack_foo_x500()
+    ld_u64 50
+    call calibrate_pack_foo_impl
+    ret
+
+entry public fun calibrate_pack_foo_x1000()
+    ld_u64 100
+    call calibrate_pack_foo_impl
+    ret
+
+public fun calibrate_pack_bar_impl(l0: u64)
+    local l1: u64
+    ld_u64 0
+    st_loc l1
+l1: copy_loc l1
+    copy_loc l0
+    lt
+    br_false l0
+    move_loc l1
+    ld_u64 1
+    add
+    st_loc l1
+    ld_u64 0
+    ld_u64 0
+    ld_u64 0
+    ld_u64 0
+    pack Foo
+    pack Bar
+    ld_u64 0
+    ld_u64 0
+    ld_u64 0
+    ld_u64 0
+    pack Foo
+    pack Bar
+    ld_u64 0
+    ld_u64 0
+    ld_u64 0
+    ld_u64 0
+    pack Foo
+    pack Bar
+    ld_u64 0
+    ld_u64 0
+    ld_u64 0
+    ld_u64 0
+    pack Foo
+    pack Bar
+    ld_u64 0
+    ld_u64 0
+    ld_u64 0
+    ld_u64 0
+    pack Foo
+    pack Bar
+    ld_u64 0
+    ld_u64 0
+    ld_u64 0
+    ld_u64 0
+    pack Foo
+    pack Bar
+    ld_u64 0
+    ld_u64 0
+    ld_u64 0
+    ld_u64 0
+    pack Foo
+    pack Bar
+    ld_u64 0
+    ld_u64 0
+    ld_u64 0
+    ld_u64 0
+    pack Foo
+    pack Bar
+    ld_u64 0
+    ld_u64 0
+    ld_u64 0
+    ld_u64 0
+    pack Foo
+    pack Bar
+    ld_u64 0
+    ld_u64 0
+    ld_u64 0
+    ld_u64 0
+    pack Foo
+    pack Bar
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    branch l1
+l0: ret
+
+entry public fun calibrate_pack_bar_x100()
+    ld_u64 10
+    call calibrate_pack_bar_impl
+    ret
+
+entry public fun calibrate_pack_bar_x500()
+    ld_u64 50
+    call calibrate_pack_bar_impl
+    ret
+
+entry public fun calibrate_pack_bar_x1000()
+    ld_u64 100
+    call calibrate_pack_bar_impl
+    ret
+
+public fun calibrate_pack_t8_impl(l0: u64)
+    local l1: u64
+    ld_u64 0
+    st_loc l1
+l1: copy_loc l1
+    copy_loc l0
+    lt
+    br_false l0
+    move_loc l1
+    ld_u64 1
+    add
+    st_loc l1
+    ld_u64 0
+    pack T1
+    pack T2
+    pack T3
+    pack T4
+    pack T5
+    pack T6
+    pack T7
+    pack T8
+    pop
+    ld_u64 0
+    pack T1
+    pack T2
+    pack T3
+    pack T4
+    pack T5
+    pack T6
+    pack T7
+    pack T8
+    pop
+    ld_u64 0
+    pack T1
+    pack T2
+    pack T3
+    pack T4
+    pack T5
+    pack T6
+    pack T7
+    pack T8
+    pop
+    ld_u64 0
+    pack T1
+    pack T2
+    pack T3
+    pack T4
+    pack T5
+    pack T6
+    pack T7
+    pack T8
+    pop
+    ld_u64 0
+    pack T1
+    pack T2
+    pack T3
+    pack T4
+    pack T5
+    pack T6
+    pack T7
+    pack T8
+    pop
+    ld_u64 0
+    pack T1
+    pack T2
+    pack T3
+    pack T4
+    pack T5
+    pack T6
+    pack T7
+    pack T8
+    pop
+    ld_u64 0
+    pack T1
+    pack T2
+    pack T3
+    pack T4
+    pack T5
+    pack T6
+    pack T7
+    pack T8
+    pop
+    ld_u64 0
+    pack T1
+    pack T2
+    pack T3
+    pack T4
+    pack T5
+    pack T6
+    pack T7
+    pack T8
+    pop
+    ld_u64 0
+    pack T1
+    pack T2
+    pack T3
+    pack T4
+    pack T5
+    pack T6
+    pack T7
+    pack T8
+    pop
+    ld_u64 0
+    pack T1
+    pack T2
+    pack T3
+    pack T4
+    pack T5
+    pack T6
+    pack T7
+    pack T8
+    pop
+    branch l1
+l0: ret
+
+entry public fun calibrate_pack_t8_x100()
+    ld_u64 10
+    call calibrate_pack_t8_impl
+    ret
+
+entry public fun calibrate_pack_t8_x500()
+    ld_u64 50
+    call calibrate_pack_t8_impl
+    ret
+
+entry public fun calibrate_pack_t8_x1000()
+    ld_u64 100
+    call calibrate_pack_t8_impl
+    ret
+
+public fun calibrate_pack_t32_impl(l0: u64)
+    local l1: u64
+    ld_u64 0
+    st_loc l1
+l1: copy_loc l1
+    copy_loc l0
+    lt
+    br_false l0
+    move_loc l1
+    ld_u64 1
+    add
+    st_loc l1
+    ld_u64 0
+    pack T1
+    pack T2
+    pack T3
+    pack T4
+    pack T5
+    pack T6
+    pack T7
+    pack T8
+    pack T9
+    pack T10
+    pack T11
+    pack T12
+    pack T13
+    pack T14
+    pack T15
+    pack T16
+    pack T17
+    pack T18
+    pack T19
+    pack T20
+    pack T21
+    pack T22
+    pack T23
+    pack T24
+    pack T25
+    pack T26
+    pack T27
+    pack T28
+    pack T29
+    pack T30
+    pack T31
+    pop
+    ld_u64 0
+    pack T1
+    pack T2
+    pack T3
+    pack T4
+    pack T5
+    pack T6
+    pack T7
+    pack T8
+    pack T9
+    pack T10
+    pack T11
+    pack T12
+    pack T13
+    pack T14
+    pack T15
+    pack T16
+    pack T17
+    pack T18
+    pack T19
+    pack T20
+    pack T21
+    pack T22
+    pack T23
+    pack T24
+    pack T25
+    pack T26
+    pack T27
+    pack T28
+    pack T29
+    pack T30
+    pack T31
+    pop
+    ld_u64 0
+    pack T1
+    pack T2
+    pack T3
+    pack T4
+    pack T5
+    pack T6
+    pack T7
+    pack T8
+    pack T9
+    pack T10
+    pack T11
+    pack T12
+    pack T13
+    pack T14
+    pack T15
+    pack T16
+    pack T17
+    pack T18
+    pack T19
+    pack T20
+    pack T21
+    pack T22
+    pack T23
+    pack T24
+    pack T25
+    pack T26
+    pack T27
+    pack T28
+    pack T29
+    pack T30
+    pack T31
+    pop
+    ld_u64 0
+    pack T1
+    pack T2
+    pack T3
+    pack T4
+    pack T5
+    pack T6
+    pack T7
+    pack T8
+    pack T9
+    pack T10
+    pack T11
+    pack T12
+    pack T13
+    pack T14
+    pack T15
+    pack T16
+    pack T17
+    pack T18
+    pack T19
+    pack T20
+    pack T21
+    pack T22
+    pack T23
+    pack T24
+    pack T25
+    pack T26
+    pack T27
+    pack T28
+    pack T29
+    pack T30
+    pack T31
+    pop
+    ld_u64 0
+    pack T1
+    pack T2
+    pack T3
+    pack T4
+    pack T5
+    pack T6
+    pack T7
+    pack T8
+    pack T9
+    pack T10
+    pack T11
+    pack T12
+    pack T13
+    pack T14
+    pack T15
+    pack T16
+    pack T17
+    pack T18
+    pack T19
+    pack T20
+    pack T21
+    pack T22
+    pack T23
+    pack T24
+    pack T25
+    pack T26
+    pack T27
+    pack T28
+    pack T29
+    pack T30
+    pack T31
+    pop
+    ld_u64 0
+    pack T1
+    pack T2
+    pack T3
+    pack T4
+    pack T5
+    pack T6
+    pack T7
+    pack T8
+    pack T9
+    pack T10
+    pack T11
+    pack T12
+    pack T13
+    pack T14
+    pack T15
+    pack T16
+    pack T17
+    pack T18
+    pack T19
+    pack T20
+    pack T21
+    pack T22
+    pack T23
+    pack T24
+    pack T25
+    pack T26
+    pack T27
+    pack T28
+    pack T29
+    pack T30
+    pack T31
+    pop
+    ld_u64 0
+    pack T1
+    pack T2
+    pack T3
+    pack T4
+    pack T5
+    pack T6
+    pack T7
+    pack T8
+    pack T9
+    pack T10
+    pack T11
+    pack T12
+    pack T13
+    pack T14
+    pack T15
+    pack T16
+    pack T17
+    pack T18
+    pack T19
+    pack T20
+    pack T21
+    pack T22
+    pack T23
+    pack T24
+    pack T25
+    pack T26
+    pack T27
+    pack T28
+    pack T29
+    pack T30
+    pack T31
+    pop
+    ld_u64 0
+    pack T1
+    pack T2
+    pack T3
+    pack T4
+    pack T5
+    pack T6
+    pack T7
+    pack T8
+    pack T9
+    pack T10
+    pack T11
+    pack T12
+    pack T13
+    pack T14
+    pack T15
+    pack T16
+    pack T17
+    pack T18
+    pack T19
+    pack T20
+    pack T21
+    pack T22
+    pack T23
+    pack T24
+    pack T25
+    pack T26
+    pack T27
+    pack T28
+    pack T29
+    pack T30
+    pack T31
+    pop
+    ld_u64 0
+    pack T1
+    pack T2
+    pack T3
+    pack T4
+    pack T5
+    pack T6
+    pack T7
+    pack T8
+    pack T9
+    pack T10
+    pack T11
+    pack T12
+    pack T13
+    pack T14
+    pack T15
+    pack T16
+    pack T17
+    pack T18
+    pack T19
+    pack T20
+    pack T21
+    pack T22
+    pack T23
+    pack T24
+    pack T25
+    pack T26
+    pack T27
+    pack T28
+    pack T29
+    pack T30
+    pack T31
+    pop
+    ld_u64 0
+    pack T1
+    pack T2
+    pack T3
+    pack T4
+    pack T5
+    pack T6
+    pack T7
+    pack T8
+    pack T9
+    pack T10
+    pack T11
+    pack T12
+    pack T13
+    pack T14
+    pack T15
+    pack T16
+    pack T17
+    pack T18
+    pack T19
+    pack T20
+    pack T21
+    pack T22
+    pack T23
+    pack T24
+    pack T25
+    pack T26
+    pack T27
+    pack T28
+    pack T29
+    pack T30
+    pack T31
+    pop
+    branch l1
+l0: ret
+
+entry public fun calibrate_pack_t32_x100()
+    ld_u64 10
+    call calibrate_pack_t32_impl
+    ret
+
+entry public fun calibrate_pack_t32_x500()
+    ld_u64 50
+    call calibrate_pack_t32_impl
+    ret
+
+entry public fun calibrate_pack_t32_x1000()
+    ld_u64 100
+    call calibrate_pack_t32_impl
+    ret

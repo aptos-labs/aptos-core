@@ -1,0 +1,93 @@
+module 0xcafe::CallRecrusive
+fun f1(l0: u64)
+    ld_u64 0
+    copy_loc l0
+    lt
+    br_false l0
+    move_loc l0
+    ld_u64 1
+    sub
+    call f1
+l0: ret
+
+entry public fun calibrate_f1()
+    ld_u64 100
+    call f1
+    ret
+
+fun f2(l0: u64, l1: u64)
+    ld_u64 0
+    copy_loc l0
+    lt
+    br_false l0
+    move_loc l0
+    ld_u64 1
+    sub
+    move_loc l1
+    call f2
+l0: ret
+
+entry public fun calibrate_f2()
+    ld_u64 1000
+    ld_u64 50
+    call f2
+    ret
+
+fun f3(l0: u64)
+    local l1: u64
+    local l2: u64
+    local l3: u64
+    ld_u64 0
+    copy_loc l0
+    lt
+    br_false l0
+    move_loc l0
+    ld_u64 1
+    sub
+    call f3
+l0: ret
+
+entry public fun calibrate_f3()
+    ld_u64 200
+    call f3
+    ret
+
+fun f4()
+    ret
+
+entry public fun calibrate_f4_loop()
+    local l0: u64
+    ld_u64 0
+    st_loc l0
+l1: copy_loc l0
+    ld_u64 1000
+    lt
+    br_false l0
+    move_loc l0
+    ld_u64 1
+    add
+    st_loc l0
+    call f4
+    branch l1
+l0: ret
+
+fun f5(l0: u64)
+    ld_u64 0
+    copy_loc l0
+    lt
+    br_false l0
+    move_loc l0
+    ld_u64 1
+    sub
+    call f5
+    branch l1
+l0: ld_u64 1
+    ld_u64 2
+    sub
+    pop
+l1: ret
+
+entry public fun calibrate_f5_should_error()
+    ld_u64 100
+    call f5
+    ret

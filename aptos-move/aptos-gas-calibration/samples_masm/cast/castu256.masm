@@ -1,0 +1,84 @@
+module 0xcafe::CastU256
+public fun calibrate_castu256_impl(l0: u64)
+    local l1: u64
+    ld_u64 0
+    st_loc l1
+l1: copy_loc l1
+    copy_loc l0
+    lt
+    br_false l0
+    move_loc l1
+    ld_u64 1
+    add
+    st_loc l1
+    ld_u8 0
+    cast_u256
+    pop
+    ld_u64 0
+    cast_u256
+    pop
+    ld_u128 0
+    cast_u256
+    pop
+    ld_u16 0
+    cast_u256
+    pop
+    ld_u32 0
+    cast_u256
+    pop
+    ld_u256 0
+    cast_u256
+    pop
+    ld_u8 21
+    cast_u256
+    pop
+    ld_u64 21
+    cast_u256
+    pop
+    ld_u128 21
+    cast_u256
+    pop
+    ld_u16 21
+    cast_u256
+    pop
+    ld_u32 21
+    cast_u256
+    pop
+    ld_u256 21
+    cast_u256
+    pop
+    ld_u8 255
+    cast_u256
+    pop
+    ld_u64 18446744073709551615
+    cast_u256
+    pop
+    ld_u128 340282366920938463463374607431768211455
+    cast_u256
+    pop
+    ld_u16 65535
+    cast_u256
+    pop
+    ld_u32 4294967295
+    cast_u256
+    pop
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    cast_u256
+    pop
+    branch l1
+l0: ret
+
+entry public fun calibrate_castu256_x100()
+    ld_u64 10
+    call calibrate_castu256_impl
+    ret
+
+entry public fun calibrate_castu256_x500()
+    ld_u64 50
+    call calibrate_castu256_impl
+    ret
+
+entry public fun calibrate_castu256_x1000()
+    ld_u64 100
+    call calibrate_castu256_impl
+    ret
