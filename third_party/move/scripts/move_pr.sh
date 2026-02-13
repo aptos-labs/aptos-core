@@ -117,7 +117,6 @@ MOVE_CRATES_INTEGRATION_TEST="\
   -p bytecode-verifier-tests \
   -p bytecode-verifier-transactional-tests \
   -p move-asm \
-  -p move-cli \
   -p move-decompiler \
   -p move-model \
   -p move-package \

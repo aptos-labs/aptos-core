@@ -232,7 +232,6 @@ members = [
     "third_party/move/move-prover/bytecode-pipeline",
     "third_party/move/move-prover/lab",
     "third_party/move/move-prover/move-abigen",
-    "third_party/move/move-prover/move-docgen",
     "third_party/move/move-prover/move-errmapgen",
     "third_party/move/move-prover/test-utils",
     "third_party/move/move-symbol-pool",
@@ -247,10 +246,10 @@ members = [
     "third_party/move/tools/move-asm",
     "third_party/move/tools/move-bytecode-utils",
     "third_party/move/tools/move-bytecode-viewer",
-    "third_party/move/tools/move-cli",
     "third_party/move/tools/move-coverage",
     "third_party/move/tools/move-decompiler",
     "third_party/move/tools/move-disassembler",
+    "third_party/move/tools/move-docgen",
     "third_party/move/tools/move-linter",
     "third_party/move/tools/move-package",
     "third_party/move/tools/move-package-cache",
@@ -872,14 +871,13 @@ move-bytecode-verifier = { path = "third_party/move/move-bytecode-verifier" }
 move-bytecode-verifier-invalid-mutations = { path = "third_party/move/move-bytecode-verifier/invalid-mutations" }
 move-bytecode-viewer = { path = "third_party/move/tools/move-bytecode-viewer" }
 move-bytecode-utils = { path = "third_party/move/tools/move-bytecode-utils" }
-move-cli = { path = "third_party/move/tools/move-cli" }
 move-command-line-common = { path = "third_party/move/move-command-line-common" }
 move-coverage = { path = "third_party/move/tools/move-coverage" }
 legacy-move-compiler = { path = "third_party/move/move-compiler-v2/legacy-move-compiler" }
 move-compiler-v2 = { path = "third_party/move/move-compiler-v2" }
 move-core-types = { path = "third_party/move/move-core/types" }
 move-decompiler = { path = "third_party/move/tools/move-decompiler" }
-move-docgen = { path = "third_party/move/move-prover/move-docgen" }
+move-docgen = { path = "third_party/move/tools/move-docgen" }
 move-disassembler = { path = "third_party/move/tools/move-disassembler" }
 move-errmapgen = { path = "third_party/move/move-prover/move-errmapgen" }
 move-ir-types = { path = "third_party/move/move-ir/types" }

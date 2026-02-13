@@ -8,12 +8,12 @@ use aptos_vm::natives;
 use move_model::model::GlobalEnv;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 
-/// Configures the move-cli unit test validation hook to run the extended checker.
+/// Configures the unit test validation hook to run the extended checker.
 fn configure_extended_checks_for_unit_test() {
     fn validate(env: &GlobalEnv) {
         extended_checks::run_extended_checks(env);
     }
-    move_cli::base::test_validation::set_validation_hook(Box::new(validate));
+    move_unit_test::test_validation::set_validation_hook(Box::new(validate));
 }
 
 // move_stdlib has the testing feature enabled to include debug native functions

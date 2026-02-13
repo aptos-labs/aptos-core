@@ -137,15 +137,33 @@ impl SymmetricKey {
     }
 }
 
+/// Domain separation salt for the OTP KDF.
+/// This must be identical between Rust and TypeScript implementations.
+const HKDF_SALT: &[u8] = b"APTOS_BATCH_ENCRYPTION_OTP";
+
+/// Derives a 32-byte key from high-entropy source bytes using HKDF (RFC 5869).
+///
+/// This is a manual implementation of HKDF-SHA256 to avoid dependency version conflicts.
+/// HKDF consists of two steps:
+/// 1. Extract: PRK = HMAC-Hash(salt, IKM)
+/// 2. Expand: OKM = HMAC-Hash(PRK, info || 0x01)
+///
+/// For 32-byte output with SHA256, only one expand iteration is needed.
 pub fn hmac_kdf(
     otp_source: impl AsRef<[u8]>,
 ) -> GenericArray<u8, <Sha256 as OutputSizeUser>::OutputSize> {
-    // TODO should we use this instead? https://docs.rs/hkdf/latest/hkdf/
-    let mut mac: Hmac<Sha256> = Hmac::new_from_slice(b"") // TODO should I put a key here?
-        .expect("HMAC can take key of any size");
-    // TODO should this be an option or result?
-    mac.update(otp_source.as_ref());
-    mac.finalize().into_bytes()
+    // HKDF-Extract: PRK = HMAC-Hash(salt, IKM)
+    let mut extract_mac: Hmac<Sha256> =
+        Hmac::new_from_slice(HKDF_SALT).expect("HMAC can take key of any size");
+    extract_mac.update(otp_source.as_ref());
+    let prk = extract_mac.finalize().into_bytes();
+
+    // HKDF-Expand: OKM = HMAC-Hash(PRK, info || 0x01)
+    // info is empty, so we just append 0x01
+    let mut expand_mac: Hmac<Sha256> =
+        Hmac::new_from_slice(&prk).expect("HMAC can take key of any size");
+    expand_mac.update(&[0x01]);
+    expand_mac.finalize().into_bytes()
 }
 
 /// Domain separation tag for hash-to-curve.
