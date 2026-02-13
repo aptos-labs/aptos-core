@@ -356,6 +356,15 @@ impl Committer {
             GAUGE.set_with(&["hot_state_items"], self.base.len() as i64);
             GAUGE.set_with(&["hot_state_key_bytes"], self.total_key_bytes as i64);
             GAUGE.set_with(&["hot_state_value_bytes"], self.total_value_bytes as i64);
+            GAUGE.set_with(
+                &["hot_state_deferred_merge_old_views"],
+                self.old_views.len() as i64,
+            );
+            GAUGE.set_with(
+                &["hot_state_deferred_merge_version_lag"],
+                (self.committed.lock().state.next_version() - self.merged_state.next_version())
+                    as i64,
+            );
         }
 
         // Final merge attempt before quitting.
