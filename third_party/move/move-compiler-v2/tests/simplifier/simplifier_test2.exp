@@ -56,7 +56,7 @@ module 0x8675::M {
 // -- Sourcified model before first bytecode pipeline
 module 0x8675::M {
     public fun test(): u64 {
-        let (r) = (10);
+        let r = 10;
         let t = r;
         let t2 = 0;
         while (r > 0) {

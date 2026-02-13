@@ -146,7 +146,7 @@ impl<'a, C: CurveGroup> homomorphism::Trait for Homomorphism<'a, C> {
         CodomainShape(outputs)
     }
 
-    fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
+    fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
         <Homomorphism<C> as fixed_base_msms::Trait>::normalize_output(value)
     }
 }

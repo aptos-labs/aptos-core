@@ -57,6 +57,7 @@ use aptos_crypto::{
     ValidCryptoMaterial, VerifyingKey,
 };
 use num_traits::Zero;
+use rand_core::{CryptoRng, RngCore};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, ops::AddAssign};
 
@@ -317,13 +318,14 @@ pub trait HasAggregatableSubtranscript: Transcript {
 
     fn get_subtranscript(&self) -> Self::Subtranscript;
 
-    fn verify<A: Serialize + Clone>(
+    fn verify<A: Serialize + Clone, R: RngCore + CryptoRng>(
         &self,
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         spks: &[Self::SigningPubKey],
         eks: &[Self::EncryptPubKey],
         sid: &A, // Note the different function signature heres
+        rng: &mut R,
     ) -> anyhow::Result<()>;
 }
 

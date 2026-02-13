@@ -170,7 +170,7 @@ impl<C: CurveGroup> homomorphism::Trait for WeightedHomomorphism<'_, C> {
         }
     }
 
-    fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
+    fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
         <WeightedHomomorphism<C> as fixed_base_msms::Trait>::normalize_output(value)
     }
 }
@@ -518,7 +518,7 @@ mod tests {
                 &dks[player_id],
                 &pp,
                 &table,
-                1 << radix_exponent, // we're not aggregating anything in this test. TODO: aggregating-and-decrypting should happen somewhere in this crate, though currently it's happening in some fptx_smoke test I think
+                1 << radix_exponent, // we're not aggregating anything in this test. TODO: aggregating-and-decrypting should be tested somewhere in this crate, though currently it's happening in some fptx_smoke test I think
                 radix_exponent,
             );
 

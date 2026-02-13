@@ -444,7 +444,6 @@ impl NodeSetup {
             ChainHealthBackoffConfig::new_no_backoff(),
             false,
             onchain_consensus_config.effective_validator_txn_config(),
-            true,
             Arc::new(MockOptQSPayloadProvider {}),
         );
 

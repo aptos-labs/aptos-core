@@ -18,7 +18,6 @@ aptos-gas-schedule = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm ={ workspace = true, features = ["testing"] }
 clap = { workspace = true }
-move-cli = { workspace = true }
 move-model = { workspace = true }
 move-package = { workspace = true }
 move-prover = { workspace = true }

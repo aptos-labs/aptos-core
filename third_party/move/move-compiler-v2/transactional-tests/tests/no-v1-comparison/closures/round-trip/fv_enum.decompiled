@@ -56,7 +56,7 @@ module 0x66::fv_enum_basic {
         acquires Mapper
     {
         let _v0;
-        let _v1 = Mapper::Twice<u64,u64>{_0: Version::V1<u64,u64>{v1: |arg0| add_k_persistent(arg0, 3)}};
+        let _v1 = Mapper::Twice<u64, u64>{_0: Version::V1<u64, u64>{v1: |arg0| add_k_persistent(arg0, 3)}};
         move_to<Mapper<u64, u64>>(p0, _v1);
         let _v2 = signer::address_of(p0);
         let _v3 = borrow_global<Mapper<u64, u64>>(_v2);

@@ -23,7 +23,7 @@ use core::{
     sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
-use futures::future::join_all;
+use futures::{future::join_all, join};
 use itertools::Itertools;
 use log::{debug, error, info, warn};
 use rand::seq::IteratorRandom;
@@ -300,23 +300,25 @@ impl SubmissionWorker {
         check_account_sleep_duration: Duration,
         loop_stats: &StatsAccumulator,
     ) {
-        let (latest_fetched_counts, sum_of_completion_timestamps_millis) =
+        let (
+            (latest_fetched_counts, sum_of_completion_timestamps_millis_seq_nums),
+            (failed_orderless_txns, sum_of_completion_timestamps_millis_orderless),
+        ) = join!(
             wait_for_accounts_sequence(
                 start_time,
                 self.client(),
                 &account_to_start_and_end_seq_num,
                 txn_expiration_ts_secs,
                 check_account_sleep_duration,
+            ),
+            wait_for_orderless_txns(
+                start_time,
+                self.client(),
+                &account_to_orderless_txns,
+                txn_expiration_ts_secs,
+                check_account_sleep_duration,
             )
-            .await;
-
-        let failed_orderless_txns = wait_for_orderless_txns(
-            self.client(),
-            &account_to_orderless_txns,
-            txn_expiration_ts_secs,
-            check_account_sleep_duration,
-        )
-        .await;
+        );
 
         for account in self.accounts.iter_mut() {
             update_account_seq_num(
@@ -356,7 +358,8 @@ impl SubmissionWorker {
                 .fetch_add(num_committed as u64, Ordering::Relaxed);
 
             if !skip_latency_stats {
-                let sum_latency = sum_of_completion_timestamps_millis
+                let sum_latency = sum_of_completion_timestamps_millis_seq_nums
+                    .saturating_add(sum_of_completion_timestamps_millis_orderless)
                     .saturating_sub(avg_txn_offset_time as u128 * num_committed as u128);
                 let avg_latency = (sum_latency / num_committed as u128) as u64;
                 loop_stats

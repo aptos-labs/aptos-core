@@ -8,13 +8,12 @@ use aptos_types::{
     on_chain_config::{aptos_test_feature_flags_genesis, Features, TimedFeaturesBuilder},
 };
 use aptos_vm::natives;
-use move_cli::base::{
-    test::{run_move_unit_tests, UnitTestResult},
-    test_validation,
-};
 use move_model::model::GlobalEnv;
 use move_package::{source_package::std_lib::StdVersion, CompilerConfig};
-use move_unit_test::UnitTestingConfig;
+use move_unit_test::{
+    package_test::{run_move_unit_tests, UnitTestResult},
+    test_validation, UnitTestingConfig,
+};
 use move_vm_runtime::native_functions::NativeFunctionTable;
 use std::{collections::BTreeMap, path::PathBuf};
 use tempfile::tempdir;
@@ -28,7 +27,7 @@ where
     path
 }
 
-/// Configures the move-cli unit test validation hook to run the extended checker.
+/// Configures the unit test validation hook to run the extended checker.
 fn configure_extended_checks_for_unit_test() {
     fn validate(env: &GlobalEnv) {
         extended_checks::run_extended_checks(env);

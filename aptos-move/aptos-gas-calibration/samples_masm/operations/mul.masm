@@ -1,0 +1,275 @@
+module 0xcafe::OperationMul
+entry public fun calibrate_mul_x10()
+    local l0: u64
+    ld_u64 0
+    st_loc l0
+l1: copy_loc l0
+    ld_u64 1
+    lt
+    br_false l0
+    move_loc l0
+    ld_u64 1
+    add
+    st_loc l0
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    branch l1
+l0: ret
+
+entry public fun calibrate_mul_x50()
+    local l0: u64
+    ld_u64 0
+    st_loc l0
+l1: copy_loc l0
+    ld_u64 5
+    lt
+    br_false l0
+    move_loc l0
+    ld_u64 1
+    add
+    st_loc l0
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    branch l1
+l0: ret
+
+entry public fun calibrate_mul_x100()
+    local l0: u64
+    ld_u64 0
+    st_loc l0
+l1: copy_loc l0
+    ld_u64 10
+    lt
+    br_false l0
+    move_loc l0
+    ld_u64 1
+    add
+    st_loc l0
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    branch l1
+l0: ret
+
+entry public fun calibrate_mul_x300()
+    local l0: u64
+    ld_u64 0
+    st_loc l0
+l1: copy_loc l0
+    ld_u64 30
+    lt
+    br_false l0
+    move_loc l0
+    ld_u64 1
+    add
+    st_loc l0
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    branch l1
+l0: ret
+
+entry public fun calibrate_mul_x600()
+    local l0: u64
+    ld_u64 0
+    st_loc l0
+l1: copy_loc l0
+    ld_u64 60
+    lt
+    br_false l0
+    move_loc l0
+    ld_u64 1
+    add
+    st_loc l0
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    ld_u64 100
+    ld_u64 1
+    mul
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    branch l1
+l0: ret

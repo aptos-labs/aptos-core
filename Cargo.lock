@@ -304,7 +304,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "7.14.2"
+version = "8.0.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -367,7 +367,6 @@ dependencies = [
  "move-asm",
  "move-binary-format",
  "move-bytecode-source-map",
- "move-cli",
  "move-command-line-common",
  "move-compiler-v2",
  "move-core-types",
@@ -830,7 +829,6 @@ dependencies = [
 name = "aptos-cached-packages"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "aptos-framework",
  "aptos-package-builder",
  "aptos-types",
@@ -839,8 +837,6 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "sha2 0.9.9",
- "walkdir",
 ]
 
 [[package]]
@@ -2045,7 +2041,6 @@ dependencies = [
  "log",
  "merlin",
  "move-binary-format",
- "move-cli",
  "move-command-line-common",
  "move-compiler-v2",
  "move-core-types",
@@ -2101,9 +2096,9 @@ dependencies = [
  "bcs 0.1.4",
  "clap 4.5.21",
  "float-cmp",
+ "move-asm",
  "move-binary-format",
  "move-core-types",
- "move-ir-compiler",
  "nalgebra",
  "walkdir",
 ]
@@ -2799,6 +2794,10 @@ dependencies = [
 name = "aptos-jemalloc"
 version = "0.1.0"
 dependencies = [
+ "aptos-logger",
+ "aptos-metrics-core",
+ "once_cell",
+ "tikv-jemalloc-ctl",
  "tikv-jemallocator",
 ]
 
@@ -2976,11 +2975,12 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "goldenfile",
+ "indoc",
+ "move-asm",
  "move-binary-format",
  "move-command-line-common",
  "move-core-types",
  "move-coverage",
- "move-ir-compiler",
  "move-model",
  "move-vm-runtime",
  "move-vm-types",
@@ -3213,7 +3213,6 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "clap 4.5.21",
- "move-cli",
  "move-model",
  "move-package",
  "move-prover",
@@ -3232,7 +3231,6 @@ dependencies = [
  "bcs 0.1.4",
  "dir-diff",
  "file_diff",
- "move-cli",
  "move-core-types",
  "move-package",
  "move-unit-test",
@@ -5057,10 +5055,11 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "clap 4.5.21",
+ "either",
  "glob",
+ "move-asm",
  "move-binary-format",
  "move-core-types",
- "move-ir-compiler",
  "move-vm-runtime",
  "move-vm-test-utils",
  "move-vm-types",
@@ -11691,10 +11690,11 @@ dependencies = [
  "aptos-vm-genesis",
  "claims",
  "fail",
+ "indoc",
+ "move-asm",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
- "move-ir-compiler",
  "proptest",
  "test-case",
 ]
@@ -12525,37 +12525,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap 4.5.21",
- "codespan-reporting",
- "colored",
- "datatest-stable",
- "httpmock",
- "legacy-move-compiler",
- "move-binary-format",
- "move-bytecode-viewer",
- "move-command-line-common",
- "move-compiler-v2",
- "move-core-types",
- "move-coverage",
- "move-disassembler",
- "move-docgen",
- "move-errmapgen",
- "move-model",
- "move-package",
- "move-prover",
- "move-stdlib",
- "move-unit-test",
- "move-vm-runtime",
- "move-vm-test-utils",
- "once_cell",
- "tempfile",
-]
-
-[[package]]
 name = "move-command-line-common"
 version = "0.1.0"
 dependencies = [
@@ -12745,7 +12714,7 @@ dependencies = [
 name = "move-examples"
 version = "0.1.1"
 dependencies = [
- "move-cli",
+ "move-prover",
  "move-stdlib",
 ]
 
@@ -12944,6 +12913,7 @@ dependencies = [
  "atty",
  "clap 4.5.21",
  "codespan-reporting",
+ "colored",
  "itertools 0.13.0",
  "legacy-move-compiler",
  "libtest-mimic",
@@ -12954,6 +12924,7 @@ dependencies = [
  "move-docgen",
  "move-errmapgen",
  "move-model",
+ "move-package",
  "move-prover-boogie-backend",
  "move-prover-bytecode-pipeline",
  "move-prover-test-utils",
@@ -13101,7 +13072,6 @@ dependencies = [
  "legacy-move-compiler",
  "log",
  "move-binary-format",
- "move-cli",
  "move-command-line-common",
  "move-core-types",
  "move-docgen",
@@ -13134,7 +13104,6 @@ dependencies = [
  "better_any",
  "bytes",
  "move-binary-format",
- "move-cli",
  "move-core-types",
  "move-package",
  "move-stdlib",
@@ -13200,10 +13169,10 @@ dependencies = [
  "legacy-move-compiler",
  "move-binary-format",
  "move-bytecode-utils",
- "move-cli",
  "move-command-line-common",
  "move-compiler-v2",
  "move-core-types",
+ "move-coverage",
  "move-ir-types",
  "move-model",
  "move-package",

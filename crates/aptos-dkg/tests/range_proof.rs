@@ -22,14 +22,14 @@ fn assert_range_proof_correctness<E: Pairing, B: BatchedRangeProof<E>>(
     n: usize,
     ell: u8,
 ) {
-    let mut rng = thread_rng();
+    let mut rng = rand::thread_rng();
     let RangeProofUniversalSetup { pk, vk } = setup;
     let (values, comm, r) =
         test_utils::range_proof_random_instance::<_, B, _>(pk, n, ell, &mut rng);
     println!("setup finished, prove starting for n={}, ell={}", n, ell);
 
     let proof = B::prove(pk, &values, ell, &comm, &r, &mut rng);
-    proof.verify(vk, n, ell, &comm).unwrap();
+    proof.verify(vk, n, ell, &comm, &mut rng).unwrap();
 
     // === Serialize to memory ===
     let encoded = {
@@ -51,7 +51,7 @@ fn assert_range_proof_correctness<E: Pairing, B: BatchedRangeProof<E>>(
     let decoded = B::deserialize_compressed(&*encoded).expect("Deserialization failed");
 
     // Verify still succeeds
-    decoded.verify(vk, n, ell, &comm).unwrap();
+    decoded.verify(vk, n, ell, &comm, &mut rng).unwrap();
 
     println!(
         "Serialization round-trip test passed for n={}, ell={}",
@@ -61,7 +61,7 @@ fn assert_range_proof_correctness<E: Pairing, B: BatchedRangeProof<E>>(
     // Make invalid
     let mut invalid_proof = decoded.clone();
     invalid_proof.maul();
-    assert!(invalid_proof.verify(vk, n, ell, &comm).is_err());
+    assert!(invalid_proof.verify(vk, n, ell, &comm, &mut rng).is_err());
 }
 
 #[cfg(test)]

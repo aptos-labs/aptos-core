@@ -53,18 +53,20 @@ pub(crate) fn is_valid_layout(layout: &MoveTypeLayout) -> bool {
         | L::Function => true,
 
         L::Vector(layout) | L::Native(_, layout) => is_valid_layout(layout),
-        L::Struct(MoveStructLayout::RuntimeVariants(variants)) => {
-            variants.iter().all(|v| v.iter().all(is_valid_layout))
-        },
-        L::Struct(MoveStructLayout::Runtime(fields)) => {
-            if fields.is_empty() {
-                return false;
-            }
-            fields.iter().all(is_valid_layout)
-        },
-        L::Struct(_) => {
-            // decorated layouts not supported
-            false
+        L::Struct(struct_layout) => match struct_layout.as_ref() {
+            MoveStructLayout::RuntimeVariants(variants) => {
+                variants.iter().all(|v| v.iter().all(is_valid_layout))
+            },
+            MoveStructLayout::Runtime(fields) => {
+                if fields.is_empty() {
+                    return false;
+                }
+                fields.iter().all(is_valid_layout)
+            },
+            _ => {
+                // decorated layouts not supported
+                false
+            },
         },
     }
 }

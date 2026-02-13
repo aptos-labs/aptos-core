@@ -38,9 +38,9 @@ where
 
     let statement = hom.apply(&witness);
 
-    let proof = hom.prove(&witness, &statement, CNTXT, &mut rng);
+    let (proof, normalized_statement) = hom.prove(&witness, statement, CNTXT, &mut rng);
 
-    hom.verify(&hom.normalize(&statement), &proof, CNTXT)
+    hom.verify(&normalized_statement, &proof, CNTXT, &mut rng)
         .expect("Sigma protocol proof failed verification");
 }
 
@@ -57,9 +57,9 @@ fn test_imhomog_chaum_pedersen<
 
     let statement = hom.apply(&witness);
 
-    let proof = hom.prove(&witness, &statement, CNTXT, &mut rng);
+    let (proof, normalized_statement) = hom.prove(&witness, statement, CNTXT, &mut rng);
 
-    hom.verify(&hom.normalize(&statement), &proof, CNTXT)
+    hom.verify(&normalized_statement, &proof, CNTXT, &mut rng)
         .expect("Inhomogeneous Chaum Pederson sigma proof failed verification");
 }
 
@@ -73,9 +73,9 @@ fn test_imhomog_scalar_mul<'a, E>(
 
     let statement = hom.apply(&witness);
 
-    let proof = hom.prove(&witness, &statement, CNTXT, &mut rng);
+    let (proof, normalized_statement) = hom.prove(&witness, statement, CNTXT, &mut rng);
 
-    hom.verify(&hom.normalize(&statement), &proof, CNTXT)
+    hom.verify(&normalized_statement, &proof, CNTXT, &mut rng)
         .expect("Inhomogeneous Chaum Pederson sigma proof failed verification");
 }
 
@@ -109,7 +109,7 @@ mod schnorr {
             self.apply_msm(self.msm_terms(input))
         }
 
-        fn normalize(&self, value: &Self::Codomain) -> Self::CodomainNormalized {
+        fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
             <Schnorr<C> as fixed_base_msms::Trait>::normalize_output(value)
         }
     }

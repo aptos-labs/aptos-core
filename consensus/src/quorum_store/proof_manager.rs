@@ -7,7 +7,7 @@ use crate::{
     quorum_store::{batch_generator::BackPressure, batch_proof_queue::BatchProofQueue, counters},
 };
 use aptos_consensus_types::{
-    common::{Payload, PayloadFilter, ProofWithData, TxnSummaryWithExpiration},
+    common::{Payload, PayloadFilter, TxnSummaryWithExpiration},
     payload::{OptQuorumStorePayload, PayloadExecutionLimit},
     proof_of_store::{BatchInfoExt, ProofOfStore, ProofOfStoreMsg},
     request_response::{GetPayloadCommand, GetPayloadResponse},
@@ -34,7 +34,6 @@ pub struct ProofManager {
     back_pressure_total_proof_limit: u64,
     remaining_total_proof_num: u64,
     allow_batches_without_pos_in_proposal: bool,
-    enable_payload_v2: bool,
 }
 
 impl ProofManager {
@@ -44,7 +43,6 @@ impl ProofManager {
         back_pressure_total_proof_limit: u64,
         batch_store: Arc<BatchStore>,
         allow_batches_without_pos_in_proposal: bool,
-        enable_payload_v2: bool,
         batch_expiry_gap_when_init_usecs: u64,
     ) -> Self {
         Self {
@@ -58,7 +56,6 @@ impl ProofManager {
             back_pressure_total_proof_limit,
             remaining_total_proof_num: 0,
             allow_batches_without_pos_in_proposal,
-            enable_payload_v2,
         }
     }
 
@@ -224,7 +221,7 @@ impl ProofManager {
                 ))
             }
         } else if proof_block.is_empty() && inline_block.is_empty() {
-            Payload::empty(true, self.allow_batches_without_pos_in_proposal)
+            Payload::empty(true)
         } else {
             trace!(
                 "QS: GetBlockRequest excluded len {}, block len {}, inline len {}",
@@ -232,8 +229,7 @@ impl ProofManager {
                 proof_block.len(),
                 inline_block.len()
             );
-            // Both QuorumStoreInlineHybrid and QuorumStoreInlineHybridV2 use BatchInfo
-            // So we need to convert BatchInfoExt to BatchInfo
+            // Convert to BatchInfo for V1
             let inline_block_v1: Vec<_> = inline_block
                 .into_iter()
                 .map(|(info, txns)| (info.info().clone(), txns))
@@ -245,20 +241,12 @@ impl ProofManager {
                     ProofOfStore::new(info.info().clone(), sig)
                 })
                 .collect();
-
-            if self.enable_payload_v2 {
-                Payload::QuorumStoreInlineHybridV2(
-                    inline_block_v1,
-                    ProofWithData::new(proof_block_v1),
-                    PayloadExecutionLimit::None,
-                )
-            } else {
-                Payload::QuorumStoreInlineHybrid(
-                    inline_block_v1,
-                    ProofWithData::new(proof_block_v1),
-                    None,
-                )
-            }
+            Payload::OptQuorumStore(OptQuorumStorePayload::new(
+                inline_block_v1.into(),
+                Vec::new().into(),
+                proof_block_v1.into(),
+                PayloadExecutionLimit::None,
+            ))
         };
 
         let res = GetPayloadResponse::GetPayloadResponse(response);

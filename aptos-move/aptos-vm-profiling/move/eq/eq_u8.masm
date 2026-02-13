@@ -1,0 +1,19 @@
+module 0x1::M
+fun run()
+    local l0: u64
+    ld_u64 0
+    st_loc l0
+l1: copy_loc l0
+    ld_u64 1000
+    lt
+    br_false l0
+    ld_u8 1
+    ld_u8 2
+    eq
+    pop
+    move_loc l0
+    ld_u64 1
+    add
+    st_loc l0
+    branch l1
+l0: ret

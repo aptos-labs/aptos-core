@@ -994,29 +994,35 @@ fn pick_client(clients: &[RestClient]) -> &RestClient {
 }
 
 async fn wait_for_orderless_txns(
+    start_time: Instant,
     client: &RestClient,
     account_orderless_txns: &HashMap<AccountAddress, HashSet<HashValue>>,
     txn_expiration_ts_secs: u64,
     sleep_between_cycles: Duration,
-) -> HashMap<AccountAddress, HashSet<HashValue>> {
+) -> (HashMap<AccountAddress, HashSet<HashValue>>, u128) {
     if account_orderless_txns.is_empty() {
-        return HashMap::new();
+        return (HashMap::new(), 0);
     }
+    let mut sum_of_completion_timestamps_millis = 0u128;
+
     let mut pending_account_txns = account_orderless_txns.clone();
     loop {
-        let futures = pending_account_txns.keys().map(|account| async move {
-            (
-                *account,
-                FETCH_ACCOUNT_RETRY_POLICY
-                    .retry(move || {
-                        client.get_account_transaction_summaries(*account, None, None, None)
-                    })
-                    .await,
-            )
-        });
+        let account_txn_summaries =
+            join_all(pending_account_txns.keys().map(|account| async move {
+                (
+                    *account,
+                    FETCH_ACCOUNT_RETRY_POLICY
+                        .retry(move || {
+                            client.get_account_transaction_summaries(*account, None, None, None)
+                        })
+                        .await,
+                )
+            }))
+            .await;
 
+        let millis_elapsed = start_time.elapsed().as_millis();
         let mut latest_ledger_ts_secs = u64::MAX;
-        for (account, txn_summaries_result) in join_all(futures).await {
+        for (account, txn_summaries_result) in account_txn_summaries {
             match txn_summaries_result {
                 Ok(response) => {
                     let ledger_timestamp =
@@ -1026,7 +1032,9 @@ async fn wait_for_orderless_txns(
                     for txn_summary in response.into_inner() {
                         let remove_account =
                             if let Some(txn_hashes) = pending_account_txns.get_mut(&account) {
-                                txn_hashes.remove(&txn_summary.transaction_hash());
+                                if txn_hashes.remove(&txn_summary.transaction_hash()) {
+                                    sum_of_completion_timestamps_millis += millis_elapsed;
+                                }
                                 txn_hashes.is_empty()
                             } else {
                                 false
@@ -1091,7 +1099,7 @@ async fn wait_for_orderless_txns(
 
         time::sleep(sleep_between_cycles).await;
     }
-    pending_account_txns
+    (pending_account_txns, sum_of_completion_timestamps_millis)
 }
 
 /// This function waits for the submitted transactions to be committed, up to
