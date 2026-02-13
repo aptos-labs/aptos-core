@@ -80,6 +80,58 @@ fn layers(
     layers
 }
 
+#[test]
+fn test_is_descendant_of() {
+    //  Build a tree:
+    //
+    //       root (layer 0)
+    //        |
+    //      child1 (layer 1)
+    //      /    \
+    //  fork_a  fork_b (layer 2)
+    //    |
+    //  fork_a2 (layer 3)
+    //
+    let root = MapLayer::<u8, u8>::new_family("test");
+    let child1 = root.view_layers_after(&root).new_layer(&[(1, 10)]);
+    let fork_a = child1.view_layers_after(&root).new_layer(&[(2, 20)]);
+    let fork_b = child1.view_layers_after(&root).new_layer(&[(3, 30)]);
+    let fork_a2 = fork_a.view_layers_after(&root).new_layer(&[(4, 40)]);
+
+    // Self-descendant (reflexive).
+    assert!(root.is_descendant_of(&root));
+    assert!(child1.is_descendant_of(&child1));
+    assert!(fork_a.is_descendant_of(&fork_a));
+
+    // Direct lineage.
+    assert!(child1.is_descendant_of(&root));
+    assert!(fork_a.is_descendant_of(&root));
+    assert!(fork_a.is_descendant_of(&child1));
+    assert!(fork_a2.is_descendant_of(&root));
+    assert!(fork_a2.is_descendant_of(&child1));
+    assert!(fork_a2.is_descendant_of(&fork_a));
+    assert!(fork_b.is_descendant_of(&root));
+    assert!(fork_b.is_descendant_of(&child1));
+
+    // Ancestor is not a descendant of its descendants.
+    assert!(!root.is_descendant_of(&child1));
+    assert!(!root.is_descendant_of(&fork_a));
+    assert!(!child1.is_descendant_of(&fork_a));
+
+    // Cross-fork: fork_a and fork_b are NOT descendants of each other.
+    assert!(!fork_a.is_descendant_of(&fork_b));
+    assert!(!fork_b.is_descendant_of(&fork_a));
+
+    // Deeper cross-fork: fork_a2 is NOT a descendant of fork_b.
+    assert!(!fork_a2.is_descendant_of(&fork_b));
+    assert!(!fork_b.is_descendant_of(&fork_a2));
+
+    // Different family entirely.
+    let other_root = MapLayer::<u8, u8>::new_family("other");
+    assert!(!child1.is_descendant_of(&other_root));
+    assert!(!other_root.is_descendant_of(&child1));
+}
+
 proptest! {
     #[test]
     fn test_layered_map_get(
