@@ -34,7 +34,10 @@ use crate::{
         IncomingBlockRetrievalRequest, IncomingDAGRequest, IncomingRandGenRequest,
         IncomingRpcRequest, IncomingSecretShareRequest, NetworkReceivers, NetworkSender,
     },
-    network_interface::{ConsensusMsg, ConsensusNetworkClient},
+    network_interface::{
+        ConsensusMsg, ConsensusNetworkBridge, ConsensusNetworkClient,
+        StrongConsensusNetworkBridge,
+    },
     payload_client::{
         mixed::MixedPayloadClient, user::quorum_store_client::QuorumStoreClient, PayloadClient,
     },
@@ -78,12 +81,9 @@ use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_network::{
-    application::{interface::NetworkClient, storage::PeersAndMetadata},
-    peer::DisconnectReason,
+    application::interface::NetworkClient,
     protocols::network::Event,
 };
-use aptos_config::network_id::{NetworkId, PeerNetworkId};
-use aptos_types::network_address::NetworkAddress;
 use aptos_safety_rules::{
     safety_rules_manager, Error, PersistentSafetyStorage, SafetyRulesManager,
 };
@@ -132,128 +132,6 @@ const PROPOSER_ROUND_BEHIND_STORAGE_BUFFER: usize = 30;
 pub enum LivenessStorageData {
     FullRecoveryData(RecoveryData),
     PartialRecoveryData(LedgerRecoveryData),
-}
-
-/// Bridge adapter that wraps ConsensusNetworkClient to implement NetworkClientInterface<PrefixConsensusMsg>
-///
-/// This allows prefix consensus to use the existing consensus network infrastructure
-/// by wrapping PrefixConsensusMsg in ConsensusMsg::PrefixConsensusMsg before sending.
-#[derive(Clone)]
-struct ConsensusNetworkBridge {
-    inner: ConsensusNetworkClient<aptos_network::application::interface::NetworkClient<ConsensusMsg>>,
-}
-
-impl ConsensusNetworkBridge {
-    fn new(inner: ConsensusNetworkClient<aptos_network::application::interface::NetworkClient<ConsensusMsg>>) -> Self {
-        Self { inner }
-    }
-}
-
-#[async_trait::async_trait]
-impl aptos_network::application::interface::NetworkClientInterface<aptos_prefix_consensus::PrefixConsensusMsg>
-    for ConsensusNetworkBridge
-{
-    async fn add_peers_to_discovery(
-        &self,
-        peers: &[(PeerNetworkId, NetworkAddress)],
-    ) -> Result<(), aptos_network::application::error::Error> {
-        // Delegate to underlying network client
-        self.inner.network_client().add_peers_to_discovery(peers).await
-    }
-
-    async fn disconnect_from_peer(
-        &self,
-        peer: PeerNetworkId,
-        disconnect_reason: DisconnectReason,
-    ) -> Result<(), aptos_network::application::error::Error> {
-        // Delegate to underlying network client
-        self.inner.network_client().disconnect_from_peer(peer, disconnect_reason).await
-    }
-
-    fn get_available_peers(&self) -> Result<Vec<PeerNetworkId>, aptos_network::application::error::Error> {
-        // Delegate to underlying network client
-        self.inner.network_client().get_available_peers()
-    }
-
-    fn get_peers_and_metadata(&self) -> Arc<PeersAndMetadata> {
-        // Delegate to underlying network client
-        self.inner.network_client().get_peers_and_metadata()
-    }
-
-    fn send_to_peer(
-        &self,
-        message: aptos_prefix_consensus::PrefixConsensusMsg,
-        peer: PeerNetworkId,
-    ) -> Result<(), aptos_network::application::error::Error> {
-        // Wrap PrefixConsensusMsg in ConsensusMsg and delegate
-        let wrapped = ConsensusMsg::PrefixConsensusMsg(Box::new(message));
-        self.inner.network_client().send_to_peer(wrapped, peer)
-    }
-
-    fn send_to_peer_raw(
-        &self,
-        message: bytes::Bytes,
-        peer: PeerNetworkId,
-    ) -> Result<(), aptos_network::application::error::Error> {
-        // Delegate raw send to underlying network client
-        self.inner.network_client().send_to_peer_raw(message, peer)
-    }
-
-    fn send_to_peers(
-        &self,
-        message: aptos_prefix_consensus::PrefixConsensusMsg,
-        peers: Vec<PeerNetworkId>,
-    ) -> Result<(), aptos_network::application::error::Error> {
-        // Wrap PrefixConsensusMsg in ConsensusMsg and delegate
-        let wrapped = ConsensusMsg::PrefixConsensusMsg(Box::new(message));
-        self.inner.network_client().send_to_peers(wrapped, peers)
-    }
-
-    async fn send_to_peer_rpc(
-        &self,
-        message: aptos_prefix_consensus::PrefixConsensusMsg,
-        rpc_timeout: Duration,
-        peer: PeerNetworkId,
-    ) -> Result<aptos_prefix_consensus::PrefixConsensusMsg, aptos_network::application::error::Error> {
-        // Prefix consensus doesn't use RPC, but implement for completeness
-        let wrapped = ConsensusMsg::PrefixConsensusMsg(Box::new(message));
-        let response = self.inner.network_client().send_to_peer_rpc(wrapped, rpc_timeout, peer).await?;
-
-        // Unwrap response
-        match response {
-            ConsensusMsg::PrefixConsensusMsg(msg) => Ok(*msg),
-            _ => Err(aptos_network::application::error::Error::RpcError(
-                "Unexpected message type in RPC response".to_string()
-            )),
-        }
-    }
-
-    async fn send_to_peer_rpc_raw(
-        &self,
-        _message: bytes::Bytes,
-        _rpc_timeout: Duration,
-        _peer: PeerNetworkId,
-    ) -> Result<aptos_prefix_consensus::PrefixConsensusMsg, aptos_network::application::error::Error> {
-        // Not used by prefix consensus
-        Err(aptos_network::application::error::Error::RpcError(
-            "Raw RPC not supported for prefix consensus".to_string()
-        ))
-    }
-
-    fn to_bytes_by_protocol(
-        &self,
-        peers: Vec<PeerNetworkId>,
-        message: aptos_prefix_consensus::PrefixConsensusMsg,
-    ) -> anyhow::Result<HashMap<PeerNetworkId, bytes::Bytes>> {
-        // Wrap and delegate
-        let wrapped = ConsensusMsg::PrefixConsensusMsg(Box::new(message));
-        self.inner.network_client().to_bytes_by_protocol(peers, wrapped)
-    }
-
-    fn sort_peers_by_latency(&self, network: NetworkId, peers: &mut [aptos_types::PeerId]) {
-        // Delegate to underlying network client
-        self.inner.network_client().sort_peers_by_latency(network, peers)
-    }
 }
 
 // Manager the components that shared across epoch and spawn per-epoch RoundManager with
@@ -313,6 +191,10 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     // Prefix Consensus channels
     prefix_consensus_tx: Option<aptos_channels::UnboundedSender<(Author, aptos_prefix_consensus::PrefixConsensusMsg)>>,
     prefix_consensus_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
+
+    // Strong Prefix Consensus channels
+    strong_prefix_consensus_tx: Option<aptos_channels::UnboundedSender<(Author, aptos_prefix_consensus::StrongPrefixConsensusMsg)>>,
+    strong_prefix_consensus_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -391,6 +273,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             quorum_store_txn_filter_config,
             prefix_consensus_tx: None,
             prefix_consensus_close_tx: None,
+            strong_prefix_consensus_tx: None,
+            strong_prefix_consensus_close_tx: None,
         }
     }
 
@@ -813,6 +697,18 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .await
                 .expect("Could not send shutdown indicator to QuorumStore");
             ack_rx.await.expect("Failed to stop QuorumStore");
+        }
+
+        // Shutdown prefix consensus managers (basic and strong)
+        if self.prefix_consensus_close_tx.is_some() {
+            if let Err(e) = self.stop_prefix_consensus().await {
+                warn!(error = ?e, "Error stopping prefix consensus during epoch shutdown");
+            }
+        }
+        if self.strong_prefix_consensus_close_tx.is_some() {
+            if let Err(e) = self.stop_strong_prefix_consensus().await {
+                warn!(error = ?e, "Error stopping strong prefix consensus during epoch shutdown");
+            }
         }
     }
 
@@ -1844,6 +1740,29 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     );
                 }
             },
+            ConsensusMsg::StrongPrefixConsensusMsg(msg) => {
+                let msg_epoch = msg.epoch();
+                if msg_epoch == self.epoch() {
+                    if let Some(tx) = &mut self.strong_prefix_consensus_tx {
+                        tx.send((peer_id, *msg)).map_err(|e| {
+                            anyhow::anyhow!("Failed to send to strong_prefix_consensus_tx: {:?}", e)
+                        }).await?;
+                    } else {
+                        warn!(
+                            remote_peer = peer_id,
+                            epoch = msg_epoch,
+                            "[EpochManager] Received StrongPrefixConsensusMsg but strong PC not running"
+                        );
+                    }
+                } else {
+                    warn!(
+                        remote_peer = peer_id,
+                        msg_epoch = msg_epoch,
+                        local_epoch = self.epoch(),
+                        "[EpochManager] StrongPrefixConsensusMsg epoch mismatch"
+                    );
+                }
+            },
             _ => {
                 bail!("[EpochManager] Unexpected messages: {:?}", msg);
             },
@@ -2162,6 +2081,117 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             info!(epoch = self.epoch(), "Prefix consensus stopped");
         } else {
             warn!("Prefix consensus not running");
+        }
+
+        Ok(())
+    }
+
+    /// Start Strong Prefix Consensus manager
+    pub async fn start_strong_prefix_consensus(
+        &mut self,
+        slot: u64,
+        initial_ranking: Vec<Author>,
+        input_vector: aptos_prefix_consensus::PrefixVector,
+    ) -> anyhow::Result<()> {
+        // Check if already running
+        if self.strong_prefix_consensus_tx.is_some() {
+            warn!(
+                epoch = self.epoch(),
+                "Strong prefix consensus already running, ignoring start request"
+            );
+            return Ok(());
+        }
+
+        info!(
+            epoch = self.epoch(),
+            slot = slot,
+            party_id = %self.author,
+            "Starting strong prefix consensus"
+        );
+
+        // Create unbounded channel for messages
+        let (tx, rx) = aptos_channels::new_unbounded(
+            &counters::OP_COUNTERS.gauge("strong_prefix_consensus_channel_msgs"),
+        );
+        self.strong_prefix_consensus_tx = Some(tx.clone());
+
+        // Get epoch state and validators
+        let epoch_state = self.epoch_state().clone();
+        let validators = epoch_state.verifier.clone();
+
+        // Create network bridge and sender adapter
+        let bridge = StrongConsensusNetworkBridge::new(self.network_sender.clone());
+        let network_client = aptos_prefix_consensus::StrongPrefixConsensusNetworkClient::new(bridge);
+        let network_sender = aptos_prefix_consensus::StrongNetworkSenderAdapter::new(
+            self.author,
+            network_client,
+            tx.clone(),
+            validators.clone(),
+        );
+
+        // Get validator signer
+        let private_key = self.load_consensus_key(&validators)?;
+        let validator_signer = aptos_types::validator_signer::ValidatorSigner::new(
+            self.author,
+            std::sync::Arc::new(private_key),
+        );
+
+        // Create manager
+        let manager = aptos_prefix_consensus::StrongPrefixConsensusManager::new(
+            self.author,
+            self.epoch(),
+            slot,
+            initial_ranking,
+            input_vector,
+            network_sender,
+            validator_signer,
+            validators,
+        );
+
+        // Create shutdown channel
+        let (close_tx, close_rx) = futures::channel::oneshot::channel();
+        self.strong_prefix_consensus_close_tx = Some(close_tx);
+
+        // Spawn manager task
+        tokio::spawn(manager.run(rx, close_rx));
+
+        info!(
+            epoch = self.epoch(),
+            slot = slot,
+            "Strong prefix consensus manager spawned"
+        );
+
+        Ok(())
+    }
+
+    /// Stop Strong Prefix Consensus if running
+    pub async fn stop_strong_prefix_consensus(&mut self) -> anyhow::Result<()> {
+        if let Some(close_tx) = self.strong_prefix_consensus_close_tx.take() {
+            info!(epoch = self.epoch(), "Stopping strong prefix consensus");
+
+            // Send shutdown signal
+            let (ack_tx, ack_rx) = futures::channel::oneshot::channel();
+            if close_tx.send(ack_tx).is_err() {
+                warn!("Strong prefix consensus manager already stopped");
+            } else {
+                // Wait for acknowledgment with timeout
+                if tokio::time::timeout(
+                    Duration::from_secs(5),
+                    ack_rx,
+                )
+                .await
+                .is_err()
+                {
+                    warn!("Timeout waiting for strong prefix consensus shutdown acknowledgment");
+                }
+            }
+
+            // Clear channel
+            self.strong_prefix_consensus_tx = None;
+
+            info!(epoch = self.epoch(), "Strong prefix consensus stopped");
+        } else {
+            warn!("Strong prefix consensus not running");
         }
 
         Ok(())

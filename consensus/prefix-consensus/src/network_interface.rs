@@ -194,6 +194,135 @@ where
     }
 }
 
+// =============================================================================
+// Strong Prefix Consensus network types
+// =============================================================================
+
+/// Network client wrapper for Strong Prefix Consensus
+///
+/// Same pattern as `PrefixConsensusNetworkClient` but for `StrongPrefixConsensusMsg`.
+#[derive(Clone)]
+pub struct StrongPrefixConsensusNetworkClient<NetworkClient> {
+    network_client: NetworkClient,
+}
+
+impl<NetworkClient: NetworkClientInterface<StrongPrefixConsensusMsg>>
+    StrongPrefixConsensusNetworkClient<NetworkClient>
+{
+    pub fn new(network_client: NetworkClient) -> Self {
+        Self { network_client }
+    }
+
+    pub fn send_to(
+        &self,
+        peer: PeerId,
+        message: StrongPrefixConsensusMsg,
+    ) -> Result<(), Error> {
+        let peer_network_id = PeerNetworkId::new(NetworkId::Validator, peer);
+        self.network_client.send_to_peer(message, peer_network_id)
+    }
+
+    pub fn send_to_many(
+        &self,
+        peers: Vec<PeerId>,
+        message: StrongPrefixConsensusMsg,
+    ) -> Result<(), Error> {
+        let peer_network_ids: Vec<PeerNetworkId> = peers
+            .into_iter()
+            .map(|peer| PeerNetworkId::new(NetworkId::Validator, peer))
+            .collect();
+        self.network_client
+            .send_to_peers(message, peer_network_ids)
+    }
+}
+
+/// Network sender adapter for Strong Prefix Consensus
+///
+/// Implements `StrongPrefixConsensusNetworkSender` using the Aptos network layer.
+/// Self-send goes through a channel; all other sends go through the network client.
+#[derive(Clone)]
+pub struct StrongNetworkSenderAdapter<NetworkClient> {
+    author: Author,
+    network_client: StrongPrefixConsensusNetworkClient<NetworkClient>,
+    self_sender: UnboundedSender<(Author, StrongPrefixConsensusMsg)>,
+    validators: Arc<ValidatorVerifier>,
+}
+
+impl<NetworkClient> StrongNetworkSenderAdapter<NetworkClient> {
+    pub fn new(
+        author: Author,
+        network_client: StrongPrefixConsensusNetworkClient<NetworkClient>,
+        self_sender: UnboundedSender<(Author, StrongPrefixConsensusMsg)>,
+        validators: Arc<ValidatorVerifier>,
+    ) -> Self {
+        Self {
+            author,
+            network_client,
+            self_sender,
+            validators,
+        }
+    }
+
+    fn other_validators(&self) -> Vec<Author> {
+        self.validators
+            .get_ordered_account_addresses_iter()
+            .filter(|addr| addr != &self.author)
+            .collect()
+    }
+}
+
+#[async_trait::async_trait]
+impl<NetworkClient> StrongPrefixConsensusNetworkSender
+    for StrongNetworkSenderAdapter<NetworkClient>
+where
+    NetworkClient:
+        NetworkClientInterface<StrongPrefixConsensusMsg> + Send + Sync + Clone,
+{
+    async fn broadcast_strong_msg(&self, msg: StrongPrefixConsensusMsg) {
+        // Send to self via channel
+        let mut self_sender = self.self_sender.clone();
+        if let Err(err) = self_sender.send((self.author, msg.clone())).await {
+            error!(
+                error = ?err,
+                "Failed to send strong PC msg to self via channel"
+            );
+        }
+
+        // Send to all other validators
+        let others = self.other_validators();
+        if !others.is_empty() {
+            if let Err(err) = self.network_client.send_to_many(others, msg) {
+                warn!(
+                    error = ?err,
+                    "Failed to broadcast strong PC msg to other validators"
+                );
+            }
+        }
+    }
+
+    async fn send_strong_msg(&self, peer: Author, msg: StrongPrefixConsensusMsg) {
+        if peer == self.author {
+            // Self-send via channel
+            let mut self_sender = self.self_sender.clone();
+            if let Err(err) = self_sender.send((self.author, msg)).await {
+                error!(
+                    error = ?err,
+                    "Failed to send strong PC msg to self via channel"
+                );
+            }
+        } else {
+            // Send to remote peer via network
+            if let Err(err) = self.network_client.send_to(peer, msg) {
+                warn!(
+                    error = ?err,
+                    peer = %peer,
+                    "Failed to send strong PC msg to peer"
+                );
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use aptos_types::{

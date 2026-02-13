@@ -12,7 +12,7 @@ use crate::{
         secret_sharing::network_messages::SecretShareNetworkMessage,
     },
 };
-use aptos_prefix_consensus::PrefixConsensusMsg;
+use aptos_prefix_consensus::{PrefixConsensusMsg, StrongPrefixConsensusMsg};
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalResponse},
@@ -27,14 +27,16 @@ use aptos_consensus_types::{
     vote_msg::VoteMsg,
 };
 use aptos_network::{
-    application::{error::Error, interface::NetworkClientInterface},
+    application::{error::Error, interface::NetworkClientInterface, storage::PeersAndMetadata},
+    peer::DisconnectReason,
     ProtocolId,
 };
+use aptos_types::network_address::NetworkAddress;
 use aptos_types::{epoch_change::EpochChangeProof, PeerId};
 use bytes::Bytes;
 pub use pipeline::commit_reliable_broadcast::CommitMessage;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 /// Network type for consensus
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -105,6 +107,8 @@ pub enum ConsensusMsg {
     SecretShareMsg(SecretShareNetworkMessage),
     /// Prefix Consensus message: Vote1, Vote2, or Vote3 for prefix consensus protocol
     PrefixConsensusMsg(Box<PrefixConsensusMsg>),
+    /// Strong Prefix Consensus message: multi-view protocol messages
+    StrongPrefixConsensusMsg(Box<StrongPrefixConsensusMsg>),
 }
 
 /// Network type for consensus
@@ -140,6 +144,7 @@ impl ConsensusMsg {
             ConsensusMsg::ProofOfStoreMsgV2(_) => "ProofOfStoreMsgV2",
             ConsensusMsg::SecretShareMsg(_) => "SecretShareMsg",
             ConsensusMsg::PrefixConsensusMsg(_) => "PrefixConsensusMsg",
+            ConsensusMsg::StrongPrefixConsensusMsg(_) => "StrongPrefixConsensusMsg",
         }
     }
 }
@@ -246,8 +251,258 @@ impl<NetworkClient: NetworkClientInterface<ConsensusMsg>> ConsensusNetworkClient
     }
 
     /// Get reference to the underlying network client
-    /// This is used by the prefix consensus bridge adapter
+    /// This is used by the prefix consensus bridge adapters
     pub fn network_client(&self) -> &NetworkClient {
         &self.network_client
+    }
+}
+
+// =============================================================================
+// Prefix Consensus network bridges
+//
+// These bridges wrap sub-protocol messages (PrefixConsensusMsg,
+// StrongPrefixConsensusMsg) inside ConsensusMsg variants so they travel over the
+// single consensus network channel. Each bridge implements
+// NetworkClientInterface<SubMsg> by delegating to the underlying
+// ConsensusNetworkClient<NetworkClient<ConsensusMsg>>.
+// =============================================================================
+
+/// Bridge adapter: wraps `PrefixConsensusMsg` in `ConsensusMsg::PrefixConsensusMsg`
+/// so basic prefix consensus can send over the consensus network.
+#[derive(Clone)]
+pub(crate) struct ConsensusNetworkBridge<NetworkClient> {
+    inner: ConsensusNetworkClient<NetworkClient>,
+}
+
+impl<NetworkClient> ConsensusNetworkBridge<NetworkClient> {
+    pub fn new(inner: ConsensusNetworkClient<NetworkClient>) -> Self {
+        Self { inner }
+    }
+}
+
+#[async_trait::async_trait]
+impl<NetworkClient: NetworkClientInterface<ConsensusMsg> + Send + Sync>
+    NetworkClientInterface<PrefixConsensusMsg> for ConsensusNetworkBridge<NetworkClient>
+{
+    async fn add_peers_to_discovery(
+        &self,
+        peers: &[(PeerNetworkId, NetworkAddress)],
+    ) -> Result<(), Error> {
+        // Delegate to underlying network client
+        self.inner.network_client().add_peers_to_discovery(peers).await
+    }
+
+    async fn disconnect_from_peer(
+        &self,
+        peer: PeerNetworkId,
+        disconnect_reason: DisconnectReason,
+    ) -> Result<(), Error> {
+        // Delegate to underlying network client
+        self.inner.network_client().disconnect_from_peer(peer, disconnect_reason).await
+    }
+
+    fn get_available_peers(&self) -> Result<Vec<PeerNetworkId>, Error> {
+        // Delegate to underlying network client
+        self.inner.network_client().get_available_peers()
+    }
+
+    fn get_peers_and_metadata(&self) -> Arc<PeersAndMetadata> {
+        // Delegate to underlying network client
+        self.inner.network_client().get_peers_and_metadata()
+    }
+
+    fn send_to_peer(
+        &self,
+        message: PrefixConsensusMsg,
+        peer: PeerNetworkId,
+    ) -> Result<(), Error> {
+        // Wrap PrefixConsensusMsg in ConsensusMsg and delegate
+        let wrapped = ConsensusMsg::PrefixConsensusMsg(Box::new(message));
+        self.inner.network_client().send_to_peer(wrapped, peer)
+    }
+
+    fn send_to_peer_raw(
+        &self,
+        message: Bytes,
+        peer: PeerNetworkId,
+    ) -> Result<(), Error> {
+        // Delegate raw send to underlying network client
+        self.inner.network_client().send_to_peer_raw(message, peer)
+    }
+
+    fn send_to_peers(
+        &self,
+        message: PrefixConsensusMsg,
+        peers: Vec<PeerNetworkId>,
+    ) -> Result<(), Error> {
+        // Wrap PrefixConsensusMsg in ConsensusMsg and delegate
+        let wrapped = ConsensusMsg::PrefixConsensusMsg(Box::new(message));
+        self.inner.network_client().send_to_peers(wrapped, peers)
+    }
+
+    async fn send_to_peer_rpc(
+        &self,
+        message: PrefixConsensusMsg,
+        rpc_timeout: Duration,
+        peer: PeerNetworkId,
+    ) -> Result<PrefixConsensusMsg, Error> {
+        // Prefix consensus doesn't use RPC, but implement for completeness
+        let wrapped = ConsensusMsg::PrefixConsensusMsg(Box::new(message));
+        let response = self.inner.network_client().send_to_peer_rpc(wrapped, rpc_timeout, peer).await?;
+        // Unwrap response
+        match response {
+            ConsensusMsg::PrefixConsensusMsg(msg) => Ok(*msg),
+            _ => Err(Error::RpcError(
+                "Unexpected message type in RPC response".to_string()
+            )),
+        }
+    }
+
+    async fn send_to_peer_rpc_raw(
+        &self,
+        _message: Bytes,
+        _rpc_timeout: Duration,
+        _peer: PeerNetworkId,
+    ) -> Result<PrefixConsensusMsg, Error> {
+        // Not used by prefix consensus
+        Err(Error::RpcError(
+            "Raw RPC not supported for prefix consensus".to_string()
+        ))
+    }
+
+    fn to_bytes_by_protocol(
+        &self,
+        peers: Vec<PeerNetworkId>,
+        message: PrefixConsensusMsg,
+    ) -> anyhow::Result<HashMap<PeerNetworkId, Bytes>> {
+        // Wrap and delegate
+        let wrapped = ConsensusMsg::PrefixConsensusMsg(Box::new(message));
+        self.inner.network_client().to_bytes_by_protocol(peers, wrapped)
+    }
+
+    fn sort_peers_by_latency(&self, network: NetworkId, peers: &mut [PeerId]) {
+        // Delegate to underlying network client
+        self.inner.network_client().sort_peers_by_latency(network, peers)
+    }
+}
+
+/// Bridge adapter: wraps `StrongPrefixConsensusMsg` in
+/// `ConsensusMsg::StrongPrefixConsensusMsg` so Strong PC can send over the
+/// consensus network. Same pattern as `ConsensusNetworkBridge`.
+#[derive(Clone)]
+pub(crate) struct StrongConsensusNetworkBridge<NetworkClient> {
+    inner: ConsensusNetworkClient<NetworkClient>,
+}
+
+impl<NetworkClient> StrongConsensusNetworkBridge<NetworkClient> {
+    pub fn new(inner: ConsensusNetworkClient<NetworkClient>) -> Self {
+        Self { inner }
+    }
+}
+
+#[async_trait::async_trait]
+impl<NetworkClient: NetworkClientInterface<ConsensusMsg> + Send + Sync>
+    NetworkClientInterface<StrongPrefixConsensusMsg>
+    for StrongConsensusNetworkBridge<NetworkClient>
+{
+    async fn add_peers_to_discovery(
+        &self,
+        peers: &[(PeerNetworkId, NetworkAddress)],
+    ) -> Result<(), Error> {
+        // Delegate to underlying network client
+        self.inner.network_client().add_peers_to_discovery(peers).await
+    }
+
+    async fn disconnect_from_peer(
+        &self,
+        peer: PeerNetworkId,
+        disconnect_reason: DisconnectReason,
+    ) -> Result<(), Error> {
+        // Delegate to underlying network client
+        self.inner.network_client().disconnect_from_peer(peer, disconnect_reason).await
+    }
+
+    fn get_available_peers(&self) -> Result<Vec<PeerNetworkId>, Error> {
+        // Delegate to underlying network client
+        self.inner.network_client().get_available_peers()
+    }
+
+    fn get_peers_and_metadata(&self) -> Arc<PeersAndMetadata> {
+        // Delegate to underlying network client
+        self.inner.network_client().get_peers_and_metadata()
+    }
+
+    fn send_to_peer(
+        &self,
+        message: StrongPrefixConsensusMsg,
+        peer: PeerNetworkId,
+    ) -> Result<(), Error> {
+        // Wrap StrongPrefixConsensusMsg in ConsensusMsg and delegate
+        let wrapped = ConsensusMsg::StrongPrefixConsensusMsg(Box::new(message));
+        self.inner.network_client().send_to_peer(wrapped, peer)
+    }
+
+    fn send_to_peer_raw(
+        &self,
+        message: Bytes,
+        peer: PeerNetworkId,
+    ) -> Result<(), Error> {
+        // Delegate raw send to underlying network client
+        self.inner.network_client().send_to_peer_raw(message, peer)
+    }
+
+    fn send_to_peers(
+        &self,
+        message: StrongPrefixConsensusMsg,
+        peers: Vec<PeerNetworkId>,
+    ) -> Result<(), Error> {
+        // Wrap StrongPrefixConsensusMsg in ConsensusMsg and delegate
+        let wrapped = ConsensusMsg::StrongPrefixConsensusMsg(Box::new(message));
+        self.inner.network_client().send_to_peers(wrapped, peers)
+    }
+
+    async fn send_to_peer_rpc(
+        &self,
+        message: StrongPrefixConsensusMsg,
+        rpc_timeout: Duration,
+        peer: PeerNetworkId,
+    ) -> Result<StrongPrefixConsensusMsg, Error> {
+        // Strong prefix consensus doesn't use RPC, but implement for completeness
+        let wrapped = ConsensusMsg::StrongPrefixConsensusMsg(Box::new(message));
+        let response = self.inner.network_client().send_to_peer_rpc(wrapped, rpc_timeout, peer).await?;
+        // Unwrap response
+        match response {
+            ConsensusMsg::StrongPrefixConsensusMsg(msg) => Ok(*msg),
+            _ => Err(Error::RpcError(
+                "Unexpected message type in Strong PC RPC response".to_string()
+            )),
+        }
+    }
+
+    async fn send_to_peer_rpc_raw(
+        &self,
+        _message: Bytes,
+        _rpc_timeout: Duration,
+        _peer: PeerNetworkId,
+    ) -> Result<StrongPrefixConsensusMsg, Error> {
+        // Not used by strong prefix consensus
+        Err(Error::RpcError(
+            "Raw RPC not supported for strong prefix consensus".to_string()
+        ))
+    }
+
+    fn to_bytes_by_protocol(
+        &self,
+        peers: Vec<PeerNetworkId>,
+        message: StrongPrefixConsensusMsg,
+    ) -> anyhow::Result<HashMap<PeerNetworkId, Bytes>> {
+        // Wrap and delegate
+        let wrapped = ConsensusMsg::StrongPrefixConsensusMsg(Box::new(message));
+        self.inner.network_client().to_bytes_by_protocol(peers, wrapped)
+    }
+
+    fn sort_peers_by_latency(&self, network: NetworkId, peers: &mut [PeerId]) {
+        // Delegate to underlying network client
+        self.inner.network_client().sort_peers_by_latency(network, peers)
     }
 }

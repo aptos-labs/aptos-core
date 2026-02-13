@@ -248,14 +248,14 @@ This layered architecture enables multi-slot censorship-resistant consensus as d
 
 ---
 
-## Current Status (February 7, 2026)
+## Current Status (February 12, 2026)
 
 ### Repository State
 - **Branch**: `prefix-consensus-prototype`
-- **HEAD**: Phase 4 Chunks 1-3 complete (Strong Protocol + Network Messages + Strong Manager)
+- **HEAD**: Phase 5 complete (Strong PC Integration with EpochManager)
 - **Tests**: 186/186 unit tests passing
 - **Smoke Tests**: Run manually by user (no need to run in Claude sessions)
-- **Build**: ✅ No warnings or errors
+- **Build**: ✅ Clean (only expected dead-code warnings for not-yet-called strong PC start method)
 
 ### Progress Summary
 - ✅ **Basic Prefix Consensus**: Complete (Phase 1-6 of network-integration.md)
@@ -266,7 +266,8 @@ This layered architecture enables multi-slot censorship-resistant consensus as d
 - ✅ **Strong PC Phase 4 Chunk 1**: Strong Protocol state machine complete (strong_protocol.rs)
 - ✅ **Strong PC Phase 4 Chunk 2**: Network messages complete (StrongPrefixConsensusMsg + types)
 - ✅ **Strong PC Phase 4 Chunk 3**: Strong Manager complete (strong_manager.rs) + cross-cutting fixes
-- ⏳ **Strong PC Phase 5**: Integration with consensus layer (EpochManager)
+- ✅ **Strong PC Phase 5**: Integration with consensus layer (EpochManager wiring + network bridges)
+- ⏳ **Strong PC Phase 6 (Smoke Tests)**: Next
 - ⏳ **Slot Manager**: Future work (after Strong PC complete)
 
 **Main Design Plan**: `.plans/strong-prefix-consensus.md`
@@ -436,8 +437,35 @@ IndirectCert(empty=2, parent=1) is created. If the chain traces to it, `view()=2
 - **Fetch DoS protection**: Check `pending_fetches` before validating unsolicited `CertFetchResponse` messages. Keep entry in `pending_fetches` until successful validation (don't remove on failed validation — would lose the hash for retry).
 - **Unreachable vs legitimate None guards**: 4 cases where `None` is unreachable use `expect()`, 3 cases in `process_view_vote1/2/3` where `None` means stale view use `return`.
 
+### Phase 5 Implementation Details (Integration)
+
+**Files modified**:
+- `consensus/src/network_interface.rs` — Added `ConsensusMsg::StrongPrefixConsensusMsg` variant, moved both `ConsensusNetworkBridge` and `StrongConsensusNetworkBridge` here (were in epoch_manager)
+- `consensus/src/epoch_manager.rs` — Added `strong_prefix_consensus_tx`/`close_tx` fields, `start_strong_prefix_consensus()`, `stop_strong_prefix_consensus()`, `check_epoch` routing, epoch cleanup in `shutdown_current_processor`
+- `consensus/prefix-consensus/src/network_interface.rs` — Added `StrongPrefixConsensusNetworkClient`, `StrongNetworkSenderAdapter` implementing `StrongPrefixConsensusNetworkSender` trait
+- `consensus/prefix-consensus/src/lib.rs` — Updated exports
+
+**Network architecture** (4-layer send-side stack, mirrors basic PC):
+```
+ConsensusNetworkClient (sends ConsensusMsg over the wire)
+    ↓ wrapped in
+StrongConsensusNetworkBridge (wraps in ConsensusMsg::StrongPrefixConsensusMsg)
+    ↓ wrapped in
+StrongPrefixConsensusNetworkClient (PeerId → PeerNetworkId mapping)
+    ↓ wrapped in
+StrongNetworkSenderAdapter (implements StrongPrefixConsensusNetworkSender trait)
+    ↓ passed to
+StrongPrefixConsensusManager::new(...)
+```
+
+**Receive side**: `check_epoch` matches `ConsensusMsg::StrongPrefixConsensusMsg`, verifies epoch, forwards to `strong_prefix_consensus_tx` channel.
+
+**Epoch cleanup**: Both `stop_prefix_consensus()` and `stop_strong_prefix_consensus()` called in `shutdown_current_processor()`.
+
+**Bridge refactor**: Both `ConsensusNetworkBridge` and `StrongConsensusNetworkBridge` moved from `epoch_manager.rs` to `network_interface.rs` (where `ConsensusMsg` lives). Made generic over `NetworkClient` type parameter.
+
 ### Next Action
-Begin Strong Prefix Consensus Phase 5: Integration with consensus layer (EpochManager wiring, real NetworkSender implementation)
+Begin Strong Prefix Consensus Phase 6: Smoke tests (wire `start_strong_prefix_consensus` into smoke test harness, test multi-view agreement)
 
 ---
 
@@ -451,6 +479,7 @@ Begin Strong Prefix Consensus Phase 5: Integration with consensus layer (EpochMa
 - [ ] **Empty view without inner PC**: Consider sending EmptyViewMessage directly (without running the inner PC) when no certificates have arrived at timeout. This saves 3 rounds of inner PC for the all-bot case. Caveat: all parties must participate in the inner PC to ensure others can form QCs, so this optimization only applies when ALL parties have no certificates for the view.
 - [ ] **View 1 start timer for multi-slot protocol**: When Strong Prefix Consensus is used within the multi-slot final protocol (Slot Manager), add a timer before starting View 1 to allow parties to collect input vectors from other slots before beginning. Currently View 1 starts immediately with the local input vector.
 - [ ] **Garbage collect data structures on slot commit**: When a slot is committed, clean up accumulated state (e.g., `view_states`, `pc_states`, `empty_view_collectors`, `pending_fetches`, `pending_commit_proof`, cert store) to free memory and avoid unbounded growth across slots.
+- [ ] **Collapse network bridges into one generic bridge**: After the inner PC trait (Phase 9) unifies basic and strong PC, replace the two separate `ConsensusNetworkBridge` and `StrongConsensusNetworkBridge` (in `network_interface.rs`) with a single generic bridge parameterized by message type and `ConsensusMsg` wrapping variant. Eliminates ~120 lines of duplicated boilerplate.
 
 ---
 
@@ -462,7 +491,7 @@ consensus/prefix-consensus/src/
 ├── types.rs              - Vote/QC types + ViewProposal/CertFetch types (1039 lines)
 ├── protocol.rs           - 3-round state machine (606 lines)
 ├── manager.rs            - Event-driven orchestrator (737 lines)
-├── network_interface.rs  - Network adapter (224 lines)
+├── network_interface.rs  - Network adapter + Strong PC client/adapter (~330 lines)
 ├── network_messages.rs   - PrefixConsensusMsg + StrongPrefixConsensusMsg (795 lines)
 ├── signing.rs            - BLS helpers (184 lines)
 ├── certify.rs            - QC formation (220 lines)
@@ -496,7 +525,8 @@ testsuite/smoke-test/src/consensus/prefix_consensus/
 8. **6f12e09ceb** (Feb 3): Fix race condition, add output writing
 9. **f5e736d906** (Feb 4): Divergent inputs test
 10. **537848ce43** (Feb 4): Update docs (Phase 6 complete, Strong PC plan)
-11. **(pending)** (Feb 5): Security enhancements for Verifiable Prefix Consensus ← HEAD
+11. **(pending)** (Feb 5): Security enhancements for Verifiable Prefix Consensus
+12. **(pending)** (Feb 12): Strong PC integration with EpochManager (Phase 5) ← HEAD
 
 ---
 
