@@ -1,78 +1,18 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use super::reroot_path;
+use crate::run_move_prover_with_model_v2;
 use anyhow::bail;
-use clap::Parser;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use colored::Colorize;
 use move_model::metadata::{CompilerVersion, LanguageVersion};
-use move_package::{BuildConfig, ModelConfig};
-use move_prover::run_move_prover_with_model_v2;
+use move_package::{source_package::layout::SourcePackageLayout, BuildConfig, ModelConfig};
 use std::{
     io::Write,
     path::{Path, PathBuf},
     time::Instant,
 };
 use tempfile::TempDir;
-
-#[derive(Parser, Debug)]
-pub enum ProverOptions {
-    // Pass through unknown commands to the prover Clap parser
-    #[clap(
-        external_subcommand,
-        takes_value(true),
-        multiple_values(true),
-        multiple_occurrences(true)
-    )]
-    Options(Vec<String>),
-}
-
-/// Run the Move Prover on the package at `path`. If no path is provided defaults to current
-/// directory. Use `.. prove .. -- <options>` to pass on options to the prover.
-#[derive(Parser)]
-#[clap(name = "prove")]
-pub struct Prove {
-    /// The target filter used to prune the modules to verify. Modules with a name that contains
-    /// this string will be part of verification.
-    #[clap(short = 't', long = "target")]
-    pub target_filter: Option<String>,
-    /// Internal field indicating that this prover run is for a test.
-    #[clap(skip)]
-    pub for_test: bool,
-    /// Any options passed to the prover.
-    #[clap(subcommand)]
-    pub options: Option<ProverOptions>,
-}
-
-impl Prove {
-    pub fn execute(self, path: Option<PathBuf>, config: BuildConfig) -> anyhow::Result<()> {
-        let rerooted_path = reroot_path(path)?;
-        let Self {
-            target_filter,
-            for_test,
-            options,
-        } = self;
-        let opts = match options {
-            Some(ProverOptions::Options(opts)) => opts,
-            _ => vec![],
-        };
-        let mut args = vec!["package".to_string()];
-        let prover_toml = Path::new(&rerooted_path).join("Prover.toml");
-        if prover_toml.exists() {
-            args.push(format!("--config={}", prover_toml.to_string_lossy()));
-        }
-        args.extend(opts.iter().cloned());
-        let options = move_prover::cli::Options::create_from_args(&args)?;
-        if for_test {
-            options.setup_logging_for_test();
-        } else {
-            options.setup_logging();
-        }
-
-        run_move_prover(config, &rerooted_path, &target_filter, for_test, options)
-    }
-}
 
 // =================================================================================================
 // API for Rust unit tests
@@ -123,15 +63,23 @@ impl ProverTest {
         //   parallelize package based tests.
         let saved_cd = std::env::current_dir().expect("current directory");
         let pkg_path = path_in_crate(std::mem::take(&mut self.path));
-        let cmd = Prove {
-            target_filter: None,
-            for_test: true,
-            options: Some(ProverOptions::Options(std::mem::take(&mut self.options))),
-        };
+
+        // Build prover options
+        let opts = std::mem::take(&mut self.options);
+        let rerooted_path = SourcePackageLayout::try_find_root(&pkg_path).unwrap_or(pkg_path);
+        let mut args = vec!["package".to_string()];
+        let prover_toml = rerooted_path.join("Prover.toml");
+        if prover_toml.exists() {
+            args.push(format!("--config={}", prover_toml.to_string_lossy()));
+        }
+        args.extend(opts.iter().cloned());
+        let options = crate::cli::Options::create_from_args(&args).unwrap();
+        options.setup_logging_for_test();
+
         let mut build_config = BuildConfig::default();
         build_config.compiler_config.language_version = Some(LanguageVersion::latest_stable());
         build_config.compiler_config.compiler_version = Some(CompilerVersion::latest_stable());
-        let res = cmd.execute(Some(pkg_path), build_config);
+        let res = run_move_prover(build_config, &rerooted_path, &None, true, options);
         std::env::set_current_dir(saved_cd).expect("restore current directory");
         res.unwrap()
     }
@@ -163,7 +111,7 @@ pub fn run_move_prover(
     path: &Path,
     target_filter: &Option<String>,
     for_test: bool,
-    mut options: move_prover::cli::Options,
+    mut options: crate::cli::Options,
 ) -> anyhow::Result<()> {
     // Always run the prover in dev mode, so addresses get default assignments
     config.dev_mode = true;

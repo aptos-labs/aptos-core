@@ -31,7 +31,6 @@ walkdir = { workspace = true }
 [dev-dependencies]
 dir-diff = { workspace = true }
 file_diff = { workspace = true }
-move-cli = { workspace = true }
 move-package = { workspace = true }
 move-unit-test = { workspace = true }
 tempfile = { workspace = true }

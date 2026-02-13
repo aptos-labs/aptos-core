@@ -25,7 +25,6 @@ smallvec = { workspace = true }
 [dev-dependencies]
 dir-diff = "0.3.2"
 file_diff = "1.0.0"
-move-cli = { workspace = true }
 move-package = { workspace = true }
 move-unit-test = { workspace = true }
 tempfile = { workspace = true }

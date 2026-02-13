@@ -367,7 +367,6 @@ dependencies = [
  "move-asm",
  "move-binary-format",
  "move-bytecode-source-map",
- "move-cli",
  "move-command-line-common",
  "move-compiler-v2",
  "move-core-types",
@@ -2042,7 +2041,6 @@ dependencies = [
  "log",
  "merlin",
  "move-binary-format",
- "move-cli",
  "move-command-line-common",
  "move-compiler-v2",
  "move-core-types",
@@ -3215,7 +3213,6 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "clap 4.5.21",
- "move-cli",
  "move-model",
  "move-package",
  "move-prover",
@@ -3234,7 +3231,6 @@ dependencies = [
  "bcs 0.1.4",
  "dir-diff",
  "file_diff",
- "move-cli",
  "move-core-types",
  "move-package",
  "move-unit-test",
@@ -12529,37 +12525,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap 4.5.21",
- "codespan-reporting",
- "colored",
- "datatest-stable",
- "httpmock",
- "legacy-move-compiler",
- "move-binary-format",
- "move-bytecode-viewer",
- "move-command-line-common",
- "move-compiler-v2",
- "move-core-types",
- "move-coverage",
- "move-disassembler",
- "move-docgen",
- "move-errmapgen",
- "move-model",
- "move-package",
- "move-prover",
- "move-stdlib",
- "move-unit-test",
- "move-vm-runtime",
- "move-vm-test-utils",
- "once_cell",
- "tempfile",
-]
-
-[[package]]
 name = "move-command-line-common"
 version = "0.1.0"
 dependencies = [
@@ -12749,7 +12714,7 @@ dependencies = [
 name = "move-examples"
 version = "0.1.1"
 dependencies = [
- "move-cli",
+ "move-prover",
  "move-stdlib",
 ]
 
@@ -12948,6 +12913,7 @@ dependencies = [
  "atty",
  "clap 4.5.21",
  "codespan-reporting",
+ "colored",
  "itertools 0.13.0",
  "legacy-move-compiler",
  "libtest-mimic",
@@ -12958,6 +12924,7 @@ dependencies = [
  "move-docgen",
  "move-errmapgen",
  "move-model",
+ "move-package",
  "move-prover-boogie-backend",
  "move-prover-bytecode-pipeline",
  "move-prover-test-utils",
@@ -13105,7 +13072,6 @@ dependencies = [
  "legacy-move-compiler",
  "log",
  "move-binary-format",
- "move-cli",
  "move-command-line-common",
  "move-core-types",
  "move-docgen",
@@ -13138,7 +13104,6 @@ dependencies = [
  "better_any",
  "bytes",
  "move-binary-format",
- "move-cli",
  "move-core-types",
  "move-package",
  "move-stdlib",
@@ -13204,10 +13169,10 @@ dependencies = [
  "legacy-move-compiler",
  "move-binary-format",
  "move-bytecode-utils",
- "move-cli",
  "move-command-line-common",
  "move-compiler-v2",
  "move-core-types",
+ "move-coverage",
  "move-ir-types",
  "move-model",
  "move-package",
