@@ -648,6 +648,7 @@ fn main() {
     set_layout_caches(true);
     if opt.skip_paranoid_checks {
         set_paranoid_type_checks(false);
+        set_async_runtime_checks(false);
     } else {
         // If we do paranoid checks, then they are allowed to run async in post-commit hook.
         set_paranoid_type_checks(true);
