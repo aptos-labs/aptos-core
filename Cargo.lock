@@ -12926,6 +12926,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "clap 4.5.21",
  "codespan",
  "codespan-reporting",
  "futures",
@@ -12953,6 +12954,7 @@ name = "move-prover-bytecode-pipeline"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "clap 4.5.21",
  "codespan-reporting",
  "datatest-stable",
  "itertools 0.13.0",
