@@ -14,6 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-batch-encryption = { workspace = true }
 aptos-bounded-executor = { workspace = true }
 aptos-channels = { workspace = true }
 aptos-config = { workspace = true }
@@ -42,6 +43,7 @@ futures = { workspace = true }
 futures-channel = { workspace = true }
 futures-util = { workspace = true }
 move-core-types = { workspace = true }
+ark-std = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
@@ -56,4 +58,4 @@ aptos-types = { workspace = true, features = ["testing"] }
 smoke-test = []
 
 [package.metadata.cargo-machete]
-ignored = ["serde_bytes"]
+ignored = ["ark-std", "serde_bytes"]

@@ -7,9 +7,9 @@ use crate::{
         missing_transcript_fetcher::MissingTranscriptFetcher,
         subtrx_cert_producer,
         types::{
-            AggregatedSubtranscript, CertifiedAggregatedSubtranscript, MissingTranscriptRequest,
-            MissingTranscriptResponse,
+            CertifiedAggregatedSubtranscript, MissingTranscriptRequest, MissingTranscriptResponse,
         },
+        TEST_DIGEST_KEY,
     },
     counters,
     network::{IncomingRpcRequest, NetworkSender, RpcResponseSender},
@@ -26,13 +26,15 @@ use aptos_dkg::pvss::{
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::{debug, error, info, warn};
 use aptos_reliable_broadcast::ReliableBroadcast;
+use aptos_batch_encryption::shared::encryption_key::EncryptionKey;
+use aptos_dkg::pvss::traits::Subtranscript;
 use aptos_types::{
     dkg::{
         chunky_dkg::{
-            CertifiedAggregatedChunkySubtranscript, ChunkyDKG, ChunkyDKGConfig,
-            ChunkyDKGSessionMetadata, ChunkyDKGSessionState, ChunkyDKGStartEvent,
-            ChunkyDKGTranscript, ChunkyInputSecret, ChunkySubtranscript, ChunkyTranscript,
-            DealerPrivateKey, DealerPublicKey,
+            AggregatedSubtranscript, CertifiedAggregatedChunkySubtranscript,
+            CertifiedChunkyDKGOutput, ChunkyDKG, ChunkyDKGConfig, ChunkyDKGSessionMetadata,
+            ChunkyDKGSessionState, ChunkyDKGStartEvent, ChunkyDKGTranscript, ChunkyInputSecret,
+            ChunkySubtranscript, ChunkyTranscript, DealerPrivateKey, DealerPublicKey,
         },
         DKGTranscriptMetadata,
     },
@@ -496,7 +498,16 @@ impl ChunkyDKGManager {
 
         counters::observe_chunky_dkg_stage(start_time, self.my_addr, "agg_subtrx_certified");
 
-        let txn = ValidatorTransaction::ChunkyDKGResult(CertifiedAggregatedChunkySubtranscript {
+        // Derive encryption key from subtranscript + DigestKey
+        let mpk_g2 = aggregated_subtranscript
+            .subtranscript
+            .get_dealt_public_key()
+            .as_g2();
+        let encryption_key = EncryptionKey::new(mpk_g2, TEST_DIGEST_KEY.tau_g2);
+        let encryption_key_bytes = bcs::to_bytes(&encryption_key)
+            .map_err(|e| anyhow!("encryption key serialization error: {e}"))?;
+
+        let certified_transcript = CertifiedAggregatedChunkySubtranscript {
             metadata: DKGTranscriptMetadata {
                 epoch: self.epoch_state.epoch,
                 author: self.my_addr,
@@ -504,6 +515,11 @@ impl ChunkyDKGManager {
             transcript_bytes: bcs::to_bytes(&aggregated_subtranscript)
                 .map_err(|e| anyhow!("transcript serialization error: {e}"))?,
             signature: aggregate_signature,
+        };
+
+        let txn = ValidatorTransaction::ChunkyDKGResult(CertifiedChunkyDKGOutput {
+            certified_transcript,
+            encryption_key: encryption_key_bytes,
         });
         // TODO(ibalajiarun): Derive Topic from txn
         let vtxn_guard = self.vtxn_pool.put(
