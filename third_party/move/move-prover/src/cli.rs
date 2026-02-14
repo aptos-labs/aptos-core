@@ -11,7 +11,6 @@ use clap::{builder::PossibleValuesParser, Arg, ArgAction, ArgAction::SetTrue, Co
 use codespan_reporting::diagnostic::Severity;
 use legacy_move_compiler::{command_line::SKIP_ATTRIBUTE_CHECKS, shared::NumericalAddress};
 use log::LevelFilter;
-use move_errmapgen::ErrmapOptions;
 use move_model::{
     metadata::LanguageVersion, model::VerificationScope, options::ModelBuilderOptions,
 };
@@ -37,8 +36,6 @@ pub struct Options {
     pub output_path: String,
     /// Verbosity level for logging.
     pub verbosity_level: LevelFilter,
-    /// Whether to run the error map generator instead of the prover.
-    pub run_errmapgen: bool,
     /// Whether to run the read write set analysis instead of the prover
     pub run_read_write_set: bool,
     /// The paths to the Move sources.
@@ -68,17 +65,12 @@ pub struct Options {
     pub prover: ProverOptions,
     /// Options for the prover backend.
     pub backend: BoogieOptions,
-    /// Options for the error map generator.
-    /// TODO: this currently create errors during deserialization, so skip them for this.
-    #[serde(skip_serializing)]
-    pub errmapgen: ErrmapOptions,
 }
 
 impl Default for Options {
     fn default() -> Self {
         Self {
             output_path: "output.bpl".to_string(),
-            run_errmapgen: false,
             run_read_write_set: false,
             verbosity_level: LevelFilter::Info,
             move_sources: vec![],
@@ -87,7 +79,6 @@ impl Default for Options {
             model_builder: ModelBuilderOptions::default(),
             prover: ProverOptions::default(),
             backend: BoogieOptions::default(),
-            errmapgen: ErrmapOptions::default(),
             experimental_pipeline: false,
             skip_attribute_checks: false,
             language_version: Some(LanguageVersion::default()),
@@ -273,13 +264,6 @@ impl Options {
                     .num_args(0..)
                     .help("Specify one simplification pass to run on the specifications. \
                     This option May be specified multiple times to compose a pipeline")
-            )
-            .arg(
-                Arg::new("errmapgen")
-                    .long("errmapgen")
-                    .action(SetTrue)
-                    .help("runs the error map generator instead of the prover. \
-                    The generated error map will be written to `errmap` unless configured otherwise"),
             )
             .arg(
                 Arg::new("packedtypesgen")
@@ -582,9 +566,6 @@ impl Options {
         }
         if matches.get_flag("ignore-pragma-opaque-internal-only") {
             options.model_builder.ignore_pragma_opaque_internal_only = true;
-        }
-        if matches.get_flag("errmapgen") {
-            options.run_errmapgen = true;
         }
         if matches.get_flag("read-write-set") {
             options.run_read_write_set = true;
