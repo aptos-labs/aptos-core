@@ -12,7 +12,7 @@ use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     proof::accumulator::{InMemoryEventAccumulator, InMemoryTransactionAccumulator},
-    transaction::{PersistedAuxiliaryInfo, TransactionInfo},
+    transaction::{PersistedAuxiliaryInfo, SignedTransaction, TransactionInfo},
 };
 use rayon::prelude::*;
 use std::sync::Arc;

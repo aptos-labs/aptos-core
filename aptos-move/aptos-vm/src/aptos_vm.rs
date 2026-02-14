@@ -42,8 +42,8 @@ use aptos_framework::natives::code::PublishRequest;
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::{
-    gas_feature_versions,
-    gas_feature_versions::{RELEASE_V1_10, RELEASE_V1_27, RELEASE_V1_38},
+    gas_feature_versions::{self, RELEASE_V1_10, RELEASE_V1_27, RELEASE_V1_38},
+    gas_params::txn,
     AptosGasParameters, VMGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
@@ -420,7 +420,9 @@ impl AptosVM {
                     // and so no need to delay any checks (as there are none).
                     !f.module().address().is_special()
                 },
-                Ok(TransactionExecutableRef::Empty) | Err(_) => false,
+                Ok(TransactionExecutableRef::Empty)
+                | Ok(TransactionExecutableRef::Encrypted)
+                | Err(_) => false,
             }
     }
 
@@ -1088,6 +1090,14 @@ impl AptosVM {
                     )
                 })?;
             },
+            TransactionExecutableRef::Encrypted => {
+                let status_code = StatusCode::ABORTED;
+                let vm_status = VMStatus::Executed;
+                let txn_status =
+                    TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(status_code)));
+                let vm_output = VMOutput::empty_with_status(txn_status);
+                return Ok((vm_status, vm_output));
+            },
 
             // Not reachable as this function should only be invoked for entry or script
             // transaction payload.
@@ -1249,6 +1259,13 @@ impl AptosVM {
                 let s = VMStatus::error(
                     StatusCode::FEATURE_UNDER_GATING,
                     Some("Multisig transaction does not support script payload".to_string()),
+                );
+                return Ok((s, discarded_output(StatusCode::FEATURE_UNDER_GATING)));
+            },
+            TransactionExecutableRef::Encrypted => {
+                let s = VMStatus::error(
+                    StatusCode::FEATURE_UNDER_GATING,
+                    Some("Multisig transaction does not support encrypted payload".to_string()),
                 );
                 return Ok((s, discarded_output(StatusCode::FEATURE_UNDER_GATING)));
             },
@@ -2132,6 +2149,18 @@ impl AptosVM {
                 &mut traversal_context,
             )
         });
+        if txn.is_encrypted_txn() {
+            // Log the VM execution result for encrypted transactions.
+            info!(
+                "Encrypted user transaction executed. txn_hash={}, sender={}, status={:?}, gas_used={}, output_status={:?}, vm_status={:?}",
+                txn.committed_hash(),
+                txn.sender(),
+                vm_status,
+                gas_usage,
+                output.status(),
+                vm_status,
+            );
+        }
 
         // Whether user transaction succeeded or failed (e.g., abort in Move code or running out
         // of gas in epilogue), we record the trace of all executed instructions.
@@ -3259,9 +3288,9 @@ impl VMValidator for AptosVM {
             }
         }
 
-        if transaction.payload().is_encrypted_variant() {
-            return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
-        }
+        // if transaction.payload().is_encrypted_variant() {
+        //     return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+        // }
         let txn = match transaction.check_signature() {
             Ok(t) => t,
             _ => {
@@ -3333,6 +3362,15 @@ impl VMValidator for AptosVM {
         };
 
         TRANSACTIONS_VALIDATED.inc_with(&[counter_label]);
+
+        if txn.is_encrypted_txn() {
+            info!(
+                "Encrypted transaction detected. txn_hash={}, sender={}, result={:?}",
+                txn.committed_hash(),
+                txn.sender(),
+                result,
+            );
+        }
 
         result
     }

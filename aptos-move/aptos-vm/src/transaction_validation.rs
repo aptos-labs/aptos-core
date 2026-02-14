@@ -426,6 +426,12 @@ pub(crate) fn run_multisig_prologue(
                 Some("Script payload not supported for multisig transactions".to_string()),
             ));
         },
+        TransactionExecutableRef::Encrypted => {
+            return Err(VMStatus::error(
+                StatusCode::FEATURE_UNDER_GATING,
+                Some("Encrypted payload not supported for multisig transactions".to_string()),
+            ));
+        },
     };
 
     session
