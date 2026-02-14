@@ -50,7 +50,10 @@ use aptos_network::{
 use aptos_storage_interface::DbReader;
 use aptos_time_service::TimeService;
 use aptos_types::{
-    block_info::Round, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
+    block_info::Round,
+    epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
+    on_chain_config::OnChainChunkyDKGConfig,
     validator_signer::ValidatorSigner,
 };
 use futures::StreamExt;
@@ -1083,6 +1086,7 @@ impl ConsensusObserver {
             AccountAddress,
             IncomingSecretShareRequest,
         >(QueueStyle::FIFO, 1, None);
+        let chunky_dkg_config = OnChainChunkyDKGConfig::default_disabled();
         self.execution_client
             .start_epoch(
                 sk,
@@ -1092,6 +1096,8 @@ impl ConsensusObserver {
                 &consensus_config,
                 &execution_config,
                 &randomness_config,
+                &chunky_dkg_config,
+                None,
                 None,
                 None,
                 rand_msg_rx,

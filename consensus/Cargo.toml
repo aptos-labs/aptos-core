@@ -14,6 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+ark-std = { workspace = true }
 aptos-batch-encryption = { workspace = true }
 aptos-bitvec = { workspace = true }
 aptos-bounded-executor = { workspace = true }
@@ -25,6 +26,7 @@ aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 aptos-dkg = { workspace = true }
+aptos-dkg-runtime = { workspace = true }
 aptos-enum-conversion-derive = { workspace = true }
 aptos-event-notifications = { workspace = true }
 aptos-executor = { workspace = true }

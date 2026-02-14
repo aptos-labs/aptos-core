@@ -687,19 +687,22 @@ impl BatchProofQueue {
                 }
             })
         }
-        info!(
-            // before non full check
-            block_total_txns = cur_all_txns,
-            block_unique_txns = cur_unique_txns,
-            max_txns = max_txns,
-            max_txns_after_filtering = max_txns_after_filtering,
-            soft_max_txns_after_filtering = soft_max_txns_after_filtering,
-            max_bytes = max_txns.size_in_bytes(),
-            result_is_proof = !batches_without_proofs,
-            result_count = result.len(),
-            full = full,
-            return_non_full = return_non_full,
-            "Pull payloads from QuorumStore: internal"
+        sample!(
+            SampleRate::Duration(Duration::from_secs(1)),
+            info!(
+                // before non full check
+                block_total_txns = cur_all_txns,
+                block_unique_txns = cur_unique_txns,
+                max_txns = max_txns,
+                max_txns_after_filtering = max_txns_after_filtering,
+                soft_max_txns_after_filtering = soft_max_txns_after_filtering,
+                max_bytes = max_txns.size_in_bytes(),
+                result_is_proof = !batches_without_proofs,
+                result_count = result.len(),
+                full = full,
+                return_non_full = return_non_full,
+                "Pull payloads from QuorumStore: internal"
+            )
         );
 
         counters::EXCLUDED_TXNS_WHEN_PULL.observe(excluded_txns as f64);

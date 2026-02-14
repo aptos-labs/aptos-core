@@ -362,6 +362,7 @@ impl RoundManager {
         local_config: ConsensusConfig,
         randomness_config: OnChainRandomnessConfig,
         jwk_consensus_config: OnChainJWKConsensusConfig,
+        chunky_dkg_config: OnChainChunkyDKGConfig,
         fast_rand_config: Option<RandConfig>,
         proposal_status_tracker: Arc<dyn TPastProposalStatusTracker>,
         opt_proposal_loopback_tx: aptos_channels::UnboundedSender<OptBlockData>,
@@ -392,7 +393,7 @@ impl RoundManager {
             local_config,
             randomness_config,
             jwk_consensus_config,
-            chunky_dkg_config: OnChainChunkyDKGConfig::Off,
+            chunky_dkg_config,
             fast_rand_config,
             pending_order_votes: PendingOrderVotes::new(),
             blocks_with_broadcasted_fast_shares: LruCache::new(

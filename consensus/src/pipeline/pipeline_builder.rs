@@ -26,7 +26,7 @@ use aptos_consensus_types::{
     quorum_cert::QuorumCert,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
-use aptos_crypto::HashValue;
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_executor_types::{state_compute_result::StateComputeResult, BlockExecutorTrait};
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_infallible::Mutex;
@@ -128,6 +128,7 @@ pub struct PipelineBuilder {
     validators: Arc<[AccountAddress]>,
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     is_randomness_enabled: bool,
+    is_decryption_enabled: bool,
     signer: Arc<ValidatorSigner>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     payload_manager: Arc<dyn TPayloadManager>,
@@ -208,12 +209,9 @@ impl Tracker {
     }
 
     fn log_start(&self) {
-        trace!(
+        info!(
             "[Pipeline] Block {} {} {} enters {}",
-            self.block_id,
-            self.epoch,
-            self.round,
-            self.name
+            self.block_id, self.epoch, self.round, self.name
         );
     }
 
@@ -229,7 +227,7 @@ impl Tracker {
         counters::PIPELINE_TRACING
             .with_label_values(&[self.name, "work_time"])
             .observe(work_time.as_secs_f64());
-        trace!(
+        info!(
             "[Pipeline] Block {} {} {} finishes {}, waits {}ms, takes {}ms",
             self.block_id,
             self.epoch,
@@ -254,6 +252,7 @@ impl PipelineBuilder {
         validators: Arc<[AccountAddress]>,
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         is_randomness_enabled: bool,
+        is_decryption_enabled: bool,
         signer: Arc<ValidatorSigner>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
         payload_manager: Arc<dyn TPayloadManager>,
@@ -271,6 +270,7 @@ impl PipelineBuilder {
             validators,
             block_executor_onchain_config,
             is_randomness_enabled,
+            is_decryption_enabled,
             signer,
             state_sync_notifier,
             payload_manager,
@@ -449,7 +449,7 @@ impl PipelineBuilder {
             async move {
                 derived_self_key_share_rx
                     .await
-                    .map_err(|_| TaskError::from(anyhow!("commit proof tx cancelled")))
+                    .map_err(|_| TaskError::from(anyhow!("derived self key share tx cancelled")))
             },
             Some(&mut abort_handles),
         );
@@ -463,6 +463,7 @@ impl PipelineBuilder {
                 materialize_fut,
                 block.clone(),
                 self.signer.author(),
+                self.is_decryption_enabled,
                 self.secret_share_config.clone(),
                 derived_self_key_share_tx,
                 secret_shared_key_rx,
@@ -1171,6 +1172,12 @@ impl PipelineBuilder {
 
         tracker.start_working();
         let txns = compute_result.transactions_to_commit().to_vec();
+        // for txn in &txns {
+        //     info!(
+        //         "Committed txn: {:?}",
+        //         txn.try_as_signed_user_txn().map(|t| t.committed_hash())
+        //     );
+        // }
         let subscribable_events = compute_result.subscribable_events().to_vec();
         if let Err(e) = monitor!(
             "notify_state_sync",
