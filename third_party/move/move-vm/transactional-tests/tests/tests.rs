@@ -59,6 +59,7 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
             include: &[
                 // Note: for functions values the difference between generated files are stack
                 // traces only (attached for in-place checks, set to None for async checks).
+                "/limits/",
                 "/function_values_safety/",
                 "/paranoid-tests/",
                 "/stack_size/",
@@ -77,6 +78,7 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
                 VerifierConfig::unbounded().set_scope(VerificationScope::Nothing),
             ),
             include: &[
+                "/limits/",
                 "/function_values_safety/",
                 "/paranoid-tests/",
                 "/stack_size/",
