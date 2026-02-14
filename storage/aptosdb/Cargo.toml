@@ -60,6 +60,7 @@ tokio = { workspace = true }
 [dev-dependencies]
 aptos-block-executor = { workspace = true }
 aptos-executor-types = { workspace = true }
+aptos-experimental-layered-map = { workspace = true }
 aptos-jellyfish-merkle = { workspace = true, features = ["fuzzing"] }
 aptos-proptest-helpers = { workspace = true }
 aptos-schemadb = { workspace = true, features = ["fuzzing"] }
