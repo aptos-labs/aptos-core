@@ -51,7 +51,7 @@ use aptos_storage_interface::DbReader;
 use aptos_time_service::TimeService;
 use aptos_types::{
     block_info::Round, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
-    validator_signer::ValidatorSigner,
+    on_chain_config::OnChainChunkyDKGConfig, validator_signer::ValidatorSigner,
 };
 use futures::StreamExt;
 use futures_channel::oneshot;
@@ -1065,7 +1065,13 @@ impl ConsensusObserver {
     async fn wait_for_epoch_start(&mut self) {
         // Wait for the epoch state to update
         let block_payloads = self.observer_block_data.lock().get_block_payloads();
-        let (payload_manager, consensus_config, execution_config, randomness_config) = self
+        let (
+            payload_manager,
+            consensus_config,
+            execution_config,
+            randomness_config,
+            chunky_dkg_config,
+        ) = self
             .observer_epoch_state
             .wait_for_epoch_start(block_payloads)
             .await;
@@ -1083,6 +1089,7 @@ impl ConsensusObserver {
             AccountAddress,
             IncomingSecretShareRequest,
         >(QueueStyle::FIFO, 1, None);
+        let chunky_dkg_config = OnChainChunkyDKGConfig::default_disabled();
         self.execution_client
             .start_epoch(
                 sk,
@@ -1092,6 +1099,8 @@ impl ConsensusObserver {
                 &consensus_config,
                 &execution_config,
                 &randomness_config,
+                &chunky_dkg_config,
+                None,
                 None,
                 None,
                 rand_msg_rx,
