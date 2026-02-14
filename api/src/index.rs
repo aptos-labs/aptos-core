@@ -33,6 +33,7 @@ impl IndexApi {
             .check_api_output_enabled("Get ledger info", &accept_type)?;
         let ledger_info = self.context.get_latest_ledger_info()?;
         let node_role = self.context.node_role();
+        let encryption_key = self.context.get_encryption_key().unwrap_or(None);
 
         api_spawn_blocking(move || match accept_type {
             AcceptType::Json => {
@@ -48,7 +49,8 @@ impl IndexApi {
                 ))
             },
             AcceptType::Bcs => {
-                let index_response = IndexResponseBcs::new(ledger_info.clone(), node_role);
+                let index_response =
+                    IndexResponseBcs::new(ledger_info.clone(), node_role, encryption_key);
                 BasicResponse::try_from_bcs((index_response, &ledger_info, BasicResponseStatus::Ok))
             },
         })

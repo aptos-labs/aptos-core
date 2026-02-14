@@ -62,10 +62,15 @@ pub struct IndexResponseBcs {
     pub node_role: RoleType,
     pub oldest_block_height: U64,
     pub block_height: U64,
+    pub encryption_key: Option<Vec<u8>>,
 }
 
 impl IndexResponseBcs {
-    pub fn new(ledger_info: LedgerInfo, node_role: RoleType) -> IndexResponseBcs {
+    pub fn new(
+        ledger_info: LedgerInfo,
+        node_role: RoleType,
+        encryption_key: Option<Vec<u8>>,
+    ) -> IndexResponseBcs {
         Self {
             chain_id: ledger_info.chain_id,
             epoch: ledger_info.epoch,
@@ -75,6 +80,7 @@ impl IndexResponseBcs {
             oldest_block_height: ledger_info.oldest_block_height,
             block_height: ledger_info.block_height,
             node_role,
+            encryption_key,
         }
     }
 }

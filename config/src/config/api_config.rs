@@ -142,7 +142,7 @@ impl Default for ApiConfig {
             wait_by_hash_timeout_ms: 1_000,
             wait_by_hash_poll_interval_ms: 20,
             wait_by_hash_max_active_connections: 100,
-            allow_encrypted_txns_submission: false,
+            allow_encrypted_txns_submission: true,
         }
     }
 }

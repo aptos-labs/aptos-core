@@ -8,14 +8,24 @@ use crate::{
         transaction::{authenticator::AuthenticationKey, RawTransaction, TransactionPayload},
     },
 };
+use anyhow::Result;
+use aptos_batch_encryption::{
+    schemes::fptx_weighted::FPTXWeighted, traits::BatchThresholdEncryption,
+};
 pub use aptos_cached_packages::aptos_stdlib;
-use aptos_crypto::{ed25519::Ed25519PublicKey, HashValue};
+use aptos_crypto::{ed25519::Ed25519PublicKey, hash::CryptoHash, HashValue};
 use aptos_global_constants::{GAS_UNIT_PRICE, MAX_GAS_AMOUNT};
 use aptos_types::{
     function_info::FunctionInfo,
-    transaction::{EntryFunction, Script},
+    secret_sharing::EncryptionKey,
+    transaction::{
+        encrypted_payload::{DecryptedPayload, EncryptedPayload, PayloadAssociatedData},
+        EntryFunction, Script,
+    },
 };
+use ark_std::rand::{rngs::StdRng, SeedableRng};
 use rand::{thread_rng, Rng};
+use std::sync::{Arc, RwLock};
 
 pub struct TransactionBuilder {
     sender: Option<AccountAddress>,
@@ -25,6 +35,7 @@ pub struct TransactionBuilder {
     gas_unit_price: u64,
     expiration_timestamp_secs: u64,
     chain_id: ChainId,
+    encryption_key: Arc<RwLock<Option<EncryptionKey>>>,
 }
 
 impl TransactionBuilder {
@@ -42,6 +53,7 @@ impl TransactionBuilder {
             gas_unit_price: std::cmp::max(GAS_UNIT_PRICE, 1),
             sender: None,
             sequence_number: None,
+            encryption_key: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -96,7 +108,21 @@ impl TransactionBuilder {
         self
     }
 
-    pub fn build(self) -> RawTransaction {
+    pub fn build(mut self) -> RawTransaction {
+        // Read the encryption key at build time (not at builder-creation time)
+        // so that epoch-change key rotations are always picked up.
+        let encryption_key = self.encryption_key.read().unwrap().clone();
+        if let Some(ref encryption_key) = encryption_key {
+            assert!(!self.payload.is_encrypted_variant());
+            let encrypted_payload = TransactionFactory::encrypt_payload(
+                self.payload.clone(),
+                self.sender.expect("sender must have been set"),
+                encryption_key,
+            )
+            .expect("Payload must encrypt");
+            self.payload = TransactionPayload::EncryptedPayload(encrypted_payload);
+        }
+
         let sequence_number = if self.has_nonce() {
             u64::MAX
         } else {
@@ -130,6 +156,10 @@ pub struct TransactionFactory {
 
     use_txn_payload_v2_format: bool,
     use_replay_protection_nonce: bool,
+    /// Shared encryption key. All clones of a factory share the same key,
+    /// allowing it to be updated (e.g., on epoch change) and have all
+    /// generators see the new key immediately.
+    encryption_key: Arc<RwLock<Option<EncryptionKey>>>,
 }
 
 impl TransactionFactory {
@@ -144,7 +174,47 @@ impl TransactionFactory {
             chain_id,
             use_txn_payload_v2_format: false,
             use_replay_protection_nonce: false,
+            encryption_key: Arc::new(RwLock::new(None)),
         }
+    }
+
+    /// Sets the encryption key for the factory.
+    /// When set, payloads will be automatically encrypted when using `payload()` method.
+    pub fn with_encryption_key(self, encryption_key: EncryptionKey) -> Self {
+        *self.encryption_key.write().unwrap() = Some(encryption_key);
+        self
+    }
+
+    /// Sets the encryption key from BCS-serialized bytes.
+    /// Use this with the encryption key bytes returned from the REST API's ledger info.
+    pub fn with_encryption_key_from_bytes(self, bytes: &[u8]) -> Result<Self> {
+        let encryption_key: EncryptionKey = bcs::from_bytes(bytes)?;
+        *self.encryption_key.write().unwrap() = Some(encryption_key);
+        Ok(self)
+    }
+
+    /// Updates the encryption key at runtime. Since the key is shared across
+    /// all clones of this factory, this affects all transaction generators
+    /// that were created from this factory.
+    pub fn update_encryption_key_from_bytes(&self, bytes: Option<&[u8]>) -> Result<()> {
+        let new_key = bytes.map(|b| bcs::from_bytes(b)).transpose()?;
+        *self.encryption_key.write().unwrap() = new_key;
+        Ok(())
+    }
+
+    /// Detaches this factory from any shared encryption key, giving it its
+    /// own independent (empty) key. Useful for init/setup factories that must
+    /// never encrypt, even if sibling factories share the same Arc.
+    pub fn without_encryption(mut self) -> Self {
+        self.encryption_key = Arc::new(RwLock::new(None));
+        self
+    }
+
+    /// Returns a handle to the shared encryption key. This can be used to
+    /// update the key from outside the factory (e.g., from an emitter worker
+    /// that detects an epoch change).
+    pub fn encryption_key_handle(&self) -> Arc<RwLock<Option<EncryptionKey>>> {
+        self.encryption_key.clone()
     }
 
     pub fn with_max_gas_amount(mut self, max_gas_amount: u64) -> Self {
@@ -381,7 +451,50 @@ impl TransactionFactory {
             gas_unit_price: self.gas_unit_price,
             expiration_timestamp_secs: self.expiration_timestamp(),
             chain_id: self.chain_id,
+            encryption_key: self.encryption_key.clone(),
         }
+    }
+
+    /// Encrypts a transaction payload using the provided encryption key.
+    /// This is a helper method used internally by `with_encrypted_payload` and `payload`.
+    fn encrypt_payload(
+        payload: TransactionPayload,
+        sender: AccountAddress,
+        encryption_key: &EncryptionKey,
+    ) -> Result<EncryptedPayload> {
+        // Convert payload to executable
+        let executable = payload.executable()?;
+        let extra_config = payload.extra_config();
+
+        // Generate decryption nonce
+        let decryption_nonce: u64 = rand::random();
+
+        // Create DecryptedPayload for encryption
+        let decrypted_payload = DecryptedPayload::new(executable, decryption_nonce);
+
+        // Create associated data
+        let associated_data = PayloadAssociatedData::new(sender);
+
+        // Encrypt the payload
+        // Note: FPTXWeighted::encrypt requires CryptoRng from ark_std::rand, so we use StdRng
+        let mut rng = StdRng::from_entropy();
+        let ciphertext = FPTXWeighted::encrypt(
+            encryption_key,
+            &mut rng,
+            &decrypted_payload,
+            &associated_data,
+        )?;
+
+        // Compute payload hash from the executable
+        // We need to compute hash before encryption, so we use the executable directly
+        let payload_hash = CryptoHash::hash(&decrypted_payload);
+
+        // Create encrypted payload
+        Ok(EncryptedPayload::Encrypted {
+            ciphertext,
+            extra_config,
+            payload_hash,
+        })
     }
 
     fn expiration_timestamp(&self) -> u64 {

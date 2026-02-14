@@ -17,6 +17,8 @@ pub struct LedgerInfo {
     pub block_height: U64,
     pub oldest_block_height: U64,
     pub ledger_timestamp: U64,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub txn_encryption_key: Option<String>,
 }
 
 impl LedgerInfo {
@@ -36,6 +38,7 @@ impl LedgerInfo {
             block_height: block_height.into(),
             oldest_block_height: oldest_block_height.into(),
             ledger_timestamp: ledger_info.timestamp_usecs().into(),
+            txn_encryption_key: None,
         }
     }
 
@@ -56,6 +59,7 @@ impl LedgerInfo {
             block_height: block_height.into(),
             oldest_block_height: oldest_block_height.into(),
             ledger_timestamp: ledger_timestamp.into(),
+            txn_encryption_key: None,
         }
     }
 
@@ -73,5 +77,10 @@ impl LedgerInfo {
 
     pub fn timestamp(&self) -> u64 {
         self.ledger_timestamp.into()
+    }
+
+    pub fn with_txn_encryption_key(mut self, key: Option<String>) -> Self {
+        self.txn_encryption_key = key;
+        self
     }
 }

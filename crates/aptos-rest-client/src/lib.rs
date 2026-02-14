@@ -404,6 +404,7 @@ impl Client {
             oldest_block_height: r.oldest_block_height.into(),
             block_height: r.block_height.into(),
             cursor: None,
+            encryption_key: r.encryption_key,
         });
         assert_eq!(response.inner().chain_id, response.state().chain_id);
         assert_eq!(response.inner().epoch, response.state().epoch);

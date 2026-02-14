@@ -259,13 +259,18 @@ impl Context {
                 E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
             })?;
 
+        let encryption_key_hex = self.get_encryption_key()
+            .unwrap_or(None)
+            .map(hex::encode);
+
         Ok(LedgerInfo::new(
             &self.chain_id(),
             &ledger_info,
             oldest_version,
             oldest_block_height,
             newest_block_event.height(),
-        ))
+        )
+        .with_txn_encryption_key(encryption_key_hex))
     }
 
     pub fn get_latest_ledger_info<E: ServiceUnavailableError>(&self) -> Result<LedgerInfo, E> {
@@ -342,6 +347,10 @@ impl Context {
                         })?;
                     let (oldest_version, oldest_block_height) =
                         self.get_oldest_version_and_block_height()?;
+                    let encryption_key_hex = self.get_encryption_key()
+                        .unwrap_or(None)
+                        .map(hex::encode);
+
                     return Ok(LedgerInfo::new_ledger_info(
                         &self.chain_id(),
                         new_block_event.epoch(),
@@ -350,7 +359,8 @@ impl Context {
                         oldest_block_height,
                         new_block_event.height(),
                         new_block_event.proposed_time(),
-                    ));
+                    )
+                    .with_txn_encryption_key(encryption_key_hex));
                 } else {
                     // Indexer doesn't have data yet as DB is boostrapping.
                     return Err(E::service_unavailable_with_code_no_info(
@@ -369,6 +379,14 @@ impl Context {
 
     pub fn get_latest_ledger_info_with_signatures(&self) -> Result<LedgerInfoWithSignatures> {
         Ok(self.db.get_latest_ledger_info()?)
+    }
+
+    pub fn get_encryption_key(&self) -> Result<Option<Vec<u8>>> {
+        use aptos_types::decryption::PerEpochEncryptionKeyResource;
+        let version = self.get_latest_ledger_info_with_signatures()?.ledger_info().version();
+        let resource: Option<PerEpochEncryptionKeyResource> =
+            self.get_resource(AccountAddress::ONE, version)?;
+        Ok(resource.and_then(|r| r.encryption_key))
     }
 
     pub fn get_state_value(&self, state_key: &StateKey, version: u64) -> Result<Option<Vec<u8>>> {
