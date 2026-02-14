@@ -34,6 +34,7 @@ use anyhow::bail;
 use aptos_crypto::{
     arkworks::{
         self,
+        msm::IsMsmInput,
         random::{
             sample_field_element, sample_field_elements, unsafe_random_point,
             unsafe_random_point_group, unsafe_random_points, UniformRand,
@@ -51,11 +52,12 @@ use ark_ec::{
     pairing::{Pairing, PairingOutput},
     CurveGroup, VariableBaseMSM,
 };
-use ark_ff::{AdditiveGroup, Fp, FpConfig};
+use ark_ff::{AdditiveGroup, Fp, FpConfig, Zero};
 use ark_poly::EvaluationDomain;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress};
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Domain-separation tag (DST) used to ensure that all cryptographic hashes and
 /// transcript operations within the protocol are uniquely namespaced
@@ -127,38 +129,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         );
 
         {
-            // Verify the PoK
-            let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
-            let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
-                SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,
-                SrsBasis::PowersOfTau { .. } => {
-                    bail!("Expected a Lagrange basis, received powers of tau basis instead")
-                },
-            };
-            let hom = hkzg_chunked_elgamal::WeightedHomomorphism::<E>::new(
-                lagr_g1,
-                pp.pk_range_proof.ck_S.xi_1,
-                &pp.pp_elgamal,
-                &eks_inner,
-            );
-            if let Err(err) = hom.verify(
-                &TupleCodomainShape(
-                    sigma_protocol::homomorphism::TrivialShape(
-                        self.sharing_proof.range_proof_commitment.0.into_affine(), // Because it's not affine by default. Should probably change that
-                    ),
-                    chunked_elgamal::WeightedCodomainShape {
-                        chunks: self.subtrs.Cs.clone(),
-                        randomness: self.subtrs.Rs.clone(),
-                    },
-                ),
-                &self.sharing_proof.SoK,
-                &sok_cntxt,
-                rng,
-            ) {
-                bail!("PoK verification failed: {:?}", err);
-            }
-
-            // Verify the range proof
+            // Verify the range proof (still separate)
             if let Err(err) = self.sharing_proof.range_proof.verify(
                 &pp.pk_range_proof.vk,
                 sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize,
@@ -170,23 +141,46 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             }
         }
 
-        // Do the SCRAPE LDT
+        // PoK MSM terms (G1) and LDT MSM terms (G2) for merging into one pairing check
+        let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
+        let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
+            SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,
+            SrsBasis::PowersOfTau { .. } => {
+                bail!("Expected a Lagrange basis, received powers of tau basis instead")
+            },
+        };
+        let hom = hkzg_chunked_elgamal::WeightedHomomorphism::<E>::new(
+            lagr_g1,
+            pp.pk_range_proof.ck_S.xi_1,
+            &pp.pp_elgamal,
+            &eks_inner,
+        );
+        let pok_statement = TupleCodomainShape(
+            sigma_protocol::homomorphism::TrivialShape(
+                self.sharing_proof.range_proof_commitment.0.into_affine(),
+            ),
+            chunked_elgamal::WeightedCodomainShape {
+                chunks: self.subtrs.Cs.clone(),
+                randomness: self.subtrs.Rs.clone(),
+            },
+        );
+        let pok_msm_terms = hom
+            .msm_terms_for_verify::<_, hkzg_chunked_elgamal::WeightedHomomorphism<'static, E>, _>(
+                &pok_statement,
+                &self.sharing_proof.SoK,
+                &sok_cntxt,
+                rng,
+            );
+
         let ldt = LowDegreeTest::random(
             rng,
             sc.get_threshold_weight(),
             sc.get_total_weight() + 1,
             true,
             &sc.get_threshold_config().domain,
-        ); // includes_zero is true here means it includes a commitment to f(0), which is in V[n]
-           // Collect affine elements (already affine, no need to normalize)
+        );
         let mut Vs_flat: Vec<E::G2Affine> = self.subtrs.Vs.iter().flatten().copied().collect();
         Vs_flat.push(self.subtrs.V0);
-        // could add an assert_eq here with sc.get_total_weight()
-        ldt.low_degree_test_group::<E::G2>(&Vs_flat)?;
-
-        // Now compute the final MSM // TODO: merge this multi_exp with the PoK verification, as in YOLO YOSO? // TODO2: and use the iterate stuff you developed? it's being forgotten here
-        let mut base_vec = Vec::new();
-        let mut exp_vec = Vec::new();
 
         let beta = sample_field_element(rng);
         let powers_of_beta = utils::powers(beta, sc.get_total_weight() + 1);
@@ -196,35 +190,89 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             Cs_flat.len(),
             sc.get_total_weight(),
             "Number of ciphertexts does not equal number of weights"
-        ); // TODO what if zero weight?
-           // could add an assert_eq here with sc.get_total_weight()
+        );
 
+        let mut weighted_Cs_base = Vec::new();
+        let mut weighted_Cs_scalar = Vec::new();
         for i in 0..Cs_flat.len() {
             for j in 0..Cs_flat[i].len() {
-                let base = Cs_flat[i][j];
-                let exp = pp.powers_of_radix[j] * powers_of_beta[i];
-                base_vec.push(base);
-                exp_vec.push(exp);
+                weighted_Cs_base.push(Cs_flat[i][j]);
+                weighted_Cs_scalar.push(pp.powers_of_radix[j] * powers_of_beta[i]);
             }
         }
 
-        let weighted_Cs =
-            E::G1::msm(&base_vec, &exp_vec).expect("Failed to compute MSM of Cs in chunky");
+        let gamma: E::ScalarField = sample_field_element(rng);
+        let gamma_sq = gamma * gamma;
 
-        let weighted_Vs = E::G2::msm(
-            &Vs_flat[..sc.get_total_weight()], // Don't use the last entry of `Vs_flat`
-            &powers_of_beta[..sc.get_total_weight()],
-        )
-        .expect("Failed to compute MSM of Vs in chunky");
+        // Merge G1 MSM terms: gamma * PoK_terms + 1 * weighted_Cs_terms
+        let mut g1_agg: HashMap<Vec<u8>, (E::G1Affine, E::ScalarField)> = HashMap::new();
+        for (base, scalar) in pok_msm_terms
+            .bases()
+            .iter()
+            .zip(pok_msm_terms.scalars().iter())
+        {
+            let s = *scalar * gamma;
+            let mut key = Vec::new();
+            base.serialize_with_mode(&mut key, Compress::No)
+                .expect("basis serialization");
+            g1_agg
+                .entry(key)
+                .and_modify(|(_, s0)| *s0 += s)
+                .or_insert((*base, s));
+        }
+        for (base, scalar) in weighted_Cs_base.iter().zip(weighted_Cs_scalar.iter()) {
+            let mut key = Vec::new();
+            base.serialize_with_mode(&mut key, Compress::No)
+                .expect("basis serialization");
+            g1_agg
+                .entry(key)
+                .and_modify(|(_, s0)| *s0 += scalar)
+                .or_insert((*base, *scalar));
+        }
+        let (g1_bases, g1_scalars): (Vec<_>, Vec<_>) =
+            g1_agg.into_values().filter(|(_, s)| !s.is_zero()).unzip();
+        let combined_G1 =
+            E::G1::msm(&g1_bases, &g1_scalars).expect("Failed to compute merged G1 MSM in chunky");
+
+        let ldt_msm_terms = ldt.ldt_msm_input::<E::G2>(&Vs_flat)?;
+        let n = sc.get_total_weight();
+        // Merge G2 MSM terms: gamma^2 * LDT_terms + 1 * weighted_Vs_terms
+        let mut g2_agg: HashMap<Vec<u8>, (E::G2Affine, E::ScalarField)> = HashMap::new();
+        for (base, scalar) in ldt_msm_terms
+            .bases()
+            .iter()
+            .zip(ldt_msm_terms.scalars().iter())
+        {
+            let s = *scalar * gamma_sq;
+            let mut key = Vec::new();
+            base.serialize_with_mode(&mut key, Compress::No)
+                .expect("basis serialization");
+            g2_agg
+                .entry(key)
+                .and_modify(|(_, s0)| *s0 += s)
+                .or_insert((*base, s));
+        }
+        for (base, scalar) in Vs_flat[..n].iter().zip(powers_of_beta[..n].iter()) {
+            let mut key = Vec::new();
+            base.serialize_with_mode(&mut key, Compress::No)
+                .expect("basis serialization");
+            g2_agg
+                .entry(key)
+                .and_modify(|(_, s0)| *s0 += scalar)
+                .or_insert((*base, *scalar));
+        }
+        let (g2_bases, g2_scalars): (Vec<_>, Vec<_>) =
+            g2_agg.into_values().filter(|(_, s)| !s.is_zero()).unzip();
+        let combined_G2 =
+            E::G2::msm(&g2_bases, &g2_scalars).expect("Failed to compute merged G2 MSM in chunky");
 
         let res = E::multi_pairing(
             [
-                weighted_Cs.into_affine(),
+                combined_G1.into_affine(),
                 *pp.get_encryption_public_params().message_base(),
             ],
-            [pp.get_commitment_base(), (-weighted_Vs).into_affine()],
-        ); // Making things affine here rather than converting the two bases to group elements, since that's probably what they would be converted to anyway: https://github.com/arkworks-rs/algebra/blob/c1f4f5665504154a9de2345f464b0b3da72c28ec/ec/src/models/bls12/g1.rs#L14
-
+            [pp.get_commitment_base(), (-combined_G2).into_affine()],
+        );
         if PairingOutput::<E>::ZERO != res {
             return Err(anyhow::anyhow!("Expected zero during multi-pairing check"));
         }
@@ -252,7 +300,6 @@ impl<E: Pairing> ValidCryptoMaterial for Transcript<E> {
     const AIP_80_PREFIX: &'static str = "";
 
     fn to_bytes(&self) -> Vec<u8> {
-        // TODO: using `Result<Vec<u8>>` and `.map_err(|_| CryptoMaterialError::DeserializationError)` would be more consistent here?
         bcs::to_bytes(&self).expect("Unexpected error during PVSS transcript serialization")
     }
 }
