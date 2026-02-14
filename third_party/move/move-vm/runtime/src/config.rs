@@ -66,6 +66,11 @@ pub struct VMConfig {
     /// duplicate node-count charges. This avoids spurious `TOO_MANY_TYPE_NODES` errors
     /// when the same struct appears in multiple positions (e.g., enum variants).
     pub enable_struct_layout_local_cache: bool,
+    /// When enabled, checks the depth of types during gas charging for type node counting.
+    /// This prevents types from being created at depths exceeding maximum allowed depth during
+    /// execution when types are not created (e.g., local types when there are no runtime type
+    /// checks).
+    pub check_depth_on_type_counts: bool,
 }
 
 impl Default for VMConfig {
@@ -97,6 +102,7 @@ impl Default for VMConfig {
             enable_debugging: false,
             enable_closure_depth_check: true,
             enable_struct_layout_local_cache: true,
+            check_depth_on_type_counts: true,
         }
     }
 }

@@ -1,0 +1,21 @@
+//# publish
+module 0x22::test
+
+// Here, local has depth of 20 (allowed) or 21 (not allowed).
+public fun deep_local<T>()
+   local _x: vector<T>
+   ret
+
+public fun entry_below_limit()
+   // Nested 18 vectors.
+   call deep_local<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>>>>>>>>>>>
+   ret
+
+public fun entry_above_limit()
+   // Nested 19 vectors.
+   call deep_local<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>>>>>>>>>>>>
+   ret
+
+//# run --verbose 0x22::test::entry_below_limit
+
+//# run --verbose 0x22::test::entry_above_limit

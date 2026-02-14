@@ -416,8 +416,16 @@ impl AptosVM {
                     true
                 },
                 Ok(TransactionExecutableRef::EntryFunction(f)) => {
-                    // If entry function is defined at special address - it is part of trusted code
-                    // and so no need to delay any checks (as there are none).
+                    // Perform in-place checks for entry functions at special addresses (e.g.,
+                    // framework code at 0x1) and not asynchronously.
+                    //
+                    // Rationale:
+                    // Special addresses contain trusted code. With the trusted code optimization,
+                    // type checks are disabled entirely, so async replay would only add overhead
+                    // (recording and replaying) without providing validation benefits. This is a
+                    // heuristic: if the entrypoint is trusted, most called functions are likely
+                    // trusted. While closures may call untrusted code, being conservative here
+                    // avoids unnecessary overhead in the common case.
                     !f.module().address().is_special()
                 },
                 Ok(TransactionExecutableRef::Empty) | Err(_) => false,
