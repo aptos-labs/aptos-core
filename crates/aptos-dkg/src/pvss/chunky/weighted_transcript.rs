@@ -12,6 +12,7 @@ use crate::{
             input_secret::InputSecret,
             keys,
             public_parameters::PublicParameters,
+            sok_context::SokContext,
             subtranscript::Subtranscript,
         },
         traits::{
@@ -118,12 +119,12 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         }
 
         // Initialize the **identical** PVSS SoK context
-        let sok_cntxt = (
-            &spks[self.dealer.id],
-            sid.clone(),
+        let sok_cntxt = SokContext::new(
+            spks[self.dealer.id].clone(),
+            sid,
             self.dealer.id,
-            DST.to_vec(),
-        ); // As above, this is a bit hacky... though we have access to `self` now
+            <Self as traits::Transcript>::dst(),
+        );
 
         {
             // Verify the PoK
@@ -267,15 +268,6 @@ impl<E: Pairing> TryFrom<&[u8]> for Transcript<E> {
 
 delegate_transcript_core_to_subtrs!(Transcript<E>, subtrs);
 
-// Temporary hack, will deal with this at some point... a struct would be cleaner
-#[allow(type_alias_bounds)]
-type SokContext<'a, A: Serialize + Clone> = (
-    bls12381::PublicKey,
-    &'a A,   // This is for the session id
-    usize,   // This is for the player id
-    Vec<u8>, // This is for the DST
-);
-
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Transcript
     for Transcript<E>
 {
@@ -311,7 +303,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         );
 
         // Initialize the PVSS SoK context
-        let sok_cntxt = (spk.clone(), session_id, dealer.id, DST.to_vec()); // This is a bit hacky; also get rid of DST here and use self.dst? Would require making `self` input of `deal()`
+        let sok_cntxt = SokContext::new(spk.clone(), session_id, dealer.id, Self::dst());
 
         // Generate the Shamir secret sharing polynomial
         let mut f = vec![*s.get_secret_a()]; // constant term of polynomial

@@ -13,6 +13,7 @@ mod hkzg_chunked_elgamal_commit;
 mod input_secret;
 mod keys;
 pub mod public_parameters;
+mod sok_context;
 mod subtranscript;
 mod weighted_transcript;
 mod weighted_transcript_v2;
