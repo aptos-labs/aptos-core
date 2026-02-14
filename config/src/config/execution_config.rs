@@ -90,13 +90,7 @@ impl Default for ExecutionConfig {
             genesis_waypoint: None,
             blockstm_v2_enabled: false,
             layout_caches_enabled: true,
-<<<<<<< HEAD
-            // TODO: consider setting to be true by default.
-            async_runtime_checks: false,
-=======
             async_runtime_checks: true,
-            enable_pre_write: true,
->>>>>>> 29bf3480df ([vm] Use async type checks as default (#18752))
         }
     }
 }
