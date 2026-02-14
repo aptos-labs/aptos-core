@@ -6,7 +6,7 @@ use aptos_dkg::pvss::{
     das::{self, unweighted_protocol},
     insecure_field,
     test_utils::{self, reconstruct_dealt_secret_key_randomly, NoAux},
-    traits::transcript::AggregatableTranscript,
+    traits::{transcript::AggregatableTranscript, TranscriptCore},
     weighted::generic_weighting::GenericWeighting,
 };
 use rand::{rngs::StdRng, thread_rng};
@@ -36,12 +36,10 @@ fn test_dkg_all_weighted() {
     aggregatable_dkg::<das::WeightedTranscript>(wcs.last().unwrap(), seed.to_bytes_le());
 }
 
-use aptos_dkg::pvss::traits::Transcript;
-
 /// Deals `n` times, aggregates all transcripts, and attempts to reconstruct the secret dealt in this
 /// aggregated transcript.
 fn aggregatable_dkg<T: AggregatableTranscript + CryptoHash>(
-    sc: &<T as Transcript>::SecretSharingConfig,
+    sc: &<T as TranscriptCore>::SecretSharingConfig,
     seed_bytes: [u8; 32],
 ) {
     let mut rng = StdRng::from_seed(seed_bytes);

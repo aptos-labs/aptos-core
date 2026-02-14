@@ -56,16 +56,41 @@ impl Convert<Scalar, das::PublicParameters> for pvss::input_secret::InputSecret 
     }
 }
 
-impl traits::Transcript for Transcript {
+impl traits::TranscriptCore for Transcript {
     type DealtPubKey = pvss::dealt_pub_key::g2::DealtPubKey;
     type DealtPubKeyShare = pvss::dealt_pub_key_share::g2::DealtPubKeyShare;
     type DealtSecretKey = Scalar;
     type DealtSecretKeyShare = Scalar;
     type DecryptPrivKey = encryption_dlog::g1::DecryptPrivKey;
     type EncryptPubKey = encryption_dlog::g1::EncryptPubKey;
-    type InputSecret = pvss::input_secret::InputSecret;
     type PublicParameters = das::PublicParameters;
     type SecretSharingConfig = ThresholdConfigBlstrs;
+
+    fn get_public_key_share(
+        &self,
+        _sc: &Self::SecretSharingConfig,
+        player: &Player,
+    ) -> Self::DealtPubKeyShare {
+        Self::DealtPubKeyShare::new(Self::DealtPubKey::new(self.V[player.id]))
+    }
+
+    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
+        Self::DealtPubKey::new(*self.V.last().unwrap())
+    }
+
+    fn decrypt_own_share(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        player: &Player,
+        _dk: &Self::DecryptPrivKey,
+        _pp: &Self::PublicParameters,
+    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
+        (self.C[player.id], self.get_public_key_share(sc, player))
+    }
+}
+
+impl traits::Transcript for Transcript {
+    type InputSecret = pvss::input_secret::InputSecret;
     type SigningPubKey = bls12381::PublicKey;
     type SigningSecretKey = bls12381::PrivateKey;
 
@@ -114,28 +139,6 @@ impl traits::Transcript for Transcript {
         self.dealers.clone()
     }
 
-    fn get_public_key_share(
-        &self,
-        _sc: &Self::SecretSharingConfig,
-        player: &Player,
-    ) -> Self::DealtPubKeyShare {
-        Self::DealtPubKeyShare::new(Self::DealtPubKey::new(self.V[player.id]))
-    }
-
-    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
-        Self::DealtPubKey::new(*self.V.last().unwrap())
-    }
-
-    fn decrypt_own_share(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        player: &Player,
-        _dk: &Self::DecryptPrivKey,
-        _pp: &Self::PublicParameters,
-    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        (self.C[player.id], self.get_public_key_share(sc, player))
-    }
-
     #[allow(non_snake_case)]
     fn generate<R>(
         sc: &Self::SecretSharingConfig,
@@ -156,7 +159,7 @@ impl traits::Transcript for Transcript {
 impl AggregatableTranscript for Transcript {
     fn verify<A: Serialize + Clone>(
         &self,
-        sc: &<Self as traits::Transcript>::SecretSharingConfig,
+        sc: &<Self as traits::TranscriptCore>::SecretSharingConfig,
         pp: &Self::PublicParameters,
         _spks: &[Self::SigningPubKey],
         eks: &[Self::EncryptPubKey],

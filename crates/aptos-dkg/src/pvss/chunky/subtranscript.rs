@@ -1,13 +1,19 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::traits::{transcript::Aggregated, Aggregatable};
+use crate::{
+    pvss::chunky::{chunked_elgamal::decrypt_chunked_scalars, keys, PublicParameters},
+    traits::{transcript::Aggregated, Aggregatable, TranscriptCore},
+    Scalar,
+};
 use aptos_crypto::{
     arkworks::serialization::{ark_de, ark_se},
+    player::Player,
     weighted_config::WeightedConfigArkworks,
     CryptoMaterialError, TSecretSharingConfig, ValidCryptoMaterial,
 };
 use ark_ec::{pairing::Pairing, CurveGroup};
+use ark_ff::{Fp, FpConfig};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use serde::{Deserialize, Serialize};
 
@@ -49,7 +55,6 @@ impl<P: Pairing> ValidCryptoMaterial for Subtranscript<P> {
     const AIP_80_PREFIX: &'static str = "";
 
     fn to_bytes(&self) -> Vec<u8> {
-        // TODO: using `Result<Vec<u8>>` and `.map_err(|_| CryptoMaterialError::DeserializationError)` would be more consistent here?
         bcs::to_bytes(&self).expect("Unexpected error during PVSS transcript serialization")
     }
 }
@@ -188,5 +193,73 @@ impl<E: Pairing> Aggregated<Subtranscript<E>> for SubtranscriptProjective<E> {
         debug_assert!(g1_iter.next().is_none());
         debug_assert!(g2_iter.next().is_none());
         result
+    }
+}
+
+impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> TranscriptCore
+    for Subtranscript<E>
+{
+    type DealtPubKey = keys::DealtPubKey<E>;
+    type DealtPubKeyShare = Vec<keys::DealtPubKeyShare<E>>;
+    type DealtSecretKey = keys::DealtSecretKey<E::ScalarField>;
+    type DealtSecretKeyShare = Vec<keys::DealtSecretKeyShare<E::ScalarField>>;
+    type DecryptPrivKey = keys::DecryptPrivKey<E>;
+    type EncryptPubKey = keys::EncryptPubKey<E>;
+    type PublicParameters = PublicParameters<E>;
+    type SecretSharingConfig = WeightedConfigArkworks<E::ScalarField>;
+
+    #[allow(non_snake_case)]
+    fn get_public_key_share(
+        &self,
+        _sc: &Self::SecretSharingConfig,
+        player: &Player,
+    ) -> Self::DealtPubKeyShare {
+        self.Vs[player.id]
+            .iter()
+            .map(|&V_i| keys::DealtPubKeyShare::<E>::new(keys::DealtPubKey::new(V_i)))
+            .collect()
+    }
+
+    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
+        Self::DealtPubKey::new(self.V0)
+    }
+
+    #[allow(non_snake_case)]
+    fn decrypt_own_share(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        player: &Player,
+        dk: &Self::DecryptPrivKey,
+        pp: &Self::PublicParameters,
+    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
+        let Cs = &self.Cs[player.id];
+        debug_assert_eq!(Cs.len(), sc.get_player_weight(player));
+
+        if !Cs.is_empty() {
+            if let Some(first_key) = self.Rs.first() {
+                debug_assert_eq!(
+                    first_key.len(),
+                    Cs[0].len(),
+                    "Number of ephemeral keys does not match the number of ciphertext chunks"
+                );
+            }
+        }
+
+        let pk_shares = self.get_public_key_share(sc, player);
+
+        let sk_shares: Vec<_> = decrypt_chunked_scalars(
+            &Cs,
+            &self.Rs,
+            &dk.dk,
+            &pp.pp_elgamal,
+            &pp.dlog_table,
+            pp.get_dlog_range_bound(),
+            pp.ell,
+        );
+
+        (
+            Scalar::vec_from_inner(sk_shares),
+            pk_shares, // TODO: review this formalism... why do we need this here?
+        )
     }
 }

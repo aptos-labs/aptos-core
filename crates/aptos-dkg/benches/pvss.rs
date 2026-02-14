@@ -14,7 +14,7 @@ use aptos_dkg::pvss::{
     },
     traits::transcript::{
         Aggregatable, AggregatableTranscript, Aggregated, HasAggregatableSubtranscript,
-        MalleableTranscript, Transcript, WithMaxNumShares,
+        MalleableTranscript, Transcript, TranscriptCore, WithMaxNumShares,
     },
     WeightedConfigBlstrs,
 };
@@ -67,7 +67,7 @@ pub fn all_groups(c: &mut Criterion) {
 }
 
 pub fn aggregatable_pvss_group<T: AggregatableTranscript + MalleableTranscript>(
-    sc: &<T as Transcript>::SecretSharingConfig,
+    sc: &<T as TranscriptCore>::SecretSharingConfig,
     c: &mut Criterion,
 ) -> DealingArgs<T> {
     let name = T::scheme_name();
@@ -101,7 +101,7 @@ where
     T: MalleableTranscript
         + HasAggregatableSubtranscript<
             Subtranscript: Aggregatable<
-                SecretSharingConfig = <T as Transcript>::SecretSharingConfig,
+                SecretSharingConfig = <T as TranscriptCore>::SecretSharingConfig,
             >,
         >,
 {
@@ -133,7 +133,7 @@ where
 pub fn weighted_pvss_group<
     T: AggregatableTranscript + MalleableTranscript<SecretSharingConfig = WeightedConfigBlstrs>,
 >(
-    sc: &<T as Transcript>::SecretSharingConfig,
+    sc: &<T as TranscriptCore>::SecretSharingConfig,
     d: DealingArgs<T>,
     c: &mut Criterion,
 ) {
@@ -192,7 +192,7 @@ fn pvss_deal<T: Transcript, M: Measurement>(
 }
 
 fn pvss_aggregate<T: AggregatableTranscript, M: Measurement>(
-    sc: &<T as Transcript>::SecretSharingConfig,
+    sc: &<T as TranscriptCore>::SecretSharingConfig,
     g: &mut BenchmarkGroup<M>,
 ) {
     g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
@@ -221,7 +221,9 @@ fn pvss_aggregate<T: AggregatableTranscript, M: Measurement>(
 fn pvss_subaggregate<T, M: Measurement>(sc: &T::SecretSharingConfig, g: &mut BenchmarkGroup<M>)
 where
     T: HasAggregatableSubtranscript<
-        Subtranscript: Aggregatable<SecretSharingConfig = <T as Transcript>::SecretSharingConfig>,
+        Subtranscript: Aggregatable<
+            SecretSharingConfig = <T as TranscriptCore>::SecretSharingConfig,
+        >,
     >,
 {
     g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
@@ -249,7 +251,7 @@ where
 }
 
 fn pvss_verify<T: AggregatableTranscript, M: Measurement>(
-    sc: &<T as Transcript>::SecretSharingConfig,
+    sc: &<T as TranscriptCore>::SecretSharingConfig,
     pp: &T::PublicParameters,
     ssks: &[T::SigningSecretKey],
     spks: &[T::SigningPubKey],
@@ -380,7 +382,7 @@ fn pvss_nonaggregate_verify<T: HasAggregatableSubtranscript, M: Measurement>(
 }
 
 fn pvss_aggregate_verify<T: AggregatableTranscript + MalleableTranscript, M: Measurement>(
-    sc: &<T as Transcript>::SecretSharingConfig,
+    sc: &<T as TranscriptCore>::SecretSharingConfig,
     pp: &T::PublicParameters,
     ssks: &[T::SigningSecretKey],
     spks: &Vec<T::SigningPubKey>,

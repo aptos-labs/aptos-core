@@ -15,14 +15,14 @@ mod keys;
 pub mod public_parameters;
 mod subtranscript;
 mod weighted_transcript;
-mod weighted_transcriptv2;
+mod weighted_transcript_v2;
 
 pub use input_secret::InputSecret;
 pub use keys::EncryptPubKey;
 pub use public_parameters::{PublicParameters, DEFAULT_ELL_FOR_TESTING};
 pub use subtranscript::Subtranscript as WeightedSubtranscript;
 pub use weighted_transcript::Transcript as UnsignedWeightedTranscript;
-pub use weighted_transcriptv2::Transcript as UnsignedWeightedTranscriptv2;
+pub use weighted_transcript_v2::Transcript as UnsignedWeightedTranscriptv2;
 #[allow(type_alias_bounds)]
 pub type SignedWeightedTranscript<E: Pairing> = GenericSigning<UnsignedWeightedTranscript<E>>;
 #[allow(type_alias_bounds)]

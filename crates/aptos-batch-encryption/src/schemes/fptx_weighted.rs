@@ -24,7 +24,7 @@ use aptos_crypto::{
     TSecretSharingConfig as _,
 };
 use aptos_dkg::pvss::{
-    traits::{Reconstructable as _, Subtranscript},
+    traits::{Reconstructable as _, TranscriptCore},
     Player,
 };
 use ark_ec::AffineRepr;
@@ -228,11 +228,11 @@ impl BatchThresholdEncryption for FPTXWeighted {
 
     fn setup(
         digest_key: &Self::DigestKey,
-        pvss_public_params: &<Self::SubTranscript as Subtranscript>::PublicParameters,
+        pvss_public_params: &<Self::SubTranscript as TranscriptCore>::PublicParameters,
         subtranscript: &Self::SubTranscript,
         threshold_config: &Self::ThresholdConfig,
         current_player: Player,
-        msk_share_decryption_key: &<Self::SubTranscript as Subtranscript>::DecryptPrivKey,
+        msk_share_decryption_key: &<Self::SubTranscript as TranscriptCore>::DecryptPrivKey,
     ) -> Result<(
         Self::EncryptionKey,
         Vec<Self::VerificationKey>,

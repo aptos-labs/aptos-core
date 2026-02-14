@@ -1,9 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{
-    pvss::{test_utils::NoAux, traits::transcript::HasAggregatableSubtranscript},
-    traits::Transcript,
+use crate::pvss::{
+    test_utils::NoAux,
+    traits::{transcript::HasAggregatableSubtranscript, Transcript, TranscriptCore},
 };
 use aptos_crypto::{
     bls12381, player::Player, CryptoMaterialError, Signature, SigningKey, Uniform,
@@ -47,11 +47,9 @@ pub struct SessionContribution<C, S> {
     pub sid: S,     // the session id
 }
 
-/// Currently has requirements on the `SigningPubKey` and `SigningSecretKey`, in order
-/// to get a signature of type `bls12381::Signature`; this can be relaxed
 impl<
         T: Transcript<SigningPubKey = bls12381::PublicKey, SigningSecretKey = bls12381::PrivateKey>,
-    > Transcript for GenericSigning<T>
+    > TranscriptCore for GenericSigning<T>
 {
     type DealtPubKey = T::DealtPubKey;
     type DealtPubKeyShare = T::DealtPubKeyShare;
@@ -59,9 +57,39 @@ impl<
     type DealtSecretKeyShare = T::DealtSecretKeyShare;
     type DecryptPrivKey = T::DecryptPrivKey;
     type EncryptPubKey = T::EncryptPubKey;
-    type InputSecret = T::InputSecret;
     type PublicParameters = T::PublicParameters;
     type SecretSharingConfig = T::SecretSharingConfig;
+
+    fn get_public_key_share(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        player: &Player,
+    ) -> Self::DealtPubKeyShare {
+        T::get_public_key_share(&self.trs, sc, player)
+    }
+
+    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
+        T::get_dealt_public_key(&self.trs)
+    }
+
+    fn decrypt_own_share(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        player: &Player,
+        dk: &Self::DecryptPrivKey,
+        pp: &Self::PublicParameters,
+    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
+        T::decrypt_own_share(&self.trs, sc, player, dk, pp)
+    }
+}
+
+/// Currently has requirements on the `SigningPubKey` and `SigningSecretKey`, in order
+/// to get a signature of type `bls12381::Signature`; this can be relaxed
+impl<
+        T: Transcript<SigningPubKey = bls12381::PublicKey, SigningSecretKey = bls12381::PrivateKey>,
+    > Transcript for GenericSigning<T>
+{
+    type InputSecret = T::InputSecret;
     type SigningPubKey = T::SigningPubKey;
     type SigningSecretKey = T::SigningSecretKey;
 
@@ -101,28 +129,6 @@ impl<
 
     fn get_dealers(&self) -> Vec<Player> {
         T::get_dealers(&self.trs)
-    }
-
-    fn get_public_key_share(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        player: &Player,
-    ) -> Self::DealtPubKeyShare {
-        T::get_public_key_share(&self.trs, sc, player)
-    }
-
-    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
-        T::get_dealt_public_key(&self.trs)
-    }
-
-    fn decrypt_own_share(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        player: &Player,
-        dk: &Self::DecryptPrivKey,
-        pp: &Self::PublicParameters,
-    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        T::decrypt_own_share(&self.trs, sc, player, dk, pp)
     }
 
     fn generate<R>(sc: &Self::SecretSharingConfig, pp: &Self::PublicParameters, rng: &mut R) -> Self
