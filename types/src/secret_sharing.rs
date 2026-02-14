@@ -134,8 +134,6 @@ impl SecretSharedKey {
 /// This is temporary and meant to change in future PRs
 #[derive(Clone)]
 pub struct SecretShareConfig {
-    _author: Author,
-    _epoch: u64,
     validator: Arc<ValidatorVerifier>,
     digest_key: DigestKey,
     msk_share: MasterSecretKeyShare,
@@ -147,29 +145,27 @@ pub struct SecretShareConfig {
 
 impl SecretShareConfig {
     pub fn new(
-        author: Author,
-        epoch: u64,
         validator: Arc<ValidatorVerifier>,
         digest_key: DigestKey,
         msk_share: MasterSecretKeyShare,
         verification_keys: Vec<VerificationKey>,
         config: <FPTXWeighted as BatchThresholdEncryption>::ThresholdConfig,
         encryption_key: EncryptionKey,
+        weights: HashMap<Author, u64>,
     ) -> Self {
         Self {
-            _author: author,
-            _epoch: epoch,
             validator,
             digest_key,
             msk_share,
             verification_keys,
             config,
             encryption_key,
-            weights: HashMap::new(),
+            weights,
         }
     }
 
     pub fn get_id(&self, peer: &Author) -> usize {
+        // TODO(ibalajiarun): Index out of bounds
         *self
             .validator
             .address_to_validator_index()

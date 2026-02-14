@@ -120,7 +120,7 @@ impl OnChainChunkyDKGConfig {
     }
 
     pub fn default_for_genesis() -> Self {
-        OnChainChunkyDKGConfig::Off
+        OnChainChunkyDKGConfig::default_enabled()
     }
 
     pub fn chunky_dkg_enabled(&self) -> bool {

@@ -171,7 +171,14 @@ impl TransactionAuthenticator {
             Self::Ed25519 {
                 public_key,
                 signature,
-            } => signature.verify(raw_txn, public_key),
+            } => {
+                if raw_txn.payload.is_encrypted_variant() {
+                    let raw_txn = raw_txn.clone().into_encrypted_variant();
+                    signature.verify(&raw_txn, public_key)
+                } else {
+                    signature.verify(raw_txn, public_key)
+                }
+            },
             Self::FeePayer {
                 sender,
                 secondary_signer_addresses,
