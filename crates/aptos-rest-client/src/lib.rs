@@ -395,7 +395,9 @@ impl Client {
 
     // TODO: Remove this, just use `get_index`: https://github.com/aptos-labs/aptos-core/issues/5597.
     pub async fn get_ledger_information(&self) -> AptosResult<Response<State>> {
-        let response = self.get_index_bcs().await?.map(|r| State {
+        let response = self.get_index_bcs().await?;
+        let encryption_key = response.state().encryption_key.clone();
+        let response = response.map(|r| State {
             chain_id: r.chain_id,
             epoch: r.epoch.into(),
             version: r.ledger_version.into(),
@@ -404,6 +406,7 @@ impl Client {
             oldest_block_height: r.oldest_block_height.into(),
             block_height: r.block_height.into(),
             cursor: None,
+            encryption_key,
         });
         assert_eq!(response.inner().chain_id, response.state().chain_id);
         assert_eq!(response.inner().epoch, response.state().epoch);
