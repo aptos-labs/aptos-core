@@ -40,7 +40,7 @@ use std::{
     sync::Arc,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct HotStateMetadata {
     latest: Option<StateKey>,
     oldest: Option<StateKey>,
