@@ -49,15 +49,30 @@ impl PipelineBuilder {
                 None,
             ));
         }
-        // If the config is None, then decryption is disabled.
+        // If the config is None, then we are on the observer path:
+        // no local secret share config available, so receive the pre-computed
+        // decryption key via channel instead of deriving locally.
+        // Assumption: `input_txns` is free of Encrypted Transactions
+        // due to VM validation checks
         let Some(secret_share_config) = maybe_secret_share_config else {
-            // Assumption: `input_txns` is free of Encrypted Transactions
-            // due to VM validation checks
+            let _ = derived_self_key_share_tx.send(None);
+            let maybe_key = secret_shared_key_rx
+                .await
+                .map_err(|_| anyhow!("secret_shared_key_rx dropped in observer path"))?;
+            let dec_key = maybe_key.map(|key| {
+                BlockTxnDecryptionKey::new(
+                    DecKeyMetadata {
+                        epoch: key.metadata.epoch,
+                        round: key.metadata.round,
+                    },
+                    bcs::to_bytes(&key.key).expect("SecretSharedKey serialization"),
+                )
+            });
             return Ok((
                 input_txns,
                 max_txns_from_block_to_execute,
                 block_gas_limit,
-                Some(None),
+                Some(dec_key),
             ));
         };
 
