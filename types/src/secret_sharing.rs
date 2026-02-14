@@ -9,7 +9,7 @@ use crate::{account_address::AccountAddress, validator_verifier::ValidatorVerifi
 use aptos_batch_encryption::{
     schemes::fptx_weighted::FPTXWeighted, traits::BatchThresholdEncryption,
 };
-use aptos_crypto::hash::HashValue;
+use aptos_crypto::{hash::HashValue, player::Player};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 
@@ -151,8 +151,15 @@ impl SecretShareConfig {
         verification_keys: Vec<VerificationKey>,
         config: <FPTXWeighted as BatchThresholdEncryption>::ThresholdConfig,
         encryption_key: EncryptionKey,
-        weights: HashMap<Author, u64>,
     ) -> Self {
+        let weights = validator
+            .address_to_validator_index()
+            .iter()
+            .map(|(author, &index)| {
+                let weight = config.get_player_weight(&Player { id: index });
+                (*author, weight as u64)
+            })
+            .collect();
         Self {
             validator,
             digest_key,
@@ -189,8 +196,8 @@ impl SecretShareConfig {
         self.config.get_threshold_config().n as u64
     }
 
-    pub fn get_peer_weight(&self, _peer: &Author) -> u64 {
-        1
+    pub fn get_peer_weight(&self, peer: &Author) -> u64 {
+        self.weights.get(peer).copied().unwrap_or(0)
     }
 
     pub fn get_peer_weights(&self) -> &HashMap<Author, u64> {

@@ -55,6 +55,9 @@ use crate::{
     util::time_service::TimeService,
 };
 use anyhow::{anyhow, bail, ensure, Context};
+use aptos_batch_encryption::{
+    schemes::fptx_weighted::FPTXWeighted, traits::BatchThresholdEncryption,
+};
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{
@@ -83,17 +86,25 @@ use aptos_safety_rules::{
 };
 use aptos_types::{
     account_address::AccountAddress,
-    dkg::{real_dkg::maybe_dk_from_bls_sk, DKGState, DKGTrait, DefaultDKG},
+    dkg::{
+        chunky_dkg::{
+            AggregatedSubtranscript, ChunkyDKG, ChunkyDKGState, ChunkyDecryptPrivKey,
+            TEST_DIGEST_KEY,
+        },
+        real_dkg::maybe_dk_from_bls_sk,
+        DKGState, DKGTrait, DefaultDKG,
+    },
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     jwks::SupportedOIDCProviders,
     on_chain_config::{
-        Features, LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider,
-        OnChainConsensusConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig,
-        OnChainRandomnessConfig, ProposerElectionType, RandomnessConfigMoveStruct,
-        RandomnessConfigSeqNum, ValidatorSet,
+        ChunkyDKGConfigMoveStruct, Features, LeaderReputationType, OnChainChunkyDKGConfig,
+        OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
+        OnChainExecutionConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
+        ProposerElectionType, RandomnessConfigMoveStruct, RandomnessConfigSeqNum, ValidatorSet,
     },
     randomness::{RandKeys, WvufPP, WVUF},
+    secret_sharing::SecretShareConfig,
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
@@ -807,11 +818,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         onchain_execution_config: OnChainExecutionConfig,
         onchain_randomness_config: OnChainRandomnessConfig,
         onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
+        onchain_chunky_dkg_config: OnChainChunkyDKGConfig,
         network_sender: Arc<NetworkSender>,
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<dyn TPayloadManager>,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
+        secret_sharing_config: Option<SecretShareConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
     ) {
@@ -870,8 +883,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 &onchain_consensus_config,
                 &onchain_execution_config,
                 &onchain_randomness_config,
+                &onchain_chunky_dkg_config,
                 rand_config,
                 fast_rand_config.clone(),
+                secret_sharing_config.clone(),
                 rand_msg_rx,
                 secret_sharing_msg_rx,
                 recovery_data.commit_root_block().round(),
@@ -981,6 +996,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.config.clone(),
             onchain_randomness_config,
             onchain_jwk_consensus_config,
+            onchain_chunky_dkg_config,
             fast_rand_config,
             failures_tracker,
             opt_proposal_loopback_tx,
@@ -1167,6 +1183,68 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         Ok((rand_config, fast_rand_config))
     }
 
+    fn try_get_secret_share_config_for_epoch(
+        &self,
+        consensus_key: std::sync::Arc<PrivateKey>,
+        new_epoch_state: &EpochState,
+        onchain_chunky_dkg_config: &OnChainChunkyDKGConfig,
+        maybe_chunky_dkg_state: anyhow::Result<ChunkyDKGState>,
+        consensus_config: &OnChainConsensusConfig,
+    ) -> Result<SecretShareConfig, NoSecretSharingReason> {
+        if !consensus_config.is_vtxn_enabled() {
+            return Err(NoSecretSharingReason::VTxnDisabled);
+        }
+        if !onchain_chunky_dkg_config.chunky_dkg_enabled() {
+            return Err(NoSecretSharingReason::FeatureDisabled);
+        }
+
+        let dkg_state =
+            maybe_chunky_dkg_state.map_err(NoSecretSharingReason::ChunkyDKGStateResourceMissing)?;
+        let dkg_session = dkg_state
+            .last_completed
+            .ok_or(NoSecretSharingReason::DKGCompletedSessionResourceMissing)?;
+        if dkg_session.metadata.dealer_epoch + 1 != new_epoch_state.epoch {
+            return Err(NoSecretSharingReason::CompletedSessionTooOld);
+        }
+
+        let dkg_config = ChunkyDKG::generate_config(&dkg_session.metadata);
+        let my_index = new_epoch_state
+            .verifier
+            .address_to_validator_index()
+            .get(&self.author)
+            .copied()
+            .ok_or_else(|| NoSecretSharingReason::NotInValidatorSet)?;
+
+        let dkg_decrypt_key: ChunkyDecryptPrivKey = consensus_key.as_ref().into();
+        let subtranscript =
+            bcs::from_bytes::<AggregatedSubtranscript>(dkg_session.transcript.as_slice())
+                .map_err(NoSecretSharingReason::TranscriptDeserializationError)?;
+
+        // TODO(ibalajiarun): Replace with proper Trusted setup for production
+        let digest_key = TEST_DIGEST_KEY.clone();
+
+        let current_player = Player { id: my_index };
+
+        let (encryption_key, verification_keys, msk_share) = FPTXWeighted::setup(
+            &digest_key,
+            &dkg_config.public_parameters,
+            &subtranscript.subtranscript,
+            &dkg_config.threshold_config,
+            current_player,
+            &dkg_decrypt_key,
+        )
+        .map_err(NoSecretSharingReason::SecretShareSetupFailed)?;
+
+        Ok(SecretShareConfig::new(
+            new_epoch_state.verifier.clone(),
+            digest_key,
+            msk_share,
+            verification_keys,
+            dkg_config.threshold_config,
+            encryption_key,
+        ))
+    }
+
     async fn start_new_epoch(&mut self, payload: OnChainConfigPayload<P>) {
         let validator_set: ValidatorSet = payload
             .get()
@@ -1189,6 +1267,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             payload.get();
         let onchain_jwk_consensus_config: anyhow::Result<OnChainJWKConsensusConfig> = payload.get();
         let dkg_state = payload.get::<DKGState>();
+        let chunky_dkg_state = payload.get::<ChunkyDKGState>();
+        let chunky_dkg_config_move_struct: anyhow::Result<ChunkyDKGConfigMoveStruct> =
+            payload.get();
 
         if let Err(error) = &onchain_consensus_config {
             warn!("Failed to read on-chain consensus config {}", error);
@@ -1200,6 +1281,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         if let Err(error) = &randomness_config_move_struct {
             warn!("Failed to read on-chain randomness config {}", error);
+        }
+
+        if let Err(error) = &chunky_dkg_config_move_struct {
+            warn!("Failed to read on-chain chunky DKG config {}", error);
         }
 
         self.epoch_state = Some(epoch_state.clone());
@@ -1266,6 +1351,26 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             },
         };
 
+        info!("Generating secret share config");
+        let onchain_chunky_dkg_config =
+            OnChainChunkyDKGConfig::from_configs(chunky_dkg_config_move_struct.ok());
+        let secret_sharing_config = match self.try_get_secret_share_config_for_epoch(
+            loaded_consensus_key.clone(),
+            &epoch_state,
+            &onchain_chunky_dkg_config,
+            chunky_dkg_state,
+            &consensus_config,
+        ) {
+            Ok(config) => Some(config),
+            Err(reason) => {
+                warn!(
+                    "Failed to get secret share config for epoch [{}]: {:?}",
+                    epoch_state.epoch, reason
+                );
+                None
+            },
+        };
+
         info!(
             "[Randomness] start_new_epoch: epoch={}, rand_config={:?}, fast_rand_config={:?}",
             epoch_state.epoch, rand_config, fast_rand_config
@@ -1305,6 +1410,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 execution_config,
                 onchain_randomness_config,
                 jwk_consensus_config,
+                onchain_chunky_dkg_config,
                 network_sender,
                 payload_client,
                 payload_manager,
@@ -1322,11 +1428,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 execution_config,
                 onchain_randomness_config,
                 jwk_consensus_config,
+                onchain_chunky_dkg_config,
                 network_sender,
                 payload_client,
                 payload_manager,
                 rand_config,
                 fast_rand_config,
+                secret_sharing_config,
                 rand_msg_rx,
                 secret_share_manager_rx,
             )
@@ -1370,6 +1478,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn start_new_epoch_with_jolteon(
         &mut self,
         consensus_key: Arc<PrivateKey>,
@@ -1378,11 +1487,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         execution_config: OnChainExecutionConfig,
         onchain_randomness_config: OnChainRandomnessConfig,
         jwk_consensus_config: OnChainJWKConsensusConfig,
+        onchain_chunky_dkg_config: OnChainChunkyDKGConfig,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<dyn TPayloadManager>,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
+        secret_sharing_config: Option<SecretShareConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_share_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
     ) {
@@ -1400,11 +1511,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     execution_config,
                     onchain_randomness_config,
                     jwk_consensus_config,
+                    onchain_chunky_dkg_config,
                     Arc::new(network_sender),
                     payload_client,
                     payload_manager,
                     rand_config,
                     fast_rand_config,
+                    secret_sharing_config,
                     rand_msg_rx,
                     secret_share_msg_rx,
                 )
@@ -1423,6 +1536,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn start_new_epoch_with_dag(
         &mut self,
         epoch_state: Arc<EpochState>,
@@ -1431,6 +1545,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         on_chain_execution_config: OnChainExecutionConfig,
         onchain_randomness_config: OnChainRandomnessConfig,
         onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
+        onchain_chunky_dkg_config: OnChainChunkyDKGConfig,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<dyn TPayloadManager>,
@@ -1467,8 +1582,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 &onchain_consensus_config,
                 &on_chain_execution_config,
                 &onchain_randomness_config,
+                &onchain_chunky_dkg_config,
                 rand_config,
                 fast_rand_config,
+                None,
                 rand_msg_rx,
                 secret_share_msg_rx,
                 highest_committed_round,
@@ -2008,6 +2125,21 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             },
         }
     }
+}
+
+#[allow(dead_code)]
+#[derive(Debug)]
+pub enum NoSecretSharingReason {
+    VTxnDisabled,
+    FeatureDisabled,
+    ChunkyDKGStateResourceMissing(anyhow::Error),
+    DKGCompletedSessionResourceMissing,
+    CompletedSessionTooOld,
+    NotInValidatorSet,
+    ErrConvertingConsensusKeyToDecryptionKey(anyhow::Error),
+    TranscriptDeserializationError(bcs::Error),
+    SetupDigestKeyError(anyhow::Error),
+    SecretShareSetupFailed(anyhow::Error),
 }
 
 #[allow(dead_code)]

@@ -21,7 +21,7 @@ use aptos_crypto::{bls12381, weighted_config::WeightedConfigArkworks, TSecretSha
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_dkg::pvss::{
     chunky::{
-        EncryptPubKey, InputSecret, PublicParameters, SignedWeightedTranscript,
+        DecryptPrivKey, EncryptPubKey, InputSecret, PublicParameters, SignedWeightedTranscript,
         WeightedSubtranscript,
     },
     traits::{
@@ -46,6 +46,7 @@ pub type DealerPrivateKey = bls12381::PrivateKey;
 pub type DealerPublicKey = bls12381::PublicKey;
 pub type ChunkyDKGThresholdConfig = WeightedConfigArkworks<Fr>;
 pub type ChunkyEncryptPubKey = EncryptPubKey<Pairing>;
+pub type ChunkyDecryptPrivKey = DecryptPrivKey<Pairing>;
 pub type ChunkyDKGPublicParameters = PublicParameters<Pairing>;
 pub type ChunkyInputSecret = InputSecret<Fr>;
 /// Shared test DigestKey for encryption key derivation.
