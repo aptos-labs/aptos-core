@@ -35,10 +35,10 @@ use crate::{
 use anyhow::bail;
 use aptos_crypto::{
     arkworks::{
-        msm::verify_msm_terms_with_start,
+        msm::{self, IsMsmInput},
         random::{
-            sample_field_elements, unsafe_random_point, unsafe_random_point_group,
-            unsafe_random_points, UniformRand,
+            sample_field_element, sample_field_elements, unsafe_random_point,
+            unsafe_random_point_group, unsafe_random_points, UniformRand,
         },
         scrape::LowDegreeTest,
         serialization::{ark_de, ark_se},
@@ -48,8 +48,8 @@ use aptos_crypto::{
     weighted_config::WeightedConfigArkworks,
     CryptoMaterialError, TSecretSharingConfig, ValidCryptoMaterial,
 };
-use ark_ec::{pairing::Pairing, CurveGroup};
-use ark_ff::{AdditiveGroup, Fp, FpConfig};
+use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};
+use ark_ff::{AdditiveGroup, Field, Fp, FpConfig};
 use ark_poly::EvaluationDomain;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand_core::{CryptoRng, RngCore};
@@ -191,11 +191,17 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
 
         hom.check_first_msm_eval(first_msm_terms)?;
 
-        verify_msm_terms_with_start::<E::G2>(
-            vec![ldt_msm_terms],
-            second_msm_terms,
-            sample_field_elements(1, rng),
-        )?;
+        let beta = sample_field_element(rng);
+        let merged_g2 =
+            msm::merge_scaled_msm_terms::<E::G2>(&[&second_msm_terms, &ldt_msm_terms], &[
+                E::ScalarField::ONE,
+                beta,
+            ]);
+        let g2_msm = E::G2::msm(merged_g2.bases(), merged_g2.scalars())
+            .expect("Failed to compute merged G2 MSM in chunky v2");
+        if g2_msm != E::G2::ZERO {
+            bail!("G2 MSM check failed (expected zero)");
+        }
 
         Ok(())
     }

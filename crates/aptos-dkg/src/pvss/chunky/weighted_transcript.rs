@@ -34,7 +34,7 @@ use anyhow::bail;
 use aptos_crypto::{
     arkworks::{
         self,
-        msm::IsMsmInput,
+        msm::{self, IsMsmInput, MsmInput},
         random::{
             sample_field_element, sample_field_elements, unsafe_random_point,
             unsafe_random_point_group, unsafe_random_points, UniformRand,
@@ -52,12 +52,11 @@ use ark_ec::{
     pairing::{Pairing, PairingOutput},
     CurveGroup, VariableBaseMSM,
 };
-use ark_ff::{AdditiveGroup, Fp, FpConfig, Zero};
+use ark_ff::{AdditiveGroup, Field, Fp, FpConfig};
 use ark_poly::EvaluationDomain;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Domain-separation tag (DST) used to ensure that all cryptographic hashes and
 /// transcript operations within the protocol are uniquely namespaced
@@ -201,70 +200,30 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             }
         }
 
-        let gamma: E::ScalarField = sample_field_element(rng);
+        let gamma = sample_field_element(rng);
         let gamma_sq = gamma * gamma;
 
-        // Merge G1 MSM terms: gamma * PoK_terms + 1 * weighted_Cs_terms
-        let mut g1_agg: HashMap<Vec<u8>, (E::G1Affine, E::ScalarField)> = HashMap::new();
-        for (base, scalar) in pok_msm_terms
-            .bases()
-            .iter()
-            .zip(pok_msm_terms.scalars().iter())
-        {
-            let s = *scalar * gamma;
-            let mut key = Vec::new();
-            base.serialize_with_mode(&mut key, Compress::No)
-                .expect("basis serialization");
-            g1_agg
-                .entry(key)
-                .and_modify(|(_, s0)| *s0 += s)
-                .or_insert((*base, s));
-        }
-        for (base, scalar) in weighted_Cs_base.iter().zip(weighted_Cs_scalar.iter()) {
-            let mut key = Vec::new();
-            base.serialize_with_mode(&mut key, Compress::No)
-                .expect("basis serialization");
-            g1_agg
-                .entry(key)
-                .and_modify(|(_, s0)| *s0 += scalar)
-                .or_insert((*base, *scalar));
-        }
-        let (g1_bases, g1_scalars): (Vec<_>, Vec<_>) =
-            g1_agg.into_values().filter(|(_, s)| !s.is_zero()).unzip();
-        let combined_G1 =
-            E::G1::msm(&g1_bases, &g1_scalars).expect("Failed to compute merged G1 MSM in chunky");
+        let weighted_Cs_msm =
+            MsmInput::new(weighted_Cs_base, weighted_Cs_scalar).expect("weighted_Cs MSM terms");
+        let merged_g1 =
+            msm::merge_scaled_msm_terms::<E::G1>(&[&pok_msm_terms, &weighted_Cs_msm], &[
+                gamma,
+                E::ScalarField::ONE,
+            ]);
+        let combined_G1 = E::G1::msm(merged_g1.bases(), merged_g1.scalars())
+            .expect("Failed to compute merged G1 MSM in chunky");
 
         let ldt_msm_terms = ldt.ldt_msm_input::<E::G2>(&Vs_flat)?;
         let n = sc.get_total_weight();
-        // Merge G2 MSM terms: gamma^2 * LDT_terms + 1 * weighted_Vs_terms
-        let mut g2_agg: HashMap<Vec<u8>, (E::G2Affine, E::ScalarField)> = HashMap::new();
-        for (base, scalar) in ldt_msm_terms
-            .bases()
-            .iter()
-            .zip(ldt_msm_terms.scalars().iter())
-        {
-            let s = *scalar * gamma_sq;
-            let mut key = Vec::new();
-            base.serialize_with_mode(&mut key, Compress::No)
-                .expect("basis serialization");
-            g2_agg
-                .entry(key)
-                .and_modify(|(_, s0)| *s0 += s)
-                .or_insert((*base, s));
-        }
-        for (base, scalar) in Vs_flat[..n].iter().zip(powers_of_beta[..n].iter()) {
-            let mut key = Vec::new();
-            base.serialize_with_mode(&mut key, Compress::No)
-                .expect("basis serialization");
-            g2_agg
-                .entry(key)
-                .and_modify(|(_, s0)| *s0 += scalar)
-                .or_insert((*base, *scalar));
-        }
-        let (g2_bases, g2_scalars): (Vec<_>, Vec<_>) =
-            g2_agg.into_values().filter(|(_, s)| !s.is_zero()).unzip();
-        let combined_G2 =
-            E::G2::msm(&g2_bases, &g2_scalars).expect("Failed to compute merged G2 MSM in chunky");
+        let weighted_Vs_msm = MsmInput::new(Vs_flat[..n].to_vec(), powers_of_beta[..n].to_vec())
+            .expect("weighted_Vs MSM terms");
+        let merged_g2 =
+            msm::merge_scaled_msm_terms::<E::G2>(&[&ldt_msm_terms, &weighted_Vs_msm], &[
+                gamma_sq,
+                E::ScalarField::ONE,
+            ]);
+        let combined_G2 = E::G2::msm(merged_g2.bases(), merged_g2.scalars())
+            .expect("Failed to compute merged G2 MSM in chunky");
 
         let res = E::multi_pairing(
             [

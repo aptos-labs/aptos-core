@@ -10,8 +10,9 @@
 use crate::utils;
 use anyhow::ensure;
 use ark_ec::CurveGroup;
+use ark_ff::Zero;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use std::fmt::Debug;
+use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 /// Input to a (not necessarily fixed-base) multi-scalar multiplication (MSM).
 ///
@@ -143,4 +144,32 @@ pub fn verify_msm_terms<C: CurveGroup>(
         MsmInput::new(Vec::new(), Vec::new()).unwrap(),
         powers_of_beta,
     )
+}
+
+/// Merges multiple `MsmInput`s into one, with the i-th input scaled by `scales[i]`.
+/// Same base in different inputs is aggregated (scalars summed). Terms with zero scalar are dropped.
+///
+/// # Panics
+/// If `term_sets.len() != scales.len()` or if the merged result cannot be built into `MsmInput`.
+pub fn merge_scaled_msm_terms<C: CurveGroup>(
+    term_sets: &[&MsmInput<C::Affine, C::ScalarField>],
+    scales: &[C::ScalarField],
+) -> MsmInput<C::Affine, C::ScalarField>
+where
+    C::Affine: Copy + Eq + Hash,
+{
+    assert_eq!(
+        term_sets.len(),
+        scales.len(),
+        "term_sets and scales length mismatch"
+    );
+    let mut agg: HashMap<C::Affine, C::ScalarField> = HashMap::new();
+    for (terms, scale) in term_sets.iter().zip(scales.iter()) {
+        for (base, scalar) in terms.bases().iter().zip(terms.scalars().iter()) {
+            let s = *scalar * scale;
+            agg.entry(*base).and_modify(|s0| *s0 += s).or_insert(s);
+        }
+    }
+    let (bases, scalars): (Vec<_>, Vec<_>) = agg.into_iter().filter(|(_, s)| !s.is_zero()).unzip();
+    MsmInput::new(bases, scalars).expect("merged MSM terms")
 }
