@@ -103,7 +103,7 @@ pub async fn create_emit_job_request(
         .max_gas_per_txn(2000000)
         .coordination_delay_between_instances(Duration::from_secs(1))
         .transaction_mix_per_phase(transaction_mix_per_phase)
-        .mode(EmitJobMode::ConstTps { tps: 20 })
+        .mode(EmitJobMode::ConstTps { tps: 2 })
         .account_type(account_type);
 
     if let AccountType::Keyless = account_type {

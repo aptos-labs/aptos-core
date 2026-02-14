@@ -5,6 +5,7 @@ use crate::{
     consensus::helpers::generate_traffic_and_assert_committed, smoke_test_environment::SwarmBuilder,
 };
 use aptos_forge::{wait_for_all_nodes_to_catchup, NodeExt, SwarmExt};
+use aptos_logger::info;
 use aptos_rest_client::Client;
 use std::{sync::Arc, time::Duration};
 
@@ -24,10 +25,12 @@ async fn test_remote_batch_read_from_block_voters() {
         .await;
     let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
 
+    info!("waiting for catchup");
     swarm
         .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
         .await
         .unwrap();
+    info!("catchup finished");
 
     let validator_client_0 = swarm
         .validator(validator_peer_ids[0])
@@ -38,6 +41,8 @@ async fn test_remote_batch_read_from_block_voters() {
         .unwrap()
         .rest_client();
 
+    info!("stopping batchmsg");
+
     // Make every node fetch the batch
     validator_client_0
         .set_failpoint(
@@ -47,6 +52,8 @@ async fn test_remote_batch_read_from_block_voters() {
         .await
         .unwrap();
 
+    info!("sending traffic after stopping batchmsg");
+
     // Send traffic to Node 0 only
     generate_traffic_and_assert_committed(
         &mut swarm,
@@ -54,6 +61,8 @@ async fn test_remote_batch_read_from_block_voters() {
         Duration::from_secs(20),
     )
     .await;
+
+    info!("stopping request_batch");
 
     // Fail batch request for Node 3, so it cannot commit
     validator_client_3

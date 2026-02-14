@@ -86,6 +86,7 @@ impl SwarmBuilder {
     // Gas is not enabled with this setup, it's enabled via forge instance.
     pub async fn build_inner(&mut self) -> anyhow::Result<LocalSwarm> {
         ::aptos_logger::Logger::new().init();
+        env_logger::init();
         info!("Preparing to finish compiling");
         // TODO change to return Swarm trait
         // Add support for forge
