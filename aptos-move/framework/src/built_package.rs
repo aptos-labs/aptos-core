@@ -7,7 +7,7 @@ use crate::{
     natives::code::{ModuleMetadata, PackageDep, PackageMetadata, UpgradePolicy},
     zip_metadata, zip_metadata_str,
 };
-use anyhow::bail;
+use anyhow::{bail, Context};
 use aptos_types::{
     account_address::AccountAddress,
     transaction::EntryABI,
@@ -521,7 +521,8 @@ impl BuiltPackage {
             .map(|s| s.to_string())
             .unwrap_or_default();
         let manifest_file = self.package_path.join("Move.toml");
-        let manifest = std::fs::read_to_string(manifest_file)?;
+        let manifest = std::fs::read_to_string(&manifest_file)
+            .with_context(|| format!("Failed to read Move.toml manifest at {:?}", manifest_file))?;
         let custom_props = extract_custom_fields(&manifest)?;
         let manifest = zip_metadata_str(&manifest)?;
         let upgrade_policy = if let Some(val) = custom_props.get(UPGRADE_POLICY_CUSTOM_FIELD) {
@@ -533,7 +534,8 @@ impl BuiltPackage {
         for u in self.package.root_modules() {
             let name = u.unit.name().to_string();
             let source = if self.options.with_srcs {
-                zip_metadata_str(&std::fs::read_to_string(&u.source_path)?)?
+                zip_metadata_str(&std::fs::read_to_string(&u.source_path)
+                    .with_context(|| format!("Failed to read source file at {:?}", u.source_path))?)?
             } else {
                 vec![]
             };
@@ -593,8 +595,10 @@ impl BuiltPackage {
     pub fn extract_metadata_and_save(&self) -> anyhow::Result<()> {
         let data = self.extract_metadata()?;
         let path = self.package_artifacts_path();
-        std::fs::create_dir_all(&path)?;
-        std::fs::write(path.join(METADATA_FILE_NAME), bcs::to_bytes(&data)?)?;
+        std::fs::create_dir_all(&path)
+            .with_context(|| format!("Failed to create directory at {:?}", path))?;
+        std::fs::write(path.join(METADATA_FILE_NAME), bcs::to_bytes(&data)?)
+            .with_context(|| format!("Failed to write metadata file at {:?}", path.join(METADATA_FILE_NAME)))?;
         Ok(())
     }
 }
@@ -646,7 +650,8 @@ fn inject_runtime_metadata(
                             .with_extension(MOVE_COMPILED_EXTENSION);
                         if path.is_file() {
                             let bytes = unit_with_source.unit.serialize(bytecode_version);
-                            std::fs::write(path, bytes)?;
+                            std::fs::write(&path, bytes)
+                                .with_context(|| format!("Failed to write compiled module to {:?}", path))?;
                         }
                     }
                 }

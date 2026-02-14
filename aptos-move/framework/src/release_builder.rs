@@ -98,8 +98,10 @@ impl ReleaseOptions {
         }
         let bundle = ReleaseBundle::new(released_packages, source_paths);
         let parent = output.parent().expect("Failed to get parent directory");
-        std::fs::create_dir_all(parent).context("Failed to create dirs")?;
-        std::fs::write(&output, bcs::to_bytes(&bundle)?).context("Failed to write output")?;
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create parent directory at {}", parent.display()))?;
+        std::fs::write(&output, bcs::to_bytes(&bundle)?)
+            .with_context(|| format!("Failed to write release bundle to {}", output.display()))?;
         Ok(())
     }
 
