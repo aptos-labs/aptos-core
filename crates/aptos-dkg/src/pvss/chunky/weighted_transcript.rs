@@ -1,6 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! Weighted chunky PVSS transcript (v1): SCRAPE LDT + PoK + consistency check combined into two MSMs, then checked via a single pairing check.
+
 use crate::{
     delegate_transcript_core_to_subtrs,
     pcs::univariate_hiding_kzg,
@@ -12,8 +14,8 @@ use crate::{
             input_secret::InputSecret,
             keys,
             public_parameters::PublicParameters,
-            sok_context::SokContext,
             subtranscript::Subtranscript,
+            verify_common::{verify_weighted_preamble, SokContext},
         },
         traits::{
             self,
@@ -62,6 +64,7 @@ use serde::{Deserialize, Serialize};
 /// transcript operations within the protocol are uniquely namespaced
 pub const DST: &[u8; 39] = b"APTOS_WEIGHTED_CHUNKY_FIELD_PVSS_FS_DST";
 
+/// Single-dealer weighted chunky PVSS transcript (v1).
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Transcript<P: Pairing> {
@@ -97,35 +100,15 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         sid: &A,
         rng: &mut R,
     ) -> anyhow::Result<()> {
-        if eks.len() != sc.get_total_num_players() {
-            bail!(
-                "Expected {} encryption keys, but got {}",
-                sc.get_total_num_players(),
-                eks.len()
-            );
-        }
-        if self.subtrs.Cs.len() != sc.get_total_num_players() {
-            bail!(
-                "Expected {} arrays of chunked ciphertexts, but got {}",
-                sc.get_total_num_players(),
-                self.subtrs.Cs.len()
-            );
-        }
-        if self.subtrs.Vs.len() != sc.get_total_num_players() {
-            bail!(
-                "Expected {} arrays of commitment elements, but got {}",
-                sc.get_total_num_players(),
-                self.subtrs.Vs.len()
-            );
-        }
-
-        // Initialize the **identical** PVSS SoK context
-        let sok_cntxt = SokContext::new(
-            spks[self.dealer.id].clone(),
+        let sok_cntxt = verify_weighted_preamble(
+            sc,
+            &self.subtrs,
+            &self.dealer,
+            spks,
+            eks,
             sid,
-            self.dealer.id,
             <Self as traits::Transcript>::dst(),
-        );
+        )?;
 
         {
             // Verify the range proof (still separate)
@@ -240,6 +223,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
     }
 }
 
+/// Proof that chunked ciphertexts and commitments are consistent (SoK + batched range proof).
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct SharingProof<P: Pairing> {
@@ -339,30 +323,21 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         debug_assert_eq!(flattened_Vs_proj.len(), sc.get_total_weight() + 1);
 
-        let Vs_proj = sc.group_by_player(&flattened_Vs_proj); // This won't use the last item in `flattened_Vs` because of `sc`
+        let Vs_proj = sc.group_by_player(&flattened_Vs_proj); // last item of flattened_Vs_proj is f(0), won't appear in Vs_proj
         let V0_proj = *flattened_Vs_proj.last().unwrap();
 
-        // Collect all G2 elements (from V0 and Vs)
+        // Batch normalize G2 elements and re-split into V0 and per-player Vs (same layout as Vs_proj).
         let mut g2_elems = vec![V0_proj];
         for row in &Vs_proj {
             g2_elems.extend(row.iter().copied());
         }
-
-        // Batch normalize
         let g2_affine = E::G2::normalize_batch(&g2_elems);
-
-        // Reconstruct nested structures in affine form
         let mut g2_iter = g2_affine.into_iter();
-
-        // V0
         let V0 = g2_iter.next().unwrap();
-
-        // Vs
         let Vs: Vec<Vec<E::G2Affine>> = Vs_proj
             .iter()
             .map(|row| row.iter().map(|_| g2_iter.next().unwrap()).collect())
             .collect();
-
         debug_assert!(g2_iter.next().is_none());
 
         Transcript {
@@ -414,7 +389,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 }
 
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcript<E> {
-    // why are N and P needed? TODO: maybe integrate into deal()
+    /// Encrypts chunked shares and builds the sharing proof (SoK + range proof).
+    /// Panics if `pp.pk_range_proof.ck_S` is not a Lagrange SRS basis (same requirement as verify).
     #[allow(non_snake_case)]
     pub fn encrypt_chunked_shares<
         'a,

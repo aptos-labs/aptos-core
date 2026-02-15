@@ -29,7 +29,8 @@ pub trait Trait:
     homomorphism::Trait<
     Codomain = Self::CodomainShape<Self::MsmOutput>,
     CodomainNormalized = Self::CodomainShape<Self::Base>,
-> {
+>
+{
     /// Type of MSM base points (e.g. curve affine element). CodomainNormalized is `CodomainShape<Base>`.
     type Base: Copy
         + Eq

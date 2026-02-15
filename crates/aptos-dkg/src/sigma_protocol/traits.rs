@@ -1,7 +1,6 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use std::hash::Hash;
 use crate::{
     fiat_shamir,
     sigma_protocol::{
@@ -26,7 +25,7 @@ use ark_ff::{Field, Fp, FpConfig, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand_core::{CryptoRng, RngCore};
 use serde::Serialize;
-use std::fmt::Debug;
+use std::{fmt::Debug, hash::Hash};
 
 pub trait Trait<C: CurveGroup>:
     fixed_base_msms::Trait<

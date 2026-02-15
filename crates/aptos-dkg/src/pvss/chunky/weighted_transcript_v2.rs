@@ -1,6 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! Weighted chunky PVSS transcript (v2): SCRAPE LDT + PoK with G2-side MSM merge (no pairing in verify).
+
 use crate::{
     delegate_transcript_core_to_subtrs,
     pcs::univariate_hiding_kzg,
@@ -13,8 +15,8 @@ use crate::{
             input_secret::InputSecret,
             keys,
             public_parameters::PublicParameters,
-            sok_context::SokContext,
             subtranscript::Subtranscript,
+            verify_common::{verify_weighted_preamble, SokContext},
         },
         traits::{
             self,
@@ -59,6 +61,7 @@ use serde::{Deserialize, Serialize};
 /// transcript operations within the protocol are uniquely namespaced
 pub const DST: &[u8; 42] = b"APTOS_WEIGHTED_CHUNKY_FIELD_PVSS_v2_FS_DST";
 
+/// Single-dealer weighted chunky PVSS transcript (v2).
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Transcript<E: Pairing> {
@@ -95,35 +98,15 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         sid: &A,
         rng: &mut R,
     ) -> anyhow::Result<()> {
-        if eks.len() != sc.get_total_num_players() {
-            bail!(
-                "Expected {} encryption keys, but got {}",
-                sc.get_total_num_players(),
-                eks.len()
-            );
-        }
-        if self.subtrs.Cs.len() != sc.get_total_num_players() {
-            bail!(
-                "Expected {} arrays of chunked ciphertexts, but got {}",
-                sc.get_total_num_players(),
-                self.subtrs.Cs.len()
-            );
-        }
-        if self.subtrs.Vs.len() != sc.get_total_num_players() {
-            bail!(
-                "Expected {} arrays of commitment elements, but got {}",
-                sc.get_total_num_players(),
-                self.subtrs.Vs.len()
-            );
-        }
-
-        // Initialize the **identical** PVSS SoK context
-        let sok_cntxt = SokContext::new(
-            spks[self.dealer.id].clone(),
+        let sok_cntxt = verify_weighted_preamble(
+            sc,
+            &self.subtrs,
+            &self.dealer,
+            spks,
+            eks,
             sid,
-            self.dealer.id,
             <Self as traits::Transcript>::dst(),
-        );
+        )?;
 
         {
             // Verify the range proof
@@ -207,6 +190,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
     }
 }
 
+/// Proof that chunked ciphertexts and commitments are consistent (SoK + batched range proof).
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct SharingProof<E: Pairing> {
@@ -353,7 +337,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 }
 
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcript<E> {
-    // why are N and P needed? TODO: maybe integrate into deal()
+    /// Encrypts chunked shares and builds the sharing proof (SoK + range proof).
+    /// Panics if `pp.pk_range_proof.ck_S` is not a Lagrange SRS basis (same requirement as verify).
     #[allow(non_snake_case)]
     pub fn encrypt_chunked_shares<'a, A: Serialize + Clone, R: RngCore + CryptoRng>(
         f_evals: &[E::ScalarField],
@@ -465,7 +450,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
             range_proof_commitment: TrivialShape(range_proof_commitment.0.into()), // TODO: fix this
         };
 
-        // Vs is already flat from CodomainShape
+        // Vs_flat from homomorphism codomain was grouped by player into Vs above.
 
         (Cs, Rs, Vs, sharing_proof)
     }
