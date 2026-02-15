@@ -34,6 +34,7 @@ aptos-short-hex-str = { workspace = true }
 aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
 aptos-validator-transaction-pool = { workspace = true }
+ark-std = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
@@ -56,4 +57,4 @@ aptos-types = { workspace = true, features = ["testing"] }
 smoke-test = []
 
 [package.metadata.cargo-machete]
-ignored = ["serde_bytes"]
+ignored = ["ark-std", "serde_bytes"]
