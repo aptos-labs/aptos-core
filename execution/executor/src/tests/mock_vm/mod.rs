@@ -430,8 +430,8 @@ fn decode_transaction(txn: &SignedTransaction) -> MockVMTransaction {
         Ok(TransactionExecutableRef::EntryFunction(_)) => {
             unimplemented!("MockVM does not support multisig transaction payload.")
         },
-        Ok(TransactionExecutableRef::Empty) => {
-            unimplemented!("MockVM does not support empty transaction payload.")
+        Ok(TransactionExecutableRef::Empty) | Ok(TransactionExecutableRef::Encrypted) => {
+            unimplemented!("MockVM does not support empty/encrypted transaction payload.")
         },
         Err(_) => unimplemented!("MockVM does not support given transaction payload."),
     }

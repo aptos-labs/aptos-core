@@ -353,7 +353,9 @@ fn matches_entry_function(
         },
         TransactionPayload::Payload(TransactionPayloadInner::V1 { executable, .. }) => {
             match executable.as_ref() {
-                TransactionExecutableRef::Script(_) | TransactionExecutableRef::Empty => false,
+                TransactionExecutableRef::Script(_)
+                | TransactionExecutableRef::Empty
+                | TransactionExecutableRef::Encrypted => false,
                 TransactionExecutableRef::EntryFunction(entry_function) => {
                     compare_entry_function(entry_function, address, module_name, function)
                 },
@@ -362,7 +364,9 @@ fn matches_entry_function(
         TransactionPayload::EncryptedPayload(payload) => {
             if let Ok(executable) = payload.executable_ref() {
                 match executable {
-                    TransactionExecutableRef::Script(_) | TransactionExecutableRef::Empty => false,
+                    TransactionExecutableRef::Script(_)
+                    | TransactionExecutableRef::Empty
+                    | TransactionExecutableRef::Encrypted => false,
                     TransactionExecutableRef::EntryFunction(entry_function) => {
                         compare_entry_function(entry_function, address, module_name, function)
                     },
@@ -396,7 +400,9 @@ fn matches_entry_function_module_address(
         },
         TransactionPayload::Payload(TransactionPayloadInner::V1 { executable, .. }) => {
             match executable.as_ref() {
-                TransactionExecutableRef::Script(_) | TransactionExecutableRef::Empty => false,
+                TransactionExecutableRef::Script(_)
+                | TransactionExecutableRef::Empty
+                | TransactionExecutableRef::Encrypted => false,
                 TransactionExecutableRef::EntryFunction(entry_function) => {
                     compare_entry_function_module_address(entry_function, module_address)
                 },
@@ -405,7 +411,9 @@ fn matches_entry_function_module_address(
         TransactionPayload::EncryptedPayload(payload) => {
             if let Ok(executable) = payload.executable_ref() {
                 match executable {
-                    TransactionExecutableRef::Script(_) | TransactionExecutableRef::Empty => false,
+                    TransactionExecutableRef::Script(_)
+                    | TransactionExecutableRef::Empty
+                    | TransactionExecutableRef::Encrypted => false,
                     TransactionExecutableRef::EntryFunction(entry_function) => {
                         compare_entry_function_module_address(entry_function, module_address)
                     },
@@ -460,9 +468,9 @@ fn matches_script_argument_address(
         TransactionPayload::Script(script) => compare_script_argument_address(script, address),
         TransactionPayload::Payload(TransactionPayloadInner::V1 { executable, .. }) => {
             match executable.as_ref() {
-                TransactionExecutableRef::EntryFunction(_) | TransactionExecutableRef::Empty => {
-                    false
-                },
+                TransactionExecutableRef::EntryFunction(_)
+                | TransactionExecutableRef::Empty
+                | TransactionExecutableRef::Encrypted => false,
                 TransactionExecutableRef::Script(script) => {
                     compare_script_argument_address(script, address)
                 },
@@ -472,7 +480,8 @@ fn matches_script_argument_address(
             if let Ok(executable) = payload.executable_ref() {
                 match executable {
                     TransactionExecutableRef::EntryFunction(_)
-                    | TransactionExecutableRef::Empty => false,
+                    | TransactionExecutableRef::Empty
+                    | TransactionExecutableRef::Encrypted => false,
                     TransactionExecutableRef::Script(script) => {
                         compare_script_argument_address(script, address)
                     },
