@@ -248,6 +248,7 @@ impl<C: CurveGroup, H1, H2> sigma_protocol::Trait<C> for TupleHomomorphism<H1, H
 where
     H1: sigma_protocol::Trait<C>,
     H2: sigma_protocol::Trait<C>,
+    // OLD: H2: fixed_base_msms::Trait<Domain = H1::Domain, MsmInput = H1::MsmInput>, so can we simply the next 3 lines?
     H2: homomorphism::Trait<Domain = H1::Domain>,
     H1: fixed_base_msms::Trait<Base = C::Affine, Scalar = C::ScalarField>,
     H2: fixed_base_msms::Trait<Base = C::Affine, Scalar = C::ScalarField>,
@@ -255,21 +256,11 @@ where
     /// Concatenate the DSTs of the two homomorphisms, plus some
     /// additional metadata to ensure uniqueness.
     fn dst(&self) -> Vec<u8> {
-        let mut dst = Vec::new();
-
-        let dst1 = self.hom1.dst();
-        let dst2 = self.hom2.dst();
-
-        // Domain-separate them properly so concatenation is unambiguous.
-        // Prefix with their lengths so [a|b] and [ab|] don't collide.
-        dst.extend_from_slice(b"TupleHomomorphism(");
-        dst.extend_from_slice(&(dst1.len() as u32).to_be_bytes());
-        dst.extend_from_slice(&dst1);
-        dst.extend_from_slice(&(dst2.len() as u32).to_be_bytes());
-        dst.extend_from_slice(&dst2);
-        dst.extend_from_slice(b")");
-
-        dst
+        homomorphism::domain_separate_dsts(
+            b"TupleHomomorphism(",
+            &[self.hom1.dst(), self.hom2.dst()],
+            b")",
+        )
     }
 }
 
@@ -283,21 +274,11 @@ where
     H2: fixed_base_msms::Trait<Domain = H1::Domain>,
 {
     fn dst(&self) -> Vec<u8> {
-        let mut dst = Vec::new();
-
-        let dst1 = self.hom1.dst();
-        let dst2 = self.hom2.dst();
-
-        // Domain-separate them properly so concatenation is unambiguous.
-        // Prefix with their lengths so [a|b] and [ab|] don't collide.
-        dst.extend_from_slice(b"PairingTupleHomomorphism(");
-        dst.extend_from_slice(&(dst1.len() as u32).to_be_bytes());
-        dst.extend_from_slice(&dst1);
-        dst.extend_from_slice(&(dst2.len() as u32).to_be_bytes());
-        dst.extend_from_slice(&dst2);
-        dst.extend_from_slice(b")");
-
-        dst
+        homomorphism::domain_separate_dsts(
+            b"PairingTupleHomomorphism(",
+            &[self.hom1.dst(), self.hom2.dst()],
+            b")",
+        )
     }
 
     /// Returns the MSM terms for each homomorphism, combined into a tuple.

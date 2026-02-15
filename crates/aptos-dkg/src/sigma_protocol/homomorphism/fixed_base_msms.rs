@@ -193,17 +193,6 @@ where
     LargerDomain: Witness<C::ScalarField>,
 {
     fn dst(&self) -> Vec<u8> {
-        let mut dst = Vec::new();
-
-        let dst_original = self.hom.dst();
-
-        // Domain-separate them properly so concatenation is unambiguous.
-        // Prefix with their lengths so [a|b] and [ab|] don't collide.
-        dst.extend_from_slice(b"Lift(");
-        dst.extend_from_slice(&(dst_original.len() as u32).to_be_bytes());
-        dst.extend_from_slice(&dst_original);
-        dst.extend_from_slice(b")");
-
-        dst
+        homomorphism::domain_separate_dsts(b"Lift(", &[self.hom.dst()], b")")
     }
 }

@@ -166,3 +166,16 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> IntoIter
 // ===============================================================================
 // ============================= END: TRIVIAL SHAPE ==============================
 // ===============================================================================
+
+/// Builds a domain-separation tag for a composite homomorphism by prefixing each
+/// sub-DST with its length (big-endian), so e.g. `[a|b]` and `[ab|]` do not collide.
+#[inline]
+pub fn domain_separate_dsts(prefix: &[u8], parts: &[Vec<u8>], suffix: &[u8]) -> Vec<u8> {
+    let mut out = Vec::from(prefix);
+    for p in parts {
+        out.extend_from_slice(&(p.len() as u32).to_be_bytes());
+        out.extend_from_slice(p);
+    }
+    out.extend_from_slice(suffix);
+    out
+}
