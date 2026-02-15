@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use std::hash::Hash;
 use crate::{
     fiat_shamir,
     sigma_protocol::{
@@ -160,7 +161,7 @@ pub trait Trait<C: CurveGroup>:
         c: C::ScalarField,
     ) -> MsmInput<C::Affine, C::ScalarField>
     where
-        C::Affine: Copy + Eq + std::hash::Hash,
+        C::Affine: Copy + Eq + Hash,
     {
         // Per index: (term_i * β^i) ∪ (A_i, −β^i) ∪ (P_i, −c·β^i), then merge all with scale 1.
         let term_inputs: Vec<MsmInput<C::Affine, C::ScalarField>> = msm_terms

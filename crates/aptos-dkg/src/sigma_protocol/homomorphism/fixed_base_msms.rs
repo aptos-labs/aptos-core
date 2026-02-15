@@ -29,11 +29,7 @@ pub trait Trait:
     homomorphism::Trait<
     Codomain = Self::CodomainShape<Self::MsmOutput>,
     CodomainNormalized = Self::CodomainShape<Self::Base>,
->
-where
-    MsmInput<Self::Base, Self::Scalar>:
-        Clone + Debug + Eq + CanonicalSerialize + CanonicalDeserialize,
-{
+> {
     /// Type of MSM base points (e.g. curve affine element). CodomainNormalized is `CodomainShape<Base>`.
     type Base: Copy
         + Eq
@@ -44,7 +40,7 @@ where
         + Debug;
 
     /// Scalar type used in MSM terms.
-    type Scalar: ark_ff::PrimeField;
+    type Scalar: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq + Zero;
 
     /// The output type of evaluating an MSM. `Codomain` should equal `CodomainShape<MsmOutput>`, in the current version
     /// of the code.
