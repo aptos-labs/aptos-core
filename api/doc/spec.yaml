@@ -12249,6 +12249,7 @@ components:
       - events
       - timestamp
       - certified_subtrx
+      - encryption_key
       properties:
         version:
           $ref: '#/components/schemas/U64'
@@ -12283,6 +12284,8 @@ components:
           $ref: '#/components/schemas/U64'
         certified_subtrx:
           $ref: '#/components/schemas/ExportedCertifiedAggregatedChunkySubtranscript'
+        encryption_key:
+          $ref: '#/components/schemas/HexEncodedBytes'
     DKGResultTransaction:
       type: object
       required:

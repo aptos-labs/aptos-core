@@ -15,7 +15,7 @@
       "block_gas_limit_reached": false,
       "block_output_limit_reached": false,
       "block_effective_block_gas_units": 18,
-      "block_approx_output_size": 1976
+      "block_approx_output_size": 2092
     },
     "type": "block_epilogue_transaction"
   },
@@ -101,6 +101,21 @@
           "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "6500000"
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::decryption::PerBlockDecryptionKey",
+          "data": {
+            "decryption_key": {
+              "vec": []
+            },
+            "epoch": "1",
+            "round": "1"
           }
         },
         "type": "write_resource"
@@ -276,7 +291,7 @@
       "block_gas_limit_reached": false,
       "block_output_limit_reached": false,
       "block_effective_block_gas_units": 18,
-      "block_approx_output_size": 1976
+      "block_approx_output_size": 2092
     },
     "type": "block_epilogue_transaction"
   },
@@ -362,6 +377,21 @@
           "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "7000000"
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::decryption::PerBlockDecryptionKey",
+          "data": {
+            "decryption_key": {
+              "vec": []
+            },
+            "epoch": "1",
+            "round": "1"
           }
         },
         "type": "write_resource"
@@ -537,7 +567,7 @@
       "block_gas_limit_reached": false,
       "block_output_limit_reached": false,
       "block_effective_block_gas_units": 18,
-      "block_approx_output_size": 1976
+      "block_approx_output_size": 2092
     },
     "type": "block_epilogue_transaction"
   },
@@ -623,6 +653,21 @@
           "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "7500000"
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::decryption::PerBlockDecryptionKey",
+          "data": {
+            "decryption_key": {
+              "vec": []
+            },
+            "epoch": "1",
+            "round": "1"
           }
         },
         "type": "write_resource"
@@ -798,7 +843,7 @@
       "block_gas_limit_reached": false,
       "block_output_limit_reached": false,
       "block_effective_block_gas_units": 18,
-      "block_approx_output_size": 1976
+      "block_approx_output_size": 2092
     },
     "type": "block_epilogue_transaction"
   },
@@ -884,6 +929,21 @@
           "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "8000000"
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::decryption::PerBlockDecryptionKey",
+          "data": {
+            "decryption_key": {
+              "vec": []
+            },
+            "epoch": "1",
+            "round": "1"
           }
         },
         "type": "write_resource"
@@ -1059,7 +1119,7 @@
       "block_gas_limit_reached": false,
       "block_output_limit_reached": false,
       "block_effective_block_gas_units": 18,
-      "block_approx_output_size": 1976
+      "block_approx_output_size": 2092
     },
     "type": "block_epilogue_transaction"
   },
@@ -1145,6 +1205,21 @@
           "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "8500000"
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::decryption::PerBlockDecryptionKey",
+          "data": {
+            "decryption_key": {
+              "vec": []
+            },
+            "epoch": "1",
+            "round": "1"
           }
         },
         "type": "write_resource"
@@ -1320,7 +1395,7 @@
       "block_gas_limit_reached": false,
       "block_output_limit_reached": false,
       "block_effective_block_gas_units": 18,
-      "block_approx_output_size": 1976
+      "block_approx_output_size": 2092
     },
     "type": "block_epilogue_transaction"
   },
@@ -1406,6 +1481,21 @@
           "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "9000000"
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::decryption::PerBlockDecryptionKey",
+          "data": {
+            "decryption_key": {
+              "vec": []
+            },
+            "epoch": "1",
+            "round": "1"
           }
         },
         "type": "write_resource"
@@ -1581,7 +1671,7 @@
       "block_gas_limit_reached": false,
       "block_output_limit_reached": false,
       "block_effective_block_gas_units": 18,
-      "block_approx_output_size": 1976
+      "block_approx_output_size": 2092
     },
     "type": "block_epilogue_transaction"
   },
@@ -1667,6 +1757,21 @@
           "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "9500000"
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::decryption::PerBlockDecryptionKey",
+          "data": {
+            "decryption_key": {
+              "vec": []
+            },
+            "epoch": "1",
+            "round": "1"
           }
         },
         "type": "write_resource"
@@ -1842,7 +1947,7 @@
       "block_gas_limit_reached": false,
       "block_output_limit_reached": false,
       "block_effective_block_gas_units": 18,
-      "block_approx_output_size": 1976
+      "block_approx_output_size": 2092
     },
     "type": "block_epilogue_transaction"
   },
@@ -1928,6 +2033,21 @@
           "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "10000000"
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::decryption::PerBlockDecryptionKey",
+          "data": {
+            "decryption_key": {
+              "vec": []
+            },
+            "epoch": "1",
+            "round": "1"
           }
         },
         "type": "write_resource"
@@ -2103,7 +2223,7 @@
       "block_gas_limit_reached": false,
       "block_output_limit_reached": false,
       "block_effective_block_gas_units": 18,
-      "block_approx_output_size": 1976
+      "block_approx_output_size": 2092
     },
     "type": "block_epilogue_transaction"
   }

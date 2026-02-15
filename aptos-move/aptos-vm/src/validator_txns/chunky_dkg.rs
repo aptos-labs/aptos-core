@@ -8,9 +8,12 @@ use crate::{
     system_module_names::{FINISH_WITH_CHUNKY_DKG_RESULT, RECONFIGURATION_WITH_DKG_MODULE},
     AptosVM,
 };
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_logger::{info, warn};
 use aptos_types::{
-    dkg::chunky_dkg::{CertifiedAggregatedChunkySubtranscript, ChunkyDKGState},
+    dkg::chunky_dkg::{
+        AggregatedSubtranscript, CertifiedAggregatedChunkySubtranscript, CertifiedChunkyDKGOutput,
+        ChunkyDKGState, TEST_DIGEST_KEY,
+    },
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{ConfigurationResource, OnChainConfig, ValidatorSet},
     transaction::TransactionStatus,
@@ -27,14 +30,14 @@ use move_core_types::{
 };
 use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
-use serde::{Deserialize, Serialize};
-
 #[derive(Debug)]
 enum ExpectedFailure {
     // Move equivalent: `errors::invalid_argument(*)`
     EpochNotCurrent = 0x10201,
     MultiSigVerificationFailed = 0x010202,
     NotEnoughVotingPower = 0x010203,
+    TranscriptDeserializationFailed = 0x010204,
+    EncryptionKeyMismatch = 0x010205,
 
     // Move equivalent: `errors::invalid_state(*)`
     MissingResourceChunkyDKGState = 0x30201,
@@ -48,11 +51,6 @@ enum ExecutionFailure {
     Unexpected(VMStatus),
 }
 
-/// Wrapper so that transcript bytes can be used with verify_multi_signatures (requires CryptoHash).
-/// BCS(TranscriptBytesForSigning(bytes)) equals BCS(bytes), so the hash matches what was signed.
-#[derive(Clone, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
-struct TranscriptBytesForSigning(Vec<u8>);
-
 impl AptosVM {
     pub(crate) fn process_chunky_dkg_result(
         &self,
@@ -60,25 +58,32 @@ impl AptosVM {
         module_storage: &impl AptosModuleStorage,
         log_context: &AdapterLogSchema,
         session_id: SessionId,
-        transcript: CertifiedAggregatedChunkySubtranscript,
+        dkg_output: CertifiedChunkyDKGOutput,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
+        info!("Process chunky DKG Result");
         match self.process_chunky_dkg_result_inner(
             resolver,
             module_storage,
             log_context,
             session_id,
-            transcript,
+            dkg_output,
         ) {
             Ok((vm_status, vm_output)) => Ok((vm_status, vm_output)),
-            Err(ExecutionFailure::Expected(failure)) => Ok((
-                VMStatus::MoveAbort {
-                    location: AbortLocation::Script,
-                    code: failure as u64,
-                    message: None,
-                },
-                VMOutput::empty_with_status(TransactionStatus::Discard(StatusCode::ABORTED)),
-            )),
-            Err(ExecutionFailure::Unexpected(vm_status)) => Err(vm_status),
+            Err(ExecutionFailure::Expected(failure)) => {
+                warn!("Execution Failure Expected: {:?}", failure);
+                Ok((
+                    VMStatus::MoveAbort {
+                        location: AbortLocation::Script,
+                        code: failure as u64,
+                        message: None,
+                    },
+                    VMOutput::empty_with_status(TransactionStatus::Discard(StatusCode::ABORTED)),
+                ))
+            },
+            Err(ExecutionFailure::Unexpected(vm_status)) => {
+                warn!("Execution failure unexpected: {:?}", vm_status);
+                Err(vm_status)
+            },
         }
     }
 
@@ -88,13 +93,18 @@ impl AptosVM {
         module_storage: &impl AptosModuleStorage,
         log_context: &AdapterLogSchema,
         session_id: SessionId,
-        transcript: CertifiedAggregatedChunkySubtranscript,
+        dkg_output: CertifiedChunkyDKGOutput,
     ) -> Result<(VMStatus, VMOutput), ExecutionFailure> {
+        let CertifiedChunkyDKGOutput {
+            certified_transcript,
+            encryption_key,
+        } = dkg_output;
+
         let CertifiedAggregatedChunkySubtranscript {
             metadata,
             transcript_bytes,
             signature,
-        } = transcript;
+        } = certified_transcript;
 
         let config_resource = ConfigurationResource::fetch_config(resolver).ok_or(
             ExecutionFailure::Expected(ExpectedFailure::MissingResourceConfiguration),
@@ -126,19 +136,30 @@ impl AptosVM {
             .check_voting_power(authors.iter(), true)
             .map_err(|_| ExecutionFailure::Expected(ExpectedFailure::NotEnoughVotingPower))?;
 
-        // Verify multi-sig (signature is over BCS(aggregated_subtranscript) = transcript_bytes).
+        // TODO(ibalajiarun): Figure out how to verify without bcs deserialization
+        let trx: AggregatedSubtranscript = bcs::from_bytes(&transcript_bytes).map_err(|_| {
+            ExecutionFailure::Expected(ExpectedFailure::TranscriptDeserializationFailed)
+        })?;
         verifier
-            .verify_multi_signatures(
-                &TranscriptBytesForSigning(transcript_bytes.clone()),
-                &signature,
-            )
+            .verify_multi_signatures(&trx, &signature)
             .map_err(|_| ExecutionFailure::Expected(ExpectedFailure::MultiSigVerificationFailed))?;
+
+        // Rederive encryption key from the transcript and verify it matches the claimed key.
+        let derived_key_bytes = trx
+            .derive_encryption_key_bytes(TEST_DIGEST_KEY.tau_g2)
+            .map_err(|_| ExecutionFailure::Expected(ExpectedFailure::EncryptionKeyMismatch))?;
+        if derived_key_bytes != encryption_key {
+            return Err(ExecutionFailure::Expected(
+                ExpectedFailure::EncryptionKeyMismatch,
+            ));
+        }
 
         let mut gas_meter = UnmeteredGasMeter;
         let mut session = self.new_session(resolver, session_id, None);
         let args = vec![
             MoveValue::Signer(AccountAddress::ONE),
             transcript_bytes.as_move_value(),
+            encryption_key.as_move_value(),
         ];
 
         let traversal_storage = TraversalStorage::new();

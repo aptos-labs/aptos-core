@@ -597,6 +597,7 @@ impl Session {
                         entry_function.function()
                     )
                 },
+                // TODO(ibalajiarun): How do you simulate encrypted transaction?
                 TransactionExecutable::Empty | TransactionExecutable::Encrypted => {
                     unimplemented!(
                         "empty/encrypted executable -- unclear how this should be handled"
