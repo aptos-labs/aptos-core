@@ -165,6 +165,8 @@ pub enum FeatureFlag {
     VM_BINARY_FORMAT_V10 = 106,
     /// Whether SLH-DSA-SHA2-128s signature scheme is enabled for transaction authentication.
     SLH_DSA_SHA2_128S_SIGNATURE = 107,
+    /// Whether EncryptedTransactions is enabled
+    ENCRYPTED_TRANSACTIONS = 108,
 }
 
 impl FeatureFlag {
@@ -472,6 +474,10 @@ impl Features {
 
     pub fn is_session_continuation_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::SESSION_CONTINUATION)
+    }
+
+    pub fn is_encrypted_transactions_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ENCRYPTED_TRANSACTIONS)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

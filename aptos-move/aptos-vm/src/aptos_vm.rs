@@ -428,7 +428,9 @@ impl AptosVM {
                     // avoids unnecessary overhead in the common case.
                     !f.module().address().is_special()
                 },
-                Ok(TransactionExecutableRef::Empty) | Err(_) => false,
+                Ok(TransactionExecutableRef::Empty)
+                | Ok(TransactionExecutableRef::Encrypted)
+                | Err(_) => false,
             }
     }
 
@@ -1096,7 +1098,17 @@ impl AptosVM {
                     )
                 })?;
             },
-
+            TransactionExecutableRef::Encrypted => {
+                // If the executable is still `Encrypted` here, it means that decryption
+                // failed. The transaction is kept on chain as aborted.
+                // TODO(ibalajiarun): Figure out better status code
+                let status_code = StatusCode::ABORTED;
+                let vm_status = VMStatus::Executed;
+                let txn_status =
+                    TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(status_code)));
+                let vm_output = VMOutput::empty_with_status(txn_status);
+                return Ok((vm_status, vm_output));
+            },
             // Not reachable as this function should only be invoked for entry or script
             // transaction payload.
             _ => unreachable!("Only scripts or entry functions are executed"),
@@ -1253,10 +1265,13 @@ impl AptosVM {
                     bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| invariant_violation_error())?
                 }
             },
-            TransactionExecutableRef::Script(_) => {
+            TransactionExecutableRef::Script(_) | TransactionExecutableRef::Encrypted => {
                 let s = VMStatus::error(
                     StatusCode::FEATURE_UNDER_GATING,
-                    Some("Multisig transaction does not support script payload".to_string()),
+                    Some(
+                        "Multisig transaction does not support script or encrypted payload"
+                            .to_string(),
+                    ),
                 );
                 return Ok((s, discarded_output(StatusCode::FEATURE_UNDER_GATING)));
             },
@@ -1951,6 +1966,15 @@ impl AptosVM {
                     Some("Orderless transactions are not yet supported".to_string()),
                 ));
             }
+        }
+
+        if transaction.payload().is_encrypted_variant()
+            && !self.features().is_encrypted_transactions_enabled()
+        {
+            return Err(VMStatus::error(
+                StatusCode::FEATURE_UNDER_GATING,
+                Some("Encrypted transactions are not yet supported".to_string()),
+            ));
         }
 
         // The prologue MUST be run AFTER any validation. Otherwise you may run prologue and hit
@@ -3267,7 +3291,9 @@ impl VMValidator for AptosVM {
             }
         }
 
-        if transaction.payload().is_encrypted_variant() {
+        if transaction.payload().is_encrypted_variant()
+            && !self.features().is_encrypted_transactions_enabled()
+        {
             return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
         }
         let txn = match transaction.check_signature() {

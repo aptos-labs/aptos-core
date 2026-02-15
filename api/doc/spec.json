@@ -16387,7 +16387,8 @@
           "changes",
           "events",
           "timestamp",
-          "certified_subtrx"
+          "certified_subtrx",
+          "encryption_key"
         ],
         "properties": {
           "version": {
@@ -16437,6 +16438,9 @@
           },
           "certified_subtrx": {
             "$ref": "#/components/schemas/ExportedCertifiedAggregatedChunkySubtranscript"
+          },
+          "encryption_key": {
+            "$ref": "#/components/schemas/HexEncodedBytes"
           }
         }
       },
