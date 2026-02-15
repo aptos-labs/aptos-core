@@ -27,6 +27,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+pub mod agent;
 pub mod cli;
 pub mod inference;
 pub mod package_prove;
@@ -44,6 +45,9 @@ pub fn run_move_prover_v2<W: WriteColor>(
     options: Options,
     experiments: Vec<String>,
 ) -> anyhow::Result<()> {
+    if options.inference.inference && options.agent.ai.is_some() {
+        return agent::run_agent_inference(options, experiments);
+    }
     let now = Instant::now();
     let mut env = create_move_prover_v2_model(error_writer, options.clone(), experiments)?;
     if options.inference.inference {

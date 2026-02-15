@@ -5402,7 +5402,9 @@ impl<'env> FunctionEnv<'env> {
 
     /// Returns true if either the name or simple name of this function matches the given string
     pub fn matches_name(&self, name: &str) -> bool {
-        name.eq(&*self.get_simple_name_string()) || name.eq(&*self.get_name_string())
+        name == *self.get_simple_name_string()
+            || name == &*self.get_name_string()
+            || name == self.get_full_name_with_address()
     }
 
     /// Determine whether this function is explicitly deactivated for verification.
