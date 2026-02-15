@@ -23,7 +23,7 @@ mod approved_execution_hashes;
 mod aptos_features;
 mod aptos_version;
 mod chain_id;
-mod chunky_dkg_config;
+pub mod chunky_dkg_config;
 mod commit_history;
 mod consensus_config;
 mod execution_config;
