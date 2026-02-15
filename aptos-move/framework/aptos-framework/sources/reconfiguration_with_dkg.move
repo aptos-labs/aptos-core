@@ -4,6 +4,7 @@ module aptos_framework::reconfiguration_with_dkg {
     use aptos_framework::chunky_dkg;
     use aptos_framework::chunky_dkg_config;
     use aptos_framework::consensus_config;
+    use aptos_framework::decryption;
     use aptos_framework::dkg;
     use aptos_framework::execution_config;
     use aptos_framework::gas_schedule;
@@ -81,6 +82,7 @@ module aptos_framework::reconfiguration_with_dkg {
         randomness_config_seqnum::on_new_epoch(framework);
         randomness_config::on_new_epoch(framework);
         randomness_api_v0_config::on_new_epoch(framework);
+        decryption::on_new_epoch(framework);
         reconfiguration::reconfigure();
     }
 
@@ -112,16 +114,19 @@ module aptos_framework::reconfiguration_with_dkg {
 
     /// Complete the current Chunky DKG session with the given result.
     /// No-op if Chunky DKG is not enabled.
+    /// Buffers the derived encryption key for the next epoch.
     /// finish(account) is invoked only when both DKG and Chunky DKG have no in-progress session
     /// (via maybe_finish_reconfig_with_chunky_dkg).
     fun finish_with_chunky_dkg_result(
-        account: &signer, chunky_dkg_result: vector<u8>
+        account: &signer, chunky_dkg_result: vector<u8>, encryption_key: vector<u8>
     ) {
         if (!chunky_dkg_config::enabled()) {
             return;
         };
 
         chunky_dkg::finish(chunky_dkg_result);
+        let next_epoch = reconfiguration::current_epoch() + 1;
+        decryption::set_for_next_epoch(next_epoch, encryption_key);
         maybe_finish_reconfig_with_chunky_dkg(account);
     }
 }
