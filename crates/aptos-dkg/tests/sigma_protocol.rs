@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_crypto::arkworks::{
-    msm::{IsMsmInput, MsmInput},
+    msm::MsmInput,
     random::{sample_field_element, sample_field_elements},
 };
 use aptos_dkg::{
@@ -117,30 +117,31 @@ mod schnorr {
     impl<C: CurveGroup<ScalarField = Fp<P, N>>, const N: usize, P: FpConfig<N>>
         fixed_base_msms::Trait for Schnorr<C>
     {
+        type Base = C::Affine;
         type CodomainShape<T>
             = CodomainShape<T>
         where
             T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-        type MsmInput = MsmInput<C::Affine, C::ScalarField>;
         type MsmOutput = C;
         type Scalar = C::ScalarField;
 
-        fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
+        fn msm_terms(
+            &self,
+            input: &Self::Domain,
+        ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>> {
             CodomainShape(MsmInput {
                 bases: vec![self.G],
                 scalars: vec![*input],
             })
         }
 
-        fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
+        fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
             // for the homomorphism we only need `input.bases()[0] * input.scalars()[0]`
             // but the verification needs a 3-term MSM... so we should really do a custom MSM which dispatches based on length TODO
             C::msm(input.bases(), input.scalars()).expect("MSM failed in Schnorr")
         }
 
-        fn batch_normalize(
-            msm_output: Vec<Self::MsmOutput>,
-        ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
+        fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
             C::normalize_batch(&msm_output)
         }
     }

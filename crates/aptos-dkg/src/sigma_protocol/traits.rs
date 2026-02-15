@@ -14,23 +14,25 @@ use crate::{
 };
 use anyhow::ensure;
 use aptos_crypto::{
-    arkworks::{msm::IsMsmInput, random::sample_field_element},
+    arkworks::{
+        msm::{merge_scaled_msm_terms, MsmInput},
+        random::sample_field_element,
+    },
     utils,
 };
 use ark_ec::CurveGroup;
-use ark_ff::{Field, Fp, FpConfig, PrimeField, Zero};
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress};
+use ark_ff::{Field, Fp, FpConfig, PrimeField};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand_core::{CryptoRng, RngCore};
 use serde::Serialize;
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 
-// `CurveGroup` is needed here because the code does `into_affine()` // TODO: not anymore!!!
 pub trait Trait<C: CurveGroup>:
     fixed_base_msms::Trait<
         Domain: Witness<C::ScalarField>,
+        Base = C::Affine,
         MsmOutput = C,
         Scalar = C::ScalarField,
-        MsmInput: IsMsmInput<Base = C::Affine>, // need to be a bit specific because this code multiplies scalars and does into_affine(), etc // TODO: not anymore!!!
     > + Sized
     + CanonicalSerialize
 {
@@ -44,7 +46,11 @@ pub trait Trait<C: CurveGroup>:
         statement: Self::Codomain,
         cntxt: &Ct, // for SoK purposes
         rng: &mut R,
-    ) -> (Proof<<Self as fixed_base_msms::Trait>::Scalar, Self>, <Self as homomorphism::Trait>::CodomainNormalized) { // or C::ScalarField
+    ) -> (
+        Proof<<Self as fixed_base_msms::Trait>::Scalar, Self>,
+        <Self as homomorphism::Trait>::CodomainNormalized,
+    ) {
+        // or C::ScalarField
         prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
     }
 
@@ -57,14 +63,12 @@ pub trait Trait<C: CurveGroup>:
         rng: &mut R,
     ) -> anyhow::Result<()>
     where
-        H: homomorphism::Trait<Domain = Self::Domain, CodomainNormalized = Self::CodomainNormalized>, // need this because `H` is technically different from `Self` due to lifetime changes
+        H: homomorphism::Trait<
+            Domain = Self::Domain,
+            CodomainNormalized = Self::CodomainNormalized,
+        >, // need this because `H` is technically different from `Self` due to lifetime changes
     {
-        let msm_terms = self.msm_terms_for_verify::<_, H, _>(
-            public_statement,
-            proof,
-            cntxt,
-            rng,
-        );
+        let msm_terms = self.msm_terms_for_verify::<_, H, _>(public_statement, proof, cntxt, rng);
 
         let msm_result = Self::msm_eval(msm_terms);
         ensure!(msm_result == C::ZERO); // or MsmOutput::zero()
@@ -109,9 +113,12 @@ pub trait Trait<C: CurveGroup>:
         proof: &Proof<C::ScalarField, H>,
         cntxt: &Ct,
         rng: &mut R,
-    ) -> Self::MsmInput
+    ) -> MsmInput<C::Affine, C::ScalarField>
     where
-        H: homomorphism::Trait<Domain = Self::Domain, CodomainNormalized = Self::CodomainNormalized>, // Need this because the lifetime was changed
+        H: homomorphism::Trait<
+            Domain = Self::Domain,
+            CodomainNormalized = Self::CodomainNormalized,
+        >, // Need this because the lifetime was changed
     {
         let prover_first_message = match &proof.first_proof_item {
             FirstProofItem::Commitment(A) => A,
@@ -122,7 +129,13 @@ pub trait Trait<C: CurveGroup>:
 
         let number_of_beta_powers = public_statement.clone().into_iter().count(); // TODO: maybe pass the into_iter version in merge_msm_terms?
 
-        let (c, powers_of_beta) = self.compute_verifier_challenges(public_statement, prover_first_message, cntxt, number_of_beta_powers, rng);
+        let (c, powers_of_beta) = self.compute_verifier_challenges(
+            public_statement,
+            prover_first_message,
+            cntxt,
+            number_of_beta_powers,
+            rng,
+        );
 
         let msm_terms_for_prover_response = self.msm_terms(&proof.z);
 
@@ -140,57 +153,35 @@ pub trait Trait<C: CurveGroup>:
     /// added here because it's convenient (and slightly faster) to do that when the c factor is being added
     #[allow(non_snake_case)]
     fn merge_msm_terms(
-        msm_terms: Vec<Self::MsmInput>,
+        msm_terms: Vec<MsmInput<C::Affine, C::ScalarField>>,
         prover_first_message: &Self::CodomainNormalized,
         statement: &Self::CodomainNormalized,
         powers_of_beta: &[C::ScalarField],
         c: C::ScalarField,
-    ) -> Self::MsmInput
+    ) -> MsmInput<C::Affine, C::ScalarField>
+    where
+        C::Affine: Copy + Eq + std::hash::Hash,
     {
-        // Aggregate (basis, scalar) pairs so each basis appears at most once (scalars summed).
-        // Key = canonical serialization of basis (curve points don't implement Hash).
-        let mut aggregated: HashMap<Vec<u8>, (C::Affine, C::ScalarField)> = HashMap::new();
-
-        for (((term, A), P), beta_power) in msm_terms
+        // Per index: (term_i * β^i) ∪ (A_i, −β^i) ∪ (P_i, −c·β^i), then merge all with scale 1.
+        let term_inputs: Vec<MsmInput<C::Affine, C::ScalarField>> = msm_terms
             .into_iter()
             .zip(prover_first_message.clone().into_iter())
             .zip(statement.clone().into_iter())
-            .zip(powers_of_beta)
-        {
-            let mut bases = term.bases().to_vec();
-            let mut scalars = term.scalars().to_vec();
-
-            // Multiply scalars by βᶦ
-            for scalar in scalars.iter_mut() {
-                *scalar *= beta_power;
-            }
-
-            // Add prover + statement contributions
-            bases.push(A); // this is the element `A` from the prover's first message
-            bases.push(P); // this is the element `P` from the statement, but we'll need `P^c`
-
-            scalars.push(-(*beta_power));
-            scalars.push(-c * beta_power);
-
-            for (base, scalar) in bases.into_iter().zip(scalars) {
-                let mut key = Vec::new();
-                base.serialize_with_mode(&mut key, Compress::No)
-                    .expect("basis serialization");
-                aggregated
-                    .entry(key)
-                    .and_modify(|(_, s)| *s += scalar)
-                    .or_insert((base, scalar));
-            }
-        }
-
-        // Build final MSM input, skipping terms with zero scalar (0·P = identity).
-        let (final_basis, final_scalars): (Vec<_>, Vec<_>) = aggregated
-            .into_values()
-            .filter(|(_, s)| !s.is_zero())
-            .unzip();
-
-        Self::MsmInput::new(final_basis, final_scalars)
-            .expect("Something went wrong constructing MSM input")
+            .zip(powers_of_beta.iter().copied())
+            .map(|(((term, A), P), beta_power)| {
+                let mut bases = term.bases().to_vec();
+                bases.push(A);
+                bases.push(P);
+                let mut scalars: Vec<C::ScalarField> =
+                    term.scalars().iter().map(|s| *s * beta_power).collect();
+                scalars.push(-beta_power);
+                scalars.push(-c * beta_power);
+                MsmInput::new(bases, scalars).expect("sigma protocol MSM term")
+            })
+            .collect();
+        let refs: Vec<&MsmInput<C::Affine, C::ScalarField>> = term_inputs.iter().collect();
+        let ones: Vec<C::ScalarField> = (0..refs.len()).map(|_| C::ScalarField::ONE).collect();
+        merge_scaled_msm_terms::<C>(&refs, &ones)
     }
 }
 

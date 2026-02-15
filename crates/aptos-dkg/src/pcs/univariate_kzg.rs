@@ -5,7 +5,7 @@ use crate::sigma_protocol::{
     homomorphism,
     homomorphism::{fixed_base_msms, fixed_base_msms::Trait, TrivialShape as CodomainShape},
 };
-use aptos_crypto::arkworks::msm::{IsMsmInput, MsmInput};
+use aptos_crypto::arkworks::msm::MsmInput;
 use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use std::fmt::Debug;
@@ -41,15 +41,18 @@ impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<'a, E> {
 }
 
 impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
+    type Base = E::G1Affine;
     type CodomainShape<T>
         = CodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-    type MsmInput = MsmInput<E::G1Affine, E::ScalarField>;
     type MsmOutput = E::G1;
     type Scalar = E::ScalarField;
 
-    fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
+    fn msm_terms(
+        &self,
+        input: &Self::Domain,
+    ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>> {
         debug_assert!(
             self.lagr_g1.len() > input.1.len(),
             "Not enough Lagrange basis elements for univariate KZG: required {}, got {}",
@@ -67,13 +70,11 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
         })
     }
 
-    fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
+    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
         E::G1::msm(input.bases(), input.scalars()).expect("MSM failed in univariate KZG")
     }
 
-    fn batch_normalize(
-        msm_output: Vec<Self::MsmOutput>,
-    ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
+    fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
         E::G1::normalize_batch(&msm_output)
     }
 }

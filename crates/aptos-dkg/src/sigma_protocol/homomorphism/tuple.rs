@@ -12,7 +12,7 @@ use crate::{
 };
 use anyhow::ensure;
 use aptos_crypto::{
-    arkworks::{msm::IsMsmInput, random::sample_field_element},
+    arkworks::{msm::MsmInput, random::sample_field_element},
     utils,
 };
 use ark_ec::{pairing::Pairing, CurveGroup};
@@ -201,7 +201,7 @@ where
 /// Implementation of `FixedBaseMsms` for a tuple of two homomorphisms.
 ///
 /// This allows combining two homomorphisms that share the same `Domain`.
-/// For simplicity, we currently require that the MSM types (`MsmInput` and `MsmOutput`) match;
+/// For simplicity, we currently require that the MSM types (Base, Scalar, MsmOutput) match;
 /// this ensures compatibility with batch verification in a Σ-protocol and may be relaxed in the future.
 /// For the moment, we **implicitly** assume that the two msm_eval methods are identical, but is probably
 /// not necessary through enums.
@@ -212,32 +212,34 @@ where
     H1: fixed_base_msms::Trait,
     H2: fixed_base_msms::Trait<
         Domain = H1::Domain,
-        MsmInput = H1::MsmInput,
+        Base = H1::Base,
+        Scalar = H1::Scalar,
         MsmOutput = H1::MsmOutput,
     >,
 {
+    type Base = H1::Base;
     type CodomainShape<T>
         = TupleCodomainShape<H1::CodomainShape<T>, H2::CodomainShape<T>>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-    type MsmInput = H1::MsmInput;
     type MsmOutput = H1::MsmOutput;
     type Scalar = H1::Scalar;
 
     /// Returns the MSM terms for each homomorphism, combined into a tuple.
-    fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
+    fn msm_terms(
+        &self,
+        input: &Self::Domain,
+    ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>> {
         let terms1 = self.hom1.msm_terms(input);
         let terms2 = self.hom2.msm_terms(input);
         TupleCodomainShape(terms1, terms2)
     }
 
-    fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
+    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
         H1::msm_eval(input)
     }
 
-    fn batch_normalize(
-        msm_output: Vec<Self::MsmOutput>,
-    ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
+    fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
         H1::batch_normalize(msm_output)
     }
 }
@@ -246,7 +248,9 @@ impl<C: CurveGroup, H1, H2> sigma_protocol::Trait<C> for TupleHomomorphism<H1, H
 where
     H1: sigma_protocol::Trait<C>,
     H2: sigma_protocol::Trait<C>,
-    H2: fixed_base_msms::Trait<Domain = H1::Domain, MsmInput = H1::MsmInput>, // Huh MsmOutput = H1::MsmOutput yields compiler error??
+    H2: homomorphism::Trait<Domain = H1::Domain>,
+    H1: fixed_base_msms::Trait<Base = C::Affine, Scalar = C::ScalarField>,
+    H2: fixed_base_msms::Trait<Base = C::Affine, Scalar = C::ScalarField>,
 {
     /// Concatenate the DSTs of the two homomorphisms, plus some
     /// additional metadata to ensure uniqueness.
@@ -301,8 +305,8 @@ where
         &self,
         input: &H1::Domain,
     ) -> (
-        H1::CodomainShape<H1::MsmInput>,
-        H2::CodomainShape<H2::MsmInput>,
+        H1::CodomainShape<MsmInput<H1::Base, H1::Scalar>>,
+        H2::CodomainShape<MsmInput<H2::Base, H2::Scalar>>,
     ) {
         let terms1 = self.hom1.msm_terms(input);
         let terms2 = self.hom2.msm_terms(input);
@@ -310,14 +314,20 @@ where
     }
 
     // TODO: maybe remove, see comment below
-    pub fn check_first_msm_eval(&self, input: H1::MsmInput) -> anyhow::Result<()> {
+    pub fn check_first_msm_eval(
+        &self,
+        input: MsmInput<H1::Base, H1::Scalar>,
+    ) -> anyhow::Result<()> {
         let result = H1::msm_eval(input);
         ensure!(result == H1::MsmOutput::zero());
         Ok(())
     }
 
     // TODO: Doesn't get used atm... so we're implicitly mixing different MSM code :-/
-    pub fn check_second_msm_eval(&self, input: H2::MsmInput) -> anyhow::Result<()> {
+    pub fn check_second_msm_eval(
+        &self,
+        input: MsmInput<H2::Base, H2::Scalar>,
+    ) -> anyhow::Result<()> {
         let result = H2::msm_eval(input);
         ensure!(result == H2::MsmOutput::zero());
         Ok(())
@@ -369,7 +379,10 @@ where
         proof: &Proof<H1::Scalar, H>,
         cntxt: &Ct,
         rng: &mut R,
-    ) -> (H1::MsmInput, H2::MsmInput)
+    ) -> (
+        MsmInput<H1::Base, H1::Scalar>,
+        MsmInput<H2::Base, H2::Scalar>,
+    )
     where
         H: homomorphism::Trait<
             Domain = <Self as homomorphism::Trait>::Domain,

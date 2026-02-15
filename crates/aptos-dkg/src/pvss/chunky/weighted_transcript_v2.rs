@@ -35,7 +35,7 @@ use crate::{
 use anyhow::bail;
 use aptos_crypto::{
     arkworks::{
-        msm::{self, IsMsmInput},
+        msm,
         random::{
             sample_field_element, sample_field_elements, unsafe_random_point,
             unsafe_random_point_group, unsafe_random_points, UniformRand,
@@ -256,7 +256,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     }
 
     #[allow(non_snake_case)]
-    fn deal<A: Serialize + Clone, R: rand_core::RngCore + rand_core::CryptoRng>(
+    fn deal<A: Serialize + Clone, R: RngCore + CryptoRng>(
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         _ssk: &Self::SigningSecretKey,
@@ -312,10 +312,11 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     }
 
     #[allow(non_snake_case)]
-    fn generate<R>(sc: &Self::SecretSharingConfig, pp: &Self::PublicParameters, rng: &mut R) -> Self
-    where
-        R: rand_core::RngCore + rand_core::CryptoRng,
-    {
+    fn generate<R: RngCore + CryptoRng>(
+        sc: &Self::SecretSharingConfig,
+        pp: &Self::PublicParameters,
+        rng: &mut R,
+    ) -> Self {
         let num_chunks_per_share = num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize;
 
         let V0 = unsafe_random_point::<E::G2, _>(rng);
@@ -354,11 +355,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcript<E> {
     // why are N and P needed? TODO: maybe integrate into deal()
     #[allow(non_snake_case)]
-    pub fn encrypt_chunked_shares<
-        'a,
-        A: Serialize + Clone,
-        R: rand_core::RngCore + rand_core::CryptoRng,
-    >(
+    pub fn encrypt_chunked_shares<'a, A: Serialize + Clone, R: RngCore + CryptoRng>(
         f_evals: &[E::ScalarField],
         eks: &[keys::EncryptPubKey<E>],
         pp: &PublicParameters<E>,

@@ -34,7 +34,7 @@ use anyhow::bail;
 use aptos_crypto::{
     arkworks::{
         self,
-        msm::{self, IsMsmInput, MsmInput},
+        msm::{self, MsmInput},
         random::{
             sample_field_element, sample_field_elements, unsafe_random_point,
             unsafe_random_point_group, unsafe_random_points, UniformRand,
@@ -291,7 +291,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     }
 
     #[allow(non_snake_case)]
-    fn deal<A: Serialize + Clone, R: rand_core::RngCore + rand_core::CryptoRng>(
+    fn deal<A: Serialize + Clone, R: RngCore + CryptoRng>(
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         _ssk: &Self::SigningSecretKey,
@@ -377,10 +377,11 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     }
 
     #[allow(non_snake_case)]
-    fn generate<R>(sc: &Self::SecretSharingConfig, pp: &Self::PublicParameters, rng: &mut R) -> Self
-    where
-        R: rand_core::RngCore + rand_core::CryptoRng,
-    {
+    fn generate<R: RngCore + CryptoRng>(
+        sc: &Self::SecretSharingConfig,
+        pp: &Self::PublicParameters,
+        rng: &mut R,
+    ) -> Self {
         let num_chunks_per_share = num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize;
 
         let V0 = unsafe_random_point::<E::G2, _>(rng);
