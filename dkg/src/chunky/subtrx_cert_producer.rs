@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    chunky::types::{AggregatedSubtranscript, CertifiedAggregatedSubtranscript},
+    chunky::types::CertifiedAggregatedSubtranscript,
     counters,
     types::{
         ChunkyDKGSubtranscriptSignatureRequest, ChunkyDKGSubtranscriptSignatureResponse, DKGMessage,
@@ -16,7 +16,9 @@ use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_reliable_broadcast::{BroadcastStatus, ReliableBroadcast};
 use aptos_types::{
-    dkg::chunky_dkg::ChunkyDKGConfig, epoch_state::EpochState, validator_verifier::VerifyError,
+    dkg::chunky_dkg::{AggregatedSubtranscript, ChunkyDKGConfig},
+    epoch_state::EpochState,
+    validator_verifier::VerifyError,
 };
 use futures::future::AbortHandle;
 use futures_util::future::Abortable;
@@ -173,6 +175,9 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkySubtranscriptCertificationState> 
                 .epoch_state
                 .verifier
                 .aggregate_signatures(sig_aggregator.signatures.iter())?;
+            self.epoch_state
+                .verifier
+                .verify_multi_signatures(&self.aggregated_subtranscript, &aggregate_signature)?;
 
             Some(CertifiedAggregatedSubtranscript {
                 aggregated_subtranscript: self.aggregated_subtranscript.clone(),

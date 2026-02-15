@@ -2,12 +2,12 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_crypto::HashValue;
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_crypto_derive::CryptoHasher;
 use aptos_dkg::pvss::Player;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     dkg::{
-        chunky_dkg::{ChunkyDKGTranscript, ChunkySubtranscript},
+        chunky_dkg::{AggregatedSubtranscript, ChunkyDKGTranscript},
         DKGTranscriptMetadata,
     },
 };
@@ -70,17 +70,7 @@ impl ChunkyDKGSubtranscriptSignatureResponse {
         }
     }
 }
-
-/// An aggregated transcript with the list of dealers who contributed to it.
-#[allow(dead_code)]
-#[derive(Clone, Debug, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
-pub struct AggregatedSubtranscript {
-    pub subtranscript: ChunkySubtranscript,
-    pub dealers: Vec<Player>,
-}
-
 /// A validated aggregated subtranscript with an aggregate signature that can verify it.
-#[allow(dead_code)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CertifiedAggregatedSubtranscript {
     pub aggregated_subtranscript: AggregatedSubtranscript,

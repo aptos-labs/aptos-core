@@ -153,7 +153,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     if let Some(tx) = self.dkg_start_event_tx.as_ref() {
                         if let Ok(dkg_start_event) = DKGStartEvent::try_from(&event) {
                             let _ = tx.push((), dkg_start_event);
-                            return Ok(());
                         } else {
                             error!("[DKG] on_dkg_start_notification: failed in converting a contract event to a DKGStartEvent!");
                         }
@@ -165,7 +164,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         match ChunkyDKGStartEvent::try_from(&event) {
                             Ok(dkg_start_event) => {
                                 let _ = tx.push((), dkg_start_event);
-                                return Ok(());
                             },
                             Err(e) => {
                                 error!("[DKG] Failed conversion to ChunkyDKGStartEvent: {}", e);
