@@ -1442,6 +1442,7 @@ name = "aptos-dkg-runtime"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-batch-encryption",
  "aptos-bounded-executor",
  "aptos-channels",
  "aptos-config",
@@ -1462,6 +1463,7 @@ dependencies = [
  "aptos-time-service",
  "aptos-types",
  "aptos-validator-transaction-pool",
+ "ark-std 0.5.0",
  "async-trait",
  "bcs 0.1.4",
  "bytes",
