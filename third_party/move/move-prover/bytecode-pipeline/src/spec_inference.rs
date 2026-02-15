@@ -104,7 +104,10 @@ use move_model::{
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     exp_simplifier::ExpSimplifier,
     model::{FunctionEnv, GlobalEnv, Loc, ModuleId, NodeId, QualifiedId, StructEnv, StructId},
-    pragmas::INFERENCE_PRAGMA,
+    pragmas::{
+        CONDITION_INFERRED_PROP, CONDITION_INFERRED_SATHARD, CONDITION_INFERRED_VACUOUS,
+        INFERENCE_PRAGMA,
+    },
     sourcifier::Sourcifier,
     symbol::Symbol,
     ty::{PrimitiveType, Type, BOOL_TYPE, NUM_TYPE},
@@ -126,15 +129,6 @@ use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     fmt,
 };
-
-/// Property name used to mark inferred spec conditions
-const INFERRED_PROPERTY: &str = "inferred";
-
-/// Symbol value for inferred conditions that are vacuously strong (unconstrained quant vars)
-const VACUOUS_VALUE: &str = "vacuous";
-
-/// Symbol value for inferred conditions with quantifiers hard for SAT/SMT solvers
-const SATHARD_VALUE: &str = "sathard";
 
 // =================================================================================================
 // WP State and Annotation
@@ -688,7 +682,7 @@ impl FunctionTargetProcessor for SpecInferenceProcessor {
     ) -> fmt::Result {
         writeln!(f, "\n\n==== spec-inference results ====\n")?;
 
-        let inferred_sym = env.symbol_pool().make(INFERRED_PROPERTY);
+        let inferred_sym = env.symbol_pool().make(CONDITION_INFERRED_PROP);
 
         // Use Sourcifier to print functions with their inferred specs
         let sourcifier = Sourcifier::new(env, true);
@@ -744,9 +738,9 @@ fn update_spec<'env>(
 ) {
     let env = fun_env.module_env.env;
     let pool = env.symbol_pool();
-    let inferred_sym = pool.make(INFERRED_PROPERTY);
-    let vacuous_sym = pool.make(VACUOUS_VALUE);
-    let sathard_sym = pool.make(SATHARD_VALUE);
+    let inferred_sym = pool.make(CONDITION_INFERRED_PROP);
+    let vacuous_sym = pool.make(CONDITION_INFERRED_VACUOUS);
+    let sathard_sym = pool.make(CONDITION_INFERRED_SATHARD);
     let loc = fun_env.get_loc();
 
     // Read the inference pragma to decide what to emit.
@@ -820,6 +814,7 @@ fn update_spec<'env>(
                 .map(|e| mk_cond(ConditionKind::AbortsIf, e)),
         );
     }
+
 }
 
 /// Checks that all inferred conditions only reference parameter temporaries.
@@ -846,7 +841,7 @@ fn check_bad_temps(fun_env: &FunctionEnv) {
 /// of equality patterns and emits a modifies clause for each unique one.
 fn emit_modifies(fun_env: &FunctionEnv, state: &WPState) {
     let env = fun_env.module_env.env;
-    let inferred_sym = env.symbol_pool().make(INFERRED_PROPERTY);
+    let inferred_sym = env.symbol_pool().make(CONDITION_INFERRED_PROP);
     let loc = fun_env.get_loc();
     let properties = BTreeMap::from([(inferred_sym, PropertyValue::Value(Value::Bool(true)))]);
 
