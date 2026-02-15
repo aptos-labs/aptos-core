@@ -597,8 +597,10 @@ impl Session {
                         entry_function.function()
                     )
                 },
-                TransactionExecutable::Empty => {
-                    unimplemented!("empty executable -- unclear how this should be handled")
+                TransactionExecutable::Empty | TransactionExecutable::Encrypted => {
+                    unimplemented!(
+                        "empty/encrypted executable -- unclear how this should be handled"
+                    )
                 },
             }
         }
