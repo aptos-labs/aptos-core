@@ -23,8 +23,11 @@ move-prover-boogie-backend = { workspace = true }
 move-prover-bytecode-pipeline = { workspace = true }
 move-stackless-bytecode = { workspace = true }
 once_cell = { workspace = true }
+reqwest = { workspace = true, features = ["blocking"] }
 serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 tempfile = { workspace = true }
+tera = { workspace = true }
 toml = { workspace = true }
 
 [dev-dependencies]

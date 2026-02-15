@@ -6,7 +6,7 @@
 
 //! Functionality related to the command line interface of the Move prover.
 
-use crate::inference::InferenceOptions;
+use crate::{agent::AgentOptions, inference::InferenceOptions};
 use anyhow::anyhow;
 use clap::Parser;
 use codespan_reporting::diagnostic::Severity;
@@ -136,6 +136,10 @@ pub struct Options {
     #[command(flatten)]
     #[serde(skip)]
     pub inference: InferenceOptions,
+    /// AI agent options (agentic spec inference with Claude).
+    #[command(flatten)]
+    #[serde(skip)]
+    pub agent: AgentOptions,
 
     /// BEGIN OF STRUCTURED OPTIONS. DO NOT ADD VALUE FIELDS AFTER THIS
     /// Options for the prover.
@@ -168,6 +172,7 @@ impl Default for Options {
             verify_only: None,
             z3_trace: None,
             inference: InferenceOptions::default(),
+            agent: AgentOptions::default(),
         }
     }
 }
@@ -254,6 +259,9 @@ impl Options {
             });
             self.move_named_address_values
                 .push("Extensions=0x1".to_string());
+        }
+        if self.agent.ai.is_some() && !self.inference.inference {
+            return Err(anyhow!("--ai requires --inference (-i) to be enabled"));
         }
         self.backend.num_instances = std::cmp::max(self.backend.num_instances, 1);
         self.backend.derive_options();

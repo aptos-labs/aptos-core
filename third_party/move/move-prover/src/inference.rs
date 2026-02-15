@@ -33,7 +33,8 @@ use codespan_reporting::term::termcolor::WriteColor;
 #[allow(unused_imports)]
 use log::{debug, info};
 use move_model::{
-    ast::SpecBlockTarget, emitln, model::GlobalEnv, sourcifier::Sourcifier, symbol::Symbol,
+    ast::SpecBlockTarget, emitln, model::GlobalEnv, pragmas::CONDITION_INFERRED_PROP,
+    sourcifier::Sourcifier, symbol::Symbol,
 };
 use move_prover_bytecode_pipeline::pipeline_factory;
 use move_stackless_bytecode::{
@@ -64,6 +65,9 @@ pub enum InferenceOutput {
     Stdout,
     File,
     Unified,
+    /// Suppress all output (used internally when the caller captures results directly).
+    #[clap(skip)]
+    None,
 }
 
 /// Run spec inference on the model and print inferred specs to stdout.
@@ -86,6 +90,21 @@ pub fn run_spec_inference_with_model_and_dump<W: WriteColor>(
     start_time: Instant,
 ) -> anyhow::Result<String> {
     Ok(run_spec_inference_inner(env, error_writer, options, start_time, true)?.unwrap_or_default())
+}
+
+/// Run the inference pipeline and return enriched source strings (for agent mode).
+///
+/// Unlike `run_spec_inference_with_model`, this suppresses stdout/file output
+/// since the caller captures the result directly via `generate_unified_string`.
+pub fn run_inference_to_strings<W: WriteColor>(
+    env: &mut GlobalEnv,
+    error_writer: &mut W,
+    mut options: Options,
+    start_time: Instant,
+) -> anyhow::Result<Vec<(PathBuf, String)>> {
+    options.inference.inference_output = InferenceOutput::None;
+    run_spec_inference_inner(env, error_writer, options, start_time, false)?;
+    Ok(generate_unified_string(env))
 }
 
 /// Inner function that optionally captures a bytecode dump.
@@ -180,17 +199,17 @@ fn run_spec_inference_inner<W: WriteColor>(
     )?;
 
     // Output inferred specs.
-    let inferred_sym = env.symbol_pool().make("inferred");
     match options.inference.inference_output {
         InferenceOutput::Stdout => {
-            output_to_stdout(env, inferred_sym);
+            output_to_stdout(env);
         },
         InferenceOutput::File => {
-            output_to_files(env, inferred_sym, &options)?;
+            output_to_files(env, &options)?;
         },
         InferenceOutput::Unified => {
-            output_unified(env, inferred_sym, &options)?;
+            output_unified(env, &options)?;
         },
+        InferenceOutput::None => {},
     }
 
     info!(
@@ -205,7 +224,8 @@ fn run_spec_inference_inner<W: WriteColor>(
 }
 
 /// Output inferred specs to stdout (default mode).
-fn output_to_stdout(env: &GlobalEnv, inferred_sym: Symbol) {
+fn output_to_stdout(env: &GlobalEnv) {
+    let inferred_sym = env.symbol_pool().make(CONDITION_INFERRED_PROP);
     let sourcifier = Sourcifier::new(env, true);
 
     for module in env.get_modules() {
@@ -234,7 +254,8 @@ fn output_to_stdout(env: &GlobalEnv, inferred_sym: Symbol) {
 }
 
 /// Output inferred specs to per-module `.spec.move` files.
-fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> anyhow::Result<()> {
+fn output_to_files(env: &GlobalEnv, options: &Options) -> anyhow::Result<()> {
+    let inferred_sym = env.symbol_pool().make(CONDITION_INFERRED_PROP);
     for module in env.get_modules() {
         if !module.is_target() {
             continue;
@@ -312,10 +333,13 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
     Ok(())
 }
 
-/// Output inferred specs as enriched source files: the original source with
-/// inferred spec blocks injected inline after each function definition (or
-/// appended to existing spec blocks).
-fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> anyhow::Result<()> {
+/// Generate enriched source strings: the original source with inferred spec blocks
+/// injected inline after each function definition (or appended to existing spec blocks).
+/// Returns a vec of (source_path, enriched_source) pairs.
+pub fn generate_unified_string(env: &GlobalEnv) -> Vec<(PathBuf, String)> {
+    let inferred_sym = env.symbol_pool().make(CONDITION_INFERRED_PROP);
+    let mut results = Vec::new();
+
     for module in env.get_modules() {
         if !module.is_target() {
             continue;
@@ -407,13 +431,8 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
                 };
 
                 // Generate only the inferred condition lines.
-                let cond_text = generate_inferred_conditions(
-                    env,
-                    &fun,
-                    inferred_sym,
-                    &inner_indent,
-                    &original_prop_keys,
-                );
+                let cond_text =
+                    generate_inferred_conditions(env, &fun, &inner_indent, &original_prop_keys);
 
                 insertions.push((insert_pos, cond_text));
             } else {
@@ -425,7 +444,7 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
                 let indent = detect_indent(&source, fun_start);
 
                 // Generate a full spec block.
-                let spec_text = generate_full_spec_block(env, &fun, inferred_sym, &indent);
+                let spec_text = generate_full_spec_block(env, &fun, &indent);
 
                 insertions.push((fun_end, format!("\n{}", spec_text)));
             }
@@ -440,8 +459,19 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
             result.insert_str(*offset, text);
         }
 
-        // Determine output path.
         let source_path = PathBuf::from(module.get_source_path());
+        results.push((source_path, result));
+    }
+
+    results
+}
+
+/// Output inferred specs as enriched source files: the original source with
+/// inferred spec blocks injected inline after each function definition (or
+/// appended to existing spec blocks).
+fn output_unified(env: &GlobalEnv, options: &Options) -> anyhow::Result<()> {
+    let results = generate_unified_string(env);
+    for (source_path, result) in results {
         let stem = source_path
             .file_stem()
             .expect("source file should have a stem");
@@ -481,10 +511,10 @@ fn detect_indent(source: &str, byte_offset: usize) -> String {
 fn generate_inferred_conditions(
     env: &GlobalEnv,
     fun: &move_model::model::FunctionEnv,
-    inferred_sym: Symbol,
     indent: &str,
     original_property_keys: &std::collections::BTreeSet<Symbol>,
 ) -> String {
+    let inferred_sym = env.symbol_pool().make(CONDITION_INFERRED_PROP);
     let sourcifier = Sourcifier::new(env, true);
 
     // Filter to only inferred conditions and new properties, print, then restore.
@@ -539,9 +569,9 @@ fn generate_inferred_conditions(
 fn generate_full_spec_block(
     env: &GlobalEnv,
     fun: &move_model::model::FunctionEnv,
-    inferred_sym: Symbol,
     indent: &str,
 ) -> String {
+    let inferred_sym = env.symbol_pool().make(CONDITION_INFERRED_PROP);
     let sourcifier = Sourcifier::new(env, true);
 
     // Filter to only inferred conditions, print, then restore.

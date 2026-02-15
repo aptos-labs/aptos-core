@@ -226,6 +226,10 @@ fn collect_tests(tests: &mut Vec<Trial>, dir: &str) {
             continue;
         }
         let path = entry.path().to_path_buf();
+        // Skip agent recordings — they are non-deterministic manual runs.
+        if path.strip_prefix(&base).unwrap().starts_with("agent") {
+            continue;
+        }
         let test_name = format!("inference::{}", path.strip_prefix(&base).unwrap().display());
         tests.push(Trial::test(test_name, move || {
             test_runner(&path).map_err(|err| format!("{:?}", err).into())
