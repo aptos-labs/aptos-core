@@ -645,6 +645,15 @@ where
     fn scheme_name() -> &'static [u8] {
         b"Shplonked"
     }
+
+    fn default_num_point_dims_for_tests() -> u32 {
+        1
+    }
+
+    /// Univariate degree bound 15 (16 coefficients) for tests.
+    fn degree_bounds_for_test_point_dims(_num_point_dims: u32) -> Vec<usize> {
+        vec![15]
+    }
 }
 
 /// Type marker for the Shplonked PCS (univariate, batch opening support).

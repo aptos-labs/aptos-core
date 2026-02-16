@@ -648,6 +648,15 @@ where
     fn scheme_name() -> &'static [u8] {
         b"Zeromorph"
     }
+
+    fn default_num_point_dims_for_tests() -> u32 {
+        4
+    }
+
+    /// Multilinear: degree 1 per variable → `[1; n]` gives 2^n coefficients.
+    fn degree_bounds_for_test_point_dims(num_point_dims: u32) -> Vec<usize> {
+        vec![1; num_point_dims as usize]
+    }
 }
 
 #[allow(non_snake_case)]

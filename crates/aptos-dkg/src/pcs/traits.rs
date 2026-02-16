@@ -84,6 +84,18 @@ pub trait PolynomialCommitmentScheme {
     fn transcript_dst_for_batch_open() -> &'static [u8] {
         b"pcs_batch_open_test"
     }
+
+    /// Default number of point dimensions for generic tests (e.g. variables for multilinear, or 1 for univariate).
+    fn default_num_point_dims_for_tests() -> u32 {
+        1
+    }
+
+    /// Degree bounds for setup, given the number of point dimensions used in tests.
+    /// Must be consistent with `default_num_point_dims_for_tests()` so that polynomial size matches.
+    /// E.g. Zeromorph: `vec![1; num_point_dims]` (multilinear → 2^n coeffs); Shplonked: `vec![(1 << num_point_dims) - 1]` for univariate degree.
+    fn degree_bounds_for_test_point_dims(num_point_dims: u32) -> Vec<usize> {
+        vec![(1_usize << num_point_dims).saturating_sub(1)]
+    }
 }
 
 /// Generate a random polynomial from a set of size `len` consisting of values of bit-length `ell`.

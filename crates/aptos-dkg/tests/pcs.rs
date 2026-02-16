@@ -7,7 +7,6 @@
 use aptos_dkg::pcs::{
     shplonked::Shplonked,
     traits::{first_transcript_challenge, random_point, random_poly, PolynomialCommitmentScheme},
-    zeromorph::Zeromorph,
 };
 use ark_bn254::Bn254;
 use ark_ec::CurveGroup;
@@ -22,8 +21,8 @@ where
     PCS::WitnessField: ark_ff::PrimeField,
 {
     let mut rng = thread_rng();
-    let degree_bounds = degree_bounds_for_scheme::<PCS>();
-    let num_point_dims = num_point_dims_for_scheme::<PCS>();
+    let num_point_dims = PCS::default_num_point_dims_for_tests();
+    let degree_bounds = PCS::degree_bounds_for_test_point_dims(num_point_dims);
 
     let (ck, vk) = PCS::setup(degree_bounds, &mut rng);
 
@@ -49,7 +48,7 @@ where
     PCS::WitnessField: ark_ff::PrimeField + From<u64>,
 {
     let mut rng = thread_rng();
-    let num_point_dims = num_point_dims_for_scheme::<PCS>();
+    let num_point_dims = PCS::default_num_point_dims_for_tests();
 
     let values: Vec<PCS::WitnessField> =
         (0..16).map(|i| PCS::WitnessField::from(i as u64)).collect();
@@ -61,24 +60,6 @@ where
     let poly2 = poly.clone();
     let eval2 = PCS::evaluate_point(&poly2, &point);
     assert_eq!(eval, eval2, "evaluate_point should be deterministic");
-}
-
-fn degree_bounds_for_scheme<PCS: PolynomialCommitmentScheme + 'static>() -> Vec<usize> {
-    if core::any::TypeId::of::<PCS>() == core::any::TypeId::of::<Zeromorph<Bn254>>() {
-        vec![1, 1, 1, 1]
-    } else if core::any::TypeId::of::<PCS>() == core::any::TypeId::of::<Shplonked<Bn254>>() {
-        vec![15]
-    } else {
-        vec![7]
-    }
-}
-
-fn num_point_dims_for_scheme<PCS: PolynomialCommitmentScheme + 'static>() -> u32 {
-    if core::any::TypeId::of::<PCS>() == core::any::TypeId::of::<Zeromorph<Bn254>>() {
-        4
-    } else {
-        1
-    }
 }
 
 mod zeromorph {
@@ -118,7 +99,7 @@ mod zeromorph {
         let gammas: Vec<_> = (0..polys.len())
             .scan(<Bn254 as Pairing>::ScalarField::one(), |acc, _| {
                 let g = *acc;
-                *acc = *acc * gamma;
+                *acc *= gamma;
                 Some(g)
             })
             .collect();
