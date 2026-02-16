@@ -167,6 +167,24 @@ pub static ROCKSDB_SHARD_PROPERTIES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static ROCKSDB_TICKERS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_rocksdb_tickers",
+        "rocksdb statistics tickers",
+        &["db_name", "ticker_name"]
+    )
+    .unwrap()
+});
+
+pub static ROCKSDB_SHARD_TICKERS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_rocksdb_shard_tickers",
+        "sharded rocksdb statistics tickers",
+        &["db_name", "shard_id", "ticker_name"]
+    )
+    .unwrap()
+});
+
 // Async committer gauges:
 pub(crate) static LATEST_SNAPSHOT_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(

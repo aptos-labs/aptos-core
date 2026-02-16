@@ -2,9 +2,14 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    backup::backup_handler::BackupHandler, event_store::EventStore, ledger_db::LedgerDb,
-    pruner::LedgerPrunerManager, rocksdb_property_reporter::RocksdbPropertyReporter,
-    state_kv_db::StateKvDb, state_merkle_db::StateMerkleDb, state_store::StateStore,
+    backup::backup_handler::BackupHandler,
+    event_store::EventStore,
+    ledger_db::LedgerDb,
+    pruner::{LedgerPrunerManager, PrunerManager},
+    rocksdb_property_reporter::RocksdbPropertyReporter,
+    state_kv_db::StateKvDb,
+    state_merkle_db::StateMerkleDb,
+    state_store::StateStore,
     transaction_store::TransactionStore,
 };
 use aptos_config::config::{HotStateConfig, PrunerConfig, RocksdbConfigs, StorageDirPaths};
@@ -216,5 +221,30 @@ impl AptosDB {
         let mut ledger_batch = SchemaBatch::new();
         ledger_metadata_db.put_ledger_info(genesis_li, &mut ledger_batch)?;
         ledger_metadata_db.write_schemas(ledger_batch)
+    }
+
+    /// Blocks until all pruners have finished their pending work.
+    pub fn wait_for_all_pruners(&self) {
+        info!("Waiting for all pruners to catch up...");
+        loop {
+            let sp = &self.state_store.state_pruner;
+            let pending = self.ledger_pruner.is_pruning_pending()
+                || sp.state_merkle_pruner.is_pruning_pending()
+                || sp.epoch_snapshot_pruner.is_pruning_pending()
+                || sp.state_kv_pruner.is_pruning_pending()
+                || sp
+                    .hot_state_merkle_pruner
+                    .as_ref()
+                    .is_some_and(|p| p.is_pruning_pending())
+                || sp
+                    .hot_epoch_snapshot_pruner
+                    .as_ref()
+                    .is_some_and(|p| p.is_pruning_pending());
+            if !pending {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        info!("All pruners caught up.");
     }
 }

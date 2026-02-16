@@ -220,7 +220,11 @@ impl Default for RocksdbConfigs {
     fn default() -> Self {
         Self {
             ledger_db_config: RocksdbConfig::default(),
-            state_merkle_db_config: RocksdbConfig::default(),
+            state_merkle_db_config: RocksdbConfig {
+                bloom_filter_bits: Some(10.0),
+                bloom_before_level: Some(2),
+                ..Default::default()
+            },
             state_kv_db_config: RocksdbConfig {
                 bloom_filter_bits: Some(10.0),
                 bloom_before_level: Some(2),
@@ -232,7 +236,7 @@ impl Default for RocksdbConfigs {
             },
             enable_storage_sharding: true,
             high_priority_background_threads: 4,
-            low_priority_background_threads: 2,
+            low_priority_background_threads: 12,
             shared_block_cache_size: Self::DEFAULT_BLOCK_CACHE_SIZE,
         }
     }

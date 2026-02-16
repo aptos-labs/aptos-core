@@ -10,7 +10,10 @@ use crate::{
         write_set_db_column_families,
     },
     ledger_db::LedgerDb,
-    metrics::{OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES, ROCKSDB_SHARD_PROPERTIES},
+    metrics::{
+        OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES, ROCKSDB_SHARD_PROPERTIES, ROCKSDB_SHARD_TICKERS,
+        ROCKSDB_TICKERS,
+    },
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
 };
@@ -18,7 +21,7 @@ use anyhow::Result;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
-use aptos_schemadb::{ColumnFamilyName, DB};
+use aptos_schemadb::{ColumnFamilyName, Ticker, DB};
 use aptos_types::state_store::NUM_STATE_SHARDS;
 use once_cell::sync::Lazy;
 use std::{
@@ -83,6 +86,57 @@ fn set_property(cf_name: &str, db: &DB) -> Result<()> {
 const SHARD_NAME_BY_ID: [&str; NUM_STATE_SHARDS] = [
     "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15",
 ];
+
+const ROCKSDB_TICKER_LIST: &[(Ticker, &str)] = &[
+    // Compaction health
+    (Ticker::StallMicros, "stall_micros"),
+    (Ticker::CompactReadBytes, "compact_read_bytes"),
+    (Ticker::CompactWriteBytes, "compact_write_bytes"),
+    (Ticker::FlushWriteBytes, "flush_write_bytes"),
+    // Bloom filters (full key lookups)
+    (Ticker::BloomFilterUseful, "bloom_filter_useful"),
+    (Ticker::BloomFilterFullPositive, "bloom_filter_full_positive"),
+    (
+        Ticker::BloomFilterFullTruePositive,
+        "bloom_filter_full_true_positive",
+    ),
+    // Bloom filters (prefix seeks)
+    (
+        Ticker::BloomFilterPrefixChecked,
+        "bloom_filter_prefix_checked",
+    ),
+    (
+        Ticker::BloomFilterPrefixUseful,
+        "bloom_filter_prefix_useful",
+    ),
+    (
+        Ticker::BloomFilterPrefixTruePositive,
+        "bloom_filter_prefix_true_positive",
+    ),
+    // Block cache
+    (Ticker::BlockCacheHit, "block_cache_hit"),
+    (Ticker::BlockCacheMiss, "block_cache_miss"),
+    (Ticker::BlockCacheDataHit, "block_cache_data_hit"),
+    (Ticker::BlockCacheDataMiss, "block_cache_data_miss"),
+    (Ticker::BlockCacheFilterHit, "block_cache_filter_hit"),
+    (Ticker::BlockCacheFilterMiss, "block_cache_filter_miss"),
+];
+
+fn set_db_tickers(db_name: &str, db: &DB) {
+    for (ticker, name) in ROCKSDB_TICKER_LIST {
+        ROCKSDB_TICKERS
+            .with_label_values(&[db_name, name])
+            .set(db.get_ticker_count(*ticker) as i64);
+    }
+}
+
+fn set_shard_db_tickers(db_name: &str, db: &DB, shard: usize) {
+    for (ticker, name) in ROCKSDB_TICKER_LIST {
+        ROCKSDB_SHARD_TICKERS
+            .with_label_values(&[db_name, SHARD_NAME_BY_ID[shard], name])
+            .set(db.get_ticker_count(*ticker) as i64);
+    }
+}
 
 fn set_shard_property(cf_name: ColumnFamilyName, db: &DB, shard: usize) -> Result<()> {
     if !skip_reporting_cf(cf_name) {
@@ -159,6 +213,36 @@ fn update_rocksdb_properties(
             }
         }
     }
+
+    // Collect RocksDB statistics tickers
+    if enable_storage_sharding {
+        set_db_tickers("ledger_metadata_db", &ledger_db.metadata_db_arc());
+        set_db_tickers("write_set_db", ledger_db.write_set_db_raw());
+        set_db_tickers("transaction_info_db", ledger_db.transaction_info_db_raw());
+        set_db_tickers("transaction_db", ledger_db.transaction_db_raw());
+        set_db_tickers("event_db", ledger_db.event_db_raw());
+        set_db_tickers(
+            "transaction_accumulator_db",
+            ledger_db.transaction_accumulator_db_raw(),
+        );
+
+        set_db_tickers("state_kv_metadata_db", state_kv_db.metadata_db());
+        if state_kv_db.enabled_sharding() {
+            for shard in 0..NUM_STATE_SHARDS {
+                set_shard_db_tickers("state_kv_db", state_kv_db.db_shard(shard), shard);
+            }
+        }
+    } else {
+        set_db_tickers("ledger_db", &ledger_db.metadata_db_arc());
+    }
+
+    set_db_tickers("state_merkle_metadata_db", state_merkle_db.metadata_db());
+    if state_merkle_db.sharding_enabled() {
+        for shard in 0..NUM_STATE_SHARDS {
+            set_shard_db_tickers("state_merkle_db", state_merkle_db.db_shard(shard), shard);
+        }
+    }
+
     Ok(())
 }
 

@@ -17,7 +17,6 @@ legacy-move-compiler = { workspace = true }
 log = { workspace = true, features = ["serde"] }
 move-command-line-common = { workspace = true }
 move-compiler-v2 = { workspace = true }
-move-errmapgen = { workspace = true }
 move-model = { workspace = true }
 move-package = { workspace = true }
 move-prover-boogie-backend = { workspace = true }

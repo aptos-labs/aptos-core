@@ -11,7 +11,6 @@ use itertools::Itertools;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 use log::{log_enabled, Level};
-use move_errmapgen::ErrmapGen;
 use move_model::{
     code_writer::CodeWriter, metadata::LATEST_STABLE_COMPILER_VERSION_VALUE, model::GlobalEnv,
 };
@@ -116,14 +115,6 @@ pub fn run_move_prover_with_model_v2<W: WriteColor>(
 
     // Populate initial number operation state for each function and struct based on the pragma
     create_init_num_operation_state(env);
-
-    // Same for the error map generator
-    if options.run_errmapgen {
-        return {
-            run_errmapgen(env, &options, start_time);
-            Ok(())
-        };
-    }
 
     // Check correct backend versions.
     options.backend.check_tool_versions()?;
@@ -300,18 +291,4 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
     }
 
     targets
-}
-
-fn run_errmapgen(env: &GlobalEnv, options: &Options, now: Instant) {
-    let mut generator = ErrmapGen::new(env, &options.errmapgen);
-    let checking_elapsed = now.elapsed();
-    info!("generating error map");
-    generator.r#gen();
-    generator.save_result();
-    let generating_elapsed = now.elapsed();
-    info!(
-        "{:.3}s checking, {:.3}s generating",
-        checking_elapsed.as_secs_f64(),
-        (generating_elapsed - checking_elapsed).as_secs_f64()
-    );
 }
