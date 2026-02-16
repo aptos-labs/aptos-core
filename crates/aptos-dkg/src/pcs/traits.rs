@@ -5,18 +5,20 @@
 
 // TODO: This trait is still very much a work in progress
 
-use rand::{CryptoRng, RngCore};
+use crate::fiat_shamir::PolynomialCommitmentScheme as _;
+use rand_core::{CryptoRng, RngCore};
+use std::fmt::Debug;
 
 pub trait PolynomialCommitmentScheme {
     type CommitmentKey: Clone;
     type VerificationKey: Clone;
     type Polynomial: Clone;
-    type WitnessField: Clone + From<u64>; // So the domain of a polynomial is a Vec<WitnessField>
-                                          // For small fields, add ChallengeField here, which should probably have a from-WitnessField-property
+    type WitnessField: Copy + From<u64> + Debug + Eq; // So the domain of a polynomial is a Vec<WitnessField>
+                                                      // For small fields, add ChallengeField here, which should probably have a from-WitnessField-property
     type Commitment: Clone;
     type Proof: Clone;
 
-    fn setup<R: rand_core::RngCore + rand_core::CryptoRng>(
+    fn setup<R: RngCore + CryptoRng>(
         // security_bits: usize, // make this an Option<usize> ??
         degree_bounds: Vec<usize>,
         rng: &mut R,
@@ -60,9 +62,7 @@ pub trait PolynomialCommitmentScheme {
         batch: bool,
     ) -> anyhow::Result<()>;
 
-    fn random_witness<R: rand_core::RngCore + rand_core::CryptoRng>(
-        rng: &mut R,
-    ) -> Self::WitnessField;
+    fn random_witness<R: RngCore + CryptoRng>(rng: &mut R) -> Self::WitnessField;
 
     fn polynomial_from_vec(vec: Vec<Self::WitnessField>) -> Self::Polynomial;
 
@@ -102,32 +102,29 @@ pub trait PolynomialCommitmentScheme {
 ///
 /// - `len` controls the number of values used to generate the polynomial.
 /// - `ell` controls the bit-length of each value (should be at most 64).
-pub fn random_poly<CS: PolynomialCommitmentScheme, R: rand_core::RngCore + rand_core::CryptoRng>(
+pub fn random_poly<PCS: PolynomialCommitmentScheme, R: RngCore + CryptoRng>(
     rng: &mut R,
     len: u32, // limited to u32 only because higher wouldn't be too slow for most commitment schemes
     ell: u8,
-) -> CS::Polynomial {
+) -> PCS::Polynomial {
     // Sample `len` field elements, each constructed from an `ell`-bit integer
-    let ell_bit_values: Vec<CS::WitnessField> = (0..len)
+    let ell_bit_values: Vec<PCS::WitnessField> = (0..len)
         .map(|_| {
             // Mask to `ell` bits by shifting away higher bits
             let val = rng.next_u64() >> (64 - ell);
-            CS::WitnessField::from(val)
+            PCS::WitnessField::from(val)
         })
         .collect();
 
     // Convert the value vector into a polynomial representation
-    CS::polynomial_from_vec(ell_bit_values)
+    PCS::polynomial_from_vec(ell_bit_values)
 }
 
 /// Generate a random evaluation point in FF^n.
 ///
 /// This corresponds to sampling a point at which the polynomial will be opened.
 /// The dimension `num_vars` should be log2 of the polynomial length.
-pub fn random_point<
-    CS: PolynomialCommitmentScheme,
-    R: rand_core::RngCore + rand_core::CryptoRng,
->(
+pub fn random_point<CS: PolynomialCommitmentScheme, R: RngCore + CryptoRng>(
     rng: &mut R,
     num_vars: u32, // i.e. this is `n` if the point lies in `FF^n`
 ) -> Vec<CS::WitnessField> {
@@ -141,7 +138,6 @@ pub fn random_point<
 /// This helper does not model that; it is only for tests that need a deterministic
 /// scalar from a transcript (e.g. batch tests that reconstruct the combined commitment).
 pub fn first_transcript_challenge<F: ark_ff::PrimeField>(dst: &[u8]) -> F {
-    use crate::fiat_shamir::PolynomialCommitmentScheme as _;
     let mut t = merlin::Transcript::new(dst);
     t.challenge_scalar()
 }

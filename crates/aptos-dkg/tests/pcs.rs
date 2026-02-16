@@ -15,11 +15,7 @@ use rand::thread_rng;
 
 const PCS_BATCH_DST: &[u8] = b"pcs_batch_open_test";
 
-fn test_pcs_setup_commit_open_verify<PCS>()
-where
-    PCS: PolynomialCommitmentScheme + 'static,
-    PCS::WitnessField: ark_ff::PrimeField,
-{
+fn test_pcs_setup_commit_open_verify<PCS: PolynomialCommitmentScheme>() {
     let mut rng = thread_rng();
     let num_point_dims = PCS::default_num_point_dims_for_tests();
     let degree_bounds = PCS::degree_bounds_for_test_point_dims(num_point_dims);
@@ -32,20 +28,20 @@ where
     let r = PCS::random_witness(&mut rng);
     let com = PCS::commit(&ck, poly.clone(), Some(r));
 
-    let challenge = random_point::<PCS, _>(&mut rng, num_point_dims);
-    let eval = PCS::evaluate_point(&poly, &challenge);
+    let challenge_pt = random_point::<PCS, _>(&mut rng, num_point_dims);
+    let eval = PCS::evaluate_point(&poly, &challenge_pt);
 
     let mut trs = merlin::Transcript::new(PCS::transcript_dst_for_single_open());
-    let proof = PCS::open(&ck, poly, challenge.clone(), Some(r), &mut rng, &mut trs);
+    let proof = PCS::open(&ck, poly, challenge_pt.clone(), Some(r), &mut rng, &mut trs);
 
     // Verifier rebuilds challenges from proof using the same DST.
-    PCS::verify(&vk, com, challenge, eval, proof, &mut trs, false).expect("verify should succeed");
+    PCS::verify(&vk, com, challenge_pt, eval, proof, &mut trs, false)
+        .expect("verify should succeed");
 }
 
-fn test_pcs_polynomial_from_vec_evaluate_point<PCS>()
+fn test_pcs_polynomial_from_vec_evaluate_point<PCS: PolynomialCommitmentScheme>()
 where
-    PCS: PolynomialCommitmentScheme + 'static,
-    PCS::WitnessField: ark_ff::PrimeField + From<u64>,
+    PCS::WitnessField: From<u64>,
 {
     let mut rng = thread_rng();
     let num_point_dims = PCS::default_num_point_dims_for_tests();
