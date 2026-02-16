@@ -62,6 +62,7 @@ pub fn zk_pcs_commit<E: Pairing>(
         .collect()
 }
 
+#[allow(non_snake_case)]
 #[derive(CanonicalSerialize, Clone, CanonicalDeserialize, Debug)]
 struct ZkPcsOpeningSigmaProof<E: Pairing> {
     r_com_y: E::G1Affine,
@@ -72,6 +73,8 @@ struct ZkPcsOpeningSigmaProof<E: Pairing> {
     z_rho: E::ScalarField,
 }
 
+#[allow(private_interfaces)]
+#[allow(non_snake_case)]
 #[derive(CanonicalSerialize, Clone, CanonicalDeserialize, Debug)]
 pub struct ZkPcsOpeningProof<E: Pairing> {
     pub(crate) eval_points: Vec<E::ScalarField>,
@@ -86,6 +89,7 @@ pub struct ZkPcsOpeningProof<E: Pairing> {
 }
 
 /// Opens at the given points and returns both the opening proof and the commitment to evaluations (com_y).
+#[allow(non_snake_case)]
 pub fn zk_pcs_open_with_com_y<E: Pairing, R: RngCore + CryptoRng>(
     srs: &Srs<E>,
     _d: u8,
@@ -278,7 +282,8 @@ pub fn zk_pcs_open_with_com_y<E: Pairing, R: RngCore + CryptoRng>(
     for (r_i, w_i) in r_yi.iter().zip(evals.iter()) {
         z_yi.push(*r_i + c * w_i);
     }
-    let z_u = r_u + c * u;
+    // r_V uses -r_u*[ξ]_1, V uses +u*[ξ]_1, so response for [ξ] must be -r_u + c*u
+    let z_u = c * u - r_u;
     let z_rho = r_rho + c * rho;
 
     let points_proj = vec![r_com_y, r_V, V, W, W_prime, Y];
@@ -324,6 +329,7 @@ pub fn zk_pcs_open<E: Pairing, R: RngCore + CryptoRng>(
 }
 
 /// Verifier uses gamma and z from the proof (prover stored them there after reading from transcript).
+#[allow(non_snake_case)]
 pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
     zk_pcs_opening_proof: &ZkPcsOpeningProof<E>,
     commitments: &[E::G1Affine],
@@ -392,7 +398,7 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
         r_V,
         r_y,
         z_yi,
-        z_u: _z_u,
+        z_u,
         z_rho,
     } = sigma_proof;
 
@@ -424,6 +430,9 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
         gamma_i *= gamma;
     }
 
+    // V relation: sum_y*[1]_1 + z_u*xi_1 - r_V - c*V = 0; batch with beta
+    scalars.push(beta * sum_y);
+    scalars.push(beta * (*z_u));
     scalars.push(-beta);
     scalars.push(-c * beta);
 
@@ -432,7 +441,14 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
     bases.push(*r_V);
     bases.push(*V);
 
-    E::G1::msm(&bases, &scalars);
+    // Sigma protocol (group homomorphism) check: response MSM must equal identity
+    let sigma_msm = E::G1::msm(&bases, &scalars)
+        .map_err(|e| anyhow::anyhow!("Sigma proof MSM failed: {:?}", e))?;
+    if sigma_msm != E::G1::zero() {
+        return Err(anyhow::anyhow!(
+            "Sigma proof group homomorphism check failed (expected identity)"
+        ));
+    }
 
     let lhs_y: E::ScalarField = z_yi.iter().copied().sum();
     let rhs_y = *r_y + *y_sum * c;
