@@ -57,6 +57,7 @@ pub trait PolynomialCommitmentScheme {
         eval: Self::WitnessField,
         proof: Self::Proof,
         trs: &mut merlin::Transcript,
+        batch_dst: Option<&'static [u8]>,
     ) -> anyhow::Result<()>;
 
     fn random_witness<R: rand_core::RngCore + rand_core::CryptoRng>(
@@ -71,6 +72,17 @@ pub trait PolynomialCommitmentScheme {
     ) -> Self::WitnessField;
 
     fn scheme_name() -> &'static [u8];
+
+    /// Transcript domain separator for single open/verify. Prover and verifier must use the same
+    /// so that the verifier can reconstruct the same Fiat–Shamir challenges from the proof.
+    fn transcript_dst_for_single_open() -> &'static [u8] {
+        b"pcs_single_open_test"
+    }
+
+    /// DST for batch open/verify. Pass as `batch_dst` in `verify` when verifying a batch proof.
+    fn transcript_dst_for_batch_open() -> &'static [u8] {
+        b"pcs_batch_open_test"
+    }
 }
 
 /// Generate a random polynomial from a set of size `len` consisting of values of bit-length `ell`.
@@ -107,4 +119,16 @@ pub fn random_point<
     num_vars: u32, // i.e. this is `n` if the point lies in `FF^n`
 ) -> Vec<CS::WitnessField> {
     (0..num_vars).map(|_| CS::random_witness(rng)).collect()
+}
+
+/// Returns the first Fiat–Shamir challenge from a fresh transcript with the given DST.
+///
+/// **Test / batch tests only.** In a real protocol the verifier’s challenge depends on
+/// the prover’s first message (and other transcript contents), not just the DST.
+/// This helper does not model that; it is only for tests that need a deterministic
+/// scalar from a transcript (e.g. batch tests that reconstruct the combined commitment).
+pub fn first_transcript_challenge<F: ark_ff::PrimeField>(dst: &[u8]) -> F {
+    use crate::fiat_shamir::PolynomialCommitmentScheme as _;
+    let mut t = merlin::Transcript::new(dst);
+    t.challenge_scalar()
 }

@@ -55,6 +55,18 @@ pub struct ZeromorphVerifierKey<P: Pairing> {
 #[derive(Debug, PartialEq, CanonicalSerialize, CanonicalDeserialize, Clone)]
 pub struct ZeromorphCommitment<P: Pairing>(P::G1);
 
+impl<P: Pairing> ZeromorphCommitment<P> {
+    /// Reference to the inner G1 element (e.g. for combining in batch verify).
+    pub fn as_inner(&self) -> &P::G1 {
+        &self.0
+    }
+
+    /// Build a commitment from a G1 element (e.g. combined commitment in batch verify).
+    pub fn from_g1(g: P::G1) -> Self {
+        Self(g)
+    }
+}
+
 impl<P: Pairing> Default for ZeromorphCommitment<P> {
     fn default() -> Self {
         Self(P::G1::zero())
@@ -418,24 +430,22 @@ where
         eval: &P::ScalarField,
         proof: &ZeromorphProof<P>,
         transcript: &mut merlin::Transcript,
+        batch_dst: Option<&'static [u8]>,
     ) -> anyhow::Result<()> {
-        transcript.append_sep(Self::protocol_name());
-
-        //let q_comms: Vec<P::G1> = proof.q_k_com.iter().map(|c| c.into_group()).collect();
-        proof
-            .q_k_com
-            .iter()
-            .for_each(|c| transcript.append_point(&c.0));
-
-        // Challenge y
-        let y_challenge: P::ScalarField = transcript.challenge_scalar();
-
-        // Receive commitment C_q_hat
-        transcript.append_point(&proof.q_hat_com.0);
-
-        // Get x and z challenges
-        let x_challenge = transcript.challenge_scalar();
-        let z_challenge = transcript.challenge_scalar();
+        // Rebuild transcript from proof so we derive the same y, x, z as the prover.
+        let dst = batch_dst
+            .unwrap_or_else(<Self as crate::pcs::traits::PolynomialCommitmentScheme>::transcript_dst_for_single_open);
+        let mut t = merlin::Transcript::new(dst);
+        if batch_dst.is_some() {
+            let _gamma: P::ScalarField = t.challenge_scalar(); // consume gamma so state matches batch_open
+        }
+        t.append_sep(Self::protocol_name());
+        proof.q_k_com.iter().for_each(|c| t.append_point(&c.0));
+        let y_challenge: P::ScalarField = t.challenge_scalar();
+        t.append_point(&proof.q_hat_com.0);
+        let x_challenge = t.challenge_scalar();
+        let z_challenge = t.challenge_scalar();
+        let _ = transcript; // may be used by other schemes
 
         // Must match prover: use point in reversed order so q_scalars[k] aligns with quotients[k].
         let point_reversed_for_scalars: Vec<P::ScalarField> = point.iter().rev().cloned().collect();
@@ -613,8 +623,9 @@ where
         eval: Self::WitnessField,
         proof: Self::Proof,
         trs: &mut merlin::Transcript,
+        batch_dst: Option<&'static [u8]>,
     ) -> anyhow::Result<()> {
-        Zeromorph::verify(&vk, &com, &challenge, &eval, &proof, trs)
+        Zeromorph::verify(&vk, &com, &challenge, &eval, &proof, trs, batch_dst)
     }
 
     fn random_witness<R: RngCore + CryptoRng>(rng: &mut R) -> Self::WitnessField {
@@ -971,6 +982,7 @@ mod test {
                 &eval,
                 &proof,
                 &mut verifier_transcript,
+                None,
             )
             .unwrap();
             let v_transcript_squeeze: <Bn254 as Pairing>::ScalarField =
@@ -992,6 +1004,7 @@ mod test {
                 &altered_verifier_eval,
                 &proof,
                 &mut verifier_transcript,
+                None,
             )
             .is_err())
         }

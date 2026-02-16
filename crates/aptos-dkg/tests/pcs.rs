@@ -1,0 +1,226 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
+//! Generic tests for any type implementing [PolynomialCommitmentScheme].
+//! Instantiated for Zeromorph and Shplonked below.
+
+use aptos_dkg::pcs::{
+    shplonked::Shplonked,
+    traits::{first_transcript_challenge, random_point, random_poly, PolynomialCommitmentScheme},
+    zeromorph::Zeromorph,
+};
+use ark_bn254::Bn254;
+use ark_ec::CurveGroup;
+use ark_ff::{One, Zero};
+use rand::thread_rng;
+
+const PCS_BATCH_DST: &[u8] = b"pcs_batch_open_test";
+
+fn test_pcs_setup_commit_open_verify<CS>()
+where
+    CS: PolynomialCommitmentScheme + 'static,
+    CS::WitnessField: ark_ff::PrimeField,
+{
+    let mut rng = thread_rng();
+    let degree_bounds = degree_bounds_for_scheme::<CS>();
+    let num_point_dims = num_point_dims_for_scheme::<CS>();
+
+    let (ck, vk) = CS::setup(degree_bounds, &mut rng);
+
+    // Use 2^num_point_dims so polynomial and challenge dimensions match (Zeromorph multilinear).
+    let poly_len = 1u32 << num_point_dims;
+    let poly = random_poly::<CS, _>(&mut rng, poly_len, 32);
+    let r = CS::random_witness(&mut rng);
+    let com = CS::commit(&ck, poly.clone(), Some(r));
+
+    let challenge = random_point::<CS, _>(&mut rng, num_point_dims);
+    let eval = CS::evaluate_point(&poly, &challenge);
+
+    let mut trs = merlin::Transcript::new(CS::transcript_dst_for_single_open());
+    let proof = CS::open(&ck, poly, challenge.clone(), Some(r), &mut rng, &mut trs);
+
+    // Verifier rebuilds challenges from proof using the same DST.
+    CS::verify(&vk, com, challenge, eval, proof, &mut trs, None).expect("verify should succeed");
+}
+
+fn test_pcs_polynomial_from_vec_evaluate_point<CS>()
+where
+    CS: PolynomialCommitmentScheme + 'static,
+    CS::WitnessField: ark_ff::PrimeField + From<u64>,
+{
+    let mut rng = thread_rng();
+    let num_point_dims = num_point_dims_for_scheme::<CS>();
+
+    let values: Vec<CS::WitnessField> = (0..16).map(|i| CS::WitnessField::from(i as u64)).collect();
+    let poly = CS::polynomial_from_vec(values);
+
+    let point = random_point::<CS, _>(&mut rng, num_point_dims);
+    let eval = CS::evaluate_point(&poly, &point);
+
+    let poly2 = poly.clone();
+    let eval2 = CS::evaluate_point(&poly2, &point);
+    assert_eq!(eval, eval2, "evaluate_point should be deterministic");
+}
+
+fn degree_bounds_for_scheme<CS: PolynomialCommitmentScheme + 'static>() -> Vec<usize> {
+    if core::any::TypeId::of::<CS>() == core::any::TypeId::of::<Zeromorph<Bn254>>() {
+        vec![1, 1, 1, 1]
+    } else if core::any::TypeId::of::<CS>() == core::any::TypeId::of::<Shplonked<Bn254>>() {
+        vec![15]
+    } else {
+        vec![7]
+    }
+}
+
+fn num_point_dims_for_scheme<CS: PolynomialCommitmentScheme + 'static>() -> u32 {
+    if core::any::TypeId::of::<CS>() == core::any::TypeId::of::<Zeromorph<Bn254>>() {
+        4
+    } else {
+        1
+    }
+}
+
+mod zeromorph {
+    use super::*;
+    use aptos_dkg::pcs::zeromorph::{Zeromorph, ZeromorphCommitment};
+    use ark_ec::pairing::Pairing;
+
+    #[test]
+    fn zeromorph_bn254_setup_commit_open_verify() {
+        test_pcs_setup_commit_open_verify::<Zeromorph<Bn254>>();
+    }
+
+    #[test]
+    fn zeromorph_bn254_polynomial_from_vec_evaluate_point() {
+        test_pcs_polynomial_from_vec_evaluate_point::<Zeromorph<Bn254>>();
+    }
+
+    #[test]
+    fn zeromorph_bn254_batch_open_verify() {
+        let mut rng = thread_rng();
+        let degree_bounds = vec![1, 1, 1, 1];
+        let num_point_dims = 4u32;
+
+        let (ck, vk) = Zeromorph::<Bn254>::setup(degree_bounds, &mut rng);
+
+        let poly_len = 1u32 << num_point_dims; // 16 so multilinear has 4 vars
+        let polys: Vec<_> = (0..3)
+            .map(|_| random_poly::<Zeromorph<Bn254>, _>(&mut rng, poly_len, 32))
+            .collect();
+        let rs: Vec<_> = (0..polys.len())
+            .map(|_| Zeromorph::<Bn254>::random_witness(&mut rng))
+            .collect();
+        let challenge = random_point::<Zeromorph<Bn254>, _>(&mut rng, num_point_dims);
+
+        let gamma: <Bn254 as Pairing>::ScalarField = first_transcript_challenge(PCS_BATCH_DST);
+
+        let gammas: Vec<_> = (0..polys.len())
+            .scan(<Bn254 as Pairing>::ScalarField::one(), |acc, _| {
+                let g = *acc;
+                *acc = *acc * gamma;
+                Some(g)
+            })
+            .collect();
+
+        let combined_eval = polys
+            .iter()
+            .zip(gammas.iter())
+            .map(|(p, g)| Zeromorph::<Bn254>::evaluate_point(p, &challenge) * *g)
+            .fold(<Bn254 as Pairing>::ScalarField::zero(), |a, b| a + b);
+
+        let commitments: Vec<ZeromorphCommitment<Bn254>> = polys
+            .iter()
+            .zip(rs.iter())
+            .map(|(p, r)| {
+                <Zeromorph<Bn254> as PolynomialCommitmentScheme>::commit(&ck, p.clone(), Some(*r))
+            })
+            .collect();
+
+        let combined_g1 = commitments
+            .iter()
+            .zip(gammas.iter())
+            .map(|(c, g)| (c.as_inner().into_affine(), *g))
+            .fold(<Bn254 as Pairing>::G1::zero(), |acc, (c, g)| acc + c * g);
+        let combined_com = ZeromorphCommitment::from_g1(combined_g1);
+
+        let mut trs = merlin::Transcript::new(PCS_BATCH_DST);
+        let proof = Zeromorph::<Bn254>::batch_open(
+            ck,
+            polys,
+            challenge.clone(),
+            Some(rs),
+            &mut rng,
+            &mut trs,
+        );
+
+        let mut trs_verify = merlin::Transcript::new(PCS_BATCH_DST);
+        Zeromorph::<Bn254>::verify(
+            &vk,
+            &combined_com,
+            &challenge,
+            &combined_eval,
+            &proof,
+            &mut trs_verify,
+            Some(Zeromorph::<Bn254>::transcript_dst_for_batch_open()),
+        )
+        .expect("batch verify should succeed");
+    }
+}
+
+mod shplonked {
+    use super::*;
+    use aptos_dkg::pcs::shplonked::zk_pcs_verify;
+
+    #[test]
+    fn shplonked_bn254_setup_commit_open_verify() {
+        test_pcs_setup_commit_open_verify::<Shplonked<Bn254>>();
+    }
+
+    #[test]
+    fn shplonked_bn254_polynomial_from_vec_evaluate_point() {
+        test_pcs_polynomial_from_vec_evaluate_point::<Shplonked<Bn254>>();
+    }
+
+    #[test]
+    fn shplonked_bn254_batch_open_verify() {
+        let mut rng = thread_rng();
+        let degree_bounds = vec![15];
+        let num_point_dims = 1u32;
+
+        let (ck, vk) = Shplonked::<Bn254>::setup(degree_bounds, &mut rng);
+
+        let polys: Vec<_> = (0..3)
+            .map(|_| random_poly::<Shplonked<Bn254>, _>(&mut rng, 8, 32))
+            .collect();
+        let rs: Vec<_> = (0..polys.len())
+            .map(|_| Shplonked::<Bn254>::random_witness(&mut rng))
+            .collect();
+        let challenge = random_point::<Shplonked<Bn254>, _>(&mut rng, num_point_dims);
+
+        let commitments: Vec<_> = polys
+            .iter()
+            .zip(rs.iter())
+            .map(|(p, r)| Shplonked::<Bn254>::commit(&ck, p.clone(), Some(*r)))
+            .collect();
+        let commitments_affine: Vec<_> = commitments.iter().map(|c| c.0.into_affine()).collect();
+
+        let mut trs = merlin::Transcript::new(PCS_BATCH_DST);
+        let proof = Shplonked::<Bn254>::batch_open(
+            ck,
+            polys,
+            challenge.clone(),
+            Some(rs),
+            &mut rng,
+            &mut trs,
+        );
+
+        zk_pcs_verify(
+            &proof.opening,
+            &commitments_affine,
+            proof.com_y,
+            &vk,
+            &mut rng,
+        )
+        .expect("batch verify should succeed");
+    }
+}
