@@ -597,7 +597,20 @@ fn add_accounts_impl<V>(
         aptos_genesis::test_utils::test_config_with_custom_features(init_features);
     config.storage.dir = output_dir.as_ref().to_path_buf();
     storage_test_config.init_storage_config(&mut config);
-    let db = init_db(&config);
+    let (aptos_db, db) = DbReaderWriter::wrap(
+        AptosDB::open(
+            config.storage.get_dir_paths(),
+            false, /* readonly */
+            config.storage.storage_pruner_config,
+            config.storage.rocksdb_configs,
+            false,
+            config.storage.buffered_state_target_items,
+            config.storage.max_num_nodes_per_lru_cache_shard,
+            None,
+            HotStateConfig::default(),
+        )
+        .expect("DB should open."),
+    );
 
     let start_version = db.reader.get_latest_ledger_info_version().unwrap();
 
@@ -697,6 +710,8 @@ fn add_accounts_impl<V>(
         "Total written leaf nodes value size: {} bytes",
         APTOS_JELLYFISH_LEAF_ENCODED_BYTES.get()
     );
+
+    aptos_db.wait_for_all_pruners();
 }
 
 fn log_total_supply(db_reader: &Arc<dyn DbReader>) {
