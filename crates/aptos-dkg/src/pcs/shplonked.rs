@@ -602,7 +602,7 @@ where
         eval: Self::WitnessField,
         proof: Self::Proof,
         _trs: &mut merlin::Transcript,
-        _batch_dst: Option<&'static [u8]>,
+        _batch: bool,
     ) -> anyhow::Result<()> {
         let point = challenge
             .first()

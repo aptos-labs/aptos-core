@@ -40,7 +40,7 @@ where
     let proof = PCS::open(&ck, poly, challenge.clone(), Some(r), &mut rng, &mut trs);
 
     // Verifier rebuilds challenges from proof using the same DST.
-    PCS::verify(&vk, com, challenge, eval, proof, &mut trs, None).expect("verify should succeed");
+    PCS::verify(&vk, com, challenge, eval, proof, &mut trs, false).expect("verify should succeed");
 }
 
 fn test_pcs_polynomial_from_vec_evaluate_point<PCS>()
@@ -162,7 +162,7 @@ mod zeromorph {
             &combined_eval,
             &proof,
             &mut trs_verify,
-            Some(Zeromorph::<Bn254>::transcript_dst_for_batch_open()),
+            true,
         )
         .expect("batch verify should succeed");
     }

@@ -430,13 +430,18 @@ where
         eval: &P::ScalarField,
         proof: &ZeromorphProof<P>,
         transcript: &mut merlin::Transcript,
-        batch_dst: Option<&'static [u8]>,
+        batch: bool,
     ) -> anyhow::Result<()> {
         // Rebuild transcript from proof so we derive the same y, x, z as the prover.
-        let dst = batch_dst
-            .unwrap_or_else(<Self as crate::pcs::traits::PolynomialCommitmentScheme>::transcript_dst_for_single_open);
+        let dst = if batch {
+            <Self as crate::pcs::traits::PolynomialCommitmentScheme>::transcript_dst_for_batch_open(
+            )
+        } else {
+            <Self as crate::pcs::traits::PolynomialCommitmentScheme>::transcript_dst_for_single_open(
+            )
+        };
         let mut t = merlin::Transcript::new(dst);
-        if batch_dst.is_some() {
+        if batch {
             let _gamma: P::ScalarField = t.challenge_scalar(); // consume gamma so state matches batch_open
         }
         t.append_sep(Self::protocol_name());
@@ -623,9 +628,9 @@ where
         eval: Self::WitnessField,
         proof: Self::Proof,
         trs: &mut merlin::Transcript,
-        batch_dst: Option<&'static [u8]>,
+        batch: bool,
     ) -> anyhow::Result<()> {
-        Zeromorph::verify(&vk, &com, &challenge, &eval, &proof, trs, batch_dst)
+        Zeromorph::verify(&vk, &com, &challenge, &eval, &proof, trs, batch)
     }
 
     fn random_witness<R: RngCore + CryptoRng>(rng: &mut R) -> Self::WitnessField {

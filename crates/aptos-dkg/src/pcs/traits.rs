@@ -57,7 +57,7 @@ pub trait PolynomialCommitmentScheme {
         eval: Self::WitnessField,
         proof: Self::Proof,
         trs: &mut merlin::Transcript,
-        batch_dst: Option<&'static [u8]>,
+        batch: bool,
     ) -> anyhow::Result<()>;
 
     fn random_witness<R: rand_core::RngCore + rand_core::CryptoRng>(
@@ -73,13 +73,14 @@ pub trait PolynomialCommitmentScheme {
 
     fn scheme_name() -> &'static [u8];
 
-    /// Transcript domain separator for single open/verify. Prover and verifier must use the same
-    /// so that the verifier can reconstruct the same Fiat–Shamir challenges from the proof.
+    /// Transcript domain separator for single open/verify. Used when `verify(..., batch: false)`.
+    /// Prover and verifier must use the same DST so the verifier can reconstruct the same
+    /// Fiat–Shamir challenges from the proof.
     fn transcript_dst_for_single_open() -> &'static [u8] {
         b"pcs_single_open_test"
     }
 
-    /// DST for batch open/verify. Pass as `batch_dst` in `verify` when verifying a batch proof.
+    /// Transcript domain separator for batch open/verify. Used when `verify(..., batch: true)`.
     fn transcript_dst_for_batch_open() -> &'static [u8] {
         b"pcs_batch_open_test"
     }
