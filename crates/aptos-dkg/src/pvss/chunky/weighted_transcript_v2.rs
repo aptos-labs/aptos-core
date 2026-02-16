@@ -152,6 +152,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             pp.ell,
         );
 
+        let num_chunks = num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize;
+        let total_weight = sc.get_total_weight();
         let (first_msm_terms, second_msm_terms) = hom.msm_terms_for_verify(
             &TupleCodomainShape(
                 TupleCodomainShape(
@@ -169,6 +171,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             ),
             &self.sharing_proof.SoK,
             &sok_cntxt,
+            Some((1 + total_weight * num_chunks, total_weight)),
             rng,
         );
 

@@ -342,7 +342,7 @@ where
         >,
     {
         let (first_msm_terms, second_msm_terms) =
-            self.msm_terms_for_verify::<_, H, _>(public_statement, proof, cntxt, rng);
+            self.msm_terms_for_verify::<_, H, _>(public_statement, proof, cntxt, None, rng);
 
         let first_msm_result = H1::msm_eval(first_msm_terms);
         ensure!(first_msm_result == H1::MsmOutput::zero());
@@ -359,6 +359,7 @@ where
         public_statement: &<Self as homomorphism::Trait>::CodomainNormalized,
         proof: &Proof<H1::Scalar, H>,
         cntxt: &Ct,
+        number_of_beta_powers: Option<(usize, usize)>, // (len1, len2); None => compute from statement (clones)
         rng: &mut R,
     ) -> (
         MsmInput<H1::Base, H1::Scalar>,
@@ -385,8 +386,12 @@ where
         );
 
         let beta = sample_field_element(rng); // verifier-specific challenge
-        let len1 = public_statement.0.clone().into_iter().count(); // hmm maybe pass the into_iter version in merge_msm_terms?
-        let len2 = public_statement.1.clone().into_iter().count();
+        let (len1, len2) = number_of_beta_powers.unwrap_or_else(|| {
+            (
+                public_statement.0.clone().into_iter().count(),
+                public_statement.1.clone().into_iter().count(),
+            )
+        });
         let powers_of_beta = utils::powers(beta, len1 + len2);
         let (first_powers_of_beta, second_powers_of_beta) = powers_of_beta.split_at(len1);
 

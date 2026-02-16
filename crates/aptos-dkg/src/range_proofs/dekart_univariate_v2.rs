@@ -705,6 +705,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             &(two_term_msm::CodomainShape((*hatC - comm.0).into_affine())),
             pi_PoK,
             &Self::DST,
+            Some(1), // TrivialShape has one element
             rng,
         )?;
 
