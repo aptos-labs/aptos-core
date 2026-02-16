@@ -6,15 +6,12 @@ use crate::{
     sigma_protocol::{
         homomorphism,
         homomorphism::{fixed_base_msms, EntrywiseMap},
-        traits::{fiat_shamir_challenge_for_sigma_protocol, prove_homomorphism},
-        FirstProofItem, Proof,
+        traits::{prove_homomorphism, verifier_challenges_with_length},
+        Proof,
     },
 };
 use anyhow::ensure;
-use aptos_crypto::{
-    arkworks::{msm::MsmInput, random::sample_field_element},
-    utils,
-};
+use aptos_crypto::arkworks::msm::MsmInput;
 use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_ff::Zero;
 use ark_serialize::{
@@ -371,28 +368,24 @@ where
             CodomainNormalized = <Self as homomorphism::Trait>::CodomainNormalized,
         >, // need this?
     {
-        let prover_first_message = match &proof.first_proof_item {
-            FirstProofItem::Commitment(A) => A,
-            FirstProofItem::Challenge(_) => {
-                panic!("Missing implementation - expected commitment, not challenge")
-            },
-        };
-        let c = fiat_shamir_challenge_for_sigma_protocol::<_, H1::Scalar, _>(
-            cntxt,
-            self,
-            &public_statement,
-            &prover_first_message,
-            &self.dst(),
-        );
-
-        let beta = sample_field_element(rng); // verifier-specific challenge
+        let prover_first_message = proof
+            .prover_commitment()
+            .expect("Missing implementation - expected commitment, not challenge");
         let (len1, len2) = number_of_beta_powers.unwrap_or_else(|| {
             (
                 public_statement.0.clone().into_iter().count(),
                 public_statement.1.clone().into_iter().count(),
             )
         });
-        let powers_of_beta = utils::powers(beta, len1 + len2);
+        let (c, powers_of_beta) = verifier_challenges_with_length::<_, H1::Scalar, _, _>(
+            cntxt,
+            self,
+            public_statement,
+            prover_first_message,
+            &self.dst(),
+            len1 + len2,
+            rng,
+        );
         let (first_powers_of_beta, second_powers_of_beta) = powers_of_beta.split_at(len1);
 
         let (first_msm_terms_of_response, second_msm_terms_of_response) = self.msm_terms(&proof.z);

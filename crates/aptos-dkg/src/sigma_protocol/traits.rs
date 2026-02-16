@@ -96,26 +96,17 @@ pub trait Trait<C: CurveGroup>:
         Ct: Serialize,
         // H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>, // will probably need this if we use `FirstProofItem<F, H>` instead
     {
-        // --- Fiat–Shamir challenge c ---
-        let c = fiat_shamir_challenge_for_sigma_protocol::<_, C::ScalarField, _>(
-            cntxt,
-            self,
-            &public_statement,
-            prover_first_message,
-            &self.dst(),
-        );
-
-        // --- Random verifier challenge β ---
         let n =
             number_of_beta_powers.unwrap_or_else(|| public_statement.clone().into_iter().count());
-        let powers_of_beta = if n > 1 {
-            let beta = sample_field_element(rng);
-            utils::powers(beta, n)
-        } else {
-            utils::powers(C::ScalarField::ONE, n)
-        };
-
-        (c, powers_of_beta)
+        verifier_challenges_with_length::<_, C::ScalarField, _, _>(
+            cntxt,
+            self,
+            public_statement,
+            prover_first_message,
+            &self.dst(),
+            n,
+            rng,
+        )
     }
 
     // Returns the MSM terms that `verify()` needs
@@ -244,6 +235,44 @@ impl<F: PrimeField, W: Witness<F>> Witness<F> for Vec<W> {
 // Standard method to get `trait Statement = Canonical Serialize + ...`, because type aliases are experimental in Rust
 pub trait Statement: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq {}
 impl<T> Statement for T where T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq {}
+
+/// Computes the Fiat–Shamir challenge and verifier β-powers for a Σ-protocol,
+/// with an explicit total length for the powers (e.g. `len1 + len2` for two-component protocols).
+/// Callers can split the returned `powers_of_beta` slice as needed.
+#[allow(non_snake_case)]
+pub fn verifier_challenges_with_length<
+    Ct: Serialize,
+    F: PrimeField,
+    H: homomorphism::Trait + CanonicalSerialize,
+    R: RngCore + CryptoRng,
+>(
+    cntxt: &Ct,
+    hom: &H,
+    public_statement: &H::CodomainNormalized,
+    prover_first_message: &H::CodomainNormalized,
+    dst: &[u8],
+    total_beta_powers: usize,
+    rng: &mut R,
+) -> (F, Vec<F>)
+where
+    H::Domain: Witness<F>,
+    H::CodomainNormalized: Statement,
+{
+    let c = fiat_shamir_challenge_for_sigma_protocol::<_, F, _>(
+        cntxt,
+        hom,
+        public_statement,
+        prover_first_message,
+        dst,
+    );
+    let powers_of_beta = if total_beta_powers > 1 {
+        let beta = sample_field_element(rng);
+        utils::powers(beta, total_beta_powers)
+    } else {
+        vec![F::ONE]
+    };
+    (c, powers_of_beta)
+}
 
 /// Computes the Fiat–Shamir challenge for a Σ-protocol instance.
 ///
