@@ -99,7 +99,8 @@ fn benchmark_commitment_scheme<PCS: PolynomialCommitmentScheme>(c: &mut Criterio
                     (challenge, val, com, proof, trs)
                 },
                 |(challenge, val, com, proof, mut trs)| {
-                    let _ = PCS::verify(black_box(&vk), com, challenge, val, proof, &mut trs, None);
+                    let _ =
+                        PCS::verify(black_box(&vk), com, challenge, val, proof, &mut trs, false);
                 },
                 BatchSize::LargeInput,
             );

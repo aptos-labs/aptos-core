@@ -432,7 +432,8 @@ where
         transcript: &mut merlin::Transcript,
         batch: bool,
     ) -> anyhow::Result<()> {
-        // Rebuild transcript from proof so we derive the same y, x, z as the prover.
+        // Always derive challenges from an internal transcript (caller may pass the same transcript
+        // as open(), so we cannot assume it is fresh). Use the appropriate DST for single vs batch.
         let dst = if batch {
             <Self as crate::pcs::traits::PolynomialCommitmentScheme>::transcript_dst_for_batch_open(
             )
@@ -964,7 +965,9 @@ mod test {
             let r = <Bn254 as Pairing>::ScalarField::rand(&mut ark_rng);
             let commitment = Zeromorph::<Bn254>::commit(&pk, &poly, r);
 
-            let mut prover_transcript = merlin::Transcript::new(b"TestEval");
+            // Use the same DST as verify() when batch=false, so challenges match.
+            let dst = <Zeromorph<Bn254> as crate::pcs::traits::PolynomialCommitmentScheme>::transcript_dst_for_single_open();
+            let mut prover_transcript = merlin::Transcript::new(dst);
             let s = Scalar(r);
             let proof = Zeromorph::<Bn254>::open(
                 &pk,
@@ -975,11 +978,9 @@ mod test {
                 &mut rng,
                 &mut prover_transcript,
             );
-            let p_transcript_squeeze: <Bn254 as Pairing>::ScalarField =
-                prover_transcript.challenge_scalar();
 
-            // Verify proof.
-            let mut verifier_transcript = merlin::Transcript::new(b"TestEval");
+            // Verify proof (verifier derives challenges from an internal transcript with the same DST).
+            let mut verifier_transcript = merlin::Transcript::new(dst);
             Zeromorph::<Bn254>::verify(
                 &vk,
                 &commitment,
@@ -987,13 +988,9 @@ mod test {
                 &eval,
                 &proof,
                 &mut verifier_transcript,
-                None,
+                false,
             )
             .unwrap();
-            let v_transcript_squeeze: <Bn254 as Pairing>::ScalarField =
-                verifier_transcript.challenge_scalar();
-
-            assert_eq!(p_transcript_squeeze, v_transcript_squeeze);
 
             // evaluate bad proof for soundness
             let altered_verifier_point = point
@@ -1001,7 +998,7 @@ mod test {
                 .map(|s| *s + <Bn254 as Pairing>::ScalarField::one())
                 .collect::<Vec<_>>();
             let altered_verifier_eval = poly.evaluate(&altered_verifier_point);
-            let mut verifier_transcript = merlin::Transcript::new(b"TestEval");
+            let mut verifier_transcript = merlin::Transcript::new(dst);
             assert!(Zeromorph::<Bn254>::verify(
                 &vk,
                 &commitment,
@@ -1009,7 +1006,7 @@ mod test {
                 &altered_verifier_eval,
                 &proof,
                 &mut verifier_transcript,
-                None,
+                false,
             )
             .is_err())
         }
