@@ -255,7 +255,7 @@ This layered architecture enables multi-slot censorship-resistant consensus as d
 ### Repository State
 - **Branch**: `prefix-consensus-prototype`
 - **HEAD**: Phase 9 complete (Inner PC Abstraction Trait + signing refactor)
-- **Tests**: 190/190 unit tests passing, 4/4 smoke tests passing
+- **Tests**: 189/189 unit tests passing, 4/4 smoke tests passing
 - **Build**: ✅ Clean
 
 ### Progress Summary
@@ -270,6 +270,7 @@ This layered architecture enables multi-slot censorship-resistant consensus as d
 - ✅ **Strong PC Phase 5**: Integration with consensus layer (EpochManager wiring + network bridges)
 - ✅ **Strong PC Phase 8 (Smoke Tests)**: 2 strong PC tests + 2 basic PC tests, 4 integration bugs fixed
 - ✅ **Strong PC Phase 9 (Inner PC Abstraction)**: InnerPCAlgorithm trait + ThreeRoundPC impl + generic manager + signing factory functions
+- ✅ **Basic Manager Trait Refactor**: PrefixConsensusManager made generic over InnerPCAlgorithm, DefaultPCManager alias added
 - ⏳ **Slot Manager**: Future work (after Strong PC complete)
 
 **Main Design Plan**: `.plans/strong-prefix-consensus.md`
@@ -511,6 +512,20 @@ StrongPrefixConsensusManager::new(...)
 - `Message` associated type constrained to `PrefixConsensusMsg` in manager's impl block (not in trait)
 - Manager remains generic but `DefaultStrongPCManager` alias provides ergonomic default
 
+### Basic Manager Trait Refactor
+
+**Completed**: February 12, 2026
+
+Applied the same `InnerPCAlgorithm` trait abstraction to the basic `PrefixConsensusManager`:
+- Made `PrefixConsensusManager<NS, T: InnerPCAlgorithm>` generic, added `DefaultPCManager<NS>` type alias
+- Removed 5 vote-processing/cascading methods (~310 lines): `process_vote1/2/3`, `start_round2/3`
+- Removed `protocol`, `validator_verifier`, `seen_vote1/2/3` fields (5 fields)
+- Added `algorithm: T`, `output`, `input_vector` fields (3 fields)
+- Constructor now takes `PrefixConsensusInput` instead of `Arc<PrefixConsensusProtocol>`
+- `epoch_manager.rs` updated: removed protocol construction, uses `DefaultPCManager::new()`
+- Deleted `test_duplicate_vote_rejection` (tested at protocol level), updated remaining 2 tests
+- Net: 408 deletions, 96 insertions across 3 files
+
 ### Next Action
 Strong Prefix Consensus Phase 10 (Performance) or Phase 11 (Documentation), or begin Slot Manager
 
@@ -537,7 +552,7 @@ Strong Prefix Consensus Phase 10 (Performance) or Phase 11 (Documentation), or b
 consensus/prefix-consensus/src/
 ├── types.rs              - Vote/QC types + ViewProposal/CertFetch types (1039 lines)
 ├── protocol.rs           - 3-round state machine (~585 lines, reduced by signing refactor)
-├── manager.rs            - Event-driven orchestrator (737 lines)
+├── manager.rs            - Event-driven orchestrator, generic over InnerPCAlgorithm (~430 lines)
 ├── network_interface.rs  - Network adapter + Strong PC client/adapter (~330 lines)
 ├── network_messages.rs   - PrefixConsensusMsg + StrongPrefixConsensusMsg (795 lines)
 ├── signing.rs            - BLS helpers + create_signed_vote* factory functions (~240 lines)
@@ -584,7 +599,8 @@ testsuite/smoke-test/src/consensus/strong_prefix_consensus/
 12. **2c52a342f7** (Feb 12): Strong PC integration with EpochManager (Phase 5)
 13. **7df6a297e1** (Feb 12): Strong PC smoke test and integration bug fixes (Phase 8)
 14. **(pending)**: Strong PC divergent inputs smoke test
-15. **039271f95e** (Feb 12): Inner PC Abstraction Trait + signing factory functions (Phase 9) ← HEAD
+15. **039271f95e** (Feb 12): Inner PC Abstraction Trait + signing factory functions (Phase 9)
+16. **1b353c4e46** (Feb 12): Make basic PrefixConsensusManager generic over InnerPCAlgorithm ← HEAD
 
 ---
 
