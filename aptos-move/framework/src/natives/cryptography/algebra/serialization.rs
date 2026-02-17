@@ -5,8 +5,8 @@ use crate::{
     abort_unless_feature_flag_enabled,
     natives::cryptography::algebra::{
         abort_invariant_violated, AlgebraContext, SerializationFormat, Structure,
-        BLS12381_R_SCALAR, BN254_R_SCALAR, E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES,
-        MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        BLS12381_R_SCALAR, BN254_R_SCALAR, E_SERIALIZATION_BLS12381GT_CONST_LOADING_FAILED,
+        E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
     },
     safe_borrow_element, store_element, structure_from_ty_arg,
 };
@@ -444,12 +444,18 @@ pub fn deserialize_internal(
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
             context.charge(ALGEBRA_ARK_BLS12_381_FQ12_DESER)?;
+            let r_scalar = BLS12381_R_SCALAR.as_ref().ok_or_else(|| {
+                SafeNativeError::abort_with_message(
+                    E_SERIALIZATION_BLS12381GT_CONST_LOADING_FAILED,
+                    "BLS12381 GT constant loading failed",
+                )
+            })?;
             match <ark_bls12_381::Fq12>::deserialize_uncompressed(bytes) {
                 Ok(element) => {
                     context.charge(
                         ALGEBRA_ARK_BLS12_381_FQ12_POW_U256 + ALGEBRA_ARK_BLS12_381_FQ12_EQ,
                     )?;
-                    if element.pow(BLS12381_R_SCALAR.0) == ark_bls12_381::Fq12::one() {
+                    if element.pow(r_scalar.0) == ark_bls12_381::Fq12::one() {
                         let handle = store_element!(context, element)?;
                         Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])
                     } else {
