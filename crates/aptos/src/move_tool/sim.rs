@@ -6,7 +6,7 @@ use crate::{
     move_tool::ReplayNetworkSelection,
 };
 use aptos_rest_client::Client;
-use aptos_transaction_simulation_session::Session;
+use aptos_transaction_simulation_session::{BlockTimestamp, Session};
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
@@ -164,6 +164,74 @@ impl CliCommand<Option<serde_json::Value>> for ViewResourceGroup {
     }
 }
 
+/// Execute a new block
+///
+/// This executes a real block metadata transaction through the VM. The block prologue
+/// updates the on-chain timestamp and may trigger an epoch change if enough time has
+/// passed since the last reconfiguration.
+///
+/// If neither --timestamp-usecs nor --offset-usecs is provided, the block advances by
+/// 1 microsecond. These two options are mutually exclusive.
+#[derive(Debug, Parser)]
+pub struct NewBlock {
+    /// Path to a stored session
+    #[clap(long)]
+    session: PathBuf,
+
+    /// Absolute block timestamp in microseconds.
+    #[clap(long, conflicts_with = "offset_usecs")]
+    timestamp_usecs: Option<u64>,
+
+    /// Advance the current timestamp by this many microseconds.
+    #[clap(long, conflicts_with = "timestamp_usecs")]
+    offset_usecs: Option<u64>,
+}
+
+#[async_trait]
+impl CliCommand<serde_json::Value> for NewBlock {
+    fn command_name(&self) -> &'static str {
+        "new-block"
+    }
+
+    async fn execute(self) -> CliTypedResult<serde_json::Value> {
+        let mut session = Session::load(&self.session)?;
+
+        let timestamp = match (self.timestamp_usecs, self.offset_usecs) {
+            (Some(ts), _) => BlockTimestamp::Absolute(ts),
+            (_, Some(offset)) => BlockTimestamp::Offset(offset),
+            (None, None) => BlockTimestamp::Default,
+        };
+
+        let result = session.new_block(timestamp)?;
+        serde_json::to_value(result).map_err(|e| anyhow::anyhow!(e).into())
+    }
+}
+
+/// Advance to the next epoch
+///
+/// This calculates the minimum timestamp needed to cross the epoch boundary and
+/// executes a new block at that timestamp, triggering a reconfiguration.
+#[derive(Debug, Parser)]
+pub struct AdvanceEpoch {
+    /// Path to a stored session
+    #[clap(long)]
+    session: PathBuf,
+}
+
+#[async_trait]
+impl CliCommand<serde_json::Value> for AdvanceEpoch {
+    fn command_name(&self) -> &'static str {
+        "advance-epoch"
+    }
+
+    async fn execute(self) -> CliTypedResult<serde_json::Value> {
+        let mut session = Session::load(&self.session)?;
+
+        let result = session.advance_epoch()?;
+        serde_json::to_value(result).map_err(|e| anyhow::anyhow!(e).into())
+    }
+}
+
 /// BETA: Commands for interacting with a local simulation session
 ///
 /// BETA: Subject to change
@@ -173,6 +241,8 @@ pub enum Sim {
     Fund(Fund),
     ViewResource(ViewResource),
     ViewResourceGroup(ViewResourceGroup),
+    NewBlock(NewBlock),
+    AdvanceEpoch(AdvanceEpoch),
 }
 
 impl Sim {
@@ -184,6 +254,8 @@ impl Sim {
             Sim::ViewResourceGroup(view_resource_group) => {
                 view_resource_group.execute_serialized().await
             },
+            Sim::NewBlock(new_block) => new_block.execute_serialized().await,
+            Sim::AdvanceEpoch(advance_epoch) => advance_epoch.execute_serialized().await,
         }
     }
 }

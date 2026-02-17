@@ -4699,6 +4699,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "aptos-api-types",
+ "aptos-crypto",
  "aptos-resource-viewer",
  "aptos-rest-client",
  "aptos-transaction-simulation",
@@ -4715,7 +4716,6 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
- "tokio",
  "url",
 ]
 
