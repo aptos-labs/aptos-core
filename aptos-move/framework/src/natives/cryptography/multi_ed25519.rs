@@ -15,7 +15,7 @@ use aptos_gas_algebra::{Arg, GasExpression};
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
     safely_assert_eq, safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext,
-    SafeNativeResult,
+    SafeNativeError, SafeNativeResult,
 };
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use move_core_types::gas_algebra::{NumArgs, NumBytes};
@@ -25,6 +25,13 @@ use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use rand_core::OsRng;
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, convert::TryFrom};
+
+/// Equivalent to `std::errors::internal(1)` in Move.
+const E_MULTI_ED25519_SK_CREATE_FAILED: u64 = 0x0A_0001;
+/// Equivalent to `std::errors::internal(2)` in Move.
+const E_MULTI_ED25519_PK_CREATE_FAILED: u64 = 0x0A_0002;
+/// Equivalent to `std::errors::internal(3)` in Move.
+const E_MULTI_ED25519_SK_DESERIALIZATION_FAILED: u64 = 0x0A_0003;
 
 /// See `public_key_validate_v2_internal` comments in `multi_ed25519.move`.
 fn native_public_key_validate_v2(
@@ -176,8 +183,20 @@ fn native_generate_keys(
         .iter()
         .map(|pair| pair.public_key.clone())
         .collect();
-    let group_sk = multi_ed25519::MultiEd25519PrivateKey::new(private_keys, threshold).unwrap();
-    let group_pk = multi_ed25519::MultiEd25519PublicKey::new(public_keys, threshold).unwrap();
+    let group_sk =
+        multi_ed25519::MultiEd25519PrivateKey::new(private_keys, threshold).map_err(|_e| {
+            SafeNativeError::abort_with_message(
+                E_MULTI_ED25519_SK_CREATE_FAILED,
+                "MultiEd25519 secret key creation failed",
+            )
+        })?;
+    let group_pk =
+        multi_ed25519::MultiEd25519PublicKey::new(public_keys, threshold).map_err(|_e| {
+            SafeNativeError::abort_with_message(
+                E_MULTI_ED25519_PK_CREATE_FAILED,
+                "MultiEd25519 public key creation failed",
+            )
+        })?;
     Ok(smallvec![
         Value::vector_u8(group_sk.to_bytes()),
         Value::vector_u8(group_pk.to_bytes()),
@@ -192,7 +211,13 @@ fn native_sign(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let message = safely_pop_arg!(arguments, Vec<u8>);
     let sk_bytes = safely_pop_arg!(arguments, Vec<u8>);
-    let group_sk = multi_ed25519::MultiEd25519PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
+    let group_sk =
+        multi_ed25519::MultiEd25519PrivateKey::try_from(sk_bytes.as_slice()).map_err(|_e| {
+            SafeNativeError::abort_with_message(
+                E_MULTI_ED25519_SK_DESERIALIZATION_FAILED,
+                "MultiEd25519 secret key deserialization failed",
+            )
+        })?;
     let sig = group_sk.sign_arbitrary_message(message.as_slice());
     Ok(smallvec![Value::vector_u8(sig.to_bytes()),])
 }

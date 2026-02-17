@@ -67,6 +67,18 @@ const NUM_POINTS_LIMIT: usize = 10000;
 /// Equivalent to `std::error::resource_exhausted(4)` in Move.
 const E_TOO_MANY_POINTS_CREATED: u64 = 0x09_0004;
 
+/// Equivalent to `std::errors::internal(1)` in Move.
+const E_INVALID_POINT_HANDLE: u64 = 0x0A_0001;
+
+/// Equivalent to `std::errors::internal(2)` in Move.
+const E_MSM_LOG2_FAILED: u64 = 0x0A_0002;
+
+/// Equivalent to `std::errors::internal(3)` in Move.
+const E_RISTRETTO255_POINT_DUPLICATE_HANDLE: u64 = 0x0A_0003;
+
+/// Equivalent to `std::errors::internal(4)` in Move. Invalid Ristretto scalar bytes length.
+pub(crate) const E_RISTRETTO255_SCALAR_INVALID_BYTES_LENGTH: u64 = 0x0A_0004;
+
 /// A structure representing mutable data of the NativeRistrettoPointContext. This is in a RefCell
 /// of the overall context so we can mutate while still accessing the overall context.
 #[derive(Default)]
@@ -115,40 +127,67 @@ impl PointStore {
         self.points[handle.0 as usize] = point
     }
 
-    /// Gets a RistrettoPoint that was previously allocated.
-    pub fn get_point(&self, handle: &RistrettoPointHandle) -> &RistrettoPoint {
-        //&self.points[handle.0 as usize]
-        self.points.get(handle.0 as usize).unwrap()
+    /// Gets a RistrettoPoint that was previously allocated, or `Err` if the handle is invalid.
+    pub fn get_point(&self, handle: &RistrettoPointHandle) -> SafeNativeResult<&RistrettoPoint> {
+        self.points.get(handle.0 as usize).ok_or_else(|| {
+            SafeNativeError::abort_with_message(E_INVALID_POINT_HANDLE, "Invalid point handle")
+        })
     }
 
-    /// Gets a RistrettoPoint that was previously allocated.
-    pub fn get_point_mut(&mut self, handle: &RistrettoPointHandle) -> &mut RistrettoPoint {
-        //&mut self.points[handle.0 as usize]
-        self.points.get_mut(handle.0 as usize).unwrap()
+    /// Gets a mutable RistrettoPoint that was previously allocated, or `Err` if the handle is invalid.
+    pub fn get_point_mut(
+        &mut self,
+        handle: &RistrettoPointHandle,
+    ) -> SafeNativeResult<&mut RistrettoPoint> {
+        self.points.get_mut(handle.0 as usize).ok_or_else(|| {
+            SafeNativeError::abort_with_message(E_INVALID_POINT_HANDLE, "Invalid point handle")
+        })
     }
 
     /// Returns mutable references to two different Ristretto points in the vector using split_at_mut.
     /// Note that Rust's linear types prevent us from simply returning `(&mut points[i], &mut points[j])`.
+    /// Returns `Err` if the same handle is passed twice.
     pub fn get_two_muts(
         &mut self,
         a: &RistrettoPointHandle,
         b: &RistrettoPointHandle,
-    ) -> (&mut RistrettoPoint, &mut RistrettoPoint) {
+    ) -> SafeNativeResult<(&mut RistrettoPoint, &mut RistrettoPoint)> {
         use std::cmp::Ordering;
 
-        let (sw, a, b) = match Ord::cmp(&a, &b) {
+        let (sw, a, b) = match Ord::cmp(a, b) {
             Ordering::Less => (false, a.0 as usize, b.0 as usize),
             Ordering::Greater => (true, b.0 as usize, a.0 as usize),
-            Ordering::Equal => panic!("attempted to exclusive-borrow one element twice"),
+            Ordering::Equal => {
+                return Err(SafeNativeError::abort_with_message(
+                    E_RISTRETTO255_POINT_DUPLICATE_HANDLE,
+                    "Duplicate Ristretto point handle",
+                ))
+            },
         };
 
-        let (left, right) = self.points.split_at_mut(a + 1);
-        let (a_ref, b_ref) = (&mut left[a], &mut right[b - (a + 1)]);
+        let (left, right) = self.points.split_at_mut_checked(a + 1).ok_or_else(|| {
+            SafeNativeError::abort_with_message(
+                E_INVALID_POINT_HANDLE,
+                "Invalid Ristretto point handle: split index out of bounds",
+            )
+        })?;
+        let a_ref = left.get_mut(a).ok_or_else(|| {
+            SafeNativeError::abort_with_message(
+                E_INVALID_POINT_HANDLE,
+                "Invalid Ristretto point handle: first handle out of bounds",
+            )
+        })?;
+        let b_ref = right.get_mut(b - (a + 1)).ok_or_else(|| {
+            SafeNativeError::abort_with_message(
+                E_INVALID_POINT_HANDLE,
+                "Invalid Ristretto point handle: second handle out of bounds",
+            )
+        })?;
 
         if sw {
-            (b_ref, a_ref)
+            Ok((b_ref, a_ref))
         } else {
-            (a_ref, b_ref)
+            Ok((a_ref, b_ref))
         }
     }
 
@@ -268,7 +307,7 @@ pub(crate) fn native_point_clone(
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
     let handle = pop_as_ristretto_handle(&mut args)?;
-    let point = point_data.get_point(&handle);
+    let point = point_data.get_point(&handle)?;
     let clone = *point;
     let result_handle = point_data.safe_add_point(clone)?;
 
@@ -288,9 +327,7 @@ pub(crate) fn native_point_compress(
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let point_data = point_context.point_data.borrow();
     let handle = get_point_handle(&safely_pop_arg!(args, StructRef))?;
-
-    let point = point_data.get_point(&handle);
-
+    let point = point_data.get_point(&handle)?;
     Ok(smallvec![Value::vector_u8(point.compress().to_bytes())])
 }
 
@@ -314,11 +351,11 @@ pub(crate) fn native_point_mul(
     // Compute result = a * point (or a = a * point) and return a RistrettoPointHandle
     let result_handle = match in_place {
         false => {
-            let point = point_data.get_point(&point_handle).mul(scalar);
+            let point = point_data.get_point(&point_handle)?.mul(scalar);
             point_data.safe_add_point(point)?
         },
         true => {
-            point_data.get_point_mut(&point_handle).mul_assign(scalar);
+            point_data.get_point_mut(&point_handle)?.mul_assign(scalar);
             point_handle.0
         },
     };
@@ -341,10 +378,8 @@ pub(crate) fn native_point_equals(
 
     let b_handle = get_point_handle(&safely_pop_arg!(args, StructRef))?;
     let a_handle = get_point_handle(&safely_pop_arg!(args, StructRef))?;
-
-    let a = point_data.get_point(&a_handle);
-    let b = point_data.get_point(&b_handle);
-
+    let a = point_data.get_point(&a_handle)?;
+    let b = point_data.get_point(&b_handle)?;
     // Checks if a == b
     Ok(smallvec![Value::bool(a.eq(b))])
 }
@@ -368,11 +403,11 @@ pub(crate) fn native_point_neg(
     // Compute result = - point (or point = -point) and return a RistrettoPointHandle
     let result_handle = match in_place {
         false => {
-            let point = point_data.get_point(&point_handle).neg();
+            let point = point_data.get_point(&point_handle)?.neg();
             point_data.safe_add_point(point)?
         },
         true => {
-            let neg = point_data.get_point_mut(&point_handle).neg();
+            let neg = point_data.get_point_mut(&point_handle)?.neg();
             point_data.set_point(&point_handle, neg);
             point_handle.0
         },
@@ -401,9 +436,8 @@ pub(crate) fn native_point_add(
     // Compute result = a + b (or a = a + b) and return a RistrettoPointHandle
     let result_handle = match in_place {
         false => {
-            let a = point_data.get_point(&a_handle);
-            let b = point_data.get_point(&b_handle);
-
+            let a = point_data.get_point(&a_handle)?;
+            let b = point_data.get_point(&b_handle)?;
             let point = a.add(b);
             point_data.safe_add_point(point)?
         },
@@ -413,7 +447,7 @@ pub(crate) fn native_point_add(
             // we never have two different Move `RistrettoPoint` structs constructed with the same
             // handles.
             debug_assert!(a_handle != b_handle);
-            let (a, b) = point_data.get_two_muts(&a_handle, &b_handle);
+            let (a, b) = point_data.get_two_muts(&a_handle, &b_handle)?;
 
             a.add_assign(&*b);
             a_handle.0
@@ -443,9 +477,8 @@ pub(crate) fn native_point_sub(
     // Compute result = a - b (or a = a - b) and return a RistrettoPointHandle
     let result_handle = match in_place {
         false => {
-            let a = point_data.get_point(&a_handle);
-            let b = point_data.get_point(&b_handle);
-
+            let a = point_data.get_point(&a_handle)?;
+            let b = point_data.get_point(&b_handle)?;
             let point = a.sub(b);
             point_data.safe_add_point(point)?
         },
@@ -454,7 +487,7 @@ pub(crate) fn native_point_sub(
             // get references to the same a and b RistrettoPoint, while our own invariants ensure
             // we never have two different Move RistrettoPoint constructed with the same handles.
             debug_assert!(a_handle != b_handle);
-            let (a, b) = point_data.get_two_muts(&a_handle, &b_handle);
+            let (a, b) = point_data.get_two_muts(&a_handle, &b_handle)?;
 
             a.sub_assign(&*b);
             a_handle.0
@@ -505,7 +538,7 @@ pub(crate) fn native_basepoint_double_mul(
     let a = pop_scalar_from_bytes(&mut args)?;
 
     // Compute result = a * A + b * BASEPOINT and return a RistrettoPointHandle
-    let A_ref = point_data.get_point(&A_handle);
+    let A_ref = point_data.get_point(&A_handle)?;
     let result = RistrettoPoint::vartime_double_scalar_mul_basepoint(&a, A_ref, &b);
     let result_handle = point_data.safe_add_point(result)?;
 
@@ -576,8 +609,8 @@ pub(crate) fn native_double_scalar_mul(
     let handle1 = pop_as_ristretto_handle(&mut args)?;
 
     let points = vec![
-        point_data.get_point(&handle1),
-        point_data.get_point(&handle2),
+        point_data.get_point(&handle1)?,
+        point_data.get_point(&handle2)?,
     ];
 
     let scalars = [scalar1, scalar2];
@@ -611,10 +644,13 @@ pub(crate) fn safe_native_multi_scalar_mul_no_floating_point(
     // Invariant: log2_floor(num + 1) > 0. This is because num >= 1, thanks to the invariant we enforce on
     // the caller of this native. Therefore, num + 1 >= 2, which implies log2_floor(num + 1) >= 1.
     // So we never divide by zero.
+    let log2_val = log2_floor(num + 1).ok_or_else(|| {
+        SafeNativeError::abort_with_message(E_MSM_LOG2_FAILED, "MSM log2 computation failed")
+    })?;
     context.charge(
         RISTRETTO255_POINT_PARSE_ARG * NumArgs::new(num as u64)
             + RISTRETTO255_SCALAR_PARSE_ARG * NumArgs::new(num as u64)
-            + RISTRETTO255_POINT_MUL * NumArgs::new((num / log2_floor(num + 1).unwrap()) as u64),
+            + RISTRETTO255_POINT_MUL * NumArgs::new((num / log2_val) as u64),
     )?;
 
     // parse scalars
@@ -639,7 +675,7 @@ pub(crate) fn safe_native_multi_scalar_mul_no_floating_point(
             let move_point = points_ref.borrow_elem(i)?;
             let point_handle = get_point_handle_from_struct(move_point)?;
 
-            points.push(point_data.get_point(&point_handle));
+            points.push(point_data.get_point(&point_handle)?);
         }
 
         // NOTE: The variable-time multiscalar multiplication (MSM) algorithm for a size-n MSM employed in curve25519 is:

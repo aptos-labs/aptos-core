@@ -1271,6 +1271,7 @@ dependencies = [
  "aptos-db-indexer",
  "aptos-db-indexer-schemas",
  "aptos-executor-types",
+ "aptos-experimental-layered-map",
  "aptos-experimental-runtimes",
  "aptos-infallible",
  "aptos-jellyfish-merkle",
@@ -4699,6 +4700,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "aptos-api-types",
+ "aptos-crypto",
  "aptos-resource-viewer",
  "aptos-rest-client",
  "aptos-transaction-simulation",
@@ -4715,7 +4717,6 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
- "tokio",
  "url",
 ]
 

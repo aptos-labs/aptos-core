@@ -1,12 +1,13 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::natives::cryptography::ristretto255::{
-    pop_32_byte_slice, pop_64_byte_slice, pop_scalar_from_bytes, SCALAR_NUM_BYTES,
+use crate::natives::cryptography::{
+    ristretto255::{pop_32_byte_slice, pop_64_byte_slice, pop_scalar_from_bytes, SCALAR_NUM_BYTES},
+    ristretto255_point::E_RISTRETTO255_SCALAR_INVALID_BYTES_LENGTH,
 };
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
-    safely_assert_eq, safely_pop_arg, SafeNativeContext, SafeNativeResult,
+    safely_assert_eq, safely_pop_arg, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
 use curve25519_dalek::scalar::Scalar;
 use move_core_types::gas_algebra::{NumArgs, NumBytes};
@@ -60,7 +61,12 @@ pub(crate) fn native_scalar_is_canonical(
         return Ok(smallvec![Value::bool(false)]);
     }
 
-    let bytes_slice = <[u8; SCALAR_NUM_BYTES]>::try_from(bytes).unwrap();
+    let bytes_slice = <[u8; SCALAR_NUM_BYTES]>::try_from(bytes.as_slice()).map_err(|_| {
+        SafeNativeError::abort_with_message(
+            E_RISTRETTO255_SCALAR_INVALID_BYTES_LENGTH,
+            "Invalid Ristretto scalar bytes length",
+        )
+    })?;
 
     let s = Scalar::from_canonical_bytes(bytes_slice);
 
