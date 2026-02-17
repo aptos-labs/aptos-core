@@ -147,7 +147,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             },
         );
         let num_chunks = num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize;
-        let pok_num_beta_powers = 1 + sc.get_total_weight() * num_chunks;
+        let pok_num_beta_powers =
+            1 + sc.get_total_weight() * num_chunks + sc.get_max_weight() * num_chunks;
         let pok_msm_terms = hom
             .msm_terms_for_verify::<_, hkzg_chunked_elgamal::WeightedHomomorphism<'static, E>, _>(
                 &pok_statement,

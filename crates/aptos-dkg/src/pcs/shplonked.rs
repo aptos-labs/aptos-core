@@ -99,6 +99,11 @@ pub fn zk_pcs_open_with_com_y<E: Pairing, R: RngCore + CryptoRng>(
     trs: &mut merlin::Transcript,
     rng: &mut R,
 ) -> (ZkPcsOpeningProof<E>, E::G1Affine) {
+    assert!(
+        srs.taus_1.len() >= 2,
+        "Shplonked opening requires SRS with at least 2 tau powers (taus_1[0], taus_1[1]); got {}",
+        srs.taus_1.len()
+    );
     let hom = univariate_hiding_kzg::CommitmentHomomorphism::<E> {
         msm_basis: &srs.taus_1,
         xi_1: srs.xi_1,
@@ -468,7 +473,7 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
     let lhs_y: E::ScalarField = z_yi.iter().copied().sum();
     let rhs_y = *r_y + *y_sum * c;
 
-    assert_eq!(lhs_y, rhs_y, "sigma proof y sum check failed");
+    anyhow::ensure!(lhs_y == rhs_y, "sigma proof y sum check failed");
 
     Ok(())
 }
@@ -503,12 +508,14 @@ where
         degree_bounds: Vec<usize>,
         rng: &mut R,
     ) -> (Self::CommitmentKey, Self::VerificationKey) {
+        // Opening proof needs taus_1[0] and taus_1[1] (Y = [1]_1·y_term − t·[τ]_1), so require m >= 2.
         let m = degree_bounds
             .iter()
             .map(|&d| d + 1)
             .max()
             .unwrap_or(1)
-            .next_power_of_two();
+            .next_power_of_two()
+            .max(2);
         let trapdoor = Trapdoor::<E>::rand(rng);
         let (vk_extra, ck) = univariate_hiding_kzg::setup_extra(
             m,

@@ -321,6 +321,7 @@ where
         prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
     }
 
+    // Probably not using this atm
     #[allow(non_snake_case)]
     pub fn verify<Ct: Serialize, H, R: RngCore + CryptoRng>(
         &self,

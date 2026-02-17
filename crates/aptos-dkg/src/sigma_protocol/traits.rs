@@ -96,15 +96,15 @@ pub trait Trait<C: CurveGroup>:
         Ct: Serialize,
         // H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>, // will probably need this if we use `FirstProofItem<F, H>` instead
     {
-        let n =
-            number_of_beta_powers.unwrap_or_else(|| public_statement.clone().into_iter().count());
+        let number_of_beta_powers =
+            number_of_beta_powers.unwrap_or_else(|| public_statement.clone().into_iter().count()); // Would prefer not to have to clone this just to get a count
         verifier_challenges_with_length::<_, C::ScalarField, _, _>(
             cntxt,
             self,
             public_statement,
             prover_first_message,
             &self.dst(),
-            n,
+            number_of_beta_powers,
             rng,
         )
     }
@@ -165,7 +165,8 @@ pub trait Trait<C: CurveGroup>:
     where
         C::Affine: Copy + Eq + Hash,
     {
-        // Per index: (term_i * β^i) ∪ (A_i, −β^i) ∪ (P_i, −c·β^i), then merge all with scale 1.
+        let n = msm_terms.len();
+        // Per index: (term_i * β^i) ∪ (A_i, −β^i) ∪ (P_i, −c·β^i), then in the final line merge all with scale 1.
         let term_inputs: Vec<MsmInput<C::Affine, C::ScalarField>> = msm_terms
             .into_iter()
             .zip(prover_first_message.clone().into_iter())
@@ -182,11 +183,25 @@ pub trait Trait<C: CurveGroup>:
                 MsmInput::new(bases, scalars).expect("sigma protocol MSM term")
             })
             .collect();
+        debug_assert_eq!(
+            term_inputs.len(),
+            n,
+            "merge_msm_terms: msm_terms iterator length mismatch"
+        );
+        debug_assert_eq!(
+            powers_of_beta.len(),
+            n,
+            "merge_msm_terms: powers_of_beta iterator length mismatch"
+        );
         let refs: Vec<&MsmInput<C::Affine, C::ScalarField>> = term_inputs.iter().collect();
         let ones: Vec<C::ScalarField> = (0..refs.len()).map(|_| C::ScalarField::ONE).collect();
         merge_scaled_msm_terms::<C>(&refs, &ones)
     }
 }
+
+// Standard method to get `trait Statement = Canonical Serialize + ...`, because type aliases are experimental in Rust
+pub trait Statement: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq {}
+impl<T> Statement for T where T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq {}
 
 pub trait Witness<F: Field>: CanonicalSerialize + CanonicalDeserialize + Clone + Eq {
     /// Computes a scaled addition: `self + c * other`. Can take ownership because the
@@ -232,10 +247,6 @@ impl<F: PrimeField, W: Witness<F>> Witness<F> for Vec<W> {
     }
 }
 
-// Standard method to get `trait Statement = Canonical Serialize + ...`, because type aliases are experimental in Rust
-pub trait Statement: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq {}
-impl<T> Statement for T where T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq {}
-
 /// Computes the Fiat–Shamir challenge and verifier β-powers for a Σ-protocol,
 /// with an explicit total length for the powers (e.g. `len1 + len2` for two-component protocols).
 /// Callers can split the returned `powers_of_beta` slice as needed.
@@ -251,7 +262,7 @@ pub fn verifier_challenges_with_length<
     public_statement: &H::CodomainNormalized,
     prover_first_message: &H::CodomainNormalized,
     dst: &[u8],
-    total_beta_powers: usize,
+    number_of_beta_powers: usize,
     rng: &mut R,
 ) -> (F, Vec<F>)
 where
@@ -265,9 +276,9 @@ where
         prover_first_message,
         dst,
     );
-    let powers_of_beta = if total_beta_powers > 1 {
+    let powers_of_beta = if number_of_beta_powers > 1 {
         let beta = sample_field_element(rng);
-        utils::powers(beta, total_beta_powers)
+        utils::powers(beta, number_of_beta_powers)
     } else {
         vec![F::ONE]
     };

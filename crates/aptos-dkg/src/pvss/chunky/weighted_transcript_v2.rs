@@ -154,6 +154,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
 
         let num_chunks = num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize;
         let total_weight = sc.get_total_weight();
+        // First component length: 1 (TrivialShape) + chunks (total_weight*num_chunks) + randomness (max_weight*num_chunks), matching WeightedCodomainShape::into_iter
+        let first_len = 1 + total_weight * num_chunks + sc.get_max_weight() * num_chunks;
         let (first_msm_terms, second_msm_terms) = hom.msm_terms_for_verify(
             &TupleCodomainShape(
                 TupleCodomainShape(
@@ -171,7 +173,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             ),
             &self.sharing_proof.SoK,
             &sok_cntxt,
-            Some((1 + total_weight * num_chunks, total_weight)),
+            Some((first_len, total_weight)),
             rng,
         );
 

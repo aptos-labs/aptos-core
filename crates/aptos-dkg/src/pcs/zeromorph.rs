@@ -432,26 +432,20 @@ where
         transcript: &mut merlin::Transcript,
         batch: bool,
     ) -> anyhow::Result<()> {
-        // Always derive challenges from an internal transcript (caller may pass the same transcript
-        // as open(), so we cannot assume it is fresh). Use the appropriate DST for single vs batch.
-        let dst = if batch {
-            <Self as crate::pcs::traits::PolynomialCommitmentScheme>::transcript_dst_for_batch_open(
-            )
-        } else {
-            <Self as crate::pcs::traits::PolynomialCommitmentScheme>::transcript_dst_for_single_open(
-            )
-        };
-        let mut t = merlin::Transcript::new(dst);
+        // Use the caller's transcript so verification is bound to the same protocol context as the
+        // prover; otherwise proofs could be replayed across contexts sharing the same DST.
         if batch {
-            let _gamma: P::ScalarField = t.challenge_scalar(); // consume gamma so state matches batch_open
+            let _gamma: P::ScalarField = transcript.challenge_scalar(); // consume gamma so state matches batch_open
         }
-        t.append_sep(Self::protocol_name());
-        proof.q_k_com.iter().for_each(|c| t.append_point(&c.0));
-        let y_challenge: P::ScalarField = t.challenge_scalar();
-        t.append_point(&proof.q_hat_com.0);
-        let x_challenge = t.challenge_scalar();
-        let z_challenge = t.challenge_scalar();
-        let _ = transcript; // may be used by other schemes
+        transcript.append_sep(Self::protocol_name());
+        proof
+            .q_k_com
+            .iter()
+            .for_each(|c| transcript.append_point(&c.0));
+        let y_challenge: P::ScalarField = transcript.challenge_scalar();
+        transcript.append_point(&proof.q_hat_com.0);
+        let x_challenge = transcript.challenge_scalar();
+        let z_challenge = transcript.challenge_scalar();
 
         // Must match prover: use point in reversed order so q_scalars[k] aligns with quotients[k].
         let point_reversed_for_scalars: Vec<P::ScalarField> = point.iter().rev().cloned().collect();
