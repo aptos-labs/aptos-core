@@ -31,12 +31,28 @@ fn test_pcs_setup_commit_open_verify<PCS: PolynomialCommitmentScheme>() {
     let challenge_pt = random_point::<PCS, _>(&mut rng, num_point_dims);
     let eval = PCS::evaluate_point(&poly, &challenge_pt);
 
-    let mut trs = merlin::Transcript::new(PCS::transcript_dst_for_single_open());
-    let proof = PCS::open(&ck, poly, challenge_pt.clone(), Some(r), &mut rng, &mut trs);
+    let mut trs_prover = merlin::Transcript::new(PCS::transcript_dst_for_single_open());
+    let proof = PCS::open(
+        &ck,
+        poly,
+        challenge_pt.clone(),
+        Some(r),
+        &mut rng,
+        &mut trs_prover,
+    );
 
-    // Verifier rebuilds challenges from proof using the same DST.
-    PCS::verify(&vk, com, challenge_pt, eval, proof, &mut trs, false)
-        .expect("verify should succeed");
+    // Verifier uses a fresh transcript with the same DST so it derives the same gamma, z, c.
+    let mut trs_verifier = merlin::Transcript::new(PCS::transcript_dst_for_single_open());
+    PCS::verify(
+        &vk,
+        com,
+        challenge_pt,
+        eval,
+        proof,
+        &mut trs_verifier,
+        false,
+    )
+    .expect("verify should succeed");
 }
 
 fn test_pcs_polynomial_from_vec_evaluate_point<PCS: PolynomialCommitmentScheme>()
@@ -182,21 +198,23 @@ mod shplonked {
             .collect();
         let commitments_affine: Vec<_> = commitments.iter().map(|c| c.0.into_affine()).collect();
 
-        let mut trs = merlin::Transcript::new(PCS_BATCH_DST);
+        let mut trs_prover = merlin::Transcript::new(PCS_BATCH_DST);
         let proof = Shplonked::<Bn254>::batch_open(
             ck,
             polys,
             challenge.clone(),
             Some(rs),
             &mut rng,
-            &mut trs,
+            &mut trs_prover,
         );
 
+        let mut trs_verifier = merlin::Transcript::new(PCS_BATCH_DST);
         zk_pcs_verify(
             &proof.opening,
             &commitments_affine,
             proof.com_y,
             &vk,
+            &mut trs_verifier,
             &mut rng,
         )
         .expect("batch verify should succeed");

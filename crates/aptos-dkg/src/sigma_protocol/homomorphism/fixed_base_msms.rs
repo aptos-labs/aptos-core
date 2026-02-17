@@ -9,7 +9,7 @@ use aptos_crypto::arkworks::msm::MsmInput;
 use ark_ec::CurveGroup;
 use ark_ff::Zero;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use std::fmt::Debug;
+use std::{fmt::Debug, hash::Hash};
 
 /// A `FixedBaseMsms` instance represents a homomorphism whose outputs can be expressed as
 /// one or more **fixed-base multi-scalar multiplications (MSMs)**, sharing consistent base and scalar types.
@@ -32,13 +32,7 @@ pub trait Trait:
 >
 {
     /// Type of MSM base points (e.g. curve affine element). CodomainNormalized is `CodomainShape<Base>`.
-    type Base: Copy
-        + Eq
-        + std::hash::Hash
-        + CanonicalSerialize
-        + CanonicalDeserialize
-        + Clone
-        + Debug;
+    type Base: Copy + Eq + Hash + CanonicalSerialize + CanonicalDeserialize + Clone + Debug;
 
     /// Scalar type used in MSM terms.
     type Scalar: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq + Zero;

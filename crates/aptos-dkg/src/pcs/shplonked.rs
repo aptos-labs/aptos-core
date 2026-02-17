@@ -78,8 +78,6 @@ struct ZkPcsOpeningSigmaProof<E: Pairing> {
 #[derive(CanonicalSerialize, Clone, CanonicalDeserialize, Debug)]
 pub struct ZkPcsOpeningProof<E: Pairing> {
     pub(crate) eval_points: Vec<E::ScalarField>,
-    pub(crate) gamma: E::ScalarField,
-    pub(crate) z: E::ScalarField,
     pub(crate) y_sum: E::ScalarField,
     pub(crate) V: E::G1Affine,
     pub(crate) W: E::G1Affine,
@@ -114,7 +112,7 @@ pub fn zk_pcs_open_with_com_y<E: Pairing, R: RngCore + CryptoRng>(
         })
         .0;
 
-    let gamma = trs.challenge_scalar();
+    let gamma: E::ScalarField = trs.challenge_scalar();
 
     let mut z_T = DensePolynomial::from_coefficients_vec(vec![E::ScalarField::ONE]);
 
@@ -276,7 +274,15 @@ pub fn zk_pcs_open_with_com_y<E: Pairing, R: RngCore + CryptoRng>(
 
     let r_y: E::ScalarField = r_yi.iter().copied().sum();
 
-    let c: E::ScalarField = merlin::Transcript::new(b"verifier_challenge").challenge_scalar();
+    // Bind sigma first message to transcript so verifier derives the same c.
+    trs.append_point(&r_com_y);
+    trs.append_point(&r_V);
+    let mut r_y_buf = Vec::new();
+    r_y.serialize_compressed(&mut r_y_buf)
+        .expect("sigma r_y serialization");
+    trs.append_message(b"sigma-first-r_y", &r_y_buf);
+
+    let c: E::ScalarField = trs.challenge_scalar();
 
     let mut z_yi = Vec::with_capacity(f_is.len());
     for (r_i, w_i) in r_yi.iter().zip(evals.iter()) {
@@ -302,8 +308,6 @@ pub fn zk_pcs_open_with_com_y<E: Pairing, R: RngCore + CryptoRng>(
 
     let proof = ZkPcsOpeningProof {
         eval_points,
-        gamma,
-        z,
         y_sum,
         V,
         W,
@@ -328,19 +332,19 @@ pub fn zk_pcs_open<E: Pairing, R: RngCore + CryptoRng>(
     zk_pcs_open_with_com_y(srs, d, f_is, commitments, eval_points, evals, rs, trs, rng).0
 }
 
-/// Verifier uses gamma and z from the proof (prover stored them there after reading from transcript).
+/// Verifier derives gamma, z and c from the shared transcript (same trs as prover, or
+/// a fresh trs with the same DST and prior content so challenges match).
 #[allow(non_snake_case)]
 pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
     zk_pcs_opening_proof: &ZkPcsOpeningProof<E>,
     commitments: &[E::G1Affine],
     com_y: E::G1Affine,
     srs: &Srs<E>,
+    trs: &mut merlin::Transcript,
     rng: &mut R,
 ) -> anyhow::Result<()> {
     let ZkPcsOpeningProof {
         eval_points,
-        gamma,
-        z,
         y_sum,
         V,
         W,
@@ -348,6 +352,9 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
         Y,
         sigma_proof,
     } = zk_pcs_opening_proof;
+
+    let gamma: E::ScalarField = trs.challenge_scalar();
+    let z: E::ScalarField = trs.challenge_scalar();
 
     let mut alphas = Vec::with_capacity(eval_points.len());
     let mut gamma_i = E::ScalarField::ONE;
@@ -391,7 +398,15 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
         return Err(anyhow::anyhow!("Expected zero during multi-pairing check"));
     }
 
-    let c: E::ScalarField = merlin::Transcript::new(b"verifier_challenge").challenge_scalar();
+    trs.append_point(&sigma_proof.r_com_y.into_group());
+    trs.append_point(&sigma_proof.r_V.into_group());
+    let mut r_y_buf = Vec::new();
+    sigma_proof
+        .r_y
+        .serialize_compressed(&mut r_y_buf)
+        .expect("sigma r_y serialization");
+    trs.append_message(b"sigma-first-r_y", &r_y_buf);
+    let c: E::ScalarField = trs.challenge_scalar();
 
     let ZkPcsOpeningSigmaProof {
         r_com_y,
@@ -601,7 +616,7 @@ where
         challenge: Vec<Self::WitnessField>,
         eval: Self::WitnessField,
         proof: Self::Proof,
-        _trs: &mut merlin::Transcript,
+        trs: &mut merlin::Transcript,
         _batch: bool,
     ) -> anyhow::Result<()> {
         let point = challenge
@@ -618,7 +633,7 @@ where
         );
         let mut rng = rand::thread_rng();
         let commitments = vec![com.0.into_affine()];
-        zk_pcs_verify(&proof.opening, &commitments, proof.com_y, vk, &mut rng)
+        zk_pcs_verify(&proof.opening, &commitments, proof.com_y, vk, trs, &mut rng)
     }
 
     fn random_witness<R: rand_core::RngCore + rand_core::CryptoRng>(

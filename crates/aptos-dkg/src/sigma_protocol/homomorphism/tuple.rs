@@ -245,10 +245,7 @@ impl<C: CurveGroup, H1, H2> sigma_protocol::Trait<C> for TupleHomomorphism<H1, H
 where
     H1: sigma_protocol::Trait<C>,
     H2: sigma_protocol::Trait<C>,
-    // OLD: H2: fixed_base_msms::Trait<Domain = H1::Domain, MsmInput = H1::MsmInput>, so can we simply the next 3 lines?
     H2: homomorphism::Trait<Domain = H1::Domain>,
-    H1: fixed_base_msms::Trait<Base = C::Affine, Scalar = C::ScalarField>,
-    H2: fixed_base_msms::Trait<Base = C::Affine, Scalar = C::ScalarField>,
 {
     /// Concatenate the DSTs of the two homomorphisms, plus some
     /// additional metadata to ensure uniqueness.
