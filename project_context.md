@@ -4,8 +4,8 @@
 
 Implementing Prefix Consensus protocols (from research paper "Prefix Consensus For Censorship Resistant BFT") within Aptos Core for leaderless, censorship-resistant consensus.
 
-**Current Phase**: Strong Prefix Consensus - Smoke tests complete, inner PC abstraction next
-**Completed**: Basic Prefix Consensus, Strong PC through Phase 8 (Smoke Tests)
+**Current Phase**: Strong Prefix Consensus - Phase 9 (Inner PC Abstraction) complete, Phase 10 (Performance) next
+**Completed**: Basic Prefix Consensus, Strong PC through Phase 9 (Inner PC Abstraction)
 
 ---
 
@@ -138,7 +138,7 @@ Implementing Prefix Consensus protocols (from research paper "Prefix Consensus F
 ## Strong Prefix Consensus - In Progress 🚧
 
 **Goal**: Multi-view protocol where all parties agree on identical v_high output
-**Status**: Phases 1-8 complete (core implementation + smoke tests), Phase 9 (Inner PC Abstraction) next
+**Status**: Phases 1-9 complete (core implementation + smoke tests + inner PC abstraction), Phase 10 (Performance) next
 **Plan**: `.plans/strong-prefix-consensus.md`
 
 ### What is Strong Prefix Consensus?
@@ -254,8 +254,8 @@ This layered architecture enables multi-slot censorship-resistant consensus as d
 
 ### Repository State
 - **Branch**: `prefix-consensus-prototype`
-- **HEAD**: Phase 8 complete (Strong PC Smoke Tests)
-- **Tests**: 186/186 unit tests passing, 4/4 smoke tests passing
+- **HEAD**: Phase 9 complete (Inner PC Abstraction Trait + signing refactor)
+- **Tests**: 190/190 unit tests passing, 4/4 smoke tests passing
 - **Build**: ✅ Clean
 
 ### Progress Summary
@@ -269,7 +269,7 @@ This layered architecture enables multi-slot censorship-resistant consensus as d
 - ✅ **Strong PC Phase 4 Chunk 3**: Strong Manager complete (strong_manager.rs) + cross-cutting fixes
 - ✅ **Strong PC Phase 5**: Integration with consensus layer (EpochManager wiring + network bridges)
 - ✅ **Strong PC Phase 8 (Smoke Tests)**: 2 strong PC tests + 2 basic PC tests, 4 integration bugs fixed
-- ⏳ **Strong PC Phase 9 (Inner PC Abstraction)**: Next — extract trait for swappable inner algorithm
+- ✅ **Strong PC Phase 9 (Inner PC Abstraction)**: InnerPCAlgorithm trait + ThreeRoundPC impl + generic manager + signing factory functions
 - ⏳ **Slot Manager**: Future work (after Strong PC complete)
 
 **Main Design Plan**: `.plans/strong-prefix-consensus.md`
@@ -489,8 +489,30 @@ StrongPrefixConsensusManager::new(...)
 3. **Epoch transition**: DKG completes ~1.5s after epoch 1, triggering epoch 1→2 that kills the protocol. Fixed by calling triggers on every epoch start.
 4. **DirectSend dispatch**: `StrongPrefixConsensusMsg` missing from `network.rs` match arm, silently dropping all strong PC network messages.
 
+### Phase 9 Implementation Details (Inner PC Abstraction)
+
+**Completed**: February 12, 2026
+**Detailed plan**: `.plans/inner-pc-trait.md`
+
+**New files**:
+- `inner_pc_trait.rs` (~90 lines) — `InnerPCAlgorithm` trait with `new_for_view()`, `start()`, `process_message()`
+- `inner_pc_impl.rs` (~400 lines) — `ThreeRoundPC` struct implementing the trait, wrapping `PrefixConsensusProtocol` with cascade helpers and `RoundState` enum. 4 unit tests.
+
+**Modified files**:
+- `strong_manager.rs` — Made generic over `T: InnerPCAlgorithm`. `PCState<T>` holds `algorithm: T`. Deleted 6 methods (~130 lines): `process_view_vote1/2/3`, `start_view_round2/3`, match dispatch. Added `DefaultStrongPCManager<NS>` type alias.
+- `signing.rs` — Added `create_signed_vote1/2/3` factory functions (construct vote from fields + signer in one call). Replaced dummy-signature-then-reconstruct pattern in `protocol.rs`.
+- `protocol.rs` — Replaced 3 dummy-signature blocks (~15 lines each) with single `create_signed_vote*()` calls (~3 lines each). Net reduction ~21 lines.
+- `epoch_manager.rs` — Changed to `DefaultStrongPCManager::new()`
+- `lib.rs` — Added module declarations and exports for new types
+
+**Key design decisions**:
+- Signer passed by reference to `start()` and `process_message()` (not stored in struct) — avoids Clone bound on ValidatorSigner
+- `process_message()` returns `Vec<Self::Message>` for cascading (QC1 → Vote2 → QC2 → Vote3)
+- `Message` associated type constrained to `PrefixConsensusMsg` in manager's impl block (not in trait)
+- Manager remains generic but `DefaultStrongPCManager` alias provides ergonomic default
+
 ### Next Action
-Strong Prefix Consensus Phase 9: Inner PC Abstraction Trait — extract inner Prefix Consensus behind a trait so the Strong Manager can swap algorithms (e.g., 2-round good case from Appendix D)
+Strong Prefix Consensus Phase 10 (Performance) or Phase 11 (Documentation), or begin Slot Manager
 
 ---
 
@@ -514,18 +536,20 @@ Strong Prefix Consensus Phase 9: Inner PC Abstraction Trait — extract inner Pr
 ```
 consensus/prefix-consensus/src/
 ├── types.rs              - Vote/QC types + ViewProposal/CertFetch types (1039 lines)
-├── protocol.rs           - 3-round state machine (606 lines)
+├── protocol.rs           - 3-round state machine (~585 lines, reduced by signing refactor)
 ├── manager.rs            - Event-driven orchestrator (737 lines)
 ├── network_interface.rs  - Network adapter + Strong PC client/adapter (~330 lines)
 ├── network_messages.rs   - PrefixConsensusMsg + StrongPrefixConsensusMsg (795 lines)
-├── signing.rs            - BLS helpers (184 lines)
+├── signing.rs            - BLS helpers + create_signed_vote* factory functions (~240 lines)
 ├── certify.rs            - QC formation (220 lines)
 ├── verification.rs       - Validation (150 lines)
 ├── utils.rs              - Prefix operations + first_non_bot (210 lines)
 ├── certificates.rs       - Certificates + StrongPCCommit + cert_reaches_view1 (1348 lines)
 ├── view_state.rs         - RankingManager, ViewState, ViewOutput (695 lines)
-├── strong_protocol.rs    - Strong PC state machine (918 lines) - Phase 4 Chunk 1
-└── strong_manager.rs     - Strong PC event orchestrator (1394 lines) - Phase 4 Chunk 3
+├── strong_protocol.rs    - Strong PC state machine (918 lines)
+├── strong_manager.rs     - Strong PC event orchestrator, generic over InnerPCAlgorithm (~1270 lines)
+├── inner_pc_trait.rs     - InnerPCAlgorithm trait (~90 lines) - Phase 9
+└── inner_pc_impl.rs      - ThreeRoundPC implementation + 4 tests (~400 lines) - Phase 9
 
 testsuite/smoke-test/src/consensus/prefix_consensus/
 ├── helpers.rs            - Test helpers (cleanup_all, wait_for_outputs, generate_hashes)
@@ -540,6 +564,7 @@ testsuite/smoke-test/src/consensus/strong_prefix_consensus/
 ### Plans
 - `.plans/network-integration.md` - Basic Prefix Consensus plan (complete)
 - `.plans/strong-prefix-consensus.md` - Strong Prefix Consensus plan (current)
+- `.plans/inner-pc-trait.md` - Inner PC Abstraction Trait plan (complete)
 
 ---
 
@@ -558,7 +583,8 @@ testsuite/smoke-test/src/consensus/strong_prefix_consensus/
 11. **(pending)** (Feb 5): Security enhancements for Verifiable Prefix Consensus
 12. **2c52a342f7** (Feb 12): Strong PC integration with EpochManager (Phase 5)
 13. **7df6a297e1** (Feb 12): Strong PC smoke test and integration bug fixes (Phase 8)
-14. **(pending)**: Strong PC divergent inputs smoke test ← HEAD
+14. **(pending)**: Strong PC divergent inputs smoke test
+15. **039271f95e** (Feb 12): Inner PC Abstraction Trait + signing factory functions (Phase 9) ← HEAD
 
 ---
 
