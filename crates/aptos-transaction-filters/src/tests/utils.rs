@@ -13,7 +13,7 @@ use aptos_types::{
     secret_sharing::{Ciphertext, EvalProof},
     transaction::{
         authenticator::{AccountAuthenticator, AnyPublicKey, TransactionAuthenticator},
-        encrypted_payload::EncryptedPayload,
+        encrypted_payload::{EncryptedPayload, SyncEncryptedPayload},
         EntryFunction, Multisig, MultisigTransactionPayload, RawTransaction, Script,
         SignedTransaction, TransactionExecutable, TransactionExecutableRef, TransactionExtraConfig,
         TransactionPayload, TransactionPayloadInner,
@@ -60,7 +60,8 @@ pub fn create_encrypted_transaction() -> SignedTransaction {
         payload_hash: HashValue::random(),
     };
 
-    let transaction_payload = TransactionPayload::EncryptedPayload(encrypted_payload);
+    let transaction_payload =
+        TransactionPayload::EncryptedPayload(SyncEncryptedPayload::new(encrypted_payload));
     create_signed_transaction(transaction_payload, false)
 }
 
@@ -76,7 +77,8 @@ pub fn create_encrypted_transaction_failed_state() -> SignedTransaction {
         eval_proof: EvalProof::random(),
     };
 
-    let transaction_payload = TransactionPayload::EncryptedPayload(encrypted_payload);
+    let transaction_payload =
+        TransactionPayload::EncryptedPayload(SyncEncryptedPayload::new(encrypted_payload));
     create_signed_transaction(transaction_payload, false)
 }
 
@@ -94,7 +96,8 @@ pub fn create_encrypted_transaction_plaintext_state() -> SignedTransaction {
         decryption_nonce: 0,
     };
 
-    let transaction_payload = TransactionPayload::EncryptedPayload(encrypted_payload);
+    let transaction_payload =
+        TransactionPayload::EncryptedPayload(SyncEncryptedPayload::new(encrypted_payload));
     create_signed_transaction(transaction_payload, false)
 }
 

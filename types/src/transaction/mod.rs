@@ -16,7 +16,7 @@ use crate::{
             AASigningData, AccountAuthenticator, AnyPublicKey, AnySignature,
             SingleKeyAuthenticator, TransactionAuthenticator,
         },
-        encrypted_payload::EncryptedPayload,
+        encrypted_payload::{EncryptedPayload, SyncEncryptedPayload},
     },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
     write_set::{HotStateOp, WriteSet},
@@ -41,6 +41,7 @@ use std::{
     collections::BTreeMap,
     convert::TryFrom,
     fmt::{self, Debug, Display, Formatter},
+    sync::Arc,
 };
 
 pub mod analyzed_transaction;
@@ -88,12 +89,7 @@ pub use script::{
     TypeArgumentABI,
 };
 use serde::de::DeserializeOwned;
-use std::{
-    collections::BTreeSet,
-    hash::Hash,
-    ops::Deref,
-    sync::{atomic::AtomicU64, Arc},
-};
+use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;
@@ -791,8 +787,9 @@ pub enum TransactionPayload {
     /// Contains an executable (script/entry function) along with extra configuration.
     /// Once this new format is fully rolled out, above payload variants will be deprecated.
     Payload(TransactionPayloadInner),
-    /// Represents an encrypted transaction payload
-    EncryptedPayload(EncryptedPayload),
+    /// Represents an encrypted transaction payload.
+    /// Uses interior mutability via Mutex to allow decryption without cloning.
+    EncryptedPayload(SyncEncryptedPayload),
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -929,9 +926,10 @@ impl TransactionPayload {
             TransactionPayload::ModuleBundle(_) => {
                 Err(format_err!("ModuleBundle variant is deprecated"))
             },
-            TransactionPayload::EncryptedPayload(encrypted_payload) => {
-                encrypted_payload.executable_ref()
-            },
+            // Cannot return a reference through Mutex - use executable() instead for encrypted payloads
+            TransactionPayload::EncryptedPayload(_) => Err(format_err!(
+                "executable_ref() is not supported for EncryptedPayload, use executable() instead"
+            )),
         }
     }
 
@@ -951,7 +949,7 @@ impl TransactionPayload {
                 extra_config.clone()
             },
             TransactionPayload::EncryptedPayload(encrypted_payload) => {
-                encrypted_payload.extra_config().clone()
+                encrypted_payload.extra_config()
             },
         }
     }
@@ -1050,14 +1048,7 @@ impl TransactionPayload {
         matches!(self, Self::EncryptedPayload(_))
     }
 
-    pub fn as_encrypted_payload(&self) -> Option<&EncryptedPayload> {
-        match self {
-            Self::EncryptedPayload(payload) => Some(payload),
-            _ => None,
-        }
-    }
-
-    pub fn as_encrypted_payload_mut(&mut self) -> Option<&mut EncryptedPayload> {
+    pub fn as_encrypted_payload(&self) -> Option<&SyncEncryptedPayload> {
         match self {
             Self::EncryptedPayload(payload) => Some(payload),
             _ => None,
@@ -1124,13 +1115,13 @@ impl WriteSetPayload {
 /// **IMPORTANT:** The signature of a `SignedTransaction` is not guaranteed to be verified. For a
 /// transaction whose signature is statically guaranteed to be verified, see
 /// [`SignatureCheckedTransaction`].
-#[derive(Clone, Eq, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct SignedTransaction {
     /// The raw transaction
-    raw_txn: RawTransaction,
+    raw_txn: Arc<RawTransaction>,
 
     /// Public key and signature to authenticate
-    authenticator: TransactionAuthenticator,
+    authenticator: Arc<TransactionAuthenticator>,
 
     /// A cached size of the raw transaction bytes.
     /// Prevents serializing the same transaction multiple times to determine size.
@@ -1147,12 +1138,14 @@ pub struct SignedTransaction {
     committed_hash: OnceCell<HashValue>,
 }
 
-/// PartialEq ignores the cached OnceCell fields that may or may not be initialized.
+/// PartialEq ignores the cached OnceCell fields.
 impl PartialEq for SignedTransaction {
     fn eq(&self, other: &Self) -> bool {
         self.raw_txn == other.raw_txn && self.authenticator == other.authenticator
     }
 }
+
+impl Eq for SignedTransaction {}
 
 /// A transaction for which the signature has been verified. Created by
 /// [`SignedTransaction::check_signature`] and [`RawTransaction::sign`].
@@ -1199,8 +1192,8 @@ impl SignedTransaction {
         authenticator: TransactionAuthenticator,
     ) -> SignedTransaction {
         SignedTransaction {
-            raw_txn,
-            authenticator,
+            raw_txn: Arc::new(raw_txn),
+            authenticator: Arc::new(authenticator),
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
             committed_hash: OnceCell::new(),
@@ -1214,8 +1207,8 @@ impl SignedTransaction {
     ) -> SignedTransaction {
         let authenticator = TransactionAuthenticator::ed25519(public_key, signature);
         SignedTransaction {
-            raw_txn,
-            authenticator,
+            raw_txn: Arc::new(raw_txn),
+            authenticator: Arc::new(authenticator),
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
             committed_hash: OnceCell::new(),
@@ -1322,7 +1315,7 @@ impl SignedTransaction {
     }
 
     pub fn authenticator(&self) -> TransactionAuthenticator {
-        self.authenticator.clone()
+        (*self.authenticator).clone()
     }
 
     pub fn authenticator_ref(&self) -> &TransactionAuthenticator {
@@ -1334,7 +1327,7 @@ impl SignedTransaction {
     }
 
     pub fn into_raw_transaction(self) -> RawTransaction {
-        self.raw_txn
+        Arc::unwrap_or_clone(self.raw_txn)
     }
 
     pub fn raw_transaction_ref(&self) -> &RawTransaction {
@@ -1347,10 +1340,6 @@ impl SignedTransaction {
 
     pub fn chain_id(&self) -> ChainId {
         self.raw_txn.chain_id
-    }
-
-    pub fn payload(&self) -> &TransactionPayload {
-        &self.raw_txn.payload
     }
 
     pub fn executable_ref(&self) -> Result<TransactionExecutableRef<'_>> {
@@ -1416,7 +1405,7 @@ impl SignedTransaction {
 
     pub fn is_multi_agent(&self) -> bool {
         matches!(
-            self.authenticator,
+            *self.authenticator,
             TransactionAuthenticator::MultiAgent { .. }
         )
     }
@@ -1436,8 +1425,22 @@ impl SignedTransaction {
         self.payload().is_encrypted_variant()
     }
 
-    pub fn payload_mut(&mut self) -> &mut TransactionPayload {
-        &mut self.raw_txn.payload
+    /// Returns a reference to the payload.
+    pub fn payload(&self) -> &TransactionPayload {
+        &self.raw_txn.payload
+    }
+
+    /// Provides mutable access to the encrypted payload for decryption.
+    /// Uses interior mutability via Mutex to avoid cloning the entire RawTransaction.
+    /// Returns None if the payload is not an encrypted payload.
+    pub fn with_encrypted_payload_mut<F, R>(&self, f: F) -> Option<R>
+    where
+        F: FnOnce(&mut EncryptedPayload) -> R,
+    {
+        match &self.raw_txn.payload {
+            TransactionPayload::EncryptedPayload(sync_payload) => Some(sync_payload.with_mut(f)),
+            _ => None,
+        }
     }
 }
 
