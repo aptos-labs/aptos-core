@@ -337,11 +337,6 @@ impl StateKvDb {
         readonly: bool,
         is_hot: bool,
     ) -> Result<DB> {
-        let open_func = if readonly {
-            DB::open_cf_readonly
-        } else {
-            DB::open_cf
-        };
         let rocksdb_opts = gen_rocksdb_options(state_kv_db_config, env, readonly);
         let cfds = if is_hot {
             gen_hot_state_kv_shard_cfds
@@ -349,7 +344,11 @@ impl StateKvDb {
             gen_state_kv_shard_cfds
         }(state_kv_db_config, block_cache);
 
-        open_func(&rocksdb_opts, path, name, cfds)
+        if readonly {
+            DB::open_cf_readonly(rocksdb_opts, path, name, cfds)
+        } else {
+            DB::open_cf(rocksdb_opts, path, name, cfds)
+        }
     }
 
     fn db_shard_path<P: AsRef<Path>>(db_root_path: P, shard_id: usize, is_hot: bool) -> PathBuf {
