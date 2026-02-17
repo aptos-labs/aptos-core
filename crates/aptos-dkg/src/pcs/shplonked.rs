@@ -38,6 +38,7 @@ pub struct Srs<E: Pairing> {
     pub(crate) xi_2: E::G2Affine,
 }
 
+// we will use hiding KZG for now
 pub fn zk_pcs_commit<E: Pairing>(
     srs: &Srs<E>,
     f_is: Vec<Vec<E::ScalarField>>,
@@ -73,22 +74,30 @@ struct ZkPcsOpeningSigmaProof<E: Pairing> {
     z_rho: E::ScalarField,
 }
 
+/// Statement for the sigma protocol: commitment to evaluations and related values.
+#[allow(non_snake_case)]
+#[derive(CanonicalSerialize, Clone, CanonicalDeserialize, Debug)]
+pub struct ZkPcsOpeningSigmaProofStatement<E: Pairing> {
+    pub com_y: E::G1Affine,
+    pub V: E::G1Affine,
+    pub y_sum: E::ScalarField,
+}
+
 #[allow(private_interfaces)]
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, Clone, CanonicalDeserialize, Debug)]
 pub struct ZkPcsOpeningProof<E: Pairing> {
     pub(crate) eval_points: Vec<E::ScalarField>,
-    pub(crate) y_sum: E::ScalarField,
-    pub(crate) V: E::G1Affine,
     pub(crate) W: E::G1Affine,
-    pub(crate) W_prime: E::G1Affine,
-    pub(crate) Y: E::G1Affine,
+    pub(crate) W_prime: E::G1Affine, 
+    pub(crate) Y: E::G1Affine, // extra HKZG term
     pub(crate) sigma_proof: ZkPcsOpeningSigmaProof<E>,
+    pub(crate) sigma_proof_statement: ZkPcsOpeningSigmaProofStatement<E>,
 }
 
-/// Opens at the given points and returns both the opening proof and the commitment to evaluations (com_y).
+/// Opens at the given points; the opening proof includes the sigma proof statement (com_y, V, y_sum).
 #[allow(non_snake_case)]
-pub fn zk_pcs_open_with_com_y<E: Pairing, R: RngCore + CryptoRng>(
+pub fn zk_pcs_open<E: Pairing, R: RngCore + CryptoRng>(
     srs: &Srs<E>,
     _d: u8,
     f_is: Vec<Vec<E::ScalarField>>,
@@ -98,7 +107,9 @@ pub fn zk_pcs_open_with_com_y<E: Pairing, R: RngCore + CryptoRng>(
     rs: Vec<E::ScalarField>,
     trs: &mut merlin::Transcript,
     rng: &mut R,
-) -> (ZkPcsOpeningProof<E>, E::G1Affine) {
+) -> ZkPcsOpeningProof<E> {
+
+    // Step 1
     assert!(
         srs.taus_1.len() >= 2,
         "Shplonked opening requires SRS with at least 2 tau powers (taus_1[0], taus_1[1]); got {}",
@@ -116,9 +127,13 @@ pub fn zk_pcs_open_with_com_y<E: Pairing, R: RngCore + CryptoRng>(
             values: Scalar::vec_from_inner(evals.clone()),
         })
         .0;
+    trs.append_point(&com_y.into_affine());
 
+    // Step 2
     let gamma: E::ScalarField = trs.challenge_scalar();
 
+    // Step 3
+    // First construct Z_T TODO: optimise this
     let mut z_T = DensePolynomial::from_coefficients_vec(vec![E::ScalarField::ONE]);
 
     for x in eval_points.iter() {
@@ -173,6 +188,7 @@ pub fn zk_pcs_open_with_com_y<E: Pairing, R: RngCore + CryptoRng>(
         })
         .0;
 
+    // Step 4
     let z = trs.challenge_scalar();
 
     let z_T_val = z_T.evaluate(&z);
@@ -280,8 +296,8 @@ pub fn zk_pcs_open_with_com_y<E: Pairing, R: RngCore + CryptoRng>(
     let r_y: E::ScalarField = r_yi.iter().copied().sum();
 
     // Bind sigma first message to transcript so verifier derives the same c.
-    trs.append_point(&r_com_y);
-    trs.append_point(&r_V);
+    trs.append_point(&r_com_y.into_affine()); // TODO: batch this
+    trs.append_point(&r_V.into_affine());
     let mut r_y_buf = Vec::new();
     r_y.serialize_compressed(&mut r_y_buf)
         .expect("sigma r_y serialization");
@@ -311,52 +327,47 @@ pub fn zk_pcs_open_with_com_y<E: Pairing, R: RngCore + CryptoRng>(
 
     let y_sum: E::ScalarField = evals.iter().copied().sum();
 
+    let sigma_proof_statement = ZkPcsOpeningSigmaProofStatement {
+        com_y: com_y.into_affine(),
+        V,
+        y_sum,
+    };
+
     let proof = ZkPcsOpeningProof {
         eval_points,
-        y_sum,
-        V,
+        sigma_proof_statement,
         W,
         W_prime,
         Y,
         sigma_proof,
     };
-    (proof, com_y.into_affine())
-}
-
-pub fn zk_pcs_open<E: Pairing, R: RngCore + CryptoRng>(
-    srs: &Srs<E>,
-    d: u8,
-    f_is: Vec<Vec<E::ScalarField>>,
-    commitments: Vec<E::G1>,
-    eval_points: Vec<E::ScalarField>,
-    evals: Vec<E::ScalarField>,
-    rs: Vec<E::ScalarField>,
-    trs: &mut merlin::Transcript,
-    rng: &mut R,
-) -> ZkPcsOpeningProof<E> {
-    zk_pcs_open_with_com_y(srs, d, f_is, commitments, eval_points, evals, rs, trs, rng).0
+    proof
 }
 
 /// Verifier derives gamma, z and c from the shared transcript (same trs as prover, or
-/// a fresh trs with the same DST and prior content so challenges match).
+/// a fresh transcript with the same DST and prior content so challenges match).
 #[allow(non_snake_case)]
 pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
     zk_pcs_opening_proof: &ZkPcsOpeningProof<E>,
     commitments: &[E::G1Affine],
-    com_y: E::G1Affine,
     srs: &Srs<E>,
     trs: &mut merlin::Transcript,
     rng: &mut R,
 ) -> anyhow::Result<()> {
     let ZkPcsOpeningProof {
         eval_points,
-        y_sum,
-        V,
+        sigma_proof_statement,
         W,
         W_prime,
         Y,
         sigma_proof,
     } = zk_pcs_opening_proof;
+
+    let com_y = sigma_proof_statement.com_y;
+    let V = sigma_proof_statement.V;
+    let y_sum = sigma_proof_statement.y_sum;
+
+    trs.append_point(&com_y);
 
     let gamma: E::ScalarField = trs.challenge_scalar();
     let z: E::ScalarField = trs.challenge_scalar();
@@ -390,7 +401,7 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
     // Paper: F := Σ_i γ^{i-1}·Z_{T∖x_i}(z)·com_i − Z_T(z)·W − V
     // Check: e(F + z·W', [1]_2) = e(W', [τ]_2) · e(Y, [ξ]_2)
     // So e(F+z·W', g_2) · e(−W', τ_2) · e(−Y, ξ_2) = identity
-    let F = sum_com - (*W) * z_T_val - (*V);
+    let F = sum_com - (*W) * z_T_val - V;
     let g1_terms = vec![
         (F + (*W_prime) * z).into_affine(),
         (-(*W_prime).into_group()).into_affine(),
@@ -403,8 +414,8 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
         return Err(anyhow::anyhow!("Expected zero during multi-pairing check"));
     }
 
-    trs.append_point(&sigma_proof.r_com_y.into_group());
-    trs.append_point(&sigma_proof.r_V.into_group());
+    trs.append_point(&sigma_proof.r_com_y);
+    trs.append_point(&sigma_proof.r_V);
     let mut r_y_buf = Vec::new();
     sigma_proof
         .r_y
@@ -459,7 +470,7 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
     bases.push(srs.taus_1[0]);
     bases.push(srs.xi_1);
     bases.push(*r_V);
-    bases.push(*V);
+    bases.push(V);
 
     // Sigma protocol (group homomorphism) check: response MSM must equal identity
     let sigma_msm = E::G1::msm(&bases, &scalars)
@@ -471,7 +482,7 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
     }
 
     let lhs_y: E::ScalarField = z_yi.iter().copied().sum();
-    let rhs_y = *r_y + *y_sum * c;
+    let rhs_y = *r_y + y_sum * c;
 
     anyhow::ensure!(lhs_y == rhs_y, "sigma proof y sum check failed");
 
@@ -486,11 +497,10 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
 #[derive(Clone, Debug, PartialEq, Eq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct ShplonkedCommitment<E: Pairing>(pub E::G1);
 
-/// Proof for the PCS trait: opening proof plus commitment to the evaluation (com_y).
+/// Proof for the PCS trait: opening proof (includes sigma proof statement with com_y).
 #[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
 pub struct ShplonkedPcsProof<E: Pairing> {
     pub opening: ZkPcsOpeningProof<E>,
-    pub com_y: E::G1Affine,
 }
 
 impl<E> PolynomialCommitmentScheme for Shplonked<E>
@@ -569,7 +579,7 @@ where
             Some(r),
         );
         let commitments = vec![com.0];
-        let (opening, com_y) = zk_pcs_open_with_com_y(
+        let opening = zk_pcs_open(
             ck,
             0, // degree not used for single poly
             vec![coeffs],
@@ -580,7 +590,7 @@ where
             trs,
             rng,
         );
-        ShplonkedPcsProof { opening, com_y }
+        ShplonkedPcsProof { opening }
     }
 
     fn batch_open<R: RngCore + CryptoRng>(
@@ -603,7 +613,7 @@ where
             .zip(rs.iter())
             .map(|(coeffs, &r)| zk_pcs_commit(&ck, vec![coeffs.clone()], vec![r])[0])
             .collect();
-        let (opening, com_y) = zk_pcs_open_with_com_y(
+        let opening = zk_pcs_open(
             &ck,
             0,
             f_is,
@@ -614,7 +624,7 @@ where
             trs,
             rng,
         );
-        ShplonkedPcsProof { opening, com_y }
+        ShplonkedPcsProof { opening }
     }
 
     fn verify(
@@ -635,12 +645,12 @@ where
             "challenge point does not match opening proof"
         );
         anyhow::ensure!(
-            proof.opening.y_sum == eval,
+            proof.opening.sigma_proof_statement.y_sum == eval,
             "claimed eval does not match opening proof"
         );
         let mut rng = rand::thread_rng();
         let commitments = vec![com.0.into_affine()];
-        zk_pcs_verify(&proof.opening, &commitments, proof.com_y, vk, trs, &mut rng)
+        zk_pcs_verify(&proof.opening, &commitments, vk, trs, &mut rng)
     }
 
     fn random_witness<R: rand_core::RngCore + rand_core::CryptoRng>(

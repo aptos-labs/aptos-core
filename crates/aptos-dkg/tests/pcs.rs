@@ -212,7 +212,6 @@ mod shplonked {
         zk_pcs_verify(
             &proof.opening,
             &commitments_affine,
-            proof.com_y,
             &vk,
             &mut trs_verifier,
             &mut rng,

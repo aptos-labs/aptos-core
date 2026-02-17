@@ -80,6 +80,18 @@ pub struct ZeromorphProof<P: Pairing> {
     pub q_k_com: Vec<univariate_hiding_kzg::Commitment<P>>, // has type Vec<P::G1>, this is a vector of KZG commitments for the q_k
 }
 
+/// Batched instance produced by Zeromorph opening: the univariate polynomial `f`, opening point,
+/// claimed value, and randomness. Can be opened with `open_batched_instance_with_hkzg`, or combined
+/// with other instances before a single univariate KZG open.
+#[derive(Clone, Debug)]
+pub struct ZeromorphBatchedOpeningInstance<P: Pairing> {
+    pub f_coeffs: Vec<P::ScalarField>,
+    pub rho: P::ScalarField,
+    pub x: P::ScalarField,
+    pub y: P::ScalarField,
+    pub s: CommitmentRandomness<P::ScalarField>,
+}
+
 /// Computes the multilinear quotient polynomials for a given polynomial and evaluation point.
 ///
 /// Given a multilinear polynomial `poly` over `n` variables and a point `point = [x_0, ..., x_{n-1}]`,
@@ -286,16 +298,23 @@ where
         )
     }
 
-    pub fn open<R: RngCore + CryptoRng>(
+    /// Produces the batched opening instance (and commitments) that would be opened by univariate
+    /// hiding KZG. Call `open_batched_instance_with_hkzg` to get the opening proof, or batch this
+    /// instance with others first.
+    pub fn open_to_batched_instance<R: RngCore + CryptoRng>(
         pp: &ZeromorphProverKey<P>,
         poly: &DenseMultilinearExtension<P::ScalarField>,
         point: &[P::ScalarField],
-        eval: P::ScalarField, // Can be calculated
+        eval: P::ScalarField,
         s: CommitmentRandomness<P::ScalarField>,
         rng: &mut R,
-        transcript: &mut merlin::Transcript,
-    ) -> ZeromorphProof<P> {
-        transcript.append_sep(Self::protocol_name());
+        trs: &mut merlin::Transcript,
+    ) -> (
+        ZeromorphBatchedOpeningInstance<P>,
+        univariate_hiding_kzg::Commitment<P>,
+        Vec<univariate_hiding_kzg::Commitment<P>>,
+    ) {
+        trs.append_sep(Self::protocol_name());
 
         // TODO: PUT THIS BACK IN
         // if pp.commit_pp.msm_basis.len() < poly.len() {
@@ -333,8 +352,8 @@ where
             .collect();
 
         // Step 2: verifier challenge to aggregate degree bound proofs
-        q_k_com.iter().for_each(|c| transcript.append_point(&c.0));
-        let y_challenge: P::ScalarField = transcript.challenge_scalar();
+        q_k_com.iter().for_each(|c| trs.append_point(&c.0.into_affine()));
+        let y_challenge: P::ScalarField = trs.challenge_scalar();
 
         // Step 3: Aggregate shifted q_k into \hat{q} and compute commitment
 
@@ -350,11 +369,11 @@ where
             &r,
             offset,
         );
-        transcript.append_point(&q_hat_com.0);
+        trs.append_point(&q_hat_com.0.into_affine());
 
         // Step 4/6: Obtain x challenge to evaluate the polynomial, and z challenge to aggregate two challenges
-        let x_challenge = transcript.challenge_scalar();
-        let z_challenge = transcript.challenge_scalar();
+        let x_challenge = trs.challenge_scalar();
+        let z_challenge = trs.challenge_scalar();
 
         // Step 5/7: Compute this batched poly
 
@@ -402,20 +421,47 @@ where
             "batched polynomial f must vanish at x_challenge"
         );
 
-        // Compute and send proof commitment pi. Use s_combined so the opening proof's blinding matches zeta_z_com's blinding.
-        // HKZG verify requires rho = s for the blinding terms to cancel, so set rho = s_combined.
         let s_combined_scalar = Scalar(s_combined);
+        let batched_instance = ZeromorphBatchedOpeningInstance {
+            f_coeffs: f.coeffs,
+            rho: s_combined,
+            x: x_challenge,
+            y: P::ScalarField::zero(),
+            s: s_combined_scalar,
+        };
 
-        let pi = univariate_hiding_kzg::CommitmentHomomorphism::open(
+        (batched_instance, q_hat_com, q_k_com)
+    }
+
+    /// Run univariate hiding KZG open on a batched instance (e.g. from `open_to_batched_instance`).
+    /// Use this to complete a single Zeromorph open or to open after batching with more instances.
+    pub fn open_batched_instance_with_hkzg(
+        pp: &ZeromorphProverKey<P>,
+        instance: &ZeromorphBatchedOpeningInstance<P>,
+    ) -> univariate_hiding_kzg::OpeningProof<P> {
+        univariate_hiding_kzg::CommitmentHomomorphism::open(
             &pp.hiding_kzg_pp,
-            f.coeffs,
-            s_combined,
-            x_challenge,
-            P::ScalarField::zero(),
-            &s_combined_scalar,
+            instance.f_coeffs.clone(),
+            instance.rho,
+            instance.x,
+            instance.y,
+            &instance.s,
             pp.open_offset,
-        );
+        )
+    }
 
+    pub fn open<R: RngCore + CryptoRng>(
+        pp: &ZeromorphProverKey<P>,
+        poly: &DenseMultilinearExtension<P::ScalarField>,
+        point: &[P::ScalarField],
+        eval: P::ScalarField, // Can be calculated
+        s: CommitmentRandomness<P::ScalarField>,
+        rng: &mut R,
+        trs: &mut merlin::Transcript,
+    ) -> ZeromorphProof<P> {
+        let (batched_instance, q_hat_com, q_k_com) =
+            Self::open_to_batched_instance(pp, poly, point, eval, s, rng, trs);
+        let pi = Self::open_batched_instance_with_hkzg(pp, &batched_instance);
         ZeromorphProof {
             pi,
             q_hat_com,
@@ -429,23 +475,23 @@ where
         point: &[P::ScalarField],
         eval: &P::ScalarField,
         proof: &ZeromorphProof<P>,
-        transcript: &mut merlin::Transcript,
+        trs: &mut merlin::Transcript,
         batch: bool,
     ) -> anyhow::Result<()> {
         // Use the caller's transcript so verification is bound to the same protocol context as the
         // prover; otherwise proofs could be replayed across contexts sharing the same DST.
         if batch {
-            let _gamma: P::ScalarField = transcript.challenge_scalar(); // consume gamma so state matches batch_open
+            let _gamma: P::ScalarField = trs.challenge_scalar(); // consume gamma so state matches batch_open
         }
-        transcript.append_sep(Self::protocol_name());
+        trs.append_sep(Self::protocol_name());
         proof
             .q_k_com
             .iter()
-            .for_each(|c| transcript.append_point(&c.0));
-        let y_challenge: P::ScalarField = transcript.challenge_scalar();
-        transcript.append_point(&proof.q_hat_com.0);
-        let x_challenge = transcript.challenge_scalar();
-        let z_challenge = transcript.challenge_scalar();
+            .for_each(|c| trs.append_point(&c.0.into_affine()));
+        let y_challenge: P::ScalarField = trs.challenge_scalar();
+        trs.append_point(&proof.q_hat_com.0.into_affine());
+        let x_challenge = trs.challenge_scalar();
+        let z_challenge = trs.challenge_scalar();
 
         // Must match prover: use point in reversed order so q_scalars[k] aligns with quotients[k].
         let point_reversed_for_scalars: Vec<P::ScalarField> = point.iter().rev().cloned().collect();
