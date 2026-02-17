@@ -26,6 +26,7 @@ pub fn gen_rocksdb_options(config: &RocksdbConfig, env: Option<&Env>, readonly: 
     }
     db_opts.set_max_open_files(config.max_open_files);
     db_opts.set_max_total_wal_size(config.max_total_wal_size);
+    db_opts.set_max_background_jobs(config.max_background_jobs);
 
     if let Some(level) = config.stats_level {
         db_opts.enable_statistics();
