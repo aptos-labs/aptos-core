@@ -1,0 +1,8 @@
+processed 4 tasks
+task 0 lines 3-60:  publish [module 0xc0ffee::corner_cases {]
+task 1 lines 63-63:  run 0xc0ffee::corner_cases::test_mixed
+return values: 16
+task 2 lines 65-65:  run 0xc0ffee::corner_cases::test_tuple_match_true
+return values: 9
+task 3 lines 67-67:  run 0xc0ffee::corner_cases::test_tuple_match_false
+return values: 0

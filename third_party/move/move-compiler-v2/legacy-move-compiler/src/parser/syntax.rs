@@ -860,6 +860,26 @@ fn parse_typed_bind(context: &mut Context) -> Result<TypedBind, Box<Diagnostic>>
 //          | <NameAccessChain> <OptionalTypeArgs>
 fn parse_bind(context: &mut Context) -> Result<Bind, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
+
+    // Check for literal patterns (for primitive pattern matching)
+    let tok = context.tokens.peek();
+    // Check for literal patterns (for primitive pattern matching).
+    // NumValue followed by "::" is an module access (e.g. 0x1::module), not a literal.
+    let is_literal = matches!(
+        tok,
+        Tok::True | Tok::False | Tok::NumTypedValue | Tok::ByteStringValue
+    ) || (tok == Tok::NumValue && context.tokens.lookahead()? != Tok::ColonColon);
+    if is_literal {
+        let val = parse_value(context)?;
+        let end_loc = context.tokens.previous_end_loc();
+        return Ok(spanned(
+            context.tokens.file_hash(),
+            start_loc,
+            end_loc,
+            Bind_::Literal(val),
+        ));
+    }
+
     if context.tokens.peek() == Tok::Identifier {
         let next_tok = context.tokens.lookahead()?;
         if next_tok != Tok::LBrace

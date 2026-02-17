@@ -1,0 +1,73 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/nested_match.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun test_match_in_branches(p0: u8, p1: u8): u8 {
+        'l2: loop {
+            'l1: loop {
+                'l0: loop {
+                    loop {
+                        if (p0 == 0u8) if (!(p1 == 0u8)) break else if (p0 == 1u8) if (p1 == 0u8) break 'l0 else break 'l1 else break 'l2;
+                        return 0u8
+                    };
+                    return 1u8
+                };
+                return 2u8
+            };
+            return 3u8
+        };
+        99u8
+    }
+    public fun test_nested_match(p0: bool, p1: u8): u8 {
+        'l3: loop {
+            'l4: loop {
+                'l2: loop {
+                    'l0: loop {
+                        'l1: loop {
+                            loop {
+                                if (p0 == true) {
+                                    if (p1 == 0u8) break;
+                                    if (!(p1 == 1u8)) break 'l0;
+                                    break 'l1
+                                };
+                                assert!(p0 == false, 14566554180833181697);
+                                if (p1 == 0u8) break 'l2;
+                                if (!(p1 == 1u8)) break 'l3;
+                                break 'l4
+                            };
+                            return 10u8
+                        };
+                        return 11u8
+                    };
+                    return 19u8
+                };
+                return 20u8
+            };
+            return 21u8
+        };
+        29u8
+    }
+}
+
+
+//# run 0xc0ffee::m::test_nested_match --args true 0u8
+
+//# run 0xc0ffee::m::test_nested_match --args true 1u8
+
+//# run 0xc0ffee::m::test_nested_match --args true 5u8
+
+//# run 0xc0ffee::m::test_nested_match --args false 0u8
+
+//# run 0xc0ffee::m::test_nested_match --args false 1u8
+
+//# run 0xc0ffee::m::test_nested_match --args false 5u8
+
+//# run 0xc0ffee::m::test_match_in_branches --args 0u8 0u8
+
+//# run 0xc0ffee::m::test_match_in_branches --args 0u8 5u8
+
+//# run 0xc0ffee::m::test_match_in_branches --args 1u8 0u8
+
+//# run 0xc0ffee::m::test_match_in_branches --args 1u8 5u8
+
+//# run 0xc0ffee::m::test_match_in_branches --args 5u8 0u8

@@ -1,0 +1,24 @@
+processed 12 tasks
+task 0 lines 3-50:  publish [module 0xc0ffee::m {]
+task 1 lines 53-53:  run 0xc0ffee::m::test_nested_match --args true 0u8
+return values: 10
+task 2 lines 55-55:  run 0xc0ffee::m::test_nested_match --args true 1u8
+return values: 11
+task 3 lines 57-57:  run 0xc0ffee::m::test_nested_match --args true 5u8
+return values: 19
+task 4 lines 59-59:  run 0xc0ffee::m::test_nested_match --args false 0u8
+return values: 20
+task 5 lines 61-61:  run 0xc0ffee::m::test_nested_match --args false 1u8
+return values: 21
+task 6 lines 63-63:  run 0xc0ffee::m::test_nested_match --args false 5u8
+return values: 29
+task 7 lines 65-65:  run 0xc0ffee::m::test_match_in_branches --args 0u8 0u8
+return values: 99
+task 8 lines 67-67:  run 0xc0ffee::m::test_match_in_branches --args 0u8 5u8
+return values: 1
+task 9 lines 69-69:  run 0xc0ffee::m::test_match_in_branches --args 1u8 0u8
+return values: 0
+task 10 lines 71-71:  run 0xc0ffee::m::test_match_in_branches --args 1u8 5u8
+return values: 0
+task 11 lines 73-73:  run 0xc0ffee::m::test_match_in_branches --args 5u8 0u8
+return values: 0

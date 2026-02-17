@@ -1,0 +1,21 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/bool_exhaustive_with_wildcard.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun test_bool_wildcard(p0: bool): u8 {
+        if (p0 == true) return 1u8;
+        0u8
+    }
+    public fun test_only_wildcard(p0: bool): u8 {
+        42u8
+    }
+}
+
+
+//# run 0xc0ffee::m::test_bool_wildcard --args true
+
+//# run 0xc0ffee::m::test_bool_wildcard --args false
+
+//# run 0xc0ffee::m::test_only_wildcard --args true
+
+//# run 0xc0ffee::m::test_only_wildcard --args false

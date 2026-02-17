@@ -1,0 +1,97 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/tuple_nested_wildcard.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun test_mixed(p0: u8, p1: u8): u8 {
+        let _v0 = p0 == 0u8;
+        loop {
+            if (!_v0) {
+                if (p1 == 0u8) {
+                    p0 = 1u8;
+                    break
+                };
+                p0 = 2u8;
+                break
+            };
+            return 0u8
+        };
+        p0
+    }
+    public fun test_simple_tuple(p0: u8, p1: u8): u8 {
+        let _v0;
+        if (p0 == 0u8) _v0 = p1 == 0u8 else _v0 = false;
+        'l1: loop {
+            'l2: loop {
+                'l0: loop {
+                    loop {
+                        if (!_v0) {
+                            let _v1;
+                            let _v2;
+                            let _v3;
+                            if (p0 == 0u8) _v1 = p1 == 1u8 else _v1 = false;
+                            if (_v1) break;
+                            if (p0 == 1u8) _v3 = p1 == 0u8 else _v3 = false;
+                            if (_v3) break 'l0;
+                            if (p0 == 1u8) _v2 = p1 == 1u8 else _v2 = false;
+                            if (!_v2) break 'l1;
+                            break 'l2
+                        };
+                        return 0u8
+                    };
+                    return 1u8
+                };
+                return 2u8
+            };
+            return 3u8
+        };
+        MAX_U8
+    }
+    public fun test_triple(p0: u8, p1: u8, p2: u8): u8 {
+        let _v0;
+        let _v1;
+        if (p0 == 0u8) _v1 = p1 == 0u8 else _v1 = false;
+        if (_v1) _v0 = p2 == 0u8 else _v0 = false;
+        'l0: loop {
+            'l1: loop {
+                loop {
+                    if (!_v0) {
+                        let _v2;
+                        if (p0 == 0u8) _v2 = p1 == 0u8 else _v2 = false;
+                        if (_v2) break;
+                        if (!(p0 == 0u8)) break 'l0;
+                        break 'l1
+                    };
+                    return 0u8
+                };
+                return 1u8
+            };
+            return 2u8
+        };
+        3u8
+    }
+}
+
+
+//# run 0xc0ffee::m::test_mixed --args 0u8 10u8
+
+//# run 0xc0ffee::m::test_mixed --args 10u8 0u8
+
+//# run 0xc0ffee::m::test_mixed --args 5u8 5u8
+
+//# run 0xc0ffee::m::test_simple_tuple --args 0u8 0u8
+
+//# run 0xc0ffee::m::test_simple_tuple --args 0u8 1u8
+
+//# run 0xc0ffee::m::test_simple_tuple --args 1u8 0u8
+
+//# run 0xc0ffee::m::test_simple_tuple --args 1u8 1u8
+
+//# run 0xc0ffee::m::test_simple_tuple --args 5u8 5u8
+
+//# run 0xc0ffee::m::test_triple --args 0u8 0u8 0u8
+
+//# run 0xc0ffee::m::test_triple --args 0u8 0u8 1u8
+
+//# run 0xc0ffee::m::test_triple --args 0u8 1u8 1u8
+
+//# run 0xc0ffee::m::test_triple --args 1u8 1u8 1u8

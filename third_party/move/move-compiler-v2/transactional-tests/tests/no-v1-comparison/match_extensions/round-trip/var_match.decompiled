@@ -1,0 +1,11 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/var_match.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun double(p0: u64): u64 {
+        p0 + p0
+    }
+}
+
+
+//# run 0xc0ffee::m::double --args 10

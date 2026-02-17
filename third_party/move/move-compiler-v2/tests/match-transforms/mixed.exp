@@ -1,0 +1,68 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    enum Color {
+        Red,
+        Green,
+        Blue,
+        RGB {
+            0: u8,
+            1: u8,
+            2: u8,
+        }
+    }
+    public fun test(c: &Color,p: bool,q: bool): u8 {
+        {
+          let $prim_0: bool = p;
+          match (c) {
+            m::Color::Red if Eq($prim_0, true) => {
+              0
+            }
+            m::Color::Green if Eq($prim_0, true) => {
+              1
+            }
+            m::Color::Blue if Eq($prim_0, true) => {
+              2
+            }
+            m::Color::RGB{ 0: r, 1: g, 2: b } if Eq($prim_0, true) => {
+              3
+            }
+            m::Color::Red if And(Eq($prim_0, false), p) => {
+              4
+            }
+            m::Color::RGB{ 0: r, 1: g, 2: b } if And(Eq($prim_0, false), And(Eq<u8>(Deref(r), 1), q)) => {
+              3
+            }
+            _: (&Color, bool) => {
+              42
+            }
+          }
+
+        }
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    enum Color {
+        Red,
+        Green,
+        Blue,
+        RGB {
+            0: u8,
+            1: u8,
+            2: u8,
+        }
+    }
+    public fun test(c: &Color, p: bool, q: bool): u8 {
+        let _prim_0 = p;
+        match (c) {
+            Color::Red{} if _prim_0 == true => 0u8,
+            Color::Green{} if _prim_0 == true => 1u8,
+            Color::Blue{} if _prim_0 == true => 2u8,
+            Color::RGB(r, g, b) if _prim_0 == true => 3u8,
+            Color::Red{} if _prim_0 == false && p => 4u8,
+            Color::RGB(r, g, b) if _prim_0 == false && (*r == 1u8 && q) => 3u8,
+            _ => 42u8,
+        }
+    }
+}

@@ -1,0 +1,64 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/guard_multiple_same_pattern.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun test_complex_guard(p0: u8, p1: u8): u8 {
+        let _v0;
+        if (p0 == 0u8) _v0 = p1 > 10u8 else _v0 = false;
+        'l0: loop {
+            'l1: loop {
+                loop {
+                    if (!_v0) {
+                        let _v1;
+                        if (p0 == 0u8) _v1 = p1 > 5u8 else _v1 = false;
+                        if (_v1) break;
+                        if (!(p0 == 0u8)) break 'l0;
+                        break 'l1
+                    };
+                    return 0u8
+                };
+                return 1u8
+            };
+            return 2u8
+        };
+        3u8
+    }
+    public fun test_multiple_guards(p0: u64, p1: bool, p2: bool): u64 {
+        let _v0;
+        if (p0 == 0) _v0 = p1 else _v0 = false;
+        'l0: loop {
+            'l1: loop {
+                loop {
+                    if (!_v0) {
+                        let _v1;
+                        if (p0 == 0) _v1 = p2 else _v1 = false;
+                        if (_v1) break;
+                        if (!(p0 == 0)) break 'l0;
+                        break 'l1
+                    };
+                    return 1
+                };
+                return 2
+            };
+            return 3
+        };
+        4
+    }
+}
+
+
+//# run 0xc0ffee::m::test_multiple_guards --args 0u64 true false
+
+//# run 0xc0ffee::m::test_multiple_guards --args 0u64 false true
+
+//# run 0xc0ffee::m::test_multiple_guards --args 0u64 false false
+
+//# run 0xc0ffee::m::test_multiple_guards --args 1u64 true true
+
+//# run 0xc0ffee::m::test_complex_guard --args 0u8 15u8
+
+//# run 0xc0ffee::m::test_complex_guard --args 0u8 7u8
+
+//# run 0xc0ffee::m::test_complex_guard --args 0u8 3u8
+
+//# run 0xc0ffee::m::test_complex_guard --args 5u8 10u8

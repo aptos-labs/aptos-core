@@ -1,0 +1,34 @@
+processed 17 tasks
+task 0 lines 3-95:  publish [module 0xc0ffee::m {]
+task 1 lines 98-98:  run 0xc0ffee::m::test_u8 --args 0u8
+return values: 0
+task 2 lines 100-100:  run 0xc0ffee::m::test_u8 --args 1u8
+return values: 1
+task 3 lines 102-102:  run 0xc0ffee::m::test_u8 --args 50u8
+return values: 99
+task 4 lines 104-104:  run 0xc0ffee::m::test_u16 --args 0u16
+return values: 0
+task 5 lines 106-106:  run 0xc0ffee::m::test_u16 --args 1u16
+return values: 1
+task 6 lines 108-108:  run 0xc0ffee::m::test_u16 --args 500u16
+return values: 999
+task 7 lines 110-110:  run 0xc0ffee::m::test_u32 --args 0u32
+return values: 0
+task 8 lines 112-112:  run 0xc0ffee::m::test_u32 --args 1u32
+return values: 1
+task 9 lines 114-114:  run 0xc0ffee::m::test_u32 --args 500u32
+return values: 999
+task 10 lines 116-116:  run 0xc0ffee::m::test_u64 --args 0u64
+return values: 0
+task 11 lines 118-118:  run 0xc0ffee::m::test_u64 --args 1u64
+return values: 1
+task 12 lines 120-120:  run 0xc0ffee::m::test_u64 --args 500u64
+return values: 999
+task 13 lines 122-122:  run 0xc0ffee::m::test_u128 --args 0u128
+return values: 0
+task 14 lines 124-124:  run 0xc0ffee::m::test_u128 --args 1u128
+return values: 1
+task 15 lines 126-126:  run 0xc0ffee::m::test_u256 --args 0u256
+return values: 0
+task 16 lines 128-128:  run 0xc0ffee::m::test_u256 --args 1u256
+return values: 1

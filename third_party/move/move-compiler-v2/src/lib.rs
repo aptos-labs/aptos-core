@@ -394,6 +394,14 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
         });
     }
 
+    // Check match exhaustiveness / unreachable arms and transform primitive pattern
+    // matches to if-else statements. This runs before inlining to avoid repeated
+    // transformation of inlined code, and after lint checks so that the lints get
+    // access to the original pattern match structure.
+    env_pipeline.add("match checks and transforms", |env: &mut GlobalEnv| {
+        env_pipeline::match_checks_and_transforms::check_and_transform(env)
+    });
+
     if options.experiment_on(Experiment::INLINING) {
         let rewriting_scope = if options.whole_program {
             RewritingScope::Everything

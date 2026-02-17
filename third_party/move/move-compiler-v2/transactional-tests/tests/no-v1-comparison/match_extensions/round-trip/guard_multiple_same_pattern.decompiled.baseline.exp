@@ -1,0 +1,18 @@
+processed 9 tasks
+task 0 lines 3-47:  publish [module 0xc0ffee::m {]
+task 1 lines 50-50:  run 0xc0ffee::m::test_multiple_guards --args 0u64 true false
+return values: 1
+task 2 lines 52-52:  run 0xc0ffee::m::test_multiple_guards --args 0u64 false true
+return values: 2
+task 3 lines 54-54:  run 0xc0ffee::m::test_multiple_guards --args 0u64 false false
+return values: 3
+task 4 lines 56-56:  run 0xc0ffee::m::test_multiple_guards --args 1u64 true true
+return values: 4
+task 5 lines 58-58:  run 0xc0ffee::m::test_complex_guard --args 0u8 15u8
+return values: 0
+task 6 lines 60-60:  run 0xc0ffee::m::test_complex_guard --args 0u8 7u8
+return values: 1
+task 7 lines 62-62:  run 0xc0ffee::m::test_complex_guard --args 0u8 3u8
+return values: 2
+task 8 lines 64-64:  run 0xc0ffee::m::test_complex_guard --args 5u8 10u8
+return values: 3

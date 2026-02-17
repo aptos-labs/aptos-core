@@ -427,6 +427,8 @@ pub enum LValue_ {
         Option<DotDot>,
     ),
     PositionalUnpack(ModuleAccess, Option<Vec<Type>>, LValueOrDotDotList),
+    // Literal value pattern (for primitive pattern matching)
+    Literal(Value),
 }
 pub type LValue = Spanned<LValue_>;
 pub type LValueList_ = Vec<LValue>;
@@ -1993,6 +1995,9 @@ impl AstDebug for LValue_ {
                 w.write("(");
                 w.comma(&args.value, |w, b| b.ast_debug(w));
                 w.write(")");
+            },
+            L::Literal(val) => {
+                val.value.ast_debug(w);
             },
         }
     }

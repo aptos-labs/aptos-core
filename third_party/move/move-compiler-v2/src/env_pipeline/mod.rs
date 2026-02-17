@@ -18,6 +18,7 @@ pub mod function_checker;
 pub mod inliner;
 pub mod inlining_optimization;
 pub mod lambda_lifter;
+pub mod match_checks_and_transforms;
 pub mod model_ast_lints;
 pub mod recursive_struct_checker;
 pub mod rewrite_target;
