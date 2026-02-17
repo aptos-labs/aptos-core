@@ -34,6 +34,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
+aptos-types = { workspace = true, features = ["fuzzing"] }
 prometheus = { workspace = true }
 proptest = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }

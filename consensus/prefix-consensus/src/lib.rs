@@ -38,6 +38,8 @@
 
 pub mod certificates;
 mod certify;
+pub mod inner_pc_impl;
+pub mod inner_pc_trait;
 pub mod manager;
 pub mod network_interface;
 pub mod network_messages;
@@ -60,8 +62,8 @@ pub use network_interface::{
 pub use network_messages::{PrefixConsensusMsg, StrongPrefixConsensusMsg};
 pub use protocol::PrefixConsensusProtocol;
 pub use signing::{
-    sign_vote1, sign_vote2, sign_vote3, verify_vote1_signature, verify_vote2_signature,
-    verify_vote3_signature,
+    create_signed_vote1, create_signed_vote2, create_signed_vote3, sign_vote1, sign_vote2,
+    sign_vote3, verify_vote1_signature, verify_vote2_signature, verify_vote3_signature,
 };
 pub use types::{
     CertFetchRequest, CertFetchResponse, Element, PartyId, PrefixConsensusInput,
@@ -76,7 +78,9 @@ pub use certificates::{
     cert_reaches_view1, Certificate, DirectCertificate, EmptyViewMessage, EmptyViewStatement,
     HighestKnownView, IndirectCertificate, StrongPCCommit, StrongPCCommitError,
 };
-pub use strong_manager::StrongPrefixConsensusManager;
+pub use inner_pc_impl::ThreeRoundPC;
+pub use inner_pc_trait::InnerPCAlgorithm;
+pub use strong_manager::{DefaultStrongPCManager, StrongPrefixConsensusManager};
 pub use strong_protocol::{
     ChainBuildError, StrongPrefixConsensusProtocol, View1Decision, ViewDecision,
 };

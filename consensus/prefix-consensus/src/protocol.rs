@@ -149,27 +149,14 @@ impl PrefixConsensusProtocol {
         *state = ProtocolState::Round1;
         drop(state);
 
-        // Create Vote1 with dummy signature first
-        let dummy_sig = aptos_crypto::bls12381::Signature::dummy_signature();
-        let vote = Vote1::new(
+        let vote = crate::signing::create_signed_vote1(
             self.input.party_id,
             self.input.input_vector.clone(),
             self.input.epoch,
             0, // slot: always 0 for single-shot
             self.input.view,
-            dummy_sig,
-        );
-
-        // Sign it with real BLS signature
-        let signature = crate::signing::sign_vote1(&vote, signer)?;
-        let vote = Vote1::new(
-            self.input.party_id,
-            self.input.input_vector.clone(),
-            self.input.epoch,
-            0,
-            self.input.view,
-            signature,
-        );
+            signer,
+        )?;
 
         // Add own vote to pending votes
         let qc1 = self.process_vote1(vote.clone()).await?;
@@ -269,29 +256,15 @@ impl PrefixConsensusProtocol {
             "Starting Round 2"
         );
 
-        // Create Vote2 with dummy signature first
-        let dummy_sig = aptos_crypto::bls12381::Signature::dummy_signature();
-        let vote = Vote2::new(
-            self.input.party_id,
-            certified.clone(),
-            qc1.clone(),
-            self.input.epoch,
-            0,
-            self.input.view,
-            dummy_sig,
-        );
-
-        // Sign it with real BLS signature
-        let signature = crate::signing::sign_vote2(&vote, signer)?;
-        let vote = Vote2::new(
+        let vote = crate::signing::create_signed_vote2(
             self.input.party_id,
             certified.clone(),
             qc1,
             self.input.epoch,
             0, // slot: always 0 for single-shot
             self.input.view,
-            signature,
-        );
+            signer,
+        )?;
 
         // Add own vote to pending votes
         let qc2 = self.process_vote2(vote.clone()).await?;
@@ -390,29 +363,15 @@ impl PrefixConsensusProtocol {
             "Starting Round 3"
         );
 
-        // Create Vote3 with dummy signature first
-        let dummy_sig = aptos_crypto::bls12381::Signature::dummy_signature();
-        let vote = Vote3::new(
-            self.input.party_id,
-            mcp.clone(),
-            qc2.clone(),
-            self.input.epoch,
-            0,
-            self.input.view,
-            dummy_sig,
-        );
-
-        // Sign it with real BLS signature
-        let signature = crate::signing::sign_vote3(&vote, signer)?;
-        let vote = Vote3::new(
+        let vote = crate::signing::create_signed_vote3(
             self.input.party_id,
             mcp.clone(),
             qc2,
             self.input.epoch,
             0, // slot: always 0 for single-shot
             self.input.view,
-            signature,
-        );
+            signer,
+        )?;
 
         // Add own vote to pending votes
         let output = self.process_vote3(vote.clone()).await?;

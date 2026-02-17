@@ -2207,7 +2207,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         );
 
         // Create manager
-        let manager = aptos_prefix_consensus::StrongPrefixConsensusManager::new(
+        let manager = aptos_prefix_consensus::DefaultStrongPCManager::new(
             self.author,
             self.epoch(),
             slot,

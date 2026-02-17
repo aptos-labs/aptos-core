@@ -6,14 +6,83 @@
 
 //! Signature helpers for Prefix Consensus
 
-use crate::types::{PartyId, Vote1, Vote1SignData, Vote2, Vote2SignData, Vote3, Vote3SignData};
+use crate::types::{
+    PartyId, PrefixVector, Vote1, Vote1SignData, Vote2, Vote2SignData, Vote3, Vote3SignData, QC1,
+    QC2,
+};
 use anyhow::{bail, Result};
 use aptos_crypto::bls12381::Signature as BlsSignature;
 use aptos_types::{validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier};
 
-/// Sign a Vote1 message
+/// Create a signed Vote1 message.
+///
+/// Constructs the signable payload, signs it, and returns a complete Vote1
+/// with a valid BLS signature. Avoids the dummy-signature-then-reconstruct pattern.
+pub fn create_signed_vote1(
+    author: PartyId,
+    input_vector: PrefixVector,
+    epoch: u64,
+    slot: u64,
+    view: u64,
+    signer: &ValidatorSigner,
+) -> Result<Vote1> {
+    let sign_data = Vote1SignData {
+        author,
+        input_vector: input_vector.clone(),
+        epoch,
+        slot,
+        view,
+    };
+    let signature = signer.sign(&sign_data)?;
+    Ok(Vote1::new(author, input_vector, epoch, slot, view, signature))
+}
+
+/// Create a signed Vote2 message.
+pub fn create_signed_vote2(
+    author: PartyId,
+    certified_prefix: PrefixVector,
+    qc1: QC1,
+    epoch: u64,
+    slot: u64,
+    view: u64,
+    signer: &ValidatorSigner,
+) -> Result<Vote2> {
+    let sign_data = Vote2SignData {
+        author,
+        certified_prefix: certified_prefix.clone(),
+        qc1: qc1.clone(),
+        epoch,
+        slot,
+        view,
+    };
+    let signature = signer.sign(&sign_data)?;
+    Ok(Vote2::new(author, certified_prefix, qc1, epoch, slot, view, signature))
+}
+
+/// Create a signed Vote3 message.
+pub fn create_signed_vote3(
+    author: PartyId,
+    mcp_prefix: PrefixVector,
+    qc2: QC2,
+    epoch: u64,
+    slot: u64,
+    view: u64,
+    signer: &ValidatorSigner,
+) -> Result<Vote3> {
+    let sign_data = Vote3SignData {
+        author,
+        mcp_prefix: mcp_prefix.clone(),
+        qc2: qc2.clone(),
+        epoch,
+        slot,
+        view,
+    };
+    let signature = signer.sign(&sign_data)?;
+    Ok(Vote3::new(author, mcp_prefix, qc2, epoch, slot, view, signature))
+}
+
+/// Sign a Vote1 message (legacy — prefer `create_signed_vote1` for new code)
 pub fn sign_vote1(vote: &Vote1, signer: &ValidatorSigner) -> Result<BlsSignature> {
-    // Sign only the non-signature fields (including view for replay protection)
     let sign_data = Vote1SignData {
         author: vote.author,
         input_vector: vote.input_vector.clone(),
@@ -25,9 +94,8 @@ pub fn sign_vote1(vote: &Vote1, signer: &ValidatorSigner) -> Result<BlsSignature
     Ok(signature)
 }
 
-/// Sign a Vote2 message
+/// Sign a Vote2 message (legacy — prefer `create_signed_vote2` for new code)
 pub fn sign_vote2(vote: &Vote2, signer: &ValidatorSigner) -> Result<BlsSignature> {
-    // Sign only the non-signature fields (including view for replay protection)
     let sign_data = Vote2SignData {
         author: vote.author,
         certified_prefix: vote.certified_prefix.clone(),
@@ -40,9 +108,8 @@ pub fn sign_vote2(vote: &Vote2, signer: &ValidatorSigner) -> Result<BlsSignature
     Ok(signature)
 }
 
-/// Sign a Vote3 message
+/// Sign a Vote3 message (legacy — prefer `create_signed_vote3` for new code)
 pub fn sign_vote3(vote: &Vote3, signer: &ValidatorSigner) -> Result<BlsSignature> {
-    // Sign only the non-signature fields (including view for replay protection)
     let sign_data = Vote3SignData {
         author: vote.author,
         mcp_prefix: vote.mcp_prefix.clone(),

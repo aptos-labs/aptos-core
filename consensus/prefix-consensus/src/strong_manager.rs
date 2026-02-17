@@ -21,16 +21,16 @@ use crate::{
         Certificate, EmptyViewMessage, EmptyViewStatement,
         IndirectCertificate, StrongPCCommit,
     },
+    inner_pc_impl::ThreeRoundPC,
+    inner_pc_trait::InnerPCAlgorithm,
     network_interface::StrongPrefixConsensusNetworkSender,
     network_messages::{PrefixConsensusMsg, StrongPrefixConsensusMsg},
-    protocol::PrefixConsensusProtocol,
-    signing::{verify_vote1_signature, verify_vote2_signature, verify_vote3_signature},
     strong_protocol::{
         ChainBuildError, StrongPrefixConsensusProtocol, View1Decision, ViewDecision,
     },
     types::{
         CertFetchRequest, CertFetchResponse, PartyId, PrefixConsensusInput, PrefixConsensusOutput,
-        PrefixVector, ViewProposal, Vote1, Vote2, Vote3, QC3,
+        PrefixVector, ViewProposal, QC3,
     },
     view_state::{RankingManager, ViewOutput, ViewState},
 };
@@ -58,31 +58,28 @@ const VIEW_START_TIMEOUT: Duration = Duration::from_millis(300);
 // ============================================================================
 
 /// State for a per-view Prefix Consensus instance
-struct PCState {
-    /// The inner PC protocol instance
-    protocol: Arc<PrefixConsensusProtocol>,
+struct PCState<T: InnerPCAlgorithm> {
+    /// The inner PC algorithm instance
+    algorithm: T,
     /// Whether this view's PC has started (Round 1 broadcast)
     started: bool,
     /// Whether this view's PC has completed (QC3 formed)
     completed: bool,
 }
 
-impl PCState {
-    fn new(protocol: Arc<PrefixConsensusProtocol>) -> Self {
-        Self {
-            protocol,
-            started: false,
-            completed: false,
-        }
-    }
-}
-
 // ============================================================================
 // Strong Manager
 // ============================================================================
 
-/// Manager for the multi-view Strong Prefix Consensus protocol
-pub struct StrongPrefixConsensusManager<NetworkSender> {
+/// Type alias for the default Strong PC Manager using the 3-round protocol.
+pub type DefaultStrongPCManager<NS> = StrongPrefixConsensusManager<NS, ThreeRoundPC>;
+
+/// Manager for the multi-view Strong Prefix Consensus protocol.
+///
+/// Generic over the inner PC algorithm `T`, allowing different implementations
+/// (e.g., 3-round standard, 2-round good-case from Appendix D) to be swapped in
+/// without changing the view management, proposal, commit, or event loop logic.
+pub struct StrongPrefixConsensusManager<NetworkSender, T: InnerPCAlgorithm> {
     // Identity
     party_id: PartyId,
     epoch: u64,
@@ -95,7 +92,7 @@ pub struct StrongPrefixConsensusManager<NetworkSender> {
     ranking_manager: RankingManager,
     current_view: u64,
     view_states: HashMap<u64, ViewState>,
-    pc_states: HashMap<u64, PCState>,
+    pc_states: HashMap<u64, PCState<T>>,
 
     // Duplicate detection for proposals and empty-view messages
     seen_proposals: HashMap<u64, HashSet<PartyId>>,
@@ -123,8 +120,8 @@ pub struct StrongPrefixConsensusManager<NetworkSender> {
     input_vector: PrefixVector,
 }
 
-impl<NetworkSender: StrongPrefixConsensusNetworkSender>
-    StrongPrefixConsensusManager<NetworkSender>
+impl<NetworkSender: StrongPrefixConsensusNetworkSender, T: InnerPCAlgorithm<Message = PrefixConsensusMsg>>
+    StrongPrefixConsensusManager<NetworkSender, T>
 {
     /// Create a new Strong Prefix Consensus manager
     pub fn new(
@@ -258,7 +255,7 @@ impl<NetworkSender: StrongPrefixConsensusNetworkSender>
             "Starting View 1"
         );
 
-        // Create inner PC protocol for View 1
+        // Create inner PC algorithm for View 1
         let input = PrefixConsensusInput::new(
             self.input_vector.clone(),
             self.party_id,
@@ -266,28 +263,25 @@ impl<NetworkSender: StrongPrefixConsensusNetworkSender>
             self.slot,
             1, // view 1
         );
-        let pc_protocol = Arc::new(PrefixConsensusProtocol::new(
-            input,
-            self.validator_verifier.clone(),
-        ));
+        let mut algorithm = T::new_for_view(input, self.validator_verifier.clone());
+        let (outbound_msgs, output) = algorithm.start(&self.validator_signer).await?;
 
-        // Start Round 1
-        let (vote1, qc1) = pc_protocol.start_round1(&self.validator_signer).await?;
-
-        let mut pc_state = PCState::new(pc_protocol);
-        pc_state.started = true;
+        let pc_state = PCState {
+            algorithm,
+            started: true,
+            completed: false,
+        };
         self.pc_states.insert(1, pc_state);
 
-        // Broadcast Vote1 wrapped in InnerPC
-        let msg = StrongPrefixConsensusMsg::InnerPC {
-            view: 1,
-            msg: PrefixConsensusMsg::from(vote1),
-        };
-        self.network_sender.broadcast_strong_msg(msg).await;
+        // Broadcast all outbound messages (may include Vote1, Vote2, Vote3 if cascading)
+        for out_msg in outbound_msgs {
+            let msg = StrongPrefixConsensusMsg::InnerPC { view: 1, msg: out_msg };
+            self.network_sender.broadcast_strong_msg(msg).await;
+        }
 
-        // If QC1 formed during self-vote (early votes accumulated), start Round 2
-        if qc1.is_some() {
-            self.start_view_round2(1).await;
+        // If the inner PC completed during start (all rounds cascaded)
+        if let Some(pc_output) = output {
+            self.finalize_view(1, pc_output).await;
         }
 
         Ok(())
@@ -451,7 +445,7 @@ impl<NetworkSender: StrongPrefixConsensusNetworkSender>
             "Starting inner PC for View {}", view
         );
 
-        // Create inner PC protocol
+        // Create inner PC algorithm
         let input = PrefixConsensusInput::new(
             input_vector,
             self.party_id,
@@ -459,27 +453,24 @@ impl<NetworkSender: StrongPrefixConsensusNetworkSender>
             self.slot,
             view,
         );
-        let pc_protocol = Arc::new(PrefixConsensusProtocol::new(
-            input,
-            self.validator_verifier.clone(),
-        ));
+        let mut algorithm = T::new_for_view(input, self.validator_verifier.clone());
 
-        // Start Round 1
-        match pc_protocol.start_round1(&self.validator_signer).await {
-            Ok((vote1, qc1)) => {
-                let mut pc_state = PCState::new(pc_protocol);
-                pc_state.started = true;
+        match algorithm.start(&self.validator_signer).await {
+            Ok((outbound_msgs, output)) => {
+                let pc_state = PCState {
+                    algorithm,
+                    started: true,
+                    completed: false,
+                };
                 self.pc_states.insert(view, pc_state);
 
-                let msg = StrongPrefixConsensusMsg::InnerPC {
-                    view,
-                    msg: PrefixConsensusMsg::from(vote1),
-                };
-                self.network_sender.broadcast_strong_msg(msg).await;
+                for out_msg in outbound_msgs {
+                    let msg = StrongPrefixConsensusMsg::InnerPC { view, msg: out_msg };
+                    self.network_sender.broadcast_strong_msg(msg).await;
+                }
 
-                // If QC1 formed during self-vote (early votes accumulated), start Round 2
-                if qc1.is_some() {
-                    self.start_view_round2(view).await;
+                if let Some(pc_output) = output {
+                    self.finalize_view(view, pc_output).await;
                 }
             }
             Err(e) => {
@@ -708,7 +699,10 @@ impl<NetworkSender: StrongPrefixConsensusNetworkSender>
     // Inner PC Message Handling
     // ========================================================================
 
-    /// Route an inner PC message to the correct view's protocol
+    /// Route an inner PC message to the correct view's algorithm.
+    ///
+    /// The algorithm handles author mismatch checks, signature verification,
+    /// vote processing, and round transitions internally.
     async fn process_inner_pc(&mut self, author: Author, view: u64, msg: PrefixConsensusMsg) {
         let pc_state = match self.pc_states.get_mut(&view) {
             Some(state) => state,
@@ -726,129 +720,12 @@ impl<NetworkSender: StrongPrefixConsensusNetworkSender>
             return;
         }
 
-        match msg {
-            PrefixConsensusMsg::Vote1Msg(vote) => {
-                self.process_view_vote1(author, view, *vote).await;
-            }
-            PrefixConsensusMsg::Vote2Msg(vote) => {
-                self.process_view_vote2(author, view, *vote).await;
-            }
-            PrefixConsensusMsg::Vote3Msg(vote) => {
-                self.process_view_vote3(author, view, *vote).await;
-            }
-        }
-    }
-
-    async fn process_view_vote1(&mut self, author: Author, view: u64, vote: Vote1) {
-        let pc_state = match self.pc_states.get_mut(&view) {
-            Some(s) => s,
-            None => return,
-        };
-
-        // Author mismatch check
-        if vote.author != author {
-            return;
-        }
-
-        // Signature verification
-        if verify_vote1_signature(&vote, &author, &self.validator_verifier).is_err() {
-            return;
-        }
-
-        // Pass to protocol
-        match pc_state.protocol.process_vote1(vote).await {
-            Ok(Some(_qc1)) => {
-                // QC1 formed, start Round 2
-                self.start_view_round2(view).await;
-            }
-            Ok(None) => {}
-            Err(e) => {
-                warn!(
-                    party_id = %self.party_id,
-                    view = view,
-                    error = ?e,
-                    "Failed to process Vote1"
-                );
-            }
-        }
-    }
-
-    async fn start_view_round2(&mut self, view: u64) {
-        let pc_state = self
-            .pc_states
-            .get(&view)
-            .expect("PCState must exist when starting Round 2");
-
-        match pc_state.protocol.start_round2(&self.validator_signer).await {
-            Ok((vote2, qc2)) => {
-                let msg = StrongPrefixConsensusMsg::InnerPC {
-                    view,
-                    msg: PrefixConsensusMsg::from(vote2),
-                };
-                self.network_sender.broadcast_strong_msg(msg).await;
-
-                // If QC2 formed during self-vote (early votes accumulated), start Round 3
-                if qc2.is_some() {
-                    self.start_view_round3(view).await;
+        match pc_state.algorithm.process_message(author, msg, &self.validator_signer).await {
+            Ok((outbound_msgs, output)) => {
+                for out_msg in outbound_msgs {
+                    let wrapped = StrongPrefixConsensusMsg::InnerPC { view, msg: out_msg };
+                    self.network_sender.broadcast_strong_msg(wrapped).await;
                 }
-            }
-            Err(e) => {
-                warn!(
-                    party_id = %self.party_id,
-                    view = view,
-                    error = ?e,
-                    "Failed to start Round 2"
-                );
-            }
-        }
-    }
-
-    async fn process_view_vote2(&mut self, author: Author, view: u64, vote: Vote2) {
-        let pc_state = match self.pc_states.get_mut(&view) {
-            Some(s) => s,
-            None => return,
-        };
-
-        if vote.author != author {
-            return;
-        }
-
-        if verify_vote2_signature(&vote, &author, &self.validator_verifier).is_err() {
-            return;
-        }
-
-        match pc_state.protocol.process_vote2(vote).await {
-            Ok(Some(_qc2)) => {
-                self.start_view_round3(view).await;
-            }
-            Ok(None) => {}
-            Err(e) => {
-                warn!(
-                    party_id = %self.party_id,
-                    view = view,
-                    error = ?e,
-                    "Failed to process Vote2"
-                );
-            }
-        }
-    }
-
-    async fn start_view_round3(&mut self, view: u64) {
-        let pc_state = self
-            .pc_states
-            .get(&view)
-            .expect("PCState must exist when starting Round 3");
-
-        match pc_state.protocol.start_round3(&self.validator_signer).await {
-            Ok((vote3, output)) => {
-                let msg = StrongPrefixConsensusMsg::InnerPC {
-                    view,
-                    msg: PrefixConsensusMsg::from(vote3),
-                };
-                self.network_sender.broadcast_strong_msg(msg).await;
-
-                // If output formed during self-vote (early votes accumulated),
-                // handle view completion immediately
                 if let Some(pc_output) = output {
                     self.finalize_view(view, pc_output).await;
                 }
@@ -858,37 +735,7 @@ impl<NetworkSender: StrongPrefixConsensusNetworkSender>
                     party_id = %self.party_id,
                     view = view,
                     error = ?e,
-                    "Failed to start Round 3"
-                );
-            }
-        }
-    }
-
-    async fn process_view_vote3(&mut self, author: Author, view: u64, vote: Vote3) {
-        let pc_state = match self.pc_states.get_mut(&view) {
-            Some(s) => s,
-            None => return,
-        };
-
-        if vote.author != author {
-            return;
-        }
-
-        if verify_vote3_signature(&vote, &author, &self.validator_verifier).is_err() {
-            return;
-        }
-
-        match pc_state.protocol.process_vote3(vote).await {
-            Ok(Some(pc_output)) => {
-                self.finalize_view(view, pc_output).await;
-            }
-            Ok(None) => {}
-            Err(e) => {
-                warn!(
-                    party_id = %self.party_id,
-                    view = view,
-                    error = ?e,
-                    "Failed to process Vote3"
+                    "Inner PC process_message error"
                 );
             }
         }
@@ -1281,7 +1128,7 @@ mod tests {
     fn create_test_manager(
         signers: &mut Vec<ValidatorSigner>,
         verifier: Arc<ValidatorVerifier>,
-    ) -> (StrongPrefixConsensusManager<MockNetworkSender>, MockNetworkSender) {
+    ) -> (DefaultStrongPCManager<MockNetworkSender>, MockNetworkSender) {
         let party_id = signers[0].author();
         let initial_ranking: Vec<PartyId> = signers.iter().map(|s| s.author()).collect();
         let network = MockNetworkSender::new();
