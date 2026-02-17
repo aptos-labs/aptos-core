@@ -40,6 +40,14 @@ pub fn feature_flag_of_serialization_format(
         | Some(SerializationFormat::BLS12381G2Uncompressed)
         | Some(SerializationFormat::BLS12381G2Compressed)
         | Some(SerializationFormat::BLS12381Gt) => Some(FeatureFlag::BLS12_381_STRUCTURES),
+        Some(SerializationFormat::BLS12377FrLsb)
+        | Some(SerializationFormat::BLS12377FrMsb)
+        | Some(SerializationFormat::BLS12377Fq12LscLsb)
+        | Some(SerializationFormat::BLS12377G1Uncompressed)
+        | Some(SerializationFormat::BLS12377G1Compressed)
+        | Some(SerializationFormat::BLS12377G2Uncompressed)
+        | Some(SerializationFormat::BLS12377G2Compressed)
+        | Some(SerializationFormat::BLS12377Gt) => Some(FeatureFlag::BLS12_377_STRUCTURES),
         Some(SerializationFormat::BN254FrLsb)
         | Some(SerializationFormat::BN254FrMsb)
         | Some(SerializationFormat::BN254FqLsb)
@@ -169,6 +177,38 @@ pub fn serialize_internal(
                     ALGEBRA_ARK_BLS12_381_FQ12_SERIALIZE
                 ),
                 (
+                    Structure::BLS12377Fr,
+                    SerializationFormat::BLS12377FrLsb,
+                    ark_bls12_377::Fr,
+                    serialize_uncompressed,
+                    false,
+                    ALGEBRA_ARK_BLS12_381_FR_SERIALIZE
+                ),
+                (
+                    Structure::BLS12377Fr,
+                    SerializationFormat::BLS12377FrMsb,
+                    ark_bls12_377::Fr,
+                    serialize_uncompressed,
+                    true,
+                    ALGEBRA_ARK_BLS12_381_FR_SERIALIZE
+                ),
+                (
+                    Structure::BLS12377Fq12,
+                    SerializationFormat::BLS12377Fq12LscLsb,
+                    ark_bls12_377::Fq12,
+                    serialize_uncompressed,
+                    false,
+                    ALGEBRA_ARK_BLS12_381_FQ12_SERIALIZE
+                ),
+                (
+                    Structure::BLS12377Gt,
+                    SerializationFormat::BLS12377Gt,
+                    ark_bls12_377::Fq12,
+                    serialize_uncompressed,
+                    false,
+                    ALGEBRA_ARK_BLS12_381_FQ12_SERIALIZE
+                ),
+                (
                     Structure::BN254Fr,
                     SerializationFormat::BN254FrLsb,
                     ark_bn254::Fr,
@@ -246,6 +286,38 @@ pub fn serialize_internal(
                     Structure::BLS12381G2,
                     SerializationFormat::BLS12381G2Compressed,
                     ark_bls12_381::G2Projective,
+                    serialize_compressed,
+                    ALGEBRA_ARK_BLS12_381_G2_AFFINE_SERIALIZE_COMP,
+                    ALGEBRA_ARK_BLS12_381_G2_PROJ_TO_AFFINE
+                ),
+                (
+                    Structure::BLS12377G1,
+                    SerializationFormat::BLS12377G1Uncompressed,
+                    ark_bls12_377::G1Projective,
+                    serialize_uncompressed,
+                    ALGEBRA_ARK_BLS12_381_G1_AFFINE_SERIALIZE_UNCOMP,
+                    ALGEBRA_ARK_BLS12_381_G1_PROJ_TO_AFFINE
+                ),
+                (
+                    Structure::BLS12377G1,
+                    SerializationFormat::BLS12377G1Compressed,
+                    ark_bls12_377::G1Projective,
+                    serialize_compressed,
+                    ALGEBRA_ARK_BLS12_381_G1_AFFINE_SERIALIZE_COMP,
+                    ALGEBRA_ARK_BLS12_381_G1_PROJ_TO_AFFINE
+                ),
+                (
+                    Structure::BLS12377G2,
+                    SerializationFormat::BLS12377G2Uncompressed,
+                    ark_bls12_377::G2Projective,
+                    serialize_uncompressed,
+                    ALGEBRA_ARK_BLS12_381_G2_AFFINE_SERIALIZE_UNCOMP,
+                    ALGEBRA_ARK_BLS12_381_G2_PROJ_TO_AFFINE
+                ),
+                (
+                    Structure::BLS12377G2,
+                    SerializationFormat::BLS12377G2Compressed,
+                    ark_bls12_377::G2Projective,
                     serialize_compressed,
                     ALGEBRA_ARK_BLS12_381_G2_AFFINE_SERIALIZE_COMP,
                     ALGEBRA_ARK_BLS12_381_G2_PROJ_TO_AFFINE
@@ -373,6 +445,33 @@ pub fn deserialize_internal(
                 ALGEBRA_ARK_BLS12_381_FR_DESER
             )
         },
+        (Some(Structure::BLS12377Fr), Some(SerializationFormat::BLS12377FrLsb)) => {
+            if bytes.len() != 32 {
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
+            }
+            ark_deserialize_internal!(
+                context,
+                bytes,
+                ark_bls12_377::Fr,
+                deserialize_uncompressed,
+                ALGEBRA_ARK_BLS12_381_FR_DESER
+            )
+        },
+        (Some(Structure::BLS12377Fr), Some(SerializationFormat::BLS12377FrMsb)) => {
+            if bytes.len() != 32 {
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
+            }
+            let mut bytes_copy: Vec<u8> = bytes.to_vec();
+            bytes_copy.reverse();
+            let bytes = bytes_copy.as_slice();
+            ark_deserialize_internal!(
+                context,
+                bytes,
+                ark_bls12_377::Fr,
+                deserialize_uncompressed,
+                ALGEBRA_ARK_BLS12_381_FR_DESER
+            )
+        },
         (Some(Structure::BLS12381Fq12), Some(SerializationFormat::BLS12381Fq12LscLsb)) => {
             // Valid BLS12381Fq12LscLsb serialization should be 576-byte.
             if bytes.len() != 576 {
@@ -382,6 +481,18 @@ pub fn deserialize_internal(
                 context,
                 bytes,
                 ark_bls12_381::Fq12,
+                deserialize_uncompressed,
+                ALGEBRA_ARK_BLS12_381_FQ12_DESER
+            )
+        },
+        (Some(Structure::BLS12377Fq12), Some(SerializationFormat::BLS12377Fq12LscLsb)) => {
+            if bytes.len() != 576 {
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
+            }
+            ark_deserialize_internal!(
+                context,
+                bytes,
+                ark_bls12_377::Fq12,
                 deserialize_uncompressed,
                 ALGEBRA_ARK_BLS12_381_FQ12_DESER
             )
@@ -399,6 +510,18 @@ pub fn deserialize_internal(
                 ALGEBRA_ARK_BLS12_381_G1_AFFINE_DESER_UNCOMP
             )
         },
+        (Some(Structure::BLS12377G1), Some(SerializationFormat::BLS12377G1Uncompressed)) => {
+            if bytes.len() != 96 {
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
+            }
+            ark_ec_point_deserialize_internal!(
+                context,
+                bytes,
+                ark_bls12_377::G1Affine,
+                deserialize_uncompressed,
+                ALGEBRA_ARK_BLS12_381_G1_AFFINE_DESER_UNCOMP
+            )
+        },
         (Some(Structure::BLS12381G1), Some(SerializationFormat::BLS12381G1Compressed)) => {
             // Valid BLS12381G1AffineCompressed serialization should be 48-byte.
             if bytes.len() != 48 {
@@ -408,6 +531,18 @@ pub fn deserialize_internal(
                 context,
                 bytes,
                 ark_bls12_381::G1Affine,
+                deserialize_compressed,
+                ALGEBRA_ARK_BLS12_381_G1_AFFINE_DESER_COMP
+            )
+        },
+        (Some(Structure::BLS12377G1), Some(SerializationFormat::BLS12377G1Compressed)) => {
+            if bytes.len() != 48 {
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
+            }
+            ark_ec_point_deserialize_internal!(
+                context,
+                bytes,
+                ark_bls12_377::G1Affine,
                 deserialize_compressed,
                 ALGEBRA_ARK_BLS12_381_G1_AFFINE_DESER_COMP
             )
@@ -425,6 +560,18 @@ pub fn deserialize_internal(
                 ALGEBRA_ARK_BLS12_381_G2_AFFINE_DESER_UNCOMP
             )
         },
+        (Some(Structure::BLS12377G2), Some(SerializationFormat::BLS12377G2Uncompressed)) => {
+            if bytes.len() != 192 {
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
+            }
+            ark_ec_point_deserialize_internal!(
+                context,
+                bytes,
+                ark_bls12_377::G2Affine,
+                deserialize_uncompressed,
+                ALGEBRA_ARK_BLS12_381_G2_AFFINE_DESER_UNCOMP
+            )
+        },
         (Some(Structure::BLS12381G2), Some(SerializationFormat::BLS12381G2Compressed)) => {
             // Valid BLS12381G2AffineCompressed serialization should be 96-byte.
             if bytes.len() != 96 {
@@ -434,6 +581,18 @@ pub fn deserialize_internal(
                 context,
                 bytes,
                 ark_bls12_381::G2Affine,
+                deserialize_compressed,
+                ALGEBRA_ARK_BLS12_381_G2_AFFINE_DESER_COMP
+            )
+        },
+        (Some(Structure::BLS12377G2), Some(SerializationFormat::BLS12377G2Compressed)) => {
+            if bytes.len() != 96 {
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
+            }
+            ark_ec_point_deserialize_internal!(
+                context,
+                bytes,
+                ark_bls12_377::G2Affine,
                 deserialize_compressed,
                 ALGEBRA_ARK_BLS12_381_G2_AFFINE_DESER_COMP
             )
@@ -450,6 +609,26 @@ pub fn deserialize_internal(
                         ALGEBRA_ARK_BLS12_381_FQ12_POW_U256 + ALGEBRA_ARK_BLS12_381_FQ12_EQ,
                     )?;
                     if element.pow(BLS12381_R_SCALAR.0) == ark_bls12_381::Fq12::one() {
+                        let handle = store_element!(context, element)?;
+                        Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])
+                    } else {
+                        Ok(smallvec![Value::bool(false), Value::u64(0)])
+                    }
+                },
+                _ => Ok(smallvec![Value::bool(false), Value::u64(0)]),
+            }
+        },
+        (Some(Structure::BLS12377Gt), Some(SerializationFormat::BLS12377Gt)) => {
+            if bytes.len() != 576 {
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
+            }
+            context.charge(ALGEBRA_ARK_BLS12_381_FQ12_DESER)?;
+            match <ark_bls12_377::Fq12>::deserialize_uncompressed(bytes) {
+                Ok(element) => {
+                    context.charge(
+                        ALGEBRA_ARK_BLS12_381_FQ12_POW_U256 + ALGEBRA_ARK_BLS12_381_FQ12_EQ,
+                    )?;
+                    if element.pow(super::BLS12377_R_SCALAR.0) == ark_bls12_377::Fq12::one() {
                         let handle = store_element!(context, element)?;
                         Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])
                     } else {

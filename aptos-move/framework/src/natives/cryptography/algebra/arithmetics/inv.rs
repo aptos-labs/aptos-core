@@ -47,12 +47,28 @@ pub fn inv_internal(
             ark_bls12_381::Fr,
             ALGEBRA_ARK_BLS12_381_FR_INV
         ),
+        Some(Structure::BLS12377Fr) => {
+            ark_inverse_internal!(
+                context,
+                args,
+                ark_bls12_377::Fr,
+                ALGEBRA_ARK_BLS12_381_FR_INV
+            )
+        },
         Some(Structure::BLS12381Fq12) => ark_inverse_internal!(
             context,
             args,
             ark_bls12_381::Fq12,
             ALGEBRA_ARK_BLS12_381_FQ12_INV
         ),
+        Some(Structure::BLS12377Fq12) => {
+            ark_inverse_internal!(
+                context,
+                args,
+                ark_bls12_377::Fq12,
+                ALGEBRA_ARK_BLS12_381_FQ12_INV
+            )
+        },
         Some(Structure::BN254Fr) => {
             ark_inverse_internal!(context, args, ark_bn254::Fr, ALGEBRA_ARK_BN254_FR_INV)
         },
