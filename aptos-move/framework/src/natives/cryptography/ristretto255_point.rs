@@ -165,8 +165,24 @@ impl PointStore {
             },
         };
 
-        let (left, right) = self.points.split_at_mut(a + 1);
-        let (a_ref, b_ref) = (&mut left[a], &mut right[b - (a + 1)]);
+        let (left, right) = self.points.split_at_mut_checked(a + 1).ok_or_else(|| {
+            SafeNativeError::abort_with_message(
+                E_INVALID_POINT_HANDLE,
+                "Invalid Ristretto point handle: split index out of bounds",
+            )
+        })?;
+        let a_ref = left.get_mut(a).ok_or_else(|| {
+            SafeNativeError::abort_with_message(
+                E_INVALID_POINT_HANDLE,
+                "Invalid Ristretto point handle: first handle out of bounds",
+            )
+        })?;
+        let b_ref = right.get_mut(b - (a + 1)).ok_or_else(|| {
+            SafeNativeError::abort_with_message(
+                E_INVALID_POINT_HANDLE,
+                "Invalid Ristretto point handle: second handle out of bounds",
+            )
+        })?;
 
         if sw {
             Ok((b_ref, a_ref))
