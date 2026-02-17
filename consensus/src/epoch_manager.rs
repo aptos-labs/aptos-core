@@ -2092,16 +2092,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             std::sync::Arc::new(private_key),
         );
 
-        // Create protocol
-        let protocol = std::sync::Arc::new(
-            aptos_prefix_consensus::PrefixConsensusProtocol::new(input.clone(), validators.clone())
-        );
-
         // Create manager
-        let manager = aptos_prefix_consensus::PrefixConsensusManager::new(
-            input.party_id,
+        let party_id = input.party_id;
+        let manager = aptos_prefix_consensus::DefaultPCManager::new(
+            party_id,
             input.epoch,
-            protocol,
+            input,
             network_sender,
             validator_signer,
             validators,
@@ -2119,7 +2115,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         info!(
             epoch = self.epoch(),
-            party_id = %input.party_id,
+            party_id = %party_id,
             "Prefix consensus manager spawned"
         );
 

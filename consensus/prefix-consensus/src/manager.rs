@@ -7,80 +7,77 @@
 //! Prefix Consensus Manager
 //!
 //! This module provides the event-driven manager that orchestrates the Prefix Consensus
-//! protocol lifecycle. It handles incoming network messages, verifies signatures,
-//! progresses through protocol rounds, and triggers vote broadcasts.
+//! protocol lifecycle. It delegates vote processing, signature verification, and round
+//! cascading to the [`InnerPCAlgorithm`] trait implementation.
 
 use crate::{
+    inner_pc_impl::ThreeRoundPC,
+    inner_pc_trait::InnerPCAlgorithm,
     network_interface::PrefixConsensusNetworkSender,
     network_messages::PrefixConsensusMsg,
-    protocol::PrefixConsensusProtocol,
-    signing::{verify_vote1_signature, verify_vote2_signature, verify_vote3_signature},
-    types::{PartyId, PrefixConsensusOutput, Vote1, Vote2, Vote3},
+    types::{PartyId, PrefixConsensusInput, PrefixConsensusOutput, PrefixVector},
 };
 use anyhow::Result;
 use aptos_consensus_types::common::Author;
 use aptos_logger::prelude::*;
 use aptos_types::{validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier};
 use futures::{FutureExt, StreamExt};
-use std::{
-    collections::HashSet,
-    sync::Arc,
-};
-use tokio::sync::RwLock;
+use std::sync::Arc;
+
+/// Type alias for the default basic PC Manager using the 3-round protocol.
+pub type DefaultPCManager<NS> = PrefixConsensusManager<NS, ThreeRoundPC>;
 
 /// Manager for Prefix Consensus protocol execution
 ///
-/// Orchestrates the protocol lifecycle: receives network messages, verifies signatures,
-/// passes votes to the protocol, and broadcasts new votes as rounds progress.
-pub struct PrefixConsensusManager<NetworkSender> {
+/// Orchestrates the protocol lifecycle: receives network messages, delegates
+/// vote processing to the inner algorithm, and broadcasts outbound messages.
+/// Generic over the inner PC algorithm `T`, allowing different implementations
+/// to be swapped in without changing the event loop or output handling logic.
+pub struct PrefixConsensusManager<NetworkSender, T: InnerPCAlgorithm> {
     /// This party's ID
     party_id: PartyId,
 
     /// Current epoch
     epoch: u64,
 
-    /// The underlying protocol state machine
-    protocol: Arc<PrefixConsensusProtocol>,
+    /// The inner PC algorithm instance
+    algorithm: T,
 
     /// Network sender for broadcasting votes
     network_sender: NetworkSender,
 
-    /// Validator signer for signature verification
+    /// Validator signer for signing
     validator_signer: ValidatorSigner,
 
-    /// Validator verifier for signature checking
-    validator_verifier: Arc<ValidatorVerifier>,
+    /// Stored output when protocol completes
+    output: Option<PrefixConsensusOutput>,
 
-    /// Track seen Vote1 messages to prevent duplicates
-    seen_vote1: Arc<RwLock<HashSet<PartyId>>>,
-
-    /// Track seen Vote2 messages to prevent duplicates
-    seen_vote2: Arc<RwLock<HashSet<PartyId>>>,
-
-    /// Track seen Vote3 messages to prevent duplicates
-    seen_vote3: Arc<RwLock<HashSet<PartyId>>>,
+    /// Input vector (stored for write_output_file)
+    input_vector: PrefixVector,
 }
 
-impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<NetworkSender> {
+impl<NetworkSender: PrefixConsensusNetworkSender, T: InnerPCAlgorithm<Message = PrefixConsensusMsg>>
+    PrefixConsensusManager<NetworkSender, T>
+{
     /// Create a new Prefix Consensus manager
     pub fn new(
         party_id: PartyId,
         epoch: u64,
-        protocol: Arc<PrefixConsensusProtocol>,
+        input: PrefixConsensusInput,
         network_sender: NetworkSender,
         validator_signer: ValidatorSigner,
         validator_verifier: Arc<ValidatorVerifier>,
     ) -> Self {
+        let input_vector = input.input_vector.clone();
+        let algorithm = T::new_for_view(input, validator_verifier);
         Self {
             party_id,
             epoch,
-            protocol,
+            algorithm,
             network_sender,
             validator_signer,
-            validator_verifier,
-            seen_vote1: Arc::new(RwLock::new(HashSet::new())),
-            seen_vote2: Arc::new(RwLock::new(HashSet::new())),
-            seen_vote3: Arc::new(RwLock::new(HashSet::new())),
+            output: None,
+            input_vector,
         }
     }
 
@@ -93,8 +90,6 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
         info!(
             party_id = %self.party_id,
             epoch = self.epoch,
-            validator_count = self.validator_verifier.len(),
-            total_stake = self.validator_verifier.total_voting_power(),
             "Initializing Prefix Consensus"
         );
 
@@ -109,7 +104,7 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
     ///
     /// This follows the RoundManager pattern from AptosBFT consensus.
     pub async fn run(
-        self,
+        mut self,
         mut message_rx: aptos_channels::UnboundedReceiver<(Author, PrefixConsensusMsg)>,
         close_rx: futures::channel::oneshot::Receiver<futures::channel::oneshot::Sender<()>>,
     ) {
@@ -119,36 +114,36 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
             "PrefixConsensusManager event loop started"
         );
 
-        // Broadcast Vote1 FIRST before entering message loop
-        // This ensures the receiver is ready before our own Vote1 arrives via self-send
-        match self.protocol.start_round1(&self.validator_signer).await {
-            Ok((vote1, qc1)) => {
-                info!(
-                    party_id = %self.party_id,
-                    vote_author = %vote1.author,
-                    input_len = vote1.input_vector.len(),
-                    "Broadcasting Vote1"
-                );
-                self.network_sender.broadcast_vote1(vote1).await;
-                if qc1.is_some() {
-                    if let Err(e) = self.start_round2().await {
-                        error!(party_id = %self.party_id, error = ?e, "Failed to start Round 2 after early QC1");
-                    }
+        // Start protocol: broadcasts Vote1 and cascades if early QCs form
+        match self.algorithm.start(&self.validator_signer).await {
+            Ok((msgs, output)) => {
+                self.broadcast_messages(msgs).await;
+                if let Some(out) = output {
+                    self.handle_output(out);
                 }
-            }
+            },
             Err(e) => {
                 error!(
                     party_id = %self.party_id,
                     error = ?e,
-                    "Failed to start Round 1"
+                    "Failed to start protocol"
                 );
                 return;
-            }
+            },
         }
 
         let mut close_rx = close_rx.into_stream();
 
         loop {
+            // Check if protocol completed during start
+            if self.output.is_some() {
+                info!(
+                    party_id = %self.party_id,
+                    "Prefix Consensus protocol complete"
+                );
+                break;
+            }
+
             tokio::select! {
                 biased;
 
@@ -175,7 +170,7 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
                     }
 
                     // Check if protocol is complete
-                    if self.is_complete().await {
+                    if self.output.is_some() {
                         info!(
                             party_id = %self.party_id,
                             "Prefix Consensus protocol complete"
@@ -194,9 +189,9 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
 
     /// Process an incoming network message
     ///
-    /// Routes the message to the appropriate handler based on its type.
-    /// Invalid messages (wrong epoch, duplicate, bad signature) are logged and ignored.
-    pub async fn process_message(&self, author: Author, msg: PrefixConsensusMsg) -> Result<()> {
+    /// Delegates to the inner algorithm for vote processing, signature verification,
+    /// and round cascading. Invalid messages (wrong epoch) are logged and ignored.
+    async fn process_message(&mut self, author: Author, msg: PrefixConsensusMsg) -> Result<()> {
         // Check epoch first
         if msg.epoch() != self.epoch {
             warn!(
@@ -209,319 +204,66 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
             return Ok(());
         }
 
-        match msg {
-            PrefixConsensusMsg::Vote1Msg(vote) => {
-                self.process_vote1(author, *vote).await
-            },
-            PrefixConsensusMsg::Vote2Msg(vote) => {
-                self.process_vote2(author, *vote).await
-            },
-            PrefixConsensusMsg::Vote3Msg(vote) => {
-                self.process_vote3(author, *vote).await
-            },
-        }
-    }
-
-    /// Process a Vote1 message
-    async fn process_vote1(&self, author: Author, vote: Vote1) -> Result<()> {
-        debug!(
-            party_id = %self.party_id,
-            vote_author = %vote.author,
-            input_len = vote.input_vector.len(),
-            "Processing Vote1"
-        );
-
-        // Check that claimed author matches network sender
-        if vote.author != author {
-            warn!(
-                party_id = %self.party_id,
-                claimed_author = %vote.author,
-                actual_sender = %author,
-                "Vote1 author mismatch - rejecting potential impersonation attack"
-            );
-            return Ok(());
-        }
-
-        // Check for duplicate
-        {
-            let mut seen = self.seen_vote1.write().await;
-            if seen.contains(&vote.author) {
-                debug!(
-                    party_id = %self.party_id,
-                    vote_author = %vote.author,
-                    "Ignoring duplicate Vote1"
-                );
-                return Ok(());
-            }
-            seen.insert(vote.author);
-        }
-
-        // Verify signature
-        if let Err(e) = verify_vote1_signature(&vote, &author, &self.validator_verifier) {
-            warn!(
-                party_id = %self.party_id,
-                vote_author = %vote.author,
-                error = ?e,
-                "Vote1 signature verification failed"
-            );
-            return Ok(());
-        }
-
-        // Pass to protocol
-        match self.protocol.process_vote1(vote).await {
-            Ok(Some(qc1)) => {
-                info!(
-                    party_id = %self.party_id,
-                    qc_size = qc1.votes.len(),
-                    "QC1 formed, starting Round 2"
-                );
-                self.start_round2().await?;
-            },
-            Ok(None) => {
-                // Vote processed, but QC not yet formed
-                debug!(
-                    party_id = %self.party_id,
-                    "Vote1 processed, waiting for more votes"
-                );
-            },
-            Err(e) => {
-                warn!(
-                    party_id = %self.party_id,
-                    error = ?e,
-                    "Failed to process Vote1"
-                );
-            },
-        }
-
-        Ok(())
-    }
-
-    /// Start Round 2 after QC1 formation
-    async fn start_round2(&self) -> Result<()> {
-        info!(
-            party_id = %self.party_id,
-            "Starting Round 2"
-        );
-
-        // Protocol creates Vote2 (QC1 is already stored in protocol)
-        let (vote2, qc2) = self.protocol.start_round2(&self.validator_signer).await?;
-
-        info!(
-            party_id = %self.party_id,
-            vote_author = %vote2.author,
-            certified_prefix_len = vote2.certified_prefix.len(),
-            "Broadcasting Vote2"
-        );
-
-        // Broadcast our Vote2
-        self.network_sender.broadcast_vote2(vote2).await;
-
-        // If QC2 formed during self-vote processing (early votes accumulated),
-        // immediately start Round 3
-        if qc2.is_some() {
-            self.start_round3().await?;
-        }
-
-        Ok(())
-    }
-
-    /// Process a Vote2 message
-    async fn process_vote2(&self, author: Author, vote: Vote2) -> Result<()> {
-        debug!(
-            party_id = %self.party_id,
-            vote_author = %vote.author,
-            certified_prefix_len = vote.certified_prefix.len(),
-            "Processing Vote2"
-        );
-
-        // Check for duplicate
-        {
-            let mut seen = self.seen_vote2.write().await;
-            if seen.contains(&vote.author) {
-                debug!(
-                    party_id = %self.party_id,
-                    vote_author = %vote.author,
-                    "Ignoring duplicate Vote2"
-                );
-                return Ok(());
-            }
-            seen.insert(vote.author);
-        }
-
-        // Check that claimed author matches network sender
-        if vote.author != author {
-            warn!(
-                party_id = %self.party_id,
-                claimed_author = %vote.author,
-                actual_sender = %author,
-                "Vote2 author mismatch - rejecting potential impersonation attack"
-            );
-            return Ok(());
-        }
-
-        // Verify signature
-        if let Err(e) = verify_vote2_signature(&vote, &author, &self.validator_verifier) {
-            warn!(
-                party_id = %self.party_id,
-                vote_author = %vote.author,
-                error = ?e,
-                "Vote2 signature verification failed"
-            );
-            return Ok(());
-        }
-
-        // Pass to protocol
-        match self.protocol.process_vote2(vote).await {
-            Ok(Some(qc2)) => {
-                info!(
-                    party_id = %self.party_id,
-                    qc_size = qc2.votes.len(),
-                    "QC2 formed, starting Round 3"
-                );
-                self.start_round3().await?;
-            },
-            Ok(None) => {
-                debug!(
-                    party_id = %self.party_id,
-                    "Vote2 processed, waiting for more votes"
-                );
-            },
-            Err(e) => {
-                warn!(
-                    party_id = %self.party_id,
-                    error = ?e,
-                    "Failed to process Vote2"
-                );
-            },
-        }
-
-        Ok(())
-    }
-
-    /// Start Round 3 after QC2 formation
-    async fn start_round3(&self) -> Result<()> {
-        info!(
-            party_id = %self.party_id,
-            "Starting Round 3"
-        );
-
-        // Protocol creates Vote3 (QC2 is already stored in protocol)
-        let (vote3, output) = self.protocol.start_round3(&self.validator_signer).await?;
-
-        info!(
-            party_id = %self.party_id,
-            vote_author = %vote3.author,
-            mcp_prefix_len = vote3.mcp_prefix.len(),
-            "Broadcasting Vote3"
-        );
-
-        // Broadcast our Vote3
-        self.network_sender.broadcast_vote3(vote3).await;
-
-        // If output formed during self-vote processing (early votes accumulated),
-        // protocol is already complete — output file will be written on next loop check
-        if output.is_some() {
-            info!(
-                party_id = %self.party_id,
-                "QC3 formed during Round 3 start (early votes)"
-            );
-        }
-
-        Ok(())
-    }
-
-    /// Process a Vote3 message
-    async fn process_vote3(&self, author: Author, vote: Vote3) -> Result<()> {
-        debug!(
-            party_id = %self.party_id,
-            vote_author = %vote.author,
-            mcp_prefix_len = vote.mcp_prefix.len(),
-            "Processing Vote3"
-        );
-
-        // Check for duplicate
-        {
-            let mut seen = self.seen_vote3.write().await;
-            if seen.contains(&vote.author) {
-                debug!(
-                    party_id = %self.party_id,
-                    vote_author = %vote.author,
-                    "Ignoring duplicate Vote3"
-                );
-                return Ok(());
-            }
-            seen.insert(vote.author);
-        }
-
-        // Check that claimed author matches network sender
-        if vote.author != author {
-            warn!(
-                party_id = %self.party_id,
-                claimed_author = %vote.author,
-                actual_sender = %author,
-                "Vote3 author mismatch - rejecting potential impersonation attack"
-            );
-            return Ok(());
-        }
-
-        // Verify signature
-        if let Err(e) = verify_vote3_signature(&vote, &author, &self.validator_verifier) {
-            warn!(
-                party_id = %self.party_id,
-                vote_author = %vote.author,
-                error = ?e,
-                "Vote3 signature verification failed"
-            );
-            return Ok(());
-        }
-
-        // Pass to protocol
-        match self.protocol.process_vote3(vote).await {
-            Ok(Some(_qc3)) => {
-                info!(
-                    party_id = %self.party_id,
-                    "QC3 formed, Prefix Consensus complete"
-                );
-
-                // Write output to file for smoke test validation
-                if let Err(e) = self.write_output_file().await {
-                    warn!(
-                        party_id = %self.party_id,
-                        error = ?e,
-                        "Failed to write output file"
-                    );
+        match self.algorithm.process_message(author, msg, &self.validator_signer).await {
+            Ok((msgs, output)) => {
+                self.broadcast_messages(msgs).await;
+                if let Some(out) = output {
+                    self.handle_output(out);
                 }
             },
-            Ok(None) => {
-                debug!(
-                    party_id = %self.party_id,
-                    "Vote3 processed, waiting for more votes"
-                );
-            },
             Err(e) => {
                 warn!(
                     party_id = %self.party_id,
                     error = ?e,
-                    "Failed to process Vote3"
+                    "Failed to process message"
                 );
             },
         }
 
         Ok(())
+    }
+
+    /// Dispatch returned messages to the correct broadcast method.
+    async fn broadcast_messages(&self, messages: Vec<PrefixConsensusMsg>) {
+        for msg in messages {
+            match msg {
+                PrefixConsensusMsg::Vote1Msg(v) => self.network_sender.broadcast_vote1(*v).await,
+                PrefixConsensusMsg::Vote2Msg(v) => self.network_sender.broadcast_vote2(*v).await,
+                PrefixConsensusMsg::Vote3Msg(v) => self.network_sender.broadcast_vote3(*v).await,
+            }
+        }
+    }
+
+    /// Handle protocol completion output.
+    fn handle_output(&mut self, output: PrefixConsensusOutput) {
+        info!(
+            party_id = %self.party_id,
+            v_low_len = output.v_low.len(),
+            v_high_len = output.v_high.len(),
+            "Prefix Consensus complete"
+        );
+        self.output = Some(output);
+        if let Err(e) = self.write_output_file() {
+            warn!(
+                party_id = %self.party_id,
+                error = ?e,
+                "Failed to write output file"
+            );
+        }
     }
 
     /// Check if the protocol has completed
-    pub async fn is_complete(&self) -> bool {
-        self.protocol.is_complete().await
+    pub fn is_complete(&self) -> bool {
+        self.output.is_some()
     }
 
     /// Get the protocol output if complete
-    pub async fn get_output(&self) -> Option<PrefixConsensusOutput> {
-        self.protocol.get_output().await
+    pub fn get_output(&self) -> Option<&PrefixConsensusOutput> {
+        self.output.as_ref()
     }
 
     /// Write output to file for smoke test validation
-    async fn write_output_file(&self) -> anyhow::Result<()> {
+    fn write_output_file(&self) -> anyhow::Result<()> {
         use serde::{Serialize, Deserialize};
 
         #[derive(Serialize, Deserialize)]
@@ -533,15 +275,13 @@ impl<NetworkSender: PrefixConsensusNetworkSender> PrefixConsensusManager<Network
             v_high: Vec<String>,
         }
 
-        let output = self.get_output().await
+        let output = self.output.as_ref()
             .ok_or_else(|| anyhow::anyhow!("Protocol not complete"))?;
-
-        let input_vector = self.protocol.get_input_vector();
 
         let output_file = OutputFile {
             party_id: format!("{:x}", self.party_id),
             epoch: self.epoch,
-            input: input_vector.iter().map(|h| h.to_hex()).collect(),
+            input: self.input_vector.iter().map(|h| h.to_hex()).collect(),
             v_low: output.v_low.iter().map(|h| h.to_hex()).collect(),
             v_high: output.v_high.iter().map(|h| h.to_hex()).collect(),
         };
@@ -576,7 +316,7 @@ mod tests {
     use super::*;
     use crate::{
         network_interface::PrefixConsensusNetworkSender,
-        types::PrefixConsensusInput,
+        types::{PrefixConsensusInput, Vote1, Vote2, Vote3},
     };
     use aptos_crypto::HashValue;
     use aptos_types::{
@@ -628,13 +368,12 @@ mod tests {
             1,                         // view (default for standalone)
         );
 
-        let protocol = Arc::new(PrefixConsensusProtocol::new(input, verifier.clone()));
         let network_sender = MockNetworkSender;
 
-        let manager = PrefixConsensusManager::new(
+        let manager = DefaultPCManager::new(
             party_id,
             1, // epoch
-            protocol,
+            input,
             network_sender,
             signers.remove(0),
             verifier,
@@ -642,53 +381,7 @@ mod tests {
 
         assert_eq!(manager.party_id(), party_id);
         assert_eq!(manager.epoch(), 1);
-        assert!(!manager.is_complete().await);
-    }
-
-    #[tokio::test]
-    async fn test_duplicate_vote_rejection() {
-        let (mut signers, verifier) = create_test_validators(4);
-        let party_id = signers[0].author();
-
-        let input = PrefixConsensusInput::new(
-            vec![HashValue::random()], // input_vector
-            party_id,                  // party_id
-            1,                         // epoch
-            0,                         // slot (default for standalone)
-            1,                         // view (default for standalone)
-        );
-
-        let protocol = Arc::new(PrefixConsensusProtocol::new(input, verifier.clone()));
-        let network_sender = MockNetworkSender;
-
-        let manager = PrefixConsensusManager::new(
-            party_id,
-            1, // epoch
-            protocol,
-            network_sender,
-            signers.remove(0),
-            verifier,
-        );
-
-        // Create a duplicate vote (same author twice)
-        let vote = Vote1::new(
-            signers[1].author(),
-            vec![HashValue::random()],
-            1,
-            0,
-            1, // view (default for standalone)
-            aptos_crypto::bls12381::Signature::dummy_signature(),
-        );
-
-        // First should succeed
-        manager.process_vote1(signers[1].author(), vote.clone()).await.unwrap();
-
-        // Second should be ignored (duplicate check)
-        let seen_before = manager.seen_vote1.read().await.len();
-        manager.process_vote1(signers[1].author(), vote.clone()).await.unwrap();
-        let seen_after = manager.seen_vote1.read().await.len();
-
-        assert_eq!(seen_before, seen_after); // Duplicate was ignored
+        assert!(!manager.is_complete());
     }
 
     #[tokio::test]
@@ -704,13 +397,12 @@ mod tests {
             1,                         // view (default for standalone)
         );
 
-        let protocol = Arc::new(PrefixConsensusProtocol::new(input, verifier.clone()));
         let network_sender = MockNetworkSender;
 
-        let manager = PrefixConsensusManager::new(
+        let mut manager = DefaultPCManager::new(
             party_id,
             1, // epoch (manager in epoch 1)
-            protocol,
+            input,
             network_sender,
             signers.remove(0),
             verifier,
@@ -731,7 +423,7 @@ mod tests {
         // Should be rejected due to epoch mismatch
         manager.process_message(signers[1].author(), msg).await.unwrap();
 
-        // Verify vote was not added to seen set
-        assert!(manager.seen_vote1.read().await.is_empty());
+        // Verify protocol did not complete
+        assert!(!manager.is_complete());
     }
 }

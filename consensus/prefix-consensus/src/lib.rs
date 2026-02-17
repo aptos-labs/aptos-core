@@ -53,7 +53,7 @@ mod verification;
 pub mod view_state;
 
 pub use certify::{qc1_certify, qc2_certify, qc3_certify};
-pub use manager::PrefixConsensusManager;
+pub use manager::{DefaultPCManager, PrefixConsensusManager};
 pub use network_interface::{
     NetworkSenderAdapter, PrefixConsensusNetworkClient, PrefixConsensusNetworkSender,
     StrongNetworkSenderAdapter, StrongPrefixConsensusNetworkClient,
