@@ -16,9 +16,17 @@ pub struct InternalIndexerDBConfig {
     pub event_v2_translation_ignores_below_version: u64,
     pub enable_statekeys: bool,
     pub batch_size: usize,
+    /// Number of worker threads for the internal indexer DB runtime.
+    /// Defaults to 2 if not specified.
+    #[serde(default = "InternalIndexerDBConfig::default_runtime_threads")]
+    pub runtime_threads: Option<usize>,
 }
 
 impl InternalIndexerDBConfig {
+    fn default_runtime_threads() -> Option<usize> {
+        Some(2)
+    }
+
     pub fn new(
         enable_transaction: bool,
         enable_event: bool,
@@ -34,6 +42,7 @@ impl InternalIndexerDBConfig {
             event_v2_translation_ignores_below_version,
             enable_statekeys,
             batch_size,
+            runtime_threads: Self::default_runtime_threads(),
         }
     }
 
@@ -75,6 +84,7 @@ impl Default for InternalIndexerDBConfig {
             event_v2_translation_ignores_below_version: 0,
             enable_statekeys: false,
             batch_size: 10_000,
+            runtime_threads: Self::default_runtime_threads(),
         }
     }
 }

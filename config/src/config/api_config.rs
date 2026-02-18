@@ -134,7 +134,7 @@ impl Default for ApiConfig {
             max_account_modules_page_size: DEFAULT_MAX_ACCOUNT_MODULES_PAGE_SIZE,
             max_gas_view_function: DEFAULT_MAX_VIEW_GAS,
             max_runtime_workers: None,
-            runtime_worker_multiplier: 2,
+            runtime_worker_multiplier: 1,
             gas_estimation: GasEstimationConfig::default(),
             periodic_gas_estimation_ms: Some(30_000),
             view_filter: ViewFilter::default(),
